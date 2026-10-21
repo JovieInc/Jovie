@@ -285,6 +285,14 @@ test('subscription transport routes codex with -i images and claude with Read on
     };
   };
   const transport = subscriptionVisionTransport({
+    env: {
+      PATH: 'preserved-test-path',
+      ANTHROPIC_API_KEY: 'unused-test-key',
+      ANTHROPIC_AUTH_TOKEN: 'unused-test-token',
+      OPENAI_API_KEY: 'unused-test-key',
+      AI_GATEWAY_API_KEY: 'unused-test-key',
+      CODEX_API_KEY: 'unused-test-key',
+    },
     spawnImpl: /** @type {typeof import('node:child_process').spawnSync} */ (
       spawnImpl
     ),
@@ -304,7 +312,16 @@ test('subscription transport routes codex with -i images and claude with Read on
     'codex must attach every image with -i'
   );
   assert.ok(codex.args.includes('--skip-git-repo-check'));
-  assert.equal(codex.options.env.AI_GATEWAY_API_KEY, undefined);
+  assert.equal(codex.options.env.PATH, 'preserved-test-path');
+  for (const key of [
+    'AI_GATEWAY_API_KEY',
+    'ANTHROPIC_API_KEY',
+    'ANTHROPIC_AUTH_TOKEN',
+    'OPENAI_API_KEY',
+    'CODEX_API_KEY',
+  ]) {
+    assert.equal(codex.options.env[key], undefined);
+  }
 
   await transport({
     model: 'anthropic/claude-opus-5.5',
@@ -314,6 +331,8 @@ test('subscription transport routes codex with -i images and claude with Read on
   });
   const claude = spawned.at(-1);
   assert.equal(claude.bin, 'claude');
+  assert.equal(claude.options.env.ANTHROPIC_API_KEY, undefined);
+  assert.equal(claude.options.env.ANTHROPIC_AUTH_TOKEN, undefined);
   assert.ok(claude.args.includes('claude-opus-5-5'));
   assert.ok(claude.args.includes('Read'));
   assert.match(claude.options.input, /\/a\.png/);

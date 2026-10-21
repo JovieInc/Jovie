@@ -105,7 +105,7 @@ export const MARKETING_ROLE_MODEL_CANDIDATES: Readonly<
   ],
   'layout-chooser': [
     {
-      id: 'anthropic/claude-sonnet-5',
+      id: 'anthropic/claude-sonnet-5.5',
       family: 'anthropic',
       channel: 'subscription',
       pool: 'claude-code',
@@ -229,7 +229,7 @@ export const MARKETING_ROLE_MODEL_CANDIDATES: Readonly<
   ],
   'vision-judge': [
     {
-      id: 'anthropic/claude-sonnet-5',
+      id: 'anthropic/claude-sonnet-5.5',
       family: 'anthropic',
       channel: 'subscription',
       pool: 'claude-code',

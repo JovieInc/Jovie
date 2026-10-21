@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   bugFingerprint,
+  defaultVisionProviders,
   listScreenshotEvents,
   loadLedger,
   processScreenshot,
@@ -235,4 +236,86 @@ test('watch dirs default to ~/Desktop and honor SCREENSHOT_WATCH_DIRS', () => {
     watchDirs({ SCREENSHOT_WATCH_DIRS: '~/Desktop,~/Pictures' }, '/home/tim'),
     ['/home/tim/Desktop', '/home/tim/Pictures']
   );
+});
+
+test('default vision route uses subscriptions even when legacy metered keys are configured', async () => {
+  const dir = fixtureDir();
+  try {
+    const shot = writeShot(dir, 'shot.png');
+    const calls = [];
+    const providers = defaultVisionProviders(
+      {
+        ANTHROPIC_API_KEY: 'unused-test-key',
+        AI_GATEWAY_API_KEY: 'unused-test-key',
+      },
+      async request => {
+        calls.push(request);
+        return JSON.stringify({ surface: 'personal', product: null });
+      }
+    );
+    const [entry] = listScreenshotEvents(dir);
+    const intakeCalls = [];
+    const receipt = await processScreenshot(
+      deps({
+        entry,
+        ledgerPath: join(dir, 'events.jsonl'),
+        providers,
+        intake: fakeIntake(intakeCalls),
+      })
+    );
+    assert.equal(receipt.status, 'ignored-personal');
+    assert.equal(intakeCalls.length, 0);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].model, 'anthropic/claude-sonnet-5.5');
+    assert.deepEqual(calls[0].images, [shot]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('subscription vision fallback preserves bug analysis without a metered provider', async () => {
+  const dir = fixtureDir();
+  try {
+    writeShot(dir, 'shot.png');
+    const [entry] = listScreenshotEvents(dir);
+    const models = [];
+    const providers = defaultVisionProviders({}, async request => {
+      models.push(request.model);
+      if (request.model.startsWith('anthropic/'))
+        throw new Error('subscription unavailable');
+      return JSON.stringify(
+        request.prompt.includes('classify')
+          ? {
+              surface: 'jovie-product',
+              product: 'jovie',
+              summary: 'release page',
+            }
+          : {
+              title: 'Repair clipped play control',
+              symptoms: 'clipped',
+              repro: 'open release',
+              severity: 'P2',
+            }
+      );
+    });
+    const intakeCalls = [];
+    const receipt = await processScreenshot(
+      deps({
+        entry,
+        ledgerPath: join(dir, 'events.jsonl'),
+        providers,
+        intake: fakeIntake(intakeCalls),
+      })
+    );
+    assert.equal(receipt.status, 'filed');
+    assert.equal(intakeCalls.length, 1);
+    assert.deepEqual(models, [
+      'anthropic/claude-sonnet-5.5',
+      'openai/gpt-5.6-luna',
+      'anthropic/claude-sonnet-5.5',
+      'openai/gpt-5.6-luna',
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -7,8 +7,10 @@ prompts:
 providers:
   - id: echo
     label: golden-mock
-  - id: openai:gpt-4o-mini
+  - id: vercel:zai/glm-5.3-flash
     label: judge-grader
+    config:
+      apiKeyEnvar: AI_GATEWAY_API_KEY
 
 defaultTest:
   options:

@@ -22,7 +22,7 @@ export type CopyTier = (typeof COPY_TIERS)[number];
  */
 export const JUDGE_ROSTER: Readonly<Record<CopyTier, readonly string[]>> = {
   flagship: ['anthropic/claude-opus-5.5', 'openai/gpt-5.5', 'zai/glm-5.3'],
-  standard: ['zai/glm-5.3-flash', 'anthropic/claude-sonnet-5'],
+  standard: ['zai/glm-5.3-flash', 'anthropic/claude-sonnet-5.5'],
   volume: [],
 };
 

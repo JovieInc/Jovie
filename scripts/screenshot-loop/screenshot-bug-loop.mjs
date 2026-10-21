@@ -20,10 +20,10 @@
  *                filed/deduped product issue or a silent personal receipt
  *                is not "verified".
  *
- * Vision routing (JOV-15868 follow-on): an ordered provider route — primary
- * Anthropic aux model, fallback Vercel AI Gateway. When every provider is
- * unavailable or rate-limited the loop fails closed with a receipt and leaves
- * the event unprocessed so the next sweep retries.
+ * Vision routing (JOV-8702): Claude Code subscription, then Codex subscription.
+ * Reuses the art evaluator's subscription transport; no metered API route.
+ * When every provider is unavailable the loop fails closed with a receipt and
+ * leaves the event unprocessed so the next sweep retries.
  *
  * Usage:
  *   node scripts/screenshot-loop/screenshot-bug-loop.mjs --once
@@ -34,10 +34,6 @@
  *   SCREENSHOT_WATCH_DIRS    — colon/comma separated dirs (default ~/Desktop)
  *   SCREENSHOT_LOOP_STATE_DIR— ledger dir (default ~/.jovie/screenshot-loop)
  *   SCREENSHOT_LOOP_DISABLED — "1" halts intake without filing
- *   ANTHROPIC_API_KEY        — enables the primary vision provider
- *   AUX_VISION_MODEL         — primary model id (default claude-haiku-4-5)
- *   AI_GATEWAY_API_KEY       — enables the Vercel AI Gateway fallback
- *   GATEWAY_VISION_MODEL     — fallback model id (default openai/gpt-5-mini)
  */
 
 import { createHash } from 'node:crypto';
@@ -54,6 +50,7 @@ import { basename, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { upsertLinearIssueByTitleFingerprint } from '../lib/linear-issue-intake.mjs';
 import { AGENT_READY_LABEL } from '../lib/remediation-signal.mjs';
+import { subscriptionVisionTransport } from '../vision/art-evaluator.mjs';
 
 export const SCREENSHOT_LOOP_SCHEMA = 'jovie.screenshot-bug-loop/v1';
 export const IMAGE_EXTENSIONS = new Set([
@@ -167,18 +164,6 @@ Answer ONLY with minified JSON:
 {"title":"imperative bug title <= 80 chars","symptoms":"what looks broken","repro":"likely reproduction path","severity":"P0"|"P1"|"P2"}
 Do not include personal information visible in the capture.`;
 
-function imageContent(path) {
-  const buffer = readFileSync(path);
-  const mediaType =
-    {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.webp': 'image/webp',
-      '.gif': 'image/gif',
-    }[extname(path).toLowerCase()] ?? 'image/png';
-  return { buffer, base64: buffer.toString('base64'), mediaType };
-}
-
 function parseJsonObject(text) {
   const match = String(text ?? '').match(/\{[\s\S]*\}/);
   if (!match) return null;
@@ -189,104 +174,29 @@ function parseJsonObject(text) {
   }
 }
 
-/** Primary: Anthropic aux vision model. Requires ANTHROPIC_API_KEY. */
-export function anthropicProvider(env = process.env) {
-  return {
-    name: 'anthropic-aux',
-    available: () => Boolean(env.ANTHROPIC_API_KEY),
-    async analyze(path, prompt, fetchImpl = fetch) {
-      const { base64, mediaType } = imageContent(path);
-      const response = await fetchImpl(
-        'https://api.anthropic.com/v1/messages',
-        {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'x-api-key': env.ANTHROPIC_API_KEY,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model: env.AUX_VISION_MODEL ?? 'claude-haiku-4-5',
-            max_tokens: 512,
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  {
-                    type: 'image',
-                    source: {
-                      type: 'base64',
-                      media_type: mediaType,
-                      data: base64,
-                    },
-                  },
-                  { type: 'text', text: prompt },
-                ],
-              },
-            ],
-          }),
-        }
-      );
-      if (response.status === 429) return { ok: false, reason: 'rate_limited' };
-      if (!response.ok) {
-        return { ok: false, reason: `http_${response.status}` };
-      }
-      const body = /** @type {any} */ (await response.json());
-      const text = (body?.content ?? [])
-        .filter(part => part?.type === 'text')
-        .map(part => part.text)
-        .join('');
+/** Subscription-only routes. Missing CLIs/auth fail through to the next lane. */
+export function defaultVisionProviders(
+  env = process.env,
+  transport = subscriptionVisionTransport({ env })
+) {
+  return [
+    { name: 'claude-subscription', model: 'anthropic/claude-sonnet-5.5' },
+    { name: 'codex-subscription', model: 'openai/gpt-5.6-luna' },
+  ].map(({ name, model }) => ({
+    name,
+    // The shared transport checks executable/auth failures without API fallback.
+    available: () => true,
+    async analyze(path, prompt) {
+      const text = await transport({
+        model,
+        system:
+          'Inspect only the attached screenshot. Return only the requested JSON.',
+        prompt,
+        images: [path],
+      });
       return { ok: true, text };
     },
-  };
-}
-
-/** Fallback: Vercel AI Gateway chat-completions vision model. */
-export function gatewayProvider(env = process.env) {
-  return {
-    name: 'vercel-ai-gateway',
-    available: () => Boolean(env.AI_GATEWAY_API_KEY),
-    async analyze(path, prompt, fetchImpl = fetch) {
-      const { base64, mediaType } = imageContent(path);
-      const response = await fetchImpl(
-        'https://ai-gateway.vercel.sh/v1/chat/completions',
-        {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            authorization: `Bearer ${env.AI_GATEWAY_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: env.GATEWAY_VISION_MODEL ?? 'openai/gpt-5-mini',
-            max_tokens: 512,
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  {
-                    type: 'image_url',
-                    image_url: { url: `data:${mediaType};base64,${base64}` },
-                  },
-                  { type: 'text', text: prompt },
-                ],
-              },
-            ],
-          }),
-        }
-      );
-      if (response.status === 429) return { ok: false, reason: 'rate_limited' };
-      if (!response.ok) {
-        return { ok: false, reason: `http_${response.status}` };
-      }
-      const body = /** @type {any} */ (await response.json());
-      const text = body?.choices?.[0]?.message?.content ?? '';
-      return { ok: true, text };
-    },
-  };
-}
-
-export function defaultVisionProviders(env = process.env) {
-  return [anthropicProvider(env), gatewayProvider(env)];
+  }));
 }
 
 /**
