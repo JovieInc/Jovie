@@ -71,7 +71,7 @@ not GitHub or Vercel cron jobs.
 | Unit | Schedule | Purpose | Source |
 |------|----------|---------|--------|
 | `com.jovie.lanes` / `jovie-lanes.timer` | Every 5 minutes + load/boot | Drain-safe release update, then dispatch idle provider seats. Event-driven workers pull again immediately; this is the idle fallback. | `scripts/lanes/install.sh`, `scripts/lanes/lane_runner.py` |
-| `com.jovie.lanes-watchdog` / `jovie-lanes-watchdog.timer` | Every minute + load/boot | Local-only factory liveness observer. Performs at most three bounded recoveries through the installed lanes service, verifies a new admitting/writing observation, and alerts only on exhaustion or decision-required capacity loss. Defined by the installer but not installed on Gem as of 2026-10-20 (Gem runs only `jovie-lanes.timer`); reconciliation is with the lanes owner. | `scripts/lanes/install.sh`, `scripts/lanes/factory_watchdog.py` |
+| `com.jovie.lanes-watchdog` / `jovie-lanes-watchdog.timer` | Every minute + load/boot | Local-only factory liveness observer. Performs at most three bounded recoveries through the installed lanes service, verifies a new admitting/writing observation, and alerts only on exhaustion or decision-required capacity loss. Installed on Gem 2026-10-20 (`jovie-lanes-watchdog.timer`, from the installer template); its receipt is `~/.local/state/jovie-lanes/factory-watchdog.json`, which the lanes doctor watches through the automation registry. | `scripts/lanes/install.sh`, `scripts/lanes/factory_watchdog.py` |
 
 ## Production Schedule
 
