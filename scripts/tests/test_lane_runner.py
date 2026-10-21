@@ -11419,10 +11419,35 @@ class SelftestForeignLineageTest(unittest.TestCase):
                 self.assertFalse(self.lineage(table))
 
 
+def _own_subtree(pid: int, me: int) -> bool:
+    """True when /proc's ppid chain from pid reaches me (this test process)."""
+    for _ in range(64):
+        if pid == me:
+            return True
+        try:
+            pid = int((Path("/proc") / str(pid) / "stat").read_text().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+        if pid <= 1:
+            return False
+    return False
+
+
 class OperatorInstallerGlueTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="operator-installer-glue-")
         self.addCleanup(self.tmp.cleanup)
+        # Every self-test custody scan in this class sees only this test's own process
+        # subtree. CI's structural lane runs ~30 commands at once; their non-dumpable
+        # children (chromium etc.) refuse /proc environ and held these tests at random
+        # (runs 39533866177, 39536019717: selftest-process-custody-unreadable). Production
+        # custody is unchanged: it scans every same-UID process and fails closed.
+        real_row, me = lane._selftest_process_row, os.getpid()
+        scoped = patch.object(lane, "_selftest_process_row",
+                              side_effect=lambda entry, pid, uid: real_row(entry, pid, uid)
+                              if _own_subtree(pid, me) else None)
+        scoped.start()
+        self.addCleanup(scoped.stop)
         self.root = Path(self.tmp.name).resolve()
         self.host = SimpleNamespace(state=self.root / "state", repo=self.root / "repo", gate_slots=2)
         self.host.state.mkdir()
