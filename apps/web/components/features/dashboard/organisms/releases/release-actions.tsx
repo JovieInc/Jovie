@@ -96,6 +96,12 @@ export interface BuildReleaseActionsOptions {
   ) => void;
 }
 
+/** Shared row + detail-rail capabilities. Both surfaces must receive one set. */
+export type ReleaseActionCapabilities = Pick<
+  BuildReleaseActionsOptions,
+  'onDelete' | 'onChangeStatus' | 'isSmartLinkLocked' | 'getSmartLinkLockReason'
+>;
+
 function buildPrimaryCopySmartLinkItem(
   opts: Pick<BuildReleaseActionsOptions, 'release' | 'onCopy'> & {
     locked: boolean;
