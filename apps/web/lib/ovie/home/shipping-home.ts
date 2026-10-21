@@ -9,11 +9,13 @@
  */
 
 import {
+  formatDurationSeconds,
   HOME_LOOP_NOT_MEASURED,
   type HomeLoopAsk,
   type HomeLoopAttention,
   type HomeLoopConstraint,
   type HomeLoopDoneItem,
+  type HomeLoopLatencyRow,
   type HomeLoopRow,
   type HomeLoopTile,
   type HomeLoopTileMemory,
@@ -25,7 +27,9 @@ import type { OvieInbox, OvieInboxCase } from '@/lib/ovie/inbox';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import type {
   CountMeasurement,
+  DeliveryMergedPullRequest,
   DeliverySummary,
+  StageSummary,
 } from '@/lib/ovie/shipping-state/contract';
 
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
@@ -386,6 +390,29 @@ export function buildConstraint(
   return null;
 }
 
+/**
+ * Add today's merged PRs that no task already names. Task items come first
+ * (they carry verification); merged-only PRs are "landed", not verified.
+ */
+export function mergeDoneWithRecent(
+  done: readonly OvieDoneItem[],
+  recent: readonly DeliveryMergedPullRequest[],
+  limit = 12
+): readonly OvieDoneItem[] {
+  const named = new Set(
+    done.map(item => /#(\d+)$/.exec(item.label)?.[1]).filter(Boolean)
+  );
+  const extra = recent
+    .filter(pr => !named.has(String(pr.number)))
+    .map(pr => ({
+      id: `pr:${pr.repo}#${pr.number}`,
+      label: `${pr.title} · #${pr.number}`,
+      url: pr.url,
+      verified: false,
+    }));
+  return [...done, ...extra].slice(0, limit);
+}
+
 export function buildOvieHomeShipping(input: {
   readonly delivery: DeliverySummary;
   readonly operationalTasks: OperationalTaskFeed;
@@ -399,7 +426,10 @@ export function buildOvieHomeShipping(input: {
     constraint: buildConstraint(delivery, rows, operationalTasks.syncState),
     pulse: buildPulse(delivery, input.pulseMemory),
     rows,
-    done: buildDoneToday(operationalTasks, since),
+    done: mergeDoneWithRecent(
+      buildDoneToday(operationalTasks, since),
+      delivery.merges.recent ?? []
+    ),
     mergesToday: countValue(delivery.merges.today),
     tasksSyncState: operationalTasks.syncState,
   };
@@ -424,4 +454,62 @@ export function buildOvieAsks(inbox: OvieInbox): readonly OvieAsk[] {
   return inbox.cases
     .filter(item => item.state === 'needs_you')
     .map(askFromCase);
+}
+
+/** "shipping:pr-open" → "Shipping · PR Open"; unknown shapes pass through. */
+export function stageLabel(stage: string): string {
+  const words = (part: string) =>
+    part
+      .split(/[-_]/)
+      .filter(Boolean)
+      .map(word =>
+        /^(pr|ci|mq)$/i.test(word)
+          ? word.toUpperCase()
+          : word.charAt(0).toUpperCase() + word.slice(1)
+      )
+      .join(' ');
+  return stage
+    .split(':')
+    .map(part => part.split('->').map(words).join(' → '))
+    .join(' · ');
+}
+
+export interface OvieStageLatency {
+  readonly rows: readonly HomeLoopLatencyRow[];
+  /** Regressed metrics with no row in the slowest list, labelled. */
+  readonly otherRegressions: readonly string[];
+  readonly coverage: string | null;
+}
+
+/**
+ * The slowest 7d p95 stages and current regressions — what Home drives down.
+ * Regression keys look like "remediation:classified.p95".
+ */
+export function buildStageLatency(
+  summary: StageSummary | null | undefined,
+  maxRows = 5
+): OvieStageLatency | null {
+  if (!summary) return null;
+  const regressed = new Set(
+    summary.regressions.map(key => key.replace(/\.p(50|95)$/, ''))
+  );
+  const rows = summary.slowestP95.slice(0, maxRows).map(row => ({
+    id: row.stage,
+    label: stageLabel(row.stage),
+    p50: formatDurationSeconds(row.p50),
+    p95: formatDurationSeconds(row.p95),
+    samples: row.n,
+    regressed: regressed.has(row.stage),
+  }));
+  const shown = new Set(rows.map(row => row.id));
+  return {
+    rows,
+    otherRegressions: [...regressed]
+      .filter(stage => !shown.has(stage))
+      .map(stageLabel),
+    coverage:
+      summary.stagesWithData !== null && summary.stagesTotal !== null
+        ? `${summary.stagesWithData} of ${summary.stagesTotal} stages measured`
+        : null,
+  };
 }
