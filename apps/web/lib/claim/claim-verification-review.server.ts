@@ -32,20 +32,10 @@ import {
 } from './claim-verification';
 
 /**
- * Minimal operator review path for held high-reach claims
- * (lib/claim/claim-verification.ts):
- *
- * - a Summer card in the admin Ovie inbox when a request reaches
- *   `pending_verification` (Tim's queue),
- * - an admin list,
- * - approve: link the artist exactly like the self-serve connect path,
- * - reject: refund the first month and cancel, only on an explicit operator
- *   decision. Nothing here runs automatically.
- *
- * Every decision is timestamped on the record and recorded as a funnel stage
- * (`claim-verified` / `claim-rejected`).
+ * Minimal operator review for held high-reach claims: a decision card in the
+ * admin Ovie inbox, an admin list, approve (link the artist) and reject
+ * (refund first month + cancel; explicit operator decision only).
  */
-
 /** Summer card idempotency keys for claim cards start with this. */
 export const CLAIM_VERIFICATION_CARD_PREFIX = 'claim-verification_';
 
@@ -133,13 +123,12 @@ export async function listClaimVerifications(
     .where(drizzleSql`${statusExpr} = ${status}`)
     .limit(limit);
 
-  return rows.flatMap(row => {
-    const record = readClaimVerification(row.settings);
+  return rows.flatMap(({ settings, ...row }) => {
+    const record = readClaimVerification(settings);
     return record
       ? [
           {
-            profileId: row.profileId,
-            handle: row.handle,
+            ...row,
             userId: row.userId ?? null,
             email: row.email ?? null,
             record,

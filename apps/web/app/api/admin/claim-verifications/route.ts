@@ -11,11 +11,7 @@ const querySchema = z.object({
   status: z.enum(CLAIM_VERIFICATION_STATUSES).default('pending_verification'),
 });
 
-/**
- * GET /api/admin/claim-verifications?status=pending_verification
- *
- * Admin list of held high-reach artist claims (lib/claim/claim-verification.ts).
- */
+/** Admin: held claim verifications (lib/claim/claim-verification-review.server.ts). */
 export async function GET(request: NextRequest) {
   const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
   if (!entitlements.isAuthenticated) {
