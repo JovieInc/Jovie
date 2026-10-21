@@ -125,7 +125,6 @@ function collectSameOriginApiFailures(
 const JOV_8781_QUARANTINED_AXE_RULES = [
   'label-content-name-mismatch',
   'nested-interactive',
-  'no-focusable-content',
 ];
 
 async function assertAccessible(page: import('@playwright/test').Page) {

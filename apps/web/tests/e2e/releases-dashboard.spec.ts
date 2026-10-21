@@ -299,7 +299,10 @@ test.describe('Releases dashboard', () => {
 
     const smartLinkPage = await page.context().newPage();
     try {
-      const response = await smartLinkPage.goto(copiedUrl!, {
+      // The copied URL always carries the canonical public host (never a
+      // loopback), so follow its path on the server under test.
+      const smartLinkPath = new URL(copiedUrl!).pathname;
+      const response = await smartLinkPage.goto(smartLinkPath, {
         waitUntil: 'domcontentloaded',
         timeout: 180_000,
       });
@@ -500,6 +503,9 @@ test.describe('Releases dashboard', () => {
       timeout: TIMEOUTS.ELEMENT_CHECK,
     });
     await addReleaseButton.click();
+    // With Spotify connected, New release offers "Sync from Spotify" or
+    // "Add manually"; the calendar lives in the manual form.
+    await page.getByRole('menuitem', { name: 'Add manually' }).click();
 
     const addReleaseSidebar = page.getByTestId('add-release-sidebar');
     await expect(addReleaseSidebar).toBeVisible({
