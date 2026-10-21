@@ -138,6 +138,7 @@ export function HomeLoopStageRows({
   );
 }
 
+/** Matches a capped, populated list (rows plus the legend line). */
 export function HomeLoopStageRowsSkeleton({
   rows = 4,
 }: Readonly<{ readonly rows?: number }>) {
@@ -149,11 +150,17 @@ export function HomeLoopStageRowsSkeleton({
           <LoadingSkeleton height='h-2' width='w-40' />
         </div>
       ))}
+      <p
+        aria-hidden='true'
+        className='border-t border-subtle py-1.5 text-2xs text-transparent'
+      >
+        Loading stages
+      </p>
     </div>
   );
 }
 
-const SKELETON_ROWS = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6'] as const;
+const SKELETON_ROWS = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8'] as const;
 
 /** Compact chips for work that landed today. */
 export function HomeLoopDoneChips({

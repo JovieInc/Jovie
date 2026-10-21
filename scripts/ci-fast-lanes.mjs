@@ -533,6 +533,11 @@ const LANES_COVERAGE_RUN = `{ ${LANES_BACKGROUND_SHARDS.map(shard => `${lanesCov
 /** @jovie/api-client (TS) unit + conformance suite, run with the operations lane. */
 export const API_CLIENT_TS_COMMAND = 'pnpm --filter @jovie/api-client test';
 
+/** scripts/apiclient: the Python port, held to the same conformance fixtures. */
+export const API_CLIENT_PY_COMMAND = structuralPythonRegression(
+  'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage run --branch --include="*/scripts/apiclient/*" -m pytest scripts/tests/test_apiclient.py scripts/tests/test_apiclient_conformance.py -q -p no:cacheprovider --basetemp="${RUNNER_TEMP:-/tmp}/jovie-apiclient-pytest" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage report --fail-under=85'
+);
+
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
@@ -752,6 +757,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ratchet-core.test.mjs',
   'scripts/lib/__tests__/domain-expiry.test.mjs',
   'scripts/lib/__tests__/credentials-registry.test.mjs',
+  'scripts/lib/__tests__/credentials-spend-check.test.mjs',
   'scripts/lib/__tests__/remediation-sweep.test.mjs',
   'scripts/lib/__tests__/remediation-sweep-workflow-contract.test.mjs',
   'scripts/lib/__tests__/repository-docs-ratchet.test.mjs',
@@ -767,6 +773,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/scripts-typecheck.test.mjs',
   'scripts/lib/__tests__/seo-certify-workflow-contract.test.mjs',
   'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
+  'scripts/lib/__tests__/shipping-slo-collector.test.mjs',
   'scripts/lib/__tests__/shipping-slo.test.mjs',
   'scripts/lib/__tests__/stage-events.test.mjs',
   'scripts/lib/__tests__/stale-pr-base-sha.test.mjs',
@@ -2431,6 +2438,7 @@ export async function runStructural(opts = {}) {
       : [];
   const operationsParts = [
     API_CLIENT_TS_COMMAND,
+    API_CLIENT_PY_COMMAND,
     'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
     'node --test .github/scripts/dependency-parity-evidence.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-controller.test.mjs',
