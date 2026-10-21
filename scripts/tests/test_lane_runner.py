@@ -13713,3 +13713,19 @@ class SelftestRetryDiagnosticTest(unittest.TestCase):
             self.assertIn("release self-test failure: FAIL: test_bound", text)
             self.assertIn("release self-test failure: AssertionError: 2 != 0", text)
             self.assertNotIn("noise", text)
+
+
+class AdoptionShareTest(unittest.TestCase):
+    """A fixed share of selection passes tries green drafts before red repairs (2026-10-21)."""
+
+    def test_every_nth_pass_is_an_adoption_turn_and_zero_disables_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = SimpleNamespace(state=Path(tmp))
+            with patch.dict(os.environ, {"LANES_ADOPT_SHARE_EVERY": "4"}):
+                self.assertEqual([lane.adoption_turn_due(host) for _ in range(8)],
+                                 [False, False, False, True, False, False, False, True])
+            with patch.dict(os.environ, {"LANES_ADOPT_SHARE_EVERY": "0"}):
+                self.assertFalse(any(lane.adoption_turn_due(host) for _ in range(8)))
+            (host.state / "adopt-share.json").write_text("not json")
+            with patch.dict(os.environ, {"LANES_ADOPT_SHARE_EVERY": "bogus"}):
+                self.assertEqual(sum(lane.adoption_turn_due(host) for _ in range(lane.ADOPT_SHARE_EVERY)), 1)
