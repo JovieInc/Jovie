@@ -197,28 +197,24 @@ def scan_snapshot(path: Path, run, remote: str, sha: str) -> str | None:
         return "scan-base-unknown"
     if base == sha:
         return None
-    scan_ref = f"refs/jovie-sweep-scan/{os.getpid()}-{sha[:12]}"
-    if git(path, run, "update-ref", scan_ref, sha).returncode != 0:
-        return "scan-ref-failed"
+    # trufflehog --branch takes a commit SHA or short branch name: a full ref path
+    # (refs/...) silently scans nothing and exits 0 (probed on Gem, trufflehog 3.95.5).
     try:
-        try:
-            truffle = run([trufflehog, "git", f"file://{path}", "--branch", scan_ref, "--since-commit", base,
-                           "--no-verification", "--fail", "--no-update", "--json"],
-                          capture_output=True, text=True, timeout=SCAN_TIMEOUT_S)
-            leaks = run([gitleaks, "git", str(path), "--log-opts", f"{base}..{sha}", "--no-banner",
-                         "--redact", "--exit-code", "1"],
-                        capture_output=True, text=True, timeout=SCAN_TIMEOUT_S)
-        except (OSError, subprocess.SubprocessError) as error:
-            return f"scan-failed:{type(error).__name__}"
-        if truffle.returncode == TRUFFLEHOG_FINDINGS:
-            return "secret-finding:trufflehog"
-        if leaks.returncode == 1:
-            return "secret-finding:gitleaks"
-        if truffle.returncode != 0 or leaks.returncode != 0:
-            return f"scan-failed:trufflehog={truffle.returncode},gitleaks={leaks.returncode}"
-        return None
-    finally:
-        git(path, run, "update-ref", "-d", scan_ref)
+        truffle = run([trufflehog, "git", f"file://{path}", "--branch", sha, "--since-commit", base,
+                       "--no-verification", "--fail", "--no-update", "--json"],
+                      capture_output=True, text=True, timeout=SCAN_TIMEOUT_S)
+        leaks = run([gitleaks, "git", str(path), "--log-opts", f"{base}..{sha}", "--no-banner",
+                     "--redact", "--exit-code", "1"],
+                    capture_output=True, text=True, timeout=SCAN_TIMEOUT_S)
+    except (OSError, subprocess.SubprocessError) as error:
+        return f"scan-failed:{type(error).__name__}"
+    if truffle.returncode == TRUFFLEHOG_FINDINGS:
+        return "secret-finding:trufflehog"
+    if leaks.returncode == 1:
+        return "secret-finding:gitleaks"
+    if truffle.returncode != 0 or leaks.returncode != 0:
+        return f"scan-failed:trufflehog={truffle.returncode},gitleaks={leaks.returncode}"
+    return None
 
 
 def backup(path: Path, info: dict, run, prefix: str, date: str) -> str | None:

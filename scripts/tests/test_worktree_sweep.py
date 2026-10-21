@@ -350,14 +350,16 @@ class SnapshotScanTest(unittest.TestCase):
         self.assertEqual(self.scan(base=None)[0], "scan-base-unknown")
         self.assertEqual(self.scan(base="a" * 40)[0], None)  # nothing new beyond the remote
 
-    def test_scan_covers_base_to_snapshot_and_always_drops_its_temp_ref(self):
+    def test_scan_covers_base_to_snapshot_by_commit_sha(self):
         _, calls = self.scan(truffle=sweeper.TRUFFLEHOG_FINDINGS)
         truffle = next(call for call in calls if "trufflehog" in call[0])
         self.assertIn("--fail", truffle)
         self.assertEqual(truffle[truffle.index("--since-commit") + 1], "b" * 40)
+        # A full ref path makes trufflehog scan nothing and exit 0; the SHA is scanned.
+        self.assertEqual(truffle[truffle.index("--branch") + 1], "a" * 40)
         leaks = next(call for call in calls if "gitleaks" in call[0])
         self.assertIn(f"{'b' * 40}..{'a' * 40}", leaks)
-        self.assertTrue(any("update-ref" in call and "-d" in call for call in calls))
+        self.assertFalse(any("update-ref" in call for call in calls))
 
     def test_missing_scanner_holds(self):
         run, calls = self.fake_run()
