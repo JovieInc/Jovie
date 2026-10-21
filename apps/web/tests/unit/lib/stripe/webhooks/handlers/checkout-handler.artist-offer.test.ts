@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   recordStage: vi.fn(),
   attributeLead: vi.fn(),
   admitPaidUser: vi.fn(),
+  markClaimVerificationsPaid: vi.fn(),
+  captureCriticalError: vi.fn(),
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
@@ -35,6 +37,9 @@ vi.mock('@/lib/stripe/webhooks/utils', () => ({
 vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
   recordArtistOfferStage: mocks.recordStage,
 }));
+vi.mock('@/lib/claim/claim-verification.server', () => ({
+  markClaimVerificationsPaid: mocks.markClaimVerificationsPaid,
+}));
 vi.mock('@/lib/leads/funnel-events', () => ({
   attributeLeadPaidConversionByAppUserId: mocks.attributeLead,
 }));
@@ -47,7 +52,7 @@ vi.mock('@/lib/email/paid-welcome', () => ({
   maybeSendPaidWelcomeAfterEntitlement: vi.fn(),
 }));
 vi.mock('@/lib/error-tracking', () => ({
-  captureCriticalError: vi.fn(),
+  captureCriticalError: mocks.captureCriticalError,
   logFallback: vi.fn(),
   captureError: vi.fn(),
 }));
@@ -79,6 +84,7 @@ describe('$12 artist profile checkout webhook', () => {
       appUserId: APP_USER_ID,
     });
     mocks.admitPaidUser.mockResolvedValue({ admitted: true });
+    mocks.markClaimVerificationsPaid.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -130,6 +136,49 @@ describe('$12 artist profile checkout webhook', () => {
     );
   });
 
+  it('moves a high-reach claim to pending verification on payment', async () => {
+    mocks.markClaimVerificationsPaid.mockResolvedValue(1);
+    const { CheckoutSessionHandler } = await import(
+      '@/lib/stripe/webhooks/handlers/checkout-handler'
+    );
+    const event = signedFixtureEvent();
+    const timestamp = new Date(event.created * 1000);
+    const result = await new CheckoutSessionHandler().handle({
+      event,
+      stripeEventId: event.id,
+      stripeEventTimestamp: timestamp,
+    });
+
+    // Payment still succeeds; only the claim waits for verification.
+    expect(result).toMatchObject({ success: true, isActive: true });
+    expect(mocks.markClaimVerificationsPaid).toHaveBeenCalledWith({
+      appUserId: APP_USER_ID,
+      paidAt: timestamp,
+      acquisitionId: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+    });
+  });
+
+  it('fails the webhook so Stripe retries when the verification transition cannot be written', async () => {
+    const failure = new Error('db down');
+    mocks.markClaimVerificationsPaid.mockRejectedValue(failure);
+    const { CheckoutSessionHandler } = await import(
+      '@/lib/stripe/webhooks/handlers/checkout-handler'
+    );
+    const event = signedFixtureEvent();
+    await expect(
+      new CheckoutSessionHandler().handle({
+        event,
+        stripeEventId: event.id,
+        stripeEventTimestamp: new Date(event.created * 1000),
+      })
+    ).rejects.toThrow('db down');
+    expect(mocks.captureCriticalError).toHaveBeenCalledWith(
+      'Claim verification payment transition failed',
+      failure,
+      expect.objectContaining({ event: 'checkout.session.completed' })
+    );
+  });
+
   it('does not record paid or admit the buyer when the subscription is not active', async () => {
     mocks.retrieveSubscription.mockResolvedValue({
       ...fixture.subscription,
@@ -147,5 +196,6 @@ describe('$12 artist profile checkout webhook', () => {
 
     expect(mocks.recordStage).not.toHaveBeenCalled();
     expect(mocks.admitPaidUser).not.toHaveBeenCalled();
+    expect(mocks.markClaimVerificationsPaid).not.toHaveBeenCalled();
   });
 });

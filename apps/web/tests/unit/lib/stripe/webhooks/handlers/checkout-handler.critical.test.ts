@@ -33,6 +33,10 @@ const {
   mockLoggerWarn: vi.fn(),
 }));
 
+vi.mock('@/lib/claim/claim-verification.server', () => ({
+  markClaimVerificationsPaid: vi.fn().mockResolvedValue(0),
+}));
+
 vi.mock('@/lib/stripe/client', () => ({
   stripe: {
     subscriptions: {

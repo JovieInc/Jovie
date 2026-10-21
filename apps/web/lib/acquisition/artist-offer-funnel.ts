@@ -27,6 +27,25 @@ export const ARTIST_OFFER_FUNNEL_STAGES = [
 export type ArtistOfferFunnelStage =
   (typeof ARTIST_OFFER_FUNNEL_STAGES)[number];
 
+/**
+ * Branch stages sit off the linear funnel. `pending-verification` is reached
+ * after `paid` when a high-reach artist claim waits for ownership
+ * verification (`lib/claim/claim-verification.ts`) instead of going live.
+ */
+export const ARTIST_OFFER_BRANCH_STAGES = [
+  { stage: 'pending-verification', from: 'paid' },
+  { stage: 'claim-verified', from: 'pending-verification' },
+  { stage: 'claim-rejected', from: 'pending-verification' },
+] as const satisfies readonly {
+  readonly stage: string;
+  readonly from: string;
+}[];
+
+export type ArtistOfferBranchStage =
+  (typeof ARTIST_OFFER_BRANCH_STAGES)[number]['stage'];
+
+type ArtistOfferAnyStage = ArtistOfferFunnelStage | ArtistOfferBranchStage;
+
 /** Stages written by producers; the rest are derived from the journey row. */
 export const RECORDED_ARTIST_OFFER_STAGES = [
   'pricing',
@@ -34,7 +53,10 @@ export const RECORDED_ARTIST_OFFER_STAGES = [
   'checkout',
   'paid',
   'profile-live',
-] as const satisfies readonly ArtistOfferFunnelStage[];
+  'pending-verification',
+  'claim-verified',
+  'claim-rejected',
+] as const satisfies readonly ArtistOfferAnyStage[];
 
 export type RecordedArtistOfferStage =
   (typeof RECORDED_ARTIST_OFFER_STAGES)[number];
@@ -58,7 +80,7 @@ export function stageForFunnelPath(
 }
 
 export type ArtistOfferJourneyTimeline = {
-  readonly [Stage in ArtistOfferFunnelStage]?: Date | null;
+  readonly [Stage in ArtistOfferAnyStage]?: Date | null;
 };
 
 export interface ArtistOfferStageSummary {
@@ -75,6 +97,17 @@ export interface ArtistOfferStageSummary {
   readonly fromVisitSeconds: DurationSummary;
 }
 
+export interface ArtistOfferBranchSummary {
+  readonly stage: ArtistOfferBranchStage;
+  readonly from: ArtistOfferAnyStage;
+  /** Journeys that reached this branch stage. */
+  readonly journeys: number;
+  /** Share of the parent stage's journeys that branched here. */
+  readonly conversionFromParent: number | null;
+  /** Seconds from the parent stage, over journeys with both timestamps. */
+  readonly fromParentSeconds: DurationSummary;
+}
+
 export interface DurationSummary {
   readonly samples: number;
   readonly p50: number | null;
@@ -88,6 +121,8 @@ export interface ArtistOfferFunnelReport {
   /** Consented journeys only; non-consented visitors are never stored. */
   readonly scope: 'consented_first_party_journeys';
   readonly stages: readonly ArtistOfferStageSummary[];
+  /** Off-funnel branches (e.g. paid → pending-verification). */
+  readonly branches: readonly ArtistOfferBranchSummary[];
 }
 
 /** Nearest-rank percentile; deterministic and dependency-free. */
@@ -169,11 +204,32 @@ export function buildArtistOfferFunnelReport(input: {
     } satisfies ArtistOfferStageSummary;
   });
 
+  const reached = (stage: ArtistOfferAnyStage): number =>
+    counts.get(stage as ArtistOfferFunnelStage) ??
+    input.timelines.filter(timeline => Boolean(timeline[stage])).length;
+
+  const branches = ARTIST_OFFER_BRANCH_STAGES.map(({ stage, from }) => {
+    const fromParent: number[] = [];
+    for (const timeline of input.timelines) {
+      const step = secondsBetween(timeline[from], timeline[stage]);
+      if (step !== null) fromParent.push(step);
+    }
+    const journeys = reached(stage);
+    return {
+      stage,
+      from,
+      journeys,
+      conversionFromParent: ratio(journeys, reached(from)),
+      fromParentSeconds: summarize(fromParent),
+    } satisfies ArtistOfferBranchSummary;
+  });
+
   return {
     schema: 'jovie-artist-offer-funnel/v1',
     entity: 'revenue-funnel',
     window: { start: input.start.toISOString(), end: input.end.toISOString() },
     scope: 'consented_first_party_journeys',
     stages,
+    branches,
   };
 }
