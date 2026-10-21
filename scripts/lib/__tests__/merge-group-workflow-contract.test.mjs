@@ -1508,10 +1508,14 @@ describe('merge_group workflow contract', () => {
     // An interpolated run script is evaluated as one format() expression with
     // a ~21,000-char cap; crossing it fails ci.yml with zero jobs. Event
     // values must enter through env so the script stays a plain string.
-    const workflow = load(CI_WORKFLOW);
+    const workflow =
+      /** @type {{ jobs: Record<string, { steps: Array<{ id?: string, run: string, env: Record<string, string> }> }> }} */ (
+        load(CI_WORKFLOW)
+      );
     const detect = workflow.jobs['ci-path-changes'].steps.find(
       step => step.id === 'detect'
     );
+    if (!detect) throw new Error('ci-path-changes is missing the detect step');
     expect(detect.run).not.toContain('${{');
     expect(detect.env).toEqual({
       EVENT_NAME: '${{ github.event_name }}',
