@@ -37,7 +37,10 @@ import {
   useRegisterHeaderSearch,
 } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
-import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
+import {
+  buildReleaseActions,
+  type ReleaseActionCapabilities,
+} from '@/features/dashboard/organisms/releases/release-actions';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -619,6 +622,23 @@ export function ShellReleasesView({
     [router]
   );
 
+  // One capability contract powers the row context menu, row overflow and
+  // selected-release rail. Keep eligibility and callbacks in sync by design.
+  const releaseActionCapabilities = useMemo<ReleaseActionCapabilities>(
+    () => ({
+      onDelete: handleDeleteRequest,
+      onChangeStatus: handleSaveStatus,
+      isSmartLinkLocked,
+      getSmartLinkLockReason,
+    }),
+    [
+      getSmartLinkLockReason,
+      handleDeleteRequest,
+      handleSaveStatus,
+      isSmartLinkLocked,
+    ]
+  );
+
   const contextMenuItemsByReleaseId = useMemo(() => {
     return new Map(
       visibleReleases.map(release => [
@@ -628,26 +648,20 @@ export function ShellReleasesView({
           onEdit: openEditor,
           onCopy: handleCopy,
           artistName,
-          isSmartLinkLocked,
-          getSmartLinkLockReason,
-          onDelete: handleDeleteRequest,
+          ...releaseActionCapabilities,
           canGenerateAlbumArt: showGenerateAlbumArtAction,
           onGenerateAlbumArt: handleGenerateAlbumArt,
           onGeneratePitch: handleGeneratePitch,
-          onChangeStatus: handleSaveStatus,
         }),
       ])
     );
   }, [
     artistName,
-    getSmartLinkLockReason,
     handleCopy,
-    handleDeleteRequest,
     handleGenerateAlbumArt,
     handleGeneratePitch,
-    handleSaveStatus,
-    isSmartLinkLocked,
     openEditor,
+    releaseActionCapabilities,
     showGenerateAlbumArtAction,
     visibleReleases,
   ]);
@@ -804,6 +818,7 @@ export function ShellReleasesView({
       width: RELEASE_DETAIL_PANEL_WIDTH,
       providerConfig,
       artistName,
+      ...releaseActionCapabilities,
       onClose: closeEditor,
       onRefresh: editingRelease
         ? () => handleRefreshRelease(editingRelease.id)
@@ -882,6 +897,7 @@ export function ShellReleasesView({
     isTrackSidebarOpen,
     openTrackDrawer,
     providerConfig,
+    releaseActionCapabilities,
     refreshingReleaseId,
     showGenerateAlbumArtAction,
   ]);
