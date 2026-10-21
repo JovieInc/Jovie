@@ -26,6 +26,7 @@
     {"id": "workflow:cli-chaos", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/cli-chaos.yml", "repair": "JOV-8657. Mac-only failures: a diff defect (e.g. GNU-only `date -d`/`sed -i`) is labelled to the PR's writer lane by Lane Fix Relay; a lane or runner defect is repaired by gem-ci-repair, filed as remediation:mac-lane; an offline or asleep jovie-mac pool falls back to hosted macOS and is repaired by gem-hostops."},
     {"id": "workflow:codeowners-drift", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/codeowners-drift.yml"},
     {"id": "workflow:codeql", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/codeql.yml"},
+    {"id": "workflow:controller-quota-replay", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/controller-quota-replay.yml"},
     {"id": "workflow:cost-anomaly-gate", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/cost-anomaly-gate.yml"},
     {"id": "workflow:deepsec-native", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/deepsec-native.yml"},
     {"id": "workflow:delivery-control-receipts", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/delivery-control-receipts.yml"},

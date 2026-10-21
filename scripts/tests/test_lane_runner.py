@@ -11405,6 +11405,15 @@ class SelftestForeignLineageTest(unittest.TestCase):
             helper.kill()
             helper.wait(timeout=10)
 
+    def test_an_unproven_hold_records_its_parent_chain(self):
+        procs = {10: (self.UID, 200, "linux:5"), 200: (self.UID, 1, "linux:2"),
+                 500: (self.UID, 200, "linux:100")}
+        hops = lane._lineage_evidence(500, self.CLEANUP, identity=procs.get)
+        self.assertEqual([(h["pid"], h["ownerAncestor"], h["sameUid"]) for h in hops], [(500, False, True), (200, True, True)])
+        held = lane.SelftestCleanupHeld("selftest-process-custody-unreadable", pid=500, start="linux:100",
+                                        source="proc-environ", lineage=hops)
+        self.assertEqual(held.observation["lineage"][1]["pid"], 200)
+
     def test_anything_short_of_proof_keeps_the_hold(self):
         for name, table in {
             "owner-descendant": {500: (self.UID, 10, "linux:100")},
@@ -11656,7 +11665,15 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         self.assertEqual(diagnostic["stderrSha256"], hashlib.sha256(stderr.encode()).hexdigest())
         self.assertEqual(diagnostic["stderrBytes"], len(stderr.encode()))
         self.assertEqual((stage / ".selftest-stderr.log").read_text(), stderr)
-        self.assertNotIn("test_bound", console.getvalue())
+        # The raw FAIL header sits outside the 2000-character console tail. The
+        # refusal still names that selector on its own lines (2026-10-21).
+        console_text = console.getvalue()
+        tail, separator, named = console_text.partition("release self-test retry:")
+        self.assertEqual(separator, "release self-test retry:")
+        self.assertEqual(tail, "x" * 2000 + "\n")
+        self.assertNotIn("test_bound", tail)
+        self.assertIn("release self-test failed selector(s): scripts.tests.test_fixture.Example.test_bound", named)
+        self.assertIn("release self-test failure: FAIL: test_bound (scripts.tests.test_fixture.Example)", named)
         for name in [".selftest-diagnostic.json", ".selftest-stderr.log"]:
             self.assertEqual((stage / name).stat().st_mode & 0o777, 0o600)
 
@@ -11751,6 +11768,10 @@ class OperatorInstallerGlueTest(unittest.TestCase):
                     safe["source"] = observation["source"]
                 if type(observation.get("errno")) is int:
                     safe["errno"] = observation["errno"]
+                if isinstance(observation.get("lineage"), list):
+                    safe["lineage"] = [{key: hop.get(key) for key in ("pid", "comm", "sameUid", "birth", "baseline",
+                                                                      "owner", "ownerAncestor", "parent", "gone")
+                                        if key in hop} for hop in observation["lineage"][:16] if isinstance(hop, dict)]
                 digest = cleanup.get("sourceSha256")
                 if isinstance(digest, str) and len(digest) == 64 and set(digest) <= set("0123456789abcdef"):
                     safe["sourceSha256"] = digest
@@ -13517,7 +13538,9 @@ class SelftestCleanupScopeTest(unittest.TestCase):
                 lane.reap_selftest_processes(receipt)
         self.assertEqual(receipt["diagnostic"]["observation"], {
             "pid": 201, "start": "linux:2000", "source": "proc-environ",
-            "errorCode": "selftest-process-custody-unreadable", "errno": 13})
+            "errorCode": "selftest-process-custody-unreadable", "errno": 13,
+            "lineage": [{"pid": 201, "comm": "", "sameUid": True, "birth": "linux:2000",
+                         "baseline": False, "owner": False, "ownerAncestor": False, "parent": 1}]})
         self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
 
     def test_denied_environment_and_reused_zombie_birth_still_holds(self):
@@ -13690,6 +13713,29 @@ class SelftestProcessAbsenceTest(unittest.TestCase):
         with self.assertRaises(lane.SelftestCleanupHeld):
             lane._selftest_process_row(self.entry(PermissionError(13, "denied"), []), 201, os.getuid())
 
+
+class SelftestRetryDiagnosticTest(unittest.TestCase):
+    """A refused release names the selector that failed twice (CI summaries keep only stderr)."""
+
+    def test_failed_retry_prints_selectors_and_failure_lines(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = Path(tmp)
+            rerun = subprocess.CompletedProcess([], 1, stdout="", stderr=(
+                "FAIL: test_bound (scripts.tests.test_x.Example.test_bound)\n"
+                "Traceback (most recent call last):\n  noise\n"
+                "AssertionError: 2 != 0\n"))
+            with patch.object(lane, "selftest_env", return_value={}), \
+                 patch.object(lane, "reap_selftest_processes", return_value=0), \
+                 patch.object(lane, "_selftest_cleanup_summary", return_value={"outcome": "clean"}), \
+                 patch.object(lane.lifecycle, "run", return_value=rerun), \
+                 contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertFalse(lane.retry_failed_selectors(
+                    stage, "FAIL: test_bound (scripts.tests.test_x.Example.test_bound)\n"))
+            text = err.getvalue()
+            self.assertIn("release self-test failed selector(s): scripts.tests.test_x.Example.test_bound", text)
+            self.assertIn("release self-test failure: FAIL: test_bound", text)
+            self.assertIn("release self-test failure: AssertionError: 2 != 0", text)
+            self.assertNotIn("noise", text)
 
 
 class AdoptionShareTest(unittest.TestCase):

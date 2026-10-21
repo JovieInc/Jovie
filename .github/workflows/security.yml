@@ -92,6 +92,10 @@ jobs:
               ./scripts/security/scan-secrets.sh ci-pr "${{ github.event.before }}"
             fi
           else
+            # Worktree-sweep snapshots live under refs/jovie-preserved/* in this
+            # public repo; checkout fetches only branches and tags, so map them
+            # into local heads for the full-history scan.
+            git fetch --no-tags origin '+refs/jovie-preserved/*:refs/heads/jovie-preserved/*'
             ./scripts/security/scan-secrets.sh full
           fi
 
@@ -222,6 +226,7 @@ jobs:
               ./scripts/security/scan-secrets.sh ci-pr-trufflehog "${{ github.event.before }}"
             fi
           else
+            git fetch --no-tags origin '+refs/jovie-preserved/*:refs/heads/jovie-preserved/*'
             ./scripts/security/scan-secrets.sh full-trufflehog
           fi
 
