@@ -204,6 +204,49 @@ describe('dead-man liveness', () => {
     }
   });
 
+  // 2026-10-20 21:13-21:52Z: 10 entries sat AWAITING_CHECKS for 39 min and
+  // nothing alarmed (JOV-8706). Silence while the queue is non-empty is red.
+  it('a non-empty merge queue that stops merging is silent; an empty queue is fresh', async () => {
+    const queue = (totalCount, enqueuedMinutesAgo, mergedMinutesAgo) => ({
+      data: {
+        repository: {
+          mergeQueue: {
+            entries: {
+              totalCount,
+              nodes: enqueuedMinutesAgo.map(m => ({ enqueuedAt: iso(m) })),
+            },
+          },
+          ref: { target: { committedDate: iso(mergedMinutesAgo) } },
+        },
+      },
+    });
+    const run = body =>
+      runLiveness({
+        registry: only('github:jovie:merge-queue-progress'),
+        nowMs: NOW,
+        token: 't',
+        fetchImpl: fakeFetch({ '/graphql': body }),
+      }).then(({ report }) =>
+        rowFor(report, 'github:jovie:merge-queue-progress')
+      );
+    const stalled = await run(queue(10, [45, 40], 39));
+    expect(stalled.status).toBe('stale');
+    expect(stalled.ageMinutes).toBe(39);
+    // A PR queued after a quiet stretch is not a stall yet.
+    expect((await run(queue(1, [2], 300))).status).toBe('fresh');
+    expect((await run(queue(0, [], 600))).status).toBe('fresh');
+    // Unreadable or unauthenticated is silence, never health.
+    expect((await run(502)).status).not.toBe('fresh');
+    const unauth = await runLiveness({
+      registry: only('github:jovie:merge-queue-progress'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({ '/graphql': queue(0, [], 0) }),
+    });
+    expect(
+      rowFor(unauth.report, 'github:jovie:merge-queue-progress').status
+    ).not.toBe('fresh');
+  });
+
   it('only counts the configured trigger events for scheduled baselines', async () => {
     const { report } = await runLiveness({
       registry: only('github:jovie:security'),
