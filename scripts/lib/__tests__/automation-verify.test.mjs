@@ -2974,8 +2974,8 @@ describe('automation-verify affected scope', () => {
     expect(plan.mode).toBe('selected');
     expect(plan.selectedTests).toEqual(
       expect.arrayContaining([
-        'apps/web/tests/unit/home/mounted-home-artist-outcomes-system-b-style-guard.test.ts',
-        'apps/web/tests/unit/home/mounted-home-hero-system-b-style-guard.test.ts',
+        'apps/web/tests/unit/home/mounted-home-grid-spine-system-b-style-guard.test.ts',
+        'apps/web/tests/unit/home/mounted-home-faq-system-b-style-guard.test.ts',
         'apps/web/tests/unit/home/dead-home-actions-system-b-style-guard.test.ts',
       ])
     );
@@ -2983,17 +2983,17 @@ describe('automation-verify affected scope', () => {
       plan.selectedTests.filter(file =>
         file.startsWith('apps/web/tests/unit/home/')
       )
-    ).toHaveLength(15);
+    ).toHaveLength(8);
   });
 
   it('selects the homepage System B style guards for homepage component changes', () => {
     const plan = buildAffectedTestPlan([
-      'apps/web/components/homepage/HomepageMeetJovie.tsx',
+      'apps/web/components/homepage/HomepageIdentityHero.tsx',
     ]);
 
     expect(plan.mode).toBe('selected');
     expect(plan.selectedTests).toContain(
-      'apps/web/tests/unit/home/mounted-home-artist-outcomes-system-b-style-guard.test.ts'
+      'apps/web/tests/unit/home/mounted-home-grid-spine-system-b-style-guard.test.ts'
     );
     expect(plan.selectedTests).toContain(
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'

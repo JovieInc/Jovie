@@ -4,20 +4,15 @@
 
 > **Question this answers:** "What scheduled jobs already run? Can I add my logic to an existing one?"
 >
+> **Canonical registry (2026-10-20):** every company automation (GitHub, Vercel, lanes, Gem, Macs, Codex, Summer, Managed Agents) is registered with owner, trigger, metric, run-receipt location, max staleness and kill switch in [`canon/automation-registry.jsonl`](../canon/automation-registry.jsonl) (one automation per line). CI (`automation-registry` source guard) fails when a GitHub cron, Vercel cron or lanes clock has no live entry, or a live entry outlives its schedule. This page explains the jobs; the registry is the inventory.
+>
 > Before creating a new cron job, read [AGENTS.md — Infrastructure & Scheduling Guardrails](../AGENTS.md#infrastructure--scheduling-guardrails-critical).
 > **JOV-5852:** execution follows information, not time. A GitHub Actions cron must declare `# clock-class:` (`skip-if-unchanged` | `production-liveness` | `temporal-resource` | `upstream-advisory`). Do not add a clock when a causal event already exists.
 > **JOV-INV-042 (2026-10-11):** GitHub cron is frozen. `scripts/lib/ci-schedule-inventory.mjs` keeps `CRON_KEEP_REASONS` (since 2026-10-12 every kept clock names its time-bound external fact, calendar window, real resource limit, or owner-tracked replacement), `ADMISSION_CRON_DEBT`, and `POLLING_DEBT`; each list only shrinks. Admission and landing are event-driven or run from the Gem lanes tick; no workflow polls GitHub state.
 
 ## Codex Workspace Automations
 
-These are local Codex automations for agent workflow hygiene. They are not production app crons, do not run in Vercel, and must not add routes under `apps/web/app/api/cron/*`.
-
-| Name | Schedule | Purpose | Source |
-|------|----------|---------|--------|
-| `PR Comment Hardening Retro` (`pr-comment-hardening-retro`) | Mondays 09:00 America/Los_Angeles | Scans recent PR review comments, reports repeated agent mistake classes, and may open draft PRs only for bounded docs/tests/skill hardening. | Codex automation using `scripts/pr-comment-retro.mjs` |
-| `Weekly Paxel + Is Agentic` (`weekly-agent-readiness`) | Tuesdays 09:00 America/Los_Angeles | Runs the reviewed local Paxel wrapper, requires fresh 100/100 public reports for Jovie and LYB, and writes the bounded profile-delta + two-ship receipt outside the repository. Activation fails closed until the one-time YC SSO token exists. | Codex automation using `scripts/weekly-agent-readiness.mjs`; see `docs/operations/weekly-agent-readiness.md` |
-
-Before adding another Codex workspace automation, inspect existing Codex automations and repo schedules. Combine with this retro only when the job is about converting review feedback into durable agent hardening; keep product or production scheduling in the Vercel cron registry below.
+Codex automations are heartbeats that wake one live goal thread; Codex is on-demand and is not a scheduler. The active ones are registered as `codex:*` in the registry with a migrate note (pause when the goal closes). The 2026-10-20 sweep archived 16 paused heartbeats to `~/.local/state/retired-loops/2026-10-20/codex-automations/` on the ops Mac. The `pr-comment-hardening-retro` and `weekly-agent-readiness` automations this page used to list were not installed there; their scripts (`scripts/pr-comment-retro.mjs`, `scripts/weekly-agent-readiness.mjs`) run on demand. Recurring needs go to the lanes tick, not a new Codex heartbeat.
 
 ## GitHub Actions Schedule
 
@@ -34,10 +29,9 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 | `Vercel Preview Cleanup` | (see workflow) | Terminal-event cleanup: cancels/deletes preview deployments for a closed PR's ref and emits a `jovie-preview-env-cleanup/v1` receipt (JOV-5941). | `.github/workflows/vercel-preview-cleanup.yml` |
 | `M2 Revenue-Path Canary` | `37 6 * * *` UTC + Production Controller `workflow_run` + manual / `workflow_call` | Daily + deploy-hook money-path probe: signed-out → claim → $199 Pro checkout → activation. Timestamped receipt; Slack + Linear with repro on red. Distinct from Canary Health Gate uptime. | `.github/workflows/m2-revenue-path-canary.yml` |
 | `Golden Path Nightly` | `23 9 * * *` UTC (skip-if-unchanged) + manual | JOV-6920: dispatches the real-auth + Stripe test-mode Golden Path lane in `ci.yml` on `main` and exits (skipped when main has a green Golden Path under 24 h old). The dispatched run's `Golden Path Report` job files one fingerprinted P0 Linear issue on red or resolves it on green; a red run reopens the existing issue into Todo. Acquisition eligibility reads that ci.yml job, not this dispatcher. | `.github/workflows/golden-path-nightly.yml` |
-| `Merge Queue Green Enroll` | `*/15 * * * *` UTC (temporal-resource) + required-check `workflow_run` + `unlabeled`/`reopened` + manual | JOV-7589: event-driven enrollment of CLEAN PRs into the merge queue, plus a 15-minute full-roster reconciliation sweep. A merge-queue ejection while checks are already green emits no completion event, so the sweep is the only wake that re-arms a dequeued green head within 15 minutes. | `.github/workflows/merge-queue-green-enroll.yml` |
 | `Security Scanning` | `0 14 * * 1` UTC (upstream-advisory) + push to `main` + manual | JOV-7565: weekly dependency/SAST baseline — upstream OSV/Semgrep advisories publish on their own clock, so push-only triggers can miss new findings on unchanged source. Uploads SARIF with read-contents/security-events only. | `.github/workflows/security.yml`, `scripts/security/` |
 | `VOC Mine` | `0 14 * * 1` UTC (upstream-advisory) + manual | JOV-7701: weekly mining of public complaints and payment objections about the tools Jovie replaces (app reviews, review pages, HN). Uploads anonymized classified items as a 90-day artifact. Skips until `VOC_TARGETS_JSON` and `EXA_API_KEY` secrets exist; on-demand runs publish dated receipts to gbrain `ops/voc/`. | `.github/workflows/voc-mine.yml`, `scripts/voc/README.md` |
-| `Remediation Sweep` | `11 8 * * *` UTC daily; `17 8 * * 1` UTC weekly + manual `dry_run` | JOV-7552/JOV-7592: files or reopens fingerprinted Linear issues when a watched failure returns. Weekly: open-draft rollup. Daily: `lane-fix-exhausted` older than 24h, hold labels idle more than 7d, terminal-red non-draft `summer-config` PRs, Summer receipt staleness, and Vercel production ERROR. GitHub reads are limited to Jovie and summer-config. The Vercel job skips with a warning when no read-only token secret is set. | `.github/workflows/remediation-sweep.yml` |
+| `Remediation Sweep` | `11 8 * * *` UTC daily; `17 8 * * 1` UTC weekly + manual `dry_run` | JOV-7552/JOV-7592: files or reopens fingerprinted Linear issues when a watched failure returns. Weekly: open-draft rollup. Daily: `lane-fix-exhausted` older than 24h, hold labels idle more than 7d, terminal-red non-draft `summer-config` PRs, Summer receipt staleness, Vercel production ERROR, and the credentials/spend registry (`--mode credentials`: expiry 7d/1d, runway under 14 days, 50/80/100% caps, unowned secrets; `docs/COST_MONITORING.md` Layer 3). GitHub reads are limited to Jovie and summer-config. The Vercel job skips with a warning when no read-only token secret is set. | `.github/workflows/remediation-sweep.yml` |
 | `Production Synthetic Monitoring` | `17 */6 * * *` UTC for deep browser synthetics; `47 7 * * *` UTC for Web AI health; manual | Existing front-door/auth/profile coverage plus one daily production Gateway turn for web chat, insights, pitches, titles, and packaging. Web AI failures emit a redacted receipt, Slack alert, and high-priority Linear bug signal with the founder allowlist name. | `.github/workflows/synthetic-monitoring.yml` |
 | `Summer Eve identity check` | `17 * * * *` UTC (hourly) + `workflow_dispatch` + every pull request | Rejects a Summer per-deployment URL or deployment-id pin in source. On schedule, manual dispatch, and pull requests that touch the Summer bridge (the identity job only boots then; other PRs run the pin guard alone), confirms `https://summer.jov.ie/runtime/v1/identity` is source-bound production project `prj_LaVQva346cjp5XfrbAIIQUln7tPH`. A Vercel readback runs only when `SUMMER_PIN_CHECK_VERCEL_TOKEN` is present. | `.github/workflows/summer-eve-pin.yml` |
 
@@ -62,7 +56,7 @@ cannot authorize reactivation or a full-log sweep.
 
 ## Local Hermes Launchd Schedule
 
-These are historical machine-local Hermes jobs, separate from Vercel production crons. This table does not authorize installation or activation.
+Retired with Hermes (2026-09-05); the registry records them as `retired` with archive paths. This table does not authorize installation or activation.
 
 | Unit | Schedule | Purpose | Source |
 |------|----------|---------|--------|
@@ -77,7 +71,7 @@ not GitHub or Vercel cron jobs.
 | Unit | Schedule | Purpose | Source |
 |------|----------|---------|--------|
 | `com.jovie.lanes` / `jovie-lanes.timer` | Every 5 minutes + load/boot | Drain-safe release update, then dispatch idle provider seats. Event-driven workers pull again immediately; this is the idle fallback. | `scripts/lanes/install.sh`, `scripts/lanes/lane_runner.py` |
-| `com.jovie.lanes-watchdog` / `jovie-lanes-watchdog.timer` | Every minute + load/boot | Local-only factory liveness observer. Performs at most three bounded recoveries through the installed lanes service, verifies a new admitting/writing observation, and alerts only on exhaustion or decision-required capacity loss. | `scripts/lanes/install.sh`, `scripts/lanes/factory_watchdog.py` |
+| `com.jovie.lanes-watchdog` / `jovie-lanes-watchdog.timer` | Every minute + load/boot | Local-only factory liveness observer. Performs at most three bounded recoveries through the installed lanes service, verifies a new admitting/writing observation, and alerts only on exhaustion or decision-required capacity loss. Defined by the installer but not installed on Gem as of 2026-10-20 (Gem runs only `jovie-lanes.timer`); reconciliation is with the lanes owner. | `scripts/lanes/install.sh`, `scripts/lanes/factory_watchdog.py` |
 
 ## Production Schedule
 
@@ -96,6 +90,8 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | `/api/cron/process-pre-saves` | `0 2 * * *` | Daily at 02:00 UTC |
 | `/api/cron/monitor-metadata-submissions` | `0 * * * *` | Hourly |
 | `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
+| `/api/cron/process-workflow-runs` | `*/6 * * * *` | Every 6 minutes (403 at the trusted-origin check on every call as of 2026-10-20) |
+| `/api/cron/voice-pipeline` | `*/5 * * * *` | Every 5 minutes (missing from the unused root `vercel.json`) |
 | `/api/cron/public-profile-canary` | `13 6 * * *` | Daily at 06:13 UTC |
 | `/api/cron/auth-signup-onboarding-canary` | `23 6 * * *` | Daily at 06:23 UTC (JOV-1871) |
 | `/api/cron/artist-daily-snapshots` | `15 9 * * *` | Daily at 09:15 UTC. No-op unless `ARTIST_DAILY_SNAPSHOTS` is true. YouTube Data API statistics when `YOUTUBE_DATA_API_KEY` is set; Wikimedia pageviews. Social HTML waits for isolated egress. |
