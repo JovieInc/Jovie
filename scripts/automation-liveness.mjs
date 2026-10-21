@@ -21,9 +21,12 @@
  * --file applies the decisions through scripts/lib/remediation-signal.mjs
  * (needs LINEAR_API_KEY; REMEDIATION_INTAKE_DISABLED=1 skips).
  */
+import { execFile as execFileCb } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 import { createApiClient } from '../packages/api-client/client.ts';
 import { hashCredential } from '../packages/api-client/store.ts';
 import {
@@ -39,6 +42,75 @@ import {
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TIMEOUT_MS = 10_000;
 const SHA_RE = /^[0-9a-f]{40}$/;
+const execFile = promisify(execFileCb);
+
+/**
+ * refs/heads/main over the git protocol. The Git Database REST ref answers
+ * 403 to the Actions token (run 39646931368) even while other reads succeed.
+ * Anonymous ls-remote does not spend that quota; the token is only the
+ * fallback, and it never appears on the command line.
+ */
+export async function readMainShaViaGit({
+  repo,
+  token = '',
+  execFileImpl = execFile,
+} = {}) {
+  if (!/^[^/\s]+\/[^/\s]+$/.test(String(repo ?? ''))) return null;
+  const url = `https://github.com/${repo}.git`;
+  const args = ['ls-remote', '--refs', url, 'refs/heads/main'];
+  const baseEnv = {
+    PATH: process.env.PATH ?? '',
+    HOME: process.env.HOME ?? '',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_SYSTEM: '/dev/null',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_TERMINAL_PROMPT: '0',
+    GCM_INTERACTIVE: 'never',
+  };
+  const shaFrom = async env => {
+    const { stdout } = await execFileImpl('git', args, {
+      cwd: tmpdir(),
+      env,
+      timeout: TIMEOUT_MS,
+      maxBuffer: 8192,
+    });
+    const sha = String(stdout ?? '')
+      .trim()
+      .split(/\s+/)[0];
+    return SHA_RE.test(sha ?? '') ? sha : null;
+  };
+  try {
+    const anonymous = await shaFrom(baseEnv);
+    if (anonymous) return anonymous;
+  } catch {
+    // Authenticated git is the second read. A transport failure here is not
+    // yet silence.
+  }
+  if (!token) return null;
+  try {
+    return await shaFrom({
+      ...baseEnv,
+      GIT_CONFIG_COUNT: '2',
+      GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
+      GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`,
+      GIT_CONFIG_KEY_1: 'core.hooksPath',
+      GIT_CONFIG_VALUE_1: '/dev/null',
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function mainRefFromRecovery(readMainSha, receipt) {
+  if (typeof readMainSha !== 'function') return null;
+  try {
+    const sha = await readMainSha(receipt);
+    if (!SHA_RE.test(sha ?? '')) return null;
+    return { ref: 'refs/heads/main', object: { type: 'commit', sha } };
+  } catch {
+    return null;
+  }
+}
 
 async function readJson(fetchImpl, url, headers = {}) {
   const controller = new AbortController();
@@ -153,7 +225,14 @@ export async function observeJsonTimestamp(receipt, { fetchImpl }) {
  */
 export async function observeProductionFreshness(
   receipt,
-  { fetchImpl, token, nowMs, githubClient, apiUrl = 'https://api.github.com' }
+  {
+    fetchImpl,
+    token,
+    nowMs,
+    githubClient,
+    apiUrl = 'https://api.github.com',
+    readMainSha,
+  }
 ) {
   const build = await readJson(fetchImpl, receipt.buildInfoUrl);
   const live = build.ok ? build.body?.commitSha : null;
@@ -170,6 +249,7 @@ export async function observeProductionFreshness(
       fetch: fetchImpl,
     });
   let head;
+  let refDenied = false;
   try {
     const response = await client.request({
       url: `${apiUrl}/repos/${receipt.repo}/git/ref/heads/main`,
@@ -184,16 +264,23 @@ export async function observeProductionFreshness(
       maxWaitMs: TIMEOUT_MS,
       timeoutMs: TIMEOUT_MS,
     });
-    if (response.status !== 200)
-      return { ok: false, reason: `main-ref-http-${response.status}` };
-    head = response.json();
+    if (response.status === 200) head = response.json();
+    else if (response.status === 403) refDenied = true;
+    else return { ok: false, reason: `main-ref-http-${response.status}` };
   } catch (error) {
-    return {
-      ok: false,
-      reason: error?.status
-        ? `main-ref-http-${error.status}`
-        : `main-ref-${error?.failure ?? error?.kind ?? 'unreadable'}`,
-    };
+    if (error?.status === 403) refDenied = true;
+    else {
+      return {
+        ok: false,
+        reason: error?.status
+          ? `main-ref-http-${error.status}`
+          : `main-ref-${error?.failure ?? error?.kind ?? 'unreadable'}`,
+      };
+    }
+  }
+  if (refDenied) {
+    head = await mainRefFromRecovery(readMainSha, receipt);
+    if (!head) return { ok: false, reason: 'main-ref-http-403' };
   }
   const main =
     head?.ref === 'refs/heads/main' && head?.object?.type === 'commit'
@@ -329,10 +416,11 @@ export async function runLiveness({
   token = '',
   nowMs = Date.now(),
   githubClient,
+  readMainSha,
 }) {
   const startedAt = new Date(nowMs).toISOString();
   const observations = new Map();
-  const context = { fetchImpl, token, nowMs, githubClient };
+  const context = { fetchImpl, token, nowMs, githubClient, readMainSha };
   for (const entry of registry.entries ?? []) {
     if (entry?.status !== 'live') continue;
     const observed = await observeEntry(entry, context);
@@ -427,10 +515,12 @@ export async function main({
     );
     return { automations };
   }
+  const token = env.GH_TOKEN ?? env.GITHUB_TOKEN ?? '';
   const { report, events, startedAt } = await runLiveness({
     registry,
     fetchImpl,
-    token: env.GH_TOKEN ?? env.GITHUB_TOKEN ?? '',
+    token,
+    readMainSha: receipt => readMainShaViaGit({ repo: receipt.repo, token }),
   });
   const endedAt = new Date().toISOString();
   const runUrl = env.GITHUB_RUN_ID

@@ -3,7 +3,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
-import { runLiveness as runLivenessImpl } from '../../automation-liveness.mjs';
+import {
+  readMainShaViaGit,
+  runLiveness as runLivenessImpl,
+} from '../../automation-liveness.mjs';
 import {
   livenessDecisions,
   livenessFingerprint,
@@ -289,6 +292,149 @@ describe('dead-man liveness', () => {
       reason: 'main-ref-unreadable',
     });
     expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
+  it('recovers a 403 main ref over the git protocol', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+        '/git/ref/heads/main': 403,
+      }),
+      readMainSha: async () => MAIN,
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: 'production-current',
+    });
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
+  it('ages an unshipped main recovered after a 403 ref read', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': 403,
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [{ commit: { committer: { date: iso(30) } } }],
+        },
+      }),
+      readMainSha: async () => MAIN,
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: '1-commits-unshipped',
+      ageMinutes: 30,
+    });
+  });
+
+  it('stays red when git cannot recover a 403 main ref', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+        '/git/ref/heads/main': 403,
+      }),
+      readMainSha: async () => {
+        throw new Error('ls-remote failed');
+      },
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'unknown',
+      reason: 'main-ref-http-403',
+    });
+    expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
+  it('recovers when the ref client throws HTTP 403', async () => {
+    const { report } = await runLivenessImpl({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+      }),
+      githubClient: {
+        request: async () => {
+          const error = new Error('denied');
+          error.status = 403;
+          throw error;
+        },
+      },
+      readMainSha: async () => MAIN,
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: 'production-current',
+    });
+  });
+
+  it('reads main with anonymous ls-remote and keeps the token off the command', async () => {
+    const calls = [];
+    const sha = await readMainShaViaGit({
+      repo: 'JovieInc/Jovie',
+      token: 'secret-token',
+      execFileImpl: async (cmd, args, opts) => {
+        calls.push({ cmd, args, env: opts.env });
+        return { stdout: `${MAIN}\trefs/heads/main\n` };
+      },
+    });
+    expect(sha).toBe(MAIN);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].cmd).toBe('git');
+    expect(calls[0].args).toEqual([
+      'ls-remote',
+      '--refs',
+      'https://github.com/JovieInc/Jovie.git',
+      'refs/heads/main',
+    ]);
+    expect(JSON.stringify(calls[0])).not.toContain('secret-token');
+    expect(calls[0].env.GIT_CONFIG_GLOBAL).toBe('/dev/null');
+    expect(calls[0].env.GIT_CONFIG_VALUE_0).toBeUndefined();
+  });
+
+  it('falls back to authenticated ls-remote without printing the token', async () => {
+    const calls = [];
+    const sha = await readMainShaViaGit({
+      repo: 'JovieInc/Jovie',
+      token: 'secret-token',
+      execFileImpl: async (cmd, args, opts) => {
+        calls.push({ cmd, args, env: opts.env });
+        if (calls.length === 1) throw new Error('anonymous failed');
+        return { stdout: `${MAIN}\trefs/heads/main\n` };
+      },
+    });
+    expect(sha).toBe(MAIN);
+    expect(calls).toHaveLength(2);
+    expect(calls[1].args.join(' ')).not.toContain('secret-token');
+    expect(calls[1].env.GIT_CONFIG_VALUE_0).toMatch(/^AUTHORIZATION: basic /);
+    expect(
+      Buffer.from(
+        calls[1].env.GIT_CONFIG_VALUE_0.replace('AUTHORIZATION: basic ', ''),
+        'base64'
+      ).toString()
+    ).toBe('x-access-token:secret-token');
+  });
+
+  it('rejects an unreadable git main and a malformed repository', async () => {
+    await expect(
+      readMainShaViaGit({
+        repo: 'not a repo',
+        execFileImpl: async () => {
+          throw new Error('should not run');
+        },
+      })
+    ).resolves.toBeNull();
+    await expect(
+      readMainShaViaGit({
+        repo: 'JovieInc/Jovie',
+        execFileImpl: async () => ({ stdout: 'nope\n' }),
+      })
+    ).resolves.toBeNull();
   });
 
   it.each([401, 403, 404, 429, 503])(
