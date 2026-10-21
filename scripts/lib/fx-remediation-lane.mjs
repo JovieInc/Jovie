@@ -13,7 +13,7 @@ export const FX_EXECUTOR_POLICY = Object.freeze({
   provider: 'vercel-ai-gateway',
   route: 'github-actions-fx',
   identityBasis: 'configured-gateway-and-observed-model',
-  expectedModel: 'openai/gpt-5.6-luna',
+  expectedModel: 'zai/glm-5.3',
   modelSubstitutionPolicy: 'reject-observed-mismatch',
   maxSteps: 12,
   stepLimitBasis: 'FX_MAX_AGENT_STEPS',

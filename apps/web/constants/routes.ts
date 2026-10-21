@@ -104,6 +104,7 @@ export const APP_ROUTES = {
   ADMIN_PRODUCT: '/app/ov/product',
   ADMIN_OPERATIONS: '/app/ov/operations',
   ADMIN_NEEDS_YOU: '/app/ov/needs-you',
+  ADMIN_INBOX: '/app/ov/inbox',
   ADMIN_SHIPPING: '/app/ov/shipping',
   ADMIN_PEOPLE: '/app/ov/people',
   ADMIN_GROWTH: '/app/ov/growth',

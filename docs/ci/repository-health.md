@@ -163,6 +163,17 @@ Pruned under this rule (JOV-6671): historical `apps/web/drizzle/migrations/meta/
 
 Stale audit, status, and one-off script files accumulated at the root (`*_AUDIT.md`, `.agent-status.json`, `run-checks.sh`, `test-homepage.*`). The 2026-10-20 pass deleted the dead ones and moved the JOV-2712 hardening bundle to `docs/hardening/`. To stop regrowth, `scripts/repo-root-allowlist.json` lists every tracked top-level file and directory; `scripts/repo-hygiene-guard.mjs` fails any added path whose first segment is not listed, and a guard test keeps the list equal to the tracked root. Put docs under `docs/` or `canon/`, scripts under `scripts/`, and run evidence outside git. Adding a root entry is a reviewed edit to the allowlist; retiring one removes it.
 
+### Stale branch sweep
+
+Remote branches grew to 7,752 by 2026-10-20 because GitHub only auto-deletes merged PR heads. Agent branches with no PR, closed-unmerged heads, and squash-merged heads that got later commits all stayed. `scripts/stale-branch-sweep.mjs` (policy in `scripts/lib/stale-branch-sweep.mjs`) is dry-run by default. With `--apply` it deletes a branch only when nothing can be lost:
+
+- **Contained:** the tip is reachable from `main` and is at least 3 days old.
+- **Archived:** the branch is idle for at least 14 days and has no open PR. Its tip is pushed to `refs/archive/<branch>` and read back at the planned SHA. Only then is the branch deleted, with `--force-with-lease` on that SHA.
+
+The sweep never touches `main`, `gh-readonly-queue/*`, `backup/*` (hostops preservation owned by `scripts/lanes/worktree_sweep.py`), `release/*`, `dependabot/*`, a branch with an open PR, or a branch named in `--keep-file` (for example, one checked out in a local worktree). `refs/archive/*` is not fetched by the default refspec, so archived work costs clones nothing. To restore a branch, run `git push origin refs/archive/<branch>:refs/heads/<branch>`.
+
+GitHub crons are frozen (JOV-INV-042), so `.github/workflows/stale-branch-sweep.yml` has no schedule. The Gem lanes clock fires `repository_dispatch` type `clock_stale_branch_sweep` weekly; that event applies unless `client_payload.apply` is `false`. The automation registry records the cadence. Manual `workflow_dispatch` is a dry-run unless `apply=true`. Each run uploads a `jovie-stale-branch-sweep/v1` receipt.
+
 ### Split a package or repository
 
 All must hold for two consecutive 30-day windows:

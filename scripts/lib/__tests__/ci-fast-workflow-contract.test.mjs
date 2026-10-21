@@ -27,7 +27,9 @@ import {
   formatLaneDuration,
   LANE_COMMANDS,
   LANE_GROUPS,
+  LANES_PYTEST_FILES,
   LANES_PYTEST_SHARD_EXPRESSION,
+  LANES_PYTEST_SHARDS,
   listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
   NODE_RUNTIME_CONTRACT_COMMAND,
@@ -315,15 +317,17 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
-  it('partitions the lanes coverage suite into complementary concurrent shards', () => {
-    // One coverage map used to come from one serial pytest (174.5s, the
-    // remaining job's long pole). Both shards must select the identical files
-    // with complementary -k expressions, both must pass, and their maps must
-    // be combined before any per-module threshold reads the data file.
+  it('partitions the lanes coverage suite into four balanced concurrent shards', () => {
+    // The lanes pytest is the remaining job's long pole (308.5s in merge group
+    // 39479966697). Every lanes test file must run exactly once across the
+    // shards: the two keyword shards split test_lane_runner.py with
+    // complementary -k expressions over that one file, and the other shards
+    // own disjoint whole files. All four maps are combined before any
+    // per-module threshold reads the data file.
     const [command] = STRUCTURAL_PYTHON_REGRESSION_COMMANDS;
     const shards = [
       ...command.matchAll(
-        /COVERAGE_FILE="([^"]+)" python3 -m coverage run --branch -m pytest ((?:scripts\/tests\/\S+\.py ?)+) -q -p no:cacheprovider --basetemp="([^"]+)" -k "([^"]+)"/gu
+        /COVERAGE_FILE="([^"]+)" python3 -m coverage run --branch -m pytest ((?:scripts\/tests\/\S+\.py ?)+) -q -p no:cacheprovider --basetemp="([^"]+)"(?: -k "([^"]+)")?/gu
       ),
     ].map(([, data, files, basetemp, keyword]) => ({
       data,
@@ -331,18 +335,27 @@ describe('ci-fast bounded parallel workflow', () => {
       basetemp,
       keyword,
     }));
-    expect(shards.map(shard => shard.keyword)).toEqual([
+    expect(shards).toHaveLength(LANES_PYTEST_SHARDS.length);
+    expect(shards).toHaveLength(4);
+    const keyed = shards.filter(shard => shard.keyword);
+    expect(keyed.map(shard => shard.keyword)).toEqual([
       LANES_PYTEST_SHARD_EXPRESSION,
       `not (${LANES_PYTEST_SHARD_EXPRESSION})`,
     ]);
-    expect(shards[1].files).toEqual(shards[0].files);
-    expect(shards[0].files).toContain('scripts/tests/test_lane_runner.py');
-    expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(2);
-    expect(command).toContain(
-      'lanes_b=$?; wait "$lanes_a" && test "$lanes_b" -eq 0; } && '
+    expect(keyed[1].files).toEqual(keyed[0].files);
+    expect(keyed[0].files).toEqual(['scripts/tests/test_lane_runner.py']);
+    // Whole-file shards plus the keyed file cover the suite exactly once.
+    const whole = shards.filter(shard => !shard.keyword).flatMap(s => s.files);
+    expect(new Set(whole).size).toBe(whole.length);
+    expect([...whole, ...keyed[0].files].sort()).toEqual(
+      [...LANES_PYTEST_FILES].sort()
     );
+    expect(LANES_PYTEST_FILES).toHaveLength(28);
+    expect(whole).toContain('scripts/tests/test_model_radar.py');
+    expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
+    expect(new Set(shards.map(shard => shard.data)).size).toBe(4);
     const combine = command.indexOf(
-      `python3 -m coverage combine "${shards[0].data}" "${shards[1].data}"`
+      `python3 -m coverage combine ${shards.map(shard => `"${shard.data}"`).join(' ')}`
     );
     expect(combine).toBeGreaterThan(-1);
     expect(command.indexOf('python3 -m coverage report')).toBeGreaterThan(
@@ -350,9 +363,9 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
-  it('fails the lanes coverage command when either shard fails', () => {
+  it('fails the lanes coverage command when any shard fails', () => {
     const [command] = STRUCTURAL_PYTHON_REGRESSION_COMMANDS;
-    for (const failing of ['a', 'b', '']) {
+    for (const failing of ['a', 'b', 'c', 'd', '']) {
       const root = mkdtempSync(join(tmpdir(), 'lanes-shards-'));
       try {
         const bin = join(root, 'bin');
@@ -371,8 +384,12 @@ describe('ci-fast bounded parallel workflow', () => {
           },
         });
         const calls = readFileSync(join(root, 'calls.log'), 'utf8');
+        // Every shard runs, even when an earlier one failed.
+        for (const id of ['a', 'b', 'c', 'd'])
+          expect(calls).toContain(`jovie-lanes-${id}.coverage -m coverage run`);
         if (failing) {
-          expect(result.status, failing).not.toBe(0);
+          // The failing shard's own exit status (9) is propagated.
+          expect(result.status, failing).toBe(9);
           expect(calls).not.toContain('-m coverage report');
         } else {
           expect(result.status, result.stderr).toBe(0);
