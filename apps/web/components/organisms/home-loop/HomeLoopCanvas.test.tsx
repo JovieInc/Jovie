@@ -23,7 +23,13 @@ import {
   useUndoableAnswers,
 } from './useUndoableAnswers';
 
-const toastMock = vi.hoisted(() => vi.fn());
+const toastMock = vi.hoisted(() =>
+  Object.assign(vi.fn(), {
+    dismiss: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+  })
+);
 vi.mock('@/components/feedback', () => ({ toast: toastMock }));
 
 function props(
@@ -361,6 +367,9 @@ describe('useUndoableAnswers', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     toastMock.mockReset();
+    toastMock.dismiss.mockReset();
+    toastMock.error.mockReset();
+    toastMock.success.mockReset();
   });
   afterEach(() => vi.useRealTimers());
 
@@ -423,5 +432,63 @@ describe('useUndoableAnswers', () => {
       label: 'Not recorded. Try again.',
       state: 'failed',
     });
+  });
+
+  it('commits a pending answer when the hook unmounts during the undo window', async () => {
+    const commit = vi.fn().mockResolvedValue(undefined);
+    const onCommitted = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useUndoableAnswers({ onCommitted })
+    );
+
+    act(() => result.current.answer({ id: 'a', label: 'Approved', commit }));
+    expect(commit).not.toHaveBeenCalled();
+
+    await act(async () => {
+      unmount();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOME_LOOP_UNDO_WINDOW_MS);
+    });
+
+    expect(commit).toHaveBeenCalledOnce();
+    expect(toastMock.dismiss).toHaveBeenCalledWith('home-loop-answer-a');
+    expect(toastMock.success).toHaveBeenCalledWith('Approved');
+    expect(onCommitted).toHaveBeenCalledWith('a');
+  });
+
+  it('does not send an undone answer when the hook unmounts', async () => {
+    const commit = vi.fn().mockResolvedValue(undefined);
+    const { result, unmount } = renderHook(() => useUndoableAnswers());
+
+    act(() => result.current.answer({ id: 'a', label: 'Approved', commit }));
+    const undo = toastMock.mock.calls[0]?.[1]?.action?.onClick as () => void;
+    act(() => undo());
+    await act(async () => {
+      unmount();
+    });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(toastMock.success).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed flush when unmount commits and the send fails', async () => {
+    const commit = vi
+      .fn()
+      .mockRejectedValue(new Error('Not recorded. Try again.'));
+    const onCommitted = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useUndoableAnswers({ onCommitted })
+    );
+
+    act(() => result.current.answer({ id: 'a', label: 'Approved', commit }));
+    await act(async () => {
+      unmount();
+    });
+
+    expect(commit).toHaveBeenCalledOnce();
+    expect(onCommitted).not.toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalledWith('Not recorded. Try again.');
+    expect(toastMock.success).not.toHaveBeenCalled();
   });
 });
