@@ -15,6 +15,10 @@ const iso = minutesAgo => new Date(NOW - minutesAgo * 60_000).toISOString();
 const MAIN = 'a'.repeat(40);
 const LIVE = 'b'.repeat(40);
 
+function mainRef(sha) {
+  return { ref: 'refs/heads/main', object: { type: 'commit', sha } };
+}
+
 function only(...ids) {
   const entries = registry.entries.filter(entry => ids.includes(entry.id));
   expect(entries.map(entry => entry.id).sort()).toEqual([...ids].sort());
@@ -71,7 +75,7 @@ describe('dead-man liveness', () => {
           [12, 'success', 1]
         ),
         'jov.ie/api/health/build-info': { commitSha: LIVE },
-        '/commits/main': { sha: MAIN },
+        '/git/ref/heads/main': mainRef(MAIN),
         [`/compare/${LIVE}...${MAIN}`]: {
           ahead_by: 9,
           commits: [{ commit: { committer: { date: iso(5 * 60) } } }],
@@ -103,6 +107,136 @@ describe('dead-man liveness', () => {
     expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
       status: 'unknown',
       reason: 'live-sha-unreadable',
+    });
+    expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
+  it('reads main identity without requesting the full commit and its diff', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      token: 'test-token',
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+        '/git/ref/heads/main': mainRef(MAIN),
+        '/commits/main': 503,
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: 'production-current',
+      lastProofAt: iso(0),
+    });
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
+  it('keeps a recent unshipped commit inside the promotion silence budget', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': mainRef(MAIN),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [{ commit: { committer: { date: iso(30) } } }],
+        },
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: '1-commits-unshipped',
+      ageMinutes: 30,
+    });
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
+  it.each([
+    [503, 'unknown', 'unshipped-range-unreadable'],
+    [{ ahead_by: 1, commits: [] }, 'unknown', 'unshipped-age-unreadable'],
+    [{ ahead_by: 0 }, 'fresh', 'production-current'],
+  ])(
+    'judges the unshipped range independently (%j)',
+    async (range, status, reason) => {
+      const { report } = await runLiveness({
+        registry: only('derived:jovie:production-promotion'),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: LIVE },
+          '/git/ref/heads/main': mainRef(MAIN),
+          [`/compare/${LIVE}...${MAIN}`]: range,
+        }),
+      });
+      expect(
+        rowFor(report, 'derived:jovie:production-promotion')
+      ).toMatchObject({
+        status,
+        reason,
+      });
+      expect(livenessDecisions(report).length).toBe(status === 'fresh' ? 0 : 1);
+    }
+  );
+
+  it.each([401, 403, 404, 429, 503])(
+    'keeps an HTTP %s main-ref failure red with its diagnostic reason',
+    async status => {
+      const { report } = await runLiveness({
+        registry: only('derived:jovie:production-promotion'),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: MAIN },
+          '/git/ref/heads/main': status,
+        }),
+      });
+      expect(
+        rowFor(report, 'derived:jovie:production-promotion')
+      ).toMatchObject({
+        status: 'unknown',
+        reason: `main-ref-http-${status}`,
+      });
+      expect(livenessDecisions(report)[0].action).toBe('red');
+    }
+  );
+
+  it.each([
+    [{ name: 'AbortError' }, 'timeout'],
+    [new Error('connection reset'), 'transport'],
+  ])('keeps a failed main-ref transport red (%j)', async (error, reason) => {
+    const buildFetch = fakeFetch({
+      'jov.ie/api/health/build-info': { commitSha: MAIN },
+    });
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: async url => {
+        if (url.includes('/git/ref/heads/main')) throw error;
+        return buildFetch(url);
+      },
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'unknown',
+      reason: `main-ref-${reason}`,
+    });
+    expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
+  it.each([
+    {},
+    mainRef('invalid'),
+    { ref: 'refs/heads/main', object: { type: 'tree', sha: MAIN } },
+    { ref: 'refs/heads/other', object: { type: 'commit', sha: MAIN } },
+  ])('rejects malformed or unrelated main refs (%j)', async ref => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+        '/git/ref/heads/main': ref,
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'unknown',
+      reason: 'main-sha-unreadable',
     });
     expect(livenessDecisions(report)[0].action).toBe('red');
   });

@@ -158,12 +158,18 @@ export async function observeProductionFreshness(
   if (!SHA_RE.test(live ?? ''))
     return { ok: false, reason: 'live-sha-unreadable' };
   const headers = githubHeaders(token);
+  // Only the branch identity is needed here. The commit endpoint also
+  // computes changed files and patches, adding avoidable work to this probe.
   const head = await readJson(
     fetchImpl,
-    `${apiUrl}/repos/${receipt.repo}/commits/main`,
+    `${apiUrl}/repos/${receipt.repo}/git/ref/heads/main`,
     headers
   );
-  const main = head.ok ? head.body?.sha : null;
+  if (!head.ok) return { ok: false, reason: `main-ref-${head.reason}` };
+  const main =
+    head.body?.ref === 'refs/heads/main' && head.body?.object?.type === 'commit'
+      ? head.body.object.sha
+      : null;
   if (!SHA_RE.test(main ?? ''))
     return { ok: false, reason: 'main-sha-unreadable' };
   const now = new Date(nowMs).toISOString();
