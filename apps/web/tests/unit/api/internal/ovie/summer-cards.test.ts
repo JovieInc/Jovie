@@ -345,6 +345,22 @@ describe('GET /api/internal/ovie/summer-cards', () => {
     });
   });
 
+  it('lets Summer poll post-ship feedback on decided cards', async () => {
+    hoisted.list.mockResolvedValue([]);
+    await GET(
+      new Request(
+        `${URL_BASE}?status=decided&feedbackSince=2026-10-22T00:00:00.000Z`
+      )
+    );
+    expect(hoisted.list).toHaveBeenCalledWith({
+      status: 'decided',
+      feedbackSince: '2026-10-22T00:00:00.000Z',
+      limit: 50,
+    });
+    const bad = await GET(new Request(`${URL_BASE}?feedbackSince=soon`));
+    expect(bad.status).toBe(400);
+  });
+
   it('defaults to pending cards', async () => {
     hoisted.list.mockResolvedValue([]);
     await GET(new Request(URL_BASE));

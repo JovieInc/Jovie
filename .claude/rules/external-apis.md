@@ -29,6 +29,15 @@ The client is the contract. Do not reimplement any of it at a call site:
   breaker; a half-open probe closes it. Transitions log one JSON line.
 - **Cache and batch:** GitHub GETs reuse ETags (a 304 is free); repeated reads
   take `cacheTtlMs`; N lookups use one aliased GraphQL `batch()`, not N calls.
+- **Money:** a paid call passes `priceUsd` (or the provider's
+  `pricing.perCallUsd`). It is reserved against a per-credential UTC-day cap
+  (`pricing.dailyCapUsd` or `dailySpendCapUsd`) before the call and refunded if
+  the call fails. A priced call with no cap, a reached cap, or a provider 402
+  throws `BudgetExhaustedError` (`budget_exhausted`).
+- **Credentials:** `resolveCredential` / `resolve_credential` try own, then
+  shared, then pooled (opt-in). Every fallback is logged; none means fail closed.
+- **Blocked providers** (`"status": "blocked"`, e.g. composio) stay registered
+  so the guard flags their hosts; the client refuses to call them.
 
 `node packages/api-client/cli.ts status --json` (or `PYTHONPATH=scripts python3
 -m apiclient status --json`) shows per-provider budget, breaker and usage for lanes doctor.

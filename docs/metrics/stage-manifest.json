@@ -338,6 +338,29 @@
         }
       ]
     },
+    "linear-intake": {
+      "entityId": "Linear issue identifier (JOV-123, LYB-45)",
+      "description": "One issue that entered Triage, from entry to classification (team, priority, labels, out of Triage) or an explicit Ovie card for Tim. Dwell SLO 15 min (.claude/rules/event-driven.md); dead-man summer:triage-dwell.",
+      "endToEnd": [["triage", "classified"]],
+      "stages": [
+        {
+          "id": "triage",
+          "meaning": "issue entered Triage (create or move) until Summer's scoped triage turn read back its effect",
+          "producer": "summer-config",
+          "status": "spec",
+          "source": "summer-stage-feed",
+          "owner": "summer-config"
+        },
+        {
+          "id": "classified",
+          "meaning": "terminal: completed when moved out of Triage with priority set, failed when held as an Ovie card for Tim",
+          "producer": "summer-config",
+          "status": "spec",
+          "source": "summer-stage-feed",
+          "owner": "summer-config"
+        }
+      ]
+    },
     "summer-turn": {
       "entityId": "<hashed conversation>:<hashed turn> (summer-config hashes both)",
       "description": "One Summer turn from triggering event to measured outcome.",

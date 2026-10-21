@@ -234,6 +234,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const query = summerCardListQuerySchema.safeParse({
     status: params.get('status') ?? undefined,
     since: params.get('since') ?? undefined,
+    feedbackSince: params.get('feedbackSince') ?? undefined,
     limit: params.get('limit') ?? undefined,
   });
   if (!query.success) {
