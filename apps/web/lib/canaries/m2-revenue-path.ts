@@ -3,7 +3,8 @@
  *
  * Sequential money-path probe, distinct from generic uptime and the existing
  * auth / public-profile canaries:
- *   signed-out → claim → $199 Pro checkout → activation
+ *   signed-out → claim → $12 Pro checkout → activation (step id keeps its
+ *   historical `pro_checkout_199` name for receipt continuity)
  *
  * Shared between:
  *  - The CLI runner (`scripts/m2-revenue-path-canary.ts`)
@@ -15,6 +16,7 @@
  *  - Each step records startedAt / finishedAt on the receipt.
  */
 
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import { hasServerError, isOkStatus } from './public-profile';
 
@@ -52,7 +54,8 @@ export const M2_SIGNED_OUT_MARKERS = [
 ] as const;
 
 export const M2_CLAIM_FIRST_COPY = 'Claim my free profile';
-export const M2_CLAIM_PRO_ACCESS_COPY = 'Request access';
+/** Pro CTA label from offer truth (self-serve since EVENT: Tim, 2026-10-20). */
+export const M2_CLAIM_PRO_ACCESS_COPY = getPublicPriceClaim('pro').ctaLabel;
 export const M2_CLAIM_PRICE_DISPLAY = `$${M2_PRO_MONTHLY_USD}`;
 
 export const M2_ACTIVATION_MARKERS = [
@@ -352,7 +355,7 @@ export function evaluateProCheckout199(input: {
     return {
       ok: false,
       statusCode: input.checkoutPostStatus,
-      detail: `Unsigned $199 checkout POST must be 401, got HTTP ${input.checkoutPostStatus}`,
+      detail: `Unsigned $${M2_PRO_MONTHLY_USD} checkout POST must be 401, got HTTP ${input.checkoutPostStatus}`,
       evidence,
     };
   }

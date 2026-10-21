@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import { ACTIVE_PRICE_MAPPINGS, PRICE_MAPPINGS } from '@/lib/stripe/config';
+import { VISIBILITY_AUDIT_PRICE_USD } from '@/lib/visibility-audit/offer';
 import { PLATFORM_EVIDENCE } from './platform-evidence';
 import {
   CHANNELS,
@@ -77,8 +78,9 @@ describe('commerce support matrix', () => {
       currency: ARTIST_VISIBILITY_OFFER.pro.currency,
       interval: ARTIST_VISIBILITY_OFFER.pro.interval,
     });
+    // The one-off audit is its own $199 Payment Link, not the Pro price.
     expect(find(data, 'one_time_service').runtime.price.amountCents).toBe(
-      toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd)
+      toCents(VISIBILITY_AUDIT_PRICE_USD)
     );
     expect(find(data, 'legacy_offer').stripe.prices).toEqual(
       Object.values(PRICE_MAPPINGS)

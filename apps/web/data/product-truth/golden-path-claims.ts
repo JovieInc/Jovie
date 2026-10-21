@@ -245,7 +245,7 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'pricing',
     route: '/pricing',
     source: 'apps/web/lib/billing/offer-truth.ts',
-    copy: 'Limited access.',
+    copy: 'Self-serve. Cancel anytime.',
     nature: 'offer',
     capabilityIds: [],
   },
