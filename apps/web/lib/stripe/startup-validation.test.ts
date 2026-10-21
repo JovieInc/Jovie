@@ -39,7 +39,7 @@ describe('Artist Visibility billing startup contract', () => {
     expect(getActivePriceIds()).toEqual(['price_visibility']);
     expect(getPriceMappingDetails('price_visibility')).toMatchObject({
       plan: 'pro',
-      amount: 19900,
+      amount: 1200,
       currency: 'usd',
       interval: 'month',
     });
