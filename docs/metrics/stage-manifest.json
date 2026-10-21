@@ -264,10 +264,31 @@
         }
       ]
     },
+    "automation-run": {
+      "entityId": "<automationId>@<runRef> (registry id in canon/automation-registry.jsonl plus the run's own reference)",
+      "description": "One run of a registered automation, from start to its terminal receipt, as observed by the dead-man liveness check.",
+      "endToEnd": [["started", "finished"]],
+      "stages": [
+        {
+          "id": "started",
+          "meaning": "the automation's run started (from its receipt)",
+          "producer": "automation-liveness",
+          "status": "pushed",
+          "source": "automation-liveness-receipts"
+        },
+        {
+          "id": "finished",
+          "meaning": "the run reached a terminal receipt (completed or failed)",
+          "producer": "automation-liveness",
+          "status": "pushed",
+          "source": "automation-liveness-receipts"
+        }
+      ]
+    },
     "summer-turn": {
-      "entityId": "summer conversation id + turn number",
+      "entityId": "<hashed conversation>:<hashed turn> (summer-config hashes both)",
       "description": "One Summer turn from triggering event to measured outcome.",
-      "endToEnd": [["event", "outcome"]],
+      "endToEnd": [["event", "outcome"], ["model-turn", "outcome"]],
       "stages": [
         {
           "id": "event",
@@ -281,25 +302,22 @@
           "id": "model-turn",
           "meaning": "model call started",
           "producer": "summer-config",
-          "status": "spec",
-          "source": "summer-stage-feed",
-          "owner": "summer-config"
+          "status": "pushed",
+          "source": "summer-stage-feed"
         },
         {
           "id": "action",
           "meaning": "tool/action dispatched",
           "producer": "summer-config",
-          "status": "spec",
-          "source": "summer-stage-feed",
-          "owner": "summer-config"
+          "status": "pushed",
+          "source": "summer-stage-feed"
         },
         {
           "id": "outcome",
           "meaning": "terminal receipt with outcome recorded",
           "producer": "summer-config",
-          "status": "spec",
-          "source": "summer-stage-feed",
-          "owner": "summer-config"
+          "status": "pushed",
+          "source": "summer-stage-feed"
         }
       ]
     }
@@ -331,9 +349,16 @@
       "url": null,
       "owner": "LogYourBody release loop"
     },
-    "summer-stage-feed": {
+    "automation-liveness-receipts": {
       "kind": "events",
       "url": null,
+      "artifact": "automation-liveness-receipts/stage-events.ndjson",
+      "workflow": "automation-liveness.yml",
+      "owner": "automation registry (scripts/automation-liveness.mjs)"
+    },
+    "summer-stage-feed": {
+      "kind": "events",
+      "url": "https://summer.jov.ie/runtime/v1/summer-stage-events.ndjson",
       "owner": "summer-config"
     },
     "revenue-funnel-timings": {

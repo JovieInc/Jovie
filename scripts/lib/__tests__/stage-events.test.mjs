@@ -174,7 +174,7 @@ describe('stage timings', () => {
     expect(queued['28d']).toEqual({ n: 3, p50: 300, p95: 900 });
     expect(t.entities.shipping.stages.verified).toMatchObject({
       terminal: true,
-      '24h': { n: 1, p50: null, p95: null },
+      '24h': { n: 1, p50: null, p95: null, failed: 0, failRate: 0 },
       regression: null,
     });
     expect(t.entities.shipping.stages['gate-seat']['24h']).toEqual({
@@ -192,6 +192,35 @@ describe('stage timings', () => {
         .length,
       stagesWithData: 4,
       events: 6,
+    });
+  });
+
+  it('reports failures and the failure rate on terminal stages', () => {
+    const outcome = (id, outcome) =>
+      event({
+        entityType: 'summer-turn',
+        stage: 'outcome',
+        entityId: id,
+        enteredAt: ago(30),
+        exitedAt: ago(30),
+        outcome,
+      });
+    const t = computeStageTimings(
+      [
+        outcome('a', 'failed'),
+        outcome('b', 'failed'),
+        outcome('c', 'completed'),
+        outcome('d', 'failed'),
+      ],
+      MANIFEST,
+      { now: NOW }
+    );
+    expect(t.entities['summer-turn'].stages.outcome['24h']).toEqual({
+      n: 4,
+      p50: null,
+      p95: null,
+      failed: 3,
+      failRate: 0.75,
     });
   });
 
