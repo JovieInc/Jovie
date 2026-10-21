@@ -294,7 +294,6 @@ export async function runComparison(output: string) {
             } catch {
               /* Failed flights remain in the paired receipts. */
             }
-
             const receiptPath = resolve(
               attemptOutput,
               `attempt-${attempt}.json`
@@ -382,7 +381,6 @@ export async function runComparison(output: string) {
     rmSync(scratch, { recursive: true, force: true });
   }
 }
-
 if (process.argv[1]?.endsWith('compare-chat-performance.ts')) {
   runComparison(
     resolve(process.argv[2] ?? '.context/perf/chat-comparison')

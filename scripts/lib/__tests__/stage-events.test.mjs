@@ -176,7 +176,7 @@ describe('stage timings', () => {
       regression: null,
     });
     expect(t.coverage).toEqual({
-      stagesTotal: 31,
+      stagesTotal: 34,
       stagesWithData: 2,
       events: 4,
     });

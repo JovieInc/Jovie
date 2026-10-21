@@ -14,8 +14,6 @@
   "entities": {
     "chat-comparison": {
       "entityId": "source SHA (build) or source SHA:attempt (smoke)",
-      "description": "Manual exact-source comparison; guarded local receipts, no remote feed configured.",
-      "endToEnd": [],
       "stages": [
         {
           "id": "build",

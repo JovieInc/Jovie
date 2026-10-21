@@ -66,7 +66,7 @@ function isPlaywrightConfigModule(
   );
 }
 const localTrace = Object.fromEntries(
-  'playwright.config.docs-guides.ts=off|playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
+  'playwright.config.chat-comparison.ts=off|playwright.config.docs-guides.ts=off|playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
     .split('|')
     .map(value => value.split('='))
 );
