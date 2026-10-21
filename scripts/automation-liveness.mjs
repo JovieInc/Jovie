@@ -78,14 +78,24 @@ export async function observeGithubWorkflow(
   const branch = receipt.branch
     ? `&branch=${encodeURIComponent(receipt.branch)}`
     : '';
-  const url = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=30${branch}`;
-  const read = await readJson(fetchImpl, url, githubHeaders(token));
-  if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
-  const runs = Array.isArray(read.body?.workflow_runs)
-    ? read.body.workflow_runs
-    : null;
-  if (!runs) return { ok: false, reason: 'github-runs-unreadable' };
+  const base = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=30${branch}`;
   const events = receipt.events ?? null;
+  // Filter by event server-side: a busy push/PR workflow would otherwise
+  // push its scheduled runs out of the 30-run window (security.yml, 2026-10-21).
+  const urls = events
+    ? events.map(event => `${base}&event=${encodeURIComponent(event)}`)
+    : [base];
+  const runs = [];
+  for (const url of urls) {
+    const read = await readJson(fetchImpl, url, githubHeaders(token));
+    if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
+    if (!Array.isArray(read.body?.workflow_runs))
+      return { ok: false, reason: 'github-runs-unreadable' };
+    runs.push(...read.body.workflow_runs);
+  }
+  runs.sort((a, b) =>
+    String(b?.updated_at ?? '').localeCompare(String(a?.updated_at ?? ''))
+  );
   const run = runs.find(
     row =>
       conclusions.includes(row?.conclusion) &&

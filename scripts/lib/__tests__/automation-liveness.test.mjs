@@ -271,6 +271,28 @@ describe('dead-man liveness', () => {
 });
 
 describe('liveness run receipts', () => {
+  it('reads scheduled runs that 30 newer push runs would hide', async () => {
+    const pushes = Array.from({ length: 30 }, (_, i) => [
+      i + 1,
+      'success',
+      100 + i,
+      'push',
+    ]);
+    const { report } = await runLiveness({
+      registry: only('github:jovie:security'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'security.yml/runs': url =>
+          url.includes('event=schedule')
+            ? runs([2 * 24 * 60, 'success', 1, 'schedule'])
+            : url.includes('event=')
+              ? runs()
+              : runs(...pushes),
+      }),
+    });
+    expect(rowFor(report, 'github:jovie:security').status).toBe('fresh');
+  });
+
   it('emits receipts for observed runs during a liveness pass', async () => {
     const { events } = await runLiveness({
       registry: only('github:jovie:production-continuity'),
