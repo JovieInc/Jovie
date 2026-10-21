@@ -1195,7 +1195,7 @@ describe('merge_group workflow contract', () => {
     // merges the shard reports and runs the changed-line ratchet.
     const shard = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage-shard');
     const coverage = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage');
-    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(60);
+    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(20);
     for (const job of [shard, coverage]) {
       const timeout = Number(job.match(/timeout-minutes:\s*(\d+)/)?.[1]);
       expect(timeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);

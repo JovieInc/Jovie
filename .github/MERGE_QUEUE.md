@@ -88,10 +88,10 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
 - Minimum entries to merge: `1`.
 - Minimum entries wait: `0` minutes. A source-green PR forms a group
   immediately instead of waiting for a cohort.
-- Maximum entries per merge: `5`. Each entry still builds its own synthetic
+- Maximum entries per merge: `10`. Each entry still builds its own synthetic
   head layered on the entry ahead (one member per group), so per-member lanes
-  and member policy are unchanged; up to five green entries land in one push.
-- Maximum entries building concurrently: checked-in ceiling `6`. Lower live
+  and member policy are unchanged; up to ten green entries land in one push.
+- Maximum entries building concurrently: checked-in ceiling `10`. Lower live
   values remain supported as a reversible runner-capacity brake. Raise the
   file and the live ruleset together.
 - Check response timeout: `60` minutes (source-first cutover and live readback
@@ -131,14 +131,18 @@ inside each per-member synthetic head. The trusted changed-path classifier runs
 only the selected Web, Mac, iOS, operations/tooling, and shared-contract lanes,
 so a fast-only change does not inherit an unrelated PR's slow product lane.
 
-**Ship now:** immediate groups (`min=1`, `wait=0`), up to five green entries
-per merge push, six building concurrently, ALLGREEN. HEADGREEN is unsafe here:
+**Ship now:** immediate groups (`min=1`, `wait=0`), up to ten green entries
+per merge push, ten building concurrently, ALLGREEN, 20-minute check response
+budget (2026-10-21, Tim-approved; 3 of 287 group runs exceeded 20 minutes in
+the first 12 hours, with no timeout removals). HEADGREEN is unsafe here:
 member policy validates only the newest member and lanes are path-selected per
 member, so an earlier member could land without its own lanes passing.
 **Re-evaluate when:** the group failure rate stays under 10% and the repo
-GITHUB_TOKEN bucket stays healthy for a day. **Then:** raise
-`max_entries_to_build` toward 8 in this file and the live ruleset together,
-watching hosted macOS pickup (the org shares five hosted macOS slots).
+GITHUB_TOKEN bucket stays healthy for a day. **Then:** keep 10/10; if
+merge-group runs selecting the 30/40-minute iOS or Mac lanes start timing out
+at the 20-minute response budget (the 2026-09-23 failure mode), raise the
+budget in this file and the live ruleset together, watching hosted macOS pickup
+(the org shares five hosted macOS slots).
 
 ### Tuning log
 
@@ -149,6 +153,8 @@ watching hosted macOS pickup (the org shares five hosted macOS slots).
 | 2026-10-13 02:37 | live `max_entries_to_build` 6 → 8 | throughput |
 | 2026-10-13 03:47 | live `max_entries_to_build` 8 → 6 | GITHUB_TOKEN quota storm |
 | 2026-10-13 | source synced to live (build 6, merge 5) | keep the daily verify green |
+| 2026-10-21 04:47 | live `max_entries_to_build` 6 → 10, `max_entries_to_merge` 5 → 10, `check_response_timeout_minutes` 60 → 20 (Tim-approved) | queue 40 deep at ~5 merges/h; stuck checks held the head for an hour |
+| 2026-10-21 | source synced to live (build 10, merge 10, timeout 20) | keep the daily verify green (JOV-8205) |
 
 ## Reconciliation and loop prevention
 

@@ -5755,7 +5755,7 @@ jobs:
     # requires every shard to pass, merges their coverage maps, and runs the
     # changed-line ratchet on the exact diff.
     # Job timeout must fail before GitHub merge-queue
-    # check_response_timeout_minutes=60 after source-first ruleset cutover.
+    # check_response_timeout_minutes (20 since 2026-10-21; see MERGE_QUEUE.md).
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
