@@ -12,6 +12,7 @@ import {
   worstCaseMonthlyUsd,
 } from '../summer-improvement-loop-config.mjs';
 
+/** @returns {any} */
 const fresh = () => structuredClone(loadLoopConfig());
 const ids = {
   agentId: 'agent_01test',
@@ -144,6 +145,7 @@ describe('summer improvement loop config', () => {
 
   it('reads the Keychain with -w and checks existence without it', () => {
     const calls = [];
+    /** @type {(status: number) => any} */
     const fake = status => (cmd, args) => {
       calls.push([cmd, ...args]);
       return { status, stdout: status === 0 ? 'secret\n' : '' };
