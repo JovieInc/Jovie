@@ -248,6 +248,27 @@
         }
       ]
     },
+    "automation-run": {
+      "entityId": "<automationId>@<runRef> (registry id in canon/automation-registry.jsonl plus the run's own reference)",
+      "description": "One run of a registered automation, from start to its terminal receipt, as observed by the dead-man liveness check.",
+      "endToEnd": [["started", "finished"]],
+      "stages": [
+        {
+          "id": "started",
+          "meaning": "the automation's run started (from its receipt)",
+          "producer": "automation-liveness",
+          "status": "pushed",
+          "source": "automation-liveness-receipts"
+        },
+        {
+          "id": "finished",
+          "meaning": "the run reached a terminal receipt (completed or failed)",
+          "producer": "automation-liveness",
+          "status": "pushed",
+          "source": "automation-liveness-receipts"
+        }
+      ]
+    },
     "summer-turn": {
       "entityId": "summer conversation id + turn number",
       "description": "One Summer turn from triggering event to measured outcome.",
@@ -314,6 +335,13 @@
       "kind": "events",
       "url": null,
       "owner": "LogYourBody release loop"
+    },
+    "automation-liveness-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "automation-liveness-receipts/stage-events.ndjson",
+      "workflow": "automation-liveness.yml",
+      "owner": "automation registry (scripts/automation-liveness.mjs)"
     },
     "summer-stage-feed": {
       "kind": "events",
