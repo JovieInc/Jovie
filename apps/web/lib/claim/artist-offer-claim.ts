@@ -4,22 +4,27 @@
  * `/claim` finds or creates an artist profile, then hands off to the
  * existing claim, sign-in, onboarding and Stripe Checkout path. Payment never
  * grants verification. Identity ownership is still decided by the existing
- * claim proof (exact Spotify artist match or claim token), and high-profile
- * artists are never self-serve: they need manual verification first.
+ * claim proof (exact Spotify artist match or claim token). High-reach artists
+ * still reach checkout, but their identity is held as a verification request
+ * on the buyer's own profile until an operator verifies it
+ * (`lib/claim/claim-verification.ts`).
  *
  * Pure module: decisions only, no I/O. The route lives at
  * `app/claim/start/route.ts`.
  */
 
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  CLAIM_VERIFICATION_REACH_THRESHOLD,
+  requiresClaimVerification,
+} from './claim-verification';
 
 /**
- * At or above this many Spotify followers an artist is a public figure whose
- * identity cannot be claimed self-serve. Re-evaluate when the manual
- * verification queue exceeds 20 requests a week; then automate verification
- * (e.g. Spotify for Artists proof) instead of moving the threshold.
+ * Reach threshold for ownership verification. One config value, owned by
+ * `lib/claim/claim-verification.ts` (Spotify followers; taste default 50k).
  */
-export const HIGH_PROFILE_FOLLOWER_THRESHOLD = 100_000;
+export const HIGH_PROFILE_FOLLOWER_THRESHOLD =
+  CLAIM_VERIFICATION_REACH_THRESHOLD;
 
 /** Short-lived marker that routes onboarding checkout back to the claim flow. */
 export const CLAIM_FLOW_COOKIE = 'jv_claim_flow';
@@ -65,11 +70,7 @@ export function isSpotifyArtistId(
 export function requiresManualVerification(
   followers: number | null | undefined
 ): boolean {
-  return (
-    typeof followers === 'number' &&
-    Number.isFinite(followers) &&
-    followers >= HIGH_PROFILE_FOLLOWER_THRESHOLD
-  );
+  return requiresClaimVerification(followers);
 }
 
 /** Checkout for an artist who already has a live, claimed profile. */
@@ -105,9 +106,9 @@ function signupHref(params: Record<string, string>): string {
 
 /**
  * Decide where a claim attempt goes next. Order matters: subscribers and
- * already-claimed viewers never pay twice; famous names stop before any
- * ownership step; existing unclaimed profiles reuse the proof-checked
- * `/{username}/claim` path.
+ * already-claimed viewers never pay twice; existing unclaimed profiles reuse
+ * the proof-checked `/{username}/claim` path unless the artist is high reach,
+ * in which case the buyer gets their own profile and a verification request.
  */
 export function resolveClaimRedirect(input: {
   readonly viewer: ClaimViewer;
@@ -123,11 +124,11 @@ export function resolveClaimRedirect(input: {
   }
 
   if (artist.profile?.isClaimed) return claimStateHref('already_claimed');
-  if (requiresManualVerification(artist.followers)) {
-    return claimStateHref('verification_required');
-  }
 
-  if (artist.profile) {
+  // High reach: never the proof-checked prebuilt-profile takeover. The buyer
+  // creates their own profile and pays as usual; onboarding stores the artist
+  // as a verification request instead of linking it.
+  if (artist.profile && !requiresManualVerification(artist.followers)) {
     return `/${encodeURIComponent(artist.profile.username)}/claim?next=auth`;
   }
 

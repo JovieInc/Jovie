@@ -4,8 +4,13 @@ import { NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
 import {
   closeLinearIssue,
+  commentOnLinearIssue,
   fetchTimActionIssues,
 } from '@/lib/hud/linear-actions';
+import {
+  LINEAR_ANSWER_MAX_LENGTH,
+  linearAnswerComment,
+} from '@/lib/ovie/linear-ask';
 import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { logger } from '@/lib/utils/logger';
 
@@ -59,9 +64,10 @@ export async function GET(): Promise<Response> {
 /**
  * POST /api/admin/hud/tim-actions
  *
- * Body: { issueId: string }
+ * Body: { issueId: string, answer?: string }
  *
- * Closes a Linear issue. Admin-only.
+ * Closes a Linear issue. With `answer`, first posts it as a comment so the
+ * asking agent reads the founder's reply from Linear. Admin-only.
  */
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -108,6 +114,31 @@ export async function POST(request: Request): Promise<Response> {
       return NextResponse.json(
         { error: 'issueId must not be empty' },
         { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const rawAnswer = (body as { answer?: unknown }).answer;
+    if (rawAnswer !== undefined && typeof rawAnswer !== 'string') {
+      return NextResponse.json(
+        { error: 'answer must be a string' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+    const answer = rawAnswer?.trim() ?? '';
+    if (answer.length > LINEAR_ANSWER_MAX_LENGTH) {
+      return NextResponse.json(
+        { error: 'answer is too long' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+    // The answer must land before the issue closes, or the asker loses it.
+    if (
+      answer &&
+      !(await commentOnLinearIssue(issueId, linearAnswerComment(answer)))
+    ) {
+      return NextResponse.json(
+        { error: 'Failed to record the answer in Linear' },
+        { status: 502, headers: NO_STORE_HEADERS }
       );
     }
 

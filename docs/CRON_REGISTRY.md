@@ -4,7 +4,7 @@
 
 > **Question this answers:** "What scheduled jobs already run? Can I add my logic to an existing one?"
 >
-> **Canonical registry (2026-10-20):** every company automation (GitHub, Vercel, lanes, Gem, Macs, Codex, Summer, Managed Agents) is registered with owner, trigger, metric, run-receipt location, max staleness and kill switch in [`canon/automation-registry.jsonl`](../canon/automation-registry.jsonl) (one automation per line). CI (`automation-registry` source guard) fails when a GitHub cron, Vercel cron or lanes clock has no live entry, or a live entry outlives its schedule. This page explains the jobs; the registry is the inventory.
+> **Canonical registry (2026-10-20):** every company automation (GitHub, Vercel, lanes, Gem, Macs, Codex, Summer, Managed Agents) is registered with owner, trigger, metric, run-receipt location, max staleness and kill switch in [`canon/automation-registry.jsonl`](../canon/automation-registry.jsonl) (one automation per line). CI (`automation-registry` source guard) fails when a GitHub cron, Vercel cron or lanes clock has no live entry, or a live entry outlives its schedule. `.github/workflows/automation-liveness.yml` is the dead-man: after each Runner Health Monitor run it compares every hosted-readable receipt to its max staleness (a missing or unreadable heartbeat is red) and files one fingerprinted Linear issue per silent critical loop. This page explains the jobs; the registry is the inventory.
 >
 > Before creating a new cron job, read [AGENTS.md — Infrastructure & Scheduling Guardrails](../AGENTS.md#infrastructure--scheduling-guardrails-critical).
 > **JOV-5852:** execution follows information, not time. A GitHub Actions cron must declare `# clock-class:` (`skip-if-unchanged` | `production-liveness` | `temporal-resource` | `upstream-advisory`). Do not add a clock when a causal event already exists.
@@ -23,7 +23,7 @@ Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on G
 | Workflow | Schedule | Purpose | Source |
 |----------|----------|---------|--------|
 | `CI Duration Ratchet` | `25 6 * * *` UTC + push to local-gate files on `main` | Measures rolling p95 of recent PR merge-gate CI runs and fails + Slack-alerts when p95 exceeds the committed baseline + margin. `dev-loop` job times every `.husky/pre-commit` rung + pre-push publication against budgets in `scripts/dev-loop-latency.mjs`. | `.github/workflows/ci-duration-ratchet.yml` |
-| `Shipping SLO Ratchet` | `13 7 * * *` UTC + manual | JOV-6783: rolling 7d p50/p95 across CI wall time (per required workflow event), merge-queue wait/ejection, PR lead time by lane, red→green remediation, production lag, and merges/day throughput vs the +8% WoW growth line and its second-order trend. >10% improvement held 3 days → draft ratchet PR on `docs/metrics/shipping-slo-baseline.json`; >20% regression/throughput drop or flat growth → deduped `slo-regression` issues. Commits `docs/metrics/shipping-slo-latest.json` so the Symphony lanes status gist (`scripts/lanes/doctor.py`) embeds the `slo` block. LLM-free. | `.github/workflows/shipping-slo.yml` |
+| `Shipping SLO Ratchet` | `13 7 * * *` UTC + manual | JOV-6783: rolling 7d p50/p95 across CI wall time (per required workflow event), merge-queue wait/ejection, PR lead time by lane, red→green remediation, production lag, and merges/day throughput vs the +8% WoW growth line and its second-order trend. >10% improvement held 3 days → draft ratchet PR on `docs/metrics/shipping-slo-baseline.json`; >20% regression/throughput drop or flat growth → deduped `slo-regression` issues. Commits `docs/metrics/shipping-slo-latest.json` so the Symphony lanes status gist (`scripts/lanes/doctor.py`) embeds the `slo` block. The same run derives `jovie-stage-event/v1` stage timings (24h/7d/28d p50/p95/n + regression flags) into `docs/metrics/stage-timings-latest.json` ([STAGE_EVENTS.md](metrics/STAGE_EVENTS.md)). LLM-free. | `.github/workflows/shipping-slo.yml` |
 | `Merge Queue Ruleset Verify` | `17 6 * * *` UTC + push to ruleset/source files on `main` + manual | Live GitHub ruleset 10512119 parity (`pnpm ci:merge-queue:verify`). Also runs on `main` pushes to ruleset/source files. Slack on failure. Not a source-PR or merge-group gate. | `.github/workflows/merge-queue-ruleset-verify.yml` |
 | `Neon Ephemeral Branch Cleanup` | (see workflow) | Terminal-event cleanup: deletes ephemeral Neon branches when PRs close and emits a `jovie-preview-env-cleanup/v1` receipt (JOV-5941). | `.github/workflows/neon-ephemeral-branch-cleanup.yml` |
 | `Vercel Preview Cleanup` | (see workflow) | Terminal-event cleanup: cancels/deletes preview deployments for a closed PR's ref and emits a `jovie-preview-env-cleanup/v1` receipt (JOV-5941). | `.github/workflows/vercel-preview-cleanup.yml` |
@@ -71,7 +71,17 @@ not GitHub or Vercel cron jobs.
 | Unit | Schedule | Purpose | Source |
 |------|----------|---------|--------|
 | `com.jovie.lanes` / `jovie-lanes.timer` | Every 5 minutes + load/boot | Drain-safe release update, then dispatch idle provider seats. Event-driven workers pull again immediately; this is the idle fallback. | `scripts/lanes/install.sh`, `scripts/lanes/lane_runner.py` |
-| `com.jovie.lanes-watchdog` / `jovie-lanes-watchdog.timer` | Every minute + load/boot | Local-only factory liveness observer. Performs at most three bounded recoveries through the installed lanes service, verifies a new admitting/writing observation, and alerts only on exhaustion or decision-required capacity loss. Defined by the installer but not installed on Gem as of 2026-10-20 (Gem runs only `jovie-lanes.timer`); reconciliation is with the lanes owner. | `scripts/lanes/install.sh`, `scripts/lanes/factory_watchdog.py` |
+| `com.jovie.lanes-watchdog` / `jovie-lanes-watchdog.timer` | Every minute + load/boot | Local-only factory liveness observer. Performs at most three bounded recoveries through the installed lanes service, verifies a new admitting/writing observation, and alerts only on exhaustion or decision-required capacity loss. Installed on Gem 2026-10-20 (`jovie-lanes-watchdog.timer`, from the installer template); its receipt is `~/.local/state/jovie-lanes/factory-watchdog.json`, which the lanes doctor watches through the automation registry. | `scripts/lanes/install.sh`, `scripts/lanes/factory_watchdog.py` |
+
+**Proposed, not active:** the market signal watcher (`scripts/signals/signal_watch.py`) is built to
+run from the Gem lanes tick like `yc_corpus.tick`: at most one detached run every 6 h. It polls the
+curated changelog list in `scripts/signals/sources.json` with conditional GETs, reads new X
+bookmarks, classifies them with Jev under a $0.25/day cap, writes `signals/` gbrain pages, and sends
+at most 3 cards a day to Summer's `market-intel` source. `scripts/lanes/**` has a sole writer, so
+the hook (`signal_watch.tick(host.state)` in `finish_dispatch`, plus `scripts/signals` in
+`RELEASE_EXTRAS`) is proposed to the lanes owner rather than edited here. The upstream changelogs
+publish on their own clock (`upstream-advisory`); adding a GitHub cron would grow the frozen
+JOV-INV-042 allowlist.
 
 ## Production Schedule
 

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   ARTIST_OFFER_FUNNEL_STAGES,
   buildArtistOfferFunnelReport,
+  isOfferLanding,
   isRecordedArtistOfferStage,
+  landingPathname,
   percentile,
   stageForFunnelPath,
 } from './artist-offer-funnel';
@@ -28,6 +30,9 @@ describe('artist-offer funnel contract', () => {
 
   it('only accepts producer-recorded stages; visit and sign-in are derived', () => {
     expect(isRecordedArtistOfferStage('paid')).toBe(true);
+    expect(isRecordedArtistOfferStage('pending-verification')).toBe(true);
+    expect(isRecordedArtistOfferStage('claim-verified')).toBe(true);
+    expect(isRecordedArtistOfferStage('claim-rejected')).toBe(true);
     expect(isRecordedArtistOfferStage('visit')).toBe(false);
     expect(isRecordedArtistOfferStage('sign-in')).toBe(false);
     expect(isRecordedArtistOfferStage('anything')).toBe(false);
@@ -113,5 +118,94 @@ describe('artist-offer funnel contract', () => {
     });
     expect(report.stages.every(stage => stage.journeys === 0)).toBe(true);
     expect(report.stages[1].conversionFromPrevious).toBeNull();
+  });
+
+  it('reports the paid → pending-verification branch off the linear funnel', () => {
+    const report = buildArtistOfferFunnelReport({
+      start: t0,
+      end: at(86_400),
+      totalVisits: 4,
+      timelines: [
+        { visit: at(0), paid: at(100), 'pending-verification': at(160) },
+        { visit: at(0), paid: at(200) },
+      ],
+    });
+    expect(report.stages.map(stage => stage.stage)).toEqual(
+      ARTIST_OFFER_FUNNEL_STAGES
+    );
+    expect(report.branches[0]).toEqual({
+      stage: 'pending-verification',
+      from: 'paid',
+      journeys: 1,
+      conversionFromParent: 0.5,
+      fromParentSeconds: { samples: 1, p50: 60, p95: 60 },
+    });
+  });
+
+  it('reports operator decisions as branches off pending-verification', () => {
+    const report = buildArtistOfferFunnelReport({
+      start: t0,
+      end: at(86_400),
+      totalVisits: 3,
+      timelines: [
+        {
+          visit: at(0),
+          paid: at(100),
+          'pending-verification': at(100),
+          'claim-verified': at(3_700),
+        },
+        {
+          visit: at(0),
+          paid: at(100),
+          'pending-verification': at(100),
+          'claim-rejected': at(7_300),
+        },
+      ],
+    });
+    const byStage = Object.fromEntries(
+      report.branches.map(branch => [branch.stage, branch])
+    );
+    expect(byStage['claim-verified']).toMatchObject({
+      from: 'pending-verification',
+      journeys: 1,
+      conversionFromParent: 0.5,
+      fromParentSeconds: { samples: 1, p50: 3_600, p95: 3_600 },
+    });
+  });
+
+  it('normalizes stored landings, including full pixel URLs', () => {
+    expect(landingPathname('https://jov.ie/pricing?utm=x')).toBe('/pricing');
+    expect(landingPathname('/claim/?plan=pro')).toBe('/claim');
+    expect(landingPathname('https://jov.ie')).toBe('/');
+    expect(landingPathname(null)).toBe('/');
+    expect(landingPathname('tim')).toBe('/tim');
+  });
+
+  it('counts only the offer front door and claim path as offer landings', () => {
+    expect(isOfferLanding('/pricing')).toBe(true);
+    expect(isOfferLanding('https://jov.ie/claim/start?spotify=x')).toBe(true);
+    expect(isOfferLanding('/')).toBe(true);
+    expect(isOfferLanding('https://jov.ie/some-artist')).toBe(false);
+    expect(isOfferLanding('/pricing-old')).toBe(false);
+  });
+
+  it('passes diagnostics through and defaults them to empty', () => {
+    const base = {
+      start: new Date('2026-10-01T00:00:00Z'),
+      end: new Date('2026-10-02T00:00:00Z'),
+      totalVisits: 10,
+      timelines: [],
+    };
+    expect(buildArtistOfferFunnelReport(base).diagnostics).toEqual({
+      visitsByLanding: { offer: 0, other: 0 },
+      stageEventsInWindow: {},
+    });
+    const diagnostics = {
+      visitsByLanding: { offer: 2, other: 8 },
+      stageEventsInWindow: { pricing: 3 },
+    };
+    expect(
+      buildArtistOfferFunnelReport({ ...base, diagnostics }).diagnostics
+    ).toEqual(diagnostics);
   });
 });
