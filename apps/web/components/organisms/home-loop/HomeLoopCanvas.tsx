@@ -39,7 +39,7 @@ export interface HomeLoopCanvasProps {
   /** Partial source failure while some or no asks are still shown. */
   readonly asksNotice?: string | null;
   readonly answers: Readonly<Record<string, HomeLoopAnswer>>;
-  readonly onApprove: (ask: HomeLoopAsk) => void;
+  readonly onApprove: (ask: HomeLoopAsk, option?: string) => void;
   readonly onReply: (ask: HomeLoopAsk, text: string) => void;
   /** Post-ship feedback on a decided ask; the decision stands. */
   readonly onFeedback?: (ask: HomeLoopAsk, text: string) => void;
