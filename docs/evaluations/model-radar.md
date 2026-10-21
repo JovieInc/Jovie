@@ -31,7 +31,7 @@ pairings are eligible under current channel policy.
 
 | Task (current) | Candidate | Evidence | Decision |
 |---|---|---|---|
-| Summer turns (`zai/glm-5.3-flash`) | Opus 5.5, Sonnet 5.5, Haiku 5.5, DeepSeek V4.1 Flash, Clef cascade | Summer task eval below | **Keep glm-5.3-flash.** Re-evaluate on a new roster-eligible model, weekly, or when the eval reaches 60+ cases |
+| Summer turns (`zai/glm-5.3-flash`) | Opus 5.5, Sonnet 5.5, Haiku 5.5, DeepSeek V4.1 Flash, Clef cascade | 96-case Summer task eval below | **Keep glm-5.3-flash.** Re-evaluate on a new roster-eligible model or weekly |
 | CI failure triage (Jev) | Clairic extract then Clef decide | 39-job replay: 15/25 decided correctly at 0.8 vs Jev 16/25; $0.048 vs $0.0036; 2.3-2.5 s vs 0.55 s | **Reject.** Re-evaluate when the repair prompt needs typed fields (failing file, root error) or Clairic leaves preview |
 | CI failure triage (Jev) | Clef (27B) direct | 21/25 decided at 0.8, all correct, 1 unclear tail misrouted; $0.0176 | **Re-evaluate** at 100+ labeled shadow receipts (gain within noise) |
 | PR stage-time p95 forecast (code) | Clairic `forecast` | 3 cut-offs x 7 days: MAE 25.2 h vs 13.0 h for the 7-day median | **Reject.** Code does the math, as the Clairic authors advise |
@@ -40,38 +40,41 @@ pairings are eligible under current channel policy.
 | Screenshot bug loop (`claude-haiku-4-5`, `openai/gpt-5-mini`) | Clef screenshot evaluator (#22339) | metered Anthropic/OpenAI conflicts with JOV-7119 | Route-hygiene campaign |
 | Clef screenshot evaluator (`clef`) | `clef-omni`, `clef-flash` | not run | Re-evaluate on its labeled set |
 | Research router judge (`clef-flash`) | `clef`, `clairic` | no labeled set | Build the set first |
-| FX CI repair, PR conflict handler (`openai/gpt-5.6-*` on a Gateway key) | `gpt-6-*` | JOV-7119 forbids metered openai | Policy flag; move to the Codex subscription lane |
+| FX CI repair, PR conflict handler (were `openai/gpt-5.6-*` on a Gateway key) | allowlisted `zai/glm-5.3` | JOV-7119 forbids metered openai | Routed to `zai/glm-5.3` (JOV-8702, #22393) |
 
 ### Summer task eval (first fully managed task)
 
-28 frozen real inputs in `JovieInc/summer-config` `apps/summer/evals/model-eval`:
-8 CI-failure triage, 6 Linear lane routing, 4 shipping cards, 4 founder replies,
-6 Boardy emails. Every arm gets Summer's own `instructions.md`, one repair turn,
-and is charged for every call. Claude arms ran on the subscription and are priced
-at list for comparison.
+96 frozen real inputs in `JovieInc/summer-config` `apps/summer/evals/model-eval`:
+39 CI-failure triage, 17 Linear lane routing, 11 shipping cards, 14 founder
+replies, 15 investor-intro prep drafts. Every arm gets Summer's own
+`instructions.md`, one repair turn, and is charged for every call. Claude arms
+ran on the subscription and are priced at list for comparison.
 
-| Arm | Success | Spend | Cost per success | Mean latency |
+| Arm | Success (strict) | Spend | Cost per success | Mean latency |
 |---|---:|---:|---:|---:|
-| `zai/glm-5.3-flash` (current, Gateway) | 23/28 | $0.034 | $0.0015 | 3.3 s |
-| `claude-haiku-5-5` | 24/28 | $0.036 | $0.0015 | 4.9 s |
-| DeepSeek V4.1 Flash (Workers AI) | 24/28 | $0.072 | $0.0030 | 4.9 s |
-| `claude-sonnet-5-5` | 23/28 | $0.703 | $0.0306 | 7.2 s |
-| `claude-opus-5-5` | 27/28 | $1.471 | $0.0545 | 7.5 s |
-| Clef (classification slices only) | 15/20 | $0.003 | $0.0002 | 1.1 s |
-| Clef-flash (classification slices only) | 13/20 | $0.0005 | $0.00004 | 0.6 s |
+| `zai/glm-5.3-flash` (current, Gateway) | 68/96 | $0.120 | $0.0018 | 6.9 s |
+| `claude-haiku-5-5` | 71/96 | $0.126 | $0.0018 | 9.0 s |
+| `claude-opus-5-5` | 71/96 | $5.219 | $0.0735 | 10.7 s |
+| DeepSeek V4.1 Flash (Workers AI) | 65/96 | $0.255 | $0.0039 | 6.0 s |
+| Clef (classification slices only) | 48/71 | $0.013 | $0.0003 | 0.7 s |
 
 No arm beats the current model beyond noise at an acceptable cost per success.
-Opus 5.5 is closest on quality (+14 points, noise 16) but costs 37x per success,
-is priced above the budget's reservation ceilings and is metered Anthropic.
-Haiku 5.5 ties at the same cost and is also metered Anthropic. DeepSeek V4.1
-Flash is refused by the Gateway allowlist and costs 2x on Workers AI. The Clef
-cascade passes the screen on the classification slices (equal within noise,
-0.13x cost per success), but Summer's budget authority refuses Cloudflare and
-Summer has no pre-model classification step yet.
+Opus 5.5 is +3.1 points (noise 12.6; +7.0 vs noise 10.4 excluding triage) at 41x
+cost per success. Haiku 5.5 ties at the same cost and is metered Anthropic.
+DeepSeek V4.1 Flash is refused by the Gateway allowlist and costs 2.2x on Workers
+AI. On the classification slices the Clef cascade is equal within noise (48/71 vs
+glm 46/71) at 0.13x cost per success, but Summer has no pre-model classification
+step yet. Triage labels follow the CI taxonomy rather than Summer policy, and every
+arm fails about half of triage; policy-labeled triage cases are the next eval
+improvement. Verdict: keep glm-5.3-flash (decision
+`decisions/models/summer-main-model-96-cases-2026-10-20`, superseding the 28-case one).
 
 Summer's model is now a managed choice in summer-config: a roster of models
 priced within the budget ceilings, a hash-bucketed canary slice per turn and a
-promote/rollback rule on cost per successful turn.
+promote/rollback rule on cost per successful turn. A contained trial path for
+off-Gateway models (Workers AI on Cloudflare credits first, then the Claude
+Platform API credit under a $30/month sub-cap, never the consumer subscription)
+ships idle in summer-config#271, with its own ledger and automatic rollback.
 
 ## Campaigns (ranked by ROI)
 
@@ -85,8 +88,7 @@ promote/rollback rule on cost per successful turn.
    Success: mutation score up, flake rate and CI time not worse than 5%.
 2. **Model-route hygiene.** One PR per owner: remediation chain to grok-4.7,
    Sonnet 5 to Sonnet 5.5 in marketing roles and the copy judge, screenshot loop
-   off metered Anthropic/OpenAI onto Clef, FX/conflict handler onto the Codex
-   subscription. Expected gain: policy compliance and current models. Cost under
+   off metered Anthropic/OpenAI onto Clef (FX/conflict handler done: glm-5.3). Expected gain: policy compliance and current models. Cost under
    $5 of evals. Blast radius: model ids in config. Success: registry drift check
    green, each owner's eval not worse.
 3. **Clef-first System-1 classification.** After 100+ labeled shadow receipts,
