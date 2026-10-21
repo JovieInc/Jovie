@@ -38,17 +38,32 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     profileId,
     chatMode,
     homeCanvas,
+    homeCanvasMode,
   }: {
     readonly profileId?: string;
     readonly chatMode?: 'ov' | null;
-    readonly homeCanvas?: ReactNode;
+    readonly homeCanvas?:
+      | ReactNode
+      | ((state: {
+          messages: [];
+          isStreaming: boolean;
+          onOpenTranscript: () => void;
+        }) => ReactNode);
+    readonly homeCanvasMode?: string;
   }) => (
     <div
       data-testid='shared-jovie-chat'
       data-profile-id={profileId}
       data-chat-mode={chatMode ?? undefined}
+      data-home-canvas-mode={homeCanvasMode}
     >
-      {homeCanvas}
+      {typeof homeCanvas === 'function'
+        ? homeCanvas({
+            messages: [],
+            isStreaming: false,
+            onOpenTranscript: () => undefined,
+          })
+        : homeCanvas}
     </div>
   ),
 }));
@@ -77,6 +92,10 @@ describe('OvChatClient shared component ownership', () => {
     );
     expect(screen.getByTestId('shared-jovie-chat')).toContainElement(
       screen.getByTestId('ovie-home-canvas')
+    );
+    expect(screen.getByTestId('shared-jovie-chat')).toHaveAttribute(
+      'data-home-canvas-mode',
+      'living'
     );
   });
 

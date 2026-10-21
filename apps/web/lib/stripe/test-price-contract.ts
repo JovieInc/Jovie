@@ -66,6 +66,16 @@ export function assertStripeTestAccount(
   }
 }
 
+/**
+ * Metadata stamped on the Stripe price that carries the current offer
+ * (EVENT: Tim, 2026-10-20 — $12/month self-serve artist profile). The retired
+ * $199 fixture carried `issue: JOV-6218` and must no longer match.
+ */
+export const ARTIST_VISIBILITY_PRICE_METADATA = {
+  offer: 'artist_visibility_pro',
+  decision: 'tim-2026-10-20-artist-profile-12',
+} as const;
+
 /** Require the Stripe fixture to match the published monthly offer exactly. */
 export function assertArtistVisibilityStripeTestPrice(
   price: ArtistVisibilityStripePrice
@@ -82,8 +92,8 @@ export function assertArtistVisibilityStripeTestPrice(
     price.recurring?.interval !== ARTIST_VISIBILITY_OFFER.pro.interval ||
     price.recurring?.interval_count !== 1 ||
     price.recurring?.usage_type !== 'licensed' ||
-    price.metadata?.issue !== 'JOV-6218' ||
-    price.metadata?.offer !== 'artist_visibility_pro'
+    price.metadata?.decision !== ARTIST_VISIBILITY_PRICE_METADATA.decision ||
+    price.metadata?.offer !== ARTIST_VISIBILITY_PRICE_METADATA.offer
   ) {
     throw new Error(
       `Configured Stripe test price must be active, test-mode USD ${expectedAmount}/month`
