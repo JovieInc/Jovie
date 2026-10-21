@@ -189,10 +189,10 @@
       "id": "fx-ci-repair",
       "taskType": "agentic-coding",
       "automation": null,
-      "currentModel": "openai/gpt-5.6-luna",
+      "currentModel": "zai/glm-5.3",
       "channel": "gateway-allowlist",
       "sourcePath": ".github/workflows/rolling-ci-dispatch.yml",
-      "sourceMatch": "FX_MODEL: openai/gpt-5.6-luna",
+      "sourceMatch": "FX_MODEL: zai/glm-5.3",
       "costUsd": null,
       "costBasis": "FX_AI_GATEWAY_API_KEY, 12 agent steps max; not measured",
       "qualityMetric": "bounded patch makes the failing job pass",
@@ -200,16 +200,16 @@
       "evalRef": null,
       "evalSize": 0,
       "screens": ["same-family-successor"],
-      "notes": "openai/* on a Gateway key conflicts with JOV-7119; flagged, not changed here."
+      "notes": "Routed to the allowlisted zai/glm-5.3 (JOV-8702, #22393)."
     },
     {
       "id": "pr-conflict-resolution",
       "taskType": "agentic-coding",
       "automation": null,
-      "currentModel": "openai/gpt-5.6-sol",
+      "currentModel": "zai/glm-5.3",
       "channel": "gateway-allowlist",
       "sourcePath": ".github/workflows/pr-conflict-handler.yml",
-      "sourceMatch": "openai/gpt-5.6-sol",
+      "sourceMatch": "FX_MODEL: zai/glm-5.3",
       "costUsd": null,
       "costBasis": "fx ask on FX_AI_GATEWAY_API_KEY; not measured",
       "qualityMetric": "conflict resolved and required checks green",
@@ -217,7 +217,7 @@
       "evalRef": null,
       "evalSize": 0,
       "screens": ["same-family-successor"],
-      "notes": "openai/* on a Gateway key conflicts with JOV-7119; flagged, not changed here."
+      "notes": "Routed to the allowlisted zai/glm-5.3 (JOV-8702, #22393)."
     },
     {
       "id": "internal-pr-review",
