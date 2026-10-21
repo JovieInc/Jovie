@@ -1864,11 +1864,22 @@ def sync_main(host, lane, pr: dict, now: float, *, terminal_ok: bool = False) ->
     ok = result.returncode == 0
     lane.update_json(host.state / "synced.json",
                      lambda synced: synced.update({str(pr["number"]): {"from": pr["headRefOid"], "at": now, "ok": ok}}))
-    ledger(host, {"schema": "jovie-lane-run/v1", "kind": "sync-main", "origin": "autonomous-lane",
-                  "attribution": {"category": "finalizer-only", "provider": "lane-event"},
-                  "pr": pr["number"], "headBefore": pr["headRefOid"],
-                  "verdict": "synced" if ok else "sync-failed", "endedAt": lane.now_iso()})
+    receipt = {"schema": "jovie-lane-run/v1", "kind": "sync-main", "origin": "autonomous-lane",
+               "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+               "pr": pr["number"], "headBefore": pr["headRefOid"],
+               "verdict": "synced" if ok else "sync-failed", "endedAt": lane.now_iso()}
+    if not ok:
+        # 71 sync-failed rows/24h on 2026-10-21 carried no reason; keep GitHub's own answer.
+        receipt["reasons"] = [sync_failure_reason(result)]
+    ledger(host, receipt)
     return "synced" if ok else "sync-failed"
+
+
+def sync_failure_reason(result) -> str:
+    """GitHub's update-branch refusal, short and secret-free (the API message, not the token)."""
+    text = f"{getattr(result, 'stdout', '') or ''} {getattr(result, 'stderr', '') or ''}"
+    found = re.search(r'"message"\s*:\s*"([^"]{1,160})"', text) or re.search(r"(HTTP \d{3}[^\n]{0,120})", text)
+    return "update-branch:" + (found.group(1) if found else f"exit-{getattr(result, 'returncode', '?')}")
 
 
 def ledger(host, receipt: dict) -> None:

@@ -1872,6 +1872,12 @@ class PublishTest(unittest.TestCase):
         self.assertEqual(events({**row, "gateWaitS": 99999}), [events({**row, "gateWaitS": None})[0]])
         self.assertEqual(events({**row, "pr": None}), [])
 
+    def test_a_held_sweep_snapshot_raises_an_alert_per_checkout(self):
+        alerts = doctor.judge(obs(sweepSecretHeld=[{"name": "94af-Jovie", "path": "/w/Jovie",
+                                                     "reason": "secret-finding:trufflehog"}]))
+        self.assertIn("secret-finding:trufflehog", alerts["sweep-snapshot-secret:94af-Jovie"])
+        self.assertFalse([key for key in doctor.judge(obs()) if key.startswith("sweep-snapshot-secret:")])
+
     def test_a_truncated_stage_file_is_read_back_by_its_size(self):
         now = time.time()
         iso = lambda delta: doctor.datetime.fromtimestamp(now - delta, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
