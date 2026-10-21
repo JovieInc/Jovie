@@ -80,6 +80,14 @@ function failClosed(baseDeployedSha, candidateSha, reasons, paths = []) {
   };
 }
 
+/**
+ * @param {{
+ *   baseDeployedSha?: string | null,
+ *   candidateSha?: string | null,
+ *   paths?: string[] | null,
+ *   manifest?: any,
+ * }} input
+ */
 export function gradeReleaseRange({
   baseDeployedSha,
   candidateSha,
