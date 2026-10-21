@@ -269,6 +269,32 @@ describe('home loop parts', () => {
   });
 });
 
+describe('HomeLoopAsks options', () => {
+  it('replaces the primary action with the asker options', () => {
+    const onApprove = vi.fn();
+    const ask = {
+      ...HOME_LOOP_FIXTURE_ASKS[0],
+      options: ['Signed in', 'Restarted it myself'],
+    };
+    render(
+      <HomeLoopAsks
+        asks={[ask]}
+        answers={{}}
+        onApprove={onApprove}
+        onReply={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId('home-loop-ask-approve')).toBeNull();
+    const options = screen.getAllByTestId('home-loop-ask-option');
+    expect(options.map(option => option.textContent)).toEqual([
+      'Signed in',
+      'Restarted it myself',
+    ]);
+    fireEvent.click(options[1] as HTMLElement);
+    expect(onApprove).toHaveBeenCalledWith(ask, 'Restarted it myself');
+  });
+});
+
 describe('HomeLoopAsks defaults and feedback', () => {
   afterEach(() => vi.useRealTimers());
 

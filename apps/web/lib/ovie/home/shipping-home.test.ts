@@ -472,7 +472,8 @@ describe('buildOvieAsks', () => {
         why: 'Why this matters',
         decidable: true,
         actionLabel: 'Mark done',
-        canReply: false,
+        // Linear replies are posted back to the issue as the answer.
+        canReply: true,
         evidence: ['https://example.com/receipt'],
         decisionDefault: null,
         canFeedback: false,
