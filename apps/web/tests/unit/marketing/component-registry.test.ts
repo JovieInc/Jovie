@@ -959,7 +959,10 @@ describe('canonical marketing component registry', () => {
       entry => entry.sourceBacked
     );
     const unknown = sourceBacked.filter(entry => entry.penRootId === null);
-    expect(unknown.map(entry => entry.id)).toEqual(['recipe.homepage']);
+    expect(unknown.map(entry => entry.id)).toEqual([
+      'section.blog-feed',
+      'recipe.homepage',
+    ]);
     expect(validateMarketingPenRegistry(sourceBacked)).toEqual([]);
     expect(
       sourceBacked

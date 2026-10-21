@@ -838,7 +838,7 @@ jobs:
           fi
 
           # CHANGELOG.md is customer-facing web content, not documentation.
-          if ! echo "$CHANGED_FILES" | grep -q -E '^(\.github/|CHANGELOG\.md$)' &&
+          if ! echo "$CHANGED_FILES" | grep -q -E '^(\.github/|CHANGELOG\.md$|docs/playbooks/[^/]+\.playbook\.md$)' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
@@ -861,7 +861,7 @@ jobs:
           fi
 
           # Test paths
-          TEST_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|packages/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|package.*\.json)'
+          TEST_PATTERN='^(docs/playbooks/[^/]+\.playbook\.md$|apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|packages/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$TEST_PATTERN"; then
             RUN_TEST=true
             echo "run_test=true" >> "$GITHUB_OUTPUT"
@@ -3499,6 +3499,7 @@ jobs:
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test \
                   tests/e2e/storybook-agent-status.spec.ts \
+                  tests/e2e/storybook-destructive-button.spec.ts \
                   tests/e2e/storybook-elevation.spec.ts \
                   tests/e2e/storybook-input.spec.ts \
                   tests/e2e/storybook-marketing-faq.spec.ts \
@@ -6368,13 +6369,15 @@ jobs:
     environment: Preview – jovie
     # Launch-gate job (JOV-3758): full signup -> onboarding -> music import -> live
     # public profile -> Stripe checkout journey against real Better Auth + an ephemeral
-    # Manual golden-path evidence uses the isolated Neon branch.
+    # Manual golden-path evidence prefers the shared Neon branch. A failed
+    # database-certification job still runs this lane through the fallback
+    # branch so certification writes a certificate (JOV-8614).
     # Unlike ci-e2e-smoke this must NOT set NEXT_PUBLIC_CLERK_MOCK or
     # E2E_USE_TEST_AUTH_BYPASS — required mode fails closed if either is present.
     # Path-triggered (not always-on): the spec has a 900s timeout, so always-on would
     # blow the CI budget and churn the external Spotify/Stripe fixtures.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.neon-db.result == 'success' }}
+    if: ${{ always() && !cancelled() && needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     outputs:
@@ -6729,11 +6732,12 @@ jobs:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           CERT_DIR: ${{ runner.temp }}/canonical-artist-site-certification
+          PRODUCER_RESULT: ${{ needs.ci-golden-path.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           CERT_PATH="$(find "$CERT_DIR" -name certificate.json -print -quit 2>/dev/null || true)"
-          CERT_PATH="$CERT_PATH" node scripts/canonical-artist-site-intake.mjs
+          CERT_PATH="$CERT_PATH" PRODUCER_RESULT="$PRODUCER_RESULT" node scripts/canonical-artist-site-intake.mjs
       - name: File or resolve the Golden Path Linear issue
         if: ${{ always() && !cancelled() }}
         env:

@@ -32,6 +32,16 @@ const pkg = (before, after, desktop = {}) =>
   });
 
 describe('product lane classifier', () => {
+  it('routes native playbook-only changes through web checks', () => {
+    expect(
+      classifyProductLanes([
+        'docs/playbooks/growth-presence-repair-offer.playbook.md',
+      ]).selectedLanes
+    ).toEqual(['web']);
+    expect(
+      classifyProductLanes(['docs/playbooks/TEMPLATE.md']).selectedLanes
+    ).toEqual(['operations']);
+  });
   it('routes the published CLI skill artifacts through the CLI web gate and rejects unknown skill paths', () => {
     const receipt = classifyProductLanes([
       'skills/jovie/SKILL.md',
@@ -188,6 +198,21 @@ describe('product lane classifier', () => {
     expect(
       receipt.classifications.every(
         item => item.rule === 'shared-release-communications'
+      )
+    ).toBe(true);
+  });
+
+  it('classifies the shared API client package as operations tooling', () => {
+    const receipt = classifyProductLanes([
+      'packages/api-client/client.ts',
+      'packages/api-client/package.json',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['operations']);
+    expect(
+      receipt.classifications.every(
+        item =>
+          item.rule === 'operations-api-client' &&
+          item.category === 'operations-tooling'
       )
     ).toBe(true);
   });

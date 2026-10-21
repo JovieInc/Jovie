@@ -88,6 +88,11 @@ describe('outbound queue display', () => {
     expect(cleanOutboundName(null, 'handle')).toBe('handle');
   });
 
+  it('trims whitespace before removing handle prefixes', () => {
+    expect(cleanOutboundName('  @bktherula  ', 'bk')).toBe('bktherula');
+    expect(cleanOutboundName('  @  ', 'handle')).toBe('handle');
+  });
+
   it('bands fit scores and keeps unscored leads unknown', () => {
     expect(fitBand(null)).toBe('unknown');
     expect(fitBand(80)).toBe('high');

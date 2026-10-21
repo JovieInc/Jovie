@@ -31,7 +31,7 @@ it.
 
 ### Hero
 
-- Body: `New releases and nearby shows can take the lead without changing the profile you share.`
+- Body: `Your music, artist bio, and social links in one free profile. Review the details, then share your Jovie link.`
 - Primary action: `Claim your profile`
 - Secondary action: `See It Adapt`
 - Signature: `jov.ie/you`
@@ -78,10 +78,14 @@ tickets, and support can take their turn.`
 - Headline: `Free to claim. Yours to share.`
 - Action: `Claim your profile`
 
-The free-plan FAQ must keep the entitlement boundary explicit: the public
-profile is free with up to 100 fan contacts; Pro adds countdowns, release
-notifications, unlimited contacts, and tips. Contact capture and outbound
-release notifications remain distinct promises.
+The FAQ now explains the free profile, the existing management-claim process,
+reviewing artist details before sharing, and payment versus profile ownership.
+A matching name or a paid subscription does not establish ownership. It does
+not promise paid release tools or advertise the proposed $12 pilot before its
+offer and entitlement acceptance under JOV-8368. Free-profile evidence comes
+from the existing billing truth and free entitlement registry; this copy does
+not expand those entitlements. Broader adaptive/outcome sections retain their
+existing scope and are not certified as an MVP-only page by this correction.
 
 ## Change rule
 

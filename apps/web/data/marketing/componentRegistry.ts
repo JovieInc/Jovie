@@ -701,9 +701,34 @@ const SECTION_RESOLUTIONS = {
     MARKETING_PEN_CONTRACT_IDS.section.contentProse,
     'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.contentProse}'
   ),
-  'blog-feed': unresolved(
-    'The registered BlogCard path does not resolve to the shared BlogFeed root.'
-  ),
+  'blog-feed': {
+    sourceBacked: true,
+    resolvedSource: 'apps/web/app/(marketing)/blog/BlogFeed.tsx',
+    exportName: 'BlogFeed',
+    penRootId: null,
+    penRootIds: [],
+    penIdentityReason:
+      'The blog index is source-owned by BlogFeed and BlogCategoryContent. It has no Pen root; BlogCard is a nested card, not the section root.',
+    rootProofs: [
+      {
+        source: 'apps/web/app/(marketing)/blog/BlogFeed.tsx',
+        binding: "data-testid='marketing-section-blog-feed'",
+        occurrences: 1,
+      },
+    ],
+    occurrenceProofs: [
+      {
+        variantId: 'featured-grid',
+        componentPath: 'apps/web/app/(marketing)/blog/BlogFeed.tsx',
+        rootBinding: "data-marketing-variant='featured-grid'",
+      },
+      {
+        variantId: 'category-filtered-grid',
+        componentPath: 'apps/web/components/organisms/BlogCategoryContent.tsx',
+        rootBinding: "data-marketing-variant='category-filtered-grid'",
+      },
+    ],
+  },
 } as const satisfies Record<MarketingSectionId, SourceResolution>;
 
 export const MARKETING_SECTION_REGISTRY: readonly MarketingSectionRegistryEntry[] =

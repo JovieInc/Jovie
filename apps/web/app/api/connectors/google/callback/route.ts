@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCachedAuth } from '@/lib/auth/cached';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { asConnectorStatusSql } from '@/lib/connectors/db-expressions';
-import { verifyGoogleOAuthState } from '@/lib/connectors/google-calendar/oauth-state';
+import {
+  GoogleOAuthStateExpiredError,
+  verifyGoogleOAuthState,
+} from '@/lib/connectors/google-calendar/oauth-state';
 import {
   CONNECTOR_PROVIDERS,
   GOOGLE_OAUTH_SCOPE,
@@ -31,6 +36,41 @@ interface GoogleUserInfoResponse {
   sub: string;
 }
 
+function redirectWith(
+  origin: string,
+  returnTo: string,
+  values: Record<string, string>
+) {
+  const target = new URL(
+    sanitizeRedirectUrl(returnTo) ?? APP_ROUTES.SETTINGS_CONNECTORS,
+    origin
+  );
+  // Only this attempt's result may describe the outcome; drop stale markers
+  // carried in the originating query while keeping unrelated context.
+  target.searchParams.delete('error');
+  target.searchParams.delete('connected');
+  for (const [key, value] of Object.entries(values))
+    target.searchParams.set(key, value);
+  return NextResponse.redirect(target, { status: 302 });
+}
+
+/**
+ * The signed origin, only when the state verifies and still belongs to the
+ * signed-in user. Anything else falls back to Settings.
+ */
+async function verifiedReturnTo(stateParam: string | null): Promise<string> {
+  if (!stateParam) return APP_ROUTES.SETTINGS_CONNECTORS;
+  try {
+    const state = verifyGoogleOAuthState(stateParam);
+    const { userId } = await getCachedAuth();
+    return userId === state.userId
+      ? state.returnTo
+      : APP_ROUTES.SETTINGS_CONNECTORS;
+  } catch {
+    return APP_ROUTES.SETTINGS_CONNECTORS;
+  }
+}
+
 /**
  * GET /api/connectors/google/callback
  *
@@ -38,8 +78,10 @@ interface GoogleUserInfoResponse {
  * resolves the Gmail address (providerAccountId), and persists
  * both Gmail + Calendar connector accounts with encrypted tokens.
  *
- * On success: redirects to returnTo from the state token.
- * On error: redirects to settings/connectors with error param.
+ * Nothing is exchanged or written unless the signed state verifies and the
+ * current session is the user who started the flow. Redirects go to the
+ * sanitized returnTo from that state, otherwise to settings/connectors.
+ * `connected=google` is a navigation hint only; Settings reads server rows.
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -47,26 +89,40 @@ export async function GET(request: Request) {
   const stateParam = searchParams.get('state');
   const errorParam = searchParams.get('error');
 
-  const settingsUrl = `${origin}${APP_ROUTES.SETTINGS_CONNECTORS}`;
+  let returnTo: string = APP_ROUTES.SETTINGS_CONNECTORS;
+  const fail = (error: string) => redirectWith(origin, returnTo, { error });
 
   if (errorParam) {
-    logger.error('[connectors/google/callback] OAuth provider error', {
-      errorParam,
-    });
-    return NextResponse.redirect(`${settingsUrl}?error=oauth_denied`, {
-      status: 302,
-    });
+    // Only an explicit consent decline is a cancellation; other provider
+    // errors stay failures. Neither path exchanges or writes anything.
+    const canceled = errorParam === 'access_denied';
+    if (!canceled) {
+      logger.error('[connectors/google/callback] OAuth provider error', {
+        errorParam,
+      });
+    }
+    returnTo = await verifiedReturnTo(stateParam);
+    return fail(canceled ? 'oauth_canceled' : 'oauth_provider_error');
   }
 
   if (!code || !stateParam) {
-    return NextResponse.redirect(`${settingsUrl}?error=oauth_missing_params`, {
-      status: 302,
-    });
+    return fail('oauth_missing_params');
   }
 
   try {
     const state = verifyGoogleOAuthState(stateParam);
-    const { userId, returnTo } = state;
+    const { userId } = state;
+
+    // The grant must land on the Jovie user who started it. A changed or
+    // signed-out session exchanges nothing and writes nothing.
+    const session = await getCachedAuth();
+    if (!session.userId || session.userId !== userId) {
+      logger.warn(
+        '[connectors/google/callback] Session does not match OAuth state'
+      );
+      return fail('oauth_session_changed');
+    }
+    returnTo = state.returnTo;
 
     const redirectUri = `${env.GOOGLE_OAUTH_REDIRECT_URI_BASE ?? origin + '/api/connectors/google'}/callback`;
 
@@ -91,9 +147,7 @@ export async function GET(request: Request) {
         status: tokenRes.status,
         body,
       });
-      return NextResponse.redirect(`${settingsUrl}?error=token_exchange`, {
-        status: 302,
-      });
+      return fail('token_exchange');
     }
 
     const tokens = (await tokenRes.json()) as GoogleTokenResponse;
@@ -112,9 +166,7 @@ export async function GET(request: Request) {
       logger.error('[connectors/google/callback] Userinfo fetch failed', {
         status: userInfoRes.status,
       });
-      return NextResponse.redirect(`${settingsUrl}?error=userinfo`, {
-        status: 302,
-      });
+      return fail('userinfo');
     }
 
     const userInfo = (await userInfoRes.json()) as GoogleUserInfoResponse;
@@ -241,25 +293,20 @@ export async function GET(request: Request) {
       expiresAt,
     });
 
-    const redirectTarget = returnTo.startsWith('/')
-      ? `${origin}${returnTo}`
-      : returnTo;
     if (!gmailCanRead && !calendarCanRead) {
-      return NextResponse.redirect(`${settingsUrl}?error=missing_scopes`, {
-        status: 302,
-      });
+      return fail('missing_scopes');
     }
-    return NextResponse.redirect(`${redirectTarget}?connected=google`, {
-      status: 302,
-    });
+    return redirectWith(origin, returnTo, { connected: 'google' });
   } catch (error) {
+    if (error instanceof GoogleOAuthStateExpiredError) {
+      logger.warn('[connectors/google/callback] OAuth state expired');
+      return fail('oauth_expired');
+    }
     logger.error('[connectors/google/callback] Unexpected error', { error });
     await captureError('Google OAuth callback failed', error, {
       route: '/api/connectors/google/callback',
       method: 'GET',
     });
-    return NextResponse.redirect(`${settingsUrl}?error=oauth_callback`, {
-      status: 302,
-    });
+    return fail('oauth_callback');
   }
 }

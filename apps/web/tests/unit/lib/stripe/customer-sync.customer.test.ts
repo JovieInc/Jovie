@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockRevenueFailure = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/observability/revenue-spine', () => ({
+  captureRevenueSpineFailure: mockRevenueFailure,
+}));
+
 const APP_USER_ID = '7b4b948f-9720-4c5f-98da-8a7335015da9';
 
 const mocks = vi.hoisted(() => ({
@@ -261,12 +266,17 @@ describe('ensureStripeCustomer', () => {
       },
       success: true,
     });
-    mocks.stripeCustomerRetrieve.mockRejectedValue(
-      new Error('Stripe unavailable')
-    );
+    const error = new Error('Stripe unavailable');
+    mocks.stripeCustomerRetrieve.mockRejectedValue(error);
 
     const result = await ensureStripeCustomer();
 
+    expect(mockRevenueFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: 'stripe_sync',
+      severity: 'blocked',
+      userId: APP_USER_ID,
+      error,
+    });
     expect(result).toEqual({
       error: 'Failed to create or retrieve customer',
       success: false,

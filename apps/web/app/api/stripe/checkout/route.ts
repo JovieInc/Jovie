@@ -14,6 +14,7 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import {
   MAX_REFERRAL_CODE_LENGTH,
@@ -69,7 +70,10 @@ function normalizeReferralCode(raw: unknown): string | undefined {
   return isValid ? trimmed.toLowerCase() : undefined;
 }
 
-async function validatePriceId(priceId: string): Promise<NextResponse | null> {
+async function validatePriceId(
+  priceId: string,
+  userId: string
+): Promise<NextResponse | null> {
   const activePriceIds = getActivePriceIds();
 
   Sentry.addBreadcrumb({
@@ -83,6 +87,12 @@ async function validatePriceId(priceId: string): Promise<NextResponse | null> {
   });
 
   if (activePriceIds.length === 0) {
+    captureRevenueSpineFailure({
+      stage: 'checkout',
+      failureCode: 'configuration_missing',
+      severity: 'blocked',
+      userId,
+    });
     await captureCriticalError(
       'Checkout rejected: no active price IDs configured',
       new Error(
@@ -145,9 +155,11 @@ async function handleCheckoutError(error: unknown): Promise<NextResponse> {
 }
 
 export async function POST(request: NextRequest) {
+  let affectedUserId: string | null = null;
   try {
     const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) return jsonError('Unauthorized', 401);
+    affectedUserId = userId;
 
     const parsedBody = await parseJsonBody<{
       humanConfirmed?: unknown;
@@ -211,7 +223,7 @@ export async function POST(request: NextRequest) {
     const referralCode = normalizeReferralCode(rawReferralCode);
     const onboardingReturnTo = normalizeOnboardingReturnTo(rawReturnTo);
 
-    const priceError = await validatePriceId(priceId);
+    const priceError = await validatePriceId(priceId, userId);
     if (priceError) return priceError;
 
     if (!isMaxPlanEnabled() && isMaxPriceId(priceId)) {
@@ -327,6 +339,12 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
+    captureRevenueSpineFailure({
+      stage: 'checkout',
+      severity: 'blocked',
+      userId: affectedUserId,
+      error,
+    });
     logger.error('Error creating checkout session:', error);
     return handleCheckoutError(error);
   }
