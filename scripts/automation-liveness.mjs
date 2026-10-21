@@ -311,7 +311,13 @@ export async function observeEntry(entry, context) {
 
 /**
  * @typedef {(url: string, init?: any) => Promise<{status: number, json: () => Promise<any>}>} FetchLike
- * @param {{registry: any, fetchImpl?: FetchLike, token?: string, nowMs?: number}} options
+ * @param {{
+ *   registry: any,
+ *   fetchImpl?: FetchLike,
+ *   token?: string,
+ *   nowMs?: number,
+ *   githubClient?: import('../packages/api-client/client.ts').ApiClient,
+ * }} options
  */
 export async function runLiveness({
   registry,
