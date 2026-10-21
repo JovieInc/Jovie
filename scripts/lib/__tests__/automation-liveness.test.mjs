@@ -204,6 +204,57 @@ describe('dead-man liveness', () => {
     }
   });
 
+  // 2026-10-20 21:13-21:52Z: 10 entries sat AWAITING_CHECKS for 39 min and
+  // nothing alarmed (JOV-8706). Silence while the queue is non-empty is red;
+  // max silence 45 min = ~2x merge-group p95 (23.9 min, 48h to 2026-10-21).
+  it('a non-empty merge queue that stops merging is silent; an empty queue is fresh', async () => {
+    const queue = (totalCount, enqueuedMinutesAgo, mergedMinutesAgo) => ({
+      data: {
+        repository: {
+          mergeQueue: {
+            entries: {
+              totalCount,
+              nodes: enqueuedMinutesAgo.map(m => ({ enqueuedAt: iso(m) })),
+            },
+          },
+          pullRequests: {
+            nodes: [
+              { mergedAt: iso(mergedMinutesAgo + 30) },
+              { mergedAt: iso(mergedMinutesAgo) },
+            ],
+          },
+        },
+      },
+    });
+    const run = body =>
+      runLiveness({
+        registry: only('github:jovie:merge-queue-progress'),
+        nowMs: NOW,
+        token: 't',
+        fetchImpl: fakeFetch({ '/graphql': body }),
+      }).then(({ report }) =>
+        rowFor(report, 'github:jovie:merge-queue-progress')
+      );
+    const stalled = await run(queue(10, [60, 55], 50));
+    expect(stalled.status).toBe('stale');
+    expect(stalled.ageMinutes).toBe(50);
+    // One ejection rebuild (~p95 23 min) inside 45 min is normal operation.
+    expect((await run(queue(10, [60, 55], 39))).status).toBe('fresh');
+    // A PR queued after a quiet stretch is not a stall yet.
+    expect((await run(queue(1, [2], 300))).status).toBe('fresh');
+    expect((await run(queue(0, [], 600))).status).toBe('fresh');
+    // Unreadable or unauthenticated is silence, never health.
+    expect((await run(502)).status).not.toBe('fresh');
+    const unauth = await runLiveness({
+      registry: only('github:jovie:merge-queue-progress'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({ '/graphql': queue(0, [], 0) }),
+    });
+    expect(
+      rowFor(unauth.report, 'github:jovie:merge-queue-progress').status
+    ).not.toBe('fresh');
+  });
+
   it('only counts the configured trigger events for scheduled baselines', async () => {
     const { report } = await runLiveness({
       registry: only('github:jovie:security'),
@@ -220,6 +271,28 @@ describe('dead-man liveness', () => {
 });
 
 describe('liveness run receipts', () => {
+  it('reads scheduled runs that 30 newer push runs would hide', async () => {
+    const pushes = Array.from({ length: 30 }, (_, i) => [
+      i + 1,
+      'success',
+      100 + i,
+      'push',
+    ]);
+    const { report } = await runLiveness({
+      registry: only('github:jovie:security'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'security.yml/runs': url =>
+          url.includes('event=schedule')
+            ? runs([2 * 24 * 60, 'success', 1, 'schedule'])
+            : url.includes('event=')
+              ? runs()
+              : runs(...pushes),
+      }),
+    });
+    expect(rowFor(report, 'github:jovie:security').status).toBe('fresh');
+  });
+
   it('emits receipts for observed runs during a liveness pass', async () => {
     const { events } = await runLiveness({
       registry: only('github:jovie:production-continuity'),

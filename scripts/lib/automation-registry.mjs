@@ -63,6 +63,7 @@ export const RECEIPT_KINDS = Object.freeze([
   'github-workflow',
   'json-timestamp',
   'production-freshness',
+  'merge-queue-progress',
   'host-local',
   'none',
 ]);
@@ -71,6 +72,7 @@ export const HOSTED_RECEIPT_KINDS = Object.freeze([
   'github-workflow',
   'json-timestamp',
   'production-freshness',
+  'merge-queue-progress',
 ]);
 
 const ID_RE = /^[a-z0-9][a-z0-9:._-]*$/;
@@ -149,6 +151,9 @@ export function validateRegistry(registry) {
       (!nonEmpty(receipt.url) || !nonEmpty(receipt.path))
     ) {
       errors.push(`${at}: json-timestamp receipts need url and path`);
+    }
+    if (receipt.kind === 'merge-queue-progress' && !nonEmpty(receipt.repo)) {
+      errors.push(`${at}: merge-queue-progress receipts need repo`);
     }
     if (
       receipt.kind === 'production-freshness' &&

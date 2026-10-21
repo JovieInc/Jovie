@@ -78,14 +78,24 @@ export async function observeGithubWorkflow(
   const branch = receipt.branch
     ? `&branch=${encodeURIComponent(receipt.branch)}`
     : '';
-  const url = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=30${branch}`;
-  const read = await readJson(fetchImpl, url, githubHeaders(token));
-  if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
-  const runs = Array.isArray(read.body?.workflow_runs)
-    ? read.body.workflow_runs
-    : null;
-  if (!runs) return { ok: false, reason: 'github-runs-unreadable' };
+  const base = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=30${branch}`;
   const events = receipt.events ?? null;
+  // Filter by event server-side: a busy push/PR workflow would otherwise
+  // push its scheduled runs out of the 30-run window (security.yml, 2026-10-21).
+  const urls = events
+    ? events.map(event => `${base}&event=${encodeURIComponent(event)}`)
+    : [base];
+  const runs = [];
+  for (const url of urls) {
+    const read = await readJson(fetchImpl, url, githubHeaders(token));
+    if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
+    if (!Array.isArray(read.body?.workflow_runs))
+      return { ok: false, reason: 'github-runs-unreadable' };
+    runs.push(...read.body.workflow_runs);
+  }
+  runs.sort((a, b) =>
+    String(b?.updated_at ?? '').localeCompare(String(a?.updated_at ?? ''))
+  );
   const run = runs.find(
     row =>
       conclusions.includes(row?.conclusion) &&
@@ -177,6 +187,84 @@ export async function observeProductionFreshness(
   };
 }
 
+/**
+ * Merge-queue progress (2026-10-20: the queue stalled 39 min with no alarm,
+ * JOV-8706). An empty queue is a fresh proof; otherwise the proof is the later
+ * of the last merged PR and the oldest entry's enqueue time, so a
+ * non-empty queue that stops merging goes silent. Unreadable is silence.
+ */
+export async function observeMergeQueueProgress(
+  receipt,
+  { fetchImpl, token, nowMs, apiUrl = 'https://api.github.com' }
+) {
+  if (!token) return { ok: false, reason: 'merge-queue-token-missing' };
+  const [owner, name] = String(receipt.repo).split('/');
+  const branch = receipt.branch ?? 'main';
+  // Merge time comes from PR mergedAt: a queue-merged commit keeps the
+  // timestamp of its merge group, not of the merge itself.
+  const query = `query($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){entries(first:100){totalCount nodes{enqueuedAt}}} pullRequests(baseRefName:$branch,states:MERGED,first:10,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{mergedAt}}}}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let body;
+  try {
+    const response = await fetchImpl(`${apiUrl}/graphql`, {
+      method: 'POST',
+      headers: {
+        ...githubHeaders(token),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        variables: { owner, name, branch },
+      }),
+      signal: controller.signal,
+    });
+    if (response.status !== 200)
+      return { ok: false, reason: `merge-queue-http-${response.status}` };
+    body = await response.json();
+  } catch (error) {
+    return {
+      ok: false,
+      reason:
+        error?.name === 'AbortError'
+          ? 'merge-queue-timeout'
+          : 'merge-queue-transport',
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+  const repo = body?.data?.repository;
+  const entries = repo?.mergeQueue?.entries;
+  if (!repo || body?.errors?.length || !entries)
+    return { ok: false, reason: 'merge-queue-unreadable' };
+  if (Number(entries.totalCount) === 0)
+    return {
+      ok: true,
+      lastProofAt: new Date(nowMs).toISOString(),
+      reason: 'merge-queue-empty',
+    };
+  const merges = (repo.pullRequests?.nodes ?? [])
+    .map(node => Date.parse(node?.mergedAt ?? ''))
+    .filter(Number.isFinite);
+  const lastMerge = merges.length ? Math.max(...merges) : Number.NaN;
+  const enqueued = (entries.nodes ?? [])
+    .map(node => Date.parse(node?.enqueuedAt ?? ''))
+    .filter(Number.isFinite);
+  const waitingSince = enqueued.length ? Math.min(...enqueued) : Number.NaN;
+  const proof = Math.max(
+    Number.isFinite(lastMerge) ? lastMerge : -Infinity,
+    Number.isFinite(waitingSince) ? waitingSince : -Infinity
+  );
+  if (!Number.isFinite(proof))
+    return { ok: false, reason: 'merge-queue-times-unreadable' };
+  return {
+    ok: true,
+    lastProofAt: new Date(proof).toISOString(),
+    reason: `${entries.totalCount}-queued`,
+  };
+}
+
 export async function observeEntry(entry, context) {
   const receipt = entry.receipt ?? {};
   if (receipt.kind === 'github-workflow')
@@ -185,6 +273,8 @@ export async function observeEntry(entry, context) {
     return observeJsonTimestamp(receipt, context);
   if (receipt.kind === 'production-freshness')
     return observeProductionFreshness(receipt, context);
+  if (receipt.kind === 'merge-queue-progress')
+    return observeMergeQueueProgress(receipt, context);
   return null;
 }
 

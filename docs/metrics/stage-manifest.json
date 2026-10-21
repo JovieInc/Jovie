@@ -84,6 +84,22 @@
           "source": "github-pr"
         },
         {
+          "id": "gate-seat",
+          "meaning": "lane gate waiting for a host gate seat (admission deferrals exit as abandoned)",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "gate",
+          "meaning": "lane gate run on the exact head (seat acquired to verdict)",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
           "id": "ready",
           "meaning": "pull request ready for review (non-draft)",
           "producer": "github",
@@ -409,6 +425,10 @@
   },
   "producers": {
     "workflows": {
+      "automation-liveness.yml": [
+        "automation-run:started",
+        "automation-run:finished"
+      ],
       "ci.yml": ["shipping:ready", "remediation:red", "remediation:green"],
       "lane-fix-relay.yml": ["remediation:classified"],
       "staging-controller.yml": ["release:staging"],
