@@ -52,6 +52,7 @@ import {
   isOperatorNavigationHrefActive,
   OPERATOR_NAV_GROUP_LABEL,
   OPERATOR_NAV_SECTIONS,
+  type OperatorNavSection,
 } from './operator-navigation';
 import { IdentitySwitcher } from './ProfileSwitcher';
 import { SidebarDockBridge } from './SidebarDockBridge';
@@ -100,11 +101,11 @@ const TOOLS_OPEN_KEY = 'ovie.nav.tools-open.v1';
  * is one Home), remembers the viewer's choice, and is always open while one
  * of its destinations is active so the current page is never hidden.
  */
-function OperatorNavSection({
+function OperatorNavGroup({
   section,
   pathname,
 }: Readonly<{
-  readonly section: (typeof OPERATOR_NAV_SECTIONS)[number];
+  readonly section: OperatorNavSection;
   readonly pathname: string;
 }>) {
   const [stored, setStored] = useState(false);
@@ -176,7 +177,7 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
     <div className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
       <nav aria-label='OV Navigation' className='flex flex-col gap-4'>
         {OPERATOR_NAV_SECTIONS.map(section => (
-          <OperatorNavSection
+          <OperatorNavGroup
             key={section.id}
             section={section}
             pathname={pathname}

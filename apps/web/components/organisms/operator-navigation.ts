@@ -90,7 +90,15 @@ export const OPERATOR_NAV_GROUP_LABEL =
  * no group label; Tools opens on demand and stays open while one of its
  * destinations is active.
  */
-export const OPERATOR_NAV_SECTIONS = [
+export interface OperatorNavSection {
+  readonly id: 'home' | 'tools';
+  /** `null`: the group renders without a label. */
+  readonly label: string | null;
+  readonly collapsible: boolean;
+  readonly items: readonly OperatorNavItem[];
+}
+
+export const OPERATOR_NAV_SECTIONS: readonly OperatorNavSection[] = [
   {
     id: 'home',
     label: null,
@@ -103,7 +111,7 @@ export const OPERATOR_NAV_SECTIONS = [
     collapsible: true,
     items: OPERATOR_NAV_ITEMS.filter(item => item.section === 'utilities'),
   },
-] as const;
+];
 
 /**
  * Home is the OV index (`/app/ov`) and matches only exactly; the chat route
