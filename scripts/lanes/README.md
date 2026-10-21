@@ -948,4 +948,6 @@ own gate fails before CI does.
 
 CI (`.github/workflows/design-gate.yml`) warns when a PR touches the same
 paths with no completed brief; it enforces only when `DESIGN_GATE_ENFORCE`
-is truthy, and unreadable briefs stay warnings even then.
+is truthy, and unreadable briefs stay warnings even then. Changed paths are
+the pull_request merge commit's diff against its first parent, so an
+exhausted installation REST budget cannot fail the job before that check.

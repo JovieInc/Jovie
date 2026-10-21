@@ -1,7 +1,3 @@
-# controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Cursor
-# necessary-trust-boundary: Read-only pull_request listing of changed files via the ephemeral github.token (`gh api .../pulls/<n>/files`); permissions are contents:read + pull-requests:read only, so the hop can observe but cannot write labels, checks, code, or comments. No merge, deploy, or release authority is added.
-# revisit-trigger: Remove this workflow (and the exception) once the design gate is enforced by an existing controller or required check rather than a standalone pull_request hop; otherwise revisit if DESIGN_GATE_ENFORCE graduates to a merge-queue required check.
 name: Design gate
 
 # Warns when a PR touches a marketing or landing surface without a completed
@@ -14,6 +10,12 @@ name: Design gate
 #   apps/web/components/marketing/
 #   apps/web/data/marketing/
 # Not a merge-queue required check. Unreadable briefs stay warnings.
+#
+# Changed paths come from the pull_request merge commit, not the pulls files
+# API. On 2026-10-11 the installation REST budget hit zero and PR Size Guard
+# failed closed on that API; on 2026-10-21 this job did too (HTTP 403 before
+# the brief check). Depth 2 includes that merge commit's first parent, the
+# base tip GitHub merged into. Diffing that parent is the PR's path list.
 
 on:
   pull_request:
@@ -31,7 +33,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
   group: design-gate-${{ github.event.pull_request.number }}
@@ -47,13 +48,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # pull_request checks out refs/pull/<n>/merge. Depth 2 includes its
+          # first parent, so the path list does not need the files API.
+          fetch-depth: 2
 
       - name: Changed files
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename' > "$RUNNER_TEMP/design-gate-files.txt"
+          if ! git rev-parse --verify --quiet 'HEAD^1' >/dev/null; then
+            echo "::error::Design gate checkout has no merge parent. fetch-depth must include the pull_request merge commit."
+            exit 1
+          fi
+          git diff --name-only --diff-filter=ACDMRTUXB 'HEAD^1' HEAD > "$RUNNER_TEMP/design-gate-files.txt"
 
       - name: Check the design brief
         env:
