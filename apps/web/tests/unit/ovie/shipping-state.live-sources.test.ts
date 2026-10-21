@@ -15,6 +15,7 @@ import {
   type LiveIo,
   NAMED_AUTHORITY_URLS,
   pacificMidnightIso,
+  parseLaneFlow,
   parseStageSummary,
   readLanePullRequests,
   readLanesStatus,
@@ -235,7 +236,81 @@ describe('lanes-status (symphony-lanes-status/v1 gist)', () => {
       stagesWithData: null,
       regressions: [],
       slowestP95: [],
+      endToEnd7d: [],
     });
+  });
+
+  it('parses end-to-end spans and marks regressed ones', () => {
+    const summary = parseStageSummary({
+      schema: 'jovie-stage-summary/v1',
+      at: '2026-09-27T01:58:00Z',
+      regressions: ['remediation:red->green.p95'],
+      endToEnd7d: {
+        'shipping:pr-open->merged': { n: 571, p50: 2280, p95: 102600 },
+        'remediation:red->green': { n: 156, p50: 3420, p95: 259560 },
+        'release:staging->verified': { n: -1, p50: 1, p95: 2 },
+      },
+    });
+    expect(summary?.endToEnd7d).toEqual([
+      {
+        pipeline: 'shipping:pr-open->merged',
+        p50: 2280,
+        p95: 102600,
+        n: 571,
+        regressed: false,
+      },
+      {
+        pipeline: 'remediation:red->green',
+        p50: 3420,
+        p95: 259560,
+        n: 156,
+        regressed: true,
+      },
+    ]);
+  });
+
+  it('reads flow health from prs, slo, admission and ownership', () => {
+    expect(
+      parseLaneFlow({
+        prs: { open: 94, red: 20, dirty: 7, cleanNotQueued: 6, exhausted: 11 },
+        slo: {
+          at: '2026-09-27T01:50:00Z',
+          queueEjectionRate: 0.72,
+          queueWaitP95Seconds: 10471,
+          productionLagP95Seconds: 527997,
+          throughput: { mergesPerDay: 87.4 },
+          regressions: ['merge_queue.ejection_rate'],
+        },
+        admission: { eligiblePool: 0, candidatePool: 28 },
+        ownership: { ownerless: 2 },
+      })
+    ).toEqual({
+      openPrs: 94,
+      redPrs: 20,
+      dirtyPrs: 7,
+      cleanNotQueued: 6,
+      exhaustedPrs: 11,
+      mergesPerHour: 3.6,
+      queueEjectionRate: 0.72,
+      queueWaitP95Seconds: 10471,
+      productionLagP95Seconds: 527997,
+      eligiblePool: 0,
+      candidatePool: 28,
+      ownerless: 2,
+      regressions: ['merge_queue.ejection_rate'],
+      at: '2026-09-27T01:50:00.000Z',
+    });
+  });
+
+  it('keeps unpublished flow fields unknown rather than zero', () => {
+    expect(parseLaneFlow({})).toBeNull();
+    const flow = parseLaneFlow({
+      prs: { open: 'many' },
+      slo: { queueEjectionRate: 4 },
+    });
+    expect(flow?.openPrs).toBeNull();
+    expect(flow?.queueEjectionRate).toBeNull();
+    expect(flow?.mergesPerHour).toBeNull();
   });
 
   it('marks the lanes block stale when `at` is older than ten minutes', async () => {
