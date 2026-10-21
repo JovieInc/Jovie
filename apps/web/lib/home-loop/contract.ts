@@ -70,6 +70,11 @@ export interface HomeLoopAsk {
    * Ovie matches the inbox verbs (Approve, Mark done, Certify).
    */
   readonly actionLabel?: string;
+  /**
+   * One-click answers the asker offered. When present they replace the
+   * single primary action; the first is the recommended one.
+   */
+  readonly options?: readonly string[];
   /** A written reply (request changes) is accepted for this ask. */
   readonly canReply: boolean;
   readonly evidence: readonly string[];

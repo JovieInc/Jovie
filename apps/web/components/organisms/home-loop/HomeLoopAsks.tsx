@@ -71,7 +71,7 @@ function AskCard({
   readonly ask: HomeLoopAsk;
   readonly answer: HomeLoopAnswer | undefined;
   readonly approveLabel: string;
-  readonly onApprove: (ask: HomeLoopAsk) => void;
+  readonly onApprove: (ask: HomeLoopAsk, option?: string) => void;
   readonly onReply: (ask: HomeLoopAsk, text: string) => void;
   readonly onFeedback?: (ask: HomeLoopAsk, text: string) => void;
 }>) {
@@ -180,7 +180,21 @@ function AskCard({
         </p>
       ) : (
         <div className={ACTION_SLOT}>
-          {ask.decidable ? (
+          {ask.decidable && ask.options?.length
+            ? ask.options.map((option, index) => (
+                <Button
+                  key={option}
+                  type='button'
+                  size='sm'
+                  variant={index === 0 ? 'primary' : 'secondary'}
+                  onClick={() => onApprove(ask, option)}
+                  data-testid='home-loop-ask-option'
+                >
+                  {option}
+                </Button>
+              ))
+            : null}
+          {ask.decidable && !ask.options?.length ? (
             <Button
               type='button'
               size='sm'
@@ -266,7 +280,7 @@ export function HomeLoopAsks({
   readonly moreHref?: string;
   readonly answers: Readonly<Record<string, HomeLoopAnswer>>;
   readonly approveLabel?: string;
-  readonly onApprove: (ask: HomeLoopAsk) => void;
+  readonly onApprove: (ask: HomeLoopAsk, option?: string) => void;
   readonly onReply: (ask: HomeLoopAsk, text: string) => void;
   readonly onFeedback?: (ask: HomeLoopAsk, text: string) => void;
 }>) {

@@ -57,8 +57,8 @@ in the manifest `regression` block.
 
 ## Outputs
 
-- `docs/metrics/stage-timings-latest.json` (`jovie-stage-timings/v1`): full table,
-  committed by the snapshot bot PR.
+- `docs/metrics/stage-timings-latest.json` (`jovie-stage-timings-compact/v1`): table committed by the snapshot bot PR.
+  `windowFormat` names the compact array fields; `terminalWindowFormat` additionally names `failed` and `failRate`.
 - `docs/metrics/shipping-slo-latest.json` gains `stages`
   (`jovie-stage-summary/v1`): coverage, regressions, the five slowest 7d p95
   stages and 7d end-to-end p50/p95/n. The lanes status gist embeds this file as
