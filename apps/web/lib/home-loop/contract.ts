@@ -85,6 +85,14 @@ export interface HomeLoopAsk {
   readonly decisionDefault: HomeLoopDecisionDefault | null;
   /** Post-ship feedback is accepted once the ask is decided. */
   readonly canFeedback: boolean;
+  /**
+   * A no-default decision that has waited too long: level 1 from 24h, level
+   * 2 from 48h. Home ranks it first and badges its age.
+   */
+  readonly escalation?: {
+    readonly level: 1 | 2;
+    readonly waitingHours: number;
+  } | null;
 }
 
 export interface HomeLoopDecisionDefault {
