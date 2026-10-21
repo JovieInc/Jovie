@@ -100,7 +100,9 @@ export function validateStageEvent(event, manifest) {
   if (!event || typeof event !== 'object') return ['event must be an object'];
   if (event.schema !== STAGE_EVENT_SCHEMA)
     errors.push(`schema must be ${STAGE_EVENT_SCHEMA}`);
-  const entity = manifest?.entities?.[event.entityType];
+  const entity = Object.hasOwn(manifest?.entities ?? {}, event.entityType)
+    ? manifest.entities[event.entityType]
+    : undefined;
   if (!entity) errors.push(`unknown entityType ${event.entityType}`);
   else if (!entity.stages.some(stage => stage.id === event.stage))
     errors.push(`unknown stage ${event.entityType}:${event.stage}`);

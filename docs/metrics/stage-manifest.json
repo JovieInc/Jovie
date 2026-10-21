@@ -257,14 +257,16 @@
           "id": "started",
           "meaning": "the automation's run started (from its receipt)",
           "producer": "automation-liveness",
-          "status": "pushed",
+          "status": "spec",
+          "owner": "automation registry",
           "source": "automation-liveness-receipts"
         },
         {
           "id": "finished",
           "meaning": "the run reached a terminal receipt (completed or failed)",
           "producer": "automation-liveness",
-          "status": "pushed",
+          "status": "spec",
+          "owner": "automation registry",
           "source": "automation-liveness-receipts"
         }
       ]

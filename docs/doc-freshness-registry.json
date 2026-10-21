@@ -19,7 +19,9 @@
     "docs/company/CAPITAL-STRATEGY.md",
     "docs/marketing/*.md"
   ],
-  "gardeningScopes": ["docs/doc-gardening/**/*.md"],
+  "gardeningScopes": [
+    "docs/doc-gardening/**/*.md"
+  ],
   "computers": {
     "scoped-rules-count": {
       "description": "Topic-scoped rule files under .claude/rules/",
@@ -30,12 +32,16 @@
   "freshnessMarkers": [
     {
       "id": "scoped-rules-count",
-      "files": ["CLAUDE.md"],
+      "files": [
+        "CLAUDE.md"
+      ],
       "computer": "scoped-rules-count"
     },
     {
       "id": "scoped-rules-count",
-      "files": ["docs/doc-gardening/SEED-STALE.md"],
+      "files": [
+        "docs/doc-gardening/SEED-STALE.md"
+      ],
       "computer": "scoped-rules-count",
       "gardeningOnly": true
     }
@@ -547,15 +553,15 @@
     "docs/metrics/STAGE_EVENTS.md": {
       "owner": "@itstimwhite",
       "claim": "The stage-event contract, sources, outputs and emitter specs match the manifest and the stage-timings code.",
-      "documentSha256": "5187290f413c4c47ceefa54ff9b740187e0d0abc35965aee6f6a73a2a372a3a8",
+      "documentSha256": "a9eaf87ec89390a3d3f7f1d9802d3c889bbeb766419ad34ae1cee9d4812fc49f",
       "sources": [
         {
           "path": "docs/metrics/stage-manifest.json",
-          "sha256": "d17f08a9b41b1d4e8f7b641edde567e995ed87ecb1f7f5ecc32ed34ebd270199"
+          "sha256": "60a555b694698b96916c60de3979777ca3793be67f11923dae094fbb6552c2e7"
         },
         {
           "path": "scripts/lib/stage-events.mjs",
-          "sha256": "3d66ba10bd994fbb660a419c6c0ffb77a6c45b29b2ca12ef8f307318184c208c"
+          "sha256": "3e9a8195791d9a5e1982ee89a4f5b48c23e7b6aa3fdddb3d3a14d29d6a316c10"
         }
       ]
     }

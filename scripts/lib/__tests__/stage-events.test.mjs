@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { checkStageManifest } from '../../stage-manifest-check.mjs';
+import { runStageEvents } from '../automation-registry.mjs';
 import {
   buildStageSummary,
   chainStages,
@@ -108,6 +109,54 @@ describe('stage event contract', () => {
     expect(parsed.events).toHaveLength(1);
     expect(parsed.rejected.map(r => r.line)).toEqual([2, 3]);
   });
+
+  it.each(['constructor', '__proto__', 'toString'])(
+    'rejects inherited entity type %s without aborting the feed',
+    entityType => {
+      const text = [
+        JSON.stringify(event({ entityType })),
+        JSON.stringify(event({})),
+      ].join('\n');
+      expect(parseStageEventFeed(text, MANIFEST)).toEqual({
+        events: [event({})],
+        rejected: [{ line: 1, errors: [`unknown entityType ${entityType}`] }],
+      });
+    }
+  );
+
+  it.each(['completed', 'failed'])(
+    'accepts and times a %s automation run from the existing emitter helper',
+    outcome => {
+      const rows = runStageEvents({
+        automationId: 'automation-liveness',
+        runRef: 'run-1',
+        startedAt: ago(2),
+        endedAt: ago(1),
+        outcome,
+        sourceReceipt: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+      });
+      expect(rows).toHaveLength(2);
+      const parsed = parseStageEventFeed(
+        rows.map(row => JSON.stringify(row)).join('\n'),
+        MANIFEST
+      );
+      expect(parsed).toEqual({ events: rows, rejected: [] });
+      const timings = computeStageTimings(parsed.events, MANIFEST, {
+        now: NOW,
+      }).entities['automation-run'];
+      expect(timings.stages.started['24h']).toEqual({
+        n: 1,
+        p50: 60,
+        p95: 60,
+      });
+      expect(timings.stages.finished['24h'].n).toBe(1);
+      expect(timings.endToEnd['started->finished']['24h']).toEqual({
+        n: 1,
+        p50: 60,
+        p95: 60,
+      });
+    }
+  );
 
   it('chains observed stages, skips unobserved ones and clamps inversions', () => {
     const events = chainStages(

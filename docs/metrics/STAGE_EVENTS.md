@@ -122,11 +122,14 @@ token-readable URL and register it as `summer-stage-feed.url` in the manifest.
 
 ### Automation liveness (`automation-run`)
 
-Live emitter: `scripts/automation-liveness.mjs` (workflow
-`automation-liveness.yml`) writes `automation-run:started` and
-`automation-run:finished` rows for every registered automation whose receipt
-carries both timestamps, into the artifact
-`automation-liveness-receipts/stage-events.ndjson`.
+The existing `runStageEvents` helper in `scripts/lib/automation-registry.mjs`
+produces `automation-run:started` and `automation-run:finished` rows from a
+run receipt carrying both timestamps. The publishing integration is planned
+in [#22362](https://github.com/JovieInc/Jovie/pull/22362):
+`scripts/automation-liveness.mjs` and workflow `automation-liveness.yml`
+will write the rows into `automation-liveness-receipts/stage-events.ndjson`.
+Until those files land, the stages remain `spec` and the workflow is not
+registered under `producers.workflows`.
 
 | Stage | Timestamp |
 | --- | --- |
@@ -135,9 +138,9 @@ carries both timestamps, into the artifact
 
 `entityId` = `<automationId>@<runRef>` (`automationId` from
 `canon/automation-registry.jsonl`). Rows without real timestamps are never
-emitted. The source has no URL yet: the shipping-slo collector reads `url`
-sources only, so reading the artifact is the remaining step before these
-timings reach the snapshot.
+emitted. The source has no URL yet: after the publisher lands, the
+shipping-slo collector also needs artifact ingestion before these timings
+reach the snapshot; it currently reads `url` sources only.
 
 ### LogYourBody release loop
 
