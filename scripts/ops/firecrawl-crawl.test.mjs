@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -96,9 +96,102 @@ test('rejects bad sitemap, unknown flags, and bad limit', () => {
   assert.match(run(['crawl', 'https://x', '--limit', '0']).stderr, /--limit/);
 });
 
-test('map/crawl require a URL and the API key', () => {
+test('map/crawl require a URL and the research gateway', () => {
   assert.match(run(['map']).stderr, /missing/);
-  const r = run(['crawl', 'https://x'], { PATH: process.env.PATH });
-  assert.match(r.stderr, /FIRECRAWL_API_KEY/);
+  const r = run(['crawl', 'https://x'], {
+    PATH: process.env.PATH,
+    JOVIE_RESEARCH_BIN: '/nonexistent/jovie-research',
+  });
+  assert.match(r.stderr, /research gateway not found/);
   assert.notEqual(r.status, 0);
+});
+
+function fakeGateway(dir, reply, code = 0) {
+  const bin = join(dir, 'jovie-research');
+  const log = join(dir, 'calls.log');
+  writeFileSync(
+    bin,
+    `#!/bin/sh\necho "$*" >> '${log}'\nprintf '%s' '${reply}'\nexit ${code}\n`,
+    { mode: 0o755 }
+  );
+  return { bin, log };
+}
+
+test('map goes through the gateway and books one credit', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fc-gw-'));
+  try {
+    const { bin, log } = fakeGateway(
+      dir,
+      JSON.stringify({ success: true, links: ['https://x/a', 'https://x/b'] })
+    );
+    const r = run(['map', 'https://x.example/'], {
+      PATH: process.env.PATH,
+      JOVIE_RESEARCH_BIN: bin,
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /"mapped": 2/);
+    rmSync(join(dirname(SCRIPT), '.cache/firecrawl-registry/x.example.json'), {
+      force: true,
+    });
+    const call = readFileSync(log, 'utf8');
+    assert.match(
+      call,
+      /^call firecrawl POST \/v1\/map --units 1 --caller firecrawl-crawl --body /
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('map truncates a large delta to --limit without SIGPIPE, in v1 body shape', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fc-big-'));
+  try {
+    const links = Array.from(
+      { length: 5000 },
+      (_, i) => `https://big.example/p${i}`
+    );
+    const { bin, log } = fakeGateway(
+      dir,
+      JSON.stringify({ success: true, links })
+    );
+    const r = run(
+      ['map', 'https://big.example/', '--limit', '3', '--sitemap', 'skip'],
+      {
+        PATH: process.env.PATH,
+        JOVIE_RESEARCH_BIN: bin,
+      }
+    );
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(
+      r.stdout
+        .trim()
+        .split('\n')
+        .filter(l => l.startsWith('https://')).length,
+      3
+    );
+    const call = readFileSync(log, 'utf8');
+    assert.match(call, /"ignoreSitemap":true/);
+    assert.doesNotMatch(call, /"sitemap"/);
+  } finally {
+    rmSync(
+      join(dirname(SCRIPT), '.cache/firecrawl-registry/big.example.json'),
+      { force: true }
+    );
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a capped gateway stops the crawl with a clear reason', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fc-cap-'));
+  try {
+    const { bin } = fakeGateway(dir, '', 75);
+    const r = run(['map', 'https://x.example/'], {
+      PATH: process.env.PATH,
+      JOVIE_RESEARCH_BIN: bin,
+    });
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /credit cap reached or no credential/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

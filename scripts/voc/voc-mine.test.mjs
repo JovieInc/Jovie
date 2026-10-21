@@ -5,7 +5,9 @@ import {
   anonymize,
   classify,
   dedupe,
+  exaSearch,
   renderIndexPage,
+  setExaGateway,
   shortQuote,
   summarize,
   toItem,
@@ -147,5 +149,70 @@ describe('persona objections', () => {
         assert.ok(o.evidence.quote.length > 0);
       }
     }
+  });
+});
+
+describe('exa via the research gateway', () => {
+  it('books gateway cost, keeps alias-matching highlights and stops at the cap', async () => {
+    const calls = [];
+    let n = 0;
+    setExaGateway({
+      deps: {},
+      g: {
+        async callSource(_deps, source, req) {
+          calls.push({ source, ...req });
+          n += 1;
+          if (n > 1) {
+            const error = new Error('exa cap reached: dailyUsd 1');
+            error.name = 'CapExceeded';
+            throw error;
+          }
+          return {
+            status: 200,
+            usd: 0.007,
+            body: {
+              results: [
+                {
+                  url: 'https://example.com/r',
+                  highlights: [
+                    'Acme Links is totally overpriced for what it does, so I cancelled and switched to a free alternative.',
+                    'unrelated',
+                  ],
+                },
+              ],
+            },
+          };
+        },
+      },
+    });
+    const cost = { exa: 0 };
+    const items = await exaSearch(
+      target,
+      '2026-10-20T00:00:00Z',
+      '2026-01-01',
+      cost
+    );
+    assert.equal(cost.exa, 0.007);
+    assert.equal(items.length, 1);
+    assert.deepEqual(
+      calls.map(c => [c.source, c.path, c.caller]),
+      [
+        ['exa', '/search', 'voc-mine'],
+        ['exa', '/search', 'voc-mine'],
+      ]
+    );
+    const after = await exaSearch(
+      target,
+      '2026-10-20T00:00:00Z',
+      '2026-01-01',
+      cost
+    );
+    assert.equal(
+      after.length,
+      0,
+      'a capped gateway stops Exa for the rest of the run'
+    );
+    assert.equal(calls.length, 2);
+    setExaGateway(null);
   });
 });

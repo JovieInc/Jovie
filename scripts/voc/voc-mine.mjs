@@ -216,7 +216,7 @@ async function getJson(url, init) {
     return await res.json();
   } catch {
     // undici connects time out on some macOS hosts where curl succeeds
-    // (seen against Apple's and Exa's edges); retry once through curl.
+    // (seen against Apple's edge); retry once through curl.
     const args = ['-sfL', '--max-time', '30', '-A', UA];
     for (const [k, v] of Object.entries(init?.headers ?? {}))
       args.push('-H', `${k}: ${v}`);
@@ -289,10 +289,47 @@ async function hnComments(target, observedAt, sinceEpoch) {
   return items;
 }
 
-// Exa search (licensed index; respects robots). Low per-call cost; key from env.
-async function exaSearch(target, observedAt, since, cost) {
-  const key = process.env.EXA_API_KEY;
-  if (!key) return [];
+// Exa calls go through the shared research gateway (packages/research): one
+// credential lookup, the host-wide Exa caps, the api-client budget ledger, a
+// one-day response cache and cost metrics. A capped or unavailable gateway
+// skips Exa for the rest of the run instead of spending past the cap.
+let gateway;
+/** Tests inject `{ g: { callSource }, deps }` instead of the real gateway. */
+export function setExaGateway(fake) {
+  gateway = fake === null ? undefined : Promise.resolve(fake);
+}
+async function exaCall(path, body, cost) {
+  gateway ??= import('../../packages/research/gateway.ts')
+    .then(g => ({ g, deps: g.gatewayDeps() }))
+    .catch(error => {
+      process.stderr.write(
+        `exa skipped: research gateway unavailable (${error.message})\n`
+      );
+      return null;
+    });
+  const gw = await gateway;
+  if (!gw || gw.stopped) return null;
+  try {
+    const out = await gw.g.callSource(gw.deps, 'exa', {
+      path,
+      body,
+      caller: 'voc-mine',
+      cacheTtlMs: 24 * 3600 * 1000,
+      idempotent: true,
+    });
+    cost.exa += out.usd;
+    return out.status < 400 ? out.body : null;
+  } catch (error) {
+    if (error.name === 'CapExceeded' || /no credential/.test(error.message)) {
+      gw.stopped = true;
+      process.stderr.write(`exa stopped: ${error.message}\n`);
+    }
+    return null;
+  }
+}
+
+// Exa search (licensed index; respects robots). Low per-call cost.
+export async function exaSearch(target, observedAt, since, cost) {
   const queries = target.queries ?? [
     `${target.name} complaints review problems`,
     `is ${target.name} worth paying for? cancelled subscription free alternative`,
@@ -302,10 +339,9 @@ async function exaSearch(target, observedAt, since, cost) {
   );
   const items = [];
   for (const query of queries) {
-    const data = await getJson('https://api.exa.ai/search', {
-      method: 'POST',
-      headers: { 'x-api-key': key, 'content-type': 'application/json' },
-      body: JSON.stringify({
+    const data = await exaCall(
+      '/search',
+      {
         query,
         numResults: 8,
         startPublishedDate: since,
@@ -316,9 +352,9 @@ async function exaSearch(target, observedAt, since, cost) {
             query: 'complaint, frustration, or reason not worth paying',
           },
         },
-      }),
-    }).catch(() => null);
-    cost.exa += data?.costDollars?.total ?? 0;
+      },
+      cost
+    );
     for (const r of data?.results ?? []) {
       for (const h of r.highlights ?? []) {
         if (!target.queries && !aliases.some(a => h.toLowerCase().includes(a)))
@@ -340,15 +376,13 @@ async function exaSearch(target, observedAt, since, cost) {
 
 // Public review pages fetched through Exa's contents endpoint (cached crawl).
 async function trustpilotReviews(target, observedAt, cost) {
-  const key = process.env.EXA_API_KEY;
-  if (!key || !target.trustpilot) return [];
+  if (!target.trustpilot) return [];
   const url = `https://www.trustpilot.com/review/${target.trustpilot}`;
-  const data = await getJson('https://api.exa.ai/contents', {
-    method: 'POST',
-    headers: { 'x-api-key': key, 'content-type': 'application/json' },
-    body: JSON.stringify({ urls: [url], text: { maxCharacters: 40000 } }),
-  }).catch(() => null);
-  cost.exa += data?.costDollars?.total ?? 0;
+  const data = await exaCall(
+    '/contents',
+    { urls: [url], text: { maxCharacters: 40000 } },
+    cost
+  );
   const text = data?.results?.[0]?.text ?? '';
   return text
     .split(/\n\s*\n/)

@@ -717,6 +717,11 @@ def execute(job: dict, config: dict, context: str, state: Path, run=lifecycle.ru
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     slug = decision_slug(job, day)
     if job["decisionType"] == "research":
+        # Shared research router first: cached and cheap-tier evidence (gbrain, repo, Firecrawl, Exa
+        # under the host caps) goes into the memo prompt, so the expensive backend does not re-search it.
+        evidence = router_evidence(job, config.get("researchRouter"), run=run)
+        if evidence:
+            context = f"{context}\n\nROUTER EVIDENCE (already gathered by jovie-research; cite, do not re-search):\n{evidence}"
         # Tim 2026-09-28: GLM 5.3 first, Astra when GLM cannot answer; Fable is never a research lane.
         for spec in filter(None, [config["research"], config.get("researchEscalation")]):
             out = run_research(spec, research_prompt(job, context), run=run)
@@ -758,6 +763,22 @@ def execute(job: dict, config: dict, context: str, state: Path, run=lifecycle.ru
                            prior_art=prior_art)
     return {"record": record, "comment": render_comment(record, proposal, review), "retry": False,
             "proposal": proposal, "review": review}
+
+
+def router_evidence(job: dict, spec: dict | None, run=lifecycle.run, limit: int = 6000) -> str:
+    """Bounded evidence from the shared research router (packages/research). Fail-open: a missing
+    CLI, cap, timeout or empty result returns "" and the research backend runs as before."""
+    if not spec:
+        return ""
+    try:
+        result = run([arg.format(question=job["question"]) for arg in spec["cmd"]], capture_output=True,
+                     text=True, timeout=int(spec.get("timeoutS", 180)))
+    except (subprocess.TimeoutExpired, OSError):
+        return ""
+    text = (result.stdout or "").strip()
+    if result.returncode != 0 or not text or "No relevant results" in text:
+        return ""
+    return text[:limit]
 
 
 def run_research(spec: dict, prompt: str, run=lifecycle.run) -> dict:

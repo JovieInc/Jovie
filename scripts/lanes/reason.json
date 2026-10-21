@@ -79,6 +79,19 @@
       ]
     }
   ],
+  "researchRouter": {
+    "name": "jovie-research",
+    "timeoutS": 180,
+    "cmd": [
+      "jovie-research",
+      "ask",
+      "{question}",
+      "--mode",
+      "standard",
+      "--caller",
+      "reason-lane"
+    ]
+  },
   "research": {
     "name": "hyperagent-glm-research",
     "model": "z-ai/glm-5.3",
