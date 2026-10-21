@@ -4455,6 +4455,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/v1/music/resolve/route.ts",
+      "kind": "handler",
+      "route": "/api/v1/music/resolve",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/v1/openapi.json/route.ts",
       "kind": "handler",
       "route": "/api/v1/openapi.json",
