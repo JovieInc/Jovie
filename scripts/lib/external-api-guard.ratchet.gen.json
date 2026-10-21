@@ -675,6 +675,9 @@
     "scripts/shipping_origin.py": {
       "gh-subprocess": 2
     },
+    "scripts/signals/signal_watch.py": {
+      "provider-host": 1
+    },
     "scripts/source-admission-check.mjs": {
       "gh-subprocess": 1
     },
