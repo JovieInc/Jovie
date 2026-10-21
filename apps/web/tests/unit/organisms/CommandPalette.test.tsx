@@ -488,7 +488,7 @@ describe('CommandPalette', () => {
       .find(el => el.textContent?.includes('Switch to OV'));
     fireEvent.mouseDown(action!);
 
-    expect(assignMock).toHaveBeenCalledWith('/app/ov/chat');
+    expect(assignMock).toHaveBeenCalledWith('/app/ov');
     expect(pushMock).not.toHaveBeenCalled();
   });
 

@@ -1,0 +1,45 @@
+● JOVIE · SYMPHONY · lanes unknown-release on gem · ! hud≠release · ! tick ?                                                                                     ✕ github open · ✕ linear · ? feed · ? prod · 18:29:30Z
+ CONSTRAINT ? UNKNOWN   evidence · lanes-status unread · the doctor writes it every tick on the primary host
+ PRODUCTION  ? UNKNOWN served build unknown · not-read-yet
+ FLOW 24h    draft ? → prepared ? → queued ? → merged ? → deployed ? → verified ? · merges ?/h · opened ?/h (1h) · claim→merge p50 ? · eligible→verified ? (no producer)
+ WORKERS   ? UNKNOWN 0 running / unknown (codex 0/? · grok 0/?)        │  REPAIR    ? UNKNOWN open lane PRs unknown                             │  SHIPPED   ? UNKNOWN merged unknown
+○ codex      vacant ×3 · no codex account available                    │   ? PR list: not read yet                                              │   ? merged PRs: not-read-yet (source age unknown)
+○ grok       vacant · no worker process · the minute timer restarts i… │   ? repair demand unknown (lanes-status unread)                        │
+  codex      24h started 0 · productive 0 · PR 0 · landed unknown      │   hold records 0                                                       │
+  grok       24h started 0 · productive 0 · PR 0 · landed unknown      │                                                                        │
+  24h verdicts: no runs                                                │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+ SUPPLY    ? UNKNOWN Todo ? → eligible ? → new issues ?                │                                                                        │
+  codex      new issues unknown (doctor unread)                        │                                                                        │
+  grok       new issues unknown (doctor unread)                        │                                                                        │
+  ✕ Linear not read yet                                                │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+ ALERTS    ? UNKNOWN 1 active · 0 critical/failing                     │                                                                        │
+? lanes-status unread · owner doctor.py on the primary host            │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │  BUDGETS   ? UNKNOWN GitHub budget unknown
+                                                                       │                                                                        │   ? GitHub rate: not-read-yet (source age unknown)
+                                                                       │                                                                        │   ✕ codex accounts FileNotFoundError: codex
+                                                                       │  QUEUE     ? UNKNOWN merge queue unknown · wait p50 ? · ejections ?    │
+                                                                       │   ? queue read: not-read-yet (source age unknown)                      │
+                                                                       │   ? promotion: not-read-yet                                            │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │  HOST      ✓ OK      disk 41% free · mem ? free · load ? / 16 cores
+● running ○ idle ✓ ok ! warn ✕ fail ? unknown  │  draft→prepared→queued→merged→deployed→verified  │  ↑↓ PgUp/PgDn Home/End scroll workers

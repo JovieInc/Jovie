@@ -21,25 +21,28 @@ import {
   hasPublicAnnualOffer,
   isMaxPurchaseEnabled,
   isSelfServiceOffer,
+  PRO_SELF_SERVE_TRUTH,
   PUBLIC_CUSTOM_PRICE_LABEL,
   validateBillingInterval,
 } from './offer-truth';
 
 describe('Artist Visibility offer contract', () => {
-  it('locks artist-visibility-offer-contract-v1 to Pro $199 without a public Max price', () => {
+  it('locks artist-visibility-offer-contract-v1 to self-serve Pro $12 without a public Max price', () => {
     expect(ARTIST_VISIBILITY_OFFER_CONTRACT_ID).toBe(
       'artist-visibility-offer-contract-v1'
     );
-    expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(199);
+    // EVENT: Tim, 2026-10-20 — first paid offer is $12/month, self-serve.
+    expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(12);
     expect(getPublicPriceClaims().map(claim => claim.plan)).toEqual([
       'free',
       'pro',
       'enterprise',
     ]);
     expect(getPublicPriceClaim('pro')).toMatchObject({
-      priceUsd: 199,
-      ctaLabel: 'Request access',
-      selfService: false,
+      priceUsd: 12,
+      ctaLabel: 'Claim your profile',
+      ctaHref: '/claim?plan=pro',
+      selfService: true,
     });
     expect(FORBIDDEN_PUBLIC_PRICING_PAGE_MARKERS).toEqual([
       '$149',
@@ -49,10 +52,10 @@ describe('Artist Visibility offer contract', () => {
     ]);
   });
 
-  it('uses the same $199 monthly price in public claims and Pro entitlements', () => {
-    expect(getPaidPlanPriceUsd('pro', 'month')).toBe(199);
+  it('uses the same $12 monthly price in public claims and Pro entitlements', () => {
+    expect(getPaidPlanPriceUsd('pro', 'month')).toBe(12);
     expect(ENTITLEMENT_REGISTRY.pro.marketing.price).toEqual({
-      monthly: 199,
+      monthly: 12,
       yearly: null,
     });
     expect(getPlanSignupHref('pro', 'month')).toBe(
@@ -139,11 +142,11 @@ describe('Artist Visibility offer contract', () => {
       annualPriceUsd: null,
       priceLabel: formatUsdAmount(getPaidPlanPriceUsd('pro', 'month')),
       cadence: '/mo',
-      selfService: false,
-      badge: 'Limited access',
-      note: 'Limited access.',
-      ctaLabel: 'Request access',
-      ctaHref: '/waitlist',
+      selfService: true,
+      badge: 'Self-serve',
+      note: PRO_SELF_SERVE_TRUTH,
+      ctaLabel: 'Claim your profile',
+      ctaHref: '/claim?plan=pro',
     });
     expect(formatPublicPriceDisplay(pro)).toBe(`${pro.priceLabel}/mo`);
     expect(max).toMatchObject({

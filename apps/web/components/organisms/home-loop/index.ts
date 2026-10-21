@@ -1,3 +1,4 @@
+export { HomeLoopAnswerPanel } from './HomeLoopAnswerPanel';
 export {
   type HomeLoopAnswer,
   type HomeLoopAnswerState,

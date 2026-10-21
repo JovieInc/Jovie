@@ -1515,6 +1515,557 @@ def delivery_rows(f: dict, width: int) -> list[str]:
 
 
 
+# ---------------------------------------------------------------- panels
+
+def heading(name: str, state: str, summary, width: int) -> str:
+    """A fixed-geometry title: label, then a state slot that never changes width, then the
+    summary parts that fit, least important dropped first."""
+    slot = f"{MARK[state]} {WORD[state]}"
+    lead = paint("label", f" {name:<8} ") + " " + paint(state, f"{slot:<9}") + " "
+    parts = summary if isinstance(summary, list) else [(0, summary)]
+    return lead + fit(parts, max(1, width - visible(lead)))
+
+
+def finish(title: str, body: list, width: int, rows: int) -> list[str]:
+    """Title plus the body lines that fit. Body items are text or (priority, text); when the
+    panel is short, the most important lines stay, in order, and the rest are counted."""
+    items = [item if isinstance(item, tuple) else (1, item) for item in body]
+    room = max(0, rows - 1)
+    if len(items) > room:
+        keep = room - 1 if room >= 2 else room
+        chosen = sorted(sorted(range(len(items)), key=lambda index: (items[index][0], index))[:keep])
+        hidden = len(items) - len(chosen)
+        items = [items[index] for index in chosen] + ([(0, f"  +{hidden} more")] if room >= 2 else [])
+    return [title] + [clip(text, width) for _, text in items]
+
+
+def worker_rows(f: dict, width: int) -> list[str]:
+    local, now = f["local"], f["now"]
+    slots, workers = local.get("slots") or {}, local.get("workers") or []
+    feed_providers = dig(f["feed"], "throughput", "providers", default={})
+    rows = []
+    for name in f["lanes"]:
+        mine = [w for w in workers if w["provider"] == name]
+        for worker in (w for w in mine if w.get("run")):
+            run = worker["run"]
+            title = f["titles"].get(run["target"]) or "title not in current GitHub/Linear read"
+            kind = {"issue": "issue", "adopt": "gate", "fix": "fix-red"}.get(run["kind"], run["kind"])
+            elapsed = since(run["startedAt"], now)
+            rows.append(titled(paint("ok", "● ") + f"{name:<10} {run['target']:<9} {kind:<7} {run.get('phase', '?'):<13} "
+                               f"{elapsed:>6}  ", title, width))
+        polling = [w for w in mine if not w.get("run")]
+        vacant = max(0, slots.get(name, 0) - len(mine))
+        reason = dig(feed_providers, name, "idleReason")
+        # The doctor's idle reason comes from its last tick; this census is newer, so a
+        # "fully-utilized" verdict against a polling worker is stale, not a reason.
+        reason = None if reason in (None, "fully-utilized") else humanize(reason)
+        facts = admission_facts(name, local, now)
+        hint = (pool_hint(name, local, now) if facts["error"] else
+                f"eligible {facts['eligible']}/{facts['candidates']} · new issues {facts['qualified']}")
+        if polling:
+            count = f" ×{len(polling)}" if len(polling) > 1 else ""
+            rows.append(f"○ {name:<10} polling{count} · " + (reason + " · " if reason else "") + hint)
+        if vacant:
+            count = f" ×{vacant}" if vacant > 1 else ""
+            rows.append(f"○ {name:<10} vacant{count} · " + vacancy_reason(name, local))
+    return rows
+
+
+def productivity_rows(f: dict, width: int) -> list[str]:
+    rows = []
+    for name in f["lanes"]:
+        metric = f["throughput"]["providers"].get(name)
+        if not metric:
+            continue
+        landed = "unknown" if f["mergeError"] else str(metric["landedOutput"])
+        rows.append(fit([(0, f"  {name:<10} 24h started {metric['workerStarts']}"),
+                         (0, f"productive {metric['productiveRuns']}"), (1, f"PR {metric['prsCreated']}"),
+                         (1, f"first-pass {pct(metric['firstPassGreenRate'])}"),
+                         (1, f"repair {metric['remediationRuns']}"), (0, f"landed {landed}"),
+                         (2, f"offered {metric['eligibleWorkOffered']}")], width))
+    verdicts = sorted((f["local"].get("ledger24h") or {}).items(), key=lambda item: (-item[1], str(item[0])))
+    rows.append(fit([(0, "  24h verdicts:" + ("" if verdicts else " no runs"))]
+                    + [(1 + rank, f"{key} {value}") for rank, (key, value) in enumerate(verdicts)], width,
+                    sep=" · ").replace("verdicts: · ", "verdicts: "))
+    return rows
+
+
+def panel_workers(f: dict, width: int, rows: int, viewport: SlotViewport) -> list[str]:
+    local = f["local"]
+    slots, known = local.get("slots") or {}, f["slotsKnown"]
+    autoscale_mode = local.get("autoscaleMode") or "off"
+    bases = local.get("baseSlots") or {}
+    parts = []
+    for name in f["lanes"]:
+        count = slots.get(name, 0)
+        label = f"{name} {sum(1 for w in f['busy'] if w['provider'] == name)}/{count if known else '?'}"
+        base = bases.get(name)
+        if autoscale_mode != "off" and isinstance(base, int) and base != count:
+            label += f"{'↑' if count > base else '↓'}{base}"
+        parts.append(label)
+    total = sum(slots.values())
+    summary = [(0, f"{len(f['busy'])} running / {total if known else 'unknown'} ({' · '.join(parts) or 'no lanes'})"),
+               (3, f"auto:{autoscale_mode}" if autoscale_mode != "off" else ""),
+               (1, f"gate seats {local.get('gateSeats', '?')}"),
+               (2, f"off {' '.join(f['off'])}" if f["off"] else "")]
+    idle_with_work = any(dig(f["feed"], "throughput", "providers", name, "idleReason") ==
+                         "capacity-idle-with-qualified-work" for name in f["lanes"])
+    state = "unknown" if not known else "warn" if idle_with_work else "ok"
+    slot_rows, extra = worker_rows(f, width), productivity_rows(f, width)
+    budget = max(0, rows - 1)
+    if len(slot_rows) + len(extra) <= budget:
+        body = slot_rows + extra
+    else:
+        # Slots come first; productivity lines take what the slot page leaves.
+        page = max(1, budget - min(len(extra), max(0, budget - 4)))
+        scrolling = len(slot_rows) > page
+        page = max(1, page - 1) if scrolling else len(slot_rows)
+        shown = viewport.window(slot_rows, page)
+        body = shown + ([f"  Rows {viewport.offset + 1}-{viewport.offset + len(shown)} of {len(slot_rows)}"
+                         " · ↑↓ scroll · PgUp/PgDn · Home/End"] if scrolling else [])
+        body += extra[:max(0, budget - len(body))]
+    return [heading("WORKERS", state, summary, width)] + [clip(line, width) for line in body[:max(0, budget)]]
+
+
+def panel_supply(f: dict, width: int, rows: int, viewport=None) -> list[str]:
+    local, linear = f["local"], f["linear"]
+    facts = {name: admission_facts(name, local, f["now"]) for name in f["lanes"]}
+    known = [value for value in facts.values() if not value["error"]]
+    eligible = max((value["eligible"] for value in known), default=None)
+    qualified = sum(value["qualified"] for value in known) if known else None
+    candidates = max((value["candidates"] for value in known), default=None)
+    todo = linear.get("poolTotal") if linear.get("ok") else candidates
+    state = ("unknown" if not known else "warn" if eligible == 0 and (candidates or 0) > 0 else "ok")
+    summary = [(0, f"Todo {num(todo)} → eligible {num(eligible)} → new issues {num(qualified)}"),
+               (1, f"triage returns {linear['triage']}" if linear.get("ok") else "")]
+    body = []
+    for name, value in facts.items():
+        if value["error"]:
+            body.append((0, f"  {name:<10} " + pool_hint(name, local, f["now"])))
+        else:
+            body.append((1, f"  {name:<10} new {value['qualified']} · eligible {value['eligible']}/{value['candidates']}"
+                            f" · {value['capacity']}"))
+    rejected = exclusions({"rejectedByProvider": {name: value.get("reasons") or {} for name, value in facts.items()
+                                                  if not value["error"]}})
+    for rank, (reason, count, lanes) in enumerate(rejected):
+        lanes_text = "all lanes" if len(lanes) == len(known) and len(known) > 1 else ", ".join(lanes)
+        body.append((0 if rank < 2 else 2, f"  {count:>4} excluded  {reason:<26} {lanes_text}"))
+    if linear.get("ok"):
+        body.append((3, f"  Linear mirror {age(linear.get('fetchedAt'), f['now'])} · in progress {len(linear.get('active') or {})}"))
+    else:
+        body.append((0, "  " + paint("fail", "✕ Linear " + console_text(linear.get("error", "unread")))))
+    return finish(heading("SUPPLY", state, summary, width), body, width, rows)
+
+
+def pr_note(pr: dict, f: dict) -> tuple[str, str]:
+    merge = pr.get("merge") or "UNKNOWN"
+    held = repair_hold(pr, f["local"].get("held") or {})
+    queued = f["queued"].get(pr["number"])
+    if queued:
+        note, state = f"queued {str(queued['state']).lower()}", "ok"
+    elif merge == "DIRTY":
+        note, state = "merge conflict", "fail"
+    elif held:
+        note, state = held, "warn"
+    elif pr.get("draft"):
+        note, state = "draft · awaiting gate", "text"
+    elif merge == "BLOCKED":
+        note, state = "blocked · reason unknown", "warn"
+    elif merge == "UNSTABLE":
+        note, state = "unstable · non-passing status", "warn"
+    elif merge == "UNKNOWN":
+        note, state = "merge state unknown", "unknown"
+    else:
+        note, state = "prepared · " + merge.lower(), "ok"
+    if held and (queued or merge == "DIRTY"):
+        note += " · " + held
+    return note, state
+
+
+def panel_repair(f: dict, width: int, rows: int, viewport=None) -> list[str]:
+    local, feed, now = f["local"], f["feed"], f["now"]
+    open_prs = f["open"]
+    body = []
+    if f["openKnown"]:
+        stamp = (f["github"].get("readAt") or {}).get("open") or f["github"].get("fetchedAt")
+        summary = [(0, f"open lane PRs {len(open_prs)} · draft {sum(1 for p in open_prs if p['draft'])} · "
+                       f"non-draft {sum(1 for p in open_prs if not p['draft'])}"), (1, f"PR read {since(stamp, now)}")]
+    else:
+        summary = [(0, "open lane PRs unknown"), (1, "draft unknown · non-draft unknown")]
+        body.append((0, "  " + paint("unknown", "? PR list: " + console_text(f["openError"] or "not-read-yet"))))
+    prs = dig(feed, "prs", default={})
+    escalation, remediation = dig(feed, "escalation", default={}), dig(feed, "remediation", default={})
+    if feed:
+        body.append((0, fit([(0, f"  repo PRs open {num(prs.get('open'))}"), (0, f"red {num(prs.get('red'))}"),
+                         (0, f"dirty {num(prs.get('dirty'))}"), (1, f"clean not queued {num(prs.get('cleanNotQueued'))}"),
+                         (1, f"exhausted {num(prs.get('exhausted'))}"),
+                         (2, f"escalating {num(escalation.get('escalating'))}"),
+                         (3, f"repair events open {num(remediation.get('eventsOpen'))}")], width)))
+    else:
+        body.append((0, "  " + paint("unknown", f"? repair demand unknown ({f['feedError']})")))
+    if local.get("heldError"):
+        body.append((0, "  " + paint("unknown", f"? hold records unknown · {local['heldError']}")))
+    else:
+        reasons = dig(feed, "held_by_reason", default={})
+        body.append((1, f"  hold records {len(local.get('held') or {})}"
+                        + (" · " + " · ".join(f"{k} {v}" for k, v in sorted(reasons.items(), key=lambda i: (-i[1], i[0])))
+                           if reasons else "")))
+    for row in (dig(feed, "oldest_prs", default=[]) or [])[:1]:
+        if isinstance(row, dict):
+            body.append((2, fit([(0, f"  oldest #{row.get('pr')} {num(row.get('ageH'), 'h')}"),
+                                 (1, f"idle {num(row.get('idleH'), 'h')}"), (0, console_text(row.get("state") or "?")),
+                                 (2, console_text(row.get("reason") or "")), (3, console_text(row.get("next") or ""))], width)))
+    rank = {"fail": 0, "warn": 1, "unknown": 2, "text": 3, "ok": 4}
+    ordered = sorted(open_prs, key=lambda pr: (rank[pr_note(pr, f)[1]], pr["number"]))
+    for pr in ordered:
+        note, state = pr_note(pr, f)
+        # ID and disposition first: the lane and title take whatever width is left.
+        line = f"#{pr['number']} {pr['issue']:<9} {'DRAFT' if pr['draft'] else 'OPEN '} " + paint(None if state == "text" else state, note)
+        if visible(line) + 6 <= width:
+            line = titled(line + f"  {pr['lane']} · ", pr["title"], width)
+        body.append((1 + min(rank[state], 2), line))
+    state = ("unknown" if not f["openKnown"] else
+             "warn" if prs.get("dirty") or prs.get("red") or any(pr.get("merge") == "DIRTY" for pr in open_prs)
+             or (local.get("held") and not local.get("heldError")) else "ok")
+    return finish(heading("REPAIR", state, summary, width), body, width, rows)
+
+
+def promotion_lines(metrics) -> list[str]:
+    if not metrics or metrics.get("error"):
+        return ["  " + paint("unknown", "? promotion: " + console_text((metrics or {}).get("error", "not-read-yet")))]
+    first = metrics["firstPass"]["rate"]
+    back = metrics["reenqueueMinutes"]
+    per_merge = metrics.get("queueEntriesPerMerge")
+    return [[(0, f"  first-pass {pct(first)}"), (0, f"ejected→back p75 {num(back['p75'], 'm')} ({back['pending']} waiting)")],
+            [(0, f"  open→enqueue p75 {num(metrics['openToFirstEnqueueMinutes']['p75'], 'm')}"),
+             (1, f"CLEAN not queued {metrics['occupancy']['cleanNotQueued']}"),
+             (2, f"queue entries/merge {num(per_merge)}")]]
+
+
+def panel_queue(f: dict, width: int, rows: int, viewport=None) -> list[str]:
+    feed, now = f["feed"] or {}, f["now"]
+    throughput = feed.get("mergeThroughput") or {}
+    ci = dig(feed, "slo", "ciP95Seconds", "merge_group")
+    depth = "merge queue unknown" if f["queueError"] else f"merge queue {f['queue']['depth']}"
+    summary = [(0, depth), (1, f"wait p50 {num(throughput.get('queueWaitP50Minutes'), 'm')}"),
+               (0, f"ejections {pct(throughput.get('ejectionRate')) if throughput else '?'}"),
+               (2, f"CI merge_group p95 {dur(ci) if isinstance(ci, (int, float)) else '?'}")]
+    ejection = throughput.get("ejectionRate")
+    state = ("unknown" if f["queueError"] else
+             "warn" if isinstance(ejection, (int, float)) and ejection >= 0.25 else "ok")
+    body = ([(0, "  " + paint("unknown", "? queue read: " + console_text(f["queueError"])))] if f["queueError"] else [])
+    body += [line if isinstance(line, str) else fit(line, width) for line in promotion_lines(f["github"].get("promotion"))]
+    for entry in sorted(f["queue"].get("entries", []), key=lambda e: str(e.get("enqueuedAt"))):
+        body.append(f"  #{entry['number']} {str(entry['state']).lower():<16} {since(entry['enqueuedAt'], now):>6}")
+    return finish(heading("QUEUE", state, summary, width), body, width, rows)
+
+
+def panel_shipped(f: dict, width: int, rows: int, viewport=None) -> list[str]:
+    local, prod, now = f["local"], f["prod"], f["now"]
+    merged = f["merged"]
+    if f["mergeError"]:
+        summary, state = "merged unknown", "unknown"
+    else:
+        deployed = (f"deployed {prod['deployed']}" + (f" (+{prod['unknown']} ?)" if prod.get("unknown") else "")
+                    if not prod.get("error") and "deployed" in prod else "deployed ?")
+        verified = (f"verified {prod['deployed']}" if prod.get("verified") == "verified" and "deployed" in prod
+                    else "verified ?")
+        summary = [(0, f"merged {len(merged)} in 24h"), (0, deployed), (0, verified),
+                   (2, f"last lane gate {age(local.get('lastLanding'), now)}")]
+        state = prod["state"] if merged else "ok"
+    values = f["attributions"].values()
+    body = []
+    if not f["mergeError"]:
+        coverage = f"{sum(v.get('confidence') == 'verified' for v in values)}/{len(merged)}" if merged else "0/0"
+        body.append((3, f"  attribution verified {coverage} · inferred {sum(v.get('confidence') == 'inferred' for v in values)}"
+                        f" · unknown {sum(v.get('confidence') == 'unknown' for v in values)}"))
+    if f["mergeError"]:
+        body.append((0, "  " + paint("unknown", "? merged PRs: " + console_text(f["mergeError"]))))
+    states = prod.get("rows") or {}
+    for pr in merged:
+        deployed = states.get(pr["number"])
+        if deployed and prod.get("verified") == "verified":
+            word, style = "verified", "ok"
+        elif deployed:
+            word, style = "deployed", "text"
+        elif deployed is False:
+            word, style = "merged", "warn" if (timestamp_age(pr.get("mergedAt"), now) or 0) > 3600 else "text"
+        else:
+            word, style = "merged ?", "unknown"
+        body.append((1 if deployed is False else 2, titled(f"#{pr['number']} " + paint(None if style == "text" else style, f"{word:<9}")
+                                                            + f" {since(pr.get('mergedAt'), now):>6}  ", pr["title"], width)))
+    return finish(heading("SHIPPED", state, summary, width), body, width, rows)
+
+
+def panel_alerts(f: dict, width: int, rows: int, viewport=None) -> list[str]:
+    local, feed, now = f["local"], f["feed"], f["now"]
+    doctor = local.get("doctor") or {}
+    body, seen, states = [], set(), []
+    conditions = active_conditions(feed or {})
+    # Evidence gets its own line while the panel has room for every alert twice.
+    loose = [key for key in (doctor.get("alerts") or {}) if key not in dict(conditions)]
+    roomy = 2 * len(conditions) + len(loose) <= rows - 1
+    for key, condition in conditions:
+        seen.add(key)
+        critical = condition.get("severity") == "critical"
+        states.append("fail" if critical else "warn")
+        mark = paint("fail", "✕ crit") if critical else paint("warn", "! warn")
+        escalation = dig(condition, "summerEscalation", "outcome")
+        evidence = console_text(condition.get("evidence") or "")
+        nxt = condition.get("nextAction")
+        body.append((0 if critical else 1, fit(
+            [(0, f"{mark} {key} {since(condition.get('firstObservedAt'), now)}"),
+             (0, f"owner {console_text(condition.get('owner') or '?')}"),
+             (2, f"summer {escalation}" if escalation else ""),
+             (1, "" if roomy else evidence),
+             (3, f"next {console_text(nxt)}" if nxt not in (None, "none") else "")], width)))
+        if roomy and evidence:
+            body.append((2, "    " + evidence))
+    for key, text in (doctor.get("alerts") or {}).items():
+        if key not in seen:
+            states.append("fail")
+            body.append((0, paint("fail", f"✕ {key}: {console_text(text)}") + " · owner ?"))
+    if local.get("heldError"):
+        states.append("fail")
+        body.append((0, paint("fail", "✕ " + local["heldError"]) + " · owner lanes harness"))
+    if not feed:
+        states.append("unknown")
+        body.append((0, paint("unknown", f"? {f['feedError']}") + " · owner doctor.py on the primary host"))
+    for name, seconds in (local.get("cooldowns") or {}).items():
+        states.append("warn")
+        body.append((1, paint("warn", f"! cooldown {name} {dur(seconds)}")))
+    if local.get("requeue"):
+        states.append("warn")
+        body.append((1, paint("warn", f"! requeue pending #{', #'.join(local['requeue'])}")))
+    ledger = local.get("ledger24h") or {}
+    if ledger.get("failed") and "failed-runs" not in seen:
+        states.append("warn")
+        body.append((1, paint("warn", f"! failed runs 24h {ledger['failed']}")))
+    tick = local.get("tick") or {}
+    if tick.get("error"):
+        states.append("fail")
+        body.append((0, paint("fail", f"✕ dispatch tick: {console_text(tick['error'])}") + " · owner lanes harness"))
+    if not body:
+        body.append(paint("ok", "✓ no alerts recorded"))
+    summary = f"{len(states)} active · {states.count('fail')} critical/failing" if states else "none active"
+    return finish(heading("ALERTS", worst(*states), summary, width), body, width, rows)
+
+
+def capacity_rows(f: dict, width: int) -> list[str]:
+    """Perishable capacity: the exact receipt Ovi consumes, with no HUD-side forecast math."""
+    local, now = f["local"], f["now"]
+    accounts = local.get("codex") or {}
+    doctor = local.get("doctor") or {}
+    capacity = doctor.get("capacity")
+    rows = []
+    if capacity and capacity.get("schema") == "jovie.capacity-horizon/v1":
+        capacity_error = capacity_receipt_error(doctor, capacity, now)
+        incidents = capacity.get("incidents") or []
+        leases = [] if capacity_error else capacity.get("leases") or []
+        source_gaps = sorted({capacity_freshness(row, now) for row in leases} - {"fresh"})
+        rows.append("  " + (paint("unknown", f"? capacity horizon unknown ({capacity_error}) · show-only") if capacity_error else
+                            f"capacity horizon {len(leases)} leases · {len(incidents)} reported incident(s) · show-only"))
+        for row in leases[:4]:
+            status = capacity_freshness(row, now)
+            known = status == "fresh"
+            remaining = "?" if row.get("usableRemaining") is None else f"{row['usableRemaining']:g}%"
+            banked = "?" if row.get("bankedCount") is None else str(row["bankedCount"])
+            event = row.get("event") or {}
+            elapsed = timestamp_age(event.get("at"), now)
+            deadline = "?" if elapsed is None else dur(max(0, int(-elapsed)))
+            forecast = row.get("forecast") or {}
+            unused = "?" if forecast.get("projectedUnused") is None else f"{forecast['projectedUnused']:g}%"
+            drain = forecast.get("completionP50At") or "?"
+            rate = "?" if forecast.get("sustainablePercentPerHour") is None else f"{forecast['sustainablePercentPerHour']:g}%/h"
+            job = (row.get("route") or {}).get("selectedJob") or "no selected job"
+            mode = str(row.get("mode") or "unknown").upper()
+            if not known:
+                remaining = banked = deadline = drain = rate = unused = "?"
+                mode, job = "UNKNOWN", "selection unknown"
+            style = "fail" if mode == "EMERGENCY" else "ok" if mode == "NORMAL" and known else "warn"
+            mark = MARK[style if known else "unknown"]
+            rows.append("  " + paint(style if known else "unknown", fit(
+                [(0, f"{mark} {row.get('alias', '?')} {remaining}"), (1, f"banked {banked}"),
+                 (1, f"{event.get('label', 'source gap')} {deadline}"), (3, f"drain {drain} @ {rate}"),
+                 (3, f"unused {unused}"), (0, mode), (2, console_text(job)), (0, status)], width - 2)))
+        blocker = f"unknown ({capacity_error})" if capacity_error else \
+            "capacity source " + ", ".join(source_gaps) if source_gaps else capacity.get("topBlocker") or "no material blocker"
+        rows.append("  " + paint("warn" if capacity_error or source_gaps or incidents else None,
+                                 f"top blocker: {console_text(blocker)}"))
+    elif accounts.get("error"):
+        rows.append("  " + paint("fail", "✕ codex accounts " + console_text(accounts["error"])))
+    else:
+        rows.append(f"  codex accounts {len(accounts.get('available', []))}/{accounts.get('count', 0)} available")
+        for name, row in (accounts.get("accounts") or {}).items():
+            source = ((row.get("capacityLease") or {}).get("sources") or {}).get("capacity") or {}
+            status = capacity_freshness({"freshness": {"status": "fresh", "observedAt": source.get("observedAt")}}, now)
+            if status != "fresh":
+                rows.append("  " + paint("unknown", f"? {name} capacity {status}" + (" · leased" if row.get("leased") else "")))
+                continue
+            remaining = "?" if row.get("remainingPercent") is None else f"{row['remainingPercent']}%"
+            reset = "?" if row.get("naturalResetInS") is None else dur(row["naturalResetInS"])
+            banked = "?" if row.get("bankedResetCount") is None else str(row["bankedResetCount"])
+            detail = f"{name} {remaining} left · reset {reset} · banked {banked}"
+            if row.get("leased"):
+                rows.append("  " + paint("ok", f"● {detail} · leased"))
+            elif row.get("available"):
+                rows.append("  " + paint("ok", f"✓ {detail}"))
+            else:
+                rows.append("  " + paint("fail", f"✕ {detail} · retry {dur(row.get('resetsInS') or 0)}"))
+        if not accounts.get("accounts"):
+            rows.append("  no ChatGPT profiles found")
+    return rows
+
+
+def panel_budgets(f: dict, width: int, rows: int, viewport=None) -> list[str]:
+    github, feed = f["github"], f["feed"] or {}
+    rate = github.get("rate") if not f["rateError"] else None
+    if rate:
+        remaining = min(rate["graphql"], rate["core"])
+        state = "fail" if remaining < 600 else "warn" if remaining < 1500 else "ok"
+        reset_in = timestamp_age(rate.get("resetAt"), f["now"])
+        summary = (f"GitHub graphql {rate['graphql']}/5000 · core {rate['core']} · resets in "
+                   f"{dur(-reset_in) if reset_in is not None else '?'}")
+    else:
+        summary, state = "GitHub budget unknown", "unknown"
+    body = [] if rate else [(0, "  " + paint("unknown", "? GitHub rate: " + console_text(f["rateError"] or "unread")))]
+    linear = feed.get("linear") or {}
+    outbox = linear.get("outbox") if isinstance(linear.get("outbox"), dict) else {}
+    if outbox:
+        body.append((2, f"  Linear outbox {num(outbox.get('depth'))} · dead {num(outbox.get('dead'))} · "
+                        f"oldest {dur(outbox['oldestAgeS']) if isinstance(outbox.get('oldestAgeS'), (int, float)) else 'none'}"))
+    for provider, reason in sorted((dig(f["local"], "tick", "quotaBlocked", default={}) or {}).items()):
+        state = worst(state, "warn")
+        body.append((0, "  " + paint("warn", f"! {provider} quota-blocked: {console_text(reason)}")))
+    body.extend(capacity_rows(f, width))
+    return finish(heading("BUDGETS", state, summary, width), body, width, rows)
+
+
+def panel_host(f: dict, width: int, rows: int, viewport=None) -> list[str]:
+    system = f["system"]
+    disk, memory, load, cores = system.get("diskFreePct"), system.get("memAvailPct"), system.get("load1"), system.get("cores") or 1
+    state = worst("unknown" if disk is None else "fail" if disk < 10 else "warn" if disk < 20 else "ok",
+                  "warn" if isinstance(memory, (int, float)) and memory < 15 else "ok",
+                  "warn" if isinstance(load, (int, float)) and load > 1.5 * cores else "ok")
+    summary = (f"disk {num(disk, '%')} free · mem {num(memory, '%')} free · "
+               f"load {num(load)} / {system.get('cores', '?')} cores")
+    return [heading("HOST", state, summary, width)]
+
+
+PANELS = {"workers": panel_workers, "supply": panel_supply, "repair": panel_repair, "queue": panel_queue,
+          "shipped": panel_shipped, "alerts": panel_alerts, "budgets": panel_budgets, "host": panel_host}
+# Rows per panel, independent of the data so refreshes never move a panel:
+# (minimum rows including the title, share of spare rows per round, maximum rows).
+SIZING = {"workers": (3, 1, 12), "supply": (2, 1, 10), "repair": (3, 2, 99), "queue": (1, 1, 6),
+          "shipped": (2, 2, 26), "alerts": (2, 2, 16), "budgets": (1, 1, 8), "host": (1, 0, 1)}
+# Column order follows the operator's questions; one column keeps that priority top to bottom.
+LAYOUTS = {
+    3: [["workers", "supply", "alerts"], ["repair", "queue"], ["shipped", "budgets", "host"]],
+    2: [["workers", "supply", "repair"], ["shipped", "queue", "alerts", "budgets", "host"]],
+    1: [["workers", "supply", "repair", "queue", "shipped", "budgets", "host", "alerts"]],
+}
+GUTTER = " │ "
+
+
+def allocate(names: list[str], rows: int) -> dict[str, int]:
+    alloc, left = {}, rows
+    for name in names:
+        need = SIZING[name][0]
+        if need > left:
+            break
+        alloc[name], left = need, left - need
+    while left > 0:
+        grew = False
+        for name in alloc:
+            _minimum, share, cap = SIZING[name]
+            give = min(share, cap - alloc[name], left)
+            if give > 0:
+                alloc[name] += give
+                left -= give
+                grew = True
+        if not grew:
+            break
+    if left and alloc:  # every panel is at its cap: the longest list takes the rest
+        flex = next((name for name in ("repair", "workers", "shipped", "alerts") if name in alloc), next(iter(alloc)))
+        alloc[flex] += left
+    return alloc
+
+
+def header(f: dict, width: int) -> str:
+    local, linear, github, now = f["local"], f["linear"], f["github"], f["now"]
+    release = local.get("release") or "unknown-release"
+    hud_state = paint("ok", "✓ hud=release") if local.get("releaseMatchesHud") else paint("warn", "! hud≠release")
+    tick = local.get("tick") or {}
+    tick_age = timestamp_age(tick.get("at"), now)
+    tick_note = (paint("fail", f"✕ tick {since(tick.get('at'), now)} failing") if tick.get("error") else
+                 paint("warn", f"! tick {since(tick.get('at'), now)}") if tick_age is None or tick_age > 300 else
+                 f"tick {since(tick.get('at'), now)}")
+    left = fit([(0, paint("strong", "● JOVIE · SYMPHONY")), (0, f"lanes {release} on {local.get('host', '?')}"),
+                (1, hud_state), (1, tick_note)], width)
+    sources = []
+    stale = [source for source in ("open", "queue", "merged", "rate") if "stale" in (github_source_error(github, source, now) or "")]
+    failed = [source for source in ("open", "queue", "merged", "rate") if github.get("errors", {}).get(source)]
+    sources.append((0, paint("warn", "! github stale") if stale else paint("fail", "✕ github " + "/".join(failed)) if failed
+                    else f"github {since(github.get('fetchedAt'), now)}"))
+    linear_age = timestamp_age(linear.get("fetchedAt"), now)
+    sources.append((1, paint("fail", "✕ linear") if not linear.get("ok") else
+                    paint("warn", "! linear stale " + since(linear["fetchedAt"], now)) if linear_age is None or linear_age > 3 * REFRESH_REMOTE_S
+                    else f"linear {since(linear['fetchedAt'], now)}"))
+    sources.append((1, f"feed {since(f['feed']['at'], now)}" if f["feed"] else paint("unknown", "? feed")))
+    sources.append((2, paint("unknown", "? prod") if f["prod"]["error"] and not f["prod"].get("prodSha")
+                    else f"prod {since((model_production(f) or {}).get('readAt'), now)}"))
+    sources.append((0, f"{now:%H:%M:%S}Z"))
+    right = fit(sources, max(10, width - visible(left) - 2))
+    return pad(left + " " * max(1, width - visible(left) - visible(right)) + right, width)
+
+
+def footer(f: dict, width: int, hidden: list[str]) -> str:
+    return fit([(0, "● running ○ idle " + badge("ok", "ok") + " " + badge("warn", "warn") + " "
+                 + badge("fail", "fail") + " " + badge("unknown", "unknown")),
+                (0, paint("warn", "hidden: " + ", ".join(hidden)) if hidden else ""),
+                (1, "draft→prepared→queued→merged→deployed→verified"),
+                (2, "↑↓ PgUp/PgDn Home/End scroll workers"),
+                (3, "sources: lane state · ledger · lanes-status · Linear mirror · GitHub · jov.ie/api/version · /proc")],
+               width, sep="  │  ")
+
+
+def render_panels(model: dict, width: int = 160, height: int = 45,
+           viewport: SlotViewport | None = None, now: datetime | None = None) -> list[str]:
+    """The panel layout: three columns from 200 cells, two from 120, one below."""
+    now = utcnow() if now is None else now
+    viewport = viewport or SlotViewport()
+    f = interpret(model, now)
+    top = [header(f, width), banner(f, width)] + delivery_rows(f, width)
+    body_rows = max(0, height - len(top) - 1)
+    count = 3 if width >= 200 else 2 if width >= 120 else 1
+    inner = width - len(GUTTER) * (count - 1)
+    widths = [inner // count + (1 if index < inner % count else 0) for index in range(count)]
+    columns, hidden = [], []
+    for names, column_width in zip(LAYOUTS[count], widths):
+        alloc = allocate(names, body_rows)
+        hidden += [name for name in names if name not in alloc]
+        lines = []
+        for name, rows in alloc.items():
+            block = PANELS[name](f, column_width, rows, viewport)[:rows]
+            lines += block + [""] * (rows - len(block))
+        lines += [""] * (body_rows - len(lines))
+        columns.append([pad(line, column_width) for line in lines[:body_rows]])
+    body = [GUTTER.join(cells) for cells in zip(*columns)] if columns and body_rows else []
+    frame = (top + body)[:max(0, height - 1)] + [footer(f, width, hidden)]
+    frame = [pad(line, width) for line in frame[:height]]
+    while len(frame) < height:
+        frame.append(" " * width)
+    return frame
+
+
+def vacancy_reason(name: str, local: dict) -> str:
+    if name in local.get("cooldowns", {}):
+        return f"provider cooling {dur(local['cooldowns'][name])}"
+    if name == "codex" and not (local.get("codex") or {}).get("available"):
+        return "no codex account available"
+    return "no worker process · the minute timer restarts idle lanes"
+
+
 # ---------------------------------------------------------------- loop
 
 class Remote(threading.Thread):
@@ -1584,6 +2135,8 @@ def main(argv=None) -> int:
     parser.add_argument("--slot-offset", type=int, default=0,
                         help="first slot row; interactive arrows and Page Up/Down scroll")
     parser.add_argument("--interval", type=float, default=2.0)
+    parser.add_argument("--layout", choices=("legacy", "panels"), default="legacy",
+                        help="panels: the redesigned multi-column console layout")
     args = parser.parse_args(argv)
     host = lane.Host()
     lane.load_github_env()
@@ -1593,7 +2146,8 @@ def main(argv=None) -> int:
     viewport = SlotViewport(args.slot_offset)
     if args.once:
         width, height = terminal_dimensions(args)
-        sys.stdout.write("\n".join(render(build_model(host), width, height, viewport)) + "\n")
+        draw = render_panels if args.layout == "panels" else render
+        sys.stdout.write("\n".join(draw(build_model(host), width, height, viewport)) + "\n")
         return 0
     remote = Remote(host)
     remote.start()
@@ -1616,7 +2170,7 @@ def main(argv=None) -> int:
                     current_model = build_model(host, remote)
                     refresh_at = time.monotonic() + max(0.0, args.interval)
                 width, height = terminal_dimensions(args)
-                frame = render(current_model, width, height, viewport)
+                frame = (render_panels if args.layout == "panels" else render)(current_model, width, height, viewport)
                 if (width, height) != shown_size:
                     sys.stdout.write("\x1b[2J")
                     shown = None

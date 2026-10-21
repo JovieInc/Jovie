@@ -51,7 +51,7 @@ function readSource(filePath: string): string {
 }
 
 describe('admin ops shell normalization', () => {
-  it('keeps Ops inside AdminPage and treats /app/ov/ops as a redirect', () => {
+  it('keeps Ops inside AdminPage at /app/ov/ops and lands /hud on Home', () => {
     const hud = readSource(HUD_PAGE);
     const ops = readSource(OPS_PAGE);
 
@@ -62,18 +62,18 @@ describe('admin ops shell normalization', () => {
     expect(hud).toContain("density={tokenOk ? 'kiosk' : 'shell'}");
     expect(hud).not.toContain('OvieMacHud');
     expect(hud).not.toContain("action='exit'");
-    expect(ops).toContain('redirect(APP_ROUTES.HUD)');
-    expect(ops).not.toContain('<AdminPage');
     const hudShell = readSource(HUD_SHELL_PAGE);
-    expect(hudShell).toContain("from '@/app/hud/page'");
-    expect(hudShell).toContain("export const dynamic = 'force-dynamic'");
-    expect(hudShell).toContain("export const runtime = 'nodejs'");
-    expect(hudShell).not.toMatch(/export\s*\{[^}]*\bdynamic\b/);
-    expect(hudShell).not.toMatch(/export\s*\{[^}]*\bruntime\b/);
-    expect(hudShell).toContain(
+    expect(hudShell).toContain('redirect(APP_ROUTES.OV)');
+    expect(hudShell).not.toContain('<AdminPage');
+    expect(ops).toContain("from '@/app/hud/page'");
+    expect(ops).toContain("export const dynamic = 'force-dynamic'");
+    expect(ops).toContain("export const runtime = 'nodejs'");
+    expect(ops).not.toMatch(/export\s*\{[^}]*\bdynamic\b/);
+    expect(ops).not.toMatch(/export\s*\{[^}]*\bruntime\b/);
+    expect(ops).toContain(
       "import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';"
     );
-    expect(hudShell).toContain('await requireCurrentAdminPageAccess();');
+    expect(ops).toContain('await requireCurrentAdminPageAccess();');
   });
 
   it('mounts the consolidated operational control panel below the HUD dashboard', () => {

@@ -162,7 +162,16 @@ function filesUnder(root, directory) {
   if (!existsSync(start)) return [];
   return globSync('**/*.{cjs,js,json,mjs,ts,tsx}', {
     cwd: start,
-    exclude: ['**/.next/**', '**/node_modules/**'],
+    // Generated outputs are not source. CI writes coverage JSON under apps/
+    // while this scan runs, which flipped a same-source reuse to 'refreshed'.
+    exclude: [
+      '**/.next/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      '**/.turbo/**',
+      '**/test-results/**',
+      '**/playwright-report/**',
+    ],
   })
     .map(path => join(start, path))
     .filter(path => statSync(path).isFile());

@@ -31,6 +31,11 @@ def plain(line: str) -> str:
     return ANSI.sub("", line)
 
 
+def cells(frame: list[str], raw: bool = False) -> list[str]:
+    """Each column's segment of each physical row (the panel layout is laid out in columns)."""
+    return [cell for row in frame for cell in (row if raw else plain(row)).split(hud.GUTTER)]
+
+
 def model(**overrides) -> dict:
     base = {
         "local": {
@@ -1408,3 +1413,180 @@ class ConsoleTextTest(unittest.TestCase):
         self.assertEqual(plain(hud.fit(parts, 40)), "#22307 merged · low value · deployed 7")
         self.assertEqual(plain(hud.fit(parts, 26)), "#22307 merged · deployed 7")
         self.assertEqual(plain(hud.fit(parts, 14)), "#22307 merged")
+    def test_row_allocation_is_fixed_by_geometry_alone(self):
+        for count, columns in hud.LAYOUTS.items():
+            for rows in (19, 40, 60):
+                for names in columns:
+                    alloc = hud.allocate(names, rows)
+                    with self.subTest(columns=count, rows=rows, names=names):
+                        self.assertEqual(sum(alloc.values()), rows)
+                        self.assertEqual(alloc, hud.allocate(names, rows))
+        self.assertEqual(hud.allocate(["workers", "supply"], 4), {"workers": 4}, "a panel that cannot fit is hidden whole")
+
+
+    def test_once_draws_the_panel_layout_on_request(self):
+        value, now = fixture("live")
+        output = io.StringIO()
+        with mock.patch.object(hud.lane, "Host"), mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud, "build_model", return_value=value), \
+                mock.patch.object(hud, "utcnow", return_value=now), mock.patch.object(hud.sys, "stdout", output):
+            self.assertEqual(hud.main(["--once", "--layout", "panels", "--width", "160", "--height", "45"]), 0)
+        self.assertIn(" WORKERS ", output.getvalue())
+        self.assertNotIn("ACTIVE SLOTS", output.getvalue())
+
+
+FIXTURES = ROOT / "scripts/lanes/hud_fixtures"
+SNAPSHOT_SIZES = ((160, 45), (215, 45), (80, 24))
+FIXTURE_NAMES = ("live", "degraded", "missing")
+
+
+def degrade(value: dict) -> dict:
+    """The live capture with every authority answering badly: PR list over budget, stale queue,
+    pending marker, stalled delivery, a critical liveness condition, held.json unreadable."""
+    github, local = value["github"], value["local"]
+    github["errors"] = {"open": "github-budget-floor: 529 (< 600) until reset"}
+    github.pop("open")
+    github["readAt"]["queue"] = "2026-10-20T17:30:00+00:00"
+    github["rate"] = {"core": 529, "graphql": 412, "resetAt": "2026-10-20T19:16:27Z"}
+    github["promotion"] = {"error": "RuntimeError: gh: HTTP 502\nretry later"}
+    value["production"]["marker"] = {"status": "pending"}
+    local.update(releaseMatchesHud=False, slotEvidence="unknown", heldError="held.json unavailable or invalid",
+                 held={}, cooldowns={"grok": 540})
+    local["tick"].update(error="dispatch failed: OSError: [Errno 28] No space left on device",
+                         quotaBlocked={"codex": "usage-limit until 21:00Z"})
+    local["doctor"]["capacity"]["leases"][0]["freshness"] = {"status": "stale"}
+    local["feed"]["delivery"]["state"] = "stalled"
+    local["feed"]["conditions"]["started-without-live-owner"] = {
+        "state": "active", "severity": "critical", "owner": "summer", "firstObservedAt": "2026-10-20T17:41:00Z",
+        "evidence": "3 In Progress issues have no live lane lease: JOV-8701, JOV-8702, JOV-8655",
+        "nextAction": "reclaim-or-return-to-todo", "summerEscalation": {"outcome": "requested"}}
+    local["workers"][0]["run"]["phase"] = "gate"
+    value["linear"] = {"ok": False, "error": "HTTPError: 429 rate limited\nretry-after 60"}
+    value["system"] = {"load1": 22.4, "cores": 16, "diskFreePct": 8.2, "memAvailPct": 11}
+    return value
+
+
+def nothing_read() -> dict:
+    """The first frame after boot: nothing read yet, no status feed, no codex lane."""
+    return {"local": {"host": "gem", "release": None, "releaseMatchesHud": False, "providers": {"codex": {}, "grok": {}},
+                      "slots": {"codex": 3, "grok": 1}, "baseSlots": {"codex": 3, "grok": 1}, "slotEvidence": "unknown",
+                      "autoscaleMode": "off", "workers": [], "ledger24h": {}, "runs24h": 0, "receipts24h": [],
+                      "attributionReceipts": [], "lastLanding": None, "held": {}, "heldError": None, "failures": {},
+                      "gateTimeouts": {}, "requeue": {}, "cooldowns": {}, "doctor": {}, "feed": None, "tick": {},
+                      "codex": {"error": "FileNotFoundError: codex", "accounts": {}, "available": []}, "gateSeats": 2},
+            "linear": {"ok": False, "error": "not read yet"}, "github": {"ok": False, "errors": {"open": "not read yet"}},
+            "production": {}, "system": {"load1": None, "cores": 16, "diskFreePct": 41.0, "memAvailPct": None}}
+
+
+def fixture(name: str):
+    """A model and the instant it is rendered at. live is a trimmed Gem capture (2026-10-20)."""
+    data = json.loads((FIXTURES / "live.json").read_text())
+    now = hud.datetime.fromisoformat(data.pop("_now"))
+    data.pop("_source", None)
+    builders = {"live": lambda: data, "degraded": lambda: degrade(data), "missing": nothing_read}
+    return builders[name](), now
+
+
+class FrameSnapshotTest(unittest.TestCase):
+    """Whole-frame snapshots at Gem's tty1 grid (160x45), the native 21:9 grid of its 1720x720
+    framebuffer (215x45) and the 80x24 floor. HUD_UPDATE_SNAPSHOTS=1 rewrites them."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.rendered = []
+        for name in FIXTURE_NAMES:
+            for width, height in SNAPSHOT_SIZES:
+                value, now = fixture(name)
+                cls.rendered.append((name, width, height, hud.render_panels(value, width, height, now=now)))
+
+    def frames(self):
+        return iter(self.rendered)
+
+    def test_frames_match_snapshots(self):
+        update = bool(hud.os.environ.get("HUD_UPDATE_SNAPSHOTS"))
+        for name, width, height, frame in self.frames():
+            with self.subTest(fixture=name, size=f"{width}x{height}"):
+                text = "\n".join(plain(row).rstrip() for row in frame) + "\n"
+                path = FIXTURES / "__snapshots__" / f"{name}-{width}x{height}.txt"
+                if update:
+                    path.parent.mkdir(exist_ok=True)
+                    path.write_text(text)
+                self.assertEqual(text, path.read_text())
+
+    def test_every_frame_fills_the_grid_with_console_font_glyphs_only(self):
+        for name, width, height, frame in self.frames():
+            with self.subTest(fixture=name, size=f"{width}x{height}"):
+                self.assertEqual(len(frame), height)
+                self.assertTrue(all(hud.visible(row) == width for row in frame))
+                glyphs = {char for row in frame for char in plain(row)}
+                outside = {char for char in glyphs if not (" " <= char < "\x7f" or "\xa0" <= char <= "ſ")
+                           and char not in hud.CONSOLE_GLYPHS}
+                self.assertEqual(outside, set(), "tty1's PSF font cannot draw these")
+                self.assertTrue(all(row.count("\x1b[") == 0 or row.endswith("\x1b[0m") or row.endswith(" ")
+                                    for row in frame))
+
+    def test_key_ids_are_never_truncated(self):
+        for name, width, height, frame in self.frames():
+            with self.subTest(fixture=name, size=f"{width}x{height}"):
+                text = "\n".join(plain(row) for row in frame)
+                self.assertNotRegex(text, r"(#\d+|JOV-\d*|PR\d*)…")
+                for cell in cells(frame):
+                    if found := re.match(r"(#\d+) ", cell):
+                        self.assertRegex(found.group(1), r"^#\d{5}$")
+
+    def test_colour_never_carries_a_state_alone(self):
+        words = ("merged", "deployed", "verified", "queued", "merge conflict", "held:", "unstable",
+                 "blocked", "prepared", "undeployed", "top blocker", "capacity horizon", "promotion")
+        for name, width, height, frame in self.frames():
+            for row in frame:
+                for code, text in re.findall(r"\x1b\[(?:7;)?(31|33|35|36)m([^\x1b]*)\x1b\[0m", row):
+                    with self.subTest(fixture=name, size=f"{width}x{height}", text=text):
+                        self.assertTrue(any(mark in text for mark in "✓!✕?●") or any(word in text for word in words),
+                                        f"coloured text without a glyph or state word: {text!r}")
+
+    def test_panels_hold_their_place_whatever_the_data(self):
+        labels = re.compile(r"\x1b\[7m (WORKERS|SUPPLY|REPAIR|QUEUE|SHIPPED|ALERTS|BUDGETS|HOST) ")
+        for width, height in SNAPSHOT_SIZES:
+            layouts = [[(index, hud.visible(row[:match.start()]), match.group(1))
+                        for index, row in enumerate(frame) for match in labels.finditer(row)]
+                       for _name, w, h, frame in self.rendered if (w, h) == (width, height)]
+            with self.subTest(size=f"{width}x{height}"):
+                self.assertEqual(layouts[0], layouts[1])
+                self.assertEqual(layouts[0], layouts[2])
+                self.assertEqual({label for _, _, label in layouts[0]},
+                                 {"WORKERS", "SUPPLY", "REPAIR", "QUEUE", "SHIPPED", "ALERTS", "BUDGETS", "HOST"})
+
+    def test_the_live_frame_answers_the_operator_questions_in_order(self):
+        value, now = fixture("live")
+        frame = [plain(row) for row in hud.render_panels(value, 160, 45, now=now)]
+        self.assertIn("CONSTRAINT ! WARN   deploy · 7 merged PR(s) not in production · oldest 1h41m", frame[1])
+        self.assertIn("serves 060037d · ✓ verified", frame[2])
+        self.assertIn("behind 18 commits", frame[2])
+        self.assertIn("merged 10 → deployed 3 → verified 3", frame[3])
+        self.assertIn("merges 5/h", frame[3])
+        text = "\n".join(frame)
+        self.assertIn("17 excluded  sensitive-text", text)
+        self.assertIn("owner symphony-lanes-doctor", text)
+
+    def test_degraded_sources_say_so_and_the_worst_constraint_wins(self):
+        value, now = fixture("degraded")
+        frame = [plain(row) for row in hud.render_panels(value, 160, 45, now=now)]
+        text = "\n".join(frame)
+        self.assertIn("CONSTRAINT ✕ FAIL   delivery", frame[1])
+        self.assertIn("Production Verified marker pending", frame[2])
+        self.assertIn("verified ?", frame[3])
+        self.assertIn("✕ crit started-without-live-owner", text, "a new liveness condition shows with its owner")
+        self.assertIn("owner summer", text)
+        self.assertIn("? PR list: github-budget-floor: 529 (< 600) until reset", text)
+        self.assertIn("? queue read: stale", text)
+        self.assertIn("✕ Linear HTTPError: 429 rate limited retry-after 60", text)
+        self.assertIn("HOST      ✕ FAIL", text)
+        self.assertNotIn("open lane PRs 0", text)
+
+    def test_missing_data_renders_unknown_never_zero(self):
+        value, now = fixture("missing")
+        text = "\n".join(plain(row) for row in hud.render_panels(value, 80, 24, now=now))
+        self.assertIn("CONSTRAINT ? UNKNOWN", text)
+        self.assertIn("served build unknown", text)
+        self.assertIn("merged ? → deployed ? → verified ?", text)
+        self.assertNotRegex(text, r"merged 0|deployed 0|open lane PRs 0")
