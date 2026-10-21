@@ -42,6 +42,11 @@ function card(overrides: Partial<SummerCard> = {}): SummerCard {
     comment: null,
     createdAt: '2026-09-06T10:00:00.000Z',
     decidedAt: null,
+    decideBy: '2026-09-08T10:00:00.000Z',
+    defaultDecision: 'reject',
+    resolution: null,
+    feedback: [],
+    feedbackAt: null,
     ...overrides,
   };
 }
