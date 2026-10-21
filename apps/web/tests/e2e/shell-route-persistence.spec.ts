@@ -305,11 +305,19 @@ async function resolveChatConversationPathWithRetry(
 }
 
 async function openLibraryReleasesView(page: Page): Promise<void> {
-  const link = page.locator('a[href="/app/library"]').first();
-  await expect(link).toBeVisible({ timeout: 30_000 });
-  await link.evaluate(element => {
+  const candidate = page
+    .locator('a[href="/app/library"]')
+    .filter({ visible: true })
+    .first();
+  await expect(candidate).toBeVisible({ timeout: 30_000 });
+  // Rewriting href changes which element `a[href="/app/library"]` matches
+  // (the shell also renders a hidden mobile Work link), so pin the visible
+  // anchor with a probe attribute before rewriting it.
+  await candidate.evaluate(element => {
+    element.setAttribute('data-e2e-library-releases-link', 'true');
     element.setAttribute('href', '/app/library?view=releases');
   });
+  const link = page.locator('a[data-e2e-library-releases-link="true"]');
   await Promise.all([
     page.waitForURL(
       url =>

@@ -59,8 +59,15 @@ test.describe('Command palette — Cmd+K contract', () => {
     await expect(matches.first()).toBeVisible({ timeout: 5_000 });
 
     // Enter commits the highlighted item — should navigate to releases.
+    // Releases live inside Work: /app/releases redirects to the library's
+    // releases view (app/app/(shell)/releases/page.tsx).
     await page.keyboard.press('Enter');
-    await page.waitForURL(/\/app\/releases/, { timeout: 15_000 });
+    await page.waitForURL(
+      url =>
+        url.pathname === APP_ROUTES.LIBRARY &&
+        url.searchParams.get('view') === 'releases',
+      { timeout: 15_000 }
+    );
 
     // Move focus back to the body so the next Meta+K isn't swallowed by an
     // auto-focused form element on the destination route.
@@ -84,7 +91,13 @@ test.describe('Command palette — Cmd+K contract', () => {
     });
     await waitForHydration(page);
 
-    await page.getByRole('button', { name: /^Search$/ }).click();
+    // The sidebar trigger's accessible name is `Search Jovie` (its visible
+    // text is `Search`/`Search chats`), see HeaderSearchSurfaceFromContext.
+    await page
+      .getByRole('button', { name: 'Search Jovie', exact: true })
+      .filter({ visible: true })
+      .first()
+      .click();
 
     const headerInput = page.getByRole('combobox', { name: 'Search Jovie' });
     await expect(headerInput).toBeVisible({ timeout: 10_000 });
