@@ -1,4 +1,11 @@
-import { mkdir, mkdtemp, readFile, utimes, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  utimes,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -21,6 +28,68 @@ describe('FileLedgerStore', () => {
       )
     );
     expect((await store.read('github')).credentials.c?.lastWriteAt).toBe(25);
+  });
+
+  it('serializes across stores that share a dir (separate processes)', async () => {
+    const dir = await root();
+    const stores = Array.from(
+      { length: 3 },
+      () => new FileLedgerStore(dir, Date.now, { lockTimeoutMs: 60_000 })
+    );
+    await Promise.all(
+      Array.from({ length: 30 }, (_, i) =>
+        stores[i % 3].transact('github', ledger => {
+          credentialState(ledger, 'c', Date.now()).lastWriteAt += 1;
+        })
+      )
+    );
+    expect((await stores[0].read('github')).credentials.c?.lastWriteAt).toBe(
+      30
+    );
+  });
+
+  it('lets exactly one waiter break a stale lock while others contend', async () => {
+    const dir = await root();
+    const stores = Array.from(
+      { length: 3 },
+      () => new FileLedgerStore(dir, Date.now, { lockTimeoutMs: 60_000 })
+    );
+    const lock = join(stores[0].dir, 'github.lock.d');
+    await mkdir(lock, { recursive: true });
+    await writeFile(join(lock, 'owner'), 'crashed-process');
+    const old = new Date(Date.now() - 60_000);
+    await utimes(lock, old, old);
+    await Promise.all(
+      Array.from({ length: 30 }, (_, i) =>
+        stores[i % 3].transact('github', ledger => {
+          credentialState(ledger, 'c', Date.now()).lastWriteAt += 1;
+        })
+      )
+    );
+    expect((await stores[0].read('github')).credentials.c?.lastWriteAt).toBe(
+      30
+    );
+    expect((await readdir(stores[0].dir)).sort()).toEqual(['github.json']);
+  });
+
+  it('on lock timeout returns the decision without clobbering the holder', async () => {
+    const dir = await root();
+    const store = new FileLedgerStore(dir, Date.now, { lockTimeoutMs: 50 });
+    await store.transact('github', ledger => {
+      credentialState(ledger, 'c', Date.now()).lastWriteAt = 7;
+    });
+    const lock = join(store.dir, 'github.lock.d');
+    await mkdir(lock);
+    await writeFile(join(lock, 'owner'), 'other-process');
+    const seen = await store.transact('github', ledger => {
+      const state = credentialState(ledger, 'c', Date.now());
+      state.lastWriteAt = 999;
+      return 'decided';
+    });
+    expect(seen).toBe('decided');
+    expect(store.unpersisted).toBe(1);
+    expect((await store.read('github')).credentials.c?.lastWriteAt).toBe(7);
+    expect(await readFile(join(lock, 'owner'), 'utf8')).toBe('other-process');
   });
 
   it('breaks a stale lock left by a crashed process', async () => {

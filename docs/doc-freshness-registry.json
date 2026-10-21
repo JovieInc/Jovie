@@ -547,15 +547,15 @@
     "docs/metrics/STAGE_EVENTS.md": {
       "owner": "@itstimwhite",
       "claim": "The stage-event contract, sources, outputs and emitter specs match the manifest and the stage-timings code.",
-      "documentSha256": "ba67818de3f93d4e4a83611a9f56ef75b2bf6ac9948a68642a29426b687bd347",
+      "documentSha256": "6c72e49e29c13881b2b43f4b1113aeb927437d4d6068817fcb1d1dba07b55fbd",
       "sources": [
         {
           "path": "docs/metrics/stage-manifest.json",
-          "sha256": "b6c0752587b08d9a3b5c24d80a580a3f81427cda7af9167305f275644c9d7d78"
+          "sha256": "bd67aeb76e163a5411f1986f6076fa95bdff88fda5cd9cb2b8280fdd2a319bea"
         },
         {
           "path": "scripts/lib/stage-events.mjs",
-          "sha256": "3d66ba10bd994fbb660a419c6c0ffb77a6c45b29b2ca12ef8f307318184c208c"
+          "sha256": "d7b18a8e609488fb47dfabb4b5b24ffc7cc575ca333353f6201f5597d2d98a9d"
         }
       ]
     }

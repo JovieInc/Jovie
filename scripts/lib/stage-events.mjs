@@ -253,17 +253,31 @@ function windowStats(samples, nowMs) {
   return out;
 }
 
+/**
+ * Terminal stages have no dwell: report arrivals, and how many arrived
+ * `failed` with the failure rate, so a failing loop is visible at a glance.
+ */
 function arrivals(events, type, stageId, nowMs) {
-  const at = events
+  const rows = events
     .filter(e => e.entityType === type && e.stage === stageId)
-    .map(e => Date.parse(e.enteredAt));
+    .map(e => ({
+      at: Date.parse(e.enteredAt),
+      failed: e.outcome === 'failed',
+    }));
   const out = {};
-  for (const [name, span] of Object.entries(WINDOWS))
+  for (const [name, span] of Object.entries(WINDOWS)) {
+    const inWindow = rows.filter(r => r.at > nowMs - span && r.at <= nowMs);
+    const failed = inWindow.filter(r => r.failed).length;
     out[name] = {
-      n: at.filter(t => t > nowMs - span && t <= nowMs).length,
+      n: inWindow.length,
       p50: null,
       p95: null,
+      failed,
+      failRate: inWindow.length
+        ? Math.round((failed / inWindow.length) * 1000) / 1000
+        : null,
     };
+  }
   return out;
 }
 

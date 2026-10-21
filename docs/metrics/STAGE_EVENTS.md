@@ -13,7 +13,7 @@ One row per entity per stage. Stage dwell time is `exitedAt - enteredAt`.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `schema` | `"jovie-stage-event/v1"` | Contract version. Breaking changes bump it. |
-| `entityType` | manifest key | `shipping`, `remediation`, `release`, `ios-release`, `revenue-funnel`, `summer-turn` |
+| `entityType` | manifest key | `shipping`, `remediation`, `release`, `ios-release`, `revenue-funnel`, `summer-turn`, `automation-run` |
 | `entityId` | string | Stable id; the format is declared per entity in the manifest. |
 | `stage` | manifest stage id | Must be registered for the entity type. Unregistered stages are rejected. |
 | `enteredAt` | ISO-8601 | When the entity entered the stage. |
@@ -47,7 +47,8 @@ No new database. Two paths, both read by the daily
 
 `scripts/lib/stage-events.mjs` aggregates p50/p95/n per stage and per declared
 end-to-end pair over 24h/7d/28d, using completion time for windowing. A
-terminal stage has no dwell, so it reports arrivals (`n`) only.
+terminal stage has no dwell, so it reports arrivals (`n`), `failed` and
+`failRate`.
 
 **Regression flag**: the 7d p95 is compared with the p95 of days 8 to 28. It is
 flagged only when both sides have enough samples (10 recent, 20 baseline), the
@@ -107,8 +108,13 @@ every ledger receipt in the last 28 days on the first publish.
 
 ### summer-config (Summer)
 
-Publish `summer-stage-events.ndjson` (same contract) to a public or
-token-readable URL and register it as `summer-stage-feed.url` in the manifest.
+Live since 2026-10-20 23:52Z at
+`https://summer.jov.ie/runtime/v1/summer-stage-events.ndjson`, registered as
+`summer-stage-feed.url`. `model-turn`, `action` and `outcome` are `pushed`;
+`event` stays `spec` until the feed emits ingress rows, so the tracked
+end-to-end pair is `model-turn->outcome`. The terminal `outcome` stage reports
+`failed` and `failRate` per window (first read 2026-10-21: 22 turns, 15
+failed, pre-fix; fixed in summer-config #270).
 
 | Stage | Timestamp |
 | --- | --- |
@@ -117,8 +123,27 @@ token-readable URL and register it as `summer-stage-feed.url` in the manifest.
 | `summer-turn:action` | first tool/action dispatch |
 | `summer-turn:outcome` | terminal receipt (`summer-shadow/terminal/<key>.json`) |
 
-`entityId` = `<conversation>:<turn>`. `outcome` on the terminal row: `completed`,
+`entityId` = `<conversation>:<turn>`, both hashed by summer-config. `outcome` on the terminal row: `completed`,
 `failed` or `abandoned`. Backfill from the existing receipt blobs.
+
+### Automation liveness (`automation-run`)
+
+Live emitter: `scripts/automation-liveness.mjs` (workflow
+`automation-liveness.yml`) writes `automation-run:started` and
+`automation-run:finished` rows for every registered automation whose receipt
+carries both timestamps, into the artifact
+`automation-liveness-receipts/stage-events.ndjson`.
+
+| Stage | Timestamp |
+| --- | --- |
+| `automation-run:started` | run start from the automation's receipt |
+| `automation-run:finished` | terminal receipt; `outcome` `completed` or `failed` |
+
+`entityId` = `<automationId>@<runRef>` (`automationId` from
+`canon/automation-registry.jsonl`). Rows without real timestamps are never
+emitted. The source has no URL yet: the shipping-slo collector reads `url`
+sources only, so reading the artifact is the remaining step before these
+timings reach the snapshot.
 
 ### LogYourBody release loop
 
@@ -136,3 +161,9 @@ may leave the app. The `revenue-funnel-timings` source expects
 `GET https://jov.ie/api/cron/stage-timings` (CRON_SECRET) to return the
 `kind: timings` shape above. Adding that cron route needs approval under the
 infra guardrail; it is tracked as a gap issue until then.
+
+`pending-verification`, `claim-verified` and `claim-rejected` are branch stages
+off `paid` for high-reach artist claims. They are not steps in the linear
+funnel. The app records them in `acquisition_journey_stages`, and the admin
+artist-offer funnel report (`branches[]`) already returns their counts and
+p50/p95.
