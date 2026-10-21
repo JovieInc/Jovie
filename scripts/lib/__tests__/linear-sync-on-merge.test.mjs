@@ -832,6 +832,20 @@ describe('linear sync on merge', () => {
     }
   );
 
+  // Linear's Duplicate state type is closed work: a duplicate child must not
+  // hold its parent open (72 parents waited on sub-issues on 2026-10-21).
+  it('treats a Duplicate-state child as closed for the parent gate', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'In Progress';
+    issue.children = [['JOV-2', 'duplicate', '2026-10-03T12:00:00Z']];
+    issue.attachments = [];
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    await sweep(fetchImpl);
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Done');
+  });
+
   it('retains a parent without its own outcome, then closes from fresh verified proof without inventing a parent PR', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];

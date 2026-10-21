@@ -1072,9 +1072,12 @@ async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
     ),
     hasChildren: childNodes.length > 0,
     openChildren: childNodes
+      // Linear's Duplicate state type is closed work, like canceled.
       .filter(
         child =>
-          !['completed', 'canceled'].includes(String(child?.state?.type ?? ''))
+          !['completed', 'canceled', 'duplicate'].includes(
+            String(child?.state?.type ?? '')
+          )
       )
       .map(child => String(child?.identifier ?? '').toUpperCase())
       .filter(Boolean),
