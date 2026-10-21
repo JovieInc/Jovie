@@ -70,6 +70,20 @@ export interface HomeLoopAsk {
   readonly evidence: readonly string[];
 }
 
+/** Persona copy; Jovie and Ovie fill the same skeleton with their own words. */
+export interface HomeLoopCopy {
+  readonly constraintClear: string;
+  readonly asksTitle: string;
+  readonly asksEmpty: string;
+  readonly asksError: string;
+  readonly inFlightTitle: string;
+  readonly inFlightEmpty: string;
+  readonly inFlightError: string;
+  readonly doneTitle: string;
+  readonly doneEmpty: string;
+  readonly approveLabel?: string;
+}
+
 /** Last observed tile values, used only to fill `was` when a source has none. */
 export type HomeLoopTileMemory<Key extends string = string> = Readonly<
   Partial<Record<Key, { readonly value: string; readonly was: string | null }>>

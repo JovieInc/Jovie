@@ -462,13 +462,99 @@ jobs:
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: pnpm --filter @jovie/web seo:certify --sha "$EXPECTED_HEAD" --run-ref "pr-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+  # Shift-left (JOV-6834). Unit tests ran only on the merge-group head, so a
+  # PR-local defect was first caught in the queue: 168 of 307 merge-group
+  # failures in the 7 days to 2026-10-20 were fixed by a later PR commit, 44
+  # of them in Unit Tests (71 ejections across 27 of the 45 PRs merged in
+  # 48 h). This runs the merge-group shard command against the exact PR head,
+  # limited by `--changed` to tests whose module graph reaches the diff. The
+  # merge-group Unit Tests job stays: it validates the combined head, which
+  # differed from the PR head for 92 of 103 sampled merges.
+  unit:
+    name: Affected Unit Tests (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      # Every shard is a required source proof; the first red one suffices.
+      fail-fast: true
+      matrix:
+        shard: ['1/4', '2/4', '3/4', '4/4']
+    steps:
+      - *proof-reuse
+      - *reused-checkout
+      - name: Select unit-affecting diff
+        id: scope
+        if: steps.reuse.outputs.reuse != 'true'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          echo "base=$base_sha" >> "$GITHUB_OUTPUT"
+          changed() { ! git diff --quiet "$base_sha" HEAD -- "$@"; }
+          web=false; ui=false; ovie=false; ci=false
+          # Web unit tests also import scripts/ and .github/ modules, so
+          # those paths select their related tests too.
+          if changed apps/web packages pnpm-lock.yaml package.json turbo.json scripts .github; then web=true; fi
+          if changed packages/ui; then ui=true; fi
+          if changed apps/ovie; then ovie=true; fi
+          # tests/unit/ci read workflow YAML and scripts from disk, outside
+          # the module graph `--changed` follows: run that suite whole.
+          if changed scripts .github; then ci=true; fi
+          printf 'web=%s\nui=%s\novie=%s\nci=%s\n' "$web" "$ui" "$ovie" "$ci" >> "$GITHUB_OUTPUT"
+          if [[ "$web$ui$ovie" == 'falsefalsefalse' ]]; then
+            echo 'No unit-affecting source changed; non-applicable receipt recorded.'
+          fi
+      - name: Setup Node.js and pnpm
+        if: steps.reuse.outputs.reuse != 'true' && (steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true')
+        uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Playwright warm path
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true'
+        uses: ./.github/actions/setup-playwright
+      - name: Load quarantined unit tests
+        id: quarantine
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true'
+        run: node .github/scripts/quarantine-ledger.mjs emit-github-output
+      - name: Run web unit tests related to the exact PR diff
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true'
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
+          BASE_SHA: ${{ steps.scope.outputs.base }}
+        run: |
+          set -euo pipefail
+          export NODE_OPTIONS="--max-old-space-size=3072"
+          # Same fast config, pool and quarantine as the merge-group shards;
+          # `--changed` keeps only tests whose module graph reaches the diff.
+          pnpm --filter @jovie/web test:fast -- \
+            --pool=forks --maxWorkers="$(nproc)" --fileParallelism \
+            --retry=${{ steps.quarantine.outputs.unit_default_retries }} \
+            --changed "$BASE_SHA" --passWithNoTests \
+            --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
+      - name: Run CI contract tests read from disk
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ci == 'true' && matrix.shard == '3/4'
+        run: |
+          set -euo pipefail
+          # Same command and quarantine as the merge group's structural web lane.
+          command="$(node -e "import('./scripts/ci-fast-lanes.mjs').then(m => process.stdout.write(m.webCiContractTestsCommand()))")"
+          bash -c "$command"
+      - name: Run packages/ui unit tests
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true' && matrix.shard == '1/4'
+        run: pnpm turbo test --filter=@jovie/ui
+      - name: Run Ovie route and private-boundary coverage
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ovie == 'true' && matrix.shard == '2/4'
+        run: pnpm --filter @jovie/ovie test
   ready:
     name: PR Ready
     if: ${{ always() }}
-    needs: [deterministic, security, migration, coverage]
+    needs: [deterministic, security, migration, coverage, unit]
     runs-on: ubuntu-latest
     steps:
       - name: Require every source proof
         env:
           RESULTS: ${{ join(needs.*.result, ',') }}
-        run: test "$RESULTS" = 'success,success,success,success'
+        run: test "$RESULTS" = 'success,success,success,success,success'
