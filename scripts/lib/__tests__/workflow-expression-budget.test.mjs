@@ -1,8 +1,17 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { load } from 'js-yaml';
 import { test } from 'vitest';
 import {
   EXPRESSION_LIMIT,
@@ -74,6 +83,116 @@ test('a group stacked on an already broken base is a victim, not the culprit', (
   const victim = introducedOverBudget(broken, broken);
   assert.equal(victim.over.length, 0);
   assert.equal(victim.inherited.length, 1);
+});
+
+for (const hasId of [true, false]) {
+  test(`renaming an inherited broken step stays a victim ${hasId ? 'with' : 'without'} an id`, () => {
+    let original = workflow(detectScript(21_052));
+    if (!hasId) original = original.replace('        id: detect\n', '');
+    const renamed = original.replace(
+      'name: Detect path changes for all job types',
+      'name: Renamed detection step'
+    );
+    const result = introducedOverBudget(
+      runScriptSizes('ci.yml', renamed),
+      runScriptSizes('ci.yml', original)
+    );
+    assert.equal(result.over.length, 0);
+    assert.equal(result.inherited.length, 1);
+  });
+}
+
+test('the workflow hydrates sparse-checkout blobs before scanning offline', () => {
+  const root = mkdtempSync(join(tmpdir(), 'workflow-budget-fetch-'));
+  const source = join(root, 'source');
+  const clone = join(root, 'clone');
+  const git = (cwd, ...args) =>
+    execFileSync('git', args, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  try {
+    mkdirSync(join(source, 'scripts'), { recursive: true });
+    mkdirSync(join(source, '.github/workflows'), { recursive: true });
+    git(source, 'init', '--quiet', '--initial-branch=main');
+    git(source, 'config', 'user.name', 'Budget test');
+    git(source, 'config', 'user.email', 'budget@example.invalid');
+    git(source, 'config', 'uploadpack.allowFilter', 'true');
+    writeFileSync(
+      join(source, 'scripts/workflow-expression-budget.mjs'),
+      readFileSync(SCRIPT)
+    );
+    for (const [name, length] of [
+      ['ci', 21_052],
+      ['other', 20_000],
+    ]) {
+      writeFileSync(
+        join(source, `.github/workflows/${name}.yml`),
+        workflow(detectScript(length))
+      );
+    }
+    git(source, 'add', '.');
+    git(source, 'commit', '--quiet', '-m', 'base');
+    const base = git(source, 'rev-parse', 'HEAD');
+    git(
+      root,
+      'clone',
+      '--quiet',
+      '--no-checkout',
+      '--depth=1',
+      '--filter=blob:none',
+      `file://${source}`,
+      clone
+    );
+    git(
+      clone,
+      'sparse-checkout',
+      'set',
+      '--no-cone',
+      '/scripts/workflow-expression-budget.mjs'
+    );
+    git(clone, 'checkout', '--quiet', 'main');
+    symlinkSync(resolve('node_modules'), join(clone, 'node_modules'), 'dir');
+    writeFileSync(join(source, 'notes.txt'), 'group-only change');
+    git(source, 'add', 'notes.txt');
+    git(source, 'commit', '--quiet', '-m', 'group');
+    const head = git(source, 'rev-parse', 'HEAD');
+    const configuration =
+      /** @type {{ jobs: Record<string, { steps: { name?: string, run?: string }[] }> }} */ (
+        load(readFileSync('.github/workflows/pr-size-guard.yml', 'utf8'))
+      );
+    const step = configuration.jobs['merge-group-workflow-load'].steps.find(
+      step => step.name === 'Require combined-head workflows to load'
+    );
+    assert.ok(step?.run);
+    const fetchScript = step.run.split('unset AUTH_HEADER')[0];
+    assert.notEqual(fetchScript, step.run);
+    const result = spawnSync('bash', ['-c', fetchScript], {
+      cwd: clone,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GH_TOKEN: 'fixture-token',
+        GROUP_BASE: base,
+        GROUP_HEAD: head,
+      },
+      timeout: 15_000,
+    });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    // The fetch must hydrate files before the scan can trigger lazy requests.
+    renameSync(source, join(root, 'offline-source'));
+    const offline = spawnSync(process.execPath, [SCRIPT, '--ref', head], {
+      cwd: clone,
+      encoding: 'utf8',
+      env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
+      timeout: 10_000,
+    });
+    assert.equal(offline.status, 1, offline.stdout + offline.stderr);
+    assert.match(offline.stdout, /over the 20950 budget/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('CLI fails the exact head and the head merged into a moved base', () => {

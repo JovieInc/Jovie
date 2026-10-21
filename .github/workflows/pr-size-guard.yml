@@ -222,7 +222,8 @@ jobs:
           fi
           [[ "$GROUP_HEAD" =~ ^[0-9a-f]{40}$ && "$GROUP_BASE" =~ ^[0-9a-f]{40}$ ]]
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          # The group commit and its parent, which is the group base.
+          # Re-fetch the group and base blobs that the sparse checkout omitted,
+          # so scanning workflow files does not trigger per-file network calls.
           GIT_CONFIG_COUNT=2 \
           GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
           GIT_CONFIG_VALUE_0="$AUTH_HEADER" \
@@ -231,7 +232,7 @@ jobs:
           GIT_TERMINAL_PROMPT=0 \
           GIT_LFS_SKIP_SMUDGE=1 \
             timeout --kill-after=5s 60s \
-              git fetch --filter=blob:limit=1g --no-tags --depth=2 origin "$GROUP_HEAD" \
+              git fetch --refetch --filter=blob:limit=1g --no-tags --depth=2 origin "$GROUP_HEAD" \
             || echo '::warning::Could not fetch the combined head; the guard fails open.'
           unset AUTH_HEADER
           status=0

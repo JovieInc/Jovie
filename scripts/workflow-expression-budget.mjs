@@ -23,6 +23,7 @@
  * under the limit alone and over it once merged.
  */
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
@@ -80,7 +81,7 @@ export function formatExpressionLength(value) {
 /**
  * @param {string} path
  * @param {string} text
- * @returns {{ path: string, job: string, step: string, length: number }[]}
+ * @returns {{ path: string, job: string, step: string, identity: string, length: number }[]}
  */
 export function runScriptSizes(path, text) {
   let parsed;
@@ -102,6 +103,10 @@ export function runScriptSizes(path, text) {
         path,
         job,
         step: String(step.name ?? step.id ?? `step ${index + 1}`),
+        // Display names can change without introducing a broken script.
+        identity: step.id
+          ? `id:${step.id}`
+          : `run:${createHash('sha256').update(step.run).digest('hex')}`,
         length,
       });
     });
@@ -110,7 +115,7 @@ export function runScriptSizes(path, text) {
 }
 
 /**
- * @param {{ path: string, job: string, step: string, length: number }[]} sizes
+ * @param {{ path: string, job: string, step: string, identity: string, length: number }[]} sizes
  * @param {{ limit?: number, warning?: number }} [budget]
  */
 export function evaluateRunScriptBudget(
@@ -175,7 +180,7 @@ function report(label, result) {
   }
 }
 
-const sizeKey = size => `${size.path}\u0000${size.job}\u0000${size.step}`;
+const sizeKey = size => `${size.path}\u0000${size.job}\u0000${size.identity}`;
 
 /**
  * Over-budget scripts at head whose base version loads. A merge group whose
