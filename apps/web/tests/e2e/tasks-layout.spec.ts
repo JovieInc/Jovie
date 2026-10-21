@@ -360,7 +360,7 @@ async function selectTaskMetaOption(
   triggerName: string,
   optionName: string
 ): Promise<void> {
-  await page.getByLabel(triggerName).click();
+  await page.getByRole('button', { name: triggerName }).click();
   await page.getByRole('menuitem', { name: optionName }).click();
 }
 
