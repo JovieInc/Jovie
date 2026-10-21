@@ -126,14 +126,18 @@ class SessionTest(unittest.TestCase):
         self.assertEqual(events[-1], "unlock")
 
     def test_exact_proof_and_minimum_write_window_boundaries(self):
-        code, rows, _ = self.run_session(seen=NOW - 38)
+        # Wall-clock proof-age boundaries: pin monotonic time too. With the real clock, >3 s
+        # of CI load inside the fence shrank the exact 22 s window and ejected #22328's group
+        # (run 39547950716, "2 != 0").
+        frozen = lambda: 1000.0
+        code, rows, _ = self.run_session(seen=NOW - 38, monotonic=frozen)
         self.assertEqual(code, 0)
         self.assertEqual(rows[1]["expiresAt"], NOW + guard.MIN_WRITE_WINDOW_S)
         for age, reason in [(38.000001, "native-proof-write-window-too-short"),
                             (60, "native-proof-write-window-too-short"),
                             (60.000001, "native-proof-expired")]:
             with self.subTest(age=age):
-                code, rows, _ = self.run_session(seen=NOW - age)
+                code, rows, _ = self.run_session(seen=NOW - age, monotonic=frozen)
                 self.assertEqual(code, 2)
                 self.assertEqual(rows[-1]["reason"], reason)
                 self.assertNotIn("locked", [row["phase"] for row in rows])
