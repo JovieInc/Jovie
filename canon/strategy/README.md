@@ -16,6 +16,7 @@ strategy miss is a retrieval defect, not a silent proceed.
 |---|---|---|---|
 | [APIs/MCPs are a core Jovie line, not first](theses/2026-09-03-apis-mcps-core-not-first.md) | active | 2026-09-03 | product priority, YouTube artist loop, agent-native access, API/MCP/CLI, distribution |
 | [Sell outcomes, eliminate creator side quests, keep the execution substrate replaceable](theses/2026-10-02-sell-outcomes-replaceable-substrate.md) | active | 2026-10-02 | business model, pricing, free tier, creator workflow, delegation, orchestration, substrate |
+| [First paid offer: $12/month self-serve artist profile](theses/2026-10-20-first-paid-offer-artist-profile-12.md) | active | 2026-10-20 | pricing, checkout, claim, revenue |
 
 Rules:
 

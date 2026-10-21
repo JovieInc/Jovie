@@ -115,7 +115,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(
       screen.getByText('Start 14-day Artist Presence trial')
     ).toBeInTheDocument();
-    expect(screen.getByText(/199\/month/)).toBeInTheDocument();
+    expect(screen.getByText(/\$12\/month/)).toBeInTheDocument();
     expect(screen.getByText(/No credit card/)).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')
@@ -200,7 +200,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     searchParamsState.value = 'plan=pro&interval=annual';
     const { rerender } = render(<AuthShell mode='sign-up' />);
     expect(screen.getByText('Choose an available plan')).toBeInTheDocument();
-    expect(screen.queryByText(/199\/month/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\$12\/month/)).not.toBeInTheDocument();
     searchParamsState.value = 'plan=max';
     rerender(<AuthShell mode='sign-up' />);
     expect(screen.getByText('Contact sales')).toBeInTheDocument();

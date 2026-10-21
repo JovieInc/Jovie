@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import type {
   HomeLoopAsk,
   HomeLoopConstraint,
@@ -35,13 +36,21 @@ export interface HomeLoopCanvasProps {
   /** Status of the shipping read (constraint, pulse, in flight, done). */
   readonly loopStatus: HomeLoopSectionStatus;
   readonly asksStatus: HomeLoopSectionStatus;
+  /** Partial source failure while some or no asks are still shown. */
+  readonly asksNotice?: string | null;
   readonly answers: Readonly<Record<string, HomeLoopAnswer>>;
   readonly onApprove: (ask: HomeLoopAsk) => void;
   readonly onReply: (ask: HomeLoopAsk, text: string) => void;
+  /** Post-ship feedback on a decided ask; the decision stands. */
+  readonly onFeedback?: (ask: HomeLoopAsk, text: string) => void;
   readonly onRetryLoop?: () => void;
   readonly onRetryAsks?: () => void;
   /** Where the full list of asks lives once Home shows the top few. */
   readonly asksMoreHref?: string;
+  /** Generated answer for the current canvas state, under the pulse. */
+  readonly answer?: ReactNode;
+  /** Generated UI that updates the in-flight section in place. */
+  readonly inFlightOverride?: ReactNode;
 }
 
 /**
@@ -61,12 +70,16 @@ export function HomeLoopCanvas({
   doneSummary,
   loopStatus,
   asksStatus,
+  asksNotice,
   answers,
   onApprove,
   onReply,
+  onFeedback,
   onRetryLoop,
   onRetryAsks,
   asksMoreHref,
+  answer,
+  inFlightOverride,
 }: HomeLoopCanvasProps) {
   const openAsks = asks.filter(
     ask => !answers[ask.id] || answers[ask.id]?.state === 'failed'
@@ -79,6 +92,7 @@ export function HomeLoopCanvas({
         loading={loopStatus === 'loading'}
       />
       <HomeLoopPulse tiles={pulse} loading={loopStatus === 'loading'} />
+      {answer}
       <div className='grid items-start gap-4 xl:grid-cols-2 2xl:grid-cols-3'>
         <HomeLoopSection
           title={copy.asksTitle}
@@ -87,6 +101,7 @@ export function HomeLoopCanvas({
           isEmpty={asks.length === 0}
           emptyLabel={copy.asksEmpty}
           errorLabel={copy.asksError}
+          notice={asksNotice}
           onRetry={onRetryAsks}
           skeleton={<HomeLoopAsksSkeleton />}
           minBodyClassName='min-h-24'
@@ -99,13 +114,14 @@ export function HomeLoopCanvas({
             moreHref={asksMoreHref}
             onApprove={onApprove}
             onReply={onReply}
+            onFeedback={onFeedback}
           />
         </HomeLoopSection>
         <HomeLoopSection
           title={copy.inFlightTitle}
           count={rows.length}
-          status={loopStatus}
-          isEmpty={rows.length === 0}
+          status={inFlightOverride ? 'ready' : loopStatus}
+          isEmpty={!inFlightOverride && rows.length === 0}
           emptyLabel={copy.inFlightEmpty}
           errorLabel={copy.inFlightError}
           onRetry={onRetryLoop}
@@ -114,7 +130,9 @@ export function HomeLoopCanvas({
           className='xl:row-span-2 2xl:row-span-1'
           testId='home-loop-in-flight-section'
         >
-          <HomeLoopStageRows stages={stages} rows={rows} />
+          {inFlightOverride ?? (
+            <HomeLoopStageRows stages={stages} rows={rows} />
+          )}
         </HomeLoopSection>
         <HomeLoopSection
           title={copy.doneTitle}
