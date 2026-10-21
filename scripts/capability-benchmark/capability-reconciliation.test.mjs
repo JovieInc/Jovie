@@ -606,3 +606,64 @@ test('stack inventory digests source, not generated outputs written during the s
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('stack inventory in a git checkout digests tracked source only (JOV-8749)', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import(
+    'node:fs'
+  );
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const root = mkdtempSync(join(tmpdir(), 'stack-inventory-git-'));
+  try {
+    const write = (path, content) => {
+      mkdirSync(join(root, path, '..'), { recursive: true });
+      writeFileSync(join(root, path), content);
+    };
+    write('package.json', '{"name":"fixture","private":true}');
+    write(
+      'apps/web/package.json',
+      '{"name":"web","dependencies":{"next":"16.4.1"}}'
+    );
+    write(
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\nimporters:\n  .: {}\n  apps/web:\n    dependencies:\n      next:\n        specifier: 16.4.1\n        version: 16.4.1\n"
+    );
+    write(
+      'apps/web/app/page.tsx',
+      "import Link from 'next/link';\nexport default Link;\n"
+    );
+    const git = args =>
+      execFileSync('git', ['-C', root, ...args], { stdio: 'ignore' });
+    git(['init', '-q']);
+    git(['add', '.']);
+    git([
+      '-c',
+      'user.email=t@example.com',
+      '-c',
+      'user.name=t',
+      'commit',
+      '-q',
+      '-m',
+      'fixture',
+    ]);
+    const first = reconciliation.buildStackInventory(root, 'sha-1');
+    // An untracked report outside the excluded output directories (the 2026-10-21 recurrence).
+    write('apps/web/reports/live-run.json', '{"x":1}');
+    write('apps/web/app/scratch.ts', 'export const x = 1;\n');
+    assert.equal(
+      reconciliation.buildStackInventory(root, 'sha-2', first).status,
+      'reused'
+    );
+    write(
+      'apps/web/app/page.tsx',
+      "import Link from 'next/link';\nexport default Link; // changed\n"
+    );
+    assert.equal(
+      reconciliation.buildStackInventory(root, 'sha-3', first).status,
+      'refreshed'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

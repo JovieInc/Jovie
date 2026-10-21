@@ -73,17 +73,15 @@ describe('ReleasesView', () => {
     expect(screen.getByText('Latest')).toBeVisible();
     expect(screen.queryByText('Latest Release')).not.toBeInTheDocument();
     expect(screen.queryByText('More Releases')).not.toBeInTheDocument();
-    expect(screen.getByAltText('Newest Song')).toHaveClass('object-contain');
-    expect(screen.getByAltText('Newest Song')).not.toHaveClass('object-cover');
-    expect(screen.getByAltText('Newest Song')).toHaveAttribute(
-      'data-priority',
-      'true'
-    );
+    // Artwork is decorative (empty alt) so the link name is the visible text.
+    const newestArtwork = links[0]!.querySelector('img');
+    const olderArtwork = links[1]!.querySelector('img');
+    expect(newestArtwork).toHaveAttribute('alt', '');
+    expect(newestArtwork).toHaveClass('object-contain');
+    expect(newestArtwork).not.toHaveClass('object-cover');
+    expect(newestArtwork).toHaveAttribute('data-priority', 'true');
     expect(within(links[0]!).queryByRole('button')).not.toBeInTheDocument();
-    expect(screen.getByAltText('Older Song')).toHaveAttribute(
-      'data-priority',
-      'false'
-    );
+    expect(olderArtwork).toHaveAttribute('data-priority', 'false');
   });
 
   it('tracks release clicks with profile context', () => {
@@ -96,7 +94,7 @@ describe('ReleasesView', () => {
       />
     );
 
-    const link = screen.getByRole('link', { name: 'View Newest Song' });
+    const link = screen.getByRole('link', { name: /Newest Song/ });
     link.addEventListener('click', event => event.preventDefault());
     fireEvent.click(link);
 
