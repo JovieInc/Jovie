@@ -122,14 +122,22 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
     });
     await expect(expanded).toBeVisible();
     const expandedLinks = expanded.getByRole('link');
-    await expect(expandedLinks).toHaveCount(4);
-    expect(await linkContract(expandedLinks)).toEqual([
-      ...CANONICAL_LABELS.map((label, index) => ({
+    // Utility rows: Public Profile (any creator with a handle, since #16320)
+    // then Settings.
+    await expect(expandedLinks).toHaveCount(5);
+    const expandedContract = await linkContract(expandedLinks);
+    expect(expandedContract.slice(0, 3)).toEqual(
+      CANONICAL_LABELS.map((label, index) => ({
         label,
         href: CANONICAL_HREFS[index],
-      })),
-      { label: 'Settings', href: APP_ROUTES.SETTINGS },
-    ]);
+      }))
+    );
+    expect(expandedContract[3]?.label).toBe('Public Profile');
+    expect(expandedContract[3]?.href).toMatch(/^\/[^/]+$/);
+    expect(expandedContract[4]).toEqual({
+      label: 'Settings',
+      href: APP_ROUTES.SETTINGS,
+    });
     for (const label of FORBIDDEN_LABELS) {
       await expect(expanded.getByRole('link', { name: label })).toHaveCount(0);
     }

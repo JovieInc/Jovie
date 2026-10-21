@@ -99,9 +99,14 @@ test.describe('Command palette — Cmd+K contract', () => {
       .first()
       .click();
 
-    const headerInput = page.getByRole('combobox', { name: 'Search Jovie' });
+    // Since #15240 the sidebar trigger opens the shell-owned main-plane
+    // search: its input lives in the header seam
+    // (command-palette-header-input) and results replace the route in the
+    // main plane. It must not open the full-page modal palette.
+    const headerInput = page.getByTestId('command-palette-header-input');
     await expect(headerInput).toBeVisible({ timeout: 10_000 });
     await expect(headerInput).toBeFocused();
-    await expect(page.locator(PALETTE_INPUT)).toBeHidden();
+    await expect(page.getByTestId('cmdk-main-plane')).toBeVisible();
+    await expect(page.getByTestId('shared-command-palette')).toHaveCount(0);
   });
 });
