@@ -181,6 +181,27 @@
         }
       ]
     },
+    "release-replay": {
+      "entityId": "<controller workflow file>#<run id>@<run attempt> (the failed controller attempt)",
+      "description": "One failed Staging/Production Controller attempt, from its failure to the replay decision of controller-quota-replay.yml. Only transient failures (quota, GitHub 5xx, network, runner loss) are replayed, at most to attempt 3.",
+      "endToEnd": [["blocked", "replayed"]],
+      "stages": [
+        {
+          "id": "blocked",
+          "meaning": "the controller attempt failed; exits at the replay decision (advanced = replayed, abandoned = not transient or superseded, failed = attempt or wait cap)",
+          "producer": "controller-quota-replay.yml",
+          "status": "pushed",
+          "source": "release-replay-receipts"
+        },
+        {
+          "id": "replayed",
+          "meaning": "gh run rerun --failed was accepted for the attempt",
+          "producer": "controller-quota-replay.yml",
+          "status": "pushed",
+          "source": "release-replay-receipts"
+        }
+      ]
+    },
     "ios-release": {
       "entityId": "JovieInc/LogYourBody@sha",
       "description": "LogYourBody iOS build from merge to App Store release.",
@@ -380,6 +401,13 @@
       "workflow": "automation-liveness.yml",
       "owner": "automation registry (scripts/automation-liveness.mjs)"
     },
+    "release-replay-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "release-replay-receipts/stage-events.ndjson",
+      "workflow": "controller-quota-replay.yml",
+      "owner": "release path (.github/scripts/controller-quota-replay.mjs)"
+    },
     "summer-stage-feed": {
       "kind": "events",
       "url": "https://summer.jov.ie/runtime/v1/summer-stage-events.ndjson",
@@ -398,6 +426,10 @@
       "lane-fix-relay.yml": ["remediation:classified"],
       "staging-controller.yml": ["release:staging"],
       "production-controller.yml": ["release:verified", "shipping:verified"],
+      "controller-quota-replay.yml": [
+        "release-replay:blocked",
+        "release-replay:replayed"
+      ],
       "production-release.yml": [
         "release:canary",
         "release:prod",
