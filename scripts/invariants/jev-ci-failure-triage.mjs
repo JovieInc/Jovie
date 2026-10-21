@@ -37,6 +37,7 @@ export const CI_TRIAGE_NEXT = Object.freeze({
   production_incident: 'incident',
 });
 
+/** @type {Array<[RegExp, string]>} */
 const REDACTIONS = [
   [/Bearer\s+\S+/gi, 'Bearer [redacted]'],
   [
