@@ -6789,7 +6789,8 @@ jobs:
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
-          GOLDEN_PATH_RESULT: ${{ needs.ci-golden-path.outputs.certification_outcome == 'failure' && needs.ci-golden-path.outputs.journey_outcome == 'success' && 'success' || needs.ci-golden-path.result }}
+          # A certification failure is a failure; never remap it to success.
+          GOLDEN_PATH_RESULT: ${{ needs.ci-golden-path.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           MAIN_SHA: ${{ github.sha }}
         run: node scripts/golden-path-nightly-intake.mjs
