@@ -38,8 +38,9 @@ import { buildReleaseShareContext } from '@/lib/share/context';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import {
   appendUTMParamsToUrl,
-  extractUTMParams,
   type PartialUTMParams,
+  resolveSmartLinkOutboundUtmParams,
+  SMART_LINK_DEFAULT_UTM_PARAMS,
 } from '@/lib/utm';
 
 interface Provider {
@@ -100,13 +101,10 @@ function resolveReleaseUtmParams(
     return defaultParams;
   }
 
-  const currentUtmParams = extractUTMParams(
-    new URLSearchParams(globalThis.location.search)
+  return resolveSmartLinkOutboundUtmParams(
+    new URLSearchParams(globalThis.location.search),
+    defaultParams
   );
-
-  return Object.keys(currentUtmParams).length > 0
-    ? currentUtmParams
-    : defaultParams;
 }
 
 function getReleaseSharePathname(
@@ -338,7 +336,7 @@ export function ReleaseLandingPage({
   allowDownloads = false,
   soundsUrl,
   tracking,
-  utmParams = { utm_source: 'jovie' },
+  utmParams = SMART_LINK_DEFAULT_UTM_PARAMS,
   parentRelease = null,
   claimBanner = null,
   downloadUrl = null,
@@ -513,7 +511,9 @@ export function ReleaseLandingPage({
         {/* Footer — always pinned at bottom */}
         <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]'>
           <SmartLinkPoweredByFooter
-            reportHref={`${APP_ROUTES.REPORT}?type=smart_link${tracking?.smartLinkSlug ? `&target=${encodeURIComponent(tracking.smartLinkSlug)}` : ''}`}
+            reportTarget={
+              tracking?.smartLinkSlug ? (sharePathname ?? null) : null
+            }
           />
         </div>
       </div>

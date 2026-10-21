@@ -864,7 +864,7 @@ jobs:
           echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
 
           # Build paths
-          BUILD_PATTERN='^(CHANGELOG\.md$|apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/middleware\.ts|package.*\.json|turbo\.json)'
+          BUILD_PATTERN='^(CHANGELOG\.md$|apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.(js|mjs|ts)|vercel\.json|packages/|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/proxy\.ts|package.*\.json|turbo\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$BUILD_PATTERN"; then
             RUN_BUILD=true
             echo "run_build=true" >> "$GITHUB_OUTPUT"
