@@ -124,6 +124,14 @@ export function OpportunityInboxPageClient({
   const router = useRouter();
   const inboxHomeEnabled = useAppFlag('INBOX_HOME');
   const [cards, setCards] = useState(inbox.cards);
+  const decisionLocks = useRef(new Set<string>());
+  const decisionFocusRecoveryRef = useRef<{
+    id: string;
+    origin: HTMLElement | null;
+  } | null>(null);
+  const [pendingDecisionIds, setPendingDecisionIds] = useState<
+    ReadonlySet<string>
+  >(new Set());
   const [isRefreshing, startRefresh] = useTransition();
   const retryFocusRecoveryRef = useRef(false);
   const inboxReadUnavailable =
@@ -196,6 +204,9 @@ export function OpportunityInboxPageClient({
     reviseMutation,
     nextStepMutation,
   } = useOpportunityInboxMutations();
+  const approveDecision = approveMutation.mutateAsync;
+  const dismissDecision = dismissMutation.mutateAsync;
+  const reviseDecision = reviseMutation.mutateAsync;
   const { confirmMutation, rejectMutation, undoRejectMutation } =
     useTourDateReviewMutations();
 
@@ -259,59 +270,71 @@ export function OpportunityInboxPageClient({
     [scheduleStackFocusRecovery]
   );
 
+  // Each promise owns its completion even if another row starts a mutation.
+  // TanStack's per-call mutate callbacks only notify the latest observer.
+  const runDecision = useCallback(
+    (id: string, send: () => Promise<unknown>) => {
+      if (decisionLocks.current.has(id)) return;
+      decisionLocks.current.add(id);
+      setPendingDecisionIds(new Set(decisionLocks.current));
+      const focus = document.activeElement as HTMLElement | null;
+      void send()
+        .then(
+          () => {
+            if (
+              document.activeElement === document.body ||
+              document.activeElement === focus
+            )
+              beginStackAction(id);
+            setCards(current => current.filter(card => card.id !== id));
+          },
+          () => {
+            decisionFocusRecoveryRef.current = { id, origin: focus };
+          }
+        )
+        .finally(() => {
+          decisionLocks.current.delete(id);
+          setPendingDecisionIds(new Set(decisionLocks.current));
+        });
+    },
+    [beginStackAction]
+  );
+
   const handleApprove = useCallback(
     (id: string) => {
-      const card = cards.find(candidate => candidate.id === id);
-      // Optimistic remove; restore on failure (JOV-3932).
-      setCards(current => current.filter(c => c.id !== id));
-      approveMutation.mutate(id, {
-        onError: () => {
-          if (card) {
-            setCards(current => [card, ...current]);
-          }
-          scheduleStackFocusRecovery(id);
-        },
-      });
+      runDecision(id, () => approveDecision(id));
     },
-    [approveMutation, cards, scheduleStackFocusRecovery]
+    [approveDecision, runDecision]
   );
 
   const handleDismiss = useCallback(
     (id: string) => {
-      const card = cards.find(candidate => candidate.id === id);
-      setCards(current => current.filter(c => c.id !== id));
-      dismissMutation.mutate(id, {
-        onError: () => {
-          if (card) {
-            setCards(current => [card, ...current]);
-          }
-          scheduleStackFocusRecovery(id);
-        },
-      });
+      runDecision(id, () => dismissDecision(id));
     },
-    [cards, dismissMutation, scheduleStackFocusRecovery]
+    [dismissDecision, runDecision]
   );
 
-  /**
-   * Comment-for-revision (JOV-5128): preserve the draft until committed; the
-   * server writes a new pending draft carrying the feedback history.
-   */
   const handleRevise = useCallback(
     (id: string, comment: string) => {
-      reviseMutation.mutate(
-        { id, comment },
-        {
-          onSuccess: () => {
-            beginStackAction(id);
-            setCards(current =>
-              current.filter(candidate => candidate.id !== id)
-            );
-          },
-        }
-      );
+      runDecision(id, () => reviseDecision({ id, comment }));
     },
-    [beginStackAction, reviseMutation]
+    [reviseDecision, runDecision]
   );
+
+  useEffect(() => {
+    const recovery = decisionFocusRecoveryRef.current;
+    if (!recovery) return;
+    const { origin, id } = recovery;
+    if (origin?.isConnected && origin.matches(':disabled')) return;
+    decisionFocusRecoveryRef.current = null;
+    if (
+      document.activeElement !== document.body &&
+      document.activeElement !== origin
+    )
+      return;
+    if (origin?.isConnected) origin.focus({ preventScroll: true });
+    else beginStackAction(id);
+  }, [pendingDecisionIds, pendingActionId, pendingReviseId, beginStackAction]);
 
   /** Open chat with the card pinned (JOV-3932/3933). */
   const handleOpen = useCallback(
@@ -461,12 +484,15 @@ export function OpportunityInboxPageClient({
 
     const recoveryTarget =
       stackKeyboardControlRef.current ??
+      inboxPageRef.current?.querySelector<HTMLElement>(
+        '[data-testid="opportunity-inbox-feed"] button:not(:disabled)'
+      ) ??
       signalFilterRefs.current[signalFilterFocusIndex] ??
       inboxPageRef.current?.querySelector<HTMLElement>(
         '[data-testid="opportunity-inbox-tour-date-review"] button, [data-testid="inbox-runtime-notification"] button:not(:disabled), [data-testid="opportunity-inbox-empty-state"] a, [data-testid="opportunity-inbox-empty-state"] button, [data-testid="opportunity-inbox-availability"] button'
       );
 
-    recoveryTarget?.focus();
+    recoveryTarget?.focus({ preventScroll: true });
     stackActionNeedsFocusRecoveryRef.current = null;
   }, [
     cards.length,
@@ -622,6 +648,7 @@ export function OpportunityInboxPageClient({
                   onNextStep={handleNextStep}
                   onRevise={handleRevise}
                   pendingActionId={pendingActionId}
+                  pendingDecisionIds={pendingDecisionIds}
                   pendingFeedbackId={pendingFeedbackId}
                   pendingReviseId={pendingReviseId}
                   pendingNextStepId={pendingNextStepId}

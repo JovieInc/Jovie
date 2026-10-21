@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fixtureInventory } from '@/lib/ovie/certifications/fixtures';
 import type { OvieInboxCase } from '@/lib/ovie/inbox';
@@ -55,6 +61,51 @@ const response = (cases: readonly OvieInboxCase[]) =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Ovie Inbox', () => {
+  it.each([200, 409, 503])(
+    'paints pending, blocks duplicates, and restores decision focus after %s',
+    async status => {
+      const fetcher = mount(response([item]));
+      await screen.findByText('First decision');
+      let release!: (value: Response) => void;
+      fetcher.mockImplementationOnce(
+        () =>
+          new Promise<Response>(resolve => {
+            release = resolve;
+          })
+      );
+      const second = { ...item, id: 'summer:two', title: 'Second decision' };
+      if (status !== 503)
+        fetcher.mockResolvedValueOnce(
+          response(status === 200 ? [second] : [item])
+        );
+      const notes = screen.getByLabelText('Decision notes');
+      fireEvent.change(notes, {
+        target: { value: 'Preserved operator comment' },
+      });
+      const trigger = screen.getByRole('button', { name: 'Reject' });
+      trigger.focus();
+      fireEvent.click(trigger);
+      fireEvent.click(trigger);
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect(trigger).toBeDisabled();
+      expect(screen.getByText('First decision')).toBeVisible();
+      expect(notes).toHaveValue('Preserved operator comment');
+      await act(async () => release(new Response('{}', { status })));
+      if (status === 200) {
+        await screen.findByText('Second decision');
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: 'Approve' })).toHaveFocus()
+        );
+        expect(screen.getByLabelText('Decision notes')).toHaveValue('');
+      } else {
+        await screen.findByRole('alert');
+        await waitFor(() => expect(trigger).toHaveFocus());
+        expect(notes).toHaveValue('Preserved operator comment');
+        expect(screen.getByLabelText('Decision notes')).toBe(notes);
+      }
+    }
+  );
+
   it('shows one canonical certification card and submits its exact evidence digest', async () => {
     const cases = projectOvieInbox([], [], fixtureInventory()).cases;
     const fetcher = mount(response(cases), new Response('{}'), response([]));

@@ -2,6 +2,7 @@ import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useState } from 'react';
+import { withDashboardProviders } from '@/.storybook/dashboard-fixtures';
 import { fixtureInventory } from '@/lib/ovie/certifications/fixtures';
 import type { OvieInbox as Inbox } from '@/lib/ovie/inbox';
 import { projectOvieInbox } from '@/lib/ovie/inbox';
@@ -101,4 +102,16 @@ export const IncompleteCoverage: Story = {
 
 export const Certification: Story = {
   decorators: withInbox(projectOvieInbox([], [], fixtureInventory())),
+};
+
+/** Real query; the browser scenario supplies synthetic HTTP responses. */
+export const DecisionPerformance: Story = {
+  decorators: [
+    withDashboardProviders,
+    Story => (
+      <div className='h-dvh overflow-y-auto'>
+        <Story />
+      </div>
+    ),
+  ],
 };

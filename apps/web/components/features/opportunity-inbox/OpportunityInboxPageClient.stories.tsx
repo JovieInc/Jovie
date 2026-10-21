@@ -1,8 +1,12 @@
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { getRouter } from '@storybook/nextjs-vite/navigation.mock';
 import { useQueryClient } from '@tanstack/react-query';
-import { useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { withDashboardProviders } from '@/.storybook/dashboard-fixtures';
+import type { OpportunityInboxData } from '@/lib/connectors/opportunity-inbox-types';
 import { queryKeys } from '@/lib/queries/keys';
+import { opportunityDecisionFixture } from '@/tests/helpers/decision-inbox-fixtures';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
 const meta = {
@@ -153,6 +157,42 @@ export const DoneForYou: Story = {
       <CompletedWorkFixture>
         <Story />
       </CompletedWorkFixture>
+    ),
+  ],
+};
+
+/** Stand in for the RSC snapshot on router.refresh; mutations remain real. */
+function DecisionPerformanceFixture() {
+  const [inbox, setInbox] = useState(opportunityDecisionFixture);
+  useEffect(() => {
+    const refresh = getRouter().refresh;
+    refresh.mockImplementation(() => {
+      void fetch('/api/connectors/suggested-actions')
+        .then(response => response.json())
+        .then((snapshot: OpportunityInboxData) => setInbox(snapshot));
+    });
+    return () => refresh.mockReset();
+  }, []);
+  return (
+    <div
+      className='contents'
+      data-fixture-reconciled={
+        inbox.cards[0]?.why === 'Latest authoritative evidence.' || undefined
+      }
+    >
+      <OpportunityInboxPageClient inbox={inbox} />
+    </div>
+  );
+}
+
+export const DecisionPerformance: Story = {
+  args: { inbox: opportunityDecisionFixture },
+  render: () => <DecisionPerformanceFixture />,
+  decorators: [
+    Story => (
+      <div className='flex h-dvh min-h-0 flex-col overflow-y-auto'>
+        <Story />
+      </div>
     ),
   ],
 };

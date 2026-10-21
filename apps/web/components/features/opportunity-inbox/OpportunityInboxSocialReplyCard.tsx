@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowRight, MessagesSquare } from 'lucide-react';
-import { useId, useState } from 'react';
+import { memo, useId, useState } from 'react';
 import { OpportunityCard } from '@/components/organisms/opportunity-card/OpportunityCard';
 import { formatOpportunityInboxRelativeTime } from '@/lib/connectors/opportunity-inbox-time';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
@@ -26,7 +26,7 @@ const EXECUTION_STATE_LABELS: Readonly<Record<string, string>> = {
   ambiguous: 'Needs Review',
 };
 
-export function OpportunityInboxSocialReplyCard({
+function OpportunityInboxSocialReplyCardComponent({
   card,
   onApprove,
   onDismiss,
@@ -220,14 +220,37 @@ export function OpportunityInboxSocialReplyCard({
         </div>
         <button
           type='button'
-          className='system-b-opportunity-inbox-primary'
+          className='system-b-opportunity-inbox-primary relative'
           disabled={isBusy}
           onClick={() => onApprove(card.id)}
         >
-          {isApproving ? 'Approving…' : card.primaryActionLabel}
+          <span className={isBusy ? 'invisible' : undefined}>
+            {card.primaryActionLabel}
+          </span>
+          {isBusy ? (
+            <span className='absolute inset-0 flex items-center justify-center'>
+              Saving…
+            </span>
+          ) : null}
           <ArrowRight className='system-b-opportunity-inbox-primary-icon' />
         </button>
       </div>
     </OpportunityCard>
   );
 }
+
+export const OpportunityInboxSocialReplyCard = memo(
+  OpportunityInboxSocialReplyCardComponent,
+  (previous, next) =>
+    previous.onApprove === next.onApprove &&
+    previous.onDismiss === next.onDismiss &&
+    previous.onRevise === next.onRevise &&
+    previous.isApproving === next.isApproving &&
+    previous.isDismissing === next.isDismissing &&
+    previous.isRevising === next.isRevising &&
+    previous.className === next.className &&
+    // RSC refreshes recreate these JSON view models. Preserve unchanged rows
+    // while still repainting any changed evidence or draft from the server.
+    (previous.card === next.card ||
+      JSON.stringify(previous.card) === JSON.stringify(next.card))
+);

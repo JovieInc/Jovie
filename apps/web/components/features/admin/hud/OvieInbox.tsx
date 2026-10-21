@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FounderReviewRecorder } from '@/components/features/opportunity-inbox/FounderReviewRecorder';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
@@ -27,6 +27,25 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const surfaceRef = useRef<HTMLElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (submitting || !returnFocusRef.current) return;
+    const origin = returnFocusRef.current;
+    returnFocusRef.current = null;
+    // Do not steal focus if the operator moved elsewhere during the request.
+    if (
+      document.activeElement !== document.body &&
+      document.activeElement !== origin
+    )
+      return;
+    const target = origin.isConnected
+      ? origin
+      : (surfaceRef.current?.querySelector<HTMLElement>(
+          '[data-testid="ovie-inbox-decision"] button'
+        ) ?? surfaceRef.current?.querySelector<HTMLElement>('button'));
+    target?.focus({ preventScroll: true });
+  }, [submitting]);
   const query = useQuery<Inbox>({
     queryKey: ['ovie', 'inbox'],
     queryFn: async ({ signal }) => {
@@ -58,6 +77,7 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
   async function decide(decision: 'approve' | 'reject' | 'modify') {
     if (!item?.decisionTarget || submittingRef.current) return;
     submittingRef.current = true;
+    returnFocusRef.current = document.activeElement as HTMLElement | null;
     setSubmitting(true);
     setError(null);
     try {
@@ -103,7 +123,7 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
   }
 
   return (
-    <ContentSurfaceCard data-testid='ovie-inbox'>
+    <ContentSurfaceCard data-testid='ovie-inbox' ref={surfaceRef}>
       <div className='min-h-64 p-4'>
         <div className='flex items-center justify-between gap-3'>
           <h2 className='whitespace-nowrap text-sm font-semibold text-primary-token'>
@@ -136,7 +156,11 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
               </DrawerButton>
             </div>
           ) : item ? (
-            <article data-testid='ovie-inbox-decision' key={item.id}>
+            <article
+              data-testid='ovie-inbox-decision'
+              data-case-id={item.id}
+              key={item.id}
+            >
               {item.certification ? (
                 <CertificationReviewCard {...item.certification} />
               ) : (
@@ -187,13 +211,14 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
                       onChange={event => setNotes(event.target.value)}
                       rows={3}
                       maxLength={2000}
-                      disabled={submitting}
+                      readOnly={submitting}
                     />
                   </label>
                   <div className='flex flex-wrap gap-2'>
                     <DrawerButton
                       type='button'
                       tone='primary'
+                      loading={submitting}
                       disabled={submitting || query.isFetching}
                       onClick={() => void decide('approve')}
                     >

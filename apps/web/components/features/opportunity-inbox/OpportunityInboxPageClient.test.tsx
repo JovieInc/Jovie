@@ -29,6 +29,7 @@ import {
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OpportunityInboxData } from '@/lib/connectors/opportunity-inbox-types';
+import { opportunityDecisionFixture } from '@/tests/helpers/decision-inbox-fixtures';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
 const runtimeState = vi.hoisted(() => ({
@@ -121,19 +122,25 @@ vi.mock('@/features/dashboard/organisms/PreviewDataHydrator', () => ({
   ),
 }));
 
+function decisionPromise(input: unknown) {
+  return new Promise((resolve, reject) => {
+    mutateMock(input, { onSuccess: resolve, onError: reject });
+  });
+}
+
 vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
   useOpportunityInboxMutations: () => ({
     approveMutation: {
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
+      mutateAsync: decisionPromise,
     },
     dismissMutation: {
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
+      mutateAsync: decisionPromise,
     },
     feedbackMutation: {
       isPending: false,
@@ -145,7 +152,7 @@ vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
-      mutateAsync: mutateAsyncMock,
+      mutateAsync: decisionPromise,
     },
     nextStepMutation: {
       isPending: false,
@@ -195,6 +202,95 @@ const pendingTourDate = {
 };
 
 describe('OpportunityInboxPageClient', () => {
+  it('recovers focus and keeps page notes when reconciliation removes a failed decision', async () => {
+    let fail: (() => void) | undefined;
+    mutateMock.mockImplementation((_id, options) => {
+      fail = options.onError;
+    });
+    const inbox = {
+      ...opportunityDecisionFixture,
+      cards: opportunityDecisionFixture.cards.slice(0, 1),
+    };
+    const { rerender } = render(<OpportunityInboxPageClient inbox={inbox} />);
+    const notes = screen.getByLabelText('Notes', { exact: true });
+    fireEvent.change(notes, { target: { value: 'Keep page context' } });
+    const trigger = screen.getByRole('button', { name: 'Approve reply' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(trigger).toBeDisabled();
+    rerender(<OpportunityInboxPageClient inbox={{ ...inbox, cards: [] }} />);
+    await act(async () => fail?.());
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus()
+    );
+    expect(notes).toHaveValue('Keep page context');
+  });
+
+  it('settles overlapping rows independently and keeps the remaining request pending', async () => {
+    const receipts: Array<() => void> = [];
+    mutateMock.mockImplementation((_id, options) =>
+      receipts.push(options.onSuccess)
+    );
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          ...opportunityDecisionFixture,
+          cards: opportunityDecisionFixture.cards.slice(0, 2),
+        }}
+      />
+    );
+    const triggers = screen.getAllByRole('button', { name: /Approve reply/ });
+    fireEvent.click(triggers[0]!);
+    fireEvent.click(triggers[1]!);
+    expect(mutateMock).toHaveBeenCalledTimes(2);
+    expect(triggers[0]).toBeDisabled();
+    expect(triggers[1]).toBeDisabled();
+    await act(async () => receipts[1]!());
+    expect(
+      screen.queryByTestId('opportunity-inbox-card-decision-1')
+    ).not.toBeInTheDocument();
+    expect(triggers[0]).toBeDisabled();
+    await act(async () => receipts[0]!());
+    expect(
+      screen.queryByTestId('opportunity-inbox-card-decision-0')
+    ).not.toBeInTheDocument();
+  });
+
+  it.each(['Approve reply', 'Dismiss', 'Request revision'])(
+    'keeps the card and revision draft until acknowledgement of %s, blocking duplicates',
+    async name => {
+      let acknowledge: (() => void) | undefined;
+      mutateMock.mockImplementation((_id, options) => {
+        acknowledge = options?.onSuccess;
+      });
+      render(
+        <OpportunityInboxPageClient
+          inbox={{
+            ...opportunityDecisionFixture,
+            cards: opportunityDecisionFixture.cards.slice(0, 1),
+          }}
+        />
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Revise' }));
+      const comment = screen.getByLabelText('Revision feedback for Jovie');
+      fireEvent.change(comment, {
+        target: { value: 'Keep this revision draft' },
+      });
+      const trigger = screen.getByRole('button', { name });
+      fireEvent.click(trigger);
+      fireEvent.click(trigger);
+      expect(mutateMock).toHaveBeenCalledOnce();
+      expect(comment).toHaveValue('Keep this revision draft');
+      expect(
+        screen.getByTestId('opportunity-inbox-card-decision-0')
+      ).toBeVisible();
+      await act(async () => acknowledge?.());
+      expect(
+        screen.queryByTestId('opportunity-inbox-card-decision-0')
+      ).not.toBeInTheDocument();
+    }
+  );
+
   afterEach(() => {
     runtimeState.update = null;
     inboxHomeEnabled = false;
@@ -771,7 +867,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(newSong).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('removes a card optimistically after approve', () => {
+  it('removes a card after acknowledged approval', async () => {
     mutateMock.mockImplementation((_id, options) => {
       options?.onSuccess?.();
     });
@@ -800,12 +896,15 @@ describe('OpportunityInboxPageClient', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Plan Opportunity/ }));
-    expect(
-      screen.getByTestId('opportunity-inbox-empty-state')
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('opportunity-inbox-empty-state')
+      ).toBeInTheDocument()
+    );
   });
 
   it('returns focus to the active filter after clearing its stack', async () => {
+    mutateMock.mockImplementation((_id, options) => options?.onSuccess?.());
     const user = userEvent.setup();
     inboxHomeEnabled = true;
 
@@ -857,6 +956,7 @@ describe('OpportunityInboxPageClient', () => {
   it.each([false, true])(
     'returns focus to remaining Inbox work after clearing cards (update=%s)',
     async hasUpdate => {
+      mutateMock.mockImplementation((_id, options) => options?.onSuccess?.());
       if (hasUpdate)
         runtimeState.update = {
           available: true,
@@ -1064,7 +1164,7 @@ describe('OpportunityInboxPageClient', () => {
     }
   );
 
-  it('returns focus to a queue item restored after an asynchronous failure', async () => {
+  it('keeps the current queue item until an asynchronous failure recovers', async () => {
     const user = userEvent.setup();
     inboxHomeEnabled = true;
     let rejectAction: (() => void) | undefined;
@@ -1097,7 +1197,9 @@ describe('OpportunityInboxPageClient', () => {
 
     screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+    expect(
+      screen.queryByRole('link', { name: 'Start A Chat' })
+    ).not.toBeInTheDocument();
 
     act(() => {
       rejectAction?.();

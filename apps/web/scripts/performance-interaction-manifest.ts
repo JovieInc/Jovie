@@ -450,6 +450,63 @@ export const INTERACTION_HOT_PATHS = [
     },
     firstSlice: false,
   },
+  ...(['opportunity-inbox-decision', 'ovie-inbox-decision'] as const).map(
+    id => ({
+      id,
+      title:
+        id === 'opportunity-inbox-decision'
+          ? 'Creator opportunity decision feedback'
+          : 'Ovie inbox decision feedback',
+      tier: 'P0' as const,
+      route:
+        id === 'opportunity-inbox-decision'
+          ? APP_ROUTES.DASHBOARD
+          : APP_ROUTES.OV,
+      requiresAuth: true,
+      interactionClass: 'mutation-visible-feedback' as const,
+      managerLoopProximity: 'high' as const,
+      expectedFrequency: 'high' as const,
+      trustRisk: 'high' as const,
+      budget: {
+        ...INTERACTION_CLASS_BUDGETS['mutation-visible-feedback'],
+        renderToInteractiveP95Ms:
+          INTERACTION_CLASS_BUDGETS['chat-message-round-trip']
+            .renderToInteractiveP95Ms,
+        maxDroppedFrames:
+          INTERACTION_CLASS_BUDGETS['chat-message-round-trip'].maxDroppedFrames,
+        minimumSampleCount: 5,
+        targetLabel:
+          'Painted pending <=100ms p95; response to usable <=50ms p95; zero dropped scroll frames',
+      },
+      ia: {
+        trigger: 'Approve, reject, or request a revision with notes',
+        focusOrigin: 'Current decision control',
+        firstVisibleFeedback:
+          'Current card remains visible with disabled pending controls',
+        usableState:
+          'Acknowledged decision advances; failed decision retains drafts and retry controls',
+        focusDestination: 'Next decision or original control on failure',
+        escapePath: 'Retry after a failed or reconciled response',
+        returnFocus: 'Original control with notes preserved',
+        contextPreservation: [
+          'decision identity',
+          'notes and revision drafts',
+          'scroll position',
+        ],
+        dataTrustClass: 'approval-critical' as const,
+        feedbackSemantics: ['pending', 'success', 'failure', 'stale'] as const,
+      },
+      likelyRootCauseBuckets: [
+        'network-gated-ui',
+        'react-render-cascade',
+      ] as const,
+      selectors: {
+        firstFeedback: '[disabled], [aria-busy="true"]',
+        usableState: 'button:not(:disabled)',
+      },
+      firstSlice: false,
+    })
+  ),
   {
     id: 'lyrics-toggle',
     title: 'Lyric view toggles from keyboard',

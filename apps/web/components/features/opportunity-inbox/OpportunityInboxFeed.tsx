@@ -23,6 +23,7 @@ export interface OpportunityInboxFeedProps {
   readonly onNextStep?: (id: string) => void;
   readonly onRevise?: (id: string, comment: string) => void;
   readonly pendingActionId?: string | null;
+  readonly pendingDecisionIds?: ReadonlySet<string>;
   readonly pendingFeedbackId?: string | null;
   readonly pendingReviseId?: string | null;
   readonly pendingNextStepId?: string | null;
@@ -56,6 +57,7 @@ export function OpportunityInboxFeed({
   onNextStep,
   onRevise,
   pendingActionId = null,
+  pendingDecisionIds,
   pendingFeedbackId: _pendingFeedbackId = null,
   pendingReviseId = null,
   pendingNextStepId = null,
@@ -91,7 +93,11 @@ export function OpportunityInboxFeed({
           }}
           onRevise={onRevise}
           onOpen={onOpen ?? (() => undefined)}
-          pendingActionId={pendingActionId}
+          pendingActionId={
+            pendingDecisionIds?.has(stackCards[0]?.id ?? '')
+              ? stackCards[0]?.id
+              : pendingActionId
+          }
           pendingNextStepId={pendingNextStepId}
           pendingReviseId={pendingReviseId}
           keyboardControlRef={stackKeyboardControlRef}
@@ -118,17 +124,26 @@ export function OpportunityInboxFeed({
                 onNextStep={onNextStep ?? onApprove}
                 onDismiss={onDismiss}
                 isSubmittingNextStep={pendingNextStepId === card.id}
-                isDismissing={pendingActionId === card.id}
+                isDismissing={
+                  pendingDecisionIds?.has(card.id) ||
+                  pendingActionId === card.id
+                }
               />
             ) : card.category === 'social_reply' && card.socialReply ? (
               <OpportunityInboxSocialReplyCard
                 key={card.id}
                 card={card}
-                onApprove={id => void onApprove(id)}
-                onDismiss={id => void onDismiss(id)}
+                onApprove={onApprove}
+                onDismiss={onDismiss}
                 onRevise={onRevise ?? (() => undefined)}
-                isApproving={pendingActionId === card.id}
-                isDismissing={pendingActionId === card.id}
+                isApproving={
+                  pendingDecisionIds?.has(card.id) ||
+                  pendingActionId === card.id
+                }
+                isDismissing={
+                  pendingDecisionIds?.has(card.id) ||
+                  pendingActionId === card.id
+                }
                 isRevising={pendingReviseId === card.id}
               />
             ) : card.category === 'youtube_thumbnail' &&
@@ -138,7 +153,10 @@ export function OpportunityInboxFeed({
                 card={card}
                 onApprove={onApprove}
                 onReject={onDismiss}
-                isBusy={pendingActionId === card.id}
+                isBusy={
+                  pendingDecisionIds?.has(card.id) ||
+                  pendingActionId === card.id
+                }
               />
             ) : (
               <OpportunityRow
@@ -155,7 +173,10 @@ export function OpportunityInboxFeed({
                 }
                 onPrimaryAction={id => onApprove(id)}
                 onDismiss={id => onDismiss(id)}
-                isBusy={pendingActionId === card.id}
+                isBusy={
+                  pendingDecisionIds?.has(card.id) ||
+                  pendingActionId === card.id
+                }
               />
             )
           )}
