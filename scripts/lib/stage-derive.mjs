@@ -39,8 +39,7 @@ export function releaseGenerations(controllers, shaMergedAt = new Map()) {
     if (!promote && !verified) continue;
     generations.push({
       sha: run.headSha,
-      headCommitAt:
-        shaMergedAt.get(run.headSha) ?? run.headCommitAt ?? run.createdAt,
+      headCommitAt: shaMergedAt.get(run.headSha) ?? run.headCommitAt,
       promoteStartedAt: promote?.startedAt ?? null,
       deployedAt: promote?.completedAt ?? null,
       verifiedAt: verified?.completedAt ?? null,
@@ -161,13 +160,16 @@ export function deriveRemediationEvents({ prs, feed = new Map() }, manifest) {
       if (!red && (RED.has(commit.rollup) || failing.length)) {
         red = {
           sha: commit.oid,
-          at: earliest(failing.map(s => s.updatedAt)) ?? commit.committedDate,
+          at: earliest(failing.map(s => s.updatedAt)),
         };
         continue;
       }
       if (red && commit.rollup === 'SUCCESS') {
-        const greenAt =
-          latest(suites.map(s => s.updatedAt)) ?? commit.committedDate;
+        const greenAt = latest(suites.map(s => s.updatedAt));
+        if (!red.at || !greenAt) {
+          red = null;
+          continue;
+        }
         const entityId = `${pr.repository}#${pr.number}@${String(red.sha).slice(0, 12)}`;
         const classified = pr.timelineTruncated
           ? null

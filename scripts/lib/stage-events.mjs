@@ -429,7 +429,12 @@ export function buildStageSummary(timings) {
   };
 }
 
-const packWindow = w => [w?.n ?? 0, w?.p50 ?? null, w?.p95 ?? null];
+const packWindow = (w, terminal) => [
+  w?.n ?? 0,
+  w?.p50 ?? null,
+  w?.p95 ?? null,
+  ...(terminal ? [w?.failed ?? null, w?.failRate ?? null] : []),
+];
 const packRegression = r =>
   r
     ? [
@@ -441,52 +446,29 @@ const packRegression = r =>
         r.baselineN,
       ]
     : null;
-
-/**
- * Committed form of the stage-timings document: each window is
- * [n, p50, p95] and each regression is
- * [regressed, ratio, recentP95, baselineP95, recentN, baselineN], so the
- * daily snapshot stays a few hundred lines and diffs stay reviewable.
- */
 export function compactStageTimings(timings) {
+  const packRows = rows => {
+    const out = {};
+    for (const [id, { source: _source, ...row }] of Object.entries(rows)) {
+      for (const w of timings.windows)
+        row[w] = packWindow(row[w], row.terminal);
+      out[id] = { ...row, regression: packRegression(row.regression) };
+    }
+    return out;
+  };
   const entities = {};
-  for (const [type, entity] of Object.entries(timings.entities)) {
-    const stages = {};
-    for (const [id, row] of Object.entries(entity.stages))
-      stages[id] = {
-        status: row.status,
-        ...(row.terminal ? { terminal: true } : {}),
-        ...Object.fromEntries(
-          timings.windows.map(w => [w, packWindow(row[w])])
-        ),
-        regression: packRegression(row.regression),
-      };
-    const endToEnd = {};
-    for (const [pair, row] of Object.entries(entity.endToEnd))
-      endToEnd[pair] = {
-        ...Object.fromEntries(
-          timings.windows.map(w => [w, packWindow(row[w])])
-        ),
-        regression: packRegression(row.regression),
-      };
-    entities[type] = { stages, endToEnd };
-  }
+  for (const [type, entity] of Object.entries(timings.entities))
+    entities[type] = {
+      stages: packRows(entity.stages),
+      endToEnd: packRows(entity.endToEnd),
+    };
   return {
+    ...timings,
     schema: 'jovie-stage-timings-compact/v1',
-    generatedAt: timings.generatedAt,
-    unit: timings.unit,
     windowFormat: ['n', 'p50', 'p95'],
-    regressionFormat: [
-      'regressed',
-      'ratio',
-      'recentP95',
-      'baselineP95',
-      'recentN',
-      'baselineN',
-    ],
-    regressions: timings.regressions,
-    coverage: timings.coverage,
-    sources: timings.sources,
+    terminalWindowFormat: ['n', 'p50', 'p95', 'failed', 'failRate'],
+    regressionFormat:
+      'regressed ratio recentP95 baselineP95 recentN baselineN'.split(' '),
     entities,
   };
 }

@@ -10,6 +10,8 @@ const PR_PAGE = 25;
 const NODE_BATCH = 40;
 const RUN_PAGE_CAP = 10;
 const FEED_MAX_BYTES = 8 * 1024 * 1024;
+const CONTROLLER_SOURCE =
+  /^(?:Production Controller )?([a-f0-9]{40}) from CI [1-9]\d* attempt [1-9]\d*$/;
 const PR_SEARCH = `query($q:String!,$after:String){search(type:ISSUE,query:$q,first:${PR_PAGE},after:$after){pageInfo{hasNextPage endCursor} nodes{... on PullRequest{number title headRefName createdAt mergedAt author{login} mergeCommit{oid} timelineItems(first:60,itemTypes:[READY_FOR_REVIEW_EVENT,ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT,MERGED_EVENT,LABELED_EVENT]){pageInfo{hasNextPage} nodes{__typename ... on ReadyForReviewEvent{createdAt} ... on AddedToMergeQueueEvent{createdAt} ... on RemovedFromMergeQueueEvent{createdAt} ... on MergedEvent{createdAt} ... on LabeledEvent{createdAt label{name}}}} commits(last:15){pageInfo{hasPreviousPage} nodes{commit{id oid committedDate statusCheckRollup{state}}}}}}}}`;
 // Check-suite timings only for commits on PRs that went red: nesting them in
 // the search made 29-day collection time out.
@@ -73,7 +75,6 @@ const normalizeSuite = suite => ({
   event: suite.workflowRun?.event ?? null,
 });
 const RED_ROLLUP = new Set(['FAILURE', 'ERROR']);
-/** Attach check suites to every commit of PRs that had a red rollup. */
 export function attachRedPrSuites({ gh, prs, failures = [] }) {
   const commits = new Map();
   for (const pr of prs) {
@@ -130,10 +131,7 @@ export function normalizePr(node, repository) {
   };
 }
 const ymd = ms => new Date(ms).toISOString().slice(0, 10);
-function utcDay(ms) {
-  const date = new Date(ms);
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-}
+const utcDay = ms => Date.parse(ymd(ms));
 function* dateWindows(sinceMs, nowMs, days) {
   for (let from = utcDay(sinceMs); from <= nowMs; from += days * DAY_MS) {
     const to = Math.min(from + (days - 1) * DAY_MS, nowMs);
@@ -179,7 +177,7 @@ export function collectMergedPrs({
   return unique;
 }
 const RUN_JQ =
-  '[.workflow_runs[] | {id, nodeId: .node_id, headSha: .head_sha, event, conclusion, createdAt: .created_at, startedAt: .run_started_at, updatedAt: .updated_at, url: .html_url, headCommitAt: .head_commit.timestamp}]';
+  '[.workflow_runs[] | {id, nodeId: .node_id, title: .display_title, headSha: .head_sha, event, conclusion, createdAt: .created_at, startedAt: .run_started_at, updatedAt: .updated_at, url: .html_url, headCommitAt: .head_commit.timestamp}]';
 /** Completed runs since `sinceMs`, in weeks so a 29-day query stays under 1000 rows. */
 export function listWorkflowRuns({
   gh,
@@ -207,6 +205,15 @@ export function listWorkflowRuns({
         if (!run?.id || seen.has(run.id)) continue;
         const at = Date.parse(run.createdAt ?? '');
         if (Number.isFinite(at) && at < sinceMs) continue;
+        if (workflow.endsWith('-controller.yml')) {
+          // Both controllers put the source CI identity in their run-name.
+          run.headSha = CONTROLLER_SOURCE.exec(run.title ?? '')?.[1] ?? null;
+          run.headCommitAt = null; // The controller commit time is unrelated.
+          if (!run.headSha) {
+            failures.push(`${workflow} run ${run.id}: source SHA unavailable`);
+            continue;
+          }
+        }
         seen.add(run.id);
         runs.push(run);
       }
@@ -222,7 +229,6 @@ export function listWorkflowRuns({
   }
   return runs;
 }
-/** Attach check-run (job) timings to runs through batched GraphQL. */
 export function attachJobs({ gh, runs }) {
   const byNode = new Map(runs.filter(r => r.nodeId).map(r => [r.nodeId, r]));
   const ids = [...byNode.keys()];
@@ -253,7 +259,6 @@ async function fetchText(fetchImpl, url, headers = {}) {
   return text;
 }
 const LINEAR_ISSUES = `query($numbers:[Float!]){issues(first:50,filter:{team:{key:{eq:"JOV"}},number:{in:$numbers}}){nodes{identifier createdAt startedAt history(first:30){nodes{createdAt fromState{type} toState{type}}}}}}`;
-/** Linear createdAt/startedAt/state history for JOV ids (needs a key). */
 export async function collectLinearIssues({ fetchImpl, apiKey, identifiers }) {
   const out = {};
   const linear = createLinearClient({

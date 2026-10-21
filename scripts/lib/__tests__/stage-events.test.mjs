@@ -6,6 +6,7 @@ import { checkStageManifest } from '../../stage-manifest-check.mjs';
 import {
   buildStageSummary,
   chainStages,
+  compactStageTimings,
   computeStageTimings,
   parseStageEventFeed,
   regressionFlag,
@@ -222,6 +223,9 @@ describe('stage timings', () => {
       MANIFEST,
       { now: NOW }
     );
+    expect(
+      compactStageTimings(t).entities['summer-turn'].stages.outcome['24h']
+    ).toEqual([4, null, null, 3, 0.75]);
     expect(t.entities['summer-turn'].stages.outcome['24h']).toEqual({
       n: 4,
       p50: null,

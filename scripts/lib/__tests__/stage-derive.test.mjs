@@ -152,21 +152,19 @@ describe('stage derivation from receipts', () => {
       ['JovieInc/Jovie#9@aaaaaaaaaaaa', 'green', ago(130), ago(130)],
     ]);
   });
-  it('does not time remediation or queue admission from a truncated history', () => {
-    const truncated = deriveStageEvents(
-      {
-        prs: [
-          pr(8, { timelineTruncated: true }),
-          pr(
-            9,
-            JSON.parse(
-              `{"commitsTruncated":true,"commits":[{"oid":"${'a'.repeat(40)}","committedDate":${q(ago(180))},"rollup":"FAILURE","suites":[]},{"oid":"${'b'.repeat(40)}","committedDate":${q(ago(130))},"rollup":"SUCCESS","suites":[]}]}`
-            )
-          ),
-        ],
-      },
-      MANIFEST
-    );
+  it('does not time remediation or queue admission from missing or truncated history', () => {
+    const raw = {
+      prs: [
+        pr(8, { timelineTruncated: true }),
+        pr(
+          9,
+          JSON.parse(
+            `{"commitsTruncated":true,"commits":[{"oid":"a","committedDate":${q(ago(180))},"rollup":"FAILURE","suites":[]},{"oid":"b","committedDate":${q(ago(130))},"rollup":"SUCCESS","suites":[]}]}`
+          )
+        ),
+      ],
+    };
+    const truncated = deriveStageEvents(raw, MANIFEST);
     const shipping = truncated.filter(item => item.entityId.endsWith('#8'));
     expect(shipping.map(item => item.stage)).toEqual(
       expect.arrayContaining(['merged'])
@@ -176,6 +174,12 @@ describe('stage derivation from receipts', () => {
     expect(truncated.filter(item => item.entityType === 'remediation')).toEqual(
       []
     );
+    Object.assign(raw.prs[1], { commitsTruncated: false });
+    expect(
+      deriveStageEvents(raw, MANIFEST).filter(
+        item => item.entityType === 'remediation'
+      )
+    ).toEqual([]);
   });
   it('derives LogYourBody merge → TestFlight and passes summer feed rows through', () => {
     const raw = {
@@ -227,7 +231,7 @@ describe('stage collector', () => {
       if (args[1].includes('LogYourBody'))
         throw new Error('HTTP 404: Not Found');
       if (args[1].includes('production-controller'))
-        return `[{"id":1,"nodeId":"N1","headSha":"m3","conclusion":"success","createdAt":${at(3)}}]`;
+        return `[{"id":1,"nodeId":"N1","title":"Production Controller ${'a'.repeat(40)} from CI 1 attempt 1","headSha":"m3","conclusion":"success","createdAt":${at(3)}}]`;
       return '[]';
     };
     const fetchImpl = async url => {
@@ -264,6 +268,7 @@ describe('stage collector', () => {
     expect(raw.controllers.production[0].jobs[0].name).toBe(
       'Production Verified'
     );
+    expect(raw.controllers.production[0].headSha).toBe('a'.repeat(40));
     // Three 3-day search chunks cover 7 days, plus one batched job lookup.
     expect(calls.filter(a => a[1] === 'graphql')).toHaveLength(4);
   });
@@ -342,7 +347,7 @@ describe('stage collector', () => {
     const runs = listWorkflowRuns({
       gh,
       repository: 'JovieInc/Jovie',
-      workflow: 'production-controller.yml',
+      workflow: 'ios-release-loop.yml',
       sinceMs: Date.parse('2026-10-01T00:00:00Z'),
       nowMs: Date.parse('2026-10-20T12:00:00Z'),
       failures,
