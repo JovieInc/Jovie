@@ -376,6 +376,10 @@ jobs:
           TRIGGER_HEAD_REPOSITORY: ${{ fromJSON(needs.release-source.outputs.ci).head_repository.full_name }}
           PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
         shell: bash
+        # Keep this run script free of ${{ }}: GitHub evaluates an interpolated
+        # script as one format() expression capped at ~21,000 chars, and crossing
+        # it fails the workflow with zero jobs (JOV-8706). Pass inputs via env;
+        # the runner already exports GITHUB_RUN_ID and GITHUB_RUN_ATTEMPT.
         run: |
           set -euo pipefail
           {
@@ -455,8 +459,8 @@ jobs:
             --sha "$EXPECTED_SHA" \
             --repo "$REPOSITORY" \
             --controller-workflow-id "$controller_workflow_id" \
-            --actor-run-id "${{ github.run_id }}" \
-            --actor-attempt "${{ github.run_attempt }}")"
+            --actor-run-id "${GITHUB_RUN_ID}" \
+            --actor-attempt "${GITHUB_RUN_ATTEMPT}")"
           jq -e '
             type == "object" and
             (.state | IN("none", "pending", "recovery_available", "verified", "manual")) and
@@ -482,8 +486,8 @@ jobs:
               exit 0
               ;;
             recovery_available)
-              if [ "${{ github.run_attempt }}" != "2" ] ||
-                [ "$(jq -r '.controllerRun // 0' <<<"$marker_state_json")" != "${{ github.run_id }}" ] ||
+              if [ "${GITHUB_RUN_ATTEMPT}" != "2" ] ||
+                [ "$(jq -r '.controllerRun // 0' <<<"$marker_state_json")" != "${GITHUB_RUN_ID}" ] ||
                 [ "$marker_reason" != "current_recovery_attempt_requires_lease" ]; then
                 echo "::error::Only the exact full controller attempt 2 may consume an interrupted-marker recovery."
                 exit 1
@@ -492,7 +496,7 @@ jobs:
               echo "marker_recovery=true" >> "$GITHUB_OUTPUT"
               ;;
             none)
-              if [ "${{ github.run_attempt }}" != "1" ]; then
+              if [ "${GITHUB_RUN_ATTEMPT}" != "1" ]; then
                 echo "::error::A controller rerun without durable marker evidence cannot authorize production."
                 exit 1
               fi
