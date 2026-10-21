@@ -882,7 +882,7 @@ function parseEndToEnd(
   if (!isRecord(value)) return [];
   return Object.entries(value)
     .flatMap(([key, row]) => {
-      const pipeline = /^[a-z0-9][a-z0-9:_.>-]{0,95}$/i.test(key) ? key : null;
+      const pipeline = /^[a-z0-9][-a-z0-9:_.>]{0,95}$/i.test(key) ? key : null;
       if (!pipeline || !isRecord(row)) return [];
       if (!Number.isSafeInteger(row.n) || Number(row.n) < 0) return [];
       return [
