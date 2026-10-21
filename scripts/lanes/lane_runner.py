@@ -4589,6 +4589,12 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
             if acknowledged:
                 row.update(status="acknowledged", acknowledgedAt=now, receipt=receipt)
                 row["history"].append({"at": now, "outcome": "authoritative-readback"})
+            elif now >= row["deadline"]:
+                # The readback proved the action absent and its deadline forbids a send: the
+                # intent expired. Gem 2026-10-20: 36 comments starved for 3-12 days expired
+                # this way and held remediation-delivery open with nothing left to deliver.
+                row["status"] = "superseded"
+                row["history"].append({"at": now, "outcome": "expired-unsent", "receipt": receipt})
             else:
                 raise RuntimeError("event-delivery-unacknowledged")
         except Exception as error:
