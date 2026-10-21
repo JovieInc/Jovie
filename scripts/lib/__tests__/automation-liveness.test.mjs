@@ -414,6 +414,55 @@ describe('dead-man liveness', () => {
     expect(livenessDecisions(report)[0].action).toBe('red');
   });
 
+  // Run 39674054063: git/ref answered 403 while production was on main.
+  // The commit SHA media type is the alternate contents read.
+  it('reads main from the commit SHA when the git ref answers 403', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': 403,
+        '/commits/main': new Response(`${MAIN}\n`, {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        }),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(30) } },
+            },
+          ],
+        },
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      ageMinutes: 30,
+      reason: '1-commits-unshipped',
+    });
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
+  it('keeps a 403 red when the commit SHA read also fails', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+        '/git/ref/heads/main': 403,
+        '/commits/main': 403,
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'unknown',
+      reason: 'main-ref-http-403',
+    });
+    expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
   it('keeps malformed main-ref JSON red with an unreadable reason', async () => {
     const { report } = await runLiveness({
       registry: only('derived:jovie:production-promotion'),

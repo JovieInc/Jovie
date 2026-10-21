@@ -197,6 +197,89 @@ async function landedOnMainAt(
     : committerDate;
 }
 
+function shaFromMainRef(head) {
+  return head?.ref === 'refs/heads/main' && head?.object?.type === 'commit'
+    ? head.object.sha
+    : null;
+}
+
+function shaFromCommitBody(text) {
+  const trimmed = String(text ?? '').trim();
+  if (SHA_RE.test(trimmed)) return trimmed;
+  try {
+    const sha = JSON.parse(trimmed)?.sha;
+    return SHA_RE.test(sha ?? '') ? sha : null;
+  } catch {
+    return null;
+  }
+}
+
+function mainRefFailure(error, status) {
+  if (status) return { ok: false, reason: `main-ref-http-${status}` };
+  return {
+    ok: false,
+    reason: error?.status
+      ? `main-ref-http-${error.status}`
+      : `main-ref-${error?.failure ?? error?.kind ?? 'unreadable'}`,
+  };
+}
+
+/**
+ * Branch tip for the promotion probe.
+ *
+ * `git/ref` is the cheap read. The Actions token sometimes answers that one
+ * route with HTTP 403 while the commit SHA media type still returns the tip
+ * (run 39674054063). One alternate read keeps that blip from looking like a
+ * stalled release. Any other failure stays unreadable.
+ */
+async function readMainSha(client, repo, headers, apiUrl) {
+  const request = (url, accept) =>
+    client.request({
+      url,
+      headers: {
+        Accept: accept,
+        'Cache-Control': 'no-cache',
+        ...headers,
+      },
+      priority: 'report',
+      conditional: false,
+      maxAttempts: 2,
+      maxWaitMs: TIMEOUT_MS,
+      timeoutMs: TIMEOUT_MS,
+    });
+  let failure;
+  try {
+    const response = await request(
+      `${apiUrl}/repos/${repo}/git/ref/heads/main`,
+      'application/json'
+    );
+    if (response.status === 200) {
+      const sha = shaFromMainRef(response.json());
+      return SHA_RE.test(sha ?? '')
+        ? { ok: true, sha }
+        : { ok: false, reason: 'main-sha-unreadable' };
+    }
+    failure = mainRefFailure(null, response.status);
+    if (response.status !== 403) return failure;
+  } catch (error) {
+    failure = mainRefFailure(error);
+    if (error?.status !== 403) return failure;
+  }
+  try {
+    // application/vnd.github.sha is the raw tip. The default commit
+    // document also builds the patch, which this probe does not need.
+    const response = await request(
+      `${apiUrl}/repos/${repo}/commits/main`,
+      'application/vnd.github.sha'
+    );
+    if (response.status !== 200) return failure;
+    const sha = shaFromCommitBody(response.text);
+    return SHA_RE.test(sha ?? '') ? { ok: true, sha } : failure;
+  } catch {
+    return failure;
+  }
+}
+
 /**
  * Production promotion heartbeat, independent of the continuity guard's own
  * verdict: production carrying main is a fresh proof; otherwise the proof is
@@ -212,8 +295,6 @@ export async function observeProductionFreshness(
   if (!SHA_RE.test(live ?? ''))
     return { ok: false, reason: 'live-sha-unreadable' };
   const headers = githubHeaders(token);
-  // Only the branch identity is needed here. The commit endpoint also
-  // computes changed files and patches, adding avoidable work to this probe.
   const client =
     githubClient ??
     createApiClient({
@@ -221,38 +302,9 @@ export async function observeProductionFreshness(
       credential: hashCredential('github', token ?? ''),
       fetch: fetchImpl,
     });
-  let head;
-  try {
-    const response = await client.request({
-      url: `${apiUrl}/repos/${receipt.repo}/git/ref/heads/main`,
-      headers: {
-        Accept: 'application/json',
-        'Cache-Control': 'no-cache',
-        ...headers,
-      },
-      priority: 'report',
-      conditional: false,
-      maxAttempts: 2,
-      maxWaitMs: TIMEOUT_MS,
-      timeoutMs: TIMEOUT_MS,
-    });
-    if (response.status !== 200)
-      return { ok: false, reason: `main-ref-http-${response.status}` };
-    head = response.json();
-  } catch (error) {
-    return {
-      ok: false,
-      reason: error?.status
-        ? `main-ref-http-${error.status}`
-        : `main-ref-${error?.failure ?? error?.kind ?? 'unreadable'}`,
-    };
-  }
-  const main =
-    head?.ref === 'refs/heads/main' && head?.object?.type === 'commit'
-      ? head.object.sha
-      : null;
-  if (!SHA_RE.test(main ?? ''))
-    return { ok: false, reason: 'main-sha-unreadable' };
+  const mainRead = await readMainSha(client, receipt.repo, headers, apiUrl);
+  if (!mainRead.ok) return mainRead;
+  const main = mainRead.sha;
   const now = new Date(nowMs).toISOString();
   if (live === main)
     return { ok: true, lastProofAt: now, reason: 'production-current' };
