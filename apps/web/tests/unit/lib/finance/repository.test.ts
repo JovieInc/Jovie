@@ -56,6 +56,7 @@ const render = (fragment: unknown) => {
 const whereSql = (index = 0) => render(calls('where')[index][0]);
 
 const repo = () => import('@/lib/finance/repository');
+type Repo = Awaited<ReturnType<typeof repo>>;
 
 const RESULT: ClassificationResult = {
   lens: 'creator_income',
@@ -75,8 +76,7 @@ describe('finance repository owner scoping (JOV-4609)', () => {
   it.each([
     [
       'listFinanceInstitutions',
-      (r: Awaited<ReturnType<typeof repo>>) =>
-        r.listFinanceInstitutions('creator_1'),
+      (r: Repo) => r.listFinanceInstitutions('creator_1'),
     ],
     ['listFinanceAccounts', r => r.listFinanceAccounts('creator_1')],
     ['getFinanceAccount', r => r.getFinanceAccount('creator_1', ACCOUNT_ID)],
@@ -114,7 +114,7 @@ describe('finance repository owner scoping (JOV-4609)', () => {
       'listClassificationReviewQueue',
       r => r.listClassificationReviewQueue('creator_1'),
     ],
-  ] as const)(
+  ] satisfies ReadonlyArray<readonly [string, (r: Repo) => unknown]>)(
     '%s rejects non-UUID owners before touching the db',
     async (_name, run) => {
       await expect(run(await repo())).rejects.toThrow(

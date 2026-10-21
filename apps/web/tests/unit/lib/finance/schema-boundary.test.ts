@@ -62,7 +62,7 @@ const CLASSIFICATION_MIGRATION_PATH = path.join(
   'drizzle/migrations/0128_finance_classification.sql'
 );
 
-const ALL_TABLES = Object.values(financeSchema).filter(
+const ALL_TABLES = (Object.values(financeSchema) as unknown[]).filter(
   (value): value is PgTable => is(value, PgTable)
 );
 

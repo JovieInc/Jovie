@@ -51,6 +51,7 @@ const whereSql = () => {
 };
 
 const repo = () => import('@/lib/finance/budget-repository');
+type Repo = Awaited<ReturnType<typeof repo>>;
 
 describe('budget repository (JOV-4620)', () => {
   beforeEach(() => {
@@ -74,11 +75,7 @@ describe('budget repository (JOV-4620)', () => {
 
   describe('owner validation', () => {
     it.each([
-      [
-        'listBudgetTargets',
-        (r: Awaited<ReturnType<typeof repo>>) =>
-          r.listBudgetTargets('creator_42'),
-      ],
+      ['listBudgetTargets', (r: Repo) => r.listBudgetTargets('creator_42')],
       [
         'upsertBudgetTarget',
         r =>
@@ -105,12 +102,15 @@ describe('budget repository (JOV-4620)', () => {
         'listBudgetMonthTransactions',
         r => r.listBudgetMonthTransactions('creator_42', '2026-10'),
       ],
-    ] as const)('%s rejects non-UUID owners before the db', async (_n, run) => {
-      await expect(run(await repo())).rejects.toThrow(
-        'Invalid financial owner id'
-      );
-      expect(recorder.state.calls).toEqual([]);
-    });
+    ] satisfies ReadonlyArray<readonly [string, (r: Repo) => unknown]>)(
+      '%s rejects non-UUID owners before the db',
+      async (_n, run) => {
+        await expect(run(await repo())).rejects.toThrow(
+          'Invalid financial owner id'
+        );
+        expect(recorder.state.calls).toEqual([]);
+      }
+    );
   });
 
   describe('listBudgetTargets', () => {

@@ -48,7 +48,10 @@ describe('redactFinancialFields', () => {
     const payload = Object.fromEntries(
       FINANCE_SENSITIVE_FIELDS.map(field => [field, 'secret'])
     );
-    const out = redactFinancialFields({ ...payload, keep: 'ok' });
+    const out: Record<string, unknown> = redactFinancialFields({
+      ...payload,
+      keep: 'ok',
+    });
     for (const field of FINANCE_SENSITIVE_FIELDS) {
       expect(out[field]).toBe('[redacted]');
     }

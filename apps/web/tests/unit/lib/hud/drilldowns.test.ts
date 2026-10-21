@@ -115,6 +115,7 @@ describe('filterOpsExceptions', () => {
   const noDetail: OpsException = {
     id: 'queue-stuck',
     label: 'Merge queue stuck',
+    detail: null,
     href: 'https://example.com/queue',
   };
 
