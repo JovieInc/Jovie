@@ -25,8 +25,13 @@ const mocks = vi.hoisted(() => {
     recordStage: vi.fn().mockResolvedValue(true),
     getArtist: vi.fn(),
     isSpotifyAvailable: vi.fn().mockReturnValue(true),
+    fileCard: vi.fn().mockResolvedValue(undefined),
   };
 });
+
+vi.mock('./claim-verification-review.server', () => ({
+  fileClaimVerificationCard: mocks.fileCard,
+}));
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({
@@ -110,13 +115,14 @@ describe('claim verification persistence', () => {
     expect(record.status).toBe('awaiting_payment');
     expect(mocks.state.updates[0]?.settings).toEqual({
       keep: true,
-      claimVerification: awaiting,
+      claimVerification: { ...awaiting, acquisitionId: 'journey-1' },
     });
+    expect(mocks.fileCard).not.toHaveBeenCalled();
     expect(mocks.recordStage).not.toHaveBeenCalled();
   });
 
   it('records the pending-verification stage when the requester already pays', async () => {
-    mocks.state.selectRows = [[{ settings: {} }]];
+    mocks.state.selectRows = [[{ settings: {}, handle: 'requester' }]];
     await requestClaimVerification({
       profileId: 'p1',
       spotifyArtistId: 'famous',
@@ -131,13 +137,20 @@ describe('claim verification persistence', () => {
       'pending-verification',
       requestedAt
     );
+    expect(mocks.fileCard).toHaveBeenCalledWith(
+      expect.objectContaining({ profileId: 'p1', handle: 'requester' })
+    );
   });
 
   it('transitions every awaiting request on payment and records the stage once', async () => {
     mocks.state.selectRows = [
       [
-        { id: 'p1', settings: { claimVerification: awaiting } },
-        { id: 'p2', settings: {} },
+        {
+          id: 'p1',
+          handle: 'requester',
+          settings: { claimVerification: awaiting },
+        },
+        { id: 'p2', handle: 'other', settings: {} },
       ],
     ];
     await expect(
@@ -160,6 +173,43 @@ describe('claim verification persistence', () => {
       'pending-verification',
       paidAt
     );
+    expect(mocks.fileCard).toHaveBeenCalledTimes(1);
+    expect(mocks.fileCard).toHaveBeenCalledWith({
+      profileId: 'p1',
+      handle: 'requester',
+      record: expect.objectContaining({
+        status: 'pending_verification',
+        acquisitionId: 'journey-1',
+      }),
+    });
+  });
+
+  it('replays the review card on a webhook retry without a second transition', async () => {
+    const pending = {
+      ...awaiting,
+      status: 'pending_verification',
+      paidAt: paidAt.toISOString(),
+    };
+    mocks.state.selectRows = [
+      [
+        {
+          id: 'p1',
+          handle: 'requester',
+          settings: { claimVerification: pending },
+        },
+      ],
+    ];
+    await expect(
+      markClaimVerificationsPaid({
+        appUserId: 'u1',
+        paidAt,
+        acquisitionId: null,
+      })
+    ).resolves.toBe(0);
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.fileCard).toHaveBeenCalledWith(
+      expect.objectContaining({ profileId: 'p1', record: pending })
+    );
   });
 
   it('is a no-op for buyers without an open request (the wedge path)', async () => {
@@ -173,5 +223,6 @@ describe('claim verification persistence', () => {
     ).resolves.toBe(0);
     expect(mocks.update).not.toHaveBeenCalled();
     expect(mocks.recordStage).not.toHaveBeenCalled();
+    expect(mocks.fileCard).not.toHaveBeenCalled();
   });
 });
