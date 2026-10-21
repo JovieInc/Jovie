@@ -151,7 +151,9 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
         id: ask.id,
         label:
           decision === 'approve'
-            ? ovieAskAction(target?.kind).committedLabel
+            ? notes
+              ? `Answered: ${notes}`
+              : ovieAskAction(target?.kind).committedLabel
             : `Replied: ${notes}`,
         commit: async () => {
           if (!target) throw new Error('This decision is no longer open.');
@@ -296,7 +298,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       asksStatus={asksStatus}
       asksNotice={asksNotice}
       answers={answers}
-      onApprove={ask => decide(ask, 'approve', '')}
+      onApprove={(ask, option) => decide(ask, 'approve', option ?? '')}
       onReply={(ask, text) => decide(ask, 'reject', text)}
       onFeedback={sendFeedback}
       onRetryLoop={() => void shipping.refetch()}

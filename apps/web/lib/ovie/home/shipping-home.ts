@@ -494,9 +494,9 @@ function askFromCase(item: OvieInboxCase): OvieAsk {
     why: item.body,
     decidable: item.decisionTarget !== null,
     actionLabel: ovieAskAction(item.decisionTarget?.kind).actionLabel,
-    // Linear asks only accept approval; their discussion lives in Linear.
-    canReply:
-      item.decisionTarget !== null && item.decisionTarget.kind !== 'linear',
+    ...(item.answers?.length ? { options: item.answers } : {}),
+    // Linear replies are posted back to the issue as the answer.
+    canReply: item.decisionTarget !== null,
     evidence: item.evidence,
     decisionDefault: decisionDefaultOf(item),
     // Summer cards accept post-ship feedback once decided.
