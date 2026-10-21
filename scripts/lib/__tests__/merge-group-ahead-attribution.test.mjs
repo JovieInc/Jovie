@@ -16,8 +16,8 @@ const fixture = name =>
 // ahead = #22328's group (run 39536019717) failed only on the lanes selftest
 // flake; poison = #22331's group (run 39536021794) built on that head and
 // failed its own external-api-guard ratchet.
-const AHEAD_LOG = fixture('ahead-22328-lanes-flake.log');
-const POISON_LOG = fixture('poison-22331-api-guard.log');
+const AHEAD_LOG = fixture('ahead-22328-lanes-flake.txt');
+const POISON_LOG = fixture('poison-22331-api-guard.txt');
 
 const failedCiFastJobs = [
   { name: 'ci-fast (remaining)', conclusion: 'failure' },
