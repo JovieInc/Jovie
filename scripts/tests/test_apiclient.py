@@ -1,6 +1,7 @@
 """Python API client core against the fake provider: budgets, priorities, breaker, cache, ledger."""
 from __future__ import annotations
 
+import io
 import os
 import shutil
 import sys
@@ -8,6 +9,7 @@ import tempfile
 import threading
 import time
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -171,6 +173,47 @@ class StoreTest(unittest.TestCase):
         for t in threads:
             t.join()
         self.assertEqual(store.read("github")["credentials"]["c"]["lastWriteAt"], 20)
+
+    def test_separate_stores_on_one_dir_serialize(self):
+        root = tmp(self)
+        stores = [FileLedgerStore(root, lock_timeout_ms=60_000) for _ in range(3)]
+
+        def bump(store):
+            def fn(ledger):
+                credential_state(ledger, "c", int(time.time() * 1000))["lastWriteAt"] += 1
+            for _ in range(10):
+                store.transact("github", fn)
+
+        threads = [threading.Thread(target=bump, args=(s,)) for s in stores]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(stores[0].read("github")["credentials"]["c"]["lastWriteAt"], 30)
+
+    def test_lock_timeout_returns_decision_without_clobbering_holder(self):
+        store = FileLedgerStore(tmp(self), lock_timeout_ms=50)
+        store.transact("github", lambda ledger: credential_state(ledger, "c", int(time.time() * 1000)).update(lastWriteAt=7))
+        lock = store.dir / "github.lock.d"
+        lock.mkdir()
+        (lock / "owner").write_text("other-process")
+
+        def fn(ledger):
+            credential_state(ledger, "c", int(time.time() * 1000))["lastWriteAt"] = 999
+            return "decided"
+
+        with redirect_stderr(io.StringIO()):
+            self.assertEqual(store.transact("github", fn), "decided")
+        self.assertEqual(store.read("github")["credentials"]["c"]["lastWriteAt"], 7)
+        self.assertEqual((lock / "owner").read_text(), "other-process")
+
+    def test_lock_timing_ignores_an_injected_fake_clock(self):
+        clock = FakeClock()
+        store = FileLedgerStore(tmp(self), clock.read, lock_timeout_ms=50)
+        lock = store.dir / "github.lock.d"
+        lock.mkdir(parents=True)
+        with redirect_stderr(io.StringIO()):
+            self.assertIsNone(store.transact("github", lambda ledger: None))
 
     def test_stale_lock_is_broken_and_torn_file_reads_empty(self):
         store = FileLedgerStore(tmp(self))
