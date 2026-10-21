@@ -679,6 +679,7 @@ function baseEnv(
 ): NodeJS.ProcessEnv {
   return {
     NODE_ENV: process.env.NODE_ENV,
+    NODE_V8_COVERAGE: process.env.NODE_V8_COVERAGE,
     PATH: process.env.PATH,
     HOME: process.env.HOME,
     GITHUB_WORKSPACE: workspace,
@@ -2168,7 +2169,7 @@ ${fixtureCheckout}
     });
     expect(diagnostic.status).toBe(1);
     expect(`${diagnostic.stdout}\n${diagnostic.stderr}`).toContain(
-      'image-policy:"fake.png"'
+      'file-classes=image:1'
     );
     const sensitiveFile = join(workspace, 'person@example.com.png');
     write(sensitiveFile, invalid[0]);
@@ -2190,7 +2191,7 @@ ${fixtureCheckout}
     ).not.toContain('person@example.com');
     expect(
       `${sensitiveDiagnostic.stdout}\n${sensitiveDiagnostic.stderr}`
-    ).toContain('image-policy:"[sensitive]"');
+    ).toContain('file-classes=image:1');
     const outsideWorkspace = fixture();
     const outsideFile = join(outsideWorkspace, 'outside.png');
     write(outsideFile, invalid[0]);
@@ -2351,6 +2352,160 @@ ${fixtureCheckout}
     ])
       expect(() => resolveArtifactFiles([path], workspace), path).toThrow();
     expect(() => resolveArtifactFiles(['real/safe.json'], rootAlias)).toThrow();
+  });
+
+  it.each([
+    [
+      'report.json',
+      '{"headers":{"authorization":"Bearer fixture-only-value"}}',
+      'json',
+      'credential-text',
+    ],
+    [
+      'events.JSONL',
+      '{"env":[["API_KEY","fixture-only-value"]]}\n',
+      'jsonl',
+      'credential-text',
+    ],
+    [
+      'error-context.md',
+      '# Page snapshot\nAPI_KEY=fixture-only-value',
+      'markdown',
+      'credential-text',
+    ],
+    [
+      'broken.json',
+      '{"private-fragment":fixture-only-value',
+      'json',
+      'malformed-structured-text',
+    ],
+    [
+      'broken.jsonl',
+      '{}\n{"private-fragment":fixture-only-value',
+      'jsonl',
+      'malformed-structured-text',
+    ],
+    [
+      'broken.md',
+      Buffer.from([0xff, 0xfe]),
+      'markdown',
+      'malformed-structured-text',
+    ],
+    ['capture.png', 'not a PNG', 'image', 'image-policy'],
+    [
+      'trace.zip',
+      'private container payload',
+      'container',
+      'forbidden-container',
+    ],
+    [
+      'unrecognized.bin',
+      'private unknown payload',
+      'unknown',
+      'unknown-binary',
+    ],
+  ])(
+    'emits bounded rejection diagnostics for %s',
+    (name, contents, fileClass, category) => {
+      const workspace = fixture();
+      const runner = fixture();
+      // Identity-like text, a credential-like fragment, control characters and
+      // Actions syntax belong only to the fixture path, never to diagnostics.
+      const adversarial = join(
+        workspace,
+        'person@example.invalid',
+        'token=fixture-only-value',
+        '::error::injected\n%0A',
+        name
+      );
+      write(adversarial, contents);
+      const expected = `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=${category}:1; file-classes=${fileClass}:1\n`;
+      for (const reportPaths of ['false', 'true']) {
+        const result = spawnSync(process.execPath, [guardScript, adversarial], {
+          cwd: workspace,
+          encoding: 'utf8',
+          env: baseEnv(workspace, runner, {
+            GITHUB_ACTIONS: 'false',
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            PLAYWRIGHT_ARTIFACT_REPORT_PATHS: reportPaths,
+            PLAYWRIGHT_ARTIFACT_STAGE_DIR: join(runner, 'must-not-stage'),
+          }),
+        });
+        expect(result.status).toBe(1);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toBe(expected);
+        expect(existsSync(join(runner, 'must-not-stage'))).toBe(false);
+      }
+    }
+  );
+
+  it('aggregates rejected file classes without listing files or counting secret occurrences', () => {
+    const workspace = fixture();
+    const runner = fixture();
+    for (let index = 0; index < 120; index++) {
+      write(
+        join(workspace, 'out', `person-${index}@example.invalid.json`),
+        JSON.stringify({
+          API_KEY: 'fixture-only-value',
+          PASSWORD: 'another-fixture-value',
+        })
+      );
+    }
+    write(
+      join(workspace, 'out/error-context.md'),
+      'API_KEY=fixture-only-value'
+    );
+    write(join(workspace, 'out/trace.har'), '{}');
+    write(join(workspace, 'out/unknown.custom-extension'), 'private');
+    write(join(workspace, 'out/safe.json'), '{}');
+    const result = runChild(workspace, runner, 'process.exit(23)', {
+      GITHUB_ACTIONS: 'false',
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+      PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
+    });
+    expect(result.status).toBe(23);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe(
+      'PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 123 unsafe or unverifiable Playwright artifact file(s); categories=credential-text:121,forbidden-container:1,unknown-binary:1; file-classes=container:1,json:120,markdown:1,unknown:1\n'
+    );
+    expect(result.stderr.length).toBeLessThan(512);
+    expect(existsSync(join(runner, 'safe-playwright-producer/blocked'))).toBe(
+      true
+    );
+    expect(existsSync(join(runner, 'safe-playwright-producer/current'))).toBe(
+      false
+    );
+    const retry = runChild(
+      workspace,
+      runner,
+      "require('node:fs').writeFileSync('child-ran','1')",
+      { GITHUB_ACTIONS: 'false' }
+    );
+    expect(retry.status).toBe(1);
+    expect(existsSync(join(workspace, 'child-ran'))).toBe(false);
+    expect(retry.stderr).toBe(
+      'PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=inspection-error:1; file-classes=unknown:1\n'
+    );
+  });
+
+  it('uses unknown for inspection failures without exposing raw errors or requested paths', () => {
+    const workspace = fixture();
+    const result = spawnSync(
+      process.execPath,
+      [guardScript, 'missing-person@example.invalid.json'],
+      {
+        cwd: workspace,
+        encoding: 'utf8',
+        env: baseEnv(workspace, fixture(), {
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
+        }),
+      }
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe(
+      'PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=inspection-error:1; file-classes=unknown:1\n'
+    );
   });
 
   it.each([undefined, 'false'])(
