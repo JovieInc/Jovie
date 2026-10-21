@@ -18,7 +18,7 @@ const ghDefault = args =>
 function jsonCall(gh, args, reason) {
   let result;
   try {
-    // `gh label list --json` prints nothing (not `[]`) when no label matches.
+    // gh label list --json prints nothing (not []) when no label matches.
     const output = gh(args);
     result = String(output).trim() === '' ? [] : JSON.parse(output);
   } catch {
