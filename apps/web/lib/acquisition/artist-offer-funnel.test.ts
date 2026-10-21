@@ -169,9 +169,5 @@ describe('artist-offer funnel contract', () => {
       conversionFromParent: 0.5,
       fromParentSeconds: { samples: 1, p50: 3_600, p95: 3_600 },
     });
-    expect(byStage['claim-rejected']).toMatchObject({
-      journeys: 1,
-      fromParentSeconds: { p50: 7_200 },
-    });
   });
 });

@@ -14,7 +14,19 @@ import {
   requiresClaimVerification,
   withClaimVerification,
 } from './claim-verification';
-import { fileClaimVerificationCard } from './claim-verification-review.server';
+
+/**
+ * Lazy: the review module pulls in Stripe, release import and the Ovie card
+ * store, which the onboarding/dashboard callers of this module never need.
+ */
+async function fileClaimVerificationCard(
+  input: Parameters<
+    typeof import('./claim-verification-review.server').fileClaimVerificationCard
+  >[0]
+): Promise<void> {
+  const review = await import('./claim-verification-review.server');
+  await review.fileClaimVerificationCard(input);
+}
 
 export interface ArtistReach {
   /** Spotify followers; null when unknown. */

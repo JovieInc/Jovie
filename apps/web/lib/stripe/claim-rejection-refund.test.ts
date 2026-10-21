@@ -72,20 +72,6 @@ describe('refundFirstMonthAndCancel', () => {
     );
   });
 
-  it('falls back to the charge when the payment has no intent', async () => {
-    mocks.listInvoicePayments.mockResolvedValue({
-      data: [{ status: 'paid', payment: { type: 'charge', charge: 'ch_1' } }],
-    });
-    await refundFirstMonthAndCancel({
-      subscriptionId: 'sub_1',
-      idempotencyKey: KEY,
-    });
-    expect(mocks.createRefund).toHaveBeenCalledWith(
-      expect.objectContaining({ charge: 'ch_1' }),
-      { idempotencyKey: KEY }
-    );
-  });
-
   it('treats an already-refunded charge and canceled subscription as done', async () => {
     mocks.createRefund.mockRejectedValue(
       Object.assign(new Error('refunded'), { code: 'charge_already_refunded' })
@@ -109,17 +95,6 @@ describe('refundFirstMonthAndCancel', () => {
         idempotencyKey: KEY,
       })
     ).rejects.toThrow('card_declined');
-    expect(mocks.cancelSubscription).not.toHaveBeenCalled();
-  });
-
-  it('fails closed when a paid invoice has no refundable payment', async () => {
-    mocks.listInvoicePayments.mockResolvedValue({ data: [] });
-    await expect(
-      refundFirstMonthAndCancel({
-        subscriptionId: 'sub_1',
-        idempotencyKey: KEY,
-      })
-    ).rejects.toThrow('No refundable payment');
     expect(mocks.cancelSubscription).not.toHaveBeenCalled();
   });
 

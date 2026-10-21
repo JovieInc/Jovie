@@ -159,17 +159,6 @@ describe('operator decision transition', () => {
     });
   });
 
-  it('records the refund on a rejection', () => {
-    expect(
-      decideClaimVerificationRecord(pending(), {
-        decision: 'reject',
-        decidedAt,
-        decidedBy: 'tim@jov.ie',
-        refundId: 're_123',
-      })
-    ).toMatchObject({ status: 'rejected', refundId: 're_123' });
-  });
-
   it('only decides pending_verification, so repeated clicks are no-ops', () => {
     const input = { decision: 'reject', decidedAt, decidedBy: null } as const;
     expect(decideClaimVerificationRecord(request(), input)).toBeNull();

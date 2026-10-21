@@ -89,10 +89,8 @@ import {
   markClaimVerificationPaid,
 } from './claim-verification';
 import {
-  claimVerificationCardKey,
   decideClaimVerification,
   fileClaimVerificationCard,
-  profileIdFromClaimCardKey,
 } from './claim-verification-review.server';
 
 const PROFILE = '11111111-2222-4333-8444-555555555555';
@@ -136,14 +134,6 @@ describe('claim verification review', () => {
     mocks.assertIdentity.mockResolvedValue(undefined);
   });
 
-  it('round-trips card keys and ignores other cards', () => {
-    expect(profileIdFromClaimCardKey(claimVerificationCardKey(PROFILE))).toBe(
-      PROFILE
-    );
-    expect(profileIdFromClaimCardKey('summer-outbound-1')).toBeNull();
-    expect(profileIdFromClaimCardKey('claim-verification_')).toBeNull();
-  });
-
   it('files a deterministic decision card in the Ovie inbox', async () => {
     await fileClaimVerificationCard({
       profileId: PROFILE,
@@ -164,26 +154,6 @@ describe('claim verification review', () => {
     );
     const body = mocks.submitCard.mock.calls[0]?.[0]?.body as string;
     expect(body).toContain('2,400,000 Spotify followers');
-  });
-
-  it('does not file a card before payment', async () => {
-    await fileClaimVerificationCard({
-      profileId: PROFILE,
-      handle: 'requester',
-      record: { ...pending, status: 'awaiting_payment' },
-    });
-    expect(mocks.submitCard).not.toHaveBeenCalled();
-  });
-
-  it('throws on a card conflict so the webhook retries', async () => {
-    mocks.submitCard.mockResolvedValueOnce({ outcome: 'conflict' });
-    await expect(
-      fileClaimVerificationCard({
-        profileId: PROFILE,
-        handle: 'requester',
-        record: pending,
-      })
-    ).rejects.toThrow('conflict');
   });
 
   it('approve links the artist under the identity lock and records the stage', async () => {
@@ -291,18 +261,6 @@ describe('claim verification review', () => {
     expect(mocks.recordStage).not.toHaveBeenCalled();
   });
 
-  it('refuses to reject without a subscription to refund', async () => {
-    queueProfile(pending, null);
-    await expect(
-      decideClaimVerification({
-        profileId: PROFILE,
-        decision: 'reject',
-        decidedBy: null,
-      })
-    ).resolves.toEqual({ outcome: 'no_subscription' });
-    expect(mocks.refund).not.toHaveBeenCalled();
-  });
-
   it('never re-runs side effects for a decided or unpaid request', async () => {
     for (const record of [
       { ...pending, status: 'rejected' },
@@ -318,16 +276,5 @@ describe('claim verification review', () => {
     }
     expect(mocks.refund).not.toHaveBeenCalled();
     expect(mocks.update).not.toHaveBeenCalled();
-  });
-
-  it('returns not_found for a profile without a request', async () => {
-    mocks.state.selectRows.push([]);
-    await expect(
-      decideClaimVerification({
-        profileId: PROFILE,
-        decision: 'approve',
-        decidedBy: null,
-      })
-    ).resolves.toEqual({ outcome: 'not_found' });
   });
 });

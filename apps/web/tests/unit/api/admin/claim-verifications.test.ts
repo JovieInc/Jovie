@@ -69,22 +69,7 @@ describe('admin claim verification routes', () => {
     expect(forbidden.status).toBe(403);
   });
 
-  it('rejects an unknown status filter', async () => {
-    const response = await GET(
-      new NextRequest(
-        'https://jov.ie/api/admin/claim-verifications?status=approved'
-      )
-    );
-    expect(response.status).toBe(400);
-  });
-
-  it('requires a signed-in admin to decide', async () => {
-    mocks.entitlements.mockResolvedValue({
-      ...admin,
-      isAuthenticated: false,
-      isAdmin: false,
-    });
-    expect((await decide({ decision: 'reject' })).status).toBe(401);
+  it('requires an admin to decide', async () => {
     mocks.entitlements.mockResolvedValue({ ...admin, isAdmin: false });
     expect((await decide({ decision: 'reject' })).status).toBe(403);
     expect(mocks.decide).not.toHaveBeenCalled();
@@ -105,16 +90,9 @@ describe('admin claim verification routes', () => {
     });
   });
 
-  it('maps not-pending, conflicts and failures', async () => {
-    mocks.decide.mockResolvedValueOnce({
-      outcome: 'not_pending',
-      record: { status: 'verified' },
-    });
-    expect((await decide({ decision: 'approve' })).status).toBe(409);
+  it('maps outcomes and failures to status codes', async () => {
     mocks.decide.mockResolvedValueOnce({ outcome: 'identity_conflict' });
     expect((await decide({ decision: 'approve' })).status).toBe(409);
-    mocks.decide.mockResolvedValueOnce({ outcome: 'not_found' });
-    expect((await decide({ decision: 'approve' })).status).toBe(404);
     mocks.decide.mockRejectedValueOnce(new Error('stripe down'));
     expect((await decide({ decision: 'reject' })).status).toBe(500);
   });

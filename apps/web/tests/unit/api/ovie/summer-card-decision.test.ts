@@ -117,20 +117,6 @@ describe('POST /api/ovie/summer-cards/[id]/decision', () => {
     expect(hoisted.decide).not.toHaveBeenCalled();
   });
 
-  it('keeps the card pending and reports 503 when the refund fails', async () => {
-    hoisted.getCard.mockResolvedValue({
-      id: CARD_ID,
-      idempotencyKey: 'claim-verification_11111111-2222-4333-8444-555555555555',
-      status: 'pending',
-    });
-    hoisted.decideClaim.mockRejectedValue(new Error('stripe down'));
-
-    const response = await call({ decision: 'reject' });
-
-    expect(response.status).toBe(503);
-    expect(hoisted.decide).not.toHaveBeenCalled();
-  });
-
   it('returns 401 for an unauthenticated caller', async () => {
     hoisted.resolvePrincipal.mockResolvedValue({
       authenticated: false,

@@ -22,13 +22,7 @@ function json(body: Readonly<Record<string, unknown>>, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
-/**
- * POST /api/admin/claim-verifications/{profileId}/decision
- * { decision: 'approve' | 'reject', reason? }
- *
- * Explicit operator decision. Approve links the artist; reject refunds the
- * first month and cancels the subscription.
- */
+/** Admin: held claim verifications (lib/claim/claim-verification-review.server.ts). */
 export async function POST(
   request: Request,
   context: { params: Promise<{ profileId: string }> }
