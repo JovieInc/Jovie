@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 
 const mockUsePlanGate = vi.fn(() => ({
   canAccessTasksWorkspace: true,
@@ -98,7 +99,13 @@ vi.mock('@/components/molecules/drawer', () => ({
     isEmpty ? (
       <p data-testid='empty-state'>{emptyMessage}</p>
     ) : (
-      <div data-testid='right-drawer'>
+      <div
+        data-testid='right-drawer'
+        data-context-action-ids={contextMenuItems
+          ?.filter(item => Boolean(item.id))
+          .map(item => item.id)
+          .join(',')}
+      >
         {entityHeader}
         {tabs}
         {contextMenuItems?.map(item =>
@@ -769,6 +776,62 @@ describe('ReleaseSidebar inspector cards', () => {
       'true'
     );
     expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
+  });
+
+  it('enforces row/rail action parity for status, deletion and smart-link gating', () => {
+    const onDelete = vi.fn();
+    const onChangeStatus = vi.fn();
+    const isSmartLinkLocked = vi.fn(() => true);
+    const getSmartLinkLockReason = vi.fn(() => 'cap' as const);
+
+    render(
+      <ReleaseSidebar
+        release={mockReleaseWithStatus}
+        {...defaultProps}
+        onDelete={onDelete}
+        onChangeStatus={onChangeStatus}
+        isSmartLinkLocked={isSmartLinkLocked}
+        getSmartLinkLockReason={getSmartLinkLockReason}
+      />
+    );
+
+    // The independent row-menu contract is the expected action set. A missing
+    // rail handler or missing lock gate must make the rendered contract differ.
+    const expectedIds = buildReleaseActions({
+      release: mockReleaseWithStatus,
+      onEdit: vi.fn(),
+      onCopy: vi.fn().mockResolvedValue(undefined),
+      onDelete,
+      onChangeStatus,
+      isSmartLinkLocked,
+      getSmartLinkLockReason,
+    })
+      .filter(item => 'id' in item)
+      .map(item => item.id);
+
+    const actualIds = screen
+      .getByTestId('right-drawer')
+      .getAttribute('data-context-action-ids')
+      ?.split(',');
+
+    expect(actualIds).toEqual([...expectedIds, 'refresh-release']);
+    expect(actualIds).toContain('release-status');
+    expect(actualIds).toContain('delete');
+    expect(
+      screen.getByTestId('context-menu-copy-smart-link')
+    ).toHaveTextContent('Smart link (Pro)');
+
+    // Deliberate-red fixture: omitting a supported handler changes the set,
+    // even though the builder and all remaining actions still work.
+    const incomplete = buildReleaseActions({
+      release: mockReleaseWithStatus,
+      onEdit: vi.fn(),
+      onCopy: vi.fn().mockResolvedValue(undefined),
+      onDelete,
+    })
+      .filter(item => 'id' in item)
+      .map(item => item.id);
+    expect(incomplete).not.toEqual(expectedIds);
   });
 
   it('smart link analytics card renders when a release is selected', async () => {
