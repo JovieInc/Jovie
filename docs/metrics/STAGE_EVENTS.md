@@ -13,7 +13,7 @@ One row per entity per stage. Stage dwell time is `exitedAt - enteredAt`.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `schema` | `"jovie-stage-event/v1"` | Contract version. Breaking changes bump it. |
-| `entityType` | manifest key | `shipping`, `remediation`, `release`, `ios-release`, `revenue-funnel`, `summer-turn` |
+| `entityType` | manifest key | `shipping`, `remediation`, `release`, `ios-release`, `revenue-funnel`, `summer-turn`, `automation-run` |
 | `entityId` | string | Stable id; the format is declared per entity in the manifest. |
 | `stage` | manifest stage id | Must be registered for the entity type. Unregistered stages are rejected. |
 | `enteredAt` | ISO-8601 | When the entity entered the stage. |
@@ -119,6 +119,25 @@ token-readable URL and register it as `summer-stage-feed.url` in the manifest.
 
 `entityId` = `<conversation>:<turn>`. `outcome` on the terminal row: `completed`,
 `failed` or `abandoned`. Backfill from the existing receipt blobs.
+
+### Automation liveness (`automation-run`)
+
+Live emitter: `scripts/automation-liveness.mjs` (workflow
+`automation-liveness.yml`) writes `automation-run:started` and
+`automation-run:finished` rows for every registered automation whose receipt
+carries both timestamps, into the artifact
+`automation-liveness-receipts/stage-events.ndjson`.
+
+| Stage | Timestamp |
+| --- | --- |
+| `automation-run:started` | run start from the automation's receipt |
+| `automation-run:finished` | terminal receipt; `outcome` `completed` or `failed` |
+
+`entityId` = `<automationId>@<runRef>` (`automationId` from
+`canon/automation-registry.jsonl`). Rows without real timestamps are never
+emitted. The source has no URL yet: the shipping-slo collector reads `url`
+sources only, so reading the artifact is the remaining step before these
+timings reach the snapshot.
 
 ### LogYourBody release loop
 
