@@ -480,6 +480,21 @@ class JudgeTest(unittest.TestCase):
             self.assertIn("60 min old", alerts["automation-silent:gem:stale"])
             self.assertIn("missing", alerts["automation-silent:gem:missing"])
             self.assertEqual(doctor.automation_watch(None, "gem", now), {"known": False, "silent": {}})
+            self.assertIn("automation-registry-unreadable",
+                          doctor.judge(obs(automation={"known": False, "silent": {}}, now=now)))
+            self.assertNotIn("automation-registry-unreadable",
+                             doctor.judge(obs(automation={"known": False, "silent": {}, "skipped": True}, now=now)))
+            self.assertNotIn("automation-registry-unreadable", doctor.judge(obs(now=now)))
+
+    def test_the_watched_registry_is_the_one_merged_on_main(self):
+        # The doctor must read the path the registry actually ships at (#22354: canon/).
+        repo = Path(__file__).resolve().parents[2]
+        if not (repo / "canon").is_dir():
+            self.skipTest("staged lanes release trees carry no canon/")
+        self.assertTrue((repo / doctor.AUTOMATION_REGISTRY).is_file(), doctor.AUTOMATION_REGISTRY)
+        rows = doctor.automation_registry(repo, run=lambda *_a, **_k: doctor.subprocess.CompletedProcess(
+            [], 0, (repo / doctor.AUTOMATION_REGISTRY).read_text(), ""))
+        self.assertTrue(rows and any(row["id"] == "gem:lanes-watchdog" for row in rows))
 
     def test_the_hosted_liveness_check_and_the_doctor_watch_each_other(self):
         now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
@@ -500,6 +515,20 @@ class JudgeTest(unittest.TestCase):
                          {"installed": True, "lastRunAt": "2026-10-20T21:30:00Z"})
         self.assertEqual(doctor.automation_liveness(fake(1, stderr="gh: Not Found (HTTP 404)"), 0), {"installed": False})
         self.assertEqual(doctor.automation_liveness(fake(1, stderr="timeout"), 0), {"installed": None})
+
+    def test_liveness_counts_only_successful_main_runs(self):
+        # Most runs are job-skipped (every 5th Production Continuity Guard run does work).
+        calls = []
+        lane = types.SimpleNamespace(REPO_SLUG="JovieInc/Jovie", shared=lambda key, ttl, fetch: fetch(),
+                                     sh=lambda args, **k: calls.append(args) or types.SimpleNamespace(
+                                         returncode=0, stdout='[""]', stderr=""))
+        self.assertEqual(doctor.automation_liveness(lane, 0), {"installed": True, "lastRunAt": None})
+        self.assertIn("status=success", calls[0][2])
+        self.assertIn("branch=main", calls[0][2])
+        # Installed but never succeeded reads as silent, not alive.
+        now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
+        self.assertIn("automation-liveness-silent", doctor.judge(obs(
+            automationLiveness={"installed": True, "lastRunAt": None}, now=now)))
 
     def test_a_failed_status_gist_publish_raises_status_feed_stale(self):
         failed = doctor.judge(obs(), {"statusFeedError": "RuntimeError: status-gist-publish-unconfirmed"})
