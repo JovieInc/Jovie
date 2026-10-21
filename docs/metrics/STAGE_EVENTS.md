@@ -42,6 +42,12 @@ No new database. Two paths, both read by the daily
    stages GitHub cannot see publishes a rolling 28-day NDJSON file of contract
    rows at the source URL in the manifest. Invalid rows are counted as
    `rejected` in the snapshot, never silently kept or dropped.
+   A GitHub Actions producer instead names an `artifact` (`<name>/<file>`):
+   the collector lists that artifact's non-expired uploads in the window,
+   downloads up to 60 spread evenly across it (`gh run download` through the
+   budgeted client), and dedupes rows by entityType, entityId and stage. A
+   source whose artifacts are listed but none readable is a failure, not an
+   empty success.
    Privacy-bound producers (revenue funnel) publish only pre-aggregated
    `{entities:{<type>:{stages:{<id>:{windows,regression}}}}}` (`kind: timings`).
 
@@ -143,9 +149,8 @@ controller attempt 3, after waiting for the token's quota reset or
 | `release-replay:blocked` | the failed attempt's `updated_at`; exits at the decision. `outcome` `advanced` (replayed), `abandoned` (not transient, superseded, or prod already on main) or `failed` (attempt/wait cap, rejected rerun) |
 | `release-replay:replayed` | the accepted `gh run rerun --failed` request |
 
-`entityId` = `<workflow file>#<run id>@<attempt>`. Like `automation-run`, the
-source is an artifact, so it reaches stage timings once the collector reads
-artifact sources.
+`entityId` = `<workflow file>#<run id>@<attempt>`. The source is an artifact
+(see "Where events live").
 
 ### Automation liveness (`automation-run`)
 
@@ -162,9 +167,7 @@ carries both timestamps, into the artifact
 
 `entityId` = `<automationId>@<runRef>` (`automationId` from
 `canon/automation-registry.jsonl`). Rows without real timestamps are never
-emitted. The source has no URL yet: the shipping-slo collector reads `url`
-sources only, so reading the artifact is the remaining step before these
-timings reach the snapshot.
+emitted. The collector reads the artifact source (see "Where events live").
 
 ### LogYourBody release loop
 
