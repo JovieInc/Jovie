@@ -337,6 +337,7 @@ web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|de
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx,apps/web/app/onboarding/checkout/loading.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
 web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile
+web.claim|web|artist-claim-checkout|apps/web/app/claim/page.tsx,apps/web/app/claim/ClaimArtistSearch.tsx|desktop,mobile
 web.account-shell|web|account-shell|apps/web/app/account/layout.tsx|desktop,mobile
 web.account-creation-recovery|web|account-creation-recovery|apps/web/app/error/user-creation-failed/page.tsx,apps/web/app/error/user-creation-failed/loading.tsx|desktop,mobile
 web.root-error-boundary|web|screen.errors.root|apps/web/app/error.tsx,apps/web/app/global-error.tsx|desktop,mobile
