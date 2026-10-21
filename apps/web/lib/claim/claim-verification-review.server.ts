@@ -310,7 +310,9 @@ export async function decideClaimVerification(input: {
     if (!row.subscriptionId) return { outcome: 'no_subscription' };
     const refund = await refundFirstMonthAndCancel({
       subscriptionId: row.subscriptionId,
-      idempotencyKey: `claim-verification-reject:${input.profileId}`,
+      // Per subscription: a profile re-requested and rejected again inside
+      // Stripe's 24h idempotency window refunds its own charge.
+      idempotencyKey: `claim-verification-reject:${input.profileId}:${row.subscriptionId}`,
     });
     refundId = refund.refundId;
   }

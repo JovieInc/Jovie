@@ -365,6 +365,34 @@
           "source": "summer-stage-feed"
         }
       ]
+    },
+    "claim-dogfood": {
+      "entityId": "claim-checkout-dogfood#<run id>@<run attempt>",
+      "description": "One browser dogfood of the $12 artist claim (Stripe test mode, fixture artists): from the staging deploy (or dispatch) that made it due to the journey verdict.",
+      "endToEnd": [["wait", "journey"]],
+      "stages": [
+        {
+          "id": "wait",
+          "meaning": "staging deploy finished (Staging Controller completed) or dispatch, until the dogfood job started",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        },
+        {
+          "id": "setup",
+          "meaning": "job start to app ready: ephemeral Neon branch, migrations, build, server",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        },
+        {
+          "id": "journey",
+          "meaning": "browser journey; outcome completed (green) or failed (red)",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        }
+      ]
     }
   },
   "sources": {
@@ -418,6 +446,13 @@
       "url": "https://jov.ie/api/cron/stage-timings",
       "auth": "CRON_SECRET",
       "owner": "apps/web"
+    },
+    "claim-dogfood-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "claim-dogfood-receipts/stage-events.ndjson",
+      "workflow": "claim-checkout-dogfood.yml",
+      "owner": "revenue path (scripts/claim-dogfood-report.mjs)"
     }
   },
   "producers": {

@@ -1,0 +1,235 @@
+name: Claim Checkout Dogfood
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Staging Controller completion is the only event that says a new main generation reached staging; this hop runs the $12 claim journey in a browser for that exact SHA against an ephemeral Neon branch with Stripe test mode and the local test-auth bypass. It holds Stripe test, Neon and Linear/Slack secrets only; no production credential, no deploy permission.
+# removal-trigger: Remove the hop when Staging Controller runs the claim dogfood as its own post-alias job.
+#
+# Tim, 2026-10-21: the end-to-end claim check is a dogfood process run by
+# browser automation, not by hand. tests/e2e/claim-checkout.spec.ts covers
+# pricing -> /claim search -> fixture artist -> claim start -> signed-in
+# $12 Stripe test checkout -> signed webhook -> Pro entitlement, and the
+# high-reach branch (>=50k followers): pending_verification -> Ovie inbox card
+# -> reject with a Stripe test-mode refund -> approve. Fixture artists only.
+#
+# Clocks: no cron here (JOV-INV-042 freezes the cron allowlist). The daily run
+# follows Golden Path Nightly's completion, whose clock already exists for the
+# same reason (real auth plus Stripe test mode drift with no repo event).
+# Each run writes jovie-stage-event/v1 rows (entity claim-dogfood) to the
+# artifact claim-dogfood-receipts/stage-events.ndjson. Red runs file or reopen
+# one fingerprinted Linear issue and post to Slack; green runs resolve it.
+
+on:
+  workflow_run:
+    workflows: ['Staging Controller', 'Golden Path Nightly']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref or SHA to dogfood (default main)
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # One run at a time. Never cancel mid-run: an interrupted run would leave a
+  # Stripe test subscription behind. GitHub keeps only the newest pending run.
+  group: claim-checkout-dogfood
+  cancel-in-progress: false
+
+jobs:
+  dogfood:
+    name: Claim checkout dogfood (Stripe test mode)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.head_branch == 'main' &&
+       (github.event.workflow_run.name == 'Golden Path Nightly' ||
+        github.event.workflow_run.conclusion == 'success'))
+    environment: Preview – jovie
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      DOGFOOD_SHA: ${{ (github.event.workflow_run.name == 'Staging Controller' && github.event.workflow_run.head_sha) || inputs.ref || 'main' }}
+      DOGFOOD_TRIGGER: ${{ github.event.workflow_run.name || github.event_name }}
+      # Staging Controller completion (or dispatch time) is when the run became due.
+      DOGFOOD_DUE_AT: ${{ github.event.workflow_run.updated_at || '' }}
+    steps:
+      - name: Record job start
+        run: |
+          echo "RECEIPT_DIR=$RUNNER_TEMP/claim-dogfood-receipts" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/claim-dogfood-receipts"
+          echo "JOB_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.DOGFOOD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Create ephemeral Neon database branch
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: claim-dogfood-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production
+          expires_in_hours: '2'
+
+      - name: Resolve DATABASE_URL
+        id: resolve-db
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        run: |
+          if [ -z "${{ steps.resolve-db.outputs.database_url }}" ]; then
+            echo "::error::No ephemeral Neon DATABASE_URL. Refusing to run the dogfood against a shared database."
+            exit 1
+          fi
+          echo "DATABASE_URL=${{ steps.resolve-db.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Run migrations (ephemeral Neon)
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          NODE_ENV: test
+          GIT_BRANCH: claim-dogfood-${{ github.run_id }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Setup Playwright (Chromium)
+        uses: ./.github/actions/setup-playwright
+
+      - name: Build the app at the dogfooded SHA
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_APP_URL: http://localhost:3260
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3260
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Materialize standalone assets
+        run: |
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+
+      - name: Run the claim dogfood
+        id: journey
+        env:
+          # Stripe TEST mode only. The spec fails closed on a live key, another
+          # account, or a price that is not the $12 test fixture.
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: price_1USkjzASl9B9udHvEYkZLYZp
+          STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+        run: |
+          cd apps/web
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "::error::Standalone server not found after build"
+            exit 1
+          fi
+          export NODE_ENV=test
+          export CI=true
+          # Local test-auth bypass: allowed only off Vercel preview/production
+          # (lib/auth/test-mode.ts), so this runs on the runner's own server.
+          export E2E_USE_TEST_AUTH_BYPASS=1
+          export VERCEL_ENV=development
+          export E2E_TEST_MODE=1
+          export NEXT_DISABLE_TOOLBAR=1
+          export NEXT_PUBLIC_TURNSTILE_SITE_KEY="1x00000000000000000000AA"
+          export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
+          URL_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+          export URL_ENCRYPTION_KEY
+          export AI_GATEWAY_API_KEY="claim-dogfood-no-ai"
+          export HOSTNAME=localhost
+          export NEXT_PUBLIC_APP_URL=http://localhost:3260
+          export BETTER_AUTH_URL=http://localhost:3260
+          export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3260
+
+          PORT=3260 node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "::error::Standalone server died"; exit 1; }
+            if curl -sf http://localhost:3260/pricing > /dev/null 2>&1; then break; fi
+            if [ "$i" -eq 60 ]; then echo "::error::Server not ready in 60s"; exit 1; fi
+            sleep 1
+          done
+          echo "JOURNEY_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
+          set +e
+          E2E_SKIP_WEB_SERVER=1 BASE_URL=http://localhost:3260 \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm exec playwright test tests/e2e/claim-checkout.spec.ts \
+              --project=chromium --reporter=line,json --output=test-results \
+            > "$RECEIPT_DIR/playwright.log" 2>&1
+          status=$?
+          set -e
+          tail -n 120 "$RECEIPT_DIR/playwright.log"
+          echo "JOURNEY_FINISHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+          exit "$status"
+
+      - name: Emit stage events (claim-dogfood)
+        if: ${{ always() }}
+        env:
+          JOURNEY_OUTCOME: ${{ steps.journey.outcome }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/claim-dogfood-report.mjs stage-events
+
+      - name: Upload receipts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: claim-dogfood-receipts
+          path: ${{ runner.temp }}/claim-dogfood-receipts/stage-events.ndjson
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Playwright artifacts on failure
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: claim-dogfood-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/test-results/
+          allow-markdown: 'true'
+          retention-days: 7
+
+      - name: File, reopen or resolve the Linear issue
+        if: ${{ always() && !cancelled() }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          JOURNEY_OUTCOME: ${{ steps.journey.outcome || 'missing' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: node scripts/claim-dogfood-report.mjs intake
+
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
