@@ -6064,6 +6064,29 @@ def retire_published_preserved(host: Host, number: int) -> list[str]:
 UNRESUMABLE_PRESERVED = pr_events.UNRESUMABLE_PRESERVED
 PRESERVED_ARCHIVE_REF = "refs/jovie-preserved/"
 PRESERVED_ARCHIVE_AFTER_S = 6 * 3600
+# Verdicts that stop a run before it finishes; its checkout may be resumed or reconciled.
+INTERRUPTED_VERDICTS = frozenset({"cancelled", "revoked", "reconcile-unavailable", "disk-held", "recovery-handoff"})
+
+
+def _ended_on_its_own_terms(host: Host, run_id) -> bool:
+    """The preserved run finished (e.g. fix-no-change) instead of being interrupted: nobody
+    will ever reconcile it, so waiting PRESERVED_ARCHIVE_AFTER_S only blocks the PR.
+    2026-10-20 on Gem: 72 preserved-target-needs-reconciliation handoffs in 24h, mostly
+    fix-no-change runs that left regenerated artifacts behind (PR #22420: screenshot PNGs)."""
+    if not run_id:
+        return False
+    try:
+        lines = (host.state / "runs/ledger.jsonl").read_text().splitlines()
+    except OSError:
+        return False
+    for line in reversed(lines):
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(row, dict) and row.get("runId") == run_id:
+            return bool(row.get("endedAt")) and row.get("verdict") not in INTERRUPTED_VERDICTS
+    return False
 
 
 def archive_unresumable_preserved(host: Host, path: Path, reason: str) -> str | None:
@@ -6083,7 +6106,13 @@ def archive_unresumable_preserved(host: Host, path: Path, reason: str) -> str | 
             stamp = datetime.fromisoformat(str(json.loads(marker).get("at")).replace("Z", "+00:00")).timestamp()
         except (ValueError, TypeError, AttributeError):
             stamp = marker_path.stat().st_mtime
-        if time.time() - stamp < PRESERVED_ARCHIVE_AFTER_S or worktree_busy(path):
+        try:
+            run_id = json.loads(marker).get("runId")
+        except (ValueError, AttributeError):
+            run_id = None
+        grace = (0 if reason == "preserved-target-needs-reconciliation" and _ended_on_its_own_terms(host, run_id)
+                 else PRESERVED_ARCHIVE_AFTER_S)
+        if time.time() - stamp < grace or worktree_busy(path):
             return None
         head = sh(["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=path, timeout=30)
         if head.returncode:
@@ -6383,7 +6412,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             if preserved:
                 if not retire_completed_repair(host, worktree, receipt):
                     preserve_repair(worktree, receipt)
-            elif receipt.get("verdict") in {"cancelled", "revoked", "reconcile-unavailable", "disk-held", "recovery-handoff"}:
+            elif receipt.get("verdict") in INTERRUPTED_VERDICTS:
                 preserve_repair(worktree, receipt)
             else:
                 reap_run_processes(worktree, receipt)

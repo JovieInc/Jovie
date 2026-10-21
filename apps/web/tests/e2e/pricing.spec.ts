@@ -113,10 +113,10 @@ test.describe('Pricing Page', () => {
       'Artist Presence'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      'Limited access'
+      'Self-serve'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      'Request access'
+      'Claim your profile'
     );
     await expect(
       page.getByTestId('marketing-pricing-plan-enterprise')
@@ -220,7 +220,7 @@ test.describe('Pricing Page', () => {
           await expect(selector).toHaveValue('pro');
           await expect(
             table.getByRole('columnheader', { name: /Artist Presence/ })
-          ).toContainText('$199/mo');
+          ).toContainText('$12/mo');
           await expect(
             table
               .getByRole('rowheader', { name: 'Contact / subscriber capture' })
@@ -258,7 +258,7 @@ test.describe('Pricing Page', () => {
           await expect(selector).toHaveValue('pro');
           await expect(
             table.getByRole('columnheader', { name: /Artist Presence/ })
-          ).toContainText('$199/mo');
+          ).toContainText('$12/mo');
           await expect(
             table
               .getByRole('rowheader', { name: 'Contact / subscriber capture' })
@@ -277,7 +277,7 @@ test.describe('Pricing Page', () => {
           ).toContainText('$0');
           await expect(
             table.getByRole('columnheader', { name: /Artist Presence/ })
-          ).toContainText('$199/mo');
+          ).toContainText('$12/mo');
         }
         if (width === 320) {
           const accessibility = await new AxeBuilder({ page })
@@ -354,9 +354,9 @@ test.describe('Pricing Page', () => {
     await expect(freeTierCta).toHaveAttribute('href', /\/signup\?plan=free/);
     await expect(
       page.getByTestId('marketing-pricing-plan-pro').getByRole('link', {
-        name: 'Request access',
+        name: 'Claim your profile',
       })
-    ).toHaveAttribute('href', '/waitlist');
+    ).toHaveAttribute('href', '/claim?plan=pro');
     await expect(
       page.getByTestId('marketing-pricing-plan-enterprise').getByRole('link', {
         name: 'Contact sales',

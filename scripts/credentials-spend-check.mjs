@@ -8,7 +8,9 @@
  * --live reads, when their credentials are present in the environment or on
  * the host: AI Gateway credits (AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN),
  * Summer's dated grants on Vercel (VERCEL_READONLY_TOKEN, VERCEL_TOKEN, or the
- * local Vercel CLI login with --vercel-cli-auth), and Gem's Codex ledger.
+ * local Vercel CLI login with --vercel-cli-auth), Gem's Codex ledger, and
+ * Summer's provider-trial ledger (SUMMER_PROVIDER_TRIAL_LEDGER: a file path or
+ * https URL, optional bearer SUMMER_PROVIDER_TRIAL_LEDGER_TOKEN).
  * Every run records stage timestamps; --receipt appends the run record.
  * --file-linear files each alerting finding through the remediation intake
  * (LINEAR_API_KEY), the same path the nightly remediation sweep uses.
@@ -24,6 +26,7 @@ import {
   localVercelToken,
   readCodexAccounts,
   readGatewayCredits,
+  readProviderTrialLedger,
   readSummerGrants,
 } from './lib/credentials-live-reads.mjs';
 import {
@@ -95,6 +98,7 @@ async function stage(stages, name, now, fn) {
  *   live?: boolean,
  *   vercelCliAuth?: boolean,
  *   codexPath?: string,
+ *   trialLedger?: string,
  *   fetchImpl?: typeof fetch,
  *   now?: () => number,
  *   registry?: { credentials: any, spend: any, thirdPartyGrants?: any[] },
@@ -107,6 +111,7 @@ export async function runCheck({
   live = false,
   vercelCliAuth = false,
   codexPath,
+  trialLedger,
   fetchImpl = fetch,
   now = Date.now,
   registry,
@@ -159,6 +164,17 @@ export async function runCheck({
         .filter(account => account.lastKind === 'auth')
         .map(account => account.account);
     }
+
+    const trial = await stage(stages, 'read-provider-trial-ledger', now, () =>
+      readProviderTrialLedger({
+        source: trialLedger ?? env.SUMMER_PROVIDER_TRIAL_LEDGER,
+        token: env.SUMMER_PROVIDER_TRIAL_LEDGER_TOKEN,
+        fetchImpl,
+        now,
+      })
+    );
+    reads.providerTrialLedger = trial.ok ? 'ok' : trial.reason;
+    if (trial.ok) Object.assign(overlay.spend, trial.value);
   }
   const evaluated = await stage(stages, 'evaluate', now, async () => ({
     ok: true,
@@ -239,6 +255,7 @@ async function main() {
     live: process.argv.includes('--live'),
     vercelCliAuth: process.argv.includes('--vercel-cli-auth'),
     codexPath: argument('--codex-accounts') ?? undefined,
+    trialLedger: argument('--trial-ledger') ?? undefined,
     fileLinear,
     upsert,
   });
