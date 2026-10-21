@@ -1,19 +1,5 @@
-/**
- * Durable capture for verified Stripe events that cannot be applied yet.
- *
- * A paid event (for example an active subscription on a price we have not
- * mapped to a plan) must never be acknowledged and forgotten. Handlers throw
- * `StripeReconciliationRequiredError`; the webhook route then marks the stored
- * `stripe_webhook_events` row `needs_reconciliation` and leaves `processed_at`
- * unset. Only after that write succeeds may the route return 2xx. If the write
- * fails, the route returns 5xx and Stripe retries.
- *
- * Because `processed_at` stays null, the billing-reconciliation cron replays
- * the stored event through the same handlers. Once the cause is fixed (the
- * price is mapped), replay applies it, and the existing processed_at lease plus
- * the billing audit log's stripe_event_id dedupe grant it exactly once.
- */
-
+// Persist unapplied paid events before returning 2xx; failed capture must return
+// 5xx for Stripe retry. Unprocessed rows reuse billing replay and audit dedupe.
 import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { captureCriticalError } from '@/lib/error-tracking';
@@ -53,10 +39,7 @@ export function isStripeReconciliationRequiredError(
   return error instanceof StripeReconciliationRequiredError;
 }
 
-/**
- * Sentry gets identifiers needed to find the queued row, never customer,
- * subscription or email details (those stay in the database row).
- */
+// Alert with identifiers only; customer details stay in the database.
 function alertContext(
   error: StripeReconciliationRequiredError,
   stripeEventId: string,
@@ -81,20 +64,13 @@ export interface MarkNeedsReconciliationInput {
   readonly eventType: string;
   readonly route: string;
   readonly error: StripeReconciliationRequiredError;
-  /**
-   * When set, the write only applies while this lease is still owned, and the
-   * lease is released. Replay passes `keepLease: true` so a still-blocked
-   * event rotates behind healthy ones until its lease expires.
-   */
+  // Compare the owned lease; keepLease lets blocked replay rows rotate.
   readonly leaseStartedAt?: Date | null;
   readonly keepLease?: boolean;
   readonly now?: Date;
 }
 
-/**
- * Persist the reconciliation marker, then alert. Throws when the row could not
- * be written so the caller returns non-2xx and Stripe retries.
- */
+// Capture must succeed before alerting or acknowledging the event.
 export async function markStripeEventNeedsReconciliation(
   input: MarkNeedsReconciliationInput
 ): Promise<void> {
@@ -150,10 +126,7 @@ export async function markStripeEventNeedsReconciliation(
   );
 }
 
-/**
- * Value for `reconciliation_status` when an event is finally applied: a row
- * previously flagged becomes `reconciled`; any other row is left untouched.
- */
+// Successful replay reconciles only previously flagged rows.
 export const reconciledStatusOnSuccess = drizzleSql`CASE WHEN ${stripeWebhookEvents.reconciliationStatus} = ${NEEDS_RECONCILIATION} THEN ${RECONCILED} ELSE ${stripeWebhookEvents.reconciliationStatus} END`;
 
 export const reconciledAtOnSuccess = (now: Date) =>
@@ -171,12 +144,8 @@ export interface CaptureStripeEventForReconciliationInput {
   readonly now?: Date;
 }
 
-/**
- * For webhook routes that do not otherwise store events (tips): persist the
- * verified event as a terminal needs_reconciliation row. `processed_at` is set
- * so the subscription replay never re-drives it; a human reconciles it from
- * the queue. Throws on failure so the route returns non-2xx.
- */
+// Tips are terminal reconciliation rows: processed_at excludes them from
+// subscription replay. Failed capture throws so Stripe retries.
 export async function captureStripeEventForReconciliation(
   input: CaptureStripeEventForReconciliationInput
 ): Promise<void> {

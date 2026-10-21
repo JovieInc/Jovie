@@ -1,25 +1,8 @@
 // @vitest-environment node
-/**
- * Paid Stripe events that cannot be applied yet must never be acknowledged and
- * forgotten (audit 2026-10-21 F17: an unknown price returned 200 "skipped",
- * Stripe never retried, and the paid entitlement was lost).
- *
- * Real route handlers, real webhook handlers, real billing persistence and the
- * real replay run against real Postgres. Only the Stripe network client is
- * replaced (signatures are still verified by the real Stripe SDK), plus
- * external notification sinks (Slack, email, Redis cache) that this test does
- * not exercise.
- *
- * The app talks to the database through its production driver
- * (@neondatabase/serverless over WebSocket).
- *
- * Targets:
- * - STRIPE_RECONCILIATION_TEST_DATABASE_URL: disposable loopback Postgres
- *   (127.0.0.1, database name starting with `jovie_stripe_recon`). The test
- *   bridges the Neon WebSocket driver to it and applies migrations first.
- * - DB_CERTIFICATION=true + DATABASE_URL: the isolated, already-migrated Neon
- *   certification branch in CI.
- */
+// Real routes, persistence and replay over the production Neon driver. Only
+// Stripe network calls and notification/cache sinks are stubbed; signatures stay real.
+// Run on a migrated DB_CERTIFICATION branch or a disposable loopback database
+// named jovie_stripe_recon* via STRIPE_RECONCILIATION_TEST_DATABASE_URL.
 import { randomUUID } from 'node:crypto';
 import net from 'node:net';
 import { neonConfig } from '@neondatabase/serverless';
@@ -52,40 +35,28 @@ const { mockCaptureCriticalError } = vi.hoisted(() => {
 vi.mock('@/lib/stripe/client', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/stripe/client')>();
   const { default: StripeSdk } = await import('stripe');
+  const unavailable = vi.fn(() => {
+    throw new Error('Stripe network is not available in this test');
+  });
   return {
     ...actual,
     stripe: {
       webhooks: StripeSdk.webhooks,
-      subscriptions: {
-        retrieve: vi.fn(() => {
-          throw new Error('Stripe network is not available in this test');
-        }),
-        cancel: vi.fn(() => {
-          throw new Error('Stripe network is not available in this test');
-        }),
-      },
+      subscriptions: { retrieve: unavailable, cancel: unavailable },
     },
   };
 });
 
-// Alert sink (Sentry) is observed, not exercised.
-vi.mock('@/lib/error-tracking', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/error-tracking')>();
-  return {
-    ...actual,
-    captureCriticalError: mockCaptureCriticalError,
-  };
-});
+vi.mock('@/lib/error-tracking', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/error-tracking')>()),
+  captureCriticalError: mockCaptureCriticalError,
+}));
 
-// External notification sinks unrelated to the entitlement under test.
-vi.mock('@/lib/notifications/providers/slack', async importOriginal => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    notifySlackUpgrade: vi.fn(async () => undefined),
-    notifySlackCancellation: vi.fn(async () => undefined),
-  };
-});
+vi.mock('@/lib/notifications/providers/slack', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  notifySlackUpgrade: vi.fn(async () => undefined),
+  notifySlackCancellation: vi.fn(async () => undefined),
+}));
 // Next's cache invalidation needs a request context this test does not have.
 vi.mock('next/cache', async importOriginal => ({
   ...(await importOriginal<typeof import('next/cache')>()),
@@ -119,23 +90,6 @@ function resolveTarget(env: NodeJS.ProcessEnv): Target | null {
 }
 
 const target = resolveTarget(process.env);
-
-function signedRequest(
-  url: string,
-  event: Record<string, unknown>,
-  secret: string
-): NextRequest {
-  const payload = JSON.stringify(event);
-  const signature = Stripe.webhooks.generateTestHeaderString({
-    payload,
-    secret,
-  });
-  return new NextRequest(url, {
-    method: 'POST',
-    body: payload,
-    headers: { 'stripe-signature': signature },
-  });
-}
 
 describe.skipIf(!target)(
   'Stripe webhooks never acknowledge and lose a paid event (real Postgres)',
@@ -228,32 +182,31 @@ describe.skipIf(!target)(
       return { appUserId: user.id, clerkId };
     }
 
-    function subscriptionEvent(input: {
-      eventId: string;
-      clerkId: string;
-      priceId: string;
-      createdSeconds: number;
-    }) {
-      eventIds.push(input.eventId);
+    function subscriptionEvent(
+      eventId: string,
+      clerkId: string,
+      priceId: string
+    ) {
+      eventIds.push(eventId);
       return {
-        id: input.eventId,
+        id: eventId,
         object: 'event',
         type: 'customer.subscription.updated',
-        created: input.createdSeconds,
+        created: Math.floor(Date.now() / 1000),
         livemode: false,
         data: {
           object: {
-            id: `sub_recon_${input.eventId}`,
+            id: `sub_recon_${eventId}`,
             object: 'subscription',
             status: 'active',
             customer: `cus_recon_${suffix}`,
-            metadata: { clerk_user_id: input.clerkId },
+            metadata: { clerk_user_id: clerkId },
             items: {
               object: 'list',
               data: [
                 {
-                  id: `si_recon_${input.eventId}`,
-                  price: { id: input.priceId, object: 'price' },
+                  id: `si_recon_${eventId}`,
+                  price: { id: priceId, object: 'price' },
                 },
               ],
             },
@@ -282,14 +235,61 @@ describe.skipIf(!target)(
       return { auditRows: audit.length, user };
     }
 
-    async function postMain(event: Record<string, unknown>) {
-      const { POST } = await import('@/app/api/stripe/webhooks/route');
+    function paidCheckout(
+      eventId: string,
+      amountTotal: number,
+      metadata: Record<string, string>
+    ) {
+      eventIds.push(eventId);
+      return {
+        id: eventId,
+        object: 'event',
+        type: 'checkout.session.completed',
+        created: Math.floor(Date.now() / 1000),
+        data: {
+          object: {
+            id: `cs_${eventId}`,
+            object: 'checkout.session',
+            payment_status: 'paid',
+            amount_total: amountTotal,
+            customer: null,
+            metadata,
+          },
+        },
+      };
+    }
+
+    async function postWebhook(
+      event: Record<string, unknown>,
+      endpoint: 'main' | 'merch' | 'tips' = 'main'
+    ) {
+      const handlers = {
+        main: () => import('@/app/api/stripe/webhooks/route'),
+        merch: () => import('@/app/api/webhooks/stripe-merch/route'),
+        tips: () => import('@/app/api/webhooks/stripe-tips/route'),
+      };
+      const secret = {
+        main: WEBHOOK_SECRET,
+        merch: MERCH_SECRET,
+        tips: TIPS_SECRET,
+      }[endpoint];
+      const route =
+        endpoint === 'main'
+          ? '/api/stripe/webhooks'
+          : `/api/webhooks/stripe-${endpoint}`;
+      const { POST } = await handlers[endpoint]();
+      const payload = JSON.stringify(event);
       return POST(
-        signedRequest(
-          'https://jov.ie/api/stripe/webhooks',
-          event,
-          WEBHOOK_SECRET
-        )
+        new NextRequest(`https://jov.ie${route}`, {
+          method: 'POST',
+          body: payload,
+          headers: {
+            'stripe-signature': Stripe.webhooks.generateTestHeaderString({
+              payload,
+              secret,
+            }),
+          },
+        })
       );
     }
 
@@ -297,19 +297,11 @@ describe.skipIf(!target)(
       const { appUserId, clerkId } = await seedUser('price');
       const priceId = `price_recon_unmapped_${suffix}`;
       const eventId = `evt_recon_price_${suffix}`;
-      // Old enough that the replay cron treats it as stuck.
-      const createdSeconds = Math.floor(Date.now() / 1000) - 3 * 60 * 60;
-      const event = subscriptionEvent({
-        eventId,
-        clerkId,
-        priceId,
-        createdSeconds,
-      });
+      const event = subscriptionEvent(eventId, clerkId, priceId);
 
-      const first = await postMain(event);
+      const first = await postWebhook(event);
       expect(first.status).toBe(200);
 
-      // 2xx is only allowed because the event is durably queued, unprocessed.
       const captured = await webhookRow(eventId);
       expect(captured).toMatchObject({
         type: 'customer.subscription.updated',
@@ -342,22 +334,20 @@ describe.skipIf(!target)(
         })
       );
 
-      // A second delivery while still unmapped is captured again, not granted.
-      const redelivered = await postMain(event);
+      const redelivered = await postWebhook(event);
       expect(redelivered.status).toBe(200);
       expect((await webhookRow(eventId)).reconciliationStatus).toBe(
         'needs_reconciliation'
       );
 
-      // Replay before the fix: stays queued, nothing granted.
-      const replayAt = new Date(Date.now() + 60_000);
+      // Replay selects by the stored row's created_at, not Stripe's timestamp.
+      const replayAt = new Date(Date.now() + 3 * 60 * 60_000);
       const blocked = await replayUnprocessedStripeWebhooks(replayAt);
       expect(
         blocked.needsReconciliation.map(issue => issue.stripeEventId)
       ).toContain(eventId);
       expect((await grants(eventId, appUserId)).auditRows).toBe(0);
 
-      // The fix ships: the price is mapped.
       PRICE_MAPPINGS[priceId] = {
         priceId,
         plan: 'pro',
@@ -384,7 +374,6 @@ describe.skipIf(!target)(
           user: { isPro: true, stripePriceId: priceId },
         });
 
-        // Exactly once: replay again and redeliver the same event id.
         const again = await replayUnprocessedStripeWebhooks(
           new Date(fixedAt.getTime() + 11 * 60_000)
         );
@@ -393,7 +382,7 @@ describe.skipIf(!target)(
             i => i.stripeEventId
           )
         ).not.toContain(eventId);
-        const duplicate = await postMain(event);
+        const duplicate = await postWebhook(event);
         expect(duplicate.status).toBe(200);
         await expect(duplicate.json()).resolves.toEqual({ received: true });
         expect((await grants(eventId, appUserId)).auditRows).toBe(1);
@@ -405,19 +394,18 @@ describe.skipIf(!target)(
     it('returns non-2xx and keeps the event retryable when the reconciliation capture fails', async () => {
       const { appUserId, clerkId } = await seedUser('fail');
       const eventId = `evt_recon_fail_${suffix}`;
-      const event = subscriptionEvent({
+      const event = subscriptionEvent(
         eventId,
         clerkId,
-        priceId: `price_recon_fail_${suffix}`,
-        createdSeconds: Math.floor(Date.now() / 1000),
-      });
+        `price_recon_fail_${suffix}`
+      );
 
       await client.unsafe(`CREATE OR REPLACE FUNCTION recon_capture_failure() RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN RAISE EXCEPTION 'injected reconciliation capture failure'; END $$`);
       await client.unsafe(`CREATE TRIGGER recon_capture_failure BEFORE INSERT OR UPDATE ON stripe_webhook_events
         FOR EACH ROW WHEN (NEW.reconciliation_status = 'needs_reconciliation') EXECUTE FUNCTION recon_capture_failure()`);
       try {
-        const response = await postMain(event);
+        const response = await postWebhook(event);
         expect(response.status).toBe(500);
 
         const row = await webhookRow(eventId);
@@ -428,32 +416,10 @@ describe.skipIf(!target)(
         });
         expect((await grants(eventId, appUserId)).auditRows).toBe(0);
 
-        // Tips: the capture insert fails too → 500 so Stripe retries.
         const tipEventId = `evt_recon_tip_fail_${suffix}`;
-        eventIds.push(tipEventId);
-        const { POST: postTips } = await import(
-          '@/app/api/webhooks/stripe-tips/route'
-        );
-        const tipResponse = await postTips(
-          signedRequest(
-            'https://jov.ie/api/webhooks/stripe-tips',
-            {
-              id: tipEventId,
-              object: 'event',
-              type: 'checkout.session.completed',
-              created: Math.floor(Date.now() / 1000),
-              data: {
-                object: {
-                  id: `cs_recon_tip_fail_${suffix}`,
-                  object: 'checkout.session',
-                  payment_status: 'paid',
-                  amount_total: 500,
-                  metadata: {},
-                },
-              },
-            },
-            TIPS_SECRET
-          )
+        const tipResponse = await postWebhook(
+          paidCheckout(tipEventId, 500, {}),
+          'tips'
         );
         expect(tipResponse.status).toBe(500);
         expect(await webhookRow(tipEventId)).toBeUndefined();
@@ -464,30 +430,10 @@ describe.skipIf(!target)(
 
     it('captures a paid merch checkout for an unknown order before acknowledging', async () => {
       const eventId = `evt_recon_merch_${suffix}`;
-      eventIds.push(eventId);
       const orderId = randomUUID();
-      const { POST } = await import('@/app/api/webhooks/stripe-merch/route');
-      const response = await POST(
-        signedRequest(
-          'https://jov.ie/api/webhooks/stripe-merch',
-          {
-            id: eventId,
-            object: 'event',
-            type: 'checkout.session.completed',
-            created: Math.floor(Date.now() / 1000),
-            data: {
-              object: {
-                id: `cs_recon_merch_${suffix}`,
-                object: 'checkout.session',
-                payment_status: 'paid',
-                amount_total: 3500,
-                customer: null,
-                metadata: { merch_order_id: orderId },
-              },
-            },
-          },
-          MERCH_SECRET
-        )
+      const response = await postWebhook(
+        paidCheckout(eventId, 3500, { merch_order_id: orderId }),
+        'merch'
       );
 
       expect(response.status).toBe(200);
@@ -505,28 +451,9 @@ describe.skipIf(!target)(
 
     it('captures an unattributable paid tip as a terminal reconciliation row', async () => {
       const eventId = `evt_recon_tip_${suffix}`;
-      eventIds.push(eventId);
-      const { POST } = await import('@/app/api/webhooks/stripe-tips/route');
-      const response = await POST(
-        signedRequest(
-          'https://jov.ie/api/webhooks/stripe-tips',
-          {
-            id: eventId,
-            object: 'event',
-            type: 'checkout.session.completed',
-            created: Math.floor(Date.now() / 1000),
-            data: {
-              object: {
-                id: `cs_recon_tip_${suffix}`,
-                object: 'checkout.session',
-                payment_status: 'paid',
-                amount_total: 500,
-                metadata: { handle: `no-such-artist-${suffix}` },
-              },
-            },
-          },
-          TIPS_SECRET
-        )
+      const response = await postWebhook(
+        paidCheckout(eventId, 500, { handle: `no-such-artist-${suffix}` }),
+        'tips'
       );
 
       expect(response.status).toBe(200);
@@ -535,7 +462,6 @@ describe.skipIf(!target)(
         reconciliationStatus: 'needs_reconciliation',
         reconciliationReason: 'tip_unattributed',
       });
-      // Terminal: the subscription replay must not re-drive a tip.
       expect(row.processedAt).not.toBeNull();
       expect(row.reconciliationContext).toMatchObject({
         handle: `no-such-artist-${suffix}`,
