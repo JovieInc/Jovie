@@ -1674,7 +1674,8 @@ class LinearClientTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             env = Path(tmp) / "linear.env"
             env.write_text("OTHER=1\n")
-            with self.assertRaises(SystemExit):
+            # #22378: no personal-key fallback; a RuntimeError the doctor and watchdog degrade on.
+            with self.assertRaises(lane.LinearAppCredentialMissing):
                 lane.Linear(env)
 
 
