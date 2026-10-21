@@ -104,6 +104,18 @@ nodes:
       - workflow_run
     terminalReceipt: job:green-source
     jobCount: 2
+  - name: Automation Liveness
+    path: .github/workflows/automation-liveness.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:liveness
+    jobCount: 1
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
     active: true
@@ -892,7 +904,8 @@ nodes:
     category: production-verification
     authoritativeProducer: Production Controller
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Automation Liveness
     triggeringStateTransition:
       - repository_dispatch
       - schedule
@@ -1349,6 +1362,9 @@ nodes:
     terminalReceipt: job:mine
     jobCount: 1
 edges:
+  - from: Production Continuity Guard
+    to: Automation Liveness
+    type: workflow_run
   - from: CI
     to: iOS CI
     type: workflow_call
