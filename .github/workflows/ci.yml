@@ -1131,17 +1131,50 @@ jobs:
             scripts/lib/merge-group-admission.mjs
             scripts/lib/github-rate-limit.mjs
           sparse-checkout-cone-mode: false
+      # JOV-8754: admission is the queue's highest-priority REST caller. The
+      # repo GITHUB_TOKEN bucket (5,000/h, shared by every workflow) ran dry
+      # hourly on 2026-10-21 (07:41-07:52Z, 08:23-08:52Z) and every merge
+      # group waited out the reset here. Read on the Jovie Bot installation's
+      # own bucket (used 397/5,000 that hour), read-only scopes, as
+      # ci-merge-group-supersede already does. A failed mint or any failed
+      # app-token attempt falls back to GITHUB_TOKEN, so admission stays
+      # fail-closed and never gets weaker than before.
+      - name: Generate Jovie Bot admission read token
+        id: admission-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-checks: read
+          permission-contents: read
+          permission-pull-requests: read
       - name: Require live queue membership and external admission checks
         id: admission
         env:
           GH_TOKEN: ${{ github.token }}
+          ADMISSION_APP_TOKEN: ${{ steps.admission-token.outputs.token }}
         run: |
           set -euo pipefail
           policy='scripts/lib/merge-group-admission.mjs'
           policy_contract="$(node "$policy" --print-contract-version)"
           if [[ "$policy_contract" == 'jovie-merge-group-live-admission/v2' \
             || "$policy_contract" == 'jovie-merge-group-live-admission/v1' ]]; then
-            node "$policy"
+            # Each attempt writes its own outputs; only the deciding attempt's
+            # are published, so a failed app-token attempt leaves no trace.
+            attempt_output="$RUNNER_TEMP/admission-output"
+            : > "$attempt_output"
+            if [[ -n "${ADMISSION_APP_TOKEN:-}" ]] &&
+              GH_TOKEN="$ADMISSION_APP_TOKEN" GITHUB_OUTPUT="$attempt_output" node "$policy"; then
+              echo 'Admission read on the Jovie Bot installation bucket.'
+            else
+              [[ -n "${ADMISSION_APP_TOKEN:-}" ]] &&
+                echo '::notice::Admission app-token attempt did not decide; retrying on GITHUB_TOKEN.'
+              : > "$attempt_output"
+              GITHUB_OUTPUT="$attempt_output" node "$policy"
+            fi
+            cat "$attempt_output" >> "$GITHUB_OUTPUT"
             admitted_value="$(sed -n 's/^admitted=//p' "$GITHUB_OUTPUT")"
             if [[ "$admitted_value" != 'true' && "$admitted_value" != 'false' ]]; then
               echo '::error::Live queue admission policy emitted an invalid admitted value'

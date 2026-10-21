@@ -34,13 +34,17 @@ export type ArtistOfferFunnelStage =
  */
 export const ARTIST_OFFER_BRANCH_STAGES = [
   { stage: 'pending-verification', from: 'paid' },
+  { stage: 'claim-verified', from: 'pending-verification' },
+  { stage: 'claim-rejected', from: 'pending-verification' },
 ] as const satisfies readonly {
   readonly stage: string;
-  readonly from: ArtistOfferFunnelStage;
+  readonly from: string;
 }[];
 
 export type ArtistOfferBranchStage =
   (typeof ARTIST_OFFER_BRANCH_STAGES)[number]['stage'];
+
+type ArtistOfferAnyStage = ArtistOfferFunnelStage | ArtistOfferBranchStage;
 
 /** Stages written by producers; the rest are derived from the journey row. */
 export const RECORDED_ARTIST_OFFER_STAGES = [
@@ -50,10 +54,9 @@ export const RECORDED_ARTIST_OFFER_STAGES = [
   'paid',
   'profile-live',
   'pending-verification',
-] as const satisfies readonly (
-  | ArtistOfferFunnelStage
-  | ArtistOfferBranchStage
-)[];
+  'claim-verified',
+  'claim-rejected',
+] as const satisfies readonly ArtistOfferAnyStage[];
 
 export type RecordedArtistOfferStage =
   (typeof RECORDED_ARTIST_OFFER_STAGES)[number];
@@ -77,9 +80,7 @@ export function stageForFunnelPath(
 }
 
 export type ArtistOfferJourneyTimeline = {
-  readonly [Stage in
-    | ArtistOfferFunnelStage
-    | ArtistOfferBranchStage]?: Date | null;
+  readonly [Stage in ArtistOfferAnyStage]?: Date | null;
 };
 
 export interface ArtistOfferStageSummary {
@@ -98,7 +99,7 @@ export interface ArtistOfferStageSummary {
 
 export interface ArtistOfferBranchSummary {
   readonly stage: ArtistOfferBranchStage;
-  readonly from: ArtistOfferFunnelStage;
+  readonly from: ArtistOfferAnyStage;
   /** Journeys that reached this branch stage. */
   readonly journeys: number;
   /** Share of the parent stage's journeys that branched here. */
@@ -203,20 +204,22 @@ export function buildArtistOfferFunnelReport(input: {
     } satisfies ArtistOfferStageSummary;
   });
 
+  const reached = (stage: ArtistOfferAnyStage): number =>
+    counts.get(stage as ArtistOfferFunnelStage) ??
+    input.timelines.filter(timeline => Boolean(timeline[stage])).length;
+
   const branches = ARTIST_OFFER_BRANCH_STAGES.map(({ stage, from }) => {
     const fromParent: number[] = [];
-    let journeys = 0;
     for (const timeline of input.timelines) {
-      if (!timeline[stage]) continue;
-      journeys += 1;
       const step = secondsBetween(timeline[from], timeline[stage]);
       if (step !== null) fromParent.push(step);
     }
+    const journeys = reached(stage);
     return {
       stage,
       from,
       journeys,
-      conversionFromParent: ratio(journeys, counts.get(from) ?? 0),
+      conversionFromParent: ratio(journeys, reached(from)),
       fromParentSeconds: summarize(fromParent),
     } satisfies ArtistOfferBranchSummary;
   });

@@ -420,11 +420,28 @@ run_trufflehog_ci_pr() {
   return "$classify_status"
 }
 
-# Schedule/full-history (run 35215186887) still reports an unverified Vercel
-# finding with no File path. The match is the commit message of this SHA;
-# path excludes cannot suppress commit messages. Allowlist that exact SHA
-# only — do not drop the Vercel detector and do not rewrite history.
-TRUFFLEHOG_FULL_ALLOW_COMMITS='304e0d95ae1b5f80f58c27b4ca6b7939b3a04584'
+# Exact-SHA allowlist for the schedule/full-history scan. Every entry records
+# why each of its findings is not a credential; never add a SHA without that.
+# Do not drop detectors and do not rewrite history.
+#
+# 304e0d95ae…: unverified Vercel finding with no File path (run 35215186887).
+#   The match is a 24-char identifier in the commit message; path excludes
+#   cannot suppress commit messages.
+# 1bfeaada31…: worktree-sweep snapshot on backup/mac/94af-Jovie-20261009
+#   (2026-10-09). It committed outputs/sidebar-review/diagnostics, whose source
+#   tarballs and static builds repeat already-triaged content. Runs 38313683820
+#   and 39312262148 reported 48 unverified findings here, re-scanned per file
+#   on 2026-10-21 (value hashes only):
+#   - Postgres/URI in .env.example, tests/lib/database-url-validation.test.ts,
+#     .agents/skills/gstack/test/skill-e2e-cso.test.ts: example connection
+#     strings, excluded at their live paths in .trufflehog-exclude.txt.
+#   - FastlyPersonalToken in scripts/{download-current-spotify-images,
+#     fetch-current-artist-images}.ts and Vercel in lib/cron/auth.test.ts,
+#     lib/merch/artwork.ts: historical JOV-2940 fixtures, excluded at their
+#     live paths.
+#   - YoutubeApiKey (one value) in Storybook static index.json copies: a story
+#     id next to the YouTubeComment export, not a key.
+TRUFFLEHOG_FULL_ALLOW_COMMITS='304e0d95ae1b5f80f58c27b4ca6b7939b3a04584 1bfeaada31f16bf55e797c81cd8109fae69bdef8'
 
 classify_trufflehog_full_findings() {
   local scan_log="$1" status="$2"
@@ -451,7 +468,7 @@ classify_trufflehog_full_findings() {
   remaining="$(grep -vxF -f "$allow_file" <<<"$finding_commits" || true)"
   rm -f "$allow_file"
   if [[ -z "$remaining" ]]; then
-    echo "::warning title=Secret scan allowlisted historical commit::trufflehog reported findings only in allowlisted commit(s): $(paste -sd, - <<<"$finding_commits"). These are known non-credential matches (commit-message detector bait with no file path) and cannot fail the schedule scan." >&2
+    echo "::warning title=Secret scan allowlisted historical commit::trufflehog reported findings only in allowlisted commit(s): $(paste -sd, - <<<"$finding_commits"). Each is a recorded non-credential match (see TRUFFLEHOG_FULL_ALLOW_COMMITS) and cannot fail the schedule scan." >&2
     return 0
   fi
   return 183
