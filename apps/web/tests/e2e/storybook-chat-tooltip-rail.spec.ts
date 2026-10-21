@@ -154,7 +154,9 @@ test('hybrid touch activates chat actions first and keyboard hints return', asyn
   await actions.focus();
   await page.keyboard.press('Tab');
   await expect(clipped).toBeFocused();
-  await expect(page.getByTestId('tooltip-content')).toBeVisible();
+  await expect(
+    page.getByRole('tooltip', { name: /^Plan the autumn release/ })
+  ).toBeVisible();
   await clipped.press('Escape');
   await clipped.hover();
   await expect(page.getByTestId('tooltip-content')).toBeVisible();
@@ -179,5 +181,7 @@ test('fitting after resize closes a hint and reclipping waits for fresh intent',
   await page.keyboard.press('Tab');
   await page.keyboard.press('Shift+Tab');
   await expect(clipped).toBeFocused();
-  await expect(page.getByTestId('tooltip-content')).toBeVisible();
+  await expect(
+    page.getByRole('tooltip', { name: /^Plan the autumn release/ })
+  ).toBeVisible();
 });
