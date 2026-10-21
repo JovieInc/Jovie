@@ -218,3 +218,75 @@ export function codexOverlays(accounts) {
   }
   return overlays;
 }
+
+/** Summer's contained provider-trial ledger (summer-config provider-trial.ts). */
+export const TRIAL_LEDGER_SCHEMA = 'summer.provider-trial-ledger/v1';
+export const TRIAL_LEDGER_PATH = 'summer-company/provider-trial/ledger.json';
+/** Trial channel -> ops/registry/spend.json line id. */
+export const TRIAL_SPEND_IDS = Object.freeze({
+  'workers-ai': 'summer-trial-workers-ai',
+  'anthropic-api': 'summer-trial-anthropic-api',
+});
+
+/**
+ * Current UTC month's booked spend per trial channel. A channel with no slot
+ * this month has booked nothing, so it reads as $0 rather than unmeasured.
+ */
+export function summarizeProviderTrialLedger(ledger, nowMs) {
+  if (ledger?.schema !== TRIAL_LEDGER_SCHEMA)
+    return { ok: false, reason: 'trial-ledger-schema' };
+  const observedAt = new Date(nowMs).toISOString();
+  const month = observedAt.slice(0, 7);
+  const slots = ledger.months?.[month] ?? {};
+  const value = {};
+  for (const [channel, id] of Object.entries(TRIAL_SPEND_IDS)) {
+    const micro = slots[channel]?.bookedMicroUsd ?? 0;
+    if (!Number.isFinite(micro) || micro < 0)
+      return { ok: false, reason: `trial-ledger-unparsed:${channel}` };
+    value[id] = {
+      observedAt,
+      periodKey: month,
+      spentUsd: micro / 1_000_000,
+      source: `provider-trial ledger ${month}.${channel}.bookedMicroUsd`,
+    };
+  }
+  return { ok: true, value };
+}
+
+/**
+ * Reads the ledger from a local file or an https URL (a private Vercel Blob
+ * URL takes a read token as a bearer header). No source configured is a
+ * reported skip, not a failure.
+ *
+ * @param {{
+ *   source?: string,
+ *   token?: string,
+ *   fetchImpl?: typeof fetch,
+ *   now: () => number,
+ * }} options
+ */
+export async function readProviderTrialLedger({
+  source,
+  token,
+  fetchImpl = fetch,
+  now,
+}) {
+  if (!source) return { ok: false, reason: 'no-trial-ledger-source' };
+  let ledger;
+  if (/^https:\/\//.test(source)) {
+    const response = await fetchImpl(source, {
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (response.status === 404)
+      return { ok: false, reason: 'trial-ledger-absent' };
+    if (!response.ok)
+      return { ok: false, reason: `trial-ledger-http-${response.status}` };
+    ledger = await response.json();
+  } else {
+    if (!existsSync(source))
+      return { ok: false, reason: 'trial-ledger-absent' };
+    ledger = JSON.parse(readFileSync(source, 'utf8'));
+  }
+  return summarizeProviderTrialLedger(ledger, now());
+}

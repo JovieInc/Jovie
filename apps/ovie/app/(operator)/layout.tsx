@@ -12,7 +12,7 @@ export default async function OperatorLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const access = await getCurrentAdminPageAccess();
   if (!access.isAuthenticated || !access.userId)
-    redirect('/signin?redirect_url=/hud');
+    redirect('/signin?redirect_url=/app/ov');
   if (!access.hasAdminRole) forbidden();
   const pathname = (await headers()).get('x-ovie-pathname') ?? '/app/ov/chat';
   return (
