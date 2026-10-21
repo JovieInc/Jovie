@@ -120,6 +120,17 @@ export interface HomeLoopLatencyRow {
   readonly regressed: boolean;
 }
 
+/**
+ * One entry of the stage-time strip under the pulse: an end-to-end span
+ * ("PR → merged 38m / 28h") or a flow p95. Values arrive formatted.
+ */
+export interface HomeLoopStripItem {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string;
+  readonly tone: HomeLoopTone;
+}
+
 /** Compact duration for seconds; unknown stays "Not measured". */
 export function formatDurationSeconds(value: number | null): string {
   if (value === null || !Number.isFinite(value) || value < 0)

@@ -196,7 +196,7 @@ describe('OvieHomeCanvas', () => {
       '1 item is blocked'
     );
     expect(screen.getByTestId('home-loop-done')).toHaveTextContent('3 merges');
-    expect(screen.getByTestId('home-loop-stage-row')).toHaveAttribute(
+    expect(screen.getByTestId('home-loop-kanban-card')).toHaveAttribute(
       'data-attention',
       'blocked'
     );
@@ -468,7 +468,7 @@ describe('OvieHomeCanvas', () => {
     expect(
       screen.getByTestId('home-loop-in-flight-generated')
     ).toHaveTextContent('Shipping Now');
-    expect(screen.queryByTestId('home-loop-stage-row')).toBeNull();
+    expect(screen.queryByTestId('home-loop-kanban-card')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Previous Answer' }));
     expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
@@ -477,7 +477,7 @@ describe('OvieHomeCanvas', () => {
     expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
       'Monthly Revenue'
     );
-    expect(screen.getByTestId('home-loop-stage-row')).toBeVisible();
+    expect(screen.getByTestId('home-loop-kanban-card')).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Conversation' }));
     expect(chat.onOpenTranscript).toHaveBeenCalledOnce();
