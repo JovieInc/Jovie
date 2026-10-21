@@ -66,6 +66,7 @@ import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-7704)
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
+import outcome_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 import credentials_spend  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
@@ -7917,6 +7918,12 @@ def dispatch(host: Host) -> int:
         tick["reason"] = reason_lane.tick(host, THIS, lambda: Linear(host.linear_env))
     except (Exception, SystemExit) as error:  # Summer's reasoning jobs never take dispatch down
         tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        owner = os.environ.get("OUTCOME_LANE_OWNER", "gem").split(".")[0]
+        tick["outcome"] = (outcome_lane.tick(host, THIS) if HOST == owner else
+                           {"status": "not-owner", "owner": owner})
+    except (Exception, SystemExit) as error:  # outcome verification never takes dispatch down
+        tick["outcomeError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         if not os.environ.get("LANES_SELFTEST"):  # a release self-test never writes to Linear
             teams = ["JOV", *(binding.key for binding in bindings.extra_bindings(THIS))]

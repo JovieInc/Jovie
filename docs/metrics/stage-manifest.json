@@ -107,6 +107,14 @@
           "producer": "production-controller.yml",
           "status": "derived",
           "source": "github-controller"
+        },
+        {
+          "id": "outcome-receipt",
+          "meaning": "outcome receipt owed (lifecycle comment) to receipt recorded by the outcome lane; entityId is the JOV issue",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
         }
       ]
     },
