@@ -68,6 +68,7 @@ export async function ingestSocialPlatformUrl(
      * gets a new handle instead of a merged link.
      */
     readonly allocateNewHandleOnCollision?: boolean;
+    readonly createdByUserId?: string;
   } = {}
 ): Promise<NextResponse> {
   const detected = detectPlatform(inputUrl);
@@ -104,6 +105,7 @@ export async function ingestSocialPlatformUrl(
     normalizedUrl: detected.normalizedUrl,
     spotifyArtistName: spotifyData?.name ?? null,
     spotifyData,
+    createdByUserId: options.createdByUserId,
   };
 
   const response = await withSystemIngestionSession(async tx => {

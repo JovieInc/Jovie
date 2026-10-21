@@ -2,7 +2,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CLI_VERSION_FALLBACK,
   type CliOutput,
@@ -655,5 +655,29 @@ describe('jovie music resolve', () => {
       error: { apiCode: 'UPSTREAM_FAILURE', retryable: true },
     });
     expect(stderr.read()).toBe('');
+  });
+});
+
+describe('API key environment', () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it('passes JOVIE_API_KEY to CLI requests', async () => {
+    const key = 'jovie_' + 'x'.repeat(64);
+    vi.stubEnv('JOVIE_API_KEY', key);
+    const fetchImpl = vi.fn(async () => Response.json({}));
+    const stdout = createOutput();
+    const stderr = createOutput();
+    expect(
+      await runCli(
+        ['profile', 'create', 'https://open.spotify.com/artist/test'],
+        { fetchImpl, stdout: stdout.output, stderr: stderr.output }
+      )
+    ).toBe(0);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: `Bearer ${key}` }),
+      })
+    );
+    expect(stdout.read() + stderr.read()).not.toContain(key);
   });
 });

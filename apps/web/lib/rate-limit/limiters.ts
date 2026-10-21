@@ -351,6 +351,11 @@ export const agentProfileCreateLimiter = createRateLimiter(
   }
 );
 
+export const agentProfileCreateAuthenticatedLimiter = createRateLimiter(
+  RATE_LIMITERS.agentProfileCreateAuthenticated,
+  { requireRedis: true }
+);
+
 /**
  * Rate limiter for anonymous creator extraction
  * (`GET /api/agents/creator-lookup`). Limit: 60 requests per hour per IP.
@@ -1317,6 +1322,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     publicProfile: publicProfileLimiter,
     publicArtistApi: publicArtistApiLimiter,
     agentProfileCreate: agentProfileCreateLimiter,
+    agentProfileCreateAuthenticated: agentProfileCreateAuthenticatedLimiter,
     agentCreatorLookup: agentCreatorLookupLimiter,
     claimTokenAccess: claimTokenAccessLimiter,
     investorPortalToken: investorPortalTokenLimiter,

@@ -232,3 +232,12 @@ describe('published public CLI/MCP contract', () => {
     );
   });
 });
+
+it('documents optional bearer authentication without requiring it for profile creation', () => {
+  expect(
+    ARTIST_OPENAPI_DOCUMENT.paths['/api/agents/profiles'].post?.security
+  ).toEqual([{}, { AgentApiKey: [] }]);
+  expect(
+    ARTIST_OPENAPI_DOCUMENT.components.securitySchemes.AgentApiKey
+  ).toMatchObject({ type: 'http', scheme: 'bearer' });
+});

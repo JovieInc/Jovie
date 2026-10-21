@@ -24,6 +24,7 @@ const DEFAULT_PERSONA = INTERNAL_DJ_DEMO_PERSONA.profile;
  */
 const DEFAULT_DEMO_PROFILE: CreatorProfile = {
   id: DEMO_PROFILE_ID,
+  createdByUserId: null,
   userId: 'demo-user-001',
   waitlistEntryId: null,
   creatorType: DEFAULT_PERSONA.creatorType,

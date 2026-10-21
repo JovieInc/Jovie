@@ -1,5 +1,5 @@
 import { Readable } from 'node:stream';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { FetchImplementation } from './client.js';
 import { handleMcpMessage, serveMcp } from './mcp.js';
@@ -418,4 +418,28 @@ describe('MCP hostile input boundary', () => {
         .idempotentHint
     ).toBe(false);
   });
+});
+
+it('forwards the configured API key for MCP product calls without returning it', async () => {
+  const key = 'jovie_' + 'x'.repeat(64);
+  const fetchImpl = vi.fn(async () => Response.json({}));
+  const result = await handleMcpMessage(
+    {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'create_profile',
+        arguments: { url: 'https://open.spotify.com/artist/test' },
+      },
+    },
+    { ...context(fetchImpl), apiKey: key }
+  );
+  expect(fetchImpl).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: `Bearer ${key}` }),
+    })
+  );
+  expect(JSON.stringify(result)).not.toContain(key);
 });

@@ -3,15 +3,22 @@ import { expectPublicOpenApiResponse } from '@/tests/utils/public-openapi';
 
 const hoisted = vi.hoisted(() => ({
   flag: vi.fn(),
+  auth: vi.fn(),
+  accountLimit: vi.fn(),
   limit: vi.fn(),
   spotify: vi.fn(),
   ingest: vi.fn(),
   selectRows: [] as unknown[][],
 }));
 
+vi.mock('@/lib/auth/agent-api-key', () => ({
+  authenticateAgentApiKey: hoisted.auth,
+}));
+
 vi.mock('@/constants/app', () => ({ BASE_URL: 'https://jov.ie' }));
 vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: hoisted.flag }));
 vi.mock('@/lib/rate-limit', () => ({
+  agentProfileCreateAuthenticatedLimiter: { limit: hoisted.accountLimit },
   agentProfileCreateLimiter: { limit: hoisted.limit },
   createRateLimitHeaders: () => ({ 'Retry-After': '60' }),
   getClientIP: () => '203.0.113.10',
@@ -61,12 +68,56 @@ describe('POST /api/agents/profiles', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.selectRows = [];
+    hoisted.auth.mockResolvedValue({ ok: true, userId: null });
+    hoisted.accountLimit.mockResolvedValue({ success: true });
     hoisted.flag.mockResolvedValue(true);
     hoisted.limit.mockResolvedValue({ success: true });
     hoisted.spotify.mockResolvedValue({
       name: 'Radiohead',
       spotifyId: '4Z8W4fKeB5YxbusRsdQVPb',
     });
+  });
+
+  it('uses the account budget and persists creator attribution without granting ownership', async () => {
+    hoisted.auth.mockResolvedValue({ ok: true, userId: 'app-user' });
+    hoisted.selectRows = [
+      [],
+      [{ isPublic: true, isClaimed: false, displayName: 'Artist' }],
+    ];
+    hoisted.ingest.mockResolvedValue(
+      Response.json({ profile: { username: 'artist' } })
+    );
+    const res = await post({ url: SPOTIFY_URL });
+    expect(res.status).toBe(201);
+    expect(hoisted.accountLimit).toHaveBeenCalledWith('app-user');
+    expect(hoisted.limit).not.toHaveBeenCalled();
+    expect(hoisted.ingest).toHaveBeenCalledWith(SPOTIFY_URL, {
+      allocateNewHandleOnCollision: true,
+      createdByUserId: 'app-user',
+    });
+    expect(await res.json()).toMatchObject({ claimed: false });
+  });
+
+  it('rejects invalid credentials and fails closed when authentication is down', async () => {
+    hoisted.auth.mockResolvedValueOnce({ ok: false });
+    expect((await post({ url: SPOTIFY_URL })).status).toBe(401);
+    hoisted.auth.mockRejectedValueOnce(new Error('provider unavailable'));
+    expect((await post({ url: SPOTIFY_URL })).status).toBe(503);
+    expect(hoisted.ingest).not.toHaveBeenCalled();
+    expect(hoisted.limit).not.toHaveBeenCalled();
+  });
+
+  it('enforces one shared account quota and denies writes during Redis outages', async () => {
+    hoisted.auth.mockResolvedValue({ ok: true, userId: 'app-user' });
+    hoisted.accountLimit.mockResolvedValueOnce({ success: false });
+    expect((await post({ url: SPOTIFY_URL })).status).toBe(429);
+    hoisted.accountLimit.mockResolvedValueOnce({
+      success: false,
+      unavailable: true,
+    });
+    expect((await post({ url: SPOTIFY_URL })).status).toBe(503);
+    expect(hoisted.spotify).not.toHaveBeenCalled();
+    expect(hoisted.ingest).not.toHaveBeenCalled();
   });
 
   it('returns 503 when the kill switch is off', async () => {

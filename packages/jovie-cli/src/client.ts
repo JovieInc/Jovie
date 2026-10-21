@@ -8,6 +8,7 @@ export type FetchImplementation = (
 ) => Promise<Response>;
 
 export type ResourceOptions = {
+  readonly apiKey?: string;
   readonly workerToken?: string;
   readonly baseUrl?: string;
   readonly fetchImpl?: FetchImplementation;
@@ -45,7 +46,7 @@ export class JovieRequestError extends Error {
 
 export function safeDiagnostic(value: string): string {
   return value.replace(
-    /(?:Bearer\s+[^\s"']+|jwf\.[A-Za-z0-9._-]+|sk-[A-Za-z0-9_-]{16,})/gi,
+    /(?:Bearer\s+[^\s"']+|jwf\.[A-Za-z0-9._-]+|jovie_[A-Za-z0-9_-]{32,}|sk-[A-Za-z0-9_-]{16,})/gi,
     '[redacted]'
   );
 }
@@ -359,6 +360,15 @@ async function request(
 ): Promise<{ readonly body: string; readonly url: string }> {
   const baseUrl = normalizeBaseUrl(options.baseUrl);
   const url = resourceUrl(baseUrl, pathname);
+  if (
+    options.apiKey &&
+    new URL(baseUrl).protocol !== 'https:' &&
+    !['localhost', '127.0.0.1', '[::1]'].includes(new URL(baseUrl).hostname)
+  ) {
+    throw new JovieInputError(
+      'API key authentication requires HTTPS (except loopback).'
+    );
+  }
   const method = jsonBody === undefined ? 'GET' : 'POST';
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   // One deadline covers every attempt, backoff, and the body, so a command
@@ -376,6 +386,9 @@ async function request(
         method,
         headers: {
           Accept: accept,
+          ...(options.apiKey
+            ? { Authorization: `Bearer ${options.apiKey}` }
+            : {}),
           'User-Agent': options.userAgent ?? DEFAULT_USER_AGENT,
           ...(jsonBody === undefined
             ? {}
@@ -497,7 +510,7 @@ async function requestJson(
       `${jsonBody === undefined ? 'GET' : 'POST'} ${url} returned invalid JSON`,
       url,
       undefined,
-      body.slice(0, 1_000)
+      safeDiagnostic(body.slice(0, 1_000))
     );
   }
 }
@@ -687,7 +700,7 @@ export function fetchArtistLlms(
 /**
  * Create (or find) a Jovie profile for a Spotify artist. Returns the public
  * profile URL and, when unclaimed, a claim URL the human opens to verify
- * ownership. Anonymous and rate limited per IP.
+ * ownership. API keys attribute creation; anonymous requests are limited per IP.
  */
 export function createProfile(
   spotifyArtistUrl: string,

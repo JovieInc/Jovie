@@ -683,3 +683,40 @@ describe('music resolution over the existing MCP transport', () => {
     ).rejects.toMatchObject({ apiCode: 'RESOLUTION_FAILED' });
   });
 });
+
+describe('agent API key authentication', () => {
+  it('sends an explicit key as a bearer credential', async () => {
+    const { fetchImpl, calls } = createFetch('{}');
+    await createProfile('https://open.spotify.com/artist/test', {
+      apiKey: 'jovie_' + 'x'.repeat(64),
+      fetchImpl,
+    });
+    expect(calls[0]?.init?.headers).toMatchObject({
+      Authorization: 'Bearer jovie_' + 'x'.repeat(64),
+    });
+  });
+
+  it('refuses to send credentials over remote HTTP before making a request', async () => {
+    const { fetchImpl, calls } = createFetch('{}');
+    await expect(
+      fetchArtist('demo', {
+        apiKey: 'jovie_' + 'x'.repeat(64),
+        baseUrl: 'http://example.com',
+        fetchImpl,
+      })
+    ).rejects.toThrow(/HTTPS/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('redacts key-shaped text from server diagnostics', async () => {
+    const key = 'jovie_' + 'x'.repeat(64);
+    const { fetchImpl } = createFetch(JSON.stringify({ error: key }), 401);
+    try {
+      await fetchArtist('demo', { apiKey: key, fetchImpl });
+      expect.fail('should reject');
+    } catch (error) {
+      expect(JSON.stringify(error)).not.toContain(key);
+      expect((error as Error).message).not.toContain(key);
+    }
+  });
+});

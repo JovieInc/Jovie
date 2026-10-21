@@ -45,6 +45,7 @@ export interface ExistingProfileData {
  * Context for social platform ingestion
  */
 export interface SocialPlatformContext {
+  readonly createdByUserId?: string;
   handle: string;
   normalizedHandle: string;
   platformId: string;
@@ -271,6 +272,7 @@ export async function createNewSocialProfile(
     .insert(creatorProfiles)
     .values({
       creatorType: 'creator',
+      createdByUserId: context.createdByUserId,
       username: canonicalHandle,
       usernameNormalized: canonicalHandle,
       displayName,

@@ -171,8 +171,8 @@ export const PUBLIC_AGENT_PATHS: Readonly<
       operationId: 'createProfile',
       summary: 'Create or find a Spotify artist profile',
       description:
-        'Anonymous, feature-gated and rate limited by client IP. Supports Spotify artist URLs only. Returns an existing profile unchanged (200) or creates an unclaimed profile (201). claimUrl leads to human ownership verification and is null for claimed profiles. Writes have no idempotency key and are not automatically retried by the CLI.',
-      security: [],
+        'Feature-gated. Anonymous callers are limited to 10 creations per hour per IP. An optional Bearer JOVIE_API_KEY attributes new profiles to the account and uses a shared 100-per-hour account budget. API keys do not grant artist ownership. Supports Spotify artist URLs only. Returns an existing profile unchanged (200) or creates an unclaimed profile (201). claimUrl leads to human ownership verification and is null for claimed profiles. Writes have no idempotency key and are not automatically retried by the CLI.',
+      security: [{}, { AgentApiKey: [] }],
       requestBody: body('AgentProfileRequest'),
       responses: {
         '200': jsonResponse('Existing profile', ref('AgentProfileResponse')),
@@ -185,6 +185,7 @@ export const PUBLIC_AGENT_PATHS: Readonly<
           'CREATE_FAILED',
           'VALIDATION_FAILED'
         ),
+        '401': failure('Invalid or expired API key.', 'UNAUTHORIZED'),
         '404': failure(
           'Spotify artist not found.',
           'ARTIST_NOT_FOUND',
@@ -196,7 +197,7 @@ export const PUBLIC_AGENT_PATHS: Readonly<
           'UNSUPPORTED_URL'
         ),
         '429': failure(
-          'Client IP quota exceeded.',
+          'Client IP or account quota exceeded.',
           'CREATE_FAILED',
           'RATE_LIMITED'
         ),
