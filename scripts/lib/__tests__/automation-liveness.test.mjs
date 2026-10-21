@@ -508,6 +508,149 @@ describe('dead-man liveness', () => {
     ).not.toBe('fresh');
   });
 
+  // Tim 2026-10-21: Triage is sorted on the event, not a tick. The oldest
+  // unsorted issue's age is the staleness; the dwell SLO is 15 min.
+  it('a Triage issue older than the 15-minute dwell SLO is stale; an empty Triage is fresh', async () => {
+    const triage = minutesAgo => ({
+      graphql: async () => ({
+        issues: {
+          nodes: minutesAgo.map((m, index) => ({
+            identifier: `JOV-${index + 1}`,
+            createdAt: iso(m + 1000),
+            startedTriageAt: iso(m),
+          })),
+        },
+      }),
+    });
+    const run = linear =>
+      runLiveness({
+        registry: only('summer:triage-dwell'),
+        nowMs: NOW,
+        linear,
+      }).then(({ report }) => rowFor(report, 'summer:triage-dwell'));
+    const stuck = await run(triage([3, 40]));
+    expect(stuck.status).toBe('stale');
+    expect(stuck.ageMinutes).toBe(40);
+    expect(stuck.reason).toContain('oldest=JOV-2');
+    expect((await run(triage([3, 14]))).status).toBe('fresh');
+    expect((await run(triage([]))).status).toBe('fresh');
+    // No credential or a failed read is silence, never health.
+    expect((await run(null)).status).not.toBe('fresh');
+    const failing = {
+      graphql: async () => {
+        throw new Error('Linear GraphQL: unauthorized');
+      },
+    };
+    expect((await run(failing)).status).not.toBe('fresh');
+  });
+
+  // Tim 2026-10-21: a required-green PR is promoted and enqueued on the
+  // check event. Ready + green + outside the queue for over 10 min is stale.
+  it('a ready PR whose head is required-green but not enqueued for 10+ minutes is stale', async () => {
+    const pr = (number, extra = {}) => ({
+      number,
+      isDraft: false,
+      isInMergeQueue: false,
+      mergeStateStatus: 'CLEAN',
+      baseRefName: 'main',
+      headRefOid: String(number).repeat(40).slice(0, 40),
+      ...extra,
+    });
+    // PR Ready, Migration Guard and PR Size Guard are check runs; Fork PR
+    // Gate is a commit status. Green time is the latest required success.
+    const heads = greenMinutesAgo => ({
+      check_runs: [
+        {
+          name: 'PR Ready',
+          conclusion: 'success',
+          completed_at: iso(greenMinutesAgo),
+        },
+        {
+          name: 'Migration Guard',
+          conclusion: 'success',
+          completed_at: iso(greenMinutesAgo + 20),
+        },
+        {
+          name: 'PR Size Guard',
+          conclusion: 'success',
+          completed_at: iso(greenMinutesAgo + 25),
+        },
+      ],
+    });
+    const status = greenMinutesAgo => ({
+      statuses: [
+        {
+          context: 'Fork PR Gate',
+          state: 'success',
+          created_at: iso(greenMinutesAgo + 30),
+        },
+      ],
+    });
+    const run = (list, green = 30, overrides = {}) =>
+      runLiveness({
+        registry: only('github:jovie:green-to-enqueue'),
+        nowMs: NOW,
+        token: 't',
+        fetchImpl: fakeFetch({
+          '/graphql':
+            typeof list === 'number'
+              ? list
+              : { data: { repository: { pullRequests: { nodes: list } } } },
+          '/check-runs': overrides.runs ?? heads(green),
+          '/status': overrides.status ?? status(green),
+        }),
+      }).then(({ report }) => rowFor(report, 'github:jovie:green-to-enqueue'));
+    const waiting = await run([pr(1)]);
+    expect(waiting.status).toBe('stale');
+    expect(waiting.ageMinutes).toBe(30);
+    expect(waiting.reason).toContain('#1:30m');
+    // Inside the SLO, queued, conflicting, blocked or another base: fresh.
+    expect((await run([pr(2)], 5)).status).toBe('fresh');
+    expect((await run([pr(3, { isInMergeQueue: true })])).status).toBe('fresh');
+    expect((await run([pr(4, { mergeStateStatus: 'DIRTY' })])).status).toBe(
+      'fresh'
+    );
+    expect((await run([pr(5, { mergeStateStatus: 'BLOCKED' })])).status).toBe(
+      'fresh'
+    );
+    expect((await run([pr(6, { baseRefName: 'release' })])).status).toBe(
+      'fresh'
+    );
+    // A required name with no success yet (status pending) is not green.
+    expect(
+      (
+        await run([pr(7)], 30, {
+          status: {
+            statuses: [
+              {
+                context: 'Fork PR Gate',
+                state: 'pending',
+                created_at: iso(30),
+              },
+            ],
+          },
+        })
+      ).status
+    ).toBe('fresh');
+    // Green drafts are reported, but drafts belong to their writer.
+    const draft = await run([pr(8, { isDraft: true })]);
+    expect(draft.status).toBe('fresh');
+    expect(draft.reason).toContain('draft-green=1[#8]');
+    // Unreadable or unauthenticated is silence, never health.
+    expect((await run(502)).status).not.toBe('fresh');
+    expect((await run([pr(9)], 30, { runs: 502 })).status).not.toBe('fresh');
+    const unauth = await runLiveness({
+      registry: only('github:jovie:green-to-enqueue'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        '/graphql': { data: { repository: { pullRequests: { nodes: [] } } } },
+      }),
+    });
+    expect(
+      rowFor(unauth.report, 'github:jovie:green-to-enqueue').status
+    ).not.toBe('fresh');
+  });
+
   it('only counts the configured trigger events for scheduled baselines', async () => {
     const { report } = await runLiveness({
       registry: only('github:jovie:security'),

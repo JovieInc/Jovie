@@ -33,6 +33,17 @@
     "bodySha256": "b0c5be920c0f2f5b75be43e8325735d313b0167fd9148cdb49aa1af176ec59b1"
   },
   {
+    "file": ".claude/rules/event-driven.md",
+    "paths": [
+      ".github/workflows/**",
+      "scripts/lanes/**",
+      "scripts/backlog-orchestrator/**",
+      "canon/automation-registry.jsonl",
+      "docs/metrics/**"
+    ],
+    "bodySha256": "231c6da1fc81dee71971f0fbb887af84a64e3ca878746b78036c5e72d539006a"
+  },
+  {
     "file": ".claude/rules/external-apis.md",
     "paths": [
       "apps/**",

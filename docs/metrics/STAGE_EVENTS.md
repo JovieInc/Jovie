@@ -13,7 +13,7 @@ One row per entity per stage. Stage dwell time is `exitedAt - enteredAt`.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `schema` | `"jovie-stage-event/v1"` | Contract version. Breaking changes bump it. |
-| `entityType` | manifest key | `shipping`, `remediation`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `automation-run` |
+| `entityType` | manifest key | `shipping`, `remediation`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `linear-intake`, `automation-run` |
 | `entityId` | string | Stable id; the format is declared per entity in the manifest. |
 | `stage` | manifest stage id | Must be registered for the entity type. Unregistered stages are rejected. |
 | `enteredAt` | ISO-8601 | When the entity entered the stage. |
