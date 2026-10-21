@@ -25,6 +25,7 @@
 **Idempotency:**
 
 - Stripe webhooks use the `stripeWebhookEvents` table (unique constraint on event ID) to prevent double-processing
+- A verified paid Stripe event that cannot be applied yet (unmapped price, unknown merch order, unattributable tip) is acknowledged only after its `stripeWebhookEvents` row is marked `reconciliation_status = 'needs_reconciliation'`; if that write fails the route returns 5xx so Stripe retries. Subscription and merch rows stay unprocessed, so the billing-reconciliation replay applies them exactly once after the fix. `/api/billing/health` reports the queue as `noEventsNeedReconciliation`.
 - Instantly reply milestones use `leadFunnelEvents` and its unique `(lead_id, event_type)` key; `recordLeadFunnelEventReceipt` acknowledges only after persistence.
 - Resend delivery and Printful webhooks use the `webhookEvents` table for the same purpose
 - Linear webhooks use Redis-backed `acquireRecentDispatch` with a six-hour provider-identity lock; Sentry uses the same helper with a 60s TTL
