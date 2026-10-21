@@ -128,7 +128,7 @@ function ApiKeysManager({ userId }: { readonly userId: string }) {
       </div>
       <div className='min-h-8 text-app' role='status'>
         {mutation.error ? (
-          <p className='text-destructive'>{mutation.error.message}</p>
+          <p className='text-error'>{mutation.error.message}</p>
         ) : null}
       </div>
       <div className='h-48 overflow-y-auto' aria-busy={keys.isPending}>
