@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Market signal watcher: Tim's X bookmarks and AI-lab/platform/competitor changelogs.
+"""Market signal watcher: Tim's X bookmarks, tracked X accounts and AI-lab/platform/competitor changelogs.
 
 Summer (Jovie's operator agent) uses these as signal on what to buy, borrow, adopt or
 clone for the products or internal ops. One run:
 
 1. Polls each enabled source in sources.json with ETag / If-Modified-Since, diffs only
-   entries not seen before (first sight of a source keeps just its newest few), and
-   reads new X bookmarks since the last seen one (Composio's X connector, or a JSON
-   export dropped in the inbox directory by a logged-in browser session).
+   entries not seen before (first sight of a source keeps just its newest few), reads
+   new X bookmarks from JSON exports dropped in the inbox directory by a logged-in
+   browser session, and reads new posts from the tracked X accounts in sources.json
+   through the Grok CLI's X search (x_grok.py; internal use only, no bookmark access).
 2. Fetches each bookmark's first linked page for a short extractive summary.
 3. Classifies each new item with Jev (typesafe-ai/jev on the Vercel AI Gateway, about
    $0.00002 per item) into buy / borrow / adopt / clone / ignore, product vs internal
@@ -42,7 +43,9 @@ import xml.etree.ElementTree as ET
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "lanes"))
+sys.path.insert(0, str(HERE))
 import capacity_limit  # noqa: E402  (existing signed Summer wire: summer_config, sign, canonical)
+import x_grok  # noqa: E402  (internal-only X source through the Grok CLI)
 import yc_corpus  # noqa: E402  (existing gbrain put + read-back contract)
 
 STATE_SCHEMA = "jovie.signal-watch/v1"
@@ -50,12 +53,14 @@ SUMMER_SCHEMA = "jovie.market-signal/v1"
 SUMMER_ROUTE = "/summer/v1/symphony/market-signals"
 JEV_URL = "https://ai-gateway.vercel.sh/typesafe/v1/systemone"
 JEV_MODEL = "typesafe-ai/jev"
-COMPOSIO_ORIGIN = "https://backend.composio.dev"
-BOOKMARKS_SLUG = "TWITTER_BOOKMARKS_BY_USER"
 USER_AGENT = "JovieSignalWatch/1.0 (+https://jov.ie)"
 DEFAULT_STATE = Path.home() / ".local/state/jovie-signals/state.json"
 DEFAULT_INBOX = Path.home() / ".local/state/jovie-signals/bookmarks-inbox"
 SOURCES_FILE = HERE / "sources.json"
+STAGE_EVENT_SCHEMA = "jovie-stage-event/v1"
+STAGE_EVENT_DAYS = 28
+DEFAULT_GROK_CALLS_PER_DAY = 4  # one per REFRESH_INTERVAL_S run
+MAX_SEEN_X_POSTS = 3000
 
 MAX_BYTES = 12 * 1024 * 1024
 FIRST_SIGHT_KEEP = 3          # newest entries processed the first time a source is seen
@@ -117,6 +122,13 @@ def now_iso(now: float | None = None) -> str:
     return yc_corpus.now_iso(now)
 
 
+def epoch(value: str) -> float | None:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
 def sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -161,6 +173,16 @@ def load_sources(path: Path = SOURCES_FILE) -> list[dict]:
         if source.get("enabled", True):
             sources.append(source)
     return sources
+
+
+def load_x_config(path: Path = SOURCES_FILE) -> dict:
+    """sources.json `x`: tracked accounts and search queries read through the Grok CLI."""
+    x = json.loads(path.read_text()).get("x") or {}
+    accounts = [str(handle).lstrip("@") for handle in x.get("accounts") or []]
+    if any(not re.fullmatch(r"[A-Za-z0-9_]{1,15}", handle) for handle in accounts):
+        raise ValueError("signal-x-account-invalid")
+    return {"enabled": bool(x.get("enabled", True)) and bool(accounts or x.get("queries")),
+            "accounts": accounts, "queries": [str(q)[:200] for q in x.get("queries") or []]}
 
 
 def fetch(url: str, headers: dict | None = None, timeout: int = 30) -> dict:
@@ -468,38 +490,70 @@ def bookmarks_from_inbox(inbox: Path) -> tuple[list[dict], list[Path]]:
     return items, files
 
 
-def bookmarks_from_composio(env, poster=post_json, fetcher=fetch, max_pages: int = 3) -> list[dict]:
-    """Composio's X toolkit (`TWITTER_BOOKMARKS_BY_USER`, id defaults to the connected user).
-    Needs SIGNALS_COMPOSIO_API_KEY and SIGNALS_COMPOSIO_X_ACCOUNT (a connected X account)."""
-    key, account = env.get("SIGNALS_COMPOSIO_API_KEY"), env.get("SIGNALS_COMPOSIO_X_ACCOUNT")
-    if not key or not account:
-        return []
-    headers = {"x-api-key": key}
-    items, token = [], None
-    for _ in range(max_pages):
-        arguments = {"id": "me", "max_results": 50, "tweet_fields": ["created_at", "entities", "author_id"],
-                     "expansions": ["author_id"], "user_fields": ["username"]}
-        if token:
-            arguments["pagination_token"] = token
-        status, body = poster(f"{COMPOSIO_ORIGIN}/api/v3.1/tools/execute/{BOOKMARKS_SLUG}",
-                              {"connected_account_id": account, "arguments": arguments, "allow_tracing": False}, headers)
-        if status != 200 or body.get("successful") is not True:
-            raise RuntimeError(f"composio-bookmarks-{status or 'unreachable'}")
-        data = body.get("data") or {}
-        data = data.get("response_data", data) if isinstance(data, dict) else {}
-        users = {user.get("id"): user.get("username") for user in (data.get("includes") or {}).get("users", [])}
-        for tweet in data.get("data") or []:
-            urls = [entry.get("expanded_url") for entry in ((tweet.get("entities") or {}).get("urls") or [])
-                    if isinstance(entry, dict)]
-            item = normalize_bookmark({"id": tweet.get("id"), "author": users.get(tweet.get("author_id"), ""),
-                                       "text": tweet.get("text"), "createdAt": tweet.get("created_at"),
-                                       "links": [url for url in urls if url and not re.match(r"https://(x|twitter)\.com/", url)]})
-            if item:
-                items.append(item)
-        token = (data.get("meta") or {}).get("next_token")
-        if not token:
-            break
-    return items
+def x_post_item(post: dict) -> dict:
+    item = normalize_bookmark({"id": post["id"], "author": post["author"], "text": post["text"], "url": post["url"],
+                               "links": post.get("links") or [], "createdAt": post["createdAt"]})
+    item.update(kind="x-post", source="x-accounts", sourceName=f"X @{post['author']}", category="x-post",
+                id=f"x-post:{post['id']}")
+    return item
+
+
+def poll_x(state: dict, config: dict, env, now: float, search=None) -> tuple[list[dict], dict]:
+    """New posts from the tracked accounts: one Grok CLI call per run, capped per day."""
+    x = state.setdefault("x", {})
+    day = now_iso(now)[:10]
+    if x.get("day") != day:
+        x.update(day=day, calls=0, costUsd=0.0)
+    cap = int(env.get("SIGNALS_GROK_DAILY_CALLS") or DEFAULT_GROK_CALLS_PER_DAY)
+    if not config.get("enabled") or env.get("SIGNALS_X_DISABLED") == "1":
+        return [], {"status": "disabled"}
+    if x["calls"] >= cap:
+        return [], {"status": "capped", "calls": x["calls"]}
+    since = (x.get("lastCreatedAt") or now_iso(now - 2 * 86400))[:10]
+    search = search or x_grok.search_posts
+    x["calls"] += 1
+    found = search(config["accounts"], config["queries"], since, env=env)
+    x["costUsd"] = round(x["costUsd"] + float(found.get("costUsd") or 0.0), 6)
+    seen = x.get("seen", [])
+    seen_set = set(seen)
+    fresh = [post for post in found.get("posts") or [] if post["id"] not in seen_set]
+    x["seen"] = ([post["id"] for post in fresh] + seen)[:MAX_SEEN_X_POSTS]
+    if fresh:
+        x["lastCreatedAt"] = max([post["createdAt"] for post in fresh] + [x.get("lastCreatedAt") or ""])
+    summary = {"status": found.get("status"), "found": len(found.get("posts") or []), "new": len(fresh),
+               "callsToday": x["calls"], "notionalCostUsdToday": x["costUsd"]}
+    if found.get("error") or found.get("reason"):
+        summary["error"] = found.get("error") or found.get("reason")
+    return [x_post_item(post) for post in fresh], summary
+
+
+def dwell_events(items: list[dict], observed: str) -> list[dict]:
+    """X has no push trigger, so publish-to-observed dwell is the poll's cost; one row per post."""
+    return [{"schema": STAGE_EVENT_SCHEMA, "entityType": "market-signal", "entityId": item["id"], "stage": "published",
+             "enteredAt": item["published"], "exitedAt": observed, "actor": "grok-cli", "outcome": "advanced",
+             "sourceReceipt": item["url"]} for item in items if item.get("published")]
+
+
+def append_stage_events(path: Path, rows: list[dict], now: float) -> None:
+    keep_after = now_iso(now - STAGE_EVENT_DAYS * 86400)
+    old = []
+    if path.exists():
+        for line in path.read_text().splitlines():
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if str(row.get("exitedAt") or "") >= keep_after:
+                old.append(row)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in old + rows))
+
+
+def percentile(values: list[float], fraction: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    return ordered[min(len(ordered) - 1, int(round(fraction * (len(ordered) - 1))))]
 
 
 def new_bookmarks(state: dict, candidates: list[dict]) -> list[dict]:
@@ -581,6 +635,8 @@ def card_worthy(verdict: dict | None, min_score: float = CARD_MIN_SCORE) -> bool
 def brain_slug(item: dict) -> str:
     if item["kind"] == "x-bookmark":
         return f"signals/x-bookmarks/{item['tweetId']}"
+    if item["kind"] == "x-post":
+        return f"signals/x-posts/{item['tweetId']}"
     return f"signals/changelog/{item['source']}/{item['id'].rsplit(':', 1)[-1]}"
 
 
@@ -618,7 +674,9 @@ def render_digest(day: str, rows: list[dict]) -> str:
 # Summer delivery
 
 def summer_body(item: dict, verdict: dict, observed: str) -> dict:
-    return {"schema": SUMMER_SCHEMA, "itemId": item["id"].lower()[:120], "origin": item["kind"],
+    # Summer's ingress knows x-bookmark and changelog; a tracked account's post is an announcement.
+    origin = "changelog" if item["kind"] == "x-post" else item["kind"]
+    return {"schema": SUMMER_SCHEMA, "itemId": item["id"].lower()[:120], "origin": origin,
             "sourceName": one_line(item["sourceName"], 80), "title": one_line(item["title"], 160),
             "url": item["url"][:500], "action": verdict["action"], "surface": verdict["surface"],
             "priority": verdict["priority"], "score": verdict["score"],
@@ -630,7 +688,7 @@ def deliver(state: dict, config: dict | None, poster=post_json, now: float | Non
     """Push each outbox card once. 404/5xx/unreachable keep it for the next run."""
     now = now or time.time()
     outbox = [row for row in state.get("outbox", []) if now - row.get("queuedAt", now) <= OUTBOX_MAX_AGE_S]
-    result = {"delivered": 0, "kept": 0, "dropped": 0, "statuses": []}
+    result = {"delivered": 0, "kept": 0, "dropped": 0, "statuses": [], "events": []}
     if not config:
         state["outbox"] = outbox
         result["kept"] = len(outbox)
@@ -648,6 +706,12 @@ def deliver(state: dict, config: dict | None, poster=post_json, now: float | Non
             result["dropped"] += 1
         else:
             remaining.append(row)
+            continue
+        result["events"].append({
+            "schema": STAGE_EVENT_SCHEMA, "entityType": "market-signal", "entityId": row["body"].get("itemId"),
+            "stage": "delivered", "enteredAt": now_iso(row.get("queuedAt", now)), "exitedAt": now_iso(now),
+            "actor": "summer", "outcome": "completed" if status == 202 else "failed",
+            "sourceReceipt": row["body"].get("deliveryId")})
     state["outbox"] = remaining
     result["kept"] = len(remaining)
     return result
@@ -684,7 +748,7 @@ def triage_signals(since: str, runner=None) -> dict:
 
 def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox: Path = DEFAULT_INBOX,
         fetcher=fetch, poster=post_json, put=yc_corpus.gbrain_put, summer=None, now: float | None = None,
-        dry_run: bool = False, triage=triage_signals) -> dict:
+        dry_run: bool = False, triage=triage_signals, x_config: dict | None = None, x_search=None) -> dict:
     env = os.environ if env is None else env
     now = now or time.time()
     observed = now_iso(now)
@@ -696,11 +760,22 @@ def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox:
     failures += feed_failures
 
     candidates, inbox_files = bookmarks_from_inbox(inbox)
-    try:
-        candidates = bookmarks_from_composio(env, poster, fetcher) + candidates
-    except Exception as error:
-        failures.append(f"x-bookmarks: {error}")
     bookmarks = [enrich_bookmark(item, fetcher) for item in new_bookmarks(state, candidates)]
+
+    x_items, x_summary = [], {"status": "dry-run"}
+    if not dry_run:
+        try:
+            x_items, x_summary = poll_x(state, load_x_config() if x_config is None else x_config, env, now, x_search)
+        except Exception as error:  # X is one source among many; never fail the run
+            x_summary = {"status": "failed", "error": f"{type(error).__name__}: {error}"[:200]}
+        if x_summary.get("status") == "failed":
+            failures.append(f"x-posts: {x_summary.get('error')}")
+    x_items = [enrich_bookmark(item, fetcher) for item in x_items]
+    dwell = [epoch(item["published"]) for item in x_items]
+    dwell = [now - value for value in dwell if value is not None]
+    x_summary["dwellS"] = {"n": len(dwell), "p50": percentile(dwell, 0.5), "p95": percentile(dwell, 0.95)}
+    stage_rows = dwell_events(x_items, observed)
+    bookmarks += x_items
 
     # Items left over from earlier runs (unclassified, or not yet stored) come first.
     queue = state.get("pending", []) + bookmarks + changelog
@@ -773,6 +848,9 @@ def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox:
 
     delivery = {"skipped": "dry-run"} if dry_run else deliver(
         state, capacity_limit.summer_config(env) if summer is None else summer, poster, now)
+    stage_rows += delivery.pop("events", [])
+    if stage_rows and not dry_run:
+        append_stage_events(state_path.parent / "stage-events.ndjson", stage_rows, now)
 
     if digest_rows["rows"] and not dry_run:
         ok, error = put(f"signals/digest/{day}", f"Market signals {day}", render_digest(day, digest_rows["rows"]))
@@ -786,7 +864,8 @@ def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox:
            for item, verdict in sorted(judged, key=lambda pair: -pair[1]["score"])[:5]]
     status = "ok" if not failures else "partial" if stored else "failed"
     result = {"status": status, "at": observed,
-              "changelogNew": len(changelog), "bookmarksNew": len(bookmarks), "classified": classified,
+              "changelogNew": len(changelog), "bookmarksNew": len(bookmarks) - len(x_items),
+              "xPostsNew": len(x_items), "x": x_summary, "classified": classified,
               "verdicts": verdicts, "top": top, "pending": len(state["pending"]), "stored": stored,
               "cardsQueued": queued, "delivery": delivery, "jevSpentTodayUsd": budget["spentUsd"],
               "jevCallsToday": budget["calls"], "failures": failures[:20], "failureCount": len(failures)}
