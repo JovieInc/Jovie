@@ -445,6 +445,12 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("provider-down:devin", alerts)
         self.assertNotIn("provider-idle:devin", alerts)
 
+    def test_a_missing_linear_app_credential_fails_closed_with_its_own_condition(self):
+        alerts = doctor.judge(obs(linearAppCredential=False))
+        self.assertIn("no personal-key fallback", alerts["linear-app-credential-missing"])
+        for present in (True, None):  # installed, or a fixture/self-test with no host file
+            self.assertNotIn("linear-app-credential-missing", doctor.judge(obs(linearAppCredential=present)))
+
     def test_started_issues_without_a_live_owner_escalate_after_the_grace(self):
         quiet = doctor.judge(obs(ownership={"started": 536, "ownerless": 3, "overGrace": 0}))
         self.assertNotIn("started-without-owner", quiet)  # inside the grace period
