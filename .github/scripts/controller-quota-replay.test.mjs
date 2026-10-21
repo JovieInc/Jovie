@@ -21,7 +21,9 @@ const LIVE = 'a'.repeat(40);
 const T0 = Date.parse('2026-10-21T08:19:30Z');
 const run = (extra = {}) => ({
   id: 39567203920,
-  name: 'Staging Controller',
+  // The real event: name is the run-name title, path identifies the workflow.
+  name: '0d9d7e33af62689ccf7d3ec14011bab5c4dd19ab from CI 39621392739 attempt 1',
+  path: '.github/workflows/staging-controller.yml',
   run_attempt: 1,
   conclusion: 'failure',
   status: 'completed',
@@ -373,7 +375,9 @@ describe('runReplay', () => {
 
   it('ignores workflows it does not own', async () => {
     const result = await runReplay({
-      event: { workflow_run: run({ name: 'CI' }) },
+      event: {
+        workflow_run: run({ name: 'CI', path: '.github/workflows/ci.yml' }),
+      },
       repository: 'x/y',
     });
     assert.equal(result.decision.replay, false);
@@ -387,7 +391,12 @@ describe('runCli', () => {
     const eventPath = join(dir, 'event.json');
     writeFileSync(
       eventPath,
-      JSON.stringify({ workflow_run: run({ name: 'Production Controller' }) })
+      JSON.stringify({
+        workflow_run: run({
+          name: 'Production Controller 43b6d22 from CI 1 attempt 1',
+          path: '.github/workflows/production-controller.yml',
+        }),
+      })
     );
     const summary = join(dir, 'summary.md');
     const { gh } = fakeGh({ remaining: 900, reset: 0 });
