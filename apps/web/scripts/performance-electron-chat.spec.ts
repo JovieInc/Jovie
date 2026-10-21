@@ -45,7 +45,7 @@ const repo = resolve(__dirname, '../../..');
 const desktop = resolve(repo, 'apps/desktop');
 const standalone = resolve(repo, 'apps/web/.next/standalone/apps/web');
 const output = resolve(
-  process.argv[2] ?? '/tmp/jovie-electron-chat-report.json'
+  process.env.ELECTRON_CHAT_REPORT ?? '/tmp/jovie-electron-chat-report.json'
 );
 const children: ChildProcess[] = [];
 let electron: ElectronApplication | undefined;
