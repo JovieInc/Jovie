@@ -49,9 +49,19 @@ describe('revenue-lift dashboard helpers', () => {
   });
 });
 
-function irpaaResult(overrides: Partial<IrpaaResult> = {}): IrpaaResult {
-  return {
-    window: { start: new Date(0), end: new Date(0) },
+// measuredIrpaaWindows only reads counts; the time range is irrelevant here.
+type IrpaaCounts = Pick<
+  IrpaaResult,
+  | 'activeArtists'
+  | 'runCount'
+  | 'totals'
+  | 'totalRevenueLiftCents'
+  | 'irpaaCents'
+  | 'weights'
+>;
+
+function irpaaResult(overrides: Partial<IrpaaCounts> = {}): IrpaaResult {
+  const counts: IrpaaCounts = {
     activeArtists: 0,
     runCount: 0,
     totals: { gmvDeltaCents: 0, dspClickDelta: 0, newFansDelta: 0 },
@@ -65,17 +75,18 @@ function irpaaResult(overrides: Partial<IrpaaResult> = {}): IrpaaResult {
     },
     ...overrides,
   };
+  return counts as IrpaaResult;
 }
 
 describe('measuredIrpaaWindows', () => {
-  it('treats a window with no outcomes as No data, not a measured zero', () => {
+  it('treats a period with no outcomes as No data, not a measured zero', () => {
     expect(measuredIrpaaWindows(irpaaResult(), irpaaResult())).toEqual({
       irpaa: null,
       irpaaPrior: null,
     });
   });
 
-  it('drops the delta baseline when the prior window has no data', () => {
+  it('drops the delta baseline when the prior period has no data', () => {
     const current = irpaaResult({ activeArtists: 2, runCount: 3 });
     expect(measuredIrpaaWindows(current, irpaaResult())).toEqual({
       irpaa: current,
@@ -83,7 +94,7 @@ describe('measuredIrpaaWindows', () => {
     });
   });
 
-  it('keeps both windows when both are measured', () => {
+  it('keeps both periods when both are measured', () => {
     const current = irpaaResult({ activeArtists: 2, runCount: 3 });
     const prior = irpaaResult({ activeArtists: 1, runCount: 1 });
     expect(measuredIrpaaWindows(current, prior)).toEqual({
