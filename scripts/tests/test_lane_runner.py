@@ -13689,3 +13689,27 @@ class SelftestProcessAbsenceTest(unittest.TestCase):
                                        201, os.getuid())
         with self.assertRaises(lane.SelftestCleanupHeld):
             lane._selftest_process_row(self.entry(PermissionError(13, "denied"), []), 201, os.getuid())
+
+
+class SelftestRetryDiagnosticTest(unittest.TestCase):
+    """A refused release names the selector that failed twice (CI summaries keep only stderr)."""
+
+    def test_failed_retry_prints_selectors_and_failure_lines(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = Path(tmp)
+            rerun = subprocess.CompletedProcess([], 1, stdout="", stderr=(
+                "FAIL: test_bound (scripts.tests.test_x.Example.test_bound)\n"
+                "Traceback (most recent call last):\n  noise\n"
+                "AssertionError: 2 != 0\n"))
+            with patch.object(lane, "selftest_env", return_value={}), \
+                 patch.object(lane, "reap_selftest_processes", return_value=0), \
+                 patch.object(lane, "_selftest_cleanup_summary", return_value={"outcome": "clean"}), \
+                 patch.object(lane.lifecycle, "run", return_value=rerun), \
+                 contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertFalse(lane.retry_failed_selectors(
+                    stage, "FAIL: test_bound (scripts.tests.test_x.Example.test_bound)\n"))
+            text = err.getvalue()
+            self.assertIn("release self-test failed selector(s): scripts.tests.test_x.Example.test_bound", text)
+            self.assertIn("release self-test failure: FAIL: test_bound", text)
+            self.assertIn("release self-test failure: AssertionError: 2 != 0", text)
+            self.assertNotIn("noise", text)

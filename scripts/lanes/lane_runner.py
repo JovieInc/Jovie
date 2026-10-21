@@ -8848,6 +8848,15 @@ def retry_failed_selectors(staging: Path, stderr) -> bool:
         raise failure
     print(f"release self-test retry: {len(ids)} selector(s) {'passed' if passed else 'failed again'}; "
           "see .selftest-retry.json", file=sys.stderr)
+    if not passed:
+        # The staged tree and its receipt are gone once the update is refused, and CI
+        # summaries keep only these lines: name what failed (2026-10-21 merge-group ejections
+        # said only "release tests failed").
+        print("release self-test failed selector(s): " + ", ".join(ids), file=sys.stderr)
+        text = raw.decode(errors="replace")
+        for line in [line for line in text.splitlines()
+                     if re.match(r"^(FAIL|ERROR): |^\w*(Error|Exception|Held)\b", line)][:8]:
+            print("release self-test failure: " + line[:300], file=sys.stderr)
     return passed
 
 
