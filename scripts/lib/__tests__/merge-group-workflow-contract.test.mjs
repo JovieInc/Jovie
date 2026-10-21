@@ -1535,6 +1535,24 @@ describe('merge_group workflow contract', () => {
     );
   });
 
+  it('keeps the production Cross-prove run script free of expressions (JOV-8706)', () => {
+    // 19.8k chars of interpolated script sat just under GitHub's ~21,000-char
+    // expression cap; a plain script has no cap. Run identity comes from the
+    // runner's own GITHUB_RUN_ID / GITHUB_RUN_ATTEMPT.
+    const workflow =
+      /** @type {{ jobs: Record<string, { steps?: Array<{ name?: string, run?: string }> }> }} */ (
+        load(PRODUCTION_CONTROLLER_WORKFLOW)
+      );
+    const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
+    const crossProve = steps.find(
+      step => step.name === 'Cross-prove exact successful push CI'
+    );
+    if (!crossProve?.run) throw new Error('Cross-prove step is missing');
+    expect(crossProve.run).not.toContain('${{');
+    expect(crossProve.run).toContain('--actor-run-id "${GITHUB_RUN_ID}"');
+    expect(crossProve.run).toContain('--actor-attempt "${GITHUB_RUN_ATTEMPT}"');
+  });
+
   it('classifies the pull_request head diff when the merge result is tree-identical to base (JOV-6820)', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectStep = pathChanges.slice(
