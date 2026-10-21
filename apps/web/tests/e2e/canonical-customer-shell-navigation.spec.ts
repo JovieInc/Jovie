@@ -10,6 +10,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { setTestAuthBypassSession } from '../helpers/auth';
+import { installAppFlagOverrides } from './helpers/app-flag-overrides';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 test.skip(
@@ -74,6 +75,11 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
 }, testInfo) => {
   test.setTimeout(180_000);
   await installStableShell(page);
+  // The contract below is the PROFILES_WORKSPACE-off rail. Shared dev/CI
+  // databases can carry a published environment enablement for the flag, so
+  // pin the documented precondition with a personal override (honored
+  // outside production) instead of inheriting environment state.
+  await installAppFlagOverrides(page, { PROFILES_WORKSPACE: false });
   await setTestAuthBypassSession(page, 'creator-ready');
   const chatWithProfileRail = `${APP_ROUTES.CHAT}?panel=profile`;
   await page.goto(

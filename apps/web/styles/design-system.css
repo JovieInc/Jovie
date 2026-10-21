@@ -150,7 +150,7 @@
   --app-shell-sidebar-accent-active-rgb: 236 238 241;
   --app-shell-sidebar-item-foreground-rgb: 88 90 96;
   --app-shell-sidebar-item-icon-rgb: 122 125 132;
-  --app-shell-sidebar-muted-rgb: 112 116 124;
+  --app-shell-sidebar-muted-rgb: 98 104 114;
 
   /* System B semantic aliases for public app surfaces. Keep page-level recipes
      on these names instead of route-local Tailwind literals. */
