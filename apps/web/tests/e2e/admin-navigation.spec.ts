@@ -219,10 +219,14 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     for (const item of WORKSPACE_ITEMS.filter(
       entry => entry.href !== APP_ROUTES.ADMIN_NOW
     )) {
-      await nav.getByRole('link', { name: item.label, exact: true }).click();
-      await expect(page).toHaveURL(new RegExp(`${item.href}(\\?.*)?$`), {
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
-      });
+      // A previous workspace can still be normalizing its URL (Growth
+      // replaces itself with ?view=leads), which can swallow an early click.
+      // Retry the click until the destination sticks.
+      const destination = new RegExp(`${item.href}(\\?.*)?$`);
+      await expect(async () => {
+        await nav.getByRole('link', { name: item.label, exact: true }).click();
+        await expect(page).toHaveURL(destination, { timeout: 10_000 });
+      }).toPass({ timeout: SMOKE_TIMEOUTS.NAVIGATION });
       await settleAdminNavigation(page);
 
       const { hasError } = await checkForClientError(page);

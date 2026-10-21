@@ -276,9 +276,13 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
       retries: 2,
     });
     await waitForHydration(page);
-    await expect(page).toHaveURL(/\/app\/settings\/artist-profile/, {
-      timeout: 15_000,
-    });
+    // Canonical profile settings route since JOV-7636 (#20359).
+    await expect(page).toHaveURL(
+      new RegExp(`${APP_ROUTES.SETTINGS_PROFILE}(\\?.*)?$`),
+      {
+        timeout: 15_000,
+      }
+    );
 
     await expectCareerHighlightsField(page);
   });

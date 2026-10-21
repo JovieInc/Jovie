@@ -290,7 +290,6 @@ test.describe('Releases dashboard', () => {
 
     await sidebar.getByTestId('drawer-tab-tasks').click();
     await expect(sidebar.getByTestId('release-tasks-card')).toBeVisible();
-    await sidebar.getByTestId('release-tasks-toggle').click();
     await expect(
       sidebar.locator(
         '[data-testid="release-task-checklist-scroll-region"], [data-testid="release-task-empty-state-compact"]'
@@ -386,7 +385,6 @@ test.describe('Releases dashboard', () => {
     await expect(sidebar.getByTitle('Copy smart link')).toBeVisible();
     await sidebar.getByTestId('drawer-tab-tasks').click();
     await expect(sidebar.getByTestId('release-tasks-card')).toBeVisible();
-    await sidebar.getByTestId('release-tasks-toggle').click();
     await expect(
       sidebar.locator(
         '[data-testid="release-task-checklist-scroll-region"], [data-testid="release-task-empty-state-compact"]'
