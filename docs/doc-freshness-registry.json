@@ -551,7 +551,7 @@
       "sources": [
         {
           "path": "docs/metrics/stage-manifest.json",
-          "sha256": "bd67aeb76e163a5411f1986f6076fa95bdff88fda5cd9cb2b8280fdd2a319bea"
+          "sha256": "0ae456055b1b20adce866461813394c051b1dd4e8c2a5276fd5d1d03bdca00d3"
         },
         {
           "path": "scripts/lib/stage-events.mjs",

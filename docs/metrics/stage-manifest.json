@@ -394,6 +394,10 @@
   },
   "producers": {
     "workflows": {
+      "automation-liveness.yml": [
+        "automation-run:started",
+        "automation-run:finished"
+      ],
       "ci.yml": ["shipping:ready", "remediation:red", "remediation:green"],
       "lane-fix-relay.yml": ["remediation:classified"],
       "staging-controller.yml": ["release:staging"],
