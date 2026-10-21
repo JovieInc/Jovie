@@ -533,6 +533,8 @@ const LANES_COVERAGE_RUN = `{ ${LANES_BACKGROUND_SHARDS.map(shard => `${lanesCov
  */
 /** @jovie/api-client (TS) unit + conformance suite, run with the operations lane. */
 export const API_CLIENT_TS_COMMAND = 'pnpm --filter @jovie/api-client test';
+/** @jovie/research router + decision log suite, run with the operations lane. */
+export const RESEARCH_TS_COMMAND = 'pnpm --filter @jovie/research test';
 
 /** scripts/apiclient: the Python port, held to the same conformance fixtures. */
 export const API_CLIENT_PY_COMMAND = structuralPythonRegression(
@@ -2444,6 +2446,7 @@ export async function runStructural(opts = {}) {
   const operationsParts = [
     API_CLIENT_TS_COMMAND,
     API_CLIENT_PY_COMMAND,
+    RESEARCH_TS_COMMAND,
     'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
     'node --test .github/scripts/dependency-parity-evidence.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-controller.test.mjs',
