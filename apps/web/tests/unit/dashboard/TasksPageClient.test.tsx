@@ -1197,6 +1197,27 @@ describe('TasksPageClient', () => {
     expect(screen.getAllByText('Me').length).toBeGreaterThan(0);
   });
 
+  it('names task metadata controls with their visible value (WCAG 2.5.3 Label in Name)', () => {
+    // @axe-core/playwright 4.14 flags label-content-name-mismatch when an
+    // aria-label omits the visible text; that red Generate Screenshots check
+    // blocked production promotion from 2026-10-19.
+    renderPage();
+    openTask();
+
+    for (const [action, value] of [
+      ['Change Task Status', 'In Progress'],
+      ['Change Task Priority', 'Medium'],
+      ['Change Task Assignee', 'Me'],
+    ]) {
+      const control = screen.getByRole('button', {
+        name: new RegExp(`^${action} .*${value}`),
+      });
+      // Named from content, so axe's label-in-name rule cannot diverge.
+      expect(control).not.toHaveAttribute('aria-label');
+      expect(control).not.toHaveAttribute('aria-labelledby');
+    }
+  });
+
   it('renders separate list and document scroll regions on desktop', () => {
     renderPage();
 
