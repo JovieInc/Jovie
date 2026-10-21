@@ -2720,10 +2720,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         'web.artist-profiles',
       ],
       [
-        'apps/web/app/(marketing)/artist-profiles/artist-profile-modes.ts',
-        'web.artist-profiles',
-      ],
-      [
         'apps/web/app/(marketing)/artist-profile/page.tsx',
         'web.artist-profile',
       ],
