@@ -21,9 +21,11 @@
  * --file applies the decisions through scripts/lib/remediation-signal.mjs
  * (needs LINEAR_API_KEY; REMEDIATION_INTAKE_DISABLED=1 skips).
  */
+import { execFile } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 import { createApiClient } from '../packages/api-client/client.ts';
 import { createLinearClient } from '../packages/api-client/linear.ts';
 import { hashCredential } from '../packages/api-client/store.ts';
@@ -225,15 +227,90 @@ function mainRefFailure(error, status) {
   };
 }
 
+const execFileAsync = promisify(execFile);
+
+function gitProbeEnv(token) {
+  const env = {
+    ...process.env,
+    GIT_TERMINAL_PROMPT: '0',
+    GCM_INTERACTIVE: 'never',
+  };
+  const pairs = [['core.hooksPath', '/dev/null']];
+  if (token) {
+    const encoded = Buffer.from(`x-access-token:${token}`).toString('base64');
+    pairs.push(
+      ['credential.helper', ''],
+      [
+        'http.https://github.com/.extraheader',
+        `AUTHORIZATION: basic ${encoded}`,
+      ]
+    );
+  }
+  env.GIT_CONFIG_COUNT = String(pairs.length);
+  for (const [index, [key, value]] of pairs.entries()) {
+    env[`GIT_CONFIG_KEY_${index}`] = key;
+    env[`GIT_CONFIG_VALUE_${index}`] = value;
+  }
+  return env;
+}
+
+async function defaultGit(args, env) {
+  const { stdout } = await execFileAsync('git', args, {
+    timeout: TIMEOUT_MS,
+    env,
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  return stdout;
+}
+
+/**
+ * refs/heads/main over the git protocol. The token stays in the child
+ * environment, never in argv. A failure returns null so the REST fallback
+ * can still run.
+ */
+export async function lsRemoteMain(repo, token, gitExec = defaultGit) {
+  if (!/^[^/\s]+\/[^/\s]+$/.test(String(repo ?? ''))) return null;
+  try {
+    const stdout = await gitExec(
+      [
+        'ls-remote',
+        '--refs',
+        `https://github.com/${repo}.git`,
+        'refs/heads/main',
+      ],
+      gitProbeEnv(token)
+    );
+    const sha = String(stdout ?? '')
+      .trim()
+      .split(/\s+/)[0];
+    return SHA_RE.test(sha ?? '') ? sha : null;
+  } catch {
+    return null;
+  }
+}
+
+async function shaFromGit(readGitTip) {
+  if (typeof readGitTip !== 'function') return null;
+  try {
+    const sha = await readGitTip();
+    return SHA_RE.test(sha ?? '') ? sha : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Branch tip for the promotion probe.
  *
- * `git/ref` is the cheap read. The Actions token sometimes answers that one
- * route with HTTP 403 while the commit SHA media type still returns the tip
- * (run 39674054063). One alternate read keeps that blip from looking like a
- * stalled release. Any other failure stays unreadable.
+ * `git/ref` is the cheap read. The Actions token answers that route with
+ * HTTP 403 while production is inside the silence budget (runs 39674054063
+ * and 39682307911; the second ran after the commits/main fallback landed).
+ * `GET /commits/main` is the same 403 the production controller already left
+ * for `git ls-remote`. On a 403, ask git for refs/heads/main, then try one
+ * last commit-SHA read. Any other failure stays unreadable.
  */
-async function readMainSha(client, repo, headers, apiUrl) {
+async function readMainSha(client, repo, headers, apiUrl, readGitTip) {
   const request = (url, accept) =>
     client.request({
       url,
@@ -266,6 +343,8 @@ async function readMainSha(client, repo, headers, apiUrl) {
     failure = mainRefFailure(error);
     if (error?.status !== 403) return failure;
   }
+  const fromGit = await shaFromGit(readGitTip);
+  if (fromGit) return { ok: true, sha: fromGit };
   try {
     // application/vnd.github.sha is the raw tip. The default commit
     // document also builds the patch, which this probe does not need.
@@ -289,7 +368,7 @@ async function readMainSha(client, repo, headers, apiUrl) {
  */
 export async function observeProductionFreshness(
   receipt,
-  { fetchImpl, token, nowMs, githubClient, apiUrl = GITHUB_API }
+  { fetchImpl, token, nowMs, githubClient, apiUrl = GITHUB_API, lsRemote }
 ) {
   const build = await readJson(fetchImpl, receipt.buildInfoUrl);
   const live = build.ok ? build.body?.commitSha : null;
@@ -303,7 +382,13 @@ export async function observeProductionFreshness(
       credential: hashCredential('github', token ?? ''),
       fetch: fetchImpl,
     });
-  const mainRead = await readMainSha(client, receipt.repo, headers, apiUrl);
+  const mainRead = await readMainSha(
+    client,
+    receipt.repo,
+    headers,
+    apiUrl,
+    () => lsRemote?.(receipt.repo, token)
+  );
   if (!mainRead.ok) return mainRead;
   const main = mainRead.sha;
   const now = new Date(nowMs).toISOString();
@@ -657,6 +742,7 @@ export async function observeEntry(entry, context) {
  *   nowMs?: number,
  *   githubClient?: import('../packages/api-client/client.ts').ApiClient,
  *   linear?: { graphql: (query: string, variables?: Record<string, unknown>) => Promise<any> } | null,
+ *   lsRemote?: (repo: string, token?: string) => Promise<string | null>,
  * }} options
  */
 export async function runLiveness({
@@ -666,10 +752,11 @@ export async function runLiveness({
   nowMs = Date.now(),
   githubClient,
   linear = null,
+  lsRemote = lsRemoteMain,
 }) {
   const startedAt = new Date(nowMs).toISOString();
   const observations = new Map();
-  const context = { fetchImpl, token, nowMs, githubClient, linear };
+  const context = { fetchImpl, token, nowMs, githubClient, linear, lsRemote };
   for (const entry of registry.entries ?? []) {
     if (entry?.status !== 'live') continue;
     const observed = await observeEntry(entry, context);
