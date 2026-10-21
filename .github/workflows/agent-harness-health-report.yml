@@ -37,7 +37,7 @@ jobs:
           NOW_SECONDS=$(date -u +%s)
 
           # One 100-PR GraphQL query with mergeStateStatus returned HTTP 502 (2026-10-21 run
-          # 39644519804; JOV-7954). Page 25 at a time; same JSON shape as gh pr list --json.
+          # 39644519804; JOV-7954). Page 25 at a time; preserve the report's existing JSON shape.
           PRS=$(gh api graphql --paginate -F owner="${GH_REPO%%/*}" -F name="${GH_REPO#*/}" -f query='
             query($owner: String!, $name: String!, $endCursor: String) {
               repository(owner: $owner, name: $name) {
