@@ -112,7 +112,8 @@ const {
       const transactionIndex = txStates.length;
       txStates.push(state);
       try {
-        const setupError = setupFailures.get(transactionIndex)?.().error;
+        const setupError = (await setupFailures.get(transactionIndex)?.())
+          ?.error;
         if (setupError) {
           state.poisoned = true;
           throw setupError;
