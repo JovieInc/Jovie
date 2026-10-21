@@ -278,6 +278,38 @@ describe('home loop parts', () => {
   });
 });
 
+describe('HomeLoopAsks escalation', () => {
+  it('badges how long a no-default decision has waited, by level', () => {
+    render(
+      <HomeLoopAsks
+        asks={[
+          {
+            ...HOME_LOOP_FIXTURE_ASKS[0],
+            id: 'late',
+            escalation: { level: 2, waitingHours: 52 },
+          },
+          {
+            ...HOME_LOOP_FIXTURE_ASKS[1],
+            id: 'aging',
+            escalation: { level: 1, waitingHours: 26 },
+          },
+          HOME_LOOP_FIXTURE_ASKS[0],
+        ]}
+        answers={{}}
+        onApprove={vi.fn()}
+        onReply={vi.fn()}
+      />
+    );
+    const badges = screen.getAllByTestId('home-loop-ask-escalation');
+    expect(badges.map(badge => badge.textContent)).toEqual([
+      'Waiting 52h',
+      'Waiting 26h',
+    ]);
+    expect(badges[0]).toHaveClass('text-error');
+    expect(badges[1]).toHaveClass('text-warning');
+  });
+});
+
 describe('HomeLoopAsks options', () => {
   it('replaces the primary action with the asker options', () => {
     const onApprove = vi.fn();

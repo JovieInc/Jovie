@@ -109,6 +109,19 @@ function AskCard({
       <div className='flex min-w-0 flex-col gap-0.5'>
         <div className='flex items-start justify-between gap-2'>
           <h3 className='line-clamp-2 text-balance text-sm font-medium text-primary-token'>
+            {ask.escalation ? (
+              <span
+                className={cn(
+                  'mr-1.5 inline-flex rounded-full px-1.5 align-middle text-2xs font-semibold tabular-nums',
+                  ask.escalation.level === 2
+                    ? 'bg-error-subtle text-error'
+                    : 'bg-warning-subtle text-warning'
+                )}
+                data-testid='home-loop-ask-escalation'
+              >
+                {`Waiting ${ask.escalation.waitingHours}h`}
+              </span>
+            ) : null}
             {ask.title}
           </h3>
           <Button
