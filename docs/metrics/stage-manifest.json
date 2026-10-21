@@ -270,9 +270,9 @@
       ]
     },
     "summer-turn": {
-      "entityId": "summer conversation id + turn number",
+      "entityId": "<hashed conversation>:<hashed turn> (summer-config hashes both)",
       "description": "One Summer turn from triggering event to measured outcome.",
-      "endToEnd": [["event", "outcome"]],
+      "endToEnd": [["event", "outcome"], ["model-turn", "outcome"]],
       "stages": [
         {
           "id": "event",
@@ -286,25 +286,22 @@
           "id": "model-turn",
           "meaning": "model call started",
           "producer": "summer-config",
-          "status": "spec",
-          "source": "summer-stage-feed",
-          "owner": "summer-config"
+          "status": "pushed",
+          "source": "summer-stage-feed"
         },
         {
           "id": "action",
           "meaning": "tool/action dispatched",
           "producer": "summer-config",
-          "status": "spec",
-          "source": "summer-stage-feed",
-          "owner": "summer-config"
+          "status": "pushed",
+          "source": "summer-stage-feed"
         },
         {
           "id": "outcome",
           "meaning": "terminal receipt with outcome recorded",
           "producer": "summer-config",
-          "status": "spec",
-          "source": "summer-stage-feed",
-          "owner": "summer-config"
+          "status": "pushed",
+          "source": "summer-stage-feed"
         }
       ]
     }
@@ -345,7 +342,7 @@
     },
     "summer-stage-feed": {
       "kind": "events",
-      "url": null,
+      "url": "https://summer.jov.ie/runtime/v1/summer-stage-events.ndjson",
       "owner": "summer-config"
     },
     "revenue-funnel-timings": {

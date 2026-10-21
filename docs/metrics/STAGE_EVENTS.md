@@ -47,7 +47,8 @@ No new database. Two paths, both read by the daily
 
 `scripts/lib/stage-events.mjs` aggregates p50/p95/n per stage and per declared
 end-to-end pair over 24h/7d/28d, using completion time for windowing. A
-terminal stage has no dwell, so it reports arrivals (`n`) only.
+terminal stage has no dwell, so it reports arrivals (`n`), `failed` and
+`failRate`.
 
 **Regression flag**: the 7d p95 is compared with the p95 of days 8 to 28. It is
 flagged only when both sides have enough samples (10 recent, 20 baseline), the
@@ -107,8 +108,13 @@ every ledger receipt in the last 28 days on the first publish.
 
 ### summer-config (Summer)
 
-Publish `summer-stage-events.ndjson` (same contract) to a public or
-token-readable URL and register it as `summer-stage-feed.url` in the manifest.
+Live since 2026-10-20 23:52Z at
+`https://summer.jov.ie/runtime/v1/summer-stage-events.ndjson`, registered as
+`summer-stage-feed.url`. `model-turn`, `action` and `outcome` are `pushed`;
+`event` stays `spec` until the feed emits ingress rows, so the tracked
+end-to-end pair is `model-turn->outcome`. The terminal `outcome` stage reports
+`failed` and `failRate` per window (first read 2026-10-21: 22 turns, 15
+failed, pre-fix; fixed in summer-config #270).
 
 | Stage | Timestamp |
 | --- | --- |
@@ -117,7 +123,7 @@ token-readable URL and register it as `summer-stage-feed.url` in the manifest.
 | `summer-turn:action` | first tool/action dispatch |
 | `summer-turn:outcome` | terminal receipt (`summer-shadow/terminal/<key>.json`) |
 
-`entityId` = `<conversation>:<turn>`. `outcome` on the terminal row: `completed`,
+`entityId` = `<conversation>:<turn>`, both hashed by summer-config. `outcome` on the terminal row: `completed`,
 `failed` or `abandoned`. Backfill from the existing receipt blobs.
 
 ### Automation liveness (`automation-run`)
