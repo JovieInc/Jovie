@@ -409,6 +409,10 @@ jobs:
               await Promise.all(Array.from({ length: Math.min(width, prs.length) }, worker));
             }
             let enqueued = 0;
+            // Every decision on an open, ready, unqueued PR leaves a receipt (pr, head, reason) in the
+            // job summary and one machine line, so a non-enroll is never silent (event-driven dwell).
+            const receipts = [];
+            const receipt = (pr, decision, reason) => receipts.push({ pr: pr?.number, head: String(pr?.headRefOid ?? '').slice(0, 12), decision, reason });
             for (const [index, candidate] of prs.entries()) {
               if (overBudget()) {
                 core.warning(`sweep budget spent after ${index}/${prs.length} PRs; the rest wait for their own events or the next sweep`);
@@ -434,6 +438,7 @@ jobs:
               if (!eligible(pr)) {
                 if (pr && pr.state === 'OPEN' && !pr.isDraft && !pr.isInMergeQueue) {
                   core.info(`skip #${candidate.number}: mergeStateStatus=${pr.mergeStateStatus}`);
+                  receipt(pr, 'skip', `mergeStateStatus=${pr.mergeStateStatus}`);
                 }
                 continue;
               }
@@ -473,6 +478,7 @@ jobs:
               });
               if (failure.action === 'block') {
                 core.notice(`HELD #${pr.number}@${pr.headRefOid}: ${failure.reason}`);
+                receipt(pr, 'held', failure.reason);
                 continue;
               }
               // Native history is revision-scoped: a commit/force-push after
@@ -541,6 +547,7 @@ jobs:
                   (removedUnchangedHead && failure.action !== 'retry-once' &&
                    failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval)) {
                 core.info(`skip #${pr.number}: head unchanged since queue removal (${removalReason}; ${failure.reason})`);
+                receipt(pr, 'skip', `head-unchanged-since-removal:${removalReason}:${failure.reason}`);
                 continue;
               }
               if (process.env.DRY_RUN === 'true') {
@@ -661,6 +668,7 @@ jobs:
                   }`, { id: pr.id, oid: pr.headRefOid });
                 enqueued += 1;
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                receipt(pr, 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position}`);
                 if (breakerMarked && !breakerRestore) {
                   await github.rest.issues.removeLabel({
                     owner, repo, issue_number: pr.number, name: BREAKER_LABEL,
@@ -674,9 +682,21 @@ jobs:
                   core.notice(`RELEASED rejected enqueue reservation for #${pr.number}@${pr.headRefOid}`);
                 }
                 core.warning(`#${pr.number} not enqueued: ${error.message}`);
+                receipt(pr, 'error', String(error.message).slice(0, 200));
               }
             }
             core.info(`enqueued=${enqueued}`);
+            core.info(`enroll-receipts ${JSON.stringify(receipts)}`);
+            if (receipts.length > 0 && core.summary) {
+              await core.summary
+                .addHeading('Enroll decisions', 3)
+                .addTable([
+                  [{ data: 'PR', header: true }, { data: 'Head', header: true }, { data: 'Decision', header: true }, { data: 'Reason', header: true }],
+                  ...receipts.map(row => [`#${row.pr}`, row.head, row.decision, row.reason]),
+                ])
+                .write()
+                .catch(error => core.warning(`enroll receipt summary not written: ${error.message}`));
+            }
 
   # Conversion to draft does not remove GitHub's native queue entry. Reuse the
   # existing exact-head/entry guard under the same admission owner, even during
