@@ -363,6 +363,24 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
     # detector the labeled-event path uses names it, so the ask surfaces as
     # tim-decides instead of being routed as prescribed implementation.
     thread_ask = review_authority_ask(pr)
+    if thread_ask:
+        return blocker("needs-human-decision", "changes-requested",
+                       ["current human review requires authority",
+                        f"review evidence carries a {thread_ask} decision"],
+                       "tim-decides")
+
+    if held_here and not _actionable(note):
+        return blocker("needs-human-decision", "hold",
+                       [note[:240] or "human hold without a fix"], "tim-decides")
+    if pr.get("codeownersBlocked") or "codeowners" in labels:
+        return blocker("needs-human-decision", "codeowners",
+                       ["missing required human approval"], "tim-decides")
+
+    # GitHub computes mergeability asynchronously. UNKNOWN is missing evidence,
+    # not a failed repair or a human decision; the next pass reads it again.
+    if merge == "UNKNOWN":
+        return blocker("ready", "awaiting", ["mergeStateStatus=UNKNOWN"], "wait")
+
     if human_review and not held_here and not stop_labels and not thread_ask \
             and not (pr.get("codeownersBlocked") or "codeowners" in labels):
         # Tim 2026-10-15: ordinary requested changes ship through the automated
@@ -379,19 +397,6 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
                            evidence, "apply-prescribed-fix")
         return blocker("fixable-by-model", "review",
                        evidence, "escalate")
-    if thread_ask:
-        return blocker("needs-human-decision", "changes-requested",
-                       ["current human review requires authority",
-                        f"review evidence carries a {thread_ask} decision"],
-                       "tim-decides")
-
-    if held_here and not _actionable(note):
-        return blocker("needs-human-decision", "hold",
-                       [note[:240] or "human hold without a fix"], "tim-decides")
-    if pr.get("codeownersBlocked") or "codeowners" in labels:
-        return blocker("needs-human-decision", "codeowners",
-                       ["missing required human approval"], "tim-decides")
-
     if held_here and _actionable(note):
         return blocker("fixable-by-model", "human-hold",
                        [f"{author}: {note[:400]}".strip(": ")], "apply-prescribed-fix")

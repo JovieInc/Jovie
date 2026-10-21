@@ -6499,6 +6499,45 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(linear.moves, [])
         self.assertEqual(linear.comments, [])
 
+    def test_unknown_merge_state_waits_then_rebases_before_stronger_lane(self):
+        stuck = {**self.pr(number=7), "mergeStateStatus": "UNKNOWN"}
+        attempts = {"7": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS,
+                          "lane": "devin", "at": 1, "endedAt": 2}}
+        providers = {"devin": {"enabled": True, "tier": 0},
+                     "codex": {"enabled": True, "tier": 1}}
+        linear = FakeLinear([])
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"LANES_ESCALATION": "1", "LANES_ESCALATION_STUCK_PRS": "1"}), \
+                patch.object(lane, "load_providers", return_value=providers), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "sh", side_effect=AssertionError("unexpected external mutation")), \
+                patch.object(lane.pr_events, "add_label", return_value=True) as label, \
+                patch.object(lane.pr_events, "sync_main", return_value="sync-failed") as sync:
+            host = lane.Host(state=Path(tmp))
+            path = host.state / "fix-attempts.json"
+            path.write_text(json.dumps(attempts))
+            for _ in range(2):
+                lane.escalate_exhausted(host, [stuck], linear)
+                self.assertEqual(json.loads(path.read_text()), attempts)
+                self.assertEqual(lane.load_escalation(host)["surfaced"], [])
+                sync.assert_not_called()
+                label.assert_not_called()
+            # A fresh known merge state resumes the same bounded episode.
+            stuck["mergeStateStatus"] = "DIRTY"
+            lane.escalate_exhausted(host, [stuck], linear)
+            sync.assert_called_once_with(host, lane.THIS, {**stuck, "state": "OPEN", "mergedAt": None},
+                                         unittest.mock.ANY, terminal_ok=True)
+            record = json.loads(path.read_text())["7"]
+            for key, value in attempts["7"].items():
+                self.assertEqual(record[key], value)
+            self.assertEqual(record["escalations"][0]["kind"], "deterministic")
+            self.assertEqual(record["escalations"][0]["rung"], "update-branch")
+            self.assertEqual(record["pendingEscalation"]["lane"], "codex")
+            self.assertIn("mergeStateStatus=DIRTY", record["pendingEscalation"]["dossier"])
+            self.assertNotIn("escalated", record)
+        self.assertEqual(linear.moves, [])
+        self.assertEqual(linear.comments, [])
+
     def test_escalation_pass_never_overwrites_a_repair_that_ended_meanwhile(self):
         fresh = patch.object(lane, "reconcile_fix_target", side_effect=lambda pr: {"state": "OPEN", "isInMergeQueue": False, **pr})
         fresh.start(); self.addCleanup(fresh.stop)
@@ -9259,6 +9298,9 @@ class EscalationQueueAuthorityTest(unittest.TestCase):
             if human_hold:
                 pr.update(labels=[{"name": "hold"}], holdNote={"author": "itstimwhite",
                           "body": "use computeRatePercent from @/lib/analytics/metrics and remove hold"})
+            if fault == "merge-state-unknown":
+                pr.update(mergeStateStatus="UNKNOWN", statusCheckRollup=[{
+                    "name": "Source Validation", "status": "COMPLETED", "conclusion": "FAILURE"}])
             live = json.loads(json.dumps(pr))
             record = {"sha": "head-A", "pushedHead": "head-A", "count": lane.MAX_FIX_ATTEMPTS,
                       "lane": "devin", "at": 1, "endedAt": 2, "reentry": {"keep": True},
@@ -9266,6 +9308,8 @@ class EscalationQueueAuthorityTest(unittest.TestCase):
                       "pendingEscalation": {"lane": "codex", "head": "head-A", "dossier": "existing authority",
                                             "cls": "fixable-by-model" if human_hold else "needs-rebase",
                                             "subtype": "human-hold" if human_hold else "semantic", "topRung": top}}
+            if fault == "merge-state-unknown" and not human_hold:
+                record["pendingEscalation"].update(cls="fixable-by-model", subtype="check")
             if fault == "pending-head": record["pendingEscalation"]["head"] = "head-B"
             if fault == "malformed-dossier": record["pendingEscalation"]["dossier"] = {"invalid": True}
             if fault == "empty-dossier": record["pendingEscalation"]["dossier"] = "  "
@@ -9403,6 +9447,11 @@ class EscalationQueueAuthorityTest(unittest.TestCase):
             self.assertEqual(order, [] if fault in {"pending-head", "cached-queued", "malformed-dossier", "empty-dossier", *malformed_history} else
                              ["owner"] if fault == "owner" else
                              ["owner", "target", "owner"] if fault in after_target_custody else ["owner", "target"])
+
+    def test_unknown_merge_state_cannot_charge_a_pending_model_rung(self):
+        for human_hold in (False, True):
+            with self.subTest(human_hold=human_hold):
+                self.run_case("merge-state-unknown", human_hold=human_hold)
 
     def test_refused_targets_retain_pending_history_and_claims(self):
         for fault in ("pending-head", "cached-queued", "owner", "queued", "unknown", "missing-queue", "unreadable",
