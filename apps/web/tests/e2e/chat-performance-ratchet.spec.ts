@@ -26,7 +26,25 @@ import {
   roundTripCopy,
   roundTripFromRequest,
 } from '../helpers/chat-performance-probe';
+import {
+  installScrollBackend,
+  SCROLL_CONVERSATION_ID,
+  SCROLL_STREAM_TEXT,
+} from '../helpers/chat-scroll-backend';
+import {
+  collectScrollFrames,
+  countMissedPresentationSlots,
+} from '../helpers/chat-scroll-frames';
+import {
+  readScrollAnchor,
+  SCROLL_REFRESH_PROFILE,
+  scoredScroll,
+} from '../helpers/chat-scroll-scenario';
 import { waitForHydration } from './utils/smoke-test-utils';
+
+type ScrollStreamWindow = Window & {
+  __scrollStream?: { chunks: number; active: boolean; finish: () => void };
+};
 
 const CONVERSATION_ID = 'conv-chat-performance';
 const SAMPLE_COUNT = 5;
@@ -99,7 +117,7 @@ async function mockChatBackend(page: Page) {
     })
   );
 
-  await page.route(`**/api/chat/conversations/${CONVERSATION_ID}`, route =>
+  await page.route(`**/api/chat/conversations/${CONVERSATION_ID}*`, route =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -260,43 +278,15 @@ async function readChatProbe(page: Page) {
 }
 
 async function measureDroppedScrollFrames(page: Page) {
-  return page.getByTestId('chat-message-scroll').evaluate(async element => {
-    const scrollElement = element as HTMLElement;
-    if (scrollElement.scrollHeight <= scrollElement.clientHeight) {
-      throw new Error('Chat message list must overflow for the scroll ratchet');
-    }
-
-    scrollElement.scrollTop = 0;
-    const frameIntervals: number[] = [];
-    const frameCount = 24;
-
-    await new Promise<void>(resolve => {
-      let previousTime: number | undefined;
-      let currentFrame = 0;
-
-      const step = (time: number) => {
-        if (previousTime !== undefined) {
-          frameIntervals.push(time - previousTime);
-        }
-        previousTime = time;
-        currentFrame += 1;
-        scrollElement.scrollTop =
-          (scrollElement.scrollHeight - scrollElement.clientHeight) *
-          (currentFrame / frameCount);
-
-        if (currentFrame >= frameCount) {
-          resolve();
-          return;
-        }
-        requestAnimationFrame(step);
-      };
-
-      requestAnimationFrame(step);
-    });
-
-    // A >50ms interval represents at least two consecutive missed 60Hz frames.
-    return frameIntervals.filter(interval => interval > 50).length;
+  const measurement = await page.evaluate(collectScrollFrames, {
+    selector: '[data-testid="chat-message-scroll"]',
+    direction: 'up' as const,
+    frameCount: 60,
   });
+  return countMissedPresentationSlots({
+    profile: SCROLL_REFRESH_PROFILE,
+    samples: measurement.samples,
+  }).droppedFrameCount;
 }
 
 function isChatApiRequest(request: Request): boolean {
@@ -505,3 +495,167 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
     Object.keys(uxLatencyStore.samples.chat_first_token[0]).sort()
   ).toEqual(['durationMs', 'recordedAt']);
 });
+
+for (const messageCount of [200, 2000] as const) {
+  test(`persisted ${messageCount}-message transcript scrolls without dropped frames during history loading and streaming`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+      'Requires E2E_USE_TEST_AUTH_BYPASS=1'
+    );
+    test.setTimeout(300_000);
+    await page.setViewportSize({ width: 1280, height: 480 });
+    const backend = await installScrollBackend(page, messageCount);
+    await setTestAuthBypassSession(
+      page,
+      'creator-ready',
+      `e2e-scroll-${messageCount}`
+    );
+    const chatApi = trackChatApiRequests(page);
+    await page.goto(`/app/chat/${SCROLL_CONVERSATION_ID}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    const chat = page.getByTestId('chat-content').last();
+    const composer = chat.locator('textarea[aria-label="Chat Message Input"]');
+    await waitForChatRouteReady(page, chat, composer, chatApi);
+    const viewport = page.getByTestId('chat-message-scroll');
+    const latestId = `history-${String(messageCount - 1).padStart(6, '0')}`;
+    await expect(
+      viewport.locator(`[data-message-id="${latestId}"]`)
+    ).toBeInViewport();
+    expect(backend.requests[0]).toMatchObject({
+      before: null,
+      limit: backend.pageSize,
+      firstIndex: messageCount - backend.pageSize,
+    });
+    expect(await viewport.locator('[data-message-id]').count()).toBeLessThan(
+      backend.pageSize
+    );
+
+    // Hold one real pagination response to compare the same row before/after prepend.
+    backend.holdNextPage();
+    await viewport.evaluate(element => {
+      element.scrollTop = 100;
+    });
+    await expect.poll(() => backend.requests.length).toBe(2);
+    await waitForMainThreadIdle(page);
+    const anchor = await page.evaluate(readScrollAnchor);
+    backend.releasePage();
+    await expect.poll(() => chatApi.pendingCount()).toBe(0);
+    await expect
+      .poll(async () => {
+        const next = await page.evaluate(readScrollAnchor);
+        return (
+          next.index === anchor.index + backend.pageSize &&
+          next.id === anchor.id &&
+          Math.abs(next.offset - anchor.offset) <= 2
+        );
+      })
+      .toBe(true);
+
+    const measurements: Awaited<ReturnType<typeof scoredScroll>>[] = [];
+    try {
+      // Visit the entire persisted history via real pagination, then return through
+      // the accumulated virtual window. No fixture writes to React/query state.
+      for (let pass = 0; pass < 120; pass += 1) {
+        await expect.poll(() => chatApi.pendingCount()).toBe(0);
+        await waitForMainThreadIdle(page);
+        const atStart = await viewport.evaluate(
+          element =>
+            element.scrollTop < 1 &&
+            !!element.querySelector('[data-message-id="history-000000"]')
+        );
+        if (backend.requests.at(-1)?.firstIndex === 0 && atStart) break;
+        measurements.push(await scoredScroll(page, 'up'));
+      }
+      expect(
+        backend.requests.at(-1)?.firstIndex,
+        'oldest persisted page was loaded'
+      ).toBe(0);
+      await expect(
+        viewport.locator('[data-message-id="history-000000"]')
+      ).toBeInViewport();
+      expect(
+        backend.requests.every(request => request.limit === backend.pageSize)
+      ).toBe(true);
+      expect(
+        new Set(backend.requests.map(request => request.before)).size
+      ).toBe(backend.requests.length);
+      expect(await viewport.locator('[data-message-id]').count()).toBeLessThan(
+        backend.pageSize
+      );
+
+      const jump = page.getByRole('button', {
+        name: 'Scroll To Latest Messages',
+      });
+      await expect(jump).toBeVisible();
+      await jump.click();
+      await expect(jump).toBeHidden();
+      await expect(
+        viewport.locator(`[data-message-id="${latestId}"]`)
+      ).toBeInViewport();
+      await composer.fill('Scroll performance streaming load');
+      await chat.getByRole('button', { name: /send message/i }).click();
+      await expect(
+        page
+          .getByTestId('chat-message-reply')
+          .filter({ hasText: SCROLL_STREAM_TEXT })
+      ).toBeInViewport();
+      const sentId = await page
+        .getByTestId('chat-user-bubble')
+        .filter({ hasText: 'Scroll performance streaming load' })
+        .evaluate(
+          element =>
+            element.closest<HTMLElement>('[data-message-id]')!.dataset
+              .messageId!
+        );
+      const tailIds = [sentId, 'scroll-live-assistant'];
+      const beforeChunks = await page.evaluate(
+        () => (window as ScrollStreamWindow).__scrollStream!.chunks
+      );
+      measurements.push(await scoredScroll(page, 'up', tailIds));
+      measurements.push(await scoredScroll(page, 'down', tailIds));
+      const after = await page.evaluate(() => {
+        const stream = (window as ScrollStreamWindow).__scrollStream!;
+        return { active: stream.active, chunks: stream.chunks };
+      });
+      expect(
+        after.active,
+        'stream remains live throughout measured scrolling'
+      ).toBe(true);
+      expect(
+        after.chunks - beforeChunks,
+        'stream advances concurrently'
+      ).toBeGreaterThanOrEqual(20);
+      // Leave the tail again to exercise the same jump behavior with a live row.
+      measurements.push(await scoredScroll(page, 'up', tailIds));
+      await expect(jump).toBeVisible();
+      await jump.click();
+      await expect(jump).toBeHidden();
+      await expect(
+        page
+          .getByTestId('chat-message-reply')
+          .filter({ hasText: SCROLL_STREAM_TEXT })
+      ).toBeInViewport();
+    } finally {
+      await page.evaluate(() =>
+        (window as ScrollStreamWindow).__scrollStream?.finish()
+      );
+      backend.releasePage();
+      await testInfo.attach(`transcript-scroll-${messageCount}.json`, {
+        body: JSON.stringify(
+          { messageCount, requests: backend.requests, measurements },
+          null,
+          2
+        ),
+        contentType: 'application/json',
+      });
+    }
+    expect(measurements.length).toBeGreaterThan(3);
+    expect(
+      measurements.reduce((sum, result) => sum + result.droppedFrameCount, 0),
+      JSON.stringify(measurements)
+    ).toBe(0);
+  });
+}

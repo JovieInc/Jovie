@@ -96,6 +96,9 @@ vi.mock('@tanstack/react-virtual', async importOriginal => {
 });
 
 const mockChatState = vi.hoisted(() => ({
+  hasOlderMessages: false,
+  isFetchingOlderMessages: false,
+  loadOlderMessages: vi.fn(),
   isLoadingConversation: false,
   hasMessages: true,
   isLoading: true,
@@ -151,6 +154,9 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       showCollapsedSummerFailures: mockChatState.showCollapsedSummerFailures,
       isLoadingConversation: mockChatState.isLoadingConversation,
       conversationTitle: null,
+      hasOlderMessages: mockChatState.hasOlderMessages,
+      isFetchingOlderMessages: mockChatState.isFetchingOlderMessages,
+      loadOlderMessages: mockChatState.loadOlderMessages,
       status: mockChatState.status,
       inputRef: { current: null },
       handleSubmit: vi.fn(),
@@ -270,6 +276,9 @@ afterEach(() => {
   virtualizerSpy.options = null;
   virtualizerSpy.measure.mockClear();
   virtualizerSpy.scrollToIndex.mockClear();
+  mockChatState.hasOlderMessages = false;
+  mockChatState.isFetchingOlderMessages = false;
+  mockChatState.loadOlderMessages = vi.fn();
   mockChatState.isLoadingConversation = false;
   mockChatState.hasMessages = true;
   mockChatState.isLoading = true;
@@ -846,4 +855,36 @@ describe('JovieChat styling regressions', () => {
     rerenderChat('two');
     expect(mockRailPanel.value.clearContexts).toHaveBeenCalledTimes(1);
   });
+});
+
+it('loads older history on upward scrolling during streaming and stops while pending or exhausted', () => {
+  mockChatState.hasOlderMessages = true;
+  const view = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+  const viewport = view.getByTestId('chat-message-scroll');
+  Object.defineProperty(viewport, 'clientHeight', {
+    configurable: true,
+    value: 240,
+  });
+  viewport.scrollTop = 500;
+  fireEvent.scroll(viewport);
+  expect(mockChatState.loadOlderMessages).not.toHaveBeenCalled();
+  viewport.scrollTop = 100;
+  fireEvent.scroll(viewport);
+  expect(mockChatState.loadOlderMessages).toHaveBeenCalledExactlyOnceWith({
+    cancelRefetch: false,
+  });
+  mockChatState.isFetchingOlderMessages = true;
+  view.rerender(<JovieChat profileId='profile-1' />);
+  viewport.scrollTop = 50;
+  fireEvent.scroll(viewport);
+  expect(mockChatState.loadOlderMessages).toHaveBeenCalledTimes(1);
+  mockChatState.isFetchingOlderMessages = false;
+  mockChatState.hasOlderMessages = false;
+  view.rerender(<JovieChat profileId='profile-1' />);
+  viewport.scrollTop = 0;
+  fireEvent.scroll(viewport);
+  expect(mockChatState.loadOlderMessages).toHaveBeenCalledTimes(1);
+  view.unmount();
+  fireEvent.scroll(viewport);
+  expect(mockChatState.loadOlderMessages).toHaveBeenCalledTimes(1);
 });

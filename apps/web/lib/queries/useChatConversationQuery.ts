@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { type InfiniteData, useInfiniteQuery } from '@tanstack/react-query';
 import { useId } from 'react';
 import { z } from 'zod';
+import { CHAT_TRANSCRIPT_WINDOW } from '@/lib/chat/transcript-window';
 import { CURRENT_SUMMER_SESSION_ID } from '@/lib/ovie/summer-session';
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
@@ -46,10 +47,15 @@ const summerHistorySchema = z.object({
 
 async function fetchConversation(
   conversationId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  before?: string
 ): Promise<ConversationWithMessages> {
+  const params = new URLSearchParams({
+    limit: String(CHAT_TRANSCRIPT_WINDOW.initialMessageWindow),
+  });
+  if (before) params.set('before', before);
   return fetchWithTimeout<ConversationWithMessages>(
-    `/api/chat/conversations/${conversationId}`,
+    `/api/chat/conversations/${conversationId}?${params}`,
     { signal, timeout: CHAT_CONVERSATION_FETCH_TIMEOUT_MS }
   );
 }
@@ -77,8 +83,17 @@ async function fetchSummerHistory(
   }
 }
 
+function flattenHistory(data: InfiniteData<ConversationWithMessages>) {
+  const newest = data.pages[0];
+  return {
+    ...newest,
+    messages: data.pages.toReversed().flatMap(page => page.messages),
+    hasMore: data.pages.at(-1)?.hasMore ?? false,
+  };
+}
+
 /**
- * Query hook for fetching a single conversation with all its messages.
+ * Query hook for a conversation's bounded persisted-message windows.
  *
  * Supports `refetchInterval` for polling during title generation.
  *
@@ -97,21 +112,26 @@ export function useChatConversationQuery({
 }: ConversationOptions) {
   const historyMountId = useId();
   const isSummer = chatMode === 'ov';
-  return useQuery({
+  const query = useInfiniteQuery({
     // Summer history is private to this mounted door, never a customer cache.
     queryKey: isSummer
       ? ['summer-history', historyMountId]
       : queryKeys.chat.conversation(conversationId ?? ''),
-    queryFn: ({ signal }) =>
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ signal, pageParam }) =>
       isSummer
         ? fetchSummerHistory(signal)
-        : fetchConversation(conversationId!, signal),
+        : fetchConversation(conversationId!, signal, pageParam),
+    getNextPageParam: page =>
+      !isSummer && page.hasMore ? page.messages[0]?.createdAt : undefined,
+    select: flattenHistory,
     enabled: enabled && (isSummer || !!conversationId),
     staleTime: isSummer ? 0 : 10_000,
     gcTime: isSummer ? 0 : 5 * 60 * 1000,
     placeholderData: isSummer
       ? undefined
-      : previous => (previous?.chatMode === 'ov' ? undefined : previous),
+      : previous =>
+          previous?.pages[0]?.chatMode === 'ov' ? undefined : previous,
     ...(isSummer
       ? {
           retry: false,
@@ -123,4 +143,11 @@ export function useChatConversationQuery({
     refetchInterval: isSummer ? false : refetchInterval,
     refetchIntervalInBackground: false,
   });
+  return {
+    ...query,
+    hasOlderMessages:
+      !isSummer && !query.isPlaceholderData && query.hasNextPage,
+    isFetchingOlderMessages: query.isFetchingNextPage,
+    loadOlderMessages: query.fetchNextPage,
+  };
 }
