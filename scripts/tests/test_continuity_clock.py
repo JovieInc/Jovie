@@ -211,6 +211,9 @@ class CadenceClocksTest(unittest.TestCase):
                 text = (ROOT / ".github/workflows" / c.workflow).read_text()
                 self.assertIn(f"  repository_dispatch:\n    types: [{c.event_type}]\n", text)
                 self.assertEqual(text.count("repository_dispatch:"), 1)
+                if not c.github_cron:
+                    self.assertNotIn("  schedule:\n", text, "github_cron=False means no backstop cron")
+                    continue
                 self.assertIn("  schedule:\n", text, "the GitHub cron stays as a backstop")
                 # A job gated to the schedule must also run on the clock event; only the
                 # heartbeat's own schedule-only dispatch job is exempt.
@@ -219,6 +222,7 @@ class CadenceClocksTest(unittest.TestCase):
                         self.assertIn("'repository_dispatch'", condition)
 
     def test_stale_workflows_are_dispatched_once_on_their_own_intervals(self):
+        self.age = {"stale-branch-sweep.yml": 8 * 86400}
         result = clock.tick(self.path, "gem", self.api, NOW)
         self.assertEqual(result["status"], "dispatch-requested")
         self.assertEqual(set(result["clocks"]), {c.name for c in clock.CLOCKS[1:]})
@@ -232,6 +236,16 @@ class CadenceClocksTest(unittest.TestCase):
         self.assertEqual(sorted(self.posts()), sorted([
             "event_type=clock_production_continuity", "event_type=clock_runner_heartbeat",
             "event_type=clock_runner_health_monitor"]))
+
+    def test_a_never_run_cronless_workflow_is_due_but_a_cron_backstopped_one_fails_closed(self):
+        sweep = next(c for c in clock.CLOCKS if c.name == "staleBranchSweep")
+        empty = lambda total: (lambda run, args: json.dumps({"total_count": total, "workflow_runs": []}))
+        with patch.object(clock, "api", side_effect=empty(0)):
+            self.assertEqual(clock.observe(None, NOW, sweep)["status"], "overdue")
+            with self.assertRaises(ValueError):
+                clock.observe(None, NOW, clock.CONTINUITY)
+        with patch.object(clock, "api", side_effect=empty(None)), self.assertRaises(ValueError):
+            clock.observe(None, NOW, sweep)  # a page without total_count proves nothing
 
     def test_a_fresh_run_from_any_trigger_skips_its_dispatch(self):
         self.age = {"runner-heartbeat.yml": 30, "cost-anomaly-gate.yml": 120}

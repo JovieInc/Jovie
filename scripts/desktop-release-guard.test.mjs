@@ -1569,7 +1569,10 @@ globalThis.setTimeout = (callback, ms) => {
   await published();
   assert.equal((await readFile(join(root, 'attempts'), 'utf8')).trim(), '2');
   const wait = Number((await readFile(join(root, 'sleeps'), 'utf8')).trim());
-  assert.ok(wait >= 90_000 && wait <= 91_000, `Unexpected wait: ${wait}`);
+  // The mock stamps the reset with `date +%s` (whole seconds) and the
+  // publisher waits reset + 1s from a later Date.now(), so a slow runner
+  // that crosses a second boundary lands just under 90s (seen: 89_999).
+  assert.ok(wait >= 85_000 && wait <= 91_000, `Unexpected wait: ${wait}`);
   for (const overrides of [
     { MOCK_FAIL_ENDPOINT: 'compare/', MOCK_RESET_SECONDS: '3600' },
     { MOCK_FAIL_ENDPOINT: 'compare/', MOCK_FAILURES: '4' },
