@@ -9,7 +9,7 @@ numbers — budgets live in the sources below and in the GBrain page, not here.
 
 | # | File | Owns | Enforcement today |
 |---|------|------|-------------------|
-| 1 | `apps/web/scripts/performance-route-manifest.ts` | Route budgets (FCP/LCP/CLS/TTFB, `interactive-shell-ready`, `warm-shell-response`, `skeleton-to-content`, `usable-alias-result`) and resource budgets in transferSize KB | `performance-budgets-guard.ts` in `production-release.yml`; public-profile alias staging and production exceptions are bounded below |
+| 1 | `apps/web/scripts/performance-route-manifest.ts` | Route budgets (FCP/LCP/CLS/TTFB, `interactive-shell-ready`, `warm-shell-response`, `skeleton-to-content`, `usable-alias-result`) and resource budgets in transferSize KB | `performance-budgets-guard.ts` in `production-release.yml`; staged-build alias budgets block; the production alias exception is bounded below |
 | 2 | `apps/web/.lighthouserc.json` | Production Lighthouse for `/` and `/tim` | production-controller / postdeploy — perf assertions warn; only accessibility ≥ 0.9 errors |
 | 3 | `apps/web/.lighthouserc.{dashboard,onboarding,admin,chat,public-launch,pr}.json` | Per-surface Lighthouse thresholds (error level) | `ci.yml` `ci-lighthouse-*` jobs — `workflow_dispatch` only |
 | 4 | `apps/web/scripts/performance-interaction-manifest.ts` | Interaction latency / dropped frames (jank) classes | `perf:interactions` — manual |
@@ -28,17 +28,39 @@ Controller executions where that job ran can enter its window. Neither surface c
 other surface's streak.
 
 **Ship now:** production remains warning-only. The dated
-[`jovie-public-profile-alias-graduation/v1`](./public-profile-alias-graduation.json) receipt
-records 12 qualifying runs in the latest 14-run window and a current consecutive streak of
-1/14. With five samples per route, nearest-rank p95 is the maximum sample; every selected
-route must be at or below 1500 ms for a run to qualify.
+[`jovie-public-profile-alias-graduation/v2`](./public-profile-alias-graduation.json) receipt,
+measured at 2026-10-21T01:06:00Z, records 11 qualifying production runs in the latest
+14-run window and a current consecutive streak of 0/14. The three maxima over budget
+are 1626.2, 2083.1 and 2431.6 ms. Staging independently qualifies at 14/14, so its
+exact-build alias budget now fails closed when that measurement step runs. With five
+samples per route, nearest-rank p95 is the maximum sample; every selected route must
+be at or below 1500 ms for a run to qualify.
 
 **Re-evaluate when:** production reaches 14 consecutive eligible executions, and no later
-than 2026-10-21 under JOV-8338. Staging must present its own equivalent 14-run receipt before
-its policy changes.
+than 2026-10-28T01:06:00Z under JOV-8737. Staging's independent graduation is recorded
+under JOV-8338; production evidence never changes staging's decision.
 
 **Then:** make the qualifying surface's budget gate blocking. If a surface still does not
 qualify, refresh its dated measurement and set another bounded review date.
+
+The receipt references generated JSONL with all 472 controller jobsets in the fixed
+October 14–21 interval and 28 selected measurements (840 raw samples). Each measurement
+records exact controller/attempt/job/step identities, native log SHA-256, samples and
+matching native maxima. `headSha` identifies the controller workflow source;
+`testedSha` identifies its actual checkout. Staging also records the immutable
+deployment ID/URL and matching expected SHA. Failed controllers remain eligible;
+partial measurements consume a nonqualifying slot. Missing provider pages or logs
+abort collection instead of silently skipping an execution.
+
+Refresh manually with authenticated `gh`, explicit UTC boundaries, and the owning issue:
+
+```sh
+node scripts/lib/public-profile-alias-graduation.mjs \
+  2026-10-14T00:00:00Z 2026-10-21T01:06:00Z 2026-10-28T01:06:00Z JOV-8737
+```
+
+This regenerates the receipt and its two evidence files; review the resulting
+decisions and update the existing workflow enforcement in the same change.
 
 ## Rules binding repo edits
 
