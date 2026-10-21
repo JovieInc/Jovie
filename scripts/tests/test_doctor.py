@@ -451,6 +451,36 @@ class JudgeTest(unittest.TestCase):
         for present in (True, None):  # installed, or a fixture/self-test with no host file
             self.assertNotIn("linear-app-credential-missing", doctor.judge(obs(linearAppCredential=present)))
 
+    def test_app_credential_observation_tracks_the_host_file_without_exposing_values(self):
+        lane = load("lane_runner")
+        with tempfile.TemporaryDirectory() as tmp:
+            credential = Path(tmp) / "linear-app.env"
+            with mock.patch.object(lane.linear_app_token, "default_path", return_value=credential):
+                self.assertIs(doctor._linear_app_credential(lane), False)
+                credential.write_text("LINEAR_CLIENT_ID=fixture\n")
+                self.assertIs(doctor._linear_app_credential(lane), False)
+                credential.write_text("LINEAR_CLIENT_ID=fixture\nLINEAR_CLIENT_SECRET=fixture\n")
+                self.assertIs(doctor._linear_app_credential(lane), True)
+            with mock.patch.object(lane.linear_app_token, "default_path", return_value=None):
+                self.assertIsNone(doctor._linear_app_credential(lane))
+
+    def test_unreadable_app_credentials_raise_an_alert_without_aborting_observation(self):
+        lane = load("lane_runner")
+        with tempfile.TemporaryDirectory() as tmp:
+            credential = Path(tmp) / "linear-app.env"
+            credential.write_text("LINEAR_CLIENT_ID=fixture\nLINEAR_CLIENT_SECRET=fixture\n")
+            errors = (PermissionError("private credential detail"),
+                      UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid credential bytes"))
+            for error in errors:
+                with self.subTest(error=type(error).__name__), \
+                        mock.patch.object(lane.linear_app_token, "default_path", return_value=credential), \
+                        mock.patch.object(Path, "read_text", side_effect=error):
+                    present = doctor._linear_app_credential(lane)
+                    self.assertIs(present, False)
+                    alerts = doctor.judge(obs(linearAppCredential=present))
+                    self.assertIn("linear-app-credential-missing", alerts)
+                    self.assertNotIn(str(error), json.dumps(alerts))
+
     def test_started_issues_without_a_live_owner_escalate_after_the_grace(self):
         quiet = doctor.judge(obs(ownership={"started": 536, "ownerless": 3, "overGrace": 0}))
         self.assertNotIn("started-without-owner", quiet)  # inside the grace period

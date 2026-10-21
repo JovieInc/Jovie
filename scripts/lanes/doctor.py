@@ -188,7 +188,12 @@ def _linear_app_credential(lane) -> bool | None:
     None where no host file applies (self-test, fixtures)."""
     tokens = getattr(lane, "linear_app_token", None)
     path = tokens.default_path() if tokens else None
-    return None if path is None else bool(tokens.credentials(path))
+    if path is None:
+        return None
+    try:
+        return bool(tokens.credentials(path))
+    except (OSError, UnicodeError):
+        return False
 
 
 # #22354 shipped the registry at canon/ (the repo-root allowlist rejects new top-level dirs).
