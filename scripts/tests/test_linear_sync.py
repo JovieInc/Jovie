@@ -344,3 +344,56 @@ class StartedOwnershipTest(Base):
         self.assertEqual((len(self.moves()), report["unresolved"]), (2, {"move-budget": 1}))
         again = self.reconcile(at=ownership.GRACE_S + 3, max_moves=2)  # idempotent: pending moves count
         self.assertEqual((len(self.moves()), again["started"], len(again["moved"])), (3, 1, 1))
+
+
+class MergedEvidenceTest(Base):
+    """Gem 2026-10-20: 40 Merging/Validating issues looked ownerless because their merged PRs
+    live in summer-config, Ops or LogYourBody, not Jovie main."""
+    NOW = StartedOwnershipTest.NOW
+    git, started, reconcile = StartedOwnershipTest.git, StartedOwnershipTest.started, StartedOwnershipTest.reconcile
+
+    def search(self, table, calls):
+        def run(ident):
+            calls.append(ident)
+            return table.get(ident, [])
+        return run
+
+    def comments(self):
+        return [e["body"] for e in ls._read(ls._outbox_path(self.state), ls.OUTBOX).get("entries", [])
+                if e["op"] == "comment"]
+
+    def test_an_org_merged_pr_that_claims_the_issue_makes_the_lifecycle_its_owner(self):
+        self.started(8304, "Validating")
+        self.started(8305, "Merging")
+        calls, table = [], {
+            "JOV-8304": [{"repository": "JovieInc/summer-config", "number": 209, "title": "fix(summer): x",
+                          "body": "Refs JOV-8304.\n"}],
+            "JOV-8305": [{"repository": "JovieInc/Jovie", "number": 1, "title": "docs: mentions JOV-8305 in passing",
+                          "body": "see JOV-8305"}]}
+        report = self.reconcile(search=self.search(table, calls))
+        self.assertEqual(report["owners"], {"lifecycle": 2})  # title token counts
+        self.assertEqual(sorted(calls), ["JOV-8304", "JOV-8305"])
+        self.assertEqual(len(self.comments()), 2)
+        again = self.reconcile(search=self.search(table, calls), at=ownership.GRACE_S + 1)
+        self.assertEqual((again["owners"], len(calls), len(self.comments())), ({"lifecycle": 2}, 2, 2))
+
+    def test_an_incidental_mention_is_not_evidence_and_searches_are_budgeted(self):
+        for n in range(30, 38):
+            self.started(n, "Validating")
+        calls = []
+        table = {f"JOV-{n}": [{"repository": "JovieInc/Jovie", "number": n, "title": "chore: unrelated",
+                                "body": f"context JOV-{n} (not a reference line)"}] for n in range(30, 38)}
+        report = self.reconcile(search=self.search(table, calls))
+        self.assertEqual(len(calls), ownership.SEARCHES_PER_TICK)
+        self.assertEqual(report["ownerless"], 8)
+        self.reconcile(search=self.search(table, calls), at=60)
+        self.assertEqual(len(calls), 8, "a miss is cached for a day; the rest finish next tick")
+        unreadable = self.reconcile(search=lambda ident: None, at=ownership.GRACE_S + 1)
+        self.assertEqual(unreadable["unresolved"], {"post-merge-without-merged-evidence": 8})
+
+    def test_a_refs_line_listing_several_issues_claims_each_of_them(self):
+        body = "Summary.\n\nRefs JOV-7703; JOV-6022; JOV-7514; JOV-7198.\n"  # Jovie#21232
+        for ident in ("JOV-7703", "JOV-6022", "JOV-7198"):
+            self.assertTrue(ownership.pr_names_issue({"title": "docs(fleet): x", "body": body}, ident))
+        partial = "This is a bounded first repair under JOV-8333; the rest stays open."  # summer-config#211
+        self.assertFalse(ownership.pr_names_issue({"title": "fix(summer): y", "body": partial}, "JOV-8333"))

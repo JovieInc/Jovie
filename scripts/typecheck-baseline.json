@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-10-15T22:53:32.749Z",
-  "totalErrors": 107,
+  "generatedAt": "2026-10-20T19:15:13.794Z",
+  "totalErrors": 101,
   "files": {
     "apps/web/scripts/generate-brand-assets.ts": {
       "TS1470": 2,
@@ -82,12 +82,6 @@
     },
     "scripts/lib/pr-comment-analysis.mjs": {
       "TS2345": 1
-    },
-    "scripts/linear-claim-issue.mjs": {
-      "TS2339": 3
-    },
-    "scripts/linear-query-todo.mjs": {
-      "TS2339": 3
     },
     "scripts/observability-issue-github.mjs": {
       "TS2345": 1

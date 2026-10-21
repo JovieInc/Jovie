@@ -3,6 +3,10 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import {
+  claimStateHref,
+  requiresManualVerification,
+} from '@/lib/claim/artist-offer-claim';
+import {
   clearPendingClaimContext,
   readPendingClaimContext,
   writePendingClaimContext,
@@ -194,6 +198,19 @@ export async function GET(
           spotifyUrl: getCanonicalSpotifyUrl(profile),
           isSignedIn: Boolean(userId),
         })
+      );
+    }
+
+    // High-reach artists are never taken over self-serve: payment or a
+    // Spotify match alone must not hand over their identity. /claim/start
+    // sends the buyer to their own profile + checkout, and onboarding holds
+    // the artist as a verification request (lib/claim/claim-verification.ts).
+    if (requiresManualVerification(profile.spotifyFollowers)) {
+      return redirectTo(
+        request,
+        profile.spotifyId
+          ? `${APP_ROUTES.CLAIM_START}?spotify=${encodeURIComponent(profile.spotifyId)}`
+          : claimStateHref('verification_required')
       );
     }
 

@@ -1,0 +1,696 @@
+{
+  "schema": "jovie-external-api-ratchet/v1",
+  "entries": {
+    ".agents/skills/gstack/.github/workflows/evals.yml": {
+      "gh-shell": 3
+    },
+    ".agents/skills/gstack/design/prototype.ts": {
+      "provider-host": 1
+    },
+    ".agents/skills/gstack/design/src/check.ts": {
+      "provider-host": 1
+    },
+    ".agents/skills/gstack/design/src/design-to-code.ts": {
+      "provider-host": 1
+    },
+    ".agents/skills/gstack/design/src/diff.ts": {
+      "provider-host": 1
+    },
+    ".agents/skills/gstack/design/src/evolve.ts": {
+      "provider-host": 2
+    },
+    ".agents/skills/gstack/design/src/generate.ts": {
+      "provider-host": 1
+    },
+    ".agents/skills/gstack/design/src/iterate.ts": {
+      "provider-host": 2
+    },
+    ".agents/skills/gstack/design/src/memory.ts": {
+      "provider-host": 1
+    },
+    ".agents/skills/gstack/design/src/variants.ts": {
+      "provider-host": 1
+    },
+    ".agents/skills/gstack/scripts/resolvers/review.ts": {
+      "gh-subprocess": 2
+    },
+    ".agents/skills/gstack/scripts/resolvers/utility.ts": {
+      "gh-subprocess": 2
+    },
+    ".claude/hooks/bash-safety-check.sh": {
+      "gh-shell": 2
+    },
+    ".github/actions/sentry-error-gate/action.yml": {
+      "provider-host": 4
+    },
+    ".github/actions/skip-if-unchanged/action.yml": {
+      "gh-shell": 2
+    },
+    ".github/scripts/analyze-test-flakiness.js": {
+      "gh-subprocess": 3
+    },
+    ".github/scripts/assert-live-production-bind.mjs": {
+      "provider-host": 1
+    },
+    ".github/scripts/cancel-stale-vercel-previews.mjs": {
+      "provider-host": 1
+    },
+    ".github/scripts/cleanup-pr-vercel-previews.mjs": {
+      "provider-host": 1
+    },
+    ".github/scripts/coderabbit-autofix/fetch-review.sh": {
+      "gh-shell": 2
+    },
+    ".github/scripts/collect-quarantine-evidence.mjs": {
+      "gh-subprocess": 1
+    },
+    ".github/scripts/dependency-parity-evidence.mjs": {
+      "gh-subprocess": 1
+    },
+    ".github/scripts/internal-pr-review.mjs": {
+      "provider-host": 2
+    },
+    ".github/scripts/mac-lane.sh": {
+      "gh-shell": 1
+    },
+    ".github/scripts/mutation-diff-resolve-files.sh": {
+      "gh-shell": 2
+    },
+    ".github/scripts/plan2issues.mjs": {
+      "provider-sdk": 2
+    },
+    ".github/scripts/plan2issues.v2.mjs": {
+      "provider-sdk": 2
+    },
+    ".github/scripts/pr-visual-review.mjs": {
+      "provider-host": 1
+    },
+    ".github/scripts/production-continuity.mjs": {
+      "provider-host": 1
+    },
+    ".github/scripts/publish-queue-junit.mjs": {
+      "gh-subprocess": 2
+    },
+    ".github/scripts/query-runner-heartbeat.sh": {
+      "gh-shell": 1
+    },
+    ".github/scripts/resolve-main-sha.sh": {
+      "gh-shell": 1
+    },
+    ".github/scripts/vercel-build-queue.mjs": {
+      "provider-host": 1
+    },
+    ".github/scripts/vercel-on-demand-ledger.mjs": {
+      "provider-host": 1
+    },
+    ".github/scripts/verify-main-release-readiness.mjs": {
+      "provider-host": 2
+    },
+    ".github/scripts/verify-vercel-production-domains.mjs": {
+      "provider-host": 1
+    },
+    ".github/workflows/agent-harness-health-report.yml": {
+      "gh-shell": 3
+    },
+    ".github/workflows/ci-duration-ratchet.yml": {
+      "gh-shell": 1
+    },
+    ".github/workflows/ci.yml": {
+      "gh-shell": 3,
+      "github-script": 1,
+      "provider-host": 1
+    },
+    ".github/workflows/cost-anomaly-gate.yml": {
+      "provider-host": 3
+    },
+    ".github/workflows/dependabot-auto-merge.yml": {
+      "gh-shell": 5
+    },
+    ".github/workflows/deprecation-intake.yml": {
+      "gh-shell": 4
+    },
+    ".github/workflows/design-gate.yml": {
+      "gh-shell": 2
+    },
+    ".github/workflows/design-governance.yml": {
+      "gh-shell": 4
+    },
+    ".github/workflows/desktop-release.yml": {
+      "gh-shell": 25
+    },
+    ".github/workflows/fork-pr-gate.yml": {
+      "gh-shell": 7
+    },
+    ".github/workflows/golden-path-nightly.yml": {
+      "gh-shell": 1
+    },
+    ".github/workflows/ios-testflight.yml": {
+      "gh-shell": 20
+    },
+    ".github/workflows/jovie-agent-release.yml": {
+      "gh-shell": 2
+    },
+    ".github/workflows/legacy-human-hold-scrub.yml": {
+      "gh-shell": 4
+    },
+    ".github/workflows/marketing-certification-producer.yml": {
+      "gh-shell": 2
+    },
+    ".github/workflows/merge-queue-green-enroll.yml": {
+      "github-script": 2
+    },
+    ".github/workflows/merge-queue-ruleset-verify.yml": {
+      "gh-shell": 1
+    },
+    ".github/workflows/node-runtime-compatibility.yml": {
+      "gh-shell": 4
+    },
+    ".github/workflows/pr-conflict-handler.yml": {
+      "gh-shell": 25
+    },
+    ".github/workflows/pr-review-learn.yml": {
+      "gh-shell": 2
+    },
+    ".github/workflows/pr-review.yml": {
+      "gh-shell": 2
+    },
+    ".github/workflows/pr-size-guard-label-override.yml": {
+      "gh-shell": 1
+    },
+    ".github/workflows/pr-targets-main.yml": {
+      "github-script": 1
+    },
+    ".github/workflows/production-continuity.yml": {
+      "gh-shell": 2
+    },
+    ".github/workflows/production-controller-health.yml": {
+      "gh-shell": 6
+    },
+    ".github/workflows/production-controller.yml": {
+      "gh-shell": 17
+    },
+    ".github/workflows/production-marker-recovery.yml": {
+      "gh-shell": 4
+    },
+    ".github/workflows/remediation-sweep.yml": {
+      "gh-shell": 2
+    },
+    ".github/workflows/rolling-ci-dispatch.yml": {
+      "gh-shell": 9
+    },
+    ".github/workflows/runner-health-monitor.yml": {
+      "gh-shell": 4
+    },
+    ".github/workflows/screenshots.yml": {
+      "gh-shell": 13
+    },
+    ".github/workflows/security-suppression-audit.yml": {
+      "gh-shell": 1
+    },
+    ".github/workflows/security.yml": {
+      "gh-shell": 1
+    },
+    ".github/workflows/sentry-autofix.yml": {
+      "gh-shell": 3
+    },
+    ".github/workflows/shipping-slo.yml": {
+      "gh-shell": 6
+    },
+    ".github/workflows/source-validation.yml": {
+      "gh-shell": 1
+    },
+    ".github/workflows/staging-controller.yml": {
+      "gh-shell": 1
+    },
+    ".github/workflows/synthetic-monitoring.yml": {
+      "gh-shell": 1
+    },
+    ".github/workflows/test-flakiness-report.yml": {
+      "gh-shell": 1
+    },
+    ".github/workflows/visual-a11y.yml": {
+      "gh-shell": 4
+    },
+    ".github/workflows/visual-regression.yml": {
+      "gh-shell": 6
+    },
+    ".windsurf/scripts/bash-safety-check.sh": {
+      "gh-shell": 1
+    },
+    "apps/console/lib/factory-health.ts": {
+      "provider-host": 3
+    },
+    "apps/console/lib/linear.ts": {
+      "provider-host": 1
+    },
+    "apps/eve-pilot/agent/lib/linear-client.ts": {
+      "provider-host": 1
+    },
+    "apps/eve-pilot/scripts/jovie-release.mjs": {
+      "provider-host": 1
+    },
+    "apps/web/app/api/admin/hud/shipping-velocity/route.ts": {
+      "provider-host": 1
+    },
+    "apps/web/app/api/deploy/status/route.ts": {
+      "provider-host": 1
+    },
+    "apps/web/app/api/webhooks/linear/route.ts": {
+      "provider-host": 3
+    },
+    "apps/web/app/api/webhooks/sentry/route.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/acquisition/eligibility.server.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/actions/fleet/runtime.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/admin/sentry-metrics.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/agent-os/design-lab/linear.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/ai/gateway-spend.ts": {
+      "provider-sdk": 1
+    },
+    "apps/web/lib/ai/sdk.ts": {
+      "provider-sdk": 1
+    },
+    "apps/web/lib/billing/sync-remediation.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/deployments/github.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/desktop/github-releases.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/eval/adversarial/helicone-gateway.ts": {
+      "provider-sdk": 1
+    },
+    "apps/web/lib/github/hud-token.server.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/hermes/dispatch.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/hud/ai-ops.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/hud/github-rate-limits.ts": {
+      "provider-host": 2
+    },
+    "apps/web/lib/hud/linear-actions.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/hud/ovie-mac-hud.server.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/hud/what-shipped-github.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/ovie/linear-coordination-live.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/ovie/mcp/founder-work.ts": {
+      "provider-host": 2
+    },
+    "apps/web/lib/ovie/shipping-state/live.ts": {
+      "provider-host": 2
+    },
+    "apps/web/lib/ovie/summer-eve-pin-check.ts": {
+      "provider-host": 1
+    },
+    "apps/web/lib/services/album-art/provider-xai.ts": {
+      "provider-sdk": 1
+    },
+    "apps/web/lib/services/retouching/provider-gemini.ts": {
+      "provider-sdk": 1
+    },
+    "apps/web/lib/waitlist/cohort-learnings.ts": {
+      "provider-host": 1
+    },
+    "apps/web/scripts/check-migrations.sh": {
+      "gh-shell": 1
+    },
+    "apps/web/scripts/create-pr.sh": {
+      "gh-shell": 2
+    },
+    "apps/web/scripts/fetch-sentry-issues.mjs": {
+      "provider-host": 1
+    },
+    "apps/web/scripts/golden-path-visual-review.ts": {
+      "provider-host": 1
+    },
+    "apps/web/scripts/handle-multiple-migrations.sh": {
+      "gh-shell": 6
+    },
+    "apps/web/scripts/merch-alpha-spike.ts": {
+      "provider-sdk": 1
+    },
+    "apps/web/scripts/merch-image-spike.ts": {
+      "provider-sdk": 1
+    },
+    "apps/web/scripts/merch-knockout-spike.ts": {
+      "provider-sdk": 1
+    },
+    "apps/web/scripts/refresh-unit-shard-durations.mjs": {
+      "provider-host": 1
+    },
+    "apps/web/scripts/vercel-protected-origin.cjs": {
+      "provider-host": 1
+    },
+    "packages/copy/judge.ts": {
+      "provider-host": 1
+    },
+    "scripts/agent/fix-claim.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/auto-ready-agent-drafts.sh": {
+      "gh-shell": 7
+    },
+    "scripts/auto-ready-green-drafts.sh": {
+      "gh-shell": 7
+    },
+    "scripts/backlog-orchestrator/backlog-orchestrator.mjs": {
+      "gh-subprocess": 12,
+      "provider-host": 1
+    },
+    "scripts/backlog-orchestrator/linear-client.mjs": {
+      "provider-host": 1
+    },
+    "scripts/ci-branching-guard.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/ci-health-check.sh": {
+      "gh-shell": 2
+    },
+    "scripts/ci-merge-queue-check.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/ci/gh-api-or-defer.sh": {
+      "gh-shell": 1
+    },
+    "scripts/ci/neon-orphan-reaper.mjs": {
+      "provider-host": 1
+    },
+    "scripts/create-launch-issues.sh": {
+      "gh-shell": 16
+    },
+    "scripts/credentials-inventory-collect.mjs": {
+      "provider-host": 1
+    },
+    "scripts/dependabot-pin-sync.mjs": {
+      "provider-host": 1
+    },
+    "scripts/dependabot-workflow-run-adapter.mjs": {
+      "provider-host": 1
+    },
+    "scripts/desktop-installed-apps-audit.mjs": {
+      "provider-host": 1
+    },
+    "scripts/desktop-release-assets.mjs": {
+      "provider-host": 1
+    },
+    "scripts/dispatch-kanban.sh": {
+      "gh-shell": 1,
+      "provider-host": 2
+    },
+    "scripts/doc-gardening-agent.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/docs-deploy-intake.mjs": {
+      "provider-host": 4
+    },
+    "scripts/drain-pr-queue.sh": {
+      "gh-shell": 43,
+      "provider-host": 1
+    },
+    "scripts/fleet-gate/closure_health.py": {
+      "gh-subprocess": 4
+    },
+    "scripts/fleet-gate/evaluate-fleet-gate.sh": {
+      "gh-shell": 1
+    },
+    "scripts/fleet-gate/gem-priority-gate.py": {
+      "gh-subprocess": 3
+    },
+    "scripts/funnel-judge/preview-gate.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/golden-path-lock.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/hold-contract.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/invariants/jev-gateway.mjs": {
+      "provider-host": 1
+    },
+    "scripts/invariants/screen-proof-resolver.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/knowledge/distill.ts": {
+      "provider-host": 1
+    },
+    "scripts/lanes/backlog_admission.py": {
+      "gh-subprocess": 2
+    },
+    "scripts/lanes/bindings.py": {
+      "gh-subprocess": 10
+    },
+    "scripts/lanes/continuity_clock.py": {
+      "gh-subprocess": 1
+    },
+    "scripts/lanes/design_gate_check.py": {
+      "provider-host": 1
+    },
+    "scripts/lanes/doctor.py": {
+      "gh-subprocess": 4
+    },
+    "scripts/lanes/execution_attempt.py": {
+      "gh-subprocess": 1
+    },
+    "scripts/lanes/file_overlap.py": {
+      "gh-subprocess": 4
+    },
+    "scripts/lanes/hud.py": {
+      "gh-subprocess": 1
+    },
+    "scripts/lanes/lane_runner.py": {
+      "gh-subprocess": 26,
+      "provider-host": 1
+    },
+    "scripts/lanes/linear_app_token.py": {
+      "provider-host": 1
+    },
+    "scripts/lanes/merge_evidence.py": {
+      "gh-subprocess": 1
+    },
+    "scripts/lanes/model_radar.py": {
+      "provider-host": 1
+    },
+    "scripts/lanes/pr_events.py": {
+      "gh-subprocess": 40
+    },
+    "scripts/lanes/shipping_attribution.py": {
+      "gh-subprocess": 1
+    },
+    "scripts/lanes/source_admission.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lanes/worktree_sweep.py": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/agent-branch-pattern.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/lib/auto-ready-green-drafts.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/credentials-live-reads.mjs": {
+      "provider-host": 2
+    },
+    "scripts/lib/gh-retry.sh": {
+      "gh-shell": 1
+    },
+    "scripts/lib/github-rate-limit.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/golden-path-lock.mjs": {
+      "provider-host": 1
+    },
+    "scripts/lib/isolated-ui-docs-policy.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/lib/linear-cooldown.mjs": {
+      "provider-host": 1
+    },
+    "scripts/lib/linear-sync-on-merge.mjs": {
+      "provider-host": 2
+    },
+    "scripts/lib/merge-group-admission.mjs": {
+      "provider-host": 1
+    },
+    "scripts/lib/merge-group-member-policy.mjs": {
+      "provider-host": 1
+    },
+    "scripts/lib/needs-human-autoclose.mjs": {
+      "gh-subprocess": 3,
+      "provider-host": 1
+    },
+    "scripts/lib/pr-check-failures.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/pr-comment-analysis.mjs": {
+      "gh-subprocess": 3
+    },
+    "scripts/lib/pr-size-guard-label-provenance.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/pr-size-guard-policy.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/publish-coverage-report.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/rolling-ci-fx-finish.mjs": {
+      "gh-subprocess": 1,
+      "provider-host": 1
+    },
+    "scripts/lib/rolling-ci-fx.mjs": {
+      "gh-subprocess": 1,
+      "provider-host": 1
+    },
+    "scripts/lib/rolling-ci-hosted-writer.mjs": {
+      "provider-host": 1
+    },
+    "scripts/lib/safe-pr-remediation.mjs": {
+      "provider-host": 1
+    },
+    "scripts/lib/sentry-validation-observation.mjs": {
+      "provider-host": 2
+    },
+    "scripts/lib/tracker.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/lib/upsert-pr-comment.sh": {
+      "gh-shell": 3
+    },
+    "scripts/lib/validation-sync.mjs": {
+      "provider-host": 1
+    },
+    "scripts/loop-integration-ship.sh": {
+      "gh-shell": 4
+    },
+    "scripts/loop-orchestrator.sh": {
+      "gh-shell": 1
+    },
+    "scripts/loop-train-drain.sh": {
+      "gh-shell": 3
+    },
+    "scripts/merge-group-failure-hold.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/merge-group-victim-rearm.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/merge-queue-backend.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/native-queue-eval.mjs": {
+      "gh-subprocess": 4
+    },
+    "scripts/observability-issue-github.mjs": {
+      "provider-host": 1
+    },
+    "scripts/postmortem-review.mjs": {
+      "provider-host": 1
+    },
+    "scripts/pr-comment-retro.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/pr-conflict-handler.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/pr-review/cli.mjs": {
+      "provider-host": 1
+    },
+    "scripts/pr-size-guard-label-override.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/pr-unacquired-runner-rerun.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/promotion-loss-metrics.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/publish-daily-changelog.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/quality-gap-finder.mjs": {
+      "provider-host": 1
+    },
+    "scripts/remediation-sweep.mjs": {
+      "provider-host": 1
+    },
+    "scripts/screenshot-loop/screenshot-bug-loop.mjs": {
+      "provider-host": 2
+    },
+    "scripts/security/deepsec-native-controller.mjs": {
+      "provider-host": 1
+    },
+    "scripts/security/security-gate.mjs": {
+      "provider-host": 3
+    },
+    "scripts/sentry-autofix-recurrence.mjs": {
+      "provider-host": 2
+    },
+    "scripts/setup.sh": {
+      "provider-host": 1
+    },
+    "scripts/ship-swarm/next-batch.mjs": {
+      "gh-subprocess": 1,
+      "provider-host": 1
+    },
+    "scripts/shipping-slo-intake.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/shipping-slo-report.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/shipping_origin.py": {
+      "gh-subprocess": 2
+    },
+    "scripts/source-admission-check.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/stale-branch-sweep.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/taste-classifier.mjs": {
+      "gh-subprocess": 3
+    },
+    "scripts/taste-label-guard.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/unstack-merged-parent.sh": {
+      "gh-shell": 4
+    },
+    "scripts/visual-baseline-adopt.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/workflow-token-scope.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/writer-owned-pr-promote.sh": {
+      "gh-shell": 6
+    },
+    "workers/observability-ingest/src/index.ts": {
+      "provider-host": 1
+    }
+  }
+}
