@@ -260,7 +260,8 @@ describe('public-profile alias graduation policy', () => {
       conclusion: 'failure',
       path: '.github/workflows/production-controller.yml',
     }));
-    const request = vi.fn((path, json) => {
+    // collectAliasGraduation types request as ghRequest: (path, json?) => Promise.
+    const request = vi.fn(async (path, json) => {
       if (path.includes('/workflows/'))
         return [runs.slice(0, 8), runs.slice(8)].map(workflow_runs => ({
           total_count: 17,
@@ -334,7 +335,7 @@ describe('public-profile alias graduation policy', () => {
     await expect(
       collectAliasGraduation({
         ...options,
-        request: () => [{ total_count: 18, workflow_runs: runs }],
+        request: async () => [{ total_count: 18, workflow_runs: runs }],
       })
     ).rejects.toThrow('Incomplete');
   });
