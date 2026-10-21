@@ -23,7 +23,11 @@ import {
   rememberTiles,
   withTileHistory,
 } from '@/lib/home-loop/contract';
-import type { OvieInbox, OvieInboxCase } from '@/lib/ovie/inbox';
+import type {
+  InboxDecisionTarget,
+  OvieInbox,
+  OvieInboxCase,
+} from '@/lib/ovie/inbox';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import type {
   CountMeasurement,
@@ -435,6 +439,53 @@ export function buildOvieHomeShipping(input: {
   };
 }
 
+/**
+ * Same primary verbs as the inbox drawer. Home must not call a Linear close
+ * or a founder certification an approval.
+ */
+export function ovieAskAction(kind: InboxDecisionTarget['kind'] | undefined): {
+  readonly actionLabel: string;
+  readonly committedLabel: string;
+} {
+  switch (kind) {
+    case 'linear':
+      return { actionLabel: 'Mark done', committedLabel: 'Marked done' };
+    case 'certification':
+      return { actionLabel: 'Certify', committedLabel: 'Certified' };
+    default:
+      return { actionLabel: 'Approve', committedLabel: 'Approved' };
+  }
+}
+
+/** `jovie.decision-default/v1` as the inbox publishes it (PR #22371). */
+type InboxDecisionDefaultWire = {
+  readonly contract?: unknown;
+  readonly decision?: unknown;
+  readonly summary?: unknown;
+  readonly deadline?: unknown;
+  readonly declared?: unknown;
+};
+
+function decisionDefaultOf(item: OvieInboxCase): OvieAsk['decisionDefault'] {
+  const wire = (
+    item as { readonly decisionDefault?: InboxDecisionDefaultWire | null }
+  ).decisionDefault;
+  if (
+    !wire ||
+    wire.contract !== 'jovie.decision-default/v1' ||
+    (wire.decision !== 'approve' && wire.decision !== 'reject') ||
+    typeof wire.summary !== 'string' ||
+    typeof wire.deadline !== 'string'
+  )
+    return null;
+  return {
+    decision: wire.decision,
+    summary: wire.summary,
+    deadline: wire.deadline,
+    declared: wire.declared === true,
+  };
+}
+
 function askFromCase(item: OvieInboxCase): OvieAsk {
   return {
     id: item.id,
@@ -442,10 +493,14 @@ function askFromCase(item: OvieInboxCase): OvieAsk {
     recommendation: item.recommendation,
     why: item.body,
     decidable: item.decisionTarget !== null,
+    actionLabel: ovieAskAction(item.decisionTarget?.kind).actionLabel,
     // Linear asks only accept approval; their discussion lives in Linear.
     canReply:
       item.decisionTarget !== null && item.decisionTarget.kind !== 'linear',
     evidence: item.evidence,
+    decisionDefault: decisionDefaultOf(item),
+    // Summer cards accept post-ship feedback once decided.
+    canFeedback: item.decisionTarget?.kind === 'summer',
   };
 }
 
