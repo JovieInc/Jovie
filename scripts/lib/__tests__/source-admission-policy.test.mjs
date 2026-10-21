@@ -40,7 +40,8 @@ test('trusted source-read guards reject a deleted test on an old head and execut
     const archive = execFileSync(
       '/usr/bin/git',
       ['archive', 'HEAD', 'scripts'],
-      { maxBuffer: 20 * 1024 * 1024 }
+      // scripts/ reached 20.0 MB on 2026-10-21 (ENOBUFS at a 20 MiB cap).
+      { maxBuffer: 128 * 1024 * 1024 }
     );
     execFileSync('tar', ['-x', '-C', repo], { input: archive });
     // This synthetic base isolates the web manifest guard and predates the
