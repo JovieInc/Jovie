@@ -176,7 +176,8 @@ describe('stage timings', () => {
       regression: null,
     });
     expect(t.coverage).toEqual({
-      stagesTotal: 36,
+      stagesTotal: Object.values(MANIFEST.entities).flatMap(e => e.stages)
+        .length,
       stagesWithData: 2,
       events: 4,
     });
