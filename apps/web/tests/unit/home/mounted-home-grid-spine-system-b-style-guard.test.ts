@@ -44,12 +44,32 @@ function countOccurrences(source: string, needle: string): number {
 describe('mounted homepage grid spine System B source contract', () => {
   it('keeps page-level markup free of forbidden style patterns', () => {
     const pageSource = readFileSync(path.join(webRoot, pagePath), 'utf8');
+    const heroSource = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepageYoutubeMvp.tsx'),
+      'utf8'
+    );
 
     for (const pattern of forbiddenPageChromePatterns) {
       expect(pageSource, `${pagePath} leaked ${pattern}`).not.toMatch(pattern);
+      expect(heroSource, `mounted hero leaked ${pattern}`).not.toMatch(pattern);
     }
 
     expect(pageSource).toContain('<HomepageYoutubeMvp />');
+    expect(pageSource).not.toMatch(/statsRow|stats=\{|secondaryCta/);
+    for (const primitive of [
+      '<MarketingHero',
+      '<MarketingHeroPhoto',
+      '<MarketingSurfaceCard',
+      '<HomepagePrimaryAction',
+    ]) {
+      expect(heroSource).toContain(primitive);
+    }
+    expect(
+      heroSource.slice(
+        heroSource.indexOf('<MarketingHero\n'),
+        heroSource.indexOf('</MarketingHero>')
+      )
+    ).not.toMatch(/<Button|<Link|href=/);
     // Certified homepage: proof is a statement, never a logo strip.
     expect(pageSource).not.toContain('HomeTrustSection');
     expect(pageSource).not.toContain('FaqSection');
