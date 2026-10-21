@@ -105,7 +105,8 @@ export function HomeLoopSection({
               <p
                 role='status'
                 data-testid={`${testId}-notice`}
-                className='pb-2 text-xs text-secondary-token'
+                className='line-clamp-1 shrink-0 pb-2 text-xs text-secondary-token'
+                title={notice}
               >
                 {notice}
               </p>

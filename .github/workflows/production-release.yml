@@ -1297,9 +1297,11 @@ jobs:
 
           # Staging policy is independent from the canonical production-alias
           # policy below. Only exact immutable staged-build executions count
-          # here; a production streak can never graduate staging. Keep this
-          # advisory until its own 14 consecutive five-sample nearest-rank p95
-          # receipts are <=1500ms. Recheck by 2026-10-21 under JOV-8338.
+          # here; a production streak can never graduate staging. Its own
+          # 2026-10-21 receipt qualifies 14/14 five-sample nearest-rank p95
+          # executions <=1500ms: enforce this budget closed (JOV-8338).
+          # Recheck by 2026-10-28 under JOV-8737; evidence is in
+          # docs/performance/public-profile-alias-graduation.json.
           if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
             --base-url "$deployment_url" \
             --runs 5 \
@@ -1309,11 +1311,9 @@ jobs:
             --route-id public-profile-tip \
             --route-id public-profile-tour \
             --route-id public-profile-releases; then
-            echo "::warning::Exact staged-build public-profile alias budgets failed. Staging remains independently advisory; review by 2026-10-21 (JOV-8338)."
-            echo "performance_status=warn" >> "$GITHUB_OUTPUT"
-          else
-            echo "performance_status=passed" >> "$GITHUB_OUTPUT"
+            fail_performance_gate "Exact staged-build public-profile alias budgets failed."
           fi
+          echo "performance_status=passed" >> "$GITHUB_OUTPUT"
 
       - name: Recheck main immediately before production promotion
         id: final-current
@@ -1682,10 +1682,10 @@ jobs:
     permissions:
       contents: read
     # Production canonical-alias policy is measured independently from staging.
-    # Ship now: WARN; the 2026-10-14 receipt has 12/14 qualifying runs and a
-    # current streak of 1/14 after tail misses at 1507.5ms and 2041.1ms.
+    # Ship now: WARN; the 2026-10-21 receipt has 11/14 qualifying runs and a
+    # current streak of 0/14 after tail misses at 1626.2, 2083.1 and 2431.6ms.
     # Re-evaluate when: 14 eligible canonical-alias executions are consecutive,
-    # and no later than 2026-10-21 (JOV-8338). Then: hard-fail this gate when all
+    # and no later than 2026-10-28 (JOV-8737). Then: hard-fail this gate when all
     # six routes' five-sample nearest-rank p95 values are <=1500ms. Evidence:
     # docs/performance/public-profile-alias-graduation.json.
     outputs:
@@ -1705,7 +1705,7 @@ jobs:
         run: |
           set -euo pipefail
           # The checked-in 14-run receipt does not yet authorize fail-closed
-          # enforcement. Keep measuring; JOV-8338 owns the dated recheck.
+          # enforcement. Keep measuring; JOV-8737 owns the dated recheck.
           if ! pnpm exec tsx scripts/performance-budgets-guard.ts \
             --base-url https://jov.ie \
             --runs 5 \
@@ -1715,7 +1715,7 @@ jobs:
             --route-id public-profile-tip \
             --route-id public-profile-tour \
             --route-id public-profile-releases; then
-            echo "::warning::Production public-profile alias budgets failed on jov.ie. Latest receipt: 12/14 qualifying, current streak 1/14, measured 2026-10-14; review by 2026-10-21 (JOV-8338)."
+            echo "::warning::Production public-profile alias budgets failed on jov.ie. Latest receipt: 11/14 qualifying, current streak 0/14, measured 2026-10-21; review by 2026-10-28 (JOV-8737)."
             echo "performance_status=warn" >> "$GITHUB_OUTPUT"
           else
             echo "performance_status=passed" >> "$GITHUB_OUTPUT"

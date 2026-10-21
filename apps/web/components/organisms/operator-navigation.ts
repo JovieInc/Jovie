@@ -85,16 +85,33 @@ export const OPERATOR_NAV_ITEMS: readonly OperatorNavItem[] =
 export const OPERATOR_NAV_GROUP_LABEL =
   'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90';
 
-export const OPERATOR_NAV_SECTIONS = [
+/**
+ * Ovie is one Home plus a collapsed Tools group (Tim 2026-10-21). Home needs
+ * no group label; Tools opens on demand and stays open while one of its
+ * destinations is active.
+ */
+export interface OperatorNavSection {
+  readonly id: 'home' | 'tools';
+  /** `null`: the group renders without a label. */
+  readonly label: string | null;
+  readonly collapsible: boolean;
+  readonly items: readonly OperatorNavItem[];
+}
+
+export const OPERATOR_NAV_SECTIONS: readonly OperatorNavSection[] = [
   {
-    label: 'Workspaces',
+    id: 'home',
+    label: null,
+    collapsible: false,
     items: OPERATOR_NAV_ITEMS.filter(item => item.section === 'workspaces'),
   },
   {
-    label: 'Utilities',
+    id: 'tools',
+    label: 'Tools',
+    collapsible: true,
     items: OPERATOR_NAV_ITEMS.filter(item => item.section === 'utilities'),
   },
-] as const;
+];
 
 /**
  * Home is the OV index (`/app/ov`) and matches only exactly; the chat route
