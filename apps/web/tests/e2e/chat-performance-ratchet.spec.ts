@@ -258,6 +258,9 @@ async function exchangeChatRoundTrip(
   const timings = await readChatProbe(page);
   await expect(composer).toHaveValue('Next message');
   await expect(composer).toBeFocused();
+  await expect(
+    page.getByTestId('chat-composer-surface').last()
+  ).toHaveAttribute('data-variant', 'compact');
   return { ...timings, typing };
 }
 
@@ -455,6 +458,10 @@ async function runComposerProfile(
     name: /send message/i,
   });
   await waitForChatRouteReady(page, chatContent, composer, chatApi);
+
+  await expect(
+    chatContent.getByTestId('chat-composer-surface')
+  ).toHaveAttribute('data-variant', surface.persisted ? 'compact' : 'hero');
 
   for (
     let warmupIndex = 0;
