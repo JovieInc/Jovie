@@ -1,4 +1,10 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import type { UIMessage } from 'ai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
@@ -120,6 +126,39 @@ vi.mock('@/components/jovie/components', () => ({
 }));
 
 describe('OnboardingChat empty intro', () => {
+  it('does not reopen authentication from a historical admission after a later turn', () => {
+    const initialMessages: UIMessage[] = [
+      {
+        id: 'old-admission',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'proposeNextStep',
+            toolCallId: 'old',
+            state: 'output-available',
+            input: {},
+            output: {
+              action: 'propose_next_step',
+              decision: { kind: 'instant_access', rationale: 'old', score: 85 },
+            },
+          },
+        ],
+      },
+      {
+        id: 'changed-intent',
+        role: 'user',
+        parts: [{ type: 'text', text: 'I need a different profile' }],
+      },
+    ];
+    render(
+      <OnboardingChat initialMessages={initialMessages} turnstileToken={null} />
+    );
+    expect(
+      screen.queryByTestId('onboarding-profile-review')
+    ).not.toBeInTheDocument();
+  });
+
   it('renders persisted progress without auto-submitting a starter or re-triggering claim activity', async () => {
     const initialMessages: UIMessage[] = [
       {
@@ -255,6 +294,56 @@ describe('OnboardingChat empty intro', () => {
       screen.queryByTestId('onboarding-verification-instruction-size')
     ).toBeNull();
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('submits the chosen handle directly from its explicit action without a composer relay', async () => {
+    render(
+      <OnboardingChat
+        entryProfile={{ status: 'available', handle: 'direct-entry' }}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+    const action = await screen.findByRole('button', {
+      name: 'Continue with @direct-entry',
+    });
+    await act(async () => {});
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+    fireEvent.click(action);
+    expect(chatMocks.sendMessage).toHaveBeenCalledExactlyOnceWith({
+      text: 'I want to claim jov.ie/direct-entry.',
+    });
+  });
+
+  it('sends a confirmed prebuilt identity through the existing server-validated artist-selection path', async () => {
+    render(
+      <OnboardingChat
+        entryProfile={{
+          status: 'claimable',
+          handle: 'known-artist',
+          displayName: 'Known Artist',
+          avatarUrl: null,
+          spotifyId: 'known-spotify-id',
+          spotifyUrl: 'https://open.spotify.com/artist/known-spotify-id',
+          genres: [],
+          socialLinks: [],
+          linkPlatforms: [],
+          linkCount: 0,
+        }}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+    const action = await screen.findByRole('button', {
+      name: 'Yes, that is me',
+    });
+    await act(async () => {});
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+    fireEvent.click(action);
+    expect(chatMocks.sendMessage).toHaveBeenCalledExactlyOnceWith({
+      text: 'I want to claim jov.ie/known-artist.',
+      metadata: { spotifyArtistId: 'known-spotify-id' },
+    });
   });
 
   it('keeps a handle entry on its value screen and never auto-sends the claim draft (JOV-7753)', async () => {

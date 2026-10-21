@@ -48,7 +48,7 @@ describe('onboarding sign-in placement', () => {
     ).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
       'href',
-      APP_ROUTES.SIGNIN
+      `${APP_ROUTES.SIGNIN}?redirect_url=%2Fstart%3Fresume%3D1`
     );
   });
 
@@ -67,7 +67,7 @@ describe('onboarding sign-in placement', () => {
 
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
       'href',
-      APP_ROUTES.SIGNIN
+      `${APP_ROUTES.SIGNIN}?redirect_url=%2Fstart%3Fhandle%3Dtim`
     );
   });
 

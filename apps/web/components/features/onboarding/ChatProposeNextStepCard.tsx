@@ -1,12 +1,18 @@
 'use client';
 
 // @coverage-via apps/web/tests/components/features/onboarding/ChatProposeNextStepCard.test.tsx
-import { useEffect, useRef } from 'react';
+import { Button } from '@jovie/ui';
+import { useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthShell } from '@/features/auth';
-import { useAuthSafe, useCanRenderClerkUi } from '@/hooks/useClerkSafe';
+import { useCanRenderAuthUi, useJovieAuth } from '@/hooks/useJovieAuth';
 import { track } from '@/lib/analytics';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import {
+  OnboardingProfileRail,
+  resolvePreviewArtist,
+} from './OnboardingProfileRail';
+import { useOnboardingProfileReview } from './OnboardingProfileReviewContext';
 
 /**
  * Renders the `proposeNextStep` tool result inside the onboarding chat
@@ -14,12 +20,9 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  *
  * Three render paths driven by the deterministic decision:
  *
- *  - `instant_access` → inline `AuthShell mode="sign-up"` (Better Auth-backed
- *    signup surface). The OnboardingShell's auto-claim hook then attaches the
- *    fresh user's account to the anonymous transcript and bounces them
- *    forward to /onboarding/checkout. (Clerk → Better Auth migration,
- *    client-flip commit ⑦: replaced Clerk `<SignUp />` prebuilt with the
- *    BA-backed `AuthShell`.)
+ *  - `instant_access` → populated profile review, then explicit Keep opens
+ *    the existing Better Auth signup surface. The shell's claim hook checks
+ *    the server receipt after authentication before continuing to checkout.
  *
  *  - `waitlist` → verified signup, then the claim endpoint writes the durable
  *    waitlist record. This card never renders a saved confirmation itself.
@@ -45,8 +48,17 @@ interface ChatProposeNextStepCardProps {
 export function ChatProposeNextStepCard({
   payload,
 }: ChatProposeNextStepCardProps) {
-  const { isSignedIn } = useAuthSafe();
-  const canRenderClerkUi = useCanRenderClerkUi();
+  const { isSignedIn } = useJovieAuth();
+  const canRenderAuthUi = useCanRenderAuthUi();
+  const review = useOnboardingProfileReview();
+  const artist = review ? resolvePreviewArtist(review.state) : null;
+  const handle = review?.state.handle;
+  const reviewKey = artist && handle ? `${artist.id}:${handle}` : null;
+  const [keptProfile, setKeptProfile] = useState<string | null>(null);
+  const showingAuth = reviewKey !== null && keptProfile === reviewKey;
+  const resumePath = handle
+    ? `${APP_ROUTES.START}?${new URLSearchParams({ handle })}`
+    : `${APP_ROUTES.START}?resume=1`;
   const kind = payload.decision.kind;
   const decisionTrackedRef = useRef(false);
   const saveStartedTrackedRef = useRef(false);
@@ -78,10 +90,6 @@ export function ChatProposeNextStepCard({
     }
   }, [isSignedIn, kind, payload.decision.score]);
 
-  // Memoise the auth surface so the inline form looks at home on the
-  // dark onboarding canvas. AuthShell's `compact` mode renders the
-  // provider grid + email OTP form without the full-page chrome.
-
   if (kind === 'needs_more_info') {
     // No visible card — the LLM keeps the conversation going.
     return null;
@@ -99,7 +107,7 @@ export function ChatProposeNextStepCard({
       );
     }
 
-    if (!canRenderClerkUi) {
+    if (!canRenderAuthUi) {
       return (
         <div className='min-h-72 px-1 py-1'>
           <p className='text-mid leading-7 text-primary-token'>
@@ -121,7 +129,10 @@ export function ChatProposeNextStepCard({
         <AuthShell
           mode='sign-up'
           compact
-          fallbackRedirectUrl={APP_ROUTES.START}
+          fallbackRedirectUrl={resumePath}
+          oppositeModeUrl={`${APP_ROUTES.SIGNIN}?${new URLSearchParams({ redirect_url: resumePath })}`}
+          claimHandle={handle ?? undefined}
+          suppressOneTap
         />
       </div>
     );
@@ -129,9 +140,7 @@ export function ChatProposeNextStepCard({
 
   // instant_access — the moment the visitor converts.
   if (isSignedIn) {
-    // Already authenticated mid-conversation (rare but possible if the user
-    // had a Clerk session already). Skip the form; the claim hook on the
-    // shell will fire and bounce them to checkout.
+    // The existing claim hook reports the canonical server outcome separately.
     return (
       <div className='px-1 py-1'>
         <p className='text-mid leading-7 text-primary-token'>
@@ -141,26 +150,90 @@ export function ChatProposeNextStepCard({
     );
   }
 
-  if (!canRenderClerkUi) {
-    return (
-      <div className='px-1 py-1'>
-        <p className='text-mid leading-7 text-primary-token'>
-          {`You're in. Create your account to keep this conversation and finish your profile.`}
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className='space-y-3 px-1 py-1'>
-      <p className='mb-3 text-mid leading-7 text-primary-token'>
-        {`You're in. Add an email to save your profile and this conversation.`}
+    <div
+      className='space-y-4 px-1 py-1'
+      data-testid='onboarding-profile-review'
+    >
+      <h2 className='text-xl font-semibold text-primary-token'>
+        {reviewKey ? `Here is jov.ie/${handle}` : 'Your profile draft'}
+      </h2>
+      <p className='text-app leading-6 text-secondary-token'>
+        Preview first. Sign in to save and verify your claim. This profile has
+        not been saved to your account.
       </p>
-      <AuthShell
-        mode='sign-up'
-        compact
-        fallbackRedirectUrl={APP_ROUTES.START}
-      />
+      {review && artist ? (
+        <>
+          <div className='space-y-2' data-testid='onboarding-found-sources'>
+            <h3 className='text-app font-medium text-primary-token'>
+              What Jovie Found
+            </h3>
+            <p className='text-app text-secondary-token'>
+              {artist.name} · @{handle}
+            </p>
+            {artist.latestRelease ? (
+              <p className='text-app text-secondary-token'>
+                Latest release: {artist.latestRelease.title}
+              </p>
+            ) : null}
+            {review.state.socialLinks.length ? (
+              <p className='text-app text-secondary-token'>
+                {review.state.socialLinks.length} public{' '}
+                {review.state.socialLinks.length === 1 ? 'link' : 'links'}{' '}
+                included in your preview
+              </p>
+            ) : null}
+          </div>
+          <OnboardingProfileRail state={review.state} placement='inline' />
+        </>
+      ) : (
+        <p role='status' className='text-app text-secondary-token'>
+          Your preview is not ready yet. Continue in this conversation to finish
+          the profile.
+        </p>
+      )}
+      {showingAuth && canRenderAuthUi ? (
+        <div className='space-y-3' data-testid='onboarding-save-auth'>
+          <p className='text-app text-primary-token'>
+            Continue with Google or another sign-in method to keep this profile.
+          </p>
+          <AuthShell
+            mode='sign-up'
+            compact
+            fallbackRedirectUrl={resumePath}
+            oppositeModeUrl={`${APP_ROUTES.SIGNIN}?${new URLSearchParams({ redirect_url: resumePath })}`}
+            claimHandle={handle ?? undefined}
+            suppressOneTap
+          />
+          <Button variant='ghost' onClick={() => setKeptProfile(null)}>
+            Back To Preview
+          </Button>
+        </div>
+      ) : (
+        <div className='flex flex-wrap gap-2'>
+          <Button
+            disabled={!reviewKey || !canRenderAuthUi}
+            onClick={() => setKeptProfile(reviewKey)}
+          >
+            Keep This Profile
+          </Button>
+          <Button
+            variant='ghost'
+            onClick={() => {
+              setKeptProfile(null);
+              review?.onEditDetails();
+            }}
+          >
+            Edit Details
+          </Button>
+        </div>
+      )}
+      {reviewKey && !canRenderAuthUi ? (
+        <p role='status' className='text-app text-secondary-token'>
+          Sign-in is unavailable right now. Your preview is still here; refresh
+          to try again.
+        </p>
+      ) : null}
     </div>
   );
 }

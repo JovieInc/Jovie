@@ -60,6 +60,7 @@ import {
 import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
 import type { OnboardingProfileBuilderState } from './OnboardingProfileRail';
 import { OnboardingProfileRail } from './OnboardingProfileRail';
+import { OnboardingProfileReviewContext } from './OnboardingProfileReviewContext';
 import { OnboardingSecurityCheckRecovery } from './OnboardingSecurityCheckRecovery';
 import {
   OnboardingArtistConfirmedCard,
@@ -102,6 +103,7 @@ const STARTER_VERIFICATION_INSTRUCTION = 'One quick check before we send';
  */
 
 interface OnboardingChatProps {
+  readonly previewState?: OnboardingProfileBuilderState;
   readonly initialMessages?: UIMessage[];
   readonly conversationId?: string | null;
   readonly interactionDisabled?: boolean;
@@ -480,7 +482,13 @@ function OnboardingMessageList({
     <div className='flex flex-col pb-4'>
       {displayMessages.map(message => {
         const text = getMessageText(message);
-        const toolParts = getToolParts(message);
+        // Historical admissions must not reopen auth after the visitor changes
+        // their identity or intent in a later turn.
+        const toolParts = getToolParts(message).filter(
+          part =>
+            getToolName(part) !== 'proposeNextStep' ||
+            message.id === displayMessages.at(-1)?.id
+        );
         const isThinking = message.id === THINKING_PLACEHOLDER_ID;
         const shouldRenderMessage =
           isThinking || Boolean(text) || toolParts.length === 0;
@@ -633,6 +641,7 @@ interface OnboardingMessageRegionProps {
   readonly entryMode: OnboardingEntryMode;
   readonly entryProfile: StartEntryProfile | null;
   readonly onTryAnotherName: () => void;
+  readonly onContinueWithProfile: () => void;
   readonly composerPickerOpen: boolean;
 }
 
@@ -642,6 +651,7 @@ function OnboardingMessageRegion({
   entryMode,
   entryProfile,
   onTryAnotherName,
+  onContinueWithProfile,
   hasConversationStarted,
   isBusy,
   isStreaming,
@@ -684,6 +694,8 @@ function OnboardingMessageRegion({
               mode={entryMode}
               entryProfile={entryProfile}
               onTryAnotherName={onTryAnotherName}
+              onContinueWithProfile={onContinueWithProfile}
+              disabled={isBusy}
             />
           </div>
         }
@@ -739,6 +751,7 @@ export function OnboardingChat({
   onTurnstileRequired,
   starterHandoff,
   entryProfile = null,
+  previewState,
   turnstilePanel,
   turnstilePanelVisible = false,
   turnstileHasSiteKey = false,
@@ -751,9 +764,7 @@ export function OnboardingChat({
 }: OnboardingChatProps) {
   const initialStarterPrompt = starterHandoff?.prompt ?? '';
   const hasInitialStarterPrompt = initialStarterPrompt.length > 0;
-  const initialDraft = hasInitialStarterPrompt
-    ? initialStarterPrompt
-    : (buildStartEntryDraft(entryProfile) ?? '');
+  const initialDraft = hasInitialStarterPrompt ? initialStarterPrompt : '';
   const [input, setInput] = useState(initialDraft);
   const [entryMode, setEntryMode] = useState<OnboardingEntryMode>(() => {
     if (starterHandoff?.kind === 'spotify_artist') return 'spotify_handoff';
@@ -1226,7 +1237,7 @@ export function OnboardingChat({
     </div>
   );
 
-  return (
+  const chatSurface = (
     <section
       className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
       aria-label='Jovie Onboarding Chat'
@@ -1261,6 +1272,16 @@ export function OnboardingChat({
             entryMode={entryMode}
             entryProfile={entryProfile}
             onTryAnotherName={focusComposer}
+            onContinueWithProfile={() => {
+              const claimRequest = buildStartEntryDraft(entryProfile);
+              if (claimRequest)
+                submitText(
+                  claimRequest,
+                  entryProfile?.status === 'claimable' && entryProfile.spotifyId
+                    ? { spotifyArtistId: entryProfile.spotifyId }
+                    : undefined
+                );
+            }}
             hasConversationStarted={hasConversationStarted}
             isBusy={isBusy}
             isStreaming={isStreaming}
@@ -1286,5 +1307,15 @@ export function OnboardingChat({
         </div>
       ) : null}
     </section>
+  );
+  return (
+    <OnboardingProfileReviewContext.Provider
+      value={{
+        state: previewState ?? profileBuilderState,
+        onEditDetails: focusComposer,
+      }}
+    >
+      {chatSurface}
+    </OnboardingProfileReviewContext.Provider>
   );
 }

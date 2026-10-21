@@ -125,6 +125,7 @@ export function sanitizeRedirectUrl(
   const hashIndex = url.indexOf('#');
   const cleanUrl = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
 
-  // Ensure something meaningful remains after stripping
-  return cleanUrl && cleanUrl !== '/' ? cleanUrl : null;
+  // An explicit homepage destination is meaningful. Only absent/unsafe input
+  // falls back to the account's default workspace.
+  return cleanUrl || null;
 }

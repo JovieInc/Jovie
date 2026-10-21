@@ -488,12 +488,12 @@ describe('sanitizeRedirectUrl', () => {
     expect(sanitizeRedirectUrl('/signin#/reset-password')).toBe('/signin');
   });
 
-  it('rejects root path after stripping (would be meaningless redirect)', () => {
-    expect(sanitizeRedirectUrl('/')).toBeNull();
+  it('preserves an explicit homepage destination', () => {
+    expect(sanitizeRedirectUrl('/')).toBe('/');
   });
 
-  it('rejects path that becomes just / after hash strip', () => {
-    expect(sanitizeRedirectUrl('/#fragment')).toBeNull();
+  it('preserves the homepage after stripping a fragment', () => {
+    expect(sanitizeRedirectUrl('/#fragment')).toBe('/');
   });
 });
 

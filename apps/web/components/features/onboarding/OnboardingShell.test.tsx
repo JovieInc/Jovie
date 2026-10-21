@@ -1,8 +1,9 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildEntryProfileBuilderState,
+  mergeEntryProfileBuilderState,
   OnboardingShell,
 } from './OnboardingShell';
 
@@ -102,6 +103,78 @@ vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
 }));
 
 describe('OnboardingShell status', () => {
+  it('keeps the entered handle and known links when the same artist resolves', () => {
+    const entry = {
+      artist: {
+        id: 'artist',
+        name: 'Artist',
+        url: '',
+        followers: 42,
+        latestRelease: {
+          title: 'Real release',
+          slug: 'real-release',
+          artworkUrl: 'https://cdn.example.com/release.webp',
+          releaseDate: '2026-10-20',
+          releaseType: 'single',
+        },
+      },
+      artistConfirmed: false,
+      handle: 'david',
+      socialLinks: ['https://instagram.com/artist'],
+    };
+    const chat = {
+      artist: { id: 'artist', name: 'Artist', url: '' },
+      artistConfirmed: true,
+      handle: null,
+      socialLinks: [],
+    };
+    expect(mergeEntryProfileBuilderState(entry, chat)).toMatchObject({
+      handle: 'david',
+      socialLinks: entry.socialLinks,
+      artistConfirmed: true,
+      artist: { followers: 42, latestRelease: entry.artist.latestRelease },
+    });
+    expect(
+      mergeEntryProfileBuilderState(entry, {
+        ...chat,
+        artist: { id: 'different', name: 'Other', url: '' },
+      })
+    ).toMatchObject({
+      socialLinks: [],
+      handle: null,
+      artist: { id: 'different' },
+    });
+    expect(
+      mergeEntryProfileBuilderState(entry, {
+        ...chat,
+        artist: { id: 'different', name: 'Other', url: '' },
+      }).artist?.latestRelease
+    ).toBeUndefined();
+  });
+
+  it('offers explicit account recovery and disables claim dispatch for a different handle', () => {
+    const logout = vi.fn();
+    render(
+      <OnboardingShell
+        sessionLabel='pending'
+        isSignedIn
+        accountClaimHandle='david'
+        onLogout={logout}
+      />
+    );
+    expect(
+      within(screen.getByTestId('onboarding-identity-conflict')).getByText(
+        /switch accounts to continue with @david/i
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Open Your Workspace' })
+    ).toHaveAttribute('href', '/app');
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Account' }));
+    expect(logout).toHaveBeenCalledOnce();
+    expect(claimState.enabled).toBe(false);
+  });
+
   it('keeps explicit restart/logout visible and prevents them during a pending turn', () => {
     const restart = vi.fn();
     const logout = vi.fn();
@@ -188,6 +261,23 @@ describe('OnboardingShell status', () => {
         "We couldn't save your request. Refresh this page to try again."
       )
     ).not.toBeInTheDocument();
+  });
+
+  it('preserves the requested handle in original-account recovery', () => {
+    claimState.value = 'identity-conflict';
+    render(
+      <OnboardingShell
+        sessionLabel='pending'
+        entryProfile={{ status: 'available', handle: 'requested' }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
+    expect(
+      screen.getByRole('link', { name: 'Sign in with original account' })
+    ).toHaveAttribute(
+      'href',
+      '/signin?redirect_url=%2Fstart%3Fhandle%3Drequested'
+    );
   });
 
   it('keeps recovery below navigation and above the transcript, using existing logout authority', () => {
@@ -401,6 +491,8 @@ describe('buildEntryProfileBuilderState (JOV-7753)', () => {
         url: '',
         imageUrl: 'https://blob.example.com/a.png',
         genres: ['hip hop'],
+        followers: null,
+        latestRelease: null,
       },
       artistConfirmed: false,
       handle: 'megaran',

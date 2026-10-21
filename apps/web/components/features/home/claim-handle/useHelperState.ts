@@ -38,7 +38,7 @@ export function useHelperState({
     if (available === true) {
       return {
         tone: 'success' as const,
-        text: `@${handle} is available — tap the button to claim it.`,
+        text: `@${handle} was available at the last check. We'll confirm when you save.`,
       };
     }
 
@@ -49,12 +49,15 @@ export function useHelperState({
     }
 
     if (available === false) {
-      return { tone: 'error' as const, text: 'Handle already taken' };
+      return {
+        tone: 'idle' as const,
+        text: `@${handle} already has a page. Continue to see your options.`,
+      };
     }
 
     return {
       tone: 'idle' as const,
-      text: 'Use lowercase letters, numbers, or hyphens (3–30 chars).',
+      text: 'Use lowercase letters, numbers, or hyphens (3–24 chars).',
     };
   }, [available, availError, checkingAvail, handle, handleError]);
 }

@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { getOptionalAuth } from '@/lib/auth/cached';
+import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import {
   clearPendingClaimContext,
   readPendingClaimContext,
@@ -58,14 +59,16 @@ function getCanonicalSpotifyUrl(profile: {
 
 // `getOptionalAuth().userId` is the app `users.id` since the Better Auth
 // cutover; `users.clerk_id` is null or `ba:`-prefixed on current rows.
-async function hasActiveCreatorProfile(appUserId: string): Promise<boolean> {
+async function getActiveCreatorProfileId(
+  appUserId: string
+): Promise<string | null> {
   const [user] = await db
     .select({ activeProfileId: users.activeProfileId })
     .from(users)
     .where(eq(users.id, appUserId))
     .limit(1);
 
-  return Boolean(user?.activeProfileId);
+  return user?.activeProfileId ?? null;
 }
 
 function buildAuthStartPath(params: {
@@ -119,8 +122,9 @@ export async function GET(
   }
 
   const { userId } = await getOptionalAuth();
-  if (userId && (await hasActiveCreatorProfile(userId))) {
-    return redirectTo(request, APP_ROUTES.DASHBOARD);
+  if (userId && (await getActiveCreatorProfileId(userId)) === profile.id) {
+    const access = await getExactProfileAccess(db, userId, profile.id);
+    if (access.ok) return redirectTo(request, APP_ROUTES.DASHBOARD);
   }
 
   const existingPendingClaim = await readPendingClaimContext({
@@ -178,7 +182,13 @@ export async function GET(
   if (searchParams.get('next') === 'auth') {
     if (profile.isClaimed) {
       await clearPendingClaimContext();
-      return redirectTo(request, `/${profile.usernameNormalized}`);
+      const returnPath = `${APP_ROUTES.START}?${new URLSearchParams({ handle: profile.usernameNormalized })}`;
+      return redirectTo(
+        request,
+        userId
+          ? returnPath
+          : `${APP_ROUTES.SIGNIN}?${new URLSearchParams({ redirect_url: returnPath })}`
+      );
     }
 
     if (

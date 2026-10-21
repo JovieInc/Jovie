@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 import { PhoneFrame } from '@/components/molecules/PhoneFrame';
+import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -20,6 +21,9 @@ export interface ProfilePreviewBentoProps {
   /** Domain-specific draft content inside the shared phone and hero chrome. */
   readonly phoneContent?: ReactNode;
   readonly artist: Artist;
+  readonly latestRelease?: ProfilePrimaryActionCardRelease | null;
+  readonly allowFanCapture?: boolean;
+  readonly headerSocialLinksOverride?: LegacySocialLink[];
   readonly socialLinks: LegacySocialLink[];
   readonly genres?: string[] | null;
   readonly profileHref: string;
@@ -84,6 +88,9 @@ const DEFAULT_COVER_VARS = {
 export function ProfilePreviewBento({
   phoneContent,
   artist,
+  latestRelease,
+  allowFanCapture = true,
+  headerSocialLinksOverride = [],
   socialLinks,
   genres,
   profileHref,
@@ -116,6 +123,8 @@ export function ProfilePreviewBento({
             renderMode='preview'
             presentation='embedded'
             artist={artist}
+            latestRelease={latestRelease}
+            allowFanCapture={allowFanCapture}
             socialLinks={socialLinks}
             contacts={[]}
             showPayButton={false}
@@ -138,7 +147,7 @@ export function ProfilePreviewBento({
             hideMoreMenu
             renderInteractiveOverlays={false}
             renderSemanticHeading={false}
-            headerSocialLinksOverride={[]}
+            headerSocialLinksOverride={headerSocialLinksOverride}
             resolveNearbyTour={false}
           />
         )}

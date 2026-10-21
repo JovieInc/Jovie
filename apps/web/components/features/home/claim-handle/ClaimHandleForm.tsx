@@ -14,7 +14,6 @@ import {
 } from 'react';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { HandleStatusIcon } from './HandleStatusIcon';
@@ -32,14 +31,25 @@ export function ClaimHandleForm({
   const isHero = size === 'hero';
   const isHeroLike = size !== 'default';
   const router = useRouter();
-  const { isSignedIn } = useAuthSafe();
   const inputRef = useRef<HTMLInputElement>(null);
+  const navigationRef = useRef(false);
 
   const displayDomain = BASE_URL.replace(/^https?:\/\//, '');
 
   const [handle, setHandle] = useState('');
   const [navigating, setNavigating] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [navigationError, setNavigationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const restore = () => {
+      navigationRef.current = false;
+      setNavigating(false);
+      setNavigationError(null);
+    };
+    globalThis.addEventListener('pageshow', restore);
+    return () => globalThis.removeEventListener('pageshow', restore);
+  }, []);
 
   const { handleError, checkingAvail, available, availError } =
     useHandleValidation(handle);
@@ -59,14 +69,19 @@ export function ClaimHandleForm({
   const onSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
+      if (navigationRef.current) return;
       setFormSubmitted(true);
 
       const normalizedHandle = handle.toLowerCase().trim();
 
-      if (!normalizedHandle) {
+      if (!normalizedHandle || handleError) {
         inputRef.current?.focus();
         return;
       }
+
+      navigationRef.current = true;
+      setNavigating(true);
+      setNavigationError(null);
 
       try {
         sessionStorage.setItem(
@@ -84,18 +99,17 @@ export function ClaimHandleForm({
 
       const target = `${APP_ROUTES.START}?handle=${encodeURIComponent(normalizedHandle)}`;
 
-      setNavigating(true);
-
-      if (!isSignedIn) {
-        router.push(
-          `${APP_ROUTES.SIGNUP}?redirect_url=${encodeURIComponent(target)}`
-        );
-        return;
+      try {
+        // One entry contract for new and existing sessions. /start resolves
+        // the target before auth/ownership determines the next permitted step.
+        router.push(target);
+      } catch {
+        navigationRef.current = false;
+        setNavigating(false);
+        setNavigationError("We couldn't open your profile setup. Try again.");
       }
-
-      router.push(target);
     },
-    [handle, isSignedIn, router, submitTracking]
+    [handle, handleError, router, submitTracking]
   );
 
   const showChecking = checkingAvail;
@@ -110,14 +124,19 @@ export function ClaimHandleForm({
     displayDomain,
   });
 
-  const helperToneClass = HELPER_TONE_CLASSES[helperState.tone];
+  const helperToneClass =
+    HELPER_TONE_CLASSES[navigationError ? 'error' : helperState.tone];
 
   const buttonContent = useMemo((): ReactNode => {
     if (navigating) {
       return (
         <>
-          <LoadingSpinner size='sm' tone='inverse' label='Creating' />
-          <span>Creating…</span>
+          <LoadingSpinner
+            size='sm'
+            tone='inverse'
+            label='Opening Profile Setup'
+          />
+          <span>Opening…</span>
         </>
       );
     }
@@ -181,6 +200,7 @@ export function ClaimHandleForm({
           <input
             ref={inputRef}
             id='handle-input'
+            name='handle'
             type='text'
             value={handle}
             onChange={e => setHandle(e.target.value.toLowerCase())}
@@ -247,9 +267,15 @@ export function ClaimHandleForm({
           data-visible={helperState.text ? 'true' : 'false'}
           aria-hidden={helperState.text ? undefined : 'true'}
           aria-live={helperState.tone === 'error' ? 'assertive' : 'polite'}
-          role={formSubmitted && handleError ? 'alert' : undefined}
+          role={
+            formSubmitted && (handleError || navigationError)
+              ? 'alert'
+              : undefined
+          }
         >
-          {helperState.text || ' '}
+          {navigationError ||
+            (navigating ? `Opening setup for @${handle}…` : helperState.text) ||
+            ' '}
         </p>
       )}
     </form>

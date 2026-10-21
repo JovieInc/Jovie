@@ -9,6 +9,7 @@ import {
   getDisplaySpotifyFollowers,
 } from '@/lib/onboarding/canonical-metrics';
 import type { OnboardingProfileDraft } from '@/lib/onboarding/profile-draft';
+import type { StartEntryRelease } from '@/lib/onboarding/start-entry-profile';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
@@ -33,6 +34,7 @@ export interface OnboardingProfileArtist {
   readonly popularity?: number | null;
   readonly genres?: readonly string[];
   readonly dspMatches?: readonly OnboardingDspMatch[];
+  readonly latestRelease?: StartEntryRelease | null;
 }
 
 export interface OnboardingProfileBuilderState {
@@ -195,7 +197,7 @@ function buildPreviewArtist(
     tagline:
       artist.tagline ??
       (followerLabel
-        ? `${followerLabel} Spotify followers (source: enrichment)`
+        ? `${followerLabel} Spotify followers`
         : (firstGenre ?? undefined)),
     theme: undefined,
     settings: undefined,
@@ -410,9 +412,39 @@ export function OnboardingProfileRail({
                   </a>
                 </Button>
               </div>
-            ) : undefined
+            ) : artist.latestRelease ? undefined : (
+              <div
+                className='h-full overflow-y-auto bg-surface-1 px-4 pb-6 pt-19'
+                data-testid='onboarding-profile-compact-surface'
+              >
+                {/* No release has been supplied to this draft. Reuse the
+                    canonical artist identity, never a portrait as release art. */}
+                <ProfileIdentityHeader
+                  name={previewArtist.name}
+                  handle={previewArtist.handle}
+                  imageUrl={previewArtist.image_url ?? null}
+                  profileHref={profileHref}
+                  listenHref={
+                    getSafeSpotifyArtistUrl(artist.url) ?? profileHref
+                  }
+                  hasListenDestination={Boolean(
+                    getSafeSpotifyArtistUrl(artist.url)
+                  )}
+                  socialLinks={previewLinks}
+                  headingAs='p'
+                />
+                {previewArtist.tagline ? (
+                  <p className='my-4 text-app text-secondary-token'>
+                    {previewArtist.tagline}
+                  </p>
+                ) : null}
+              </div>
+            )
           }
           artist={previewArtist}
+          latestRelease={artist.latestRelease}
+          allowFanCapture={false}
+          headerSocialLinksOverride={previewLinks}
           socialLinks={previewLinks}
           genres={previewArtist.genres}
           profileHref={profileHref}

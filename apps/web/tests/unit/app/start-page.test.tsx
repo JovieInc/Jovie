@@ -8,6 +8,8 @@ const {
   isWaitlistGateEnabledMock,
   redirectMock,
   resolveUserStateMock,
+  resolveStartEntryProfileMock,
+  getExactProfileAccessMock,
 } = vi.hoisted(() => ({
   getOrMintOnboardingSessionIdMock: vi.fn(),
   getWaitlistAccessMock: vi.fn(),
@@ -19,6 +21,8 @@ const {
     state: 'UNAUTHENTICATED',
     redirectTo: '/signin',
   }),
+  resolveStartEntryProfileMock: vi.fn(),
+  getExactProfileAccessMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -41,15 +45,24 @@ vi.mock('@/lib/synthetic/passage.server', () => ({
 // These access-state fixtures have no handle. Keep the server profile lookup
 // outside jsdom, as in the colocated route tests that cover handle forwarding.
 vi.mock('@/lib/onboarding/start-entry-profile.server', () => ({
-  resolveStartEntryProfile: vi.fn().mockResolvedValue(null),
+  resolveStartEntryProfile: resolveStartEntryProfileMock,
 }));
+
+vi.mock('@/lib/auth/profile-access', () => ({
+  getExactProfileAccess: getExactProfileAccessMock,
+}));
+vi.mock('@/lib/db', () => ({ db: {} }));
 
 vi.mock('@/components/features/onboarding/OnboardingSessionBoundary', () => ({
   OnboardingSessionBoundary: ({
     sessionLabel,
     starterHandoff,
+    entryProfile,
+    accountClaimHandle,
   }: {
     readonly sessionLabel: string;
+    readonly entryProfile?: { handle: string } | null;
+    readonly accountClaimHandle?: string;
     readonly starterHandoff?: {
       readonly kind: string;
       readonly prompt: string;
@@ -59,6 +72,8 @@ vi.mock('@/components/features/onboarding/OnboardingSessionBoundary', () => ({
   }) => (
     <div
       data-session-label={sessionLabel}
+      data-entry-handle={entryProfile?.handle}
+      data-account-claim-handle={accountClaimHandle}
       data-starter-handoff={
         starterHandoff ? JSON.stringify(starterHandoff) : ''
       }
@@ -85,6 +100,8 @@ vi.mock('@/lib/waitlist/settings', () => ({
 
 describe('/start page', () => {
   beforeEach(() => {
+    resolveStartEntryProfileMock.mockReset().mockResolvedValue(null);
+    getExactProfileAccessMock.mockReset().mockResolvedValue({ ok: false });
     redirectMock.mockClear();
     getWaitlistAccessMock.mockReset();
     getWaitlistAccessMock.mockResolvedValue({ entryId: null, status: null });
@@ -95,6 +112,76 @@ describe('/start page', () => {
       state: CanonicalUserState.UNAUTHENTICATED,
       redirectTo: '/signin',
     });
+  });
+
+  it('resolves known handle context even when an explicit starter is present', async () => {
+    resolveStartEntryProfileMock.mockResolvedValue({
+      status: 'available',
+      handle: 'david',
+    });
+    const { default: StartPage } = await import('@/app/(dynamic)/start/page');
+    const params = {
+      handle: 'david',
+      starter_prompt: 'I want to claim jov.ie/david.',
+    };
+    render(await StartPage({ searchParams: Promise.resolve(params) }));
+    expect(resolveStartEntryProfileMock).toHaveBeenCalledExactlyOnceWith(
+      params
+    );
+    expect(screen.getByTestId('onboarding-shell')).toHaveAttribute(
+      'data-entry-handle',
+      'david'
+    );
+  });
+
+  it('keeps a signed-in different-handle claim visible with account recovery', async () => {
+    resolveUserStateMock.mockResolvedValue({
+      state: CanonicalUserState.ACTIVE,
+      dbUserId: 'app-user',
+      clerkUserId: 'ba-user',
+      profileId: 'current-profile',
+    });
+    resolveStartEntryProfileMock.mockResolvedValue({
+      status: 'claimed',
+      profileId: 'target-profile',
+      handle: 'david',
+      displayName: 'David',
+      avatarUrl: null,
+    });
+    const { default: StartPage } = await import('@/app/(dynamic)/start/page');
+    render(
+      await StartPage({ searchParams: Promise.resolve({ handle: 'david' }) })
+    );
+    expect(screen.getByTestId('onboarding-shell')).toHaveAttribute(
+      'data-account-claim-handle',
+      'david'
+    );
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it('opens the current own-handle workspace only after canonical authorization', async () => {
+    resolveUserStateMock.mockResolvedValue({
+      state: CanonicalUserState.ACTIVE,
+      dbUserId: 'app-user',
+      profileId: 'target-profile',
+    });
+    resolveStartEntryProfileMock.mockResolvedValue({
+      status: 'claimed',
+      profileId: 'target-profile',
+      handle: 'david',
+      displayName: 'David',
+      avatarUrl: null,
+    });
+    getExactProfileAccessMock.mockResolvedValue({ ok: true });
+    const { default: StartPage } = await import('@/app/(dynamic)/start/page');
+    await expect(
+      StartPage({ searchParams: Promise.resolve({ handle: 'david' }) })
+    ).rejects.toThrow('NEXT_REDIRECT:/app');
+    expect(getExactProfileAccessMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'app-user',
+      'target-profile'
+    );
   });
 
   it('keeps a pre-receipt WAITLIST_PENDING user in /start so the canonical claim can finish', async () => {
