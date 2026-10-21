@@ -287,13 +287,27 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
     release,
     onClose,
     onReleaseChange,
+    onDelete,
+    onChangeStatus,
+    isSmartLinkLocked,
+    getSmartLinkLockReason,
   }: {
     release: ReleaseViewModel | null;
     onClose?: () => void;
     onReleaseChange?: (release: ReleaseViewModel) => void;
+    onDelete?: (id: string) => void;
+    onChangeStatus?: (release: ReleaseViewModel, status: ReleaseViewModel['status']) => void;
+    isSmartLinkLocked?: (id: string) => boolean;
+    getSmartLinkLockReason?: (id: string) => 'scheduled' | 'cap' | null;
   }) =>
     release ? (
-      <aside data-testid='release-sidebar'>
+      <aside
+        data-testid='release-sidebar'
+        data-has-delete={Boolean(onDelete)}
+        data-has-status={Boolean(onChangeStatus)}
+        data-has-smartlink-gate={Boolean(isSmartLinkLocked && getSmartLinkLockReason)}
+        data-is-smartlink-locked={isSmartLinkLocked?.(release.id) ?? false}
+      >
         <div>{release.title}</div>
         <input aria-label='Release title draft' defaultValue={release.title} />
         <button type='button' onClick={onClose}>
@@ -613,6 +627,18 @@ describe('ShellReleasesView', () => {
       expect(row).toHaveAttribute('aria-selected', 'false');
       expect(screen.queryByTestId('release-sidebar')).not.toBeInTheDocument();
     });
+  });
+
+  it('passes the same lifecycle and eligibility capabilities to the detail rail', async () => {
+    renderShell([fakeRelease({ id: 'r1', title: 'Lost in the Light' })]);
+
+    fireEvent.click(screen.getByRole('option', { name: /Lost in the Light/ }));
+    const rail = await screen.findByTestId('release-sidebar');
+
+    expect(rail).toHaveAttribute('data-has-delete', 'true');
+    expect(rail).toHaveAttribute('data-has-status', 'true');
+    expect(rail).toHaveAttribute('data-has-smartlink-gate', 'true');
+    expect(rail).toHaveAttribute('data-is-smartlink-locked', 'false');
   });
 
   it('keeps selected row in sync when the drawer edits a release', async () => {
