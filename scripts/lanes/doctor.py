@@ -183,7 +183,10 @@ def provider_payloads(state: Path, providers, proc: Path = Path("/proc")) -> dic
     return result
 
 
-AUTOMATION_REGISTRY = "ops/automation/registry.jsonl"
+# #22354 shipped the registry at canon/ (the repo-root allowlist rejects new top-level dirs).
+# Reading a path that is not on main must alert, never read as "nothing silent" (2026-10-21:
+# the doctor watched ops/automation/registry.jsonl, which never existed, so no row was checked).
+AUTOMATION_REGISTRY = "canon/automation-registry.jsonl"
 AUTOMATION_LIVENESS_WORKFLOW = "automation-liveness.yml"
 AUTOMATION_LIVENESS_MAX_S = 60 * 60
 AUTOMATION_LIVENESS_TTL_S = 600
@@ -243,9 +246,13 @@ def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: 
 
 
 def automation_liveness(lane, now: float) -> dict:
-    """Latest run of the hosted automation-liveness workflow (Gem watches it back)."""
+    """Latest *successful* run of the hosted automation-liveness workflow (Gem watches it back).
+
+    It follows Production Continuity Guard and runs its job only every 5th trigger, so most
+    runs are job-skipped: the latest run of any conclusion would make a dead check look alive."""
     def fetch():
-        result = lane.sh(["gh", "api", f"repos/{lane.REPO_SLUG}/actions/workflows/{AUTOMATION_LIVENESS_WORKFLOW}/runs?per_page=1",
+        result = lane.sh(["gh", "api", f"repos/{lane.REPO_SLUG}/actions/workflows/{AUTOMATION_LIVENESS_WORKFLOW}"
+                          "/runs?branch=main&status=success&per_page=1",
                           "--jq", "[.workflow_runs[0].created_at // \"\"]"], timeout=30)
         if result.returncode != 0:
             text = f"{result.stdout or ''} {result.stderr or ''}"
@@ -255,14 +262,15 @@ def automation_liveness(lane, now: float) -> dict:
         except (ValueError, IndexError, TypeError):
             return None
         return {"installed": True, "lastRunAt": created or None}
-    found = lane.shared("automation-liveness", AUTOMATION_LIVENESS_TTL_S, fetch)
+    found = lane.shared("automation-liveness-success", AUTOMATION_LIVENESS_TTL_S, fetch)
     return found if isinstance(found, dict) else {"installed": None}
 
 
 def automation_observation(host, lane, now: float) -> dict:
     """Registry watch for observe(); fixtures and self-tests read no registry or GitHub."""
     if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
-        return {"automation": {"known": False, "silent": {}}, "automationLiveness": {"installed": None}}
+        return {"automation": {"known": False, "silent": {}, "skipped": True},
+                "automationLiveness": {"installed": None}}
     try:
         watch = automation_watch(automation_registry(host.repo), lane.HOST, now)
     except Exception as error:  # observability never takes the doctor down
@@ -486,6 +494,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "autoscale": _autoscale_block(host),
         "mergedWindow": ({k: v for k, v in merged_window.items() if k != "prs"} if merged_window else None),
         "diskFreePct": round(100 * disk.free / disk.total, 1),
+        "sweepSecretHeld": [row for row in (read_json(state / "worktree-sweep.json", {}).get("secretHeld") or [])
+                            if isinstance(row, dict) and row.get("path") and Path(row["path"]).exists()],
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
@@ -855,7 +865,12 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         age = row.get("ageS")
         alerts[f"automation-silent:{automation_id}"] = (
             f"registered automation {automation_id} left no fresh receipt at {row.get('location')} "
-            f"({'missing' if age is None else f'{round(age / 60)} min old'}); owner per ops/automation/registry.jsonl")
+            f"({'missing' if age is None else f'{round(age / 60)} min old'}); owner per {AUTOMATION_REGISTRY}")
+    watched = obs.get("automation") or {}
+    if watched.get("known") is False and not watched.get("skipped"):
+        alerts["automation-registry-unreadable"] = (
+            f"origin/main:{AUTOMATION_REGISTRY} is unreadable ({watched.get('error') or 'missing or not JSONL'}); "
+            "no Gem host-local automation receipt is being watched")
     liveness = obs.get("automationLiveness") or {}
     if liveness.get("installed"):
         last = _iso_epoch(liveness.get("lastRunAt"))
@@ -949,6 +964,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                           f"agent work ({causes}); infrastructure, not the PRs, is exhausting them")
     # No design-brief-stale alert: since 2026-10-11 no issue is held for a brief (the
     # claiming run writes it), so a held brief is no longer a condition to watch.
+    for row in obs.get("sweepSecretHeld") or []:
+        # The public repo's refs/jovie-preserved/* must never carry a secret; the checkout is kept.
+        alerts[f"sweep-snapshot-secret:{row.get('name')}"] = (
+            f"worktree sweep did not publish a snapshot of {row.get('path')}: {row.get('reason')}; "
+            "the checkout is kept untouched until its owner reviews it")
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
