@@ -7,7 +7,10 @@
  * Existing call sites are grandfathered per (file, rule) count in
  * external-api-guard.ratchet.gen.json. The ratchet only shrinks: a count that
  * grows fails, a count that drops must be lowered (`--write`), and no entry
- * may exceed its value on the base revision. Justified permanent exceptions
+ * may exceed its value on the base revision. Call sites already on the base
+ * revision (main at merge-group time) never fail a PR: only the PR's own new
+ * calls do, so a call that lands on main first cannot eject an unrelated PR.
+ * Justified permanent exceptions
  * live in external-api-guard.allowlist.json with a reason and a cap.
  * Rule contract: .claude/rules/external-apis.md.
  */
@@ -212,6 +215,7 @@ export function checkGuard({
   allowlist,
   baseRatchet = null,
   onboarded = {},
+  baseCounts = null,
 }) {
   const errors = [];
   for (const entry of allowlist) {
@@ -229,7 +233,11 @@ export function checkGuard({
   for (const [path, hits] of Object.entries(found)) {
     for (const [rule, row] of Object.entries(hits)) {
       const allow = allowedBy(allowlist, path, rule);
-      const ceiling = allow ? allow.max : (ratchet[path]?.[rule] ?? 0);
+      const onBase = baseCounts?.[path]?.[rule] ?? 0;
+      const ceiling = Math.max(
+        allow ? allow.max : (ratchet[path]?.[rule] ?? 0),
+        onBase
+      );
       if (row.count > ceiling) {
         errors.push(
           `${path}:${row.lines.join(',')} ${rule}: ${row.count} direct call(s), ${ceiling} grandfathered. ` +
@@ -241,7 +249,10 @@ export function checkGuard({
   for (const [path, rules] of Object.entries(ratchet)) {
     for (const [rule, count] of Object.entries(rules)) {
       const now = found[path]?.[rule]?.count ?? 0;
-      if (now < count) {
+      // A drop that is already on the base revision came from main, not this PR.
+      const droppedOnBase =
+        baseCounts !== null && (baseCounts[path]?.[rule] ?? 0) < count;
+      if (now < count && !droppedOnBase) {
         errors.push(
           `${RATCHET_PATH}: ${path} ${rule} is ${now}, ratchet says ${count}; lower it (node scripts/external-api-guard.mjs --write)`
         );
@@ -330,6 +341,38 @@ export function baseRatchetAt(ref, repoRoot) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Per-(file, rule) counts on `ref`, for the files in `paths`, read in one
+ * `git cat-file --batch`. Returns null when the ref is unavailable.
+ */
+export function baseCountsAt(ref, repoRoot, rules, paths) {
+  if (!ref) return null;
+  const wanted = [...new Set(paths)].filter(inScope);
+  const shown = spawnSync('git', ['cat-file', '--batch'], {
+    cwd: repoRoot,
+    input: wanted.map(path => `${ref}:${path}\n`).join(''),
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  if (shown.status !== 0) return null;
+  const out = shown.stdout;
+  const counts = {};
+  let at = 0;
+  for (const path of wanted) {
+    const eol = out.indexOf(10, at);
+    if (eol < 0) return null;
+    const header = out.subarray(at, eol).toString('utf8');
+    at = eol + 1;
+    if (header.endsWith(' missing') || header.endsWith(' ambiguous')) continue;
+    const size = Number(header.split(' ')[2]);
+    if (!Number.isFinite(size)) return null;
+    const text = out.subarray(at, at + size).toString('utf8');
+    at += size + 1;
+    for (const [rule, row] of Object.entries(scanSource(path, text, rules)))
+      (counts[path] ??= {})[rule] = row.count;
+  }
+  return counts;
 }
 
 export function ciBase(repoRoot, env = process.env) {

@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ALLOWLIST_PATH,
+  baseCountsAt,
   baseRatchetAt,
   buildRules,
   checkGuard,
@@ -35,8 +36,65 @@ describe('external API guard', () => {
     const allowlist = readJson(resolve(repoRoot, ALLOWLIST_PATH), {
       entries: [],
     }).entries;
-    const baseRatchet = baseRatchetAt(ciBase(repoRoot), repoRoot);
-    expect(check(found, ratchet, allowlist, baseRatchet)).toEqual([]);
+    const base = ciBase(repoRoot);
+    const baseRatchet = baseRatchetAt(base, repoRoot);
+    const baseCounts = baseCountsAt(base, repoRoot, rules, [
+      ...Object.keys(found),
+      ...Object.keys(ratchet),
+    ]);
+    expect(
+      checkGuard({ found, ratchet, allowlist, baseRatchet, baseCounts })
+    ).toEqual([]);
+  });
+
+  it('never fails a PR for call sites already on the base revision', () => {
+    const path = 'scripts/landed-on-main.mjs';
+    const two = scan(
+      path,
+      "await fetch('https://api.linear.app/graphql');\nawait fetch('https://api.linear.app/graphql');"
+    );
+    const one = { [path]: { 'provider-host': 1 } };
+    const args = { found: two, ratchet: {}, allowlist: [], baseRatchet: {} };
+    // main gained two calls after the PR's ratchet was cut: tolerated
+    expect(
+      checkGuard({ ...args, baseCounts: { [path]: { 'provider-host': 2 } } })
+    ).toEqual([]);
+    // the PR adds a second call on top of main's one: fails
+    expect(checkGuard({ ...args, baseCounts: one })[0]).toMatch(
+      /landed-on-main\.mjs:1,2 provider-host: 2 direct call\(s\), 1 grandfathered/
+    );
+    // main migrated a call away before the PR's ratchet caught up: tolerated
+    expect(
+      checkGuard({
+        found: {},
+        ratchet: one,
+        allowlist: [],
+        baseRatchet: one,
+        baseCounts: {},
+      })
+    ).toEqual([]);
+    // the PR itself removed the call without lowering the ratchet: fails
+    expect(
+      checkGuard({
+        found: {},
+        ratchet: one,
+        allowlist: [],
+        baseRatchet: one,
+        baseCounts: one,
+      })[0]
+    ).toMatch(/lower it/);
+  });
+
+  it('reads per-file counts from a git revision', () => {
+    const head = baseCountsAt('HEAD', repoRoot, rules, [
+      'scripts/lanes/doctor.py',
+      'does/not/exist.mjs',
+    ]);
+    expect(
+      head?.['scripts/lanes/doctor.py']?.['gh-subprocess']
+    ).toBeGreaterThan(0);
+    expect(head?.['does/not/exist.mjs']).toBeUndefined();
+    expect(baseCountsAt(null, repoRoot, rules, [])).toBeNull();
   });
 
   it('rejects a new raw fetch to a provider host in TS and Python', () => {

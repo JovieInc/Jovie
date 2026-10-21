@@ -401,6 +401,9 @@
     "scripts/create-launch-issues.sh": {
       "gh-shell": 16
     },
+    "scripts/credentials-inventory-collect.mjs": {
+      "provider-host": 1
+    },
     "scripts/dependabot-pin-sync.mjs": {
       "provider-host": 1
     },
@@ -488,6 +491,9 @@
     "scripts/lanes/merge_evidence.py": {
       "gh-subprocess": 1
     },
+    "scripts/lanes/model_radar.py": {
+      "provider-host": 1
+    },
     "scripts/lanes/pr_events.py": {
       "gh-subprocess": 40
     },
@@ -505,6 +511,9 @@
     },
     "scripts/lib/auto-ready-green-drafts.mjs": {
       "gh-subprocess": 1
+    },
+    "scripts/lib/credentials-live-reads.mjs": {
+      "provider-host": 2
     },
     "scripts/lib/gh-retry.sh": {
       "gh-shell": 1
@@ -661,7 +670,7 @@
       "gh-subprocess": 1
     },
     "scripts/shipping-slo-report.mjs": {
-      "gh-subprocess": 1
+      "gh-subprocess": 2
     },
     "scripts/shipping_origin.py": {
       "gh-subprocess": 2

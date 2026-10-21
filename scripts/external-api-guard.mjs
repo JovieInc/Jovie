@@ -14,6 +14,7 @@ import { pathToFileURL } from 'node:url';
 
 import {
   ALLOWLIST_PATH,
+  baseCountsAt,
   baseProvidersAt,
   baseRatchetAt,
   buildRules,
@@ -106,6 +107,10 @@ export function main(argv = process.argv.slice(2)) {
     allowlist,
     baseRatchet: baseRatchetAt(base, repoRoot),
     onboarded,
+    baseCounts: baseCountsAt(base, repoRoot, buildRules(providers), [
+      ...Object.keys(found),
+      ...Object.keys(ratchet),
+    ]),
   });
   for (const error of errors)
     process.stderr.write(`external-api-guard: ${error}\n`);
