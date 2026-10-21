@@ -440,6 +440,7 @@ export const ServerEnvSchema = z.object({
   // Instantly (outreach email campaigns)
   INSTANTLY_API_KEY: z.string().optional(),
   INSTANTLY_CAMPAIGN_ID: z.string().optional(),
+  INSTANTLY_WEBHOOK_SECRET: z.string().min(32).optional(),
 
   // Search APIs (lead discovery)
   SERPAPI_API_KEY: z.string().optional(),
@@ -715,6 +716,7 @@ export const ENV_KEYS = [
   'JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN',
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',
+  'INSTANTLY_WEBHOOK_SECRET',
   'SERPAPI_API_KEY',
   'EXA_API_KEY',
   'JOVIE_FACEBOOK_PIXEL_ID',

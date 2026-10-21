@@ -15,7 +15,7 @@ import {
 } from './queue';
 import type { OutboundQueue } from './types';
 
-/** Reply events, once a provider webhook records them (none exist yet). */
+/** Reply milestones recorded by provider webhooks, including Instantly. */
 const REPLY_EVENT_TYPES = ['replied', 'email_replied', 'dm_replied'];
 
 /** Admin-scale bound; the whole outbound inventory is far below this. */
