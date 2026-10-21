@@ -104,6 +104,9 @@ struct MobileChatView: View {
   @State private var isAtBottom = true
   @State private var userEditedSinceSend = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  #if DEBUG
+  @State private var presentationMonitor = ChatPresentationMonitor.fixture()
+  #endif
 
   init(
     repository: ChatRepository,
@@ -160,8 +163,15 @@ struct MobileChatView: View {
       }
     }
     .task {
+      #if DEBUG
+      repository.presentationMeasurement = presentationMonitor?.measurement
+      #endif
       await repository.refreshConversations()
     }
+    #if DEBUG
+    .environment(\.chatPresentationMonitor, presentationMonitor)
+    .onDisappear { presentationMonitor?.measurement.cancel() }
+    #endif
     // voiceCaptureTrigger is owned by the shell Talk FAB / App Intents path
     // (JOV-3636). Chat no longer starts capture itself — the shell opens
     // TalkOverlayView when the trigger increments.
@@ -203,6 +213,16 @@ struct MobileChatView: View {
               onEntityTap: onEntityTap,
               onRecordVideo: onRecordVideo
             )
+            #if DEBUG
+            .background {
+              if let presentationMonitor, item.clientTurnId == repository.measurementTurnID {
+                ChatPresentationCheckpoint(monitor: presentationMonitor,
+                  kind: item.role == .user ? .feedback : .reply,
+                  eligible: item.role == .user || (item.role == .assistant && item.status == .completed && !item.content.isEmpty))
+                  .accessibilityHidden(true)
+              }
+            }
+            #endif
             .transition(.opacity)
           }
         }
@@ -287,6 +307,9 @@ struct MobileChatView: View {
         isOffline: repository.isOffline,
         workspaceMode: repository.workspace,
         onSend: {
+          #if DEBUG
+          presentationMonitor?.begin()
+          #endif
           let text = draft
           draft = ""
           userEditedSinceSend = false
@@ -305,6 +328,15 @@ struct MobileChatView: View {
           userEditedSinceSend = true
         }
       )
+      #if DEBUG
+      .background {
+        if let presentationMonitor {
+          ChatPresentationCheckpoint(monitor: presentationMonitor, kind: .input,
+            eligible: true, revision: presentationMonitor.measurement.inputRevision)
+            .accessibilityHidden(true)
+        }
+      }
+      #endif
       .padding(.horizontal, JovieSpacing.large)
       .padding(.bottom, JovieSpacing.medium)
     }

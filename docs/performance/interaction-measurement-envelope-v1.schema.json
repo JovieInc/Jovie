@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "jovie.interaction-measurement/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "measurementVersion",
+    "metadata",
+    "sampleCount",
+    "attemptCount",
+    "samples"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "jovie.interaction-measurement/v1" },
+    "measurementVersion": { "type": "string", "pattern": "^[a-z0-9-]{1,64}$" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceSHA",
+        "buildNumber",
+        "fixtureId",
+        "platform",
+        "refreshProfile"
+      ],
+      "properties": {
+        "sourceSHA": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "buildNumber": { "type": "string", "pattern": "^[0-9]{1,18}$" },
+        "fixtureId": { "type": "string", "pattern": "^[a-z0-9-]{1,64}$" },
+        "platform": { "enum": ["electron", "ios", "web"] },
+        "refreshProfile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maximumFramesPerSecond", "cadence"],
+          "properties": {
+            "maximumFramesPerSecond": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 240
+            },
+            "cadence": { "enum": ["fixed", "system-variable"] }
+          }
+        }
+      }
+    },
+    "sampleCount": { "type": "integer", "minimum": 0, "maximum": 20 },
+    "attemptCount": { "type": "integer", "minimum": 0, "maximum": 20 },
+    "samples": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/sample" }
+    }
+  },
+  "$defs": {
+    "duration": { "type": "number", "minimum": 0, "maximum": 10000 },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenarioId",
+        "runIndex",
+        "attempt",
+        "warmup",
+        "outcome",
+        "foregroundDurationMs",
+        "foregroundFrameCount",
+        "unavailableMetrics"
+      ],
+      "properties": {
+        "scenarioId": { "type": "string", "pattern": "^[a-z0-9-]{1,64}$" },
+        "runIndex": { "type": "integer", "minimum": 0, "maximum": 19 },
+        "attempt": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "warmup": { "type": "boolean" },
+        "outcome": {
+          "enum": [
+            "backgrounded",
+            "cancelled",
+            "complete",
+            "invalidClock",
+            "timedOut"
+          ]
+        },
+        "firstFeedbackMs": { "$ref": "#/$defs/duration" },
+        "dataReadyMs": { "$ref": "#/$defs/duration" },
+        "usableStateMs": { "$ref": "#/$defs/duration" },
+        "renderToInteractiveMs": { "$ref": "#/$defs/duration" },
+        "foregroundDurationMs": { "$ref": "#/$defs/duration" },
+        "foregroundFrameCount": { "type": "integer", "minimum": 0 },
+        "droppedFrameCount": { "type": "integer", "minimum": 0 },
+        "maxFrameIntervalMs": { "$ref": "#/$defs/duration" },
+        "unavailableMetrics": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "dataReadyMs",
+              "droppedFrameCount",
+              "firstFeedbackMs",
+              "maxFrameIntervalMs",
+              "renderToInteractiveMs",
+              "usableStateMs"
+            ]
+          },
+          "additionalProperties": {
+            "enum": [
+              "insufficientFrames",
+              "noHandledInput",
+              "noModelUpdate",
+              "noPresentation"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

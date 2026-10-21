@@ -59,6 +59,20 @@ struct ChatComposerBar: View {
 
   @State private var isShowingWorkflowSheet = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  #if DEBUG
+  @Environment(\.chatPresentationMonitor) private var presentationMonitor
+  #endif
+
+  private var inputBinding: Binding<String> {
+    #if DEBUG
+    Binding(get: { draft }, set: { value in
+      draft = value
+      if !value.isEmpty { presentationMonitor?.measurement.nextInputHandled() }
+    })
+    #else
+    $draft
+    #endif
+  }
 
   var body: some View {
     let trimmedDraft = draft.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -87,7 +101,7 @@ struct ChatComposerBar: View {
       .accessibilityIdentifier("chat-composer-plus")
       .accessibilityElement(children: .ignore)
 
-      TextField(placeholder, text: $draft)
+      TextField(placeholder, text: inputBinding)
         .focused($isFocused)
         .textInputAutocapitalization(.sentences)
         .disableAutocorrection(false)

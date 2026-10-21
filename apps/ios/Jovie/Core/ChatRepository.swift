@@ -38,6 +38,11 @@ final class ChatRepository {
   private var olderCursor: String?
   private var sendGeneration = 0
   private var selectionRevision = 0
+  #if DEBUG && os(iOS)
+  @ObservationIgnored var presentationMeasurement: ChatPresentationMeasurement?
+  @ObservationIgnored private(set) var measurementTurnID: String?
+  @ObservationIgnored private var measurementGeneration: Int?
+  #endif
 
   private let client: MobileChatClientProtocol
   private let cache: any ChatCaching
@@ -129,6 +134,9 @@ final class ChatRepository {
   func cancelInFlightTurn() {
     sendGeneration += 1
     sendTask?.cancel()
+    #if DEBUG && os(iOS)
+    presentationMeasurement.cancel()
+    #endif
   }
 
   func refreshConversations() async {
@@ -158,6 +166,9 @@ final class ChatRepository {
   func openConversation(_ conversationID: String) async {
     guard await acceptsCompletion() else { return }
     let isSwitchingThread = activeConversationID != conversationID
+    #if DEBUG && os(iOS)
+    if isSwitchingThread { presentationMeasurement.cancel() }
+    #endif
     if isSwitchingThread { selectionRevision += 1 }
     activeConversationID = conversationID
 
@@ -243,6 +254,9 @@ final class ChatRepository {
   }
 
   func startNewConversation() {
+    #if DEBUG && os(iOS)
+    presentationMeasurement.cancel()
+    #endif
     selectionRevision += 1
     activeConversationID = nil
     timeline = []
@@ -301,6 +315,9 @@ final class ChatRepository {
     let clientTurnId = UUID().uuidString
     let clientMessageId = UUID().uuidString
     let context = SendContext()
+    #if DEBUG && os(iOS)
+    let captureGeneration = presentationMeasurement.generation
+    #endif
 
     isSending = true
     defer {
@@ -353,6 +370,10 @@ final class ChatRepository {
             timeline.removeAll { $0.clientTurnId == target.key.clientTurnId }
           }
           context.authorization = owner.map(SendAuthorization.managed) ?? .unmanaged
+          #if DEBUG && os(iOS)
+          measurementTurnID = clientTurnId
+          measurementGeneration = captureGeneration
+          #endif
           appendOptimisticTurn(text: text, clientTurnId: clientTurnId)
         }
       }, onEvent: { event in
@@ -593,6 +614,12 @@ final class ChatRepository {
   ) {
     guard generation == sendGeneration else { return }
     apply(events: events, clientTurnId: clientTurnId)
+    #if DEBUG && os(iOS)
+    if let captureGeneration = measurementGeneration, measurementTurnID == clientTurnId,
+       timeline.contains(where: { $0.clientTurnId == clientTurnId && $0.role == .assistant && !$0.content.isEmpty }) {
+      presentationMeasurement.modelUpdated(generation: captureGeneration)
+    }
+    #endif
   }
 
   private func apply(events: [MobileChatStreamEvent], clientTurnId: String) {

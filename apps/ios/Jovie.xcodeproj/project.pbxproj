@@ -53,6 +53,8 @@
 		1B178328D9174F7D903FA1E3 /* LiveRootContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE7701B410E4EC0AF199EF8 /* LiveRootContainer.swift */; };
 		36A99669D08546B2A5146BE9 /* UITestHarnessViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D65C5C4A874DD29736473D /* UITestHarnessViews.swift */; };
 		99FBB80FCDBD4660BE1B0DCC /* MobileChatPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25CADBED3F6B431494F2C0DF /* MobileChatPlaceholderView.swift */; };
+		A87250000000000000000003 /* ChatPresentationMeasurement.swift in Sources */ = {isa = PBXBuildFile; fileRef = A87250000000000000000001 /* ChatPresentationMeasurement.swift */; };
+		A87250000000000000000004 /* ChatPresentationMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A87250000000000000000002 /* ChatPresentationMonitor.swift */; };
 		A0B10F000000000000000006 /* ObservabilityTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000001 /* ObservabilityTypes.swift */; };
 		A0B10F000000000000000007 /* NoopObservabilityProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000002 /* NoopObservabilityProvider.swift */; };
 		A0B10F000000000000000008 /* ObservabilityRedactor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000003 /* ObservabilityRedactor.swift */; };
@@ -219,6 +221,8 @@
 		
 		9924B177AFB753A4C23A4098 /* APIClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		FBCC1BE3DF9E4B0785CD0D83 /* AuthTokenExchange.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthTokenExchange.swift; sourceTree = "<group>"; };
+		A87250000000000000000001 /* ChatPresentationMeasurement.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatPresentationMeasurement.swift; sourceTree = "<group>"; };
+		A87250000000000000000002 /* ChatPresentationMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatPresentationMonitor.swift; sourceTree = "<group>"; };
 		A0B10F000000000000000001 /* ObservabilityTypes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityTypes.swift; sourceTree = "<group>"; };
 		A0B10F000000000000000002 /* NoopObservabilityProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NoopObservabilityProvider.swift; sourceTree = "<group>"; };
 		A0B10F000000000000000003 /* ObservabilityRedactor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityRedactor.swift; sourceTree = "<group>"; };
@@ -612,6 +616,8 @@
 		A0B10F00000000000000000B /* Observability */ = {
 			isa = PBXGroup;
 			children = (
+				A87250000000000000000001 /* ChatPresentationMeasurement.swift */,
+				A87250000000000000000002 /* ChatPresentationMonitor.swift */,
 				A0B10F000000000000000004 /* Observability.swift */,
 				A0B10F000000000000000003 /* ObservabilityRedactor.swift */,
 				A0B10F000000000000000001 /* ObservabilityTypes.swift */,
@@ -880,6 +886,8 @@
 				964DEFE0F4D4206832B6888E /* RootView.swift in Sources */,
 				1B178328D9174F7D903FA1E3 /* LiveRootContainer.swift in Sources */,
 				36A99669D08546B2A5146BE9 /* UITestHarnessViews.swift in Sources */,
+				A87250000000000000000003 /* ChatPresentationMeasurement.swift in Sources */,
+				A87250000000000000000004 /* ChatPresentationMonitor.swift in Sources */,
 				A0B10F000000000000000006 /* ObservabilityTypes.swift in Sources */,
 				A0B10F000000000000000007 /* NoopObservabilityProvider.swift in Sources */,
 				A0B10F000000000000000008 /* ObservabilityRedactor.swift in Sources */,
