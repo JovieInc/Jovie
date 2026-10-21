@@ -15,6 +15,19 @@ import {
   withClaimVerification,
 } from './claim-verification';
 
+/**
+ * Lazy: the review module pulls in Stripe, release import and the Ovie card
+ * store, which the onboarding/dashboard callers of this module never need.
+ */
+async function fileClaimVerificationCard(
+  input: Parameters<
+    typeof import('./claim-verification-review.server').fileClaimVerificationCard
+  >[0]
+): Promise<void> {
+  const review = await import('./claim-verification-review.server');
+  await review.fileClaimVerificationCard(input);
+}
+
 export interface ArtistReach {
   /** Spotify followers; null when unknown. */
   readonly followers: number | null;
@@ -88,7 +101,10 @@ export async function requestClaimVerification(input: {
 }): Promise<ClaimVerificationRecord> {
   const now = input.now ?? new Date();
   const [row] = await db
-    .select({ settings: creatorProfiles.settings })
+    .select({
+      settings: creatorProfiles.settings,
+      handle: creatorProfiles.usernameNormalized,
+    })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, input.profileId))
     .limit(1);
@@ -96,7 +112,9 @@ export async function requestClaimVerification(input: {
 
   const existing = readClaimVerification(row.settings);
   if (existing && existing.spotifyArtistId === input.spotifyArtistId) {
-    const paid = input.paid ? markClaimVerificationPaid(existing, now) : null;
+    const paid = input.paid
+      ? markClaimVerificationPaid(existing, now, input.acquisitionId)
+      : null;
     if (!paid) return existing;
     await db
       .update(creatorProfiles)
@@ -110,16 +128,24 @@ export async function requestClaimVerification(input: {
       'pending-verification',
       now
     );
+    await fileClaimVerificationCard({
+      profileId: input.profileId,
+      handle: row.handle,
+      record: paid,
+    });
     return paid;
   }
 
-  const record = buildClaimVerificationRequest({
-    spotifyArtistId: input.spotifyArtistId,
-    artistName: input.artistName,
-    reach: input.reach,
-    paid: input.paid,
-    now,
-  });
+  const record: ClaimVerificationRecord = {
+    ...buildClaimVerificationRequest({
+      spotifyArtistId: input.spotifyArtistId,
+      artistName: input.artistName,
+      reach: input.reach,
+      paid: input.paid,
+      now,
+    }),
+    acquisitionId: input.acquisitionId ?? null,
+  };
   await db
     .update(creatorProfiles)
     .set({
@@ -133,6 +159,11 @@ export async function requestClaimVerification(input: {
       'pending-verification',
       now
     );
+    await fileClaimVerificationCard({
+      profileId: input.profileId,
+      handle: row.handle,
+      record,
+    });
   }
   return record;
 }
@@ -151,30 +182,46 @@ export async function markClaimVerificationsPaid(input: {
   readonly acquisitionId: string | null | undefined;
 }): Promise<number> {
   const rows = await db
-    .select({ id: creatorProfiles.id, settings: creatorProfiles.settings })
+    .select({
+      id: creatorProfiles.id,
+      handle: creatorProfiles.usernameNormalized,
+      settings: creatorProfiles.settings,
+    })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.userId, input.appUserId));
 
   let transitioned = 0;
   for (const row of rows) {
+    const current = readClaimVerification(row.settings);
     const next = markClaimVerificationPaid(
-      readClaimVerification(row.settings),
-      input.paidAt
+      current,
+      input.paidAt,
+      input.acquisitionId
     );
-    if (!next) continue;
-    await db
-      .update(creatorProfiles)
-      .set({
-        settings: withClaimVerification(row.settings, next),
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, row.id));
-    transitioned += 1;
-    logger.info('Claim verification pending after payment', {
-      profileId: row.id,
-      spotifyArtistId: next.spotifyArtistId,
-      reach: next.reach.value,
-    });
+    if (next) {
+      await db
+        .update(creatorProfiles)
+        .set({
+          settings: withClaimVerification(row.settings, next),
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.id, row.id));
+      transitioned += 1;
+      logger.info('Claim verification pending after payment', {
+        profileId: row.id,
+        spotifyArtistId: next.spotifyArtistId,
+        reach: next.reach.value,
+      });
+    }
+    // File (or, on a webhook retry, replay) the review card in Tim's queue.
+    const pending = next ?? current;
+    if (pending?.status === 'pending_verification') {
+      await fileClaimVerificationCard({
+        profileId: row.id,
+        handle: row.handle,
+        record: pending,
+      });
+    }
   }
 
   if (transitioned > 0) {
