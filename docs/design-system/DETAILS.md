@@ -1008,6 +1008,22 @@ Quiet tool-call / streaming activity in the chat transcript is a first-class Sys
 
 ---
 
+## Tooltip eligibility and input
+
+A tooltip supplies a hidden label, an actionable explanation, or a shortcut.
+Do not repeat an already readable row title. Recheck rendered title overflow
+when its container, fonts, title or typography changes, and close a hint that
+becomes ineligible. List hints open below/start; sidebar hints retain their seam.
+Mouse and hardware-keyboard hints remain available on hybrid devices. Actual
+touch activates the control first and leaves no sticky hint. Essential actions
+remain visible for coarse/no-hover input.
+
+An open interactive menu belongs to its rail through the trigger's ARIA control
+relationship, including nested portals. Retain that rail's presentation until
+dismissal or detachment, without changing persisted pin intent. Unrelated
+portals and the opposite rail do not acquire ownership. Existing warm traversal,
+delays, dismissal, focus restoration and rail geometry remain canonical.
+
 ## Full-Screen Status Screens
 
 All full-screen takeover screens (offline, global error, root error, public error fallback) share identical layout geometry to prevent layout shift when transitioning between states.
