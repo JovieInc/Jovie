@@ -52,10 +52,8 @@ export const nextConfig = {
   images: { unoptimized: true },
   async redirects() {
     return [
-      { source: '/', destination: '/hud', permanent: false },
+      { source: '/', destination: '/app/ov', permanent: false },
       { source: '/app', destination: 'https://jov.ie/app', permanent: false },
-      { source: '/app/ov', destination: '/hud', permanent: false },
-      { source: '/app/ov/ops', destination: '/hud', permanent: false },
       { source: '/hud-tv', destination: '/hud', permanent: false },
       ...['/support', '/legal/terms', '/legal/privacy'].map(source => ({
         source,
