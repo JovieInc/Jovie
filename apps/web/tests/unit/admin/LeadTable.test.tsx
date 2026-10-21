@@ -191,6 +191,86 @@ describe('LeadTable', () => {
     );
   });
 
+  it('hides enrichment columns that no loaded lead has data for', async () => {
+    const leads = [
+      createMockLead({
+        id: '1',
+        fitScore: null,
+        hasPaidTier: false,
+        hasSpotifyLink: false,
+        hasInstagram: false,
+        hasTrackingPixels: false,
+        contactEmail: null,
+        musicToolsDetected: [],
+      }),
+      createMockLead({
+        id: '2',
+        displayName: 'Second Artist',
+        linktreeHandle: 'second',
+        fitScore: null,
+        hasPaidTier: false,
+        hasSpotifyLink: false,
+        hasInstagram: false,
+        hasTrackingPixels: false,
+        contactEmail: null,
+        musicToolsDetected: [],
+      }),
+    ];
+    mockLeadsInfiniteQuery.mockReturnValue({
+      data: { pages: [{ rows: leads, total: 2 }], pageParams: [1] },
+      isLoading: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
+    });
+
+    const LeadTable = await getLeadTable();
+    renderWithProviders(<LeadTable />);
+
+    expect(screen.getByText('Second Artist')).toBeInTheDocument();
+    for (const header of ['Score', 'Signals', 'Tools']) {
+      expect(
+        screen.queryByRole('columnheader', { name: header })
+      ).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText('-')).not.toBeInTheDocument();
+  });
+
+  it('labels unscored and signal-less rows consistently when columns stay visible', async () => {
+    const leads = [
+      createMockLead({ id: '1' }),
+      createMockLead({
+        id: '2',
+        displayName: 'Bare Artist',
+        linktreeHandle: 'bare',
+        fitScore: null,
+        hasPaidTier: false,
+        hasSpotifyLink: false,
+        hasInstagram: false,
+        hasTrackingPixels: false,
+        contactEmail: null,
+        musicToolsDetected: [],
+      }),
+    ];
+    mockLeadsInfiniteQuery.mockReturnValue({
+      data: { pages: [{ rows: leads, total: 2 }], pageParams: [1] },
+      isLoading: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
+    });
+
+    const LeadTable = await getLeadTable();
+    renderWithProviders(<LeadTable />);
+
+    expect(screen.getByText('Not scored')).toBeInTheDocument();
+    expect(screen.getByText('None')).toBeInTheDocument();
+    expect(screen.getByText('None detected')).toBeInTheDocument();
+    expect(screen.queryByText('-')).not.toBeInTheDocument();
+  });
+
   it('renders status filter tabs', async () => {
     mockLeadsInfiniteQuery.mockReturnValue({
       data: { pages: [{ rows: [], total: 0 }], pageParams: [1] },
