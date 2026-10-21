@@ -29,6 +29,14 @@ const base = {
   symbol: 'GET',
 };
 
+/**
+ * @param {{
+ *   driver?: string,
+ *   level?: string,
+ *   score?: string | null,
+ *   uri?: string,
+ * }} [input]
+ */
 function sarifDocument({ driver = 'CodeQL', level, score, uri } = {}) {
   return {
     runs: [
@@ -153,12 +161,15 @@ test('normalized findings without symbols or real line spans do not match', () =
 });
 
 test('OSV weekly baseline explicitly scans nested dependency sources', () => {
-  const workflow = parseYaml(
-    readFileSync(
-      new URL('../../.github/workflows/security.yml', import.meta.url),
-      'utf8'
-    )
-  );
+  const workflow =
+    /** @type {{ jobs: { osv: { steps: Array<{ run?: string }> } } }} */ (
+      parseYaml(
+        readFileSync(
+          new URL('../../.github/workflows/security.yml', import.meta.url),
+          'utf8'
+        )
+      )
+    );
   const step = workflow.jobs.osv.steps.find(step =>
     step.run?.includes('scan source')
   );
