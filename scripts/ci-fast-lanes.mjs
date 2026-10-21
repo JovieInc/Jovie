@@ -155,9 +155,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // measured and auditable), and the dead-man liveness contract stays green.
     id: 'automation-registry',
     command:
-      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs',
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs lib/__tests__/automation-liveness.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|scripts\/lanes\/continuity_clock\.py|canon\/automation-registry\.jsonl|scripts\/automation-liveness\.mjs|scripts\/lib\/(?:automation-registry\.mjs|__tests__\/automation-registry\.test\.mjs))/u,
+      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|scripts\/lanes\/continuity_clock\.py|canon\/automation-registry\.jsonl|scripts\/automation-liveness\.mjs|scripts\/lib\/(?:automation-registry\.mjs|__tests__\/automation-(?:registry|liveness)\.test\.mjs))/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -533,6 +533,8 @@ const LANES_COVERAGE_RUN = `{ ${LANES_BACKGROUND_SHARDS.map(shard => `${lanesCov
  */
 /** @jovie/api-client (TS) unit + conformance suite, run with the operations lane. */
 export const API_CLIENT_TS_COMMAND = 'pnpm --filter @jovie/api-client test';
+/** @jovie/research router + decision log suite, run with the operations lane. */
+export const RESEARCH_TS_COMMAND = 'pnpm --filter @jovie/research test';
 
 /** scripts/apiclient: the Python port, held to the same conformance fixtures. */
 export const API_CLIENT_PY_COMMAND = structuralPythonRegression(
@@ -2443,6 +2445,7 @@ export async function runStructural(opts = {}) {
   const operationsParts = [
     API_CLIENT_TS_COMMAND,
     API_CLIENT_PY_COMMAND,
+    RESEARCH_TS_COMMAND,
     'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
     'node --test .github/scripts/dependency-parity-evidence.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-controller.test.mjs',

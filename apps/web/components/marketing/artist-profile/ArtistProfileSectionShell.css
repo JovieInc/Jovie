@@ -1,0 +1,13 @@
+/* Canonical marketing section container: the public content column inside
+   the shared page gutter. Lives with the shell so every route that mounts
+   ArtistProfileSectionShell gets the same spine without importing a page
+   stylesheet. */
+.ap-section-container {
+  --ap-page-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
+  width: min(
+    var(--ds-public-content-max),
+    calc(100% - (var(--ap-page-gutter) * 2))
+  );
+  max-width: var(--ds-public-content-max);
+  padding-inline: 0;
+}

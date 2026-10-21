@@ -128,6 +128,9 @@ export async function getArtistOfferFunnelReport(input?: {
     checkout: toDate(row.stages?.checkout),
     paid: toDate(row.stages?.paid),
     'profile-live': toDate(row.stages?.['profile-live']),
+    'pending-verification': toDate(row.stages?.['pending-verification']),
+    'claim-verified': toDate(row.stages?.['claim-verified']),
+    'claim-rejected': toDate(row.stages?.['claim-rejected']),
   }));
 
   return buildArtistOfferFunnelReport({ start, end, totalVisits, timelines });

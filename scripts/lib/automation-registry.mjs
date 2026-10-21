@@ -103,7 +103,9 @@ export function validateRegistry(registry) {
     seen.add(entry.id);
     if (!STATUSES.includes(entry.status))
       errors.push(`${at}: status must be one of ${STATUSES.join('|')}`);
-    for (const field of ['owner', 'host', 'purpose', 'killSwitch']) {
+    // runsAs names the identity in canon/agent-identities.json the automation
+    // acts as, so the identity, mesh and automation registries cross-check.
+    for (const field of ['owner', 'runsAs', 'host', 'purpose', 'killSwitch']) {
       if (!nonEmpty(entry[field])) errors.push(`${at}: ${field} is required`);
     }
     const trigger = entry.trigger ?? {};
@@ -279,8 +281,22 @@ export function coverageKey(entry) {
     return `github-cron:${trigger.source}`;
   if (trigger.kind === 'vercel-cron' && trigger.repo === 'JovieInc/Jovie')
     return `vercel-cron:${trigger.path}`;
-  if (trigger.kind === 'lanes-clock') return `lanes-clock:${trigger.clock}`;
+  if (trigger.kind === 'lanes-clock' && trigger.clock)
+    return `lanes-clock:${trigger.clock}`;
   return null;
+}
+
+const WORKFLOW_SOURCE_RE = /^\.github\/workflows\/([^/]+\.ya?ml)$/;
+
+/**
+ * A lanes-clock entry registered by the workflow it dispatches (no clock
+ * name yet) covers any lanes Clock(...) that fires that workflow, and is not
+ * an error while its clock row is still pending with the lanes owner.
+ */
+function pendingClockWorkflow(entry) {
+  const trigger = entry?.trigger ?? {};
+  if (trigger.kind !== 'lanes-clock' || trigger.clock) return null;
+  return String(trigger.source ?? '').match(WORKFLOW_SOURCE_RE)?.[1] ?? null;
 }
 
 export function checkRegistryCoverage(registry, discovered) {
@@ -296,7 +312,18 @@ export function checkRegistryCoverage(registry, discovered) {
       );
     covered.set(key, entry.id);
   }
-  for (const key of discovered.keys()) {
+  const pendingWorkflows = new Set(
+    (registry?.entries ?? [])
+      .filter(entry => entry?.status === 'live')
+      .map(pendingClockWorkflow)
+      .filter(Boolean)
+  );
+  for (const [key, detail] of discovered) {
+    if (
+      key.startsWith('lanes-clock:') &&
+      pendingWorkflows.has(detail?.workflow)
+    )
+      continue;
     if (!covered.has(key)) {
       errors.push(
         `${key}: scheduled automation has no live entry in ${REGISTRY_PATH}; register it (owner, receipt, max staleness, kill switch) or remove the schedule`

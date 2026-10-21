@@ -35,6 +35,10 @@ const {
   mockAdmitPaidUser: vi.fn(),
 }));
 
+vi.mock('@/lib/claim/claim-verification.server', () => ({
+  markClaimVerificationsPaid: vi.fn().mockResolvedValue(0),
+}));
+
 vi.mock('@/lib/waitlist/paid-admission', () => ({
   admitPaidUser: mockAdmitPaidUser,
 }));

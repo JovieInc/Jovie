@@ -91,6 +91,34 @@ describe('automation registry', () => {
     );
   });
 
+  it('lets a workflow-sourced lanes-clock entry cover its clock, before and after the clock lands', () => {
+    const pending = {
+      schema: REGISTRY_SCHEMA,
+      entries: [
+        {
+          id: 'github:jovie:sweep',
+          status: 'live',
+          trigger: {
+            kind: 'lanes-clock',
+            repo: 'JovieInc/Jovie',
+            source: '.github/workflows/sweep.yml',
+          },
+        },
+      ],
+    };
+    expect(checkRegistryCoverage(pending, new Map())).toEqual([]);
+    const landed = new Map([
+      ['lanes-clock:sweepClock', { workflow: 'sweep.yml' }],
+    ]);
+    expect(checkRegistryCoverage(pending, landed)).toEqual([]);
+    const other = new Map([
+      ['lanes-clock:otherClock', { workflow: 'other.yml' }],
+    ]);
+    expect(checkRegistryCoverage(pending, other).join('\n')).toMatch(
+      /lanes-clock:otherClock: scheduled automation has no live entry/
+    );
+  });
+
   it('parses lanes clocks from continuity_clock.py', () => {
     expect(
       parseLanesClocks(
@@ -105,6 +133,7 @@ describe('automation registry', () => {
       schema: REGISTRY_SCHEMA,
       entries: [
         { ...base, id: 'x:no-kill', killSwitch: '' },
+        { ...base, id: 'x:no-identity', runsAs: undefined },
         { ...base, id: 'x:no-beat', heartbeat: undefined },
         {
           ...base,
@@ -128,6 +157,7 @@ describe('automation registry', () => {
       ],
     }).join('\n');
     expect(errors).toMatch(/x:no-kill\): killSwitch is required/);
+    expect(errors).toMatch(/x:no-identity\): runsAs is required/);
     expect(errors).toMatch(
       /x:no-beat\): critical loops declare heartbeat\.proof/
     );
