@@ -159,7 +159,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Stage | Exact responsibility |
 | --- | --- |
-| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, exact-head coverage, diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
+| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, exact-head coverage, unit tests the exact diff can affect (`--changed` against the merge base, aggregated into `PR Ready`), diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
 | Native merge queue | Re-run deterministic gates plus exact-head coverage on the exact `merge_group` head, then require only path-selected Web unit/build, Mac test/package, iOS Xcode, shared-contract integration, and model-free semantic evidence. |
 | Queue-proven main | Reuse the exact successful merge-group `PR Ready` proof and skip duplicate fallback work. |
 | Direct/admin main | Fail closed through path/risk/fast/secret/migration plus every product lane selected by the exact push diff; skipped selected lanes and executed unselected lanes are invalid. |
