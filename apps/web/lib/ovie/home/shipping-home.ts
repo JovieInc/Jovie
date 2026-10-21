@@ -564,6 +564,29 @@ function decisionDefaultOf(item: OvieInboxCase): OvieAsk['decisionDefault'] {
   };
 }
 
+/**
+ * `escalation` on no-default inbox cases (#22371): only levels 1 (24h) and
+ * 2 (48h) badge on Home. Parsed leniently; anything else means none.
+ */
+function escalationOf(item: OvieInboxCase): OvieAsk['escalation'] {
+  const wire = (
+    item as {
+      readonly escalation?: {
+        readonly level?: unknown;
+        readonly waitingHours?: unknown;
+      } | null;
+    }
+  ).escalation;
+  if (
+    !wire ||
+    (wire.level !== 1 && wire.level !== 2) ||
+    typeof wire.waitingHours !== 'number' ||
+    !Number.isFinite(wire.waitingHours)
+  )
+    return null;
+  return { level: wire.level, waitingHours: Math.floor(wire.waitingHours) };
+}
+
 function askFromCase(item: OvieInboxCase): OvieAsk {
   return {
     id: item.id,
@@ -579,6 +602,7 @@ function askFromCase(item: OvieInboxCase): OvieAsk {
     decisionDefault: decisionDefaultOf(item),
     // Summer cards accept post-ship feedback once decided.
     canFeedback: item.decisionTarget?.kind === 'summer',
+    escalation: escalationOf(item),
   };
 }
 

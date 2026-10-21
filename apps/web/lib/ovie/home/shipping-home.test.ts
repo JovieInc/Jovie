@@ -439,6 +439,28 @@ describe('buildOvieAsks', () => {
     };
   }
 
+  it('badges escalated no-default cases and ignores anything else', () => {
+    const asks = buildOvieAsks({
+      issues: [],
+      cases: [
+        {
+          ...inboxCase('late', 'needs_you'),
+          escalation: { level: 2, waitingHours: 52.7 },
+        },
+        {
+          ...inboxCase('fresh', 'needs_you'),
+          escalation: { level: 0, waitingHours: 3 },
+        },
+        { ...inboxCase('odd', 'needs_you'), escalation: { level: 'high' } },
+      ] as OvieInbox['cases'],
+    });
+    expect(asks.map(ask => ask.escalation)).toEqual([
+      { level: 2, waitingHours: 52 },
+      null,
+      null,
+    ]);
+  });
+
   it('keeps only founder decisions, in inbox order', () => {
     const inbox: OvieInbox = {
       cases: [
@@ -464,6 +486,7 @@ describe('buildOvieAsks', () => {
         evidence: ['https://example.com/receipt'],
         decisionDefault: null,
         canFeedback: true,
+        escalation: null,
       },
       {
         id: 'c',
@@ -476,6 +499,7 @@ describe('buildOvieAsks', () => {
         evidence: ['https://example.com/receipt'],
         decisionDefault: null,
         canFeedback: false,
+        escalation: null,
       },
       {
         id: 'd',
@@ -489,6 +513,7 @@ describe('buildOvieAsks', () => {
         evidence: ['https://example.com/receipt'],
         decisionDefault: null,
         canFeedback: false,
+        escalation: null,
       },
     ]);
   });
