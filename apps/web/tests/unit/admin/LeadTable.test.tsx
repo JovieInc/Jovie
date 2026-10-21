@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { LeadTable } from '@/components/features/admin/leads/LeadTable';
 import type { AdminLead } from '@/lib/queries';
 
 // Mock the queries
@@ -98,14 +99,6 @@ function renderWithProviders(ui: ReactElement) {
   );
 }
 
-// Lazy import to allow mocks to be set up first
-async function getLeadTable() {
-  const { LeadTable } = await import(
-    '@/components/features/admin/leads/LeadTable'
-  );
-  return LeadTable;
-}
-
 describe('LeadTable', () => {
   afterEach(() => {
     cleanup();
@@ -129,7 +122,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     // UnifiedTable shows skeleton rows during loading — verify no data rows appear
@@ -149,7 +141,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(
@@ -168,7 +159,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByText('Test Artist')).toBeInTheDocument();
@@ -225,7 +215,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByText('Second Artist')).toBeInTheDocument();
@@ -262,7 +251,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByText('Not scored')).toBeInTheDocument();
@@ -281,7 +269,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByText('All')).toBeInTheDocument();
@@ -301,7 +288,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     const user = userEvent.setup();
@@ -331,7 +317,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByLabelText(/^Approve /)).toBeInTheDocument();
@@ -349,7 +334,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     // The "Approve & ingest" title should not appear as an action button
@@ -374,7 +358,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByText('Spotify')).toBeInTheDocument();
@@ -395,7 +378,6 @@ describe('LeadTable', () => {
       refetch,
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByText('Unable to load leads')).toBeInTheDocument();
@@ -420,7 +402,6 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
     expect(screen.getByText('Admin verification required')).toBeInTheDocument();
