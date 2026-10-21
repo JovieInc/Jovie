@@ -163,6 +163,7 @@ jovie prod/staging, Standard machine, hard cap $10/mo (cutoff at $8).
   project's `elasticConcurrencyEnabled` flag. It reads jovie builds since the
   later of the billing-period start and enablement, and Vercel's billed build
   charges (`/v1/billing/charges`). Spend counts as the larger of the two.
+  If the token cannot read billing, the per-build estimate alone is used.
   The ledger turns on-demand off when actual or projected spend reaches $8,
   warns at $5, and turns it off when spend is unknown or the machine is not
   pinned Standard. Turning it off only puts staging and production back on
