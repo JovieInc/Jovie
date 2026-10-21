@@ -296,7 +296,10 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
     onClose?: () => void;
     onReleaseChange?: (release: ReleaseViewModel) => void;
     onDelete?: (id: string) => void;
-    onChangeStatus?: (release: ReleaseViewModel, status: ReleaseViewModel['status']) => void;
+    onChangeStatus?: (
+      release: ReleaseViewModel,
+      status: ReleaseViewModel['status']
+    ) => void;
     isSmartLinkLocked?: (id: string) => boolean;
     getSmartLinkLockReason?: (id: string) => 'scheduled' | 'cap' | null;
   }) =>
@@ -305,7 +308,9 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
         data-testid='release-sidebar'
         data-has-delete={Boolean(onDelete)}
         data-has-status={Boolean(onChangeStatus)}
-        data-has-smartlink-gate={Boolean(isSmartLinkLocked && getSmartLinkLockReason)}
+        data-has-smartlink-gate={Boolean(
+          isSmartLinkLocked && getSmartLinkLockReason
+        )}
         data-is-smartlink-locked={isSmartLinkLocked?.(release.id) ?? false}
       >
         <div>{release.title}</div>

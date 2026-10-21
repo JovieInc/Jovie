@@ -92,6 +92,7 @@ vi.mock('@/components/molecules/drawer', () => ({
       id?: string;
       type?: string;
       label?: string;
+      disabled?: boolean;
       onClick?: () => void;
     }>;
     [key: string]: unknown;
@@ -102,7 +103,7 @@ vi.mock('@/components/molecules/drawer', () => ({
       <div
         data-testid='right-drawer'
         data-context-action-ids={contextMenuItems
-          ?.filter(item => Boolean(item.id))
+          ?.filter(item => item.type !== 'separator' && Boolean(item.id))
           .map(item => item.id)
           .join(',')}
       >
@@ -114,6 +115,7 @@ vi.mock('@/components/molecules/drawer', () => ({
               key={item.id ?? item.label}
               type='button'
               data-testid={`context-menu-${item.id ?? item.label}`}
+              disabled={item.disabled}
               onClick={item.onClick}
             >
               {item.label}
@@ -781,6 +783,7 @@ describe('ReleaseSidebar inspector cards', () => {
   it('enforces row/rail action parity for status, deletion and smart-link gating', () => {
     const onDelete = vi.fn();
     const onChangeStatus = vi.fn();
+    const onGeneratePitch = vi.fn();
     const isSmartLinkLocked = vi.fn(() => true);
     const getSmartLinkLockReason = vi.fn(() => 'cap' as const);
 
@@ -790,6 +793,7 @@ describe('ReleaseSidebar inspector cards', () => {
         {...defaultProps}
         onDelete={onDelete}
         onChangeStatus={onChangeStatus}
+        onGeneratePitch={onGeneratePitch}
         isSmartLinkLocked={isSmartLinkLocked}
         getSmartLinkLockReason={getSmartLinkLockReason}
       />
@@ -803,6 +807,7 @@ describe('ReleaseSidebar inspector cards', () => {
       onCopy: vi.fn().mockResolvedValue(undefined),
       onDelete,
       onChangeStatus,
+      onGeneratePitch,
       isSmartLinkLocked,
       getSmartLinkLockReason,
     })
@@ -820,6 +825,7 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(
       screen.getByTestId('context-menu-copy-smart-link')
     ).toHaveTextContent('Smart link (Pro)');
+    expect(screen.getByTestId('context-menu-copy-smart-link')).toBeDisabled();
 
     // Deliberate-red fixture: omitting a supported handler changes the set,
     // even though the builder and all remaining actions still work.
@@ -828,10 +834,15 @@ describe('ReleaseSidebar inspector cards', () => {
       onEdit: vi.fn(),
       onCopy: vi.fn().mockResolvedValue(undefined),
       onDelete,
+      onGeneratePitch,
+      isSmartLinkLocked,
+      getSmartLinkLockReason,
     })
       .filter(item => 'id' in item)
       .map(item => item.id);
-    expect(incomplete).not.toEqual(expectedIds);
+    expect(incomplete).toEqual(
+      expectedIds.filter(id => id !== 'release-status')
+    );
   });
 
   it('smart link analytics card renders when a release is selected', async () => {

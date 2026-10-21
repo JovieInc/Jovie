@@ -4,13 +4,13 @@
  * Type definitions for the ReleaseSidebar component.
  */
 
+import type { ReleaseActionCapabilities } from '@/features/dashboard/organisms/releases/release-actions';
 import type {
   ProviderKey,
   ProviderLink,
   ReleaseViewModel,
   TrackViewModel,
 } from '@/lib/discography/types';
-import type { ReleaseActionCapabilities } from '@/features/dashboard/organisms/releases/release-actions';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 export type Release = ReleaseViewModel;
