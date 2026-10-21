@@ -170,16 +170,53 @@ describe('Inbox coverage and producer adapters', () => {
         url: '/api/admin/hud/tim-actions',
         body: { issueId: 'issue' },
       });
-      expect(() =>
+      expect(
         inboxDecisionRequest(
           { kind: 'linear', id: 'issue' },
           'reject',
-          'no',
+          ' Use the annual plan ',
           'a'
         )
-      ).toThrow('linked work');
+      ).toEqual({
+        url: '/api/admin/hud/tim-actions',
+        body: { issueId: 'issue', answer: 'Use the annual plan' },
+      });
     }
   );
+
+  it('offers the asker options and their body on Linear asks', () => {
+    const result = projectOvieInbox([], [], null, [], {
+      issues: [
+        {
+          id: 'ask',
+          identifier: 'JOV-2',
+          title: 'Claim guard threshold',
+          url: 'https://example.com/ask',
+          priority: 2,
+          priorityLabel: 'High',
+          createdAt: '2026-10-01T00:00:00Z',
+          description:
+            'Artists with 50k+ followers need verification.\nOptions: OK | Change something',
+          daysOld: 0,
+          stateType: 'unstarted',
+        },
+      ],
+      fetchedAt: inventory.generatedAt,
+      available: true,
+      observation: 'ok',
+      errorMessage: null,
+    });
+    const ask = result.cases.find(item => item.id === 'linear:ask');
+    expect(ask?.answers).toEqual(['OK', 'Change something']);
+    expect(ask?.body).toBe('Artists with 50k+ followers need verification.');
+    expect(ask?.recommendation).toBe('Answer: OK or Change something.');
+    expect(
+      inboxDecisionRequest({ kind: 'linear', id: 'ask' }, 'approve', 'OK', 'a')
+    ).toEqual({
+      url: '/api/admin/hud/tim-actions',
+      body: { issueId: 'ask', answer: 'OK' },
+    });
+  });
 });
 
 describe('Certification Inbox convergence', () => {
