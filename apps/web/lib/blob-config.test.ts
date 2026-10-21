@@ -45,4 +45,13 @@ describe('blob-config', () => {
     expect(getBlobReadWriteToken()).toBeUndefined();
     expect(getBlobCommandOptions()).toEqual({});
   });
+
+  it('builds dev mock blob URLs on a host next/image allows', async () => {
+    const { buildDevMockBlobUrl } = await import('./blob-config');
+    const url = new URL(buildDevMockBlobUrl('/press-photos/users/u/p.avif'));
+
+    // next.config.js remotePatterns only allow *.blob.vercel-storage.com.
+    expect(url.hostname.endsWith('.blob.vercel-storage.com')).toBe(true);
+    expect(url.pathname).toBe('/press-photos/users/u/p.avif');
+  });
 });
