@@ -30,7 +30,13 @@ case "$SCOPE" in
       echo "[automation-verify] Cannot resolve the scripts typecheck base from ${BASE_REF}" >&2
       exit 1
     fi
-    if git diff --name-only "$SCRIPTS_DIFF_BASE" HEAD -- scripts/ | grep -q .; then
+    # Capture first: `git diff | grep -q` can SIGPIPE git under pipefail and
+    # silently skip the check on a large diff.
+    if ! SCRIPTS_CHANGED="$(git diff --name-only "$SCRIPTS_DIFF_BASE" HEAD -- scripts/)"; then
+      echo "[automation-verify] Cannot list scripts/ changes since ${SCRIPTS_DIFF_BASE}" >&2
+      exit 1
+    fi
+    if [[ -n "$SCRIPTS_CHANGED" ]]; then
       echo "[automation-verify] scripts/ changed: running the scripts typecheck ratchet"
       node scripts/typecheck-scripts.mjs
     else
