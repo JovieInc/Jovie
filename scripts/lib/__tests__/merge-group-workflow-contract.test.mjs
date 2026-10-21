@@ -329,10 +329,10 @@ describe('merge_group workflow contract', () => {
   it('runs deterministic CI against the synthetic base-to-head diff', () => {
     expect(CI_WORKFLOW).toMatch(/merge_group:\n\s+types: \[checks_requested\]/);
     expect(CI_WORKFLOW).toContain(
-      'MERGE_GROUP_BASE_SHA="${{ github.event.merge_group.base_sha }}"'
+      'MERGE_GROUP_BASE_SHA="${EVENT_MERGE_GROUP_BASE_SHA}"'
     );
     expect(CI_WORKFLOW).toContain(
-      'MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"'
+      'MERGE_GROUP_HEAD_SHA="${EVENT_MERGE_GROUP_HEAD_SHA}"'
     );
     expect(CI_WORKFLOW).toContain(
       'git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/resolve-merge-group-path-diff.mjs"'
@@ -1429,10 +1429,10 @@ describe('merge_group workflow contract', () => {
 
     // Path Changes: explicit merge_group branch with exact base/head SHAs.
     expect(pathChanges).toContain(
-      'MERGE_GROUP_BASE_SHA="${{ github.event.merge_group.base_sha }}"'
+      'MERGE_GROUP_BASE_SHA="${EVENT_MERGE_GROUP_BASE_SHA}"'
     );
     expect(pathChanges).toContain(
-      'MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"'
+      'MERGE_GROUP_HEAD_SHA="${EVENT_MERGE_GROUP_HEAD_SHA}"'
     );
     expect(pathChanges).toContain('node "$TRUSTED_PATH_DIFF_RESOLVER"');
     expect(pathChanges).toContain('--base "$MERGE_GROUP_BASE_SHA"');
@@ -1469,9 +1469,7 @@ describe('merge_group workflow contract', () => {
       'for output in run_build run_test run_test_performance'
     );
     expect(pathChanges).toContain('echo "$output=false" >> "$GITHUB_OUTPUT"');
-    expect(pathChanges).toContain(
-      'elif [[ "${{ github.event_name }}" == "push" ]]; then'
-    );
+    expect(pathChanges).toContain('elif [[ "${EVENT_NAME}" == "push" ]]; then');
     expect(pathChanges).toContain(
       'Unsupported event for path change detection'
     );
@@ -1481,7 +1479,7 @@ describe('merge_group workflow contract', () => {
     );
     // The push branch is gated; merge_group never reads event.before.
     expect(detectStep).toMatch(
-      /merge_group[\s\S]*?elif \[\[ "\$\{\{ github\.event_name \}\}" == "push" \]\]/
+      /merge_group[\s\S]*?elif \[\[ "\$\{EVENT_NAME\}" == "push" \]\]/
     );
 
     // Risk classifier: same SHA-only contract.
@@ -1506,21 +1504,50 @@ describe('merge_group workflow contract', () => {
     expect(beforeAssignIdx).toBeGreaterThan(pushIdx);
   });
 
+  it('keeps the path-detect run script free of expressions (JOV-8706)', () => {
+    // An interpolated run script is evaluated as one format() expression with
+    // a ~21,000-char cap; crossing it fails ci.yml with zero jobs. Event
+    // values must enter through env so the script stays a plain string.
+    const workflow = load(CI_WORKFLOW);
+    const detect = workflow.jobs['ci-path-changes'].steps.find(
+      step => step.id === 'detect'
+    );
+    expect(detect.run).not.toContain('${{');
+    expect(detect.env).toEqual({
+      EVENT_NAME: '${{ github.event_name }}',
+      BASE_REF: '${{ github.base_ref }}',
+      IS_FORK_PULL_REQUEST:
+        "${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}",
+      EVENT_MERGE_GROUP_BASE_SHA: '${{ github.event.merge_group.base_sha }}',
+      EVENT_MERGE_GROUP_HEAD_SHA: '${{ github.event.merge_group.head_sha }}',
+      EVENT_PULL_REQUEST_HEAD_SHA: '${{ github.event.pull_request.head.sha }}',
+      EVENT_PUSH_BEFORE_SHA: '${{ github.event.before }}',
+    });
+    // Only the push branch may read the push base.
+    const pushStart = detect.run.indexOf(
+      'elif [[ "${EVENT_NAME}" == "push" ]]; then'
+    );
+    expect(pushStart).toBeGreaterThan(0);
+    expect(detect.run.indexOf('EVENT_PUSH_BEFORE_SHA')).toBeGreaterThan(
+      pushStart
+    );
+  });
+
   it('keeps the pull_request empty-diff docs-only hard-fail (JOV-4905)', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const detectStep = pathChanges.slice(
       pathChanges.indexOf('Detect path changes for all job types')
     );
     const pullRequestStart = detectStep.indexOf(
-      'elif [[ "${{ github.event_name }}" == "pull_request" ]]; then'
+      'elif [[ "${EVENT_NAME}" == "pull_request" ]]; then'
     );
     const mergeGroupStart = detectStep.indexOf(
-      'if [[ "${{ github.event_name }}" == "merge_group" ]]; then'
+      'if [[ "${EVENT_NAME}" == "merge_group" ]]; then'
     );
     expect(pullRequestStart).toBeGreaterThan(mergeGroupStart);
     const pullRequestBranch = detectStep.slice(pullRequestStart);
     expect(pullRequestBranch).toContain(
-      'Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification.'
+      'Empty changed-file list vs origin/${BASE_REF}; refusing a false docs-only classification.'
     );
     const mergeGroupBranch = detectStep.slice(
       mergeGroupStart,
@@ -1528,10 +1555,10 @@ describe('merge_group workflow contract', () => {
     );
     expect(mergeGroupBranch).not.toContain('refusing a false docs-only');
     expect(mergeGroupBranch).not.toMatch(
-      /(?:DIFF_BASE|CHANGED_FILES)=.*github\.event\.before/
+      /(?:DIFF_BASE|CHANGED_FILES)=.*(?:github\.event\.before|EVENT_PUSH_BEFORE_SHA)/
     );
     expect(mergeGroupBranch).not.toMatch(
-      /(?:DIFF_BASE|CHANGED_FILES|git fetch).*\${{ github\.base_ref }}/
+      /(?:DIFF_BASE|CHANGED_FILES|git fetch).*(?:\${{ github\.base_ref }}|\$\{?BASE_REF\b)/
     );
   });
 
@@ -1541,16 +1568,14 @@ describe('merge_group workflow contract', () => {
       pathChanges.indexOf('Detect path changes for all job types')
     );
     const pullRequestBranch = detectStep.slice(
-      detectStep.indexOf(
-        'elif [[ "${{ github.event_name }}" == "pull_request" ]]; then'
-      )
+      detectStep.indexOf('elif [[ "${EVENT_NAME}" == "pull_request" ]]; then')
     );
     const emptyCheckIdx = pullRequestBranch.indexOf(
       'if [[ -z "${CHANGED_FILES//[$\'\\t\\r\\n\' ]/}" ]]; then'
     );
     // The fallback diffs merge-base(origin/<base>, PR head)..PR head.
     const headFallbackIdx = pullRequestBranch.indexOf(
-      '"origin/${{ github.base_ref }}" "$PULL_REQUEST_HEAD_SHA")'
+      '"origin/${BASE_REF}" "$PULL_REQUEST_HEAD_SHA")'
     );
     expect(pullRequestBranch).toContain(
       'CLASSIFICATION_HEAD_REF="$PULL_REQUEST_HEAD_SHA"'
@@ -1734,7 +1759,18 @@ describe('merge_group workflow contract', () => {
     const detect = spawnSync('bash', ['-c', detectScript], {
       cwd: REPO_ROOT,
       encoding: 'utf8',
-      env: { ...baseEnv, GITHUB_OUTPUT: detectOutput },
+      env: {
+        ...baseEnv,
+        GITHUB_OUTPUT: detectOutput,
+        // Step env as GitHub renders it for workflow_dispatch.
+        EVENT_NAME: 'workflow_dispatch',
+        BASE_REF: '',
+        IS_FORK_PULL_REQUEST: 'false',
+        EVENT_MERGE_GROUP_BASE_SHA: '',
+        EVENT_MERGE_GROUP_HEAD_SHA: '',
+        EVENT_PULL_REQUEST_HEAD_SHA: '',
+        EVENT_PUSH_BEFORE_SHA: '',
+      },
     });
     expect(detect.status, detect.stderr || detect.stdout).toBe(0);
 
@@ -1800,7 +1836,7 @@ describe('merge_group workflow contract', () => {
       'git merge-base --is-ancestor "$PATH_DIFF_BASE_SHA" "$PATH_DIFF_HEAD_SHA"'
     );
     expect(pathChanges).toContain(
-      'CLASSIFICATION_BASE_REF="origin/${{ github.base_ref }}"'
+      'CLASSIFICATION_BASE_REF="origin/${BASE_REF}"'
     );
     expect(pathChanges).toContain('CLASSIFICATION_BASE_REF="$PUSH_BASE_SHA"');
     expect(pathChanges).toContain(
