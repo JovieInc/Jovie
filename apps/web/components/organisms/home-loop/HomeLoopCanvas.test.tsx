@@ -15,6 +15,7 @@ import {
   HOME_LOOP_FIXTURE_ROWS,
   HOME_LOOP_FIXTURE_STAGES,
 } from './fixtures';
+import { HomeLoopAnswerPanel } from './HomeLoopAnswerPanel';
 import { HomeLoopAsks } from './HomeLoopAsks';
 import { HomeLoopCanvas, type HomeLoopCanvasProps } from './HomeLoopCanvas';
 import {
@@ -22,7 +23,13 @@ import {
   useUndoableAnswers,
 } from './useUndoableAnswers';
 
-const toastMock = vi.hoisted(() => vi.fn());
+const toastMock = vi.hoisted(() =>
+  Object.assign(vi.fn(), {
+    dismiss: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+  })
+);
 vi.mock('@/components/feedback', () => ({ toast: toastMock }));
 
 function props(
@@ -262,10 +269,107 @@ describe('home loop parts', () => {
   });
 });
 
+describe('HomeLoopAsks defaults and feedback', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('shows the declared default with a live countdown', () => {
+    vi.useFakeTimers({ now: Date.parse('2026-10-22T07:00:00.000Z') });
+    render(
+      <HomeLoopAsks
+        asks={HOME_LOOP_FIXTURE_ASKS}
+        answers={{}}
+        onApprove={vi.fn()}
+        onReply={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('home-loop-ask-default')).toHaveTextContent(
+      'Approves by default — Enable it for project jovie only'
+    );
+    expect(screen.getByTestId('home-loop-ask-countdown')).toHaveTextContent(
+      'in 5h'
+    );
+    act(() => {
+      vi.advanceTimersByTime(4 * 60 * 60_000 + 60_000);
+    });
+    expect(screen.getByTestId('home-loop-ask-countdown')).toHaveTextContent(
+      'in 59m'
+    );
+    // Asks without a default show no default line.
+    expect(screen.getAllByTestId('home-loop-ask-default')).toHaveLength(1);
+  });
+
+  it('offers feedback on a decided ask and sends it', () => {
+    const onFeedback = vi.fn();
+    render(
+      <HomeLoopAsks
+        asks={HOME_LOOP_FIXTURE_ASKS}
+        answers={{ 'vercel-concurrency': { label: 'Approved', state: 'sent' } }}
+        onApprove={vi.fn()}
+        onReply={vi.fn()}
+        onFeedback={onFeedback}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add Feedback' }));
+    fireEvent.change(screen.getByRole('textbox', { name: /Feedback:/ }), {
+      target: { value: 'Too dark on iPhone SE' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send Feedback' }));
+    expect(onFeedback).toHaveBeenCalledWith(
+      HOME_LOOP_FIXTURE_ASKS[0],
+      'Too dark on iPhone SE'
+    );
+    expect(screen.queryByRole('button', { name: 'Send Feedback' })).toBeNull();
+  });
+});
+
+describe('HomeLoopAnswerPanel', () => {
+  it('bounds history navigation and exposes every control by name', () => {
+    const handlers = {
+      onBack: vi.fn(),
+      onForward: vi.fn(),
+      onHome: vi.fn(),
+      onOpenTranscript: vi.fn(),
+    };
+    render(
+      <HomeLoopAnswerPanel
+        prompt='Status?'
+        reply='All green.'
+        pending={false}
+        position={1}
+        total={2}
+        {...handlers}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Previous Answer' })
+    ).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Next Answer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Conversation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back To Home' }));
+    expect(handlers.onForward).toHaveBeenCalledOnce();
+    expect(handlers.onOpenTranscript).toHaveBeenCalledOnce();
+    expect(handlers.onHome).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('home-loop-answer')).toHaveTextContent('1 of 2');
+  });
+
+  it('replaces the in-flight rows when generated UI updates them in place', () => {
+    render(
+      <HomeLoopCanvas
+        {...props({ inFlightOverride: <p>Generated shipping card</p> })}
+      />
+    );
+    expect(screen.getByText('Generated shipping card')).toBeVisible();
+    expect(screen.queryByTestId('home-loop-stage-row')).toBeNull();
+  });
+});
+
 describe('useUndoableAnswers', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     toastMock.mockReset();
+    toastMock.dismiss.mockReset();
+    toastMock.error.mockReset();
+    toastMock.success.mockReset();
   });
   afterEach(() => vi.useRealTimers());
 
@@ -328,5 +432,63 @@ describe('useUndoableAnswers', () => {
       label: 'Not recorded. Try again.',
       state: 'failed',
     });
+  });
+
+  it('commits a pending answer when the hook unmounts during the undo window', async () => {
+    const commit = vi.fn().mockResolvedValue(undefined);
+    const onCommitted = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useUndoableAnswers({ onCommitted })
+    );
+
+    act(() => result.current.answer({ id: 'a', label: 'Approved', commit }));
+    expect(commit).not.toHaveBeenCalled();
+
+    await act(async () => {
+      unmount();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HOME_LOOP_UNDO_WINDOW_MS);
+    });
+
+    expect(commit).toHaveBeenCalledOnce();
+    expect(toastMock.dismiss).toHaveBeenCalledWith('home-loop-answer-a');
+    expect(toastMock.success).toHaveBeenCalledWith('Approved');
+    expect(onCommitted).toHaveBeenCalledWith('a');
+  });
+
+  it('does not send an undone answer when the hook unmounts', async () => {
+    const commit = vi.fn().mockResolvedValue(undefined);
+    const { result, unmount } = renderHook(() => useUndoableAnswers());
+
+    act(() => result.current.answer({ id: 'a', label: 'Approved', commit }));
+    const undo = toastMock.mock.calls[0]?.[1]?.action?.onClick as () => void;
+    act(() => undo());
+    await act(async () => {
+      unmount();
+    });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(toastMock.success).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed flush when unmount commits and the send fails', async () => {
+    const commit = vi
+      .fn()
+      .mockRejectedValue(new Error('Not recorded. Try again.'));
+    const onCommitted = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useUndoableAnswers({ onCommitted })
+    );
+
+    act(() => result.current.answer({ id: 'a', label: 'Approved', commit }));
+    await act(async () => {
+      unmount();
+    });
+
+    expect(commit).toHaveBeenCalledOnce();
+    expect(onCommitted).not.toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalledWith('Not recorded. Try again.');
+    expect(toastMock.success).not.toHaveBeenCalled();
   });
 });
