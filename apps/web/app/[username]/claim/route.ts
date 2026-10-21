@@ -3,6 +3,10 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import {
+  claimStateHref,
+  requiresManualVerification,
+} from '@/lib/claim/artist-offer-claim';
+import {
   clearPendingClaimContext,
   readPendingClaimContext,
   writePendingClaimContext,
@@ -195,6 +199,12 @@ export async function GET(
           isSignedIn: Boolean(userId),
         })
       );
+    }
+
+    // Public figures are never self-serve: payment or a Spotify match alone
+    // must not hand over a famous artist's identity (EVENT: Tim, 2026-10-20).
+    if (requiresManualVerification(profile.spotifyFollowers)) {
+      return redirectTo(request, claimStateHref('verification_required'));
     }
 
     // Structured-credit profiles may enter the same direct flow, but the
