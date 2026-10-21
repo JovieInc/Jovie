@@ -248,6 +248,18 @@ run_trufflehog_publication() {
 CLONE_CORRUPTION_SIGNATURE='promisor remote|repository corruption on the remote side|failed to clone file Git repo'
 
 repair_partial_clone() {
+  # The repair runs `git fetch --refetch` (a full ~1.9 GB pack for this repo).
+  # It exists for CI runners whose workdir was a partial (promisor) clone. On a
+  # developer or ops host the usual trigger is a git-mode scan started inside a
+  # git worktree (trufflehog cannot `git clone file://` a worktree), and a
+  # refetch there only bloats the shared object store (2026-10-21 Mac disk
+  # incident). Outside CI, repair only a real partial clone.
+  if [[ -z "${CI:-}" && "${GITHUB_ACTIONS:-}" != true \
+    && "${SECRET_SCAN_ALLOW_LOCAL_REPAIR:-}" != 1 \
+    && -z "$(git config --get remote.origin.promisor 2>/dev/null || true)" ]]; then
+    echo "::error title=Secret scan repair refused::Not on CI and not a partial clone, so no --refetch. If this is a git worktree, trufflehog cannot clone it: run history scans in CI using the Security Scanning workflow in GitHub Actions or from a full non-worktree clone." >&2
+    return 1
+  fi
   echo "Partial-clone corruption detected — repairing workdir (#13994)..."
   git config --unset-all remote.origin.promisor || true
   git config --unset-all remote.origin.partialclonefilter || true

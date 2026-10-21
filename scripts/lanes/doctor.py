@@ -503,6 +503,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "autoscale": _autoscale_block(host),
         "mergedWindow": ({k: v for k, v in merged_window.items() if k != "prs"} if merged_window else None),
         "diskFreePct": round(100 * disk.free / disk.total, 1),
+        "sweepSecretHeld": [row for row in (read_json(state / "worktree-sweep.json", {}).get("secretHeld") or [])
+                            if isinstance(row, dict) and row.get("path") and Path(row["path"]).exists()],
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
@@ -975,6 +977,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                           f"agent work ({causes}); infrastructure, not the PRs, is exhausting them")
     # No design-brief-stale alert: since 2026-10-11 no issue is held for a brief (the
     # claiming run writes it), so a held brief is no longer a condition to watch.
+    for row in obs.get("sweepSecretHeld") or []:
+        # The public repo's refs/jovie-preserved/* must never carry a secret; the checkout is kept.
+        alerts[f"sweep-snapshot-secret:{row.get('name')}"] = (
+            f"worktree sweep did not publish a snapshot of {row.get('path')}: {row.get('reason')}; "
+            "the checkout is kept untouched until its owner reviews it")
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")

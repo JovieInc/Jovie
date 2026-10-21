@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import { runLiveness as runLivenessImpl } from '../../automation-liveness.mjs';
+import { ADMISSION_BLOCKING_LABELS } from '../admission-hold-labels.mjs';
 import {
   livenessDecisions,
   livenessFingerprint,
@@ -180,6 +181,145 @@ describe('dead-man liveness', () => {
     expect(livenessDecisions(report)).toEqual([]);
   });
 
+  // JOV-8766: #22518's squash committer date was 15:52Z and the fast-forward
+  // onto main was 17:58Z. Production promoted 19 minutes later. Aging from
+  // the queue timestamp reported 141 minutes and paged a healthy release.
+  it('ages a merge-queue commit from when its push reached main', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': mainRef(MAIN),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(141) } },
+            },
+          ],
+        },
+        'event=push': {
+          total_count: 1,
+          workflow_runs: [{ created_at: iso(19), event: 'push' }],
+        },
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: '1-commits-unshipped',
+      ageMinutes: 19,
+      lastProofAt: iso(19),
+    });
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
+  it('stays stale when the commit has been on main past the silence budget', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': mainRef(MAIN),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(141) } },
+            },
+          ],
+        },
+        'event=push': {
+          total_count: 1,
+          workflow_runs: [{ created_at: iso(141), event: 'push' }],
+        },
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'stale',
+      ageMinutes: 141,
+    });
+  });
+
+  it('ignores a push run from before the commit and a failed landing read', async () => {
+    const routes = landing =>
+      fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': mainRef(MAIN),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(30) } },
+            },
+          ],
+        },
+        'event=push': landing,
+      });
+    const early = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: routes({
+        total_count: 1,
+        workflow_runs: [{ created_at: iso(400), event: 'push' }],
+      }),
+    });
+    expect(
+      rowFor(early.report, 'derived:jovie:production-promotion')
+    ).toMatchObject({
+      status: 'fresh',
+      ageMinutes: 30,
+    });
+    const unread = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: routes(503),
+    });
+    expect(
+      rowFor(unread.report, 'derived:jovie:production-promotion')
+    ).toMatchObject({
+      status: 'fresh',
+      ageMinutes: 30,
+    });
+  });
+
+  it('uses the oldest page when push runs spill past one page', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': mainRef(MAIN),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 2,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(180) } },
+            },
+          ],
+        },
+        'event=push': url =>
+          String(url).includes('page=2')
+            ? {
+                total_count: 101,
+                workflow_runs: [{ created_at: iso(130), event: 'push' }],
+              }
+            : {
+                total_count: 101,
+                workflow_runs: [{ created_at: iso(5), event: 'push' }],
+              },
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'stale',
+      ageMinutes: 130,
+    });
+  });
+
   it.each([
     [503, 'unknown', 'unshipped-range-unreadable'],
     [{ ahead_by: 1, commits: [] }, 'unknown', 'unshipped-age-unreadable'],
@@ -271,6 +411,55 @@ describe('dead-man liveness', () => {
     expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
       status: 'unknown',
       reason: 'main-ref-http-429',
+    });
+    expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
+  // Run 39674054063: git/ref answered 403 while production was on main.
+  // The commit SHA media type is the alternate contents read.
+  it('reads main from the commit SHA when the git ref answers 403', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': 403,
+        '/commits/main': new Response(`${MAIN}\n`, {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        }),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(30) } },
+            },
+          ],
+        },
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      ageMinutes: 30,
+      reason: '1-commits-unshipped',
+    });
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
+  it('keeps a 403 red when the commit SHA read also fails', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+        '/git/ref/heads/main': 403,
+        '/commits/main': 403,
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'unknown',
+      reason: 'main-ref-http-403',
     });
     expect(livenessDecisions(report)[0].action).toBe('red');
   });
@@ -505,6 +694,206 @@ describe('dead-man liveness', () => {
     });
     expect(
       rowFor(unauth.report, 'github:jovie:merge-queue-progress').status
+    ).not.toBe('fresh');
+  });
+
+  // Tim 2026-10-21: Triage is sorted on the event, not a tick. The oldest
+  // unsorted issue's age is the staleness; the dwell SLO is 15 min.
+  it('a Triage issue older than the 15-minute dwell SLO is stale; an empty Triage is fresh', async () => {
+    const triage = minutesAgo => ({
+      graphql: async () => ({
+        issues: {
+          nodes: minutesAgo.map((m, index) => ({
+            identifier: `JOV-${index + 1}`,
+            createdAt: iso(m + 1000),
+            startedTriageAt: iso(m),
+          })),
+        },
+      }),
+    });
+    const run = linear =>
+      runLiveness({
+        registry: only('summer:triage-dwell'),
+        nowMs: NOW,
+        linear,
+      }).then(({ report }) => rowFor(report, 'summer:triage-dwell'));
+    const stuck = await run(triage([3, 40]));
+    expect(stuck.status).toBe('stale');
+    expect(stuck.ageMinutes).toBe(40);
+    expect(stuck.reason).toContain('oldest=JOV-2');
+    expect((await run(triage([3, 14]))).status).toBe('fresh');
+    expect((await run(triage([]))).status).toBe('fresh');
+    // No credential or a failed read is silence, never health.
+    expect((await run(null)).status).not.toBe('fresh');
+    const failing = {
+      graphql: async () => {
+        throw new Error('Linear GraphQL: unauthorized');
+      },
+    };
+    expect((await run(failing)).status).not.toBe('fresh');
+  });
+
+  // Tim 2026-10-21: a required-green PR is promoted and enqueued on the
+  // check event. Ready + green + outside the queue for over 10 min is stale.
+  it('a ready PR whose head is required-green but not enqueued for 10+ minutes is stale', async () => {
+    const pr = (number, extra = {}) => ({
+      number,
+      isDraft: false,
+      isInMergeQueue: false,
+      mergeStateStatus: 'CLEAN',
+      baseRefName: 'main',
+      headRefOid: String(number).repeat(40).slice(0, 40),
+      labels: { nodes: [], pageInfo: { hasNextPage: false } },
+      ...extra,
+    });
+    // PR Ready, Migration Guard and PR Size Guard are check runs; Fork PR
+    // Gate is a commit status. Green time is the latest required success.
+    const heads = greenMinutesAgo => ({
+      check_runs: [
+        {
+          name: 'PR Ready',
+          conclusion: 'success',
+          completed_at: iso(greenMinutesAgo),
+        },
+        {
+          name: 'Migration Guard',
+          conclusion: 'success',
+          completed_at: iso(greenMinutesAgo + 20),
+        },
+        {
+          name: 'PR Size Guard',
+          conclusion: 'success',
+          completed_at: iso(greenMinutesAgo + 25),
+        },
+      ],
+    });
+    const status = greenMinutesAgo => ({
+      statuses: [
+        {
+          context: 'Fork PR Gate',
+          state: 'success',
+          created_at: iso(greenMinutesAgo + 30),
+        },
+      ],
+    });
+    const run = (list, green = 30, overrides = {}) =>
+      runLiveness({
+        registry: only('github:jovie:green-to-enqueue'),
+        nowMs: NOW,
+        token: 't',
+        fetchImpl: fakeFetch({
+          '/graphql':
+            typeof list === 'number'
+              ? list
+              : { data: { repository: { pullRequests: { nodes: list } } } },
+          '/check-runs': overrides.runs ?? heads(green),
+          '/status': overrides.status ?? status(green),
+        }),
+      }).then(({ report }) => rowFor(report, 'github:jovie:green-to-enqueue'));
+    const waiting = await run([pr(1)]);
+    expect(waiting.status).toBe('stale');
+    expect(waiting.ageMinutes).toBe(30);
+    expect(waiting.reason).toContain('#1:30m');
+    // JOV-8788: #22378 was required-green but queue-poison deliberately
+    // prevented admission. Use the writer's vocabulary, including machine
+    // blocks, and keep held heads out of the capped timing reads.
+    const labeled = (number, name) =>
+      pr(number, {
+        labels: { nodes: [{ name }], pageInfo: { hasNextPage: false } },
+      });
+    for (const name of ADMISSION_BLOCKING_LABELS) {
+      const held = await run([labeled(22378, name.toUpperCase())]);
+      expect(held.status, name).toBe('fresh');
+      expect(held.reason).toContain('label-held=1[#22378]');
+    }
+    const mixed = await run([
+      ...Array.from({ length: 10 }, (_, i) => labeled(20 + i, 'queue-poison')),
+      labeled(1, 'lane-fix-dequeued'),
+    ]);
+    expect(mixed.status).toBe('stale');
+    expect(mixed.reason).toContain('ready-green-unqueued=1[#1:30m]');
+    // Removing the hold resumes the existing SLO; unreadable or truncated
+    // labels cannot certify that a ready PR is eligible.
+    expect((await run([pr(22378)])).status).toBe('stale');
+    for (const labels of [
+      undefined,
+      { nodes: [] },
+      { nodes: [], pageInfo: { hasNextPage: true } },
+      { nodes: [{}], pageInfo: { hasNextPage: false } },
+    ]) {
+      const unreadable = await run([pr(1, { labels })]);
+      expect(unreadable.status).not.toBe('fresh');
+      expect(unreadable.reason).toContain('green-enqueue-labels-unreadable');
+    }
+    // Inside the SLO, queued, conflicting, blocked or another base: fresh.
+    expect((await run([pr(2)], 5)).status).toBe('fresh');
+    expect((await run([pr(3, { isInMergeQueue: true })])).status).toBe('fresh');
+    expect((await run([pr(4, { mergeStateStatus: 'DIRTY' })])).status).toBe(
+      'fresh'
+    );
+    expect((await run([pr(5, { mergeStateStatus: 'BLOCKED' })])).status).toBe(
+      'fresh'
+    );
+    expect((await run([pr(6, { baseRefName: 'release' })])).status).toBe(
+      'fresh'
+    );
+    // A required name with no success yet (status pending) is not green.
+    expect(
+      (
+        await run([pr(7)], 30, {
+          status: {
+            statuses: [
+              {
+                context: 'Fork PR Gate',
+                state: 'pending',
+                created_at: iso(30),
+              },
+            ],
+          },
+        })
+      ).status
+    ).toBe('fresh');
+    // A merge-queue failure hold for a real defect needs a new head from its
+    // owner: reported, not promotion latency. A transient hold still counts.
+    const holdStatus = cls => ({
+      statuses: [
+        ...status(30).statuses,
+        {
+          context: 'jovie-queue-failure-hold/v1',
+          state: 'success',
+          description: `class=${cls};n=1;run=1;try=1`,
+          created_at: iso(20),
+        },
+      ],
+    });
+    const defect = await run([pr(10)], 30, {
+      status: holdStatus('unclassified'),
+    });
+    expect(defect.status).toBe('fresh');
+    expect(defect.reason).toContain('defect-held=1[#10]');
+    expect(
+      (
+        await run([pr(11)], 30, {
+          status: holdStatus('transient-infrastructure'),
+        })
+      ).status
+    ).toBe('stale');
+    // Green drafts are reported, but drafts belong to their writer.
+    const draft = await run([pr(8, { isDraft: true })]);
+    expect(draft.status).toBe('fresh');
+    expect(draft.reason).toContain('draft-green=1[#8]');
+    // Unreadable or unauthenticated is silence, never health.
+    expect((await run(502)).status).not.toBe('fresh');
+    expect((await run([pr(9)], 30, { runs: 502 })).status).not.toBe('fresh');
+    const unauth = await runLiveness({
+      registry: only('github:jovie:green-to-enqueue'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        '/graphql': { data: { repository: { pullRequests: { nodes: [] } } } },
+      }),
+    });
+    expect(
+      rowFor(unauth.report, 'github:jovie:green-to-enqueue').status
     ).not.toBe('fresh');
   });
 

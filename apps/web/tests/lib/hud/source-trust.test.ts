@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildHudMetricSources,
+  formatObservedAt,
   formatSourceFreshness,
+  getSourceFreshnessState,
   HUD_SOURCE_STALE_AFTER_MS,
   isHudMetricValueAvailable,
   isSourceStale,
@@ -276,5 +278,29 @@ describe('isHudMetricValueAvailable', () => {
         nextStep: null,
       })
     ).toBe(false);
+  });
+});
+
+describe('per-source freshness budget', () => {
+  const now = Date.parse('2026-10-21T12:00:00.000Z');
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it('judges staleness against the caller-supplied cadence budget', () => {
+    const tenDaysAgo = new Date(now - 10 * DAY).toISOString();
+    expect(getSourceFreshnessState(tenDaysAgo, now)).toBe('stale');
+    expect(getSourceFreshnessState(tenDaysAgo, now, 45 * DAY)).toBe('fresh');
+    expect(getSourceFreshnessState(tenDaysAgo, now, 3 * DAY)).toBe('stale');
+  });
+
+  it('treats a missing observation as unknown, never fresh', () => {
+    expect(getSourceFreshnessState(null, now, 45 * DAY)).toBe('unknown');
+    expect(getSourceFreshnessState('not-a-date', now)).toBe('unknown');
+  });
+
+  it('formats an absolute observed timestamp', () => {
+    expect(formatObservedAt('2026-10-21T15:04:00.000Z')).toBe(
+      'Oct 21, 2026, 3:04 PM UTC'
+    );
+    expect(formatObservedAt(null)).toBe('Not recorded');
   });
 });
