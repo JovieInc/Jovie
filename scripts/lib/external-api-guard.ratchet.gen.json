@@ -47,7 +47,6 @@
       "gh-shell": 2
     },
     ".github/scripts/analyze-test-flakiness.js": {
-      "provider-host": 1,
       "gh-subprocess": 3
     },
     ".github/scripts/assert-live-production-bind.mjs": {
@@ -117,9 +116,9 @@
       "gh-shell": 1
     },
     ".github/workflows/ci.yml": {
-      "provider-host": 1,
       "gh-shell": 3,
-      "github-script": 1
+      "github-script": 1,
+      "provider-host": 1
     },
     ".github/workflows/cost-anomaly-gate.yml": {
       "provider-host": 3
@@ -377,8 +376,8 @@
       "gh-shell": 7
     },
     "scripts/backlog-orchestrator/backlog-orchestrator.mjs": {
-      "provider-host": 1,
-      "gh-subprocess": 12
+      "gh-subprocess": 12,
+      "provider-host": 1
     },
     "scripts/backlog-orchestrator/linear-client.mjs": {
       "provider-host": 1
@@ -417,8 +416,8 @@
       "provider-host": 1
     },
     "scripts/dispatch-kanban.sh": {
-      "provider-host": 2,
-      "gh-shell": 1
+      "gh-shell": 1,
+      "provider-host": 2
     },
     "scripts/doc-gardening-agent.mjs": {
       "gh-subprocess": 2
@@ -427,8 +426,8 @@
       "provider-host": 4
     },
     "scripts/drain-pr-queue.sh": {
-      "provider-host": 1,
-      "gh-shell": 43
+      "gh-shell": 43,
+      "provider-host": 1
     },
     "scripts/fleet-gate/closure_health.py": {
       "gh-subprocess": 4
@@ -482,8 +481,8 @@
       "gh-subprocess": 1
     },
     "scripts/lanes/lane_runner.py": {
-      "provider-host": 1,
-      "gh-subprocess": 26
+      "gh-subprocess": 26,
+      "provider-host": 1
     },
     "scripts/lanes/linear_app_token.py": {
       "provider-host": 1
@@ -540,8 +539,8 @@
       "provider-host": 1
     },
     "scripts/lib/needs-human-autoclose.mjs": {
-      "provider-host": 1,
-      "gh-subprocess": 3
+      "gh-subprocess": 3,
+      "provider-host": 1
     },
     "scripts/lib/pr-check-failures.mjs": {
       "gh-subprocess": 1
@@ -559,12 +558,12 @@
       "gh-subprocess": 1
     },
     "scripts/lib/rolling-ci-fx-finish.mjs": {
-      "provider-host": 1,
-      "gh-subprocess": 1
+      "gh-subprocess": 1,
+      "provider-host": 1
     },
     "scripts/lib/rolling-ci-fx.mjs": {
-      "provider-host": 1,
-      "gh-subprocess": 1
+      "gh-subprocess": 1,
+      "provider-host": 1
     },
     "scripts/lib/rolling-ci-hosted-writer.mjs": {
       "provider-host": 1
@@ -582,15 +581,6 @@
       "gh-shell": 3
     },
     "scripts/lib/validation-sync.mjs": {
-      "provider-host": 1
-    },
-    "scripts/linear-claim-issue.mjs": {
-      "provider-host": 1
-    },
-    "scripts/linear-query-todo.mjs": {
-      "provider-host": 1
-    },
-    "scripts/linear-transition-issue.mjs": {
       "provider-host": 1
     },
     "scripts/loop-integration-ship.sh": {
@@ -663,8 +653,8 @@
       "provider-host": 1
     },
     "scripts/ship-swarm/next-batch.mjs": {
-      "provider-host": 1,
-      "gh-subprocess": 1
+      "gh-subprocess": 1,
+      "provider-host": 1
     },
     "scripts/shipping-slo-intake.mjs": {
       "gh-subprocess": 1
@@ -674,6 +664,9 @@
     },
     "scripts/shipping_origin.py": {
       "gh-subprocess": 2
+    },
+    "scripts/signals/signal_watch.py": {
+      "provider-host": 1
     },
     "scripts/source-admission-check.mjs": {
       "gh-subprocess": 1

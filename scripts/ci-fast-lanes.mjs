@@ -550,7 +550,7 @@ export const RESEARCH_TS_COMMAND = 'pnpm --filter @jovie/research test';
 
 /** scripts/apiclient: the Python port, held to the same conformance fixtures. */
 export const API_CLIENT_PY_COMMAND = structuralPythonRegression(
-  'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage run --branch --include="*/scripts/apiclient/*" -m pytest scripts/tests/test_apiclient.py scripts/tests/test_apiclient_adapters.py scripts/tests/test_apiclient_conformance.py -q -p no:cacheprovider --basetemp="${RUNNER_TEMP:-/tmp}/jovie-apiclient-pytest" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage report --fail-under=85'
+  'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage run --branch --include="*/scripts/apiclient/*" -m pytest scripts/tests/test_apiclient.py scripts/tests/test_apiclient_adapters.py scripts/tests/test_apiclient_conformance.py scripts/tests/test_apiclient_pricing.py -q -p no:cacheprovider --basetemp="${RUNNER_TEMP:-/tmp}/jovie-apiclient-pytest" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage report --fail-under=85'
 );
 
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
@@ -718,6 +718,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
   'scripts/lib/__tests__/auto-ready-green-drafts.test.mjs',
+  'scripts/lib/__tests__/workflow-expression-budget.test.mjs',
   'scripts/lib/__tests__/stale-branch-sweep.test.mjs',
   'scripts/lib/__tests__/biome-a11y-exemption-scope.test.mjs',
   'scripts/lib/__tests__/biome-no-restricted-imports.test.mjs',
@@ -793,6 +794,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
   'scripts/lib/__tests__/shipping-slo-collector.test.mjs',
   'scripts/lib/__tests__/shipping-slo.test.mjs',
+  'scripts/lib/__tests__/stage-derive.test.mjs',
   'scripts/lib/__tests__/stage-events.test.mjs',
   'scripts/lib/__tests__/stale-pr-base-sha.test.mjs',
   'scripts/lib/__tests__/story-coverage-ratchet.test.mjs',

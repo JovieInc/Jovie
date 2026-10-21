@@ -2,23 +2,11 @@
 // Invariant consumer: JOV-INV-041.
 import { pathToFileURL } from 'node:url';
 
+import {
+  createLinearClient,
+  MemoryLedgerStore,
+} from '../packages/api-client/index.ts';
 import { evaluateEscapedDefectClosure } from './lib/escaped-defect-closure.mjs';
-
-const LINEAR_API = 'https://api.linear.app/graphql';
-
-/**
- * @typedef {{
- *   ok: boolean,
- *   status?: number,
- *   statusText?: string,
- *   text?: () => Promise<string>,
- *   json: () => Promise<any>,
- * }} HttpResponse
- * @typedef {(
- *   input: string | URL | Request,
- *   init?: RequestInit,
- * ) => Promise<HttpResponse>} HttpFetch
- */
 
 /**
  * @param {{
@@ -27,7 +15,7 @@ const LINEAR_API = 'https://api.linear.app/graphql';
  *   comment?: string,
  *   apiKey: string,
  *   expectedDeploymentSha?: string,
- *   fetchImpl?: HttpFetch,
+ *   fetchImpl?: typeof fetch,
  *   log?: (message: string) => void,
  * }} input
  */
@@ -49,25 +37,18 @@ export async function transitionLinearIssue({
     );
   }
 
-  async function gql(query, variables = {}) {
-    const response = await fetchImpl(LINEAR_API, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: apiKey,
-      },
-      body: JSON.stringify({ query, variables }),
-    });
-    if (!response.ok) {
-      const body = response.text ? await response.text() : '';
-      throw new Error(
-        `Linear API request failed (${response.status} ${response.statusText}): ${body}`
-      );
-    }
-    const payload = await response.json();
-    if (payload.errors) throw new Error(JSON.stringify(payload.errors));
-    return payload.data;
-  }
+  // Shared Linear budget, cooldown and retries (.claude/rules/external-apis.md).
+  // An injected fetch (tests) keeps its ledger in memory, off the host state.
+  const linear = createLinearClient({
+    identity: apiKey,
+    authorization: () => apiKey,
+    fetch: fetchImpl,
+    ...(fetchImpl === globalThis.fetch
+      ? {}
+      : { store: new MemoryLedgerStore(), legacyStateRoot: null }),
+  });
+  const gql = (query, variables = {}) =>
+    linear.graphql(query, variables, { priority: 'deploy' });
 
   const { issues } = await gql(
     `query($n: Float!) { issues(filter: { team: { key: { eq: "JOV" } }, number: { eq: $n } }, first: 1) { nodes { id identifier description labels { nodes { name } } comments(first: 50) { nodes { body } } team { states { nodes { id name } } } } } }`,
