@@ -87,7 +87,7 @@ function KanbanLane({
       data-stage={stage}
       data-testid='home-loop-kanban-lane'
     >
-      <h3 className='flex items-center justify-between gap-2 text-2xs font-medium text-secondary-token'>
+      <h3 className='flex items-center justify-between gap-2 text-balance text-2xs font-medium text-secondary-token'>
         <span className='truncate'>{label}</span>
         <span className='tabular-nums text-primary-token'>{rows.length}</span>
       </h3>
