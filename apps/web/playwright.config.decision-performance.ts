@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const isCI = !!process.env.CI;
 const baseURL = process.env.STORYBOOK_BASE_URL ?? 'http://127.0.0.1:6874';
 
 /** Model-free budgets run on optimized components, with real app styles. */
@@ -14,7 +15,11 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 25_000 },
   reporter: 'line',
-  use: { baseURL, trace: 'off', video: 'off' },
+  use: {
+    baseURL,
+    trace: isCI ? 'off' : 'on-first-retry',
+    video: isCI ? 'off' : 'retain-on-failure',
+  },
   projects: [{ name: 'chromium', use: devices['Desktop Chrome'] }],
   ...(process.env.STORYBOOK_BASE_URL
     ? {}
