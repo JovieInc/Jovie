@@ -42,17 +42,7 @@ describe('chat performance fixtures', () => {
   });
 });
 
-type Probe = {
-  start: number;
-  fetchStartedMs?: number;
-  dataReadyMs?: number;
-  firstFeedbackMs?: number;
-  usableStateMs?: number;
-  renderToInteractiveMs?: number;
-  frameId?: number;
-  observer: MutationObserver;
-};
-const probeWindow = window as Window & { __jovieChatPerformanceProbe?: Probe };
+const probeWindow = window;
 
 describe('chat performance presentation probe (synthetic DOM/clock)', () => {
   let now = 100;
@@ -74,7 +64,7 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
   });
 
   afterEach(() => {
-    probeWindow.__jovieChatPerformanceProbe?.observer.disconnect();
+    probeWindow.__jovieChatPerformanceProbe?.dispose();
     delete probeWindow.__jovieChatPerformanceProbe;
     document.body.replaceChildren();
     vi.restoreAllMocks();
@@ -86,6 +76,27 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
     const callbacks = [...frames.values()];
     frames.clear();
     for (const callback of callbacks) callback(time);
+  }
+
+  function input(disabled = false, handle = true) {
+    const composer = document.createElement('textarea');
+    composer.setAttribute('aria-label', 'Chat Message Input');
+    composer.disabled = disabled;
+    vi.spyOn(composer, 'getBoundingClientRect').mockReturnValue({
+      top: 10,
+      bottom: 30,
+      left: 10,
+      right: 210,
+      width: 200,
+      height: 20,
+    } as DOMRect);
+    if (handle)
+      composer.addEventListener('input', () => {
+        composer.defaultValue = composer.value;
+      });
+    document.body.append(composer);
+    composer.focus();
+    return composer;
   }
 
   function row(testId: string, text: string, top = 10) {
@@ -127,10 +138,7 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
 
     row('chat-user-bubble', 'Sent message');
     row('chat-message-reply', 'Received reply');
-    const composer = document.createElement('textarea');
-    composer.setAttribute('aria-label', 'Chat Message Input');
-    composer.disabled = true;
-    document.body.append(composer);
+    const composer = input(true);
     await Promise.resolve();
     frame(1030);
     expect(probe.firstFeedbackMs).toBeUndefined();
@@ -141,10 +149,13 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
     frame(1060);
     expect(probe.renderToInteractiveMs).toBeUndefined();
     composer.disabled = false;
+    composer.focus();
     frame(1070);
     frame(1080);
-    expect(probe.renderToInteractiveMs).toBe(40);
-    expect(frames.size).toBe(0);
+    frame(1090);
+    frame(1100);
+    await Promise.resolve();
+    expect(probe.renderToInteractiveMs).toBe(60);
   });
 
   it('rejects visible-looking rows inside a hidden ancestor or clipped scroll region', async () => {
@@ -172,7 +183,7 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
     expect(probe.usableStateMs).toBeUndefined();
   });
 
-  it('scores a composer already enabled when the reply is presented without adding two more frame waits', async () => {
+  it('requires a handled and presented edit after reply presentation', async () => {
     installBrowserChatProbe({
       user: 'Sent message',
       assistant: 'Received reply',
@@ -181,9 +192,7 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
     probe.start = 1000;
     row('chat-user-bubble', 'Sent message');
     row('chat-message-reply', 'Received reply');
-    const composer = document.createElement('textarea');
-    composer.setAttribute('aria-label', 'Chat Message Input');
-    document.body.append(composer);
+    const composer = input();
     await Promise.resolve();
     frame(1016);
     // Readiness still waits for the reply's actual paint opportunity.
@@ -191,8 +200,13 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
     expect(probe.renderToInteractiveMs).toBeUndefined();
     frame(1032);
     expect(probe.usableStateMs).toBe(32);
-    expect(probe.renderToInteractiveMs).toBe(0);
-    expect(frames.size).toBe(0);
+    expect(probe.renderToInteractiveMs).toBeUndefined();
+    expect(composer.value).toBe('Next message');
+    expect(composer.defaultValue).toBe('Next message');
+    frame(1048);
+    frame(1064);
+    await Promise.resolve();
+    expect(probe.renderToInteractiveMs).toBe(32);
   });
 
   it('records a real readiness delay above the unchanged 50ms budget', async () => {
@@ -202,10 +216,7 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
     });
     row('chat-user-bubble', 'Sent message');
     row('chat-message-reply', 'Received reply');
-    const composer = document.createElement('textarea');
-    composer.setAttribute('aria-label', 'Chat Message Input');
-    composer.disabled = true;
-    document.body.append(composer);
+    const composer = input(true);
     await Promise.resolve();
     frame(110);
     frame(120);
@@ -214,9 +225,44 @@ describe('chat performance presentation probe (synthetic DOM/clock)', () => {
     frame(160);
     expect(probe.renderToInteractiveMs).toBeUndefined();
     composer.disabled = false;
+    composer.focus();
     frame(180);
     frame(200);
-    expect(probe.renderToInteractiveMs).toBe(80);
+    frame(220);
+    frame(240);
+    await Promise.resolve();
+    expect(probe.renderToInteractiveMs).toBe(120);
+  });
+
+  it('does not count a native value edit as handled when the input handler is blocked', async () => {
+    installBrowserChatProbe({ user: 'Sent', assistant: 'Reply' });
+    const composer = input(false, false);
+    row('chat-user-bubble', 'Sent');
+    row('chat-message-reply', 'Reply');
+    await Promise.resolve();
+    frame(110);
+    frame(120);
+    frame(140);
+    frame(160);
+    const probe = probeWindow.__jovieChatPerformanceProbe!;
+    expect(composer.value).toBe('Next message');
+    expect(composer.defaultValue).toBe('');
+    expect(probe.renderToInteractiveMs).toBeUndefined();
+    composer.defaultValue = composer.value;
+    frame(200);
+    frame(220);
+    await Promise.resolve();
+    expect(probe.renderToInteractiveMs).toBe(100);
+  });
+
+  it('cleans up pending input frames and rejects unfinished edits on reinstall', async () => {
+    installBrowserChatProbe({ user: 'Sent', assistant: 'Reply' });
+    input(false, false);
+    const previous = probeWindow.__jovieChatPerformanceProbe!;
+    const result = previous.edit('draft').catch(error => error.message);
+    installBrowserChatProbe({ user: 'Sent', assistant: 'Reply' });
+    expect(await result).toBe('Composer probe disposed');
+    expect(frames.size).toBe(0);
   });
 
   it('intersects horizontal and nested clipping regions before scoring a row', async () => {
