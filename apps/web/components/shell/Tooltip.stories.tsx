@@ -20,7 +20,9 @@ const meta = {
   decorators: [
     Story => (
       <RenderedFamily name='Tooltip' owner='Tooltip' interactive>
-        <Story />
+        <div className='p-4'>
+          <Story />
+        </div>
       </RenderedFamily>
     ),
   ],
