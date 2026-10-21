@@ -21,6 +21,8 @@ export function fakeGh(state, args) {
   }
   if (args[0] === 'label' && args[1] === 'list') {
     if (state.failure === 'label-lookup') bad('offline label transport outage');
+    // Real gh 2.93 prints nothing, not `[]`, when no label matches --search.
+    if (!state.labels.length) return '';
     return JSON.stringify(state.labels.map(name => ({ name })));
   }
   if (args[0] === 'issue' && args[1] === 'create') {
