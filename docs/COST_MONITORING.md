@@ -11,7 +11,7 @@ This document covers the cost-anomaly defense layer. It exists because of a real
 | **0** | Vercel spend notifications + `production-continuity.yml` | Budget thresholds and Jovie/Summer availability | Founder-first alert + bounded agent ingress |
 | **1** | Provider-native spend controls | All providers | Provider-enforced pause/limit; enforcement semantics and lag vary |
 | **2** | `cost-anomaly-gate.yml` | Production event volume | **Alert-only observer** — opens one deduplicated incident |
-| **3** | Provider usage ledger (future) | Per-provider attribution | Per-provider day-over-day anomaly detection |
+| **3** | Credentials and spend registry (`ops/registry/`) | Per-provider balance, burn, runway, caps; credential and grant expiry | Daily remediation-sweep filing: expiry at 7d/1d, runway under 14 days, 50/80/100% of a cap, unowned secrets |
 
 Layer 0 composes Vercel's event-driven 50%/75%/100% notifications with a
 best-effort five-minute external HTTP probe. GitHub schedules can be delayed or
@@ -163,6 +163,7 @@ jovie prod/staging, Standard machine, hard cap $10/mo (cutoff at $8).
   project's `elasticConcurrencyEnabled` flag. It reads jovie builds since the
   later of the billing-period start and enablement, and Vercel's billed build
   charges (`/v1/billing/charges`). Spend counts as the larger of the two.
+  If the token cannot read billing, the per-build estimate alone is used.
   The ledger turns on-demand off when actual or projected spend reaches $8,
   warns at $5, and turns it off when spend is unknown or the machine is not
   pinned Standard. Turning it off only puts staging and production back on
@@ -319,14 +320,51 @@ Slack alert lands and one GitHub incident opens. Production is unchanged.
 
 ---
 
-## Layer 3: Provider Usage Ledger (Future)
+## Layer 3: Credentials and Spend Registry
 
-Not built. Tracked in Linear as candidate follow-up work. The design would be:
-- Daily cron writes per-provider usage to a `provider_usage_daily` table (rows per provider, day, units, est_cost_usd)
-- Sources: Anthropic usage API, Resend events, Vercel usage API, Sentry events
-- Daily check: each row vs 30-day rolling average; alert on day-over-day anomaly per provider
+Summer was down from 2026-10-18 to 2026-10-20 because a time-boxed provider
+grant (`SUMMER_GATEWAY_RECOVERY_GRANT`) expired and nothing watched it. Spend
+and credit were spread across providers with no single view. The registry is
+that single view. It holds metadata only: names, owners, consumers, scopes and
+dates. It never holds a secret value.
 
-This is finer-grained than Layer 2 but slower to react (daily vs every-15-min). Layers 1+2 cover the high-trauma scenario. Build Layer 3 only if observed gaps demand it.
+| File | Holds |
+| --- | --- |
+| `ops/registry/credentials.json` | Each credential (owner, consumers, scope, name patterns, created/expiry, rotation, blast radius) |
+| `ops/registry/third-party-grants.jsonl` | Grants third parties hold on Tim's and the org's accounts: Google linked apps (tim@jov.ie), GitHub OAuth and GitHub App user authorizations, JovieInc app installations. Each has scope, purpose, owner, last use and a revoke URL. The check lists stale, never-used or unexplained grants for review and never revokes anything |
+| `ops/registry/inventory.gen.json` | Generated name inventory of every Doppler config, Vercel project, GitHub Actions store and the GitHub App installation list |
+| `ops/registry/spend.json` | Each spend line (balance or spend snapshot, burn per day, cap and period, dated credits, read path) |
+
+`scripts/credentials-spend-check.mjs` evaluates both files. It alerts:
+
+- at 7 days (High) and 1 day (Urgent) before any dated credential, grant or
+  credit, and every day after an active one expires;
+- when runway drops under 14 days (Urgent under 7), or spend crosses 50%, 80%
+  or 100% of a cap (one fingerprint per period and threshold);
+- when a credential has no owner or no consumer, a secret-like name in a store
+  belongs to no registered credential, or a workflow reads a secret the store
+  does not hold.
+
+Live reads, when their token is present: AI Gateway credits
+(`AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN`; burn is the `total_used` slope
+from the committed snapshot), every Summer `*_GRANT` declaration's expiry on
+Vercel (a new grant is watched from the first run after it is declared), and
+Gem's Codex ledger (banked-reset redemption deadlines). Every run records stage
+timestamps (`jovie.credentials-spend-run/v1`).
+
+Routing: the daily Remediation Sweep runs `--mode credentials` and files one
+fingerprinted Linear issue per alert through the existing remediation intake,
+which Summer's triage picks up. The run record is uploaded as the
+`credentials-spend-run` artifact. On a host with more access (Gem), run
+`node scripts/credentials-spend-check.mjs --live --receipt <jsonl> --file-linear`.
+
+Refresh the name inventory with
+`node scripts/credentials-inventory-collect.mjs --write` (needs `doppler`, `gh`
+and a Vercel login; reads names only). Stores not refreshed for 8 days are
+reported as stale.
+
+When you add, rotate or retire a credential, or a provider changes a cap,
+update the registry entry in the same PR.
 
 ---
 
