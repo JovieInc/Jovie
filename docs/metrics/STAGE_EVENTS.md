@@ -98,6 +98,8 @@ PATCH as `lanes-status.json`). Keep 28 days, drop older rows, cap at 8 MB.
 | Stage | entityType / entityId | enteredAt | exitedAt | Source |
 | --- | --- | --- | --- | --- |
 | `shipping:worker-start` | `shipping` / `JovieInc/Jovie#<pr>` once the run has a PR, else `JOV-<n>` | ledger receipt `startedAt` | receipt `endedAt` | `runs/ledger.jsonl` issue receipt (`kind` issue) |
+| `shipping:gate-seat` | `shipping` / `JovieInc/Jovie#<pr>` | adopt receipt `startedAt` | `startedAt + gateWaitS` (no seat: `endedAt`, outcome `abandoned`) | `runs/ledger.jsonl` (`kind` adopt) |
+| `shipping:gate` | `shipping` / `JovieInc/Jovie#<pr>` | `startedAt + gateWaitS` | receipt `endedAt` (`advanced` landing/verified, `failed` held/timeout) | `runs/ledger.jsonl` (`kind` adopt) |
 | `remediation:repair-start` | `remediation` / `JovieInc/Jovie#<pr>@<first 12 chars of the red head sha>` | fix-red receipt `startedAt` | receipt `endedAt` | `runs/ledger.jsonl` (`kind` fix-red) |
 
 `actor` = provider (`codex`, `claude`, ...). `outcome`: `advanced` when the run

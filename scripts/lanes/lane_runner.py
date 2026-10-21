@@ -6973,6 +6973,34 @@ def publish_exhausted_repairs(host: Host, name: str, prs: list[dict], now: float
     return published
 
 
+ADOPT_SHARE_EVERY = 4
+
+
+def adoption_turn_due(host: Host) -> bool:
+    """Every Nth local selection pass on this host tries a green draft before red repairs.
+
+    Runs under the claim lock. LANES_ADOPT_SHARE_EVERY overrides N (0 disables the share)."""
+    try:
+        every = int(os.environ.get("LANES_ADOPT_SHARE_EVERY", ADOPT_SHARE_EVERY))
+    except ValueError:
+        every = ADOPT_SHARE_EVERY
+    if every <= 0:
+        return False
+    path = host.state / "adopt-share.json"
+    try:
+        count = int(json.loads(path.read_text()).get("passes", 0))
+    except (OSError, ValueError, TypeError, AttributeError):
+        count = 0
+    count += 1
+    try:
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"passes": count, "every": every}))
+        os.replace(tmp, path)
+    except OSError:
+        pass  # an unwritable counter only means red repairs keep their usual priority
+    return count % every == 0
+
+
 def claim_adoptable_pr(host: Host, name: str, prs: list[dict], repair_candidates: list[dict] | None = None) -> GateClaim | None:
     path = host.state / "verified.json"
     verified = json.loads(path.read_text()) if path.exists() else {}
@@ -7517,13 +7545,18 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                                 and isinstance(rung_inventory.get("prs"), list))
         rung_candidates = pending_rung_candidates(host, name, rung_inventory["prs"]) \
             if local and rung_inventory_valid else []
-        red = local and (pr_events.claim_event_pr(host, THIS, name, events)
+        # A fixed share of turns gates green drafts first: red repairs otherwise took 94-99% of
+        # lane turns and green drafts waited hours for a gate (2026-10-21, Gem ledger).
+        if local and provider_may_run(name, "adopt") and adoption_turn_due(host):
+            adopt = claim_adoptable_pr(host, name, prs, candidates)
+        red = None if adopt else local and (pr_events.claim_event_pr(host, THIS, name, events)
                          or claim_escalation_pr(host, name, list({pr["number"]: pr
                                                                for pr in candidates + rung_candidates}.values()),
                                                 routing_context=routing_context)
                          or claim_red_pr(host, name, candidates)) or None
-        adopt = None if red or not local or not provider_may_run(name, "adopt") \
-            else claim_adoptable_pr(host, name, prs, candidates)
+        if adopt is None:
+            adopt = None if red or not local or not provider_may_run(name, "adopt") \
+                else claim_adoptable_pr(host, name, prs, candidates)
         if local:
             selected = {red["number"]} if red else {adopt.pr["number"]} if adopt else set()
             try:

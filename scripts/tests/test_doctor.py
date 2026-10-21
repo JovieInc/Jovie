@@ -1831,13 +1831,31 @@ class PublishTest(unittest.TestCase):
         self.assertEqual([(r["entityType"], r["entityId"], r["stage"], r["actor"], r["outcome"], r["sourceReceipt"]) for r in rows], [
             ("shipping", "JovieInc/Jovie#22315", "worker-start", "codex", "advanced", "lanes-ledger:r1"),
             ("shipping", "JOV-6", "worker-start", "grok", "failed", "lanes-ledger:r2"),
-            ("remediation", "JovieInc/Jovie#22301@0123456789ab", "repair-start", "codex", "failed", "lanes-ledger:r3")])
+            ("remediation", "JovieInc/Jovie#22301@0123456789ab", "repair-start", "codex", "failed", "lanes-ledger:r3"),
+            ("shipping", "JovieInc/Jovie#1", "gate-seat", "codex", "abandoned", "lanes-ledger:adopt")])
         self.assertTrue(all(r["schema"] == "jovie-stage-event/v1" and r["enteredAt"] < r["exitedAt"] for r in rows))
         writes = self.api.write_count
         doctor.publish_status(self.host, self.lane, self.feed(1))
         packet = json.loads((self.state / "lanes-status-publish.json").read_text())
         self.assertNotIn("stage-events.ndjson", packet["files"], "unchanged rows are not re-uploaded")
         self.assertEqual(self.api.write_count, writes + 1)
+
+    def test_gate_seat_wait_and_gate_run_are_tracked_stages(self):
+        events = doctor.stage_events.events
+        row = {"runId": "g1", "kind": "adopt", "pr": 22385, "provider": "grok", "gateWaitS": 120,
+               "startedAt": "2026-10-21T06:33:26Z", "endedAt": "2026-10-21T07:04:02Z", "verdict": "landing"}
+        seat, gate = events(row)
+        self.assertEqual((seat["stage"], seat["enteredAt"], seat["exitedAt"], seat["outcome"]),
+                         ("gate-seat", "2026-10-21T06:33:26Z", "2026-10-21T06:35:26Z", "advanced"))
+        self.assertEqual((gate["stage"], gate["enteredAt"], gate["exitedAt"], gate["outcome"], gate["entityId"]),
+                         ("gate", "2026-10-21T06:35:26Z", "2026-10-21T07:04:02Z", "advanced", "JovieInc/Jovie#22385"))
+        self.assertEqual(events({**row, "verdict": "held"})[1]["outcome"], "failed")
+        self.assertEqual(events({**row, "verdict": "gate-deferred"})[1]["outcome"], "abandoned")
+        [deferred] = events({**row, "gateWaitS": None, "verdict": "gate-deferred"})
+        self.assertEqual((deferred["stage"], deferred["exitedAt"], deferred["outcome"]),
+                         ("gate-seat", "2026-10-21T07:04:02Z", "abandoned"))
+        self.assertEqual(events({**row, "gateWaitS": 99999}), [events({**row, "gateWaitS": None})[0]])
+        self.assertEqual(events({**row, "pr": None}), [])
 
     def test_a_truncated_stage_file_is_read_back_by_its_size(self):
         now = time.time()
