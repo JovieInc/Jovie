@@ -19,16 +19,6 @@
   );
 }
 
-.ap-section-container {
-  --ap-page-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
-  width: min(
-    var(--ds-public-content-max),
-    calc(100% - (var(--ap-page-gutter) * 2))
-  );
-  max-width: var(--ds-public-content-max);
-  padding-inline: 0;
-}
-
 .artist-profiles-home-system #faq,
 .artist-profiles-home-system .ap-section-shell[id] {
   scroll-margin-top: calc(var(--homepage-header-height, 56px) + var(--space-6));

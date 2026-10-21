@@ -408,6 +408,49 @@ def add_label(number: int, kind: str, sh=run) -> bool:
                "-f", f"labels[]={PREFIX}{kind}"]).returncode == 0
 
 
+def stale_fix_labels(pr: dict, labels: set) -> list[str]:
+    """Repair labels whose cause is gone on this exact head (2026-10-21: #22320 kept
+    lane-fix-red after its replacement run passed; #22394 kept lane-fix-conflict and
+    lane-fix-dequeued after Gem resolved the conflict). Only a required-green, open,
+    same-repo head clears anything; a poisoned PR keeps its dequeue signal."""
+    if (pr.get("isCrossRepository") or str(pr.get("state", "OPEN")).upper() != "OPEN"
+            or pr.get("mergeStateStatus") not in REQUIRED_GREEN):
+        return []
+    stale = [kind for kind in ("red", "conflict") if PREFIX + kind in labels]
+    if PREFIX + "conflict" in labels and PREFIX + "dequeued" in labels and POISON_LABEL not in labels:
+        stale.append("dequeued")  # the conflict was why the queue dropped it
+    return stale
+
+
+HEAD_CHECKS_QUERY = """query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
+pullRequest(number:$number){commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){nodes{__typename
+... on CheckRun{name conclusion startedAt completedAt} ... on StatusContext{context state createdAt}}}}}}}}}}"""
+RED_CHECK_STATES = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"})
+
+
+def head_red(number: int, sh=run) -> bool | None:
+    """True only when the latest run of some check on the head failed. GitHub's rollup counts
+    a CANCELLED (superseded) run as FAILURE even after its replacement passed. None: unreadable."""
+    owner, name = REPO.split("/", 1)
+    read = sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
+               "-F", f"name={name}", "-F", f"number={number}"])
+    try:
+        commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
+        nodes = ((commits[0]["commit"].get("statusCheckRollup") or {}).get("contexts") or {})["nodes"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return None
+    if read.returncode:
+        return None
+    latest: dict = {}
+    for node in nodes:
+        key = node.get("name") or node.get("context")
+        at = node.get("completedAt") or node.get("startedAt") or node.get("createdAt") or ""
+        state = str(node.get("conclusion") or node.get("state") or "").upper()
+        if key and (key not in latest or at >= latest[key][0]):
+            latest[key] = (at, state)
+    return any(state in RED_CHECK_STATES for _, state in latest.values())
+
+
 def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     """Drop lane-fix-red once this head is required-green.
 
@@ -2161,6 +2204,9 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
         if preservation_reason(pr, attempts.get(str(number), {}), max_attempts,
                                held=(held or {}).get(str(number)), now=now):
             continue
+        stale_labels = stale_fix_labels(pr, labels)
+        plan["unlabel"].extend((number, kind) for kind in stale_labels)
+        labels -= {PREFIX + kind for kind in stale_labels}
         if pr.get("mergeStateStatus") == "CLEAN" or pr.get("isInMergeQueue"):
             plan["reset"].append(number)  # only synchronization housekeeping; attempts remain immutable here
         wanted = []
@@ -2246,6 +2292,8 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         if kind == "conflict" and claim_active(
                 number, by_number[number].get("headRefOid"), lane.sh, now):
             continue
+        if kind == "red" and head_red(number, lane.sh) is not True:
+            continue  # a cancelled/superseded run reddens the rollup; unknown waits a pass
         if add_label(number, kind, lane.sh):
             labeled.append((number, kind))
     for number, kind in plan["unlabel"]:

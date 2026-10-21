@@ -18,6 +18,7 @@ export function HomeLoopSection({
   isEmpty,
   emptyLabel,
   errorLabel,
+  notice,
   onRetry,
   skeleton,
   minBodyClassName,
@@ -31,6 +32,8 @@ export function HomeLoopSection({
   readonly isEmpty: boolean;
   readonly emptyLabel: string;
   readonly errorLabel: string;
+  /** Ready-state source warning. Replaces the empty line when the section is empty. */
+  readonly notice?: string | null;
   readonly onRetry?: () => void;
   readonly skeleton: ReactNode;
   /** Reserved minimum body height, so state changes stay local. */
@@ -86,11 +89,29 @@ export function HomeLoopSection({
             ) : null}
           </div>
         ) : isEmpty ? (
-          <p className='rounded-lg border border-dashed border-subtle px-3 py-2 text-xs text-tertiary-token'>
-            {emptyLabel}
+          <p
+            role={notice ? 'status' : undefined}
+            data-testid={notice ? `${testId}-notice` : undefined}
+            className={cn(
+              'rounded-lg border border-dashed border-subtle px-3 py-2 text-xs',
+              notice ? 'text-secondary-token' : 'text-tertiary-token'
+            )}
+          >
+            {notice ?? emptyLabel}
           </p>
         ) : (
-          children
+          <>
+            {notice ? (
+              <p
+                role='status'
+                data-testid={`${testId}-notice`}
+                className='pb-2 text-xs text-secondary-token'
+              >
+                {notice}
+              </p>
+            ) : null}
+            {children}
+          </>
         )}
       </div>
     </section>
