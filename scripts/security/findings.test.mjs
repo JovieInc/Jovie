@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { load as parseYaml } from 'js-yaml';
 import {
   computeKey,
   familyOf,
@@ -27,6 +28,161 @@ const base = {
   rule_id: 'js/sql-injection',
   symbol: 'GET',
 };
+
+function sarifDocument({ driver = 'CodeQL', level, score, uri } = {}) {
+  return {
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: driver,
+            rules: [
+              {
+                id: base.rule_id,
+                properties: { 'security-severity': score },
+              },
+            ],
+          },
+        },
+        results: [
+          {
+            ruleId: base.rule_id,
+            level,
+            locations: [{ physicalLocation: { artifactLocation: { uri } } }],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+test('SARIF security scores take precedence over diagnostic levels', () => {
+  for (const [level, score, expected] of [
+    ['warning', '9.8', 'critical'],
+    ['note', '8.2', 'high'],
+    ['error', '5.0', 'medium'],
+    ['warning', '2.0', 'low'],
+    ['warning', '0', 'info'],
+    ['warning', undefined, 'medium'],
+    ['error', null, 'high'],
+    ['warning', '', 'medium'],
+    ['error', 'invalid', 'high'],
+    ['error', '11', 'high'],
+    ['warning', '-1', 'medium'],
+  ]) {
+    const result = parseDocument(sarifDocument({ level, score }));
+    assert.equal(result.findings[0].severity, expected, `${level}/${score}`);
+  }
+});
+
+test('CSV and JSON severity names ignore surrounding whitespace and case', () => {
+  const csv = parseDocument(
+    'id,severity,rule,file\nD-1, high ,js/sql-injection,apps/example.js',
+    { source: 'daybreak' }
+  );
+  assert.equal(csv.findings[0].severity, 'high');
+  const json = parseDocument([{ ...base, severity: ' HIGH ' }]);
+  assert.equal(json.findings[0].severity, 'high');
+});
+
+test('literal JSON/CSV paths survive percent signs while SARIF URIs decode safely', () => {
+  const csv = parseDocument('id,rule,file\nD-1,js/sql-injection,apps/100%.js');
+  assert.equal(csv.findings[0].file, 'apps/100%.js');
+  for (const file of ['apps/100%.js', 'apps/literal%20name.js']) {
+    const result = parseDocument([{ ...base, file }]);
+    assert.equal(result.findings[0].file, file);
+    assert.deepEqual(result.warnings, []);
+  }
+  for (const [uri, expected] of [
+    ['file:///workspace/Jovie/apps/100%25.js', 'apps/100%.js'],
+    ['apps/a%20b.js', 'apps/a b.js'],
+    ['apps/100%.js', 'apps/100%.js'],
+    ['apps/%E0%A4%A.js', 'apps/%E0%A4%A.js'],
+  ]) {
+    const result = parseDocument(sarifDocument({ uri }));
+    assert.equal(result.findings[0].file, expected);
+  }
+  const jsonUri = parseDocument([
+    { rule_id: base.rule_id, location: { uri: 'apps/a%20b.js' } },
+  ]);
+  assert.equal(jsonUri.findings[0].file, 'apps/a b.js');
+});
+
+test('SARIF keeps CLI and cloud scanner provenance distinct', () => {
+  for (const [driver, expected] of [
+    ['codex-cli', 'codex-cli'],
+    ['Codex CLI', 'codex-cli'],
+    ['codexcli', 'codex-cli'],
+    ['codex-cloud', 'codex-cloud'],
+    ['Codex Cloud', 'codex-cloud'],
+    ['Codex', 'codex-cloud'],
+    ['Aardvark', 'codex-cli'],
+    ['CodeQL', 'codeql'],
+  ]) {
+    const result = parseDocument(sarifDocument({ driver }));
+    assert.equal(result.findings[0].source, expected, driver);
+  }
+});
+
+test('normalized findings without symbols or real line spans do not match', () => {
+  const [left, right] = parseDocument([
+    { ...base, symbol: null, id: 'one' },
+    { ...base, symbol: null, id: 'two' },
+  ]).findings;
+  assert.equal(left.start_line, null);
+  assert.equal(left.end_line, null);
+  assert.equal(sameFinding(left, right), false);
+  for (const invalid of [null, undefined, '', 0, -1, 1.5, 'unknown']) {
+    assert.equal(
+      sameFinding(
+        { ...left, start_line: invalid, end_line: invalid },
+        { ...right, start_line: invalid, end_line: invalid }
+      ),
+      false,
+      String(invalid)
+    );
+  }
+  assert.equal(
+    sameFinding({ ...left, start_line: 10 }, { ...right, end_line: 15 }),
+    true
+  );
+  assert.equal(
+    sameFinding({ ...left, symbol: 'GET' }, { ...right, symbol: 'GET' }),
+    true
+  );
+});
+
+test('OSV weekly baseline explicitly scans nested dependency sources', () => {
+  const workflow = parseYaml(
+    readFileSync(
+      new URL('../../.github/workflows/security.yml', import.meta.url),
+      'utf8'
+    )
+  );
+  const step = workflow.jobs.osv.steps.find(step =>
+    step.run?.includes('scan source')
+  );
+  assert.ok(step);
+  // v2.5.1 cmd/osv-scanner/scan/source/command.go defaults recursive=false.
+  const command = step.run
+    .split('\n')
+    .find(line => line.includes('./osv-scanner scan source'));
+  assert.match(command, /scan source\s+--recursive\s/);
+  assert.ok(command.includes('--no-ignore '));
+  assert.ok(
+    command.includes(
+      '--lockfile requirements.txt:.github/requirements/pytest.txt '
+    )
+  );
+  assert.match(command, /--format sarif --output-file osv\.sarif \.$/);
+  assert.match(step.run, /version=v2\.5\.1/);
+  assert.match(
+    step.run,
+    /sha=f9f25499a2c8cc367b3af45df2ea7eeca7fbccceab9c35079968f4b3652194be/
+  );
+  assert.match(step.run, /sha256sum -c -/);
+  assert.match(step.run, /if \[\[ "\$code" -gt 1 \]\]/);
+});
 
 test('keys are stable across scanners and line changes', () => {
   const expected = computeKey({
@@ -305,6 +461,144 @@ test('security gate is report-only until explicitly enabled', async () => {
     }).reason,
     'linear_unavailable'
   );
+});
+
+test('a bounded Linear inventory must finish pagination before passing', async () => {
+  for (const enabled of [true, false]) {
+    const cursors = [];
+    const decision = await runSecurityGate({
+      env: { LINEAR_API_KEY: 'test', SECURITY_GATE_ENABLED: String(enabled) },
+      changedFiles: [base.file],
+      prBody: '',
+      labels: [],
+      fetchImpl: async (_url, init) => {
+        cursors.push(JSON.parse(init.body).variables.after);
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              issues: {
+                nodes: [],
+                pageInfo: {
+                  hasNextPage: true,
+                  endCursor: `page-${cursors.length}`,
+                },
+              },
+            },
+          }),
+        };
+      },
+    });
+    assert.deepEqual(cursors, [null, 'page-1', 'page-2', 'page-3', 'page-4']);
+    assert.deepEqual(decision, {
+      status: enabled ? 'fail' : 'report-only',
+      reason: 'linear_unavailable',
+      blocking: [],
+      exitCode: enabled ? 1 : 0,
+    });
+  }
+});
+
+test('a complete fifth Linear page retains earlier blockers and can pass empty', async () => {
+  for (const includeBlocker of [true, false]) {
+    let page = 0;
+    const decision = await runSecurityGate({
+      env: { LINEAR_API_KEY: 'test', SECURITY_GATE_ENABLED: 'true' },
+      changedFiles: [base.file],
+      prBody: '',
+      labels: [],
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({
+          data: {
+            issues: {
+              nodes:
+                ++page === 1 && includeBlocker ? [securityIssue('JOV-9')] : [],
+              pageInfo: { hasNextPage: page < 5, endCursor: `page-${page}` },
+            },
+          },
+        }),
+      }),
+    });
+    assert.equal(page, 5);
+    assert.deepEqual(decision, {
+      status: includeBlocker ? 'fail' : 'pass',
+      blocking: includeBlocker ? ['JOV-9'] : [],
+      exitCode: includeBlocker ? 1 : 0,
+    });
+  }
+});
+
+test('missing or repeated Linear cursors cannot certify a complete inventory', async () => {
+  for (const endCursor of [null, 'repeated']) {
+    let calls = 0;
+    const decision = await runSecurityGate({
+      env: { LINEAR_API_KEY: 'test', SECURITY_GATE_ENABLED: 'true' },
+      changedFiles: [base.file],
+      prBody: '',
+      labels: [],
+      fetchImpl: async () => {
+        calls += 1;
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              issues: { nodes: [], pageInfo: { hasNextPage: true, endCursor } },
+            },
+          }),
+        };
+      },
+    });
+    assert.equal(calls, endCursor ? 2 : 1);
+    assert.equal(decision.status, 'fail');
+    assert.equal(decision.reason, 'linear_unavailable');
+    assert.equal(decision.exitCode, 1);
+  }
+});
+
+test('report-only unavailable evidence differs from a successful empty lookup', async () => {
+  const run = fetchImpl =>
+    runSecurityGate({
+      env: { LINEAR_API_KEY: 'test' },
+      changedFiles: [base.file],
+      prBody: '',
+      labels: [],
+      fetchImpl,
+    });
+  for (const response of [
+    { ok: false },
+    {
+      ok: true,
+      json: async () => ({ errors: [{ message: 'synthetic error' }] }),
+    },
+    { ok: true, json: async () => ({ data: { issues: null } }) },
+    { ok: true, json: async () => ({ data: { issues: { nodes: [] } } }) },
+  ]) {
+    const decision = await run(async () => response);
+    assert.deepEqual(decision, {
+      status: 'report-only',
+      reason: 'linear_unavailable',
+      blocking: [],
+      exitCode: 0,
+    });
+    assert.equal(
+      formatGateReport(decision),
+      'security-gate: report-only\nlinear_unavailable\nnone\n'
+    );
+  }
+  const offline = await run(async () => {
+    throw new Error('synthetic offline');
+  });
+  assert.equal(offline.reason, 'linear_unavailable');
+  assert.equal(offline.exitCode, 0);
+  const empty = await run(async () => ({
+    ok: true,
+    json: async () => ({
+      data: { issues: { nodes: [], pageInfo: { hasNextPage: false } } },
+    }),
+  }));
+  assert.deepEqual(empty, { status: 'report-only', blocking: [], exitCode: 0 });
+  assert.equal(formatGateReport(empty), 'security-gate: report-only\nnone\n');
 });
 
 test('a report-only merge group spends no GitHub or Linear read', async () => {

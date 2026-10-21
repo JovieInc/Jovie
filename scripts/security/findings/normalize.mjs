@@ -32,18 +32,23 @@ function numbers(value) {
 }
 
 function severity(value, score) {
-  const name = String(value ?? '').toLowerCase();
+  const name = String(value ?? '')
+    .trim()
+    .toLowerCase();
   if (SEVERITIES.has(name)) return name;
+  // SARIF diagnostic levels describe presentation, not security impact.
+  const numeric =
+    score == null || String(score).trim() === '' ? NaN : Number(score);
+  if (Number.isFinite(numeric) && numeric >= 0 && numeric <= 10) {
+    if (numeric >= 9) return 'critical';
+    if (numeric >= 7) return 'high';
+    if (numeric >= 4) return 'medium';
+    return numeric > 0 ? 'low' : 'info';
+  }
   if (name === 'error') return 'high';
   if (name === 'warning' || name === 'moderate') return 'medium';
   if (name === 'note' || name === 'none')
     return name === 'note' ? 'low' : 'info';
-  const numeric = Number(score);
-  if (Number.isFinite(numeric)) {
-    if (numeric >= 9) return 'critical';
-    if (numeric >= 7) return 'high';
-    if (numeric >= 4) return 'medium';
-  }
   return 'low';
 }
 
@@ -60,20 +65,31 @@ function status(value) {
 }
 
 function sourceFrom(name) {
-  const driver = String(name ?? '').toLowerCase();
+  const driver = String(name ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
   for (const source of SOURCES) {
-    if (driver.includes(source.replace('-cloud', '').replace('-', ''))) {
+    if (driver.includes(source.replaceAll('-', ''))) {
       return source;
     }
   }
-  if (driver.includes('aardvark') || driver.includes('codex'))
-    return 'codex-cli';
+  if (driver.includes('aardvark')) return 'codex-cli';
+  if (driver.includes('codex')) return 'codex-cloud';
   return null;
 }
 
-function pathFrom(value) {
+function pathFrom(value, isUri = false) {
   if (!value) return null;
-  let path = decodeURIComponent(String(value))
+  let path = String(value);
+  if (isUri) {
+    try {
+      path = decodeURIComponent(path);
+    } catch (error) {
+      if (!(error instanceof URIError)) throw error;
+      // Preserve malformed scanner URIs rather than dropping the document.
+    }
+  }
+  path = path
     .replace(/^file:\/\//, '')
     .replaceAll('\\', '/')
     .replace(/^\.\//, '');
@@ -160,7 +176,7 @@ function sarifFindings(document, options) {
           validated: properties.validated === true,
           rule_id: ruleId,
           cwe,
-          file: pathFrom(physical.artifactLocation?.uri),
+          file: pathFrom(physical.artifactLocation?.uri, true),
           start_line: region.startLine ?? null,
           end_line: region.endLine ?? region.startLine ?? null,
           symbol:
@@ -188,6 +204,7 @@ function codexFindings(document, options) {
     rows.map((entry, index) => {
       const location = entry.location ?? entry.locations?.[0] ?? {};
       const region = location.region ?? {};
+      const file = entry.file ?? entry.path ?? entry.file_path ?? location.path;
       return finding(options, {
         source: options.source ?? entry.source ?? 'codex-cloud',
         source_id:
@@ -198,13 +215,7 @@ function codexFindings(document, options) {
         validated: entry.validated === true || entry.validated === 'true',
         rule_id: entry.rule_id ?? entry.rule ?? null,
         cwe: numbers([entry.cwe, entry.cwes]),
-        file: pathFrom(
-          entry.file ??
-            entry.path ??
-            entry.file_path ??
-            location.path ??
-            location.uri
-        ),
+        file: file != null ? pathFrom(file) : pathFrom(location.uri, true),
         start_line: entry.start_line ?? entry.line ?? region.startLine ?? null,
         end_line: entry.end_line ?? region.endLine ?? entry.line ?? null,
         symbol: entry.symbol ?? entry.function ?? location.symbol ?? null,

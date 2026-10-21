@@ -97,9 +97,16 @@ export function computeKey(finding) {
 }
 
 function span(finding) {
+  if (finding?.start_line == null && finding?.end_line == null) return null;
   const start = Number(finding?.start_line ?? finding?.end_line);
   const end = Number(finding?.end_line ?? finding?.start_line);
-  if (!Number.isInteger(start) || !Number.isInteger(end)) return null;
+  if (
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start <= 0 ||
+    end <= 0
+  )
+    return null;
   return [Math.min(start, end), Math.max(start, end)];
 }
 

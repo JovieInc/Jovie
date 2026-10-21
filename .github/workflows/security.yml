@@ -118,7 +118,9 @@ jobs:
           echo "${sha}  osv-scanner" | sha256sum -c -
           chmod +x osv-scanner
           set +e
-          ./osv-scanner scan source --format sarif --output-file osv.sarif .
+          # This clean checkout has no installed dependencies. Include the
+          # tracked-but-ignored vendored lockfile and nonstandard requirements.
+          ./osv-scanner scan source --recursive --no-ignore --lockfile requirements.txt:.github/requirements/pytest.txt --format sarif --output-file osv.sarif .
           code=$?
           set -e
           if [[ "$code" -gt 1 ]]; then
