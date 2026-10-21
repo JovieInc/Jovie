@@ -7,6 +7,7 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -15,6 +16,12 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
+import {
+  expectedDesktopAssetNames,
+  isStagingAssetName,
+  parseLatestMacYaml,
+  validateReleaseEnvelope,
+} from './desktop-release-assets.mjs';
 
 const APPLICATIONS_DIR = '/Applications';
 export const DESKTOP_UPDATE_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
@@ -61,6 +68,15 @@ function isIsoTimestamp(value) {
   if (typeof value !== 'string' || value.length === 0) return false;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) && new Date(parsed).toISOString() === value;
+}
+
+// GitHub timestamps omit milliseconds; still reject date-only values and
+// calendar dates that Date.parse silently normalizes (for example February 30).
+function isReleaseTimestamp(value) {
+  return (
+    typeof value === 'string' &&
+    isIsoTimestamp(value.replace(/(T\d{2}:\d{2}:\d{2})Z$/, '$1.000Z'))
+  );
 }
 
 function isDesktopBuildIdentityRecord(value) {
@@ -273,6 +289,9 @@ export function readBundleShortVersion(appPath) {
  *   readonly installedVersion: string | null;
  *   readonly latestVersion: string | null;
  *   readonly latestPublishedAt: string | null;
+ *   readonly installedSourceRevision?: string | null;
+ *   readonly latestSourceRevision?: string | null;
+ *   readonly publicationIdentityVerified?: boolean;
  *   readonly now?: Date;
  *   readonly staleAfterMs?: number;
  * }} input
@@ -291,11 +310,13 @@ export function evaluateDesktopUpdateFreshness(input) {
       reason: `${channel}: latest shipped version is unknown.`,
     };
   }
-  if (installed === input.latestVersion) {
-    return { channel, status: 'current', red: false, reason: null };
-  }
   const publishedAt = new Date(input.latestPublishedAt);
-  if (Number.isNaN(publishedAt.getTime())) {
+  const now = input.now ?? new Date();
+  if (
+    !isReleaseTimestamp(input.latestPublishedAt) ||
+    !Number.isFinite(now.getTime()) ||
+    publishedAt > now
+  ) {
     return {
       channel,
       status: 'unknown',
@@ -303,13 +324,44 @@ export function evaluateDesktopUpdateFreshness(input) {
       reason: `${channel}: latest published_at is invalid.`,
     };
   }
-  const lagMs = (input.now ?? new Date()).getTime() - publishedAt.getTime();
+  if (
+    input.publicationIdentityVerified !== true ||
+    !['production', 'staging'].includes(channel) ||
+    !versionMatchesChannel(channel, input.latestVersion) ||
+    !FULL_SHA.test(input.installedSourceRevision ?? '') ||
+    !FULL_SHA.test(input.latestSourceRevision ?? '')
+  ) {
+    return {
+      channel,
+      status: 'unknown',
+      red: true,
+      reason: `${channel}: published assets/feed or exact source identity is unverified.`,
+    };
+  }
+  if (installed === input.latestVersion) {
+    if (input.installedSourceRevision !== input.latestSourceRevision) {
+      return {
+        channel,
+        status: 'identity-mismatch',
+        red: true,
+        reason: `${channel}: version matches but installed source differs from the published release.`,
+      };
+    }
+    return {
+      channel,
+      status: 'identity-matched',
+      red: false,
+      reason:
+        'Installed and published source identities match; binary integrity and running web lineage require separate receipts.',
+    };
+  }
+  const lagMs = now.getTime() - publishedAt.getTime();
   const staleAfterMs = input.staleAfterMs ?? DESKTOP_UPDATE_STALE_AFTER_MS;
   if (lagMs <= staleAfterMs) {
     return {
       channel,
       status: 'updating',
-      red: false,
+      red: true,
       reason: `${channel}: installed ${installed} is behind ${input.latestVersion} for less than 24h.`,
     };
   }
@@ -321,33 +373,139 @@ export function evaluateDesktopUpdateFreshness(input) {
   };
 }
 
-/** @returns {Promise<{ readonly name?: unknown; readonly published_at?: unknown; readonly updated_at?: unknown }>} */
-async function githubJson(url, fetchImpl = fetch) {
+function githubHeaders(accept) {
   const headers = {
-    Accept: 'application/vnd.github+json',
+    Accept: accept,
     'User-Agent': 'jovie-desktop-update-freshness',
   };
   const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
   if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+async function githubJson(url, fetchImpl = fetch) {
   const response = await fetchImpl(url, {
-    headers,
+    headers: githubHeaders('application/vnd.github+json'),
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new Error(`GitHub ${response.status} for ${url}`);
-  return /** @type {Promise<{ readonly name?: unknown; readonly published_at?: unknown; readonly updated_at?: unknown }>} */ (
-    response.json()
-  );
+  return response.json();
 }
 
-function shippedVersion(release, prefix, rolling = false) {
+async function shippedVersion(release, channel, fetchImpl) {
+  const rolling = channel === 'staging';
   const name = typeof release?.name === 'string' ? release.name : null;
   // GitHub preserves published_at when the rolling staging release is updated.
   // The current asset/feed generation is dated by updated_at instead.
   const publishedAt = rolling ? release?.updated_at : release?.published_at;
-  return {
-    version: prefix && name ? name.replace(prefix, '') : name,
+  const version =
+    rolling && name ? name.replace(/^Desktop staging\s+/i, '') : name;
+  const result = {
+    version,
     publishedAt: typeof publishedAt === 'string' ? publishedAt : null,
+    sourceRevision: release?.target_commitish ?? null,
+    publicationIdentityVerified: false,
+    publicationError: null,
   };
+  try {
+    if (
+      !isReleaseTimestamp(release?.published_at) ||
+      !isReleaseTimestamp(publishedAt) ||
+      Date.parse(release.published_at) > Date.parse(publishedAt)
+    ) {
+      throw new Error('Published release timestamps are invalid.');
+    }
+    if (!FULL_SHA.test(result.sourceRevision ?? '')) {
+      throw new Error('Published source revision is unavailable.');
+    }
+    validateReleaseEnvelope({
+      environment: channel,
+      release: { ...release, name: version },
+      releaseSha: result.sourceRevision,
+      version,
+      draft: false,
+    });
+    const names = expectedDesktopAssetNames(version, channel);
+    if (channel === 'production' && release.assets.length !== names.length) {
+      throw new Error(
+        'Production release must contain exactly five desktop assets.'
+      );
+    }
+    // Rolling staging retains prior channel generations for updater clients.
+    if (
+      channel === 'staging' &&
+      release.assets.some(asset => !isStagingAssetName(asset.name))
+    ) {
+      throw new Error('Staging release contains an unexpected asset.');
+    }
+    const assets = names.map(expected => {
+      const matches = release.assets.filter(asset => asset.name === expected);
+      if (
+        matches.length !== 1 ||
+        matches[0].state !== 'uploaded' ||
+        !Number.isSafeInteger(matches[0].size) ||
+        matches[0].size <= 0 ||
+        !/^sha256:[0-9a-f]{64}$/.test(matches[0].digest ?? '')
+      ) {
+        throw new Error(
+          `Published asset is missing or unverified: ${expected}`
+        );
+      }
+      return matches[0];
+    });
+    const feed = assets.find(asset => asset.name.endsWith('.yml'));
+    if (!Number.isSafeInteger(feed.id) || feed.id <= 0 || feed.size > 16_384) {
+      throw new Error('Published feed identity or size is invalid.');
+    }
+    const response = await fetchImpl(
+      `${GITHUB_API}/repos/${GITHUB_REPO}/releases/assets/${feed.id}`,
+      {
+        headers: githubHeaders('application/octet-stream'),
+        signal: AbortSignal.timeout(30_000),
+      }
+    );
+    if (!response.ok)
+      throw new Error(`Published feed returned ${response.status}.`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (
+      bytes.length !== feed.size ||
+      `sha256:${createHash('sha256').update(bytes).digest('hex')}` !==
+        feed.digest
+    ) {
+      throw new Error(
+        'Published feed digest or size differs from release metadata.'
+      );
+    }
+    const metadata = parseLatestMacYaml(bytes.toString('utf8'));
+    const zip = assets.find(asset => asset.name.endsWith('.zip'));
+    if (
+      metadata.version !== version ||
+      metadata.path !== zip.name ||
+      metadata.files.length !== 2 ||
+      !/^[A-Za-z0-9+/]{86}==$/.test(metadata.sha512 ?? '') ||
+      metadata.files.filter(
+        file => file.url === zip.name && file.sha512 === metadata.sha512
+      ).length !== 1 ||
+      ['.zip', '.dmg'].some(extension => {
+        const asset = assets.find(item => item.name.endsWith(extension));
+        const files = metadata.files.filter(file => file.url === asset.name);
+        return (
+          files.length !== 1 ||
+          Number(files[0].size) !== asset.size ||
+          !/^[A-Za-z0-9+/]{86}==$/.test(files[0].sha512 ?? '')
+        );
+      })
+    ) {
+      throw new Error(
+        'Published feed does not target the exact channel assets.'
+      );
+    }
+    result.publicationIdentityVerified = true;
+  } catch (error) {
+    result.publicationError =
+      error instanceof Error ? error.message : String(error);
+  }
+  return result;
 }
 
 export async function fetchShippedDesktopVersions(fetchImpl = fetch) {
@@ -360,8 +518,8 @@ export async function fetchShippedDesktopVersions(fetchImpl = fetch) {
     fetchImpl
   ).catch(() => null);
   return {
-    production: shippedVersion(production),
-    staging: shippedVersion(staging, /^Desktop staging\s+/i, true),
+    production: await shippedVersion(production, 'production', fetchImpl),
+    staging: await shippedVersion(staging, 'staging', fetchImpl),
   };
 }
 
@@ -564,12 +722,22 @@ async function maybeEvaluateFreshness(result) {
       bundle.identifier && KNOWN_DESKTOP_BUNDLE_IDS[bundle.identifier]?.role;
     if (role !== 'production' && role !== 'staging') return [];
     const latest = shipped[role];
+    const installedVersion =
+      readBundleShortVersion(bundle.path) || bundle.version;
     return [
       evaluateDesktopUpdateFreshness({
         channel: role,
-        installedVersion: readBundleShortVersion(bundle.path) || bundle.version,
+        installedVersion,
         latestVersion: latest.version,
         latestPublishedAt: latest.publishedAt,
+        installedSourceRevision:
+          bundle.buildIdentity?.channel === role &&
+          bundle.buildIdentity.version === installedVersion &&
+          buildIdentityHasReleaseProvenance(bundle.buildIdentity)
+            ? bundle.buildIdentity.sourceRevision
+            : null,
+        latestSourceRevision: latest.sourceRevision,
+        publicationIdentityVerified: latest.publicationIdentityVerified,
       }),
     ];
   });
