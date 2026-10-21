@@ -3,6 +3,12 @@ import { mkdirSync, mkdtempSync, renameSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { ApiError, createApiClient } from '../../packages/api-client/client.ts';
+import { FakeClock } from '../../packages/api-client/fake-provider.ts';
+import {
+  hashCredential,
+  MemoryLedgerStore,
+} from '../../packages/api-client/store.ts';
 import {
   aggregate,
   buildQuestions,
@@ -26,6 +32,17 @@ const PNG = Buffer.concat([
 ]);
 const tmp = () => mkdtempSync(join(tmpdir(), 'clef-eval-'));
 const auth = { accountId: 'acct', token: 'tok', source: 'test' };
+const clientFactory =
+  (store = new MemoryLedgerStore(), clock = new FakeClock()) =>
+  options =>
+    createApiClient({
+      ...options,
+      store,
+      now: clock.read,
+      sleep: clock.sleep,
+      random: () => 0.5,
+      log: () => {},
+    });
 const env = dir => ({ CLEF_EVAL_LEDGER: join(dir, 'ledger.jsonl') });
 const answers = (overrides = {}) =>
   Object.fromEntries(
@@ -214,6 +231,7 @@ test('callClef posts data URIs and maps errors without leaking bodies', async ()
   /** @type {any} */
   let seen;
   const ok = await callClef({
+    createClient: clientFactory(),
     auth,
     model: 'clef-flash',
     state: 's',
@@ -221,17 +239,14 @@ test('callClef posts data URIs and maps errors without leaking bodies', async ()
     images: [PNG],
     fetchImpl: async (url, init) => {
       seen = {
-        url,
+        url: String(url),
         body: JSON.parse(init.body),
-        auth: init.headers.Authorization,
+        auth: new Headers(init.headers).get('Authorization'),
       };
-      return {
-        ok: true,
-        json: async () => ({
-          success: true,
-          result: { answers: {}, usage: {} },
-        }),
-      };
+      return Response.json({
+        success: true,
+        result: { answers: {}, usage: {} },
+      });
     },
   });
   assert.deepEqual(ok, { answers: {}, usage: {} });
@@ -243,16 +258,17 @@ test('callClef posts data URIs and maps errors without leaking bodies', async ()
   assert.equal(seen.auth, 'Bearer tok');
   await assert.rejects(
     callClef({
+      createClient: clientFactory(),
       auth,
       model: 'clef',
       state: 's',
       questions: {},
       images: [PNG],
-      fetchImpl: async () => ({
-        ok: false,
-        status: 422,
-        json: async () => ({ success: false, errors: [{ code: 3030 }] }),
-      }),
+      fetchImpl: async () =>
+        Response.json(
+          { success: false, errors: [{ code: 3030 }] },
+          { status: 422 }
+        ),
     }),
     /workers-ai-error-3030/
   );
@@ -387,15 +403,13 @@ test('calls raise the connect attempt budget that caused "fetch failed" timeouts
   const net = await import('node:net');
   net.setDefaultAutoSelectFamilyAttemptTimeout(250);
   await callClef({
+    createClient: clientFactory(),
     auth,
     model: 'clef',
     state: 's',
     questions: {},
     images: [PNG],
-    fetchImpl: async () => ({
-      ok: true,
-      json: async () => ({ success: true, result: {} }),
-    }),
+    fetchImpl: async () => Response.json({ success: true, result: {} }),
   });
   assert.equal(
     net.getDefaultAutoSelectFamilyAttemptTimeout(),
@@ -404,4 +418,80 @@ test('calls raise the connect attempt budget that caused "fetch failed" timeouts
   net.setDefaultAutoSelectFamilyAttemptTimeout(10_000);
   ensureConnectAttemptBudget();
   assert.equal(net.getDefaultAutoSelectFamilyAttemptTimeout(), 10_000);
+});
+
+test('Cloudflare cooldown is shared across Clef calls without exposing the credential', async () => {
+  const store = new MemoryLedgerStore();
+  const clock = new FakeClock();
+  const createClient = clientFactory(store, clock);
+  let calls = 0;
+  const options = {
+    auth,
+    model: 'clef',
+    state: 's',
+    questions: {},
+    images: [PNG],
+    createClient,
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls === 1)
+        return Response.json(
+          { success: false },
+          { status: 429, headers: { 'retry-after': '60' } }
+        );
+      return Response.json({ success: true, result: { answers: {} } });
+    },
+  };
+  const deferred = error =>
+    error instanceof ApiError && error.retryAt > clock.now;
+  await assert.rejects(callClef(options), deferred);
+  await assert.rejects(callClef(options), deferred);
+  assert.equal(calls, 1);
+  const ledger = await store.read('cloudflare');
+  assert.deepEqual(Object.keys(ledger.credentials), [
+    hashCredential('cloudflare', auth.token),
+  ]);
+  clock.now += 60_001;
+  assert.deepEqual(await callClef(options), { answers: {} });
+  assert.equal(calls, 2);
+});
+
+test('Clef transport delegates one transient retry to the shared client', async () => {
+  const clock = new FakeClock();
+  const started = clock.now;
+  let calls = 0;
+  const result = await callClef({
+    auth,
+    model: 'clef',
+    state: 's',
+    questions: {},
+    images: [PNG],
+    createClient: clientFactory(new MemoryLedgerStore(), clock),
+    fetchImpl: async () => {
+      calls += 1;
+      return calls === 1
+        ? Response.json({ success: false }, { status: 503 })
+        : Response.json({ success: true, result: { answers: {} } });
+    },
+  });
+  assert.deepEqual(result, { answers: {} });
+  assert.equal(calls, 2);
+  assert.ok(clock.now > started, 'client applies its backoff before retrying');
+  let failures = 0;
+  await assert.rejects(
+    callClef({
+      auth,
+      model: 'clef',
+      state: 's',
+      questions: {},
+      images: [PNG],
+      createClient: clientFactory(),
+      fetchImpl: async () => {
+        failures += 1;
+        return Response.json({ success: false }, { status: 503 });
+      },
+    }),
+    error => error instanceof ApiError && error.kind === 'exhausted'
+  );
+  assert.equal(failures, 2, 'persistent errors stop after one transport retry');
 });

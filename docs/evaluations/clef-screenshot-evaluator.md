@@ -57,11 +57,18 @@ Otherwise the local `wrangler login` OAuth token, which needs the `ai:write`
 scope and is refreshed through `wrangler whoami` when it is near expiry. A
 run refreshes it before any call within two minutes of expiry, and retries
 once after a refresh when a call fails with an auth error or `fetch failed`.
-Calls also raise Node's per-address connect budget from 250 ms to 2.5 s. On
+Requests use the existing `packages/api-client` Cloudflare provider contract
+for shared credential budgets, cooldowns, circuit breakers and bounded transport
+retries (at most two attempts). Each attempt and any budget wait are bounded by
+20 seconds; rate-limit deferrals remain advisory provider errors. The endpoint
+origin comes from its provider registry. Calls also raise Node's per-address
+connect budget from 250 ms to 2.5 s. On
 this host, IPv6 is unavailable and the IPv4 handshake takes about 0.8 s, so the
 250 ms default made every request fail with `fetch failed` (ETIMEDOUT) even
-with a valid token. Failures still return `provider-error`; they never throw. Nothing
-is logged except token counts. Cost is about $0.002 per desktop+mobile view pair
+with a valid token. Failures still return `provider-error`; they never throw.
+The shared client logs breaker transitions with hashed credential labels;
+response bodies and credentials are never logged. Cost is about $0.002 per
+desktop+mobile view pair
 with `clef`. A daily cap (`CLEF_EVAL_DAILY_CAP_USD`, default $5) is enforced
 from `~/.cache/jovie/clef-screenshot-ledger.jsonl`.
 

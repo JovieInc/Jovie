@@ -19,6 +19,9 @@ import {
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createApiClient } from '../../packages/api-client/client.ts';
+import { providerSpec } from '../../packages/api-client/contract.ts';
+import { hashCredential } from '../../packages/api-client/store.ts';
 
 export const SCREENSHOT_EVAL_SCHEMA = 'clef-screenshot-eval/v1';
 export const DEFAULT_ACCOUNT_ID = 'fd8a6fcfa0ff0b708dbae942af18c49b';
@@ -318,9 +321,10 @@ export function ensureConnectAttemptBudget() {
 }
 
 /**
- * One Workers AI decision call. Zero retries; bounded by timeoutMs.
+ * One Workers AI decision request through the shared provider client.
+ * At most two transport attempts; waits and each attempt are bounded by timeoutMs.
  *
- * @param {{auth: {accountId: string, token: string}, model: string, state: string, questions: object, images: Buffer[], fetchImpl?: (url: string, init: any) => Promise<any>, timeoutMs?: number}} options
+ * @param {{auth: {accountId: string, token: string}, model: string, state: string, questions: object, images: Buffer[], fetchImpl?: (url: string, init: any) => Promise<any>, timeoutMs?: number, createClient?: typeof createApiClient}} options
  */
 export async function callClef({
   auth,
@@ -330,25 +334,40 @@ export async function callClef({
   images,
   fetchImpl = fetch,
   timeoutMs = 20_000,
+  createClient = createApiClient,
 }) {
   const id = CLEF_MODELS[model];
   if (!id) throw new Error(`unknown model: ${model}`);
   ensureConnectAttemptBudget();
-  const res = await fetchImpl(
-    `https://api.cloudflare.com/client/v4/accounts/${auth.accountId}/ai/run/${id}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${auth.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ state, questions, images: images.map(toDataUri) }),
-      signal: AbortSignal.timeout(timeoutMs),
-    }
-  );
+  const spec = providerSpec('cloudflare');
+  const client = createClient({
+    provider: 'cloudflare',
+    credential: hashCredential('cloudflare', auth.token),
+    authorize: headers => {
+      headers.set('Authorization', `Bearer ${auth.token}`);
+    },
+    fetch: fetchImpl,
+  });
+  const res = await client.request({
+    url: `https://${spec.hosts[0]}${spec.pathPrefix}accounts/${auth.accountId}/ai/run/${id}`,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: { state, questions, images: images.map(toDataUri) },
+    priority: 'default',
+    write: false,
+    idempotent: true,
+    maxAttempts: 2,
+    maxWaitMs: timeoutMs,
+    timeoutMs,
+  });
   /** @type {any} */
-  const body = await res.json().catch(() => null);
-  if (!res.ok || !body?.success) {
+  let body;
+  try {
+    body = res.json();
+  } catch {
+    body = null;
+  }
+  if (res.status < 200 || res.status >= 300 || !body?.success) {
     const code = body?.errors?.[0]?.code ?? res.status;
     throw new Error(`workers-ai-error-${code}`);
   }
