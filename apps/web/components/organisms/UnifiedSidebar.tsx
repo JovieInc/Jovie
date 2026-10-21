@@ -154,10 +154,6 @@ function OperatorNavSection({
           />
           {section.label}
         </button>
-      ) : section.label ? (
-        <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_LABEL)}>
-          {section.label}
-        </span>
       ) : null}
       <div id={groupId} hidden={!open}>
         <SettingsNavGroup

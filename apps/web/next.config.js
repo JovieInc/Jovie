@@ -503,6 +503,16 @@ const nextConfig = {
         source: '/app/admin/ingest',
         destination: '/app/ov/growth?view=ingest',
       },
+      // Needs You is retired into Home; keep both bookmark forms working.
+      // Home owns the authoritative admin and privacy-lock checks.
+      {
+        source: '/app/ov/needs-you',
+        destination: '/app/ov',
+      },
+      {
+        source: '/app/admin/needs-you',
+        destination: '/app/ov',
+      },
       {
         source: '/app/admin/:path*',
         destination: '/app/ov/:path*',
