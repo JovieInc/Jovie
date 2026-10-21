@@ -57,7 +57,12 @@ export function buildStageStrip(delivery: DeliverySummary): OvieStageStrip {
       id: 'flow:prod-lag',
       label: 'Prod Lag P95',
       value: formatDurationSeconds(flow.productionLagP95Seconds),
-      tone: flow.productionLagP95Seconds > 86_400 ? 'warn' : 'neutral',
+      // A regressed merged-to-verified SLO outranks the one-day warn.
+      tone: regressed.has('production_lag.merged_to_verified.p95')
+        ? 'bad'
+        : flow.productionLagP95Seconds > 86_400
+          ? 'warn'
+          : 'neutral',
     });
   if (regressed.size > 0)
     items.push({

@@ -72,6 +72,28 @@ describe('buildStageStrip', () => {
     expect(strip.coverage).toBe('14 of 31 stages measured');
   });
 
+  it('marks Prod Lag P95 bad when the merged-to-verified SLO regressed', () => {
+    const toneOf = (seconds: number) => {
+      const strip = buildStageStrip(
+        withLanes({
+          flow: {
+            ...FLOW,
+            productionLagP95Seconds: seconds,
+            regressions: [
+              ...FLOW.regressions,
+              'production_lag.merged_to_verified.p95',
+            ],
+          },
+        })
+      );
+      return strip.items.find(item => item.id === 'flow:prod-lag')?.tone;
+    };
+
+    // Under and over the one-day warn threshold both stay bad once regressed.
+    expect(toneOf(3600)).toBe('bad');
+    expect(toneOf(527997)).toBe('bad');
+  });
+
   it('falls back to the slowest stages when no span is published', () => {
     const strip = buildStageStrip(
       withLanes({ stageSummary: { ...SUMMARY, endToEnd7d: [] }, flow: null })

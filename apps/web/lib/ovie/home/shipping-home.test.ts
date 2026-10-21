@@ -440,7 +440,7 @@ describe('buildOvieAsks', () => {
   }
 
   it('badges escalated no-default cases and ignores anything else', () => {
-    const cases = [
+    const cases: readonly OvieInboxCase[] = [
       {
         ...inboxCase('late', 'needs_you'),
         escalation: { level: 2, waitingHours: 52.7 },
@@ -449,7 +449,10 @@ describe('buildOvieAsks', () => {
         ...inboxCase('fresh', 'needs_you'),
         escalation: { level: 0, waitingHours: 3 },
       },
-      { ...inboxCase('odd', 'needs_you'), escalation: { level: 'high' } },
+      {
+        ...inboxCase('odd', 'needs_you'),
+        escalation: { level: 'high' },
+      } as unknown as OvieInboxCase,
     ];
     const asks = buildOvieAsks({ issues: [], cases });
     expect(asks.map(ask => ask.escalation)).toEqual([
