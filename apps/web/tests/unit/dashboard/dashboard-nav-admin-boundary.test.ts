@@ -84,7 +84,7 @@ describe('exclusive customer vs OV navigation', () => {
       ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces').map(
         item => item.label
       )
-    ).toEqual(['Now', 'Growth', 'Product', 'Operations', 'Needs You']);
+    ).toEqual(['Home', 'Growth', 'Product', 'Operations', 'Needs You']);
     expect(
       ADMIN_NAV_REGISTRY.find(item => item.id === 'activity')
     ).toMatchObject({ label: 'Timeline', section: 'utilities' });
