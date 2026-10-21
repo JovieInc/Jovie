@@ -17,6 +17,7 @@
     {"id": "workflow:actions-cache-gc", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/actions-cache-gc.yml", "note": "Workflow header names TimWhite as accountable writer; the routine owner is the agent role here."},
     {"id": "workflow:agent-harness-health-report", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/agent-harness-health-report.yml"},
     {"id": "workflow:auto-ready-agent-drafts", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/auto-ready-agent-drafts.yml"},
+    {"id": "workflow:automation-liveness", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/automation-liveness.yml", "note": "Dead-man check over canon/automation-registry.jsonl; registry entry github:jovie:automation-liveness."},
     {"id": "workflow:canary-health-gate", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/canary-health-gate.yml"},
     {"id": "workflow:ci-duration-ratchet", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/ci-duration-ratchet.yml"},
     {"id": "workflow:ci-shard-contract-canary", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/ci-shard-contract-canary.yml"},
