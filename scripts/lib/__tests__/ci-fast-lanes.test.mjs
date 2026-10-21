@@ -60,7 +60,10 @@ it('selects writing readiness regressions and the evaluator coverage command', a
     process.env.CI_PRODUCT_LANES = 'operations';
     const commands = [];
     await runStructural({
-      changedFileList: ['scripts/invariants/jev-writing-readiness.mjs'],
+      changedFileList: [
+        'scripts/invariants/jev-revision-report.mjs',
+        'scripts/invariants/jev-writing-readiness.mjs',
+      ],
       stop: () => false,
       execute: command => {
         commands.push(command);
@@ -70,6 +73,11 @@ it('selects writing readiness regressions and the evaluator coverage command', a
     expect(
       commands.some(command =>
         command.includes('scripts/invariants/jev-writing-readiness.test.mjs')
+      )
+    ).toBe(true);
+    expect(
+      commands.some(command =>
+        command.includes('scripts/invariants/jev-revision-report.test.mjs')
       )
     ).toBe(true);
     expect(commands).toContain('pnpm invariants:check');
@@ -2091,16 +2099,18 @@ describe('source-read guard selection', () => {
     ['merge_group', []],
     ['push', []],
   ])(
-    'runs ci-schedule-inventory on %s when a workflow changes',
+    'runs ci-schedule-inventory and automation-registry on %s when a workflow changes',
     (event, pr) => {
       expect(
         selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
-      ).toEqual(['ci-schedule-inventory', ...pr]);
+      ).toEqual(['ci-schedule-inventory', 'automation-registry', ...pr]);
     }
   );
 
   it.each([
     ['scripts/lib/ci-schedule-inventory.mjs', ['ci-schedule-inventory']],
+    ['canon/automation-registry.jsonl', ['automation-registry']],
+    ['scripts/lanes/continuity_clock.py', ['automation-registry']],
     [
       'scripts/lib/__tests__/ci-schedule-inventory.test.mjs',
       ['ci-schedule-inventory'],
@@ -2225,6 +2235,19 @@ describe('source-read guard selection', () => {
     }
   });
 
+  it('runs native validation, compilation and regression tests on playbook-only changes', () => {
+    const path = 'docs/playbooks/growth-presence-repair-offer.playbook.md';
+    for (const event of ['pull_request', 'merge_group', 'push']) {
+      expect(selected(event, [path])).toContain('playbook-authoring');
+    }
+    const guard = SOURCE_GUARDS.find(
+      entry => entry.id === 'playbook-authoring'
+    );
+    expect(guard.command).toContain('playbooks:validate');
+    expect(guard.command).toContain('playbooks:compile');
+    expect(guard.command).not.toContain('--register');
+  });
+
   it('fails closed onto guards for manual, local, and unreadable diffs', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
@@ -2232,6 +2255,8 @@ describe('source-read guard selection', () => {
       'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
+      'automation-registry',
+      'playbook-authoring',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
     expect(selected('pull_request', null)).toEqual(all);
@@ -2240,6 +2265,8 @@ describe('source-read guard selection', () => {
       'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
+      'automation-registry',
+      'playbook-authoring',
     ]);
   });
 

@@ -19,6 +19,7 @@ import {
 import { captureError } from '@/lib/error-tracking';
 import { isHandleUniqueViolation } from '@/lib/errors/onboarding';
 import { isMusicfetchVendorUnavailable } from '@/lib/musicfetch/errors';
+import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import {
   type ClaimedOnboardingState,
   deriveClaimedOnboardingStateFromMessageRows,
@@ -431,7 +432,23 @@ async function persistClaimedProfileWithHandleRetry({
   throw new Error('Failed to claim onboarding profile handle after retries');
 }
 
-export async function materializeClaimedOnboardingProfile({
+export async function materializeClaimedOnboardingProfile(
+  input: MaterializeClaimedOnboardingProfileInput
+): Promise<MaterializeClaimedOnboardingProfileResult> {
+  try {
+    return await materializeProfile(input);
+  } catch (error) {
+    captureRevenueSpineFailure({
+      stage: 'profile_claim',
+      severity: 'blocked',
+      userId: input.userId,
+      error,
+    });
+    throw error;
+  }
+}
+
+async function materializeProfile({
   userId,
   conversationId,
   ipAddress,

@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
+import { existsSync, globSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
+import * as yaml from 'js-yaml';
+
+import { normalizeObservation } from '../idea-radar/idea-radar.mjs';
 import { requireIsoTimestamp } from '../summer-commissioning/receipt-trust.mjs';
 import { requiresOviCertification } from './capability-benchmark.mjs';
 
@@ -17,6 +22,48 @@ export const RECONCILIATION_DISPOSITIONS = Object.freeze(
     ' '
   )
 );
+export const STACK_CHANGE_TYPES = Object.freeze(
+  'breaking-migration capability-behavior-change deprecation-eol prerelease recommendation-change security-patch stable-feature-release'.split(
+    ' '
+  )
+);
+export const CAPABILITY_LIFECYCLE_ATTRIBUTES = Object.freeze(
+  'default-existing-apps default-new-apps deprecated experimental recommended removed stable'.split(
+    ' '
+  )
+);
+export const ADOPTION_COVERAGE_CLASSES = Object.freeze(
+  'blocked-deferred-valid-exception legitimately-inapplicable needs-migration unknown verified-aligned'.split(
+    ' '
+  )
+);
+
+const STACK_COMPONENTS = Object.freeze(
+  '@neondatabase/serverless @playwright/test @sentry/nextjs @tanstack/react-pacer @tanstack/react-query @tanstack/react-table @tanstack/react-virtual ai better-auth drizzle-orm next react react-dom stripe tailwindcss turbo vercel vitest'.split(
+    ' '
+  )
+);
+
+function officialSource(packageName) {
+  if (packageName.startsWith('@tanstack/')) return 'https://tanstack.com/blog';
+  if (packageName === 'next')
+    return 'https://github.com/vercel/next.js/releases';
+  return `https://www.npmjs.com/package/${packageName}?activeTab=versions`;
+}
+
+export const NEXT_CACHE_COMPONENTS_EXCEPTION = Object.freeze({
+  scope: 'apps/web Cache Components enablement',
+  blocker:
+    '245 route files export dynamic or revalidate, which must migrate before cacheComponents can build safely',
+  owner: 'web-platform',
+  lastTestedVersion: '16.4.0',
+  lastTestedAt: '2026-10-14T00:00:00.000Z',
+  nextAction:
+    'migrate route-segment exports by route family, then compare build, memory, initial JS, latency, and defects',
+  reviewAt: '2026-11-14T00:00:00.000Z',
+  reviewTrigger:
+    'legacy route-segment file count reaches zero or Next changes the migration contract',
+});
 const SCORE_FACTORS = new Set(
   'futureExpectedValue futureExpectedCost switchingCost strategicDifferentiation control securityPrivacy reliability performance reversibility migrationRisk'.split(
     ' '
@@ -33,6 +80,11 @@ function text(value, field) {
     throw new Error(`${field} must be non-empty text`);
   }
   return value.trim();
+}
+
+function requireFields(value, fields, label) {
+  for (const field of fields.split(' '))
+    text(value?.[field], `${label}.${field}`);
 }
 
 function normalized(value) {
@@ -98,6 +150,393 @@ export function capabilityEventFromEvidence(evidence, change) {
       class: event.class,
       capabilityIds: event.capabilityIds,
     }),
+  };
+}
+
+/** @typedef {string | { version?: string }} LockSpec */
+/** @typedef {Record<string, Record<string, LockSpec> | undefined>} DepBlock */
+/** @typedef {{ importers: Record<string, DepBlock> }} PnpmLock */
+
+function filesUnder(root, directory) {
+  const start = join(root, directory);
+  if (!existsSync(start)) return [];
+  return globSync('**/*.{cjs,js,json,mjs,ts,tsx}', {
+    cwd: start,
+    // Generated outputs are not source. CI writes coverage JSON under apps/
+    // while this scan runs, which flipped a same-source reuse to 'refreshed'.
+    exclude: [
+      '**/.next/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      '**/.turbo/**',
+      '**/test-results/**',
+      '**/playwright-report/**',
+    ],
+  })
+    .map(path => join(start, path))
+    .filter(path => statSync(path).isFile());
+}
+
+export function buildStackInventory(root, commitSha, priorInventory = null) {
+  text(commitSha, 'commitSha');
+  const lockText = readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8');
+  const lock = /** @type {PnpmLock} */ (yaml.load(lockText));
+  const rootPackageText = readFileSync(join(root, 'package.json'), 'utf8');
+  const rootPackage = JSON.parse(rootPackageText);
+  const manifests = [];
+  const rows = [];
+  for (const importer of Object.keys(lock.importers).sort()) {
+    const manifestPath = join(root, importer, 'package.json');
+    if (!existsSync(manifestPath)) continue;
+    const manifestText = readFileSync(manifestPath, 'utf8');
+    const manifest = JSON.parse(manifestText);
+    manifests.push([relative(root, manifestPath), manifestText]);
+    const declared = {
+      ...manifest.dependencies,
+      ...manifest.devDependencies,
+      ...manifest.optionalDependencies,
+    };
+    const locked = {
+      ...lock.importers[importer].dependencies,
+      ...lock.importers[importer].devDependencies,
+      ...lock.importers[importer].optionalDependencies,
+    };
+    const sources = filesUnder(root, importer).map(path => [
+      relative(root, path),
+      readFileSync(path, 'utf8'),
+    ]);
+    manifests.push(...sources);
+    for (const packageName of STACK_COMPONENTS) {
+      if (!declared[packageName]) continue;
+      const descriptor = locked[packageName];
+      const version =
+        typeof descriptor === 'string' ? descriptor : descriptor?.version;
+      const packagePattern = new RegExp(
+        `(?:from\\s*|import\\s*\\()['"]${packageName.replaceAll('/', '\\/')}(?:/|['"])`,
+        'u'
+      );
+      rows.push({
+        app: importer,
+        package: packageName,
+        owner: importer === '.' ? 'platform' : importer,
+        declaredRange: declared[packageName],
+        resolvedVersion: version?.split('(')[0] ?? null,
+        deployedVersion: null,
+        deploymentFreshness: 'unknown-until-runtime-receipt',
+        override: rootPackage.pnpm?.overrides?.[packageName] ?? null,
+        officialSource: officialSource(packageName),
+        supportedChannels:
+          'stable security-advisory prerelease-observe-only'.split(' '),
+        compatibilityConstraints: manifest.engines ?? rootPackage.engines ?? {},
+        usageFiles: sources
+          .filter(([, content]) => packagePattern.test(content))
+          .map(([path]) => path),
+      });
+    }
+  }
+  const configFiles = [
+    '.nvmrc',
+    'turbo.json',
+    ...globSync(
+      '{apps,packages,workers}/*/{next.config.js,next.config.mjs,vercel.json}',
+      { cwd: root }
+    ),
+  ].filter(path => existsSync(join(root, path)));
+  const sourceDigest = digest([
+    lockText,
+    rootPackageText,
+    manifests,
+    configFiles.map(path => [path, readFileSync(join(root, path), 'utf8')]),
+  ]);
+  return {
+    schema: 'jovie.stack-inventory/v1',
+    status:
+      priorInventory?.sourceDigest === sourceDigest ? 'reused' : 'refreshed',
+    commitSha,
+    sourceDigest,
+    rows,
+    toolchain: {
+      node: rootPackage.engines?.node ?? null,
+      packageManager: rootPackage.packageManager ?? null,
+      patches: rootPackage.pnpm?.patchedDependencies ?? {},
+      turbo: rootPackage.devDependencies?.turbo ?? null,
+    },
+    configFiles,
+  };
+}
+
+export function stackAdoptionCoverage(root) {
+  const surfaces = new Map();
+  const mark = (path, classification, evidence) => {
+    const id = relative(root, path);
+    const rank = ADOPTION_COVERAGE_CLASSES.indexOf(classification);
+    const previous = surfaces.get(id);
+    if (
+      !previous ||
+      rank < ADOPTION_COVERAGE_CLASSES.indexOf(previous.classification)
+    ) {
+      surfaces.set(id, { id, classification, evidence });
+    }
+  };
+  const config = join(root, 'apps/web/next.config.js');
+  const configText = readFileSync(config, 'utf8');
+  mark(
+    config,
+    /^\s*cacheComponents\s*:\s*true/mu.test(configText)
+      ? 'verified-aligned'
+      : 'blocked-deferred-valid-exception',
+    'effective Cache Components flag'
+  );
+  for (const path of [
+    ...filesUnder(root, 'apps/web/app'),
+    ...filesUnder(root, 'apps/web/lib'),
+  ]) {
+    if (/\.(?:stories|test)\.[^.]+$/u.test(path)) continue;
+    const content = readFileSync(path, 'utf8');
+    if (
+      /^\s*export const (?:dynamic|fetchCache|revalidate)\s*=/mu.test(content)
+    )
+      mark(path, 'needs-migration', 'legacy route-segment cache export');
+    if (/unstable_cache\s*\(/u.test(content))
+      mark(path, 'needs-migration', 'older Next cache substitute');
+    if (content.includes('@tanstack/react-query')) {
+      mark(
+        path,
+        /HydrationBoundary|\bdehydrate\s*\(/u.test(content)
+          ? 'unknown'
+          : 'verified-aligned',
+        'TanStack client state or hydration ownership'
+      );
+    }
+  }
+  const counts = Object.fromEntries(
+    ADOPTION_COVERAGE_CLASSES.map(classification => [
+      classification,
+      [...surfaces.values()].filter(
+        row => row.classification === classification
+      ).length,
+    ])
+  );
+  return {
+    denominator: surfaces.size,
+    counts,
+    surfaces: [...surfaces.values()],
+  };
+}
+
+function validateLifecycle(facts) {
+  for (const [index, fact] of (facts ?? []).entries()) {
+    if (!CAPABILITY_LIFECYCLE_ATTRIBUTES.includes(fact.attribute))
+      throw new Error(`lifecycle[${index}].attribute is invalid`);
+    requireFields(fact, 'scope evidenceUrl effectiveAt', `lifecycle[${index}]`);
+    if (fact.attribute === 'removed' && fact.explicit !== true)
+      throw new Error(
+        'removed lifecycle state requires explicit official evidence'
+      );
+  }
+}
+
+export function adaptStackDelta(delta, source, priorSourceKeys = [], nowUtc) {
+  if (source?.status !== 'ok') {
+    const delayHours = Math.min(24, 2 ** Math.max(0, source?.attempts ?? 0));
+    return {
+      status: 'stale',
+      freshness: 'unknown',
+      researchPerformed: false,
+      reason: text(source?.error, 'source.error'),
+      retryAt: new Date(Date.parse(nowUtc) + delayHours * 36e5).toISOString(),
+    };
+  }
+  if (!STACK_CHANGE_TYPES.includes(delta?.changeType))
+    throw new Error('unknown stack change type');
+  validateLifecycle(delta.lifecycle);
+  const sourceKey = digest([
+    text(delta.packageName, 'packageName'),
+    text(delta.externalId, 'externalId'),
+    text(source.revision, 'source.revision'),
+  ]);
+  if (priorSourceKeys.includes(sourceKey)) {
+    return { status: 'unchanged', sourceKey, researchPerformed: false };
+  }
+  const evidence = normalizeObservation({
+    problemOpportunity: delta.summary,
+    affectedUser: 'Jovie engineering and users of affected routes',
+    affectedCapability: delta.capabilityIds.join(', '),
+    sourceUrl: delta.sourceUrl,
+    sourceType: 'official-stack-release-or-guidance',
+    sourceItemId: `${delta.packageName}:${delta.externalId}:${source.revision}`,
+    observedAt: delta.observedAt,
+    accessConstraints: 'public official source',
+    freshness: delta.missedEvent ? 'recovered missed event' : 'event delivery',
+    engagementQuality: 1,
+    evidenceQuality: 'official primary source',
+    initialDemandEvidence:
+      'architecture maintenance signal; not customer demand',
+    uncertainty: delta.uncertainty ?? 'bounded by source scope',
+    cheapestValidationAction:
+      'inventory affected surfaces and run bounded checks',
+    capacityClass: 'maintenance-bounded',
+    revenuePathConflict: 'preemptible behind revenue-critical work',
+  });
+  const className =
+    {
+      'security-patch': 'policy-terms-security-or-privacy',
+      'deprecation-eol': 'deprecation',
+      'breaking-migration': 'protocol-or-platform',
+      prerelease: 'protocol-or-platform',
+    }[delta.changeType] ?? 'new-or-improved-capability';
+  const base = capabilityEventFromEvidence(evidence, {
+    provider: delta.packageName,
+    externalChangeId: `${delta.externalId}:${source.revision}`,
+    class: className,
+    capabilityIds: delta.capabilityIds,
+  });
+  const event = {
+    ...base,
+    changeType: delta.changeType,
+    lifecycle: delta.lifecycle,
+  };
+  event.digest = digest(event);
+  return {
+    status: 'changed',
+    discovery: delta.missedEvent ? 'catch-up' : 'process-now',
+    sourceKey,
+    sourceRevision: source.revision,
+    researchPerformed: true,
+    evidence,
+    event,
+  };
+}
+
+function validateException(exception, nowUtc) {
+  requireFields(
+    exception,
+    'scope blocker owner lastTestedVersion lastTestedAt nextAction reviewAt reviewTrigger',
+    'exception'
+  );
+  if (exception.reviewAt <= exception.lastTestedAt)
+    throw new Error('exception review must follow its last test');
+  return { ...exception, overdue: exception.reviewAt < nowUtc };
+}
+
+export function assessStackAdoption({
+  event,
+  inventory,
+  coverage,
+  decisions,
+  exception = null,
+  assessedAt,
+  verifiedAt = null,
+}) {
+  if (inventory?.commitSha == null || inventory?.sourceDigest == null)
+    throw new Error('commit-bound stack inventory is required');
+  if (
+    coverage.denominator !==
+    ADOPTION_COVERAGE_CLASSES.reduce(
+      (sum, classification) => sum + (coverage.counts[classification] ?? 0),
+      0
+    )
+  )
+    throw new Error('coverage denominator must account for every surface');
+  const byKind = new Map(decisions.map(decision => [decision.kind, decision]));
+  for (const kind of ['architecture', 'capability', 'upgrade']) {
+    const decision = byKind.get(kind);
+    if (!decision) throw new Error(`missing separate ${kind} decision`);
+    if (!RECONCILIATION_DISPOSITIONS.includes(decision.disposition))
+      throw new Error(`${kind} disposition is invalid`);
+    requireFields(
+      decision,
+      'owner confidence rationale evidence nextReevaluation',
+      kind
+    );
+    if (Object.values(decision.outcomes ?? {}).filter(Boolean).length < 5)
+      throw new Error(`${kind}.outcomes must cover maintenance trade-offs`);
+  }
+  const mature = event.lifecycle.some(fact =>
+    ['default-existing-apps', 'default-new-apps', 'recommended'].includes(
+      fact.attribute
+    )
+  );
+  const capabilityDecision = byKind.get('capability');
+  const checkedException =
+    exception == null ? null : validateException(exception, assessedAt);
+  if (
+    mature &&
+    coverage.counts['needs-migration'] > 0 &&
+    capabilityDecision.disposition !== 'ADOPT' &&
+    !checkedException
+  )
+    throw new Error(
+      'mature recommended capability requires adoption or a valid exception'
+    );
+  const observedMs = Date.parse(event.observedAt);
+  return {
+    schema: 'jovie.stack-adoption-assessment/v1',
+    eventId: event.id,
+    inventoryCommit: inventory.commitSha,
+    inventoryDigest: inventory.sourceDigest,
+    decisions: [...byKind.values()],
+    coverage,
+    exception: checkedException,
+    summerMetrics: {
+      freshness: 'current',
+      unreviewedMaterialChanges: 0,
+      releaseToDispositionMs: Date.parse(assessedAt) - observedMs,
+      releaseToVerifiedAdoptionMs: verifiedAt
+        ? Date.parse(verifiedAt) - observedMs
+        : null,
+      overdueDeferrals: checkedException?.overdue ? 1 : 0,
+    },
+  };
+}
+
+export function assertStackPatternRatchet(root, maximumLegacyFiles = 245) {
+  const config = readFileSync(join(root, 'apps/web/next.config.js'), 'utf8');
+  if (
+    /cacheComponents (?:disabled|removed) due to incompatibility with runtime=['"]nodejs/u.test(
+      config
+    )
+  )
+    throw new Error('retired Node.js Cache Components blocker was recreated');
+  const legacy = stackAdoptionCoverage(root).surfaces.filter(
+    surface => surface.evidence === 'legacy route-segment cache export'
+  );
+  if (legacy.length > maximumLegacyFiles)
+    throw new Error(`legacy Cache Components surface grew to ${legacy.length}`);
+  return { legacyFiles: legacy.length };
+}
+
+export function planStackCapabilityReconciliation(input) {
+  const source = adaptStackDelta(
+    input.delta,
+    input.source,
+    input.priorReceipts.map(receipt => receipt.sourceKey).filter(Boolean),
+    input.nowUtc
+  );
+  if (source.status !== 'changed') return source;
+  const coverage = stackAdoptionCoverage(input.root);
+  const assessment = assessStackAdoption({
+    event: source.event,
+    inventory: input.inventory,
+    coverage,
+    decisions: input.stackDecisions,
+    exception: input.exception,
+    assessedAt: input.nowUtc,
+    verifiedAt: input.verifiedAt,
+  });
+  const backlog = planCapabilityReconciliation({
+    ...input.reconciliation,
+    event: source.event,
+    priorReceipts: input.priorReceipts
+      .map(receipt => receipt.backlog)
+      .filter(Boolean),
+  });
+  return {
+    schema: 'jovie.stack-adoption-reconciliation/v1',
+    ...source,
+    inventory: input.inventory,
+    assessment,
+    backlog,
   };
 }
 

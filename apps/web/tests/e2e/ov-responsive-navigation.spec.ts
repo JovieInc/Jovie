@@ -181,7 +181,7 @@ test.describe('OV responsive navigation exclusivity', () => {
       );
 
       for (const destination of [
-        { label: 'OV', href: APP_ROUTES.ADMIN_CHAT },
+        { label: 'OV', href: APP_ROUTES.OV },
         { label: 'Jovie', href: APP_ROUTES.DASHBOARD },
       ]) {
         // An RSC fetch or changed URL alone does not prove the old server
@@ -260,8 +260,8 @@ test.describe('OV responsive navigation exclusivity', () => {
       test.setTimeout(180_000);
       await page.setViewportSize(viewport);
       await enterPersona(page, 'admin', APP_ROUTES.OV);
-      // /app/ov rewrites to /app/admin, which redirects to the HUD.
-      await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.HUD}/?$`));
+      // /app/ov is Ovie Home (founder decision 2026-10-20).
+      await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.OV}/?$`));
 
       const mobileNavigation = page.getByRole('navigation', {
         name: 'OV Mobile Navigation',

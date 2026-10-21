@@ -13,6 +13,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
+import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import { getOrCreateCustomer, stripe } from '../client';
 import { fetchUserBillingDataByAppId } from './queries';
 import { BILLING_FIELDS_CUSTOMER } from './types';
@@ -184,6 +185,12 @@ export async function ensureStripeCustomer(): Promise<{
       });
 
       if (!userResult.success || !userResult.data) {
+        captureRevenueSpineFailure({
+          stage: 'stripe_sync',
+          failureCode: 'billing_unavailable',
+          severity: 'blocked',
+          userId: appUserId,
+        });
         return {
           success: false,
           error: userResult.error ?? 'User not found in database',
@@ -282,6 +289,12 @@ export async function ensureStripeCustomer(): Promise<{
       return { success: true, customerId: customer.id };
     });
   } catch (error) {
+    captureRevenueSpineFailure({
+      stage: 'stripe_sync',
+      severity: 'blocked',
+      userId: resolvedAppUserId,
+      error,
+    });
     await captureCriticalError('Error ensuring Stripe customer', error, {
       function: 'ensureStripeCustomer',
       diagnostic: 'stripe_customer_ownership_unresolved',

@@ -257,9 +257,11 @@ refund events; separate from subscription and tip webhook secrets.
 ### `STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY`
 
 Required for new Artist Visibility Pro checkout. Set this to a distinct, active
-Stripe recurring price ID (`price_...`) for **USD 19900 cents every month** in the
-same Stripe account and mode as `STRIPE_SECRET_KEY`. Do not reuse an older Pro
-price ID or change existing subscribers' prices. Free profile and audience
+Stripe recurring price ID (`price_...`) for **USD 1200 cents every month** in the
+same Stripe account and mode as `STRIPE_SECRET_KEY`, with metadata
+`offer=artist_visibility_pro` and `decision=tim-2026-10-20-artist-profile-12`.
+Do not reuse an older Pro price ID or change existing subscribers' prices; the
+retired $199 prices are mapped as legacy in `lib/stripe/legacy-prices.ts`. Free profile and audience
 capture remain free; Enterprise contact sales goes to `support@jov.ie`.
 
 Provision the value through the supported Doppler/deployment environment path
@@ -271,8 +273,8 @@ a passing unit test or startup check is not live billing proof.
 ### `VISIBILITY_AUDIT_PAYMENT_LINK_URL`
 
 Optional public Stripe Payment Link (`https://buy.stripe.com/...`) for the
-one-off Digital Footprint & Visibility Audit. The price is $199 and is credited
-toward the first month of Artist Visibility Pro. This is not a secret and it is
+one-off Digital Footprint & Visibility Audit. The price is $199, a one-time
+purchase separate from the $12/month Artist Visibility Pro subscription. This is not a secret and it is
 not a Stripe price or product ID — do not create Stripe objects for it in app
 code.
 

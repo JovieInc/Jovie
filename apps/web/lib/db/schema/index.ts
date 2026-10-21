@@ -9,6 +9,8 @@
 export {
   type AcquisitionFirstTouch,
   type AcquisitionJourney,
+  type AcquisitionJourneyStage,
+  acquisitionJourneyStages,
   acquisitionJourneys,
   insertAcquisitionJourneySchema,
   type NewAcquisitionJourney,
@@ -564,12 +566,21 @@ export {
 } from './feature-flags';
 // Feedback
 export {
+  type FeedbackClassification,
+  type FeedbackDecisionKind,
+  type FeedbackDecisionRow,
+  type FeedbackDisposition,
   type FeedbackItem,
   type FeedbackVote,
+  feedbackClassificationEnumValues,
+  feedbackDecisionEnumValues,
+  feedbackDecisions,
+  feedbackDispositionEnumValues,
   feedbackItems,
   feedbackStatusEnumValues,
   feedbackVoteEnumValues,
   insertFeedbackItemSchema,
+  type NewFeedbackDecisionRow,
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';

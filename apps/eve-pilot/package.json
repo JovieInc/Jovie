@@ -22,7 +22,7 @@
   "dependencies": {
     "@opentelemetry/api": "1.9.1",
     "@vercel/blob": "2.8.2",
-    "ai": "7.0.140",
+    "ai": "7.0.144",
     "braintrust": "3.37.2",
     "eve": "0.72.1",
     "just-bash": "3.6.0",
@@ -31,10 +31,10 @@
   },
   "devDependencies": {
     "@types/node": "26.6.5",
-    "@vitest/coverage-v8": "5.0.4",
+    "@vitest/coverage-v8": "5.0.5",
     "typescript": "6.0.3",
     "vercel": "59.23.2",
-    "vitest": "5.0.4"
+    "vitest": "5.0.5"
   },
   "pnpm": {
     "patchedDependencies": {

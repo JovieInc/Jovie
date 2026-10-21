@@ -56,7 +56,7 @@ inactiveWorkflows:
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
 generatedAt: deterministic
-normalPrCheckRecords: 22
+normalPrCheckRecords: 23
 nodes:
   - name: Workflow Lint
     path: .github/workflows/actionlint.yml
@@ -318,7 +318,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:record-production-publish
-    jobCount: 4
+    jobCount: 6
   - name: Doc Gardening Agent
     path: .github/workflows/doc-gardening-agent.yml
     active: true
@@ -1188,7 +1188,7 @@ nodes:
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
-    jobCount: 5
+    jobCount: 6
   - name: Staging Controller
     path: .github/workflows/staging-controller.yml
     active: true
@@ -1202,6 +1202,18 @@ nodes:
       - workflow_run
     terminalReceipt: job:staging-result
     jobCount: 3
+  - name: Stale Branch Sweep
+    path: .github/workflows/stale-branch-sweep.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:sweep
+    jobCount: 1
   - name: Summer Eve identity check
     path: .github/workflows/summer-eve-pin.yml
     active: true

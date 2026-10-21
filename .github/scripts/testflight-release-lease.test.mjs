@@ -26,6 +26,11 @@ const NEXT = 'e'.repeat(40);
 const REPOSITORY = 'JovieInc/Jovie';
 const NOW = Date.parse('2026-10-16T08:00:00Z');
 
+// Shell date and the isolated CLI do not inherit the parent Node clock shim.
+function subprocessNow() {
+  return Number(execFileSync('date', ['+%s'], { encoding: 'utf8' })) * 1000;
+}
+
 function fixture() {
   const policy = JSON.parse(
     readFileSync(new URL('../testflight-release-policy.json', import.meta.url))
@@ -431,7 +436,7 @@ printf '%s\\n' '{"ok":true}'
   try {
     const within = command(['gh', 'api', 'repos/JovieInc/Jovie/commits/main'], {
       route: 'repos/JovieInc/Jovie/commits/main',
-      env: envFor(Math.floor(Date.now() / 1000) - 5),
+      env: envFor(Math.floor(subprocessNow() / 1000) - 5),
     });
     assert.equal(within.trim(), '{"ok":true}');
     rmSync(state, { force: true });
@@ -439,7 +444,7 @@ printf '%s\\n' '{"ok":true}'
       () =>
         command(['gh', 'api', 'repos/JovieInc/Jovie/commits/main'], {
           route: 'repos/JovieInc/Jovie/commits/main',
-          env: envFor(Math.floor(Date.now() / 1000) + 10000),
+          env: envFor(Math.floor(subprocessNow() / 1000) + 10000),
         }),
       error => {
         assert.match(error.message, /; rate limited: /);
@@ -947,7 +952,7 @@ test('shipped CLI uses real gh and unzip for admission and the final actual Git 
       encoding: 'utf8',
     }).trim();
     const f = fixture();
-    f.jobs[0].completed_at = new Date(Date.now() - 60000).toISOString();
+    f.jobs[0].completed_at = new Date(subprocessNow() - 60000).toISOString();
     const remap = value =>
       JSON.parse(
         JSON.stringify(value)

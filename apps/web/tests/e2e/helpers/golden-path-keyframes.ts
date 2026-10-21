@@ -28,6 +28,8 @@ export interface KeyframeRecord {
   readonly url: string;
   readonly file: string;
   readonly sha256: string;
+  /** Expected fixture identity, independent of the text rendered by the page. */
+  readonly expectedArtistName?: string;
   readonly audit: LayoutAudit;
   readonly pageErrors: readonly string[];
 }
@@ -252,7 +254,11 @@ export function watchKeyframeErrors(page: Page): void {
   if (process.env.GOLDEN_PATH_KEYFRAME_DIR) trackErrors(page);
 }
 
-export async function captureKeyframe(page: Page, id: string): Promise<void> {
+export async function captureKeyframe(
+  page: Page,
+  id: string,
+  context: Pick<KeyframeRecord, 'expectedArtistName'> = {}
+): Promise<void> {
   const dir = process.env.GOLDEN_PATH_KEYFRAME_DIR;
   if (!dir) return;
   mkdirSync(dir, { recursive: true });
@@ -278,6 +284,7 @@ export async function captureKeyframe(page: Page, id: string): Promise<void> {
     url: page.url(),
     file,
     sha256: createHash('sha256').update(image).digest('hex'),
+    expectedArtistName: context.expectedArtistName,
     audit: (await page.evaluate(LAYOUT_AUDIT_SOURCE)) as LayoutAudit,
     pageErrors: errors.splice(0),
   };

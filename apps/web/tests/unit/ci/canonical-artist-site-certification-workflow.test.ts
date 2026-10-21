@@ -23,6 +23,7 @@ const parsedCi = parseYaml(ci) as {
   jobs: Record<
     string,
     {
+      if?: string;
       'timeout-minutes'?: number;
       outputs?: { journey_outcome?: string; certification_outcome?: string };
       steps?: readonly {
@@ -169,6 +170,26 @@ node -e 'process.stdout.write(process.env.URL_ENCRYPTION_KEY)'`,
     expect(step('canonical_certification')?.['continue-on-error']).toBeFalsy();
     expect(step('canonical_certification')?.if).toBe(
       '${{ always() && !cancelled() }}'
+    );
+  });
+
+  it('still certifies when the shared database lane fails (JOV-8614)', () => {
+    const gate = parsedCi.jobs['ci-golden-path']?.if ?? '';
+    expect(gate).toContain('always()');
+    expect(gate).toContain('!cancelled()');
+    expect(gate).toContain("github.event_name == 'workflow_dispatch'");
+    expect(gate).toContain("needs.neon-db.result == 'success'");
+    expect(gate).toContain("needs.neon-db.result == 'failure'");
+    expect(gate).not.toContain("'merge_group'");
+    const report = ci.slice(
+      ci.indexOf('  ci-golden-path-report:'),
+      ci.indexOf('  ci-admin-smoke:')
+    );
+    expect(report).toContain(
+      'PRODUCER_RESULT: ${{ needs.ci-golden-path.result }}'
+    );
+    expect(report).toContain(
+      'PRODUCER_RESULT="$PRODUCER_RESULT" node scripts/canonical-artist-site-intake.mjs'
     );
   });
 });
