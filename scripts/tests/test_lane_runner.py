@@ -11667,10 +11667,32 @@ class OperatorInstallerGlueTest(unittest.TestCase):
                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
             return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
 
+        # Scope the scan to this test's own process subtree. CI's structural lane runs ~30
+        # commands at once; their non-dumpable children (chromium etc.) refuse environ and
+        # held this test at random (runs 39533866177, 39536019717). Production custody keeps
+        # scanning every same-UID process; this only stops foreign CI load reaching the fixture.
+        real_row, me = lane._selftest_process_row, os.getpid()
+
+        def own_subtree(pid):
+            for _ in range(64):
+                if pid == me:
+                    return True
+                try:
+                    pid = int((Path("/proc") / str(pid) / "stat").read_text().rsplit(")", 1)[1].split()[1])
+                except (OSError, ValueError, IndexError):
+                    return False
+                if pid <= 1:
+                    return False
+            return False
+
+        def scoped_row(entry, pid, uid):
+            return real_row(entry, pid, uid) if own_subtree(pid) else None
+
         try:
             with patch.object(lane, "mesh_dependency_roots", return_value=[self.host.repo]), \
                     patch.object(lane.worktree_pool, "node_env", return_value={"PATH": os.defpath}), \
                     patch.object(lane.lifecycle, "run", side_effect=run), \
+                    patch.object(lane, "_selftest_process_row", side_effect=scoped_row), \
                     contextlib.redirect_stderr(io.StringIO()) as console:
                 self.assertIsNone(lane.prove_staging(self.host, stage))
             self.assertEqual(len(spawned), 1)
