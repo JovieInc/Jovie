@@ -82,6 +82,7 @@ const STAGE_TIMINGS_PATH = resolve(
   REPO_ROOT,
   'docs/metrics/stage-timings-latest.json'
 );
+const API_CLIENT_CLI = resolve(REPO_ROOT, 'packages/api-client/cli.ts');
 const TIMELINE_PR_LIMIT = 80;
 const DEPLOYMENT_LIMIT = 60;
 
@@ -754,16 +755,20 @@ async function main() {
   if (!raw.stages && !hasArg(args, '--no-stages') && !inputPath)
     raw.stages = await collectStageRaw({
       gh: ghArgs =>
-        execFileSync('gh', ghArgs, {
-          encoding: 'utf8',
-          maxBuffer: 256 * 1024 * 1024,
-          env: {
-            ...process.env,
-            GH_PAGER: 'cat',
-            // Read-only token that also covers JovieInc/LogYourBody.
-            GH_TOKEN: process.env.STAGE_GH_TOKEN || process.env.GH_TOKEN,
-          },
-        }),
+        execFileSync(
+          process.execPath,
+          [API_CLIENT_CLI, 'gh', '--priority', 'report', '--', ...ghArgs],
+          {
+            encoding: 'utf8',
+            maxBuffer: 256 * 1024 * 1024,
+            env: {
+              ...process.env,
+              GH_PAGER: 'cat',
+              // Read-only token that also covers JovieInc/LogYourBody.
+              GH_TOKEN: process.env.STAGE_GH_TOKEN || process.env.GH_TOKEN,
+            },
+          }
+        ),
       manifest: stageManifest,
       repository: repo(),
       days: Number(argValue(args, '--stage-days', '29')),

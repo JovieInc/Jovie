@@ -1,3 +1,7 @@
+import {
+  createLinearClient,
+  LINEAR_API_URL,
+} from '../../packages/api-client/linear.ts';
 import { parseStageEventFeed } from './stage-events.mjs';
 
 const DAY_MS = 86_400_000;
@@ -252,21 +256,28 @@ const LINEAR_ISSUES = `query($numbers:[Float!]){issues(first:50,filter:{team:{ke
 /** Linear createdAt/startedAt/state history for JOV ids (needs a key). */
 export async function collectLinearIssues({ fetchImpl, apiKey, identifiers }) {
   const out = {};
+  const linear = createLinearClient({
+    identity: apiKey,
+    authorization: () => apiKey,
+    fetch: fetchImpl,
+  });
   const numbers = [
     ...new Set(identifiers.map(id => Number(id.split('-')[1]))),
   ].filter(Number.isFinite);
   for (let i = 0; i < numbers.length; i += 50) {
-    const response = await fetchImpl('https://api.linear.app/graphql', {
+    const response = await linear.client.request({
+      url: LINEAR_API_URL,
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: apiKey },
-      body: JSON.stringify({
+      body: {
         query: LINEAR_ISSUES,
         variables: { numbers: numbers.slice(i, i + 50) },
-      }),
-      signal: AbortSignal.timeout(20_000),
+      },
+      priority: 'report',
+      timeoutMs: 20_000,
     });
-    if (!response.ok) throw new Error(`Linear HTTP ${response.status}`);
-    const body = await response.json();
+    if (response.status < 200 || response.status >= 300)
+      throw new Error(`Linear HTTP ${response.status}`);
+    const body = JSON.parse(response.text);
     if (body.errors?.length)
       throw new Error(body.errors.map(e => e.message).join('; '));
     for (const node of body.data?.issues?.nodes ?? []) {

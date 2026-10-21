@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildReport, stageMarkdown } from '../../shipping-slo-report.mjs';
 import {
   attachRedPrSuites,
+  collectLinearIssues,
   collectMergedPrs,
   collectStageRaw,
   listWorkflowRuns,
@@ -205,6 +206,8 @@ describe('stage derivation from receipts', () => {
   });
 });
 describe('stage collector', () => {
+  beforeEach(() => vi.stubEnv('JOVIE_API_STATE', 'memory'));
+  afterEach(() => vi.unstubAllEnvs());
   it('parses NDJSON from streaming --jq filters', () => {
     expect(parseGhOutput('{"a":1}\n{"a":2}\n')).toEqual([{ a: 1 }, { a: 2 }]);
     expect(parseGhOutput('[1]')).toEqual([1]);
@@ -228,21 +231,17 @@ describe('stage collector', () => {
       return '[]';
     };
     const fetchImpl = async url => {
-      if (url.includes('linear'))
-        return {
-          ok: true,
-          json: async () =>
-            JSON.parse(
-              `{"data":{"issues":{"nodes":[{"identifier":"JOV-3","createdAt":${at(50)},"startedAt":${at(20)},"history":{"nodes":[]}}]}}}`
-            ),
-        };
-      return { ok: false, status: 404, text: async () => '' };
+      if (String(url).includes('linear'))
+        return Response.json(
+          JSON.parse(
+            `{"data":{"issues":{"nodes":[{"identifier":"JOV-3","createdAt":${at(50)},"startedAt":${at(20)},"history":{"nodes":[]}}]}}}`
+          )
+        );
+      return new Response('', { status: 404 });
     };
     const raw = await collectStageRaw({
       gh,
-      fetchImpl: /** @type {typeof fetch} */ (
-        /** @type {unknown} */ (fetchImpl)
-      ),
+      fetchImpl,
       env: { LINEAR_API_KEY: 'k' },
       manifest: MANIFEST,
       now: NOW,
@@ -267,6 +266,17 @@ describe('stage collector', () => {
     );
     // Three 3-day search chunks cover 7 days, plus one batched job lookup.
     expect(calls.filter(a => a[1] === 'graphql')).toHaveLength(4);
+  });
+  it('defers a rate-limited Linear read without spending retry budget', async () => {
+    const fetchImpl = vi.fn(async () => new Response('', { status: 429 }));
+    await expect(
+      collectLinearIssues({
+        fetchImpl,
+        apiKey: 'stage-collector-test',
+        identifiers: ['JOV-1'],
+      })
+    ).rejects.toMatchObject({ exitCode: 75 });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
   it('flags truncated PR timelines and commits', () => {
     const failures = [];
