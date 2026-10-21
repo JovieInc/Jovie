@@ -38,7 +38,7 @@ export function HomepageArtistHero({
         <div className='homepage-artist-hero__copy'>
           <h1
             id={headingId}
-            className='marketing-type-display text-primary-token homepage-artist-hero__headline'
+            className='marketing-type-display text-balance text-primary-token homepage-artist-hero__headline'
           >
             {copy.headline}
           </h1>
@@ -91,7 +91,7 @@ export function HomepageFanStates({
     >
       <h2
         id='homepage-fan-states-heading'
-        className='marketing-type-section text-primary-token homepage-artist-section__headline'
+        className='marketing-type-section text-balance text-primary-token homepage-artist-section__headline'
       >
         {copy.headline}
       </h2>
@@ -127,7 +127,7 @@ export function HomepageOfferClose({
       <div className='homepage-offer-close__copy'>
         <h2
           id='homepage-offer-heading'
-          className='marketing-type-section text-primary-token homepage-artist-section__headline'
+          className='marketing-type-section text-balance text-primary-token homepage-artist-section__headline'
         >
           {offer.headline}
         </h2>
