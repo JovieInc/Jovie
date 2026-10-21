@@ -53,6 +53,11 @@ class SessionTest(unittest.TestCase):
             finally:
                 events.append("unlock")
         commands = iter(ops or ["lock", "check", "done"])
+        # Wall time is frozen at NOW. A live monotonic clock lets a paused
+        # runner consume the 25s kernel fence until the exact 22s proof
+        # boundary fails closed. Callers that model elapsed time pass monotonic.
+        if monotonic is None:
+            monotonic = lambda: 1_000.0
         def read(timeout):
             events.append("control")
             self.assertGreaterEqual(timeout, 0)
@@ -127,7 +132,7 @@ class SessionTest(unittest.TestCase):
 
     def test_exact_proof_and_minimum_write_window_boundaries(self):
         code, rows, _ = self.run_session(seen=NOW - 38)
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 0, rows)
         self.assertEqual(rows[1]["expiresAt"], NOW + guard.MIN_WRITE_WINDOW_S)
         for age, reason in [(38.000001, "native-proof-write-window-too-short"),
                             (60, "native-proof-write-window-too-short"),
