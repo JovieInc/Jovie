@@ -85,6 +85,14 @@ export interface HomeLoopAsk {
   readonly decisionDefault: HomeLoopDecisionDefault | null;
   /** Post-ship feedback is accepted once the ask is decided. */
   readonly canFeedback: boolean;
+  /**
+   * A no-default decision that has waited too long: level 1 from 24h, level
+   * 2 from 48h. Home ranks it first and badges its age.
+   */
+  readonly escalation?: {
+    readonly level: 1 | 2;
+    readonly waitingHours: number;
+  } | null;
 }
 
 export interface HomeLoopDecisionDefault {
@@ -118,6 +126,17 @@ export interface HomeLoopLatencyRow {
   readonly p95: string;
   readonly samples: number;
   readonly regressed: boolean;
+}
+
+/**
+ * One entry of the stage-time strip under the pulse: an end-to-end span
+ * ("PR → merged 38m / 28h") or a flow p95. Values arrive formatted.
+ */
+export interface HomeLoopStripItem {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string;
+  readonly tone: HomeLoopTone;
 }
 
 /** Compact duration for seconds; unknown stays "Not measured". */

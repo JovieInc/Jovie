@@ -25,7 +25,8 @@ export const TASTE_GATE = Object.freeze({
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const SHA_REF = /^sha:([0-9a-f]{40})$/;
 const MAX_NOTE_LENGTH = 2000;
-const DAY_MS = 24 * 60 * 60 * 1000;
+/** Default-plus-deadline contract (canon/FLEET.md): 48 hours, then the default ships. */
+export const TASTE_DEFAULT_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 /** @param {unknown} value @returns {string} */
 function canonical(value) {
@@ -125,7 +126,10 @@ export function founderTasteOrder(input) {
     permittedActions: ['decide'],
     forbiddenActions: [],
     budget: {
-      deadline: new Date(Date.parse(input.now) + 7 * DAY_MS).toISOString(),
+      // Default-plus-deadline contract: taste never blocks Done for long.
+      deadline: new Date(
+        Date.parse(input.now) + TASTE_DEFAULT_WINDOW_MS
+      ).toISOString(),
       maxAttempts: 1,
       maxSpendUsd: 0,
       maxConcurrency: 1,
@@ -160,7 +164,12 @@ export function founderTasteOrder(input) {
           0,
           500
         ),
-      defaultIfSilent: null,
+      defaultIfSilent:
+        `Accept: the live build stays and ${identifier} moves to Done once every other receipt passes; post-ship feedback in Ovie files the revision.`.slice(
+          0,
+          300
+        ),
+      defaultDecision: 'approve',
       materialChange: null,
     },
     replyTo: { kind: 'linear-comment', ref: identifier },

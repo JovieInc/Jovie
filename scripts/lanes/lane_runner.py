@@ -4191,6 +4191,11 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
         if last.get("main") == main or publication_revocation(host, pr.get("headRefName")) \
                 or claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             continue
+        # A held PR (preservation hold, live repair) is not a revisit: it took one of the few
+        # per-pass slots and was ledgered as revisit-failed without any GitHub call (~334/day).
+        if not dependabot and pr.get("mergeStateStatus") != "DIRTY" and pr_events.maintenance_hold(
+                host, THIS, pr, now, terminal_ok=True):
+            continue
         if dependabot:
             action = "dependabot-recreate"
             result = sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG,
@@ -6069,7 +6074,8 @@ INTERRUPTED_VERDICTS = frozenset({"cancelled", "revoked", "reconcile-unavailable
 
 
 def _ended_on_its_own_terms(host: Host, run_id) -> bool:
-    """The preserved run finished (e.g. fix-no-change) instead of being interrupted: nobody
+    """The preserved run finished (e.g. fix-no-change), was revoked, or was cancelled because
+    its PR moved on (NEVER_RESUMED_CANCELS) instead of being interrupted for later resume: nobody
     will ever reconcile it, so waiting PRESERVED_ARCHIVE_AFTER_S only blocks the PR.
     2026-10-20 on Gem: 72 preserved-target-needs-reconciliation handoffs in 24h, mostly
     fix-no-change runs that left regenerated artifacts behind (PR #22420: screenshot PNGs)."""
@@ -6085,8 +6091,23 @@ def _ended_on_its_own_terms(host: Host, run_id) -> bool:
         except ValueError:
             continue
         if isinstance(row, dict) and row.get("runId") == run_id:
-            return bool(row.get("endedAt")) and row.get("verdict") not in INTERRUPTED_VERDICTS
+            if not row.get("endedAt"):
+                return False
+            verdict = row.get("verdict")
+            if verdict == "revoked":
+                return True  # its branch can never publish again
+            if verdict == "cancelled" and set(row.get("reasons") or []) & NEVER_RESUMED_CANCELS:
+                return True
+            return verdict not in INTERRUPTED_VERDICTS
     return False
+
+
+# A cancel for one of these reasons can never be resumed: the PR moved on (a new head, merged
+# or closed). 2026-10-21 on Gem, after #22430: most remaining 1-8/h
+# preserved-target-needs-reconciliation handoffs were target-head-superseded, waiting 6h for
+# nobody. target-pr-queued is NOT here: the head is unchanged and the work may resume if the
+# queue rejects the PR.
+NEVER_RESUMED_CANCELS = frozenset({"target-head-superseded", "target-pr-merged", "target-pr-closed"})
 
 
 def archive_unresumable_preserved(host: Host, path: Path, reason: str) -> str | None:

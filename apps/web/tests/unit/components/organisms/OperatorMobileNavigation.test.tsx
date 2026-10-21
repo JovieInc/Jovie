@@ -113,9 +113,6 @@ describe('OperatorMobileNavigation', () => {
     ).toHaveFocus();
 
     await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Needs You' })).toHaveFocus();
-
-    await user.tab();
     expect(within(menu).getByRole('link', { name: 'Ops' })).toHaveFocus();
 
     await user.tab();
