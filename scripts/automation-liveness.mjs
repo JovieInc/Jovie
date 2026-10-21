@@ -180,7 +180,7 @@ export async function observeProductionFreshness(
 /**
  * Merge-queue progress (2026-10-20: the queue stalled 39 min with no alarm,
  * JOV-8706). An empty queue is a fresh proof; otherwise the proof is the later
- * of the last commit on the branch and the oldest entry's enqueue time, so a
+ * of the last merged PR and the oldest entry's enqueue time, so a
  * non-empty queue that stops merging goes silent. Unreadable is silence.
  */
 export async function observeMergeQueueProgress(
@@ -190,7 +190,9 @@ export async function observeMergeQueueProgress(
   if (!token) return { ok: false, reason: 'merge-queue-token-missing' };
   const [owner, name] = String(receipt.repo).split('/');
   const branch = receipt.branch ?? 'main';
-  const query = `query($owner:String!,$name:String!,$branch:String!,$ref:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){entries(first:100){totalCount nodes{enqueuedAt}}} ref(qualifiedName:$ref){target{... on Commit{committedDate}}}}}`;
+  // Merge time comes from PR mergedAt: a queue-merged commit keeps the
+  // timestamp of its merge group, not of the merge itself.
+  const query = `query($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){entries(first:100){totalCount nodes{enqueuedAt}}} pullRequests(baseRefName:$branch,states:MERGED,first:10,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{mergedAt}}}}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let body;
@@ -204,7 +206,7 @@ export async function observeMergeQueueProgress(
       },
       body: JSON.stringify({
         query,
-        variables: { owner, name, branch, ref: `refs/heads/${branch}` },
+        variables: { owner, name, branch },
       }),
       signal: controller.signal,
     });
@@ -232,7 +234,10 @@ export async function observeMergeQueueProgress(
       lastProofAt: new Date(nowMs).toISOString(),
       reason: 'merge-queue-empty',
     };
-  const lastMerge = Date.parse(repo.ref?.target?.committedDate ?? '');
+  const merges = (repo.pullRequests?.nodes ?? [])
+    .map(node => Date.parse(node?.mergedAt ?? ''))
+    .filter(Number.isFinite);
+  const lastMerge = merges.length ? Math.max(...merges) : Number.NaN;
   const enqueued = (entries.nodes ?? [])
     .map(node => Date.parse(node?.enqueuedAt ?? ''))
     .filter(Number.isFinite);

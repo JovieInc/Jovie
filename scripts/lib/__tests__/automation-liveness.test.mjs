@@ -205,7 +205,8 @@ describe('dead-man liveness', () => {
   });
 
   // 2026-10-20 21:13-21:52Z: 10 entries sat AWAITING_CHECKS for 39 min and
-  // nothing alarmed (JOV-8706). Silence while the queue is non-empty is red.
+  // nothing alarmed (JOV-8706). Silence while the queue is non-empty is red;
+  // max silence 45 min = ~2x merge-group p95 (23.9 min, 48h to 2026-10-21).
   it('a non-empty merge queue that stops merging is silent; an empty queue is fresh', async () => {
     const queue = (totalCount, enqueuedMinutesAgo, mergedMinutesAgo) => ({
       data: {
@@ -216,7 +217,12 @@ describe('dead-man liveness', () => {
               nodes: enqueuedMinutesAgo.map(m => ({ enqueuedAt: iso(m) })),
             },
           },
-          ref: { target: { committedDate: iso(mergedMinutesAgo) } },
+          pullRequests: {
+            nodes: [
+              { mergedAt: iso(mergedMinutesAgo + 30) },
+              { mergedAt: iso(mergedMinutesAgo) },
+            ],
+          },
         },
       },
     });
@@ -229,9 +235,11 @@ describe('dead-man liveness', () => {
       }).then(({ report }) =>
         rowFor(report, 'github:jovie:merge-queue-progress')
       );
-    const stalled = await run(queue(10, [45, 40], 39));
+    const stalled = await run(queue(10, [60, 55], 50));
     expect(stalled.status).toBe('stale');
-    expect(stalled.ageMinutes).toBe(39);
+    expect(stalled.ageMinutes).toBe(50);
+    // One ejection rebuild (~p95 23 min) inside 45 min is normal operation.
+    expect((await run(queue(10, [60, 55], 39))).status).toBe('fresh');
     // A PR queued after a quiet stretch is not a stall yet.
     expect((await run(queue(1, [2], 300))).status).toBe('fresh');
     expect((await run(queue(0, [], 600))).status).toBe('fresh');
