@@ -534,6 +534,12 @@ describe('login timeout attribution', () => {
     '1) [chromium] › dashboard.spec.ts:10:1 › dashboard\nError: page.goto: Timeout 60000ms exceeded\n  47 [chromium] › auth-pages.spec.ts:20:1 › sign-in page',
     '1) [firefox] › resilience.spec.ts:300:1 › login retry\nError: page.goto: NS_BINDING_ABORTED\n  299 | await page.goto("/signin", { timeout: 60_000 });',
     '1) [chromium] › dashboard.spec.ts:10:1 › dashboard\nTest timeout of 90000ms exceeded\n2) [chromium] › signin.spec.ts:12:1 › sign-in\nError: expected heading',
+    '1) [firefox] › releases-dashboard.spec.ts:474:7 › release calendar\nError: expect(locator).toBeVisible() failed\nTimeout: 10000ms\n[275/477] (retries) [firefox] › resilience.spec.ts:300:7 › redirects to signin (retry #1)',
+    '1) [firefox] › dashboard.spec.ts:10:1 › dashboard\nTimeoutError: page.goto: Timeout 30000ms exceeded.\n[275/477] (retries) [setup] › auth.setup.ts:4:1 › authenticate',
+    '1) [firefox] › tipping.spec.ts:206:11 › displays QR code\nTimeoutError: locator.click: Timeout 30000ms exceeded.\n  2 failed\n    [firefox] › resilience.spec.ts:300:7 › redirects to signin',
+    '1) [firefox] › tipping.spec.ts:206:11 › displays QR code\nTimeoutError: locator.click: Timeout 30000ms exceeded.\n  2 failed\n    [setup] › auth.setup.ts:4:1 › authenticate',
+    '1) [firefox] › auth-pages.spec.ts:151:7 › /signin page › email query does not render credential fields\nError: expect(locator).toBeVisible() failed\nTimeout: 25000ms\nError Context: test-results/auth-pages-signin/error-context.md',
+    '1) [firefox] › auth.spec.ts:410:7 › signin to signup cross-link\nTimeoutError: locator.click: Timeout 30000ms exceeded.',
   ])(
     'does not pair another operation or source snippet with signin: %s',
     text => {
@@ -542,15 +548,65 @@ describe('login timeout attribution', () => {
       ).toBe('skip');
     }
   );
-  it('preserves actual authentication setup timeout evidence', () => {
+  it.each([
+    '1) [setup] › auth.setup.ts:4:1 › authenticate\nTest timeout of 90000ms exceeded',
+    '1) [firefox] › dashboard.spec.ts:10:1 › opens dashboard\nError: Test auth enter timed out waiting for /app|/start',
+    '1) [firefox] › login.spec.ts:10:1 › establishes a session\nError: Login timed out waiting for an authenticated session',
+    '1) [firefox] › dashboard.spec.ts:10:1 › opens dashboard\nError: Timed out waiting for login',
+    '1) [firefox] › dashboard.spec.ts:10:1 › opens dashboard\nTimeoutError: page.goto: Timeout 60000ms exceeded.\nCall log:\n  - navigating to "https://example.test/signin", waiting until "load"',
+    '1) [firefox] › dashboard.spec.ts:10:1 › opens dashboard\nError: expect.poll timed out\n    at waitForAuthenticatedHealth (tests/helpers/auth.ts:502:1)',
+  ])('preserves genuine setup or login-operation diagnostics: %s', text => {
     expect(
       decideLoginSignal({
         conclusion: 'failure',
-        evidenceText:
-          '1) [setup] › auth.setup.ts:4:1 › authenticate\nTest timeout of 90000ms exceeded',
+        evidenceText: text,
       }).action
     ).toBe('red');
   });
+
+  it.each([
+    ['auth-pages.spec.ts', '/signin page', 'timedOut', '', 'skip'],
+    [
+      'auth-pages.spec.ts',
+      '/signin page',
+      'failed',
+      'Error: expect(locator).toBeVisible() failed\nTimeout: 25000ms',
+      'skip',
+    ],
+    [
+      'dashboard.spec.ts',
+      'opens dashboard',
+      'failed',
+      'Error: expect.poll timed out\n    at signInUser (tests/helpers/auth.ts:562:1)',
+      'red',
+    ],
+    ['auth.setup.ts', 'authenticate', 'timedOut', '', 'red'],
+  ])(
+    'uses operation provenance in nested JSON reports: %s %s %s',
+    (file, title, status, message, action) => {
+      const report = {
+        suites: [
+          {
+            file,
+            suites: [
+              {
+                title: 'nested suite',
+                specs: [
+                  {
+                    title,
+                    tests: [{ results: [{ status, error: { message } }] }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      expect(decideLoginSignal({ conclusion: 'failure', report }).action).toBe(
+        action
+      );
+    }
+  );
 });
 
 describe('billing detector plans', () => {
