@@ -127,8 +127,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-21T19:20:24.872Z",
-    "gitSha": "07eb9bf8d20ef93bb586b9643b46211a6939758e",
+    "capturedAt": "2026-10-21T21:13:00.544Z",
+    "gitSha": "ceb7fa0314fb4be6af00745caafb1c198c001e61",
     "imagePath": "artist-profile-adaptive-section-desktop.png"
   },
   {
@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-21T19:21:43.615Z",
-    "gitSha": "07eb9bf8d20ef93bb586b9643b46211a6939758e",
+    "capturedAt": "2026-10-21T21:14:22.359Z",
+    "gitSha": "ceb7fa0314fb4be6af00745caafb1c198c001e61",
     "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-21T19:22:10.491Z",
-    "gitSha": "07eb9bf8d20ef93bb586b9643b46211a6939758e",
+    "capturedAt": "2026-10-21T21:14:50.202Z",
+    "gitSha": "ceb7fa0314fb4be6af00745caafb1c198c001e61",
     "imagePath": "artist-profile-spec-wall-section-desktop.png"
   },
   {
@@ -192,8 +192,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-21T19:22:36.854Z",
-    "gitSha": "07eb9bf8d20ef93bb586b9643b46211a6939758e",
+    "capturedAt": "2026-10-21T21:15:17.650Z",
+    "gitSha": "ceb7fa0314fb4be6af00745caafb1c198c001e61",
     "imagePath": "artist-profile-how-it-works-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-21T19:23:27.269Z",
-    "gitSha": "07eb9bf8d20ef93bb586b9643b46211a6939758e",
+    "capturedAt": "2026-10-21T21:16:09.511Z",
+    "gitSha": "ceb7fa0314fb4be6af00745caafb1c198c001e61",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -609,8 +609,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-10-21T19:25:17.816Z",
-    "gitSha": "07eb9bf8d20ef93bb586b9643b46211a6939758e",
+    "capturedAt": "2026-10-21T21:18:07.965Z",
+    "gitSha": "ceb7fa0314fb4be6af00745caafb1c198c001e61",
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
   },
@@ -626,8 +626,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-10-21T09:28:05.043Z",
-    "gitSha": "da9c2dfb90b2fe08dfc2bc8e44d915d6351c05bd",
+    "capturedAt": "2026-10-21T21:18:14.930Z",
+    "gitSha": "ceb7fa0314fb4be6af00745caafb1c198c001e61",
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
   },
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-10-21T19:25:44.096Z",
-    "gitSha": "07eb9bf8d20ef93bb586b9643b46211a6939758e",
+    "capturedAt": "2026-10-21T21:18:35.322Z",
+    "gitSha": "ceb7fa0314fb4be6af00745caafb1c198c001e61",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -694,8 +694,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-21T19:25:47.971Z",
-    "gitSha": "07eb9bf8d20ef93bb586b9643b46211a6939758e",
+    "capturedAt": "2026-10-21T21:18:39.268Z",
+    "gitSha": "ceb7fa0314fb4be6af00745caafb1c198c001e61",
     "imagePath": "dashboard-analytics-desktop.png"
   },
   {
@@ -742,8 +742,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-21T19:26:00.007Z",
-    "gitSha": "07eb9bf8d20ef93bb586b9643b46211a6939758e",
+    "capturedAt": "2026-10-21T21:18:51.414Z",
+    "gitSha": "ceb7fa0314fb4be6af00745caafb1c198c001e61",
     "imagePath": "settings-links-desktop.png"
   },
   {
