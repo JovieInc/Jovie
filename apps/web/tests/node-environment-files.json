@@ -306,6 +306,7 @@
   "scripts/performance-optimizer.test.ts",
   "scripts/performance-overnight.test.ts",
   "scripts/performance-route-resolvers.test.ts",
+  "scripts/performance-surface-comparator.test.ts",
   "scripts/png-optimization.test.ts",
   "scripts/public-route-qa-output.test.ts",
   "scripts/reconcile-vercel-build-env.test.ts",
