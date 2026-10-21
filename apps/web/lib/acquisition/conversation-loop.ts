@@ -144,13 +144,25 @@ export interface QualificationEvidenceRef {
   readonly dimension: MomTestDimension;
 }
 
+export interface CategorySpendEvidence {
+  readonly threadTurnId: string;
+  readonly category: string;
+  readonly payerId: string;
+  readonly amountMinor: number;
+  readonly currency: string;
+  readonly basis: 'reported' | 'verified';
+  /** Approved billing receipt pointer required for verified spend; never raw billing data. */
+  readonly verificationRef: string | null;
+}
+
 export interface QualificationInput {
   readonly answers: Partial<Record<MomTestDimension, string>>;
   readonly evidence: readonly QualificationEvidenceRef[];
   /** Concrete observed disqualifiers (no budget, no authority, wrong ICP). */
   readonly disqualifiers?: readonly string[];
-  /** Prospect stated a concrete current spend or paid alternative. */
+  /** Legacy compatibility input. It establishes neither spend proof nor offer intent. */
   readonly hasCurrentSpend: boolean;
+  readonly categorySpendEvidence?: readonly CategorySpendEvidence[];
   /** Prospect can authorize a purchase without another approver. */
   readonly hasAuthority: boolean;
   /** Urgency is time-bound (launch date, deadline), not vague interest. */
@@ -167,12 +179,17 @@ export type RecommendedNextAction =
 
 export interface QualificationReceipt {
   readonly contract: typeof CONVERSATION_LOOP_CONTRACT;
+  readonly policyVersion: 'conversation-qualification/2026-10-21';
   readonly coveredDimensions: readonly MomTestDimension[];
   readonly missingDimensions: readonly MomTestDimension[];
   readonly disqualifiers: readonly string[];
   readonly willingnessToPay: 'demonstrated' | 'stated' | 'unknown';
+  readonly categorySpend: {
+    readonly status: 'verified' | 'reported' | 'unknown';
+    readonly evidence: readonly CategorySpendEvidence[];
+  };
   readonly recommendedNextAction: RecommendedNextAction;
-  /** 0..1 heuristic confidence; evidence-backed coverage raises it. */
+  /** 0..1 answer/evidence coverage heuristic, never a purchase probability. */
   readonly confidence: number;
   readonly evidenceRefs: readonly QualificationEvidenceRef[];
 }
@@ -188,12 +205,31 @@ export function qualificationReceipt(
   );
   const disqualifiers = input.disqualifiers ?? [];
 
-  const willingnessToPay: QualificationReceipt['willingnessToPay'] =
-    input.hasCurrentSpend
-      ? 'demonstrated'
-      : covered.includes('spend')
-        ? 'stated'
-        : 'unknown';
+  const spendEvidence = (input.categorySpendEvidence ?? []).filter(
+    item =>
+      covered.includes('spend') &&
+      input.evidence.some(
+        ref =>
+          ref.dimension === 'spend' && ref.threadTurnId === item.threadTurnId
+      ) &&
+      item.category.trim().length > 0 &&
+      item.payerId.trim().length > 0 &&
+      Number.isSafeInteger(item.amountMinor) &&
+      item.amountMinor > 0 &&
+      /^[A-Z]{3}$/.test(item.currency) &&
+      (item.basis === 'reported' ||
+        (item.verificationRef?.trim().length ?? 0) > 0)
+  );
+  // Category spend is useful evidence, but says nothing about this Jovie offer.
+  // Legacy willingness values remain readable on historical receipts only.
+  const categorySpend: QualificationReceipt['categorySpend'] = {
+    status: spendEvidence.some(item => item.basis === 'verified')
+      ? 'verified'
+      : spendEvidence.length > 0
+        ? 'reported'
+        : 'unknown',
+    evidence: spendEvidence,
+  };
 
   const coverage = covered.length / MOM_TEST_DIMENSIONS.length;
   const evidenceBacked = new Set(input.evidence.map(e => e.dimension));
@@ -210,20 +246,19 @@ export function qualificationReceipt(
     recommendedNextAction = 'needs_you';
   } else if (missing.length > 0) {
     recommendedNextAction = 'request_evidence';
-  } else if (willingnessToPay === 'demonstrated' && input.hasConcreteUrgency) {
-    recommendedNextAction = 'commitment_payment';
-  } else if (willingnessToPay === 'demonstrated') {
-    recommendedNextAction = 'commitment_deposit';
   } else {
+    // Payment/deposit recommendations require the offer-bound job qualifier.
     recommendedNextAction = 'commitment_session';
   }
 
   return {
     contract: CONVERSATION_LOOP_CONTRACT,
+    policyVersion: 'conversation-qualification/2026-10-21',
     coveredDimensions: covered,
     missingDimensions: missing,
     disqualifiers,
-    willingnessToPay,
+    willingnessToPay: 'unknown',
+    categorySpend,
     recommendedNextAction,
     confidence,
     evidenceRefs: input.evidence,
@@ -263,9 +298,9 @@ export function selectCommitmentExperiment(
 ): CommitmentExperiment | null {
   switch (receipt.recommendedNextAction) {
     case 'commitment_payment':
-      return receipt.confidence >= 0.8 ? 'payment' : 'refundable_deposit';
     case 'commitment_deposit':
-      return 'refundable_deposit';
+      // Historical spend-based recommendations need offer-bound requalification.
+      return null;
     case 'commitment_session':
       return receipt.willingnessToPay === 'stated'
         ? 'setup_effort'

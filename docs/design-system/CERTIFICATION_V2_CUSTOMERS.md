@@ -128,25 +128,38 @@ drops the Linktree assumption: `linktree_handle` becomes nullable and
 
 ## 6. Ranking
 
-`rankCustomer` is a pure function. It returns `{ payScore, fitScore, rank, heldFor }`.
+The founder-approved JOV-6650 contract (2026-10-03) supersedes the original
+fixed-weight/payScore design. `qualifySupportedJob` and its pure `rankCustomer`
+projection in `lib/leads/job-qualification.ts` remain the ranking owner.
 
-- **payScore (0 to 1): willingness and ability to pay.** Inputs in order of
-  weight: demonstrated spend (`qualificationReceipt.willingnessToPay =
-  demonstrated`, `hasPaidTier`, paid music tools in `musicToolsDetected`, ad
-  pixels in `trackingPixelPlatforms`), then release cadence (`computePriorityScore`),
-  then stated spend.
-- **fitScore (0 to 1): fit with shipped capability.** The share of this
-  person's needs that map to FEATURE_REGISTRY IDs whose product subject is
-  `monitored`. Needs are inferred from the scrape (has Spotify, so smart links;
-  has YouTube, so thumbnails) and later from the Mom Test.
-- **Fit gate.** Every `must-sell` need must map to a monitored capability.
-  Otherwise `heldFor` lists the missing IDs and the lead is held.
-- **rank** = payScore x fitScore, among fit leads only. It orders the
-  `building` queue and the Ovie table.
+- Qualify a buyer acting for a represented entity, supported job, capability
+  version, exact offer/version, price/currency/cadence, and decision window.
+  Commercial readiness needs fresh, noncontradictory, scoped budget, authority,
+  and offer-commitment evidence. Tool facts cannot supply those claims.
+- Every explicit `must-sell` need must map to an existing product subject at
+  `monitored` for the capability version. Otherwise `heldFor` names its feature
+  IDs and `rank` is null. `fitScore` is capability coverage, never payment probability.
+- Initially `rank` is an ordinal band: 2 for a ready commitment with a deadline
+  in the decision window, 1 for ready without one, null for research/held/blocked.
+  Unknown costs and action budgets hold ranking. Research caps apply when
+  decision-changing evidence is missing; an already-supported decision needs
+  no further research.
+  Recommendations retain Tim's outbound approval requirement.
+- `payScore` is null. The historical weights (1.0 demonstrated, 0.5 cadence,
+  0.25 stated) are exported only for compatibility; they do not rank buyers.
+  Branding, pixels, badges, tools, paid access, and release cadence establish
+  neither spend nor willingness for a Jovie offer.
+- Conversation receipts keep explicit reported/verified category spend separate
+  from offer intent. `hasCurrentSpend` and answer coverage cannot justify a
+  payment/deposit recommendation. Public-only projections lack private facts
+  and remain review-needed.
 
-Ship now: fixed weights (demonstrated 1.0, cadence 0.5, stated 0.25).
-Re-evaluate when: 50 prospects have reached `converted` or were explicitly lost.
-Then: fit the weights to conversion and record the change as a rubric version.
+Ship now: evidence semantics and deterministic bands, without external actions.
+Re-evaluate when: authorized replay, bounded cohort, and time-frozen outcome/cost
+receipts exist under JOV-6650, JOV-1875, JOV-5243 and JOV-1879.
+Then: compare interpretable challengers using observed outcomes and uncertainty.
+Source/unit fixtures do not prove deployed behavior, commercial lift, or Ovie
+integration; those commissioning obligations remain open under JOV-6650.
 
 ## 7. Outbound policy
 
