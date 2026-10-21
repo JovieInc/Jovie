@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -7,6 +7,7 @@ import {
   isTimestampAfter,
   readThreadReadState,
   type SidebarThread,
+  SidebarThreadRow,
   SidebarThreadsSection,
   THREAD_READ_STORAGE_KEY,
   toSidebarThread,
@@ -523,4 +524,116 @@ describe('founder-locked calm sidebar history', () => {
     expect(formatSidebarThreadTime('2026-09-11T10:00:00', now)).toBe('Fri');
     expect(formatSidebarThreadTime('2026-03-04T10:00:00', now)).toBe('Mar 4');
   });
+});
+
+describe('chat title tooltip eligibility', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('omits a readable full-width title hint and opens a clipped title below the list', () => {
+    let width = 300;
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(
+      () => width
+    );
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(200);
+    let resize = () => {};
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(private callback: () => void) {}
+        observe(target: Element) {
+          if (target.classList.contains('text-ellipsis'))
+            resize = this.callback;
+        }
+        disconnect() {}
+      }
+    );
+    render(
+      <SidebarThreadRow thread={threads[1]} active={false} unread={false} />
+    );
+    const row = screen.getByRole('link', { name: 'Pitch tasks' });
+    fireEvent.focus(row);
+    expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+    fireEvent.blur(row);
+    width = 100;
+    act(() => resize());
+    fireEvent.focus(row);
+    expect(screen.getByTestId('tooltip-content')).toHaveAttribute(
+      'data-side',
+      'bottom'
+    );
+    expect(screen.getByTestId('tooltip-content')).toHaveAttribute(
+      'data-align',
+      'start'
+    );
+    width = 300;
+    act(() => resize());
+    expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+    width = 100;
+    act(() => resize());
+    expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+    fireEvent.blur(row);
+    fireEvent.focus(row);
+    expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
+  });
+
+  it('remeasures the same title when unread typography changes and retains sidebar placement', () => {
+    let textWidth = 90;
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(100);
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(
+      () => textWidth
+    );
+    const view = (unread: boolean) => (
+      <div data-sidebar='sidebar'>
+        <SidebarThreadRow thread={threads[1]} active={false} unread={unread} />
+      </div>
+    );
+    const { rerender } = render(view(false));
+    const row = screen.getByRole('link', { name: 'Pitch tasks' });
+    fireEvent.focus(row);
+    expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+    fireEvent.blur(row);
+    textWidth = 120;
+    rerender(view(true));
+    fireEvent.focus(row);
+    expect(screen.getByTestId('tooltip-content')).toHaveAttribute(
+      'data-side',
+      'right'
+    );
+    textWidth = 90;
+    rerender(view(false));
+    expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+  });
+});
+
+it('remeasures title text after font loading and window resize', () => {
+  let textWidth = 90;
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(100);
+  vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(
+    () => textWidth
+  );
+  const fonts = new EventTarget();
+  Object.defineProperty(fonts, 'ready', { value: Promise.resolve() });
+  const originalFonts = Object.getOwnPropertyDescriptor(document, 'fonts');
+  Object.defineProperty(document, 'fonts', {
+    configurable: true,
+    value: fonts,
+  });
+  const { unmount } = render(
+    <SidebarThreadRow thread={threads[1]} active={false} unread={false} />
+  );
+  const row = screen.getByRole('link', { name: 'Pitch tasks' });
+  textWidth = 150;
+  act(() => fonts.dispatchEvent(new Event('loadingdone')));
+  fireEvent.focus(row);
+  expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
+  textWidth = 90;
+  act(() => globalThis.dispatchEvent(new Event('resize')));
+  expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+  unmount();
+  if (originalFonts) Object.defineProperty(document, 'fonts', originalFonts);
+  else Reflect.deleteProperty(document, 'fonts');
+  vi.restoreAllMocks();
 });

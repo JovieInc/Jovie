@@ -242,6 +242,22 @@ Read [the app ia & page scaffold reference](docs/design-system/DETAILS.md#app-ia
 
 Read [the component patterns reference](docs/design-system/DETAILS.md#component-patterns) when changing this area.
 
+### Tooltip eligibility and input
+
+A tooltip supplies a hidden label, an actionable explanation, or a shortcut.
+Do not repeat an already readable row title. Recheck rendered title overflow
+when its container, fonts, title or typography changes, and close a hint that
+becomes ineligible. List hints open below/start; sidebar hints retain their seam.
+Mouse and hardware-keyboard hints remain available on hybrid devices. Actual
+touch activates the control first and leaves no sticky hint. Essential actions
+remain visible for coarse/no-hover input.
+
+An open interactive menu belongs to its rail through the trigger's ARIA control
+relationship, including nested portals. Retain that rail's presentation until
+dismissal or detachment, without changing persisted pin intent. Unrelated
+portals and the opposite rail do not acquire ownership. Existing warm traversal,
+delays, dismissal, focus restoration and rail geometry remain canonical.
+
 ### Sidebar (App Shell)
 
 Founder lock 2026-09-12, Pen `OqZTF`: combined search/inbox/new-chat bar;
