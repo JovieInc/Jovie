@@ -187,9 +187,9 @@ test.describe('Ovie CEO metric stability', () => {
     });
 
     await page.goto(
-      `/api/dev/test-auth/enter?persona=admin&redirect=${encodeURIComponent(APP_ROUTES.HUD)}`
+      `/api/dev/test-auth/enter?persona=admin&redirect=${encodeURIComponent(APP_ROUTES.ADMIN_OPS)}`
     );
-    await page.waitForURL(/\/hud(?:\?|$)/, { timeout: 30_000 });
+    await page.waitForURL(/\/app\/ov\/ops(?:\?|$)/, { timeout: 30_000 });
 
     const company = page.getByTestId('ovie-core-metric-company-survival');
     const nextMetric = page.getByTestId('ovie-core-metric-primary-outcome');
@@ -216,8 +216,8 @@ test.describe('App-shell scroll-pane regression', () => {
   const adminRoutes = [
     {
       label: 'admin ops',
-      bypass: `/api/dev/test-auth/enter?persona=admin&redirect=${APP_ROUTES.HUD}`,
-      expectedPath: /\/hud(?:\?|$)/,
+      bypass: `/api/dev/test-auth/enter?persona=admin&redirect=${APP_ROUTES.ADMIN_OPS}`,
+      expectedPath: /\/app\/ov\/ops(?:\?|$)/,
       scrollSelector: '[data-testid="hud-admin-page"]',
     },
     {

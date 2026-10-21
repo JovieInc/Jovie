@@ -453,6 +453,55 @@ class SelectionTest(unittest.TestCase):
                 task.description = description
                 self.assertIsNone(lane.pick_issue([task], {}, provider="codex"))
 
+    def reviewed(self, issue_, reviewer="claude-code lanes agent", text_of=None):
+        digest = lane.issue_text_digest(text_of or issue_)
+        receipt = {"sha256": digest, "reviewer": reviewer, "at": "2026-10-20",
+                   "reason": "product feature that builds revoke controls; no live credential is touched"}
+        return f"Reviewed.\n<!-- sensitive-text-reviewed:v1 {json.dumps(receipt)} -->"
+
+    def test_a_reviewed_false_positive_is_released_only_with_label_and_bound_receipt(self):
+        task = issue("JOV-6597", labels=["agent-ready"])
+        task.title = "Minimize OAuth scopes and add connected-account token hygiene"
+        task.description = "Encrypt refresh tokens, show connected apps/accounts with revoke controls."
+        self.assertTrue(lane.issue_hits_red_line(task))
+        receipt = [self.reviewed(task)]
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=receipt) as reader:
+            self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")  # receipt alone
+            reader.assert_not_called()
+            task.labels.append("sensitive-text-reviewed")
+            self.assertIsNone(lane.admission_rejection(task, {}, 0))  # label + bound receipt
+        for bodies in ([], None, ["<!-- sensitive-text-reviewed:v1 {not json} -->"],
+                       [self.reviewed(task, reviewer=" ")]):
+            with self.subTest(bodies=bodies), patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=bodies):
+                self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", side_effect=RuntimeError("linear down")):
+            self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")
+
+    def test_an_edit_after_review_voids_the_receipt(self):
+        task = issue("JOV-6866", labels=["agent-ready", "sensitive-text-reviewed"])
+        task.title = "Agent auth: JOVIE_API_KEY"
+        task.description = "A settings UI to mint/revoke. Keys lift the anonymous rate limit."
+        receipt = [self.reviewed(task)]
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=receipt):
+            self.assertIsNone(lane.admission_rejection(task, {}, 0))
+            task.description += "\nAlso revoke production API keys."
+            self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")
+            task.title = "Agent auth: JOVIE_API_KEY (edited)"
+            self.assertEqual(lane.admission_rejection(task, {}, 0), "sensitive-text")
+
+    def test_unreviewed_true_positives_and_the_pricing_comparison_stay_held(self):
+        held = self.pricing_comparison_issue()  # JOV-7863 per #22106: no review
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=[]):
+            self.assertEqual(lane.admission_rejection(held, {}, 0), "sensitive-text")
+        secret = issue("JOV-7390", labels=["sensitive-text-reviewed"])
+        secret.title = "Provision SUMMER_COMPOSIO_API_KEY"
+        secret.description = "Do not rotate or touch any other secrets."
+        other = issue("JOV-6597")
+        other.title, other.description = "Other issue", "revoke controls for tokens"
+        # A receipt bound to another issue's text never releases this one.
+        with patch.object(lane, "SENSITIVE_REVIEW_READER", return_value=[self.reviewed(other)]):
+            self.assertEqual(lane.admission_rejection(secret, {}, 0), "sensitive-text")
+
     def test_plural_production_prices_are_held(self):
         task = issue("JOV-9", labels=["agent-ready"])
         task.title = "Update annual plan"
@@ -5540,6 +5589,8 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertIsNone(marker["pr"], "source-safe cleanup retained the checkout without a target binding")
         self.assertNotIn("preservedWorktree", prior)
         self.calls.clear()
+        # A busy checkout still hands off with the canonical reason and keeps its source.
+        self.active = f"p123\nn{self.path}\n"
         with patch.object(lane.execution_attempt, "claim") as claim, patch.object(lane, "run_agent") as agent:
             receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
         self.assertEqual(receipt["verdict"], "recovery-handoff")
@@ -5548,6 +5599,36 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertEqual((self.path / "repair.txt").read_text(), "preserved useful edit")
         claim.assert_not_called()
         agent.assert_not_called()
+
+    def test_finished_predecessor_leftovers_are_archived_at_once_and_the_repair_runs(self):
+        # 2026-10-20 on Gem: a fix-no-change run left regenerated artifacts, and every later
+        # repair of that PR handed off for 6h (72 handoffs/24h) waiting for an owner that is gone.
+        def predecessor(cmd, cwd, log, timeout, **kwargs):
+            (cwd / "repair.txt").write_text("preserved useful edit")
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=predecessor):
+            prior = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(prior["verdict"], "fix-no-change")
+        self.path = Path(prior["worktree"])
+        self.calls.clear()
+        ran = []
+        def agent(cmd, cwd, log, timeout, **kwargs):
+            ran.append(cwd)
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=agent):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        ref = lane.PRESERVED_ARCHIVE_REF + self.path.name
+        self.assertEqual(receipt["archivedPreserved"], [ref])
+        self.assertEqual(receipt["verdict"], "fix-no-change")
+        self.assertEqual(len(ran), 1)
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.git(self.host.repo, "show", f"{ref}:repair.txt"), "preserved useful edit")
+
+    def test_interrupted_predecessor_still_waits_for_reconciliation(self):
+        prior = self.cancelled_predecessor(commit=True)
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, prior["runId"]))
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, None))
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, "no-such-run"))
 
     def test_competing_checkout_after_reconciliation_is_refused_safely(self):
         competitor = self.host.state / "worktrees/competing-owner"
@@ -6775,6 +6856,29 @@ class FixRedTest(unittest.TestCase):
                           second["execution"]["terminalState"]), ("retry", 2, "quarantined"))
 
 @unittest.skipIf(os.environ.get("LANES_SELFTEST") == "1", "running inside a release self-test")
+def lanes_release_fixture_files() -> list[Path]:
+    """Every tracked-shape file of scripts/lanes, nested ones included: a release is the whole
+    scripts/lanes tree. #22317 added scripts/lanes/hud_fixtures/, which a top-level-only copy
+    left out, so the staged release's own test_hud failed and every merge group behind it
+    ejected on this update test (2026-10-20)."""
+    return sorted(p.relative_to(ROOT) for p in (ROOT / "scripts/lanes").rglob("*")
+                  if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc")
+
+
+class LanesReleaseFixtureTest(unittest.TestCase):
+    def test_the_update_fixture_copies_nested_lanes_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            nested = Path(tmp) / "scripts/lanes/hud_fixtures/__snapshots__"
+            nested.mkdir(parents=True)
+            (nested / "live-80x24.txt").write_text("x")
+            (Path(tmp) / "scripts/lanes/hud.py").write_text("")
+            (Path(tmp) / "scripts/lanes/__pycache__").mkdir()
+            (Path(tmp) / "scripts/lanes/__pycache__/hud.cpython-312.pyc").write_text("")
+            with patch(f"{__name__}.ROOT", Path(tmp)):
+                self.assertEqual([str(p) for p in lanes_release_fixture_files()],
+                                 ["scripts/lanes/hud.py", "scripts/lanes/hud_fixtures/__snapshots__/live-80x24.txt"])
+
+
 class UpdateTest(unittest.TestCase):
     def git(self, *args, cwd):
         subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
@@ -7242,7 +7346,7 @@ with patch.object(shipping_origin, "collect", return_value=result) as collect:
             origin, clone = tmp / "origin.git", tmp / "clone"
             self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
             self.git("clone", "-q", str(origin), str(clone), cwd=tmp)
-            files = [p.relative_to(ROOT) for p in (ROOT / "scripts/lanes").iterdir() if p.is_file()]
+            files = lanes_release_fixture_files()
             for rel in [*files, *map(Path, lane.LANE_TESTS), *map(Path, lane.RELEASE_EXTRAS)]:
                 (clone / rel).parent.mkdir(parents=True, exist_ok=True)
                 (clone / rel).write_text((ROOT / rel).read_text())
@@ -10280,6 +10384,59 @@ class EventDeliveryTest(unittest.TestCase):
         self.drain(200)
         self.assertEqual(len(self.writes), 1)
         self.assertEqual(lane.load_escalation(self.host)['events'], self.events)
+
+    def test_an_exhausted_delivery_never_starves_pending_ones(self):
+        # Gem 2026-10-08..20: 4 exhausted rows took every tick's one-action budget (5,534
+        # readbacks on one) and 36 pending comment deliveries were never attempted.
+        self.intent(comments=[{'id': 'issue', 'body': 'old receipt'}])
+        data = lane._event_delivery_state(self.host)
+        [old] = data['actions'].values()
+        old.update(status='exhausted', attempts=3, nextAt=0, deadline=0, history=[{'n': n} for n in range(500)])
+        lane._save_event_delivery(self.host, data)
+        data = lane._event_delivery_state(self.host)
+        lane._queue_event_delivery(data, {'events': self.events, 'comments': [{'id': 'issue', 'body': 'new receipt'}]},
+                                   [self.issue], {'fp'}, 150)
+        lane._save_event_delivery(self.host, data)
+        report = self.drain(200)
+        self.assertEqual([w[1]['i']['body'] for w in self.writes], ['new receipt'])
+        self.assertEqual(report['deliveryAcknowledged'], 1)
+        report = self.drain(300)  # now the exhausted row gets its readback: absent and past its deadline
+        rows = {row['payload']['body']: row for row in lane._event_delivery_state(self.host)['actions'].values()}
+        self.assertEqual((rows['old receipt']['status'], rows['old receipt']['history'][-1]['outcome']),
+                         ('superseded', 'expired-unsent'))
+        self.assertLessEqual(len(rows['old receipt']['history']), lane.EVENT_DELIVERY_HISTORY + 1)
+        self.assertEqual((report['deliveryFailed'], len(self.writes)), (0, 1))
+
+    def test_an_exhausted_row_inside_its_deadline_waits_six_hours(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'old receipt'}])
+        data = lane._event_delivery_state(self.host)
+        [row] = data['actions'].values()
+        row.update(status='exhausted', attempts=3, nextAt=0, deadline=10_000)
+        lane._save_event_delivery(self.host, data)
+        report = self.drain(300)
+        [row] = lane._event_delivery_state(self.host)['actions'].values()
+        self.assertEqual((row['status'], report['deliveryFailed'], self.writes), ('exhausted', 1, []))
+        self.assertGreaterEqual(row['nextAt'], 300 + lane.EXHAUSTED_READBACK_S)
+
+    def test_a_starved_intent_past_its_deadline_expires_without_a_send(self):
+        # Gem 2026-10-20: 36 comment intents waited 3-12 days behind exhausted rows.
+        self.intent(comments=[{'id': 'issue', 'body': 'stale receipt'}])
+        report = self.drain(100 + lane.EVENT_DELIVERY_STALE_S + 1)
+        [row] = lane._event_delivery_state(self.host)['actions'].values()
+        self.assertEqual((row['status'], row['history'][-1]['outcome']), ('superseded', 'expired-unsent'))
+        self.assertEqual((report['deliveryFailed'], report['deliveryPending'], self.writes), (0, 0, []))
+
+    def test_an_exhausted_delivery_whose_event_finished_is_superseded(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'old receipt'}])
+        data = lane._event_delivery_state(self.host)
+        [row] = data['actions'].values()
+        row.update(status='exhausted', attempts=3, nextAt=0, deadline=0)
+        lane._save_event_delivery(self.host, data)
+        lane.save_escalation(self.host, {'events': {'fp': {**self.events['fp'], 'status': 'done'}}})
+        report = self.drain(200)
+        [row] = lane._event_delivery_state(self.host)['actions'].values()
+        self.assertEqual((row['status'], row['history'][-1]['outcome']), ('superseded', 'owner-finished'))
+        self.assertEqual((report['deliveryFailed'], self.writes), (0, []))
 
     def test_linear_missing_comment_error_is_the_absent_preimage_before_send(self):
         self.intent(comments=[{'id': 'issue', 'body': 'one receipt'}])

@@ -29,8 +29,9 @@ Dev port: 3105. Tests mock external services. Packaged server:
 
 ## Routes and access
 
-- `/` opens `/hud`; `/app/ov/*` preserves operator deep links and queries.
-  `/hud?ovie=mac` remains supported.
+- `/` opens Ovie Home at `/app/ov`; `/app/ov/*` preserves operator deep links
+  and queries. `/hud` and `/hud?ovie=mac` land on Home; the Ops dashboard is
+  `/app/ov/ops`.
 - Protected requests, including APIs, RSC and server actions, validate the
   Better Auth session and admin role; operation-specific authorization and
   MFA still apply. Signin/auth routes grant no operator role.
