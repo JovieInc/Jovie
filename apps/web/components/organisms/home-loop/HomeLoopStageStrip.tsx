@@ -32,7 +32,9 @@ export function HomeLoopStageStrip({
       className='flex max-h-10 min-w-0 shrink-0 flex-wrap items-baseline gap-x-4 gap-y-0.5 overflow-hidden text-xs text-secondary-token'
       data-testid='home-loop-stage-strip'
     >
-      <h2 className='shrink-0 font-medium text-primary-token'>{title}</h2>
+      <h2 className='shrink-0 text-balance font-medium text-primary-token'>
+        {title}
+      </h2>
       {items.length === 0 ? (
         <span className='text-tertiary-token'>{emptyLabel}</span>
       ) : (
