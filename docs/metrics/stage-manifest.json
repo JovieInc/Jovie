@@ -12,6 +12,27 @@
     "minAbsoluteSeconds": 60
   },
   "entities": {
+    "chat-comparison": {
+      "entityId": "source SHA (build) or source SHA:attempt (smoke)",
+      "description": "Manual exact-source comparison; guarded local receipts, no remote feed configured.",
+      "endToEnd": [],
+      "stages": [
+        {
+          "id": "build",
+          "meaning": "production standalone build",
+          "producer": "compare-chat-performance.ts",
+          "status": "pushed",
+          "source": "chat-comparison-receipts"
+        },
+        {
+          "id": "smoke",
+          "meaning": "eight-worker smoke attempt",
+          "producer": "compare-chat-performance.ts",
+          "status": "pushed",
+          "source": "chat-comparison-receipts"
+        }
+      ]
+    },
     "shipping": {
       "entityId": "owner/repo#pr (Linear identifier in actor-independent joins)",
       "description": "One unit of shipped work: Linear issue to production-verified PR.",
@@ -289,6 +310,11 @@
     }
   },
   "sources": {
+    "chat-comparison-receipts": {
+      "kind": "events",
+      "url": null,
+      "owner": "JOV-8719"
+    },
     "github-pr": {
       "kind": "derived",
       "description": "GraphQL merged-PR search with timeline items and commit check suites (28d window)."
