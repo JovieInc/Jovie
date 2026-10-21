@@ -41,6 +41,7 @@
 @source not "../components/features/admin";
 @source not "../components/features/chat";
 @source not "../components/jovie";
+@source not "../components/organisms/home-loop";
 /* App-only route subtrees — every layout that renders these imports
    styles/system-b-app.css, which compiles their utilities itself. */
 @source not "../app/onboarding";

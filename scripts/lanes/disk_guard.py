@@ -335,7 +335,7 @@ def sweep_retired_workspaces(host, run, now: float, report: dict, roots=None,
     """Idle retired Symphony workspaces go, only from a filesystem that is itself under
     LOW_PCT. Never through a mount (a bind-mounted workspace is skipped whole), never a busy
     one, and never unsaved work: a git checkout with dirty or unpushed state is first pushed to
-    `backup/<host>/...` exactly as worktree_sweep does; if that fails, or the directory is not
+    `refs/jovie-preserved/sweep/<host>/...` exactly as worktree_sweep does; if that fails, or the directory is not
     a readable checkout, it only loses regenerable build output."""
     import worktree_sweep  # late: worktree_sweep imports this module
     roots = retired_workspace_roots() if roots is None else roots
@@ -348,7 +348,7 @@ def sweep_retired_workspaces(host, run, now: float, report: dict, roots=None,
         report["errors"].append("retired-workspaces:" + ("mounts-unavailable" if mounts is None
                                                         else "process-state-unavailable"))
         return
-    prefix = "backup/mac" if sys.platform == "darwin" else f"backup/{os.uname().nodename.split('.')[0]}"
+    prefix = worktree_sweep.sweep_prefix()
     date = datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d")
     deadline = time.monotonic() + budget_s
     for root in candidates:
