@@ -722,12 +722,21 @@ def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox:
 
     # Store everything in gbrain. An unclassified page is rewritten once classified; an item
     # whose page did not land stays pending with its verdict, so nothing is lost or re-paid.
-    stored, pending, landed = 0, [], []
+    stored, pending = 0, []
     digest_rows = state.setdefault("digest", {})
     day = observed[:10]
     if digest_rows.get("day") != day:
         digest_rows.clear()
         digest_rows.update(day=day, rows=[])
+    # Cards: best first (rows are sorted that way below), capped per day across runs. A card is
+    # queued the moment its page lands, so the next checkpoint persists it; queuing after the
+    # whole store loop lost the card of a landed item when a run was killed mid-store.
+    cards = state.setdefault("cards", {})
+    if cards.get("day") != day:
+        cards.update(day=day, sent=[])
+    cap = int(env.get("SIGNALS_CARDS_PER_DAY") or DEFAULT_CARDS_PER_DAY)
+    outbox = state.setdefault("outbox", [])
+    queued = []
     # Card candidates first so a slow brain still lands them; the rest wait for the next run.
     min_score = float(env.get("SIGNALS_CARD_MIN_SCORE") or CARD_MIN_SCORE)
     rows.sort(key=lambda pair: -(pair[1]["score"] if card_worthy(pair[1], min_score) else -1))
@@ -739,42 +748,29 @@ def run(state_path: Path, *, env=None, sources: list[dict] | None = None, inbox:
         if position >= MAX_STORE_PER_RUN:
             pending.append({**item, **({"verdict": verdict} if verdict else {})})
             continue
+        card_now = False
         ok, error = (False, "dry-run") if dry_run else put(slug, item["title"], render_page(item, verdict, observed))
         if ok:
             stored += 1
-            landed.append((item, verdict))
             if verdict:
                 digest_rows["rows"] = [row for row in digest_rows["rows"] if row["slug"] != slug] + [{
                     "slug": slug, "verdict": verdict["action"], "score": verdict["score"],
                     "source": item["sourceName"], "title": item["title"][:100], "card": False}]
+            if card_worthy(verdict, min_score) and len(cards["sent"]) < cap and item["id"] not in cards["sent"]:
+                cards["sent"].append(item["id"])
+                outbox.append({"queuedAt": now, "body": summer_body(item, verdict, observed)})
+                queued.append(item["id"])
+                digest_rows["rows"][-1]["card"] = True
+                card_now = True
         elif not dry_run:
             failures.append(f"gbrain {slug}: {error}")
         if not ok or verdict is None:
             pending.append({**item, **({"verdict": verdict} if verdict else {})})
-        if not dry_run and position % 10 == 9:
+        if not dry_run and (card_now or position % 10 == 9):
             state["pending"] = (pending + [{**i, **({"verdict": v} if v else {})} for i, v in rows[position + 1:]])[-MAX_PENDING:]
             write_state(state_path, state)
     state["pending"] = pending[-MAX_PENDING:]
 
-    # Cards: best first, capped per day across runs.
-    cards = state.setdefault("cards", {})
-    if cards.get("day") != day:
-        cards.update(day=day, sent=[])
-    cap = int(env.get("SIGNALS_CARDS_PER_DAY") or DEFAULT_CARDS_PER_DAY)
-    worthy = sorted(((item, verdict) for item, verdict in landed if card_worthy(verdict, min_score)), key=lambda pair: -pair[1]["score"])
-    outbox = state.setdefault("outbox", [])
-    queued = []
-    for item, verdict in worthy:
-        if len(cards["sent"]) >= cap:
-            break
-        if item["id"] in cards["sent"]:
-            continue
-        cards["sent"].append(item["id"])
-        outbox.append({"queuedAt": now, "body": summer_body(item, verdict, observed)})
-        queued.append(item["id"])
-        for row in digest_rows["rows"]:
-            if row["slug"] == brain_slug(item):
-                row["card"] = True
     delivery = {"skipped": "dry-run"} if dry_run else deliver(
         state, capacity_limit.summer_config(env) if summer is None else summer, poster, now)
 

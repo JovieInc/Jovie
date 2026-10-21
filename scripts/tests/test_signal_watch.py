@@ -323,6 +323,27 @@ class RunTests(unittest.TestCase):
         self.assertEqual(state["pending"][0]["title"], "Queues GA")
         self.assertEqual(state["pending"][0]["verdict"]["action"], "ignore")
 
+    def test_a_run_killed_after_a_card_lands_keeps_the_card(self):
+        # 2026-10-20: a run stopped mid-store had landed a borrow/0.36 page, dropped it from
+        # pending at the checkpoint, and never queued its card.
+        class Killed(Exception):
+            pass
+        brain, calls = Brain(), []
+
+        def dies_after_first(slug, title, body):
+            calls.append(slug)
+            if len(calls) > 1:
+                raise Killed()
+            return brain(slug, title, body)
+        with self.assertRaises(Killed):
+            self.run_once(Poster({"Queues GA": jev_answer("adopt", 0.9)}), dies_after_first)
+        state = json.loads((self.dir / "state.json").read_text())
+        self.assertEqual(len(state["outbox"]), 1)
+        self.assertEqual(state["outbox"][0]["body"]["action"], "adopt")
+        self.assertEqual([item["title"] for item in state["pending"]], ["Old thing"])
+        later = self.run_once(Poster(), Brain())
+        self.assertEqual((later["cardsQueued"], later["delivery"]["delivered"]), ([], 1))
+
     def test_triage_runs_after_stored_pages_and_fails_open(self):
         result = self.run_once(Poster(), Brain())
         self.assertEqual(result["triage"], {"status": "ok", "since": "2026-10-20T00:00:00Z"})
