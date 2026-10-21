@@ -4917,6 +4917,26 @@ class TerminalRevisitTest(unittest.TestCase):
         self.assertEqual((visits["5"]["action"], visits["5"]["ok"]), ("partial-main-sync", False),
                          "an unreadable head proves no clean main commit")
 
+    def test_a_held_terminal_pr_takes_no_slot_and_is_not_a_failed_revisit(self):
+        # 2026-10-21: ~334 revisit-failed rows/day were holds that never called GitHub.
+        spent = {"sha": "h", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}
+        self.write("fix-attempts.json", {str(n): {**spent, "sha": f"h{n}"} for n in (1, 2, 3, 4)})
+        prs = [self.pr(n) for n in (1, 2, 3, 4)]
+        with patch.object(lane.pr_events, "maintenance_hold",
+                          side_effect=lambda host, l, pr, now, **kw: "repair-active" if pr["number"] < 3 else None):
+            self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW), [3, 4])
+        rows = [json.loads(line) for line in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
+        self.assertFalse([row for row in rows if row.get("verdict") == "revisit-failed"])
+        self.assertNotIn("1", json.loads((self.host.state / "terminal-revisits.json").read_text()))
+
+    def test_a_refused_update_branch_records_githubs_reason(self):
+        refused = SimpleNamespace(returncode=1, stdout='{"message":"merge conflict between base and head","status":"422"}',
+                                  stderr="gh: merge conflict between base and head (HTTP 422)")
+        self.assertEqual(lane.pr_events.sync_failure_reason(refused),
+                         "update-branch:merge conflict between base and head")
+        self.assertEqual(lane.pr_events.sync_failure_reason(SimpleNamespace(returncode=4, stdout="", stderr="")),
+                         "update-branch:exit-4")
+
     def test_the_longest_unvisited_terminal_pr_goes_first(self):
         self.write("fix-attempts.json", {str(n): {"sha": f"h{n}", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}
                                           for n in range(1, 6)})
@@ -5600,6 +5620,19 @@ class PreservedRecoveryTest(unittest.TestCase):
         claim.assert_not_called()
         agent.assert_not_called()
 
+    def test_a_cancel_for_a_moved_pr_or_a_revoked_run_never_resumes(self):
+        prior = self.cancelled_predecessor(commit=True)  # target-pr-queued: may resume
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, prior["runId"]))
+        ledger = self.host.state / "runs/ledger.jsonl"
+        rows = [{"runId": "r-sup", "endedAt": "x", "verdict": "cancelled", "reasons": ["target-head-superseded"]},
+                {"runId": "r-rev", "endedAt": "x", "verdict": "revoked", "reasons": ["publication-revoked"]},
+                {"runId": "r-tsu", "endedAt": "x", "verdict": "cancelled", "reasons": ["target-state-unavailable"]}]
+        with ledger.open("a") as out:
+            out.write("".join(json.dumps(row) + "\n" for row in rows))
+        self.assertTrue(lane._ended_on_its_own_terms(self.host, "r-sup"))
+        self.assertTrue(lane._ended_on_its_own_terms(self.host, "r-rev"))
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, "r-tsu"))
+
     def test_finished_predecessor_leftovers_are_archived_at_once_and_the_repair_runs(self):
         # 2026-10-20 on Gem: a fix-no-change run left regenerated artifacts, and every later
         # repair of that PR handed off for 6h (72 handoffs/24h) waiting for an owner that is gone.
@@ -5625,7 +5658,7 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertEqual(self.git(self.host.repo, "show", f"{ref}:repair.txt"), "preserved useful edit")
 
     def test_interrupted_predecessor_still_waits_for_reconciliation(self):
-        prior = self.cancelled_predecessor(commit=True)
+        prior = self.cancelled_predecessor(commit=True)  # queued, same head: resumable
         self.assertFalse(lane._ended_on_its_own_terms(self.host, prior["runId"]))
         self.assertFalse(lane._ended_on_its_own_terms(self.host, None))
         self.assertFalse(lane._ended_on_its_own_terms(self.host, "no-such-run"))
