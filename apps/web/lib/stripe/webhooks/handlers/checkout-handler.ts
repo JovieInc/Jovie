@@ -15,6 +15,7 @@
 
 import type Stripe from 'stripe';
 
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import { enqueuePaidWelcomeAfterEntitlement } from '@/lib/email/paid-welcome';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
@@ -184,6 +185,13 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
         );
         throw error;
       }
+
+      // Funnel measurement only; never fails or retries the webhook.
+      await recordArtistOfferStage(
+        extractCheckoutCorrelation(session.metadata).acquisitionId,
+        'paid',
+        stripeEventTimestamp
+      );
     }
 
     return result;

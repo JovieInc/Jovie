@@ -251,9 +251,13 @@ def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: 
 
 
 def automation_liveness(lane, now: float) -> dict:
-    """Latest run of the hosted automation-liveness workflow (Gem watches it back)."""
+    """Latest *successful* run of the hosted automation-liveness workflow (Gem watches it back).
+
+    It follows Production Continuity Guard and runs its job only every 5th trigger, so most
+    runs are job-skipped: the latest run of any conclusion would make a dead check look alive."""
     def fetch():
-        result = lane.sh(["gh", "api", f"repos/{lane.REPO_SLUG}/actions/workflows/{AUTOMATION_LIVENESS_WORKFLOW}/runs?per_page=1",
+        result = lane.sh(["gh", "api", f"repos/{lane.REPO_SLUG}/actions/workflows/{AUTOMATION_LIVENESS_WORKFLOW}"
+                          "/runs?branch=main&status=success&per_page=1",
                           "--jq", "[.workflow_runs[0].created_at // \"\"]"], timeout=30)
         if result.returncode != 0:
             text = f"{result.stdout or ''} {result.stderr or ''}"
@@ -263,7 +267,7 @@ def automation_liveness(lane, now: float) -> dict:
         except (ValueError, IndexError, TypeError):
             return None
         return {"installed": True, "lastRunAt": created or None}
-    found = lane.shared("automation-liveness", AUTOMATION_LIVENESS_TTL_S, fetch)
+    found = lane.shared("automation-liveness-success", AUTOMATION_LIVENESS_TTL_S, fetch)
     return found if isinstance(found, dict) else {"installed": None}
 
 

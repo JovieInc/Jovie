@@ -507,6 +507,20 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual(doctor.automation_liveness(fake(1, stderr="gh: Not Found (HTTP 404)"), 0), {"installed": False})
         self.assertEqual(doctor.automation_liveness(fake(1, stderr="timeout"), 0), {"installed": None})
 
+    def test_liveness_counts_only_successful_main_runs(self):
+        # Most runs are job-skipped (every 5th Production Continuity Guard run does work).
+        calls = []
+        lane = types.SimpleNamespace(REPO_SLUG="JovieInc/Jovie", shared=lambda key, ttl, fetch: fetch(),
+                                     sh=lambda args, **k: calls.append(args) or types.SimpleNamespace(
+                                         returncode=0, stdout='[""]', stderr=""))
+        self.assertEqual(doctor.automation_liveness(lane, 0), {"installed": True, "lastRunAt": None})
+        self.assertIn("status=success", calls[0][2])
+        self.assertIn("branch=main", calls[0][2])
+        # Installed but never succeeded reads as silent, not alive.
+        now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
+        self.assertIn("automation-liveness-silent", doctor.judge(obs(
+            automationLiveness={"installed": True, "lastRunAt": None}, now=now)))
+
     def test_a_failed_status_gist_publish_raises_status_feed_stale(self):
         failed = doctor.judge(obs(), {"statusFeedError": "RuntimeError: status-gist-publish-unconfirmed"})
         self.assertIn("status-gist-publish-unconfirmed", failed["status-feed-stale"])
