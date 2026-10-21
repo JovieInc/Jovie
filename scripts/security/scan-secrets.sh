@@ -257,7 +257,7 @@ repair_partial_clone() {
   if [[ -z "${CI:-}" && "${GITHUB_ACTIONS:-}" != true \
     && "${SECRET_SCAN_ALLOW_LOCAL_REPAIR:-}" != 1 \
     && -z "$(git config --get remote.origin.promisor 2>/dev/null || true)" ]]; then
-    echo "::error title=Secret scan repair refused::Not on CI and not a partial clone, so no --refetch. If this is a git worktree, trufflehog cannot clone it: run history scans in CI (gh workflow run security.yml) or from a full non-worktree clone." >&2
+    echo "::error title=Secret scan repair refused::Not on CI and not a partial clone, so no --refetch. If this is a git worktree, trufflehog cannot clone it: run history scans in CI using the Security Scanning workflow in GitHub Actions or from a full non-worktree clone." >&2
     return 1
   fi
   echo "Partial-clone corruption detected — repairing workdir (#13994)..."
