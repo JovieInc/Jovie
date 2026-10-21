@@ -92,6 +92,22 @@ export interface ProfilePacRelease {
   readonly releaseDate?: Date | string | null;
 }
 
+/**
+ * True when the release has a valid date that has not arrived yet. A missing
+ * or unparseable date is not "upcoming" — the card must not invent a state.
+ */
+export function isPacReleaseUpcoming(
+  release: Pick<ProfilePacRelease, 'releaseDate'> | null | undefined,
+  now: Date = new Date()
+): boolean {
+  if (!release?.releaseDate) return false;
+  const date =
+    release.releaseDate instanceof Date
+      ? release.releaseDate
+      : new Date(release.releaseDate);
+  return !Number.isNaN(date.getTime()) && date.getTime() > now.getTime();
+}
+
 function formatPacReleaseMeta(
   release: ProfilePacRelease | null | undefined,
   fallback: string
@@ -662,10 +678,17 @@ export function ProfilePacCard({
           </PrimaryPill>
         );
       } else if (release || hasPlayableDestinations) {
-        // Degraded ladder: no inline preview — link out to listen.
+        // Degraded ladder: no inline preview — link out to listen. An
+        // unreleased subject links to its coming-soon page, so the label must
+        // not promise listening that the destination cannot deliver.
+        const listenLabel = isPacReleaseUpcoming(release)
+          ? 'Coming soon'
+          : isFeatured
+            ? 'Listen now'
+            : 'Listen';
         action = (
           <PrimaryPill shape={pillShape} tone='glass' href={listenHref}>
-            {isFeatured ? 'Listen now' : 'Listen'}
+            {listenLabel}
           </PrimaryPill>
         );
       }

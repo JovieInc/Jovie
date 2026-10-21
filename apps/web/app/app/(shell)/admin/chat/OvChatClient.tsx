@@ -4,6 +4,7 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { OvieHomeCanvas } from '@/components/features/admin/hud/OvieHomeCanvas';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import { JovieChat } from '@/components/jovie/JovieChat';
+import type { HomeCanvasState } from '@/components/jovie/types';
 import { OVIE_APP_SHELL_WORKSPACE } from '@/lib/app-shell/workspaces';
 
 /**
@@ -12,6 +13,10 @@ import { OVIE_APP_SHELL_WORKSPACE } from '@/lib/app-shell/workspaces';
  * selected Summer agent, admin authorization, operator data scope, and the
  * company-loop Home canvas above the shared composer (JOV-5959).
  */
+function renderOvieHomeCanvas(chat: HomeCanvasState) {
+  return <OvieHomeCanvas chat={chat} />;
+}
+
 export function OvChatClient() {
   const { selectedProfile, creatorProfiles } = useDashboardData();
   const activeProfile = selectedProfile ?? creatorProfiles[0] ?? null;
@@ -24,7 +29,8 @@ export function OvChatClient() {
         avatarUrl={activeProfile?.avatarUrl}
         username={activeProfile?.username ?? undefined}
         chatMode={OVIE_APP_SHELL_WORKSPACE.chatMode}
-        homeCanvas={<OvieHomeCanvas />}
+        homeCanvas={renderOvieHomeCanvas}
+        homeCanvasMode='living'
       />
     </ChatWorkspaceSurface>
   );

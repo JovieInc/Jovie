@@ -252,11 +252,15 @@ test.describe('Anti-Cloaking Link Wrapping', () => {
 
       await page.goto(`/out/${data.shortId}`, { timeout: 120_000 });
 
-      await expect(page.locator('h1')).toContainText(
-        'Link Confirmation Required'
-      );
+      // Product copy is sentence case; the document <title> stays title case.
       await expect(
-        page.locator('button:has-text("Continue to Link")')
+        page.getByRole('heading', {
+          level: 1,
+          name: 'Link confirmation required',
+        })
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Continue to link' })
       ).toBeVisible();
 
       const title = await page.title();
@@ -291,20 +295,37 @@ test.describe('Anti-Cloaking Link Wrapping', () => {
       await page.goto(`/out/${data.shortId}`, { timeout: 120_000 });
 
       // Click continue button
-      await page.click('button:has-text("Continue to Link")', {
-        timeout: 10000,
+      const continueButton = page.getByRole('button', {
+        name: 'Continue to link',
       });
+      await continueButton.click({ timeout: 10000 });
 
-      // The verification flow shows "Verifying..." then "Verified! Redirecting...".
-      // On webkit, the transition can be faster or the text may flash through.
-      // Check for either the intermediate or final state.
-      const verifying = page.getByText('Verifying...');
-      const verified = page.getByText('Verified! Redirecting...');
-
-      // Wait for either state to appear (webkit may skip past "Verifying..." quickly)
-      await expect(verifying.or(verified)).toBeVisible({
-        timeout: 15000,
-      });
+      // The verification flow marks the button busy while the challenge is
+      // verified, then shows "Verified. Redirecting..." and navigates to the
+      // destination. Fast engines can pass through every intermediate state,
+      // so accept the first observable proof that verification progressed.
+      await expect
+        .poll(
+          async () => {
+            if (!new URL(page.url()).pathname.startsWith('/out/')) {
+              return 'redirected';
+            }
+            if (
+              await page
+                .getByText('Verified. Redirecting...')
+                .isVisible()
+                .catch(() => false)
+            ) {
+              return 'verified';
+            }
+            const busy = await continueButton
+              .getAttribute('aria-busy')
+              .catch(() => null);
+            return busy === 'true' ? 'verifying' : 'idle';
+          },
+          { timeout: 15000 }
+        )
+        .not.toBe('idle');
     });
 
     test('should handle rate limiting on API endpoints', async ({ page }) => {

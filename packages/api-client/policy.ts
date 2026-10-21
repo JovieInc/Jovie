@@ -55,7 +55,24 @@ export interface CredentialState {
   lastWriteAt: number;
   lastSeenAt: number;
   usage: Record<string, Partial<Record<PriorityName, Usage>>>;
+  /** Money spent today (UTC) on priced calls; absent until the first one. */
+  spend?: Spend;
 }
+
+export interface Spend {
+  /** UTC day, YYYY-MM-DD. */
+  day: string;
+  usd: number;
+}
+
+export type SpendDecision =
+  | { readonly ok: true; readonly spentUsd: number }
+  | {
+      readonly ok: false;
+      readonly spentUsd: number;
+      readonly capUsd: number | null;
+      readonly retryAt: number;
+    };
 
 export interface ProviderLedger {
   schema: typeof LEDGER_SCHEMA;
@@ -423,6 +440,53 @@ export function backoffMs(
 }
 
 /** Drop credentials nobody used recently, unless their breaker is still open. */
+export const utcDay = (nowMs: number): string =>
+  new Date(nowMs).toISOString().slice(0, 10);
+
+const nextUtcDay = (nowMs: number): number =>
+  Date.UTC(
+    new Date(nowMs).getUTCFullYear(),
+    new Date(nowMs).getUTCMonth(),
+    new Date(nowMs).getUTCDate() + 1
+  );
+
+function spentToday(state: CredentialState, nowMs: number): number {
+  return state.spend?.day === utcDay(nowMs) ? state.spend.usd : 0;
+}
+
+/**
+ * Reserve `priceUsd` against today's cap before a priced call. No cap means
+ * fail closed: a priced call never runs unbounded. Refund on failure.
+ */
+export function reserveSpend(
+  state: CredentialState,
+  priceUsd: number,
+  capUsd: number | null | undefined,
+  nowMs: number
+): SpendDecision {
+  const spent = spentToday(state, nowMs);
+  if (priceUsd <= 0) return { ok: true, spentUsd: spent };
+  if (capUsd == null || spent + priceUsd > capUsd + 1e-9)
+    return {
+      ok: false,
+      spentUsd: spent,
+      capUsd: capUsd ?? null,
+      retryAt: nextUtcDay(nowMs),
+    };
+  state.spend = { day: utcDay(nowMs), usd: spent + priceUsd };
+  return { ok: true, spentUsd: spent + priceUsd };
+}
+
+/** Failed calls are free: give back a reservation made today. */
+export function refundSpend(
+  state: CredentialState,
+  priceUsd: number,
+  nowMs: number
+): void {
+  if (priceUsd <= 0 || state.spend?.day !== utcDay(nowMs)) return;
+  state.spend.usd = Math.max(0, state.spend.usd - priceUsd);
+}
+
 export function pruneLedger(
   ledger: ProviderLedger,
   nowMs: number,
@@ -431,7 +495,9 @@ export function pruneLedger(
   for (const [id, state] of Object.entries(ledger.credentials)) {
     const open =
       state.breaker.state !== 'closed' && state.breaker.openUntil > nowMs;
-    if (!open && nowMs - state.lastSeenAt > staleMs)
+    // Today's spend must survive idle hours or the daily cap would reset.
+    const spending = spentToday(state, nowMs) > 0;
+    if (!open && !spending && nowMs - state.lastSeenAt > staleMs)
       delete ledger.credentials[id];
   }
 }

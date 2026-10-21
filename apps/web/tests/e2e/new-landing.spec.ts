@@ -87,18 +87,20 @@ test.describe('/new landing page', () => {
     );
   });
 
-  test('keeps the claim card proof on the redirected homepage', async ({
+  test('keeps the claim card identity on the redirected homepage', async ({
     page,
   }) => {
     await gotoLegacyNewLanding(page);
 
-    const hero = page.getByTestId('marketing-section-hero');
+    // JOV-7750 (#22180): the card shows the visitor's jov.ie/you identity.
+    const identity = page
+      .getByTestId('marketing-section-hero')
+      .getByTestId('homepage-hero-identity');
+    const { preview, claim } = HOMEPAGE_IDENTITY_COPY.hero;
     await expect(
-      hero.getByText(HOMEPAGE_IDENTITY_COPY.hero.preview.name)
+      identity.getByText(preview.label, { exact: true })
     ).toBeVisible();
-    await expect(
-      hero.getByText(HOMEPAGE_IDENTITY_COPY.hero.preview.label)
-    ).toBeVisible();
+    await expect(identity).toContainText(`${claim.domain}${preview.name}`);
     await expect(page.getByTestId('homepage-v2-pricing')).toHaveCount(0);
     await expect(page.getByTestId('homepage-v2-hero')).toHaveCount(0);
   });
