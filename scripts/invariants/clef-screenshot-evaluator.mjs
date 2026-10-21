@@ -255,13 +255,15 @@ function readWranglerToken(path) {
   return token ? { token, expires } : null;
 }
 
-/**
- * Credential order: CLOUDFLARE_WORKERS_AI_TOKEN, then the local `wrangler login`
- * OAuth token (refreshed via `wrangler whoami` when near expiry). Never logged.
- */
 const runWranglerWhoami = () =>
   execFileSync('wrangler', ['whoami'], { stdio: 'ignore', timeout: 20_000 });
 
+/**
+ * Credential order: CLOUDFLARE_WORKERS_AI_TOKEN, then the local `wrangler login`
+ * OAuth token (refreshed via `wrangler whoami` when near expiry). Never logged.
+ *
+ * @param {{env?: Record<string, string | undefined>, refresh?: boolean, force?: boolean, now?: () => number, runRefresh?: () => unknown}} [options]
+ */
 export function resolveWorkersAiAuth({
   env = process.env,
   refresh = true,
@@ -315,7 +317,11 @@ export function ensureConnectAttemptBudget() {
     setDefaultAutoSelectFamilyAttemptTimeout(CONNECT_ATTEMPT_TIMEOUT_MS);
 }
 
-/** One Workers AI decision call. Zero retries; bounded by timeoutMs. */
+/**
+ * One Workers AI decision call. Zero retries; bounded by timeoutMs.
+ *
+ * @param {{auth: {accountId: string, token: string}, model: string, state: string, questions: object, images: Buffer[], fetchImpl?: (url: string, init: any) => Promise<any>, timeoutMs?: number}} options
+ */
 export async function callClef({
   auth,
   model,
@@ -340,6 +346,7 @@ export async function callClef({
       signal: AbortSignal.timeout(timeoutMs),
     }
   );
+  /** @type {any} */
   const body = await res.json().catch(() => null);
   if (!res.ok || !body?.success) {
     const code = body?.errors?.[0]?.code ?? res.status;
@@ -517,7 +524,9 @@ export async function runRevisionLoop({
 /**
  * Builds views with Playwright (already a root dependency): either from image
  * files (overview + full-resolution tiles) or by capturing a URL full-page at
- * desktop (1440x900) and mobile (390x844 @2x).
+ * desktop (1440x900) and mobile (390x844, 2x DPR).
+ *
+ * @param {{files?: string[], url?: string, viewports?: string[], click?: string, wait?: number}} [options]
  */
 export async function captureViews({
   files = [],
@@ -529,6 +538,7 @@ export async function captureViews({
   const { chromium } = await import('playwright');
   const browser = await chromium.launch();
   try {
+    /** @type {Array<{label: string, png: Buffer}>} */
     const sources = files.map(f => ({
       label: f.split('/').pop(),
       png: readFileSync(f),

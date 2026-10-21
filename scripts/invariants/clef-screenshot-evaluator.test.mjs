@@ -94,6 +94,7 @@ test('aggregate takes the worst view; ungated rules are advisories', () => {
 
 test('evaluate returns per-rule probabilities, pass/fail and cost', async () => {
   const dir = tmp();
+  /** @type {any} */
   const r = await evaluateScreenshots([{ label: 'home', overview: PNG }], {
     auth,
     env: env(dir),
@@ -210,6 +211,7 @@ test('auth prefers the env token, then a fresh wrangler OAuth token', () => {
 });
 
 test('callClef posts data URIs and maps errors without leaking bodies', async () => {
+  /** @type {any} */
   let seen;
   const ok = await callClef({
     auth,
