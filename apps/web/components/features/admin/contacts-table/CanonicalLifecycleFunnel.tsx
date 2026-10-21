@@ -30,7 +30,7 @@ export function CanonicalLifecycleFunnel({
     <ContentSurfaceCard data-testid='canonical-lifecycle-funnel'>
       <div className='mb-3 flex items-baseline justify-between gap-3'>
         <div>
-          <h2 className='text-sm font-semibold tracking-tight text-primary-token'>
+          <h2 className='text-balance text-sm font-semibold tracking-tight text-primary-token'>
             Customer Lifecycle
           </h2>
           <p
