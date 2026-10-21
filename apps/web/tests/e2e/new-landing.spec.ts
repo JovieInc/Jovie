@@ -86,6 +86,8 @@ test.describe('/new landing page', () => {
     await expect(
       hero.getByRole('heading', { level: 1, name: HOMEPAGE_COPY.hero.headline })
     ).toBeVisible();
+    await expect(hero.getByText(/Tim White|Founder, Jovie/)).toHaveCount(0);
+    await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
     await expect(page.getByTestId('homepage-v2-pricing')).toHaveCount(0);
     await expect(page.getByTestId('homepage-v2-hero')).toHaveCount(0);
   });

@@ -89,6 +89,9 @@ test.describe('Homepage', () => {
     expect(
       await profile.evaluate(image => (image as HTMLImageElement).naturalWidth)
     ).toBeGreaterThan(0);
+    // Preserve main's visitor-focused claim: no founder card or retired search.
+    await expect(hero.getByText(/Tim White|Founder, Jovie/)).toHaveCount(0);
+    await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
     await expect(page.getByText('Request access')).toHaveCount(0);
   });
 

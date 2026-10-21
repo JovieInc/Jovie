@@ -1399,11 +1399,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'blog-feed',
         'featured-grid'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
       source:
-        'BlogFeed mounts a left-none hero and a featured-grid feed (2026-10-15)',
+        'BlogFeed mounts a left-none hero and a featured-grid feed (2026-10-15); the editorial layout appends the product-updates capture (#18964)',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -1423,11 +1424,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'blog-feed',
         'category-filtered-grid'
       ),
+      productUpdatesCapture,
     ],
     bindingEvidence: {
       status: 'verified',
       source:
-        'BlogCategoryContent mounts a left-none hero and a category-filtered-grid feed (2026-10-15)',
+        'BlogCategoryContent mounts a left-none hero and a category-filtered-grid feed (2026-10-15); the editorial layout appends the product-updates capture (#18964)',
     },
     status: 'active',
     specVersion: '1.0.0',
