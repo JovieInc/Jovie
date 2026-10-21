@@ -1,0 +1,30 @@
+{
+  "schema": "jovie-vendored-actions/v1",
+  "why": "JOV-8754: each remote action reference costs one GITHUB_TOKEN REST call per job (download); a composite re-resolves its nested actions on every use. Vendoring the setup-node-pnpm composite's nested actions removes those calls. Refresh with node scripts/vendor-actions.mjs --refresh <dir>.",
+  "actions": [
+    {
+      "dir": "pnpm-action-setup",
+      "repo": "pnpm/action-setup",
+      "sha": "ea17c68df8912ef543352723c149a84f56e3d413",
+      "files": {
+        "LICENSE.md": "eb9c7f938c31b542da6906e2ac11b8996cfb2ca4afe3f7440df2b5063b52f615",
+        "action.yml": "9e252c0620f3de7d239b01455c8b50b3424e347d7547d991abf71694686bf82c",
+        "dist/index.js": "fc4a334f5232afcc909722152a3427555a7360b14315b460675e40a49fe6866a"
+      }
+    },
+    {
+      "dir": "actions-cache",
+      "repo": "actions/cache",
+      "sha": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+      "files": {
+        "LICENSE": "7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32",
+        "dist/restore-only/index.js": "8522c6be9a4650a3b1571f7222293f262cc4c4708fbe061d8ed04654d476cf16",
+        "dist/restore-only/package.json": "3ca9d4afd21425087cf31893b8f9f63c81b0b8408db5e343ca76e5f8aa26ab9a",
+        "dist/save-only/index.js": "0d3cf341a79cdc0a8ce5a71103f46174e12cf4f98db46f15b8e604932eefd487",
+        "dist/save-only/package.json": "3ca9d4afd21425087cf31893b8f9f63c81b0b8408db5e343ca76e5f8aa26ab9a",
+        "restore/action.yml": "bb552a94cec165255080b7e13fe3d2051c6c79e321e99435b5859dc7de5e9057",
+        "save/action.yml": "5da400e1a7551cee617339fd1a5281483d71e6c56d86dd117fbd354f047308ec"
+      }
+    }
+  ]
+}

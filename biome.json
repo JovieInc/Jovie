@@ -12,6 +12,7 @@
     "includes": [
       "**/*",
       "!!.claude",
+      "!.github/actions/vendor/**",
       "!apps/web/drizzle/migrations/**",
       "!**/.context/**",
       "!.agents/skills/gstack/**",

@@ -112,6 +112,9 @@ jobs:
         shell: bash
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          # Source guards that read GitHub (gh-api-hold) ran unauthenticated and
+          # hit the per-IP limit ("outside the 30s budget", 2026-10-21).
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
