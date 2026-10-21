@@ -248,7 +248,7 @@ describe('public-profile alias graduation policy', () => {
     expect(aliasDecision(Array(14).fill(parsed)).graduated).toBe(true);
   });
 
-  it('collects paginated exact-attempt jobs without filtering failed controllers or borrowing staging samples', () => {
+  it('collects paginated exact-attempt jobs without filtering failed controllers or borrowing staging samples', async () => {
     const at = '2026-10-20T01:00:00Z';
     const runs = Array.from({ length: 17 }, (_, index) => ({
       id: index + 1,
@@ -309,7 +309,7 @@ describe('public-profile alias graduation policy', () => {
       trackingIssue: 'JOV-8338',
       request,
     };
-    const { receipt, measurementsText } = collectAliasGraduation(options);
+    const { receipt, measurementsText } = await collectAliasGraduation(options);
     expect(receipt.windows.production).toMatchObject({
       graduated: true,
       consecutiveQualifyingRuns: 14,
@@ -325,18 +325,18 @@ describe('public-profile alias graduation policy', () => {
     });
     expect(measurementsText.trim().split('\n')).toHaveLength(14);
     expect(request.mock.calls[0][0]).not.toContain('status=success');
-    expect(() =>
+    await expect(
       collectAliasGraduation({ ...options, nextReviewAt: at })
-    ).toThrow('bounded');
-    expect(() =>
+    ).rejects.toThrow('bounded');
+    await expect(
       collectAliasGraduation({ ...options, cutoff: 'invalid' })
-    ).toThrow('UTC');
-    expect(() =>
+    ).rejects.toThrow('UTC');
+    await expect(
       collectAliasGraduation({
         ...options,
         request: () => [{ total_count: 18, workflow_runs: runs }],
       })
-    ).toThrow('Incomplete');
+    ).rejects.toThrow('Incomplete');
   });
 
   it.each(['production', 'staging'])(

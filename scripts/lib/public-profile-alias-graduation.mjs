@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -126,18 +125,23 @@ export function aliasDecision(measurements) {
   };
 }
 
-function ghRequest(path, json = true) {
-  const args = ['api', path, ...(json ? ['--paginate', '--slurp'] : [])];
-  const value = execFileSync('gh', args, {
-    encoding: 'utf8',
-    timeout: 120_000,
-    maxBuffer: 32 * 1024 * 1024,
-  });
-  return json ? JSON.parse(value) : value;
+// Reads go through the shared budgeted gh client (external-api-guard,
+// .claude/rules/external-apis.md). --paginate keeps runGh from adding
+// --include, so stdout is the plain body for JSON pages and job logs alike.
+async function ghRequest(path, json = true) {
+  const { runGh } = await import('../../packages/api-client/gh.ts');
+  const args = ['api', path, '--paginate', ...(json ? ['--slurp'] : [])];
+  const result = await runGh(args);
+  if (result.code !== 0) {
+    throw new Error(
+      `GitHub read ${path} failed (${result.deferred ? 'quota deferred' : `exit ${result.code}`}): ${String(result.stderr).slice(0, 200)}`
+    );
+  }
+  return json ? JSON.parse(result.stdout) : result.stdout;
 }
 
 // A manual evidence refresh only: no new scheduler and no production mutations.
-export function collectAliasGraduation({
+export async function collectAliasGraduation({
   since,
   cutoff,
   nextReviewAt,
@@ -159,64 +163,65 @@ export function collectAliasGraduation({
     throw new Error('Expected a bounded window and review within seven days');
   const base = `repos/${REPOSITORY}/actions`;
   const runs = completeList(
-    request(
+    await request(
       `${base}/workflows/${WORKFLOW}/runs?per_page=100&created=${since}..${cutoff}`
     ),
     'workflow_runs'
   );
-  const inventory = runs
-    .map(run => {
-      if (
-        run.created_at < since ||
-        run.created_at > cutoff ||
-        run.path !== `.github/workflows/${WORKFLOW}`
-      )
-        throw new Error('Controller outside requested workflow/window');
-      const jobs = completeList(
-        request(
-          `${base}/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`
-        ),
-        'jobs'
-      );
-      const row = {
-        controllerRunId: run.id,
-        runAttempt: run.run_attempt,
-        headSha: run.head_sha,
-        createdAt: run.created_at,
-        updatedAt: run.updated_at,
-        status: run.status,
-        conclusion: run.conclusion,
-        enumeratedJobCount: jobs.length,
-      };
-      for (const [key, surface] of Object.entries(ALIAS_SURFACES)) {
-        const matches = jobs.filter(job => job.name === surface.job);
-        if (matches.length > 1) throw new Error('Duplicate surface job');
-        const job = matches[0];
-        const step = job?.steps.find(item => item.name === surface.step);
-        row[key] = job
-          ? {
-              jobId: job.id,
-              status: job.status,
-              conclusion: job.conclusion,
-              completedAt: job.completed_at,
-              stepNumber: step?.number ?? null,
-              stepStatus: step?.status ?? null,
-              stepConclusion: step?.conclusion ?? null,
-              stepStartedAt: step?.started_at ?? null,
-              stepCompletedAt: step?.completed_at ?? null,
-            }
-          : null;
-      }
-      return row;
-    })
-    .sort((a, b) => b.controllerRunId - a.controllerRunId);
+  const inventory = [];
+  for (const run of runs) {
+    if (
+      run.created_at < since ||
+      run.created_at > cutoff ||
+      run.path !== `.github/workflows/${WORKFLOW}`
+    )
+      throw new Error('Controller outside requested workflow/window');
+    const jobs = completeList(
+      await request(
+        `${base}/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`
+      ),
+      'jobs'
+    );
+    const row = {
+      controllerRunId: run.id,
+      runAttempt: run.run_attempt,
+      headSha: run.head_sha,
+      createdAt: run.created_at,
+      updatedAt: run.updated_at,
+      status: run.status,
+      conclusion: run.conclusion,
+      enumeratedJobCount: jobs.length,
+    };
+    for (const [key, surface] of Object.entries(ALIAS_SURFACES)) {
+      const matches = jobs.filter(job => job.name === surface.job);
+      if (matches.length > 1) throw new Error('Duplicate surface job');
+      const job = matches[0];
+      const step = job?.steps.find(item => item.name === surface.step);
+      row[key] = job
+        ? {
+            jobId: job.id,
+            status: job.status,
+            conclusion: job.conclusion,
+            completedAt: job.completed_at,
+            stepNumber: step?.number ?? null,
+            stepStatus: step?.status ?? null,
+            stepConclusion: step?.conclusion ?? null,
+            stepStartedAt: step?.started_at ?? null,
+            stepCompletedAt: step?.completed_at ?? null,
+          }
+        : null;
+    }
+    inventory.push(row);
+  }
+  inventory.sort((a, b) => b.controllerRunId - a.controllerRunId);
   const measurements = [];
   const windows = {};
   for (const [key, surface] of Object.entries(ALIAS_SURFACES)) {
     const selected = selectAliasWindow(inventory, key, cutoff);
-    const rows = selected.map(run => {
+    const rows = [];
+    for (const run of selected) {
       const job = run[key];
-      const rawLog = request(`${base}/jobs/${job.jobId}/logs`, false);
+      const rawLog = await request(`${base}/jobs/${job.jobId}/logs`, false);
       // Restrict to the measurement step: staging's job also builds and deploys.
       const log = rawLog
         .split('\n')
@@ -241,7 +246,7 @@ export function collectAliasGraduation({
         testedSha &&
           (key === 'production' || (staged && expectedSha === testedSha))
       );
-      return {
+      rows.push({
         surface: surface.surface,
         controllerRunId: run.controllerRunId,
         runAttempt: run.runAttempt,
@@ -261,8 +266,8 @@ export function collectAliasGraduation({
         ...samples,
         valid: samples.valid && identityValid,
         qualifies: samples.qualifies && identityValid,
-      };
-    });
+      });
+    }
     measurements.push(...rows);
     windows[key] = {
       ...surface,
@@ -312,7 +317,7 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   const [since, cutoff, nextReviewAt, trackingIssue] = process.argv.slice(2);
-  const result = collectAliasGraduation({
+  const result = await collectAliasGraduation({
     since,
     cutoff,
     nextReviewAt,
