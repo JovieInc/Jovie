@@ -421,7 +421,7 @@ describe('vision judge via art-evaluator', () => {
       available,
       modality: 'vision',
     });
-    expect(cheap).toBe('anthropic/claude-sonnet-5');
+    expect(cheap).toBe('anthropic/claude-sonnet-5.5');
     expect(
       pickRoleModel('judge-flagship', {
         available,
@@ -443,7 +443,7 @@ describe('vision judge via art-evaluator', () => {
     const judge = visionJudge({
       module: artModule,
       transport,
-      model: 'anthropic/claude-sonnet-5',
+      model: 'anthropic/claude-sonnet-5.5',
     });
     const score = await judge.run({
       row: row('JOV-INV-038#progressive-depth', 'visual'),

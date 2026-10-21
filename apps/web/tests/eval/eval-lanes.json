@@ -30,6 +30,7 @@
       "lib/eval/promote-trace.test.ts",
       "lib/eval/scorers/scorers.test.ts",
       "tests/eval/golden/golden-eval-set.ci.test.ts",
+      "tests/eval/golden/promptfoo-cases-generator.ci.test.ts",
       "tests/unit/chat/onboarding-transcript-quality.eval.test.ts"
     ]
   },
