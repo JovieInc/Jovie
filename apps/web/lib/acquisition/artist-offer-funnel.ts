@@ -79,6 +79,37 @@ export function stageForFunnelPath(
   return normalized === '/pricing' ? 'pricing' : null;
 }
 
+/**
+ * Landing paths that belong to the artist offer (marketing front door and
+ * the claim/sign-up path). Every other consented journey (mostly fans landing
+ * on artist profiles via the root-layout capture and /api/px) still counts as
+ * a `visit`, so the report splits visits by landing to keep the offer funnel
+ * readable (production 2026-10-21: 24,046 visits, 0 pricing).
+ */
+export const OFFER_LANDING_PATHS = [
+  '/',
+  '/pricing',
+  '/claim',
+  '/claim/start',
+  '/signup',
+  '/signin',
+  '/start',
+] as const;
+
+/** Path of a stored landing (`/x?y`, or a full URL from the profile pixel). */
+export function landingPathname(landing: string | null | undefined): string {
+  if (!landing) return '/';
+  const withoutOrigin = landing.replace(/^https?:\/\/[^/]+/i, '');
+  const path = withoutOrigin.split(/[?#]/)[0].replace(/\/+$/, '');
+  return path.startsWith('/') ? path : path ? `/${path}` : '/';
+}
+
+export function isOfferLanding(landing: string | null | undefined): boolean {
+  return (OFFER_LANDING_PATHS as readonly string[]).includes(
+    landingPathname(landing)
+  );
+}
+
 export type ArtistOfferJourneyTimeline = {
   readonly [Stage in ArtistOfferAnyStage]?: Date | null;
 };
@@ -123,7 +154,26 @@ export interface ArtistOfferFunnelReport {
   readonly stages: readonly ArtistOfferStageSummary[];
   /** Off-funnel branches (e.g. paid → pending-verification). */
   readonly branches: readonly ArtistOfferBranchSummary[];
+  readonly diagnostics: ArtistOfferFunnelDiagnostics;
 }
+
+/**
+ * Why a stage can read 0 while visits are high. `stages` is a cohort of
+ * journeys first captured in the window; `stageEventsInWindow` counts every
+ * journey that reached a recorded stage in the window, whenever it was first
+ * captured (returning visitors). Consent-gated visitors are never stored.
+ */
+export interface ArtistOfferFunnelDiagnostics {
+  readonly visitsByLanding: { readonly offer: number; readonly other: number };
+  readonly stageEventsInWindow: Readonly<
+    Partial<Record<RecordedArtistOfferStage, number>>
+  >;
+}
+
+export const EMPTY_FUNNEL_DIAGNOSTICS: ArtistOfferFunnelDiagnostics = {
+  visitsByLanding: { offer: 0, other: 0 },
+  stageEventsInWindow: {},
+};
 
 /** Nearest-rank percentile; deterministic and dependency-free. */
 export function percentile(
@@ -168,6 +218,7 @@ export function buildArtistOfferFunnelReport(input: {
   readonly end: Date;
   readonly totalVisits: number;
   readonly timelines: readonly ArtistOfferJourneyTimeline[];
+  readonly diagnostics?: ArtistOfferFunnelDiagnostics;
 }): ArtistOfferFunnelReport {
   const counts = new Map<ArtistOfferFunnelStage, number>();
   counts.set('visit', input.totalVisits);
@@ -231,5 +282,6 @@ export function buildArtistOfferFunnelReport(input: {
     scope: 'consented_first_party_journeys',
     stages,
     branches,
+    diagnostics: input.diagnostics ?? EMPTY_FUNNEL_DIAGNOSTICS,
   };
 }
