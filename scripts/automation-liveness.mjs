@@ -24,6 +24,8 @@
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createApiClient } from '../packages/api-client/client.ts';
+import { hashCredential } from '../packages/api-client/store.ts';
 import {
   evaluateLiveness,
   livenessDecisions,
@@ -151,19 +153,52 @@ export async function observeJsonTimestamp(receipt, { fetchImpl }) {
  */
 export async function observeProductionFreshness(
   receipt,
-  { fetchImpl, token, nowMs, apiUrl = 'https://api.github.com' }
+  { fetchImpl, token, nowMs, githubClient, apiUrl = 'https://api.github.com' }
 ) {
   const build = await readJson(fetchImpl, receipt.buildInfoUrl);
   const live = build.ok ? build.body?.commitSha : null;
   if (!SHA_RE.test(live ?? ''))
     return { ok: false, reason: 'live-sha-unreadable' };
   const headers = githubHeaders(token);
-  const head = await readJson(
-    fetchImpl,
-    `${apiUrl}/repos/${receipt.repo}/commits/main`,
-    headers
-  );
-  const main = head.ok ? head.body?.sha : null;
+  // Only the branch identity is needed here. The commit endpoint also
+  // computes changed files and patches, adding avoidable work to this probe.
+  const client =
+    githubClient ??
+    createApiClient({
+      provider: 'github',
+      credential: hashCredential('github', token ?? ''),
+      fetch: fetchImpl,
+    });
+  let head;
+  try {
+    const response = await client.request({
+      url: `${apiUrl}/repos/${receipt.repo}/git/ref/heads/main`,
+      headers: {
+        Accept: 'application/json',
+        'Cache-Control': 'no-cache',
+        ...headers,
+      },
+      priority: 'report',
+      conditional: false,
+      maxAttempts: 2,
+      maxWaitMs: TIMEOUT_MS,
+      timeoutMs: TIMEOUT_MS,
+    });
+    if (response.status !== 200)
+      return { ok: false, reason: `main-ref-http-${response.status}` };
+    head = response.json();
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error?.status
+        ? `main-ref-http-${error.status}`
+        : `main-ref-${error?.failure ?? error?.kind ?? 'unreadable'}`,
+    };
+  }
+  const main =
+    head?.ref === 'refs/heads/main' && head?.object?.type === 'commit'
+      ? head.object.sha
+      : null;
   if (!SHA_RE.test(main ?? ''))
     return { ok: false, reason: 'main-sha-unreadable' };
   const now = new Date(nowMs).toISOString();
@@ -280,17 +315,24 @@ export async function observeEntry(entry, context) {
 
 /**
  * @typedef {(url: string, init?: any) => Promise<{status: number, json: () => Promise<any>}>} FetchLike
- * @param {{registry: any, fetchImpl?: FetchLike, token?: string, nowMs?: number}} options
+ * @param {{
+ *   registry: any,
+ *   fetchImpl?: FetchLike,
+ *   token?: string,
+ *   nowMs?: number,
+ *   githubClient?: import('../packages/api-client/client.ts').ApiClient,
+ * }} options
  */
 export async function runLiveness({
   registry,
   fetchImpl = fetch,
   token = '',
   nowMs = Date.now(),
+  githubClient,
 }) {
   const startedAt = new Date(nowMs).toISOString();
   const observations = new Map();
-  const context = { fetchImpl, token, nowMs };
+  const context = { fetchImpl, token, nowMs, githubClient };
   for (const entry of registry.entries ?? []) {
     if (entry?.status !== 'live') continue;
     const observed = await observeEntry(entry, context);
