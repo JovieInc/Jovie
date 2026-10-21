@@ -133,7 +133,10 @@ describe('SidebarThreadsSection', () => {
       'group-hover/thread:bg-surface-0',
       'focus-visible:bg-surface-0'
     );
-    expect(action).toHaveClass('absolute', 'opacity-0');
+    expect(action).toHaveClass(
+      'absolute',
+      '[@media(hover:hover)_and_(pointer:fine)]:opacity-0'
+    );
   });
 
   it('renders dense thread links with canonical shell row state', () => {

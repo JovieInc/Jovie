@@ -128,6 +128,37 @@ test('a real Radix owned submenu retains the preview then releases on dismissal'
   await expect(rail).toHaveAttribute('data-preview', 'false');
 });
 
+test('fine pointer chat actions reveal on hover and keyboard focus', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 820, height: 798 });
+  await page.goto(chatsStory);
+  const chats = page.getByTestId('chats-page');
+  const row = chats.getByRole('link', {
+    name: 'All This Noise EP',
+    exact: true,
+  });
+  const actions = chats.getByRole('button', {
+    name: 'Chat Actions for All This Noise EP',
+  });
+  await expect(actions).toBeVisible({ timeout: 90_000 });
+  expect(
+    await page.evaluate(
+      () => matchMedia('(hover: hover) and (pointer: fine)').matches
+    )
+  ).toBe(true);
+  const before = await chats.boundingBox();
+  await page.mouse.move(1, 1);
+  await expect(actions).toHaveCSS('opacity', '0');
+  await row.hover();
+  await expect(actions).toHaveCSS('opacity', '1');
+  await page.mouse.move(1, 1);
+  await expect(actions).toHaveCSS('opacity', '0');
+  await actions.focus();
+  await expect(actions).toHaveCSS('opacity', '1');
+  expect(await chats.boundingBox()).toEqual(before);
+});
+
 test('hybrid touch activates chat actions first and keyboard hints return', async ({
   browser,
 }) => {
