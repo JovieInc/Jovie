@@ -32,7 +32,6 @@ const BRAND_LOGO_PRODUCTION_SOURCES = [
   'components/features/demo/DemoShell.tsx',
   'components/features/waitlist/WaitlistIntakeChat.tsx',
   'components/features/home/HomeV1Design.tsx',
-  'components/features/home/HeroProfilePreview.tsx',
   'app/app/(shell)/profiles/ProfilesWorkspace.tsx',
 ] as const;
 
@@ -119,9 +118,6 @@ describe('brand mark size ladder', () => {
     expect(readWebSource('components/features/dev/DevToolbar.tsx')).toContain(
       'BrandLogo'
     );
-    expect(
-      readWebSource('components/features/home/HeroProfilePreview.tsx')
-    ).toContain('BrandLogo');
     expect(
       readWebSource(
         'components/features/onboarding/OnboardingChatEmptyIntro.tsx'
