@@ -211,12 +211,15 @@ describe('external API guard', () => {
   });
 
   it('grandfathers existing calls only for a provider newly added to providers.json', () => {
-    const head = loadProviders(repoRoot);
-    const base = structuredClone(head);
-    head.providers.exa = { ...head.providers.vercel, hosts: ['api.exa.ai'] };
+    // Keep provider onboarding independent of the live registry's additions.
+    const base = {
+      providers: { existing: { hosts: ['api.existing.test'] } },
+    };
+    const head = structuredClone(base);
+    head.providers.added = { hosts: ['api.added.test'] };
     const headRules = buildRules(head);
     const text =
-      "fetch('https://api.exa.ai/search');\nfetch('https://api.vercel.com/v1');";
+      "fetch('https://api.added.test/search');\nfetch('https://api.existing.test/v1');";
     const found = {
       'scripts/voc.mjs': scanSource('scripts/voc.mjs', text, headRules),
     };
