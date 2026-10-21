@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   createLinearClient,
   LINEAR_API_URL,
@@ -10,6 +13,11 @@ const PR_PAGE = 25;
 const NODE_BATCH = 40;
 const RUN_PAGE_CAP = 10;
 const FEED_MAX_BYTES = 8 * 1024 * 1024;
+// Artifact sources (one artifact per producer run) are sampled evenly across
+// the window: automation-liveness alone uploads ~58 a day, and each download
+// takes ~2s inside the 35-minute job.
+const ARTIFACT_CAP = 60;
+const ARTIFACT_PAGE_CAP = 20;
 const CONTROLLER_SOURCE =
   /^(?:Production Controller )?([a-f0-9]{40}) from CI [1-9]\d* attempt [1-9]\d*$/;
 const PR_SEARCH = `query($q:String!,$after:String){search(type:ISSUE,query:$q,first:${PR_PAGE},after:$after){pageInfo{hasNextPage endCursor} nodes{... on PullRequest{number title headRefName createdAt mergedAt author{login} mergeCommit{oid} timelineItems(first:60,itemTypes:[READY_FOR_REVIEW_EVENT,ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT,MERGED_EVENT,LABELED_EVENT]){pageInfo{hasNextPage} nodes{__typename ... on ReadyForReviewEvent{createdAt} ... on AddedToMergeQueueEvent{createdAt} ... on RemovedFromMergeQueueEvent{createdAt} ... on MergedEvent{createdAt} ... on LabeledEvent{createdAt label{name}}}} commits(last:15){pageInfo{hasPreviousPage} nodes{commit{id oid committedDate statusCheckRollup{state}}}}}}}}`;
@@ -317,6 +325,114 @@ function parseTimingsBody(text) {
     };
   }
 }
+/**
+ * Non-expired artifacts named `name` created inside the window, newest first.
+ * Each row carries the producing run id, which the artifact download needs.
+ */
+export function listArtifacts({ gh, repository, name, sinceMs }) {
+  const rows = [];
+  for (let page = 1; page <= ARTIFACT_PAGE_CAP; page += 1) {
+    const parsed = parseGhOutput(
+      gh([
+        'api',
+        `repos/${repository}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100&page=${page}`,
+        '--jq',
+        // tojson: one compact object per line (gh pretty-prints objects).
+        '.artifacts[] | {id, created_at, expired, run: .workflow_run.id} | tojson',
+      ])
+    );
+    const batch = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+    for (const row of batch) {
+      const at = Date.parse(row?.created_at ?? '');
+      if (!row?.expired && row?.run && Number.isFinite(at) && at >= sinceMs)
+        rows.push({ id: row.id, run: row.run, createdAt: at });
+    }
+    const oldest = batch.at(-1)?.created_at;
+    if (batch.length < 100 || Date.parse(oldest ?? '') < sinceMs) break;
+  }
+  return rows.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** At most `cap` items spread evenly over the list (keeps first and last). */
+export function sampleEvenly(items, cap = ARTIFACT_CAP) {
+  if (items.length <= cap) return items;
+  if (cap <= 1) return items.slice(0, cap);
+  const picked = new Set();
+  for (let i = 0; i < cap; i += 1)
+    picked.add(Math.round((i * (items.length - 1)) / (cap - 1)));
+  return [...picked].map(i => items[i]);
+}
+
+/** Default reader: the run-download subcommand through the budgeted client, to a temp dir. */
+export function ghArtifactReader(gh) {
+  return ({ run, name, file }) => {
+    const dir = mkdtempSync(join(tmpdir(), 'stage-artifact-'));
+    try {
+      gh(['run', 'download', String(run), '-n', name, '-D', dir]);
+      const text = readFileSync(join(dir, file), 'utf8');
+      if (text.length > FEED_MAX_BYTES)
+        throw new Error('feed exceeds size cap');
+      return text;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+}
+
+/**
+ * Rows from an artifact source (`artifact: "<name>/<file>"`): every sampled
+ * artifact in the window, deduplicated by entityType, entityId and stage
+ * (consecutive liveness artifacts repeat the same latest runs).
+ */
+export function collectArtifactFeed({
+  gh,
+  readArtifact = ghArtifactReader(gh),
+  repository,
+  artifact,
+  manifest,
+  sinceMs,
+  cap = ARTIFACT_CAP,
+}) {
+  const slash = String(artifact).indexOf('/');
+  if (slash <= 0)
+    throw new Error(`artifact must be <name>/<file>: ${artifact}`);
+  const name = artifact.slice(0, slash);
+  const file = artifact.slice(slash + 1);
+  const listed = listArtifacts({ gh, repository, name, sinceMs });
+  const sampled = sampleEvenly(listed, cap);
+  const seen = new Map();
+  const rejected = [];
+  let read = 0;
+  const failures = [];
+  for (const row of sampled) {
+    let text;
+    try {
+      text = readArtifact({ run: row.run, name, file });
+      read += 1;
+    } catch (error) {
+      failures.push(
+        `${row.id}: ${String(error?.message ?? error).slice(0, 120)}`
+      );
+      continue;
+    }
+    const parsed = parseStageEventFeed(text, manifest);
+    rejected.push(...parsed.rejected);
+    for (const event of parsed.events) {
+      const key = `${event.entityType}|${event.entityId}|${event.stage}`;
+      if (!seen.has(key)) seen.set(key, event);
+    }
+  }
+  if (sampled.length && !read)
+    throw new Error(
+      `no artifact readable (${failures.slice(0, 3).join('; ')})`
+    );
+  return {
+    events: [...seen.values()],
+    rejected,
+    artifacts: { listed: listed.length, sampled: sampled.length, read },
+    failures: failures.slice(0, 5),
+  };
+}
 async function settle(sources, id, work) {
   try {
     const value = await work();
@@ -344,6 +460,7 @@ export async function collectStageRaw({
   lybRepository = 'JovieInc/LogYourBody',
   now = Date.now(),
   days = 29,
+  readArtifact = null,
 }) {
   const nowMs = typeof now === 'number' ? now : Date.parse(now);
   const sinceMs = nowMs - days * DAY_MS;
@@ -446,6 +563,29 @@ export async function collectStageRaw({
   const external = {};
   for (const [id, source] of Object.entries(manifest.sources ?? {})) {
     if (source.kind === 'derived') continue;
+    if (source.kind === 'events' && !source.url && source.artifact) {
+      const feed = await settle(sources, id, () =>
+        collectArtifactFeed({
+          gh,
+          readArtifact: readArtifact ?? ghArtifactReader(gh),
+          repository,
+          artifact: source.artifact,
+          manifest,
+          sinceMs,
+        })
+      );
+      if (feed) {
+        feeds[id] = { events: feed.events, rejected: feed.rejected };
+        sources[id] = {
+          ok: true,
+          n: feed.events.length,
+          rejected: feed.rejected.length,
+          artifacts: feed.artifacts,
+          ...(feed.failures.length ? { partial: feed.failures } : {}),
+        };
+      }
+      continue;
+    }
     if (!source.url) {
       sources[id] = { ok: false, n: 0, error: 'no producer url yet (spec)' };
       continue;

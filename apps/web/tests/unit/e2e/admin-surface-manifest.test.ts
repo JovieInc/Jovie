@@ -17,7 +17,7 @@ import {
 // These checks validate inventory parity, not authenticated runtime behavior.
 // State/action and exact-build certification remain JOV-7486 / JOV-7487.
 describe('admin surface inventory', () => {
-  it('covers the five current primary workspaces in navigation order', () => {
+  it('covers the one primary workspace, Home (Tim 2026-10-21)', () => {
     expect(ADMIN_PRIMARY_NAV_SURFACES.map(surface => surface.path)).toEqual(
       ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces').map(
         item => item.href
@@ -25,14 +25,10 @@ describe('admin surface inventory', () => {
     );
     expect(ADMIN_PRIMARY_NAV_SURFACES.map(surface => surface.id)).toEqual([
       'home',
-      'growth',
-      'product',
-      'operations',
-      'needs-you',
     ]);
     expect(
       ADMIN_RENDER_SURFACES.filter(surface => surface.primaryWorkspace)
-    ).toHaveLength(5);
+    ).toHaveLength(1);
   });
 
   it('includes each primary workspace in narrow-window snapshots', () => {
@@ -64,7 +60,6 @@ describe('admin surface inventory', () => {
     for (const [id, file] of [
       ['product', 'app/app/(shell)/admin/product/page.tsx'],
       ['operations', 'app/app/(shell)/admin/operations/page.tsx'],
-      ['needs-you', 'app/app/(shell)/admin/needs-you/page.tsx'],
       ['growth-ingest', 'app/app/(shell)/admin/growth/page.tsx'],
       ['growth-campaigns', 'app/app/(shell)/admin/growth/page.tsx'],
     ]) {
