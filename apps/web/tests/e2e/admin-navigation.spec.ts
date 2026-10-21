@@ -1,12 +1,14 @@
-import { expect, test } from '@playwright/test';
-import { APP_ROUTES } from '@/constants/routes';
+import { expect, type Page, test } from '@playwright/test';
 import {
-  ADMIN_PRIMARY_NAV_SURFACES,
-  getAdminSurfaceById,
-} from './utils/admin-surface-manifest';
+  ADMIN_NAV_REGISTRY,
+  buildAdminPeopleHref,
+} from '@/constants/admin-navigation';
+import { APP_ROUTES } from '@/constants/routes';
+import { ADMIN_PRIMARY_NAV_SURFACES } from './utils/admin-surface-manifest';
 import {
   checkForClientError,
   hasAdminCredentials,
+  operatorNavigation,
   signInAsAdmin,
 } from './utils/admin-test-utils';
 import {
@@ -16,44 +18,50 @@ import {
 } from './utils/smoke-test-utils';
 
 /**
- * Admin Navigation Persistence Tests
+ * Operator (Ovie) navigation tests.
  *
- * These tests verify that the admin navigation section:
- * 1. Displays consistently for admin users
- * 2. Remains visible after navigating between pages
- * 3. Works correctly on all admin pages
+ * The operator rail is the `OV Navigation` landmark rendered by
+ * UnifiedSidebar from ADMIN_NAV_REGISTRY. It belongs to the Ovie workspace
+ * only: since JOV-6771 the customer shell renders the same chrome for admins
+ * and creators, so the rail must be absent on customer routes.
  *
- * Run with doppler:
+ * Run:
  *   doppler run -- pnpm exec playwright test admin-navigation --project=chromium
- *
- * For debugging:
- *   doppler run -- pnpm exec playwright test admin-navigation --project=chromium --ui
  */
 
-/**
- * Admin pages to test for navigation persistence
- */
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
+const WORKSPACE_ITEMS = ADMIN_NAV_REGISTRY.filter(
+  item => item.section === 'workspaces'
+);
+
 const ADMIN_PAGES = FAST_ITERATION
-  ? [getAdminSurfaceById('ops')]
+  ? ADMIN_PRIMARY_NAV_SURFACES.slice(0, 1)
   : ADMIN_PRIMARY_NAV_SURFACES;
 
-/**
- * Dashboard pages to test navigation from
- */
-const DASHBOARD_PAGES = FAST_ITERATION
+/** Customer routes where the operator rail must never render. */
+const CUSTOMER_PAGES = FAST_ITERATION
   ? [{ path: APP_ROUTES.CHAT, name: 'Chat' }]
   : [
       { path: APP_ROUTES.CHAT, name: 'Chat' },
-      { path: APP_ROUTES.AUDIENCE, name: 'Audience' },
+      { path: APP_ROUTES.CONTACTS, name: 'Contacts' },
     ];
 
-async function settleAdminNavigation(page: import('@playwright/test').Page) {
+const NAVIGATION_OPTIONS = {
+  timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
+  retries: FAST_ITERATION ? 3 : 2,
+};
+
+async function settleAdminNavigation(page: Page) {
   await waitForHydration(page, { timeout: 15_000 }).catch(() => {});
   await page
     .waitForLoadState('domcontentloaded', { timeout: 5_000 })
     .catch(() => {});
+}
+
+async function gotoAdminRoute(page: Page, path: string) {
+  await smokeNavigateWithRetry(page, path, NAVIGATION_OPTIONS);
+  await settleAdminNavigation(page);
 }
 
 test.describe('Admin Navigation Persistence @smoke', () => {
@@ -68,227 +76,73 @@ test.describe('Admin Navigation Persistence @smoke', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!hasAdminCredentials(), 'Admin auth not available');
 
-    // Capture console errors for debugging
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.log(`[Browser Error] ${msg.text()}`);
-      }
-    });
-
     page.on('pageerror', error => {
       console.log(`[Page Error] ${error.message}`);
     });
 
-    try {
-      await signInAsAdmin(page);
-    } catch (error) {
-      console.error('Failed to sign in admin user:', error);
-      test.skip();
-    }
+    await signInAsAdmin(page);
   });
 
-  /**
-   * Core test: Admin navigation is visible and persists across page navigation
-   *
-   * This test verifies the main issue: admin nav showing intermittently.
-   * It navigates through multiple pages and checks that admin nav remains visible.
-   */
-  test('admin navigation is visible on dashboard and persists across navigation', async ({
+  test('operator navigation persists across admin workspaces and stays out of the customer shell', async ({
     page,
-  }, testInfo) => {
-    test.setTimeout(180_000); // 3 minutes for comprehensive navigation test
+  }) => {
+    test.setTimeout(240_000);
+    const nav = operatorNavigation(page);
 
-    const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
-
-    // signInAsAdmin in beforeEach already landed on /app/dashboard
-    // and waited for the app shell to be ready
-    // We're already on the dashboard - no need to navigate again
-
-    // Wait for page to fully stabilize with retry for admin nav visibility
-    // There can be race conditions with auth/caching that cause flakiness
-    await page
-      .waitForLoadState('networkidle', { timeout: 5000 })
-      .catch(() => {})
-      .catch(() => {});
-
-    // Retry checking for admin nav - it may take a moment to appear
-    let hasAdminAccess = false;
-    hasAdminAccess = await expect
-      .poll(async () => adminNavSection.isVisible().catch(() => false), {
-        timeout: 10000,
-        intervals: [500, 1000, 2000],
-      })
-      .toBeTruthy()
-      .then(() => true)
-      .catch(() => false);
-
-    if (!hasAdminAccess) {
-      // Capture screenshot for debugging
-      const screenshot = await page.screenshot().catch(() => null);
-      if (screenshot) {
-        await testInfo.attach('admin-nav-not-visible', {
-          body: screenshot,
-          contentType: 'image/png',
-        });
-      }
-
-      // The test user doesn't have admin access - skip the test
-      console.log(
-        '⚠ Test user does not have admin access (admin nav not visible)'
-      );
-      console.log('  Ensure test user has isAdmin: true in DB');
-      test.skip();
-      return;
-    }
-
-    console.log('✅ Admin nav visible on initial dashboard load');
-
-    // 2. Navigate to each dashboard page and verify admin nav persists
-    for (const dashPage of DASHBOARD_PAGES) {
-      await smokeNavigateWithRetry(page, dashPage.path, {
-        timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
-        retries: FAST_ITERATION ? 3 : 2,
-      });
-      await waitForHydration(page);
-      await page.waitForLoadState('domcontentloaded');
-
-      // Check for client-side errors
-      const { hasError: pageError } = await checkForClientError(page);
-      if (pageError) {
-        const screenshot = await page.screenshot().catch(() => null);
-        if (screenshot) {
-          await testInfo.attach(`error-${dashPage.name}`, {
-            body: screenshot,
-            contentType: 'image/png',
-          });
-        }
-        // Log but continue - we want to check all pages
-        console.log(`⚠ Client error on ${dashPage.name}`);
-        continue;
-      }
-
-      // Verify admin nav is still visible
-      await expect(
-        adminNavSection,
-        `Admin nav should be visible on ${dashPage.name}`
-      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-
-      console.log(`✅ Admin nav visible on ${dashPage.name}`);
-    }
-
-    // 3. Navigate to each admin page and verify admin nav persists
     for (const adminPage of ADMIN_PAGES) {
-      const response = await smokeNavigateWithRetry(page, adminPage.path, {
-        timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
-        retries: FAST_ITERATION ? 3 : 2,
-      });
+      await gotoAdminRoute(page, adminPage.path);
 
-      // Check for 404 (shouldn't happen if we got this far, but be safe)
-      if (response?.status() === 404) {
-        console.log(`⚠ ${adminPage.name} returned 404 - skipping`);
-        continue;
-      }
+      const { hasError } = await checkForClientError(page);
+      expect(hasError, `Client error on ${adminPage.name}`).toBe(false);
 
-      await waitForHydration(page);
-      await page.waitForLoadState('domcontentloaded');
-
-      // Check for client-side errors
-      const { hasError: pageError } = await checkForClientError(page);
-      if (pageError) {
-        const screenshot = await page.screenshot().catch(() => null);
-        if (screenshot) {
-          await testInfo.attach(`error-${adminPage.name}`, {
-            body: screenshot,
-            contentType: 'image/png',
-          });
-        }
-        console.log(`⚠ Client error on ${adminPage.name}`);
-        continue;
-      }
-
-      // Verify admin nav is still visible
       await expect(
-        adminNavSection,
-        `Admin nav should be visible on ${adminPage.name}`
+        nav,
+        `Operator nav should be visible on ${adminPage.name}`
       ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-
-      // Also verify main content loaded (not a blank page)
-      const mainContent = page.locator('main');
       await expect(
-        mainContent,
+        page.locator('main').first(),
         `Main content should be visible on ${adminPage.name}`
       ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-
-      console.log(`✅ Admin nav visible on ${adminPage.name}`);
     }
 
-    // 4. Navigate back to dashboard and verify admin nav still visible
-    await smokeNavigateWithRetry(page, DASHBOARD_PAGES[0].path, {
-      timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
-      retries: FAST_ITERATION ? 3 : 2,
-    });
-    await waitForHydration(page);
-    await page.waitForLoadState('domcontentloaded');
-
-    // Check for client-side errors on return
-    const { hasError: returnError } = await checkForClientError(page);
-    if (!returnError) {
+    for (const customerPage of CUSTOMER_PAGES) {
+      await gotoAdminRoute(page, customerPage.path);
       await expect(
-        adminNavSection,
-        'Admin nav should still be visible after returning to dashboard'
+        page.locator('main').first(),
+        `Main content should be visible on ${customerPage.name}`
       ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-
-      console.log('✅ Admin nav visible after full navigation cycle');
+      await expect(
+        nav,
+        `Operator nav must not render in the customer shell (${customerPage.name})`
+      ).toHaveCount(0);
     }
 
-    // Attach success summary
-    await testInfo.attach('admin-navigation-summary', {
-      body: JSON.stringify(
-        {
-          dashboardPagesChecked: DASHBOARD_PAGES.length,
-          adminPagesChecked: ADMIN_PAGES.length,
-          allPassed: true,
-        },
-        null,
-        2
-      ),
-      contentType: 'application/json',
-    });
+    // Returning to Ovie restores the rail.
+    await gotoAdminRoute(page, APP_ROUTES.ADMIN_NOW);
+    await expect(nav).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
   });
 
-  test('admin nav shows only primary workspaces and legacy settings admin redirects to ops', async ({
+  test('admin nav lists the registry workspaces and legacy settings admin redirects to ops', async ({
     page,
   }) => {
     test.setTimeout(120_000);
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_PEOPLE, {
-      timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
-      retries: FAST_ITERATION ? 3 : 2,
-    });
-    await settleAdminNavigation(page);
+    await gotoAdminRoute(page, APP_ROUTES.ADMIN_PEOPLE);
 
-    const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
-    await expect(adminNavSection).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
+    const nav = operatorNavigation(page);
+    await expect(nav).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
-    for (const label of ['Chat', 'Ops', 'People', 'Growth', 'Activity']) {
+    for (const item of WORKSPACE_ITEMS) {
       await expect(
-        adminNavSection.getByText(label, { exact: true })
-      ).toBeVisible();
+        nav.getByRole('link', { name: item.label, exact: true }),
+        `Workspace "${item.label}" should be in the operator nav`
+      ).toHaveAttribute('href', item.href);
     }
 
-    for (const label of ['Investors', 'Screenshots']) {
-      await expect(
-        adminNavSection.getByText(label, { exact: true })
-      ).toHaveCount(0);
-    }
+    // Retired surfaces never reappear in the rail.
+    await expect(nav.getByText('Screenshots', { exact: true })).toHaveCount(0);
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.SETTINGS_ADMIN, {
-      timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
-      retries: FAST_ITERATION ? 3 : 2,
-    });
-    await settleAdminNavigation(page);
+    await gotoAdminRoute(page, APP_ROUTES.SETTINGS_ADMIN);
 
     await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.ADMIN_OPS}$`));
     await expect(page.getByTestId('hud-admin-page')).toBeVisible({
@@ -301,13 +155,12 @@ test.describe('Admin Navigation Persistence @smoke', () => {
   }) => {
     test.setTimeout(120_000);
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_ALGORITHM_HEALTH, {
-      timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
-      retries: FAST_ITERATION ? 3 : 2,
-    });
-    await settleAdminNavigation(page);
+    await gotoAdminRoute(page, APP_ROUTES.ADMIN_ALGORITHM_HEALTH);
 
-    await expect(page).toHaveURL(/\/app\/admin\/people\?view=creators/);
+    const creatorsHref = buildAdminPeopleHref('creators');
+    await expect(page).toHaveURL(
+      new RegExp(`${creatorsHref.replace('?', '\\?')}$`)
+    );
     await expect(
       page.locator('[data-testid="admin-people-view-creators"]')
     ).toBeVisible({
@@ -315,234 +168,69 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     });
   });
 
-  /**
-   * Test rapid navigation between pages
-   *
-   * This catches race conditions where admin state might be lost
-   * during fast navigation.
-   */
   test('admin navigation persists during rapid navigation', async ({
     page,
-  }, testInfo) => {
-    test.skip(
-      FAST_ITERATION,
-      'Rapid navigation stress test is excluded from the fast smoke gate'
-    );
+  }) => {
     test.setTimeout(240_000); // Cold local bypass runs still compile several heavy routes
 
-    const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
-
-    // signInAsAdmin in beforeEach already landed on /app/dashboard
-    // and waited for the app shell to be ready
-    await page
-      .waitForLoadState('networkidle', { timeout: 5000 })
-      .catch(() => {})
-      .catch(() => {});
-
-    // Retry checking for admin nav - it may take a moment to appear
-    let hasAdminAccess = false;
-    hasAdminAccess = await expect
-      .poll(async () => adminNavSection.isVisible().catch(() => false), {
-        timeout: 10000,
-        intervals: [500, 1000, 2000],
-      })
-      .toBeTruthy()
-      .then(() => true)
-      .catch(() => false);
-
-    if (!hasAdminAccess) {
-      console.log('⚠ Test user does not have admin access');
-      test.skip();
-      return;
-    }
-
-    // Rapid navigation: quickly move between pages
-    // Use actual page routes that exist in the app
-    const allPages = [
-      APP_ROUTES.CHAT,
-      APP_ROUTES.ADMIN,
-      APP_ROUTES.RELEASES,
-      APP_ROUTES.ADMIN_USERS,
-      APP_ROUTES.CHAT,
-      APP_ROUTES.ADMIN_ACTIVITY,
+    const nav = operatorNavigation(page);
+    const rapidPages = [
+      APP_ROUTES.ADMIN_NOW,
+      APP_ROUTES.ADMIN_GROWTH,
+      APP_ROUTES.ADMIN_PEOPLE,
+      APP_ROUTES.ADMIN_NOW,
+      APP_ROUTES.ADMIN_OPS,
     ];
 
-    let failures = 0;
-
-    for (const path of allPages) {
+    const failures: string[] = [];
+    for (const path of rapidPages) {
       try {
-        await smokeNavigateWithRetry(page, path, {
-          timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
-          retries: FAST_ITERATION ? 3 : 2,
-        });
-        await settleAdminNavigation(page);
+        await gotoAdminRoute(page, path);
       } catch (error) {
-        failures++;
-        console.log(`⚠ Navigation failed on ${path}: ${String(error)}`);
-        if (page.isClosed()) {
-          break;
-        }
+        failures.push(`${path}: navigation failed (${String(error)})`);
         continue;
       }
 
-      // Check for client-side errors
-      const { hasError: pageError } = await checkForClientError(page);
-      if (pageError) {
-        failures++;
-        console.log(`⚠ Client error on ${path}`);
+      const { hasError } = await checkForClientError(page);
+      if (hasError) {
+        failures.push(`${path}: client error`);
         continue;
       }
 
-      // Check admin nav visibility
-      const isVisible = await expect
-        .poll(async () => adminNavSection.isVisible().catch(() => false), {
-          timeout: 10_000,
-          intervals: [500, 1000, 2000],
-        })
-        .toBeTruthy()
+      const visible = await nav
+        .waitFor({ state: 'visible', timeout: 10_000 })
         .then(() => true)
         .catch(() => false);
-      if (!isVisible) {
-        failures++;
-        console.log(`⚠ Admin nav not visible on ${path}`);
-
-        // Capture screenshot for debugging
-        const screenshot = await page.screenshot().catch(() => null);
-        if (screenshot) {
-          await testInfo.attach(
-            `rapid-nav-failure-${path.replace(/\//g, '-')}`,
-            {
-              body: screenshot,
-              contentType: 'image/png',
-            }
-          );
-        }
-      }
+      if (!visible) failures.push(`${path}: operator nav missing`);
     }
 
-    // Final check after all navigation
-    await settleAdminNavigation(page);
-    const { hasError: finalError } = await checkForClientError(page);
-    if (!finalError) {
-      await expect(
-        adminNavSection,
-        'Admin nav should be visible after rapid navigation'
-      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-    }
-
-    expect(failures, `Admin nav issues on ${failures} pages`).toBe(0);
-
-    console.log('✅ Admin nav persisted through rapid navigation');
+    expect(failures, 'Operator nav issues during rapid navigation').toEqual([]);
   });
 
-  /**
-   * Test client-side navigation (using links instead of page.goto)
-   *
-   * This is more realistic as it tests the actual user experience
-   * with client-side routing.
-   */
   test('admin navigation persists with client-side navigation', async ({
     page,
-  }, testInfo) => {
-    test.skip(
-      FAST_ITERATION,
-      'Client-side nav variant is excluded from the fast smoke gate'
-    );
-    test.setTimeout(120_000); // 2 minutes
+  }) => {
+    test.setTimeout(120_000);
 
-    const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
+    await gotoAdminRoute(page, APP_ROUTES.ADMIN_NOW);
+    const nav = operatorNavigation(page);
+    await expect(nav).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
-    // signInAsAdmin in beforeEach already landed on /app/dashboard
-    // and waited for the app shell to be ready
-    await page
-      .waitForLoadState('networkidle', { timeout: 5000 })
-      .catch(() => {})
-      .catch(() => {});
-
-    // Retry checking for admin nav - it may take a moment to appear
-    let hasAdminAccess = false;
-    hasAdminAccess = await expect
-      .poll(async () => adminNavSection.isVisible().catch(() => false), {
-        timeout: 10000,
-        intervals: [500, 1000, 2000],
-      })
-      .toBeTruthy()
-      .then(() => true)
-      .catch(() => false);
-
-    if (!hasAdminAccess) {
-      console.log('⚠ Test user does not have admin access');
-      test.skip();
-      return;
-    }
-
-    // Find and click the Admin nav link to expand admin section if collapsed
-    const adminNavHeader = page.locator('text=Admin').first();
-    if (await adminNavHeader.isVisible()) {
-      // The section is visible, check if we need to expand it
-      const adminLink = page.locator('a[href="/admin"]').first();
-      if (!(await adminLink.isVisible())) {
-        // Click to expand the admin section
-        await adminNavHeader.click();
-        await settleAdminNavigation(page);
-      }
-    }
-
-    // Use client-side navigation by clicking links
-    // Sidebar uses APP_ROUTES: /app/profile, /app/admin, /app/admin/users, /app/audience
-    const navLinks = [
-      { selector: `a[href="${APP_ROUTES.ADMIN}"]`, name: 'Admin Dashboard' },
-      { selector: `a[href="${APP_ROUTES.CHAT}"]`, name: 'Chat' },
-      {
-        selector: `a[href="${APP_ROUTES.ADMIN_USERS}"]`,
-        name: 'Admin Users',
-      },
-      {
-        selector: `a[href="${APP_ROUTES.AUDIENCE}"]`,
-        name: 'Audience',
-      },
-    ];
-
-    for (const link of navLinks) {
-      const linkElement = page.locator(link.selector).first();
-
-      // Skip if link not visible (feature flag, etc.)
-      if (!(await linkElement.isVisible().catch(() => false))) {
-        console.log(`⚠ Link ${link.name} not visible - skipping`);
-        continue;
-      }
-
-      await linkElement.click();
+    for (const item of WORKSPACE_ITEMS.filter(
+      entry => entry.href !== APP_ROUTES.ADMIN_NOW
+    )) {
+      await nav.getByRole('link', { name: item.label, exact: true }).click();
+      await expect(page).toHaveURL(new RegExp(`${item.href}(\\?.*)?$`), {
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      });
       await settleAdminNavigation(page);
 
-      // Check for client-side errors
-      const { hasError: navError } = await checkForClientError(page);
-      if (navError) {
-        console.log(`⚠ Client error after clicking ${link.name}`);
-        continue;
-      }
-
-      // Verify admin nav is still visible
-      const isVisible = await adminNavSection.isVisible().catch(() => false);
-      if (!isVisible) {
-        // Capture screenshot for debugging
-        const screenshot = await page.screenshot().catch(() => null);
-        if (screenshot) {
-          await testInfo.attach(`client-nav-failure-${link.name}`, {
-            body: screenshot,
-            contentType: 'image/png',
-          });
-        }
-      }
-
+      const { hasError } = await checkForClientError(page);
+      expect(hasError, `Client error after clicking ${item.label}`).toBe(false);
       await expect(
-        adminNavSection,
-        `Admin nav should be visible after clicking ${link.name}`
+        nav,
+        `Operator nav should be visible after clicking ${item.label}`
       ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-
-      console.log(`✅ Admin nav visible after clicking ${link.name}`);
     }
-
-    console.log('✅ Admin nav persisted through client-side navigation');
   });
 });

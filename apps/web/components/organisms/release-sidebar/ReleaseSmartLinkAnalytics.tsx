@@ -173,6 +173,7 @@ function ReleaseSmartLinkControl({
           displayValue={smartLinkLabel}
           density='rail'
           className='min-w-0 flex-1'
+          copyButtonTitle='Copy smart link'
           onCopy={async () => {
             if (!(await copyToClipboard(smartLinkUrl))) {
               throw new Error('Could not copy smart link');

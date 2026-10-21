@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, buildArtistProfilePayRoute } from '@/constants/routes';
 import { ensureSignedInUser } from '../helpers/auth';
 import {
   buildValidOnboardingHandle,
@@ -250,9 +250,17 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
       retries: 2,
     });
     await waitForHydration(page);
-    await expect(page).toHaveURL(/\/app\/(earnings|settings\/artist-profile)/, {
-      timeout: 15_000,
-    });
+    // /app/earnings is a legacy redirect: earnings live on the profile pay tab.
+    const payRoute = new URL(buildArtistProfilePayRoute(), page.url());
+    await expect
+      .poll(
+        () => {
+          const current = new URL(page.url());
+          return `${current.pathname}?tab=${current.searchParams.get('tab')}`;
+        },
+        { timeout: 15_000 }
+      )
+      .toBe(`${payRoute.pathname}?tab=${payRoute.searchParams.get('tab')}`);
     await expect(page.locator('text=Something went wrong')).not.toBeVisible({
       timeout: 5_000,
     });
