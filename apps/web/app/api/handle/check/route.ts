@@ -70,11 +70,19 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function serializeHandleCheck(result: HandleAvailabilityResult) {
+function serializeHandleCheck(
+  result: HandleAvailabilityResult,
+  freshness: 'fresh' | 'cached' | 'unknown' = 'unknown'
+) {
   return {
     available: result.available,
     handle: result.handle,
     reason: result.reason,
+    freshness,
+    // Legacy boolean cache entries have no observation timestamp. Never
+    // relabel their read time as a fresh database check or a reservation.
+    checkedAt: freshness === 'fresh' ? new Date().toISOString() : null,
+    reserved: false,
     ...(result.error ? { error: result.error } : {}),
     ...(result.suggestedAlternatives && result.suggestedAlternatives.length > 0
       ? { suggestedAlternatives: result.suggestedAlternatives }
@@ -150,7 +158,9 @@ export async function GET(request: Request) {
         handle: handleLower,
         available: cachedAvailability,
       });
-      return respondWithConstantTime(serializeHandleCheck(cachedResult));
+      return respondWithConstantTime(
+        serializeHandleCheck(cachedResult, 'cached')
+      );
     }
 
     // Canonical check (format/reserved/taken + explicit alternatives).
@@ -180,7 +190,9 @@ export async function GET(request: Request) {
         ? 400
         : 200;
 
-    return respondWithConstantTime(serializeHandleCheck(result), { status });
+    return respondWithConstantTime(serializeHandleCheck(result, 'fresh'), {
+      status,
+    });
   } catch (error: unknown) {
     await captureError('Error checking handle availability', error, {
       handle,

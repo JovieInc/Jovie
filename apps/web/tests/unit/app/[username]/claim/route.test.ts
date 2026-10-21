@@ -10,6 +10,7 @@ const {
   mockIsClaimTokenValid,
   mockEq,
   mockUserLimit,
+  mockGetExactProfileAccess,
 } = vi.hoisted(() => ({
   mockGetOptionalAuth: vi.fn(),
   mockGetProfileByUsername: vi.fn(),
@@ -19,6 +20,7 @@ const {
   mockIsClaimTokenValid: vi.fn(),
   mockEq: vi.fn((column: unknown, value: unknown) => ({ column, value })),
   mockUserLimit: vi.fn(),
+  mockGetExactProfileAccess: vi.fn(),
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -27,6 +29,10 @@ vi.mock('drizzle-orm', () => ({
 
 vi.mock('@/lib/auth/cached', () => ({
   getOptionalAuth: mockGetOptionalAuth,
+}));
+
+vi.mock('@/lib/auth/profile-access', () => ({
+  getExactProfileAccess: mockGetExactProfileAccess,
 }));
 
 vi.mock('@/lib/claim/context', () => ({
@@ -73,6 +79,10 @@ describe('Claim route', () => {
     mockGetOptionalAuth.mockResolvedValue({ userId: null });
     mockReadPendingClaimContext.mockResolvedValue(null);
     mockUserLimit.mockResolvedValue([]);
+    mockGetExactProfileAccess.mockResolvedValue({
+      ok: false,
+      reason: 'forbidden',
+    });
     mockGetProfileByUsername.mockResolvedValue({
       id: 'profile_1',
       username: 'claimableartist',
@@ -237,7 +247,7 @@ describe('Claim route', () => {
     );
     expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
   });
-  it('sends a signed-in owner with an active profile to the dashboard, keyed on users.id (JOV-5401)', async () => {
+  it('keeps a different-handle claim intent instead of sending the current account to its dashboard', async () => {
     mockGetOptionalAuth.mockResolvedValue({ userId: 'app-user-uuid' });
     mockUserLimit.mockResolvedValue([{ activeProfileId: 'profile_owned' }]);
 
@@ -249,8 +259,63 @@ describe('Claim route', () => {
     expect(mockEq).toHaveBeenCalledWith(users.id, 'app-user-uuid');
     expect(mockEq).not.toHaveBeenCalledWith(users.clerkId, expect.anything());
     expect(new URL(response.headers.get('location') ?? '').pathname).toBe(
+      APP_ROUTES.START
+    );
+    expect(
+      new URL(response.headers.get('location') ?? '').searchParams.get('handle')
+    ).toBe('claimableartist');
+    expect(mockGetExactProfileAccess).not.toHaveBeenCalled();
+  });
+
+  it('opens the current workspace only after exact canonical access succeeds', async () => {
+    mockGetOptionalAuth.mockResolvedValue({ userId: 'app-user-uuid' });
+    mockUserLimit.mockResolvedValue([{ activeProfileId: 'profile_1' }]);
+    mockGetExactProfileAccess.mockResolvedValue({
+      ok: true,
+      profileId: 'profile_1',
+    });
+    const response = await GET(
+      new NextRequest('https://jov.ie/claimableartist/claim?next=auth'),
+      {
+        params: Promise.resolve({ username: 'claimableartist' }),
+      }
+    );
+    expect(mockGetExactProfileAccess).toHaveBeenCalledWith(
+      expect.anything(),
+      'app-user-uuid',
+      'profile_1'
+    );
+    expect(new URL(response.headers.get('location') ?? '').pathname).toBe(
       APP_ROUTES.DASHBOARD
     );
     expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
   });
+
+  it.each([null, 'another-app-user'])(
+    'preserves already-owned target recovery for session %s without creating claim authority',
+    async userId => {
+      mockGetOptionalAuth.mockResolvedValue({ userId });
+      mockGetProfileByUsername.mockResolvedValueOnce({
+        id: 'profile_taken',
+        username: 'claimedartist',
+        usernameNormalized: 'claimedartist',
+        displayName: 'Claimed Artist',
+        spotifyId: 'spotify_taken',
+        isClaimed: true,
+      });
+      const response = await GET(
+        new NextRequest('https://jov.ie/claimedartist/claim?next=auth'),
+        { params: Promise.resolve({ username: 'claimedartist' }) }
+      );
+      const location = new URL(response.headers.get('location') ?? '');
+      expect(location.pathname).toBe(userId ? '/start' : '/signin');
+      expect(
+        userId
+          ? location.searchParams.get('handle')
+          : location.searchParams.get('redirect_url')
+      ).toBe(userId ? 'claimedartist' : '/start?handle=claimedartist');
+      expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+      expect(mockClearPendingClaimContext).toHaveBeenCalledOnce();
+    }
+  );
 });

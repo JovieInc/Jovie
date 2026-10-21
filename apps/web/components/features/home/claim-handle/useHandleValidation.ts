@@ -202,6 +202,22 @@ export function useHandleValidation(handle: string): HandleValidationResult {
     };
   }, [debouncedHandle, isValidHandle]);
 
+  // An availability observation is temporary and never reserves the name.
+  // Stop displaying it after the bounded client cache window, even if the
+  // visitor leaves the input unchanged. The save path validates again.
+  useEffect(() => {
+    if (availabilityState.available == null || availabilityState.availError)
+      return;
+    const expires = setTimeout(() => {
+      setAvailabilityState({
+        checkingAvail: false,
+        available: null,
+        availError: 'Availability check expired. Continue for a fresh check.',
+      });
+    }, HANDLE_CACHE_TTL_MS);
+    return () => clearTimeout(expires);
+  }, [availabilityState.available, availabilityState.availError]);
+
   const cancel = useCallback(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -223,8 +239,10 @@ export function useHandleValidation(handle: string): HandleValidationResult {
   return {
     handleError,
     checkingAvail,
-    available: availabilityState.available,
-    availError: availabilityState.availError,
+    // An answer for the previous input must disappear in the same render,
+    // including the debounce window before the new request starts.
+    available: checkingAvail ? null : availabilityState.available,
+    availError: checkingAvail ? null : availabilityState.availError,
     cancel,
   };
 }

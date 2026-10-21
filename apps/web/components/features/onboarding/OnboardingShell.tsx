@@ -70,6 +70,8 @@ export interface OnboardingShellProps {
   readonly turnstileTestMode?: boolean;
   /** The real page behind `?handle=`, shown before the visitor types. */
   readonly entryProfile?: StartEntryProfile | null;
+  readonly accountClaimHandle?: string;
+  readonly accountIdentityId?: string;
 }
 
 /** Preview state for a prebuilt, unclaimed page so the rail shows it on first paint. */
@@ -77,7 +79,12 @@ export function buildEntryProfileBuilderState(
   entryProfile: StartEntryProfile | null | undefined
 ): OnboardingProfileBuilderState {
   if (entryProfile?.status !== 'claimable') {
-    return EMPTY_ONBOARDING_PROFILE_BUILDER_STATE;
+    return entryProfile
+      ? {
+          ...EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+          handle: entryProfile.handle,
+        }
+      : EMPTY_ONBOARDING_PROFILE_BUILDER_STATE;
   }
   return {
     artist: {
@@ -86,10 +93,42 @@ export function buildEntryProfileBuilderState(
       url: entryProfile.spotifyUrl ?? '',
       imageUrl: entryProfile.avatarUrl,
       genres: entryProfile.genres,
+      followers: entryProfile.spotifyFollowers ?? null,
+      latestRelease: entryProfile.latestRelease ?? null,
     },
     artistConfirmed: false,
     handle: entryProfile.handle,
     socialLinks: entryProfile.socialLinks,
+  };
+}
+
+/** Preserve known links for the same identity, never for a different artist/job. */
+export function mergeEntryProfileBuilderState(
+  entry: OnboardingProfileBuilderState,
+  chat: OnboardingProfileBuilderState
+): OnboardingProfileBuilderState {
+  if (
+    chat.profileDraft?.activeRole &&
+    chat.profileDraft.activeRole !== 'artist'
+  )
+    return chat;
+  const sameArtist = !chat.artist || chat.artist.id === entry.artist?.id;
+  return {
+    ...chat,
+    artist:
+      sameArtist && chat.artist
+        ? {
+            ...entry.artist,
+            ...chat.artist,
+            followers: chat.artist.followers ?? entry.artist?.followers,
+            latestRelease:
+              entry.artist?.latestRelease ?? chat.artist.latestRelease,
+          }
+        : (chat.artist ?? entry.artist),
+    handle: chat.handle ?? (sameArtist ? entry.handle : null),
+    socialLinks: sameArtist
+      ? [...new Set([...entry.socialLinks, ...chat.socialLinks])]
+      : chat.socialLinks,
   };
 }
 
@@ -109,6 +148,7 @@ export function OnboardingShell({
   controlsDisabled = false,
   actionError = null,
   onBusyChange,
+  accountClaimHandle,
 }: OnboardingShellProps) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [profileBuilderState, setProfileBuilderState] =
@@ -221,19 +261,24 @@ export function OnboardingShell({
   // artist identity stays in this chat.
   const claimStatus = useOnboardingClaim(
     claimTrigger,
-    !resumeOwnedConversation || claimTrigger > 0
+    !accountClaimHandle && (!resumeOwnedConversation || claimTrigger > 0)
   );
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
+  const resumePath = entryProfile?.handle
+    ? `${APP_ROUTES.START}?${new URLSearchParams({ handle: entryProfile.handle })}`
+    : `${APP_ROUTES.START}?resume=1`;
+  const signInPath = `${APP_ROUTES.SIGNIN}?${new URLSearchParams({ redirect_url: resumePath })}`;
   const entryBuilderState = useMemo(
     () => buildEntryProfileBuilderState(entryProfile),
     [entryProfile]
   );
   // The chat's own state wins once it knows anything; until then the rail
   // previews the prebuilt page from `?handle=`.
-  const railState = resolvePreviewArtist(profileBuilderState)
-    ? profileBuilderState
-    : entryBuilderState;
+  const railState = mergeEntryProfileBuilderState(
+    entryBuilderState,
+    profileBuilderState
+  );
   const sideProfileRail = resolvePreviewArtist(railState) ? (
     <OnboardingProfileRail state={railState} />
   ) : null;
@@ -252,7 +297,14 @@ export function OnboardingShell({
             >
               {onRestart || onLogout || !isSignedIn ? (
                 <OnboardingIdentityConflict
-                  visible={claimStatus === 'identity-conflict'}
+                  visible={
+                    claimStatus === 'identity-conflict' ||
+                    Boolean(accountClaimHandle)
+                  }
+                  accountClaimHandle={accountClaimHandle}
+                  recoveryHandle={
+                    entryProfile?.handle ?? railState.handle ?? undefined
+                  }
                   isSignedIn={isSignedIn}
                   onLogout={onLogout}
                   disabled={actionPending || controlsDisabled}
@@ -268,7 +320,7 @@ export function OnboardingShell({
                       Start Over
                     </Button>
                   ) : null}
-                  {isSignedIn && onLogout ? (
+                  {isSignedIn && onLogout && !accountClaimHandle ? (
                     <Button
                       variant='ghost'
                       size='sm'
@@ -286,7 +338,7 @@ export function OnboardingShell({
                       touchTarget
                       className='shrink-0 whitespace-nowrap'
                     >
-                      <NextLink href={APP_ROUTES.SIGNIN}>Sign in</NextLink>
+                      <NextLink href={signInPath}>Sign in</NextLink>
                     </JovieLink>
                   ) : null}
                 </OnboardingIdentityConflict>
@@ -294,7 +346,9 @@ export function OnboardingShell({
               <OnboardingChat
                 initialMessages={initialMessages}
                 conversationId={conversationId}
-                interactionDisabled={actionPending}
+                interactionDisabled={
+                  actionPending || Boolean(accountClaimHandle)
+                }
                 onBusyChange={onBusyChange}
                 headerOverlay={!isSignedIn}
                 intentId={intentId}
@@ -302,6 +356,7 @@ export function OnboardingShell({
                 onProfileBuilderChange={setProfileBuilderState}
                 starterHandoff={starterHandoff}
                 entryProfile={entryProfile}
+                previewState={railState}
                 turnstileToken={turnstileToken}
                 turnstileStatus={turnstileState.status}
                 turnstilePanel={turnstilePanel}
@@ -349,15 +404,22 @@ export function OnboardingIdentityConflict({
   isSignedIn,
   onLogout,
   disabled = false,
+  accountClaimHandle,
+  recoveryHandle,
   children,
 }: Readonly<{
   visible: boolean;
   isSignedIn: boolean;
   onLogout?: () => void;
   disabled?: boolean;
+  accountClaimHandle?: string;
+  recoveryHandle?: string;
   children?: ReactNode;
 }>) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(Boolean(accountClaimHandle));
+  const recoveryMessage = accountClaimHandle
+    ? `This account already has a profile. Open your workspace to choose a profile, or switch accounts to continue with @${accountClaimHandle}.`
+    : 'This artist already has a Jovie profile. Sign in with the original account or use the verified profile claim flow.';
   const detailsId = useId();
   useEffect(() => {
     if (!visible) setExpanded(false);
@@ -371,8 +433,7 @@ export function OnboardingIdentityConflict({
         {visible ? (
           <>
             <span role='alert' aria-live='assertive' className='sr-only'>
-              This artist already has a Jovie profile. Sign in with the original
-              account or use the verified profile claim flow.
+              {recoveryMessage}
             </span>
             <Button
               variant='ghost'
@@ -382,7 +443,9 @@ export function OnboardingIdentityConflict({
               aria-controls={detailsId}
               onClick={() => setExpanded(value => !value)}
             >
-              Profile Conflict
+              {accountClaimHandle
+                ? `Continue with @${accountClaimHandle}`
+                : 'Profile Conflict'}
             </Button>
           </>
         ) : null}
@@ -394,10 +457,14 @@ export function OnboardingIdentityConflict({
           id={detailsId}
           data-testid='onboarding-identity-conflict'
         >
-          <p className='text-xs leading-5 text-error'>
-            This artist already has a Jovie profile. Sign in with the original
-            account or use the verified profile claim flow.
-          </p>
+          <p className='text-xs leading-5 text-error'>{recoveryMessage}</p>
+          {accountClaimHandle ? (
+            <JovieLink asChild variant='compact' touchTarget>
+              <NextLink href={APP_ROUTES.DASHBOARD}>
+                Open Your Workspace
+              </NextLink>
+            </JovieLink>
+          ) : null}
           {isSignedIn && onLogout ? (
             <Button
               variant='ghost'
@@ -409,7 +476,13 @@ export function OnboardingIdentityConflict({
             </Button>
           ) : !isSignedIn ? (
             <JovieLink asChild variant='compact' touchTarget>
-              <NextLink href={APP_ROUTES.SIGNIN}>
+              <NextLink
+                href={
+                  recoveryHandle
+                    ? `${APP_ROUTES.SIGNIN}?${new URLSearchParams({ redirect_url: `${APP_ROUTES.START}?${new URLSearchParams({ handle: recoveryHandle })}` })}`
+                    : APP_ROUTES.SIGNIN
+                }
+              >
                 Sign in with original account
               </NextLink>
             </JovieLink>

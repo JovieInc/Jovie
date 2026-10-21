@@ -651,12 +651,18 @@ export async function tryHandleAnonymousOnboardingChat(
   // JOV-7143: turn state (artist, followers, interview signals) feeds the
   // access decision, so it comes from the tool calls this server persisted,
   // never from tool outputs in the client-supplied history.
-  const serverToolHistory = await loadServerToolHistory(conversationId);
+  // Both are read-only projections of the same persisted conversation. Neither
+  // depends on the other's result, so do not add a serial database round trip
+  // before the first streamed token.
+  const [serverToolHistory, persistedTranscript] = await Promise.all([
+    loadServerToolHistory(conversationId),
+    loadPersistedTranscript(conversationId),
+  ]);
   // A reload or new tab sends only the newest message; the server transcript
   // is the conversation of record, so the turn never restarts at the opener.
   const uiMessages = resumeOnboardingTranscript({
     clientMessages,
-    persisted: await loadPersistedTranscript(conversationId),
+    persisted: persistedTranscript,
     latestClientMessageId: latestUserMessage.clientMessageId,
   });
   const turnCount = uiMessages.filter(m => m.role === 'user').length;

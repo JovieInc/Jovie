@@ -559,7 +559,15 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
       },
     });
   });
-  await page.goto('/start', { waitUntil: 'domcontentloaded' });
+  const entryUrl = new URL(page.url());
+  if (
+    entryUrl.pathname !== APP_ROUTES.START ||
+    entryUrl.searchParams.get('handle') !== handle
+  ) {
+    throw new Error(
+      'Golden Path must arrive through the homepage with its original handle'
+    );
+  }
   await expect
     .poll(
       () =>
@@ -794,6 +802,9 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     browser,
   }) => {
     test.setTimeout(900_000);
+    const randomSuffix = Math.random().toString(36).slice(2, 8);
+    const uniqueHandle = `t${Date.now().toString(36)}${randomSuffix}`;
+    await page.addInitScript(installRuntimeAutomationBypass);
     // JOV-5489: keyframes for the recorded visual review (no-op unless enabled).
     watchKeyframeErrors(page);
 
@@ -814,11 +825,23 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     });
     await captureKeyframe(page, 'home');
 
+    // Exercise the conversion path the visitor actually uses. A direct
+    // /start navigation cannot prove keyboard submission or claim intent.
+    const claimInput = page
+      .getByRole('textbox', { name: /choose your handle|your name/i })
+      .first();
+    await expect(claimInput).toBeVisible();
+    await claimInput.fill(uniqueHandle);
+    await claimInput.press('Enter');
+    await expect(page).toHaveURL(
+      url =>
+        url.pathname === APP_ROUTES.START &&
+        url.searchParams.get('handle') === uniqueHandle
+    );
+
     // ──────────────────────────────────────────────────────────────────
     // STEP 2: Start the canonical anonymous chat journey
     // ──────────────────────────────────────────────────────────────────
-    const randomSuffix = Math.random().toString(36).slice(2, 8);
-    const uniqueHandle = `t${Date.now().toString(36)}${randomSuffix}`;
     const conversationId = await driveAnonymousOnboardingJourney(
       page,
       uniqueHandle

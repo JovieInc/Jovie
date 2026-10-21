@@ -12,13 +12,6 @@ const { mockPush, mockPrefetch, mockFetch, mockTrack } = vi.hoisted(() => ({
   mockTrack: vi.fn(),
 }));
 
-// Mock dependencies
-vi.mock('@clerk/nextjs', () => ({
-  useAuth: () => ({
-    isSignedIn: false,
-  }),
-}));
-
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
@@ -43,6 +36,39 @@ beforeEach(() => {
 });
 
 describe('ClaimHandleForm', () => {
+  test('acknowledges Enter immediately and ignores a second pending submit', () => {
+    render(<ClaimHandleForm />);
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'david' },
+    });
+    const form = screen.getByTestId('claim-handle-form');
+    fireEvent.submit(form);
+    expect(form).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: /opening/i })).toBeDisabled();
+    expect(screen.getByText('Opening setup for @david…')).toBeInTheDocument();
+    expect(screen.queryByText(/creating/i)).not.toBeInTheDocument();
+    fireEvent.submit(form);
+    expect(mockPush).toHaveBeenCalledExactlyOnceWith('/start?handle=david');
+  });
+
+  test('keeps the handle and allows retry when navigation fails', () => {
+    mockPush.mockImplementationOnce(() => {
+      throw new Error('navigation failed');
+    });
+    render(<ClaimHandleForm />);
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'david' },
+    });
+    fireEvent.submit(screen.getByTestId('claim-handle-form'));
+    expect(screen.getByRole('textbox')).toHaveValue('david');
+    expect(
+      screen.getByText("We couldn't open your profile setup. Try again.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button')).toBeEnabled();
+    fireEvent.submit(screen.getByTestId('claim-handle-form'));
+    expect(mockPush).toHaveBeenCalledTimes(2);
+  });
+
   test('renders with proper accessibility attributes', () => {
     render(<ClaimHandleForm />);
 
@@ -176,9 +202,7 @@ describe('ClaimHandleForm', () => {
       section: 'final_cta',
       handle: 'releasefanclub',
     });
-    expect(mockPush).toHaveBeenCalledWith(
-      '/signup?redirect_url=%2Fstart%3Fhandle%3Dreleasefanclub'
-    );
+    expect(mockPush).toHaveBeenCalledWith('/start?handle=releasefanclub');
   });
 
   test('does not track claim submits when tracking is not configured', () => {
@@ -193,8 +217,6 @@ describe('ClaimHandleForm', () => {
     fireEvent.submit(document.querySelector('form') as HTMLFormElement);
 
     expect(mockTrack).not.toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith(
-      '/signup?redirect_url=%2Fstart%3Fhandle%3Dreleasefanclub'
-    );
+    expect(mockPush).toHaveBeenCalledWith('/start?handle=releasefanclub');
   });
 });

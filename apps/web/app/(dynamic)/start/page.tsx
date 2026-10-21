@@ -2,12 +2,16 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { OnboardingSessionBoundary } from '@/components/features/onboarding/OnboardingSessionBoundary';
+import { APP_ROUTES } from '@/constants/routes';
 import { getStartRouteRedirect } from '@/lib/auth/access-route-redirect';
 import { auth } from '@/lib/auth/better-auth';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 import { resolveUserState } from '@/lib/auth/gate';
+import { getExactProfileAccess } from '@/lib/auth/profile-access';
+import { db } from '@/lib/db';
 import { captureWarning } from '@/lib/error-tracking';
 import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
+import { readStartEntryHandle } from '@/lib/onboarding/start-entry-profile';
 import { resolveStartEntryProfile } from '@/lib/onboarding/start-entry-profile.server';
 import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 
@@ -71,18 +75,44 @@ export default async function StartPage(
     typeof params.intent_id === 'string' ? params.intent_id : undefined;
   const starterHandoff = resolveStartEntryHandoff(params);
 
-  // JOV-7753: a handle-only entry (outreach, claim redirect) shows the
-  // visitor's real page first. Explicit prompts and intents keep their flow.
+  // A handoff does not replace known public identity/catalog context.
   const [authResult, entryProfile] = await Promise.all([
     resolveUserState({ createDbUserIfMissing: false }),
-    starterHandoff || intentId
-      ? Promise.resolve(null)
-      : resolveStartEntryProfile(params),
+    resolveStartEntryProfile(params),
   ]);
-  const startRedirect = getStartRouteRedirect(authResult.state);
+  const startRedirect = getStartRouteRedirect(authResult.state, {
+    hasEntryIntent: Boolean(
+      readStartEntryHandle(params) ||
+        starterHandoff ||
+        intentId ||
+        params.resume === '1'
+    ),
+  });
   if (startRedirect) {
     redirect(startRedirect);
   }
+
+  // Consume an own-profile intent only for the current authorized workspace.
+  // Other targets require an explicit account/profile choice.
+  const targetProfileId =
+    entryProfile && 'profileId' in entryProfile ? entryProfile.profileId : null;
+  if (
+    authResult.state === CanonicalUserState.ACTIVE &&
+    authResult.dbUserId &&
+    targetProfileId === authResult.profileId &&
+    targetProfileId
+  ) {
+    const access = await getExactProfileAccess(
+      db,
+      authResult.dbUserId,
+      targetProfileId
+    );
+    if (access.ok) redirect(APP_ROUTES.DASHBOARD);
+  }
+  const accountClaimHandle =
+    authResult.state === CanonicalUserState.ACTIVE
+      ? readStartEntryHandle(params)
+      : null;
 
   const isSignedIn = authResult.state !== CanonicalUserState.UNAUTHENTICATED;
   const turnstileTestMode = await resolveSyntheticTurnstileTestMode(isSignedIn);
@@ -95,6 +125,8 @@ export default async function StartPage(
       sessionLabel='pending'
       starterHandoff={starterHandoff}
       entryProfile={entryProfile}
+      accountClaimHandle={accountClaimHandle ?? undefined}
+      accountIdentityId={authResult.clerkUserId ?? undefined}
     />
   );
 }
