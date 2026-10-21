@@ -156,7 +156,10 @@ export async function generateMetadata({
   return {
     title,
     description,
-    robots: getPublicProfileRobots(creator.usernameNormalized),
+    robots: getPublicProfileRobots(
+      creator.usernameNormalized,
+      creator.displayName
+    ),
     metadataBase: new URL(BASE_URL),
     alternates: {
       canonical: canonicalUrl,

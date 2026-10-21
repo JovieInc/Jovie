@@ -2,6 +2,12 @@ import { and, desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { BASE_URL } from '@/constants/app';
 import {
+  publicCreatorName,
+  publicMerch,
+  publicReleases,
+} from '@/lib/agent/public-catalog';
+import { publicWorkLinks } from '@/lib/agent/public-work-links';
+import {
   PUBLIC_ARTIST_API_COMMON_HEADERS,
   PUBLIC_ARTIST_API_PROFILE_CACHE_CONTROL,
   PUBLIC_ARTIST_API_RATE_LIMIT_POLICY,
@@ -12,6 +18,7 @@ import { db } from '@/lib/db';
 import { artistDailySnapshots } from '@/lib/db/schema/artist-daily-snapshots';
 import { creatorProfileRiders } from '@/lib/db/schema/riders';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
+import { getMerchMvpEnabled } from '@/lib/flags/profile-variant';
 import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
 import { getPublicProfileDiscoveryExclusionResponse } from '@/lib/profile/public-profile-discovery-response';
@@ -178,7 +185,9 @@ export async function GET(
   const [releases, merch, events, riderVisibility, links, youtubeSnapshot] =
     await Promise.all([
       getReleasesForProfileLite(profile.id),
-      getLiveMerchCardsForProfile(profile.id),
+      getMerchMvpEnabled(null).then(enabled =>
+        enabled ? getLiveMerchCardsForProfile(profile.id) : []
+      ),
       getUpcomingTourDatesForProfile(profile.id),
       db
         .select({ visibility: creatorProfileRiders.visibility })
@@ -204,7 +213,8 @@ export async function GET(
         .then(rows => rows[0]),
     ]);
 
-  const profileUrl = `${BASE_URL}/${profile.username}`;
+  const handle = profile.usernameNormalized || profile.username.toLowerCase();
+  const profileUrl = `${BASE_URL}/${handle}`;
   const youtubeChannelId =
     readYoutubeChannelId(youtubeSnapshot?.rawValues.channelId) ??
     readYoutubeChannelId(profile.youtubeMusicId) ??
@@ -214,8 +224,8 @@ export async function GET(
     {
       artist: {
         id: profile.id,
-        username: profile.username,
-        name: profile.displayName ?? profile.username,
+        username: handle,
+        name: publicCreatorName(profile),
         bio: profile.bio ?? null,
         location: profile.location ?? null,
         genres: profile.genres ?? [],
@@ -224,9 +234,11 @@ export async function GET(
         spotifyUrl: profile.spotifyUrl ?? null,
         appleMusicUrl: profile.appleMusicUrl ?? null,
         youtubeUrl: profile.youtubeUrl ?? null,
+        isClaimed: profile.isClaimed === true,
+        isVerified: profile.isVerified === true,
         creatorType: profile.creatorType,
         audience: readAudience(youtubeSnapshot, profile.spotifyFollowers),
-        links: links.map(link => ({
+        links: publicWorkLinks(links).map(link => ({
           platform: link.platform,
           url: link.url,
           displayText: link.displayText,
@@ -241,14 +253,7 @@ export async function GET(
           musicbrainz: profile.musicbrainzId ?? null,
         },
       },
-      releases: releases.map(r => ({
-        id: r.id,
-        title: r.title,
-        type: r.releaseType,
-        releaseDate: r.releaseDate ?? null,
-        artworkUrl: r.artworkUrl ?? null,
-        url: `${profileUrl}/releases`,
-      })),
+      releases: publicReleases(handle, releases),
       events: events.map(e => ({
         id: e.id,
         title: e.title ?? null,
@@ -259,26 +264,17 @@ export async function GET(
         ticketUrl: e.ticketUrl ?? null,
         ticketStatus: e.ticketStatus,
       })),
-      merch: merch.map(m => ({
-        id: m.id,
-        title: m.title,
-        description: m.description,
-        productType: m.productType,
-        imageUrl: m.primaryImageUrl,
-        retailPriceCents: m.retailPriceCents,
-        url: `${profileUrl}/merch`,
-        available: true,
-      })),
+      merch: publicMerch(handle, merch),
       _links: {
-        self: `${BASE_URL}/api/v1/${profile.username}`,
+        self: `${BASE_URL}/api/v1/${handle}`,
         profile: profileUrl,
         // Advertised only when world-readable; private/link_only stay hidden.
         ...(riderVisibility === 'profile_public'
-          ? { rider: `${BASE_URL}/api/rider/${profile.username}` }
+          ? { rider: `${BASE_URL}/api/rider/${handle}` }
           : {}),
         llmsTxt: `${profileUrl}/llms.txt`,
         feed: `${profileUrl}/feed.xml`,
-        mcp: `${BASE_URL}/api/mcp/${profile.username}`,
+        mcp: `${BASE_URL}/api/mcp/${handle}`,
         openapi: `${BASE_URL}/api/v1/openapi.json`,
       },
     },

@@ -60,6 +60,21 @@ describe('sounds page metadata', () => {
     expect(metadata.robots).toMatchObject({ index: false, follow: false });
   });
 
+  it('excludes QA display names using the same public discovery policy', async () => {
+    hoisted.getCreatorByUsername.mockResolvedValue({
+      ...creator,
+      displayName: 'GP Example +clerk test',
+    });
+    const { generateMetadata } = await import('./page');
+    expect(
+      (
+        await generateMetadata({
+          params: Promise.resolve({ username: 'realartist', slug: 'song' }),
+        })
+      ).robots
+    ).toMatchObject({ index: false, follow: false });
+  });
+
   it('keeps legitimate sound pages indexable', async () => {
     const { generateMetadata } = await import('./page');
     const metadata = await generateMetadata({

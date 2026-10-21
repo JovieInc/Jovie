@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { BASE_URL } from '@/constants/app';
-import { buildPublicWorkLinkLines } from '@/lib/agent/public-work-links';
+import { publicReleaseUrl } from '@/lib/agent/public-catalog';
+import {
+  buildPublicWorkLinkLines,
+  publicWorkUrl,
+} from '@/lib/agent/public-work-links';
 import {
   isPublicProfileIndexable,
   PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
@@ -171,40 +175,38 @@ export async function GET(_req: Request, { params }: RouteParams) {
   const dspLines: string[] = [];
   const socialLines: string[] = [];
   const otherLinks: typeof links = [];
-  const listedUrls: Array<string | null | undefined> = [
-    profile.spotify_url,
-    profile.apple_music_url,
-    profile.youtube_url,
-  ];
-
-  // Profile columns take priority over social links table
-  if (profile.spotify_url)
-    dspLines.push(`- **Spotify**: ${profile.spotify_url}`);
-  if (profile.apple_music_url)
-    dspLines.push(`- **Apple Music**: ${profile.apple_music_url}`);
-  if (profile.youtube_url)
-    dspLines.push(`- **YouTube**: ${profile.youtube_url}`);
-
-  for (const link of links) {
-    if (!link.url) continue;
-    const platform = link.platform?.toLowerCase() ?? '';
+  const listedUrls = new Set<string>();
+  const appendLink = (platform: string, value: string | null | undefined) => {
+    const url = publicWorkUrl(value);
+    if (!url || listedUrls.has(url.href)) return;
     const dspName = Object.hasOwn(DSP_PLATFORM_NAMES, platform)
       ? DSP_PLATFORM_NAMES[platform]
       : undefined;
     const socialName = Object.hasOwn(SOCIAL_PLATFORM_NAMES, platform)
       ? SOCIAL_PLATFORM_NAMES[platform]
       : undefined;
-    if (!dspName && !socialName) {
+    if (dspName) dspLines.push(`- **${dspName}**: ${url.href}`);
+    else if (socialName) socialLines.push(`- **${socialName}**: ${url.href}`);
+    else return;
+    listedUrls.add(url.href);
+  };
+
+  // Profile columns take priority; each safe destination appears once.
+  appendLink('spotify', profile.spotify_url);
+  appendLink('apple_music', profile.apple_music_url);
+  appendLink('youtube', profile.youtube_url);
+  for (const link of links) {
+    const platform = link.platform?.trim().toLowerCase() ?? '';
+    if (
+      Object.hasOwn(DSP_PLATFORM_NAMES, platform) ||
+      Object.hasOwn(SOCIAL_PLATFORM_NAMES, platform)
+    ) {
+      appendLink(platform, link.url);
+    } else {
       otherLinks.push(link);
-    } else if (dspName && !dspLines.some(l => l.includes(dspName))) {
-      dspLines.push(`- **${dspName}**: ${link.url}`);
-      listedUrls.push(link.url);
-    } else if (socialName) {
-      socialLines.push(`- **${socialName}**: ${link.url}`);
-      listedUrls.push(link.url);
     }
   }
-  const workLines = buildPublicWorkLinkLines(otherLinks, listedUrls);
+  const workLines = buildPublicWorkLinkLines(otherLinks, [...listedUrls]);
 
   const lines: string[] = [];
 
@@ -245,7 +247,10 @@ export async function GET(_req: Request, { params }: RouteParams) {
     lines.push('## Links', '', ...workLines, '');
   }
 
-  if (latestRelease?.title) {
+  const latestReleaseUrl = latestRelease
+    ? publicReleaseUrl(handle, latestRelease.slug)
+    : null;
+  if (latestRelease?.title && latestReleaseUrl) {
     lines.push('## Latest Release', '', `- **Title**: ${latestRelease.title}`);
     if (latestRelease.releaseType)
       lines.push(`- **Type**: ${latestRelease.releaseType}`);
@@ -253,11 +258,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
       lines.push(
         `- **Released**: ${toDateOnlySafe(latestRelease.releaseDate)}`
       );
-    const releaseSlug = latestRelease.slug;
-    if (releaseSlug)
-      lines.push(
-        `- **Link**: ${profileUrl}/${encodeURIComponent(releaseSlug)}`
-      );
+    lines.push(`- **Link**: ${latestReleaseUrl}`);
     lines.push('');
   }
 

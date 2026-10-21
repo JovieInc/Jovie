@@ -368,7 +368,10 @@ export async function generateMetadata({
     creator: artistName,
     metadataBase: new URL(BASE_URL),
     alternates: { canonical: canonicalUrl },
-    robots: getPublicProfileRobots(creator.usernameNormalized),
+    robots: getPublicProfileRobots(
+      creator.usernameNormalized,
+      creator.displayName
+    ),
     openGraph: {
       type: 'music.song',
       title,

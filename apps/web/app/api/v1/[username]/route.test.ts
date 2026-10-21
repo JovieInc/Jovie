@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   getProfileByUsername: vi.fn(),
+  getMerchMvpEnabled: vi.fn(),
   getReleasesForProfileLite: vi.fn(),
   getLiveMerchCardsForProfile: vi.fn(),
   getUpcomingTourDatesForProfile: vi.fn(),
@@ -59,6 +60,10 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/flags/profile-variant', () => ({
+  getMerchMvpEnabled: hoisted.getMerchMvpEnabled,
+}));
+
 vi.mock('@/lib/services/profile', () => ({
   getProfileByUsername: hoisted.getProfileByUsername,
 }));
@@ -79,6 +84,7 @@ vi.mock('@/constants/app', () => ({ BASE_URL: 'https://jov.ie' }));
 describe('GET /api/v1/[username]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.getMerchMvpEnabled.mockResolvedValue(true);
     hoisted.getClientIP.mockReturnValue('203.0.113.10');
     hoisted.publicArtistApiLimiterLimit.mockResolvedValue({
       success: true,
@@ -304,6 +310,117 @@ describe('GET /api/v1/[username]', () => {
       countText: '9,876',
       observedAt: null,
     });
+  });
+
+  it('uses persisted release slugs and live product IDs rather than collection destinations', async () => {
+    hoisted.getProfileByUsername.mockResolvedValue({
+      id: 'profile-1',
+      username: 'realartist',
+      usernameNormalized: 'realartist',
+      displayName: 'Real Artist',
+      isPublic: true,
+      isClaimed: false,
+      isVerified: false,
+      claimToken: 'private-token',
+      email: 'private@example.com',
+    });
+    hoisted.getReleasesForProfileLite.mockResolvedValue([
+      {
+        id: 'release-1',
+        title: 'Same Title',
+        slug: 'same-title-2025',
+        releaseType: 'single',
+        releaseDate: '2025-01-02',
+        artworkUrl: null,
+      },
+      {
+        id: 'release-2',
+        title: 'Same Title',
+        slug: 'same-title-2',
+        releaseType: 'album',
+        releaseDate: null,
+        artworkUrl: null,
+      },
+      ...[
+        null,
+        '',
+        '.',
+        '..',
+        'releases',
+        'bad/slug',
+        'bad\\slug',
+        'bad\nslug',
+      ].map(slug => ({ id: 'unsupported', title: 'Unsupported', slug })),
+    ]);
+    hoisted.getLiveMerchCardsForProfile.mockResolvedValue([
+      {
+        id: '00000000-0000-4000-8000-000000000002',
+        title: 'Tour Tee',
+        description: 'Cotton',
+        productType: 'shirt',
+        primaryImageUrl: null,
+        retailPriceCents: 2500,
+      },
+      { id: '', title: 'Unsupported' },
+    ]);
+    hoisted.getUpcomingTourDatesForProfile.mockResolvedValue([]);
+    const { GET } = await import('./route');
+    const res = await GET(new Request('https://jov.ie/api/v1/REALARTIST'), {
+      params: Promise.resolve({ username: 'REALARTIST' }),
+    });
+    const body = await res.json();
+    expect(body.releases).toEqual([
+      {
+        id: 'release-1',
+        title: 'Same Title',
+        type: 'single',
+        releaseDate: '2025-01-02',
+        artworkUrl: null,
+        url: 'https://jov.ie/realartist/same-title-2025',
+      },
+      {
+        id: 'release-2',
+        title: 'Same Title',
+        type: 'album',
+        releaseDate: null,
+        artworkUrl: null,
+        url: 'https://jov.ie/realartist/same-title-2',
+      },
+    ]);
+    expect(body.merch).toEqual([
+      expect.objectContaining({
+        id: '00000000-0000-4000-8000-000000000002',
+        url: 'https://jov.ie/realartist/merch/00000000-0000-4000-8000-000000000002',
+      }),
+    ]);
+    expect(body.artist).toMatchObject({
+      profileUrl: 'https://jov.ie/realartist',
+      isClaimed: false,
+      isVerified: false,
+    });
+    expect(JSON.stringify(body)).not.toMatch(/private-token|private@example/);
+    expect(hoisted.getReleasesForProfileLite).toHaveBeenCalledWith('profile-1');
+    expect(hoisted.getLiveMerchCardsForProfile).toHaveBeenCalledWith(
+      'profile-1'
+    );
+  });
+
+  it('does not advertise product destinations when the public merch page is disabled', async () => {
+    hoisted.getProfileByUsername.mockResolvedValue({
+      id: 'profile-1',
+      username: 'realartist',
+      displayName: 'Real Artist',
+      isPublic: true,
+    });
+    hoisted.getMerchMvpEnabled.mockResolvedValue(false);
+    hoisted.getReleasesForProfileLite.mockResolvedValue([]);
+    hoisted.getUpcomingTourDatesForProfile.mockResolvedValue([]);
+    const { GET } = await import('./route');
+    const res = await GET(new Request('https://jov.ie/api/v1/realartist'), {
+      params: Promise.resolve({ username: 'realartist' }),
+    });
+    expect((await res.json()).merch).toEqual([]);
+    expect(hoisted.getLiveMerchCardsForProfile).not.toHaveBeenCalled();
   });
 
   it('hides a private profile the same way as a missing one', async () => {

@@ -748,7 +748,10 @@ export async function generateMetadata({
     alternates: {
       canonical: canonicalUrl,
     },
-    robots: getPublicProfileRobots(creator.usernameNormalized),
+    robots: getPublicProfileRobots(
+      creator.usernameNormalized,
+      creator.displayName
+    ),
     openGraph: {
       type: ogType,
       title: ogTitle,

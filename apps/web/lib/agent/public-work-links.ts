@@ -6,7 +6,7 @@ interface PublicWorkLink {
 const CONTROL_CHARACTERS = /\p{Cc}/u;
 const PLATFORM_LABEL = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 
-function publicUrl(value: string | null | undefined): URL | null {
+export function publicWorkUrl(value: string | null | undefined): URL | null {
   if (!value || CONTROL_CHARACTERS.test(value)) return null;
   try {
     const url = new URL(value.trim());
@@ -28,12 +28,12 @@ export function buildPublicWorkLinkLines(
   const lines: string[] = [];
   const seen = new Set<string>();
   for (const value of alreadyListedUrls) {
-    const url = publicUrl(value);
+    const url = publicWorkUrl(value);
     if (url) seen.add(url.href);
   }
 
   for (const link of links) {
-    const url = publicUrl(link.url);
+    const url = publicWorkUrl(link.url);
     if (!url || seen.has(url.href)) continue;
 
     const platform = link.platform?.trim();
@@ -48,4 +48,17 @@ export function buildPublicWorkLinkLines(
   }
 
   return lines;
+}
+
+/** Share the existing guide URL policy with JSON consumers of the same public links. */
+export function publicWorkLinks<T extends PublicWorkLink>(
+  links: readonly T[]
+): T[] {
+  const seen = new Set<string>();
+  return links.filter(link => {
+    const url = publicWorkUrl(link.url);
+    if (!url || seen.has(url.href)) return false;
+    seen.add(url.href);
+    return true;
+  });
 }
