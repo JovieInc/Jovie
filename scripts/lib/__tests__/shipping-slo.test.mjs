@@ -630,7 +630,11 @@ describe('shipping SLO intake delivery', () => {
     expect(state.issues).toHaveLength(1);
   });
   it('executes the real workflow filing command and retains Linear replay and failure receipts', () => {
-    const step = parseYaml(WORKFLOW).jobs.measure.steps.find(
+    const workflow =
+      /** @type {{ jobs: { measure: { steps: { name: string, env: Record<string, string>, run: string }[] } } }} */ (
+        parseYaml(WORKFLOW)
+      );
+    const step = workflow.jobs.measure.steps.find(
       step => step.name === 'File deduped Linear SLO regressions'
     );
     expect(step.env.LINEAR_API_KEY).toBe('${{ secrets.LINEAR_API_KEY }}');
@@ -689,10 +693,18 @@ describe('shipping SLO intake delivery', () => {
   });
   it('does not call providers for a healthy report and rejects invalid identities', async () => {
     const state = makeState();
-    expect((await run(state, 'oct05', {})).findings).toEqual([]);
+    const healthy = report();
+    healthy.evaluation.regressions = [];
+    expect((await run(state, 'oct05', healthy)).findings).toEqual([]);
     expect(state.calls).toHaveLength(0);
     await expect(
-      upsertSloFinding({ repo: 'invalid', metric: 'invalid metric' })
+      upsertSloFinding({
+        repo: 'invalid',
+        metric: 'invalid metric',
+        title: 'invalid',
+        body: '',
+        runUrl: 'invalid',
+      })
     ).rejects.toMatchObject({ reason: 'invalid_finding_identity' });
   });
 });

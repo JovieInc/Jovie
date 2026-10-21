@@ -740,7 +740,7 @@ describe('remediationTriggersEnabled', () => {
 describe('reopenLinearIssue', () => {
   it('uses the authoritative issue id and triage state without rewriting human content', async () => {
     const fetchImpl = vi.fn(
-      async () =>
+      async (_url, _init) =>
         new Response(
           JSON.stringify({ data: { issueUpdate: { success: true } } })
         )
@@ -759,11 +759,15 @@ describe('reopenLinearIssue', () => {
     });
   });
   it('fails closed on missing routing, missing credentials, GraphQL rejection and unsuccessful writes', async () => {
-    await expect(reopenLinearIssue({ apiKey: '' })).resolves.toMatchObject({
+    await expect(
+      reopenLinearIssue({ issueId: '', stateId: '', apiKey: '' })
+    ).resolves.toMatchObject({
       ok: false,
       reason: 'missing_linear_api_key',
     });
-    await expect(reopenLinearIssue({ apiKey: 'key' })).resolves.toMatchObject({
+    await expect(
+      reopenLinearIssue({ issueId: '', stateId: '', apiKey: 'key' })
+    ).resolves.toMatchObject({
       ok: false,
       reason: 'missing_reopen_routing',
     });
