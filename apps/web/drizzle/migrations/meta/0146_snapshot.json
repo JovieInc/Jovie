@@ -1,5 +1,5 @@
 {
-  "id": "d42f0bb4-93c8-40aa-83a4-6a189b100edf",
+  "id": "611def87-7593-416a-a2cd-7deed0bad3dc",
   "prevId": "c5736eb7-20e4-4277-91b0-a323d7ad4e63",
   "version": "7",
   "dialect": "postgresql",
@@ -1217,210 +1217,6 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.api_keys": {
-      "name": "api_keys",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "config_id": {
-          "name": "config_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'default'"
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "start": {
-          "name": "start",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reference_id": {
-          "name": "reference_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "prefix": {
-          "name": "prefix",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "key": {
-          "name": "key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "refill_interval": {
-          "name": "refill_interval",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refill_amount": {
-          "name": "refill_amount",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_refill_at": {
-          "name": "last_refill_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": true
-        },
-        "rate_limit_enabled": {
-          "name": "rate_limit_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
-        },
-        "rate_limit_time_window": {
-          "name": "rate_limit_time_window",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rate_limit_max": {
-          "name": "rate_limit_max",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "request_count": {
-          "name": "request_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "remaining": {
-          "name": "remaining",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_request": {
-          "name": "last_request",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "permissions": {
-          "name": "permissions",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "api_keys_reference_id_idx": {
-          "name": "api_keys_reference_id_idx",
-          "columns": [
-            {
-              "expression": "reference_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "api_keys_config_id_idx": {
-          "name": "api_keys_config_id_idx",
-          "columns": [
-            {
-              "expression": "config_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "api_keys_reference_id_ba_users_id_fk": {
-          "name": "api_keys_reference_id_ba_users_id_fk",
-          "tableFrom": "api_keys",
-          "tableTo": "ba_users",
-          "columnsFrom": [
-            "reference_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "api_keys_key_unique": {
-          "name": "api_keys_key_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "key"
-          ]
-        }
-      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -12114,12 +11910,6 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "created_by_user_id": {
-          "name": "created_by_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "user_id": {
           "name": "user_id",
           "type": "uuid",
@@ -12747,19 +12537,6 @@
         }
       },
       "foreignKeys": {
-        "creator_profiles_created_by_user_id_users_id_fk": {
-          "name": "creator_profiles_created_by_user_id_users_id_fk",
-          "tableFrom": "creator_profiles",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
         "creator_profiles_user_id_users_id_fk": {
           "name": "creator_profiles_user_id_users_id_fk",
           "tableFrom": "creator_profiles",
@@ -38097,6 +37874,36 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "reconciliation_status": {
+          "name": "reconciliation_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reconciliation_reason": {
+          "name": "reconciliation_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reconciliation_context": {
+          "name": "reconciliation_context",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reconciliation_flagged_at": {
+          "name": "reconciliation_flagged_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reconciled_at": {
+          "name": "reconciled_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -38128,7 +37935,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "stripe_webhook_events_reconciliation_status_check": {
+          "name": "stripe_webhook_events_reconciliation_status_check",
+          "value": "\"stripe_webhook_events\".\"reconciliation_status\" IS NULL OR \"stripe_webhook_events\".\"reconciliation_status\" IN ('needs_reconciliation', 'reconciled')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.suggested_actions": {
