@@ -702,8 +702,8 @@ process.stdout.write(JSON.stringify(result));
 });
 
 it.each([
-  ['proven', 'ahead-22328-lanes-flake.log', false],
-  ['unproven', 'poison-22331-api-guard.log', true],
+  ['proven', 'ahead-22328-lanes-flake.txt', false],
+  ['unproven', 'poison-22331-api-guard.txt', true],
 ])(
   'CLI attributes against a completed failed ahead run from its job logs (%s)',
   (_label, aheadLogName, waits) => {
@@ -717,7 +717,7 @@ it.each([
           run,
           timeline,
           source: SOURCE,
-          currentLog: join(logs, 'poison-22331-api-guard.log'),
+          currentLog: join(logs, 'poison-22331-api-guard.txt'),
           // The unproven case feeds the poison log as the ahead evidence too:
           // its own failing commands never passed there.
           aheadLog: join(logs, aheadLogName),
