@@ -467,7 +467,7 @@
       "provider-host": 1
     },
     "scripts/lanes/doctor.py": {
-      "gh-subprocess": 3
+      "gh-subprocess": 4
     },
     "scripts/lanes/execution_attempt.py": {
       "gh-subprocess": 1
@@ -667,6 +667,9 @@
       "gh-subprocess": 2
     },
     "scripts/source-admission-check.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/stale-branch-sweep.mjs": {
       "gh-subprocess": 1
     },
     "scripts/taste-classifier.mjs": {
