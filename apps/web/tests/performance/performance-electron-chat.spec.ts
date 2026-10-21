@@ -13,9 +13,19 @@ import {
   type Page,
   test,
 } from '@playwright/test';
-import { APP_ROUTES } from '../constants/routes';
-import { setTestAuthBypassSession } from '../tests/helpers/auth';
-import { roundTripCopy } from '../tests/helpers/chat-performance-probe';
+import { APP_ROUTES } from '../../constants/routes';
+import {
+  assertCompleteSamples,
+  assertForeground,
+  assertSourceIdentity,
+  requireWindow,
+} from '../../scripts/performance-electron-contract';
+import {
+  buildInteractionLatencyReport,
+  type InteractionLatencySample,
+} from '../../scripts/performance-interaction-report';
+import { setTestAuthBypassSession } from '../helpers/auth';
+import { roundTripCopy } from '../helpers/chat-performance-probe';
 import {
   chatStreamResponse,
   exchangeChatRoundTrip,
@@ -29,19 +39,9 @@ import {
   triggerMeasuredSend,
   WARMUP_ROUND_TRIPS,
   waitForChatRouteReady,
-} from '../tests/helpers/chat-performance-scenario';
-import {
-  assertCompleteSamples,
-  assertForeground,
-  assertSourceIdentity,
-  requireWindow,
-} from './performance-electron-contract';
-import {
-  buildInteractionLatencyReport,
-  type InteractionLatencySample,
-} from './performance-interaction-report';
+} from '../helpers/chat-performance-scenario';
 
-const repo = resolve(__dirname, '../../..');
+const repo = resolve(__dirname, '../../../..');
 const desktop = resolve(repo, 'apps/desktop');
 const standalone = resolve(repo, 'apps/web/.next/standalone/apps/web');
 const output = resolve(

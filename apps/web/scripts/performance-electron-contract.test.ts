@@ -1,4 +1,6 @@
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { createVitest } from 'vitest/node';
 import {
   assertCompleteSamples,
   assertForeground,
@@ -36,6 +38,17 @@ const samples = Array.from({ length: 5 }, (_, runIndex) => ({
 }));
 
 describe('Electron source-host evidence', () => {
+  it('leaves the host scenario to Playwright while discovering validator unit coverage', async () => {
+    const ctx = await createVitest({ watch: false });
+    try {
+      const files = await ctx.globTestSpecifications(['performance-electron']);
+      expect(files.map(file => file.moduleId)).toEqual([
+        resolve(__dirname, 'performance-electron-contract.test.ts'),
+      ]);
+    } finally {
+      await ctx.close();
+    }
+  }, 15_000);
   it('requires one existing window, never creating a replacement', () => {
     expect(() => requireWindow([])).toThrow('exactly one');
     expect(() => requireWindow([{}, {}])).toThrow('exactly one');
