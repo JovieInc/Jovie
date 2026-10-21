@@ -460,7 +460,7 @@ export async function collectStageRaw({
   lybRepository = 'JovieInc/LogYourBody',
   now = Date.now(),
   days = 29,
-  readArtifact,
+  readArtifact = null,
 }) {
   const nowMs = typeof now === 'number' ? now : Date.parse(now);
   const sinceMs = nowMs - days * DAY_MS;
