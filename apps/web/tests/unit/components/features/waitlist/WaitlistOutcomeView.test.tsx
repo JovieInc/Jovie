@@ -1,17 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-const checkout = vi.hoisted(() => ({
-  mutate: vi.fn(),
-  isPending: false,
-  isError: false,
-}));
-
 vi.mock('@/hooks/useClerkSafe', () => ({
   useAuthSafe: () => ({ signOut: vi.fn() }),
 }));
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
-vi.mock('@/lib/queries', () => ({ useCheckoutMutation: () => checkout }));
 
 import { WaitlistOutcomeView } from '@/components/features/waitlist/WaitlistOutcomeView';
 
@@ -59,4 +52,26 @@ describe('interview waitlist receipt', () => {
       expect(screen.queryByText(/few days/)).toBeNull();
     }
   );
+
+  it.each(['coolartist', null])(
+    'keeps purchase unavailable with reserved handle %s',
+    reservedHandle => {
+      render(
+        <WaitlistOutcomeView
+          outcome='pending'
+          reservedHandle={reservedHandle}
+        />
+      );
+      expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();
+      expect(screen.getByTestId('waitlist-resume-start')).toHaveAttribute(
+        'href',
+        '/start'
+      );
+    }
+  );
+
+  it('keeps purchase unavailable on error receipts', () => {
+    render(<WaitlistOutcomeView outcome='save_failed' />);
+    expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();
+  });
 });
