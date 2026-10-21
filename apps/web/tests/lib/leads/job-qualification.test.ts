@@ -647,7 +647,7 @@ describe('job qualification', () => {
     });
   });
 
-  it('holds decisions outside their time window', () => {
+  it('holds decisions outside their validity period', () => {
     const result = qualifySupportedJob(
       input({ commercial: commercial(), now: '2026-10-04T06:00:00.000Z' })
     );
