@@ -40,3 +40,13 @@ export const OverflowLinksToInbox: Story = {
     moreHref: '/app/ov/inbox',
   },
 };
+
+export const WithAskerOptions: Story = {
+  args: {
+    asks: HOME_LOOP_FIXTURE_ASKS.map((ask, index) =>
+      index === 0
+        ? { ...ask, options: ['Signed in', 'Restarted it myself'] }
+        : ask
+    ),
+  },
+};
