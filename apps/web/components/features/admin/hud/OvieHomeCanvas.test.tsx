@@ -9,7 +9,13 @@ import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
 
-vi.mock('@/components/feedback', () => ({ toast: vi.fn() }));
+vi.mock('@/components/feedback', () => ({
+  toast: Object.assign(vi.fn(), {
+    dismiss: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+  }),
+}));
 
 const shipping = vi.hoisted(() => ({
   data: undefined as unknown,
