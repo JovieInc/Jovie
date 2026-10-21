@@ -76,7 +76,7 @@ export const ADMIN_PRIMARY_WORKSPACE_IDS = [
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_SETTINGS_TOOL_IDS = [
-  'chat',
+  'ops',
   'certifications',
   'outbound',
   'shipping',
@@ -95,9 +95,9 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
   {
     id: 'overview',
-    label: 'Now',
+    label: 'Home',
     href: APP_ROUTES.ADMIN_NOW,
-    description: 'Company pulse, ranked signals, health, and freshness',
+    description: 'What matters now, shipping, and the composer',
     section: 'workspaces',
   },
   {
@@ -129,10 +129,10 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'workspaces',
   },
   {
-    id: 'chat',
-    label: 'Chat',
-    href: APP_ROUTES.ADMIN_CHAT,
-    description: 'Operator chat surface on the signed-in artist profile',
+    id: 'ops',
+    label: 'Ops',
+    href: APP_ROUTES.ADMIN_OPS,
+    description: 'Full operations dashboard: cash, funnel, health, deployments',
     section: 'utilities',
   },
   {
@@ -393,7 +393,7 @@ export const ADMIN_LEGACY_REDIRECT_MAP = {
   },
   [APP_ROUTES.ADMIN_GROWTH_YC_METRICS]: {
     workspace: 'ops',
-    href: APP_ROUTES.HUD,
+    href: APP_ROUTES.ADMIN_OPS,
   },
 } as const;
 

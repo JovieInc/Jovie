@@ -284,6 +284,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_brand_scrub.py',
       'scripts/tests/test_agent_workflow_hygiene.py',
       'scripts/tests/test_runner_routing.py',
+      'scripts/tests/test_signal_watch.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
@@ -350,7 +351,8 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(27);
+    expect(LANES_PYTEST_FILES).toHaveLength(28);
+    expect(whole).toContain('scripts/tests/test_model_radar.py');
     expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
     expect(new Set(shards.map(shard => shard.data)).size).toBe(4);
     const combine = command.indexOf(
@@ -1986,7 +1988,10 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check'
+    );
+    expect(PACKAGE_JSON.scripts['ownership:check']).toBe(
+      'node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report'
     );
     const controlStages = buildControlTestCommands();
     expect(controlStages).toContainEqual([

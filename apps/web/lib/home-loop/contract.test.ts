@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatCountdown,
   formatDurationSeconds,
   HOME_LOOP_NOT_MEASURED,
   type HomeLoopTile,
@@ -64,5 +65,21 @@ describe('formatDurationSeconds', () => {
   it('never turns unknown into zero', () => {
     expect(formatDurationSeconds(null)).toBe(HOME_LOOP_NOT_MEASURED);
     expect(formatDurationSeconds(-1)).toBe(HOME_LOOP_NOT_MEASURED);
+  });
+});
+
+describe('formatCountdown', () => {
+  const now = Date.parse('2026-10-20T12:00:00.000Z');
+  it.each([
+    ['2026-10-20T12:30:00.000Z', 'in 30m'],
+    ['2026-10-20T17:00:00.000Z', 'in 5h'],
+    ['2026-10-23T12:00:00.000Z', 'in 3d'],
+    ['2026-10-20T11:00:00.000Z', 'now'],
+  ])('formats %s as %s', (deadline, expected) => {
+    expect(formatCountdown(deadline, now)).toBe(expected);
+  });
+
+  it('returns null for an unparseable deadline', () => {
+    expect(formatCountdown('soon', now)).toBeNull();
   });
 });

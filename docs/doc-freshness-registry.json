@@ -119,6 +119,21 @@
         }
       ]
     },
+    ".claude/rules/external-apis.md": {
+      "owner": "@itstimwhite",
+      "claim": "Every third-party API call goes through packages/api-client or scripts/apiclient, enforced by the external API guard ratchet.",
+      "documentSha256": "7ad13110ec9c4b1501f6e18737412e10432c337e75c89b769737655d72f5c1b5",
+      "sources": [
+        {
+          "path": "packages/api-client/providers.json",
+          "sha256": "f8e449fcee1f5f8cef5329d41f6955d4f36de08d0cd592e469aba8f7c674c09f"
+        },
+        {
+          "path": "scripts/lib/external-api-guard.mjs",
+          "sha256": "93114f8531a7c0bd8722e8c2086294a4ecf226cc4123c3044765e77298f9c8ba"
+        }
+      ]
+    },
     ".claude/rules/gstack.md": {
       "owner": "@itstimwhite",
       "claim": "Skill templates and regeneration follow the existing context contract, not copied provider policy.",
@@ -541,6 +556,21 @@
         {
           "path": "scripts/backlog-orchestrator/private-task.mjs",
           "sha256": "46e9fd81de86670fca59bf19d113786428b7b189f758cad75e682bb8d68924a1"
+        }
+      ]
+    },
+    "docs/metrics/STAGE_EVENTS.md": {
+      "owner": "@itstimwhite",
+      "claim": "The stage-event contract, sources, outputs and emitter specs match the manifest and the stage-timings code.",
+      "documentSha256": "6c72e49e29c13881b2b43f4b1113aeb927437d4d6068817fcb1d1dba07b55fbd",
+      "sources": [
+        {
+          "path": "docs/metrics/stage-manifest.json",
+          "sha256": "0ae456055b1b20adce866461813394c051b1dd4e8c2a5276fd5d1d03bdca00d3"
+        },
+        {
+          "path": "scripts/lib/stage-events.mjs",
+          "sha256": "d7b18a8e609488fb47dfabb4b5b24ffc7cc575ca333353f6201f5597d2d98a9d"
         }
       ]
     }
