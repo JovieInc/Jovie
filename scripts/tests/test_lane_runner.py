@@ -13530,7 +13530,9 @@ class SelftestCleanupScopeTest(unittest.TestCase):
                 lane.reap_selftest_processes(receipt)
         self.assertEqual(receipt["diagnostic"]["observation"], {
             "pid": 201, "start": "linux:2000", "source": "proc-environ",
-            "errorCode": "selftest-process-custody-unreadable", "errno": 13})
+            "errorCode": "selftest-process-custody-unreadable", "errno": 13,
+            "lineage": [{"pid": 201, "comm": "", "sameUid": True, "birth": "linux:2000",
+                         "baseline": False, "owner": False, "ownerAncestor": False, "parent": 1}]})
         self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
 
     def test_denied_environment_and_reused_zombie_birth_still_holds(self):
