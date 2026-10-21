@@ -109,13 +109,33 @@ describe('GET /claim/start', () => {
     expect(mocks.getArtist).not.toHaveBeenCalled();
   });
 
-  it('stops famous artists before any ownership or payment step', async () => {
+  it('sends a famous artist to their own profile and checkout, never the takeover route', async () => {
     mocks.getArtist.mockResolvedValue({
       name: 'Famous',
       followerCount: 80_000_000,
     });
     const response = await GET(request(`spotify=${SPOTIFY_ID}`));
-    expect(location(response)).toBe('/claim?state=verification_required');
+    const url = new URL(location(response) ?? '', 'http://localhost');
+    expect(url.pathname).toBe('/signup');
+    expect(url.searchParams.get('plan')).toBe('pro');
+  });
+
+  it('never routes an unclaimed high-reach Jovie profile to the takeover route', async () => {
+    mocks.dbRows = [
+      [
+        {
+          username: 'famous',
+          isClaimed: false,
+          followers: 50_000,
+          displayName: 'Famous',
+        },
+      ],
+    ];
+    const response = await GET(request(`spotify=${SPOTIFY_ID}`));
+    expect(location(response)).not.toContain('/famous/claim');
+    expect(new URL(location(response) ?? '', 'http://localhost').pathname).toBe(
+      '/signup'
+    );
   });
 
   it('never routes reserved fixture identities to a claim', async () => {
