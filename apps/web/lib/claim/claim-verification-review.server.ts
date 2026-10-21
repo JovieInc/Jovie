@@ -90,9 +90,11 @@ export async function fileClaimVerificationCard(input: {
     amountUsd: null,
     preflightReceiptId: null,
     evidence,
-    // No silent default: the claim stays pending until a founder decides.
+    // No automatic default (coordinator decision 2026-10-21): auto-reject
+    // would turn away a paying customer and auto-approve would defeat the
+    // guard. The card escalates on Home at 24h and 48h instead.
     decideBy: null,
-    defaultDecision: null,
+    defaultDecision: 'none',
   });
   if (result.outcome === 'conflict') {
     throw new Error(

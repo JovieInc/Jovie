@@ -11,7 +11,7 @@ import {
   type InteractionCase,
   rankInteractionCases,
 } from './interaction-case';
-import type { SummerCard } from './summer-cards';
+import { SUMMER_CARD_ESCALATION_HOURS, type SummerCard } from './summer-cards';
 
 export type InboxDecisionTarget =
   | { readonly kind: 'visual'; readonly id: string; readonly surfaceId: string }
@@ -37,10 +37,18 @@ export interface InboxDecisionDefault {
   readonly declared: boolean;
 }
 
+/** A no-default decision that has waited too long (level 1: 24h, 2: 48h). */
+export interface InboxEscalation {
+  readonly level: 0 | 1 | 2;
+  readonly waitingHours: number;
+}
+
 export interface OvieInboxCase extends InteractionCase {
   readonly decisionTarget: InboxDecisionTarget | null;
   /** Absent or null: no default declared yet (Home shows none). */
   readonly decisionDefault?: InboxDecisionDefault | null;
+  /** Present on no-default cards; Home badges and ranks levels 1 and 2 first. */
+  readonly escalation?: InboxEscalation | null;
   readonly body: string;
   readonly certification?: {
     readonly row: OvieCertificationRow;
@@ -63,7 +71,27 @@ const pending = {
   decisionDefault: null,
 } as const;
 
-function summerCardDefault(card: SummerCard): InboxDecisionDefault {
+/**
+ * A no-default card escalates instead of settling: level 1 from 24h, level 2
+ * from 48h (`SUMMER_CARD_ESCALATION_HOURS`). Level 0 means not yet.
+ */
+export function summerCardEscalation(
+  card: Pick<SummerCard, 'defaultDecision' | 'createdAt'>,
+  now: Date
+): InboxEscalation | null {
+  if (card.defaultDecision !== 'none') return null;
+  const created = Date.parse(card.createdAt);
+  if (!Number.isFinite(created)) return null;
+  const hours = Math.max(0, (now.getTime() - created) / 3_600_000);
+  const [first, second] = SUMMER_CARD_ESCALATION_HOURS;
+  return {
+    level: hours >= second ? 2 : hours >= first ? 1 : 0,
+    waitingHours: Math.floor(hours),
+  };
+}
+
+function summerCardDefault(card: SummerCard): InboxDecisionDefault | null {
+  if (card.defaultDecision === 'none') return null;
   return {
     contract: 'jovie.decision-default/v1',
     decision: card.defaultDecision,
@@ -84,9 +112,11 @@ export function projectOvieInbox(
   cards: readonly SummerCard[],
   inventory: OvieCertificationInventory | null,
   visualRuns: readonly VisualQaReviewRun[] = [],
-  linear?: TimActionsResponse
+  linear?: TimActionsResponse,
+  now: Date = new Date()
 ): OvieInbox {
   const cases: OvieInboxCase[] = [];
+  const escalationOf = (card: SummerCard) => summerCardEscalation(card, now);
   for (const proposal of proposals.filter(item => item.status === 'pending')) {
     cases.push({
       ...pending,
@@ -120,16 +150,24 @@ export function projectOvieInbox(
         card.body,
         card.recipient ? `Recipient: ${card.recipient}` : null,
         card.amountUsd !== null ? `Amount: USD ${card.amountUsd}` : null,
-        `If silent by ${card.decideBy}: ${summerCardDefault(card).summary}`,
+        card.defaultDecision === 'none'
+          ? 'No automatic default: this stays pending and escalates at 24 and 48 hours.'
+          : `If silent by ${card.decideBy}: ${summerCardDefault(card)?.summary}`,
       ]
         .filter(Boolean)
         .join('\n\n'),
       recommendation: card.recommendation,
-      priority: card.kind === 'spend' || card.kind === 'outbound' ? 1 : 2,
+      // An escalated no-default card ranks above everything else.
+      priority: escalationOf(card)?.level
+        ? 0
+        : card.kind === 'spend' || card.kind === 'outbound'
+          ? 1
+          : 2,
       createdAt: card.createdAt,
       evidence: card.evidence,
-      waitingUntil: card.decideBy,
+      waitingUntil: card.defaultDecision === 'none' ? null : card.decideBy,
       decisionDefault: summerCardDefault(card),
+      escalation: escalationOf(card),
       decisionTarget: { kind: 'summer', id: card.id },
     });
   }

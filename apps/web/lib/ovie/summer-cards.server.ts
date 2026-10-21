@@ -42,7 +42,7 @@ const storedCardSchema = z.object({
   decidedAt: z.string().nullable(),
   // Deadline contract fields; rows filed before it parse with legacy defaults.
   decideBy: z.string().nullable().default(null),
-  defaultDecision: z.enum(['approve', 'reject']).default('reject'),
+  defaultDecision: z.enum(['approve', 'reject', 'none']).default('reject'),
   resolution: z.enum(['founder', 'default']).nullable().default(null),
   feedback: z
     .array(z.object({ comment: z.string(), at: z.string() }))
@@ -259,8 +259,11 @@ export async function applySummerCardDefaults(
   limit = 100
 ): Promise<SummerCardDefaultsResult> {
   const pending = await listSummerCards({ status: 'pending', limit });
+  // `none` cards never settle themselves; they escalate on Home instead.
   const due = pending.filter(
-    card => Date.parse(card.decideBy) <= now.getTime()
+    (card): card is typeof card & { defaultDecision: 'approve' | 'reject' } =>
+      card.defaultDecision !== 'none' &&
+      Date.parse(card.decideBy) <= now.getTime()
   );
   let approvedByDefault = 0;
   let rejectedByDefault = 0;

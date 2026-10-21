@@ -271,6 +271,38 @@ describe('summer card default-plus-deadline contract', () => {
     });
   });
 
+  it('never settles a no-default card, however overdue (claim verification)', async () => {
+    const claim = contractRow({
+      id: summerCardId('claim-verification-card'),
+      idempotencyKey: 'claim-verification-card',
+      kind: 'decision',
+      defaultIfSilent:
+        'Stays pending; the artist is not linked and no refund runs.',
+      defaultDecision: 'none',
+    });
+    hoisted.listLimit.mockResolvedValue([{ value: claim }]);
+
+    const result = await applySummerCardDefaults(
+      new Date('2026-11-30T00:00:00.000Z')
+    );
+
+    expect(result).toMatchObject({ checked: 1, defaulted: 0, cardIds: [] });
+    expect(hoisted.updateSet).not.toHaveBeenCalled();
+  });
+
+  it('accepts none as a declared no-default for decision cards', () => {
+    const card = summerCardInputSchema.parse({
+      ...tasteInput,
+      idempotencyKey: 'claim-verification-key',
+      kind: 'decision',
+      defaultDecision: 'none',
+    });
+    expect(card.defaultDecision).toBe('none');
+    expect(summerCardDecisionContract(card, FILED).defaultDecision).toBe(
+      'none'
+    );
+  });
+
   it('lets a founder decision that lands first win over the default', async () => {
     const overdue = contractRow();
     hoisted.listLimit.mockResolvedValue([{ value: overdue }]);

@@ -15,7 +15,16 @@ export const SUMMER_CARD_MAX_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 export const SUMMER_CARD_DEFAULT_DECIDER = 'default-on-expiry';
 export const SUMMER_CARD_MAX_FEEDBACK = 20;
 
-export type SummerCardDefaultDecision = 'approve' | 'reject';
+/**
+ * What the deadline records. `none` opts a card out of the default entirely:
+ * it never settles itself and escalates on Home instead (claim verification:
+ * auto-reject would turn away a paying customer, auto-approve would defeat
+ * the guard; coordinator decision 2026-10-21).
+ */
+export type SummerCardDefaultDecision = 'approve' | 'reject' | 'none';
+
+/** No-default cards re-surface at the top of Home at these ages. */
+export const SUMMER_CARD_ESCALATION_HOURS = [24, 48] as const;
 
 const optionalText = (max: number) =>
   z
@@ -58,7 +67,7 @@ export const summerCardInputSchema = z
       .transform(value => (value ? new Date(value).toISOString() : null)),
     /** What the deadline records. Omitted: `reject`, so silence never acts. */
     defaultDecision: z
-      .enum(['approve', 'reject'])
+      .enum(['approve', 'reject', 'none'])
       .optional()
       .transform(value => value ?? null),
   })
