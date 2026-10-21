@@ -11405,6 +11405,15 @@ class SelftestForeignLineageTest(unittest.TestCase):
             helper.kill()
             helper.wait(timeout=10)
 
+    def test_an_unproven_hold_records_its_parent_chain(self):
+        procs = {10: (self.UID, 200, "linux:5"), 200: (self.UID, 1, "linux:2"),
+                 500: (self.UID, 200, "linux:100")}
+        hops = lane._lineage_evidence(500, self.CLEANUP, identity=procs.get)
+        self.assertEqual([(h["pid"], h["ownerAncestor"], h["sameUid"]) for h in hops], [(500, False, True), (200, True, True)])
+        held = lane.SelftestCleanupHeld("selftest-process-custody-unreadable", pid=500, start="linux:100",
+                                        source="proc-environ", lineage=hops)
+        self.assertEqual(held.observation["lineage"][1]["pid"], 200)
+
     def test_anything_short_of_proof_keeps_the_hold(self):
         for name, table in {
             "owner-descendant": {500: (self.UID, 10, "linux:100")},
@@ -11419,10 +11428,35 @@ class SelftestForeignLineageTest(unittest.TestCase):
                 self.assertFalse(self.lineage(table))
 
 
+def _own_subtree(pid: int, me: int) -> bool:
+    """True when /proc's ppid chain from pid reaches me (this test process)."""
+    for _ in range(64):
+        if pid == me:
+            return True
+        try:
+            pid = int((Path("/proc") / str(pid) / "stat").read_text().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+        if pid <= 1:
+            return False
+    return False
+
+
 class OperatorInstallerGlueTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="operator-installer-glue-")
         self.addCleanup(self.tmp.cleanup)
+        # Every self-test custody scan in this class sees only this test's own process
+        # subtree. CI's structural lane runs ~30 commands at once; their non-dumpable
+        # children (chromium etc.) refuse /proc environ and held these tests at random
+        # (runs 39533866177, 39536019717: selftest-process-custody-unreadable). Production
+        # custody is unchanged: it scans every same-UID process and fails closed.
+        real_row, me = lane._selftest_process_row, os.getpid()
+        scoped = patch.object(lane, "_selftest_process_row",
+                              side_effect=lambda entry, pid, uid: real_row(entry, pid, uid)
+                              if _own_subtree(pid, me) else None)
+        scoped.start()
+        self.addCleanup(scoped.stop)
         self.root = Path(self.tmp.name).resolve()
         self.host = SimpleNamespace(state=self.root / "state", repo=self.root / "repo", gate_slots=2)
         self.host.state.mkdir()
@@ -11631,7 +11665,15 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         self.assertEqual(diagnostic["stderrSha256"], hashlib.sha256(stderr.encode()).hexdigest())
         self.assertEqual(diagnostic["stderrBytes"], len(stderr.encode()))
         self.assertEqual((stage / ".selftest-stderr.log").read_text(), stderr)
-        self.assertNotIn("test_bound", console.getvalue())
+        # The raw FAIL header sits outside the 2000-character console tail. The
+        # refusal still names that selector on its own lines (2026-10-21).
+        console_text = console.getvalue()
+        tail, separator, named = console_text.partition("release self-test retry:")
+        self.assertEqual(separator, "release self-test retry:")
+        self.assertEqual(tail, "x" * 2000 + "\n")
+        self.assertNotIn("test_bound", tail)
+        self.assertIn("release self-test failed selector(s): scripts.tests.test_fixture.Example.test_bound", named)
+        self.assertIn("release self-test failure: FAIL: test_bound (scripts.tests.test_fixture.Example)", named)
         for name in [".selftest-diagnostic.json", ".selftest-stderr.log"]:
             self.assertEqual((stage / name).stat().st_mode & 0o777, 0o600)
 
@@ -11726,6 +11768,10 @@ class OperatorInstallerGlueTest(unittest.TestCase):
                     safe["source"] = observation["source"]
                 if type(observation.get("errno")) is int:
                     safe["errno"] = observation["errno"]
+                if isinstance(observation.get("lineage"), list):
+                    safe["lineage"] = [{key: hop.get(key) for key in ("pid", "comm", "sameUid", "birth", "baseline",
+                                                                      "owner", "ownerAncestor", "parent", "gone")
+                                        if key in hop} for hop in observation["lineage"][:16] if isinstance(hop, dict)]
                 digest = cleanup.get("sourceSha256")
                 if isinstance(digest, str) and len(digest) == 64 and set(digest) <= set("0123456789abcdef"):
                     safe["sourceSha256"] = digest
@@ -13492,7 +13538,9 @@ class SelftestCleanupScopeTest(unittest.TestCase):
                 lane.reap_selftest_processes(receipt)
         self.assertEqual(receipt["diagnostic"]["observation"], {
             "pid": 201, "start": "linux:2000", "source": "proc-environ",
-            "errorCode": "selftest-process-custody-unreadable", "errno": 13})
+            "errorCode": "selftest-process-custody-unreadable", "errno": 13,
+            "lineage": [{"pid": 201, "comm": "", "sameUid": True, "birth": "linux:2000",
+                         "baseline": False, "owner": False, "ownerAncestor": False, "parent": 1}]})
         self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
 
     def test_denied_environment_and_reused_zombie_birth_still_holds(self):
@@ -13664,3 +13712,43 @@ class SelftestProcessAbsenceTest(unittest.TestCase):
                                        201, os.getuid())
         with self.assertRaises(lane.SelftestCleanupHeld):
             lane._selftest_process_row(self.entry(PermissionError(13, "denied"), []), 201, os.getuid())
+
+
+class SelftestRetryDiagnosticTest(unittest.TestCase):
+    """A refused release names the selector that failed twice (CI summaries keep only stderr)."""
+
+    def test_failed_retry_prints_selectors_and_failure_lines(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = Path(tmp)
+            rerun = subprocess.CompletedProcess([], 1, stdout="", stderr=(
+                "FAIL: test_bound (scripts.tests.test_x.Example.test_bound)\n"
+                "Traceback (most recent call last):\n  noise\n"
+                "AssertionError: 2 != 0\n"))
+            with patch.object(lane, "selftest_env", return_value={}), \
+                 patch.object(lane, "reap_selftest_processes", return_value=0), \
+                 patch.object(lane, "_selftest_cleanup_summary", return_value={"outcome": "clean"}), \
+                 patch.object(lane.lifecycle, "run", return_value=rerun), \
+                 contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertFalse(lane.retry_failed_selectors(
+                    stage, "FAIL: test_bound (scripts.tests.test_x.Example.test_bound)\n"))
+            text = err.getvalue()
+            self.assertIn("release self-test failed selector(s): scripts.tests.test_x.Example.test_bound", text)
+            self.assertIn("release self-test failure: FAIL: test_bound", text)
+            self.assertIn("release self-test failure: AssertionError: 2 != 0", text)
+            self.assertNotIn("noise", text)
+
+
+class AdoptionShareTest(unittest.TestCase):
+    """A fixed share of selection passes tries green drafts before red repairs (2026-10-21)."""
+
+    def test_every_nth_pass_is_an_adoption_turn_and_zero_disables_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = SimpleNamespace(state=Path(tmp))
+            with patch.dict(os.environ, {"LANES_ADOPT_SHARE_EVERY": "4"}):
+                self.assertEqual([lane.adoption_turn_due(host) for _ in range(8)],
+                                 [False, False, False, True, False, False, False, True])
+            with patch.dict(os.environ, {"LANES_ADOPT_SHARE_EVERY": "0"}):
+                self.assertFalse(any(lane.adoption_turn_due(host) for _ in range(8)))
+            (host.state / "adopt-share.json").write_text("not json")
+            with patch.dict(os.environ, {"LANES_ADOPT_SHARE_EVERY": "bogus"}):
+                self.assertEqual(sum(lane.adoption_turn_due(host) for _ in range(lane.ADOPT_SHARE_EVERY)), 1)

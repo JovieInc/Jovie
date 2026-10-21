@@ -237,7 +237,7 @@ describe('Claim route', () => {
     );
     expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
   });
-  it('refuses self-serve claims of high-profile artists before writing claim context', async () => {
+  it('routes high-profile artists to the verification path before writing claim context', async () => {
     mockGetProfileByUsername.mockResolvedValueOnce({
       id: 'profile_famous',
       username: 'famousartist',
@@ -255,7 +255,7 @@ describe('Claim route', () => {
     );
 
     expect(response.headers.get('location')).toBe(
-      'http://localhost/claim?state=verification_required'
+      'http://localhost/claim/start?spotify=spotify_famous'
     );
     expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
   });
