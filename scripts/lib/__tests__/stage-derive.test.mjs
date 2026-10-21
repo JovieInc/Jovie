@@ -307,11 +307,7 @@ describe('stage collector', () => {
         : '[]';
     const raw = await collectStageRaw({
       gh,
-      fetchImpl: async () => ({
-        ok: true,
-        status: 200,
-        text: async () => 'not-json',
-      }),
+      fetchImpl: async () => new Response('not-json', { status: 200 }),
       env: {},
       manifest: JSON.parse(
         '{"sources":{"timings":{"kind":"timings","url":"https://example.test/t"}}}'
