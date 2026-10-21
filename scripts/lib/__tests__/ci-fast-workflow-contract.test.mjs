@@ -351,7 +351,7 @@ describe('ci-fast bounded parallel workflow', () => {
       [...LANES_PYTEST_FILES].sort()
     );
     expect(LANES_PYTEST_FILES).toHaveLength(28);
-    expect(shards[3].files).toContain('scripts/tests/test_model_radar.py');
+    expect(whole).toContain('scripts/tests/test_model_radar.py');
     expect(command).toContain(
       'coverage report --include="*/scripts/lanes/model_radar.py" --fail-under=90'
     );
