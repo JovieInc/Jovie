@@ -29,7 +29,7 @@ on:
       workflows:
         description: 'Comma-separated required workflow files'
         required: false
-        default: 'ci.yml'
+        default: 'ci.yml,source-validation.yml'
 
 permissions: {}
 
@@ -70,7 +70,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
           DAYS: ${{ github.event.inputs.days || '21' }}
-          WORKFLOWS: ${{ github.event.inputs.workflows || 'ci.yml' }}
+          WORKFLOWS: ${{ github.event.inputs.workflows || 'ci.yml,source-validation.yml' }}
         run: |
           set -euo pipefail
           node scripts/shipping-slo-report.mjs validate
