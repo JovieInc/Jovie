@@ -234,6 +234,26 @@ modes, neverUse rules.
   only), reduced-motion mandatory.
 - Content budgets: over-budget slot = check failure. Use `text-wrap: balance`.
 - CTA: `primaryCtaLabel` repeated verbatim throughout the page (one primary).
+- **Correct-by-default primitives (2026-10-20).** Build pages from these, not
+  page-local copies:
+  - Section frame and spine: `ArtistProfileSectionShell` (and its
+    `.ap-section-container` for a hero) owns rhythm, the content width, and
+    the one page gutter. Do not declare another `--*-page-gutter` or width.
+  - Type: `.marketing-type-display` (page h1), `.marketing-type-section`
+    (h2), `.marketing-type-lede`, all bound to the `--ds-marketing-*` ramp.
+    The `marketing-*-linear` classes are retired; no `uppercase` labels.
+  - Prices: `MarketingOfferSummary plan=…` renders price, badge, and terms
+    from `lib/billing/offer-truth.ts`; each inclusion names its
+    `PRICING_COMPARISON` row. Never type a plan price into copy
+    (`offer-price-source-guard` blocks it).
+  - Product imagery: `MarketingPhoneStateGallery` / `MarketingPhoneImage`
+    with screenshot-registry scenario ids; one real state per phone.
+  - Locks derive from the recipe and manifest. A page gets one rendered
+    contract test, not a set of per-component source-string locks.
+- Verify with the route-health observer, real Playwright screenshots at
+  320/390/768/1024/1440, axe, and the Clef screenshot evaluator when
+  available. The route DOM detector fails clamped headings that crop
+  descender ink.
 
 ### 4.5 Closed-loop generation
 
