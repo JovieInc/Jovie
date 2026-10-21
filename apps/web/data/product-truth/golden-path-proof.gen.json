@@ -34,15 +34,15 @@
       "detail": "dogfood proof dogfood-tim-known-contacts"
     },
     {
-      "id": "homepage.hero.claimed-preview",
+      "id": "homepage.hero.artist-profile",
       "step": "homepage",
       "route": "/",
       "source": "apps/web/data/homepageIdentityCopy.ts",
-      "copy": "Tim White’s Jovie profile at jov.ie/tim",
-      "nature": "outcome",
-      "evidenceClass": "dogfood",
+      "copy": "Your music and links, together.",
+      "nature": "capability",
+      "evidenceClass": null,
       "status": "admissible",
-      "detail": "dogfood proof product-profile-subscribe-capture"
+      "detail": "certified: public-profile"
     },
     {
       "id": "homepage.presence.headline",
@@ -181,7 +181,7 @@
       "step": "pricing",
       "route": "/pricing",
       "source": "apps/web/lib/billing/offer-truth.ts",
-      "copy": "Limited access.",
+      "copy": "Self-serve. Cancel anytime.",
       "nature": "offer",
       "evidenceClass": null,
       "status": "admissible",
@@ -201,7 +201,7 @@
   ],
   "evidenceCounts": {
     "computed": 5,
-    "dogfood": 3,
+    "dogfood": 2,
     "pilot": 0,
     "none": 0
   },

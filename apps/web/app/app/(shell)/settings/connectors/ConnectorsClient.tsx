@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
 import { ConnectorCard } from '@/components/features/connectors/ConnectorCard';
 import { SettingsSection } from '@/components/features/dashboard/organisms/SettingsSection';
@@ -17,6 +17,10 @@ import {
 } from '@/lib/connectors/registry';
 
 const CONNECTOR_DEFINITIONS = getConnectorDefinitions();
+
+// The only OAuth return code shown as neutral status. Every other code keeps
+// the generic failure copy and is never echoed.
+const OAUTH_CANCELED = 'oauth_canceled';
 
 interface ConnectorState {
   readonly status: ConnectorStatus;
@@ -42,7 +46,9 @@ export function ConnectorsClient({
   returnTo = APP_ROUTES.SETTINGS_CONNECTORS,
 }: ConnectorsClientProps) {
   const router = useRouter();
-  const oauthFailed = Boolean(useSearchParams().get('error'));
+  const oauthError = useSearchParams().get('error');
+  const oauthCanceled = oauthError === OAUTH_CANCELED;
+  const oauthFailed = Boolean(oauthError) && !oauthCanceled;
   const [isPendingExtract, startExtract] = useTransition();
   const [pendingBundle, setPendingBundle] = useState<string | null>(null);
   const [disconnected, setDisconnected] = useState<readonly string[]>([]);
@@ -52,10 +58,29 @@ export function ConnectorsClient({
   const [actionErrors, setActionErrors] = useState<
     Partial<Record<ConnectorProviderId, string>>
   >({});
+  // Rejects repeated clicks in the same tick, before pending state renders.
+  const connectStarted = useRef(false);
+
+  useEffect(() => {
+    // Back from provider consent can restore this page from the back/forward
+    // cache with Connect still pending; release it so the user can retry.
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted || !connectStarted.current) return;
+      connectStarted.current = false;
+      setPendingBundle(null);
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
 
   const handleConnect = (provider: ConnectorProviderId) => {
     const definition = getConnectorDefinition(provider);
-    if (pendingBundle || connectors[provider].available === false) return;
+    if (
+      connectStarted.current ||
+      pendingBundle ||
+      connectors[provider].available === false
+    )
+      return;
     const params = new URLSearchParams({
       returnTo,
     });
@@ -66,6 +91,7 @@ export function ConnectorsClient({
       }
       params.set('creatorProfileId', creatorProfileId);
     }
+    connectStarted.current = true;
     setPendingAction('connect');
     setPendingBundle(definition.oauthBundle);
     router.push(
@@ -152,6 +178,11 @@ export function ConnectorsClient({
           <p role='alert' className='py-3 text-xs text-error'>
             The connection did not finish. Check the account status below, then
             try connecting again.
+          </p>
+        )}
+        {oauthCanceled && (
+          <p role='status' className='py-3 text-xs text-secondary'>
+            Connection canceled. Nothing changed.
           </p>
         )}
         <p className='pb-3 text-xs text-tertiary'>

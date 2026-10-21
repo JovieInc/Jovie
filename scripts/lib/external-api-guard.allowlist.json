@@ -1,0 +1,11 @@
+{
+  "schema": "jovie-external-api-allowlist/v1",
+  "entries": [
+    {
+      "path": "scripts/lanes/gh_app_token.py",
+      "rule": "provider-host",
+      "max": 2,
+      "reason": "Mints the Jovie Bot installation token the client layer itself authenticates with; the budget read moves to apiclient in the lanes migration."
+    }
+  ]
+}

@@ -12,6 +12,16 @@ import {
 import { supportedAgentDecision } from '@/tests/fixtures/agent-handoff';
 import { malformedJsonRequest } from '@/tests/helpers/malformed-json-request';
 
+const mockRecordArtistOfferStage = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
+  recordArtistOfferStage: mockRecordArtistOfferStage,
+}));
+
+const mockRevenueFailure = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/observability/revenue-spine', () => ({
+  captureRevenueSpineFailure: mockRevenueFailure,
+}));
+
 const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockCreateCheckoutSession = vi.hoisted(() => vi.fn());
 const mockCreateBillingPortalSession = vi.hoisted(() => vi.fn());
@@ -553,6 +563,40 @@ describe('POST /api/stripe/checkout', () => {
     );
   });
 
+  it('returns self-serve claim checkouts to billing success or the claim page', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockResolvedValue({
+      id: 'cs_claim',
+      url: 'https://checkout.stripe.com/pay/cs_claim',
+    });
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie:
+          'jv_claim_flow=1; jv_acquisition_id=7f5bb735-8e88-4d78-ae32-5228cc12a8bb',
+      },
+      body: JSON.stringify({
+        priceId: 'price_123',
+        source: 'onboarding',
+        humanConfirmed: true,
+        returnTo: '/chat?from=onboarding',
+      }),
+    });
+
+    expect((await POST(request)).status).toBe(200);
+    const [call] = mockCreateCheckoutSession.mock.calls.at(-1) ?? [];
+    expect(call.successUrl).toMatch(
+      /\/billing\/success\?session_id=\{CHECKOUT_SESSION_ID\}/
+    );
+    expect(call.cancelUrl).toMatch(/\/claim\?state=checkout_canceled$/);
+    expect(call.idempotencyKey).toContain(':claim:');
+    expect(mockRecordArtistOfferStage).toHaveBeenCalledWith(
+      '7f5bb735-8e88-4d78-ae32-5228cc12a8bb',
+      'checkout'
+    );
+  });
+
   it('retries transient Stripe errors and preserves idempotency key', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
 
@@ -618,6 +662,12 @@ describe('POST /api/stripe/checkout', () => {
     expect(response.status).toBe(503);
     expect(response.headers.get('Retry-After')).toBe('5');
     expect(payload.error).toContain('temporarily unavailable');
+    expect(mockRevenueFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: 'checkout',
+      severity: 'blocked',
+      userId: 'user_123',
+      error: expect.any(Error),
+    });
     expect(mockCreateCheckoutSession).toHaveBeenCalledTimes(3);
   });
 

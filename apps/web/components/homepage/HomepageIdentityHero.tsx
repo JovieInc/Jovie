@@ -1,5 +1,4 @@
 // @coverage-via apps/web/tests/unit/home/HomepageIdentityHero.test.tsx
-import Image from 'next/image';
 import { ProductClaimHandleForm } from '@/app/(marketing)/product/ProductClaimHandleForm';
 import {
   MarketingHero,
@@ -7,7 +6,6 @@ import {
   MarketingSurfaceCard,
 } from '@/components/marketing';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
-import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { HomepageCertifiedExposure } from './HomepageCertifiedExposure';
 import './HomepageIdentity.css';
 
@@ -25,10 +23,9 @@ const HERO_TEXTURE = {
 } as const;
 
 /**
- * Homepage identity + link-claim hero (Pen STAGING Cyuz2 / xm2iz, Tim
- * 2026-09-28): one headline, one support line, and Tim White's real claimed
- * jov.ie/tim as proximal first-party proof (JOV-6946, JOV-INV-038) beside the
- * only action, claiming jov.ie/you. No product screenshot, nothing single-ICP.
+ * Existing split-claim composition, scoped to the artist-profile launch
+ * (JOV-7750, 2026-10-16). The identity primitive shows jov.ie/you beside
+ * the claim action, without implying that an example person owns the input.
  */
 export function HomepageIdentityHero({
   copy = HOMEPAGE_IDENTITY_COPY.hero,
@@ -80,31 +77,14 @@ export function HomepageIdentityHero({
         >
           <div
             className='flex flex-col gap-4'
-            data-testid='homepage-hero-real-profile'
+            data-testid='homepage-hero-identity'
           >
-            <div className='flex items-center gap-4'>
-              <Image
-                alt={copy.proofAlt}
-                className='size-12 shrink-0 rounded-full object-cover sm:size-14'
-                height={112}
-                priority
-                src={TIM_WHITE_PROFILE.avatarSrc}
-                width={112}
-              />
-              <div className='min-w-0'>
-                <p className='text-base text-primary-token'>{preview.name}</p>
-                <p className='whitespace-nowrap text-sm text-tertiary-token'>
-                  {preview.role}
-                </p>
-              </div>
-              <p className='product-claim-card__status ml-auto text-secondary-token'>
-                {preview.label}
-              </p>
-            </div>
+            <p className='text-sm text-secondary-token'>{preview.label}</p>
             <p className='product-claim-card__path text-primary-token'>
               <span className='text-tertiary-token'>{claim.domain}</span>
-              <span>{TIM_WHITE_PROFILE.publicProfileHandle}</span>
+              <span>{preview.name}</span>
             </p>
+            <p className='text-sm text-secondary-token'>{preview.role}</p>
           </div>
           <div
             // Phones: the claim leads the card so the consent banner never covers it.

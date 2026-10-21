@@ -1274,6 +1274,10 @@
   --color-accent-subtle: var(--noir-ion-ion-soft);
   --color-accent-foreground: oklch(100% 0 0);
 
+  /* Primary destructive button: ZiaWI red needs dark ink for normal text AA. */
+  --color-btn-destructive-bg: var(--color-error);
+  --color-btn-destructive-fg: var(--system-b-cinematic-black);
+
   /* Primary button - high contrast */
   --color-btn-primary-bg: oklch(10% 0 0);
   --color-btn-primary-fg: oklch(100% 0 0);

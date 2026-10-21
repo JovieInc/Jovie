@@ -8,6 +8,7 @@ import {
 import {
   buildOpsReport,
   deliverOpsReport,
+  MAX_EVIDENCE_AGE_MS,
   NOT_APPLICABLE,
   OPS_REPORT_REVIEW_SCHEMA,
   OPS_REPORT_SCHEMA,
@@ -348,6 +349,153 @@ test('existing send seam suppresses duplicate notification', async () => {
     'suppressed-duplicate'
   );
   assert.equal(sent.length, 1);
+});
+
+for (const outcome of ['observed', 'approved-template']) {
+  test(`${outcome} expires before the existing send adapter is called`, async () => {
+    const input = baseInput();
+    const prepared = await prepareOpsReportDelivery(input, {
+      now: () => NOW,
+      review: async value =>
+        outcome === 'observed' ? cleanReceipt(value) : { status: 'timeout' },
+    });
+    assert.equal(prepared.decision, outcome);
+    const expiredAt = Date.parse(OBSERVED_AT) + MAX_EVIDENCE_AGE_MS + 1;
+    assert.deepEqual(
+      buildOpsReport(input, { now: () => expiredAt }).deterministicIssues,
+      ['stale-evidence']
+    );
+    const sent = [];
+    const dedupe = new Set();
+    await assert.rejects(
+      deliverOpsReport(prepared, input, {
+        now: () => expiredAt,
+        dedupe,
+        send: async message => sent.push(message),
+      }),
+      /invalidated/
+    );
+    assert.equal(sent.length, 0);
+    assert.equal(dedupe.size, 0);
+  });
+}
+
+test('factual delivery remains valid through the exact evidence-age boundary', async () => {
+  const input = baseInput();
+  const prepared = await prepareOpsReportDelivery(input, {
+    now: () => NOW,
+    review: async value => cleanReceipt(value),
+  });
+  assert.equal(
+    verifyOpsReportDelivery(prepared, input, {
+      now: () => Date.parse(OBSERVED_AT) + MAX_EVIDENCE_AGE_MS,
+    }),
+    true
+  );
+});
+
+test('the deliberately degraded stale-evidence queue notice remains deliverable', async () => {
+  const input = baseInput();
+  const expiredAt = Date.parse(OBSERVED_AT) + MAX_EVIDENCE_AGE_MS + 1;
+  const prepared = await prepareOpsReportDelivery(input, {
+    now: () => expiredAt,
+    review: async () => {
+      throw new Error('blocked evidence must not call Jev');
+    },
+  });
+  assert.equal(prepared.decision, 'review-queue');
+  assert.match(
+    prepared.message,
+    /needs review before the reported state can be trusted/
+  );
+  assert.match(prepared.message, /stale-evidence/);
+  const sent = [];
+  const result = await deliverOpsReport(prepared, input, {
+    now: () => expiredAt + MAX_EVIDENCE_AGE_MS,
+    send: async message => sent.push(message),
+  });
+  assert.equal(result.outcome, 'sent-to-existing-adapter');
+  assert.deepEqual(sent, [prepared.message]);
+});
+
+test('changing a factual review to review-queue cannot bypass evidence expiry', async () => {
+  const input = baseInput();
+  const expiredAt = Date.parse(OBSERVED_AT) + MAX_EVIDENCE_AGE_MS + 1;
+  for (const review of [
+    async value => cleanReceipt(value),
+    async () => ({ status: 'timeout' }),
+  ]) {
+    const prepared = await prepareOpsReportDelivery(input, {
+      now: () => NOW,
+      review,
+    });
+    assert.notEqual(prepared.decision, 'review-queue');
+    assert.equal(prepared.review.bindings.outcome, prepared.decision);
+    assert.throws(
+      () =>
+        verifyOpsReportDelivery(
+          {
+            ...prepared,
+            decision: 'review-queue',
+            review: { ...prepared.review, outcome: 'review-queue' },
+          },
+          input,
+          { now: () => expiredAt }
+        ),
+      /invalidated/
+    );
+  }
+});
+
+test('fresh evidence must be prepared again after the previous factual report expires', async () => {
+  const expiredAt = Date.parse(OBSERVED_AT) + MAX_EVIDENCE_AGE_MS + 1;
+  const input = baseInput();
+  const old = await prepareOpsReportDelivery(input, {
+    now: () => NOW,
+    review: async value => cleanReceipt(value),
+  });
+  const freshInput = baseInput({
+    evidence: {
+      ...input.evidence,
+      observedAt: new Date(expiredAt).toISOString(),
+    },
+  });
+  assert.throws(
+    () => verifyOpsReportDelivery(old, freshInput, { now: () => expiredAt }),
+    /invalidated/
+  );
+  const fresh = await prepareOpsReportDelivery(freshInput, {
+    now: () => expiredAt,
+    review: async value => cleanReceipt(value, { completedAt: expiredAt }),
+  });
+  const sent = [];
+  assert.equal(
+    (
+      await deliverOpsReport(fresh, freshInput, {
+        now: () => expiredAt,
+        send: async message => sent.push(message),
+      })
+    ).outcome,
+    'sent-to-existing-adapter'
+  );
+  assert.equal(sent.length, 1);
+});
+
+test('a backwards delivery clock cannot turn future evidence into a factual report', async () => {
+  const input = baseInput();
+  const prepared = await prepareOpsReportDelivery(input, {
+    now: () => NOW,
+    review: async value => cleanReceipt(value),
+  });
+  const backwards = Date.parse(OBSERVED_AT) - 60_001;
+  assert.deepEqual(
+    buildOpsReport(input, { now: () => backwards }).deterministicIssues,
+    ['future-evidence']
+  );
+  assert.throws(
+    () => verifyOpsReportDelivery(prepared, input, { now: () => backwards }),
+    /invalidated/
+  );
 });
 
 test('delivery rejects changed adapter arguments, expired evidence and late reviews', async () => {

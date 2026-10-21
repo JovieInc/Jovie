@@ -11,18 +11,22 @@
  * That file is data: it does not call the mutation. A string hit counts inside
  * a string literal, or as `gh pr merge --auto`.
  *
- * The rearm job in merge-queue-green-enroll.yml is an acknowledged exception:
- * it prints a warning and does not fail the run. Every other enqueue mismatch
- * fails. Removing the live mismatch without removing the exception also fails.
+ * Enqueue mismatches fail unless explicitly acknowledged in the catalog.
+ * Removing a live mismatch without removing its acknowledgement also fails.
  *
- * REST writes, Octokit writes, and the other GraphQL mutations are a separate
- * catalog. They are not enforced here.
+ * REST writes, Octokit writes, and the other GraphQL mutations live in
+ * scripts/lib/workflow-token-scope-catalog.mjs and are installed below.
  */
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as loadYaml } from 'js-yaml';
+import {
+  augmentExtractedCalls,
+  installTokenScopeCatalog,
+  scopeExecutedSource,
+} from './lib/workflow-token-scope-catalog.mjs';
 
 const RANK = { read: 1, write: 2, admin: 3 };
 
@@ -48,13 +52,12 @@ const callCatalog = JSON.parse(
 /** @type {Record<string, Requirement>} */
 export const GRAPHQL_MUTATIONS = callCatalog.graphql;
 
-/**
- * Pre-existing rearm failure (run 38960318802, job 117173542106).
- * Scope changes are Tim-only; this check must not edit the token.
- */
+/** Explicit exceptions from the non-executable catalog; normally empty. */
 export const ACKNOWLEDGED_MISMATCHES = callCatalog.acknowledgements;
 
 const enqueueCall = callCatalog.cliEnqueueKey;
+
+installTokenScopeCatalog(GRAPHQL_MUTATIONS, ACKNOWLEDGED_MISMATCHES);
 
 const SCRIPT_PATH =
   /(?:^|[\s'"`=(])(\.?\/?(?:[A-Za-z0-9_.-]+\/)*?(?:scripts|\.github\/scripts)\/[A-Za-z0-9_./-]+\.(?:mjs|js|cjs|sh))(?=$|[\s'"`);,&|])/g;
@@ -369,17 +372,19 @@ export function extractCalls(source, mode = 'js') {
   /** @type {FoundCall[]} */
   const calls = [];
   pushGraphqlStrings(masked, calls);
-  if (mode !== 'shell') return calls;
-  for (const command of splitShellCommands(masked)) {
-    if (!shellEnqueues(command)) continue;
-    const at = masked.indexOf(command);
-    calls.push({
-      call: enqueueCall,
-      index: at < 0 ? 0 : at,
-      kind: 'cli',
-      requirement: GRAPHQL_MUTATIONS[enqueueCall] ?? null,
-    });
+  if (mode === 'shell') {
+    for (const command of splitShellCommands(masked)) {
+      if (!shellEnqueues(command)) continue;
+      const at = masked.indexOf(command);
+      calls.push({
+        call: enqueueCall,
+        index: at < 0 ? 0 : at,
+        kind: 'cli',
+        requirement: GRAPHQL_MUTATIONS[enqueueCall] ?? null,
+      });
+    }
   }
+  augmentExtractedCalls(masked, mode, calls, GRAPHQL_MUTATIONS);
   return calls;
 }
 
@@ -746,7 +751,11 @@ export function scanWorkflowTokenScopes(root, options = {}) {
               const source = cache.get(abs) ?? readFileSync(abs, 'utf8');
               cache.set(abs, source);
               const scriptMode = script.endsWith('.sh') ? 'shell' : 'js';
-              record(source, script, token, scriptMode);
+              const scoped =
+                scriptMode === 'js'
+                  ? scopeExecutedSource(source, command)
+                  : source;
+              record(scoped, script, token, scriptMode);
             }
           }
         }

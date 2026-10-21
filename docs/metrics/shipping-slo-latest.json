@@ -1,5 +1,5 @@
 {
-  "at": "2026-10-19T14:38:41.886Z",
+  "at": "2026-10-20T12:42:19.659Z",
   "ciP95Seconds": {
     "pull_request": null,
     "merge_group": 1012
@@ -8,8 +8,8 @@
   "queueEjectionRate": null,
   "leadTimeP95Seconds": {
     "devin": null,
-    "codex": 21493,
-    "other": 8713
+    "codex": 37836,
+    "other": 9940
   },
   "remediationP95Seconds": {
     "prRedToGreen": null,
@@ -23,6 +23,6 @@
     "wowGrowth": null,
     "growthTrend": "unknown"
   },
-  "regressions": [],
+  "regressions": ["lead_time.codex.p95"],
   "flatStall": false
 }
