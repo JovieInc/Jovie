@@ -97,6 +97,7 @@ extension EnvironmentValues {
 @MainActor
 struct ChatPresentationCheckpoint: UIViewRepresentable {
   let monitor: ChatPresentationMonitor
+  let generation: Int
   let kind: ChatPresentationMarker.Kind
   let eligible: Bool
   var revision: Int = 0
@@ -110,7 +111,7 @@ struct ChatPresentationCheckpoint: UIViewRepresentable {
   }
 
   func updateUIView(_ view: ChatPresentationMarker, context: Context) {
-    view.configure(kind: kind, generation: monitor.measurement.generation,
+    view.configure(kind: kind, generation: generation,
                    revision: revision, eligible: eligible)
   }
 }

@@ -217,8 +217,10 @@ struct MobileChatView: View {
             .background {
               if let presentationMonitor, item.clientTurnId == repository.measurementTurnID {
                 ChatPresentationCheckpoint(monitor: presentationMonitor,
+                  generation: presentationMonitor.measurement.generation,
                   kind: item.role == .user ? .feedback : .reply,
                   eligible: item.role == .user || (item.role == .assistant && item.status == .completed && !item.content.isEmpty))
+                  .allowsHitTesting(false)
                   .accessibilityHidden(true)
               }
             }
@@ -308,6 +310,7 @@ struct MobileChatView: View {
         workspaceMode: repository.workspace,
         onSend: {
           #if DEBUG
+          repository.preparePresentationMeasurement()
           presentationMonitor?.begin()
           #endif
           let text = draft
@@ -331,8 +334,10 @@ struct MobileChatView: View {
       #if DEBUG
       .background {
         if let presentationMonitor {
-          ChatPresentationCheckpoint(monitor: presentationMonitor, kind: .input,
+          ChatPresentationCheckpoint(monitor: presentationMonitor,
+            generation: presentationMonitor.measurement.generation, kind: .input,
             eligible: true, revision: presentationMonitor.measurement.inputRevision)
+            .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
       }

@@ -42,6 +42,11 @@ final class ChatRepository {
   @ObservationIgnored var presentationMeasurement: ChatPresentationMeasurement?
   @ObservationIgnored private(set) var measurementTurnID: String?
   @ObservationIgnored private var measurementGeneration: Int?
+
+  func preparePresentationMeasurement() {
+    measurementTurnID = nil
+    measurementGeneration = nil
+  }
   #endif
 
   private let client: MobileChatClientProtocol
@@ -135,7 +140,7 @@ final class ChatRepository {
     sendGeneration += 1
     sendTask?.cancel()
     #if DEBUG && os(iOS)
-    presentationMeasurement.cancel()
+    presentationMeasurement?.cancel()
     #endif
   }
 
@@ -167,7 +172,7 @@ final class ChatRepository {
     guard await acceptsCompletion() else { return }
     let isSwitchingThread = activeConversationID != conversationID
     #if DEBUG && os(iOS)
-    if isSwitchingThread { presentationMeasurement.cancel() }
+    if isSwitchingThread { presentationMeasurement?.cancel() }
     #endif
     if isSwitchingThread { selectionRevision += 1 }
     activeConversationID = conversationID
@@ -255,7 +260,7 @@ final class ChatRepository {
 
   func startNewConversation() {
     #if DEBUG && os(iOS)
-    presentationMeasurement.cancel()
+    presentationMeasurement?.cancel()
     #endif
     selectionRevision += 1
     activeConversationID = nil
@@ -294,6 +299,10 @@ final class ChatRepository {
     if let target {
       guard target.key.selection == selectionRevision, timeline.contains(target.userItem) else { return }
     }
+    #if DEBUG && os(iOS)
+    // A retry/tool submission cannot inherit a typed attempt's presentation.
+    if measurementTurnID != nil { presentationMeasurement?.cancel() }
+    #endif
 
     let wasSending = isSending
     sendGeneration += 1
@@ -316,7 +325,7 @@ final class ChatRepository {
     let clientMessageId = UUID().uuidString
     let context = SendContext()
     #if DEBUG && os(iOS)
-    let captureGeneration = presentationMeasurement.generation
+    let captureGeneration = presentationMeasurement?.generation
     #endif
 
     isSending = true
@@ -402,6 +411,12 @@ final class ChatRepository {
     } catch {
       // Stop the timer sink before any awaited expiry delivery or cleanup.
       context.acceptingEvents = false
+      #if DEBUG && os(iOS)
+      if (Task.isCancelled || error is CancellationError),
+         let captureGeneration, captureGeneration == presentationMeasurement?.generation {
+        presentationMeasurement?.cancel()
+      }
+      #endif
       guard await acceptsCompletion(error, allowingCancellation: true), generation == sendGeneration, selection == selectionRevision else { return }
       guard context.authorization != .notAcquired else { return }
       if Task.isCancelled || error is CancellationError {
@@ -617,7 +632,7 @@ final class ChatRepository {
     #if DEBUG && os(iOS)
     if let captureGeneration = measurementGeneration, measurementTurnID == clientTurnId,
        timeline.contains(where: { $0.clientTurnId == clientTurnId && $0.role == .assistant && !$0.content.isEmpty }) {
-      presentationMeasurement.modelUpdated(generation: captureGeneration)
+      presentationMeasurement?.modelUpdated(generation: captureGeneration)
     }
     #endif
   }
