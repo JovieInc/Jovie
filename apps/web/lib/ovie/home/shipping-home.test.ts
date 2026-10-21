@@ -223,7 +223,19 @@ describe('buildDoneToday', () => {
 describe('buildPulse', () => {
   it('shows Not measured, neutral tone, and no was for an empty summary', () => {
     const pulse = buildPulse(delivery());
-    expect(pulse).toHaveLength(7);
+    expect(pulse.map(tile => tile.key)).toEqual([
+      'prod',
+      'merges-hour',
+      'queue',
+      'red-prs',
+      'lanes',
+      'eligible',
+      'held',
+      'ownerless',
+      'merges-today',
+      'merges-7d',
+      'gem-disk',
+    ]);
     for (const tile of pulse) {
       expect(tile.value).toBe(OVIE_NOT_MEASURED);
       expect(tile.measured).toBe(false);
