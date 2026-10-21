@@ -4,6 +4,7 @@ import {
   CLAIM_VERIFICATION_REACH_THRESHOLD,
   CLAIM_VERIFICATION_SETTINGS_KEY,
   claimVerificationPendingMessage,
+  decideClaimVerificationRecord,
   isClaimVerificationOpen,
   markClaimVerificationPaid,
   readClaimVerification,
@@ -130,5 +131,50 @@ describe('claim verification settings storage', () => {
       /^Verification in progress\. Famous Artist has a large audience/
     );
     expect(claimVerificationPendingMessage('')).toContain('This artist');
+  });
+});
+
+describe('operator decision transition', () => {
+  const decidedAt = new Date('2026-10-22T09:00:00.000Z');
+  const pending = () => markClaimVerificationPaid(request(), paidAt, 'j-1');
+
+  it('keeps the funnel journey from payment for decision stages', () => {
+    expect(pending()?.acquisitionId).toBe('j-1');
+  });
+
+  it('approves a pending request with who and when', () => {
+    expect(
+      decideClaimVerificationRecord(pending(), {
+        decision: 'approve',
+        decidedAt,
+        decidedBy: 'tim@jov.ie',
+        reason: '  label email matched ',
+      })
+    ).toMatchObject({
+      status: 'verified',
+      decidedAt: decidedAt.toISOString(),
+      decidedBy: 'tim@jov.ie',
+      decisionReason: 'label email matched',
+      refundId: null,
+    });
+  });
+
+  it('records the refund on a rejection', () => {
+    expect(
+      decideClaimVerificationRecord(pending(), {
+        decision: 'reject',
+        decidedAt,
+        decidedBy: 'tim@jov.ie',
+        refundId: 're_123',
+      })
+    ).toMatchObject({ status: 'rejected', refundId: 're_123' });
+  });
+
+  it('only decides pending_verification, so repeated clicks are no-ops', () => {
+    const input = { decision: 'reject', decidedAt, decidedBy: null } as const;
+    expect(decideClaimVerificationRecord(request(), input)).toBeNull();
+    expect(decideClaimVerificationRecord(null, input)).toBeNull();
+    const rejected = decideClaimVerificationRecord(pending(), input);
+    expect(decideClaimVerificationRecord(rejected, input)).toBeNull();
   });
 });

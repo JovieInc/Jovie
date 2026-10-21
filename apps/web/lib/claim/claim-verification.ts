@@ -65,6 +65,14 @@ export interface ClaimVerificationRecord {
   /** Stage timestamps (ISO) so request → paid → decided is measurable. */
   readonly requestedAt: string;
   readonly paidAt: string | null;
+  /** Consented funnel journey, when known, so decisions are funnel stages. */
+  readonly acquisitionId?: string | null;
+  /** Operator decision (verified | rejected). */
+  readonly decidedAt?: string | null;
+  readonly decidedBy?: string | null;
+  readonly decisionReason?: string | null;
+  /** Stripe refund id for a rejected, refunded claim. */
+  readonly refundId?: string | null;
 }
 
 /** High-reach artists are never claimed self-serve. Unknown reach is not high. */
@@ -139,13 +147,42 @@ export function isClaimVerificationOpen(
  */
 export function markClaimVerificationPaid(
   record: ClaimVerificationRecord | null,
-  paidAt: Date
+  paidAt: Date,
+  acquisitionId?: string | null
 ): ClaimVerificationRecord | null {
   if (record?.status !== 'awaiting_payment') return null;
   return {
     ...record,
     status: 'pending_verification',
     paidAt: paidAt.toISOString(),
+    acquisitionId: acquisitionId ?? record.acquisitionId ?? null,
+  };
+}
+
+export type ClaimVerificationDecision = 'approve' | 'reject';
+
+/**
+ * Operator transition. Only `pending_verification` can be decided; anything
+ * else returns null so a repeated click never re-runs the side effects.
+ */
+export function decideClaimVerificationRecord(
+  record: ClaimVerificationRecord | null,
+  input: {
+    readonly decision: ClaimVerificationDecision;
+    readonly decidedAt: Date;
+    readonly decidedBy: string | null;
+    readonly reason?: string | null;
+    readonly refundId?: string | null;
+  }
+): ClaimVerificationRecord | null {
+  if (record?.status !== 'pending_verification') return null;
+  return {
+    ...record,
+    status: input.decision === 'approve' ? 'verified' : 'rejected',
+    decidedAt: input.decidedAt.toISOString(),
+    decidedBy: input.decidedBy,
+    decisionReason: input.reason?.trim() || null,
+    refundId: input.refundId ?? null,
   };
 }
 
