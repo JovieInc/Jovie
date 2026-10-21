@@ -42,7 +42,6 @@ import { ChatEmptyStateGreeting } from './components/ChatEmptyStateGreeting';
 import { ChatPinnedOpportunityHeader } from './components/ChatPinnedOpportunityHeader';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
-import { OvieEditorialBriefing } from './components/OvieEditorialBriefing';
 import {
   useChatFileAttachments,
   useChatJankMonitor,
@@ -95,7 +94,7 @@ export function JovieChat({
   avatarUrl,
   username,
   chatMode,
-  ovieHomeBriefing,
+  homeCanvas,
   ambientOwnedByShell = false,
 }: JovieChatProps) {
   // TanStack Virtual returns fresh rows from a stable `virtualizer` object. React
@@ -135,7 +134,6 @@ export function JovieChat({
     inputRef,
     handleSubmit,
     handleRetry,
-    handleSuggestedPrompt,
     handleInterruptAndSubmit,
     submitMessage,
     setChatError,
@@ -530,11 +528,12 @@ export function JovieChat({
   const showThreadView =
     conversationExists || conversationInProgress || pinnedOpportunity !== null;
   const showBottomComposer = showThreadView;
-  const showOvieBriefing =
-    chatMode === 'ov' && ovieHomeBriefing != null && !showThreadView;
+  // Shared shell (founder decision 2026-10-20): any persona may supply a
+  // living Home canvas that owns the empty state above the docked composer.
+  const showHomeCanvas = homeCanvas != null && !showThreadView;
   const hasDraftIntent = useComposerDraftIntent(
     draft,
-    !showThreadView && !showOvieBriefing
+    !showThreadView && !showHomeCanvas
   );
   const composerHasIntent =
     composerPickerOpen || hasDraftIntent || chipTray.chips.length > 0;
@@ -545,7 +544,7 @@ export function JovieChat({
   // back so the composer owns attention.
   const chatEmptyStateFirstName = getChatEmptyStateFirstName(displayName);
   const showEmptyGreeting =
-    !showThreadView && !showOvieBriefing && !composerHasIntent;
+    !showThreadView && !showHomeCanvas && !composerHasIntent;
   const {
     data: insightsSummary,
     isLoading: insightsLoading,
@@ -823,9 +822,9 @@ export function JovieChat({
       chatInputProps={chatInputProps}
       chatMode={chatMode}
       showThreadView={showThreadView}
-      // one-chrome-layer-v1: the Ovie briefing owns the empty-state chrome
+      // one-chrome-layer-v1: the Home canvas owns the empty-state chrome
       // layer, so the usage banner yields to it.
-      suppressUsageAlert={showOvieBriefing}
+      suppressUsageAlert={showHomeCanvas}
       isRateLimited={isRateLimited}
       showManifest={showManifest}
       manifestCollapsed={manifestCollapsed}
@@ -932,8 +931,8 @@ export function JovieChat({
               <div
                 className='flex min-h-0 flex-1 flex-col'
                 data-empty-affordance={
-                  showOvieBriefing
-                    ? 'ovie-briefing'
+                  showHomeCanvas
+                    ? 'home-canvas'
                     : showEmptyGreeting
                       ? 'greeting'
                       : 'none'
@@ -942,16 +941,12 @@ export function JovieChat({
                 data-testid='chat-empty-state-viewport'
                 data-top-spacing-owner={CHAT_EMPTY_TOP_SPACING_OWNER}
               >
-                {showOvieBriefing ? (
+                {showHomeCanvas ? (
                   <ChatEmptyStateComposerRegion
                     stableDocked
                     fullBleed
-                    above={
-                      <OvieEditorialBriefing
-                        briefing={ovieHomeBriefing}
-                        onSelectAction={handleSuggestedPrompt}
-                      />
-                    }
+                    alignAbove='top'
+                    above={homeCanvas}
                   >
                     <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
                       {composerSurface}

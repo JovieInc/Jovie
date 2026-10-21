@@ -26,7 +26,6 @@ const EXPLICIT_FILES = [
   'components/jovie/components/ChatInput.tsx',
   'components/jovie/components/ChatComposerToolbar.tsx',
   'components/jovie/components/chat-motion.ts',
-  'components/marketing/HomeComposerHero.tsx',
   'lib/design/system-b-radius.ts',
 ] as const;
 
@@ -160,11 +159,8 @@ describe('composer + header radius/padding source guard (JOV-3532)', () => {
     expect(semanticCss).toContain('--system-b-radius-pill: var(--radius-full)');
   });
 
-  it('keeps ChatInput + HomeComposerHero geometry on SYSTEM_B_RADIUS_PX', () => {
-    for (const rel of [
-      'components/jovie/components/ChatInput.tsx',
-      'components/marketing/HomeComposerHero.tsx',
-    ] as const) {
+  it('keeps ChatInput geometry on SYSTEM_B_RADIUS_PX', () => {
+    for (const rel of ['components/jovie/components/ChatInput.tsx'] as const) {
       const source = readFileSync(resolve(appRoot, rel), 'utf8');
       expect(source).toContain('SYSTEM_B_RADIUS_PX');
       expect(source).not.toMatch(/borderRadius\s*:\s*\d+/);

@@ -40,8 +40,11 @@ export function isAudioMediaPermissionCheck(details: unknown): boolean {
   return (details as { mediaType?: unknown }).mediaType === 'audio';
 }
 
-/** Screen capture starts on Ovie. Add `/app` here when user screen video ships. */
-export const DESKTOP_CAPTURE_ROUTE_PREFIXES = ['/hud'] as const;
+/**
+ * Screen capture starts on the Ovie Ops dashboard (`/hud` kiosk and its shell
+ * home at `/app/ov/ops`). Add `/app` here when user screen video ships.
+ */
+export const DESKTOP_CAPTURE_ROUTE_PREFIXES = ['/hud', '/app/ov/ops'] as const;
 
 export function isDesktopCaptureRouteUrl(
   urlString: string | undefined,

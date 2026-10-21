@@ -70,6 +70,45 @@ export interface HomeLoopAsk {
   readonly evidence: readonly string[];
 }
 
+/** One row of the stage latency table: durations already formatted. */
+export interface HomeLoopLatencyRow {
+  readonly id: string;
+  readonly label: string;
+  readonly p50: string;
+  readonly p95: string;
+  readonly samples: number;
+  readonly regressed: boolean;
+}
+
+/** Compact duration for seconds; unknown stays "Not measured". */
+export function formatDurationSeconds(value: number | null): string {
+  if (value === null || !Number.isFinite(value) || value < 0)
+    return HOME_LOOP_NOT_MEASURED;
+  if (value < 60) return `${Math.round(value)}s`;
+  const minutes = value / 60;
+  if (minutes < 60) return `${Math.round(minutes)}m`;
+  const hours = minutes / 60;
+  if (hours < 48)
+    return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)}h`;
+  return `${(hours / 24).toFixed(1)}d`;
+}
+
+/** Persona copy; Jovie and Ovie fill the same skeleton with their own words. */
+export interface HomeLoopCopy {
+  readonly constraintClear: string;
+  readonly asksTitle: string;
+  readonly asksEmpty: string;
+  readonly asksError: string;
+  readonly inFlightTitle: string;
+  readonly inFlightEmpty: string;
+  readonly inFlightError: string;
+  readonly doneTitle: string;
+  readonly doneEmpty: string;
+  readonly approveLabel?: string;
+  readonly latencyTitle?: string;
+  readonly latencyEmpty?: string;
+}
+
 /** Last observed tile values, used only to fill `was` when a source has none. */
 export type HomeLoopTileMemory<Key extends string = string> = Readonly<
   Partial<Record<Key, { readonly value: string; readonly was: string | null }>>
