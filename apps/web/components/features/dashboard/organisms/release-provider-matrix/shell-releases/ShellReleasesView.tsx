@@ -648,8 +648,6 @@ export function ShellReleasesView({
           onEdit: openEditor,
           onCopy: handleCopy,
           artistName,
-          isSmartLinkLocked,
-          getSmartLinkLockReason,
           ...releaseActionCapabilities,
           canGenerateAlbumArt: showGenerateAlbumArtAction,
           onGenerateAlbumArt: handleGenerateAlbumArt,

@@ -669,7 +669,7 @@ describe('ShellReleasesView', () => {
       })
     );
     fireEvent.click(
-      screen.getAllByRole('button', { name: 'Edit release links' })[0]
+      screen.getAllByRole('button', { name: 'Edit Release Links' })[0]
     );
 
     expect(await screen.findByTestId('release-sidebar')).toHaveTextContent(
@@ -677,7 +677,7 @@ describe('ShellReleasesView', () => {
     );
 
     fireEvent.click(
-      screen.getAllByRole('button', { name: 'Copy smart link' })[0]
+      screen.getAllByRole('button', { name: 'Copy Smart Link' })[0]
     );
 
     await waitFor(() => {
@@ -836,7 +836,7 @@ describe('ShellReleasesView', () => {
         screen.getAllByRole('button', { name: 'Scheduled smart link (Pro)' })[0]
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'Copy smart link' })
+        screen.queryByRole('button', { name: 'Copy Smart Link' })
       ).not.toBeInTheDocument();
     });
 
@@ -983,7 +983,7 @@ describe('ShellReleasesView', () => {
         screen.getAllByRole('button', { name: 'Scheduled smart link (Pro)' })[0]
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'Copy smart link' })
+        screen.queryByRole('button', { name: 'Copy Smart Link' })
       ).not.toBeInTheDocument();
     });
 
