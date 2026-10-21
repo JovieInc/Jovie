@@ -1,0 +1,24 @@
+● JOVIE · SYMPHONY · lanes fe27f07 on gem · ! hud≠release · ✕ tick 3m failing !…
+ CONSTRAINT ✕ FAIL   delivery · qualified admitted work has no exact-head merge…
+ PRODUCTION  ! WARN    serves 060037d · 7 undeployed · oldest 1h41m
+ FLOW 24h    prepared ? → queued ? → merged 10 → deployed 3 → verified ?
+ WORKERS   ? UNKNOWN 1 running / unknown (codex 1/? · grok 0/?) · gate seats 2
+● codex      PR21774   fix-red gate              3m  title not in current…
+○ codex      polling ×2 · eligible 1/27 · new issues 1
+○ grok       polling · eligible 0/27 · new issues 0
+ SUPPLY    ✓ OK      Todo 27 → eligible 1 → new issues 1
+    17 excluded  sensitive-text             all lanes
+  +6 more
+ REPAIR    ? UNKNOWN open lane PRs unknown · draft unknown · non-draft unknown
+  ? PR list: github-budget-floor: 529 (< 600) until reset
+  repo PRs open 36 · red 11 · dirty 2 · clean not queued 2 · exhausted 2
+  ? hold records unknown · held.json unavailable or invalid
+  oldest #21725 142h · idle 9.2h · hold:fix-exhausted · fix-exhausted
+ QUEUE     ? UNKNOWN merge queue unknown · wait p50 11.4m · ejections 20%
+ SHIPPED   ! WARN    merged 10 in 24h · deployed 3 · verified ?
+#22307 merged        5m  fix(ci): set up Playwright when proof reuse still runs…
+ BUDGETS   ✕ FAIL    GitHub graphql 412/5000 · core 529 · resets in 46m
+ HOST      ✕ FAIL    disk 8.2% free · mem 11% free · load 22.4 / 16 cores
+ ALERTS    ✕ FAIL    8 active · 3 critical/failing
+✕ crit started-without-live-owner 48m · owner summer
+● running ○ idle ✓ ok ! warn ✕ fail ? unknown

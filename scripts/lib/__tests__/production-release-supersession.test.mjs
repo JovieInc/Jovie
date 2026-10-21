@@ -2209,6 +2209,47 @@ printf 'HTTP/2 200\\r\\n\\r\\n{"sha":"%s"}\\n' "$STUB_MAIN_SHA"
 });
 
 describe('controller starvation bound', () => {
+  it.each([
+    ['current_main_sha', 'echo "is_current=true"'],
+    ['final_main_sha', '  {\n    echo "source_ci_run_id='],
+  ])('fails authorization when %s ancestry cannot be read', (variable, end) => {
+    const authorization = getStepRunScript(
+      getJobBlock(CONTROLLER_WORKFLOW, 'authorize-production'),
+      'Cross-prove exact successful push CI'
+    );
+    const start = authorization.indexOf(`${variable}="$(bash `);
+    const finish = authorization.indexOf(end, start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(finish).toBeGreaterThan(start);
+    const fixture = makeFixture('authorization-lineage-');
+    stubCommand(
+      fixture.bin,
+      'bash',
+      `#!/bin/sh
+case "$1" in
+  *resolve-main-sha.sh) printf '%s\\n' '${NEWER_SHA}' ;;
+  *release-lineage-gate.sh) printf 'decision=error\\n'; exit 1 ;;
+  -c) exec /bin/bash \"$@\" ;;
+  *) exit 2 ;;
+esac
+`
+    );
+    // Execute the actual workflow boundary, including its shell conditionals.
+    // A failed child inside [ "$(...)" ... ] must not become a green yield.
+    const result = runScript(
+      `set -euo pipefail\n${authorization.slice(start, finish)}\necho mutation-authorized`,
+      fixture,
+      { EXPECTED_SHA, REPOSITORY: 'JovieInc/Jovie' }
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).not.toContain('yielded');
+    expect(result.stdout).not.toContain('mutation-authorized');
+    expect(parseOutputs(fixture.output)).not.toHaveProperty(
+      'is_current',
+      'false'
+    );
+  });
+
   it('routes every post-coalesce main recheck through the lineage gate', () => {
     const coalesce = getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production');
     const authorize = getJobBlock(CONTROLLER_WORKFLOW, 'authorize-production');

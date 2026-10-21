@@ -65,9 +65,72 @@ export interface HomeLoopAsk {
   readonly why: string;
   /** The recommended answer can be sent in one click. */
   readonly decidable: boolean;
+  /**
+   * Primary one-click label. Omitted asks use the canvas approve label.
+   * Ovie matches the inbox verbs (Approve, Mark done, Certify).
+   */
+  readonly actionLabel?: string;
+  /**
+   * One-click answers the asker offered. When present they replace the
+   * single primary action; the first is the recommended one.
+   */
+  readonly options?: readonly string[];
   /** A written reply (request changes) is accepted for this ask. */
   readonly canReply: boolean;
   readonly evidence: readonly string[];
+  /**
+   * What happens if the founder stays silent until `deadline`
+   * (`jovie.decision-default/v1`). `null` means no default yet.
+   */
+  readonly decisionDefault: HomeLoopDecisionDefault | null;
+  /** Post-ship feedback is accepted once the ask is decided. */
+  readonly canFeedback: boolean;
+}
+
+export interface HomeLoopDecisionDefault {
+  readonly decision: 'approve' | 'reject';
+  readonly summary: string;
+  readonly deadline: string;
+  /** The asker declared it; otherwise it is the contract's fallback. */
+  readonly declared: boolean;
+}
+
+/** Natural countdown to a deadline: "in 2d", "in 5h", "in 12m", or "now". */
+export function formatCountdown(
+  deadline: string,
+  nowMs: number
+): string | null {
+  const at = Date.parse(deadline);
+  if (!Number.isFinite(at)) return null;
+  const minutes = Math.round((at - nowMs) / 60_000);
+  if (minutes <= 0) return 'now';
+  if (minutes < 60) return `in ${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `in ${hours}h`;
+  return `in ${Math.round(hours / 24)}d`;
+}
+
+/** One row of the stage latency table: durations already formatted. */
+export interface HomeLoopLatencyRow {
+  readonly id: string;
+  readonly label: string;
+  readonly p50: string;
+  readonly p95: string;
+  readonly samples: number;
+  readonly regressed: boolean;
+}
+
+/** Compact duration for seconds; unknown stays "Not measured". */
+export function formatDurationSeconds(value: number | null): string {
+  if (value === null || !Number.isFinite(value) || value < 0)
+    return HOME_LOOP_NOT_MEASURED;
+  if (value < 60) return `${Math.round(value)}s`;
+  const minutes = value / 60;
+  if (minutes < 60) return `${Math.round(minutes)}m`;
+  const hours = minutes / 60;
+  if (hours < 48)
+    return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)}h`;
+  return `${(hours / 24).toFixed(1)}d`;
 }
 
 /** Persona copy; Jovie and Ovie fill the same skeleton with their own words. */
@@ -82,6 +145,8 @@ export interface HomeLoopCopy {
   readonly doneTitle: string;
   readonly doneEmpty: string;
   readonly approveLabel?: string;
+  readonly latencyTitle?: string;
+  readonly latencyEmpty?: string;
 }
 
 /** Last observed tile values, used only to fill `was` when a source has none. */

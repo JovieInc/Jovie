@@ -1,6 +1,11 @@
 export * from './cache.ts';
+export { STATUS_SCHEMA, status, summarize } from './cli.ts';
 export * from './client.ts';
 export * from './contract.ts';
+export * from './gh.ts';
+export * from './github.ts';
 export * from './headers.ts';
+export * from './legacy.ts';
+export * from './linear.ts';
 export * from './policy.ts';
 export * from './store.ts';
