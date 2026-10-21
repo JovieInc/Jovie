@@ -318,8 +318,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         return d;
       });
       transition(decision.transition, now());
+      // The assertion keeps this visible after the ledger closure write.
+      // scripts/tsconfig.json is strict:false, so `!ok` does not narrow the union.
       const spendDenied = denied as SpendDecision | null;
-      if (spendDenied && !spendDenied.ok) {
+      if (spendDenied !== null && spendDenied.ok === false) {
         log({
           schema: 'jovie.api-client.spend/v1',
           provider,
