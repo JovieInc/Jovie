@@ -384,7 +384,7 @@
         "kind": "certification",
         "at": "2026-10-21T05:44:03.216Z",
         "ref": "docs/screenshots/jov-8097/README.md",
-        "sourceDigest": "2757fea8de89291f29de54ed1439db8db1529c9d0ff511222f81d0d13da8a8ec"
+        "sourceDigest": "00a1c8a04dc510f125efe106707f9374b83e4ecfa24d0c7cee4c1c9cdbcc4b32"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },

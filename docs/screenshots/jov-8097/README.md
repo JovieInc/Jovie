@@ -1,9 +1,23 @@
 # Pricing certification
 
-Current renewal: 2026-10-21, PR #22351 after merging PR #22382 from main.
-Local source/browser evidence only. The merged source preserves the $12/month
-self-serve offer and Pro claim CTA while moving shared container CSS into its
-section-shell owner. Both changes are covered by the renewed source digest.
+Current renewal: 2026-10-21, JOV-7772.
+
+The marketing layout imports `ArtistProfileLandingPage.css`, so Pricing's
+census hashes that whole file. JOV-7772 edits `.system-b-launch-hero-title`
+and `.system-b-launch-final h2` there. The `:where(.system-b-pricing-page)`
+block is byte-identical to `origin/main` (18762 bytes), and
+`apps/web/app/(marketing)/pricing/page.tsx` is unchanged. This renewal binds
+the existing 2026-10-21 pricing render below to the new file hash.
+
+- Source digest: `00a1c8a04dc510f125efe106707f9374b83e4ecfa24d0c7cee4c1c9cdbcc4b32`.
+
+## Previous renewal, 2026-10-21, PR #22351
+
+PR #22351 after merging PR #22382 from main. Local source/browser evidence
+only. The merged source preserves the $12/month self-serve offer and Pro claim
+CTA while moving shared container CSS into its section-shell owner. Both
+changes are covered by the source digest recorded for that renewal:
+`2757fea8de89291f29de54ed1439db8db1529c9d0ff511222f81d0d13da8a8ec`.
 
 - Node 24.21.0, Next 16.4.1, Chromium; local URL `http://localhost:33151/pricing`.
 - `PUBLIC_NOAUTH_SMOKE=1 NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_E2E_MODE=1`.
