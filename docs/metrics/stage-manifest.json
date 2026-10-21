@@ -261,6 +261,30 @@
           "status": "spec",
           "source": "revenue-funnel-timings",
           "owner": "apps/web"
+        },
+        {
+          "id": "pending-verification",
+          "meaning": "branch after paid: a high-reach artist claim (>=50k Spotify followers) is held for ownership verification instead of going live (acquisition_journey_stages, lib/claim/claim-verification.ts)",
+          "producer": "apps/web Stripe checkout webhook (markClaimVerificationsPaid)",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        },
+        {
+          "id": "claim-verified",
+          "meaning": "branch after pending-verification: an operator approved the claim and the artist was linked",
+          "producer": "apps/web claim verification review (decideClaimVerification)",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        },
+        {
+          "id": "claim-rejected",
+          "meaning": "branch after pending-verification: an operator rejected the claim; first month refunded and subscription canceled",
+          "producer": "apps/web claim verification review (decideClaimVerification)",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
         }
       ]
     },

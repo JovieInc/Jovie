@@ -163,3 +163,9 @@ may leave the app. The `revenue-funnel-timings` source expects
 `GET https://jov.ie/api/cron/stage-timings` (CRON_SECRET) to return the
 `kind: timings` shape above. Adding that cron route needs approval under the
 infra guardrail; it is tracked as a gap issue until then.
+
+`pending-verification`, `claim-verified` and `claim-rejected` are branch stages
+off `paid` for high-reach artist claims. They are not steps in the linear
+funnel. The app records them in `acquisition_journey_stages`, and the admin
+artist-offer funnel report (`branches[]`) already returns their counts and
+p50/p95.
