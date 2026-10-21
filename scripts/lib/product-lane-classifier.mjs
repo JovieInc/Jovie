@@ -173,6 +173,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^(apps\/(desktop|macos)\/|\.github\/workflows\/desktop-release\.yml$|scripts\/desktop-(release|installed-apps)[^/]*\.(mjs|test\.mjs)$)/,
   ],
   ['web-changelog', 'web', ['web'], /^CHANGELOG\.md$/],
+  ['web-playbook', 'web', ['web'], /^docs\/playbooks\/[^/]+\.playbook\.md$/],
   [
     'web-product',
     'web',
@@ -180,6 +181,22 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     // knowledge-ingest now lives in observability-ingest. First-parent ranges
     // still name the old prefix on the add and delete commits.
     /^(apps\/(web|ovie|extension)\/|packages\/(action-contracts|audio-contracts|brand|extension-contracts|jovie-cli|ui)\/|workers\/(observability-ingest|canary-otp|knowledge-ingest)\/|app\/|content\/|lib\/|trigger\/|creator_profiles\/|vercel\.json$|\.vercelignore$|skills\/jovie\/(SKILL\.md|README\.md|LICENSE)$|\.github\/workflows\/(production-release|production-marker-recovery|postdeploy-probes|canary-health-gate)\.yml$)/,
+  ],
+  [
+    // @jovie/api-client: the shared third-party API client used by scripts,
+    // lanes (via scripts/apiclient) and CI shell steps. No product app imports
+    // it yet; move it to shared-contract when one does.
+    'operations-api-client',
+    'operations-tooling',
+    [],
+    /^packages\/api-client\//,
+  ],
+  [
+    // @jovie/research: agent research router + decision log (CLI/MCP only).
+    'operations-research',
+    'operations-tooling',
+    [],
+    /^packages\/research\//,
   ],
   [
     'operations-tooling',

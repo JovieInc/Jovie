@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockRevenueFailure = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/observability/revenue-spine', () => ({
+  captureRevenueSpineFailure: mockRevenueFailure,
+}));
+
 const {
   mockGetSession,
   mockHeaders,
@@ -123,6 +128,20 @@ describe('getRequestSession', () => {
     await expect(getRequestSession()).resolves.toBe(SESSION);
 
     expect(mockGetSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports auth resolution failures while preserving the thrown error', async () => {
+    const { getCachedAuth } = await import('@/lib/auth/cached');
+    const error = Object.assign(new Error('private session error'), {
+      code: 'ETIMEDOUT',
+    });
+    mockGetSession.mockRejectedValueOnce(error);
+    await expect(getCachedAuth()).rejects.toBe(error);
+    expect(mockRevenueFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: 'auth_resolution',
+      severity: 'blocked',
+      error,
+    });
   });
 
   it('keeps a server action to one session read across auth helpers', async () => {

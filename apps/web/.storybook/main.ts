@@ -191,6 +191,13 @@ const config: StorybookConfig = {
           replacement: require.resolve('./recent-releases-mock.ts'),
         },
         {
+          // lib/observability/revenue-spine imports node:crypto at module
+          // scope and is reachable from auth/session/entitlement modules that
+          // stories render; the externalized import blanks those stories.
+          find: '@/lib/observability/revenue-spine',
+          replacement: require.resolve('./revenue-spine-mock.ts'),
+        },
+        {
           find: '@/lib/releases/release-matrix-loader',
           replacement: require.resolve('./composer-catalog-actions-mock.ts'),
         },

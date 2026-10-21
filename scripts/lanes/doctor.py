@@ -36,6 +36,7 @@ import file_overlap  # noqa: E402
 import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
 import remediation  # noqa: E402
 import shipping_attribution  # noqa: E402  (company merge provenance report)
+import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage collector)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -180,6 +181,105 @@ def provider_payloads(state: Path, providers, proc: Path = Path("/proc")) -> dic
         result[name]["pids"].sort()
         result[name]["running"] = len(result[name]["pids"]) if result[name]["known"] else None
     return result
+
+
+# #22354 shipped the registry at canon/ (the repo-root allowlist rejects new top-level dirs).
+# Reading a path that is not on main must alert, never read as "nothing silent" (2026-10-21:
+# the doctor watched ops/automation/registry.jsonl, which never existed, so no row was checked).
+AUTOMATION_REGISTRY = "canon/automation-registry.jsonl"
+AUTOMATION_LIVENESS_WORKFLOW = "automation-liveness.yml"
+AUTOMATION_LIVENESS_MAX_S = 60 * 60
+AUTOMATION_LIVENESS_TTL_S = 600
+
+
+def _iso_epoch(value) -> float | None:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp() if value else None
+    except ValueError:
+        return None
+
+
+def automation_registry(repo: Path, run=subprocess.run) -> list[dict] | None:
+    """The canonical automation registry as merged on origin/main (never the checkout)."""
+    try:
+        shown = run(["git", "-C", str(repo), "show", f"origin/main:{AUTOMATION_REGISTRY}"],
+                    capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if getattr(shown, "returncode", 1) != 0:
+        return None
+    rows = []
+    for line in (shown.stdout or "").splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            return None
+        if isinstance(row, dict) and row.get("id"):
+            rows.append(row)
+    return rows
+
+
+def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: Path | None = None) -> dict:
+    """Host-local receipts of this host's live automations: missing or older than
+    maxStalenessMinutes is silence. The hosted automation-liveness check watches Gem."""
+    home = Path.home() if home is None else home
+    if rows is None:
+        return {"known": False, "silent": {}}
+    silent = {}
+    for row in rows:
+        receipt = row.get("receipt") or {}
+        if row.get("status") != "live" or row.get("host") != host_name or receipt.get("kind") != "host-local":
+            continue
+        location = str(receipt.get("location") or "")
+        if not location.startswith(f"{host_name}:"):
+            continue
+        path = Path(location.split(":", 1)[1].replace("~", str(home), 1))
+        limit = float(row.get("maxStalenessMinutes") or 0) * 60
+        try:
+            age = now - path.stat().st_mtime
+        except OSError:
+            silent[row["id"]] = {"location": location, "ageS": None}
+            continue
+        if limit and age > limit:
+            silent[row["id"]] = {"location": location, "ageS": round(age)}
+    return {"known": True, "silent": silent}
+
+
+def automation_liveness(lane, now: float) -> dict:
+    """Latest *successful* run of the hosted automation-liveness workflow (Gem watches it back).
+
+    It follows Production Continuity Guard and runs its job only every 5th trigger, so most
+    runs are job-skipped: the latest run of any conclusion would make a dead check look alive."""
+    def fetch():
+        result = lane.sh(["gh", "api", f"repos/{lane.REPO_SLUG}/actions/workflows/{AUTOMATION_LIVENESS_WORKFLOW}"
+                          "/runs?branch=main&status=success&per_page=1",
+                          "--jq", "[.workflow_runs[0].created_at // \"\"]"], timeout=30)
+        if result.returncode != 0:
+            text = f"{result.stdout or ''} {result.stderr or ''}"
+            return {"installed": False} if "404" in text or "Not Found" in text else None
+        try:
+            created = json.loads(result.stdout)[0]
+        except (ValueError, IndexError, TypeError):
+            return None
+        return {"installed": True, "lastRunAt": created or None}
+    found = lane.shared("automation-liveness-success", AUTOMATION_LIVENESS_TTL_S, fetch)
+    return found if isinstance(found, dict) else {"installed": None}
+
+
+def automation_observation(host, lane, now: float) -> dict:
+    """Registry watch for observe(); fixtures and self-tests read no registry or GitHub."""
+    if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
+        return {"automation": {"known": False, "silent": {}, "skipped": True},
+                "automationLiveness": {"installed": None}}
+    try:
+        watch = automation_watch(automation_registry(host.repo), lane.HOST, now)
+    except Exception as error:  # observability never takes the doctor down
+        watch = {"known": False, "silent": {}, "error": type(error).__name__}
+    try:
+        liveness = automation_liveness(lane, now)
+    except Exception as error:
+        liveness = {"installed": None, "error": type(error).__name__}
+    return {"automation": watch, "automationLiveness": liveness}
 
 
 def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, dict, dict, dict]:
@@ -384,8 +484,11 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "rejectedIssues": dict(sorted(rejected_issues.items())[:20]),
         "designGate": design_census,
         "fileOverlap": file_overlap.doctor_view(state),
+        **automation_observation(host, lane, now),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
+        "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
+                      if key not in ("ownerlessSince", "evidenceNoted", "moved", "claimsReleased")},
         "merged24h": merged, "mergedAttributionError": merged_error,
         "mergeThroughput": merge_throughput, "mergeThroughputError": merge_throughput_error,
         "autoscale": _autoscale_block(host),
@@ -756,6 +859,37 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    for automation_id, row in sorted(((obs.get("automation") or {}).get("silent") or {}).items()):
+        age = row.get("ageS")
+        alerts[f"automation-silent:{automation_id}"] = (
+            f"registered automation {automation_id} left no fresh receipt at {row.get('location')} "
+            f"({'missing' if age is None else f'{round(age / 60)} min old'}); owner per {AUTOMATION_REGISTRY}")
+    watched = obs.get("automation") or {}
+    if watched.get("known") is False and not watched.get("skipped"):
+        alerts["automation-registry-unreadable"] = (
+            f"origin/main:{AUTOMATION_REGISTRY} is unreadable ({watched.get('error') or 'missing or not JSONL'}); "
+            "no Gem host-local automation receipt is being watched")
+    liveness = obs.get("automationLiveness") or {}
+    if liveness.get("installed"):
+        last = _iso_epoch(liveness.get("lastRunAt"))
+        if last is None or obs["now"] - last > AUTOMATION_LIVENESS_MAX_S:
+            ran = "never" if last is None else f"{round((obs['now'] - last) / 60)} min ago"
+            alerts["automation-liveness-silent"] = (
+                f"the hosted {AUTOMATION_LIVENESS_WORKFLOW} check last ran {ran}; "
+                "it and the Gem doctor watch each other")
+    feed_error = (previous or {}).get("statusFeedError")
+    if feed_error:
+        # The last publish of the public status gist failed (Gem 2026-10-20 18:01-19:47:
+        # a 403 froze it while lanes-status.json stayed fresh; Summer read STALE).
+        alerts["status-feed-stale"] = (f"the public lanes status gist was not updated on the last doctor pass "
+                                       f"({str(feed_error)[:120]}); Summer's shipping card reads it as stale")
+    owned = obs.get("ownership") or {}
+    if owned.get("overGrace"):
+        # The started-state invariant (ownership.py): escalated as a lanes repair, never to Tim.
+        alerts["started-without-owner"] = (
+            f"{owned['overGrace']} started JOV issues have had no live owner past the grace period "
+            f"(oldest {round((owned.get('oldestOwnerlessS') or 0) / 3600, 1)}h; unresolved "
+            f"{owned.get('unresolved') or {}}); ownership.reconcile moves them each tick")
     if obs.get("linearError"):
         alerts["linear-down"] = f"Linear unreadable: {obs['linearError']}"
     elif obs.get("linearSkipped") or obs.get("pool") is None:
@@ -851,9 +985,14 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             f"p50 wait {signal.get('queueWaitP50Minutes', 'unknown')}m, "
             f"{signal.get('mergedPerHour', 'unknown')} merged/h vs {signal.get('openedPerHour', 'unknown')} opened/h, "
             f"ejection rate {signal.get('ejectionRate', 'unknown')}")
-    escalation_line = remediation.alert_reason(obs.get("escalation") or {})
+    sweep_view = obs.get("reconcile") or {}
+    dispositions = sweep_view.get("dispositions")
+    open_prs = ({row.get("pr") for row in dispositions if isinstance(row, dict)}
+                if isinstance(dispositions, list) and (sweep_view.get("counts") or {}).get("open") == len(dispositions)
+                else None)  # an incomplete open-PR view keeps every surfaced PR
+    escalation_line = remediation.alert_reason(obs.get("escalation") or {}, open_prs)
     if escalation_line:
-        alerts["escalation-needs-human"] = escalation_line
+        alerts["escalation-surfaced"] = escalation_line
     sweep = obs.get("reconcile") or {}
     swept_age = obs["now"] - float(sweep.get("atEpoch") or 0) if obs.get("now") else None
     if sweep.get("orphans") and swept_age is not None and swept_age < 2 * pr_events.RECONCILE_S:
@@ -1456,6 +1595,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
         obs.get("now") or time.time())
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
             "fileOverlap": overlap, "linear": obs.get("linearSync") or tick.get("linear"),
+            "ownership": obs.get("ownership"),
             "lanes": counts, "providerPayloads": obs.get("providerPayloads"), "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
             "pool": obs.get("pool"), "candidatePool": obs.get("candidatePool"), "lastLandingAgeS": obs.get("lastLandingAge"),
@@ -1518,33 +1658,153 @@ def _autoscale_block(host) -> dict:
 PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
 
 
+PUBLIC_FEED_MAX_BYTES = 256 * 1024
+STATUS_DETAIL_NAME = "lanes-status-details.json"
+STAGE_EVENTS_NAME = "stage-events.ndjson"
+
+
+def public_status_projection(feed: dict, full_text: str) -> str:
+    """Keep operational fields whole; detailed attribution lives in the same gist."""
+    def identity(value, limit):
+        return value if isinstance(value, str) and len(value) <= limit else None
+
+    evidence = {
+        "fileName": STATUS_DETAIL_NAME,
+        "sha256": hashlib.sha256(full_text.encode("utf-8")).hexdigest(),
+        "bytes": len(full_text.encode("utf-8")),
+        "at": identity(feed.get("at"), 64),
+        "host": identity(feed.get("host"), 64),
+        "release": identity(feed.get("release"), 128),
+        "binding": "declared-feed-identity",
+    }
+    public = json.loads(full_text)
+    attribution = public.get("shippingAttribution")
+    projects = attribution.get("projects") if isinstance(attribution, dict) else None
+    if isinstance(projects, list):
+        for index, project in enumerate(projects):
+            if isinstance(project, dict) and isinstance(project.get("pullRequests"), list):
+                rows = project.pop("pullRequests")
+                # Absence with an explicit locator is not an empty evidence array.
+                project["pullRequestsRef"] = {
+                    "recordCount": len(rows),
+                    "jsonPointer": f"/shippingAttribution/projects/{index}/pullRequests",
+                }
+    public["publicProjection"] = {
+        "schema": "symphony-lanes-public-projection/v1", "fullEvidence": evidence,
+    }
+    text = json.dumps(public, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    if len(text.encode("utf-8")) <= PUBLIC_FEED_MAX_BYTES:
+        return text
+    # Never trim operational ownership/hold/attempt arrays to pretend they fit.
+    # Existing schema-checking readers reject this as unknown, not an empty fleet.
+    return json.dumps({
+        "schema": "symphony-lanes-status-unavailable/v1", "status": "unavailable",
+        "reason": "essential-public-feed-exceeds-byte-limit",
+        "requiredBytes": len(text.encode("utf-8")), "maxBytes": PUBLIC_FEED_MAX_BYTES,
+        "fullEvidence": evidence,
+    }, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+
+
 def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> str | None:
-    """Keep one secret gist current with the status feed; create it once and announce its URL.
-    Only the primary host (flag file ~/.config/jovie-lanes/primary) publishes, so a second
-    host running the same release never creates a second feed."""
+    """Publish one bounded status view plus complete evidence in the existing gist."""
     if not PRIMARY_FLAG.exists():
         return None
+    deadline = time.monotonic() + 60
     path = host.state / "status-gist.json"
-    record = read_json(path, {})
+    record = json.loads(path.read_text()) if path.exists() else {}
+    if not isinstance(record, dict):
+        raise RuntimeError("status-gist-record-unavailable")
+    full_text = json.dumps(feed, indent=1, ensure_ascii=False, allow_nan=False)
     body = host.state / "lanes-status.json"
-    body.write_text(json.dumps(feed, indent=1))
+    body.write_text(full_text, encoding="utf-8")
+    if body.read_bytes() != full_text.encode("utf-8"):
+        raise RuntimeError("status-feed-evidence-readback-changed")
+    public_text = public_status_projection(feed, full_text)
+    packet = {"files": {
+        "lanes-status.json": {"content": public_text},
+        STATUS_DETAIL_NAME: {"content": full_text},
+    }}
+    # docs/metrics/STAGE_EVENTS.md: the lanes stage rows, uploaded only when they changed.
+    stage_text = stage_events.ndjson(host.state / "runs" / "ledger.jsonl", time.time())
+    stage_digest = hashlib.sha256(stage_text.encode("utf-8")).hexdigest()
+    if stage_text and record.get("stageEventsSha256") != stage_digest:
+        packet["files"][STAGE_EVENTS_NAME] = {"content": stage_text}
+    packet_path = host.state / "lanes-status-publish.json"
+    created_now = not record.get("url")
+    if created_now:
+        if record:
+            raise RuntimeError("status-gist-creation-reconcile-required")
+        packet.update({"description": "Symphony lanes status (written every tick by doctor.py)", "public": False})
+    elif not isinstance(record.get("id"), str) or not re.fullmatch(r"[a-f0-9]{1,64}", record["id"]):
+        raise RuntimeError("status-gist-record-unavailable")
+    packet_text = json.dumps(packet, ensure_ascii=False, allow_nan=False)
+    packet_path.write_text(packet_text, encoding="utf-8")
     lane.load_github_env()
-    if not record.get("url"):
-        created = lifecycle.run(["gh", "gist", "create", "--desc", "Symphony lanes status (written every tick by doctor.py)",
-                                  "--filename", "lanes-status.json", str(body)], capture_output=True, text=True, timeout=60)
-        url = (created.stdout or "").strip().splitlines()[-1] if created.returncode == 0 and created.stdout.strip() else None
-        if not url:
-            return None
-        record = {"url": url, "id": url.rstrip("/").split("/")[-1], "createdAt": now_iso()}
-        path.write_text(json.dumps(record))
+
+    def api(endpoint, method, input_path=None):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RuntimeError("status-gist-deadline-exceeded")
+        args = ["gh", "api", endpoint, "--method", method]
+        if input_path is not None:
+            args.extend(["--input", str(input_path)])
+        result = lifecycle.run(args, capture_output=True, text=True, timeout=remaining)
+        if result.returncode != 0:
+            raise RuntimeError("status-gist-publish-unconfirmed")
+        return result
+
+    if created_now:
+        # An uncertain create must not create another gist on the next tick.
+        path.write_text(json.dumps({
+            "creationAttemptedAt": now_iso(),
+            "payloadSha256": hashlib.sha256(packet_text.encode("utf-8")).hexdigest(),
+        }), encoding="utf-8")
+        result = api("gists", "POST", packet_path)
         try:
-            lane.Linear(host.linear_env).comment(tracking_issue and _issue_id(lane, host, tracking_issue),
-                                                  f"🤖 doctor: lanes status feed (raw JSON, refreshed every tick): {url}/raw/lanes-status.json")
+            created = json.loads(result.stdout)
+            if (not isinstance(created.get("id"), str) or not re.fullmatch(r"[a-f0-9]{1,64}", created["id"]) or
+                    not isinstance(created.get("html_url"), str) or not created["html_url"]):
+                raise ValueError("missing gist identity")
+            record = {"url": created["html_url"], "id": created["id"], "createdAt": now_iso()}
+        except (ValueError, AttributeError):
+            raise RuntimeError("status-gist-create-unconfirmed") from None
+        # Retain the known identity even if subsequent readback is unavailable.
+        path.write_text(json.dumps(record), encoding="utf-8")
+    else:
+        api(f"gists/{record['id']}", "PATCH", packet_path)
+
+    result = api(f"gists/{record['id']}", "GET")
+    try:
+        stored = json.loads(result.stdout)
+        files = stored.get("files")
+        if stored.get("id") != record["id"] or not isinstance(files, dict):
+            raise ValueError("gist identity mismatch")
+        for name, expected in packet["files"].items():
+            actual = files.get(name)
+            if not isinstance(actual, dict):
+                raise ValueError("incomplete or changed gist evidence")
+            if name == STAGE_EVENTS_NAME and actual.get("truncated") is True:
+                # The API truncates files over 1 MB; the full size is the readback there.
+                if actual.get("size") != len(expected["content"].encode("utf-8")):
+                    raise ValueError("incomplete or changed gist evidence")
+            elif actual.get("truncated") is not False or actual.get("content") != expected["content"]:
+                raise ValueError("incomplete or changed gist evidence")
+    except (ValueError, AttributeError):
+        raise RuntimeError("status-gist-readback-unconfirmed") from None
+    record.update({
+        "verifiedAt": now_iso(),
+        "fullEvidenceSha256": hashlib.sha256(full_text.encode("utf-8")).hexdigest(),
+        "publicFeedSha256": hashlib.sha256(public_text.encode("utf-8")).hexdigest(),
+        **({"stageEventsSha256": stage_digest} if STAGE_EVENTS_NAME in packet["files"] else {}),
+    })
+    path.write_text(json.dumps(record), encoding="utf-8")
+    if created_now:
+        try:
+            lane.Linear(host.linear_env).comment(
+                tracking_issue and _issue_id(lane, host, tracking_issue),
+                f"🤖 doctor: lanes status feed (raw JSON, refreshed every tick): {record['url']}/raw/lanes-status.json")
         except Exception:
             pass
-        return url
-    lifecycle.run(["gh", "gist", "edit", record["id"], "--filename", "lanes-status.json", str(body)],
-                   capture_output=True, text=True, timeout=60)
     return record["url"]
 
 

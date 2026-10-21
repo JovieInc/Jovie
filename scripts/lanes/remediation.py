@@ -104,6 +104,16 @@ _NON_CREDENTIAL_STRATEGY = re.compile(
     r"canon/strategy|founder strategy|pricing|taste\b",
     re.IGNORECASE,
 )
+# Match only the stated assurance, capturing its credential mention. Never
+# erase another mention in the same sentence: it may request a real action.
+_CREDENTIAL_ASSURANCE = re.compile(
+    r"\b(?P<passive>credentials?)(?:,\s*(?:and\s+)?OTPs?)?\s+"
+    r"(?:are|is|were|was)\s+(?:(?:excluded|omitted|redacted|hashed|stripped|dropped|withheld)"
+    r"|not\s+(?:recorded|stored|logged|included|emitted|printed|persisted))\b"
+    r"|\bcannot\s+(?:attest|isolate)(?:\s+or\s+(?:attest|isolate))?\s+"
+    r"(?:child\s+tools,\s*)?(?P<boundary>credentials?)\b",
+    re.IGNORECASE,
+)
 ACTIONABLE_FIX = re.compile(
     r"computeRatePercent|use `|replace `|change `|fix:|add (?:the |a )?(?:story|test|colocated)|"
     r"@coverage-via|remove [`']?hold",
@@ -249,6 +259,8 @@ def _strip_negated_policy(text: str) -> str:
         piece = NEGATED_POLICY_TEXT.sub("", piece)
         if _NO_NEW_ASSURANCE.search(piece) and not _NON_CREDENTIAL_STRATEGY.search(piece):
             piece = _BARE_LIST_CREDENTIAL.sub("", piece)
+        piece = _CREDENTIAL_ASSURANCE.sub(
+            lambda match: match[0].replace(match[match.lastgroup], "", 1), piece)
         stripped.append(piece)
     return "".join(stripped)
 
@@ -929,12 +941,16 @@ def remediation_summary(snapshot: dict | None, receipts: list[dict] | None, now:
     return report
 
 
-def alert_reason(report: dict) -> str | None:
-    surfaced = report.get("surfaced") or []
+def alert_reason(report: dict, open_prs: set[int] | None = None) -> str | None:
+    """Surfaced PRs that are still open, for the lanes repair owner (Tim's rule: never a
+    human by default). `surfaced` is append-only, so on Gem 2026-10-20 the alert listed 12
+    PRs that had all merged or closed by 10-13; with the open set known, those drop out."""
+    surfaced = [row for row in report.get("surfaced") or []
+                if open_prs is None or row.get("pr") in open_prs]
     if not surfaced:
         return None
     listed = ", ".join(f"#{row.get('pr')} {row.get('cls')}" for row in surfaced[:12])
-    return f"needs a human decision: {listed}"
+    return f"surfaced PRs need a repair-owner decision: {listed}"
 
 
 def intake_labels(ws: str) -> list[str]:

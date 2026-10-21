@@ -395,7 +395,11 @@ test('a revision the failure hold blocked is never rearmed, even as a base-branc
     retryDisposition: 'blocked-until-new-source-head',
   });
   const heldRevision = heldRevisionFromReceipt(receipt, 'JovieInc/Jovie');
-  assert.deepEqual(heldRevision, { prNumber: 10, headSha: sha });
+  assert.deepEqual(heldRevision, {
+    prNumber: 10,
+    headSha: sha,
+    retryDisposition: 'blocked-until-new-source-head',
+  });
   const plan = planVictimRearms({
     runId: 300,
     implicatedPaths: ['scripts/unowned.mjs'],
@@ -587,7 +591,7 @@ test('the rearm script no longer calls gh pr merge --auto --squash', () => {
   assert.doesNotMatch(source, /['"]pr['"],\s*['"]merge['"]/);
 });
 
-test('only a trusted blocked receipt for this repository names a held revision', () => {
+test('only a trusted receipt for this repository names the failure owner', () => {
   const base = {
     schema: 'jovie-merge-group-failure-hold/v1',
     repository: 'JovieInc/Jovie',
@@ -595,16 +599,93 @@ test('only a trusted blocked receipt for this repository names a held revision',
     sourceHeadSha: sha,
     retryDisposition: 'blocked-until-new-source-head',
   };
+  // Every trusted receipt names its revision, whatever its retry disposition:
+  // the enroll job, not victim rearm, owns any retry of that revision.
+  for (const retryDisposition of [
+    'blocked-until-new-source-head',
+    'one-queue-authority-retry',
+    'requeue-after-base-moves',
+  ])
+    assert.deepEqual(
+      heldRevisionFromReceipt(
+        JSON.stringify({ ...base, retryDisposition }),
+        'JovieInc/Jovie'
+      ),
+      { prNumber: 10, headSha: sha, retryDisposition }
+    );
   for (const raw of [
     '',
     undefined,
     'not json',
-    JSON.stringify({ ...base, retryDisposition: 'one-queue-authority-retry' }),
-    JSON.stringify({ ...base, retryDisposition: 'requeue-after-base-moves' }),
+    JSON.stringify({ ...base, retryDisposition: undefined }),
     JSON.stringify({ ...base, repository: 'someone/else' }),
     JSON.stringify({ ...base, schema: 'other/v1' }),
     JSON.stringify({ ...base, sourceHeadSha: 'abc' }),
   ]) {
     assert.equal(heldRevisionFromReceipt(raw, 'JovieInc/Jovie'), null);
   }
+});
+
+test('replays #22280: the failure owner is never rearmed at its failed head as a base-branch victim (JOV-6620)', () => {
+  // Run 39457131496 (2026-10-20 16:24Z): the hold receipt named #22280 at
+  // b423d1bb with a retryable-product failure. Its lockfile-only diff did not
+  // contain the failing UnifiedTable test, so victim rearm called it a
+  // base-branch victim and re-enqueued the failed head 35 s after ejection.
+  const head = 'b423d1bb9e0ff5e8fb4b01a2f3249e9bbef11dab';
+  for (const retryDisposition of [
+    'one-queue-authority-retry',
+    'requeue-after-base-moves',
+  ]) {
+    const heldRevision = heldRevisionFromReceipt(
+      JSON.stringify({
+        schema: 'jovie-merge-group-failure-hold/v1',
+        repository: 'JovieInc/Jovie',
+        prNumber: 22280,
+        sourceHeadSha: head,
+        classification: 'retryable-product',
+        retryDisposition,
+      }),
+      'JovieInc/Jovie'
+    );
+    const plan = planVictimRearms({
+      runId: 39455689721,
+      implicatedPaths: [
+        'apps/web/components/organisms/table/UnifiedTable.test.tsx',
+      ],
+      candidates: [
+        candidate({
+          prNumber: 22280,
+          headSha: head,
+          files: ['apps/web/package.json', 'pnpm-lock.yaml'],
+        }),
+      ],
+      heldRevision,
+    });
+    assert.deepEqual(plan, [
+      { action: 'skip', prNumber: 22280, reason: 'failure-owner' },
+    ]);
+  }
+  // Positive evidence that another group member owns the failing path still
+  // rearms the owner of the failed run.
+  const heldRevision = {
+    prNumber: 10,
+    headSha: sha,
+    retryDisposition: 'one-queue-authority-retry',
+  };
+  const plan = planVictimRearms({
+    runId: 777,
+    implicatedPaths: ['apps/web/story.tsx'],
+    candidates: [
+      candidate({ files: ['docs/guide.md'] }),
+      candidate({
+        prNumber: 11,
+        headSha: other,
+        files: ['apps/web/story.tsx'],
+        inQueue: true,
+      }),
+    ],
+    heldRevision,
+  });
+  assert.equal(plan[0].action, 'rearm');
+  assert.equal(plan[0].classification, 'another-pr');
 });

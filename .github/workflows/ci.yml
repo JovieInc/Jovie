@@ -631,6 +631,19 @@ jobs:
       - name: Detect path changes for all job types
         id: detect
         shell: bash
+        # Event values come in through env so the run script contains no
+        # ${{ }} interpolation. GitHub evaluates an interpolated run script as
+        # one format() expression capped at ~21,000 chars; exceeding it fails
+        # the whole workflow with zero jobs (JOV-8706). Keep this script
+        # expression-free; add new event inputs here.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          IS_FORK_PULL_REQUEST: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+          EVENT_MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          EVENT_MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          EVENT_PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
           emit_ci_lanes() {
@@ -647,14 +660,14 @@ jobs:
               printf '%s\n' "${CHANGED_FILES:-}" | node "$TRUSTED_CI_REPO_LANES" --emit-github-output
             fi
           }
-          IS_FORK="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}"
+          IS_FORK="${IS_FORK_PULL_REQUEST}"
           # Determine changed files
-          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+          if [[ "${EVENT_NAME}" == "merge_group" ]]; then
             # JOV-4446: never fall through to github.base_ref / event.before —
             # those push/PR-only fields are empty on merge_group and produce
             # "Could not resolve origin/" + false docs-only classification.
-            MERGE_GROUP_BASE_SHA="${{ github.event.merge_group.base_sha }}"
-            MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"
+            MERGE_GROUP_BASE_SHA="${EVENT_MERGE_GROUP_BASE_SHA}"
+            MERGE_GROUP_HEAD_SHA="${EVENT_MERGE_GROUP_HEAD_SHA}"
             if [[ ! "$MERGE_GROUP_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
               [[ ! "$MERGE_GROUP_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] ||
               [[ "$MERGE_GROUP_BASE_SHA" == "0000000000000000000000000000000000000000" ]] ||
@@ -731,34 +744,34 @@ jobs:
             CLASSIFICATION_BASE_REF="$PATH_DIFF_BASE_SHA"
             CLASSIFICATION_HEAD_REF="$PATH_DIFF_HEAD_SHA"
             CLASSIFICATION_POLICY_REF="$CLASSIFICATION_BASE_REF"
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          elif [[ "${EVENT_NAME}" == "pull_request" ]]; then
             # Fail closed on base resolution: an empty CHANGED_FILES list must
             # not look docs-only and skip-cascade required lanes.
-            git fetch --no-tags origin "${{ github.base_ref }}"
-            if ! git rev-parse --verify "origin/${{ github.base_ref }}" >/dev/null 2>&1; then
-              echo "::error::Could not resolve origin/${{ github.base_ref }} after fetch"
+            git fetch --no-tags origin "${BASE_REF}"
+            if ! git rev-parse --verify "origin/${BASE_REF}" >/dev/null 2>&1; then
+              echo "::error::Could not resolve origin/${BASE_REF} after fetch"
               exit 1
             fi
-            CLASSIFICATION_BASE_REF="origin/${{ github.base_ref }}"
+            CLASSIFICATION_BASE_REF="origin/${BASE_REF}"
             CLASSIFICATION_HEAD_REF="HEAD"
             CLASSIFICATION_POLICY_REF="$CLASSIFICATION_BASE_REF"
             TRUSTED_CI_REPO_LANES="$RUNNER_TEMP/ci-repo-lanes.mjs"
             git show "${CLASSIFICATION_BASE_REF}:scripts/lib/ci-repo-lanes.mjs" \
               > "$TRUSTED_CI_REPO_LANES"
-            CHANGED_FILES=$(git diff --no-renames --name-only "origin/${{ github.base_ref }}" HEAD)
+            CHANGED_FILES=$(git diff --no-renames --name-only "origin/${BASE_REF}" HEAD)
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
               # Merge tree-identical to base; classify merge-base..head (JOV-6820).
-              PULL_REQUEST_HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+              PULL_REQUEST_HEAD_SHA="${EVENT_PULL_REQUEST_HEAD_SHA}"
               git fetch --no-tags origin "$PULL_REQUEST_HEAD_SHA"
-              CLASSIFICATION_BASE_REF=$(git merge-base "origin/${{ github.base_ref }}" "$PULL_REQUEST_HEAD_SHA")
+              CLASSIFICATION_BASE_REF=$(git merge-base "origin/${BASE_REF}" "$PULL_REQUEST_HEAD_SHA")
               CLASSIFICATION_HEAD_REF="$PULL_REQUEST_HEAD_SHA"
               CHANGED_FILES=$(git diff --no-renames --name-only "$CLASSIFICATION_BASE_REF" "$CLASSIFICATION_HEAD_REF")
             fi
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
-              echo "::error::Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification."
+              echo "::error::Empty changed-file list vs origin/${BASE_REF}; refusing a false docs-only classification."
               exit 1
             fi
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          elif [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
             printf '### Qualification classification\n\nManual dispatch requires full qualification across all product lanes.\n' >> "$GITHUB_STEP_SUMMARY"
@@ -773,8 +786,8 @@ jobs:
             echo "shared_contract_impact=ios,mac,web" >> "$GITHUB_OUTPUT"
             emit_ci_lanes all
             exit 0
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
-            PUSH_BASE_SHA="${{ github.event.before }}"
+          elif [[ "${EVENT_NAME}" == "push" ]]; then
+            PUSH_BASE_SHA="${EVENT_PUSH_BEFORE_SHA}"
             if [[ ! "$PUSH_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
               [[ "$PUSH_BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
               echo "::error::push.before is not a usable exact main base SHA"
@@ -789,7 +802,7 @@ jobs:
               > "$TRUSTED_CI_REPO_LANES"
             CHANGED_FILES=$(git diff --no-renames --name-only "$PUSH_BASE_SHA" HEAD)
           else
-            echo "::error::Unsupported event for path change detection: ${{ github.event_name }}"
+            echo "::error::Unsupported event for path change detection: ${EVENT_NAME}"
             exit 1
           fi
 
@@ -823,7 +836,7 @@ jobs:
 
           PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/)'
           PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/tests/eval/golden/.*|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
-          if [[ "${{ github.event_name }}" == "pull_request" ]] &&
+          if [[ "${EVENT_NAME}" == "pull_request" ]] &&
             echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_INFRA_TRIGGER_PATTERN" &&
             ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_INFRA_ALLOWED_PATTERN" | grep -q .; then
             echo "Promptfoo eval-infrastructure-only source PR: deferring semantic evidence to the merge-group head."
@@ -838,7 +851,7 @@ jobs:
           fi
 
           # CHANGELOG.md is customer-facing web content, not documentation.
-          if ! echo "$CHANGED_FILES" | grep -q -E '^(\.github/|CHANGELOG\.md$)' &&
+          if ! echo "$CHANGED_FILES" | grep -q -E '^(\.github/|CHANGELOG\.md$|docs/playbooks/[^/]+\.playbook\.md$)' &&
             ! echo "$CHANGED_FILES" | grep -q -v -E '\.(md|txt)$'; then
             echo "Only documentation files changed"
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon has_code_changes; do
@@ -861,7 +874,7 @@ jobs:
           fi
 
           # Test paths
-          TEST_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|packages/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|package.*\.json)'
+          TEST_PATTERN='^(docs/playbooks/[^/]+\.playbook\.md$|apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|packages/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|package.*\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$TEST_PATTERN"; then
             RUN_TEST=true
             echo "run_test=true" >> "$GITHUB_OUTPUT"
@@ -3499,6 +3512,7 @@ jobs:
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test \
                   tests/e2e/storybook-agent-status.spec.ts \
+                  tests/e2e/storybook-destructive-button.spec.ts \
                   tests/e2e/storybook-elevation.spec.ts \
                   tests/e2e/storybook-input.spec.ts \
                   tests/e2e/storybook-marketing-faq.spec.ts \
@@ -6368,13 +6382,15 @@ jobs:
     environment: Preview – jovie
     # Launch-gate job (JOV-3758): full signup -> onboarding -> music import -> live
     # public profile -> Stripe checkout journey against real Better Auth + an ephemeral
-    # Manual golden-path evidence uses the isolated Neon branch.
+    # Manual golden-path evidence prefers the shared Neon branch. A failed
+    # database-certification job still runs this lane through the fallback
+    # branch so certification writes a certificate (JOV-8614).
     # Unlike ci-e2e-smoke this must NOT set NEXT_PUBLIC_CLERK_MOCK or
     # E2E_USE_TEST_AUTH_BYPASS — required mode fails closed if either is present.
     # Path-triggered (not always-on): the spec has a 900s timeout, so always-on would
     # blow the CI budget and churn the external Spotify/Stripe fixtures.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.neon-db.result == 'success' }}
+    if: ${{ always() && !cancelled() && needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     outputs:
@@ -6729,11 +6745,12 @@ jobs:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           CERT_DIR: ${{ runner.temp }}/canonical-artist-site-certification
+          PRODUCER_RESULT: ${{ needs.ci-golden-path.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           CERT_PATH="$(find "$CERT_DIR" -name certificate.json -print -quit 2>/dev/null || true)"
-          CERT_PATH="$CERT_PATH" node scripts/canonical-artist-site-intake.mjs
+          CERT_PATH="$CERT_PATH" PRODUCER_RESULT="$PRODUCER_RESULT" node scripts/canonical-artist-site-intake.mjs
       - name: File or resolve the Golden Path Linear issue
         if: ${{ always() && !cancelled() }}
         env:

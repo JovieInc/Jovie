@@ -77,7 +77,11 @@ class SweepTest(unittest.TestCase):
         return sweeper.sweep([self.repo], self.roots, [self.base / "never"], date="20261003", **kw)
 
     def remote_branches(self):
-        return git(self.remote, "for-each-ref", "--format=%(refname:short)", "refs/heads/backup").split()
+        """Sweep snapshots on the remote; a sweep never creates a branch (refs/heads/*), since
+        branch pushes started Actions and Vercel builds (77 queued on 2026-10-20)."""
+        heads = git(self.remote, "for-each-ref", "--format=%(refname)", "refs/heads/").split()
+        self.assertEqual([ref for ref in heads if ref != "refs/heads/main"], [], "sweep created a branch")
+        return git(self.remote, "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/").split()
 
     def test_existing_drain_starts_no_cleanup_commands(self):
         state = self.base / "state"
@@ -114,7 +118,7 @@ class SweepTest(unittest.TestCase):
         self.assertTrue(report["drained"])
         self.assertFalse(first.exists())
         self.assertTrue(second.exists())
-        self.assertEqual(git(self.remote, "show", "backup/mac/first-20261003:a.txt"),
+        self.assertEqual(git(self.remote, "show", "refs/jovie-preserved/sweep/mac/first-20261003:a.txt"),
                          "keep this edit")
         self.assertEqual(len(report["removed"]), 1)
         self.assertFalse(any("prune" in args for args in commands))
@@ -159,11 +163,12 @@ class SweepTest(unittest.TestCase):
         provenance.write_text("retain provenance\n")
         report = self.sweep(now=time.time() + 2 * DAY)
         self.assertFalse(path.exists())
-        self.assertEqual(report["backups"], ["backup/mac/dirty-20261003"])
-        files = git(self.remote, "ls-tree", "-r", "--name-only", "backup/mac/dirty-20261003").split()
+        self.assertEqual(report["backups"], ["refs/jovie-preserved/sweep/mac/dirty-20261003"])
+        self.assertEqual(self.remote_branches(), report["backups"])
+        files = git(self.remote, "ls-tree", "-r", "--name-only", report["backups"][0]).split()
         self.assertEqual(sorted(files), [".symphony/package-cache/network-trace", "a.txt", "b.txt", "new.txt"],
                          "private cache bytes never reach the backup; source and provenance do")
-        self.assertEqual(git(self.remote, "show", "backup/mac/dirty-20261003:a.txt"), "edited")
+        self.assertEqual(git(self.remote, "show", "refs/jovie-preserved/sweep/mac/dirty-20261003:a.txt"), "edited")
 
     def test_failed_backup_keeps_checkout_and_strips_build_output(self):
         path = self.worktree("unsaved")
@@ -284,8 +289,10 @@ class SweepTest(unittest.TestCase):
         self.assertFalse(expired.exists())
         self.assertEqual(sorted(r["reason"] for r in report["removed"]), ["preserved-expired", "preserved-pr-closed"])
         self.assertEqual(sorted(self.remote_branches()),
-                         ["backup/mac/closed-repair-20261003", "backup/mac/expired-repair-20261003"])
-        files = git(self.remote, "ls-tree", "-r", "--name-only", "backup/mac/closed-repair-20261003").split()
+                         ["refs/jovie-preserved/sweep/mac/closed-repair-20261003",
+                          "refs/jovie-preserved/sweep/mac/expired-repair-20261003"])
+        files = git(self.remote, "ls-tree", "-r", "--name-only",
+                    "refs/jovie-preserved/sweep/mac/closed-repair-20261003").split()
         self.assertNotIn(sweeper.PRESERVED_REPAIR, files)
 
 
@@ -409,7 +416,9 @@ class HostWiringTest(unittest.TestCase):
             self.assertEqual(sweeper.default_repos(home, lanes_repo), [lanes_repo, home / "Jovie"])
             roots, never = sweeper.default_roots(home, home / "state"), sweeper.default_never(home)
             for path in (home / ".codex/worktrees/a1/Jovie", home / "conductor/workspaces/x/y",
-                         home / "state/worktrees/run", home / "jovie-wt-fix"):
+                         home / "state/worktrees/run", home / "jovie-wt-fix",
+                         # Binding (LYB) run checkouts were never swept; 347 were reclaimed by hand.
+                         home / "state/bindings/LYB/worktrees/20261020T000000Z-LYB-1-codex-abc123"):
                 self.assertTrue(sweeper.in_scope(path, roots, never), path)
             for path in (home / ".cache/pnpm", home / "Library/pnpm/store", home / "Jovie"):
                 self.assertFalse(sweeper.in_scope(path, roots, never), path)

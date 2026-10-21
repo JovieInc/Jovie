@@ -29,6 +29,18 @@ CLAIM_KEEP_S = 7 * 86400
 TERMINAL = frozenset({"completed", "canceled"})
 NOT_STARTED = frozenset({"triage", "backlog", "unstarted"})
 RELEASE_STATES = frozenset({"Todo", "Backlog", "Triage", "Done", "Canceled"})
+# Started states. Entering one needs a live owner recorded at the same moment (an active
+# local claim, or an explicit owner the caller names); a status alone owns nothing.
+STARTED = frozenset({"In Progress", "In Review", "Rework", "Merging", "Validating"})
+
+
+class StartedWithoutOwner(ValueError):
+    """A started-state move with no recorded owner: the orphaned-status bug, refused."""
+
+
+def require_owner(state: Path, issue_id: str, target: str, owner: str | None) -> None:
+    if target in STARTED and not owner and claim_status(state, issue_id) != "active":
+        raise StartedWithoutOwner(f"{target} for {issue_id} without a live owner")
 ROW = ("id identifier title description priority createdAt updatedAt state{name type} parent{id} "
        "labels(first:25){pageInfo{hasNextPage} nodes{name}}")
 SYNC_QUERY = ('query($team:String!,$since:DateTimeOrDuration!,$after:String){issues(first:50,after:$after,'
@@ -272,9 +284,12 @@ def release(state: Path, issue_id: str, status: str = "released", reason: str = 
             row.update(status=status, endedAt=time.time(), reason=reason)
 
 
-def enqueue(state: Path, op: str, issue_id: str, *, target: str | None = None, body: str | None = None) -> str:
-    """Durable, idempotent write intent. A newer state move replaces a pending one."""
+def enqueue(state: Path, op: str, issue_id: str, *, target: str | None = None, body: str | None = None,
+            owner: str | None = None) -> str:
+    """Durable, idempotent write intent. A newer state move replaces a pending one. A move
+    into a started state must name its owner (`require_owner`)."""
     if op == "move":
+        require_owner(state, issue_id, target, owner)
         key = f"move:{issue_id}:{target}"
     elif op == "comment":
         key = "comment:" + hashlib.sha256(f"{issue_id}\0{body}".encode()).hexdigest()[:24]
@@ -433,13 +448,13 @@ class Outboxed:
     def __getattr__(self, name):
         return getattr(self._client, name)
 
-    def move(self, issue_id: str, state_name: str) -> None:
+    def move(self, issue_id: str, state_name: str, owner: str | None = None) -> None:
         status = claim_status(self._state, issue_id)
         if status == "superseded":
             return  # the remote owner changed it; never overwrite that decision
         if status == "active" and state_name in RELEASE_STATES:
             release(self._state, issue_id, reason=f"lane:{state_name}")
-        enqueue(self._state, "move", issue_id, target=state_name)
+        enqueue(self._state, "move", issue_id, target=state_name, **({"owner": owner} if owner else {}))
 
     def comment(self, issue_id: str, body: str) -> None:
         enqueue(self._state, "comment", issue_id, body=body)
