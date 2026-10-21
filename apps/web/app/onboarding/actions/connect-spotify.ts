@@ -9,6 +9,11 @@ import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { invalidateReleaseCaches } from '@/lib/cache/releases';
+import { claimVerificationPendingMessage } from '@/lib/claim/claim-verification';
+import {
+  getClaimVerificationReach,
+  requestClaimVerification,
+} from '@/lib/claim/claim-verification.server';
 import {
   clearPendingClaimContext,
   readPendingClaimContext,
@@ -27,6 +32,7 @@ import {
   processMusicFetchEnrichmentJob,
 } from '@/lib/dsp-enrichment/jobs';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { createOnboardingReceiptPendingError } from '@/lib/errors/onboarding';
@@ -46,6 +52,7 @@ import {
   trackServerEvent,
   trackServerEventTx,
 } from '@/lib/server-analytics';
+import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 import { finalizePostOnboarding } from './post-onboarding';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
@@ -89,6 +96,11 @@ export interface ConnectOnboardingSpotifyArtistResult {
   importing: boolean;
   message: string;
   success: boolean;
+  /**
+   * The artist is above the claim-verification reach threshold: the identity
+   * was not linked and a verification request was stored instead.
+   */
+  verificationPending?: boolean;
 }
 
 function isSpotifyIdUniqueViolation(error: unknown): boolean {
@@ -282,6 +294,36 @@ export async function connectOnboardingSpotifyArtist(
     params.spotifyArtistId,
     profile.id
   );
+
+  // Claim integrity: a high-reach artist is never attached self-serve, even
+  // with an exact Spotify-ID match. Store a verification request on the
+  // requester's own profile instead; payment still works and moves it to
+  // pending_verification (lib/claim/claim-verification.ts).
+  const claimedElsewhere = existingClaims.some(
+    existing => existing.isClaimed === true
+  );
+  if (!claimedElsewhere && profile.spotifyId !== params.spotifyArtistId) {
+    const reach = await getClaimVerificationReach(params.spotifyArtistId);
+    if (reach !== null) {
+      const entitlements = await getCurrentUserEntitlements();
+      await requestClaimVerification({
+        profileId: profile.id,
+        spotifyArtistId: params.spotifyArtistId,
+        artistName: params.artistName || null,
+        reach,
+        paid: entitlements.isPro && !entitlements.isTrialing,
+        acquisitionId: (await cookies()).get(ACQUISITION_COOKIE_NAME)?.value,
+      });
+      return {
+        success: false,
+        verificationPending: true,
+        importing: false,
+        message: claimVerificationPendingMessage(params.artistName),
+        imported: 0,
+        artistName: params.artistName,
+      };
+    }
+  }
 
   if (existingClaims.length > 0) {
     const hasUnclaimedStructuredProfile = existingClaims.some(

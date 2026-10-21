@@ -183,7 +183,18 @@ def provider_payloads(state: Path, providers, proc: Path = Path("/proc")) -> dic
     return result
 
 
-AUTOMATION_REGISTRY = "ops/automation/registry.jsonl"
+def _linear_app_credential(lane) -> bool | None:
+    """Installed Jovie Lanes app credential (presence only; never read into the report).
+    None where no host file applies (self-test, fixtures)."""
+    tokens = getattr(lane, "linear_app_token", None)
+    path = tokens.default_path() if tokens else None
+    return None if path is None else bool(tokens.credentials(path))
+
+
+# #22354 shipped the registry at canon/ (the repo-root allowlist rejects new top-level dirs).
+# Reading a path that is not on main must alert, never read as "nothing silent" (2026-10-21:
+# the doctor watched ops/automation/registry.jsonl, which never existed, so no row was checked).
+AUTOMATION_REGISTRY = "canon/automation-registry.jsonl"
 AUTOMATION_LIVENESS_WORKFLOW = "automation-liveness.yml"
 AUTOMATION_LIVENESS_MAX_S = 60 * 60
 AUTOMATION_LIVENESS_TTL_S = 600
@@ -266,7 +277,8 @@ def automation_liveness(lane, now: float) -> dict:
 def automation_observation(host, lane, now: float) -> dict:
     """Registry watch for observe(); fixtures and self-tests read no registry or GitHub."""
     if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
-        return {"automation": {"known": False, "silent": {}}, "automationLiveness": {"installed": None}}
+        return {"automation": {"known": False, "silent": {}, "skipped": True},
+                "automationLiveness": {"installed": None}}
     try:
         watch = automation_watch(automation_registry(host.repo), lane.HOST, now)
     except Exception as error:  # observability never takes the doctor down
@@ -483,6 +495,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         **automation_observation(host, lane, now),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
+        "linearAppCredential": _linear_app_credential(lane),
         "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
                       if key not in ("ownerlessSince", "evidenceNoted", "moved", "claimsReleased")},
         "merged24h": merged, "mergedAttributionError": merged_error,
@@ -490,6 +503,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "autoscale": _autoscale_block(host),
         "mergedWindow": ({k: v for k, v in merged_window.items() if k != "prs"} if merged_window else None),
         "diskFreePct": round(100 * disk.free / disk.total, 1),
+        "sweepSecretHeld": [row for row in (read_json(state / "worktree-sweep.json", {}).get("secretHeld") or [])
+                            if isinstance(row, dict) and row.get("path") and Path(row["path"]).exists()],
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
@@ -855,11 +870,20 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    if obs.get("linearAppCredential") is False:
+        alerts["linear-app-credential-missing"] = (
+            "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
+            "access fails closed (no personal-key fallback) until the lanes host owner reinstalls it")
     for automation_id, row in sorted(((obs.get("automation") or {}).get("silent") or {}).items()):
         age = row.get("ageS")
         alerts[f"automation-silent:{automation_id}"] = (
             f"registered automation {automation_id} left no fresh receipt at {row.get('location')} "
-            f"({'missing' if age is None else f'{round(age / 60)} min old'}); owner per ops/automation/registry.jsonl")
+            f"({'missing' if age is None else f'{round(age / 60)} min old'}); owner per {AUTOMATION_REGISTRY}")
+    watched = obs.get("automation") or {}
+    if watched.get("known") is False and not watched.get("skipped"):
+        alerts["automation-registry-unreadable"] = (
+            f"origin/main:{AUTOMATION_REGISTRY} is unreadable ({watched.get('error') or 'missing or not JSONL'}); "
+            "no Gem host-local automation receipt is being watched")
     liveness = obs.get("automationLiveness") or {}
     if liveness.get("installed"):
         last = _iso_epoch(liveness.get("lastRunAt"))
@@ -953,6 +977,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                           f"agent work ({causes}); infrastructure, not the PRs, is exhausting them")
     # No design-brief-stale alert: since 2026-10-11 no issue is held for a brief (the
     # claiming run writes it), so a held brief is no longer a condition to watch.
+    for row in obs.get("sweepSecretHeld") or []:
+        # The public repo's refs/jovie-preserved/* must never carry a secret; the checkout is kept.
+        alerts[f"sweep-snapshot-secret:{row.get('name')}"] = (
+            f"worktree sweep did not publish a snapshot of {row.get('path')}: {row.get('reason')}; "
+            "the checkout is kept untouched until its owner reviews it")
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")

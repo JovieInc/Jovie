@@ -5,6 +5,7 @@
  */
 
 import {
+  buildDevMockBlobUrl,
   getBlobCommandOptions,
   isBlobStorageConfigured,
 } from '@/lib/blob-config';
@@ -47,7 +48,7 @@ export async function uploadBufferToBlob(
       '[DEV] Blob storage not configured, returning mock URL for:',
       path
     );
-    return `https://blob.vercel-storage.com/${path}`;
+    return buildDevMockBlobUrl(path);
   }
 
   let lastError: Error | null = null;

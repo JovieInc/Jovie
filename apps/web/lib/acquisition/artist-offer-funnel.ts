@@ -27,6 +27,25 @@ export const ARTIST_OFFER_FUNNEL_STAGES = [
 export type ArtistOfferFunnelStage =
   (typeof ARTIST_OFFER_FUNNEL_STAGES)[number];
 
+/**
+ * Branch stages sit off the linear funnel. `pending-verification` is reached
+ * after `paid` when a high-reach artist claim waits for ownership
+ * verification (`lib/claim/claim-verification.ts`) instead of going live.
+ */
+export const ARTIST_OFFER_BRANCH_STAGES = [
+  { stage: 'pending-verification', from: 'paid' },
+  { stage: 'claim-verified', from: 'pending-verification' },
+  { stage: 'claim-rejected', from: 'pending-verification' },
+] as const satisfies readonly {
+  readonly stage: string;
+  readonly from: string;
+}[];
+
+export type ArtistOfferBranchStage =
+  (typeof ARTIST_OFFER_BRANCH_STAGES)[number]['stage'];
+
+type ArtistOfferAnyStage = ArtistOfferFunnelStage | ArtistOfferBranchStage;
+
 /** Stages written by producers; the rest are derived from the journey row. */
 export const RECORDED_ARTIST_OFFER_STAGES = [
   'pricing',
@@ -34,7 +53,10 @@ export const RECORDED_ARTIST_OFFER_STAGES = [
   'checkout',
   'paid',
   'profile-live',
-] as const satisfies readonly ArtistOfferFunnelStage[];
+  'pending-verification',
+  'claim-verified',
+  'claim-rejected',
+] as const satisfies readonly ArtistOfferAnyStage[];
 
 export type RecordedArtistOfferStage =
   (typeof RECORDED_ARTIST_OFFER_STAGES)[number];
@@ -57,8 +79,39 @@ export function stageForFunnelPath(
   return normalized === '/pricing' ? 'pricing' : null;
 }
 
+/**
+ * Landing paths that belong to the artist offer (marketing front door and
+ * the claim/sign-up path). Every other consented journey (mostly fans landing
+ * on artist profiles via the root-layout capture and /api/px) still counts as
+ * a `visit`, so the report splits visits by landing to keep the offer funnel
+ * readable (production 2026-10-21: 24,046 visits, 0 pricing).
+ */
+export const OFFER_LANDING_PATHS = [
+  '/',
+  '/pricing',
+  '/claim',
+  '/claim/start',
+  '/signup',
+  '/signin',
+  '/start',
+] as const;
+
+/** Path of a stored landing (`/x?y`, or a full URL from the profile pixel). */
+export function landingPathname(landing: string | null | undefined): string {
+  if (!landing) return '/';
+  const withoutOrigin = landing.replace(/^https?:\/\/[^/]+/i, '');
+  const path = withoutOrigin.split(/[?#]/)[0].replace(/\/+$/, '');
+  return path.startsWith('/') ? path : path ? `/${path}` : '/';
+}
+
+export function isOfferLanding(landing: string | null | undefined): boolean {
+  return (OFFER_LANDING_PATHS as readonly string[]).includes(
+    landingPathname(landing)
+  );
+}
+
 export type ArtistOfferJourneyTimeline = {
-  readonly [Stage in ArtistOfferFunnelStage]?: Date | null;
+  readonly [Stage in ArtistOfferAnyStage]?: Date | null;
 };
 
 export interface ArtistOfferStageSummary {
@@ -75,6 +128,17 @@ export interface ArtistOfferStageSummary {
   readonly fromVisitSeconds: DurationSummary;
 }
 
+export interface ArtistOfferBranchSummary {
+  readonly stage: ArtistOfferBranchStage;
+  readonly from: ArtistOfferAnyStage;
+  /** Journeys that reached this branch stage. */
+  readonly journeys: number;
+  /** Share of the parent stage's journeys that branched here. */
+  readonly conversionFromParent: number | null;
+  /** Seconds from the parent stage, over journeys with both timestamps. */
+  readonly fromParentSeconds: DurationSummary;
+}
+
 export interface DurationSummary {
   readonly samples: number;
   readonly p50: number | null;
@@ -88,7 +152,28 @@ export interface ArtistOfferFunnelReport {
   /** Consented journeys only; non-consented visitors are never stored. */
   readonly scope: 'consented_first_party_journeys';
   readonly stages: readonly ArtistOfferStageSummary[];
+  /** Off-funnel branches (e.g. paid → pending-verification). */
+  readonly branches: readonly ArtistOfferBranchSummary[];
+  readonly diagnostics: ArtistOfferFunnelDiagnostics;
 }
+
+/**
+ * Why a stage can read 0 while visits are high. `stages` is a cohort of
+ * journeys first captured in the window; `stageEventsInWindow` counts every
+ * journey that reached a recorded stage in the window, whenever it was first
+ * captured (returning visitors). Consent-gated visitors are never stored.
+ */
+export interface ArtistOfferFunnelDiagnostics {
+  readonly visitsByLanding: { readonly offer: number; readonly other: number };
+  readonly stageEventsInWindow: Readonly<
+    Partial<Record<RecordedArtistOfferStage, number>>
+  >;
+}
+
+export const EMPTY_FUNNEL_DIAGNOSTICS: ArtistOfferFunnelDiagnostics = {
+  visitsByLanding: { offer: 0, other: 0 },
+  stageEventsInWindow: {},
+};
 
 /** Nearest-rank percentile; deterministic and dependency-free. */
 export function percentile(
@@ -133,6 +218,7 @@ export function buildArtistOfferFunnelReport(input: {
   readonly end: Date;
   readonly totalVisits: number;
   readonly timelines: readonly ArtistOfferJourneyTimeline[];
+  readonly diagnostics?: ArtistOfferFunnelDiagnostics;
 }): ArtistOfferFunnelReport {
   const counts = new Map<ArtistOfferFunnelStage, number>();
   counts.set('visit', input.totalVisits);
@@ -169,11 +255,33 @@ export function buildArtistOfferFunnelReport(input: {
     } satisfies ArtistOfferStageSummary;
   });
 
+  const reached = (stage: ArtistOfferAnyStage): number =>
+    counts.get(stage as ArtistOfferFunnelStage) ??
+    input.timelines.filter(timeline => Boolean(timeline[stage])).length;
+
+  const branches = ARTIST_OFFER_BRANCH_STAGES.map(({ stage, from }) => {
+    const fromParent: number[] = [];
+    for (const timeline of input.timelines) {
+      const step = secondsBetween(timeline[from], timeline[stage]);
+      if (step !== null) fromParent.push(step);
+    }
+    const journeys = reached(stage);
+    return {
+      stage,
+      from,
+      journeys,
+      conversionFromParent: ratio(journeys, reached(from)),
+      fromParentSeconds: summarize(fromParent),
+    } satisfies ArtistOfferBranchSummary;
+  });
+
   return {
     schema: 'jovie-artist-offer-funnel/v1',
     entity: 'revenue-funnel',
     window: { start: input.start.toISOString(), end: input.end.toISOString() },
     scope: 'consented_first_party_journeys',
     stages,
+    branches,
+    diagnostics: input.diagnostics ?? EMPTY_FUNNEL_DIAGNOSTICS,
   };
 }

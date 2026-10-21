@@ -11,6 +11,7 @@ import { and, eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { getClaimVerificationReach } from '@/lib/claim/claim-verification.server';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -333,6 +334,22 @@ export async function enrichProfileFromDsp(
 
   if (!profile) {
     throw new Error('Profile not found');
+  }
+
+  // Claim integrity: never copy a high-reach artist's name, photo or bio onto
+  // a profile that is not linked to that artist (verification pending or
+  // never requested). See lib/claim/claim-verification.ts.
+  if (
+    profile.spotifyId !== spotifyArtistId &&
+    (await getClaimVerificationReach(spotifyArtistId)) !== null
+  ) {
+    return {
+      name: profile.displayName,
+      imageUrl: profile.avatarUrl,
+      bio: profile.bio,
+      genres: [],
+      followers: null,
+    };
   }
 
   // Set all enrichment sub-statuses to 'enriching' at the start
