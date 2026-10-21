@@ -23,6 +23,19 @@ case "$SCOPE" in
       exit 1
     fi
     node scripts/turbo-local.mjs typecheck --affected
+    # Turbo packages do not cover the scripts/ tree; Source Validation checks it
+    # separately. Run the same ratchet here when scripts/ changed so a new type
+    # error fails the push, not a CI round (~45-80s locally).
+    if ! SCRIPTS_DIFF_BASE="$(git merge-base "$BASE_REF" HEAD)"; then
+      echo "[automation-verify] Cannot resolve the scripts typecheck base from ${BASE_REF}" >&2
+      exit 1
+    fi
+    if git diff --name-only "$SCRIPTS_DIFF_BASE" HEAD -- scripts/ | grep -q .; then
+      echo "[automation-verify] scripts/ changed: running the scripts typecheck ratchet"
+      node scripts/typecheck-scripts.mjs
+    else
+      echo "[automation-verify] scripts/ unchanged: scripts typecheck not selected"
+    fi
     node scripts/turbo-local.mjs lint --affected
     # Turbo's --affected flag selects packages, not tests. Any apps/web edit
     # therefore ran the entire web suite locally. Let Vitest follow the changed
@@ -43,6 +56,7 @@ case "$SCOPE" in
   full)
     echo "[automation-verify] Running full verify bundle"
     node scripts/turbo-local.mjs typecheck
+    node scripts/typecheck-scripts.mjs
     node scripts/turbo-local.mjs lint
     node scripts/turbo-local.mjs test
     ;;
