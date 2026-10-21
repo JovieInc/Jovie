@@ -34,18 +34,6 @@ export const FOOTER_CTA_VARIANTS: readonly SectionVariant[] = [
     ),
   },
   {
-    id: 'final-cta-section-claim-handle',
-    category: 'footer-cta',
-    label: 'FinalCTASection (form-based)',
-    description:
-      'Homepage claim-handle form. Slated for refactor — extract ClaimHandleForm and use MarketingFinalCTA as the shell.',
-    componentPath: 'components/features/home/FinalCTASection.tsx',
-    usedIn: ['/'],
-    status: 'consolidate',
-    mergeInto: 'marketing-final-cta-default',
-    render: () => <MarketingFinalCTA />,
-  },
-  {
     id: 'organism-cta-section',
     category: 'footer-cta',
     label: 'CTASection (organism)',
