@@ -11,7 +11,8 @@
  * local Vercel CLI login with --vercel-cli-auth), and Gem's Codex ledger.
  * Every run records stage timestamps; --receipt appends the run record.
  * --file-linear files each alerting finding through the remediation intake
- * (LINEAR_API_KEY), the same path the nightly remediation sweep uses.
+ * (LINEAR_API_KEY, or an app's OAuth LINEAR_ACCESS_TOKEN), the same path the
+ * nightly remediation sweep uses.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -179,7 +180,7 @@ export async function runCheck({
       for (const plan of plans) {
         const outcome = await upsert({
           ...plan,
-          apiKey: env.LINEAR_API_KEY,
+          apiKey: env.LINEAR_API_KEY || env.LINEAR_ACCESS_TOKEN,
         });
         filed.push({
           fingerprint: plan.fingerprint,
