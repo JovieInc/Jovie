@@ -8,6 +8,8 @@ describe('cleanScrapedDisplayName', () => {
     ['ninadevitry - Listen on YouTube, Spotify', 'ninadevitry'],
     ['@bktherula', 'bktherula'],
     ['Simple Things - Listen on Spotify', 'Simple Things'],
+    ['ODESZA Tour Dates, Tickets & Merch Links', 'ODESZA'],
+    ['AndyG | DJ & Producer | Instagram, Facebook, TikTok', 'AndyG'],
   ])('strips page-title chrome from %s', (raw, expected) => {
     expect(cleanScrapedDisplayName(raw)).toBe(expected);
   });
@@ -16,6 +18,16 @@ describe('cleanScrapedDisplayName', () => {
     expect(cleanScrapedDisplayName('Jay-Z')).toBe('Jay-Z');
     expect(cleanScrapedDisplayName('Florence + the Machine')).toBe(
       'Florence + the Machine'
+    );
+  });
+
+  it('returns null when the title is only a role, so callers use the handle', () => {
+    expect(
+      cleanScrapedDisplayName('Hip Hop Artist | NC - Listen on…')
+    ).toBeNull();
+    expect(cleanScrapedDisplayName('Singer-Songwriter')).toBeNull();
+    expect(cleanScrapedDisplayName('DJ Mitsu the Beats')).toBe(
+      'DJ Mitsu the Beats'
     );
   });
 
