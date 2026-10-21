@@ -4543,6 +4543,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/webhooks/instantly/route.ts",
+      "kind": "handler",
+      "route": "/api/webhooks/instantly",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/webhooks/linear/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/linear",
