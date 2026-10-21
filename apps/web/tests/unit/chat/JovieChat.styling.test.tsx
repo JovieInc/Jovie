@@ -709,7 +709,7 @@ describe('JovieChat styling regressions', () => {
     ).toBeNull();
   });
 
-  it('renders the Ovie editorial briefing as the empty-state affordance in ov mode', () => {
+  it('renders a supplied Home canvas as the empty-state affordance', () => {
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
@@ -720,45 +720,65 @@ describe('JovieChat styling regressions', () => {
       <JovieChat
         profileId='profile-1'
         chatMode='ov'
-        ovieHomeBriefing={{
-          greeting: 'Good morning, Tim.',
-          updatedLabel: 'Updated Sep 28, 8:00 AM PDT',
-          signal: {
-            id: 'activation.first-user',
-            title: 'The first real user completed onboarding',
-            summary: 'Activation has moved from theory to observed behavior.',
-            currentValue: '1 activated user',
-            delta: '+1 today',
-            target: 'Learn what made the path work',
-            sourceLabel: 'Founder Funnel',
-            nextAction: 'Review the session.',
-            removalEvent: 'The activation lesson is applied.',
-            summerCanAct: true,
-          },
-          actions: [
-            {
-              id: 'activation.first-user:next',
-              label: 'Start The Next Step',
-              prompt: 'Review the first activation with me.',
-            },
-          ],
-        }}
+        homeCanvas={<div data-testid='home-canvas-fixture' />}
       />
     );
 
     expect(
-      container.querySelector('[data-testid="ovie-editorial-briefing"]')
+      container.querySelector('[data-testid="home-canvas-fixture"]')
     ).toBeTruthy();
     expect(
       container
         .querySelector('[data-testid="chat-empty-state-viewport"]')
         ?.getAttribute('data-empty-affordance')
-    ).toBe('ovie-briefing');
-    // The briefing owns the empty-state chrome layer — no usage banner stack.
+    ).toBe('home-canvas');
+    // The canvas owns the empty-state chrome layer — no usage banner stack.
     expect(container.querySelector('[data-testid="chat-usage"]')).toBeNull();
   });
 
-  it('never renders the Ovie briefing outside ov mode', () => {
+  it('keeps a living Home canvas as the surface after messages, with the transcript on request', () => {
+    const states: { isStreaming: boolean; count: number }[] = [];
+    const { container, getByRole } = renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        chatMode='ov'
+        homeCanvasMode='living'
+        homeCanvas={state => {
+          states.push({
+            isStreaming: state.isStreaming,
+            count: state.messages.length,
+          });
+          return (
+            <button type='button' onClick={state.onOpenTranscript}>
+              Open Transcript Fixture
+            </button>
+          );
+        }}
+      />
+    );
+
+    expect(
+      container
+        .querySelector('[data-testid="chat-empty-state-viewport"]')
+        ?.getAttribute('data-empty-affordance')
+    ).toBe('home-canvas');
+    expect(states.at(-1)).toEqual({ isStreaming: true, count: 1 });
+
+    act(() => {
+      getByRole('button', { name: 'Open Transcript Fixture' }).click();
+    });
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-viewport"]')
+    ).toBeNull();
+    act(() => {
+      getByRole('button', { name: 'Back To Home' }).click();
+    });
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-viewport"]')
+    ).toBeTruthy();
+  });
+
+  it('keeps the bare Jovie empty state when no Home canvas is supplied', () => {
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
@@ -770,8 +790,10 @@ describe('JovieChat styling regressions', () => {
     );
 
     expect(
-      container.querySelector('[data-testid="ovie-editorial-briefing"]')
-    ).toBeNull();
+      container
+        .querySelector('[data-testid="chat-empty-state-viewport"]')
+        ?.getAttribute('data-empty-affordance')
+    ).not.toBe('home-canvas');
   });
 
   it.each([

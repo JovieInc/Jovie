@@ -28,13 +28,19 @@ test.describe('Tim White Profile Showcase', () => {
     await expect(
       page.getByTestId('tim-white-cards-playlist-fallback')
     ).toHaveAttribute('data-state', 'playlist_fallback');
-    // JOV-7123: the alerts fallback surface is the featured card itself —
-    // capture lives inside it, not in a trailing carousel card.
+    // JOV-7123: the alerts fallback is no longer a separate board card — fan
+    // capture lives inside the featured card's prompt state, so the board
+    // shows exactly the five card states above.
+    await expect(showcase.getByRole('heading', { level: 2 })).toHaveText([
+      'Latest Release',
+      'Countdown',
+      'Nearby Tour',
+      'Next Tour',
+      'Playlist Fallback',
+    ]);
     await expect(
-      page
-        .getByTestId('tim-white-cards-alerts-fallback')
-        .getByTestId('profile-pac')
-    ).toBeVisible();
+      page.getByTestId('tim-white-cards-alerts-fallback')
+    ).toHaveCount(0);
   });
 
   test('renders the subscribe showcase board', async ({ page }) => {

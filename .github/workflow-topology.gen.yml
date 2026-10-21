@@ -56,7 +56,7 @@ inactiveWorkflows:
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
 generatedAt: deterministic
-normalPrCheckRecords: 22
+normalPrCheckRecords: 24
 nodes:
   - name: Workflow Lint
     path: .github/workflows/actionlint.yml
@@ -104,6 +104,18 @@ nodes:
       - workflow_run
     terminalReceipt: job:green-source
     jobCount: 2
+  - name: Automation Liveness
+    path: .github/workflows/automation-liveness.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:liveness
+    jobCount: 1
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
     active: true
@@ -208,6 +220,17 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:analyze
+    jobCount: 1
+  - name: Controller Quota Replay
+    path: .github/workflows/controller-quota-replay.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:replay
     jobCount: 1
   - name: Cost Anomaly Gate
     path: .github/workflows/cost-anomaly-gate.yml
@@ -862,7 +885,7 @@ nodes:
       - merge_group
       - pull_request
     terminalReceipt: job:size
-    jobCount: 3
+    jobCount: 4
   - name: PR targets main
     path: .github/workflows/pr-targets-main.yml
     active: true
@@ -892,7 +915,8 @@ nodes:
     category: production-verification
     authoritativeProducer: Production Controller
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Automation Liveness
     triggeringStateTransition:
       - repository_dispatch
       - schedule
@@ -920,6 +944,7 @@ nodes:
       - release-orchestration
       - production-verification
     allowedConsumers:
+      - Controller Quota Replay
       - Delivery Control Receipts
       - desktop-release
       - iOS TestFlight
@@ -1188,7 +1213,7 @@ nodes:
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
-    jobCount: 5
+    jobCount: 6
   - name: Staging Controller
     path: .github/workflows/staging-controller.yml
     active: true
@@ -1196,12 +1221,25 @@ nodes:
     authoritativeProducer: Production Controller
     authoritativeFor: []
     allowedConsumers:
+      - Controller Quota Replay
       - Production Controller
       - Production Release
     triggeringStateTransition:
       - workflow_run
     terminalReceipt: job:staging-result
     jobCount: 3
+  - name: Stale Branch Sweep
+    path: .github/workflows/stale-branch-sweep.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:sweep
+    jobCount: 1
   - name: Summer Eve identity check
     path: .github/workflows/summer-eve-pin.yml
     active: true
@@ -1337,6 +1375,9 @@ nodes:
     terminalReceipt: job:mine
     jobCount: 1
 edges:
+  - from: Production Continuity Guard
+    to: Automation Liveness
+    type: workflow_run
   - from: CI
     to: iOS CI
     type: workflow_call
@@ -1346,6 +1387,12 @@ edges:
   - from: CLI Chaos
     to: Mac Lane Route
     type: workflow_call
+  - from: Staging Controller
+    to: Controller Quota Replay
+    type: workflow_run
+  - from: Production Controller
+    to: Controller Quota Replay
+    type: workflow_run
   - from: Production Controller
     to: Delivery Control Receipts
     type: workflow_run
