@@ -1,8 +1,8 @@
 // Marketing plan prices come from offer truth only (2026-10-20).
 //
-// A hand-typed "$12/mo" in page copy can ship a price that billing does not
-// sell (the $12 artist-profile pilot is approved but not yet published in
-// lib/billing/offer-truth.ts, JOV-8368). Pages render plan prices through
+// A hand-typed recurring price in page copy can drift from what billing
+// sells. The $12 artist-profile offer is published in
+// lib/billing/offer-truth.ts. Pages render plan prices through
 // MarketingOfferSummary / getPublicPriceClaim instead. This guard scans the
 // marketing source roots for recurring-price literals; the baseline only
 // shrinks. Blog/editorial content (apps/web/content) may quote third-party

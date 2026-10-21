@@ -556,7 +556,7 @@
     },
     {
       "fingerprint": "Marketing plan prices come only from offer truth",
-      "lessonSha256": "b78046f00b29f78c054a6cf8f2b3cd745190519d601730368bd08bd4f7d9a861",
+      "lessonSha256": "f7fcc5afa0bcb09ede80160239b8594815306fd82238cf7a64007e1a67cd1e97",
       "guards": [
         {
           "kind": "test",
@@ -592,7 +592,7 @@
     },
     {
       "fingerprint": "Two-line display clamps must not crop descenders",
-      "lessonSha256": "9175f27c0eaf6569d4bd86236e0d20e887ea8cb44155c44b5085f0da3d388d01",
+      "lessonSha256": "5773d4fc7ec4316de74d0fe87c62966d1251807d21f1126fab591094cb4bd0cf",
       "guards": [
         {
           "kind": "test",
