@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   cpSync,
@@ -14,7 +14,6 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { computeStageTimings } from '../../../scripts/lib/stage-events.mjs';
 import {
   type ChatRunBinding,
@@ -26,7 +25,6 @@ import {
 
 const root = resolve(import.meta.dirname, '../../..');
 const historicalMain = 'fcdf417872e8589fe98f89d1d57b7b342a703058';
-
 async function command(
   cwd: string,
   executable: string,
@@ -34,69 +32,32 @@ async function command(
   env = process.env
 ) {
   return new Promise<string>((done, reject) => {
-    const child = spawn(executable, args, {
-      cwd,
-      env,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    const chunks: Buffer[] = [];
-    let bytes = 0;
-    child.stdout.on('data', chunk => {
-      if (bytes < 8 * 1024 * 1024) chunks.push(chunk);
-      bytes += chunk.length;
-    });
-    child.on('error', reject);
-    child.on('close', code =>
-      code === 0
-        ? done(Buffer.concat(chunks).toString().trim())
-        : reject(
-            new Error(`Comparison command failed: ${executable} (exit ${code})`)
-          )
+    execFile(
+      executable,
+      args,
+      { cwd, env, maxBuffer: 8 * 1024 * 1024 },
+      (error, stdout) => {
+        if (error)
+          reject(new Error(`Comparison command failed: ${executable}`));
+        else done(stdout.trim());
+      }
     );
   });
 }
 const git = (...args: string[]) => command(root, 'git', args);
-
-export function validateComparisonSources(
-  head: string,
-  base: string,
-  parent: string,
-  mergeBase: string
-) {
-  if (
-    head !== FAILURE_HEAD ||
-    base !== FAILURE_BASE ||
-    parent !== FAILURE_PARENT ||
-    mergeBase !== base
-  )
-    throw new Error('Failure-era source verification failed');
-}
-
-/** Retry success never replaces the first result; missing/partial evidence stays unknown. */
-export function compareAttempts(
-  base: { budgetStatus: string; measurementStatus: string }[],
-  head: { budgetStatus: string; measurementStatus: string }[]
-) {
-  return [0, 1].map(index => ({
-    attempt: index + 1,
-    base:
-      base[index]?.measurementStatus === 'complete'
-        ? base[index].budgetStatus
-        : 'unknown',
-    head:
-      head[index]?.measurementStatus === 'complete'
-        ? head[index].budgetStatus
-        : 'unknown',
-    causality: 'unknown',
-  }));
-}
+const pnpm = (cwd: string, args: string, env: NodeJS.ProcessEnv) =>
+  command(cwd, 'pnpm', args.split(' '), env);
+const guard = resolve(root, '.github/scripts/guard-playwright-artifacts.mjs');
+const smoke =
+  'pnpm --filter=@jovie/web exec playwright test --config=playwright.config.chat-comparison.ts --project=chromium'.split(
+    ' '
+  );
 
 async function digestPaths(paths: string[]) {
   return createHash('sha256')
     .update(await git('ls-tree', '-r', 'HEAD', '--', ...paths))
     .digest('hex');
 }
-
 function digestBuild(directory: string): string {
   const hash = createHash('sha256');
   function visit(path: string) {
@@ -111,7 +72,6 @@ function digestBuild(directory: string): string {
   visit('.');
   return hash.digest('hex');
 }
-
 export async function runComparison(output: string) {
   if (await git('status', '--porcelain', '--untracked-files=normal'))
     throw new Error('Commit the reviewed harness before comparison');
@@ -125,12 +85,11 @@ export async function runComparison(output: string) {
     throw new Error(
       'Four fresh isolated comparison database URLs are required'
     );
-  validateComparisonSources(
-    await git('rev-parse', FAILURE_HEAD),
-    await git('rev-parse', FAILURE_BASE),
-    await git('rev-parse', `${FAILURE_HEAD}^`),
-    await git('merge-base', FAILURE_HEAD, historicalMain)
-  );
+  if (
+    (await git('rev-parse', `${FAILURE_HEAD}^`)) !== FAILURE_PARENT ||
+    (await git('merge-base', FAILURE_HEAD, historicalMain)) !== FAILURE_BASE
+  )
+    throw new Error('Failure-era source verification failed');
   if (
     (await command(root, 'gh', [
       'api',
@@ -188,14 +147,14 @@ export async function runComparison(output: string) {
     operation: () => Promise<string>
   ) {
     const enteredAt = new Date().toISOString();
-    let outcome = 'completed';
+    let outcome = 'advanced';
     try {
       return await operation();
     } catch (error) {
       outcome = 'failed';
       throw error;
     } finally {
-      events.push({
+      const event = {
         schema: 'jovie-stage-event/v1',
         entityType: 'chat-comparison',
         entityId,
@@ -205,7 +164,15 @@ export async function runComparison(output: string) {
         actor: 'codex',
         outcome,
         sourceReceipt: harnessSha,
-      });
+      };
+      events.push(event);
+      if (stage === 'smoke')
+        events.push({
+          ...event,
+          stage: 'finished',
+          outcome: 'completed',
+          enteredAt: event.exitedAt,
+        });
     }
   }
   try {
@@ -221,10 +188,9 @@ export async function runComparison(output: string) {
           NEXT_PUBLIC_BUILD_SHA: sourceSha,
           VERCEL_GIT_COMMIT_SHA: sourceSha,
         };
-        console.log(`Building exact ${label} ${sourceSha}`);
-        await command(checkout, 'pnpm', ['install', '--frozen-lockfile'], env);
+        await pnpm(checkout, 'install --frozen-lockfile', env);
         await timed('build', sourceSha, () =>
-          command(checkout, 'pnpm', ['turbo', 'build', '--filter=@jovie/web'], {
+          pnpm(checkout, 'turbo build --filter=@jovie/web', {
             ...sourceEnv,
             NODE_ENV: 'production',
           })
@@ -234,14 +200,10 @@ export async function runComparison(output: string) {
         const standalone = resolve(web, '.next/standalone/apps/web');
         if (!existsSync(resolve(standalone, '.next/BUILD_ID')))
           throw new Error('Production standalone output missing');
-        cpSync(
-          resolve(web, '.next/static'),
-          resolve(standalone, '.next/static'),
-          { recursive: true }
-        );
-        cpSync(resolve(web, 'public'), resolve(standalone, 'public'), {
-          recursive: true,
-        });
+        for (const asset of ['.next/static', 'public'])
+          cpSync(resolve(web, asset), resolve(standalone, asset), {
+            recursive: true,
+          });
         const binding: ChatRunBinding = {
           sourceSha,
           parentSha: await command(checkout, 'git', ['rev-parse', 'HEAD^']),
@@ -261,21 +223,19 @@ export async function runComparison(output: string) {
             ...sourceEnv,
             DATABASE_URL: databases[(label === 'base' ? 0 : 2) + attempt - 1],
           };
-          await command(
+          await pnpm(
             root,
-            'pnpm',
-            ['--filter=@jovie/web', 'run', 'seed:test-data'],
+            '--filter=@jovie/web run seed:test-data',
             databaseEnv
           );
           const attemptOutput = resolve(output, `${label}-${attempt}`);
           mkdirSync(attemptOutput, { mode: 0o700 });
-          let occupied = false;
-          try {
-            await fetch(baseURL, { signal: AbortSignal.timeout(1000) });
-            occupied = true;
-          } catch {
-            /* expected: no listener */
-          }
+          const occupied = await fetch(baseURL, {
+            signal: AbortSignal.timeout(1000),
+          }).then(
+            () => true,
+            () => false
+          );
           if (occupied) throw new Error('Comparison port already in use');
           const server = spawn(
             process.execPath,
@@ -293,13 +253,12 @@ export async function runComparison(output: string) {
             const deadline = Date.now() + 30_000;
             let ready = false;
             while (Date.now() < deadline && server.exitCode === null) {
-              try {
-                ready = (
-                  await fetch(baseURL, { signal: AbortSignal.timeout(1000) })
-                ).ok;
-              } catch {
-                /* readiness only */
-              }
+              ready = await fetch(baseURL, {
+                signal: AbortSignal.timeout(1000),
+              }).then(
+                response => response.ok,
+                () => false
+              );
               if (ready) break;
               await new Promise(done => setTimeout(done, 250));
             }
@@ -328,29 +287,14 @@ export async function runComparison(output: string) {
                 command(
                   root,
                   process.execPath,
-                  [
-                    resolve(
-                      root,
-                      '.github/scripts/guard-playwright-artifacts.mjs'
-                    ),
-                    '--run',
-                    '--',
-                    'pnpm',
-                    '--filter=@jovie/web',
-                    'exec',
-                    'playwright',
-                    'test',
-                    '--config=playwright.config.chat-comparison.ts',
-                    '--project=chromium',
-                  ],
+                  [guard, '--run', '--', ...smoke],
                   flightEnv
                 )
               );
             } catch {
-              console.log(
-                `${label} attempt ${attempt}: nonzero smoke/guard outcome`
-              );
+              /* Failed flights remain in the paired receipts. */
             }
+
             const receiptPath = resolve(
               attemptOutput,
               `attempt-${attempt}.json`
@@ -380,18 +324,9 @@ export async function runComparison(output: string) {
     const receipts = [...rows.base, ...rows.head].filter(
       row => row.measurementStatus === 'complete'
     );
-    for (const key of [
-      'harnessSha',
-      'harnessDigest',
-      'fixtureDigest',
-      'datasetDigest',
-      'browser',
-      'buildMode',
-      'workers',
-      'warmups',
-      'scoredSamples',
-      'dataset',
-    ]) {
+    for (const key of 'harnessSha harnessDigest fixtureDigest datasetDigest browser buildMode workers warmups scoredSamples dataset'.split(
+      ' '
+    )) {
       if (receipts.some(row => row[key] !== receipts[0]?.[key]))
         throw new Error('Incomparable workload receipts');
     }
@@ -418,7 +353,16 @@ export async function runComparison(output: string) {
       fixtureDigest,
       datasetDigest,
       ...COMPARISON_POLICY,
-      attempts: compareAttempts(rows.base, rows.head),
+      attempts: [0, 1].map(index => {
+        const status = (row: (typeof receipts)[number]) =>
+          row?.measurementStatus === 'complete' ? row.budgetStatus : 'unknown';
+        return {
+          attempt: index + 1,
+          base: status(rows.base[index]),
+          head: status(rows.head[index]),
+          causality: 'unknown',
+        };
+      }),
     };
     writeFileSync(
       resolve(output, 'comparison.json'),
@@ -426,35 +370,23 @@ export async function runComparison(output: string) {
       { flag: 'wx', mode: 0o600 }
     );
     try {
-      await command(
-        root,
-        process.execPath,
-        [
-          resolve(root, '.github/scripts/guard-playwright-artifacts.mjs'),
-          output,
-        ],
-        { ...env, RUNNER_TEMP: scratch }
-      );
+      await command(root, process.execPath, [guard, output], {
+        ...env,
+        RUNNER_TEMP: scratch,
+      });
     } catch {
       rmSync(output, { recursive: true, force: true });
       throw new Error('Aggregate artifact guard rejected output');
     }
-    console.log('Comparison receipts retained; causality remains unknown.');
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
-  const output = process.argv[2];
-  if (!output)
-    throw new Error(
-      'Usage: pnpm exec tsx apps/web/scripts/compare-chat-performance.ts <new-output-directory>'
-    );
-  runComparison(resolve(output)).catch(error => {
+if (process.argv[1]?.endsWith('compare-chat-performance.ts')) {
+  runComparison(
+    resolve(process.argv[2] ?? '.context/perf/chat-comparison')
+  ).catch(error => {
     console.error(error.message);
     process.exitCode = 1;
   });

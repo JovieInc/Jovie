@@ -30,6 +30,13 @@
           "producer": "compare-chat-performance.ts",
           "status": "pushed",
           "source": "chat-comparison-receipts"
+        },
+        {
+          "id": "finished",
+          "meaning": "smoke attempt finished",
+          "producer": "compare-chat-performance.ts",
+          "status": "pushed",
+          "source": "chat-comparison-receipts"
         }
       ]
     },

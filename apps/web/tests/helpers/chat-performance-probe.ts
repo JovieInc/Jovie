@@ -37,7 +37,6 @@ export interface ChatProbeTiming {
     | 'third-party'
     | 'unknown';
 }
-
 export interface ChatProbeSnapshot {
   readonly sendMs?: number;
   readonly fetchStartedMs?: number;
@@ -53,7 +52,6 @@ export interface ChatProbeSnapshot {
   readonly longTaskCount: number;
   readonly maxLongTaskMs: number;
 }
-
 export interface BrowserChatProbe {
   start: number;
   sendMs?: number;
@@ -67,7 +65,6 @@ export interface BrowserChatProbe {
   markSend: () => void;
   stop: () => ChatProbeSnapshot;
 }
-
 /** Self-contained because Playwright serializes this callback into the browser. */
 export function installBrowserChatProbe({
   assistant,
@@ -141,8 +138,6 @@ export function installBrowserChatProbe({
       return snapshot;
     },
   };
-  // Long-task attribution identifies a browsing context, never a script.
-  // LoAF script URLs are reduced immediately to fixed buckets and discarded.
   const sourceBucket = (
     source: string | undefined
   ): ChatProbeTiming['sourceBucket'] => {

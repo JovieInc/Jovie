@@ -3,7 +3,6 @@ import { resolve } from 'node:path';
 import type { Reporter, TestCase, TestResult } from '@playwright/test/reporter';
 import { checkedBinding } from './chat-performance-receipt';
 
-/** Publish only fixed enums and counters, including failures before sampling. */
 export default class ChatPerformanceReporter implements Reporter {
   private chat?: { status: TestResult['status']; durationMs: number };
   private counts = {

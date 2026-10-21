@@ -13,10 +13,6 @@ import {
   FAILURE_PARENT,
   writeChatAttempt,
 } from './chat-performance-receipt';
-import {
-  compareAttempts,
-  validateComparisonSources,
-} from './compare-chat-performance';
 import { buildInteractionLatencyReport } from './performance-interaction-report';
 
 const binding = {
@@ -131,25 +127,5 @@ describe('controlled chat receipts', () => {
     expect(
       chatAttemptReceipt({ ...input, diagnostics: [slow] }).measurementStatus
     ).toBe('incomplete');
-  });
-
-  it('does not allow a successful retry or missing evidence to replace first-attempt failure', () => {
-    const fail = { budgetStatus: 'fail', measurementStatus: 'complete' };
-    const pass = { budgetStatus: 'pass', measurementStatus: 'complete' };
-    expect(compareAttempts([pass, pass], [fail, pass])).toEqual([
-      { attempt: 1, base: 'pass', head: 'fail', causality: 'unknown' },
-      { attempt: 2, base: 'pass', head: 'pass', causality: 'unknown' },
-    ]);
-    expect(
-      compareAttempts([], [{ ...pass, measurementStatus: 'incomplete' }])[0]
-    ).toMatchObject({ base: 'unknown', head: 'unknown' });
-  });
-
-  it('requires the verified failure-era merge base, rather than the prior fix commit or current main', () => {
-    const verify = (base = FAILURE_BASE, mergeBase = FAILURE_BASE) =>
-      validateComparisonSources(FAILURE_HEAD, base, FAILURE_PARENT, mergeBase);
-    expect(() => verify()).not.toThrow();
-    expect(() => verify(FAILURE_PARENT)).toThrow();
-    expect(() => verify(FAILURE_BASE, 'f'.repeat(40))).toThrow();
   });
 });

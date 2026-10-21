@@ -1,8 +1,6 @@
 import { defineConfig } from '@playwright/test';
 import smoke from './playwright.config.smoke';
 
-// The reviewed smoke manifest supplies concurrent load. No focused grep/repeat,
-// dev server, screenshots, traces, video, error contexts, or raw JSON reporter.
 export default defineConfig({
   ...smoke,
   fullyParallel: true,

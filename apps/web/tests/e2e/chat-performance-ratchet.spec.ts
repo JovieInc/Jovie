@@ -212,30 +212,49 @@ async function triggerMeasuredSend(
 }
 
 async function readChatProbe(page: Page) {
-  try {
-    await page.waitForFunction(() => {
-      const probe = (
-        window as Window & { __jovieChatPerformanceProbe?: BrowserChatProbe }
-      ).__jovieChatPerformanceProbe;
-      return (
-        probe?.firstFeedbackMs !== undefined &&
-        probe.usableStateMs !== undefined &&
-        probe.renderToInteractiveMs !== undefined
-      );
-    });
-  } finally {
-    // Also drain and restore wrappers on timeouts. The next sample cannot own them.
-    await page.evaluate(() =>
-      (
-        window as Window & { __jovieChatPerformanceProbe?: BrowserChatProbe }
-      ).__jovieChatPerformanceProbe?.stop()
+  await page.waitForFunction(() => {
+    const probeWindow = window as Window & {
+      __jovieChatPerformanceProbe?: {
+        dataReadyMs?: number;
+        fetchStartedMs?: number;
+        frameId?: number;
+        firstFeedbackMs?: number;
+        renderToInteractiveMs?: number;
+        usableStateMs?: number;
+      };
+    };
+    const probe = probeWindow.__jovieChatPerformanceProbe;
+    return (
+      probe?.firstFeedbackMs !== undefined &&
+      probe.usableStateMs !== undefined &&
+      probe.renderToInteractiveMs !== undefined
     );
-  }
-  return page.evaluate(() =>
-    (
-      window as Window & { __jovieChatPerformanceProbe?: BrowserChatProbe }
-    ).__jovieChatPerformanceProbe!.stop()
-  );
+  });
+
+  return page.evaluate(() => {
+    const probeWindow = window as Window & {
+      __jovieChatPerformanceProbe?: {
+        dataReadyMs?: number;
+        fetchStartedMs?: number;
+        frameId?: number;
+        firstFeedbackMs?: number;
+        observer: MutationObserver;
+        stop: BrowserChatProbe['stop'];
+        renderToInteractiveMs?: number;
+        usableStateMs?: number;
+      };
+    };
+    const probe = probeWindow.__jovieChatPerformanceProbe;
+    if (
+      !probe ||
+      probe.firstFeedbackMs === undefined ||
+      probe.usableStateMs === undefined ||
+      probe.renderToInteractiveMs === undefined
+    ) {
+      throw new Error('Chat performance probe did not collect every metric');
+    }
+    return probe.stop();
+  });
 }
 
 async function measureDroppedScrollFrames(page: Page) {
