@@ -49,11 +49,11 @@ const dialect = new PgDialect();
 const calls = (method: string) =>
   recorder.state.calls.filter(c => c.method === method).map(c => c.args);
 const methods = () => recorder.state.calls.map(c => c.method);
-const render = (fragment: unknown) => {
+const toSql = (fragment: unknown) => {
   const { sql, params } = dialect.sqlToQuery(fragment as SQL);
   return { sql, params };
 };
-const whereSql = (index = 0) => render(calls('where')[index][0]);
+const whereSql = (index = 0) => toSql(calls('where')[index][0]);
 
 const repo = () => import('@/lib/finance/repository');
 type Repo = Awaited<ReturnType<typeof repo>>;
@@ -184,7 +184,7 @@ describe('finance repository owner scoping (JOV-4609)', () => {
       sql: '"finance_transactions"."owner_user_id" = $1',
       params: [OWNER_A],
     });
-    expect(render(calls('orderBy')[0][0]).sql).toBe(
+    expect(toSql(calls('orderBy')[0][0]).sql).toBe(
       '"finance_transactions"."occurred_at" desc'
     );
     expect(calls('limit')).toEqual([[100]]);
@@ -401,7 +401,7 @@ describe('classification persistence (JOV-4615)', () => {
       sql: '("finance_transaction_classifications"."owner_user_id" = $1 and ("finance_transaction_classifications"."lens" = $2 or "finance_transaction_classifications"."confidence" < $3))',
       params: [OWNER_A, 'uncategorized', '0.6'],
     });
-    expect(render(calls('innerJoin')[0][1]).sql).toBe(
+    expect(toSql(calls('innerJoin')[0][1]).sql).toBe(
       '"finance_transaction_classifications"."transaction_id" = "finance_transactions"."id"'
     );
     expect(calls('limit')).toEqual([[50]]);
