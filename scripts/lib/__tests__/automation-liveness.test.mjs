@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import { runLiveness as runLivenessImpl } from '../../automation-liveness.mjs';
+import { ADMISSION_BLOCKING_LABELS } from '../admission-hold-labels.mjs';
 import {
   livenessDecisions,
   livenessFingerprint,
@@ -693,6 +694,7 @@ describe('dead-man liveness', () => {
       mergeStateStatus: 'CLEAN',
       baseRefName: 'main',
       headRefOid: String(number).repeat(40).slice(0, 40),
+      labels: { nodes: [], pageInfo: { hasNextPage: false } },
       ...extra,
     });
     // PR Ready, Migration Guard and PR Size Guard are check runs; Fork PR
@@ -743,6 +745,37 @@ describe('dead-man liveness', () => {
     expect(waiting.status).toBe('stale');
     expect(waiting.ageMinutes).toBe(30);
     expect(waiting.reason).toContain('#1:30m');
+    // JOV-8788: #22378 was required-green but queue-poison deliberately
+    // prevented admission. Use the writer's vocabulary, including machine
+    // blocks, and keep held heads out of the capped timing reads.
+    const labeled = (number, name) =>
+      pr(number, {
+        labels: { nodes: [{ name }], pageInfo: { hasNextPage: false } },
+      });
+    for (const name of ADMISSION_BLOCKING_LABELS) {
+      const held = await run([labeled(22378, name.toUpperCase())]);
+      expect(held.status, name).toBe('fresh');
+      expect(held.reason).toContain('label-held=1[#22378]');
+    }
+    const mixed = await run([
+      ...Array.from({ length: 10 }, (_, i) => labeled(20 + i, 'queue-poison')),
+      labeled(1, 'lane-fix-dequeued'),
+    ]);
+    expect(mixed.status).toBe('stale');
+    expect(mixed.reason).toContain('ready-green-unqueued=1[#1:30m]');
+    // Removing the hold resumes the existing SLO; unreadable or truncated
+    // labels cannot certify that a ready PR is eligible.
+    expect((await run([pr(22378)])).status).toBe('stale');
+    for (const labels of [
+      undefined,
+      { nodes: [] },
+      { nodes: [], pageInfo: { hasNextPage: true } },
+      { nodes: [{}], pageInfo: { hasNextPage: false } },
+    ]) {
+      const unreadable = await run([pr(1, { labels })]);
+      expect(unreadable.status).not.toBe('fresh');
+      expect(unreadable.reason).toContain('green-enqueue-labels-unreadable');
+    }
     // Inside the SLO, queued, conflicting, blocked or another base: fresh.
     expect((await run([pr(2)], 5)).status).toBe('fresh');
     expect((await run([pr(3, { isInMergeQueue: true })])).status).toBe('fresh');

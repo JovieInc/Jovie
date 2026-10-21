@@ -27,6 +27,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createApiClient } from '../packages/api-client/client.ts';
 import { createLinearClient } from '../packages/api-client/linear.ts';
 import { hashCredential } from '../packages/api-client/store.ts';
+import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
 import {
   evaluateLiveness,
   livenessDecisions,
@@ -409,6 +410,7 @@ export async function observeLinearTriageDwell(receipt, { linear, nowMs }) {
 }
 
 const MERGEABLE_GREEN = new Set(['CLEAN', 'UNSTABLE', 'HAS_HOOKS']);
+const ADMISSION_BLOCKING = new Set(ADMISSION_BLOCKING_LABELS);
 const GREEN_TIMING_MAX_PRS = 10;
 const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
 const DEFECT_HOLD_CLASSES = new Set(['deterministic-source', 'unclassified']);
@@ -471,8 +473,10 @@ async function requiredGreenAt(
  * checks (CLEAN/UNSTABLE/HAS_HOOKS = required green and mergeable), so one
  * cheap list read finds candidates; only ready candidates (capped) pay for a
  * per-head timing read. Proof is "no ready, mergeable, required-green PR sits
- * outside the merge queue", else the earliest such green time. Green drafts
- * are counted in the reason; draft promotion is the writer's (JOV-INV-022).
+ * outside the merge queue", else the earliest such green time. Admission
+ * label holds are reported separately, using the writer's shared policy.
+ * Green drafts are counted in the reason; draft promotion is the writer's
+ * (JOV-INV-022).
  */
 export async function observeGreenToEnqueue(
   receipt,
@@ -482,7 +486,7 @@ export async function observeGreenToEnqueue(
   const [owner, name] = String(receipt.repo).split('/');
   const checks = receipt.requiredChecks ?? [];
   if (!checks.length) return { ok: false, reason: 'required-checks-missing' };
-  const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:40,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number isDraft isInMergeQueue mergeStateStatus baseRefName headRefOid}}}}`;
+  const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:40,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number isDraft isInMergeQueue mergeStateStatus baseRefName headRefOid labels(first:100){nodes{name} pageInfo{hasNextPage}}}}}}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let body;
@@ -525,9 +529,24 @@ export async function observeGreenToEnqueue(
   const drafts = green.filter(pr => pr.isDraft).map(pr => pr.number);
   const waiting = [];
   const held = [];
-  for (const pr of green
-    .filter(row => !row.isDraft)
-    .slice(0, GREEN_TIMING_MAX_PRS)) {
+  const labelHeld = [];
+  const ready = [];
+  for (const pr of green.filter(row => !row.isDraft)) {
+    if (
+      !Array.isArray(pr.labels?.nodes) ||
+      pr.labels?.pageInfo?.hasNextPage !== false ||
+      pr.labels.nodes.some(label => typeof label?.name !== 'string')
+    )
+      return { ok: false, reason: 'green-enqueue-labels-unreadable' };
+    if (
+      pr.labels.nodes.some(label =>
+        ADMISSION_BLOCKING.has(label.name.toLowerCase())
+      )
+    )
+      labelHeld.push(pr.number);
+    else ready.push(pr);
+  }
+  for (const pr of ready.slice(0, GREEN_TIMING_MAX_PRS)) {
     const timing = await requiredGreenAt(receipt.repo, pr.headRefOid, checks, {
       fetchImpl,
       token,
@@ -549,7 +568,7 @@ export async function observeGreenToEnqueue(
     .map(n => `#${n}`)
     .join(
       ','
-    )}];defect-held=${held.length}[${held.map(n => `#${n}`).join(',')}]`;
+    )}];defect-held=${held.length}[${held.map(n => `#${n}`).join(',')}];label-held=${labelHeld.length}[${labelHeld.map(n => `#${n}`).join(',')}]`;
   if (!waiting.length)
     return { ok: true, lastProofAt: new Date(nowMs).toISOString(), reason };
   return {
