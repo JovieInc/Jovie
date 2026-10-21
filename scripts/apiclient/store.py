@@ -81,6 +81,18 @@ def _wall_ms() -> int:
     return int(time.time() * 1000)
 
 
+def _claim_owner(path: Path) -> Optional[str]:
+    """Exclusive-create the owner file in the lock dir we just made; None if we lost it."""
+    token = f"{os.getpid()}-{uuid.uuid4()}"
+    try:
+        fd = os.open(str(path / "owner"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except (FileExistsError, FileNotFoundError):
+        return None
+    with os.fdopen(fd, "w") as handle:
+        handle.write(token)
+    return token
+
+
 def _is_stale(path: Path) -> bool:
     try:
         return _wall_ms() - path.stat().st_mtime * 1000 > LOCK_STALE_MS
@@ -117,7 +129,8 @@ class FileLedgerStore:
         self.dir = Path(root if root is not None else default_state_root()) / "api-ledger"
         self.now = now
         self.lock_timeout_ms = lock_timeout_ms
-        self._warned = False
+        # Transactions that ran without persisting after a lock timeout (see store.ts).
+        self.unpersisted = 0
 
     def path(self, provider: str) -> Path:
         return self.dir / f"{provider}.json"
@@ -135,7 +148,7 @@ class FileLedgerStore:
         self.dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         lock = self.dir / f"{provider}.lock.d"
         with _PROCESS_LOCKS_GUARD:
-            local = _PROCESS_LOCKS.setdefault(str(lock), threading.Lock())
+            local = _PROCESS_LOCKS.setdefault(str(lock), threading.RLock())
         with local:
             token = self._lock(lock)
             try:
@@ -155,21 +168,19 @@ class FileLedgerStore:
         while True:
             try:
                 os.mkdir(path, 0o700)
-                token = f"{os.getpid()}-{uuid.uuid4()}"
-                fd = os.open(str(path / "owner"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-                with os.fdopen(fd, "w") as handle:
-                    handle.write(token)
-                return token
             except FileExistsError:
                 pass
+            else:
+                token = _claim_owner(path)
+                if token:
+                    return token
             if _is_stale(path):
                 _break_stale(path)
                 continue
             if _wall_ms() > deadline:
-                if not self._warned:
-                    self._warned = True
-                    sys.stderr.write(json.dumps({"schema": "jovie.api-client.lock/v1", "lock": str(path),
-                                                 "outcome": "timeout-unpersisted"}) + "\n")
+                self.unpersisted += 1
+                sys.stderr.write(json.dumps({"schema": "jovie.api-client.lock/v1", "lock": str(path),
+                                             "outcome": "timeout-unpersisted", "count": self.unpersisted}) + "\n")
                 return None
             time.sleep((5 + random.randint(0, 19)) / 1000)
 

@@ -207,6 +207,24 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(store.read("github")["credentials"]["c"]["lastWriteAt"], 7)
         self.assertEqual((lock / "owner").read_text(), "other-process")
 
+    def test_reentrant_transaction_times_out_instead_of_deadlocking(self):
+        store = FileLedgerStore(tmp(self), lock_timeout_ms=50)
+
+        def outer(ledger):
+            return store.transact("github", lambda inner: "inner-ran")
+
+        with redirect_stderr(io.StringIO()):
+            self.assertEqual(store.transact("github", outer), "inner-ran")
+        self.assertEqual(store.unpersisted, 1)
+
+    def test_owner_claim_fails_closed_when_owner_exists_or_dir_is_gone(self):
+        from apiclient.store import _claim_owner
+        lock = Path(tmp(self)) / "x.lock.d"
+        self.assertIsNone(_claim_owner(lock))
+        lock.mkdir()
+        self.assertTrue(_claim_owner(lock))
+        self.assertIsNone(_claim_owner(lock))
+
     def test_lock_timing_ignores_an_injected_fake_clock(self):
         clock = FakeClock()
         store = FileLedgerStore(tmp(self), clock.read, lock_timeout_ms=50)

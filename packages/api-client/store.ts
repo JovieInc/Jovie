@@ -98,7 +98,13 @@ export class FileLedgerStore implements LedgerStore {
   private readonly now: () => number;
   private readonly lockTimeoutMs: number;
   private readonly queues = new Map<string, Promise<unknown>>();
-  private warned = false;
+  /**
+   * Transactions that ran without persisting after a lock timeout. Budget
+   * accounting is advisory (an unreadable budget never blocks work), so a
+   * timeout degrades to "decide on a fresh read, record nothing" instead of
+   * failing the API call; this counter and the per-event log make it visible.
+   */
+  unpersisted = 0;
 
   constructor(
     root: string = defaultStateRoot(),
@@ -170,9 +176,10 @@ export class FileLedgerStore implements LedgerStore {
     while (true) {
       try {
         await fs.mkdir(path, { mode: 0o700 });
-        const token = `${process.pid}-${randomUUID()}`;
-        await fs.writeFile(join(path, 'owner'), token, { mode: 0o600 });
-        return token;
+        // Only the process whose mkdir succeeded may claim; a dir someone
+        // else created is theirs even before their owner file appears.
+        const token = await claimOwner(path);
+        if (token) return token;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       }
@@ -181,12 +188,10 @@ export class FileLedgerStore implements LedgerStore {
         continue;
       }
       if (Date.now() > deadline) {
-        if (!this.warned) {
-          this.warned = true;
-          process.stderr.write(
-            `${JSON.stringify({ schema: 'jovie.api-client.lock/v1', lock: path, outcome: 'timeout-unpersisted' })}\n`
-          );
-        }
+        this.unpersisted += 1;
+        process.stderr.write(
+          `${JSON.stringify({ schema: 'jovie.api-client.lock/v1', lock: path, outcome: 'timeout-unpersisted', count: this.unpersisted })}\n`
+        );
         return null;
       }
       await sleep(5 + Math.floor(Math.random() * 20));
@@ -198,6 +203,23 @@ export class FileLedgerStore implements LedgerStore {
       .readFile(join(path, 'owner'), 'utf8')
       .catch(() => null);
     if (owner === token) await fs.rm(path, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Exclusive-create the owner file inside the lock dir we just made. EEXIST
+ * means a stalled breaker-victim raced us; ENOENT means the dir was broken
+ * away under us. Either way we do not hold the lock and keep waiting.
+ */
+async function claimOwner(path: string): Promise<string | null> {
+  const token = `${process.pid}-${randomUUID()}`;
+  try {
+    await fs.writeFile(join(path, 'owner'), token, { mode: 0o600, flag: 'wx' });
+    return token;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'EEXIST' || code === 'ENOENT') return null;
+    throw error;
   }
 }
 
