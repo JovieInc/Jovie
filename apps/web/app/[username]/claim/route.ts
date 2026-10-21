@@ -201,10 +201,17 @@ export async function GET(
       );
     }
 
-    // Public figures are never self-serve: payment or a Spotify match alone
-    // must not hand over a famous artist's identity (EVENT: Tim, 2026-10-20).
+    // High-reach artists are never taken over self-serve: payment or a
+    // Spotify match alone must not hand over their identity. /claim/start
+    // sends the buyer to their own profile + checkout, and onboarding holds
+    // the artist as a verification request (lib/claim/claim-verification.ts).
     if (requiresManualVerification(profile.spotifyFollowers)) {
-      return redirectTo(request, claimStateHref('verification_required'));
+      return redirectTo(
+        request,
+        profile.spotifyId
+          ? `${APP_ROUTES.CLAIM_START}?spotify=${encodeURIComponent(profile.spotifyId)}`
+          : claimStateHref('verification_required')
+      );
     }
 
     // Structured-credit profiles may enter the same direct flow, but the
