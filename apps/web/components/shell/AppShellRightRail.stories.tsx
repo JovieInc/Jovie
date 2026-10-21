@@ -75,5 +75,6 @@ function OwnedMenuPreviewFixture() {
 }
 
 export const OwnedMenuPreview: Story = {
+  args: { children: null },
   render: () => <OwnedMenuPreviewFixture />,
 };
