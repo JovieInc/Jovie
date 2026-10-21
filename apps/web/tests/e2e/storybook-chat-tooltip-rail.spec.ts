@@ -161,14 +161,16 @@ test('fine pointer chat actions reveal on hover and keyboard focus', async ({
 
 test('hybrid touch activates chat actions first and keyboard hints return', async ({
   browser,
+  baseURL,
 }) => {
   const context = await browser.newContext({
+    baseURL,
     hasTouch: true,
     viewport: { width: 820, height: 798 },
   });
   const page = await context.newPage();
   await useRealMotion(page);
-  await page.goto(`http://127.0.0.1:6006${chatsStory}`);
+  await page.goto(chatsStory);
   const chats = page.getByTestId('chats-page');
   const actions = chats.getByRole('button', {
     name: 'Chat Actions for All This Noise EP',
