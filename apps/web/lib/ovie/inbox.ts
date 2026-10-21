@@ -11,6 +11,7 @@ import {
   type InteractionCase,
   rankInteractionCases,
 } from './interaction-case';
+import { parseLinearAsk } from './linear-ask';
 import { SUMMER_CARD_ESCALATION_HOURS, type SummerCard } from './summer-cards';
 
 export type InboxDecisionTarget =
@@ -50,6 +51,8 @@ export interface OvieInboxCase extends InteractionCase {
   /** Present on no-default cards; Home badges and ranks levels 1 and 2 first. */
   readonly escalation?: InboxEscalation | null;
   readonly body: string;
+  /** One-click answers offered by the asker (Linear `Options:` line). */
+  readonly answers?: readonly string[];
   readonly certification?: {
     readonly row: OvieCertificationRow;
     readonly card: CertificationInboxCard | null;
@@ -258,15 +261,20 @@ export function projectOvieInbox(
     }
   }
   for (const issue of linear?.issues ?? []) {
+    const ask = parseLinearAsk(issue.description);
     cases.push({
       ...pending,
       id: `linear:${issue.id}`,
       kind: 'portfolio',
       source: { system: 'linear', id: issue.id, revision: null },
       title: issue.title,
-      body: `Review ${issue.identifier} and complete the requested work before marking it done.`,
-      recommendation:
-        'Open the linked work for its evidence and completion criteria.',
+      body:
+        ask.body ||
+        `Review ${issue.identifier} and complete the requested work before marking it done.`,
+      recommendation: ask.options[0]
+        ? `Answer: ${ask.options.join(' or ')}.`
+        : 'Open the linked work for its evidence and completion criteria.',
+      ...(ask.options.length > 0 ? { answers: ask.options } : {}),
       priority: issue.priority || 5,
       createdAt: issue.createdAt,
       evidence: [issue.url],
@@ -306,11 +314,14 @@ export function inboxDecisionRequest(
     throw new Error('Add a reason or requested changes.');
   switch (target.kind) {
     case 'linear':
-      if (decision !== 'approve')
-        throw new Error('Update this request in its linked work.');
+      // Approve carries the chosen option (or nothing for "Mark done"); a
+      // written reply is the answer itself. Both close the issue after
+      // recording the answer as a comment the asker reads back.
       return {
         url: '/api/admin/hud/tim-actions',
-        body: { issueId: target.id },
+        body: notes.trim()
+          ? { issueId: target.id, answer: notes.trim() }
+          : { issueId: target.id },
       };
     case 'visual':
       if (decision === 'modify')

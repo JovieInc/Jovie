@@ -9,13 +9,14 @@ import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
 
-vi.mock('@/components/feedback', () => ({
-  toast: Object.assign(vi.fn(), {
+const toastMock = vi.hoisted(() =>
+  Object.assign(vi.fn(), {
     dismiss: vi.fn(),
     error: vi.fn(),
     success: vi.fn(),
-  }),
-}));
+  })
+);
+vi.mock('@/components/feedback', () => ({ toast: toastMock }));
 
 const shipping = vi.hoisted(() => ({
   data: undefined as unknown,
@@ -165,13 +166,16 @@ function chatState(overrides: Partial<HomeCanvasState> = {}): HomeCanvasState {
 
 describe('OvieHomeCanvas', () => {
   const fetchMock = vi.fn();
+  let inbox: OvieInbox;
 
   beforeEach(() => {
     shipping.data = snapshot();
+    inbox = INBOX;
+    toastMock.mockClear();
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === '/api/ovie/inbox')
-        return new Response(JSON.stringify(INBOX), { status: 200 });
+        return new Response(JSON.stringify(inbox), { status: 200 });
       if (init?.method === 'POST')
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       return new Response('not found', { status: 404 });
@@ -296,6 +300,108 @@ describe('OvieHomeCanvas', () => {
     expect(within(linearCard).getByRole('status')).toHaveTextContent(
       'Marked done'
     );
+  });
+
+  describe('Linear answers', () => {
+    beforeEach(() => {
+      inbox = {
+        issues: [],
+        cases: [
+          {
+            ...INBOX.cases[0],
+            id: 'linear:JOV-9',
+            title: 'Sign in to the build runner',
+            answers: ['Signed in', 'Restarted it myself'],
+            decisionTarget: { kind: 'linear', id: 'JOV-9' },
+          },
+        ],
+      };
+    });
+
+    it.each(['Signed in', 'Restarted it myself', 'written reply'])(
+      'sends %s as the answer only after the undo window closes',
+      async answer => {
+        renderCanvas();
+        await screen.findByRole('button', { name: 'Signed in' });
+        expect(
+          screen.queryByRole('button', { name: 'Mark done' })
+        ).not.toBeInTheDocument();
+        vi.useFakeTimers();
+        if (answer === 'written reply') {
+          fireEvent.change(
+            screen.getByRole('textbox', {
+              name: 'Reply: Sign in to the build runner',
+            }),
+            { target: { value: answer } }
+          );
+          fireEvent.click(screen.getByRole('button', { name: 'Send Reply' }));
+        } else {
+          fireEvent.click(screen.getByRole('button', { name: answer }));
+        }
+        expect(
+          within(screen.getByTestId('home-loop-ask')).getByRole('status')
+        ).toHaveTextContent(
+          `${answer === 'written reply' ? 'Replied' : 'Answered'}: ${answer}`
+        );
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(HOME_LOOP_UNDO_WINDOW_MS - 1);
+        });
+        expect(fetchMock).not.toHaveBeenCalledWith(
+          '/api/admin/hud/tim-actions',
+          expect.anything()
+        );
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1);
+        });
+        const posts = fetchMock.mock.calls.filter(
+          ([url]) => url === '/api/admin/hud/tim-actions'
+        );
+        expect(posts).toHaveLength(1);
+        expect(posts[0][1]).toEqual({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ issueId: 'JOV-9', answer }),
+        });
+      }
+    );
+
+    it('cancels the Linear answer when undone', async () => {
+      renderCanvas();
+      const option = await screen.findByRole('button', { name: 'Signed in' });
+      vi.useFakeTimers();
+      fireEvent.click(option);
+      const action = toastMock.mock.calls.at(-1)?.[1]?.action;
+      expect(action).toEqual({ label: 'Undo', onClick: expect.any(Function) });
+      act(() => {
+        if (action && typeof action !== 'function') action.onClick();
+      });
+      expect(screen.getByRole('button', { name: 'Signed in' })).toBeVisible();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(HOME_LOOP_UNDO_WINDOW_MS);
+      });
+      expect(fetchMock).not.toHaveBeenCalledWith(
+        '/api/admin/hud/tim-actions',
+        expect.anything()
+      );
+    });
+
+    it('restores the answer controls when Linear cannot record the answer', async () => {
+      renderCanvas();
+      const option = await screen.findByRole('button', { name: 'Signed in' });
+      fetchMock.mockResolvedValueOnce(new Response('{}', { status: 502 }));
+      vi.useFakeTimers();
+      fireEvent.click(option);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(HOME_LOOP_UNDO_WINDOW_MS);
+      });
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Not recorded. Try again.'
+      );
+      expect(screen.getByRole('button', { name: 'Signed in' })).toBeVisible();
+      expect(
+        within(screen.getByTestId('home-loop-ask')).queryByRole('status')
+      ).not.toBeInTheDocument();
+    });
   });
 
   it('keeps loaded asks and names the missing source when the inbox is partial', async () => {
