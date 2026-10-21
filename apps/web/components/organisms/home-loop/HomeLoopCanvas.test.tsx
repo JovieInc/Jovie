@@ -7,6 +7,7 @@ import {
   within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mockFitLayout } from './fit-layout.test-utils';
 import {
   HOME_LOOP_FIXTURE_ASKS,
   HOME_LOOP_FIXTURE_COPY,
@@ -72,7 +73,8 @@ describe('HomeLoopCanvas', () => {
     expect(
       screen.getByTestId('home-loop-asks-section-count')
     ).toHaveTextContent('2');
-    expect(screen.getAllByTestId('home-loop-stage-row')).toHaveLength(6);
+    expect(screen.getAllByTestId('home-loop-kanban-card')).toHaveLength(6);
+    expect(screen.getAllByTestId('home-loop-kanban-lane')).toHaveLength(6);
     expect(screen.getByTestId('home-loop-done')).toHaveTextContent('12 merges');
     for (const id of [
       'home-loop-asks-section',
@@ -84,13 +86,12 @@ describe('HomeLoopCanvas', () => {
 
   it('names stage progress and attention for assistive tech, not color alone', () => {
     render(<HomeLoopCanvas {...props()} />);
-    const [blocked] = screen.getAllByTestId('home-loop-stage-row');
-    expect(
-      within(blocked as HTMLElement).getByRole('list', {
-        name: 'Stage 1 of 6: Investigating, Blocked',
-      })
-    ).toBeInTheDocument();
+    const [blocked] = screen.getAllByTestId('home-loop-kanban-card');
+    expect(blocked).toHaveAttribute('data-attention', 'blocked');
     expect(blocked).toHaveTextContent('Blocked');
+    expect(
+      screen.getByRole('region', { name: 'Investigating: 1' })
+    ).toContainElement(blocked as HTMLElement);
   });
 
   it('keeps one frame per section across loading, error, and empty states', () => {
@@ -177,24 +178,32 @@ describe('HomeLoopCanvas', () => {
     );
   });
 
-  it('shows the top asks and links the rest', () => {
-    const many = Array.from({ length: 5 }, (_, index) => ({
-      ...HOME_LOOP_FIXTURE_ASKS[0],
-      id: `ask-${index}`,
-    })) as HomeLoopCanvasProps['asks'];
-    render(
-      <HomeLoopCanvas
-        {...props({ asks: many, asksMoreHref: '/app/ov/inbox' })}
-      />
-    );
-    expect(screen.getAllByTestId('home-loop-ask')).toHaveLength(3);
-    expect(screen.getByTestId('home-loop-asks-more')).toHaveAttribute(
-      'href',
-      '/app/ov/inbox'
-    );
-    expect(screen.getByTestId('home-loop-asks-more')).toHaveTextContent(
-      '2 more decisions'
-    );
+  it('fits the asks to their space and links the rest', () => {
+    const restore = mockFitLayout('home-loop-asks', 250);
+    try {
+      const many = Array.from({ length: 5 }, (_, index) => ({
+        ...HOME_LOOP_FIXTURE_ASKS[0],
+        id: `ask-${index}`,
+      })) as HomeLoopCanvasProps['asks'];
+      render(
+        <HomeLoopCanvas
+          {...props({ asks: many, asksMoreHref: '/app/ov/inbox' })}
+        />
+      );
+      const visible = screen
+        .getAllByTestId('home-loop-ask')
+        .filter(card => card.style.visibility !== 'hidden');
+      expect(visible).toHaveLength(2);
+      expect(screen.getByTestId('home-loop-asks-more')).toHaveAttribute(
+        'href',
+        '/app/ov/inbox'
+      );
+      expect(screen.getByTestId('home-loop-asks-more')).toHaveTextContent(
+        '+3 more decisions'
+      );
+    } finally {
+      restore();
+    }
   });
 
   it('keeps the why collapsed until requested', () => {
