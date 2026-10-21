@@ -180,6 +180,145 @@ describe('dead-man liveness', () => {
     expect(livenessDecisions(report)).toEqual([]);
   });
 
+  // JOV-8766: #22518's squash committer date was 15:52Z and the fast-forward
+  // onto main was 17:58Z. Production promoted 19 minutes later. Aging from
+  // the queue timestamp reported 141 minutes and paged a healthy release.
+  it('ages a merge-queue commit from when its push reached main', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': mainRef(MAIN),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(141) } },
+            },
+          ],
+        },
+        'event=push': {
+          total_count: 1,
+          workflow_runs: [{ created_at: iso(19), event: 'push' }],
+        },
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: '1-commits-unshipped',
+      ageMinutes: 19,
+      lastProofAt: iso(19),
+    });
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
+  it('stays stale when the commit has been on main past the silence budget', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': mainRef(MAIN),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(141) } },
+            },
+          ],
+        },
+        'event=push': {
+          total_count: 1,
+          workflow_runs: [{ created_at: iso(141), event: 'push' }],
+        },
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'stale',
+      ageMinutes: 141,
+    });
+  });
+
+  it('ignores a push run from before the commit and a failed landing read', async () => {
+    const routes = landing =>
+      fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': mainRef(MAIN),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(30) } },
+            },
+          ],
+        },
+        'event=push': landing,
+      });
+    const early = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: routes({
+        total_count: 1,
+        workflow_runs: [{ created_at: iso(400), event: 'push' }],
+      }),
+    });
+    expect(
+      rowFor(early.report, 'derived:jovie:production-promotion')
+    ).toMatchObject({
+      status: 'fresh',
+      ageMinutes: 30,
+    });
+    const unread = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: routes(503),
+    });
+    expect(
+      rowFor(unread.report, 'derived:jovie:production-promotion')
+    ).toMatchObject({
+      status: 'fresh',
+      ageMinutes: 30,
+    });
+  });
+
+  it('uses the oldest page when push runs spill past one page', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': mainRef(MAIN),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 2,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(180) } },
+            },
+          ],
+        },
+        'event=push': url =>
+          String(url).includes('page=2')
+            ? {
+                total_count: 101,
+                workflow_runs: [{ created_at: iso(130), event: 'push' }],
+              }
+            : {
+                total_count: 101,
+                workflow_runs: [{ created_at: iso(5), event: 'push' }],
+              },
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'stale',
+      ageMinutes: 130,
+    });
+  });
+
   it.each([
     [503, 'unknown', 'unshipped-range-unreadable'],
     [{ ahead_by: 1, commits: [] }, 'unknown', 'unshipped-age-unreadable'],

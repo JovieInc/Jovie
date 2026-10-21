@@ -148,10 +148,59 @@ export async function observeJsonTimestamp(receipt, { fetchImpl }) {
   return { ok: true, lastProofAt: value, url: receipt.url };
 }
 
+const PUSH_RUNS_PAGE = 100;
+const LANDING_SKEW_MS = 2 * 60_000;
+
+/**
+ * When a merge-queue squash commit reached main.
+ *
+ * Its committer date is the queue time, which can precede the fast-forward
+ * onto main by hours. The earliest push-event run at or after that date is
+ * the landing time. An unreadable or incomplete run list keeps the committer
+ * date, so a real stall still alerts.
+ */
+async function landedOnMainAt(
+  repo,
+  sha,
+  committerDate,
+  { fetchImpl, token, apiUrl }
+) {
+  const committerMs = Date.parse(committerDate ?? '');
+  const base = `${apiUrl}/repos/${repo}/actions/runs?head_sha=${encodeURIComponent(sha)}&event=push&per_page=${PUSH_RUNS_PAGE}`;
+  const headers = githubHeaders(token);
+  const first = await readJson(fetchImpl, base, headers);
+  if (!first.ok || !Array.isArray(first.body?.workflow_runs))
+    return committerDate;
+  let runs = first.body.workflow_runs;
+  const total = Number(first.body.total_count);
+  if (Number.isFinite(total) && total > runs.length) {
+    const lastPage = Math.ceil(total / PUSH_RUNS_PAGE);
+    const older = await readJson(
+      fetchImpl,
+      `${base}&page=${lastPage}`,
+      headers
+    );
+    if (!older.ok || !Array.isArray(older.body?.workflow_runs))
+      return committerDate;
+    runs = older.body.workflow_runs;
+  }
+  const landedMs = runs
+    .map(run => Date.parse(run?.created_at ?? ''))
+    .filter(
+      ms =>
+        Number.isFinite(ms) &&
+        (!Number.isFinite(committerMs) || ms + LANDING_SKEW_MS >= committerMs)
+    )
+    .reduce((min, ms) => Math.min(min, ms), Number.POSITIVE_INFINITY);
+  return Number.isFinite(landedMs)
+    ? new Date(landedMs).toISOString()
+    : committerDate;
+}
+
 /**
  * Production promotion heartbeat, independent of the continuity guard's own
  * verdict: production carrying main is a fresh proof; otherwise the proof is
- * as old as the oldest commit production is missing. Unreadable is unknown
+ * as old as the oldest missing commit has been on main. Unreadable is unknown
  * (red), never healthy.
  */
 export async function observeProductionFreshness(
@@ -215,12 +264,21 @@ export async function observeProductionFreshness(
   if (!compare.ok) return { ok: false, reason: 'unshipped-range-unreadable' };
   if (Number(compare.body?.ahead_by) === 0)
     return { ok: true, lastProofAt: now, reason: 'production-current' };
-  const oldest = compare.body?.commits?.[0]?.commit?.committer?.date;
-  if (!Number.isFinite(Date.parse(oldest ?? '')))
+  const oldestCommit = compare.body?.commits?.[0];
+  const committerDate = oldestCommit?.commit?.committer?.date;
+  if (!Number.isFinite(Date.parse(committerDate ?? '')))
     return { ok: false, reason: 'unshipped-age-unreadable' };
+  const sha = oldestCommit?.sha;
+  const landedAt = SHA_RE.test(sha ?? '')
+    ? await landedOnMainAt(receipt.repo, sha, committerDate, {
+        fetchImpl,
+        token,
+        apiUrl,
+      })
+    : committerDate;
   return {
     ok: true,
-    lastProofAt: oldest,
+    lastProofAt: landedAt,
     reason: `${compare.body.ahead_by}-commits-unshipped`,
   };
 }
