@@ -3937,6 +3937,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/ovie/summer-cards/[id]/feedback/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/summer-cards/[id]/feedback",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/ovie/summer-cards/route.ts",
       "kind": "handler",
       "route": "/api/ovie/summer-cards",

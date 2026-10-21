@@ -96,6 +96,7 @@ export default async function InterstitialPage({
       <ContentSurfaceCard className='overflow-hidden'>
         <ContentSectionHeader
           density='compact'
+          headingLevel='h1'
           title='Link confirmation required'
           subtitle={genericDescription}
         />

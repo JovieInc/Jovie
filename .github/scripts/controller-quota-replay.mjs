@@ -31,9 +31,13 @@ import { pathToFileURL } from 'node:url';
 
 export const STAGE_EVENT_SCHEMA = 'jovie-stage-event/v1';
 export const DECISION_SCHEMA = 'jovie-controller-replay/v1';
+// Keyed by workflow path. workflow_run.name is the run's display title, and
+// both controllers set run-name ("<sha> from CI <id> attempt <n>"), so the
+// name never matches (2026-10-21 15:33Z: staging run 39626014366 was skipped
+// as an "unknown workflow").
 export const CONTROLLER_WORKFLOWS = Object.freeze({
-  'Staging Controller': 'staging-controller.yml',
-  'Production Controller': 'production-controller.yml',
+  '.github/workflows/staging-controller.yml': 'staging-controller.yml',
+  '.github/workflows/production-controller.yml': 'production-controller.yml',
 });
 export const DEFAULTS = Object.freeze({
   maxAttempts: 3,
@@ -292,12 +296,12 @@ export async function runReplay({
   options = DEFAULTS,
 }) {
   const run = event.workflow_run;
-  const workflowFile = CONTROLLER_WORKFLOWS[run.name];
+  const workflowFile = CONTROLLER_WORKFLOWS[run.path];
   if (!workflowFile) {
     const decision = {
       replay: false,
       outcome: 'abandoned',
-      reason: `unknown workflow ${run.name}`,
+      reason: `unknown workflow ${run.path}`,
     };
     return { decision, events: [] };
   }
@@ -396,7 +400,7 @@ export function renderSummary({ run, decision }) {
   return [
     '### Controller replay',
     '',
-    `Run [${run.name} ${run.id} attempt ${run.run_attempt}](${run.html_url ?? ''}) concluded \`${run.conclusion}\`.`,
+    `Run [${run.path} ${run.id} attempt ${run.run_attempt}](${run.html_url ?? ''}) concluded \`${run.conclusion}\`.`,
     `Decision: **${decision.replay ? 'replayed' : 'not replayed'}** (${decision.reason}).`,
     decision.waitedSeconds
       ? `Waited ${decision.waitedSeconds}s for backoff/quota reset.`
