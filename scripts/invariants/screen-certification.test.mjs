@@ -442,7 +442,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     const sources = [
       'apps/web/app/app/(shell)/admin/activity/page.tsx',
       'apps/web/app/app/(shell)/admin/growth/page.tsx',
-      'apps/web/app/app/(shell)/admin/needs-you/page.tsx',
       'apps/web/app/app/(shell)/admin/operations/page.tsx',
       'apps/web/app/app/(shell)/admin/product/page.tsx',
     ];
