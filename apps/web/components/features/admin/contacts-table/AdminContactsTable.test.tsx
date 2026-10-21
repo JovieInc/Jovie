@@ -277,6 +277,31 @@ describe('AdminContactsTable', () => {
     expect(screen.getByRole('button', { name: 'No' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it.each([
+    [0.9, 'stale', 'Stale, recheck (was 90%)'],
+    [null, 'stale', 'Stale, recheck'],
+    [0.9, 'fresh', '90% confidence'],
+    [0.5, 'unknown', '50% confidence · age unknown'],
+    [null, 'fresh', 'Confidence unknown'],
+  ] as const)(
+    'displays evidence confidence %s with freshness %s honestly',
+    (confidence, freshness, label) => {
+      render(
+        <EvidenceItemCard
+          item={{ ...certification.items[0]!, confidence, freshness }}
+          pending={false}
+          onDecision={vi.fn(async () => {})}
+        />
+      );
+
+      const metadata = screen.getByText(/profile, user/);
+      expect(metadata).toHaveTextContent(label);
+      if (freshness === 'stale') {
+        expect(metadata).not.toHaveTextContent(/\d+% confidence/);
+      }
+    }
+  );
+
   it('marks the keyboard-active evidence card for reuse in Ovie Outbound', () => {
     const onDecision = vi.fn(async () => {});
     const item = certification.items[0]!;
