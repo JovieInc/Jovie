@@ -1,7 +1,9 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
-import { runLiveness } from '../../automation-liveness.mjs';
+import { describe, expect, it, vi } from 'vitest';
+import { createApiClient } from '../../../packages/api-client/client.ts';
+import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
+import { runLiveness as runLivenessImpl } from '../../automation-liveness.mjs';
 import {
   livenessDecisions,
   livenessFingerprint,
@@ -15,6 +17,21 @@ const iso = minutesAgo => new Date(NOW - minutesAgo * 60_000).toISOString();
 const MAIN = 'a'.repeat(40);
 const LIVE = 'b'.repeat(40);
 
+function runLiveness(options) {
+  return runLivenessImpl({
+    ...options,
+    githubClient: createApiClient({
+      provider: 'github',
+      credential: 'test',
+      fetch: options.fetchImpl,
+      store: new MemoryLedgerStore(),
+      now: () => NOW,
+      sleep: async () => {},
+      random: () => 0,
+    }),
+  });
+}
+
 function mainRef(sha) {
   return { ref: 'refs/heads/main', object: { type: 'commit', sha } };
 }
@@ -27,13 +44,17 @@ function only(...ids) {
 
 /** Fake network: URL substring -> JSON body (or a status number). */
 function fakeFetch(routes) {
-  return async url => {
+  return async input => {
+    const url = String(input);
     const hit = Object.entries(routes).find(([key]) => url.includes(key));
-    if (!hit) return { status: 404, json: async () => ({}) };
+    if (!hit) return new Response('{}', { status: 404 });
     const value = typeof hit[1] === 'function' ? hit[1](url) : hit[1];
-    if (typeof value === 'number')
-      return { status: value, json: async () => ({}) };
-    return { status: 200, json: async () => value };
+    if (value instanceof Response) return value;
+    if (typeof value === 'number') return new Response('{}', { status: value });
+    return new Response(JSON.stringify(value), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   };
 }
 
@@ -205,6 +226,63 @@ describe('dead-man liveness', () => {
     }
   );
 
+  it('uses the default shared client without requiring installed workspace packages', async () => {
+    vi.stubEnv('JOVIE_API_STATE', 'memory');
+    try {
+      const { report } = await runLivenessImpl({
+        registry: only('derived:jovie:production-promotion'),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: MAIN },
+          '/git/ref/heads/main': mainRef(MAIN),
+        }),
+      });
+      expect(
+        rowFor(report, 'derived:jovie:production-promotion')
+      ).toMatchObject({
+        status: 'fresh',
+        reason: 'production-current',
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('keeps a quota reset beyond the read budget red without waiting', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+        '/git/ref/heads/main': new Response('{}', {
+          status: 429,
+          headers: { 'Retry-After': '60' },
+        }),
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'unknown',
+      reason: 'main-ref-http-429',
+    });
+    expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
+  it('keeps malformed main-ref JSON red with an unreadable reason', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+        '/git/ref/heads/main': new Response('not-json'),
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'unknown',
+      reason: 'main-ref-unreadable',
+    });
+    expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
   it.each([401, 403, 404, 429, 503])(
     'keeps an HTTP %s main-ref failure red with its diagnostic reason',
     async status => {
@@ -224,7 +302,7 @@ describe('dead-man liveness', () => {
         rowFor(report, 'derived:jovie:production-promotion')
       ).toMatchObject({
         status: 'unknown',
-        reason: `main-ref-http-${status}`,
+        reason: status === 429 ? 'main-ref-shed' : `main-ref-http-${status}`,
       });
       expect(attempts).toBe(status === 503 ? 2 : 1);
       expect(livenessDecisions(report)[0].action).toBe('red');
@@ -232,8 +310,8 @@ describe('dead-man liveness', () => {
   );
 
   it.each([
-    [{ name: 'AbortError' }, 'timeout'],
-    [new Error('connection reset'), 'transport'],
+    [{ name: 'AbortError' }, 'transient'],
+    [new Error('connection reset'), 'transient'],
   ])('keeps a failed main-ref transport red (%j)', async (error, reason) => {
     const buildFetch = fakeFetch({
       'jov.ie/api/health/build-info': { commitSha: MAIN },
@@ -242,7 +320,7 @@ describe('dead-man liveness', () => {
       registry: only('derived:jovie:production-promotion'),
       nowMs: NOW,
       fetchImpl: async url => {
-        if (url.includes('/git/ref/heads/main')) throw error;
+        if (String(url).includes('/git/ref/heads/main')) throw error;
         return buildFetch(url);
       },
     });

@@ -24,6 +24,8 @@
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createApiClient } from '../packages/api-client/client.ts';
+import { hashCredential } from '../packages/api-client/store.ts';
 import {
   evaluateLiveness,
   livenessDecisions,
@@ -151,7 +153,7 @@ export async function observeJsonTimestamp(receipt, { fetchImpl }) {
  */
 export async function observeProductionFreshness(
   receipt,
-  { fetchImpl, token, nowMs, apiUrl = 'https://api.github.com' }
+  { fetchImpl, token, nowMs, githubClient, apiUrl = 'https://api.github.com' }
 ) {
   const build = await readJson(fetchImpl, receipt.buildInfoUrl);
   const live = build.ok ? build.body?.commitSha : null;
@@ -160,27 +162,38 @@ export async function observeProductionFreshness(
   const headers = githubHeaders(token);
   // Only the branch identity is needed here. The commit endpoint also
   // computes changed files and patches, adding avoidable work to this probe.
-  const headUrl = `${apiUrl}/repos/${receipt.repo}/git/ref/heads/main`;
-  let head = await readJson(fetchImpl, headUrl, headers);
-  // A single transient read is not proof of a silent promotion loop. Retry
-  // once within this job's budget; quota and permission failures stay red.
-  if (
-    !head.ok &&
-    [
-      'timeout',
-      'transport',
-      'http-500',
-      'http-502',
-      'http-503',
-      'http-504',
-    ].includes(head.reason)
-  ) {
-    head = await readJson(fetchImpl, headUrl, headers);
+  const client =
+    githubClient ??
+    createApiClient({
+      provider: 'github',
+      credential: hashCredential('github', token ?? ''),
+      fetch: fetchImpl,
+    });
+  let head;
+  try {
+    const response = await client.request({
+      url: `${apiUrl}/repos/${receipt.repo}/git/ref/heads/main`,
+      headers,
+      priority: 'report',
+      conditional: false,
+      maxAttempts: 2,
+      maxWaitMs: TIMEOUT_MS,
+      timeoutMs: TIMEOUT_MS,
+    });
+    if (response.status !== 200)
+      return { ok: false, reason: `main-ref-http-${response.status}` };
+    head = response.json();
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error?.status
+        ? `main-ref-http-${error.status}`
+        : `main-ref-${error?.failure ?? error?.kind ?? 'unreadable'}`,
+    };
   }
-  if (!head.ok) return { ok: false, reason: `main-ref-${head.reason}` };
   const main =
-    head.body?.ref === 'refs/heads/main' && head.body?.object?.type === 'commit'
-      ? head.body.object.sha
+    head?.ref === 'refs/heads/main' && head?.object?.type === 'commit'
+      ? head.object.sha
       : null;
   if (!SHA_RE.test(main ?? ''))
     return { ok: false, reason: 'main-sha-unreadable' };
@@ -305,10 +318,11 @@ export async function runLiveness({
   fetchImpl = fetch,
   token = '',
   nowMs = Date.now(),
+  githubClient,
 }) {
   const startedAt = new Date(nowMs).toISOString();
   const observations = new Map();
-  const context = { fetchImpl, token, nowMs };
+  const context = { fetchImpl, token, nowMs, githubClient };
   for (const entry of registry.entries ?? []) {
     if (entry?.status !== 'live') continue;
     const observed = await observeEntry(entry, context);
