@@ -183,7 +183,10 @@ def provider_payloads(state: Path, providers, proc: Path = Path("/proc")) -> dic
     return result
 
 
-AUTOMATION_REGISTRY = "ops/automation/registry.jsonl"
+# #22354 shipped the registry at canon/ (the repo-root allowlist rejects new top-level dirs).
+# Reading a path that is not on main must alert, never read as "nothing silent" (2026-10-21:
+# the doctor watched ops/automation/registry.jsonl, which never existed, so no row was checked).
+AUTOMATION_REGISTRY = "canon/automation-registry.jsonl"
 AUTOMATION_LIVENESS_WORKFLOW = "automation-liveness.yml"
 AUTOMATION_LIVENESS_MAX_S = 60 * 60
 AUTOMATION_LIVENESS_TTL_S = 600
@@ -266,7 +269,8 @@ def automation_liveness(lane, now: float) -> dict:
 def automation_observation(host, lane, now: float) -> dict:
     """Registry watch for observe(); fixtures and self-tests read no registry or GitHub."""
     if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
-        return {"automation": {"known": False, "silent": {}}, "automationLiveness": {"installed": None}}
+        return {"automation": {"known": False, "silent": {}, "skipped": True},
+                "automationLiveness": {"installed": None}}
     try:
         watch = automation_watch(automation_registry(host.repo), lane.HOST, now)
     except Exception as error:  # observability never takes the doctor down
@@ -859,7 +863,12 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         age = row.get("ageS")
         alerts[f"automation-silent:{automation_id}"] = (
             f"registered automation {automation_id} left no fresh receipt at {row.get('location')} "
-            f"({'missing' if age is None else f'{round(age / 60)} min old'}); owner per ops/automation/registry.jsonl")
+            f"({'missing' if age is None else f'{round(age / 60)} min old'}); owner per {AUTOMATION_REGISTRY}")
+    watched = obs.get("automation") or {}
+    if watched.get("known") is False and not watched.get("skipped"):
+        alerts["automation-registry-unreadable"] = (
+            f"origin/main:{AUTOMATION_REGISTRY} is unreadable ({watched.get('error') or 'missing or not JSONL'}); "
+            "no Gem host-local automation receipt is being watched")
     liveness = obs.get("automationLiveness") or {}
     if liveness.get("installed"):
         last = _iso_epoch(liveness.get("lastRunAt"))
