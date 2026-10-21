@@ -140,7 +140,17 @@ async function ghRequest(path, json = true) {
   return json ? JSON.parse(result.stdout) : result.stdout;
 }
 
-// A manual evidence refresh only: no new scheduler and no production mutations.
+/**
+ * A manual evidence refresh only: no new scheduler and no production mutations.
+ * `request` may answer synchronously (test fakes) or asynchronously (runGh).
+ * @param {{
+ *   since: string,
+ *   cutoff: string,
+ *   nextReviewAt: string,
+ *   trackingIssue: string,
+ *   request?: (path: string, json?: boolean) => any,
+ * }} options
+ */
 export async function collectAliasGraduation({
   since,
   cutoff,
