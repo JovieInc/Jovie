@@ -492,6 +492,8 @@ When building or iterating on the Artist Profiles landing page:
   `globals.css`; a CSS variable declared only in `:root` does not emit utilities.
 - Marketing signup CTAs use `/signup`. Do not send them to `/claim`, `/register`
   or `/waitlist`; the artist profile claim flow has a different intent.
+  Exception: the paid Pro CTA is that claim intent and routes to `/claim`
+  (EVENT: Tim, 2026-10-20, $12/month self-serve artist profile).
 - Honor the marketing registry's above-the-fold hero contract: do not use a
   full-height hero shell that pushes the first proof element below the fold.
   Keep the opening proof in the composition without decorative inset cards.

@@ -24,7 +24,7 @@ describe('admin surface inventory', () => {
       )
     );
     expect(ADMIN_PRIMARY_NAV_SURFACES.map(surface => surface.id)).toEqual([
-      'ops',
+      'home',
       'growth',
       'product',
       'operations',

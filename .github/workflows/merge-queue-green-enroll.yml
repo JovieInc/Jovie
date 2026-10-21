@@ -193,6 +193,26 @@ jobs:
           # ("`workflows` scope may be required"); the installation grants it.
           permission-workflows: write
 
+      # JOV-8754: sample both REST buckets this fleet shares. GET /rate_limit
+      # costs no quota. 2026-10-21 03:25-03:52Z the repo GITHUB_TOKEN bucket ran
+      # dry and Merge Group Admission waited out the reset, so every group
+      # stalled ~25 min. One notice per bucket feeds scripts/ci/api-quota-report.mjs.
+      - name: Sample API quota
+        continue-on-error: true
+        env:
+          REPO_TOKEN: ${{ github.token }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -uo pipefail
+          for bucket in github-token jovie-bot; do
+            if [[ "$bucket" == github-token ]]; then token="$REPO_TOKEN"; else token="$APP_TOKEN"; fi
+            core="$(curl -fsS --max-time 10 -H "Authorization: Bearer $token" \
+              -H 'Accept: application/vnd.github+json' https://api.github.com/rate_limit \
+              | jq -r '.resources.core | "remaining=\(.remaining) limit=\(.limit) used=\(.used) reset=\(.reset)"')" \
+              || core="unavailable"
+            echo "::notice title=api-quota::bucket=${bucket} ${core} at=$(date -u +%s)"
+          done
+
       - name: Enqueue green PRs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

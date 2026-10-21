@@ -3,9 +3,9 @@
 // @coverage-via apps/web/components/organisms/home-loop/HomeLoopCanvas.test.tsx
 import { Button, Input } from '@jovie/ui';
 import { ArrowUp, Check, ChevronRight } from 'lucide-react';
-import { type FormEvent, useId, useState } from 'react';
+import { type FormEvent, useEffect, useId, useState } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
-import type { HomeLoopAsk } from '@/lib/home-loop/contract';
+import { formatCountdown, type HomeLoopAsk } from '@/lib/home-loop/contract';
 import { cn } from '@/lib/utils';
 
 export type HomeLoopAnswerState = 'pending' | 'sent' | 'failed';
@@ -18,6 +18,45 @@ export interface HomeLoopAnswer {
 
 const CARD_FRAME =
   'flex flex-col gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-2';
+/** Minute-resolution clock for deadline countdowns. */
+function useNowMinute(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
+function DefaultLine({ ask }: Readonly<{ readonly ask: HomeLoopAsk }>) {
+  const now = useNowMinute();
+  const fallback = ask.decisionDefault;
+  if (!fallback) return null;
+  const countdown = formatCountdown(fallback.deadline, now);
+  const verb = fallback.decision === 'approve' ? 'Approves' : 'Rejects';
+  return (
+    <p
+      className='flex flex-wrap items-baseline gap-x-1.5 text-xs text-tertiary-token'
+      data-testid='home-loop-ask-default'
+    >
+      <span>
+        {countdown === 'now'
+          ? `Default due: ${verb.toLowerCase()} — ${fallback.summary}`
+          : `${verb} by default — ${fallback.summary}`}
+      </span>
+      {countdown && countdown !== 'now' ? (
+        <time
+          className='tabular-nums text-secondary-token'
+          dateTime={fallback.deadline}
+          data-testid='home-loop-ask-countdown'
+        >
+          {countdown}
+        </time>
+      ) : null}
+    </p>
+  );
+}
+
 /** Actions and the answered line share one slot height. */
 const ACTION_SLOT = 'flex min-h-9 flex-wrap items-center gap-1.5';
 
@@ -27,17 +66,30 @@ function AskCard({
   approveLabel,
   onApprove,
   onReply,
+  onFeedback,
 }: Readonly<{
   readonly ask: HomeLoopAsk;
   readonly answer: HomeLoopAnswer | undefined;
   readonly approveLabel: string;
   readonly onApprove: (ask: HomeLoopAsk) => void;
   readonly onReply: (ask: HomeLoopAsk, text: string) => void;
+  readonly onFeedback?: (ask: HomeLoopAsk, text: string) => void;
 }>) {
   const [whyOpen, setWhyOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedback, setFeedback] = useState('');
   const whyId = useId();
   const answered = answer && answer.state !== 'failed';
+
+  function submitFeedback(event: FormEvent) {
+    event.preventDefault();
+    const text = feedback.trim();
+    if (!text || !onFeedback) return;
+    onFeedback(ask, text);
+    setFeedback('');
+    setFeedbackOpen(false);
+  }
 
   function submitReply(event: FormEvent) {
     event.preventDefault();
@@ -58,6 +110,7 @@ function AskCard({
           {ask.title}
         </h3>
         <p className='text-xs text-secondary-token'>{ask.recommendation}</p>
+        <DefaultLine ask={ask} />
       </div>
 
       <div>
@@ -113,6 +166,17 @@ function AskCard({
           {answer.state === 'pending' ? (
             <span className='text-tertiary-token'>Sending</span>
           ) : null}
+          {answer.state === 'sent' && ask.canFeedback && onFeedback ? (
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              aria-expanded={feedbackOpen}
+              onClick={() => setFeedbackOpen(open => !open)}
+            >
+              Add Feedback
+            </Button>
+          ) : null}
         </p>
       ) : (
         <div className={ACTION_SLOT}>
@@ -123,7 +187,7 @@ function AskCard({
               onClick={() => onApprove(ask)}
               data-testid='home-loop-ask-approve'
             >
-              {approveLabel}
+              {ask.actionLabel ?? approveLabel}
             </Button>
           ) : null}
           {ask.canReply ? (
@@ -161,6 +225,26 @@ function AskCard({
           ) : null}
         </div>
       )}
+      {feedbackOpen ? (
+        <form className='flex items-center gap-1' onSubmit={submitFeedback}>
+          <Input
+            inputSize='sm'
+            value={feedback}
+            onChange={event => setFeedback(event.target.value)}
+            placeholder='What should change?'
+            aria-label={`Feedback: ${ask.title}`}
+          />
+          <Button
+            type='submit'
+            variant='secondary'
+            size='icon-sm'
+            aria-label='Send Feedback'
+            disabled={!feedback.trim()}
+          >
+            <ArrowUp aria-hidden='true' className='size-3.5' />
+          </Button>
+        </form>
+      ) : null}
     </li>
   );
 }
@@ -174,6 +258,7 @@ export function HomeLoopAsks({
   moreHref,
   onApprove,
   onReply,
+  onFeedback,
 }: Readonly<{
   readonly asks: readonly HomeLoopAsk[];
   /** Dense Home shows the top asks; the rest live behind `moreHref`. */
@@ -183,6 +268,7 @@ export function HomeLoopAsks({
   readonly approveLabel?: string;
   readonly onApprove: (ask: HomeLoopAsk) => void;
   readonly onReply: (ask: HomeLoopAsk, text: string) => void;
+  readonly onFeedback?: (ask: HomeLoopAsk, text: string) => void;
 }>) {
   const visible = asks.slice(0, maxVisible);
   const hidden = asks.length - visible.length;
@@ -196,6 +282,7 @@ export function HomeLoopAsks({
           approveLabel={approveLabel}
           onApprove={onApprove}
           onReply={onReply}
+          onFeedback={onFeedback}
         />
       ))}
       {hidden > 0 ? (
