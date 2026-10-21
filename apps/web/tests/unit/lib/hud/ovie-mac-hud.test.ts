@@ -5,11 +5,18 @@ import {
   composeOvieMacHudSnapshot,
   computeDefaultAlive,
   computeWowGrowth,
+  emptyOvieMacHudInFlightPullRequests,
   gradeYcGrowth,
   monthlyToWeeklyUsd,
+  OVIE_MAC_HUD_IN_FLIGHT_PR_LIMIT,
   shippingFromMerges,
+  weeklyGrowthFromPeriodRate,
   windowToWeeklyUsd,
+  YC_EXCEPTIONAL_GROWTH,
+  YC_GOOD_GROWTH_MIN,
+  ycBarLabel,
 } from '@/lib/hud/ovie-mac-hud';
+import type { LybDailyMrr } from '@/lib/ovie/lyb-mrr';
 
 function prNode(
   overrides: Partial<{
@@ -344,5 +351,499 @@ describe('Ovie Mac HUD derivation', () => {
       items: [],
       totalOpen: 0,
     });
+  });
+});
+
+const alive = (
+  cashUsd: number | null,
+  weeklyBurnUsd: number | null,
+  weeklyRevenueUsd: number | null,
+  weeklyRevenueGrowthRate: number | null = 0,
+  available = true
+) =>
+  computeDefaultAlive({
+    cashUsd,
+    weeklyBurnUsd,
+    weeklyRevenueUsd,
+    weeklyRevenueGrowthRate,
+    available,
+  });
+
+const classify = (
+  over: Partial<Parameters<typeof classifyOvieMacHudPullRequest>[0]> = {}
+) =>
+  classifyOvieMacHudPullRequest({
+    isDraft: false,
+    reviewDecision: null,
+    mergeable: 'MERGEABLE',
+    labels: [],
+    reviewRequestCount: 0,
+    mergeQueuePosition: null,
+    ...over,
+  });
+
+const compose = (
+  pullRequests: unknown[],
+  mergeQueueEntries: unknown[] = [],
+  extra: { totalOpen?: number; sourceTruncated?: boolean; limit?: number } = {}
+) =>
+  composeOvieMacHudInFlightPullRequests({
+    totalOpen: extra.totalOpen ?? pullRequests.length,
+    pullRequests,
+    mergeQueueEntries,
+    sourceTruncated: extra.sourceTruncated,
+    limit: extra.limit,
+  });
+
+describe('computeDefaultAlive', () => {
+  it('returns unknown and hides numbers when the source is unavailable', () => {
+    expect(alive(100, 50, 80, 0.1, false)).toEqual({
+      cashUsd: null,
+      weeklyBurnUsd: null,
+      weeklyRevenueUsd: null,
+      weeklyRevenueGrowthRate: 0.1,
+      available: false,
+      status: 'unknown',
+      reachesProfitBeforeZero: null,
+      detail: 'Alive numbers unavailable.',
+    });
+  });
+
+  it.each([
+    [null, 50, 80],
+    [100, null, 80],
+    [100, 50, null],
+  ])(
+    'returns unknown when cash=%s burn=%s revenue=%s is missing',
+    (c, b, r) => {
+      expect(alive(c, b, r)).toMatchObject({
+        status: 'unknown',
+        reachesProfitBeforeZero: null,
+      });
+    }
+  );
+
+  it('calls zero revenue with burn default dead', () => {
+    expect(alive(10_000, 500, 0, 0.5)).toEqual({
+      cashUsd: 10_000,
+      weeklyBurnUsd: 500,
+      weeklyRevenueUsd: 0,
+      weeklyRevenueGrowthRate: 0.5,
+      available: true,
+      status: 'dead',
+      reachesProfitBeforeZero: false,
+      detail: '$0 revenue with burn is default dead.',
+    });
+  });
+
+  it.each([
+    [80, 50],
+    [50, 50],
+    [0, 0],
+  ])('is alive when revenue %i covers burn %i', (revenue, burn) => {
+    expect(alive(100, burn, revenue)).toMatchObject({
+      status: 'alive',
+      reachesProfitBeforeZero: true,
+      detail: 'Revenue already covers burn.',
+    });
+  });
+
+  it('is alive when growth reaches profit exactly as cash runs out', () => {
+    // Doubling weekly: revenue 100 → 200 in one week; net burn 100/week.
+    expect(alive(100, 200, 100, 1)).toMatchObject({
+      status: 'alive',
+      reachesProfitBeforeZero: true,
+      detail: 'Current burn and growth reach profit before cash hits zero.',
+    });
+    expect(alive(99, 200, 100, 1)).toMatchObject({
+      status: 'dead',
+      reachesProfitBeforeZero: false,
+      detail: 'Burn and growth do not reach profit before cash hits zero.',
+    });
+  });
+
+  it.each([
+    ['no growth', 1_000_000, 0],
+    ['unknown growth', 1_000_000, null],
+    ['shrinking revenue', 1_000_000, -0.1],
+    ['no cash', 0, 1],
+    ['negative cash', -10, 1],
+  ])('is dead with %s', (_label, cash, growth) => {
+    expect(alive(cash, 200, 100, growth)).toMatchObject({
+      status: 'dead',
+      reachesProfitBeforeZero: false,
+    });
+  });
+});
+
+describe('growth helpers', () => {
+  it('converts monthly and windowed amounts to weekly', () => {
+    expect(monthlyToWeeklyUsd(5200)).toBe(1200);
+    expect(windowToWeeklyUsd(300, 30)).toBe(70);
+    expect(windowToWeeklyUsd(300, 0)).toBe(0);
+    expect(windowToWeeklyUsd(300, -7)).toBe(0);
+  });
+
+  it('compounds a period growth rate down to a weekly rate', () => {
+    expect(weeklyGrowthFromPeriodRate(0.21, 14)).toBeCloseTo(0.1, 12);
+    expect(weeklyGrowthFromPeriodRate(0.1, 7)).toBeCloseTo(0.1, 12);
+    expect(weeklyGrowthFromPeriodRate(0.5, 0)).toBe(0);
+    expect(weeklyGrowthFromPeriodRate(0.5, -1)).toBe(0);
+  });
+
+  it('grades growth against the YC weekly bars', () => {
+    expect(YC_EXCEPTIONAL_GROWTH).toBe(0.1);
+    expect(YC_GOOD_GROWTH_MIN).toBe(0.05);
+    expect(gradeYcGrowth(0.1)).toBe('exceptional');
+    expect(gradeYcGrowth(0.0999)).toBe('good');
+    expect(gradeYcGrowth(0.05)).toBe('good');
+    expect(gradeYcGrowth(0.0499)).toBe('not-figured-out');
+    expect(gradeYcGrowth(-0.2)).toBe('not-figured-out');
+  });
+
+  it('labels each YC bar', () => {
+    expect(ycBarLabel('exceptional')).toBe('10% exceptional');
+    expect(ycBarLabel('good')).toBe('5–7%/week good');
+    expect(ycBarLabel('not-figured-out')).toBe('1% means not figured out');
+  });
+});
+
+describe('computeWowGrowth', () => {
+  it('measures revenue week over week', () => {
+    expect(
+      computeWowGrowth({
+        thisWeekRevenueUsd: 106,
+        lastWeekRevenueUsd: 100,
+        thisWeekActiveUsers: 1,
+        lastWeekActiveUsers: 2,
+      })
+    ).toEqual({
+      rate: expect.closeTo(0.06, 10),
+      source: 'revenue',
+      ycBar: 'good',
+      thisWeek: 106,
+      lastWeek: 100,
+      available: true,
+      showChart: false,
+    });
+  });
+
+  it('uses revenue when only one week has revenue', () => {
+    expect(
+      computeWowGrowth({
+        thisWeekRevenueUsd: 0,
+        lastWeekRevenueUsd: 50,
+        thisWeekActiveUsers: 10,
+        lastWeekActiveUsers: 5,
+      })
+    ).toMatchObject({ source: 'revenue', rate: -1, thisWeek: 0, lastWeek: 50 });
+    expect(
+      computeWowGrowth({
+        thisWeekRevenueUsd: 50,
+        lastWeekRevenueUsd: 0,
+        thisWeekActiveUsers: 10,
+        lastWeekActiveUsers: 5,
+      })
+    ).toMatchObject({ source: 'revenue', rate: 0, ycBar: 'not-figured-out' });
+  });
+
+  it('falls back to active users when revenue is missing', () => {
+    expect(
+      computeWowGrowth({
+        thisWeekRevenueUsd: null,
+        lastWeekRevenueUsd: 100,
+        thisWeekActiveUsers: 120,
+        lastWeekActiveUsers: 100,
+      })
+    ).toEqual({
+      rate: expect.closeTo(0.2, 10),
+      source: 'active-users',
+      ycBar: 'exceptional',
+      thisWeek: 120,
+      lastWeek: 100,
+      available: true,
+      showChart: false,
+    });
+  });
+
+  it('reports unavailable growth when no series is measured', () => {
+    expect(
+      computeWowGrowth({
+        thisWeekRevenueUsd: 10,
+        lastWeekRevenueUsd: null,
+        thisWeekActiveUsers: 10,
+        lastWeekActiveUsers: null,
+      })
+    ).toEqual({
+      rate: 0,
+      source: 'active-users',
+      ycBar: 'not-figured-out',
+      thisWeek: 0,
+      lastWeek: 0,
+      available: false,
+      showChart: false,
+    });
+  });
+});
+
+describe('shippingFromMerges', () => {
+  it('formats today’s merge count, including zero', () => {
+    expect(shippingFromMerges({ last7Days: 0, today: 0 })).toEqual({
+      shipsThisWeek: 0,
+      available: true,
+      detail:
+        'PRs merged across JovieInc in the last 7 days. 0 since midnight PT.',
+    });
+    expect(shippingFromMerges({ last7Days: 5000, today: 1234 }).detail).toBe(
+      'PRs merged across JovieInc in the last 7 days. 1,234 since midnight PT.'
+    );
+  });
+});
+
+describe('classifyOvieMacHudPullRequest', () => {
+  it.each(['blocked', 'do-not-merge', 'do not merge', 'gated', 'hold', 'HOLD'])(
+    'treats the %s label as blocking',
+    label => {
+      expect(classify({ labels: ['area/web', label] })).toBe('blocked');
+    }
+  );
+
+  it.each([
+    [{ mergeable: 'CONFLICTING' }, 'blocked'],
+    [{ reviewDecision: 'CHANGES_REQUESTED' }, 'blocked'],
+    [{ reviewDecision: 'REVIEW_REQUIRED' }, 'in_review'],
+    [{ reviewDecision: 'APPROVED' }, 'in_review'],
+    [{ reviewRequestCount: 2 }, 'in_review'],
+    [{ mergeQueuePosition: 0 }, 'merge_queue'],
+    [{ mergeQueuePosition: 0, isDraft: true }, 'merge_queue'],
+    [{}, 'open'],
+  ] as const)('%j → %s', (over, status) => {
+    expect(classify(over)).toBe(status);
+  });
+});
+
+describe('composeOvieMacHudInFlightPullRequests', () => {
+  it('normalizes a lane PR into the full in-flight shape', () => {
+    const result = compose([
+      prNode({
+        number: 7,
+        title: '  Fix ledger  ',
+        url: ' https://github.com/JovieInc/Jovie/pull/7 ',
+        headRefName: 'codex/jov-7',
+        updatedAt: '2026-08-22T01:02:03Z',
+        reviewDecision: 'APPROVED',
+        author: { login: 'devin-ai' },
+      }),
+    ]);
+    expect(result).toEqual({
+      availability: 'available',
+      totalOpen: 1,
+      items: [
+        {
+          number: 7,
+          title: 'Fix ledger',
+          url: 'https://github.com/JovieInc/Jovie/pull/7',
+          headRefName: 'codex/jov-7',
+          authorLogin: 'devin-ai',
+          updatedAtIso: '2026-08-22T01:02:03.000Z',
+          status: 'in_review',
+          statusLabel: 'In Review',
+          statusDetail: 'Approved',
+          mergeQueuePosition: null,
+        },
+      ],
+      truncated: false,
+      errorMessage: null,
+    });
+  });
+
+  it.each([
+    [{ labels: { nodes: [{ name: 'gated' }] } }, 'Blocked', 'Blocking label'],
+    [{ reviewDecision: 'CHANGES_REQUESTED' }, 'Blocked', 'Changes requested'],
+    [{ mergeable: 'CONFLICTING' }, 'Blocked', 'Merge conflict'],
+    [{ reviewRequests: { totalCount: 1 } }, 'In Review', 'Review requested'],
+    [{ reviewDecision: 'REVIEW_REQUIRED' }, 'In Review', 'Review required'],
+    [{ isDraft: true }, 'Open', 'Draft'],
+    [{}, 'Open', 'Ready'],
+  ] satisfies ReadonlyArray<
+    readonly [Parameters<typeof prNode>[0], string, string]
+  >)('%j → %s / %s', (over, statusLabel, statusDetail) => {
+    expect(compose([prNode(over)]).items[0]).toMatchObject({
+      statusLabel,
+      statusDetail,
+    });
+  });
+
+  it('drops malformed pull request nodes', () => {
+    const result = compose([
+      null,
+      'pr',
+      prNode({ number: 0 }),
+      { ...prNode({ number: 2 }), number: 2.5 },
+      prNode({ number: 3, title: '   ' }),
+      prNode({ number: 4, url: '' }),
+      prNode({ number: 5, updatedAt: 'not a date' }),
+      { ...prNode({ number: 6 }), updatedAt: undefined },
+      prNode({ number: 9 }),
+    ]);
+    expect(result.items.map(pr => pr.number)).toEqual([9]);
+  });
+
+  it('tolerates missing optional fields', () => {
+    const node = {
+      number: 8,
+      title: 'Queued human PR',
+      url: 'https://github.com/JovieInc/Jovie/pull/8',
+      updatedAt: '2026-08-22T00:00:00.000Z',
+      labels: { nodes: ['bad', { name: '' }, { name: ' hold ' }] },
+      reviewRequests: { totalCount: -1 },
+    };
+    const [item] = compose([node], [{ position: 2, pullRequest: node }]).items;
+    expect(item).toMatchObject({
+      headRefName: 'unknown',
+      authorLogin: null,
+      status: 'merge_queue',
+      statusDetail: 'Position 2',
+    });
+    // The trimmed "hold" label still blocks once the PR leaves the queue.
+    expect(
+      compose([{ ...node, headRefName: 'devin/x' }]).items[0]
+    ).toMatchObject({ status: 'blocked', statusDetail: 'Blocking label' });
+    expect(
+      compose([{ ...node, headRefName: 'devin/x', labels: null }]).items[0]
+    ).toMatchObject({ status: 'open', statusDetail: 'Ready' });
+  });
+
+  it('ignores malformed merge queue entries', () => {
+    const result = compose(
+      [prNode({ number: 1 }), prNode({ number: 2 })],
+      [
+        null,
+        { position: 1 },
+        { position: -1, pullRequest: { number: 1 } },
+        { position: 1.5, pullRequest: { number: 2 } },
+        { position: 3, pullRequest: { number: 0 } },
+      ]
+    );
+    expect(result.items.map(pr => pr.status)).toEqual(['open', 'open']);
+  });
+
+  it('prefers the open-PR node over the queue copy for the same number', () => {
+    const result = compose(
+      [prNode({ number: 5, title: 'From open list' })],
+      [{ position: 0, pullRequest: prNode({ number: 5, title: 'From queue' }) }]
+    );
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      title: 'From open list',
+      status: 'merge_queue',
+    });
+  });
+
+  it('orders queue entries by position and others by most recent update', () => {
+    const result = compose(
+      [
+        prNode({ number: 1, updatedAt: '2026-08-01T00:00:00.000Z' }),
+        prNode({ number: 2, updatedAt: '2026-08-03T00:00:00.000Z' }),
+        prNode({ number: 3, updatedAt: '2026-08-02T00:00:00.000Z' }),
+      ],
+      [
+        { position: 2, pullRequest: prNode({ number: 10 }) },
+        { position: 1, pullRequest: prNode({ number: 11 }) },
+      ]
+    );
+    expect(result.items.map(pr => pr.number)).toEqual([11, 10, 2, 3, 1]);
+  });
+
+  it('caps the list at the default limit and reports the full in-flight count', () => {
+    expect(OVIE_MAC_HUD_IN_FLIGHT_PR_LIMIT).toBe(8);
+    const nodes = Array.from({ length: 9 }, (_, i) =>
+      prNode({ number: i + 1 })
+    );
+    const result = compose(nodes, [], { totalOpen: 3 });
+    expect(result.items).toHaveLength(8);
+    expect(result.totalOpen).toBe(9);
+    expect(result.truncated).toBe(true);
+    const exact = compose(nodes.slice(0, 8));
+    expect(exact.items).toHaveLength(8);
+    expect(exact.truncated).toBe(false);
+  });
+
+  it('keeps the larger of the reported and seen totals for a truncated source', () => {
+    const nodes = [prNode({ number: 1 }), prNode({ number: 2 })];
+    expect(
+      compose(nodes, [], { totalOpen: 1, sourceTruncated: true })
+    ).toMatchObject({ totalOpen: 2, truncated: true });
+    expect(
+      compose(nodes, [], { totalOpen: 50, sourceTruncated: true })
+    ).toMatchObject({ totalOpen: 50, truncated: true });
+    expect(compose(nodes, [], { totalOpen: 50 })).toMatchObject({
+      totalOpen: 2,
+      truncated: false,
+    });
+  });
+
+  it('builds empty signals for unconfigured or failed sources', () => {
+    expect(emptyOvieMacHudInFlightPullRequests('error', 'GitHub 502')).toEqual({
+      availability: 'error',
+      totalOpen: 0,
+      items: [],
+      truncated: false,
+      errorMessage: 'GitHub 502',
+    });
+    expect(
+      emptyOvieMacHudInFlightPullRequests('not_configured').errorMessage
+    ).toBeNull();
+  });
+});
+
+describe('composeOvieMacHudSnapshot', () => {
+  const base = {
+    alive: {
+      cashUsd: 10_000,
+      weeklyBurnUsd: 500,
+      weeklyRevenueUsd: 600,
+      weeklyRevenueGrowthRate: 0,
+      available: true,
+    },
+    growth: {
+      thisWeekRevenueUsd: 600,
+      lastWeekRevenueUsd: 500,
+      thisWeekActiveUsers: null,
+      lastWeekActiveUsers: null,
+    },
+    shipping: shippingFromMerges({ last7Days: 12, today: 1 }),
+    generatedAtIso: '2026-08-22T00:00:00.000Z',
+  };
+
+  it('composes every section and omits optional ones that were not provided', () => {
+    const snapshot = composeOvieMacHudSnapshot(base);
+    expect(snapshot).toEqual({
+      alive: computeDefaultAlive(base.alive),
+      growth: computeWowGrowth(base.growth),
+      shipping: base.shipping,
+      inFlightPullRequests:
+        emptyOvieMacHudInFlightPullRequests('not_configured'),
+      generatedAtIso: '2026-08-22T00:00:00.000Z',
+    });
+    expect('lybMrr' in snapshot).toBe(false);
+    expect('decisionHud' in snapshot).toBe(false);
+  });
+
+  it('passes through provided in-flight PRs and LYB MRR', () => {
+    const inFlightPullRequests = compose([prNode({ number: 1 })]);
+    const lybMrr = { product: 'logyourbody' } as unknown as LybDailyMrr;
+    const snapshot = composeOvieMacHudSnapshot({
+      ...base,
+      inFlightPullRequests,
+      lybMrr,
+    });
+    expect(snapshot.inFlightPullRequests).toBe(inFlightPullRequests);
+    expect(snapshot.lybMrr).toBe(lybMrr);
+  });
+
+  it('adds the decision view when decision extras are supplied', () => {
+    const snapshot = composeOvieMacHudSnapshot({ ...base, decisionExtras: {} });
+    expect(snapshot.decisionHud).toBeDefined();
   });
 });

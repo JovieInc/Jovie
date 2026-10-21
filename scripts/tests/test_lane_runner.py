@@ -5589,6 +5589,8 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertIsNone(marker["pr"], "source-safe cleanup retained the checkout without a target binding")
         self.assertNotIn("preservedWorktree", prior)
         self.calls.clear()
+        # A busy checkout still hands off with the canonical reason and keeps its source.
+        self.active = f"p123\nn{self.path}\n"
         with patch.object(lane.execution_attempt, "claim") as claim, patch.object(lane, "run_agent") as agent:
             receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
         self.assertEqual(receipt["verdict"], "recovery-handoff")
@@ -5597,6 +5599,36 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertEqual((self.path / "repair.txt").read_text(), "preserved useful edit")
         claim.assert_not_called()
         agent.assert_not_called()
+
+    def test_finished_predecessor_leftovers_are_archived_at_once_and_the_repair_runs(self):
+        # 2026-10-20 on Gem: a fix-no-change run left regenerated artifacts, and every later
+        # repair of that PR handed off for 6h (72 handoffs/24h) waiting for an owner that is gone.
+        def predecessor(cmd, cwd, log, timeout, **kwargs):
+            (cwd / "repair.txt").write_text("preserved useful edit")
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=predecessor):
+            prior = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(prior["verdict"], "fix-no-change")
+        self.path = Path(prior["worktree"])
+        self.calls.clear()
+        ran = []
+        def agent(cmd, cwd, log, timeout, **kwargs):
+            ran.append(cwd)
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=agent):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        ref = lane.PRESERVED_ARCHIVE_REF + self.path.name
+        self.assertEqual(receipt["archivedPreserved"], [ref])
+        self.assertEqual(receipt["verdict"], "fix-no-change")
+        self.assertEqual(len(ran), 1)
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.git(self.host.repo, "show", f"{ref}:repair.txt"), "preserved useful edit")
+
+    def test_interrupted_predecessor_still_waits_for_reconciliation(self):
+        prior = self.cancelled_predecessor(commit=True)
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, prior["runId"]))
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, None))
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, "no-such-run"))
 
     def test_competing_checkout_after_reconciliation_is_refused_safely(self):
         competitor = self.host.state / "worktrees/competing-owner"
@@ -11387,10 +11419,35 @@ class SelftestForeignLineageTest(unittest.TestCase):
                 self.assertFalse(self.lineage(table))
 
 
+def _own_subtree(pid: int, me: int) -> bool:
+    """True when /proc's ppid chain from pid reaches me (this test process)."""
+    for _ in range(64):
+        if pid == me:
+            return True
+        try:
+            pid = int((Path("/proc") / str(pid) / "stat").read_text().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+        if pid <= 1:
+            return False
+    return False
+
+
 class OperatorInstallerGlueTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="operator-installer-glue-")
         self.addCleanup(self.tmp.cleanup)
+        # Every self-test custody scan in this class sees only this test's own process
+        # subtree. CI's structural lane runs ~30 commands at once; their non-dumpable
+        # children (chromium etc.) refuse /proc environ and held these tests at random
+        # (runs 39533866177, 39536019717: selftest-process-custody-unreadable). Production
+        # custody is unchanged: it scans every same-UID process and fails closed.
+        real_row, me = lane._selftest_process_row, os.getpid()
+        scoped = patch.object(lane, "_selftest_process_row",
+                              side_effect=lambda entry, pid, uid: real_row(entry, pid, uid)
+                              if _own_subtree(pid, me) else None)
+        scoped.start()
+        self.addCleanup(scoped.stop)
         self.root = Path(self.tmp.name).resolve()
         self.host = SimpleNamespace(state=self.root / "state", repo=self.root / "repo", gate_slots=2)
         self.host.state.mkdir()
@@ -13598,3 +13655,37 @@ class SelftestCleanupScopeTest(unittest.TestCase):
         self.assertEqual(receipt["diagnostic"]["observation"]["pid"], 100)
         self.assertEqual(receipt["diagnostic"]["outcome"], "held")
         self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+
+class SelftestProcessAbsenceTest(unittest.TestCase):
+    """ESRCH from an exiting process's proc entry is proof of absence, like ENOENT (CI #22351)."""
+
+    def entry(self, read_error, later_stats):
+        stats = iter([SimpleNamespace(st_uid=os.getuid()), *later_stats])
+
+        class Entry:
+            def stat(self_inner):
+                value = next(stats)
+                if isinstance(value, BaseException):
+                    raise value
+                return value
+
+            def __truediv__(self_inner, _name):
+                return SimpleNamespace(read_text=lambda: (_ for _ in ()).throw(read_error))
+        return Entry()
+
+    def test_esrch_or_enoent_on_reread_proves_absence(self):
+        for read_error in (FileNotFoundError(2, "gone"), ProcessLookupError(3, "exiting")):
+            for gone in (FileNotFoundError(2, "gone"), ProcessLookupError(3, "exiting")):
+                with self.subTest(read=type(read_error).__name__, gone=type(gone).__name__):
+                    self.assertIsNone(lane._selftest_process_row(self.entry(read_error, [gone]), 201, os.getuid()))
+
+    def test_a_still_present_or_unreadable_entry_still_holds(self):
+        present = SimpleNamespace(st_uid=os.getuid())
+        with self.assertRaises(lane.SelftestCleanupHeld):
+            lane._selftest_process_row(self.entry(ProcessLookupError(3, "exiting"), [present]), 201, os.getuid())
+        with self.assertRaises(lane.SelftestCleanupHeld):
+            lane._selftest_process_row(self.entry(ProcessLookupError(3, "x"), [PermissionError(13, "denied")]),
+                                       201, os.getuid())
+        with self.assertRaises(lane.SelftestCleanupHeld):
+            lane._selftest_process_row(self.entry(PermissionError(13, "denied"), []), 201, os.getuid())
