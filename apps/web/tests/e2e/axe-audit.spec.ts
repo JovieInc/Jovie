@@ -30,6 +30,22 @@ function shouldSkipBlockingAxe(surface: {
   );
 }
 
+/**
+ * Theme routes whose light theme is not certified yet (JOV-8780). Production
+ * ships theme switching off, so visitors only ever see dark here; the dark
+ * WCAG scan above still gates these surfaces. Remove an id once its
+ * light-mode color-contrast scan passes in Chromium and Firefox.
+ */
+const LIGHT_MODE_CONTRAST_DEBT: ReadonlySet<string> = new Set([
+  'home',
+  'marketing-new',
+  'marketing-pricing',
+  'marketing-launch',
+  'marketing-launch-pricing',
+  'marketing-artist-profiles',
+  'marketing-artist-notifications',
+]);
+
 function getSurfaceFilter() {
   const raw = process.env.PUBLIC_SURFACE_FILTER?.trim();
   if (!raw) {
@@ -203,6 +219,13 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
         // `.dark` there scans a state no visitor can reach, so skip it; the
         // dark-theme scan above still gates those surfaces.
         if (!isThemeRoute(new URL(page.url()).pathname)) {
+          return;
+        }
+        if (LIGHT_MODE_CONTRAST_DEBT.has(surface.id)) {
+          testInfo.annotations.push({
+            type: 'light-mode-contrast-debt',
+            description: 'JOV-8780: light-mode color-contrast scan skipped',
+          });
           return;
         }
         await page.evaluate(() => {

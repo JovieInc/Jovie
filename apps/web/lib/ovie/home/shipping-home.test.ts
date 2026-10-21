@@ -14,10 +14,13 @@ import {
   buildOvieHomeShipping,
   buildPulse,
   buildShipRows,
+  buildStageLatency,
+  mergeDoneWithRecent,
   OVIE_NOT_MEASURED,
   OVIE_SHIP_STAGES,
   rememberPulse,
   shipStageForTask,
+  stageLabel,
 } from './shipping-home';
 
 type Feed = ShippingCockpitProjection['operationalTasks'];
@@ -444,8 +447,11 @@ describe('buildOvieAsks', () => {
         recommendation: 'Approve',
         why: 'Why this matters',
         decidable: true,
+        actionLabel: 'Approve',
         canReply: true,
         evidence: ['https://example.com/receipt'],
+        decisionDefault: null,
+        canFeedback: true,
       },
       {
         id: 'c',
@@ -453,8 +459,11 @@ describe('buildOvieAsks', () => {
         recommendation: 'Approve',
         why: 'Why this matters',
         decidable: false,
+        actionLabel: 'Approve',
         canReply: false,
         evidence: ['https://example.com/receipt'],
+        decisionDefault: null,
+        canFeedback: false,
       },
       {
         id: 'd',
@@ -462,9 +471,153 @@ describe('buildOvieAsks', () => {
         recommendation: 'Approve',
         why: 'Why this matters',
         decidable: true,
-        canReply: false,
+        actionLabel: 'Mark done',
+        // Linear replies are posted back to the issue as the answer.
+        canReply: true,
         evidence: ['https://example.com/receipt'],
+        decisionDefault: null,
+        canFeedback: false,
       },
     ]);
+  });
+
+  it('names certification as certify rather than approve', () => {
+    const inbox: OvieInbox = {
+      cases: [
+        {
+          ...inboxCase('cert', 'needs_you'),
+          decisionTarget: {
+            kind: 'certification',
+            id: 'cert',
+            evidenceDigest: 'digest',
+          },
+        },
+      ],
+      issues: [],
+    };
+    expect(buildOvieAsks(inbox)[0]?.actionLabel).toBe('Certify');
+  });
+
+  it('maps the decision default contract and ignores malformed defaults', () => {
+    const withDefault = {
+      ...inboxCase('a', 'needs_you'),
+      decisionDefault: {
+        contract: 'jovie.decision-default/v1',
+        decision: 'reject',
+        summary: 'Keep the current copy',
+        deadline: '2026-10-22T12:00:00.000Z',
+        declared: true,
+      },
+    } as OvieInboxCase;
+    const malformed = {
+      ...inboxCase('b', 'needs_you'),
+      decisionDefault: { contract: 'other/v1', decision: 'approve' },
+    } as unknown as OvieInboxCase;
+    const [first, second] = buildOvieAsks({
+      cases: [withDefault, malformed],
+      issues: [],
+    });
+    expect(first?.decisionDefault).toEqual({
+      decision: 'reject',
+      summary: 'Keep the current copy',
+      deadline: '2026-10-22T12:00:00.000Z',
+      declared: true,
+    });
+    expect(second?.decisionDefault).toBeNull();
+  });
+});
+
+describe('stage latency', () => {
+  const summary = {
+    at: '2026-10-20T21:54:23.984Z',
+    stagesTotal: 31,
+    stagesWithData: 14,
+    regressions: [
+      'remediation:classified.p95',
+      'release:staging->verified.p95',
+    ],
+    slowestP95: [
+      { stage: 'remediation:classified', p50: 3219, p95: 201933, n: 126 },
+      { stage: 'shipping:pr-open', p50: 495, p95: 15147, n: 570 },
+      { stage: 'shipping:ready', p50: null, p95: 23458, n: 571 },
+    ],
+  };
+
+  it('labels stages for people, keeping acronyms', () => {
+    expect(stageLabel('shipping:pr-open')).toBe('Shipping · PR Open');
+    expect(stageLabel('release:staging->verified')).toBe(
+      'Release · Staging → Verified'
+    );
+  });
+
+  it('formats the slowest stages, flags regressions, and lists the rest', () => {
+    const latency = buildStageLatency(summary, 2);
+    expect(latency?.rows).toEqual([
+      {
+        id: 'remediation:classified',
+        label: 'Remediation · Classified',
+        p50: '54m',
+        p95: '2.3d',
+        samples: 126,
+        regressed: true,
+      },
+      {
+        id: 'shipping:pr-open',
+        label: 'Shipping · PR Open',
+        p50: '8m',
+        p95: '4.2h',
+        samples: 570,
+        regressed: false,
+      },
+    ]);
+    expect(latency?.otherRegressions).toEqual(['Release · Staging → Verified']);
+    expect(latency?.coverage).toBe('14 of 31 stages measured');
+  });
+
+  it('keeps unknown durations unknown and returns null without a summary', () => {
+    expect(buildStageLatency(summary)?.rows[2]?.p50).toBe(OVIE_NOT_MEASURED);
+    expect(buildStageLatency(null)).toBeNull();
+    expect(
+      buildStageLatency({ ...summary, stagesTotal: null })?.coverage
+    ).toBeNull();
+  });
+});
+
+describe('mergeDoneWithRecent', () => {
+  it('adds merged PRs no task names, after task items, capped', () => {
+    const done = [
+      {
+        id: 'linear:JOV-2',
+        label: 'Task 2 · #22002',
+        url: null,
+        verified: true,
+      },
+    ];
+    const recent = [
+      {
+        repo: 'Jovie',
+        number: 22002,
+        title: 'Task 2',
+        url: 'https://github.com/JovieInc/Jovie/pull/22002',
+        mergedAt: '2026-10-20T19:00:00.000Z',
+      },
+      {
+        repo: 'Jovie',
+        number: 22010,
+        title: 'Fix the queue',
+        url: 'https://github.com/JovieInc/Jovie/pull/22010',
+        mergedAt: '2026-10-20T18:00:00.000Z',
+      },
+    ];
+    expect(mergeDoneWithRecent(done, recent)).toEqual([
+      done[0],
+      {
+        id: 'pr:Jovie#22010',
+        label: 'Fix the queue · #22010',
+        url: 'https://github.com/JovieInc/Jovie/pull/22010',
+        verified: false,
+      },
+    ]);
+    expect(mergeDoneWithRecent([], recent, 1)).toHaveLength(1);
   });
 });

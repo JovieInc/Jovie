@@ -22,8 +22,10 @@ export interface LedgerStore {
   read(provider: string): Promise<ProviderLedger>;
 }
 
+/** A lock dir older than this belongs to a crashed holder and may be broken. */
 export const LOCK_STALE_MS = 10_000;
-export const LOCK_TIMEOUT_MS = 2_000;
+/** How long a transaction waits for another process before it gives up persisting. */
+export const LOCK_TIMEOUT_MS = 5_000;
 
 export function hashCredential(salt: string, secret: string): string {
   return createHash('sha256').update(`${salt}\0${secret}`).digest('hex');
@@ -79,14 +81,39 @@ export class MemoryLedgerStore implements LedgerStore {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Lock protocol, shared with scripts/apiclient/store.py:
+ * - `<provider>.lock.d` is taken with an atomic mkdir; the holder writes its
+ *   token to `owner` inside it and releases only a lock it still owns.
+ * - A lock older than LOCK_STALE_MS (wall clock vs dir mtime) is broken under
+ *   `<provider>.lock.d.break`, itself an mkdir lock, after re-checking it is
+ *   still stale, so two waiters can never both break and both hold.
+ * - On timeout the transaction runs on a fresh read but is NOT persisted:
+ *   one unrecorded call is better than clobbering every concurrent update.
+ * Within one process, transactions on a provider queue in memory first, so
+ * in-process contention never reaches the filesystem spin loop.
+ */
 export class FileLedgerStore implements LedgerStore {
   readonly dir: string;
   private readonly now: () => number;
-  private warned = false;
+  private readonly lockTimeoutMs: number;
+  private readonly queues = new Map<string, Promise<unknown>>();
+  /**
+   * Transactions that ran without persisting after a lock timeout. Budget
+   * accounting is advisory (an unreadable budget never blocks work), so a
+   * timeout degrades to "decide on a fresh read, record nothing" instead of
+   * failing the API call; this counter and the per-event log make it visible.
+   */
+  unpersisted = 0;
 
-  constructor(root: string = defaultStateRoot(), now: () => number = Date.now) {
+  constructor(
+    root: string = defaultStateRoot(),
+    now: () => number = Date.now,
+    options: { lockTimeoutMs?: number } = {}
+  ) {
     this.dir = join(root, 'api-ledger');
     this.now = now;
+    this.lockTimeoutMs = options.lockTimeoutMs ?? LOCK_TIMEOUT_MS;
   }
 
   path(provider: string): string {
@@ -105,21 +132,35 @@ export class FileLedgerStore implements LedgerStore {
     return emptyLedger(provider);
   }
 
-  async transact<T>(
+  transact<T>(provider: string, fn: (ledger: ProviderLedger) => T): Promise<T> {
+    const run = (this.queues.get(provider) ?? Promise.resolve()).then(() =>
+      this.transactLocked(provider, fn)
+    );
+    const tail = run.catch(() => undefined);
+    this.queues.set(provider, tail);
+    void tail.then(() => {
+      if (this.queues.get(provider) === tail) this.queues.delete(provider);
+    });
+    return run;
+  }
+
+  private async transactLocked<T>(
     provider: string,
     fn: (ledger: ProviderLedger) => T
   ): Promise<T> {
     await fs.mkdir(this.dir, { recursive: true, mode: 0o700 });
     const lock = join(this.dir, `${provider}.lock.d`);
-    const held = await this.lock(lock);
+    const token = await this.lock(lock);
     try {
       const ledger = await this.read(provider);
       const result = fn(ledger);
-      pruneLedger(ledger, this.now());
-      await this.write(this.path(provider), ledger);
+      if (token) {
+        pruneLedger(ledger, this.now());
+        await this.write(this.path(provider), ledger);
+      }
       return result;
     } finally {
-      if (held) await fs.rm(lock, { recursive: true, force: true });
+      if (token) await this.release(lock, token);
     }
   }
 
@@ -129,38 +170,84 @@ export class FileLedgerStore implements LedgerStore {
     await fs.rename(tmp, path);
   }
 
-  /** mkdir is atomic on every filesystem lanes use; a stale lock is renamed away. */
-  private async lock(path: string): Promise<boolean> {
-    const deadline = this.now() + LOCK_TIMEOUT_MS;
+  /** Returns the owner token, or null after a timeout (caller must not persist). */
+  private async lock(path: string): Promise<string | null> {
+    const deadline = Date.now() + this.lockTimeoutMs;
     while (true) {
       try {
         await fs.mkdir(path, { mode: 0o700 });
-        return true;
+        // Only the process whose mkdir succeeded may claim; a dir someone
+        // else created is theirs even before their owner file appears.
+        const token = await claimOwner(path);
+        if (token) return token;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       }
-      try {
-        const info = await fs.stat(path);
-        if (this.now() - info.mtimeMs > LOCK_STALE_MS) {
-          const stale = `${path}.stale-${process.pid}-${randomUUID()}`;
-          await fs.rename(path, stale);
-          await fs.rm(stale, { recursive: true, force: true });
-          continue;
-        }
-      } catch {
-        continue; // released between mkdir and stat
+      if (await isStale(path)) {
+        await breakStale(path);
+        continue;
       }
-      if (this.now() > deadline) {
-        if (!this.warned) {
-          this.warned = true;
-          process.stderr.write(
-            `${JSON.stringify({ schema: 'jovie.api-client.lock/v1', lock: path, outcome: 'timeout-unlocked' })}\n`
-          );
-        }
-        return false;
+      if (Date.now() > deadline) {
+        this.unpersisted += 1;
+        process.stderr.write(
+          `${JSON.stringify({ schema: 'jovie.api-client.lock/v1', lock: path, outcome: 'timeout-unpersisted', count: this.unpersisted })}\n`
+        );
+        return null;
       }
       await sleep(5 + Math.floor(Math.random() * 20));
     }
+  }
+
+  private async release(path: string, token: string): Promise<void> {
+    const owner = await fs
+      .readFile(join(path, 'owner'), 'utf8')
+      .catch(() => null);
+    if (owner === token) await fs.rm(path, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Exclusive-create the owner file inside the lock dir we just made. EEXIST
+ * means a stalled breaker-victim raced us; ENOENT means the dir was broken
+ * away under us. Either way we do not hold the lock and keep waiting.
+ */
+async function claimOwner(path: string): Promise<string | null> {
+  const token = `${process.pid}-${randomUUID()}`;
+  try {
+    await fs.writeFile(join(path, 'owner'), token, { mode: 0o600, flag: 'wx' });
+    return token;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'EEXIST' || code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+async function isStale(path: string): Promise<boolean> {
+  try {
+    return Date.now() - (await fs.stat(path)).mtimeMs > LOCK_STALE_MS;
+  } catch {
+    return false; // released between mkdir and stat
+  }
+}
+
+/** Only the holder of `<lock>.break` may remove a stale lock, and only if it is still stale. */
+async function breakStale(path: string): Promise<void> {
+  const breaker = `${path}.break`;
+  try {
+    await fs.mkdir(breaker, { mode: 0o700 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    if (await isStale(breaker))
+      await fs.rm(breaker, { recursive: true, force: true });
+    await sleep(5);
+    return;
+  }
+  try {
+    if (await isStale(path))
+      await fs.rm(path, { recursive: true, force: true });
+  } finally {
+    await fs.rm(breaker, { recursive: true, force: true });
   }
 }
 

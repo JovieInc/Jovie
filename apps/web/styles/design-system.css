@@ -884,18 +884,21 @@
    viewport. The desktop shell is a fixed-height phone card, so without this
    the last card renders half-covered by the dock at rest even though it can
    technically scroll into view (JOV-7192, JOV-6617 for the non-home modes).
-   Embedded previews render no dock, so they keep the in-box padding
-   instead. */
+   Previews render no dock, so they keep the in-box padding instead. Key off
+   the render mode, not data-presentation: from md up the live public profile
+   also uses presentation="embedded" (tablet/desktop drawer chrome) and still
+   renders the dock, so excluding "embedded" left the dock covering ~41px of
+   the scroll box at tablet and desktop. */
 :where(
-  [data-testid="profile-compact-surface"]:not(
-      [data-presentation="embedded"]
-    ):has(> .profile-floating-tab-bar)
+  [data-testid="profile-compact-surface"]:not([data-render-mode="preview"]):has(
+      > .profile-floating-tab-bar
+    )
     > .profile-content-column
 ) {
   margin-bottom: var(--profile-bottom-nav-height);
 }
 
-[data-testid="profile-compact-surface"]:not([data-presentation="embedded"]):has(
+[data-testid="profile-compact-surface"]:not([data-render-mode="preview"]):has(
     > .profile-floating-tab-bar
   )
   .profile-content-scroll-region {
@@ -922,9 +925,9 @@
      margin alone still left the scroll border box on the card bottom (the
      dock then covered the last ~42px). Cap the column itself. Mobile overflow
      mode stays in the max-width block above and is unchanged. */
-  [data-testid="profile-compact-surface"]:not(
-    [data-presentation="embedded"]
-  ):has(> .profile-floating-tab-bar) > .profile-content-column {
+  [data-testid="profile-compact-surface"]:not([data-render-mode="preview"]):has(
+    > .profile-floating-tab-bar
+  ) > .profile-content-column {
     flex: 1 1 auto;
     height: calc(100% - var(--profile-bottom-nav-height));
     max-height: calc(100% - var(--profile-bottom-nav-height));
@@ -932,9 +935,9 @@
     margin-bottom: 0;
   }
 
-  [data-testid="profile-compact-surface"]:not(
-      [data-presentation="embedded"]
-    ):has(> .profile-floating-tab-bar)
+  [data-testid="profile-compact-surface"]:not([data-render-mode="preview"]):has(
+      > .profile-floating-tab-bar
+    )
     .profile-content-scroll-region {
     max-height: 100%;
     min-height: 0;

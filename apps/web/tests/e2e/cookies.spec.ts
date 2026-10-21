@@ -293,9 +293,14 @@ test.describe('Cookie banner @smoke', () => {
         await menuButton.click();
         const mobileNav = page.locator('#mobile-nav-panel');
         await expect(mobileNav).toBeVisible();
-        await expect(
-          mobileNav.getByRole('link', { name: 'Get started', exact: true })
-        ).toBeVisible();
+        // Homepage header CTA lock (#19151): the homepage front door is
+        // "Find yourself" -> /start, never the generic sign-up CTA.
+        const frontDoor = mobileNav.getByRole('link', {
+          name: 'Find yourself',
+          exact: true,
+        });
+        await expect(frontDoor).toBeVisible();
+        await expect(frontDoor).toHaveAttribute('href', '/start');
       }
     });
   }

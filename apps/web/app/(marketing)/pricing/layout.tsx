@@ -6,21 +6,21 @@ export const revalidate = false;
 export const metadata: Metadata = {
   title: `${APP_NAME} Pricing`,
   description:
-    'Request access to Jovie launch plans for your Jovie profile, smart links, and audience capture.',
+    'Jovie pricing for your artist profile, smart links, and audience capture.',
   alternates: {
     canonical: `${BASE_URL}/pricing`,
   },
   openGraph: {
     title: `${APP_NAME} Pricing`,
     description:
-      'Request access to Jovie launch plans for your Jovie profile, smart links, and audience capture.',
+      'Jovie pricing for your artist profile, smart links, and audience capture.',
     url: `${BASE_URL}/pricing`,
   },
   twitter: {
     card: 'summary',
     title: `${APP_NAME} Pricing`,
     description:
-      'Request access to Jovie launch plans for your Jovie profile, smart links, and audience capture.',
+      'Jovie pricing for your artist profile, smart links, and audience capture.',
   },
 };
 
