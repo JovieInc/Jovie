@@ -47,8 +47,8 @@ describe('signed agent handoff receipt chain', () => {
   it('carries the exact acquisition and allowlisted source from discovery through claim and paid reconciliation', async () => {
     const { discovery, url, token } = await discover();
     expect(discovery).toMatchObject({
-      price: { amount: 199, currency: 'USD', interval: 'month' },
-      access: 'Limited access',
+      price: { amount: 12, currency: 'USD', interval: 'month' },
+      access: 'Self-serve',
       attributionOnly: true,
       humanConfirmationRequired: true,
     });
@@ -86,7 +86,7 @@ describe('signed agent handoff receipt chain', () => {
           logicalOrderId: 'invoice-1',
           userId: 'user-1',
           acquisitionId: webhook.acquisitionId,
-          grossAmountCents: 19900,
+          grossAmountCents: 1200,
           currency: 'usd',
           paidAt: new Date(now.getTime() + 60_000).toISOString(),
         },
