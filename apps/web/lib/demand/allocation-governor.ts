@@ -17,6 +17,7 @@ import {
   normalizeDemandSignal,
   normalizeRequestText,
 } from './demand-map';
+import { applyOutcomeDrafts } from './outcome-allocation';
 import type { DemandCluster, DemandOutcomeVerdict } from './types';
 
 export const DEMAND_ALLOCATION_KEY = 'jovie:demand:allocation:v1';
@@ -164,7 +165,10 @@ function decisionFor(
     reason = why;
   };
   const gateAge = now.getTime() - Date.parse(gate.evaluatedAt);
-  if (
+  if (row.plan.capabilityDraft) {
+    state = 'held';
+    reason = `capability-draft-disabled:${row.plan.capabilityDraft.decision.kind}`;
+  } else if (
     cluster.requiresHumanGate ||
     ['outbound', 'spend'].includes(row.plan.kind) ||
     judgment.disposition === 'human-escalation' ||
@@ -290,6 +294,8 @@ function apply(
   gate: DemandAllocationGate,
   now: Date
 ): void {
+  if (command.op === 'compile_outcome')
+    applyOutcomeDrafts(ledger, command, now);
   if (command.op === 'submit') {
     const existing = ledger.rows.find(row => row.plan.id === command.plan.id);
     if (existing) {
@@ -313,7 +319,12 @@ function apply(
     }
   }
   reconcile(ledger, gate, now);
-  if (command.op === 'submit' || command.op === 'reconcile') return;
+  if (
+    command.op === 'submit' ||
+    command.op === 'reconcile' ||
+    command.op === 'compile_outcome'
+  )
+    return;
   const row = ledger.rows.find(item => item.plan.id === command.id);
   if (!row) fail('allocation-not-found');
   if (command.op === 'claim') {
