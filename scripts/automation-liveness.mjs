@@ -25,6 +25,7 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createApiClient } from '../packages/api-client/client.ts';
+import { createLinearClient } from '../packages/api-client/linear.ts';
 import { hashCredential } from '../packages/api-client/store.ts';
 import {
   evaluateLiveness,
@@ -39,6 +40,8 @@ import {
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TIMEOUT_MS = 10_000;
 const SHA_RE = /^[0-9a-f]{40}$/;
+// Overridable per observer for tests; one literal for the external-api guard.
+const GITHUB_API = 'https://api.github.com';
 
 async function readJson(fetchImpl, url, headers = {}) {
   const controller = new AbortController();
@@ -74,7 +77,7 @@ function githubHeaders(token) {
 /** Last run of a workflow whose conclusion is one of `receipt.conclusions`. */
 export async function observeGithubWorkflow(
   receipt,
-  { fetchImpl, token, apiUrl = 'https://api.github.com' }
+  { fetchImpl, token, apiUrl = GITHUB_API }
 ) {
   const conclusions = receipt.conclusions ?? ['success'];
   const branch = receipt.branch
@@ -145,15 +148,64 @@ export async function observeJsonTimestamp(receipt, { fetchImpl }) {
   return { ok: true, lastProofAt: value, url: receipt.url };
 }
 
+const PUSH_RUNS_PAGE = 100;
+const LANDING_SKEW_MS = 2 * 60_000;
+
+/**
+ * When a merge-queue squash commit reached main.
+ *
+ * Its committer date is the queue time, which can precede the fast-forward
+ * onto main by hours. The earliest push-event run at or after that date is
+ * the landing time. An unreadable or incomplete run list keeps the committer
+ * date, so a real stall still alerts.
+ */
+async function landedOnMainAt(
+  repo,
+  sha,
+  committerDate,
+  { fetchImpl, token, apiUrl }
+) {
+  const committerMs = Date.parse(committerDate ?? '');
+  const base = `${apiUrl}/repos/${repo}/actions/runs?head_sha=${encodeURIComponent(sha)}&event=push&per_page=${PUSH_RUNS_PAGE}`;
+  const headers = githubHeaders(token);
+  const first = await readJson(fetchImpl, base, headers);
+  if (!first.ok || !Array.isArray(first.body?.workflow_runs))
+    return committerDate;
+  let runs = first.body.workflow_runs;
+  const total = Number(first.body.total_count);
+  if (Number.isFinite(total) && total > runs.length) {
+    const lastPage = Math.ceil(total / PUSH_RUNS_PAGE);
+    const older = await readJson(
+      fetchImpl,
+      `${base}&page=${lastPage}`,
+      headers
+    );
+    if (!older.ok || !Array.isArray(older.body?.workflow_runs))
+      return committerDate;
+    runs = older.body.workflow_runs;
+  }
+  const landedMs = runs
+    .map(run => Date.parse(run?.created_at ?? ''))
+    .filter(
+      ms =>
+        Number.isFinite(ms) &&
+        (!Number.isFinite(committerMs) || ms + LANDING_SKEW_MS >= committerMs)
+    )
+    .reduce((min, ms) => Math.min(min, ms), Number.POSITIVE_INFINITY);
+  return Number.isFinite(landedMs)
+    ? new Date(landedMs).toISOString()
+    : committerDate;
+}
+
 /**
  * Production promotion heartbeat, independent of the continuity guard's own
  * verdict: production carrying main is a fresh proof; otherwise the proof is
- * as old as the oldest commit production is missing. Unreadable is unknown
+ * as old as the oldest missing commit has been on main. Unreadable is unknown
  * (red), never healthy.
  */
 export async function observeProductionFreshness(
   receipt,
-  { fetchImpl, token, nowMs, githubClient, apiUrl = 'https://api.github.com' }
+  { fetchImpl, token, nowMs, githubClient, apiUrl = GITHUB_API }
 ) {
   const build = await readJson(fetchImpl, receipt.buildInfoUrl);
   const live = build.ok ? build.body?.commitSha : null;
@@ -212,12 +264,21 @@ export async function observeProductionFreshness(
   if (!compare.ok) return { ok: false, reason: 'unshipped-range-unreadable' };
   if (Number(compare.body?.ahead_by) === 0)
     return { ok: true, lastProofAt: now, reason: 'production-current' };
-  const oldest = compare.body?.commits?.[0]?.commit?.committer?.date;
-  if (!Number.isFinite(Date.parse(oldest ?? '')))
+  const oldestCommit = compare.body?.commits?.[0];
+  const committerDate = oldestCommit?.commit?.committer?.date;
+  if (!Number.isFinite(Date.parse(committerDate ?? '')))
     return { ok: false, reason: 'unshipped-age-unreadable' };
+  const sha = oldestCommit?.sha;
+  const landedAt = SHA_RE.test(sha ?? '')
+    ? await landedOnMainAt(receipt.repo, sha, committerDate, {
+        fetchImpl,
+        token,
+        apiUrl,
+      })
+    : committerDate;
   return {
     ok: true,
-    lastProofAt: oldest,
+    lastProofAt: landedAt,
     reason: `${compare.body.ahead_by}-commits-unshipped`,
   };
 }
@@ -230,7 +291,7 @@ export async function observeProductionFreshness(
  */
 export async function observeMergeQueueProgress(
   receipt,
-  { fetchImpl, token, nowMs, apiUrl = 'https://api.github.com' }
+  { fetchImpl, token, nowMs, apiUrl = GITHUB_API }
 ) {
   if (!token) return { ok: false, reason: 'merge-queue-token-missing' };
   const [owner, name] = String(receipt.repo).split('/');
@@ -300,6 +361,205 @@ export async function observeMergeQueueProgress(
   };
 }
 
+/**
+ * Triage dwell (Tim 2026-10-21: an issue that hits Triage is sorted right
+ * away, not on a tick). The proof is an empty Triage, else the oldest Triage
+ * entry time, so the age of the oldest unsorted issue is the staleness and
+ * max silence is the dwell SLO. Unreadable or unauthenticated is silence.
+ */
+export async function observeLinearTriageDwell(receipt, { linear, nowMs }) {
+  if (!linear) return { ok: false, reason: 'linear-client-missing' };
+  const teams = receipt.teams ?? ['JOV', 'LYB'];
+  let issues;
+  try {
+    const data = await linear.graphql(
+      `query($teams:[String!]){issues(first:100,filter:{state:{type:{eq:"triage"}},team:{key:{in:$teams}}}){nodes{identifier createdAt startedTriageAt}}}`,
+      { teams }
+    );
+    issues = data?.issues?.nodes;
+  } catch {
+    return { ok: false, reason: 'linear-triage-unreadable' };
+  }
+  if (!Array.isArray(issues))
+    return { ok: false, reason: 'linear-triage-unreadable' };
+  if (issues.length === 0)
+    return {
+      ok: true,
+      lastProofAt: new Date(nowMs).toISOString(),
+      reason: 'triage-empty',
+    };
+  const entered = issues
+    .map(issue => ({
+      id: issue?.identifier,
+      at: Date.parse(issue?.startedTriageAt ?? issue?.createdAt ?? ''),
+    }))
+    .filter(row => Number.isFinite(row.at))
+    .sort((a, b) => a.at - b.at);
+  if (!entered.length)
+    return { ok: false, reason: 'linear-triage-times-unreadable' };
+  const over = entered.filter(
+    row => nowMs - row.at > (receipt.dwellSloMinutes ?? 15) * 60_000
+  ).length;
+  return {
+    ok: true,
+    lastProofAt: new Date(entered[0].at).toISOString(),
+    detailOnStale: true,
+    reason: `${issues.length}-in-triage;${over}-over-slo;oldest=${entered[0].id}`,
+  };
+}
+
+const MERGEABLE_GREEN = new Set(['CLEAN', 'UNSTABLE', 'HAS_HOOKS']);
+const GREEN_TIMING_MAX_PRS = 10;
+const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
+const DEFECT_HOLD_CLASSES = new Set(['deterministic-source', 'unclassified']);
+
+/**
+ * When the exact head turned required-green: the latest success among each
+ * required name's check runs (completed_at) and commit statuses (created_at).
+ * Null when any required name has no success yet.
+ */
+async function requiredGreenAt(
+  repo,
+  sha,
+  checks,
+  { fetchImpl, token, apiUrl }
+) {
+  const headers = githubHeaders(token);
+  const runs = await readJson(
+    fetchImpl,
+    `${apiUrl}/repos/${repo}/commits/${sha}/check-runs?filter=latest&per_page=100`,
+    headers
+  );
+  const statuses = await readJson(
+    fetchImpl,
+    `${apiUrl}/repos/${repo}/commits/${sha}/status?per_page=100`,
+    headers
+  );
+  if (!runs.ok || !statuses.ok) return { ok: false };
+  let greenAt = -Infinity;
+  for (const check of checks) {
+    const times = [
+      ...(runs.body?.check_runs ?? [])
+        .filter(run => run?.name === check && run?.conclusion === 'success')
+        .map(run => Date.parse(run.completed_at ?? '')),
+      ...(statuses.body?.statuses ?? [])
+        .filter(row => row?.context === check && row?.state === 'success')
+        .map(row => Date.parse(row.created_at ?? '')),
+    ].filter(Number.isFinite);
+    if (!times.length) return { ok: true, greenAt: null, holdClass: null };
+    greenAt = Math.max(greenAt, Math.max(...times));
+  }
+  // The merge-queue failure hold is a commit status on the head (ci-plan):
+  // description `class=<class>;n=..;run=..`. A real-defect hold needs a new
+  // head from its owner; it is reported, not counted as promotion latency.
+  const hold = (statuses.body?.statuses ?? []).find(
+    row => row?.context === FAILURE_HOLD_CONTEXT
+  );
+  const holdClass =
+    /(?:^|;)class=([a-z-]+)/.exec(String(hold?.description ?? ''))?.[1] ?? null;
+  return {
+    ok: true,
+    greenAt: Number.isFinite(greenAt) ? greenAt : null,
+    holdClass,
+  };
+}
+
+/**
+ * Green -> enqueued dwell (Tim 2026-10-21: a PR whose exact head is
+ * required-green is promoted and enqueued on the check event, not on a
+ * tick). GitHub's mergeStateStatus already folds in the ruleset's required
+ * checks (CLEAN/UNSTABLE/HAS_HOOKS = required green and mergeable), so one
+ * cheap list read finds candidates; only ready candidates (capped) pay for a
+ * per-head timing read. Proof is "no ready, mergeable, required-green PR sits
+ * outside the merge queue", else the earliest such green time. Green drafts
+ * are counted in the reason; draft promotion is the writer's (JOV-INV-022).
+ */
+export async function observeGreenToEnqueue(
+  receipt,
+  { fetchImpl, token, nowMs, apiUrl = GITHUB_API }
+) {
+  if (!token) return { ok: false, reason: 'green-enqueue-token-missing' };
+  const [owner, name] = String(receipt.repo).split('/');
+  const checks = receipt.requiredChecks ?? [];
+  if (!checks.length) return { ok: false, reason: 'required-checks-missing' };
+  const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:40,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number isDraft isInMergeQueue mergeStateStatus baseRefName headRefOid}}}}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let body;
+  try {
+    const response = await fetchImpl(`${apiUrl}/graphql`, {
+      method: 'POST',
+      headers: {
+        ...githubHeaders(token),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, variables: { owner, name } }),
+      signal: controller.signal,
+    });
+    if (response.status !== 200)
+      return { ok: false, reason: `green-enqueue-http-${response.status}` };
+    body = await response.json();
+  } catch (error) {
+    return {
+      ok: false,
+      reason:
+        error?.name === 'AbortError'
+          ? 'green-enqueue-timeout'
+          : 'green-enqueue-transport',
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+  const prs = body?.data?.repository?.pullRequests?.nodes;
+  if (body?.errors?.length || !Array.isArray(prs))
+    return { ok: false, reason: 'green-enqueue-unreadable' };
+  const base = receipt.branch ?? 'main';
+  const green = prs.filter(
+    pr =>
+      pr &&
+      !pr.isInMergeQueue &&
+      pr.baseRefName === base &&
+      MERGEABLE_GREEN.has(pr.mergeStateStatus)
+  );
+  const drafts = green.filter(pr => pr.isDraft).map(pr => pr.number);
+  const waiting = [];
+  const held = [];
+  for (const pr of green
+    .filter(row => !row.isDraft)
+    .slice(0, GREEN_TIMING_MAX_PRS)) {
+    const timing = await requiredGreenAt(receipt.repo, pr.headRefOid, checks, {
+      fetchImpl,
+      token,
+      apiUrl,
+    });
+    if (!timing.ok)
+      return { ok: false, reason: 'green-enqueue-checks-unreadable' };
+    if (timing.greenAt === null) continue;
+    if (DEFECT_HOLD_CLASSES.has(timing.holdClass ?? '')) held.push(pr.number);
+    else waiting.push({ number: pr.number, greenAt: timing.greenAt });
+  }
+  waiting.sort((a, b) => a.greenAt - b.greenAt);
+  const listed = waiting
+    .slice(0, 5)
+    .map(row => `#${row.number}:${Math.round((nowMs - row.greenAt) / 60_000)}m`)
+    .join(',');
+  const reason = `ready-green-unqueued=${waiting.length}[${listed}];draft-green=${drafts.length}[${drafts
+    .slice(0, 8)
+    .map(n => `#${n}`)
+    .join(
+      ','
+    )}];defect-held=${held.length}[${held.map(n => `#${n}`).join(',')}]`;
+  if (!waiting.length)
+    return { ok: true, lastProofAt: new Date(nowMs).toISOString(), reason };
+  return {
+    ok: true,
+    lastProofAt: new Date(waiting[0].greenAt).toISOString(),
+    detailOnStale: true,
+    reason,
+  };
+}
+
 export async function observeEntry(entry, context) {
   const receipt = entry.receipt ?? {};
   if (receipt.kind === 'github-workflow')
@@ -310,6 +570,10 @@ export async function observeEntry(entry, context) {
     return observeProductionFreshness(receipt, context);
   if (receipt.kind === 'merge-queue-progress')
     return observeMergeQueueProgress(receipt, context);
+  if (receipt.kind === 'linear-triage-dwell')
+    return observeLinearTriageDwell(receipt, context);
+  if (receipt.kind === 'green-to-enqueue')
+    return observeGreenToEnqueue(receipt, context);
   return null;
 }
 
@@ -321,6 +585,7 @@ export async function observeEntry(entry, context) {
  *   token?: string,
  *   nowMs?: number,
  *   githubClient?: import('../packages/api-client/client.ts').ApiClient,
+ *   linear?: { graphql: (query: string, variables?: Record<string, unknown>) => Promise<any> } | null,
  * }} options
  */
 export async function runLiveness({
@@ -329,10 +594,11 @@ export async function runLiveness({
   token = '',
   nowMs = Date.now(),
   githubClient,
+  linear = null,
 }) {
   const startedAt = new Date(nowMs).toISOString();
   const observations = new Map();
-  const context = { fetchImpl, token, nowMs, githubClient };
+  const context = { fetchImpl, token, nowMs, githubClient, linear };
   for (const entry of registry.entries ?? []) {
     if (entry?.status !== 'live') continue;
     const observed = await observeEntry(entry, context);
@@ -431,6 +697,13 @@ export async function main({
     registry,
     fetchImpl,
     token: env.GH_TOKEN ?? env.GITHUB_TOKEN ?? '',
+    linear: env.LINEAR_API_KEY
+      ? createLinearClient({
+          identity: env.LINEAR_API_KEY,
+          authorization: () => env.LINEAR_API_KEY ?? '',
+          legacyStateRoot: null,
+        })
+      : null,
   });
   const endedAt = new Date().toISOString();
   const runUrl = env.GITHUB_RUN_ID

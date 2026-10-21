@@ -2104,3 +2104,23 @@ test('a person dequeuing a head withdraws its automatic infrastructure retry', a
   });
   assert.deepEqual(bot.mutations, [{ id: 'PR_1', oid: sha }]);
 });
+
+test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', () => {
+  const script = workflow.jobs.enroll.steps.find(
+    step => step.name === 'Enqueue green PRs'
+  ).with.script;
+  for (const decision of [
+    "receipt(pr, 'skip', `mergeStateStatus=",
+    "receipt(pr, 'held', failure.reason)",
+    "receipt(pr, 'skip', `head-unchanged-since-removal:",
+    "receipt(pr, 'enqueued',",
+    "receipt(pr, 'error',",
+  ])
+    assert.ok(script.includes(decision), decision);
+  assert.ok(
+    script.includes('core.info(`enroll-receipts ${JSON.stringify(receipts)}`)')
+  );
+  assert.ok(script.includes("addHeading('Enroll decisions', 3)"));
+  // The receipt script carries no expressions, so it never counts toward the 21k expression budget.
+  assert.ok(!script.includes('${{'));
+});

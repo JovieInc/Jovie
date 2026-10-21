@@ -216,6 +216,15 @@
         "429 Too Many Requests",
         "too many requests"
       ]
+    },
+    "composio": {
+      "status": "blocked",
+      "blockedReason": "Composio Instant bills per call after the fact with no spend cap and keeps credentials outside config/registry (handoff composio-instant, 2026-10-21). Call paid APIs through their own provider entries.",
+      "hosts": ["backend.composio.dev"],
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": [],
+      "secondaryText": []
     }
   }
 }

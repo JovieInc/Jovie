@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
@@ -224,14 +225,15 @@ class XPostTests(unittest.TestCase):
         _, off = W.poll_x({}, config, {"SIGNALS_X_DISABLED": "1"}, NOW, fake)
         self.assertEqual(off["status"], "disabled")
 
-    def test_x_posts_card_as_changelog_origin_and_record_dwell(self):
+    @patch.object(W.capacity_limit, "summer_config", side_effect=AssertionError("host Summer config must not be read"))
+    def test_x_posts_card_as_changelog_origin_and_record_dwell(self, _summer_config):
         state_dir = tempfile.TemporaryDirectory()
         self.addCleanup(state_dir.cleanup)
         fake, _ = self.search([X_POST])
         poster = Poster({"protein binders": jev_answer("adopt", 0.8)})
         result = W.run(Path(state_dir.name) / "state.json", env={"AI_GATEWAY_API_KEY": "k"}, sources=[],
                        inbox=Path(state_dir.name) / "inbox", fetcher=Fetcher({}), poster=poster, put=Brain(),
-                       summer=None, now=NOW + 86400, triage=lambda since: {"status": "ok"},
+                       summer={}, now=NOW + 86400, triage=lambda since: {"status": "ok"},
                        x_config={"enabled": True, "accounts": ["AnthropicAI"], "queries": []}, x_search=fake)
         self.assertEqual((result["xPostsNew"], result["bookmarksNew"], len(result["cardsQueued"])), (1, 0, 1))
         self.assertEqual(result["x"]["dwellS"]["n"], 1)
