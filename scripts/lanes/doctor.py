@@ -36,6 +36,7 @@ import file_overlap  # noqa: E402
 import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
 import remediation  # noqa: E402
 import shipping_attribution  # noqa: E402  (company merge provenance report)
+import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage collector)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -180,6 +181,101 @@ def provider_payloads(state: Path, providers, proc: Path = Path("/proc")) -> dic
         result[name]["pids"].sort()
         result[name]["running"] = len(result[name]["pids"]) if result[name]["known"] else None
     return result
+
+
+AUTOMATION_REGISTRY = "ops/automation/registry.jsonl"
+AUTOMATION_LIVENESS_WORKFLOW = "automation-liveness.yml"
+AUTOMATION_LIVENESS_MAX_S = 60 * 60
+AUTOMATION_LIVENESS_TTL_S = 600
+
+
+def _iso_epoch(value) -> float | None:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp() if value else None
+    except ValueError:
+        return None
+
+
+def automation_registry(repo: Path, run=subprocess.run) -> list[dict] | None:
+    """The canonical automation registry as merged on origin/main (never the checkout)."""
+    try:
+        shown = run(["git", "-C", str(repo), "show", f"origin/main:{AUTOMATION_REGISTRY}"],
+                    capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if getattr(shown, "returncode", 1) != 0:
+        return None
+    rows = []
+    for line in (shown.stdout or "").splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            return None
+        if isinstance(row, dict) and row.get("id"):
+            rows.append(row)
+    return rows
+
+
+def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: Path | None = None) -> dict:
+    """Host-local receipts of this host's live automations: missing or older than
+    maxStalenessMinutes is silence. The hosted automation-liveness check watches Gem."""
+    home = Path.home() if home is None else home
+    if rows is None:
+        return {"known": False, "silent": {}}
+    silent = {}
+    for row in rows:
+        receipt = row.get("receipt") or {}
+        if row.get("status") != "live" or row.get("host") != host_name or receipt.get("kind") != "host-local":
+            continue
+        location = str(receipt.get("location") or "")
+        if not location.startswith(f"{host_name}:"):
+            continue
+        path = Path(location.split(":", 1)[1].replace("~", str(home), 1))
+        limit = float(row.get("maxStalenessMinutes") or 0) * 60
+        try:
+            age = now - path.stat().st_mtime
+        except OSError:
+            silent[row["id"]] = {"location": location, "ageS": None}
+            continue
+        if limit and age > limit:
+            silent[row["id"]] = {"location": location, "ageS": round(age)}
+    return {"known": True, "silent": silent}
+
+
+def automation_liveness(lane, now: float) -> dict:
+    """Latest *successful* run of the hosted automation-liveness workflow (Gem watches it back).
+
+    It follows Production Continuity Guard and runs its job only every 5th trigger, so most
+    runs are job-skipped: the latest run of any conclusion would make a dead check look alive."""
+    def fetch():
+        result = lane.sh(["gh", "api", f"repos/{lane.REPO_SLUG}/actions/workflows/{AUTOMATION_LIVENESS_WORKFLOW}"
+                          "/runs?branch=main&status=success&per_page=1",
+                          "--jq", "[.workflow_runs[0].created_at // \"\"]"], timeout=30)
+        if result.returncode != 0:
+            text = f"{result.stdout or ''} {result.stderr or ''}"
+            return {"installed": False} if "404" in text or "Not Found" in text else None
+        try:
+            created = json.loads(result.stdout)[0]
+        except (ValueError, IndexError, TypeError):
+            return None
+        return {"installed": True, "lastRunAt": created or None}
+    found = lane.shared("automation-liveness-success", AUTOMATION_LIVENESS_TTL_S, fetch)
+    return found if isinstance(found, dict) else {"installed": None}
+
+
+def automation_observation(host, lane, now: float) -> dict:
+    """Registry watch for observe(); fixtures and self-tests read no registry or GitHub."""
+    if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
+        return {"automation": {"known": False, "silent": {}}, "automationLiveness": {"installed": None}}
+    try:
+        watch = automation_watch(automation_registry(host.repo), lane.HOST, now)
+    except Exception as error:  # observability never takes the doctor down
+        watch = {"known": False, "silent": {}, "error": type(error).__name__}
+    try:
+        liveness = automation_liveness(lane, now)
+    except Exception as error:
+        liveness = {"installed": None, "error": type(error).__name__}
+    return {"automation": watch, "automationLiveness": liveness}
 
 
 def qualified_pool(host, lane, capacity: dict, now: float) -> tuple[dict, int, dict, dict, dict]:
@@ -384,6 +480,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "rejectedIssues": dict(sorted(rejected_issues.items())[:20]),
         "designGate": design_census,
         "fileOverlap": file_overlap.doctor_view(state),
+        **automation_observation(host, lane, now),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
         "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
@@ -758,6 +855,25 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    for automation_id, row in sorted(((obs.get("automation") or {}).get("silent") or {}).items()):
+        age = row.get("ageS")
+        alerts[f"automation-silent:{automation_id}"] = (
+            f"registered automation {automation_id} left no fresh receipt at {row.get('location')} "
+            f"({'missing' if age is None else f'{round(age / 60)} min old'}); owner per ops/automation/registry.jsonl")
+    liveness = obs.get("automationLiveness") or {}
+    if liveness.get("installed"):
+        last = _iso_epoch(liveness.get("lastRunAt"))
+        if last is None or obs["now"] - last > AUTOMATION_LIVENESS_MAX_S:
+            ran = "never" if last is None else f"{round((obs['now'] - last) / 60)} min ago"
+            alerts["automation-liveness-silent"] = (
+                f"the hosted {AUTOMATION_LIVENESS_WORKFLOW} check last ran {ran}; "
+                "it and the Gem doctor watch each other")
+    feed_error = (previous or {}).get("statusFeedError")
+    if feed_error:
+        # The last publish of the public status gist failed (Gem 2026-10-20 18:01-19:47:
+        # a 403 froze it while lanes-status.json stayed fresh; Summer read STALE).
+        alerts["status-feed-stale"] = (f"the public lanes status gist was not updated on the last doctor pass "
+                                       f"({str(feed_error)[:120]}); Summer's shipping card reads it as stale")
     owned = obs.get("ownership") or {}
     if owned.get("overGrace"):
         # The started-state invariant (ownership.py): escalated as a lanes repair, never to Tim.
@@ -1535,6 +1651,7 @@ PRIMARY_FLAG = Path.home() / ".config/jovie-lanes/primary"
 
 PUBLIC_FEED_MAX_BYTES = 256 * 1024
 STATUS_DETAIL_NAME = "lanes-status-details.json"
+STAGE_EVENTS_NAME = "stage-events.ndjson"
 
 
 def public_status_projection(feed: dict, full_text: str) -> str:
@@ -1598,6 +1715,11 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         "lanes-status.json": {"content": public_text},
         STATUS_DETAIL_NAME: {"content": full_text},
     }}
+    # docs/metrics/STAGE_EVENTS.md: the lanes stage rows, uploaded only when they changed.
+    stage_text = stage_events.ndjson(host.state / "runs" / "ledger.jsonl", time.time())
+    stage_digest = hashlib.sha256(stage_text.encode("utf-8")).hexdigest()
+    if stage_text and record.get("stageEventsSha256") != stage_digest:
+        packet["files"][STAGE_EVENTS_NAME] = {"content": stage_text}
     packet_path = host.state / "lanes-status-publish.json"
     created_now = not record.get("url")
     if created_now:
@@ -1650,7 +1772,13 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
             raise ValueError("gist identity mismatch")
         for name, expected in packet["files"].items():
             actual = files.get(name)
-            if not isinstance(actual, dict) or actual.get("truncated") is not False or actual.get("content") != expected["content"]:
+            if not isinstance(actual, dict):
+                raise ValueError("incomplete or changed gist evidence")
+            if name == STAGE_EVENTS_NAME and actual.get("truncated") is True:
+                # The API truncates files over 1 MB; the full size is the readback there.
+                if actual.get("size") != len(expected["content"].encode("utf-8")):
+                    raise ValueError("incomplete or changed gist evidence")
+            elif actual.get("truncated") is not False or actual.get("content") != expected["content"]:
                 raise ValueError("incomplete or changed gist evidence")
     except (ValueError, AttributeError):
         raise RuntimeError("status-gist-readback-unconfirmed") from None
@@ -1658,6 +1786,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         "verifiedAt": now_iso(),
         "fullEvidenceSha256": hashlib.sha256(full_text.encode("utf-8")).hexdigest(),
         "publicFeedSha256": hashlib.sha256(public_text.encode("utf-8")).hexdigest(),
+        **({"stageEventsSha256": stage_digest} if STAGE_EVENTS_NAME in packet["files"] else {}),
     })
     path.write_text(json.dumps(record), encoding="utf-8")
     if created_now:

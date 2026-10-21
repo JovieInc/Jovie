@@ -1106,7 +1106,7 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
       try {
         await ensureSignedInUser(adminPage, getAdminCredentials());
 
-        await adminPage.goto(APP_ROUTES.HUD, {
+        await adminPage.goto(APP_ROUTES.ADMIN_OPS, {
           waitUntil: 'domcontentloaded',
           timeout: 30_000,
         });
