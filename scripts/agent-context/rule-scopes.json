@@ -144,7 +144,7 @@
       "scripts/voc/**",
       "scripts/ops/firecrawl-crawl.sh"
     ],
-    "bodySha256": "44ce1aede6d53cd1c02f3b25997114015fd83b28656ef89b8a5622082af2042b"
+    "bodySha256": "7612c910236e707e38fa51d4bf3e278bed4df06c488739a5b5090baf37784553"
   },
   {
     "file": ".claude/rules/security.md",

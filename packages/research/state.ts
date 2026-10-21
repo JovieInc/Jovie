@@ -129,6 +129,27 @@ export class ResearchState {
     );
   }
 
+  // ---- raw provider-response cache (gateway) ----------------------------
+
+  async getRaw(key: string, maxAgeMs: number): Promise<unknown | null> {
+    try {
+      const raw = JSON.parse(
+        await fs.readFile(this.path('raw', `${key}.json`), 'utf8')
+      ) as { storedAt: number; body: unknown };
+      return this.now() - raw.storedAt < maxAgeMs ? raw.body : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async putRaw(key: string, body: unknown): Promise<void> {
+    await fs.mkdir(this.path('raw'), { recursive: true });
+    await writeAtomic(
+      this.path('raw', `${key}.json`),
+      JSON.stringify({ storedAt: this.now(), body })
+    );
+  }
+
   // ---- cross-process in-flight dedupe -----------------------------------
 
   /** True when this process now owns the query; false when another does. */
@@ -200,18 +221,20 @@ export class ResearchState {
   async reserve(
     source: string,
     caps: Caps | undefined,
-    usd: number
+    usd: number,
+    /** Billable units: 1 per call, or credits/pages for unit-billed sources. */
+    units = 1
   ): Promise<string | null> {
     await this.init();
     return withLock(this.usagePath(), async () => {
       const ledger = await this.readUsage();
       const { day, month } = this.periods();
       const row = rollUsage(ledger.sources[source], day, month);
-      const blocked = capExceeded(row, caps, usd);
+      const blocked = capExceeded(row, caps, usd, units);
       if (blocked) return blocked;
-      row.day.calls += 1;
+      row.day.calls += units;
       row.day.usd += usd;
-      row.month.calls += 1;
+      row.month.calls += units;
       row.month.usd += usd;
       ledger.sources[source] = row;
       await writeAtomic(this.usagePath(), JSON.stringify(ledger, null, 2));
@@ -290,14 +313,15 @@ export function rollUsage(
 export function capExceeded(
   row: SourceUsage,
   caps: Caps | undefined,
-  usd: number
+  usd: number,
+  units = 1
 ): string | null {
   if (!caps) return null;
-  if (caps.dailyCalls !== undefined && row.day.calls + 1 > caps.dailyCalls)
+  if (caps.dailyCalls !== undefined && row.day.calls + units > caps.dailyCalls)
     return `dailyCalls ${caps.dailyCalls}`;
   if (
     caps.monthlyCalls !== undefined &&
-    row.month.calls + 1 > caps.monthlyCalls
+    row.month.calls + units > caps.monthlyCalls
   )
     return `monthlyCalls ${caps.monthlyCalls}`;
   if (caps.dailyUsd !== undefined && row.day.usd + usd > caps.dailyUsd)

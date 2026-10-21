@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyVerdict,
   createRouter,
+  isInternalQuery,
   plan,
   type SourceImpl,
   topHits,
@@ -268,6 +269,56 @@ describe('router', () => {
     expect(usage.sources.exa.day).toMatchObject({ calls: 1, usd: 0 });
   });
 
+  it('keeps internal questions off the paid tier unless asked', async () => {
+    const make = () => ({
+      gbrain: source([]),
+      repo: source([hit('repo', 'meh-doc')]),
+      firecrawl: source([]),
+      exa: source([
+        hit('exa', 'good-1'),
+        hit('exa', 'good-2'),
+        hit('exa', 'good-3'),
+      ]),
+    });
+    const config = (await import('./types.ts')).SOURCES;
+    const internal = make();
+    const router = createRouter({
+      state,
+      sources: internal,
+      judges: [titleJudge()],
+      config: { ...config, internalTerms: ['gbrain'] },
+    });
+    const result = await router.research({
+      query: 'how does gbrain supersede takes',
+    });
+    expect(internal.exa.run).not.toHaveBeenCalled();
+    expect(internal.firecrawl.run).toHaveBeenCalledTimes(1);
+    expect(result.runs.find(r => r.source === 'exa')?.skipped).toContain(
+      'internal question'
+    );
+    const forced = make();
+    const router2 = createRouter({
+      state,
+      sources: forced,
+      judges: [titleJudge()],
+      config: { ...config, internalTerms: ['gbrain'] },
+    });
+    await router2.research({ query: 'gbrain takes on the web', maxTier: 2 });
+    expect(forced.exa.run).toHaveBeenCalledTimes(1);
+  });
+
+  it('reserves credits, not calls, for credit-billed sources', async () => {
+    const sources = {
+      gbrain: source([]),
+      repo: source([]),
+      firecrawl: source([]),
+      exa: source([]),
+    };
+    const router = createRouter({ state, sources, judges: [] });
+    await router.research({ query: 'credit units', maxTier: 1 });
+    expect((await state.readUsage()).sources.firecrawl.day.calls).toBe(2);
+  });
+
   it('coalesces concurrent identical queries into one execution', async () => {
     let release!: () => void;
     const gate = new Promise<void>(r => {
@@ -340,5 +391,16 @@ describe('topHits', () => {
     expect(
       topHits([h('https://a/x?utm=1'), h('https://a/x/'), h('https://b')], 5)
     ).toHaveLength(2);
+  });
+});
+
+describe('isInternalQuery', () => {
+  it('matches whole words only', () => {
+    expect(
+      isInternalQuery('How does the Jovie lane runner work?', ['jovie'])
+    ).toBe(true);
+    expect(isInternalQuery('jovially priced search APIs', ['jovie'])).toBe(
+      false
+    );
   });
 });

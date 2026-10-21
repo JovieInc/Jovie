@@ -4,7 +4,11 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { type CredentialEnv, createProviderClients } from './credentials.ts';
+import {
+  type CredentialEnv,
+  createProviderClients,
+  type ProviderClients,
+} from './credentials.ts';
 import { createGbrainClient, type GbrainClient } from './gbrain.ts';
 import { clefJudge, jevJudge } from './judge.ts';
 import { loadResearch, researchSlug, saveResearch } from './persist.ts';
@@ -42,6 +46,9 @@ export interface Wiring {
   readonly state: ResearchState;
   readonly router: ReturnType<typeof createRouter>;
   readonly judges: Judge[];
+  readonly clients: ProviderClients;
+  /** A judge by name (clef-flash, jev), for benches that need one fixed judge. */
+  judge(name: string): Judge | undefined;
 }
 
 export function createDefaultWiring(
@@ -153,5 +160,12 @@ export function createDefaultWiring(
     persist: (result, caller) => saveResearch(gbrain, result, caller),
     slugFor: researchSlug,
   });
-  return { gbrain, state, router, judges };
+  return {
+    gbrain,
+    state,
+    router,
+    judges,
+    clients,
+    judge: name => byName[name],
+  };
 }

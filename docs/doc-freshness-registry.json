@@ -261,15 +261,15 @@
     ".claude/rules/research.md": {
       "owner": "@itstimwhite",
       "claim": "Research tier order, caps, cache and decision-log commands match the router and its source policy.",
-      "documentSha256": "1a915ea3a3396c43ed1d5028741b4ccfbe93996a2a3a08367e7298fbb192eab1",
+      "documentSha256": "037c54437208487039e21a589baddf5e863d0c58e754bf95a42a8d64f9973c82",
       "sources": [
         {
           "path": "packages/research/router.ts",
-          "sha256": "900d9b2e4a2255b82c83726238edc4169ebe086dac26ceff560bbd07fcd0b116"
+          "sha256": "ed619bb61edb61daa888c4c8e02da14e5209f79c9cfc3f51ea0f984e38f88151"
         },
         {
           "path": "packages/research/sources.json",
-          "sha256": "71ce54c70de3ca8fd98ee129c9fa6a01fc541ca06b54fa35661ecc3ff3e6fb50"
+          "sha256": "9d2b656e71e120314b82bc5d6acc9cd8425fb36a9bb5b563f3a071f54cd28b4e"
         }
       ]
     },
