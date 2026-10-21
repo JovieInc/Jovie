@@ -163,8 +163,8 @@ unless linked below.
 | `source-identity` | `error` | I | Yes | 2057 |
 | `spacing-scale (conservative)` | `error` | S + G | Yes | 614; armed=true; marketing=46; packages/ui=11; web-other=304; web-shell=253 |
 | `spacing-scale (strict)` | `warn` | S + G | No | 2202; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=851 |
-| `touch-target` | `error` | D | Yes | 159 |
-| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=318; missingTabularNums=81; nonConcentricRadius=0; undersizedHitArea=74 |
+| `touch-target` | `error` | D | Yes | 153 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=271; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
 
 The [raw-color baseline](apps/web/contrast-ratchet.baseline.json) and
 [computed pair config](apps/web/contrast-pairs.config.json) cover separate
