@@ -13630,3 +13630,37 @@ class SelftestCleanupScopeTest(unittest.TestCase):
         self.assertEqual(receipt["diagnostic"]["observation"]["pid"], 100)
         self.assertEqual(receipt["diagnostic"]["outcome"], "held")
         self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+
+class SelftestProcessAbsenceTest(unittest.TestCase):
+    """ESRCH from an exiting process's proc entry is proof of absence, like ENOENT (CI #22351)."""
+
+    def entry(self, read_error, later_stats):
+        stats = iter([SimpleNamespace(st_uid=os.getuid()), *later_stats])
+
+        class Entry:
+            def stat(self_inner):
+                value = next(stats)
+                if isinstance(value, BaseException):
+                    raise value
+                return value
+
+            def __truediv__(self_inner, _name):
+                return SimpleNamespace(read_text=lambda: (_ for _ in ()).throw(read_error))
+        return Entry()
+
+    def test_esrch_or_enoent_on_reread_proves_absence(self):
+        for read_error in (FileNotFoundError(2, "gone"), ProcessLookupError(3, "exiting")):
+            for gone in (FileNotFoundError(2, "gone"), ProcessLookupError(3, "exiting")):
+                with self.subTest(read=type(read_error).__name__, gone=type(gone).__name__):
+                    self.assertIsNone(lane._selftest_process_row(self.entry(read_error, [gone]), 201, os.getuid()))
+
+    def test_a_still_present_or_unreadable_entry_still_holds(self):
+        present = SimpleNamespace(st_uid=os.getuid())
+        with self.assertRaises(lane.SelftestCleanupHeld):
+            lane._selftest_process_row(self.entry(ProcessLookupError(3, "exiting"), [present]), 201, os.getuid())
+        with self.assertRaises(lane.SelftestCleanupHeld):
+            lane._selftest_process_row(self.entry(ProcessLookupError(3, "x"), [PermissionError(13, "denied")]),
+                                       201, os.getuid())
+        with self.assertRaises(lane.SelftestCleanupHeld):
+            lane._selftest_process_row(self.entry(PermissionError(13, "denied"), []), 201, os.getuid())
