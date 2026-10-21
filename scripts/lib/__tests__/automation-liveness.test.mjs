@@ -132,17 +132,25 @@ describe('dead-man liveness', () => {
     expect(livenessDecisions(report)[0].action).toBe('red');
   });
 
-  it('reads main identity without requesting the full commit and its diff', async () => {
+  it('reads fresh authenticated main identity without the full commit and its diff', async () => {
+    let mainHeaders = new Headers();
+    const network = fakeFetch({
+      'jov.ie/api/health/build-info': { commitSha: MAIN },
+      '/git/ref/heads/main': mainRef(MAIN),
+      '/commits/main': 503,
+    });
     const { report } = await runLiveness({
       registry: only('derived:jovie:production-promotion'),
       nowMs: NOW,
       token: 'test-token',
-      fetchImpl: fakeFetch({
-        'jov.ie/api/health/build-info': { commitSha: MAIN },
-        '/git/ref/heads/main': mainRef(MAIN),
-        '/commits/main': 503,
-      }),
+      fetchImpl: async (url, init) => {
+        if (String(url).includes('/git/ref/heads/main'))
+          mainHeaders = new Headers(init.headers);
+        return network(url);
+      },
     });
+    expect(mainHeaders.get('authorization')).toBe('Bearer test-token');
+    expect(mainHeaders.get('cache-control')).toBe('no-cache');
     expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
       status: 'fresh',
       reason: 'production-current',
@@ -226,7 +234,7 @@ describe('dead-man liveness', () => {
     }
   );
 
-  it('uses the default shared client without requiring installed workspace packages', async () => {
+  it('reads main through the default shared client', async () => {
     vi.stubEnv('JOVIE_API_STATE', 'memory');
     try {
       const { report } = await runLivenessImpl({

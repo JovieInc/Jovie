@@ -173,7 +173,11 @@ export async function observeProductionFreshness(
   try {
     const response = await client.request({
       url: `${apiUrl}/repos/${receipt.repo}/git/ref/heads/main`,
-      headers,
+      headers: {
+        Accept: 'application/json',
+        'Cache-Control': 'no-cache',
+        ...headers,
+      },
       priority: 'report',
       conditional: false,
       maxAttempts: 2,
