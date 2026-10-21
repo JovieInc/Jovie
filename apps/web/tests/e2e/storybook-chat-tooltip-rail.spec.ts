@@ -1,4 +1,23 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+
+async function useRealMotion(page: Page) {
+  // Storybook freezes animation and forces reduced motion for snapshots.
+  // These interaction checks must exercise the browser's real media preference.
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'matchMedia', {
+      value: window.matchMedia.bind(window),
+      configurable: false,
+      writable: false,
+    });
+    new MutationObserver(() => {
+      document
+        .querySelectorAll('style[data-jovie-storybook-fixtures]')
+        .forEach(node => node.remove());
+    }).observe(document, { childList: true, subtree: true });
+  });
+}
+
+test.beforeEach(async ({ page }) => useRealMotion(page));
 
 const chatsStory =
   '/iframe.html?id=organisms-unifiedsidebar--composed-chats&viewMode=story';
@@ -16,6 +35,11 @@ for (const width of [320, 390, 768, 820, 1126]) {
           theme
         );
         await page.goto(chatsStory);
+        expect(
+          await page.evaluate(
+            () => matchMedia('(prefers-reduced-motion: reduce)').matches
+          )
+        ).toBe(reducedMotion === 'reduce');
         const chats = page.getByTestId('chats-page');
         const readable = chats.getByRole('link', {
           name: 'All This Noise EP',
@@ -112,6 +136,7 @@ test('hybrid touch activates chat actions first and keyboard hints return', asyn
     viewport: { width: 820, height: 798 },
   });
   const page = await context.newPage();
+  await useRealMotion(page);
   await page.goto(`http://127.0.0.1:6006${chatsStory}`);
   const chats = page.getByTestId('chats-page');
   const actions = chats.getByRole('button', {
