@@ -1,25 +1,27 @@
 # Pricing certification
 
-Current renewal: 2026-10-20, PR #22382. Local source/browser evidence only.
-The $12/month self-serve offer changes pricing copy and the Pro CTA, invalidating
-the previous source digest. The shell, comparison layout and footer are reused.
+Current renewal: 2026-10-21, PR #22351 after merging PR #22382 from main.
+Local source/browser evidence only. The merged source preserves the $12/month
+self-serve offer and Pro claim CTA while moving shared container CSS into its
+section-shell owner. Both changes are covered by the renewed source digest.
 
-- Node 24.21.0, Next 16.4.1, Chromium; local URL `http://localhost:3267/pricing`.
+- Node 24.21.0, Next 16.4.1, Chromium; local URL `http://localhost:33151/pricing`.
 - `PUBLIC_NOAUTH_SMOKE=1 NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_E2E_MODE=1`.
-- `BASE_URL=http://localhost:3267 E2E_SKIP_WEB_SERVER=1 E2E_SKIP_SEED=1 pnpm --filter @jovie/web exec playwright test tests/e2e/pricing.spec.ts --config=playwright.config.noauth.ts --project=chromium --workers=1 --reporter=line`: **10 passed**.
+- `BASE_URL=http://localhost:33151 E2E_SKIP_WEB_SERVER=1 E2E_SKIP_SEED=1 E2E_SKIP_WARMUP=1 pnpm --filter @jovie/web exec playwright test tests/e2e/pricing.spec.ts --config=playwright.config.noauth.ts --project=chromium --workers=1 --reporter=line`: **10 passed**.
 - Renewed captures: [320px](pricing-320.png), [390px](pricing-390.png),
   [768px](pricing-768.png), [1440px](pricing-1440.png). Reviewed at 320px and 1440px.
-- At all four widths: no horizontal overflow, stable main-content geometry across
-  two animation frames after fonts, and zero axe WCAG 2 A/AA + 2.1 A/AA violations
-  in main content and the footer. The suite also covers keyboard plan selection,
-  both motion preferences, comparison text geometry and campaign attribution.
+- At all four capture widths: no horizontal overflow and stable main-content
+  geometry across two animation frames after fonts. The suite checks zero axe
+  WCAG 2 A/AA + 2.1 A/AA violations in main content and the footer at its responsive
+  viewports, keyboard plan selection, both motion preferences, comparison text
+  geometry and campaign attribution.
 - Pro displays $12/month and links to `/claim?plan=pro`; Free and Enterprise keep
   their existing actions. The browser suite now asserts the self-serve contract.
 - Source digest: `3b81badb69eb5c619810a2762a09e4c69ac2145ad87457064631da0f798d56b4`.
-  Rebound 2026-10-21 while merging the homepage branch: `MarketingHeader.tsx`
-  and `ArtistProfileLandingPage.css` are pricing owners. The header CTA change
-  is homepage-only, and `.ap-section-container` now lives in
-  `ArtistProfileSectionShell.css`. The 2026-10-20 captures still show this route.
+  Rebound onto the 2026-10-21 renewal while merging the homepage branch:
+  `MarketingHeader.tsx` and `ArtistProfileLandingPage.css` are pricing owners.
+  The header CTA change is homepage-only, and `.ap-section-container` lives in
+  `ArtistProfileSectionShell.css`. The captures are that 2026-10-21 renewal.
 
 ## Previous certification, 2026-10-15
 

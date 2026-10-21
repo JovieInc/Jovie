@@ -42,6 +42,7 @@
    Pages set --marketing-phone-gallery-bleed to their gutter. */
 @media (max-width: 47.99rem) {
   .marketing-phone-gallery {
+    width: auto;
     margin-inline: calc(var(--marketing-phone-gallery-bleed, 0px) * -1);
     padding-inline: var(--marketing-phone-gallery-bleed, 0px);
     scroll-padding-inline: var(--marketing-phone-gallery-bleed, 0px);

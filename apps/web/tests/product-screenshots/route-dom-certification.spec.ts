@@ -324,6 +324,15 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     await expectDeliberateRed(page, 'marketing', 'clipped-heading');
   });
 
+  test('rejects a spanned two-line heading whose cap crops descenders', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><section><h1 style="width:640px;font-family:serif;font-size:64px;line-height:0.9;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-block-size:calc(2 * 1lh);overflow:hidden">One profile.<br>For <span>every fan.</span></h1></section></main>'
+    );
+    await expectDeliberateRed(page, 'marketing', 'clipped-heading');
+  });
+
   test('accepts font-box overflow when all heading ink fits', async ({
     page,
   }) => {
@@ -344,6 +353,28 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
         'clipped-heading'
       );
     }
+  });
+
+  test('passes overflowing font boxes when the heading glyphs fit', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<main><section><h1 style="font-family:serif;font-size:64px;line-height:0.9;overflow:hidden">HELLO<br>WORLD</h1></section></main>'
+    );
+    const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+    expect(snapshot.findings.filter(f => f.kind === 'clipped-heading')).toEqual(
+      []
+    );
+  });
+
+  test('passes descenders with room below the final line', async ({ page }) => {
+    await page.setContent(
+      '<main><section><h1 style="width:640px;font-family:serif;font-size:64px;line-height:0.9;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-block-size:calc(2 * 1lh + 0.16em);padding-block-end:0.16em;overflow:hidden">One profile.<br>For <span>every fan.</span></h1></section></main>'
+    );
+    const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+    expect(snapshot.findings.filter(f => f.kind === 'clipped-heading')).toEqual(
+      []
+    );
   });
 
   test('accepts visually hidden accessible headings', async ({ page }) => {
