@@ -97,9 +97,9 @@ export const OPERATOR_NAV_SECTIONS = [
 ] as const;
 
 /**
- * The operator overview index redirects to Ops at `/hud`.
- * Chat stays an exact nested OV route. Every other operator destination
- * owns its nested routes.
+ * Home is the OV index (`/app/ov`) and matches only exactly; the chat route
+ * renders the same Home. Every other operator destination owns its nested
+ * routes.
  */
 export function isOperatorNavigationHrefActive(
   pathname: string,
@@ -110,7 +110,7 @@ export function isOperatorNavigationHrefActive(
   }
 
   if (href === APP_ROUTES.OV) {
-    return pathname === href;
+    return pathname === href || pathname === APP_ROUTES.ADMIN_CHAT;
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);

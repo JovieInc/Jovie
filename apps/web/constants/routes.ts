@@ -99,8 +99,8 @@ export const APP_ROUTES = {
   /** Internal visual catalog for canonical chat lifecycle and artifact states. */
   ADMIN_CHAT_PLAYGROUND: '/app/ov/chat-playground',
   /** Founder home: business and production reality in one scan. */
-  ADMIN_NOW: '/hud',
-  ADMIN_OPS: '/hud',
+  ADMIN_NOW: '/app/ov',
+  ADMIN_OPS: '/app/ov/ops',
   ADMIN_PRODUCT: '/app/ov/product',
   ADMIN_OPERATIONS: '/app/ov/operations',
   ADMIN_NEEDS_YOU: '/app/ov/needs-you',
@@ -249,6 +249,9 @@ export const APP_ROUTES = {
   WAITLIST_INVITE: '/waitlist/invite',
   /** Anonymous onboarding chat (JOV-2132). Replaces /waitlist as the front door. */
   START: '/start',
+  /** Self-serve $12/month artist profile: find or create, then checkout. */
+  CLAIM: '/claim',
+  CLAIM_START: '/claim/start',
 
   // Billing
   BILLING: '/billing',
