@@ -533,6 +533,11 @@ const LANES_COVERAGE_RUN = `{ ${LANES_BACKGROUND_SHARDS.map(shard => `${lanesCov
 /** @jovie/api-client (TS) unit + conformance suite, run with the operations lane. */
 export const API_CLIENT_TS_COMMAND = 'pnpm --filter @jovie/api-client test';
 
+/** scripts/apiclient: the Python port, held to the same conformance fixtures. */
+export const API_CLIENT_PY_COMMAND = structuralPythonRegression(
+  'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage run --branch --include="*/scripts/apiclient/*" -m pytest scripts/tests/test_apiclient.py scripts/tests/test_apiclient_conformance.py -q -p no:cacheprovider --basetemp="${RUNNER_TEMP:-/tmp}/jovie-apiclient-pytest" && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-apiclient.coverage" python3 -m coverage report --fail-under=85'
+);
+
 export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   structuralPythonRegression(
     [
@@ -2430,6 +2435,7 @@ export async function runStructural(opts = {}) {
       : [];
   const operationsParts = [
     API_CLIENT_TS_COMMAND,
+    API_CLIENT_PY_COMMAND,
     'node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs',
     'node --test .github/scripts/dependency-parity-evidence.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-native-controller.test.mjs',
