@@ -72,7 +72,14 @@ describe('claim dogfood intake', () => {
   const env = { LINEAR_API_KEY: 'lin_test' };
 
   it('resolves the fingerprinted issue on green', async () => {
-    const close = vi.fn(async () => ({ ok: true }));
+    const close = vi.fn(async () => ({
+      ok: true,
+      action: 'resolved',
+      id: 'issue-1',
+      identifier: 'JOV-1',
+      url: 'https://linear.app/jovie/issue/JOV-1',
+      commented: true,
+    }));
     const upsert = vi.fn();
     await reportClaimDogfoodResult(
       { outcome: 'success', runId: '1' },
@@ -85,7 +92,13 @@ describe('claim dogfood intake', () => {
   });
 
   it('files a P0, reopening terminal issues, and alerts on red', async () => {
-    const upsert = vi.fn(async () => ({ ok: true }));
+    const upsert = vi.fn(async () => ({
+      ok: true,
+      action: 'created',
+      id: 'issue-1',
+      identifier: 'JOV-1',
+      url: 'https://linear.app/jovie/issue/JOV-1',
+    }));
     const notify = vi.fn();
     await reportClaimDogfoodResult(
       { outcome: 'failure', runUrl: 'https://run' },
