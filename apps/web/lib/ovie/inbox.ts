@@ -39,7 +39,8 @@ export interface InboxDecisionDefault {
 
 export interface OvieInboxCase extends InteractionCase {
   readonly decisionTarget: InboxDecisionTarget | null;
-  readonly decisionDefault: InboxDecisionDefault | null;
+  /** Absent or null: no default declared yet (Home shows none). */
+  readonly decisionDefault?: InboxDecisionDefault | null;
   readonly body: string;
   readonly certification?: {
     readonly row: OvieCertificationRow;

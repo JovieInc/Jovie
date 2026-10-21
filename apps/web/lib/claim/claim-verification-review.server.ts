@@ -90,6 +90,9 @@ export async function fileClaimVerificationCard(input: {
     amountUsd: null,
     preflightReceiptId: null,
     evidence,
+    // No silent default: the claim stays pending until a founder decides.
+    decideBy: null,
+    defaultDecision: null,
   });
   if (result.outcome === 'conflict') {
     throw new Error(
