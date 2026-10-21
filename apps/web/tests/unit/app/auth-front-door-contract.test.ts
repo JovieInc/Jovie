@@ -11,19 +11,22 @@ import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 describe('auth front-door contract', () => {
-  it('keeps waitlist-on homepage CTAs in request-access mode', () => {
+  it('keeps waitlist-on front-door CTAs on the claim label, routed to signup', () => {
     const contract = getHomepageFrontDoorCtaContract(true);
 
     expect(PUBLIC_WAITLIST_URL).toBe(APP_ROUTES.SIGNUP);
     expect(contract.primary).toEqual({
-      label: 'Request access',
+      label: 'Claim your profile',
       href: APP_ROUTES.SIGNUP,
     });
     expect(contract.primary.href).not.toBe(APP_ROUTES.WAITLIST);
     expect(contract.secondary).toBeNull();
     expect(contract.fallbackSupport).toBe(
-      'Limited prelaunch access. We will email when you are in.'
+      'Free to start. Reserve your name now.'
     );
+    // Retired with the $12 self-serve offer (EVENT: Tim, 2026-10-20).
+    expect(contract.primary.label).not.toMatch(/request access/i);
+    expect(contract.fallbackSupport).not.toMatch(/limited/i);
   });
 
   it('keeps waitlist-off homepage CTAs in open-signup mode', () => {

@@ -62,7 +62,7 @@ describe('NewLandingPage', () => {
     );
     expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
     expect(
-      screen.getByRole('link', { name: 'Request access' })
+      screen.getByRole('link', { name: 'Claim your profile' })
     ).toHaveAttribute('href', '/signup');
 
     expect(() => render(<NewLandingPage />)).toThrow('NEXT_REDIRECT');

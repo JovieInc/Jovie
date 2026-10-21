@@ -50,13 +50,14 @@ export function getHomepageFrontDoorCtaContract(
 ): HomepageFrontDoorCtaContract {
   if (waitlistEnabled) {
     return {
+      // Claim, not "Request access": the $12/month profile is self-serve
+      // (EVENT: Tim, 2026-10-20). Signup still runs the post-auth waitlist gate.
       primary: {
-        label: 'Request access',
+        label: 'Claim your profile',
         href: PUBLIC_WAITLIST_URL,
       },
       secondary: null,
-      fallbackSupport:
-        'Limited prelaunch access. We will email when you are in.',
+      fallbackSupport: 'Free to start. Reserve your name now.',
     };
   }
 

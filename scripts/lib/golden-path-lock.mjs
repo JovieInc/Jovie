@@ -6,7 +6,7 @@
  * (JOV-5864 / JOV-6794):
  * - open (WAITLIST_ENABLED=false): name search
  *   ("Search your name" → "Find me") with a /start handoff
- * - waitlist-gated (WAITLIST_ENABLED=true, prelaunch): "Request access"
+ * - waitlist-gated (WAITLIST_ENABLED=true, prelaunch): "Claim your profile"
  *   primary CTA → /signup. Waitlist gating is the only allowed gate.
  * Missing secrets fail closed. Merge gate never reads E2E_PROD.
  */
@@ -21,7 +21,7 @@ export const GOLDEN_PATH_LOCK_SCHEMA = 'jovie-golden-path-lock/v1';
 export const GOLDEN_PATH_PROD_ORIGIN = 'https://jov.ie';
 export const GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER = 'Search your name';
 export const GOLDEN_PATH_HERO_SEARCH_ACTION = 'Find me';
-export const GOLDEN_PATH_GATED_CTA_LABEL = 'Request access';
+export const GOLDEN_PATH_GATED_CTA_LABEL = 'Claim your profile';
 export const GOLDEN_PATH_GATED_CTA_HREF = '/signup';
 export const GOLDEN_PATH_START_PATH = '/start';
 // Homepage link claim (Tim 2026-09-28): claim jov.ie/you, submit to /start.
@@ -161,7 +161,7 @@ export function evaluateHomepageHtml(html) {
     };
   }
   // Certified waitlist-gated state (prelaunch, WAITLIST_ENABLED=true): the
-  // hero's conversion control is "Request access" → /signup
+  // hero's conversion control is "Claim your profile" → /signup
   // (PUBLIC_WAITLIST_URL). This is the only allowed gate — the search is
   // intentionally hidden while gated (JOV-6794).
   const gatedHrefPattern = new RegExp(

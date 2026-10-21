@@ -171,7 +171,7 @@ describe('golden-path lock evaluators', () => {
   });
 
   it('accepts the certified waitlist-gated front door (JOV-6794)', () => {
-    const gated = `<a href="/signup">Request access</a>`;
+    const gated = `<a href="/signup">Claim your profile</a>`;
     expect(evaluateHomepageHtml(gated)).toMatchObject({
       id: 'homepage-cta',
       ok: true,
@@ -179,7 +179,7 @@ describe('golden-path lock evaluators', () => {
     });
     // Gated label without the /signup handoff is still a drift failure.
     expect(
-      evaluateHomepageHtml('<button>Request access</button>')
+      evaluateHomepageHtml('<button>Claim your profile</button>')
     ).toMatchObject({
       ok: false,
     });
@@ -189,7 +189,7 @@ describe('golden-path lock evaluators', () => {
     ).toMatchObject({ ok: false });
     // An uncertified waitlist wall remains forbidden.
     expect(
-      evaluateHomepageHtml('<a href="/waitlist">Request access</a>')
+      evaluateHomepageHtml('<a href="/waitlist">Claim your profile</a>')
     ).toMatchObject({ ok: false });
   });
 
