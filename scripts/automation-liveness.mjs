@@ -352,6 +352,8 @@ export async function observeLinearTriageDwell(receipt, { linear, nowMs }) {
 
 const MERGEABLE_GREEN = new Set(['CLEAN', 'UNSTABLE', 'HAS_HOOKS']);
 const GREEN_TIMING_MAX_PRS = 10;
+const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
+const DEFECT_HOLD_CLASSES = new Set(['deterministic-source', 'unclassified']);
 
 /**
  * When the exact head turned required-green: the latest success among each
@@ -386,10 +388,22 @@ async function requiredGreenAt(
         .filter(row => row?.context === check && row?.state === 'success')
         .map(row => Date.parse(row.created_at ?? '')),
     ].filter(Number.isFinite);
-    if (!times.length) return { ok: true, greenAt: null };
+    if (!times.length) return { ok: true, greenAt: null, holdClass: null };
     greenAt = Math.max(greenAt, Math.max(...times));
   }
-  return { ok: true, greenAt: Number.isFinite(greenAt) ? greenAt : null };
+  // The merge-queue failure hold is a commit status on the head (ci-plan):
+  // description `class=<class>;n=..;run=..`. A real-defect hold needs a new
+  // head from its owner; it is reported, not counted as promotion latency.
+  const hold = (statuses.body?.statuses ?? []).find(
+    row => row?.context === FAILURE_HOLD_CONTEXT
+  );
+  const holdClass =
+    /(?:^|;)class=([a-z-]+)/.exec(String(hold?.description ?? ''))?.[1] ?? null;
+  return {
+    ok: true,
+    greenAt: Number.isFinite(greenAt) ? greenAt : null,
+    holdClass,
+  };
 }
 
 /**
@@ -452,6 +466,7 @@ export async function observeGreenToEnqueue(
   );
   const drafts = green.filter(pr => pr.isDraft).map(pr => pr.number);
   const waiting = [];
+  const held = [];
   for (const pr of green
     .filter(row => !row.isDraft)
     .slice(0, GREEN_TIMING_MAX_PRS)) {
@@ -462,8 +477,9 @@ export async function observeGreenToEnqueue(
     });
     if (!timing.ok)
       return { ok: false, reason: 'green-enqueue-checks-unreadable' };
-    if (timing.greenAt !== null)
-      waiting.push({ number: pr.number, greenAt: timing.greenAt });
+    if (timing.greenAt === null) continue;
+    if (DEFECT_HOLD_CLASSES.has(timing.holdClass ?? '')) held.push(pr.number);
+    else waiting.push({ number: pr.number, greenAt: timing.greenAt });
   }
   waiting.sort((a, b) => a.greenAt - b.greenAt);
   const listed = waiting
@@ -473,7 +489,9 @@ export async function observeGreenToEnqueue(
   const reason = `ready-green-unqueued=${waiting.length}[${listed}];draft-green=${drafts.length}[${drafts
     .slice(0, 8)
     .map(n => `#${n}`)
-    .join(',')}]`;
+    .join(
+      ','
+    )}];defect-held=${held.length}[${held.map(n => `#${n}`).join(',')}]`;
   if (!waiting.length)
     return { ok: true, lastProofAt: new Date(nowMs).toISOString(), reason };
   return {

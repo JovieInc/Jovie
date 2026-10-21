@@ -632,6 +632,31 @@ describe('dead-man liveness', () => {
         })
       ).status
     ).toBe('fresh');
+    // A merge-queue failure hold for a real defect needs a new head from its
+    // owner: reported, not promotion latency. A transient hold still counts.
+    const holdStatus = cls => ({
+      statuses: [
+        ...status(30).statuses,
+        {
+          context: 'jovie-queue-failure-hold/v1',
+          state: 'success',
+          description: `class=${cls};n=1;run=1;try=1`,
+          created_at: iso(20),
+        },
+      ],
+    });
+    const defect = await run([pr(10)], 30, {
+      status: holdStatus('unclassified'),
+    });
+    expect(defect.status).toBe('fresh');
+    expect(defect.reason).toContain('defect-held=1[#10]');
+    expect(
+      (
+        await run([pr(11)], 30, {
+          status: holdStatus('transient-infrastructure'),
+        })
+      ).status
+    ).toBe('stale');
     // Green drafts are reported, but drafts belong to their writer.
     const draft = await run([pr(8, { isDraft: true })]);
     expect(draft.status).toBe('fresh');
