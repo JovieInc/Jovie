@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import { runLiveness as runLivenessImpl } from '../../automation-liveness.mjs';
+import { ADMISSION_BLOCKING_LABELS } from '../admission-hold-labels.mjs';
 import {
   livenessDecisions,
   livenessFingerprint,
@@ -414,6 +415,55 @@ describe('dead-man liveness', () => {
     expect(livenessDecisions(report)[0].action).toBe('red');
   });
 
+  // Run 39674054063: git/ref answered 403 while production was on main.
+  // The commit SHA media type is the alternate contents read.
+  it('reads main from the commit SHA when the git ref answers 403', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': 403,
+        '/commits/main': new Response(`${MAIN}\n`, {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        }),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(30) } },
+            },
+          ],
+        },
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      ageMinutes: 30,
+      reason: '1-commits-unshipped',
+    });
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
+  it('keeps a 403 red when the commit SHA read also fails', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+        '/git/ref/heads/main': 403,
+        '/commits/main': 403,
+      }),
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'unknown',
+      reason: 'main-ref-http-403',
+    });
+    expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
   it('keeps malformed main-ref JSON red with an unreadable reason', async () => {
     const { report } = await runLiveness({
       registry: only('derived:jovie:production-promotion'),
@@ -693,6 +743,7 @@ describe('dead-man liveness', () => {
       mergeStateStatus: 'CLEAN',
       baseRefName: 'main',
       headRefOid: String(number).repeat(40).slice(0, 40),
+      labels: { nodes: [], pageInfo: { hasNextPage: false } },
       ...extra,
     });
     // PR Ready, Migration Guard and PR Size Guard are check runs; Fork PR
@@ -743,6 +794,37 @@ describe('dead-man liveness', () => {
     expect(waiting.status).toBe('stale');
     expect(waiting.ageMinutes).toBe(30);
     expect(waiting.reason).toContain('#1:30m');
+    // JOV-8788: #22378 was required-green but queue-poison deliberately
+    // prevented admission. Use the writer's vocabulary, including machine
+    // blocks, and keep held heads out of the capped timing reads.
+    const labeled = (number, name) =>
+      pr(number, {
+        labels: { nodes: [{ name }], pageInfo: { hasNextPage: false } },
+      });
+    for (const name of ADMISSION_BLOCKING_LABELS) {
+      const held = await run([labeled(22378, name.toUpperCase())]);
+      expect(held.status, name).toBe('fresh');
+      expect(held.reason).toContain('label-held=1[#22378]');
+    }
+    const mixed = await run([
+      ...Array.from({ length: 10 }, (_, i) => labeled(20 + i, 'queue-poison')),
+      labeled(1, 'lane-fix-dequeued'),
+    ]);
+    expect(mixed.status).toBe('stale');
+    expect(mixed.reason).toContain('ready-green-unqueued=1[#1:30m]');
+    // Removing the hold resumes the existing SLO; unreadable or truncated
+    // labels cannot certify that a ready PR is eligible.
+    expect((await run([pr(22378)])).status).toBe('stale');
+    for (const labels of [
+      undefined,
+      { nodes: [] },
+      { nodes: [], pageInfo: { hasNextPage: true } },
+      { nodes: [{}], pageInfo: { hasNextPage: false } },
+    ]) {
+      const unreadable = await run([pr(1, { labels })]);
+      expect(unreadable.status).not.toBe('fresh');
+      expect(unreadable.reason).toContain('green-enqueue-labels-unreadable');
+    }
     // Inside the SLO, queued, conflicting, blocked or another base: fresh.
     expect((await run([pr(2)], 5)).status).toBe('fresh');
     expect((await run([pr(3, { isInMergeQueue: true })])).status).toBe('fresh');
