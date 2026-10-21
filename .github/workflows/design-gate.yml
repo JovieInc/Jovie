@@ -1,6 +1,6 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Cursor
-# necessary-trust-boundary: Read-only pull_request listing of changed files via the ephemeral github.token (`gh api .../pulls/<n>/files`); permissions are contents:read + pull-requests:read only, so the hop can observe but cannot write labels, checks, code, or comments. No merge, deploy, or release authority is added.
+# necessary-trust-boundary: Read-only pull_request evaluation from a pinned full-history git checkout; complete changed paths come from the proven event merge parents and exact PR head, without GitHub API pagination or quota-dependent reads. Permissions remain contents:read + pull-requests:read; no merge, deploy, or release authority is added.
 # revisit-trigger: Remove this workflow (and the exception) once the design gate is enforced by an existing controller or required check rather than a standalone pull_request hop; otherwise revisit if DESIGN_GATE_ENFORCE graduates to a merge-queue required check.
 name: Design gate
 
@@ -46,14 +46,10 @@ jobs:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
+          # Complete ancestry proves the PR merge-base without API pagination.
+          fetch-depth: 0
           persist-credentials: false
-
-      - name: Changed files
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename' > "$RUNNER_TEMP/design-gate-files.txt"
 
       - name: Check the design brief
         env:
@@ -62,5 +58,5 @@ jobs:
         run: |
           python3 scripts/lanes/design_gate_check.py \
             --event "$GITHUB_EVENT_PATH" \
-            --files-from "$RUNNER_TEMP/design-gate-files.txt" \
+            --git-diff \
             --repo .
