@@ -11656,7 +11656,15 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         self.assertEqual(diagnostic["stderrSha256"], hashlib.sha256(stderr.encode()).hexdigest())
         self.assertEqual(diagnostic["stderrBytes"], len(stderr.encode()))
         self.assertEqual((stage / ".selftest-stderr.log").read_text(), stderr)
-        self.assertNotIn("test_bound", console.getvalue())
+        # The raw FAIL header sits outside the 2000-character console tail. The
+        # refusal still names that selector on its own lines (2026-10-21).
+        console_text = console.getvalue()
+        tail, separator, named = console_text.partition("release self-test retry:")
+        self.assertEqual(separator, "release self-test retry:")
+        self.assertEqual(tail, "x" * 2000 + "\n")
+        self.assertNotIn("test_bound", tail)
+        self.assertIn("release self-test failed selector(s): scripts.tests.test_fixture.Example.test_bound", named)
+        self.assertIn("release self-test failure: FAIL: test_bound (scripts.tests.test_fixture.Example)", named)
         for name in [".selftest-diagnostic.json", ".selftest-stderr.log"]:
             self.assertEqual((stage / name).stat().st_mode & 0o777, 0o600)
 
