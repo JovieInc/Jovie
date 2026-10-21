@@ -558,3 +558,51 @@ test('completed commerce work stays closed while the runtime block survives appl
   });
   assert.deepEqual(replay.commerceInvalidations, receipt.commerceInvalidations);
 });
+
+test('stack inventory digests source, not generated outputs written during the scan', async () => {
+  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import(
+    'node:fs'
+  );
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const root = mkdtempSync(join(tmpdir(), 'stack-inventory-'));
+  try {
+    const write = (path, content) => {
+      mkdirSync(join(root, path, '..'), { recursive: true });
+      writeFileSync(join(root, path), content);
+    };
+    write('package.json', '{"name":"fixture","private":true}');
+    write(
+      'apps/web/package.json',
+      '{"name":"web","dependencies":{"next":"16.4.1"}}'
+    );
+    write(
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\nimporters:\n  .: {}\n  apps/web:\n    dependencies:\n      next:\n        specifier: 16.4.1\n        version: 16.4.1\n"
+    );
+    write(
+      'apps/web/app/page.tsx',
+      "import Link from 'next/link';\nexport default Link;\n"
+    );
+    const first = reconciliation.buildStackInventory(root, 'sha-1');
+    // Concurrent CI lanes write coverage and report JSON under the app.
+    write(
+      'apps/web/coverage/jov-5603-acquisition/coverage-final.json',
+      '{"x":1}'
+    );
+    write('apps/web/test-results/results.json', '{}');
+    write('apps/web/.turbo/turbo-test.log.json', '{}');
+    write('apps/web/playwright-report/data.json', '{}');
+    assert.equal(
+      reconciliation.buildStackInventory(root, 'sha-2', first).status,
+      'reused'
+    );
+    write('apps/web/app/other.ts', "export * from 'next/server';\n");
+    assert.equal(
+      reconciliation.buildStackInventory(root, 'sha-3', first).status,
+      'refreshed'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

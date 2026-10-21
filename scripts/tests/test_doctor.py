@@ -480,6 +480,21 @@ class JudgeTest(unittest.TestCase):
             self.assertIn("60 min old", alerts["automation-silent:gem:stale"])
             self.assertIn("missing", alerts["automation-silent:gem:missing"])
             self.assertEqual(doctor.automation_watch(None, "gem", now), {"known": False, "silent": {}})
+            self.assertIn("automation-registry-unreadable",
+                          doctor.judge(obs(automation={"known": False, "silent": {}}, now=now)))
+            self.assertNotIn("automation-registry-unreadable",
+                             doctor.judge(obs(automation={"known": False, "silent": {}, "skipped": True}, now=now)))
+            self.assertNotIn("automation-registry-unreadable", doctor.judge(obs(now=now)))
+
+    def test_the_watched_registry_is_the_one_merged_on_main(self):
+        # The doctor must read the path the registry actually ships at (#22354: canon/).
+        repo = Path(__file__).resolve().parents[2]
+        if not (repo / "canon").is_dir():
+            self.skipTest("staged lanes release trees carry no canon/")
+        self.assertTrue((repo / doctor.AUTOMATION_REGISTRY).is_file(), doctor.AUTOMATION_REGISTRY)
+        rows = doctor.automation_registry(repo, run=lambda *_a, **_k: doctor.subprocess.CompletedProcess(
+            [], 0, (repo / doctor.AUTOMATION_REGISTRY).read_text(), ""))
+        self.assertTrue(rows and any(row["id"] == "gem:lanes-watchdog" for row in rows))
 
     def test_the_hosted_liveness_check_and_the_doctor_watch_each_other(self):
         now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
