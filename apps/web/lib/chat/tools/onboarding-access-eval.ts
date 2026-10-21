@@ -4,7 +4,7 @@
  * This is NOT an LLM tool. It is a server function called by the
  * `proposeNextStep` tool to decide whether the visitor should:
  *
- *   - `instant_access` — Spotify/social audience has solid signal, route to checkout
+ *   - `instant_access` — verified regularly uploading YouTube music artist, route to checkout
  *   - `waitlist`       — qualifying signal too weak, defer with waitlist confirmation
  *   - `needs_more_info` — interview not complete enough to decide either way
  *
@@ -19,11 +19,7 @@ import {
   type QualificationInput,
   qualificationReceipt,
 } from '@/lib/acquisition/conversation-loop';
-import {
-  type CanonicalArtistMetrics,
-  getDisplaySpotifyFollowers,
-  normalizeArtistMetrics,
-} from '@/lib/onboarding/canonical-metrics';
+import { type CanonicalArtistMetrics } from '@/lib/onboarding/canonical-metrics';
 import {
   type AudienceBand,
   collapseInterviewSignals,
@@ -55,7 +51,9 @@ export function toQualificationInput(
     : false;
   const answers: QualificationInput['answers'] = {
     current_behavior:
-      [signal.releaseStage, tool?.name].filter(Boolean).join('; ') || undefined,
+      [signal.pastBehavior, signal.releaseStage, tool?.name]
+        .filter(Boolean)
+        .join('; ') || undefined,
     alternatives: tool?.name,
     pain: tool?.note ?? signal.objection?.text,
     urgency: urgent ? signal.releaseStage : undefined,
@@ -82,13 +80,15 @@ export interface AccessDecisionInput {
   readonly signal: InterviewSignal;
   /**
    * Spotify follower count from confirmSpotifyArtist (if resolved).
-   * Prefer `metrics` when available — this field is normalized either way.
+   * Retained for telemetry; Spotify followers never grant admission.
    */
   readonly spotifyFollowers: number | null;
   /** Optional canonical metrics snapshot (preferred over bare followers). */
   readonly metrics?: CanonicalArtistMetrics | null;
   /** Number of LLM turns observed so far. Used to break stuck loops. */
   readonly turnCount: number;
+  /** Server-resolved channel cadence and artist role, never a model score. */
+  readonly youtubeQualified?: boolean;
 }
 
 export interface AccessDecision {
@@ -108,37 +108,25 @@ export interface AccessDecision {
   };
 }
 
-/** Maximum LLM turns before we force a decision even with weak signal. */
+/** Legacy recovery turn budget; it never substitutes for an interview answer. */
 export const MAX_INTERVIEW_TURNS_BEFORE_FORCE = 3;
 
-/** Spotify follower bands that auto-qualify for instant access. */
-const INSTANT_ACCESS_FOLLOWER_THRESHOLD = 1_000;
+export const YOUTUBE_ARTIST_ACCESS_RATIONALE =
+  'regularly_uploading_youtube_music_artist';
 
 /**
  * Score the accumulated signal and return a routing decision.
  *
  * Pure function, deterministic, no I/O. Safe to call repeatedly across turns.
  *
- * Decision rules (top match wins):
- *  1. Stated disqualifier (wrong audience) → waitlist
- *  2. Verified Spotify followers >= 1k → instant_access
- *  3. Hit MAX_INTERVIEW_TURNS_BEFORE_FORCE without verified signal → waitlist
- *  4. Otherwise → needs_more_info, naming the next Mom-Test dimension
+ * An interview answer is required before either terminal outcome. Only
+ * server-verified YouTube cadence plus a music artist role grants access.
+ * Other visitors keep their interview context and reserve a waitlist spot.
  */
 export function evaluateAccessSignal(
   input: AccessDecisionInput
 ): AccessDecision {
-  const { signal, turnCount } = input;
-
-  // Always resolve followers through the canonical metrics contract so access
-  // decisions cannot mix monthly listeners into the follower threshold.
-  const metrics =
-    input.metrics ??
-    normalizeArtistMetrics(
-      { spotifyFollowers: input.spotifyFollowers },
-      { source: 'tool_output' }
-    );
-  const spotifyFollowers = getDisplaySpotifyFollowers(metrics);
+  const { signal } = input;
 
   const receipt = qualificationReceipt(toQualificationInput(signal));
   const qualification = {
@@ -146,6 +134,16 @@ export function evaluateAccessSignal(
     missingDimensions: receipt.missingDimensions,
     nextDimension: receipt.missingDimensions[0] ?? null,
   };
+
+  // Identity and a counter/role alone are not a Mom Test interview.
+  if (!signal.pastBehavior && !signal.currentTool?.name) {
+    return {
+      kind: 'needs_more_info',
+      rationale: 'past_behavior_required',
+      score: 10,
+      qualification: { ...qualification, nextDimension: 'current_behavior' },
+    };
+  }
 
   // 1. A stated disqualifier (wrong audience) is an honest waitlist.
   if (receipt.disqualifiers.length > 0) {
@@ -157,41 +155,26 @@ export function evaluateAccessSignal(
     };
   }
 
-  // 2. Verified Spotify signal (server-derived, JOV-7143) — instant access.
-  if (
-    spotifyFollowers !== null &&
-    spotifyFollowers >= INSTANT_ACCESS_FOLLOWER_THRESHOLD
-  ) {
+  if (input.youtubeQualified) {
     return {
       kind: 'instant_access',
-      rationale: `spotify_followers_${spotifyFollowers}`,
+      rationale: YOUTUBE_ARTIST_ACCESS_RATIONALE,
       score: 90,
       qualification,
     };
   }
 
-  // 3. Turn cap reached — force decision into waitlist. Self-reported audience
-  //    size never grants access on its own (JOV-7144): it is unverified.
-  if (turnCount >= MAX_INTERVIEW_TURNS_BEFORE_FORCE) {
-    return {
-      kind: 'waitlist',
-      rationale: `max_turns_reached_${turnCount}`,
-      score: 30,
-      qualification,
-    };
-  }
-
-  // 4. Not enough signal yet — ask about the next uncovered Mom-Test dimension.
   return {
-    kind: 'needs_more_info',
-    rationale: 'insufficient_signal',
-    score: 10,
+    kind: 'waitlist',
+    rationale: 'youtube_artist_icp_required',
+    score: 30,
     qualification,
   };
 }
 
 export interface OnboardingAccessInput {
   readonly accessControlled: boolean;
+  readonly youtubeQualified?: boolean;
   readonly spotifyArtistId: string | null;
   /** Any public profile link (propose_social_link); qualifies non-artists. */
   readonly publicProfileUrl?: string | null;
@@ -209,26 +192,16 @@ export interface OnboardingAccessInput {
 /**
  * JOV-7144: the single onboarding access gate, shared by the LLM tool
  * (`proposeNextStep`) and the scripted fallback engine so they cannot drift.
- * The DB-backed controlled-access gate stays authoritative.
+ * The YouTube artist exception applies under either global gate setting.
  */
 export function decideOnboardingAccess(
   input: OnboardingAccessInput
 ): AccessDecision {
-  if (input.accessControlled) {
-    // Artists are admitted first; everyone else reserves their name (Tim
-    // 2026-09-29, JOV-3379). Either a confirmed Spotify artist or any public
-    // profile link is enough evidence to save the reservation.
-    if (!input.spotifyArtistId && !input.publicProfileUrl) {
-      return {
-        kind: 'needs_more_info',
-        rationale: 'public_profile_required_for_waitlist',
-        score: 0,
-      };
-    }
+  if (!input.spotifyArtistId && !input.publicProfileUrl) {
     return {
-      kind: 'waitlist',
-      rationale: 'controlled_access_gate_enabled',
-      score: 100,
+      kind: 'needs_more_info',
+      rationale: 'public_profile_required_for_waitlist',
+      score: 0,
     };
   }
   const recordedAt = new Date().toISOString();
@@ -241,5 +214,6 @@ export function decideOnboardingAccess(
     spotifyFollowers: input.spotifyFollowers,
     metrics: input.metrics,
     turnCount: input.turnCount,
+    youtubeQualified: input.youtubeQualified,
   });
 }

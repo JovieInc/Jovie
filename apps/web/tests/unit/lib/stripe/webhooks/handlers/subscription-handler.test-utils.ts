@@ -17,7 +17,6 @@ const hoisted = vi.hoisted(() => ({
   mockExpireReferralOnChurn: vi.fn(),
   mockEnqueuePaidWelcomeAfterEntitlement: vi.fn(),
   mockNotifySlackCancellation: vi.fn(),
-  mockAdmitPaidUser: vi.fn(),
 }));
 
 export const mockGetUserIdFromStripeCustomer =
@@ -33,7 +32,6 @@ export const mockExpireReferralOnChurn = hoisted.mockExpireReferralOnChurn;
 export const mockEnqueuePaidWelcomeAfterEntitlement =
   hoisted.mockEnqueuePaidWelcomeAfterEntitlement;
 export const mockNotifySlackCancellation = hoisted.mockNotifySlackCancellation;
-export const mockAdmitPaidUser = hoisted.mockAdmitPaidUser;
 
 // Setup mocks
 vi.mock('@/lib/stripe/webhooks/utils', () => ({
@@ -68,10 +66,6 @@ vi.mock('@/lib/leads/funnel-events', () => ({
 
 vi.mock('@/lib/referrals/service', () => ({
   expireReferralOnChurn: mockExpireReferralOnChurn,
-}));
-
-vi.mock('@/lib/waitlist/paid-admission', () => ({
-  admitPaidUser: mockAdmitPaidUser,
 }));
 
 vi.mock('@/lib/email/paid-welcome', () => ({
@@ -165,5 +159,4 @@ export function setupDefaultMocks() {
   mockAttributeLeadPaidConversionByAppUserId.mockResolvedValue(undefined);
   mockExpireReferralOnChurn.mockResolvedValue(undefined);
   mockNotifySlackCancellation.mockResolvedValue({ status: 'sent' });
-  mockAdmitPaidUser.mockResolvedValue({ admitted: true });
 }

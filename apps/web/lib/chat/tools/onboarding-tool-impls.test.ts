@@ -176,7 +176,7 @@ describe('proposeNextStep controlled access', () => {
     });
   });
 
-  it('waitlists every anonymous visitor while the access gate is enabled', async () => {
+  it('asks for past behavior before waitlisting a Spotify-only visitor', async () => {
     const tools = buildOnboardingTools(
       createOnboardingTurnState({
         sessionId: 'session-controlled',
@@ -192,8 +192,8 @@ describe('proposeNextStep controlled access', () => {
     const result = await proposeNextStep.execute();
 
     expect(result.decision).toMatchObject({
-      kind: 'waitlist',
-      rationale: 'controlled_access_gate_enabled',
+      kind: 'needs_more_info',
+      rationale: 'past_behavior_required',
     });
   });
 });

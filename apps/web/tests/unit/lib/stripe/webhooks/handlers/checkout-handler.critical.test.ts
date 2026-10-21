@@ -20,7 +20,6 @@ const {
   mockAttributeLeadPaidConversionByAppUserId,
   mockActivateReferral,
   mockLoggerWarn,
-  mockAdmitPaidUser,
 } = vi.hoisted(() => ({
   mockStripeSubscriptionsRetrieve: vi.fn(),
   mockGetUserIdFromStripeCustomer: vi.fn(),
@@ -32,11 +31,6 @@ const {
   mockAttributeLeadPaidConversionByAppUserId: vi.fn(),
   mockActivateReferral: vi.fn(),
   mockLoggerWarn: vi.fn(),
-  mockAdmitPaidUser: vi.fn(),
-}));
-
-vi.mock('@/lib/waitlist/paid-admission', () => ({
-  admitPaidUser: mockAdmitPaidUser,
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
@@ -116,7 +110,6 @@ describe('@critical CheckoutSessionHandler', () => {
     mockInvalidateBillingCache.mockResolvedValue(undefined);
     mockAttributeLeadPaidConversionByAppUserId.mockResolvedValue(undefined);
     mockActivateReferral.mockResolvedValue(undefined);
-    mockAdmitPaidUser.mockResolvedValue({ admitted: true });
   });
 
   describe('eventTypes', () => {
@@ -177,11 +170,6 @@ describe('@critical CheckoutSessionHandler', () => {
         })
       );
       expect(mockInvalidateBillingCache).toHaveBeenCalled();
-      // A verified active subscription admits the buyer past the waitlist.
-      expect(mockAdmitPaidUser).toHaveBeenCalledWith({
-        appUserId: betterAuthRow.id,
-        cacheKeys: [betterAuthRow.id],
-      });
       expect(mockActivateReferral).toHaveBeenCalledWith(betterAuthRow.id);
       expect(mockActivateReferral).not.toHaveBeenCalledWith(
         betterAuthRow.clerkId
@@ -610,8 +598,6 @@ describe('@critical CheckoutSessionHandler', () => {
           isPro: false,
         })
       );
-      // No verified payment, no admission.
-      expect(mockAdmitPaidUser).not.toHaveBeenCalled();
     });
   });
 

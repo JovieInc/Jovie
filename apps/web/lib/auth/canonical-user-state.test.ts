@@ -35,6 +35,16 @@ describe('waitlist receipt state', () => {
     ).toBe(CanonicalUserState.WAITLIST_PENDING);
   });
 
+  it('requires an interview for an unapproved gate-off account', () => {
+    expect(
+      resolveCanonicalState({
+        ...pendingUser,
+        userStatus: 'new',
+        waitlistGateEnabled: false,
+      })
+    ).toBe(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION);
+  });
+
   it('does not admit a banned user with a missing receipt', () => {
     expect(
       resolveCanonicalState({ ...pendingUser, userStatus: 'banned' })

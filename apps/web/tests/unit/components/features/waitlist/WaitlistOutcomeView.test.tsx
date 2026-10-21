@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 const checkout = vi.hoisted(() => ({
@@ -41,42 +41,22 @@ describe('WaitlistOutcomeView pending receipt', () => {
   });
 });
 
-describe('WaitlistOutcomeView Start Pro (JOV-7701: anyone can buy)', () => {
-  it.each([
-    ['a reserved handle', 'coolartist'],
-    ['no link', null],
-  ])('offers Start Pro on the pending receipt with %s', (_label, handle) => {
-    checkout.mutate.mockClear();
-    render(
-      <WaitlistOutcomeView
-        outcome='pending'
-        reservedHandle={handle}
-        proCheckoutPriceId='price_pro_monthly'
-      />
-    );
-
-    const cta = screen.getByTestId('waitlist-start-pro-checkout');
-    expect(cta).toHaveTextContent('Start Pro ($199)');
-    fireEvent.click(cta);
-    // Default checkout: no onboarding source, so success lands on
-    // /billing/success and routes a link-less buyer to /start.
-    expect(checkout.mutate).toHaveBeenCalledWith(
-      { priceId: 'price_pro_monthly' },
-      expect.any(Object)
-    );
-    expect(screen.getByTestId('waitlist-resume-start')).toBeInTheDocument();
-  });
-
-  it('hides Start Pro without a configured price or on error receipts', () => {
-    const { rerender } = render(<WaitlistOutcomeView outcome='pending' />);
-    expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();
-
-    rerender(
-      <WaitlistOutcomeView
-        outcome='save_failed'
-        proCheckoutPriceId='price_pro_monthly'
-      />
-    );
-    expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();
-  });
+describe('interview waitlist receipt', () => {
+  it.each(['pending', 'waitlisted_gate_on', 'already_waitlisted'] as const)(
+    'offers resume without a purchase shortcut for %s',
+    outcome => {
+      render(
+        <WaitlistOutcomeView outcome={outcome} email='artist@example.com' />
+      );
+      expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();
+      expect(screen.getByTestId('waitlist-resume-start')).toHaveAttribute(
+        'href',
+        '/start'
+      );
+      expect(
+        screen.getByText(/music artists who upload regularly to YouTube/)
+      ).toBeVisible();
+      expect(screen.queryByText(/few days/)).toBeNull();
+    }
+  );
 });

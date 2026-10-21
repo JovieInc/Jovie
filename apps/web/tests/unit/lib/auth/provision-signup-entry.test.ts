@@ -77,15 +77,17 @@ describe('provisionAppUser sign-up waitlist entry', () => {
     );
   });
 
-  it('creates no entry when the gate is off', async () => {
+  it('keeps a new sign-up in the interview when the gate is off', async () => {
     mocks.gateEnabled = false;
     const { provisionAppUser } = await import('@/lib/auth/provision');
 
     await provisionAppUser(input);
     expect(mocks.insertedValues[0]).toMatchObject({
-      userStatus: 'waitlist_approved',
+      userStatus: 'waitlist_pending',
     });
-    expect(mocks.ensureSignupWaitlistEntry).not.toHaveBeenCalled();
+    expect(mocks.ensureSignupWaitlistEntry).toHaveBeenCalledWith(
+      'new.artist@example.com'
+    );
   });
 
   it('creates no entry for an already-approved waitlister', async () => {

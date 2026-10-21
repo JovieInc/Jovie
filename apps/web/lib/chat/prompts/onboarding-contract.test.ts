@@ -111,7 +111,7 @@ describe('deterministic onboarding prompt contract', () => {
     ],
     [
       'preservesToolPrerequisites',
-      'Use `proposeNextStep` once identity and a useful signal are known',
+      'Use `proposeNextStep` once identity and past behavior are known',
     ],
   ] as const)('rejects a prompt missing %s', (fact, requiredRule) => {
     expect(ONBOARDING_SYSTEM_PROMPT).toContain(requiredRule);

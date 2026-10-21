@@ -92,8 +92,8 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
 
   line(
     'ask_audience',
-    'v3',
-    'One thing before routing: roughly how big is the audience? Under 500, a few thousand, more?'
+    'v4',
+    'What did you use to share your last release or piece of work, and what got in the way? If you upload music to YouTube, include your channel link.'
   ),
 
   line(

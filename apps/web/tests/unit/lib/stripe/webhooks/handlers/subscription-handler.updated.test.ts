@@ -19,7 +19,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SubscriptionHandler } from '@/lib/stripe/webhooks/handlers/subscription-handler';
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 import {
-  mockAdmitPaidUser,
   mockGetUserIdFromStripeCustomer,
   mockInvalidateBillingCache,
   mockLogFallback,
@@ -71,11 +70,6 @@ describe('@critical SubscriptionHandler - Updated', () => {
       })
     );
     expect(mockInvalidateBillingCache).toHaveBeenCalled();
-    // A subscription that turns active admits a still-pending buyer.
-    expect(mockAdmitPaidUser).toHaveBeenCalledWith({
-      appUserId: 'app_user_test',
-      cacheKeys: ['user_updated'],
-    });
   });
 
   it('processes subscription updated with past_due status (downgrades)', async () => {
@@ -109,7 +103,6 @@ describe('@critical SubscriptionHandler - Updated', () => {
       })
     );
     expect(mockInvalidateBillingCache).toHaveBeenCalled();
-    expect(mockAdmitPaidUser).not.toHaveBeenCalled();
   });
 
   it('processes subscription updated with trialing status (upgrades)', async () => {

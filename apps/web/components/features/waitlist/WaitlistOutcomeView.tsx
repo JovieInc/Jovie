@@ -5,9 +5,6 @@ import { ArrowRight, CheckCircle2, Clock3, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
-import { track } from '@/lib/analytics';
-import { PLAN_PRICES } from '@/lib/config/plan-prices';
-import { useCheckoutMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
 
@@ -27,12 +24,6 @@ interface WaitlistOutcomeViewProps {
    * only claims the handle is reserved when this is non-null.
    */
   readonly reservedHandle?: string | null;
-  /**
-   * Stripe price for the self-serve Pro offer. When present, waiting visitors
-   * can buy now: a verified payment admits them, then /billing/success sends
-   * them on to claim their link.
-   */
-  readonly proCheckoutPriceId?: string | null;
 }
 
 type OutcomeCopy = {
@@ -49,7 +40,7 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
   accepted: {
     title: 'You Have Access',
     body: () =>
-      'We saved your release context. Continue setup to finish your profile and open Jovie.',
+      'We saved your interview answers. Continue setup to finish your profile and open Jovie.',
     icon: CheckCircle2,
     actionLabel: 'Continue Setup',
     actionHref: APP_ROUTES.START,
@@ -66,8 +57,8 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
     title: 'Request Saved',
     body: hasEmail =>
       hasEmail
-        ? 'Jovie is in a private rollout. We saved your release context and will email you when access opens — usually within a few days of capacity.'
-        : 'Jovie is in a private rollout. We saved your release context. Return to /start when a spot opens — usually within a few days of capacity.',
+        ? "Your interview answers are saved. We'll email you when access opens for your workflow."
+        : 'Your interview answers are saved. Return to /start when access opens for your workflow.',
     icon: Clock3,
     showNextSteps: true,
   },
@@ -93,7 +84,9 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
     title: "You're on the list",
     body: (hasEmail, reservedHandle) =>
       reservedHandle
-        ? `jov.ie/${reservedHandle} is yours. Your name and profile are reserved, and we'll email you the moment your spot opens.`
+        ? hasEmail
+          ? `jov.ie/${reservedHandle} is yours. Your name and profile are reserved, and we'll email you when your segment opens.`
+          : `jov.ie/${reservedHandle} is yours. Your name and profile are reserved. Return to /start when your segment opens.`
         : hasEmail
           ? "We're opening Jovie in waves. Your request is saved, and we'll email you the moment your spot opens."
           : "We're opening Jovie in waves. Your request is saved. Come back to /start when your spot opens.",
@@ -124,7 +117,7 @@ function NextSteps({ email }: { readonly email?: string | null }) {
   const knownEmail = email?.trim() || null;
   const contactLine = knownEmail
     ? `Watch ${knownEmail} for the access email.`
-    : 'Add a contact email at sign-in if you want a heads-up when access opens.';
+    : 'Confirm your email at sign-in to hear when your segment opens.';
 
   return (
     <ol
@@ -132,7 +125,10 @@ function NextSteps({ email }: { readonly email?: string | null }) {
       data-testid='waitlist-next-steps'
     >
       <li>{contactLine}</li>
-      <li>Expected timing: a few days once capacity opens — not instant.</li>
+      <li>
+        Access is open to music artists who upload regularly to YouTube. We do
+        not have an opening date for other workflows.
+      </li>
       <li>
         Resume anytime at{' '}
         <Link
@@ -168,57 +164,11 @@ function PrimaryCtaLink({
   );
 }
 
-export const WAITLIST_START_PRO_TEST_ID = 'waitlist-start-pro-checkout';
-
-/**
- * Opens the default checkout (no onboarding source), so success lands on
- * /billing/success, which routes a buyer without a claimed link to /start.
- */
-function StartProCheckoutButton({ priceId }: { readonly priceId: string }) {
-  const checkout = useCheckoutMutation();
-
-  return (
-    <div className='flex flex-col gap-2'>
-      <Button
-        type='button'
-        variant='primary'
-        size='lg'
-        disabled={checkout.isPending}
-        data-testid={WAITLIST_START_PRO_TEST_ID}
-        onClick={() => {
-          track('checkout_initiated', {
-            flow_type: 'waitlist_receipt',
-            price_id: priceId,
-          });
-          checkout.mutate(
-            { priceId },
-            {
-              onSuccess: data => {
-                globalThis.location.href = data.url;
-              },
-            }
-          );
-        }}
-      >
-        {checkout.isPending
-          ? 'Opening Checkout...'
-          : `Start Pro ($${PLAN_PRICES.pro.monthly})`}
-      </Button>
-      {checkout.isError ? (
-        <p className='text-sm text-error' role='alert'>
-          {"Checkout didn't open. Try again in a moment."}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 export function WaitlistOutcomeView({
   outcome,
   onRetry,
   email,
   reservedHandle,
-  proCheckoutPriceId,
 }: Readonly<WaitlistOutcomeViewProps>) {
   const copy = OUTCOME_COPY[outcome];
   const Icon = copy.icon;
@@ -230,7 +180,6 @@ export function WaitlistOutcomeView({
   const primaryHref = copy.actionHref;
   const primaryLabel = copy.actionLabel;
   const showResumeCta = Boolean(copy.showNextSteps && !primaryHref);
-  const showStartPro = Boolean(copy.showNextSteps && proCheckoutPriceId);
 
   return (
     <section className='w-full rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) px-5 py-6 text-primary-token shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>
@@ -249,15 +198,12 @@ export function WaitlistOutcomeView({
         {primaryHref && primaryLabel ? (
           <PrimaryCtaLink href={primaryHref} label={primaryLabel} />
         ) : null}
-        {showStartPro && proCheckoutPriceId ? (
-          <StartProCheckoutButton priceId={proCheckoutPriceId} />
-        ) : null}
         {showResumeCta ? (
           <PrimaryCtaLink
             href={APP_ROUTES.START}
             label='Resume At Start'
             testId='waitlist-resume-start'
-            variant={showStartPro ? 'secondary' : 'primary'}
+            variant='primary'
           />
         ) : null}
         {canRetry ? (

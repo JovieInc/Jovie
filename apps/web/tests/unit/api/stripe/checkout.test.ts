@@ -17,6 +17,9 @@ vi.mock('@/lib/observability/revenue-spine', () => ({
   captureRevenueSpineFailure: mockRevenueFailure,
 }));
 
+const mockGetDbUser = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/auth/session', () => ({ getDbUser: mockGetDbUser }));
+
 const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockCreateCheckoutSession = vi.hoisted(() => vi.fn());
 const mockCreateBillingPortalSession = vi.hoisted(() => vi.fn());
@@ -89,6 +92,7 @@ import { POST } from '@/app/api/stripe/checkout/route';
 describe('POST /api/stripe/checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetDbUser.mockResolvedValue({ userStatus: 'active' });
     mockIsMaxPlanEnabled.mockReturnValue(true);
     mockIsMaxPriceId.mockReturnValue(false);
     mockGetActivePriceIds.mockReturnValue(['price_123']);
@@ -673,4 +677,23 @@ describe('POST /api/stripe/checkout', () => {
     // 400 directly, so captureCriticalError is never invoked.
     expect(mockCaptureCriticalError).not.toHaveBeenCalled();
   });
+});
+
+describe('interview admission before checkout', () => {
+  it.each(['waitlist_pending', 'new', 'banned', null])(
+    'rejects %s without creating a Stripe session',
+    async userStatus => {
+      mockGetCachedAuth.mockResolvedValue({ userId: 'app-user' });
+      mockGetDbUser.mockResolvedValue({ userStatus });
+      mockCreateCheckoutSession.mockClear();
+      const response = await POST(
+        new NextRequest('https://jov.ie/api/stripe/checkout', {
+          method: 'POST',
+          body: JSON.stringify({ priceId: 'price_123' }),
+        })
+      );
+      expect(response.status).toBe(403);
+      expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+    }
+  );
 });
