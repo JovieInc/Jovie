@@ -647,7 +647,7 @@ describe('UnifiedSidebar library route', () => {
       name: 'OV Navigation',
     });
     expect(
-      within(operatorNavigation).getByRole('link', { name: 'Chat' })
+      within(operatorNavigation).getByRole('link', { name: 'Ops' })
     ).not.toHaveAttribute('aria-current');
     const operationsLink = within(operatorNavigation).getByRole('link', {
       name: 'Operations',

@@ -62,7 +62,7 @@ describe('PricingComparisonChart', () => {
       screen.queryByRole('switch', { name: 'Toggle Annual Billing' })
     ).not.toBeInTheDocument();
     expect(screen.queryByText('Save ~20%')).not.toBeInTheDocument();
-    expect(within(desktopTable).getByText('$199')).toBeInTheDocument();
+    expect(within(desktopTable).getByText('$12')).toBeInTheDocument();
     expect(within(desktopTable).getByText('/mo')).toBeInTheDocument();
     expect(screen.queryByText('Max')).not.toBeInTheDocument();
     expect(screen.queryByText('$149')).not.toBeInTheDocument();
@@ -92,7 +92,7 @@ describe('PricingComparisonChart', () => {
     expect(
       within(mobileTable).getByText('Artist Presence')
     ).toBeInTheDocument();
-    expect(within(mobileTable).getByText('$199')).toBeInTheDocument();
+    expect(within(mobileTable).getByText('$12')).toBeInTheDocument();
     expect(within(mobileTable).getByText('/mo')).toBeInTheDocument();
     expect(within(mobileTable).getByText('Unlimited')).toBeInTheDocument();
   });

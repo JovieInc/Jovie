@@ -9,6 +9,8 @@
 export {
   type AcquisitionFirstTouch,
   type AcquisitionJourney,
+  type AcquisitionJourneyStage,
+  acquisitionJourneyStages,
   acquisitionJourneys,
   insertAcquisitionJourneySchema,
   type NewAcquisitionJourney,
