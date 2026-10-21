@@ -1,6 +1,7 @@
 import { parseCapacityHorizon } from './client';
 import {
   DELIVERY_MERGE_REPOS,
+  type DeliveryFlow,
   type DeliveryLane,
   type DeliveryLanes,
   type DeliveryMergedPullRequest,
@@ -8,6 +9,7 @@ import {
   isExactSha,
   measuredCount,
   NOT_MEASURED_COUNT,
+  type PipelineTiming,
   SHIPPING_SOURCE_SCHEMAS,
   type ShippingSourceId,
   type StageSummary,
@@ -868,6 +870,84 @@ export function parseStageSummary(value: unknown): StageSummary | null {
     stagesWithData: count(coverage.stagesWithData),
     regressions,
     slowestP95,
+    endToEnd7d: parseEndToEnd(value.endToEnd7d, regressions),
+  };
+}
+
+/** `endToEnd7d` is keyed `entity:from->to`; a span regressed when `<key>.p95` is listed. */
+function parseEndToEnd(
+  value: unknown,
+  regressions: readonly string[]
+): PipelineTiming[] {
+  if (!isRecord(value)) return [];
+  return Object.entries(value)
+    .flatMap(([key, row]) => {
+      const pipeline = /^[a-z0-9][-a-z0-9:_.>]{0,95}$/i.test(key) ? key : null;
+      if (!pipeline || !isRecord(row)) return [];
+      if (!Number.isSafeInteger(row.n) || Number(row.n) < 0) return [];
+      return [
+        {
+          pipeline,
+          p50: seconds(row.p50),
+          p95: seconds(row.p95),
+          n: Number(row.n),
+          regressed: regressions.includes(`${key}.p95`),
+        },
+      ];
+    })
+    .slice(0, 8);
+}
+
+function finiteOrNull(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : null;
+}
+
+function countOrNull(value: unknown): number | null {
+  return Number.isSafeInteger(value) && Number(value) >= 0
+    ? Number(value)
+    : null;
+}
+
+/**
+ * Flow health from the lanes feed. Missing blocks stay null so Home renders
+ * "Not measured" rather than a false zero.
+ */
+export function parseLaneFlow(
+  payload: Record<string, unknown>
+): DeliveryFlow | null {
+  const prs = isRecord(payload.prs) ? payload.prs : null;
+  const slo = isRecord(payload.slo) ? payload.slo : null;
+  const admission = isRecord(payload.admission) ? payload.admission : null;
+  const ownership = isRecord(payload.ownership) ? payload.ownership : null;
+  if (!prs && !slo && !admission && !ownership) return null;
+  const throughput = slo && isRecord(slo.throughput) ? slo.throughput : null;
+  const mergesPerDay = finiteOrNull(throughput?.mergesPerDay);
+  const ejection = finiteOrNull(slo?.queueEjectionRate);
+  const regressions = (
+    slo && Array.isArray(slo.regressions) ? slo.regressions : []
+  )
+    .filter((item): item is string => typeof item === 'string')
+    .map(item => item.trim().slice(0, 120))
+    .filter(Boolean)
+    .slice(0, 10);
+  return {
+    openPrs: countOrNull(prs?.open),
+    redPrs: countOrNull(prs?.red),
+    dirtyPrs: countOrNull(prs?.dirty),
+    cleanNotQueued: countOrNull(prs?.cleanNotQueued),
+    exhaustedPrs: countOrNull(prs?.exhausted),
+    mergesPerHour:
+      mergesPerDay === null ? null : Math.round((mergesPerDay / 24) * 10) / 10,
+    queueEjectionRate: ejection !== null && ejection <= 1 ? ejection : null,
+    queueWaitP95Seconds: finiteOrNull(slo?.queueWaitP95Seconds),
+    productionLagP95Seconds: finiteOrNull(slo?.productionLagP95Seconds),
+    eligiblePool: countOrNull(admission?.eligiblePool),
+    candidatePool: countOrNull(admission?.candidatePool),
+    ownerless: countOrNull(ownership?.ownerless),
+    regressions,
+    at: slo ? parseTimestamp(slo.at) : null,
   };
 }
 
@@ -926,6 +1006,7 @@ export function parseLanesStatus(
     stageSummary: isRecord(payload.slo)
       ? parseStageSummary(payload.slo.stages)
       : null,
+    flow: parseLaneFlow(payload),
     publishedAt,
     stale: false,
   };
