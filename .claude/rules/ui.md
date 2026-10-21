@@ -277,6 +277,11 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
   receipts, duplicates, mappings, and process copy in operator artifacts.
 - Pen is proposal/review evidence until source identity, save/readback, and
   persistence contracts pass. Visual similarity is not source backing.
+- Marketing pages share one spine and one type ramp: sections use
+  `ArtistProfileSectionShell`, heroes use `.ap-section-container`, and type
+  uses `.marketing-type-display` / `-section` / `-lede`.
+- Marketing plan prices render only through `MarketingOfferSummary` or
+  `getPublicPriceClaim` from offer truth; never type a price into copy.
 
 ### No Duplicate Page Titles (Breadcrumb + Toolbar)
 
