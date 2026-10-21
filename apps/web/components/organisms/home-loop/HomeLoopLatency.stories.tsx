@@ -58,3 +58,24 @@ export const Clean: Story = {
     ],
   },
 };
+
+export const NotMeasured: Story = {
+  args: {
+    rows: [
+      {
+        id: 'shipping:ready',
+        label: 'Shipping · Ready',
+        p50: 'Not measured',
+        p95: 'Not measured',
+        samples: 0,
+        regressed: false,
+      },
+    ],
+    otherRegressions: [],
+    coverage: '0 of 31 stages measured',
+  },
+};
+
+export const Empty: Story = {
+  args: { rows: [], otherRegressions: [], coverage: null },
+};
