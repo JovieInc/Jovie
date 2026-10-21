@@ -422,6 +422,7 @@ describe('ProfilePacCard landscape states', () => {
             title: 'Release',
             slug: 'release',
             artworkUrl: '/release.jpg',
+            previewUrl: null,
             releaseDate,
           }}
           assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
