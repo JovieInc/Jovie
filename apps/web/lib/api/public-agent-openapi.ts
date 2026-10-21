@@ -171,7 +171,7 @@ export const PUBLIC_AGENT_PATHS: Readonly<
       operationId: 'createProfile',
       summary: 'Create or find a Spotify artist profile',
       description:
-        'Feature-gated. Anonymous callers are limited to 10 creations per hour per IP. An optional Bearer JOVIE_API_KEY attributes new profiles to the account and uses a shared 100-per-hour account budget. API keys do not grant artist ownership. Supports Spotify artist URLs only. Returns an existing profile unchanged (200) or creates an unclaimed profile (201). claimUrl leads to human ownership verification and is null for claimed profiles. Writes have no idempotency key and are not automatically retried by the CLI.',
+        'Feature-gated. Anonymous callers are limited to 10 creations per hour per IP. An optional Bearer JOVIE_API_KEY attributes new profiles to the account and uses a shared 100-per-hour account budget. Credential verification is separately limited to 100 requests per minute per IP. API keys do not grant artist ownership. Supports Spotify artist URLs only. Returns an existing profile unchanged (200) or creates an unclaimed profile (201). claimUrl leads to human ownership verification and is null for claimed profiles. Writes have no idempotency key and are not automatically retried by the CLI.',
       security: [{}, { AgentApiKey: [] }],
       requestBody: body('AgentProfileRequest'),
       responses: {

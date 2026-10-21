@@ -17,6 +17,7 @@ import {
   agentProfileCreateLimiter,
   createRateLimitHeaders,
   getClientIP,
+  publicArtistApiLimiter,
 } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
@@ -87,6 +88,23 @@ export async function POST(request: Request) {
       'Agent profile creation is temporarily disabled.',
       { 'Retry-After': RETRY_AFTER_SERVICE }
     );
+  }
+
+  // Bound the credential oracle before its indexed DB lookup, including
+  // invalid keys. Keep this separate from both creation budgets.
+  if (request.headers.has('authorization')) {
+    const verificationLimit = await publicArtistApiLimiter.limit(
+      `agent-api-key:${getClientIP(request)}`
+    );
+    if (!verificationLimit.success)
+      return fail(
+        verificationLimit.unavailable ? 503 : 429,
+        verificationLimit.unavailable
+          ? 'TEMPORARILY_UNAVAILABLE'
+          : 'RATE_LIMITED',
+        'API key verification is temporarily limited. Try again shortly.',
+        createRateLimitHeaders(verificationLimit)
+      );
   }
 
   let actor: Awaited<ReturnType<typeof authenticateAgentApiKey>>;

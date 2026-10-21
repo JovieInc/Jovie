@@ -5,6 +5,7 @@ const hoisted = vi.hoisted(() => ({
   flag: vi.fn(),
   auth: vi.fn(),
   accountLimit: vi.fn(),
+  verificationLimit: vi.fn(),
   limit: vi.fn(),
   spotify: vi.fn(),
   ingest: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: hoisted.flag }));
 vi.mock('@/lib/rate-limit', () => ({
   agentProfileCreateAuthenticatedLimiter: { limit: hoisted.accountLimit },
   agentProfileCreateLimiter: { limit: hoisted.limit },
+  publicArtistApiLimiter: { limit: hoisted.verificationLimit },
   createRateLimitHeaders: () => ({ 'Retry-After': '60' }),
   getClientIP: () => '203.0.113.10',
 }));
@@ -70,12 +72,30 @@ describe('POST /api/agents/profiles', () => {
     hoisted.selectRows = [];
     hoisted.auth.mockResolvedValue({ ok: true, userId: null });
     hoisted.accountLimit.mockResolvedValue({ success: true });
+    hoisted.verificationLimit.mockResolvedValue({ success: true });
     hoisted.flag.mockResolvedValue(true);
     hoisted.limit.mockResolvedValue({ success: true });
     hoisted.spotify.mockResolvedValue({
       name: 'Radiohead',
       spotifyId: '4Z8W4fKeB5YxbusRsdQVPb',
     });
+  });
+
+  it('bounds bearer verification attempts before touching identity or upstream services', async () => {
+    const headers = { authorization: 'Bearer jovie_' + 'x'.repeat(64) };
+    hoisted.verificationLimit.mockResolvedValueOnce({ success: false });
+    expect((await post({ url: SPOTIFY_URL }, headers)).status).toBe(429);
+    hoisted.verificationLimit.mockResolvedValueOnce({
+      success: false,
+      unavailable: true,
+    });
+    expect((await post({ url: SPOTIFY_URL }, headers)).status).toBe(503);
+    expect(hoisted.verificationLimit).toHaveBeenCalledWith(
+      'agent-api-key:203.0.113.10'
+    );
+    expect(hoisted.auth).not.toHaveBeenCalled();
+    expect(hoisted.spotify).not.toHaveBeenCalled();
+    expect(hoisted.ingest).not.toHaveBeenCalled();
   });
 
   it('uses the account budget and persists creator attribution without granting ownership', async () => {
@@ -87,8 +107,14 @@ describe('POST /api/agents/profiles', () => {
     hoisted.ingest.mockResolvedValue(
       Response.json({ profile: { username: 'artist' } })
     );
-    const res = await post({ url: SPOTIFY_URL });
+    const res = await post(
+      { url: SPOTIFY_URL },
+      { authorization: 'Bearer jovie_' + 'x'.repeat(64) }
+    );
     expect(res.status).toBe(201);
+    expect(hoisted.verificationLimit).toHaveBeenCalledWith(
+      'agent-api-key:203.0.113.10'
+    );
     expect(hoisted.accountLimit).toHaveBeenCalledWith('app-user');
     expect(hoisted.limit).not.toHaveBeenCalled();
     expect(hoisted.ingest).toHaveBeenCalledWith(SPOTIFY_URL, {
