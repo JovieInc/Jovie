@@ -56,11 +56,23 @@ describe('self-serve artist claim routing', () => {
     ).toBe('/claim?state=already_claimed');
   });
 
-  it('never self-serves a famous artist, with or without a Jovie profile', () => {
+  it('sends a famous artist to their own profile, never the takeover route', () => {
     for (const profile of [
       null,
       { username: 'famous', isClaimed: false },
     ] as const) {
+      const anon = new URL(
+        resolveClaimRedirect({
+          viewer: anonymous,
+          artist: artist({
+            followers: HIGH_PROFILE_FOLLOWER_THRESHOLD,
+            profile,
+          }),
+        }),
+        'https://jov.ie'
+      );
+      expect(anon.pathname).toBe('/signup');
+      expect(anon.searchParams.get('plan')).toBe('pro');
       expect(
         resolveClaimRedirect({
           viewer: signedIn,
@@ -69,7 +81,7 @@ describe('self-serve artist claim routing', () => {
             profile,
           }),
         })
-      ).toBe('/claim?state=verification_required');
+      ).toBe('/start');
     }
   });
 
@@ -106,8 +118,9 @@ describe('self-serve artist claim routing', () => {
   it('treats unknown reach as not famous and validates inputs', () => {
     expect(requiresManualVerification(null)).toBe(false);
     expect(requiresManualVerification(Number.NaN)).toBe(false);
-    expect(requiresManualVerification(99_999)).toBe(false);
-    expect(requiresManualVerification(100_000)).toBe(true);
+    expect(HIGH_PROFILE_FOLLOWER_THRESHOLD).toBe(50_000);
+    expect(requiresManualVerification(49_999)).toBe(false);
+    expect(requiresManualVerification(50_000)).toBe(true);
     expect(isSpotifyArtistId('4Z8W4fKeB5YxbusRsdQVPb')).toBe(true);
     expect(isSpotifyArtistId('../../etc')).toBe(false);
     expect(parseClaimPageState('checkout_canceled')).toBe('checkout_canceled');
