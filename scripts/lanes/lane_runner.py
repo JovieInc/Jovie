@@ -165,7 +165,8 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority
                   "scripts/lib/playwright-png.mjs",
                   # Six-hourly credentials/spend check (credentials_spend.py) reads the reviewed registry.
                   "scripts/credentials-spend-check.mjs", "scripts/lib/credentials-live-reads.mjs",
-                  "scripts/lib/credentials-registry.mjs", "ops/registry/credentials.json",
+                  "scripts/lib/credentials-registry.mjs", "scripts/lib/linear-issue-intake.mjs",
+                  "scripts/lib/linear-cooldown.mjs", "ops/registry/credentials.json",
                   "ops/registry/spend.json", "ops/registry/third-party-grants.jsonl",
                   "ops/registry/inventory.gen.json"]
 # Preserve legacy dated run prefixes; only Hyperagent also owns the exact

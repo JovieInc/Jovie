@@ -273,6 +273,9 @@ class CredentialsSpendTickTest(unittest.TestCase):
                                                         "GH_TOKEN": "secret"}, clear=True)
         env.start()
         self.addCleanup(env.stop)
+        no_app = patch.object(credentials_spend, "app_access_token", return_value=None)  # never the host's
+        no_app.start()
+        self.addCleanup(no_app.stop)
 
     def run_check(self, returncode=0, stdout=None):
         def run(args, **kwargs):
@@ -282,8 +285,10 @@ class CredentialsSpendTickTest(unittest.TestCase):
         return run
 
     def test_due_run_records_counts_and_waits_six_hours(self):
-        result = credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW, home=self.home)
+        result = credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW, home=self.home,
+                                        linear_token=lambda _state: None)
         self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["filing"], "unavailable")
         self.assertEqual(result["bySeverity"], {"high": 2, "low": 1})
         [(args, kwargs)] = self.calls
         self.assertEqual(args[:3], ["node", str(self.release / credentials_spend.SCRIPT), "--live"])
@@ -293,8 +298,25 @@ class CredentialsSpendTickTest(unittest.TestCase):
         state = json.loads((self.state / credentials_spend.STATE_FILE).read_text())
         self.assertEqual(state["nextAttemptAt"], NOW + credentials_spend.INTERVAL_S)
         self.assertEqual(credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW + 3600,
-                                                home=self.home)["status"], "current")
+                                                home=self.home, linear_token=lambda _state: None)["status"], "current")
         self.assertEqual(len(self.calls), 1)
+
+    def test_findings_are_filed_as_the_linear_app_never_a_personal_key(self):
+        result = credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW, home=self.home,
+                                        linear_token=lambda state: "app-access" if state == self.state else None)
+        [(args, kwargs)] = self.calls
+        self.assertIn("--file-linear", args)
+        self.assertEqual(kwargs["env"]["LINEAR_ACCESS_TOKEN"], "app-access")
+        self.assertNotIn("LINEAR_API_KEY", kwargs["env"])
+        self.assertEqual(result["filing"], "linear-app")
+
+    def test_a_failing_token_read_still_runs_the_check_without_filing(self):
+        def broken(_state):
+            raise RuntimeError("mint")
+        result = credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW, home=self.home,
+                                        linear_token=broken)
+        self.assertEqual((result["status"], result["filing"]), ("ok", "unavailable"))
+        self.assertNotIn("--file-linear", self.calls[0][0])
 
     def test_failure_keeps_only_the_error_class_and_retries_sooner(self):
         result = credentials_spend.tick(self.state, self.release, run=self.run_check(returncode=1), now=NOW,

@@ -7,16 +7,18 @@ registry on main and Gem's own Codex ledger. Each run appends its record to
 ~/.local/state/jovie-registry/credentials-runs.jsonl, the receipt the automation
 registry row gem:credentials-spend watches.
 
-No Linear filing from here: the check's intake sends LINEAR_API_KEY as a raw
-personal key, and lanes holds only the Jovie Lanes app credential (Bearer,
-#22378). The hosted remediation sweep files findings; this run keeps the receipt
-and live reads fresh between sweeps.
+Alerting findings are filed with --file-linear through the remediation intake,
+authenticated as the Jovie Lanes Linear app: its short-lived access token goes in
+LINEAR_ACCESS_TOKEN, which the intake sends as Bearer (#22440). Never a personal
+key (#22378). Without the app credential the check still runs and records
+filing=unavailable.
 """
 from __future__ import annotations
 
 import json
 import os
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +30,19 @@ SCRIPT = "scripts/credentials-spend-check.mjs"
 STATE_FILE = "credentials-spend.json"
 # Only what node needs to run: no host credentials reach the check by inheritance.
 ENV_KEYS = ("PATH", "HOME", "LANG", "TZ")
+
+
+def app_access_token(state_dir: Path) -> str | None:
+    """The Jovie Lanes Linear app's shared host token, or None (no credential, mint backoff)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import linear_app_token
+    app = linear_app_token.credentials(linear_app_token.default_path())
+    if not app:
+        return None
+    try:
+        return linear_app_token.token(*app, state_dir)
+    except linear_app_token.TokenUnavailable:
+        return None
 
 
 def receipt_path(home: Path | None = None) -> Path:
@@ -66,7 +81,7 @@ def summarize(stdout: str) -> dict:
 
 
 def tick(state_dir: Path, release: Path, run=subprocess.run, now: float | None = None,
-         home: Path | None = None) -> dict:
+         home: Path | None = None, linear_token=None) -> dict:
     if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
         return {"status": "selftest-skipped"}
     now = time.time() if now is None else now
@@ -88,12 +103,20 @@ def tick(state_dir: Path, release: Path, run=subprocess.run, now: float | None =
     env = {key: os.environ[key] for key in ENV_KEYS if key in os.environ}
     if home is not None:
         env["HOME"] = str(home)
+    args = ["node", str(script), "--live", "--receipt", str(receipt), "--json"]
     try:
-        done = run(["node", str(script), "--live", "--receipt", str(receipt), "--json"], cwd=str(release),
+        access = (linear_token or app_access_token)(state_dir)
+    except Exception:  # filing is optional; the check and its receipt still run
+        access = None
+    if access:
+        env["LINEAR_ACCESS_TOKEN"] = access
+        args.append("--file-linear")
+    try:
+        done = run(args, cwd=str(release),
                    env=env, capture_output=True, text=True, timeout=TIMEOUT_S, stdin=subprocess.DEVNULL)
         if done.returncode != 0:
             raise RuntimeError(f"exit {done.returncode}")
-        result = {"status": "ok", **summarize(done.stdout)}
+        result = {"status": "ok", **summarize(done.stdout), "filing": "linear-app" if access else "unavailable"}
         state["nextAttemptAt"] = now + INTERVAL_S
     except (OSError, subprocess.SubprocessError, RuntimeError, ValueError, TypeError) as error:
         # Output can carry provider details; keep only the error class.
