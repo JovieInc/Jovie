@@ -201,6 +201,21 @@
       "budgetHeaders": [],
       "primaryText": [],
       "secondaryText": []
+    },
+    "xai-grok-cli": {
+      "hosts": [],
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": [
+        "rate.?limit(ed)? (exceeded|reached)",
+        "usage limit",
+        "quota (exceeded|exhausted)"
+      ],
+      "secondaryText": [
+        "HTTP 429",
+        "429 Too Many Requests",
+        "too many requests"
+      ]
     }
   }
 }

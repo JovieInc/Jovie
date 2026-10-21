@@ -75,8 +75,11 @@ not GitHub or Vercel cron jobs.
 
 **Proposed, not active:** the market signal watcher (`scripts/signals/signal_watch.py`) is built to
 run from the Gem lanes tick like `yc_corpus.tick`: at most one detached run every 6 h. It polls the
-curated changelog list in `scripts/signals/sources.json` with conditional GETs, reads new X
-bookmarks, classifies them with Jev under a $0.25/day cap, writes `signals/` gbrain pages, and sends
+curated changelog list in `scripts/signals/sources.json` with conditional GETs, reads X bookmark
+exports and new posts from the tracked X accounts (one Grok CLI call per run on Tim's SuperGrok
+seat, `scripts/signals/x_grok.py`; internal use only, never a product path; X has no push trigger, so
+this is a backstop poll whose publish-to-observed dwell is recorded as stage `market-signal:published`;
+kill switch `SIGNALS_X_DISABLED=1`), classifies them with Jev under a $0.25/day cap, writes `signals/` gbrain pages, and sends
 at most 3 cards a day to Summer's `market-intel` source. `scripts/lanes/**` has a sole writer, so
 the hook (`signal_watch.tick(host.state)` in `finish_dispatch`, plus `scripts/signals` in
 `RELEASE_EXTRAS`) is proposed to the lanes owner rather than edited here. The upstream changelogs

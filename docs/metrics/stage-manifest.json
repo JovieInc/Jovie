@@ -365,6 +365,29 @@
           "source": "summer-stage-feed"
         }
       ]
+    },
+    "market-signal": {
+      "entityId": "<item id> (x-post:<snowflake id> for X posts)",
+      "description": "INTERNAL ONLY. One external market signal seen by scripts/signals/signal_watch.py. X has no push trigger, so X posts come from a backstop poll (one Grok CLI call per watcher run, every 6 h). The published stage measures that poll's cost; this is the documented exception to event-driven.",
+      "endToEnd": [["published", "delivered"]],
+      "stages": [
+        {
+          "id": "published",
+          "meaning": "from the post's own createdAt (snowflake time) to the watcher run that observed it",
+          "producer": "signal-watch",
+          "status": "spec",
+          "source": "signal-watch-feed",
+          "owner": "signals"
+        },
+        {
+          "id": "delivered",
+          "meaning": "from the card entering the outbox to Summer's signed ingress answering 202 (or rejecting it)",
+          "producer": "signal-watch",
+          "status": "spec",
+          "source": "signal-watch-feed",
+          "owner": "signals"
+        }
+      ]
     }
   },
   "sources": {
@@ -418,6 +441,12 @@
       "url": "https://jov.ie/api/cron/stage-timings",
       "auth": "CRON_SECRET",
       "owner": "apps/web"
+    },
+    "signal-watch-feed": {
+      "kind": "events",
+      "url": null,
+      "artifact": "stage-events.ndjson next to the watcher state (rolling 28 d, written by scripts/signals/signal_watch.py)",
+      "owner": "signals; published through the lanes status feed once the Gem tick is live"
     }
   },
   "producers": {
