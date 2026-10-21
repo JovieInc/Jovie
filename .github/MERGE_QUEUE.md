@@ -41,7 +41,7 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 
 ### GITHUB_TOKEN budget per group
 
-Every workflow in the repo shares one GITHUB_TOKEN REST bucket (1,000 calls/h),
+Default-branch workflows share one GITHUB_TOKEN REST bucket (5,000 calls/h, measured 2026-10-21 by the `api-quota` notices; demand was ~4,500/h),
 and each rebuild runs a group's CI again. In a green merge group, ci.yml jobs
 other than Merge Group Admission spend no REST calls. Their token-bearing steps
 only authenticate git fetches, which are git traffic and not REST, or they never
@@ -58,7 +58,7 @@ is classified, and the green-group total must stay at 5 or less.
 A failed merge-group lane used to post a failing `PR Ready` commit status
 immediately (`ejected before the slowest lane`). GitHub ejected that entry and
 rebuilt every group behind it. Each rebuild ran PR Size Guard and Merge Group
-Admission again on the shared GITHUB_TOKEN bucket (1,000 REST calls/hour),
+Admission again on the shared GITHUB_TOKEN bucket (5,000 REST calls/hour),
 which is what exhausted the quota before the hourly reset. A red lane no longer
 posts that status. `ci-merge-group-ready` still runs with `always()` and fails
 `PR Ready` when the group is actually red, so the entry is ejected once, after
