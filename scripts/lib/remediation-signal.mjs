@@ -13,7 +13,11 @@ export const AGENT_READY_LABEL = 'agent-ready';
 export const POSTDEPLOY_QUOTA_FINGERPRINT =
   'github-quota-deferred-postdeploy-probes';
 
-const LOGIN_RE = /auth\.setup|authenticate|sign-?in|login/i;
+const LOGIN_RE = /auth\.setup|authenticate|sign[ -]?in|login/i;
+const AUTH_OPERATION_RE =
+  /\bauth\.setup\b|\b(?:signInUser|ensureSignedInUser|setupAuthenticatedTest|enableTestAuthBypass|setTestAuthBypassSession|waitForAuthenticatedHealth|waitForShellReadyAfterAuth)\b/;
+const LOGIN_DIAGNOSTIC_RE =
+  /^\s*(?:\w*Error:\s*)?(?:(?:login|sign[ -]?in|authenticat(?:e|ion)|test auth (?:enter|bootstrap))\b|timed\s*out\s+waiting\s+for\s+(?:login|sign[ -]?in|authenticat))/i;
 const TIMEOUT_RE =
   /timed\s*out|TimeoutError|\btimeout(?:\s+of)?\s+\d+\s*ms\s+exceeded|\btimeout:\s*\d+\s*ms\b/i;
 
@@ -22,7 +26,9 @@ function diagnosticText(text) {
     .split('\n')
     .filter(
       line =>
-        !line.includes('[WebServer]') && !/^\s*(?:>\s*)?\d+\s*\|/.test(line)
+        !line.includes('[WebServer]') &&
+        !/^\s*(?:>\s*)?\d+\s*\|/.test(line) &&
+        !/^\s*Error Context:/.test(line)
     )
     .join('\n');
 }
@@ -57,20 +63,50 @@ export function describeRemediation({ fingerprint, source, runUrl, detail }) {
   ].join('\n');
 }
 
-function walkSuite(suite, hits) {
-  const prefix = `${suite?.file ?? ''} ${suite?.title ?? ''}`;
+function loginOperationTimedOut(message, context = '', timedOut = false) {
+  const diagnostic = diagnosticText(message);
+  if (!timedOut && !TIMEOUT_RE.test(diagnostic)) return false;
+  // Auth-page titles also describe layout, content and navigation assertions.
+  // Require setup/helper provenance or an actual login operation diagnostic.
+  if (AUTH_OPERATION_RE.test(`${context}\n${diagnostic}`)) return true;
+  const lines = diagnostic.split('\n');
+  if (
+    lines.some(line => LOGIN_DIAGNOSTIC_RE.test(line) && TIMEOUT_RE.test(line))
+  )
+    return true;
+  return lines.some(
+    line =>
+      /\bpage\.(?:goto|waitForURL):/.test(line) &&
+      TIMEOUT_RE.test(line) &&
+      (LOGIN_RE.test(line) ||
+        lines.some(
+          target =>
+            /^\s*-\s*(?:navigating to|waiting for.*(?:URL|navigation))/i.test(
+              target
+            ) && LOGIN_RE.test(target)
+        ))
+  );
+}
+
+function walkSuite(suite, hits, parentFile = '') {
+  const file = suite?.file ?? parentFile;
+  const prefix = `${file} ${suite?.title ?? ''}`;
   for (const spec of suite?.specs ?? []) {
     const title = `${prefix} ${spec?.title ?? ''}`.trim();
     for (const test of spec?.tests ?? []) {
       for (const result of test?.results ?? []) {
-        const message = diagnosticText(result?.error?.message);
-        const timedOut =
-          result?.status === 'timedOut' || TIMEOUT_RE.test(message);
-        if (timedOut && LOGIN_RE.test(`${title}\n${message}`)) hits.push(title);
+        if (
+          loginOperationTimedOut(
+            result?.error?.message,
+            file,
+            result?.status === 'timedOut'
+          )
+        )
+          hits.push(title);
       }
     }
   }
-  for (const child of suite?.suites ?? []) walkSuite(child, hits);
+  for (const child of suite?.suites ?? []) walkSuite(child, hits, file);
 }
 
 export function loginTimeoutHits(report) {
@@ -83,11 +119,12 @@ export function textHasLoginTimeout(text) {
   // Attribute a diagnostic to its own failed test. Progress from another
   // test and source options such as `timeout: 60_000` are not failures.
   let block = [];
-  const hit = () =>
-    LOGIN_RE.test(block.join('\n')) && TIMEOUT_RE.test(block.join('\n'));
+  const hit = () => loginOperationTimedOut(block.join('\n'));
   for (const line of diagnosticText(text).split('\n')) {
     const progress =
-      /^\s*(?:[✓×✘-]\s*)?(?:\d+|\[\d+\/\d+\])\s+\[[^\]]+\]\s+›/.test(line);
+      /^\s*(?:(?:[✓×✘-]\s*)?(?:\d+|\[\d+\/\d+\])\s+(?:\(retries\)\s+)?)?\[[^\]]+\]\s+›/.test(
+        line
+      );
     if (progress || /^\s*\d+\)\s+/.test(line)) {
       if (hit()) return true;
       block = [];
