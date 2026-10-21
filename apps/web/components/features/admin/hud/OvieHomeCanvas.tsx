@@ -80,9 +80,12 @@ async function fetchInbox(signal: AbortSignal): Promise<OvieInbox> {
  * Shipping comes from `ovie.shipping-state.v1` and asks from the Ovie inbox;
  * this component adds no polling of its own beyond those existing queries.
  */
-export function OvieHomeCanvas({
-  chat,
-}: Readonly<{ readonly chat?: HomeCanvasState }> = {}) {
+export interface OvieHomeCanvasProps {
+  /** Shell chat state; absent when Home renders outside the composer slot. */
+  readonly chat?: HomeCanvasState;
+}
+
+export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
   const queryClient = useQueryClient();
   const shipping = useHudShippingStateQuery(null);
   const inbox = useQuery<OvieInbox>({
