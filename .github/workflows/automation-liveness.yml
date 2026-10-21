@@ -6,14 +6,19 @@ name: Automation Liveness
 
 # Dead-man check for canon/automation-registry.jsonl (Tim 2026-10-20: every
 # automation registered, measured and auditable; silence is an alert). No new
-# clock (JOV-INV-042): it follows each Runner Health Monitor completion, which
-# the Gem lanes tick fires every 10 minutes and GitHub's cron backstops when Gem
-# is down.
+# clock (JOV-INV-042): it follows Production Continuity Guard, which the Gem
+# lanes tick fires every 5 minutes and GitHub's cron backstops when Gem is down.
+# Runner Health Monitor is a telemetry node, and the workflow topology contract
+# forbids workflow_run edges out of telemetry (observer recursion). The job runs
+# on every fifth guard run (about 25 minutes) to keep its ~40 GitHub API reads
+# per run inside the shared GITHUB_TOKEN budget; the lanes doctor alerts when no
+# run lands for 60 minutes.
 
 on:
   workflow_run:
-    workflows: [Runner Health Monitor]
+    workflows: [Production Continuity Guard]
     types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       file:
@@ -32,6 +37,10 @@ permissions:
 jobs:
   liveness:
     name: Check automation heartbeats
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      endsWith(format('{0}', github.event.workflow_run.run_number), '0') ||
+      endsWith(format('{0}', github.event.workflow_run.run_number), '5')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
