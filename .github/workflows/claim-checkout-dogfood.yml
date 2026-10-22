@@ -57,17 +57,17 @@ jobs:
       # Staging Controller completion (or dispatch time) is when the run became due.
       DOGFOOD_DUE_AT: ${{ github.event.workflow_run.updated_at || '' }}
     steps:
-      - name: Record job start
-        run: |
-          echo "RECEIPT_DIR=$RUNNER_TEMP/claim-dogfood-receipts" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/claim-dogfood-receipts"
-          echo "JOB_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.DOGFOOD_SHA }}
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Record job start
+        run: |
+          echo "RECEIPT_DIR=$RUNNER_TEMP/claim-dogfood-receipts" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/claim-dogfood-receipts"
+          echo "JOB_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup-node-pnpm
 
