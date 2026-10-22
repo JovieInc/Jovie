@@ -1,5 +1,15 @@
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  buildLegacyAliasHoldCookie,
+  isSafeRenamedAliasLocation,
+  readLegacyAliasHash,
+} from '@/lib/routing/legacy-alias-client';
+import {
+  buildLegacyAliasHoldCookie as cjsBuildLegacyAliasHoldCookie,
+  isSafeRenamedAliasLocation as cjsIsSafeRenamedAliasLocation,
+  readLegacyAliasHash as cjsReadLegacyAliasHash,
+} from '@/lib/routing/legacy-profile-alias-redirects';
 import { AliasCollisionRecovery } from './AliasCollisionRecovery';
 
 function installLocation(hash: string) {
@@ -102,5 +112,30 @@ describe('AliasCollisionRecovery', () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('client helpers stay byte-identical to the next.config CJS module', () => {
+    // The edge redirect's bypass conditions key on the cookie/hash values the
+    // client writes; a drift silently breaks the collision recovery. The CJS
+    // module cannot be imported by the browser story build (raw CJS via the
+    // alias has no interop), so the client copies are pinned to it here.
+    expect(cjsReadLegacyAliasHash('#alias=music')).toBe(
+      readLegacyAliasHash('#alias=music')
+    );
+    expect(cjsReadLegacyAliasHash('#alias=not-a-mode')).toBe(
+      readLegacyAliasHash('#alias=not-a-mode')
+    );
+    expect(cjsBuildLegacyAliasHoldCookie('dualipa', 'listen', true)).toBe(
+      buildLegacyAliasHoldCookie('dualipa', 'listen', true)
+    );
+    expect(cjsBuildLegacyAliasHoldCookie('../escape', 'listen', false)).toBe(
+      buildLegacyAliasHoldCookie('../escape', 'listen', false)
+    );
+    expect(cjsIsSafeRenamedAliasLocation('/dualipa/new-slug')).toBe(
+      isSafeRenamedAliasLocation('/dualipa/new-slug')
+    );
+    expect(cjsIsSafeRenamedAliasLocation('https://evil.example/x')).toBe(
+      isSafeRenamedAliasLocation('https://evil.example/x')
+    );
   });
 });
