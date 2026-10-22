@@ -5,7 +5,6 @@
 import './ScrollToBottom.css';
 
 import { ArrowDown } from 'lucide-react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useSyncExternalStore } from 'react';
 
 interface ScrollToBottomProps {
@@ -38,26 +37,18 @@ export function ChatStickScrollButton({
 }
 
 export function ScrollToBottom({ visible, onClick }: ScrollToBottomProps) {
-  const shouldReduceMotion = useReducedMotion();
+  if (!visible) return null;
 
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.button
-          type='button'
-          onClick={onClick}
-          initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
-          animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-          exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
-          transition={{ duration: 0.15 }}
-          className='system-b-scroll-to-bottom'
-          aria-label='Scroll To Latest Messages'
-        >
-          <span className='system-b-scroll-to-bottom-icon'>
-            <ArrowDown className='h-3 w-3' />
-          </span>
-        </motion.button>
-      )}
-    </AnimatePresence>
+    <button
+      type='button'
+      onClick={onClick}
+      className='system-b-scroll-to-bottom'
+      aria-label='Scroll To Latest Messages'
+    >
+      <span className='system-b-scroll-to-bottom-icon'>
+        <ArrowDown className='h-3 w-3' />
+      </span>
+    </button>
   );
 }

@@ -347,11 +347,12 @@ describe('JovieChat styling regressions', () => {
         onIntersect?.([{ isIntersecting: false } as IntersectionObserverEntry]);
       });
 
-      // The shared motion mock renders the button's child. The icon is a
-      // sibling of the transcript, and the message node stays mounted.
-      expect(scroll.lastElementChild).toHaveClass(
-        'system-b-scroll-to-bottom-icon'
-      );
+      const button = scroll.querySelector('.system-b-scroll-to-bottom');
+      expect(button).not.toBeNull();
+      expect(
+        button?.querySelector('.system-b-scroll-to-bottom-icon')
+      ).not.toBeNull();
+      expect(scroll.lastElementChild).toBe(button);
       expect(view.getByTestId('chat-message')).toBe(message);
     } finally {
       globalThis.IntersectionObserver = original;

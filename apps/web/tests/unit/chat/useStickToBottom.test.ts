@@ -12,7 +12,9 @@ type IntersectionCallback = (
   observer: IntersectionObserver
 ) => void;
 
-type ResizeCallback = (entries: ResizeObserverEntry[]) => void;
+type ResizeCallback = (
+  entries: Array<Pick<ResizeObserverEntry, 'target'>>
+) => void;
 
 describe('useStickToBottom', () => {
   let intersectionCallback:
@@ -224,8 +226,8 @@ describe('useStickToBottom', () => {
     });
 
     act(() => {
-      resizeCallback?.([{ target: content } as ResizeObserverEntry]);
-      resizeCallback?.([{ target: content } as ResizeObserverEntry]);
+      resizeCallback?.([{ target: content }]);
+      resizeCallback?.([{ target: content }]);
     });
 
     expect(scrollTop).toBe(0);
@@ -233,6 +235,43 @@ describe('useStickToBottom', () => {
 
     flushRaf();
     expect(scrollTop).toBe(480);
+  });
+
+  it('releases stick instead of jumping back when content resizes after the viewport has already left the bottom', () => {
+    const { result } = renderHook(() => useStickToBottom());
+
+    const container = document.createElement('div');
+    Object.defineProperty(container, 'scrollHeight', {
+      configurable: true,
+      value: 900,
+    });
+    Object.defineProperty(container, 'clientHeight', {
+      configurable: true,
+      value: 400,
+    });
+    let scrollTop = 0;
+    Object.defineProperty(container, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: value => {
+        scrollTop = value;
+      },
+    });
+    result.current.scrollContainerRef.current = container;
+
+    const content = document.createElement('div');
+    act(() => {
+      result.current.totalSizeRef(content);
+    });
+    expect(result.current.isStuckToBottom).toBe(true);
+
+    act(() => {
+      resizeCallback?.([{ target: content }]);
+    });
+
+    flushRaf();
+    expect(scrollTop).toBe(0);
+    expect(result.current.isStuckToBottom).toBe(false);
   });
 
   it('does not scroll on resize when the user has scrolled away', () => {
@@ -262,7 +301,7 @@ describe('useStickToBottom', () => {
     });
 
     act(() => {
-      resizeCallback?.([{ target: content } as ResizeObserverEntry]);
+      resizeCallback?.([{ target: content }]);
     });
 
     flushRaf();
@@ -300,7 +339,7 @@ describe('useStickToBottom', () => {
 
     // New message appended: content grows (ResizeObserver fires).
     act(() => {
-      resizeCallback?.([{ target: content } as ResizeObserverEntry]);
+      resizeCallback?.([{ target: content }]);
     });
 
     // Must NOT scroll back to bottom — user is scrolled away.
