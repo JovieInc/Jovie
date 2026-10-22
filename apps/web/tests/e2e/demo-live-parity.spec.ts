@@ -2,7 +2,10 @@ import type { Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { setTestAuthBypassSession } from '../helpers/auth';
 import { expect, test } from './setup';
-import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
+import {
+  isDestroyedExecutionContext,
+  smokeNavigateWithRetry,
+} from './utils/smoke-test-utils';
 
 const USE_TEST_AUTH_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
@@ -33,21 +36,29 @@ const AUDIENCE_COLUMN_HEADERS = [
 async function classifyAudienceSurface(
   page: Page
 ): Promise<'table' | 'empty' | 'pending'> {
-  if ((await page.getByTestId('dashboard-audience-loading').count()) > 0) {
-    return 'pending';
-  }
+  try {
+    if ((await page.getByTestId('dashboard-audience-loading').count()) > 0) {
+      return 'pending';
+    }
 
-  const headers = normalizeTexts(
-    await page.getByRole('columnheader').allInnerTexts()
-  );
-  if (AUDIENCE_COLUMN_HEADERS.every(header => headers.includes(header))) {
-    return 'table';
-  }
+    const headers = normalizeTexts(
+      await page.getByRole('columnheader').allInnerTexts()
+    );
+    if (AUDIENCE_COLUMN_HEADERS.every(header => headers.includes(header))) {
+      return 'table';
+    }
 
-  const visibleEmptyStates = await page
-    .locator('[data-testid="dashboard-audience-empty-state"]:visible')
-    .count();
-  return visibleEmptyStates > 0 ? 'empty' : 'pending';
+    const visibleEmptyStates = await page
+      .locator('[data-testid="dashboard-audience-empty-state"]:visible')
+      .count();
+    return visibleEmptyStates > 0 ? 'empty' : 'pending';
+  } catch (error) {
+    // A navigation during the poll destroys the execution context. The poll
+    // retries until the audience surface settles; the final not-pending
+    // assertion is unchanged.
+    if (isDestroyedExecutionContext(error)) return 'pending';
+    throw error;
+  }
 }
 
 async function collectAudienceContentSurface(page: Page) {
