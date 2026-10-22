@@ -18,7 +18,11 @@ describe('alias budget profile mode prerender', () => {
 
     for (const routeId of HOSTED_ALIAS_ROUTE_IDS) {
       const route = getEndUserPerfRouteById(routeId);
-      if (!route || !('aliasUsableResult' in route) || !route.aliasUsableResult) {
+      if (
+        !route ||
+        !('aliasUsableResult' in route) ||
+        !route.aliasUsableResult
+      ) {
         throw new Error(`${routeId} is missing its alias destination`);
       }
       if (!('seedProfile' in route) || !route.seedProfile) {
