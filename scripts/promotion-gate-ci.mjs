@@ -8,6 +8,7 @@
 //     Finding nothing is not an error here; the gate blocks on missing evidence.
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { runGh, splitIncluded } from '../packages/api-client/gh.ts';
 import { gradeReleaseRange } from './lib/release-range-risk.mjs';
 
 const SHA = /^[0-9a-f]{40}$/;
@@ -30,12 +31,15 @@ function changedPaths(base, candidate) {
   return diff.stdout.split('\n').filter(Boolean);
 }
 
-function gh(args) {
-  const r = spawnSync('gh', args, { encoding: 'utf8' });
-  return r.status === 0 ? r.stdout : null;
+async function gh(args) {
+  const r = await runGh(args, { priority: 'deploy' });
+  if (r.code !== 0) return null;
+  return args[0] === 'api'
+    ? (splitIncluded(r.stdout)?.body ?? r.stdout)
+    : r.stdout;
 }
 
-export function main(argv) {
+export async function main(argv) {
   const sub = argv[0];
   const o = {};
   for (let i = 1; i < argv.length; i += 2)
@@ -55,7 +59,7 @@ export function main(argv) {
   if (sub === 'fetch-evidence') {
     mkdirSync(o['out-dir'], { recursive: true });
     const name = evidenceArtifactName(o.candidate);
-    const listed = gh([
+    const listed = await gh([
       'api',
       `repos/${o.repo}/actions/artifacts?name=${name}&per_page=20`,
       '--jq',
@@ -63,7 +67,7 @@ export function main(argv) {
     ]);
     for (const runId of (listed ?? '').split('\n').filter(Boolean)) {
       const dir = `${o['out-dir']}/${runId}`;
-      const got = gh([
+      const got = await gh([
         'run',
         'download',
         runId,
@@ -83,4 +87,4 @@ export function main(argv) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`)
-  process.exit(main(process.argv.slice(2)));
+  process.exit(await main(process.argv.slice(2)));
