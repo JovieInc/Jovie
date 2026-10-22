@@ -235,6 +235,7 @@ const SmartLinkCell = memo(function SmartLinkCell({
   return (
     <Link
       href={smartLinkPath}
+      prefetch={false}
       target='_blank'
       rel='noreferrer'
       onClick={e => e.stopPropagation()}

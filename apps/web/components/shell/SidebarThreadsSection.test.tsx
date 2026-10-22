@@ -206,6 +206,9 @@ describe('SidebarThreadsSection', () => {
       expect(
         screen.getByRole('link', { name: 'Release rollout' })
       ).not.toHaveAttribute('aria-current');
+      expect(
+        screen.getByRole('link', { name: calm ? 'All chats' : 'All Chats' })
+      ).toHaveAttribute('data-prefetch', 'false');
     }
   );
 
