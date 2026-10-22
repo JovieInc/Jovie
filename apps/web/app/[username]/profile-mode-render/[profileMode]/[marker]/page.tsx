@@ -8,13 +8,15 @@ import {
   PROFILE_MODE_ALIAS_MARKER,
   RENDER_FIXTURE_METADATA,
 } from '@/lib/render-fixture-policy';
+import { aliasBudgetProfileModeParams } from '@/lib/routing/alias-budget-static-params';
 
-// Query modes are bounded by next.config.js but discovered on demand. Keep each
-// private destination on the same one-hour ISR cadence as the canonical page.
+// Query modes are bounded by next.config.js. Seeded alias destinations are
+// prerendered so the edge POP can serve them; every other profile stays
+// on-demand. Keep the one-hour ISR cadence of the canonical page.
 export const revalidate = 3600;
 
 export function generateStaticParams() {
-  return [];
+  return aliasBudgetProfileModeParams();
 }
 
 interface ProfileModeRenderPageProps {
