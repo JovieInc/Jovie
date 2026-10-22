@@ -386,6 +386,13 @@ describe('trusted gate tooling grades older and current candidates', () => {
     }
   );
 
+  it('keeps the frozen e806124 CLI outside scripts typecheck', () => {
+    const tsconfig = readFileSync(join(root, 'scripts/tsconfig.json'), 'utf8');
+    expect(tsconfig).toContain(
+      'lib/__tests__/fixtures/promotion-gate-ci.e806124.mjs'
+    );
+  });
+
   it('reproduces the production usage failure from the e806124 CLI', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'promo-old-cli-'));
     try {
