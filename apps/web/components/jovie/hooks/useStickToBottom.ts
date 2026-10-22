@@ -119,6 +119,20 @@ export function useStickToBottomController(
         return;
       }
 
+      const clientHeight = container.clientHeight;
+      if (clientHeight > 0) {
+        const distanceFromBottom =
+          container.scrollHeight - container.scrollTop - clientHeight;
+        // The sentinel observer delivers after the scroll. A resize in that
+        // gap used to assign scrollTop and jump the transcript back down,
+        // which is a dropped frame on the way through the list.
+        if (distanceFromBottom > SCROLL_THRESHOLD) {
+          restoringPinnedRef.current = false;
+          setStuckToBottom(false);
+          return;
+        }
+      }
+
       container.scrollTop = container.scrollHeight;
       if (restoringPinnedRef.current) {
         // IO callbacks can deliver hidden samples after this restoration frame.
@@ -127,7 +141,7 @@ export function useStickToBottomController(
       }
       restoringPinnedRef.current = false;
     });
-  }, []);
+  }, [setStuckToBottom]);
 
   useEffect(
     () =>
