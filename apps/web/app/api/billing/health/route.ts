@@ -14,6 +14,7 @@
  * 2. No stuck/unprocessed webhooks
  * 3. Recent reconciliation ran successfully
  * 4. Pro user count roughly matches Stripe active subscriptions
+ * 5. No paid Stripe events are waiting for reconciliation
  */
 
 import { and, sql as drizzleSql, eq, gte, isNull } from 'drizzle-orm';
@@ -33,6 +34,7 @@ import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { stripe } from '@/lib/stripe/client';
 import { getActivePriceIds, validateStripeConfig } from '@/lib/stripe/config';
+import { NEEDS_RECONCILIATION } from '@/lib/stripe/webhooks/reconciliation';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { parseDate } from '@/lib/utils/date-formatting';
 import { logger } from '@/lib/utils/logger';
@@ -66,6 +68,7 @@ interface HealthCheckResult {
     stripeConfig: HealthCheck;
     webhooksProcessing: HealthCheck;
     noStuckWebhooks: HealthCheck;
+    noEventsNeedReconciliation: HealthCheck;
     recentReconciliation: HealthCheck;
     proCountSync: HealthCheck;
   };
@@ -78,6 +81,7 @@ interface HealthCheckResult {
     lastReconciliationAt: string | null;
     lastReconciliationSuccess: boolean | null;
     lastBillingEventAt: string | null;
+    needsReconciliationCount: number;
   };
 }
 
@@ -153,6 +157,7 @@ export async function GET(request: Request) {
       proUserCount,
       stripeSubscriptionCount,
       lastBillingEvent,
+      needsReconciliation,
     ] = await Promise.all([
       // Count webhooks in last 24 hours
       withSystemIngestionSession(tx =>
@@ -215,6 +220,17 @@ export async function GET(request: Request) {
           >`MAX(${users.lastBillingEventAt})`,
         })
         .from(users),
+
+      // Paid Stripe events acknowledged but not yet applied (unmapped price,
+      // unknown merch order, unattributed tip). Any row is money at risk.
+      withSystemIngestionSession(tx =>
+        tx
+          .select({ count: drizzleSql<number>`count(*)` })
+          .from(stripeWebhookEvents)
+          .where(
+            eq(stripeWebhookEvents.reconciliationStatus, NEEDS_RECONCILIATION)
+          )
+      ),
     ]);
 
     // Parse results
@@ -228,11 +244,15 @@ export async function GET(request: Request) {
     const lastReconciliationSuccess =
       typeof recordedSuccess === 'boolean' ? recordedSuccess : null;
     const lastBillingEventAt = lastBillingEvent[0]?.lastBillingEventAt ?? null;
+    const needsReconciliationCount = Number(needsReconciliation[0]?.count ?? 0);
 
     // Perform health checks
     const stripeConfig = checkStripeConfig();
     const webhooksProcessing = checkWebhooksProcessing(recentWebhookCount);
     const noStuckWebhooks = checkNoStuckWebhooks(unprocessedWebhookCount);
+    const noEventsNeedReconciliation = checkNoEventsNeedReconciliation(
+      needsReconciliationCount
+    );
     const recentReconciliation = checkRecentReconciliation(
       lastReconciliationAt,
       reconciliationStaleBefore,
@@ -248,6 +268,7 @@ export async function GET(request: Request) {
       stripeConfig,
       webhooksProcessing,
       noStuckWebhooks,
+      noEventsNeedReconciliation,
       recentReconciliation,
       proCountSync,
     ];
@@ -260,6 +281,7 @@ export async function GET(request: Request) {
         stripeConfig,
         webhooksProcessing,
         noStuckWebhooks,
+        noEventsNeedReconciliation,
         recentReconciliation,
         proCountSync,
       },
@@ -274,6 +296,7 @@ export async function GET(request: Request) {
         lastReconciliationAt: toISOStringOrNull(lastReconciliationAt),
         lastReconciliationSuccess,
         lastBillingEventAt: toISOStringOrNull(lastBillingEventAt),
+        needsReconciliationCount,
       },
     };
 
@@ -463,6 +486,25 @@ function checkNoStuckWebhooks(stuckCount: number): HealthCheck {
     status: 'healthy',
     message: 'No stuck webhooks',
     details: { stuckCount },
+  };
+}
+
+/**
+ * Paid Stripe events that were acknowledged but not applied. Critical at any
+ * count: each one is a customer who paid and may not have what they bought.
+ */
+function checkNoEventsNeedReconciliation(count: number): HealthCheck {
+  if (count > 0) {
+    return {
+      status: 'critical',
+      message: `${count} paid Stripe events need reconciliation`,
+      details: { needsReconciliationCount: count },
+    };
+  }
+  return {
+    status: 'healthy',
+    message: 'No Stripe events need reconciliation',
+    details: { needsReconciliationCount: 0 },
   };
 }
 

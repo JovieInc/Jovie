@@ -74,7 +74,7 @@ jobs:
         shell: bash
         env:
           CLI_RELEASE_VERSION: ${{ inputs.release_version }}
-          PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only }}
+          PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only == true }}
         run: |
           set -euo pipefail
           # A blank selection (every push) takes the next unpublished patch;
@@ -189,7 +189,7 @@ jobs:
         env:
           PACKAGE_NAME: '@jovie/cli'
           REGISTRY_URL: https://registry.npmjs.org
-          PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only }}
+          PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only == true }}
           CLI_RELEASE_VERSION: ${{ needs.chaos-tarball.outputs.version }}
         run: |
           set -euo pipefail

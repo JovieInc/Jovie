@@ -249,6 +249,7 @@ function isChatApiRequest(request: Request): boolean {
   const { pathname } = new URL(request.url());
   return pathname === '/api/chat' || pathname.startsWith('/api/chat/');
 }
+// Avoid networkidle: Library warming is unrelated; full nav prefetch exceeds the RSC budget.
 export function trackChatApiRequests(page: Page) {
   const inFlight = new Set<Request>();
   page.on('request', request => {

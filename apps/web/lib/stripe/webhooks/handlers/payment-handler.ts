@@ -224,6 +224,22 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       );
 
       if (!userId) {
+        // A subscription invoice was paid but no Jovie user owns it, so no
+        // entitlement is granted and every Paying count stays 0 while the
+        // Stripe event feed shows the payment. Acknowledge (retrying cannot
+        // help) but surface it as revenue-critical instead of a silent skip.
+        await captureCriticalError(
+          'Paid subscription invoice has no attributable user',
+          new Error('cannot_identify_user_for_payment_success'),
+          {
+            route: '/api/stripe/webhooks',
+            event: 'invoice.payment_succeeded',
+            stripeEventId,
+            invoiceId: invoice.id,
+            subscriptionId,
+            livemode: invoice.livemode,
+          }
+        );
         return {
           success: true,
           skipped: true,
