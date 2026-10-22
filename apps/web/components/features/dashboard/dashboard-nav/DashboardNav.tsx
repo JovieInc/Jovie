@@ -450,7 +450,7 @@ export function DashboardNav({
         pendingNavigation?.itemId === chatNavItem.id || undefined
       }
       className={cn(
-        'relative flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-muted transition duration-subtle ease-subtle hover:bg-sidebar-accent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
+        'relative flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-muted transition duration-subtle ease-subtle hover:bg-sidebar-accent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
         pendingNavigation?.itemId === chatNavItem.id && 'opacity-70'
       )}
     >
@@ -470,7 +470,10 @@ export function DashboardNav({
 
   return (
     <>
-      <nav className='flex flex-1 flex-col' aria-label='Dashboard Navigation'>
+      <nav
+        className='flex min-h-0 flex-1 transform-gpu flex-col overflow-anchor-none'
+        aria-label='Dashboard Navigation'
+      >
         {isInSettings ? (
           <>
             <SidebarCollapsibleGroup
@@ -493,7 +496,7 @@ export function DashboardNav({
             <div
               data-sidebar-search-slot='true'
               className={cn(
-                'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5',
+                'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5 lg:overflow-hidden',
                 // The command slot keeps its vertical allocation while the
                 // surrounding rail narrows; navigation below never moves.
                 'group-data-[collapsible=icon]:mx-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:pr-0'
