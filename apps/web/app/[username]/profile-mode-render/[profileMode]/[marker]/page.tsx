@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getProfileModeRenderStaticParams } from '@/app/[username]/_lib/profile-static-params';
 import ArtistPage, {
   generateMetadata as generatePublicProfileMetadata,
 } from '@/app/[username]/page';
@@ -8,15 +9,14 @@ import {
   PROFILE_MODE_ALIAS_MARKER,
   RENDER_FIXTURE_METADATA,
 } from '@/lib/render-fixture-policy';
-import { aliasBudgetProfileModeParams } from '@/lib/routing/alias-budget-static-params';
 
-// Query modes are bounded by next.config.js. Seeded alias destinations are
-// prerendered so the edge POP can serve them; every other profile stays
-// on-demand. Keep the one-hour ISR cadence of the canonical page.
+// Query modes stay on the canonical page's one-hour ISR cadence. The tipping
+// seed is not in the featured/claimed prerender set, so the pay destination
+// has to be emitted here or the release runner fetches it across regions.
 export const revalidate = 3600;
 
 export function generateStaticParams() {
-  return aliasBudgetProfileModeParams();
+  return getProfileModeRenderStaticParams();
 }
 
 interface ProfileModeRenderPageProps {

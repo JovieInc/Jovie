@@ -6,7 +6,7 @@ import {
   getUnpublishedReleasePresence,
 } from '@/app/[username]/[slug]/_lib/data';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
-import { isLegacyProfileAliasSlug } from '@/lib/routing/legacy-profile-alias-redirects';
+import { isLegacyProfileAliasSlug } from '@/lib/routing/legacy-profile-alias-recovery';
 
 const DECISION_CACHE_CONTROL =
   'public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=300';

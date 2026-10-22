@@ -1,9 +1,12 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/chat/ScrollToBottom.test.tsx
+
 import './ScrollToBottom.css';
 
 import { ArrowDown } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useSyncExternalStore } from 'react';
 
 interface ScrollToBottomProps {
   readonly visible: boolean;
@@ -14,6 +17,26 @@ interface ScrollToBottomProps {
  * Floating button that appears when the user scrolls up in the chat,
  * allowing them to quickly jump back to the latest messages.
  */
+const STUCK_ON_SERVER = () => true;
+
+/**
+ * Follows stick-to-bottom without rendering the transcript owner.
+ * The scroll ratchet counts a frame over 50ms as dropped; re-rendering the
+ * message list when the sentinel crosses the fold is that frame.
+ */
+export function ChatStickScrollButton({
+  subscribe,
+  getSnapshot,
+  onClick,
+}: {
+  readonly subscribe: (listener: () => void) => () => void;
+  readonly getSnapshot: () => boolean;
+  readonly onClick: () => void;
+}) {
+  const stuck = useSyncExternalStore(subscribe, getSnapshot, STUCK_ON_SERVER);
+  return <ScrollToBottom visible={!stuck} onClick={onClick} />;
+}
+
 export function ScrollToBottom({ visible, onClick }: ScrollToBottomProps) {
   const shouldReduceMotion = useReducedMotion();
 
