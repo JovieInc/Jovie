@@ -1,7 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { ScrollToBottom } from '@/components/jovie/components/ScrollToBottom';
+import {
+  ChatStickScrollButton,
+  ScrollToBottom,
+} from '@/components/jovie/components/ScrollToBottom';
 
 // motion/react animations don't run in jsdom. Render elements immediately
 // so accessibility queries and style assertions work without waiting for
@@ -63,6 +66,38 @@ describe('ScrollToBottom', () => {
       screen.getByRole('button', { name: 'Scroll To Latest Messages' })
     );
 
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the latest-messages button when the stick store leaves the bottom', () => {
+    let stuck = true;
+    const listeners = new Set<() => void>();
+    const onClick = vi.fn();
+    render(
+      <ChatStickScrollButton
+        subscribe={listener => {
+          listeners.add(listener);
+          return () => {
+            listeners.delete(listener);
+          };
+        }}
+        getSnapshot={() => stuck}
+        onClick={onClick}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Scroll To Latest Messages' })
+    ).not.toBeInTheDocument();
+
+    act(() => {
+      stuck = false;
+      for (const listener of listeners) listener();
+    });
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Scroll To Latest Messages' })
+    );
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

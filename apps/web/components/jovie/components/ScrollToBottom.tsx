@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/chat/ScrollToBottom.test.tsx
+
 import './ScrollToBottom.css';
 
 import { ArrowDown } from 'lucide-react';

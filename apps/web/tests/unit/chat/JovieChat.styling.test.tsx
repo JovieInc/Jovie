@@ -320,6 +320,47 @@ describe('JovieChat styling regressions', () => {
     submitting.unmount();
     expect(getDesktopWorkState()).toBeNull();
   });
+  it('shows scroll-to-latest without remounting the transcript when the sentinel leaves', () => {
+    let onIntersect: ((entries: IntersectionObserverEntry[]) => void) | null =
+      null;
+    const original = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver = vi.fn().mockImplementation(function (
+      this: IntersectionObserver,
+      callback: (entries: IntersectionObserverEntry[]) => void
+    ) {
+      onIntersect = callback;
+      this.observe = vi.fn();
+      this.unobserve = vi.fn();
+      this.disconnect = vi.fn();
+      this.takeRecords = vi.fn(() => []);
+      this.root = null;
+      this.rootMargin = '';
+      this.thresholds = [];
+    }) as unknown as typeof IntersectionObserver;
+
+    try {
+      const view = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+      const message = view.getByTestId('chat-message');
+      const scroll = view.getByTestId('chat-message-scroll');
+      expect(
+        scroll.querySelector('.system-b-scroll-to-bottom-icon')
+      ).toBeNull();
+
+      act(() => {
+        onIntersect?.([{ isIntersecting: false } as IntersectionObserverEntry]);
+      });
+
+      // The shared motion mock renders the button's child. The icon is a
+      // sibling of the transcript, and the message node stays mounted.
+      expect(scroll.lastElementChild).toHaveClass(
+        'system-b-scroll-to-bottom-icon'
+      );
+      expect(view.getByTestId('chat-message')).toBe(message);
+    } finally {
+      globalThis.IntersectionObserver = original;
+    }
+  });
+
   it('renders thinking placeholder as a ChatMessage with isThinking when loading', () => {
     const { container } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
