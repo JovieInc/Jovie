@@ -3,7 +3,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
-import { runLiveness as runLivenessImpl } from '../../automation-liveness.mjs';
+import {
+  lsRemoteMain,
+  runLiveness as runLivenessImpl,
+} from '../../automation-liveness.mjs';
 import { ADMISSION_BLOCKING_LABELS } from '../admission-hold-labels.mjs';
 import {
   livenessDecisions,
@@ -20,6 +23,9 @@ const LIVE = 'b'.repeat(40);
 
 function runLiveness(options) {
   return runLivenessImpl({
+    // Keep the suite off the network. Tests that cover the git fallback pass
+    // their own reader.
+    lsRemote: async () => null,
     ...options,
     githubClient: createApiClient({
       provider: 'github',
@@ -78,6 +84,53 @@ function runs(...rows) {
 function rowFor(report, id) {
   return report.results.find(row => row.id === id);
 }
+
+describe('ls-remote main tip', () => {
+  it('asks git for refs/heads/main and keeps the token out of argv', async () => {
+    const token = 'actions-token';
+    const encoded = Buffer.from(`x-access-token:${token}`).toString('base64');
+    // Assigned inside the git callback. An uninitialized let stays
+    // possibly undefined under checkJs, which the scripts ratchet rejects.
+    const seen = {
+      args: /** @type {string[]} */ ([]),
+      env: /** @type {NodeJS.ProcessEnv} */ ({}),
+    };
+    const sha = await lsRemoteMain(
+      'JovieInc/Jovie',
+      token,
+      async (args, env) => {
+        seen.args = args;
+        seen.env = env;
+        return `${MAIN}\trefs/heads/main\n`;
+      }
+    );
+    expect(sha).toBe(MAIN);
+    expect(seen.args).toEqual([
+      'ls-remote',
+      '--refs',
+      'https://github.com/JovieInc/Jovie.git',
+      'refs/heads/main',
+    ]);
+    expect(JSON.stringify(seen.args)).not.toContain(token);
+    expect(JSON.stringify(seen.args)).not.toContain(encoded);
+    expect(seen.env.GIT_CONFIG_VALUE_0).toBe('/dev/null');
+    expect(seen.env.GIT_CONFIG_VALUE_2).toBe(`AUTHORIZATION: basic ${encoded}`);
+    expect(seen.env.GIT_TERMINAL_PROMPT).toBe('0');
+  });
+
+  it('returns null for a bad repo, a bad tip, or a git failure', async () => {
+    const gitExec = async () => {
+      throw new Error('network');
+    };
+    await expect(lsRemoteMain('not a repo', 't', gitExec)).resolves.toBeNull();
+    await expect(
+      lsRemoteMain('JovieInc/Jovie', 't', async () => 'nope')
+    ).resolves.toBeNull();
+    await expect(
+      lsRemoteMain('JovieInc/Jovie', 't', gitExec)
+    ).resolves.toBeNull();
+  });
+});
 
 describe('dead-man liveness', () => {
   // (a) 2026-10-20: the Production Continuity Guard kept reading green while
@@ -451,6 +504,9 @@ describe('dead-man liveness', () => {
     const { report } = await runLiveness({
       registry: only('derived:jovie:production-promotion'),
       nowMs: NOW,
+      lsRemote: async () => {
+        throw new Error('git down');
+      },
       fetchImpl: fakeFetch({
         'jov.ie/api/health/build-info': { commitSha: MAIN },
         '/git/ref/heads/main': 403,
@@ -462,6 +518,53 @@ describe('dead-man liveness', () => {
       reason: 'main-ref-http-403',
     });
     expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
+  // Run 39682307911 checked out the commits/main fallback and still recorded
+  // main-ref-http-403. The git protocol is the read that does not spend REST.
+  it('reads main with git ls-remote when both REST reads answer 403', async () => {
+    const calls = [];
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      token: 'actions-token',
+      lsRemote: async (repo, token) => {
+        calls.push([repo, token]);
+        return MAIN;
+      },
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+        '/git/ref/heads/main': 403,
+        '/commits/main': 403,
+      }),
+    });
+    expect(calls).toEqual([['JovieInc/Jovie', 'actions-token']]);
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: 'production-current',
+    });
+    expect(livenessDecisions(report)).toEqual([]);
+  });
+
+  it('does not use git ls-remote for a non-403 main-ref failure', async () => {
+    let called = false;
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      lsRemote: async () => {
+        called = true;
+        return MAIN;
+      },
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+        '/git/ref/heads/main': 404,
+      }),
+    });
+    expect(called).toBe(false);
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'unknown',
+      reason: 'main-ref-http-404',
+    });
   });
 
   it('keeps malformed main-ref JSON red with an unreadable reason', async () => {
@@ -600,6 +703,68 @@ describe('dead-man liveness', () => {
     });
     expect(rowFor(report, 'gem:lanes-tick').status).toBe('unknown');
   });
+
+  // JOV-8799: Summer's observeReceipt reports a succeeded read as `stale`
+  // once it is older than the 10-minute provider TTL. This dead-man keeps
+  // its own 60-minute silence budget and still rejects unknown or failed reads.
+  it.each([
+    ['verified', 5, 'fresh'],
+    ['stale', 11, 'fresh'],
+    ['stale', 59, 'fresh'],
+    ['stale', 60, 'fresh'],
+    ['stale', 61, 'stale'],
+    ['verified', 61, 'stale'],
+    ['unknown', 1, 'missing'],
+    ['failed', 1, 'missing'],
+    [undefined, 1, 'missing'],
+  ])(
+    'gbrain read status %s at age %im respects the heartbeat budget (%s)',
+    async (status, ageMinutes, expected) => {
+      const { report } = await runLiveness({
+        registry: only('derived:gbrain:read-path'),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          'summer.jov.ie/runtime/v1/health': {
+            receiptFreshness: {
+              gbrainRead: { status, observedAt: iso(ageMinutes) },
+            },
+          },
+        }),
+      });
+      const accepted = status === 'verified' || status === 'stale';
+      expect(rowFor(report, 'derived:gbrain:read-path')).toMatchObject({
+        status: expected,
+        budgetMinutes: 60,
+        lastProofAt: accepted ? iso(ageMinutes) : null,
+        ageMinutes: accepted ? ageMinutes : null,
+      });
+      expect(livenessDecisions(report).map(row => row.action)).toEqual(
+        expected === 'fresh' ? [] : ['red']
+      );
+      expect(
+        livenessDecisions(report, {
+          'automation-liveness-derived-gbrain-read-path': 'red',
+        }).map(row => row.action)
+      ).toEqual([expected === 'fresh' ? 'green' : 'red']);
+    }
+  );
+
+  it.each([null, undefined, 'invalid'])(
+    'a stale gbrain receipt without a valid timestamp (%s) is red',
+    async observedAt => {
+      const { report } = await runLiveness({
+        registry: only('derived:gbrain:read-path'),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          'summer.jov.ie/runtime/v1/health': {
+            receiptFreshness: { gbrainRead: { status: 'stale', observedAt } },
+          },
+        }),
+      });
+      expect(rowFor(report, 'derived:gbrain:read-path').status).toBe('missing');
+      expect(livenessDecisions(report)[0].action).toBe('red');
+    }
+  );
 
   // (c) Summer's model turns failed for two days with no escalation, while
   // its provider-read receipts stayed fresh.
@@ -913,6 +1078,134 @@ describe('dead-man liveness', () => {
 });
 
 describe('liveness run receipts', () => {
+  // JOV-8832: run 39808881974 reported no M2 runs despite daily successes.
+  // It also disagreed with itself about identical continuity receipts.
+  it.each([
+    ['github:jovie:m2-revenue-path-canary', false],
+    ['github:jovie:m2-revenue-path-canary', true],
+    ['github:jovie:production-continuity', false],
+    ['github:jovie:production-continuity', true],
+  ])(
+    'confirms an empty or skipped-only history for %s (skipped=%s)',
+    async (id, skipped) => {
+      const seen = [];
+      const { report, events } = await runLiveness({
+        registry: only(id),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          '/runs?': url => {
+            const query = new URL(url).searchParams;
+            seen.push(query);
+            if (query.get('status') === 'success')
+              return runs([10, 'success', 1]);
+            if (query.get('status') === 'failure')
+              return runs([2, 'failure', 2]);
+            return skipped
+              ? runs(
+                  ...Array.from({ length: 30 }, (_, i) => [
+                    1,
+                    'skipped',
+                    100 + i,
+                  ])
+                )
+              : runs();
+          },
+        }),
+      });
+      expect(rowFor(report, id)).toMatchObject({
+        status: 'fresh',
+        lastProofAt: iso(2),
+        url: 'https://github.com/JovieInc/Jovie/actions/runs/2',
+      });
+      expect(events.map(row => row.outcome)).toEqual(['advanced', 'failed']);
+      expect(
+        livenessDecisions(report, { [livenessFingerprint(id)]: 'red' })
+      ).toEqual([expect.objectContaining({ action: 'green', id })]);
+      expect(seen.map(query => query.get('status'))).toEqual([
+        'completed',
+        'success',
+        'failure',
+      ]);
+      expect(seen.every(query => query.get('branch') === 'main')).toBe(true);
+    }
+  );
+
+  it('keeps confirmed absence and old heartbeats red with bounded reads', async () => {
+    const id = 'github:jovie:m2-revenue-path-canary';
+    for (const stale of [false, true]) {
+      let reads = 0;
+      const { report } = await runLiveness({
+        registry: only(id),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          '/runs?': url => {
+            reads += 1;
+            return stale &&
+              new URL(url).searchParams.get('status') === 'success'
+              ? runs([4000, 'success', 1])
+              : runs();
+          },
+        }),
+      });
+      expect(reads).toBe(3);
+      expect(rowFor(report, id)).toMatchObject({
+        status: stale ? 'stale' : 'missing',
+        lastProofAt: stale ? iso(4000) : null,
+      });
+      expect(livenessDecisions(report)[0].action).toBe('red');
+    }
+  });
+
+  it.each([
+    [503, 'github-http-503'],
+    [{}, 'github-runs-unreadable'],
+    [new Response('not-json'), 'github-transport'],
+  ])('keeps unreadable confirmation red (%j)', async (response, reason) => {
+    const id = 'github:jovie:m2-revenue-path-canary';
+    const { report } = await runLiveness({
+      registry: only(id),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        '/runs?': url =>
+          new URL(url).searchParams.get('status') === 'completed'
+            ? runs()
+            : response,
+      }),
+    });
+    expect(rowFor(report, id)).toMatchObject({ status: 'unknown', reason });
+    expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
+  it('preserves trigger filters while confirming a missing scheduled heartbeat', async () => {
+    const seen = [];
+    const { report } = await runLiveness({
+      registry: only('github:jovie:security'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'security.yml/runs': url => {
+          const query = new URL(url).searchParams;
+          seen.push(query);
+          return query.get('status') === 'success' &&
+            query.get('event') === 'schedule'
+            ? runs([1, 'success', 2, 'push'], [120, 'success', 1, 'schedule'])
+            : runs();
+        },
+      }),
+    });
+    expect(rowFor(report, 'github:jovie:security')).toMatchObject({
+      status: 'fresh',
+      lastProofAt: iso(120),
+    });
+    expect(seen).toHaveLength(4);
+    expect(seen.every(query => query.get('branch') === 'main')).toBe(true);
+    expect(seen.map(query => query.get('event'))).toEqual([
+      'schedule',
+      'workflow_dispatch',
+      'schedule',
+      'workflow_dispatch',
+    ]);
+  });
+
   it('reads scheduled runs that 30 newer push runs would hide', async () => {
     const pushes = Array.from({ length: 30 }, (_, i) => [
       i + 1,
@@ -936,13 +1229,17 @@ describe('liveness run receipts', () => {
   });
 
   it('emits receipts for observed runs during a liveness pass', async () => {
+    const fetchImpl = vi.fn(
+      fakeFetch({
+        'production-continuity.yml/runs': runs([2, 'failure', 7]),
+      })
+    );
     const { events } = await runLiveness({
       registry: only('github:jovie:production-continuity'),
       nowMs: NOW,
-      fetchImpl: fakeFetch({
-        'production-continuity.yml/runs': runs([2, 'failure', 7]),
-      }),
+      fetchImpl,
     });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(events.map(row => [row.stage, row.outcome])).toEqual([
       ['started', 'advanced'],
       ['finished', 'failed'],

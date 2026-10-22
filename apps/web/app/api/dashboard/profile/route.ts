@@ -25,6 +25,7 @@ import {
   getProfileUpdatePreflight,
   NO_STORE_HEADERS,
   parseProfileUpdates,
+  readWritableProfileUsername,
   updateProfileRecords,
   validateUpdatesPayload,
 } from './lib';
@@ -32,7 +33,7 @@ import {
 // Use Node.js runtime for compatibility with DB libs and server analytics
 export const runtime = 'nodejs';
 
-async function parseProfileUpdateRequest(req: Request) {
+async function parseProfileUpdateRequest(req: Request, appUserId: string) {
   const parsedBody = await parseJsonBody<{
     updates?: Record<string, unknown>;
     expectedVersion?: unknown;
@@ -67,7 +68,17 @@ async function parseProfileUpdateRequest(req: Request) {
     return updatesValidation.response;
   }
 
-  const parsedUpdatesResult = parseProfileUpdates(updatesValidation.updates);
+  let currentUsername: string | null = null;
+  if (typeof updates.username === 'string' && isCanonicalUuid(profileId)) {
+    currentUsername = await withDbSessionTx(
+      tx => readWritableProfileUsername(tx, appUserId, profileId),
+      { clerkUserId: appUserId }
+    );
+  }
+
+  const parsedUpdatesResult = parseProfileUpdates(updatesValidation.updates, {
+    currentUsername,
+  });
   if (!parsedUpdatesResult.ok) {
     return parsedUpdatesResult.response;
   }
@@ -128,7 +139,7 @@ export async function GET() {
 export async function PUT(req: Request) {
   try {
     const appUserId = await requireAuth();
-    const parsedRequest = await parseProfileUpdateRequest(req);
+    const parsedRequest = await parseProfileUpdateRequest(req, appUserId);
     if (parsedRequest instanceof NextResponse) return parsedRequest;
 
     const {

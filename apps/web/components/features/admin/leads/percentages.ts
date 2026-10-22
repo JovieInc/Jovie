@@ -18,3 +18,18 @@ export function formatClampedPercent(
   if (value === null) return '--';
   return `${clampPercentValue(value * 100).toFixed(precision)}%`;
 }
+
+/**
+ * Display label for a count as a share of a total. Never rounds a non-zero
+ * count to "0%" (shows "<1%") nor a partial share to "100%" (shows ">99%").
+ */
+export function formatSharePercent(
+  numerator: number,
+  denominator: number
+): string {
+  if (denominator <= 0) return '--';
+  const pct = getClampedPercent(numerator, denominator);
+  if (pct === 0 && numerator > 0) return '<1%';
+  if (pct === 100 && numerator < denominator) return '>99%';
+  return `${pct}%`;
+}

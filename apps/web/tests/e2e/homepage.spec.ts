@@ -1,5 +1,6 @@
+import { HOMEPAGE_COPY } from '@/data/homepageCopy';
+import { HOMEPAGE_FAN_STATES_COPY } from '@/data/homepageFanStatesCopy';
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
-import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { expect, test } from './setup';
 import { inspectRouteDom } from './utils/route-dom-detector';
 import { waitForHydration } from './utils/smoke-test-utils';
@@ -54,43 +55,41 @@ async function gotoHomepage(page: PlaywrightPage) {
   throw new Error('Homepage rendered a transient Next.js dev overlay');
 }
 
-// Identity + link-claim homepage (Tim 2026-09-28, Pen STAGING Cyuz2).
+// Artist-profile homepage (EVENT 2026-10-20): claim + live profile, three
+// real fan states, then the free offer and the same claim.
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
     await gotoHomepage(page);
   });
 
-  test('renders the identity hero with the jov.ie/you claim as the one primary action', async ({
+  test('renders the artist-profile hero with the jov.ie/ claim as the one primary action', async ({
     page,
   }) => {
     const hero = page.getByTestId('marketing-section-hero');
     await expect(
-      hero.getByRole('heading', {
-        level: 1,
-        name: /Be found\.\s*Be understood\./,
-      })
+      hero.getByRole('heading', { level: 1, name: HOMEPAGE_COPY.hero.headline })
     ).toBeVisible();
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
 
     const cta = page.getByTestId('homepage-primary-cta');
     await expect(cta).toBeVisible();
-    await expect(cta).toHaveText('Claim');
+    await expect(cta).toHaveText(HOMEPAGE_COPY.hero.claim.action);
     await expect(page.getByTestId('homepage-claim-form')).toHaveAttribute(
       'action',
       '/start'
     );
-    // JOV-7750 (#22180): the claim card shows the visitor's own jov.ie/you
-    // identity beside the claim, never a founder or claimed customer.
-    const identity = hero.getByTestId('homepage-hero-identity');
-    const { preview, claim } = HOMEPAGE_IDENTITY_COPY.hero;
-    await expect(
-      identity.getByText(preview.label, { exact: true })
-    ).toBeVisible();
-    await expect(identity).toContainText(`${claim.domain}${preview.name}`);
-    await expect(
-      identity.getByText(preview.role, { exact: true })
-    ).toBeVisible();
+    await expect(hero.getByText(HOMEPAGE_COPY.hero.supportNote)).toBeVisible();
+    // The proof is the real product: a registry capture of a live profile,
+    // loaded eagerly as the LCP image.
+    const profile = hero.getByRole('img', {
+      name: HOMEPAGE_COPY.hero.profile.alt,
+    });
+    await expect(profile).toBeVisible();
+    expect(
+      await profile.evaluate(image => (image as HTMLImageElement).naturalWidth)
+    ).toBeGreaterThan(0);
+    // Preserve main's visitor-focused claim: no founder card or retired search.
     await expect(hero.getByText(/Tim White|Founder, Jovie/)).toHaveCount(0);
     await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
     await expect(page.getByText('Request access')).toHaveCount(0);
@@ -117,44 +116,52 @@ test.describe('Homepage', () => {
     await startRequest;
   });
 
-  test('aligns the claim identity card on desktop and mobile', async ({
+  test('shows real profile states that scroll on phones without page overflow', async ({
     page,
   }) => {
-    const { preview, claim } = HOMEPAGE_IDENTITY_COPY.hero;
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
-      const identity = page.getByTestId('homepage-hero-identity');
-      await identity.scrollIntoViewIfNeeded();
-      await expect(
-        identity.getByText(preview.label, { exact: true })
-      ).toBeVisible();
-      await expect(identity).toContainText(`${claim.domain}${preview.name}`);
-      await expect(
-        identity.getByText(preview.role, { exact: true })
-      ).toBeVisible();
+      const gallery = page.getByTestId('homepage-fan-states');
+      await gallery.scrollIntoViewIfNeeded();
+      for (const state of HOMEPAGE_FAN_STATES_COPY.states) {
+        const image = gallery.getByRole('img', { name: state.alt });
+        await image.scrollIntoViewIfNeeded();
+        await expect(image).toBeVisible();
+        await expect(
+          gallery.getByText(state.title, { exact: true })
+        ).toBeVisible();
+      }
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth
+      );
+      expect(overflow).toBeLessThanOrEqual(1);
       const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
       expect(
-        snapshot.findings.filter(
-          finding => finding.kind === 'misaligned-text-stack'
+        snapshot.findings.filter(finding =>
+          ['misaligned-text-stack', 'clipped-heading'].includes(finding.kind)
         )
       ).toEqual([]);
     }
   });
 
-  test('mounts hero, presence, structure, and close in order', async ({
+  test('mounts hero, profile states, and the offer close in order', async ({
     page,
   }) => {
     const headings = await page
       .locator('main h1:visible, main h2:visible')
       .evaluateAll(nodes => nodes.map(node => node.textContent?.trim()));
     expect(headings.filter(Boolean)).toEqual([
-      'Be found.Be understood.',
-      'Your presence, resolved.',
-      'Structure that travels.',
-      'Make it your Jovie profile.',
+      HOMEPAGE_COPY.hero.headline,
+      HOMEPAGE_FAN_STATES_COPY.headline,
+      HOMEPAGE_COPY.offer.headline,
     ]);
     await expect(page.getByTestId('homepage-close-claim-cta')).toHaveText(
-      'Claim'
+      HOMEPAGE_COPY.hero.claim.action
+    );
+    await expect(page.getByTestId('homepage-offer-summary')).toContainText(
+      '$0'
     );
   });
 
@@ -182,7 +189,7 @@ test.describe('Homepage', () => {
     );
     // The homepage never shows Request access; the header front door is /start.
     await expect(
-      header.getByRole('link', { name: 'Find yourself' })
+      header.getByRole('link', { name: 'Claim your profile' })
     ).toHaveAttribute('href', '/start');
     await expect(
       header.getByRole('link', { name: 'Request access' })
@@ -242,33 +249,9 @@ test.describe('Homepage', () => {
     }
   });
 
-  /**
-   * JOV-7126 follow-up: at 768 the split shell drops to two columns a whole
-   * breakpoint before the shared H1 ramp expects it, so "Be understood."
-   * needed a third line and the two-line clamp truncated it to "Be..."; the
-   * name column in the claim card was narrow enough to wrap "Founder, Jovie"
-   * onto three lines. Pen x4j9f fixes both with the existing type/spacing
-   * tokens. Check the broken width plus its 390/1440 neighbors for regressions.
-   */
-  test('renders the full headline and a single-line role at 768, with no regression at 390 and 1440', async ({
+  test('paints the whole two-line headline without clipping descenders', async ({
     page,
   }) => {
-    // getClientRects() on the element itself always returns exactly one
-    // rect for a block box, no matter how many lines its text wraps to —
-    // the fragmentation into lines only shows up on a Range over its text.
-    const countVisualLines = (el: Element): number => {
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      return range.getClientRects().length;
-    };
-
-    // Same split the component itself renders (HomepageIdentityHero.tsx),
-    // so the sentences stay derived from the one copy source rather than
-    // duplicated as literals.
-    const [firstSentence, secondSentence] =
-      HOMEPAGE_IDENTITY_COPY.hero.headline.split(/(?<=\.) /);
-    const roleText = HOMEPAGE_IDENTITY_COPY.hero.preview.role;
-
     for (const viewport of [
       { width: 390, height: 844 },
       { width: 768, height: 1024 },
@@ -277,111 +260,47 @@ test.describe('Homepage', () => {
       await page.setViewportSize(viewport);
       await gotoHomepage(page);
       await page.evaluate(() => document.fonts.ready);
-
       const heading = page.getByRole('heading', { level: 1 });
-      await expect(heading).toBeVisible();
-      await expect(heading).toHaveText(firstSentence + secondSentence);
-
-      // Each sentence is its own <span class="block">. The shared two-line
-      // clamp only ever truncates when the second span itself needs a
-      // second visual line (three lines total for the h1).
-      const secondLine = heading.locator('span', {
-        hasText: secondSentence,
-      });
-      const secondLineCount = await secondLine.evaluate(countVisualLines);
-      expect(
-        secondLineCount,
-        `"${secondSentence}" wrapped to ${secondLineCount} lines at ${viewport.width}px, so the two-line clamp truncates it`
-      ).toBe(1);
-
-      const headingBox = await heading.evaluate(el => ({
+      await expect(heading).toHaveText(HOMEPAGE_COPY.hero.headline);
+      const box = await heading.evaluate(el => ({
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
         scrollWidth: el.scrollWidth,
         clientWidth: el.clientWidth,
       }));
-      expect(
-        headingBox.scrollWidth,
-        `headline overflows its own box at ${viewport.width}px: ${JSON.stringify(headingBox)}`
-      ).toBeLessThanOrEqual(headingBox.clientWidth + 1);
-
-      const role = page.getByText(roleText);
-      await expect(role).toBeVisible();
-      const roleLineCount = await role.evaluate(countVisualLines);
-      expect(
-        roleLineCount,
-        `"${roleText}" wrapped to ${roleLineCount} lines at ${viewport.width}px`
-      ).toBe(1);
+      const atWidth = `${viewport.width}px: ${JSON.stringify(box)}`;
+      expect(box.scrollHeight, atWidth).toBeLessThanOrEqual(
+        box.clientHeight + 1
+      );
+      expect(box.scrollWidth, atWidth).toBeLessThanOrEqual(box.clientWidth + 1);
     }
   });
 
-  test('aligns the hero with the shared page spine and desktop columns', async ({
-    page,
-  }) => {
+  test('aligns the hero with the shared section spine', async ({ page }) => {
     for (const viewport of [
       { width: 390, height: 844 },
       { width: 768, height: 1024 },
-      { width: 1024, height: 900 },
       { width: 1440, height: 900 },
     ]) {
       await page.setViewportSize(viewport);
       await gotoHomepage(page);
-      await page.evaluate(() => document.fonts.ready);
-
       const geometry = await page.evaluate(() => {
-        const hero = document.querySelector<HTMLElement>(
-          '[data-testid="marketing-section-hero"]'
+        const heading = document.querySelector('main h1');
+        const container = document.querySelector(
+          '[data-testid="marketing-section-product-gallery"] .ap-section-container'
         );
-        const section = document.querySelector<HTMLElement>(
-          '.homepage-identity-section__inner'
-        );
-        const sectionHeader = document.querySelector<HTMLElement>(
-          '.homepage-identity-section__header'
-        );
-        const heading = hero?.querySelector('h1');
-        const card = hero?.querySelector('[data-testid="homepage-claim-card"]');
-        if (!hero || !section || !sectionHeader || !heading || !card) {
-          throw new Error(
-            'The actual homepage hero and following section must render'
-          );
+        if (!heading || !container) {
+          throw new Error('The hero and the product gallery must render');
         }
-        const heroBox = hero.getBoundingClientRect();
-        const sectionBox = section.getBoundingClientRect();
-        const style = getComputedStyle(hero);
-        const leftPadding = Number.parseFloat(style.paddingLeft);
-        const rightPadding = Number.parseFloat(style.paddingRight);
         return {
-          contentLeft: heroBox.x + leftPadding,
-          contentWidth: heroBox.width - leftPadding - rightPadding,
-          sectionLeft: sectionBox.x,
-          sectionWidth: sectionBox.width,
           headingLeft: heading.getBoundingClientRect().x,
-          cardLeft: card.getBoundingClientRect().x,
-          columnGap: Number.parseFloat(
-            getComputedStyle(sectionHeader).columnGap
-          ),
+          spineLeft: container.getBoundingClientRect().x,
         };
       });
-      const atWidth = JSON.stringify({ width: viewport.width, ...geometry });
       expect(
-        Math.abs(geometry.contentLeft - geometry.sectionLeft),
-        atWidth
+        Math.abs(geometry.headingLeft - geometry.spineLeft),
+        `${viewport.width}px: ${JSON.stringify(geometry)}`
       ).toBeLessThanOrEqual(1);
-      expect(
-        Math.abs(geometry.contentWidth - geometry.sectionWidth),
-        atWidth
-      ).toBeLessThanOrEqual(1);
-      expect(
-        Math.abs(geometry.headingLeft - geometry.sectionLeft),
-        atWidth
-      ).toBeLessThanOrEqual(1);
-      if (viewport.width >= 1024) {
-        const seventhColumn =
-          geometry.sectionLeft +
-          (geometry.sectionWidth + geometry.columnGap) / 2;
-        expect(
-          Math.abs(geometry.cardLeft - seventhColumn),
-          atWidth
-        ).toBeLessThanOrEqual(1);
-      }
     }
   });
 

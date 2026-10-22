@@ -2,6 +2,10 @@
 
 EVENT: JOV-5885, under JOV-5881, locks `/` to `youtube-artist-closed-loop-mvp-v1`. This scoped direction supersedes the general identity homepage brief. Atoms stay.
 
+Superseded for `/` by EVENT 2026-10-20 (Tim: the homepage sells the artist
+profile and its offer; see the [homepage recipe](RECIPE_CATALOG.md#recipe-homepage)).
+The brief below remains the reference for a YouTube-artist solution page.
+
 ## 1. IA / message
 
 Message: Help regularly uploading YouTube artists connect each upload to a thumbnail, a release, a smart link, and fans they can reach again.

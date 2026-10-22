@@ -1625,12 +1625,14 @@ class LinearClientTest(unittest.TestCase):
         self.assertEqual(str(missing), "linear: Entity not found: Comment")
 
     def test_graphql_error_diagnostics_retain_only_allowlisted_metadata(self):
-        client = lane.Linear.__new__(lane.Linear); client.key = "test-only-no-live-credential"
+        client = lane.Linear.__new__(lane.Linear); client.key = "linear-app:test"; client.app = ("test", "fixture")
         class Response:
             def __enter__(self): return self
             def __exit__(self, *args): return False
             def read(self): return json.dumps({"errors": [{"message": "private payload secret-token", "extensions": {"code": "FORBIDDEN", "statusCode": 403, "payload": "secret-token"}}]}).encode()
-        with patch.object(lane, "linear_cooldown_until", return_value=None), patch.object(lane, "record_linear_budget"), patch.object(lane.urllib.request, "urlopen", return_value=Response()):
+        with patch.object(lane, "linear_cooldown_until", return_value=None), patch.object(lane, "record_linear_budget"), \
+                patch.object(lane.linear_app_token, "token", return_value="fixture-token"), \
+                patch.object(lane.urllib.request, "urlopen", return_value=Response()):
             with self.assertRaises(lane.LinearRequestError) as caught:
                 client.gql("mutation", {"body": "private payload"})
         self.assertEqual(caught.exception.diagnostic, {"class": "linear-graphql", "code": "FORBIDDEN", "httpStatus": 403})
@@ -1656,10 +1658,10 @@ class LinearClientTest(unittest.TestCase):
 
     def test_reads_key_and_maps_lane_issues_from_the_local_mirror(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_STATE": tmp}):
-            env = Path(tmp) / "linear.env"
-            env.write_text('export LINEAR_API_KEY="lin_api_x"\n')
-            client = lane.Linear(env)
-            self.assertEqual(client.key, "lin_api_x")
+            app_env = Path(tmp) / "linear-app.env"
+            app_env.write_text('LINEAR_CLIENT_ID=cid\nLINEAR_CLIENT_SECRET=sec\n')
+            client = lane.Linear(app_env=app_env)
+            self.assertEqual(client.key, "linear-app:cid")
             lane.linear_sync.apply(Path(tmp), "JOV", [{
                 "id": "i1", "identifier": "JOV-5", "title": "t", "description": None, "priority": 2,
                 "createdAt": "2026-09-01T00:00:00Z", "updatedAt": "2026-10-11T00:00:00.000Z",
@@ -1674,7 +1676,8 @@ class LinearClientTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             env = Path(tmp) / "linear.env"
             env.write_text("OTHER=1\n")
-            with self.assertRaises(SystemExit):
+            # #22378: no personal-key fallback; a RuntimeError the doctor and watchdog degrade on.
+            with self.assertRaises(lane.LinearAppCredentialMissing):
                 lane.Linear(env)
 
 
@@ -1783,9 +1786,13 @@ class LinearRateLimitTest(unittest.TestCase):
             else:
                 os.environ["LANES_STATE"] = previous
         self.addCleanup(restore_state)
-        self.env = self.state / "linear.env"
-        self.env.write_text('export LINEAR_API_KEY="lin_api_test_secret"\n')
-        self.client = lane.Linear(self.env)
+        self.env = self.state / "linear-app.env"
+        self.env.write_text('LINEAR_CLIENT_ID=cid\nLINEAR_CLIENT_SECRET=lin_api_test_secret\n')
+        for patcher in (patch.object(lane.linear_app_token, "token", return_value="lin_api_test_secret"),
+                        patch.object(lane.linear_app_token, "default_path", return_value=self.env)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.client = lane.Linear(app_env=self.env)
         self.real_open = lane.urllib.request.urlopen
         self.addCleanup(lambda: setattr(lane.urllib.request, "urlopen", self.real_open))
 

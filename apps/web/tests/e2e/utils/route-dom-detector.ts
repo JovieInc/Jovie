@@ -425,11 +425,18 @@ export async function inspectRouteDom(
           if (!visibleIn(heading) || !(heading instanceof HTMLElement)) {
             continue;
           }
-          const headingBox = heading.getBoundingClientRect();
-          // Match the image-contrast detector: sr-only headings are 1x1px
-          // and intentionally clipped, while remaining accessible.
-          if (headingBox.width <= 1 && headingBox.height <= 1) continue;
           const style = getComputedStyle(heading);
+          const headingRect = heading.getBoundingClientRect();
+          // Tailwind's sr-only headings remain accessible but have no visible
+          // ink, just as in the image-contrast detector.
+          if (
+            headingRect.width <= 1 &&
+            headingRect.height <= 1 &&
+            (style.clip === 'rect(0px, 0px, 0px, 0px)' ||
+              style.clipPath === 'inset(50%)')
+          ) {
+            continue;
+          }
           const clamp = style.getPropertyValue('-webkit-line-clamp');
           const clipsY =
             style.overflowY === 'hidden' || style.overflowY === 'clip';
@@ -464,45 +471,52 @@ export async function inspectRouteDom(
             style.textOverflow === 'ellipsis'
               ? heading.scrollWidth - heading.clientWidth
               : 0;
-          // scrollHeight includes the font's line box, including blank
-          // space below glyphs. Confirm actual descender ink crosses the
-          // clip edge rather than treating that spacing as hidden text.
+          // scrollHeight includes the font box's empty descent and positioned
+          // descendants. Measure painted text instead: Range locates each
+          // glyph's baseline; canvas gives its actual ascent/descent.
           let clippedInk = 0;
-          if (clipsY && inkContext && hiddenY < lineHeight / 2) {
-            const clipBottom = headingBox.bottom - px(style.borderBottomWidth);
+          if (
+            clipsY &&
+            inkContext &&
+            heading.scrollHeight > heading.clientHeight + 1
+          ) {
+            const clipTop = headingRect.top + px(style.borderTopWidth);
+            const clipBottom = headingRect.bottom - px(style.borderBottomWidth);
             const walker = document.createTreeWalker(
               heading,
               NodeFilter.SHOW_TEXT
             );
-            while (walker.nextNode()) {
-              const node = walker.currentNode;
+            for (let node = walker.nextNode(); node; node = walker.nextNode()) {
               const parent = node.parentElement;
               if (!parent || !visibleIn(parent)) continue;
               const textStyle = getComputedStyle(parent);
-              inkContext.font = textStyle.font;
-              const content = node.textContent ?? '';
-              for (let offset = 0; offset < content.length; offset += 1) {
-                let glyph = content[offset];
-                if (!glyph || /\s/.test(glyph)) continue;
-                if (textStyle.textTransform === 'uppercase')
-                  glyph = glyph.toLocaleUpperCase();
-                if (textStyle.textTransform === 'lowercase')
-                  glyph = glyph.toLocaleLowerCase();
-                const range = document.createRange();
+              inkContext.font = `${textStyle.fontStyle} ${textStyle.fontWeight} ${textStyle.fontSize} ${textStyle.fontFamily}`;
+              const range = document.createRange();
+              const text = node.textContent ?? '';
+              let offset = 0;
+              for (const glyph of text) {
                 range.setStart(node, offset);
-                range.setEnd(node, offset + 1);
-                const box = range.getBoundingClientRect();
-                if (box.width === 0 || box.height === 0) continue;
-                const metrics = inkContext.measureText(glyph);
-                const inkBottom =
-                  box.top +
-                  metrics.fontBoundingBoxAscent +
-                  metrics.actualBoundingBoxDescent;
-                if (inkBottom - clipBottom > 1)
-                  clippedInk = Math.max(clippedInk, inkBottom - clipBottom);
+                offset += glyph.length;
+                range.setEnd(node, offset);
+                if (!glyph.trim()) continue;
+                const rect = range.getBoundingClientRect();
+                const paintedGlyph =
+                  textStyle.textTransform === 'uppercase'
+                    ? glyph.toLocaleUpperCase()
+                    : textStyle.textTransform === 'lowercase'
+                      ? glyph.toLocaleLowerCase()
+                      : glyph;
+                const ink = inkContext.measureText(paintedGlyph);
+                const baseline = rect.top + ink.fontBoundingBoxAscent;
+                clippedInk = Math.max(
+                  clippedInk,
+                  clipTop - (baseline - ink.actualBoundingBoxAscent),
+                  baseline + ink.actualBoundingBoxDescent - clipBottom
+                );
               }
             }
           }
+          if (clippedInk <= 1) clippedInk = 0;
           if (hiddenY < lineHeight / 2 && hiddenX <= 2 && clippedInk === 0) {
             continue;
           }

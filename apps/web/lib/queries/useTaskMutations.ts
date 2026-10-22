@@ -40,6 +40,61 @@ type TaskDetailCacheEntry = readonly [readonly unknown[], TaskView | undefined];
 type TaskStatsCacheEntry = readonly [readonly unknown[], TaskStats | undefined];
 type TaskQueryClient = ReturnType<typeof useQueryClient>;
 
+const taskUpdateTail = new Map<string, Promise<unknown>>();
+const taskUpdateVersion = new Map<string, number>();
+
+/** Test isolation. The queue is module state so overlapping writes share a version. */
+export function resetQueuedTaskUpdatesForTests(): void {
+  taskUpdateTail.clear();
+  taskUpdateVersion.clear();
+}
+
+function queuedTaskMutationVersion(
+  taskId: string,
+  requested: number | undefined
+): number | undefined {
+  const remembered = taskUpdateVersion.get(taskId);
+  if (remembered === undefined) return requested;
+  if (requested === undefined) return remembered;
+  return Math.max(remembered, requested);
+}
+
+function rememberTaskMutationVersion(
+  taskId: string,
+  version: number | undefined
+): void {
+  if (version === undefined) return;
+  const remembered = taskUpdateVersion.get(taskId);
+  taskUpdateVersion.set(
+    taskId,
+    remembered === undefined ? version : Math.max(remembered, version)
+  );
+}
+
+/**
+ * Same-task edits read `expectedMutationVersion` when they are scheduled.
+ * A burst (title debounce plus priority, assignee, and status) therefore
+ * sends one version several times, and every write after the first is
+ * rejected. Run them in order and stamp each write with the version the
+ * previous write committed.
+ */
+function enqueueTaskUpdate<T>(
+  taskId: string,
+  run: () => Promise<T>
+): Promise<T> {
+  const previous = taskUpdateTail.get(taskId) ?? Promise.resolve();
+  const next = previous.then(run, run);
+  taskUpdateTail.set(taskId, next);
+  const settle = () => {
+    if (taskUpdateTail.get(taskId) === next) {
+      taskUpdateTail.delete(taskId);
+      taskUpdateVersion.delete(taskId);
+    }
+  };
+  void next.then(settle, settle);
+  return next;
+}
+
 interface TaskCacheSnapshot {
   readonly previousLists: TaskListCacheEntry[];
   readonly previousBoards: TaskBoardCacheEntry[];
@@ -336,7 +391,21 @@ export function useUpdateTaskMutation() {
     }: {
       readonly taskId: string;
       readonly data: UpdateTaskInput;
-    }) => updateTask(taskId, data),
+    }) =>
+      enqueueTaskUpdate(taskId, () => {
+        const expectedMutationVersion = queuedTaskMutationVersion(
+          taskId,
+          data.expectedMutationVersion
+        );
+        const nextData =
+          expectedMutationVersion === data.expectedMutationVersion
+            ? data
+            : { ...data, expectedMutationVersion };
+        return updateTask(taskId, nextData).then(saved => {
+          rememberTaskMutationVersion(taskId, saved.mutationVersion);
+          return saved;
+        });
+      }),
     onMutate: async ({ taskId, data }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all });
 

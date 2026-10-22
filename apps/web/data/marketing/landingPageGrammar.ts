@@ -100,6 +100,7 @@ export const LANDING_PAGE_FAMILIES: readonly LandingPageFamily[] = [
       'section.capture',
       'section.monetization',
       'section.ownership',
+      'section.product-gallery',
     ],
     contentSlots: ['eyebrow', 'headline', 'body', 'items'],
     mediaStrategies: [
@@ -196,11 +197,19 @@ export const LANDING_PAGE_ROUTE_TYPES = MARKETING_RECIPES.map(recipe => ({
   referenceRoute: recipe.referenceRoute ?? null,
 }));
 
+const HOMEPAGE_RECIPE = MARKETING_RECIPES.find(
+  recipe => recipe.id === 'homepage'
+);
+
+// Section jobs derive from the homepage recipe so the lock cannot drift from
+// the page. primaryAction stays the canon founder literal checked by
+// scripts/invariants/design-surfaces.mjs (locks.homepagePrimaryAction); the
+// live `/` action is the recipe's "Claim" — reconciling the two is a canon
+// change routed to Tim (2026-10-20).
 export const LANDING_PAGE_HOMEPAGE_LOCK = {
   routeType: 'homepage',
   maxSections: 9,
-  sectionJobs: MARKETING_RECIPES.find(recipe => recipe.id === 'homepage')
-    ?.sectionOrder,
+  sectionJobs: HOMEPAGE_RECIPE?.sectionOrder,
   primaryAction: 'Find me',
   tasteOwner: 'Tim',
   canonicalShellIds: ['shell.header', 'shell.footer'],
@@ -313,7 +322,7 @@ export function certifyLandingPageComposition(
         code: 'homepage-section-lock',
         subject: candidate.routeType,
         message:
-          'Homepage composition must preserve the locked nine section jobs.',
+          'Homepage composition must preserve the homepage recipe section jobs.',
       });
     }
   }

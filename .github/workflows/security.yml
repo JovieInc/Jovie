@@ -282,6 +282,9 @@ jobs:
     # until x-ratelimit-reset, then retries the same request. That retry adds a
     # second Authorization header and GitHub answers 401 while the token is
     # still valid. The guard waits on the job token and stops that retry.
+    # A GitHub GraphQL "Something went wrong" or HTTP 5xx on that query is
+    # retried inside the guard (three attempts, short backoff, same token
+    # margin). Any other Scorecard error fails the job. The scan is not skipped.
     timeout-minutes: 50
     if: github.event_name != 'pull_request'
     permissions:

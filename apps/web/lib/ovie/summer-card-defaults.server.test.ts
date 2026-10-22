@@ -40,11 +40,12 @@ vi.mock('@/lib/db', () => ({
 const {
   SUMMER_CARD_DEFAULT_DECIDER,
   summerCardDecisionContract,
-  summerCardId,
   summerCardInputSchema,
   summerCardListQuerySchema,
-  summerCardPayloadDigest,
 } = await import('./summer-cards');
+const { summerCardId, summerCardPayloadDigest } = await import(
+  './summer-card-digest'
+);
 const {
   applySummerCardDefaults,
   decideSummerCard,
