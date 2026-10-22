@@ -308,11 +308,10 @@ function isChatApiRequest(request: Request): boolean {
  * Counts in-flight chat-owned API requests (all served by `mockChatBackend`).
  *
  * `networkidle` is not a usable readiness signal on the chat route: the shell
- * sidebar full-prefetches every nav destination (`prefetch={true}`) and warms
- * the Library route plus its release-matrix data ~300ms after mount. Those are
- * real, DB-backed renders of other routes whose duration is not bounded by the
- * chat surface, so on a loaded CI server they can keep the network busy past
- * any timeout (and get aborted mid-stream by the next navigation).
+ * must not full-prefetch every nav destination (that burst exceeds the shell
+ * RSC budget). Query warming can still fetch Library data after mount. Those
+ * requests are not bounded by the chat surface, so on a loaded CI server they
+ * can keep the network busy past any timeout.
  */
 function trackChatApiRequests(page: Page) {
   const inFlight = new Set<Request>();

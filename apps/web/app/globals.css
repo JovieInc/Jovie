@@ -151,7 +151,10 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   position: absolute;
   top: 0;
   left: 0;
-  -webkit-app-region: drag;
+  /* Drag lives on sibling strips, not this ancestor. Chromium reports
+     focus as inactive at 200% zoom when a no-drag control sits inside a
+     drag region. */
+  -webkit-app-region: no-drag;
   z-index: 60;
   display: flex;
   align-items: center;
