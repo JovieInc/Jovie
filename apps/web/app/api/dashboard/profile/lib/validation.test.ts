@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseProfileUpdates, ProfileUpdateSchema } from './validation';
+import { ProfileUpdateSchema, parseProfileUpdates } from './validation';
 
 describe('dashboard profile username updates', () => {
   it('rejects renaming a profile to the token-only claim fixture', () => {
