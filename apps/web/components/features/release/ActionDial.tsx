@@ -270,9 +270,7 @@ export function ActionDial({
       <div
         className={cn(
           'relative overflow-hidden',
-          options.length === 1
-            ? 'h-19 min-h-[4.75rem]'
-            : 'h-53 min-h-[13.25rem]'
+          options.length === 1 ? 'h-19 min-h-19' : 'h-53 min-h-53'
         )}
       >
         <div

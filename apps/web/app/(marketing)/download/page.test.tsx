@@ -17,15 +17,11 @@ describe('DownloadPage hero layout', () => {
       level: 1,
       name: 'Jovie, Installed Where You Work.',
     });
-    expect(heading).toHaveClass(
-      'marketing-h1-natural',
-      'min-h-[4.5rem]',
-      'sm:min-h-[7.5rem]'
-    );
-    expect(heading).not.toHaveClass('line-clamp-2');
+    expect(heading).toHaveClass('min-h-18', 'sm:min-h-30', 'line-clamp-2');
+    expect(heading.className).not.toContain('marketing-h1-natural');
 
     const copy = heading.parentElement;
-    expect(copy).toHaveClass('max-w-xl', 'max-sm:min-h-[25.75rem]');
+    expect(copy).toHaveClass('max-w-xl', 'max-sm:min-h-103');
     expect(copy?.parentElement).toHaveClass('items-start', 'lg:items-center');
     expect(copy?.parentElement).not.toHaveClass('items-center');
   });

@@ -28,7 +28,7 @@ describe('SmartLinksLanding', () => {
       'overflow-hidden'
     );
     expect(screen.getByTestId('action-dial').querySelector('div')).toHaveClass(
-      'min-h-[13.25rem]'
+      'min-h-53'
     );
     expect(
       screen.getByRole('link', { name: 'Open the live example' })

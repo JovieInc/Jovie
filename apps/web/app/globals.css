@@ -945,17 +945,6 @@ body {
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
-  /* Short heroes opt out of the shell cap. `1lh` is cyclic with
-     -webkit-line-clamp, so the first layout can collapse the heading to a
-     single line box and the centered column jumps when font metrics land. */
-  .marketing-h1-natural {
-    display: block;
-    max-block-size: none;
-    padding-block-end: 0;
-    overflow: visible;
-    -webkit-box-orient: initial;
-    -webkit-line-clamp: unset;
-  }
   /* The same ink allowance is needed by clamped section/CTA headings.
      Their tight Satoshi leading can crop descenders even with no hidden line. */
   :where(.home-viewport, .system-b-marketing) :where(h2, h3).line-clamp-2 {
