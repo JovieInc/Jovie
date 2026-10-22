@@ -399,6 +399,170 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["sha"], MAIN_SHA)
         self.assertIn("Main Release Ready check is missing", observed["error"])
 
+    def test_observe_main_retries_transient_502_then_reads_release_ready(self):
+        """JOV-8338: a fast GitHub 502 on the release-ready read is retried.
+
+        Wave 39794210914 failed closed at main:unknown. A later successful
+        read must be allowed to grade the check. Backoff stays bounded.
+        """
+        calls = {"check_runs": 0}
+
+        def run(command, **_kwargs):
+            endpoint = command[-1]
+            if endpoint.endswith("/branches/main"):
+                body = {"commit": {"sha": MAIN_SHA}}
+            elif endpoint.endswith(f"/commits/{MAIN_SHA}/status"):
+                body = {"state": "success"}
+            elif f"/commits/{MAIN_SHA}/check-runs?" in endpoint:
+                calls["check_runs"] += 1
+                if calls["check_runs"] == 1:
+                    return _gh_completed(
+                        command,
+                        'HTTP/2.0 502 Bad Gateway\r\n\r\n{"message":"Server Error"}\n',
+                        "gh: HTTP 502\n",
+                        1,
+                    )
+                body = {
+                    "total_count": 1,
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "started_at": "2026-10-22T14:10:00Z",
+                            "completed_at": "2026-10-22T14:12:00Z",
+                        }
+                    ],
+                }
+            elif endpoint.startswith("repos/JovieInc/Jovie/actions/artifacts?"):
+                body = {"artifacts": []}
+            else:
+                raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+            return _gh_completed(
+                command,
+                f"HTTP/2.0 200 OK\r\n\r\n{json.dumps(body)}\n",
+            )
+
+        with (
+            mock.patch.dict(os.environ, {"FLEET_GATE_HTTP_CACHE": "off"}),
+            mock.patch.object(MODULE.subprocess, "run", side_effect=run),
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["sourceGate"]["conclusion"], "success")
+        self.assertNotIn("Main Release Ready check is missing", observed.get("error", ""))
+        self.assertEqual(calls["check_runs"], 2)
+        sleep.assert_called_once_with(1)
+
+    def test_observe_main_fail_closed_after_transient_budget_is_not_a_missing_check(self):
+        def always_502(command, **_kwargs):
+            return _gh_completed(
+                command,
+                "HTTP/2.0 502 Bad Gateway\r\n\r\n{}\n",
+                "gh: HTTP 502\n",
+                1,
+            )
+
+        with (
+            mock.patch.dict(os.environ, {"FLEET_GATE_HTTP_CACHE": "off"}),
+            mock.patch.object(MODULE.subprocess, "run", side_effect=always_502) as run,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["sha"], MODULE.UNKNOWN_MAIN_SHA)
+        self.assertIn("github-observation-failed", observed["error"])
+        self.assertNotIn("Main Release Ready check is missing", observed["error"])
+        self.assertEqual(run.call_count, MODULE.GH_TRANSIENT_OBSERVATION_ATTEMPTS)
+        self.assertEqual(
+            [call.args[0] for call in sleep.call_args_list],
+            [1, 2],
+        )
+
+    def test_observe_main_missing_check_fails_closed_without_retry(self):
+        """A completed read with no Main Release Ready check is not a 502.
+
+        Retrying that verdict would weaken the gate. The exact SHA is kept
+        and deployment stays fail-closed.
+        """
+
+        def run(command, **_kwargs):
+            endpoint = command[-1]
+            if endpoint.endswith("/branches/main"):
+                body = {"commit": {"sha": MAIN_SHA}}
+            elif endpoint.endswith(f"/commits/{MAIN_SHA}/status"):
+                body = {"state": "success"}
+            elif f"/commits/{MAIN_SHA}/check-runs?" in endpoint:
+                body = {"total_count": 0, "check_runs": []}
+            elif "/actions/runs?" in endpoint:
+                body = {"total_count": 0, "workflow_runs": []}
+            else:
+                raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+            return _gh_completed(
+                command,
+                f"HTTP/2.0 200 OK\r\n\r\n{json.dumps(body)}\n",
+            )
+
+        with (
+            mock.patch.dict(os.environ, {"FLEET_GATE_HTTP_CACHE": "off"}),
+            mock.patch.object(MODULE.subprocess, "run", side_effect=run) as run_mock,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertIn("Main Release Ready check is missing", observed["error"])
+        sleep.assert_not_called()
+        self.assertEqual(run_mock.call_count, 4)
+
+    def test_observe_main_red_check_fails_closed_without_retry(self):
+        def run(command, **_kwargs):
+            endpoint = command[-1]
+            if endpoint.endswith("/branches/main"):
+                body = {"commit": {"sha": MAIN_SHA}}
+            elif endpoint.endswith(f"/commits/{MAIN_SHA}/status"):
+                body = {"state": "failure"}
+            elif f"/commits/{MAIN_SHA}/check-runs?" in endpoint:
+                body = {
+                    "total_count": 1,
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "failure",
+                            "started_at": "2026-10-22T14:10:00Z",
+                            "completed_at": "2026-10-22T14:12:00Z",
+                        }
+                    ],
+                }
+            elif endpoint.startswith("repos/JovieInc/Jovie/actions/artifacts?"):
+                body = {"artifacts": []}
+            else:
+                raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+            return _gh_completed(
+                command,
+                f"HTTP/2.0 200 OK\r\n\r\n{json.dumps(body)}\n",
+            )
+
+        with (
+            mock.patch.dict(os.environ, {"FLEET_GATE_HTTP_CACHE": "off"}),
+            mock.patch.object(MODULE.subprocess, "run", side_effect=run) as run_mock,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "red")
+        self.assertEqual(observed["reason"], "required-check-failed")
+        self.assertEqual(observed["failedChecks"], ["Main Release Ready"])
+        self.assertNotIn("error", observed)
+        sleep.assert_not_called()
+        self.assertEqual(run_mock.call_count, 4)
+
     def test_observe_main_uses_ci_job_when_check_runs_are_flooded(self):
         def github_response(_repo: str, endpoint: str):
             if endpoint == "branches/main":
@@ -4610,29 +4774,80 @@ class GitHubConditionalGetTests(unittest.TestCase):
         self.assertNotIn("-H", calls[1])
 
     def test_http_error_and_non_object_keep_the_old_failure_modes(self):
-        with mock.patch.object(
-            MODULE.subprocess,
-            "run",
-            return_value=_gh_completed(
-                ["gh", "api", "--include", "repos/JovieInc/Jovie/branches/main"],
-                "HTTP/2.0 500\n\n",
-                "gh: HTTP 500\n",
-                1,
-            ),
+        with (
+            mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=_gh_completed(
+                    ["gh", "api", "--include", "repos/JovieInc/Jovie/branches/main"],
+                    "HTTP/2.0 500\n\n",
+                    "gh: HTTP 500\n",
+                    1,
+                ),
+            ) as run,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
         ):
             with self.assertRaises(subprocess.CalledProcessError):
                 MODULE.gh_json("JovieInc/Jovie", "branches/main")
+        self.assertEqual(run.call_count, MODULE.GH_TRANSIENT_OBSERVATION_ATTEMPTS)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [1, 2])
 
-        with mock.patch.object(
-            MODULE.subprocess,
-            "run",
-            return_value=_gh_completed(
-                ["gh", "api", "--include", "repos/JovieInc/Jovie/branches/main"],
-                "HTTP/2.0 200 OK\nEtag: W/\"cc\"\n\n[]\n",
-            ),
+        with (
+            mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=_gh_completed(
+                    ["gh", "api", "--include", "repos/JovieInc/Jovie/branches/main"],
+                    "HTTP/2.0 200 OK\nEtag: W/\"cc\"\n\n[]\n",
+                ),
+            ) as run,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
         ):
             with self.assertRaises(ValueError):
                 MODULE.gh_json("JovieInc/Jovie", "branches/main")
+        self.assertEqual(run.call_count, 1)
+        sleep.assert_not_called()
+
+    def test_gh_json_does_not_retry_client_errors(self):
+        with (
+            mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=_gh_completed(
+                    ["gh", "api", "--include", "repos/JovieInc/Jovie/branches/main"],
+                    "HTTP/2.0 404 Not Found\r\n\r\n{}\n",
+                    "gh: Not Found (HTTP 404)\n",
+                    1,
+                ),
+            ) as run,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            with self.assertRaises(subprocess.CalledProcessError):
+                MODULE.gh_json("JovieInc/Jovie", "branches/main")
+        self.assertEqual(run.call_count, 1)
+        sleep.assert_not_called()
+
+    def test_gh_json_retries_a_network_timeout_once(self):
+        timeout = subprocess.TimeoutExpired(["gh", "api"], 20)
+        ok = _gh_completed(
+            ["gh"],
+            'HTTP/2.0 200 OK\r\n\r\n{"ok":true}\n',
+        )
+        with (
+            mock.patch.object(MODULE.subprocess, "run", side_effect=[timeout, timeout, ok]) as run,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                MODULE.gh_json("JovieInc/Jovie", "branches/main")
+        self.assertEqual(run.call_count, 2)
+        sleep.assert_called_once_with(1)
+
+        with (
+            mock.patch.object(MODULE.subprocess, "run", side_effect=[timeout, ok]),
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            self.assertEqual(MODULE.gh_json("JovieInc/Jovie", "branches/main"), {"ok": True})
+        sleep.assert_called_once_with(1)
 
     def test_old_gh_without_include_falls_back_to_a_plain_read(self):
         calls = []

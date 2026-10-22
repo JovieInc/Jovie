@@ -375,14 +375,50 @@ def _gh_api(endpoint: str, etag: str | None) -> subprocess.CompletedProcess[str]
     )
 
 
+# Fast 5xx and network failures get three attempts (sleep 1s, then 2s).
+# A client timeout already waited the gh timeout, so it gets one extra
+# attempt only. The fleet-promotion job is five minutes (JOV-8338: wave
+# 39794210914 failed closed on the first blip).
+GH_TRANSIENT_OBSERVATION_ATTEMPTS = 3
+
+
 def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
     """Read one GitHub REST object, revalidating with If-None-Match.
 
     A 304 does not count against the primary rate limit. The cached body is
     the last 200 for that exact endpoint. A rejected or missing validator
     refetches unconditionally.
+
+    Transient 5xx and network failures retry with bounded backoff before the
+    error is raised. A completed body is not retried: a missing or red Main
+    Release Ready check still fails closed in ``observe_main``, and a 4xx
+    fails on the first attempt.
     """
-    return _gh_json(repo, endpoint, revalidate=True)
+    return _gh_json_retrying(repo, endpoint, revalidate=True)
+
+
+def _retry_transient_read(error: BaseException, attempt: int) -> bool:
+    if attempt + 1 >= GH_TRANSIENT_OBSERVATION_ATTEMPTS:
+        return False
+    if not transient_gh_observation_error(error):
+        return False
+    if isinstance(error, subprocess.TimeoutExpired) and attempt >= 1:
+        return False
+    return True
+
+
+def _gh_json_retrying(repo: str, endpoint: str, *, revalidate: bool) -> dict[str, Any]:
+    last_error: BaseException | None = None
+    for attempt in range(GH_TRANSIENT_OBSERVATION_ATTEMPTS):
+        try:
+            return _gh_json(repo, endpoint, revalidate=revalidate)
+        except (OSError, subprocess.SubprocessError) as error:
+            last_error = error
+            if not _retry_transient_read(error, attempt):
+                raise
+            time.sleep(attempt + 1)
+    assert last_error is not None
+    raise last_error
 
 
 def _gh_json(repo: str, endpoint: str, *, revalidate: bool) -> dict[str, Any]:
@@ -811,6 +847,10 @@ def observe_main(repo: str) -> dict[str, Any]:
         return observed
 
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
+        # Transport failures reach here only after gh_json's bounded
+        # 5xx/network backoff. "Main Release Ready check is missing" is a
+        # completed read (ValueError) and is not retried. A red conclusion
+        # never raises.
         observed_sha = sha if valid_commit_sha(sha, exact=True) else UNKNOWN_MAIN_SHA
         return {
             "status": "unknown",
@@ -1760,17 +1800,24 @@ _TRANSIENT_OBSERVATION_MARKERS = (
 
 
 def transient_gh_observation_error(error: BaseException) -> bool:
-    """Whether an observer failure is a blip worth last-known reuse.
+    """Whether an observer failure is a blip worth a bounded retry or last-known reuse.
 
-    GitHub CLI 5xx/timeouts and Symphony :4041 connection refused during a
-    UI restart (live #16187 autoenroll) must not flip hold-intake to blocked.
+    GitHub CLI 5xx and network failures, including Symphony :4041 connection
+    refused during a UI restart (live #16187 autoenroll), must not flip
+    hold-intake to blocked on the first blip. A 4xx, an auth failure, and a
+    completed missing or red check are not transient.
     """
-    if isinstance(error, subprocess.TimeoutExpired):
+    if isinstance(error, (subprocess.TimeoutExpired, TimeoutError, ConnectionError)):
         return True
     if isinstance(error, subprocess.CalledProcessError):
+        status, _, _ = _parse_gh_include(str(error.stdout or ""))
+        if status is not None and 500 <= status <= 599:
+            return True
         detail = " ".join(
             str(value or "") for value in (error.stdout, error.stderr)
         ).lower()
+        if re.search(r"\bhttp\s+5\d\d\b", detail):
+            return True
         return any(marker in detail for marker in _TRANSIENT_OBSERVATION_MARKERS)
     if isinstance(error, (OSError, urllib.error.URLError)):
         return any(marker in str(error).lower() for marker in _TRANSIENT_OBSERVATION_MARKERS)
