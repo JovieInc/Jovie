@@ -17,7 +17,7 @@ const NOW = new Date('2026-10-15T18:00:00Z');
 const accounts = { openai: 'openai-jovie', stripe: 'stripe-jovie' };
 const price = {
   priceId: 'price_current_pro',
-  amountCents: 19900,
+  amountCents: 1200,
   currency: 'usd',
   interval: 'month' as const,
   legacy: false,
@@ -50,7 +50,7 @@ function matrix() {
           stripeDistribution: channel,
         },
         runtime: {
-          price: { amountCents: 19900, currency: 'usd', interval: 'month' },
+          price: { amountCents: 1200, currency: 'usd', interval: 'month' },
           featureFlag: { evaluation: 'not_applicable' },
         },
         webFallback: { state: 'runtime_gated' },
@@ -111,13 +111,13 @@ function first(input = matrix(), proof: unknown = evidence()) {
 }
 
 describe('fail-closed rail selection', () => {
-  it('selects exactly canonical $199 monthly web checkout with human claim/approval and Jovie as merchant', () => {
+  it('selects exactly canonical $12 monthly web checkout with human claim/approval and Jovie as merchant', () => {
     expect(first()).toMatchObject({
       status: 'supported',
       rail: 'ordinary-web-checkout',
       price: {
         priceId: price.priceId,
-        amountCents: 19900,
+        amountCents: 1200,
         currency: 'usd',
         interval: 'month',
       },
@@ -419,7 +419,7 @@ describe('fail-closed rail selection', () => {
         resource: alternative.priceId,
         sku: {
           priceId: alternative.priceId,
-          amountCents: 19900,
+          amountCents: 1200,
           currency: 'usd',
           interval: 'month',
           active: true,

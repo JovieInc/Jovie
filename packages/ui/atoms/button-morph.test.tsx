@@ -156,7 +156,9 @@ describe('Button pill state choreography', () => {
         Delete
       </Button>
     );
-    expect(screen.getByTestId('spinner')).toHaveClass('text-error-foreground');
+    expect(screen.getByTestId('spinner')).toHaveClass(
+      'text-btn-destructive-foreground'
+    );
     expect(screen.getByRole('button')).toHaveAttribute(
       'data-destructive',
       'true'

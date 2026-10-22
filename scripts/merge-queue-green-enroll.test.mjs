@@ -1978,3 +1978,149 @@ test('QUEUE_FREEZE gates every job that can enqueue or arm, and nothing else', (
     'merge-queue-green-enroll.yml#rearm-green-victims',
   ]);
 });
+
+// JOV-6620 replay of #22280 (2026-10-20): the merge group failed at the source
+// head (run 39455689721, retryable-product: UnifiedTable rendered 10,000 rows).
+// The old one-retry allowance re-enqueued that head on the next push sweep
+// (run 39458246113) after Tim had dequeued it, and jovie-bot then lifted the
+// queue-poison label he added. A failed head waits for a new head or a person.
+const failedHoldStatus = classification => ({
+  context: 'jovie-queue-failure-hold/v1',
+  state: 'success',
+  creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+  description: `class=${classification};n=1;run=39455689721;try=1`,
+  target_url: 'https://github.com/JovieInc/Jovie/actions/runs/39455689721',
+});
+const ejected = (actor = undefined, reason = 'failed_checks') => ({
+  1: {
+    commits: { nodes: [{ commit: { committedDate: '2026-10-20T11:18:16Z' } }] },
+    timelineItems: {
+      nodes: [{ createdAt: '2026-10-20T16:27:33Z', reason, actor }],
+    },
+  },
+});
+const unlabeledBy = (sender, label = 'queue-poison') => ({
+  action: 'unlabeled',
+  label: { name: label },
+  sender,
+  pull_request: {
+    number: 1,
+    state: 'open',
+    draft: false,
+    head: { sha },
+    updated_at: '2026-10-20T16:39:08Z',
+  },
+});
+
+test('a merge-group failure at a head blocks every automatic re-enrollment of that head (#22280)', async () => {
+  const statuses = [failedHoldStatus('retryable-product')];
+  for (const run of [
+    { eventName: 'push' },
+    { eventName: 'workflow_dispatch' },
+    // jovie-bot (lanes) lifting queue-poison is not a release.
+    {
+      eventName: 'pull_request_target',
+      payload: unlabeledBy({ login: 'jovie-bot[bot]', type: 'Bot' }),
+    },
+  ]) {
+    const result = await fixture({ statuses, overrides: ejected(), ...run });
+    assert.deepEqual(result.mutations, [], run.eventName);
+    assert.deepEqual(result.statusWrites, [], run.eventName);
+  }
+  // The failure-hold job's own receipt blocks the same head immediately.
+  const direct = await fixture({
+    eventName: 'workflow_dispatch',
+    overrides: ejected(),
+    failureReceipt: JSON.stringify({
+      schema: 'jovie-merge-group-failure-hold/v1',
+      repository: 'JovieInc/Jovie',
+      prNumber: 1,
+      sourceHeadSha: sha,
+      classification: 'retryable-product',
+      failureNumber: 1,
+      workflowRunId: 39455689721,
+      workflowRunAttempt: 1,
+      retryDisposition: 'blocked-until-new-source-head',
+    }),
+  });
+  assert.deepEqual(direct.mutations, []);
+});
+
+test('a person removing queue-poison or hold releases the failed head exactly once (#22280)', async () => {
+  const statuses = [failedHoldStatus('retryable-product')];
+  for (const label of ['queue-poison', 'hold']) {
+    const released = await fixture({
+      statuses,
+      overrides: ejected(
+        { __typename: 'User', login: 'itstimwhite' },
+        'manual'
+      ),
+      eventName: 'pull_request_target',
+      payload: unlabeledBy({ login: 'itstimwhite', type: 'User' }, label),
+    });
+    assert.deepEqual(released.mutations, [{ id: 'PR_1', oid: sha }], label);
+    assert.deepEqual(
+      released.statusWrites.map(status => status.description),
+      ['spent:run=39455689721;try=1'],
+      label
+    );
+  }
+  // A release names its exact head; a moved head is a new revision instead.
+  const stale = await fixture({
+    statuses,
+    overrides: ejected(),
+    eventName: 'pull_request_target',
+    payload: {
+      ...unlabeledBy({ login: 'itstimwhite', type: 'User' }),
+      pull_request: {
+        ...unlabeledBy({}).pull_request,
+        head: { sha: 'f'.repeat(40) },
+      },
+    },
+  });
+  assert.deepEqual(stale.mutations, []);
+});
+
+test('a person dequeuing a head withdraws its automatic infrastructure retry', async () => {
+  const statuses = [failedHoldStatus('transient-infrastructure')];
+  // Without a manual removal the one infrastructure retry still runs.
+  const retried = await fixture({
+    statuses,
+    overrides: ejected(),
+    eventName: 'push',
+  });
+  assert.deepEqual(retried.mutations, [{ id: 'PR_1', oid: sha }]);
+  const human = await fixture({
+    statuses,
+    overrides: ejected({ __typename: 'User', login: 'itstimwhite' }, 'manual'),
+    eventName: 'push',
+  });
+  assert.deepEqual(human.mutations, []);
+  // jovie-bot's own dequeue during a failure hold is not a human withdrawal.
+  const bot = await fixture({
+    statuses,
+    overrides: ejected({ __typename: 'Bot', login: 'jovie-bot' }, 'manual'),
+    eventName: 'push',
+  });
+  assert.deepEqual(bot.mutations, [{ id: 'PR_1', oid: sha }]);
+});
+
+test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', () => {
+  const script = workflow.jobs.enroll.steps.find(
+    step => step.name === 'Enqueue green PRs'
+  ).with.script;
+  for (const decision of [
+    "receipt(pr, 'skip', `mergeStateStatus=",
+    "receipt(pr, 'held', failure.reason)",
+    "receipt(pr, 'skip', `head-unchanged-since-removal:",
+    "receipt(pr, 'enqueued',",
+    "receipt(pr, 'error',",
+  ])
+    assert.ok(script.includes(decision), decision);
+  assert.ok(
+    script.includes('core.info(`enroll-receipts ${JSON.stringify(receipts)}`)')
+  );
+  assert.ok(script.includes("addHeading('Enroll decisions', 3)"));
+  // The receipt script carries no expressions, so it never counts toward the 21k expression budget.
+  assert.ok(!script.includes('${{'));
+});

@@ -10,6 +10,15 @@ import * as fs from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+/**
+ * Linear takes a personal API key raw (`lin_api_…`) and an OAuth access token
+ * (an app actor such as Jovie Lanes) as `Bearer <token>`.
+ */
+export function linearAuthorization(key) {
+  if (/^Bearer\s/i.test(key) || key.startsWith('lin_api_')) return key;
+  return `Bearer ${key}`;
+}
+
 export const LINEAR_API_URL = 'https://api.linear.app/graphql';
 export const COOLDOWN_FLOOR_MS = 60_000;
 export const COOLDOWN_JITTER = 0.25;
@@ -405,7 +414,7 @@ export async function linearRequest({
     response = await fetchImpl(LINEAR_API_URL, {
       method: 'POST',
       headers: {
-        Authorization: key,
+        Authorization: linearAuthorization(key),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ query, variables }),

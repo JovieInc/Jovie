@@ -663,6 +663,7 @@ export function ProfileCompactSurface({
         data-testid='profile-compact-surface'
         data-mode={activeVisiblePrimaryTab}
         data-presentation={presentation}
+        data-render-mode={renderMode}
         data-profile-overflow-mode={
           shouldUseOverflowScroll ? 'scroll' : undefined
         }

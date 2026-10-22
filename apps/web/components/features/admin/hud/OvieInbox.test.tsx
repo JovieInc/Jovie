@@ -29,6 +29,7 @@ const item: OvieInboxCase = {
   createdAt: '2026-10-02T00:00:00Z',
   nextAction: 'Review',
   waitingUntil: null,
+  decisionDefault: null,
   confidence: null,
   evidence: [],
   decisionTarget: { kind: 'summer', id: 'one' },

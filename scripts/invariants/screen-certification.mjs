@@ -303,11 +303,11 @@ web.investor-pipeline|web|investor-pipeline|apps/web/app/app/(shell)/admin/inves
 web.ovie-certifications|web|ovie-certifications|apps/web/app/app/(shell)/admin/certifications/page.tsx|desktop,mobile
 web.ovie-outbound|web|ovie-outbound|apps/web/app/app/(shell)/admin/outbound/page.tsx|desktop,mobile
 web.ov-hud-shell|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/hud/page.tsx|desktop,mobile
-web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx|desktop,mobile
+web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx,apps/web/app/app/(shell)/admin/page.tsx|desktop,mobile
 web.ov-inbox|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/inbox/page.tsx|desktop,mobile
 web.ov-integrations|web|settings-connectors|apps/web/app/app/(shell)/admin/integrations/page.tsx|desktop,mobile
 web.admin-chat-playground|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat-playground/page.tsx,apps/web/app/app/(shell)/admin/chat-playground/layout.tsx|desktop,mobile
-web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/needs-you/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
+web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
 web.ov-company-presence|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/presence/page.tsx|desktop,mobile
 web.admin-costs|web|admin-costs|apps/web/app/app/(shell)/admin/costs/page.tsx|desktop,mobile
 web.admin-features|web|admin-features|apps/web/app/app/(shell)/admin/features/page.tsx|desktop,mobile
@@ -317,6 +317,7 @@ web.admin-growth|web|admin-growth|apps/web/app/app/(shell)/admin/growth/page.tsx
 web.admin-people|web|admin-people|apps/web/app/app/(shell)/admin/people/page.tsx|desktop,mobile
 web.admin-agent-runs|web|admin-agent-runs|apps/web/app/app/(shell)/admin/agent-runs/|desktop,mobile
 web.admin-ops-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/ops/page.tsx|desktop,mobile
+web.admin-yc-metrics-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/growth/yc-metrics/page.tsx|desktop,mobile
 web.ov-lists|web|ovie-lists|apps/web/app/app/(shell)/admin/lists/|desktop,mobile
 web.admin-screenshots|web|admin-screenshots|apps/web/app/app/(shell)/admin/screenshots/|desktop,mobile
 web.admin-share-studio|web|admin-share-studio|apps/web/app/app/(shell)/admin/share-studio/page.tsx|desktop,mobile
@@ -337,6 +338,7 @@ web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|de
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx,apps/web/app/onboarding/checkout/loading.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
 web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile
+web.claim|web|artist-claim-checkout|apps/web/app/claim/page.tsx,apps/web/app/claim/ClaimArtistSearch.tsx|desktop,mobile
 web.account-shell|web|account-shell|apps/web/app/account/layout.tsx|desktop,mobile
 web.account-creation-recovery|web|account-creation-recovery|apps/web/app/error/user-creation-failed/page.tsx,apps/web/app/error/user-creation-failed/loading.tsx|desktop,mobile
 web.root-error-boundary|web|screen.errors.root|apps/web/app/error.tsx,apps/web/app/global-error.tsx|desktop,mobile

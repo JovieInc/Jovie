@@ -71,6 +71,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'merge_group' }}
 
 jobs:
+  # CI failures, plus PR Size Guard's "Require combined-head workflows to
+  # load" step: a ci.yml GitHub cannot load reports no CI check at all
+  # (2026-10-20, #21826), and the script ignores every other size failure.
   hold-failed-revision:
     name: Hold failed source revision
     outputs:
@@ -78,7 +81,7 @@ jobs:
       admission_recovery_receipt: ${{ steps.failure-hold.outputs.admission_recovery_receipt }}
     if: >-
       github.event_name == 'workflow_run' &&
-      github.event.workflow_run.workflow_id == 178737329 &&
+      (github.event.workflow_run.workflow_id == 178737329 || github.event.workflow_run.workflow_id == 299199506) &&
       github.event.workflow_run.event == 'merge_group' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       contains(fromJSON('["failure","timed_out","action_required","startup_failure","stale"]'), github.event.workflow_run.conclusion)
@@ -190,6 +193,26 @@ jobs:
           # A head that edits .github/workflows cannot be enqueued without it
           # ("`workflows` scope may be required"); the installation grants it.
           permission-workflows: write
+
+      # JOV-8754: sample both REST buckets this fleet shares. GET /rate_limit
+      # costs no quota. 2026-10-21 03:25-03:52Z the repo GITHUB_TOKEN bucket ran
+      # dry and Merge Group Admission waited out the reset, so every group
+      # stalled ~25 min. One notice per bucket feeds scripts/ci/api-quota-report.mjs.
+      - name: Sample API quota
+        continue-on-error: true
+        env:
+          REPO_TOKEN: ${{ github.token }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -uo pipefail
+          for bucket in github-token jovie-bot; do
+            if [[ "$bucket" == github-token ]]; then token="$REPO_TOKEN"; else token="$APP_TOKEN"; fi
+            core="$(curl -fsS --max-time 10 -H "Authorization: Bearer $token" \
+              -H 'Accept: application/vnd.github+json' https://api.github.com/rate_limit \
+              | jq -r '.resources.core | "remaining=\(.remaining) limit=\(.limit) used=\(.used) reset=\(.reset)"')" \
+              || core="unavailable"
+            echo "::notice title=api-quota::bucket=${bucket} ${core} at=$(date -u +%s)"
+          done
 
       - name: Enqueue green PRs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -351,7 +374,7 @@ jobs:
                       labels(first: 100) { pageInfo { hasNextPage } nodes { name } }
                       commits(last: 1) { nodes { commit { committedDate } } }
                       timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
-                        nodes { ... on RemovedFromMergeQueueEvent { createdAt reason } }
+                        nodes { ... on RemovedFromMergeQueueEvent { createdAt reason actor { __typename login } } }
                       }
                       breakerEvents: timelineItems(last: 100, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT, LABELED_EVENT]) {
                         nodes {
@@ -389,6 +412,10 @@ jobs:
               await Promise.all(Array.from({ length: Math.min(width, prs.length) }, worker));
             }
             let enqueued = 0;
+            // Every decision on an open, ready, unqueued PR leaves a receipt (pr, head, reason) in the
+            // job summary and one machine line, so a non-enroll is never silent (event-driven dwell).
+            const receipts = [];
+            const receipt = (pr, decision, reason) => receipts.push({ pr: pr?.number, head: String(pr?.headRefOid ?? '').slice(0, 12), decision, reason });
             for (const [index, candidate] of prs.entries()) {
               if (overBudget()) {
                 core.warning(`sweep budget spent after ${index}/${prs.length} PRs; the rest wait for their own events or the next sweep`);
@@ -414,6 +441,7 @@ jobs:
               if (!eligible(pr)) {
                 if (pr && pr.state === 'OPEN' && !pr.isDraft && !pr.isInMergeQueue) {
                   core.info(`skip #${candidate.number}: mergeStateStatus=${pr.mergeStateStatus}`);
+                  receipt(pr, 'skip', `mergeStateStatus=${pr.mergeStateStatus}`);
                 }
                 continue;
               }
@@ -440,9 +468,20 @@ jobs:
                   ? await readMainSha()
                   : undefined,
               });
-              let failure = sourceFailure;
+              // JOV-6620: a head whose merge group failed stays out until a new
+              // head or a person removes `hold`/`queue-poison` from this exact
+              // head. A bot lifting the label (lanes) never releases it.
+              let failure = failurePolicy.humanReleaseDisposition({
+                failure: sourceFailure,
+                release: failurePolicy.humanFailureReleaseIntent({
+                  eventName: context.eventName, event: context.payload,
+                }),
+                prNumber: pr.number,
+                headSha: pr.headRefOid,
+              });
               if (failure.action === 'block') {
                 core.notice(`HELD #${pr.number}@${pr.headRefOid}: ${failure.reason}`);
+                receipt(pr, 'held', failure.reason);
                 continue;
               }
               // Native history is revision-scoped: a commit/force-push after
@@ -500,10 +539,18 @@ jobs:
                   ownerHoldRelease,
                 });
               }
+              // A person pulling this head out of the queue also withdraws any
+              // automatic retry; only their explicit release re-admits it.
+              const removalActor = pr.timelineItems.nodes[0]?.actor;
+              const humanDequeued = Boolean(removedUnchangedHead) && removalReason === 'manual' &&
+                removalActor?.__typename === 'User' && !/\[bot\]$/i.test(String(removalActor?.login || ''));
               if (failure.action === 'block' ||
+                  (humanDequeued && failure.action === 'retry-once' &&
+                   failure.reason !== 'human-failure-release') ||
                   (removedUnchangedHead && failure.action !== 'retry-once' &&
                    failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval)) {
                 core.info(`skip #${pr.number}: head unchanged since queue removal (${removalReason}; ${failure.reason})`);
+                receipt(pr, 'skip', `head-unchanged-since-removal:${removalReason}:${failure.reason}`);
                 continue;
               }
               if (process.env.DRY_RUN === 'true') {
@@ -624,6 +671,7 @@ jobs:
                   }`, { id: pr.id, oid: pr.headRefOid });
                 enqueued += 1;
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                receipt(pr, 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position}`);
                 if (breakerMarked && !breakerRestore) {
                   await github.rest.issues.removeLabel({
                     owner, repo, issue_number: pr.number, name: BREAKER_LABEL,
@@ -637,9 +685,21 @@ jobs:
                   core.notice(`RELEASED rejected enqueue reservation for #${pr.number}@${pr.headRefOid}`);
                 }
                 core.warning(`#${pr.number} not enqueued: ${error.message}`);
+                receipt(pr, 'error', String(error.message).slice(0, 200));
               }
             }
             core.info(`enqueued=${enqueued}`);
+            core.info(`enroll-receipts ${JSON.stringify(receipts)}`);
+            if (receipts.length > 0 && core.summary) {
+              await core.summary
+                .addHeading('Enroll decisions', 3)
+                .addTable([
+                  [{ data: 'PR', header: true }, { data: 'Head', header: true }, { data: 'Decision', header: true }, { data: 'Reason', header: true }],
+                  ...receipts.map(row => [`#${row.pr}`, row.head, row.decision, row.reason]),
+                ])
+                .write()
+                .catch(error => core.warning(`enroll receipt summary not written: ${error.message}`));
+            }
 
   # Conversion to draft does not remove GitHub's native queue entry. Reuse the
   # existing exact-head/entry guard under the same admission owner, even during

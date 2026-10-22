@@ -12,5 +12,7 @@ export const runtime = 'nodejs';
 export default async function YcMetricsPage() {
   await requireCurrentAdminPageAccess();
 
-  redirect(APP_ROUTES.ADMIN);
+  // YC metrics (cash, funnel) live on the Ops dashboard; the legacy
+  // redirect map (ADMIN_LEGACY_REDIRECT_MAP) owns this destination.
+  redirect(APP_ROUTES.ADMIN_OPS);
 }

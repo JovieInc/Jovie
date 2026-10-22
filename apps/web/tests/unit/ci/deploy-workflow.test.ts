@@ -295,11 +295,11 @@ describe('source PR path-output reachability contract', () => {
     expect(detectStep).not.toContain('echo "skip=');
     expect(workflow).not.toContain('needs.ci-path-changes.outputs.skip');
 
-    // Workflows and canonical changelog content cannot take the docs-only exit.
-    // ci-fast additionally keys only
+    // Workflows, canonical changelog content, and compiled playbook sources
+    // cannot take the docs-only exit. ci-fast additionally keys only
     // off the authoritative Path Changes conclusion, including docs-only PRs.
     expect(detectStep).toContain(
-      'if ! echo "$CHANGED_FILES" | grep -q -E \'^(\\.github/|CHANGELOG\\.md$)\''
+      'if ! echo "$CHANGED_FILES" | grep -q -E \'^(\\.github/|CHANGELOG\\.md$|docs/playbooks/[^/]+\\.playbook\\.md$)\''
     );
     expect(
       detectStep.lastIndexOf('echo "has_code_changes=true"')
@@ -1686,11 +1686,17 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
         'if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts'
       )
     );
-    // Staged public-profile budgets are warning-only; the measurement remains enforced.
-    expect(stagedPublicProfileGate).not.toContain('fail_performance_gate');
+    // JOV-8338 graduated the exact staged-build budget independently
+    // (2026-10-21 receipt: staging 14/14 qualifying), so it fails closed with
+    // the exact-build failure subtype. Production canonical-alias budgets
+    // above stay warning-only (11/14, streak 0/14) until their own receipt
+    // graduates.
+    expect(stagedPublicProfileGate).toContain(
+      'fail_performance_gate "Exact staged-build public-profile alias budgets failed."'
+    );
     expect(stagedPublicProfileGate).not.toContain('continue-on-error: true');
-    expect(stagedPublicProfileGate).toContain('performance_status=warn');
-    expect(stagedPublicProfileGate).toContain('::warning::');
+    expect(stagedPublicProfileGate).not.toContain('performance_status=warn');
+    expect(stagedPublicProfileGate).not.toContain('::warning::');
     for (const routeId of [
       'public-profile-listen',
       'public-profile-music',
