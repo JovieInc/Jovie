@@ -62,6 +62,11 @@ function legacyProfileAliasRedirects() {
           },
         ],
         missing: bypass,
+        // Query order is the contract (`mode`, then `source`), matching
+        // getProfileModeHref and the alias document cache key. Next's
+        // redirect merger keeps request keys in front, so `?source=qr`
+        // would otherwise emit `?source=qr&mode=…`. The Next patch restores
+        // this destination order before Location is written.
         destination: `/:username?mode=${mode}&source=:profileSource#${LEGACY_PROFILE_ALIAS_HASH_KEY}=${alias}`,
         permanent: false,
       },
