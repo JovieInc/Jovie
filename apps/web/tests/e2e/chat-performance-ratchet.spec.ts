@@ -383,7 +383,12 @@ async function remountChatRoute(
   await waitForChatRouteReady(page, chatContent, composer, chatApi);
 }
 
-/** The composer allows one send per window. Wait it out on the warmed page. */
+/**
+ * The composer allows one send per window and rejects the next click.
+ * The last warmup send is already on this document, so the first scored
+ * sample has to wait too. The probe clock is the click that armed the
+ * limiter.
+ */
 async function waitForChatSendPacer(page: Page): Promise<void> {
   const windowMs = PACER_TIMING.CHAT_RATE_LIMIT_MS;
   await page.waitForFunction(limitMs => {
@@ -472,7 +477,7 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
   const samples: InteractionLatencySample[] = [];
 
   for (let runIndex = 0; runIndex < SAMPLE_COUNT; runIndex += 1) {
-    if (runIndex > 0) await waitForChatSendPacer(page);
+    await waitForChatSendPacer(page);
     const copy = roundTripCopy('Performance', runIndex);
     const timings = await exchangeChatRoundTrip(
       page,
