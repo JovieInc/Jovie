@@ -696,8 +696,18 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       sideRail.getByTestId('onboarding-phone-preview')
     ).toBeVisible();
-    const sideRailText = await sideRail.innerText();
-    expect(sideRailText.match(/\bTest Artist\b/g) ?? []).toHaveLength(1);
+    await expect(sideRail.getByTestId('profile-identity-link')).toHaveCount(1);
+    await expect(sideRail.getByTestId('profile-identity-link')).toHaveText(
+      'Test Artist'
+    );
+    await expect(
+      sideRail.getByRole('heading', {
+        name: 'Profile Highlights From Test Artist',
+      })
+    ).toHaveCount(1);
+    await expect(
+      sideRail.getByRole('heading', { name: 'Test Artist', exact: true })
+    ).toHaveCount(1);
     await expect(sideRail.getByTitle('Apple Music').first()).toBeVisible();
     await expect(
       sideRail.getByText('12.3K Spotify followers').first()

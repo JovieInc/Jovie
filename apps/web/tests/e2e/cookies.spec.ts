@@ -293,10 +293,9 @@ test.describe('Cookie banner @smoke', () => {
         await menuButton.click();
         const mobileNav = page.locator('#mobile-nav-panel');
         await expect(mobileNav).toBeVisible();
-        // Homepage header CTA lock (#19151): the homepage front door is
-        // "Find yourself" -> /start, never the generic sign-up CTA.
+        // Homepage header CTA (EVENT 2026-10-20): "Claim your profile" -> /start.
         const frontDoor = mobileNav.getByRole('link', {
-          name: 'Find yourself',
+          name: 'Claim your profile',
           exact: true,
         });
         await expect(frontDoor).toBeVisible();

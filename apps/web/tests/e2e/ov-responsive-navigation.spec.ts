@@ -30,6 +30,15 @@ async function enterPersona(
   await expect(page.locator('#main-content')).toBeVisible({ timeout: 60_000 });
 }
 
+/** Tools stays collapsed until the viewer opens it (Tim 2026-10-21). */
+async function expandOperatorTools(navigation: Locator) {
+  const tools = navigation.getByRole('button', { name: 'Tools', exact: true });
+  if ((await tools.count()) === 0) return;
+  if ((await tools.getAttribute('aria-expanded')) !== 'true') {
+    await tools.click();
+  }
+}
+
 async function visibleHrefSet(navigation: Locator) {
   return navigation.locator('a[href]').evaluateAll(links =>
     links
@@ -229,6 +238,7 @@ test.describe('OV responsive navigation exclusivity', () => {
         if (destination.label === 'OV') {
           await expect(operatorNavigation).toBeVisible();
           await expect(customerNavigation).toHaveCount(0);
+          await expandOperatorTools(operatorNavigation);
           expect(new Set(await visibleHrefSet(operatorNavigation))).toEqual(
             new Set(ADMIN_NAV_REGISTRY.map(item => item.href))
           );
@@ -337,6 +347,7 @@ test.describe('OV responsive navigation exclusivity', () => {
           page.getByRole('navigation', { name: 'Dashboard Navigation' })
         ).toHaveCount(0);
 
+        await expandOperatorTools(desktopNavigation);
         const operatorLinks = desktopNavigation.getByRole('link');
         await expect(operatorLinks).toHaveCount(ADMIN_NAV_REGISTRY.length);
         for (const item of ADMIN_NAV_REGISTRY) {
