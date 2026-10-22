@@ -110,7 +110,11 @@ export function validateOverride(override, candidateSha, nowMs) {
   return r;
 }
 
-/** Build the audited receipt for a manual recovery override. */
+/**
+ * Build the audited receipt for a manual recovery override.
+ * @param {{candidateSha: string, approver: string, reason: string,
+ *   issueRef?: string, now?: Date}} options
+ */
 export function createRecoveryOverride({
   candidateSha,
   approver,
@@ -163,6 +167,7 @@ export function evaluatePromotion({
       perJourney: {},
     };
   }
+  /** @type {Record<string, string[]>} */
   const perJourney = {};
   for (const journey of REQUIRED_JOURNEYS) {
     const candidates = evidence.filter(e => e?.journey === journey);
