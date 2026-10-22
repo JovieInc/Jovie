@@ -90,6 +90,12 @@ export type UseChatJankMonitorOptions = {
   messages: readonly UIMessage[];
   status: string;
   isStuckToBottom: boolean;
+  /**
+   * When set, stick transitions are observed here instead of through
+   * `isStuckToBottom`, so the chat surface does not re-render on scroll.
+   */
+  subscribeStuckToBottom?: (listener: () => void) => () => void;
+  getStuckToBottom?: () => boolean;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
   enabled?: boolean;
   /** Override the default emit (track + logger) for tests. */
@@ -111,6 +117,8 @@ export function useChatJankMonitor({
   messages,
   status,
   isStuckToBottom,
+  subscribeStuckToBottom,
+  getStuckToBottom,
   scrollContainerRef,
   enabled = true,
   emit,
@@ -217,6 +225,7 @@ export function useChatJankMonitor({
 
   // ── isStuckToBottom transitions ──────────────────────────────
   useEffect(() => {
+    if (subscribeStuckToBottom && getStuckToBottom) return;
     if (!enabled) {
       prevStuckRef.current = isStuckToBottom;
       return;
@@ -232,7 +241,39 @@ export function useChatJankMonitor({
     } else if (!wasStuck && isStuckToBottom) {
       monitor.onScrollAnchorRestored(conversationId);
     }
-  }, [enabled, isStuckToBottom, conversationId, monitor]);
+  }, [
+    enabled,
+    isStuckToBottom,
+    subscribeStuckToBottom,
+    getStuckToBottom,
+    conversationId,
+    monitor,
+  ]);
+
+  useEffect(() => {
+    if (!subscribeStuckToBottom || !getStuckToBottom) return;
+    prevStuckRef.current = getStuckToBottom();
+    if (!enabled) return;
+    return subscribeStuckToBottom(() => {
+      const next = getStuckToBottom();
+      const wasStuck = prevStuckRef.current;
+      prevStuckRef.current = next;
+      if (wasStuck && !next) {
+        const sinceInput = Date.now() - lastUserInputAtRef.current;
+        monitor.onScrollAnchorBroken(conversationId, {
+          withinUserInputMs: sinceInput,
+        });
+      } else if (!wasStuck && next) {
+        monitor.onScrollAnchorRestored(conversationId);
+      }
+    });
+  }, [
+    enabled,
+    subscribeStuckToBottom,
+    getStuckToBottom,
+    conversationId,
+    monitor,
+  ]);
 
   const onSend = useCallback(() => {
     if (!enabled) return;
