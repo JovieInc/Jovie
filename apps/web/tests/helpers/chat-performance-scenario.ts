@@ -25,7 +25,6 @@ type ChatProbeWindow = Window & {
     usableStateMs?: number;
   };
 };
-
 const CONVERSATION_ID = 'conv-chat-performance';
 export const SAMPLE_COUNT = 5;
 export const WARMUP_ROUND_TRIPS = 3;
@@ -42,26 +41,25 @@ export function chatStreamResponse(
   runIndex: number,
   assistantText: string
 ): string {
-  const suffix = String(runIndex);
   const metadata = {
     conversationId: CONVERSATION_ID,
-    turnId: `turn-chat-performance-${suffix}`,
-    requestId: `request-chat-performance-${suffix}`,
+    turnId: `turn-chat-performance-${runIndex}`,
+    requestId: `request-chat-performance-${runIndex}`,
   };
   const chunks = [
     {
       type: 'start',
-      messageId: `assistant-chat-performance-${suffix}`,
+      messageId: `assistant-chat-performance-${runIndex}`,
       messageMetadata: metadata,
     },
     { type: 'start-step' },
-    { type: 'text-start', id: `text-chat-performance-${suffix}` },
+    { type: 'text-start', id: `text-chat-performance-${runIndex}` },
     {
       type: 'text-delta',
-      id: `text-chat-performance-${suffix}`,
+      id: `text-chat-performance-${runIndex}`,
       delta: assistantText,
     },
-    { type: 'text-end', id: `text-chat-performance-${suffix}` },
+    { type: 'text-end', id: `text-chat-performance-${runIndex}` },
     { type: 'finish-step' },
     { type: 'finish', finishReason: 'stop', messageMetadata: metadata },
   ];
@@ -184,9 +182,8 @@ export async function readChatProbe(page: Page) {
       probe.firstFeedbackMs === undefined ||
       probe.usableStateMs === undefined ||
       probe.renderToInteractiveMs === undefined
-    ) {
+    )
       throw new Error('Chat performance probe did not collect every metric');
-    }
     probe.observer.disconnect();
     if (probe.frameId !== undefined) cancelAnimationFrame(probe.frameId);
     probe.longTaskObserver?.disconnect();
@@ -202,19 +199,16 @@ export async function readChatProbe(page: Page) {
     };
   });
 }
-export async function measureDroppedScrollFrames(page: Page) {
-  return (await measureChatScrollFrames(page)).droppedFrameCount;
-}
 export async function measureChatScrollFrames(page: Page) {
   return page.getByTestId('chat-message-scroll').evaluate(async element => {
     const scrollElement = element as HTMLElement;
-    if (scrollElement.scrollHeight <= scrollElement.clientHeight) {
+    if (scrollElement.scrollHeight <= scrollElement.clientHeight)
       throw new Error('Chat message list must overflow for the scroll ratchet');
-    }
     scrollElement.scrollTop = 0;
     const frameIntervals: number[] = [];
     let rendererHidden = false;
     const frameCount = 24;
+    const distance = scrollElement.scrollHeight - scrollElement.clientHeight;
     await new Promise<void>(resolve => {
       let previousTime: number | undefined;
       let currentFrame = 0;
@@ -226,9 +220,7 @@ export async function measureChatScrollFrames(page: Page) {
         }
         previousTime = time;
         currentFrame += 1;
-        scrollElement.scrollTop =
-          (scrollElement.scrollHeight - scrollElement.clientHeight) *
-          (currentFrame / frameCount);
+        scrollElement.scrollTop = distance * (currentFrame / frameCount);
         if (currentFrame >= frameCount) {
           resolve();
           return;
@@ -309,10 +301,12 @@ export async function exchangeChatRoundTrip(
   composer: Locator,
   sendButton: Locator,
   userText: string,
-  assistantText: string
+  assistantText: string,
+  beforeProbe?: (page: Page) => Promise<void>
 ) {
   await expect(composer).toBeEnabled();
   await composer.fill(userText);
+  await beforeProbe?.(page);
   await installChatProbe(page, userText, assistantText);
   await triggerMeasuredSend(sendButton);
   await expect(

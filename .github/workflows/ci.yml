@@ -162,7 +162,7 @@ jobs:
             --volume "$PWD:/repo:ro" \
             "$IMAGE_TAG" -lc '
               set -euo pipefail
-              test "$(node --version)" = v24.21.0
+              test "$(node --version)" = v24.22.1
               test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.9
 
               dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
@@ -291,7 +291,7 @@ jobs:
           assert_line 'pnpm store path' 'pnpm_store_path=/opt/jovie-pnpm-store' "$dependency_status"
           assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
           assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
-          assert_equal 'Node version' v24.21.0 "$(node --version)"
+          assert_equal 'Node version' v24.22.1 "$(node --version)"
           assert_equal 'pnpm version' 9.15.9 "$(pnpm --version)"
           assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
           assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
@@ -6429,7 +6429,12 @@ jobs:
     outputs:
       journey_outcome: ${{ steps.canonical_journey.outcome }}
       certification_outcome: ${{ steps.canonical_certification.outcome }}
-    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      # Preview – jovie secret STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY is
+      # the active test-mode USD 1200/month price. The assertion stays
+      # fail-closed; true reports a contract breach instead of a missing secret.
+      FEATURE_STRIPE_TEST_PRICE_CONFIGURED: 'true'
     # Scope pending replacement to one PR. GitHub replaces the older pending job in
     # a constant concurrency group even when cancel-in-progress is false, which can
     # cancel a required check before it obtains a runner. Golden-path cleanup only
@@ -6636,6 +6641,7 @@ jobs:
           # the artifact secret guard) and a reviewer-only gateway key
           # (AI Gateway key jovie-golden-path-review, $10 monthly budget).
           GOLDEN_PATH_KEYFRAME_DIR: ${{ github.workspace }}/apps/web/test-results/golden-path-keyframes/first
+          JOURNEY_EVIDENCE_REPORT: ${{ runner.temp }}/journey-evidence/playwright-report.json
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
@@ -6657,6 +6663,33 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY }}
           STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv
+
+      # Evidence for the pre-promotion gate (promotion-journey-gate.mjs). Built
+      # from the Playwright report of THIS run, so a skipped, mocked or red
+      # journey is recorded as such. Named by exact SHA so the production
+      # workflow can fetch it for the candidate.
+      - name: Emit journey evidence (jovie.journey-evidence/v1)
+        if: ${{ always() }}
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          JOURNEY_OUTCOME: ${{ steps.canonical_journey.outcome || 'skipped' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/emit-journey-evidence.mjs \
+            --report "${{ runner.temp }}/journey-evidence/playwright-report.json" \
+            --out-dir "${{ runner.temp }}/journey-evidence" \
+            --sha "${{ github.sha }}" --run-id "${{ github.run_id }}" \
+            --run-url "$RUN_URL" --outcome "$JOURNEY_OUTCOME"
+
+      - name: Upload journey evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: journey-evidence-${{ github.sha }}
+          overwrite: true
+          path: ${{ runner.temp }}/journey-evidence/journey-evidence-*.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Probe live $199 revenue path
         id: canonical_revenue

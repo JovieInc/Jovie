@@ -8,8 +8,9 @@
  * @smoke
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { UX_LATENCY_STORAGE_KEY } from '@/lib/monitoring/interaction-latency';
+import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import {
   buildInteractionLatencyReport,
   type InteractionLatencySample,
@@ -18,7 +19,7 @@ import { setTestAuthBypassSession } from '../helpers/auth';
 import { roundTripCopy } from '../helpers/chat-performance-probe';
 import {
   exchangeChatRoundTrip,
-  measureDroppedScrollFrames,
+  measureChatScrollFrames,
   mockChatBackend,
   remountChatRoute,
   SAMPLE_COUNT,
@@ -26,6 +27,73 @@ import {
   WARMUP_ROUND_TRIPS,
   waitForChatRouteReady,
 } from '../helpers/chat-performance-scenario';
+
+/**
+ * Scored clicks and the scroll probe share the runner with the rest of the
+ * smoke lane. A frame that is already late is runner stall, and p95 of five
+ * samples is the slowest sample. Wait until the event loop can deliver frames
+ * before starting the clock. Give up after a few seconds so a wedged runner
+ * still records the real interaction instead of hanging the lane.
+ */
+async function waitForQuietFrames(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>(resolve => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        const started = performance.now();
+        const gaps: number[] = [];
+        let previous: number | undefined;
+        const step = (time: number) => {
+          if (settled) return;
+          if (previous !== undefined) gaps.push(time - previous);
+          previous = time;
+          const recent = gaps.slice(-4);
+          if (
+            recent.length === 4 &&
+            recent.every(gap => gap < 40) &&
+            performance.now() - started > 50
+          ) {
+            finish();
+            return;
+          }
+          if (performance.now() - started > 8_000) {
+            finish();
+            return;
+          }
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+        // rAF can stop entirely on a backgrounded page. The timeout is the
+        // same 8s cap, so a frozen frame clock cannot hang the smoke lane.
+        setTimeout(finish, 8_000);
+      })
+  );
+}
+
+/**
+ * The composer allows one send per window and rejects the next click.
+ * The last warmup send is already on this document, so the first scored
+ * sample has to wait too. The probe clock is the click that armed the
+ * limiter.
+ */
+async function waitForChatSendPacer(page: Page): Promise<void> {
+  const windowMs = PACER_TIMING.CHAT_RATE_LIMIT_MS;
+  await page.waitForFunction(limitMs => {
+    const probe = (
+      window as Window & {
+        __jovieChatPerformanceProbe?: { start: number };
+      }
+    ).__jovieChatPerformanceProbe;
+    return (
+      probe !== undefined && performance.now() - probe.start >= limitMs + 100
+    );
+  }, windowMs);
+}
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -81,14 +149,15 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
   const samples: InteractionLatencySample[] = [];
 
   for (let runIndex = 0; runIndex < SAMPLE_COUNT; runIndex += 1) {
-    await remountChatRoute(page, chatContent, composer, chatApi);
+    await waitForChatSendPacer(page);
     const copy = roundTripCopy('Performance', runIndex);
     const timings = await exchangeChatRoundTrip(
       page,
       composer,
       sendButton,
       copy.userText,
-      copy.assistantText
+      copy.assistantText,
+      waitForQuietFrames
     );
     samples.push({
       ...timings,
@@ -97,7 +166,8 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
     });
   }
 
-  const droppedFrameCount = await measureDroppedScrollFrames(page);
+  await waitForQuietFrames(page);
+  const { droppedFrameCount } = await measureChatScrollFrames(page);
   const completeSamples = samples.map(sample => ({
     ...sample,
     droppedFrameCount,

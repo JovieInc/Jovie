@@ -45,7 +45,7 @@ describe('public CLI publication metadata', () => {
         registry: 'https://registry.npmjs.org',
       },
       bin: { jovie: './dist/cli.js' },
-      engines: { node: '>=24.21.0' },
+      engines: { node: '>=24.22.1' },
     });
     expect(manifest.files).toEqual(
       expect.arrayContaining(['dist', 'README.md', 'LICENSE'])
