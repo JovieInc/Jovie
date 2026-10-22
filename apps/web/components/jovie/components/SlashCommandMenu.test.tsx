@@ -122,6 +122,35 @@ describe('SlashCommandMenu attachment actions', () => {
     expect(source).not.toContain('Disc3');
     expect(source).toContain('release: Layers,');
   });
+
+  it('moves selection when Firefox reports keyCode 229 for ArrowDown', () => {
+    const onMoveSelected = vi.fn();
+    render(
+      withProviders(
+        <SlashCommandMenu
+          state={{ status: 'root', query: '', startIdx: 0, selectedIndex: 0 }}
+          profileId='profile-test'
+          onSelectSkill={vi.fn()}
+          onSelectEntity={vi.fn()}
+          onSetSelected={vi.fn()}
+          onMoveSelected={onMoveSelected}
+          onClose={vi.fn()}
+          onQueryChange={vi.fn()}
+        />
+      )
+    );
+
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'ArrowDown',
+        keyCode: 229,
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+
+    expect(onMoveSelected).toHaveBeenCalledWith(1, expect.any(Number));
+  });
 });
 
 function renderAlbumArtMenu(profileId = 'profile-test') {
