@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-10-20T01:21:56.958Z",
+  "generated_at": "2026-10-22T01:46:33.368Z",
   "surfaces": {
     "rls-access-control": {
-      "coverage_pct": 77.6,
+      "coverage_pct": 78.1,
       "branch_pct": 0,
       "risk_score": 42.1,
       "status": "RED"
@@ -14,14 +14,14 @@
       "status": "RED"
     },
     "stripe-webhooks": {
-      "coverage_pct": 97.2,
-      "branch_pct": 90.6,
-      "risk_score": 36.6,
+      "coverage_pct": 97.6,
+      "branch_pct": 92.1,
+      "risk_score": 36.5,
       "status": "RED"
     },
     "entitlements-registry": {
       "coverage_pct": 98.3,
-      "branch_pct": 90.5,
+      "branch_pct": 90.6,
       "risk_score": 35.6,
       "status": "RED"
     },
@@ -38,27 +38,27 @@
       "status": "YELLOW"
     },
     "claim-onboarding": {
-      "coverage_pct": 78.4,
-      "branch_pct": 66.7,
+      "coverage_pct": 78.9,
+      "branch_pct": 67.6,
       "risk_score": 26.7,
       "status": "YELLOW"
     },
     "webhook-signatures": {
-      "coverage_pct": 84.3,
-      "branch_pct": 78.1,
-      "risk_score": 25.9,
+      "coverage_pct": 85.8,
+      "branch_pct": 78,
+      "risk_score": 25.8,
       "status": "YELLOW"
     },
     "api-routes-contract": {
-      "coverage_pct": 74.9,
-      "branch_pct": 64.7,
+      "coverage_pct": 75.3,
+      "branch_pct": 65.1,
       "risk_score": 25,
       "status": "YELLOW"
     },
     "marketing-static": {
-      "coverage_pct": 81.3,
+      "coverage_pct": 81.4,
       "branch_pct": 71.7,
-      "risk_score": 10.4,
+      "risk_score": 10.3,
       "status": "GREEN"
     }
   }
