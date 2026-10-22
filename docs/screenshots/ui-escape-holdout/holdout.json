@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "labeledAt": "2026-10-04T07:08:55.000Z",
+  "labeledAt": "2026-10-22T15:26:02.702449+00:00",
   "items": [
     {
       "id": "esc-ui-h1-clipped-launch-1440",
@@ -151,6 +151,13 @@
       "caseId": "ok-artist-notifications-1440.png",
       "humanLabel": "pass",
       "notes": "/artist-notifications @1440: Notifications hero fits two lines (JOV-7772 fix)."
+    },
+    {
+      "id": "esc-ui-homepage-wide-profile-sparse-1440",
+      "caseId": "esc-ui-homepage-wide-profile-sparse-1440.png",
+      "humanLabel": "fail",
+      "mustReject": true,
+      "notes": "Tim rejected this exact desktop checkpoint after Library delivery 2026-10-22 14:39:35 UTC: poorly balanced tall profile mockup in a wide section and sparse full-page narrative. Supersedes its prior bounded visual hold. Exact source, Library byte hashes, transcript and companion context: homepage-rejection-2026-10-22.json. No universal portrait/whitespace ban or blanket Pen label."
     }
   ]
 }

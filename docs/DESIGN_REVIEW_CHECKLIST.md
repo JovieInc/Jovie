@@ -7,6 +7,48 @@ Uncovered forms / overflow / media / l10n / browser / a11y checks live in
 [`.agents/skills/gstack/design-review/references/web-interface-gaps.md`](../.agents/skills/gstack/design-review/references/web-interface-gaps.md).
 Do not invoke `web-design-guidelines` as a parallel skill.
 
+## Rendered page review
+
+Use the existing marketing-factory visual review and its
+`docs/screenshots/ui-escape-holdout/holdout.json` calibration corpus. These
+checks extend that process; icon, lint and DOM compliance do not certify design.
+
+- [ ] **Reference comparison:** bind the candidate source/build, screenshot
+  digest and viewport to the intended Pen frame/reference revision. Inspect
+  reference and candidate pixels at matching widths, both full-page and relevant
+  detail. Record concrete preserved or degraded relationships. Pen remains a
+  review/proposal surface under `DESIGN.md`; missing reference pixels mean
+  comparison **UNKNOWN**, never a parity or improvement claim.
+- [ ] **Mockup proportions:** record media, frame and containing-section bounds.
+  Check distortion, clipping and any geometry contract from the approved
+  reference deterministically. Then judge the rendered balance, scale and crop
+  within the wider composition. A valid portrait ratio or zero overflow does not
+  establish good proportions. Do not invent phone-height or whitespace limits.
+- [ ] **Full-page narrative:** map the approved brief's claims, proof and action
+  sequence to visible sections in a complete-page capture. Missing required
+  content or uncaptured regions are coverage gaps; whether the result feels
+  sparse, repetitive or convincing requires pixel review. A hero screenshot,
+  section count or footer link inventory is not full-page narrative evidence.
+  Do not add filler sections or unsupported product claims to satisfy a count.
+- [ ] **Separate outcomes:** record functional and visual results independently
+  for the same source and states. Keyboard, forms, overflow, accessibility and
+  test counts cannot set visual status to pass. Text-only Jev can inspect text
+  evidence and cannot certify pixels. Keep missing evidence UNKNOWN.
+  For accessibility, name the executed selector, standard, blocking/advisory
+  mode and observed result; configuration alone is not a pass receipt. Existing
+  JOV-8825 under JOV-7713/JOV-6856 tracks the Storybook warning-only concern;
+  its effective runtime behavior remains unverified here. Do not change that
+  enforcement policy as part of a visual review.
+
+When Tim rejects an exact rendered checkpoint, preserve the prior review as
+history and supersede its visual verdict. Bind the rejection to immutable
+capture/source evidence before adding a `fail` / `mustReject: true` calibration
+case. The existing calibration gate must reject a judge that repeats that false
+approval even if its aggregate agreement clears the unchanged threshold. A
+fixture replay proves this enforcement; it does not establish live vision-judge
+accuracy or certify a replacement design. Retain legitimate portrait and
+intentional-whitespace controls.
+
 ## Icon Usage Standards ✅
 
 When reviewing PRs or design implementations, ensure the following icon standards are met:

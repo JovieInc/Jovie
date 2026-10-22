@@ -73,13 +73,14 @@ export const VISUAL_REVIEW_ROW: RoutedInvariantRow = {
   rowId: 'factory-visual-review',
   invariantId: 'factory-visual-review',
   ruleId: null,
-  title: 'Marketing page reads as one premium, uncluttered Jovie page',
+  title:
+    'Marketing page has coherent proportions and a complete visual narrative',
   products: ['web'],
   surfaces: ['marketing'],
   route: 'visual',
   routeEvidence: ['apps/web/scripts/marketing-factory/visual-review.ts'],
   policyFingerprintSource: {
-    rule: 'One dominant focal point per section, no competing heroes, no clipped or stranded text, consistent alignment, no stock imagery.',
+    rule: 'One focal point/section; no competing heroes, clipped/stranded text, misalignment or stock imagery. Judge full-page narrative and mockup/section balance with reference pixels. Tests/text-only Jev cannot certify visuals; founder rejection overrides hold.',
     color: MARKETING_VISUAL_REVIEW_COLOR_CONTRACT.promptBlock,
   },
 };

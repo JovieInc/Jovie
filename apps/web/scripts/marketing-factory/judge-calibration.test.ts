@@ -1,8 +1,13 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { HumanHoldoutSet } from '../../lib/eval/calibration';
+import {
+  DEFAULT_KAPPA_THRESHOLD,
+  type HumanHoldoutSet,
+  loadHumanHoldoutSet,
+} from '../../lib/eval/calibration';
 import type { JudgeVerdict, StageJudge } from '../design-ci-judge-dispatch';
 import {
   calibrateVisualJudges,
@@ -53,6 +58,79 @@ afterEach(() => {
 });
 
 describe('calibrateVisualJudges', () => {
+  it('does not let high aggregate agreement override a required founder rejection', async () => {
+    const corpus = loadHumanHoldoutSet(
+      join(
+        dirname(fileURLToPath(import.meta.url)),
+        '../../../../docs/screenshots/ui-escape-holdout/holdout.json'
+      )
+    );
+    const rejected = corpus.items.find(
+      item => item.id === 'esc-ui-homepage-wide-profile-sparse-1440'
+    )!;
+    const required = {
+      ...corpus,
+      items: corpus.items.map(item =>
+        item.id === rejected.id ? { ...item, mustReject: true as const } : item
+      ),
+    };
+    const labels = Object.fromEntries(
+      corpus.items.map(item => [item.caseId, item.humanLabel])
+    );
+    labels[rejected.caseId] = 'pass';
+    const lenient = judge('fixture/false-approval', labels);
+    const receipt = await calibrateVisualJudges({
+      holdout: required,
+      judges: [lenient],
+      baseDir: '/corpus',
+    });
+    expect(receipt.judges[0]?.kappa).toBeGreaterThan(DEFAULT_KAPPA_THRESHOLD);
+    expect(receipt.judges[0]?.passed).toBe(false);
+    expect(receipt.judges[0]?.disagreements).toEqual([rejected.id]);
+    dir = mkdtempSync(join(tmpdir(), 'required-visual-rejection-'));
+    const path = join(dir, 'judge-calibration.json');
+    writeJson(path, receipt);
+    expect(failedCalibrationJudges(path).has(lenient.id!)).toBe(true);
+  });
+
+  it.each([false, true])(
+    'preserves correct required rejection with ordinary disagreement=%s',
+    async ordinaryDisagreement => {
+      const corpus = loadHumanHoldoutSet(
+        join(
+          dirname(fileURLToPath(import.meta.url)),
+          '../../../../docs/screenshots/ui-escape-holdout/holdout.json'
+        )
+      );
+      const rejected = corpus.items.find(
+        item => item.id === 'esc-ui-homepage-wide-profile-sparse-1440'
+      )!;
+      const required = {
+        ...corpus,
+        items: corpus.items.map(item =>
+          item.id === rejected.id
+            ? { ...item, mustReject: true as const }
+            : item
+        ),
+      };
+      const labels = Object.fromEntries(
+        corpus.items.map(item => [item.caseId, item.humanLabel])
+      );
+      // A portrait example remains a legitimate positive. Ordinary false alarms
+      // retain the existing agreement rule; only explicitly required cases veto it.
+      if (ordinaryDisagreement) labels['ok-artist-profiles-390.png'] = 'fail';
+      const receipt = await calibrateVisualJudges({
+        holdout: required,
+        judges: [judge('fixture/required-rejection-correct', labels)],
+        baseDir: '/corpus',
+      });
+      expect(receipt.judges[0]?.passed).toBe(true);
+      expect(receipt.judges[0]?.disagreements).toEqual(
+        ordinaryDisagreement ? ['ok-artist-profiles-390'] : []
+      );
+    }
+  );
+
   it('ranks judges by agreement with the founder labels and fails the rest', async () => {
     const sharp = judge('openai/gpt-5.6-luna', {
       'accepted-1.png': 'pass',
