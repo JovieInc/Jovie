@@ -158,6 +158,19 @@ describe('SlashCommandMenu keyboard + IME + ARIA', () => {
     ).toBeVisible();
   });
 
+  it('ArrowDown still moves selection when Firefox reports keyCode 229', () => {
+    const handlers = makeHandlers();
+    renderMenu(rootState(0), handlers);
+    const evt = new KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      keyCode: 229,
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(evt);
+    expect(handlers.onMoveSelected).toHaveBeenCalledWith(1, expect.any(Number));
+  });
+
   it('ArrowDown delegates to onMoveSelected with delta=+1', () => {
     const handlers = makeHandlers();
     renderMenu(rootState(0), handlers);

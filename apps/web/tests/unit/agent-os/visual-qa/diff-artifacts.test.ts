@@ -1,6 +1,5 @@
 import {
   lstat,
-  lutimes,
   mkdir,
   mkdtemp,
   readFile,
@@ -13,7 +12,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   computeVisualQaDiffArtifacts,
   pruneCompletedVisualQaRuns,
@@ -142,23 +141,17 @@ async function createRetentionDirectory(prefix: string): Promise<string> {
   return realpath(await mkdtemp(path.join(os.tmpdir(), prefix)));
 }
 
-// mkdir/writeFile take their mtime from the OS clock. prune compares that
-// mtime to Date.now(), which shift-clock moves. Stamp young entries at the
-// test clock so a seven-day shift does not age them into the stale window.
-async function stampAtTestClock(
-  target: string,
-  symlink = false
-): Promise<void> {
-  const clock = new Date();
-  if (symlink) await lutimes(target, clock, clock);
-  else await utimes(target, clock, clock);
-}
-
 describe('pruneCompletedVisualQaRuns', () => {
   let rootDirectory: string | undefined;
   let outsideDirectory: string | undefined;
 
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-06-10T00:00:00.000Z'));
+  });
+
   afterEach(async () => {
+    vi.useRealTimers();
     await Promise.all(
       [rootDirectory, outsideDirectory]
         .filter((directory): directory is string => Boolean(directory))
@@ -195,7 +188,13 @@ describe('pruneCompletedVisualQaRuns', () => {
       }),
       mkdir(path.join(rootDirectory, 'in-progress-run'), { recursive: true }),
     ]);
-    await stampAtTestClock(path.join(rootDirectory, 'in-progress-run'));
+    // Filesystem timestamps use the host clock, even with fake timers.
+    const youngDate = new Date();
+    await utimes(
+      path.join(rootDirectory, 'in-progress-run'),
+      youngDate,
+      youngDate
+    );
 
     const removed = await pruneCompletedVisualQaRuns('current-run', {
       retainedCompletedRuns: 2,
@@ -272,6 +271,7 @@ describe('pruneCompletedVisualQaRuns', () => {
     outsideDirectory = await createRetentionDirectory(
       'jovie-visual-qa-outside-'
     );
+    const youngDate = new Date();
     const staleDate = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
     await Promise.all([
       writeDiffSummary(rootDirectory, 'current-run', {
@@ -302,6 +302,26 @@ describe('pruneCompletedVisualQaRuns', () => {
     );
     await Promise.all([
       utimes(
+        path.join(rootDirectory, 'young-in-progress'),
+        youngDate,
+        youngDate
+      ),
+      utimes(
+        path.join(rootDirectory, 'old-run-young-nested', 'capture'),
+        staleDate,
+        staleDate
+      ),
+      utimes(
+        path.join(
+          rootDirectory,
+          'old-run-young-nested',
+          'capture',
+          'after.png'
+        ),
+        youngDate,
+        youngDate
+      ),
+      utimes(
         path.join(rootDirectory, 'stale-incomplete'),
         staleDate,
         staleDate
@@ -327,14 +347,6 @@ describe('pruneCompletedVisualQaRuns', () => {
       path.join(rootDirectory, 'old-run-nested-link'),
       staleDate,
       staleDate
-    );
-    await stampAtTestClock(path.join(rootDirectory, 'young-in-progress'));
-    await stampAtTestClock(
-      path.join(rootDirectory, 'old-run-young-nested', 'capture', 'after.png')
-    );
-    await stampAtTestClock(
-      path.join(rootDirectory, 'old-run-nested-link', 'capture-link'),
-      true
     );
 
     const removed = await pruneCompletedVisualQaRuns('current-run', {
@@ -676,10 +688,6 @@ describe('pruneCompletedVisualQaRuns', () => {
     const removed = await pruneCompletedVisualQaRuns('current-run', {
       beforeCandidateRevalidation: async runId => {
         if (runId !== 'completed-old') return;
-        // This filesystem reuses the inode and can stamp the replacement with
-        // the same birthtime when the suite is warm. The guard keys on that
-        // identity, so the replacement has to land on a later timestamp.
-        await new Promise(resolve => setTimeout(resolve, 20));
         await rm(candidatePath, { recursive: true });
         await writeDiffSummary(rootDirectory ?? '', 'completed-old', {
           computedAt: '2026-06-01T00:00:00.000Z',

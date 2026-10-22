@@ -311,6 +311,14 @@ describe('DashboardNav route warming', () => {
     const newChatAction = screen.getByRole('link', { name: 'New Chat' });
     expect(newChatAction).toBeInTheDocument();
     expect(newChatAction).toHaveAttribute('aria-label', 'New Chat');
+    expect(newChatAction.className).toContain('focus-visible:ring-inset');
+    expect(newChatAction.closest('nav')?.className).toContain('transform-gpu');
+    expect(newChatAction.closest('nav')?.className).toContain(
+      'overflow-anchor-none'
+    );
+    expect(
+      newChatAction.closest('[data-sidebar-search-slot]')?.className
+    ).toContain('lg:overflow-hidden');
 
     const nav = container.querySelector('nav');
     expect(nav).not.toBeNull();
