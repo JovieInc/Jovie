@@ -3,6 +3,110 @@ import { expect, test } from '@playwright/test';
 
 // Presentation fixtures only. Real claim/auth acceptance stays in golden-path.
 for (const width of [390, 1280]) {
+  test(`actual homepage entry retains its handle through pending and Back at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 844 });
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', error => runtimeErrors.push(error.message));
+    await page.goto(
+      '/iframe.html?id=marketing-homepageidentityhero--default&viewMode=story'
+    );
+    const hero = page.getByTestId('marketing-section-hero');
+    await expect(
+      hero.getByRole('heading', { name: 'Start with your name', exact: true })
+    ).toBeVisible();
+    await expect(hero.getByRole('img', { name: 'Jovie logo' })).toBeVisible();
+    const input = hero.getByRole('textbox', { name: 'Choose Your Handle' });
+    await expect(input).toBeInViewport();
+    const explanation = await page
+      .getByTestId('homepage-hero-explanation')
+      .boundingBox();
+    expect(explanation?.y).toBeGreaterThanOrEqual(844);
+    // Storybook wraps fetch before network interception. Use its existing
+    // live API hook so this fixture actually reaches the fetch error path.
+    await page.evaluate(() => {
+      const fixture = window as Window & {
+        __homepageAvailabilityCalls?: number;
+        __jovieApiMock?: (request: { url: URL }) => Response | undefined;
+      };
+      fixture.__homepageAvailabilityCalls = 0;
+      fixture.__jovieApiMock = ({ url }) => {
+        if (url.pathname !== '/api/handle/check') return undefined;
+        fixture.__homepageAvailabilityCalls =
+          (fixture.__homepageAvailabilityCalls ?? 0) + 1;
+        return Response.json(
+          { error: 'Availability is temporarily unavailable. Try again.' },
+          { status: 503 }
+        );
+      };
+    });
+    await input.fill('fixture-claim');
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (window as Window & { __homepageAvailabilityCalls?: number })
+              .__homepageAvailabilityCalls
+        )
+      )
+      .toBeGreaterThan(0);
+    await expect(input).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByTestId('homepage-handle-status')).not.toContainText(
+      'Checking availability'
+    );
+    await expect(page.getByTestId('homepage-handle-status')).not.toContainText(
+      'is available'
+    );
+    await page.screenshot({ path: testInfo.outputPath('homepage-error.png') });
+    await input.focus();
+    await expect(input).toBeFocused();
+    await page.screenshot({ path: testInfo.outputPath('homepage-focus.png') });
+    const before = await input.boundingBox();
+    const buttonBefore = await page
+      .getByTestId('homepage-primary-cta')
+      .boundingBox();
+    const sentAt = performance.now();
+    await input.press('Enter');
+    const pending = hero.getByRole('button', { name: /opening/i });
+    await expect(pending).toBeDisabled({ timeout: 1000 });
+    const pendingObservedMs = Math.round(performance.now() - sentAt);
+    await expect(page.getByTestId('homepage-handle-status')).toContainText(
+      'Opening setup for @fixture-claim'
+    );
+    await input.press('Enter');
+    await expect(input).toHaveValue('fixture-claim');
+    const after = await input.boundingBox();
+    const buttonAfter = await page
+      .getByTestId('homepage-primary-cta')
+      .boundingBox();
+    expect(after).toEqual(before);
+    expect(buttonAfter).toEqual(buttonBefore);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth
+      )
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath('homepage-pending.png'),
+    });
+    await writeFile(
+      testInfo.outputPath('homepage-pending-latency.json'),
+      JSON.stringify({
+        width,
+        pendingObservedMs,
+        scope:
+          'Actual homepage component; existing Storybook API hook returns HTTP 503 and router is a no-op; no auth or claim mutation.',
+      })
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await expect(
+      hero.getByRole('button', { name: 'Claim', exact: true })
+    ).toBeEnabled();
+    await expect(input).toHaveValue('fixture-claim');
+    expect(runtimeErrors).toEqual([]);
+  });
+
   test(`populated profile review precedes Google sign-in at ${width}px`, async ({
     page,
   }, testInfo) => {

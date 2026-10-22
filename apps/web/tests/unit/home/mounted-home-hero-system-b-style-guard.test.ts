@@ -71,13 +71,11 @@ describe('mounted homepage hero System B source contract', () => {
     expect(heroComponentSource).toContain('<ProductClaimHandleForm');
     expect(heroComponentSource).toContain("testIdPrefix='homepage'");
     expect(heroComponentSource).not.toMatch(/<Button|<Link|href=/);
-    // Illustrative claim preview, never a product screenshot.
+    expect(heroComponentSource).not.toContain('<MarketingSurfaceCard');
+    expect(heroComponentSource).toContain("variant='centered'");
+    // Explanatory identity remains below the fold, never a product screenshot.
     expect(heroComponentSource).not.toContain('<ArtistProfilePhoneFrame');
-    for (const primitive of [
-      '<MarketingHero',
-      '<MarketingHeroPhoto',
-      '<MarketingSurfaceCard',
-    ]) {
+    for (const primitive of ['<MarketingHero', '<MarketingHeroPhoto']) {
       expect(heroComponentSource).toContain(primitive);
     }
   });
@@ -108,7 +106,7 @@ describe('mounted homepage hero System B source contract', () => {
     expect(css).toContain('var(--ds-public-content-max)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('var(--font-mono)');
-    expect(css).toContain('var(--font-display)');
+    expect(css).toContain('var(--marketing-font-display, var(--font-sans))');
     expect(css).not.toContain('var(--linear-');
   });
 });

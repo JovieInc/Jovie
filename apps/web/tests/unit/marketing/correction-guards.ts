@@ -23,7 +23,8 @@ export const JSX_ROOTS = [
   'apps/web/components/site',
 ] as const;
 
-export const LOCKED_HOMEPAGE_H1 = 'Be found. Be understood.';
+// Tim's explicit 2026-10-21 entry refinement; keep the exact-copy invariant.
+export const LOCKED_HOMEPAGE_H1 = 'Start with your name';
 
 const SOURCE_EXT = /\.(?:tsx?|mdx?)$/u;
 const SKIP_FILE = /\.(?:test|spec|stories)\./u;

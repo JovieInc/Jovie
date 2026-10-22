@@ -1,8 +1,10 @@
+// @coverage-via apps/web/tests/unit/home/ProductClaimHandleForm.test.tsx
 'use client';
 
+import { Spinner } from '@jovie/ui';
 import { Button } from '@jovie/ui/atoms/button';
 import { useRouter } from 'next/navigation';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HandleStatusIcon } from '@/components/features/home/claim-handle/HandleStatusIcon';
 import { useHandleValidation } from '@/components/features/home/claim-handle/useHandleValidation';
 import { InputAuraFrame } from '@/components/features/home/InputAuraFrame';
@@ -30,9 +32,11 @@ export function ProductClaimHandleForm({
   const statusId = `${inputId}-status`;
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const navigationRef = useRef(false);
   const [handle, setHandle] = useState('');
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [navigating, setNavigating] = useState(false);
+  const [navigationError, setNavigationError] = useState<string | null>(null);
   const { handleError, checkingAvail, available, availError } =
     useHandleValidation(handle);
 
@@ -43,22 +47,37 @@ export function ProductClaimHandleForm({
     if (earlyDraft) setHandle(earlyDraft.toLowerCase());
   }, []);
 
+  useEffect(() => {
+    const restore = () => {
+      navigationRef.current = false;
+      setNavigating(false);
+      setNavigationError(null);
+    };
+    globalThis.addEventListener('pageshow', restore);
+    return () => globalThis.removeEventListener('pageshow', restore);
+  }, []);
+
   const unavailable = Boolean(handleError || availError || available === false);
   const statusVisible = Boolean(handle || formSubmitted);
-  const statusText = handleError
-    ? handleError
-    : checkingAvail
-      ? 'Checking availability…'
-      : availError
-        ? availError
-        : available === false
-          ? 'Handle already taken'
-          : available === true
-            ? `@${handle} is available. Select Claim to continue.`
-            : 'Use lowercase letters, numbers, or hyphens (3–24 chars).';
+  const statusText = navigationError
+    ? navigationError
+    : navigating
+      ? `Opening setup for @${handle}…`
+      : handleError
+        ? handleError
+        : checkingAvail
+          ? 'Checking availability…'
+          : availError
+            ? availError
+            : available === false
+              ? 'Handle already taken'
+              : available === true
+                ? `@${handle} is available. Select Claim to continue.`
+                : 'Use lowercase letters, numbers, or hyphens (3–24 chars).';
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (navigationRef.current) return;
     setFormSubmitted(true);
 
     const normalizedHandle = handle.trim().toLowerCase();
@@ -67,8 +86,16 @@ export function ProductClaimHandleForm({
       return;
     }
 
+    navigationRef.current = true;
     setNavigating(true);
-    router.push(buildClaimProfileStartHref(normalizedHandle));
+    setNavigationError(null);
+    try {
+      router.push(buildClaimProfileStartHref(normalizedHandle));
+    } catch {
+      navigationRef.current = false;
+      setNavigating(false);
+      setNavigationError("We couldn't open your profile setup. Try again.");
+    }
   }
 
   return (
@@ -133,7 +160,22 @@ export function ProductClaimHandleForm({
             aria-busy={checkingAvail || navigating}
             className='shrink-0'
           >
-            {submitLabel}
+            {navigating ? (
+              <span className='grid place-items-center'>
+                <span className='invisible col-start-1 row-start-1' aria-hidden>
+                  {submitLabel}
+                </span>
+                <span className='col-start-1 row-start-1'>
+                  <Spinner
+                    size='sm'
+                    tone='inverse'
+                    label='Opening Profile Setup'
+                  />
+                </span>
+              </span>
+            ) : (
+              submitLabel
+            )}
           </Button>
         </div>
       </InputAuraFrame>
@@ -141,12 +183,22 @@ export function ProductClaimHandleForm({
         id={statusId}
         data-testid={`${testIdPrefix}-handle-status`}
         className={cn(
-          'min-h-5 px-1 pt-2 text-xs text-secondary-token',
-          unavailable && 'text-error',
-          available === true && !unavailable && 'text-success'
+          // Reserve two readable status lines so error → pending cannot
+          // recenter the hero and move the focused input on a phone.
+          'min-h-10 px-1 pt-2 text-xs text-secondary-token',
+          !navigating && (unavailable || navigationError) && 'text-error',
+          available === true &&
+            !unavailable &&
+            !navigating &&
+            !navigationError &&
+            'text-success'
         )}
         aria-live='polite'
-        role={formSubmitted && handleError ? 'alert' : undefined}
+        role={
+          formSubmitted && (handleError || navigationError)
+            ? 'alert'
+            : undefined
+        }
         aria-hidden={statusVisible ? undefined : 'true'}
       >
         {statusVisible ? statusText : '\u00A0'}

@@ -152,7 +152,7 @@ describe('JOV-5864 locked homepage baseline', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Be found.Be understood.',
+        name: 'Start with your name',
       })
     ).toBeInTheDocument();
     expect(

@@ -134,7 +134,7 @@ describe('correction pyramid guards', () => {
 
   it('locks the homepage H1 to the identity copy module', () => {
     expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(LOCKED_HOMEPAGE_H1);
-    expect(LOCKED_HOMEPAGE_H1).toBe('Be found. Be understood.');
+    expect(LOCKED_HOMEPAGE_H1).toBe('Start with your name');
     const hero = readFileSync(
       path.join(webRoot, 'components/homepage/HomepageIdentityHero.tsx'),
       'utf8'

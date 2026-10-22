@@ -1,10 +1,7 @@
 // @coverage-via apps/web/tests/unit/home/HomepageIdentityHero.test.tsx
 import { ProductClaimHandleForm } from '@/app/(marketing)/product/ProductClaimHandleForm';
-import {
-  MarketingHero,
-  MarketingHeroPhoto,
-  MarketingSurfaceCard,
-} from '@/components/marketing';
+import { Logo } from '@/components/atoms/Logo';
+import { MarketingHero, MarketingHeroPhoto } from '@/components/marketing';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HomepageCertifiedExposure } from './HomepageCertifiedExposure';
 import './HomepageIdentity.css';
@@ -23,9 +20,8 @@ const HERO_TEXTURE = {
 } as const;
 
 /**
- * Existing split-claim composition, scoped to the artist-profile launch
- * (JOV-7750, 2026-10-16). The identity primitive shows jov.ie/you beside
- * the claim action, without implying that an example person owns the input.
+ * Tim's centered entry refinement (2026-10-21). The existing claim form
+ * retains its route and state ownership; explanatory copy follows the fold.
  */
 export function HomepageIdentityHero({
   copy = HOMEPAGE_IDENTITY_COPY.hero,
@@ -45,52 +41,24 @@ export function HomepageIdentityHero({
         className='marketing-hero-backdrop pointer-events-none absolute inset-0'
       />
       <MarketingHero
-        variant='split'
+        variant='centered'
         className='homepage-claim-hero__layout'
         headingId={headingId}
         testId='marketing-section-hero'
-        sectionVariant='split-claim-card'
+        sectionVariant='centered-claim'
         sectionOwner='apps/web/components/homepage/HomepageIdentityHero.tsx'
       >
-        <div className='homepage-claim-hero__copy max-w-xl'>
-          <p className='marketing-kicker'>{copy.kicker}</p>
-          <h1
-            id={headingId}
-            className='marketing-h1-linear mt-6 text-primary-token'
-          >
-            {copy.headline.split(/(?<=\.) /).map(line => (
-              <span key={line} className='block'>
-                {line}
-              </span>
-            ))}
+        <div className='homepage-claim-hero__copy'>
+          <Logo variant='word' size='md' />
+          <h1 id={headingId} className='marketing-h1-linear text-primary-token'>
+            {copy.headline}
           </h1>
-          <p className='marketing-lead-linear mt-6 max-w-xl text-secondary-token'>
-            {copy.subhead}
-          </p>
         </div>
-        <MarketingSurfaceCard
-          variant='floating'
-          glowTone='none'
-          testId='homepage-claim-card'
-          className='homepage-claim-hero__card product-claim-card w-full max-w-85'
-          contentClassName='flex flex-col gap-4 px-5 py-5 sm:gap-5 sm:px-9 sm:py-10'
+        <div
+          data-testid='homepage-claim-card'
+          className='homepage-claim-hero__card w-full'
         >
-          <div
-            className='flex flex-col gap-4'
-            data-testid='homepage-hero-identity'
-          >
-            <p className='text-sm text-secondary-token'>{preview.label}</p>
-            <p className='product-claim-card__path text-primary-token'>
-              <span className='text-tertiary-token'>{claim.domain}</span>
-              <span>{preview.name}</span>
-            </p>
-            <p className='text-sm text-secondary-token'>{preview.role}</p>
-          </div>
-          <div
-            // Phones: the claim leads the card so the consent banner never covers it.
-            className='order-first w-full sm:order-none'
-            data-testid='homepage-editorial-hero-search'
-          >
+          <div className='w-full' data-testid='homepage-editorial-hero-search'>
             <ProductClaimHandleForm
               domain={claim.domain}
               placeholder={claim.placeholder}
@@ -100,8 +68,24 @@ export function HomepageIdentityHero({
               submitTestId='homepage-primary-cta'
             />
           </div>
-        </MarketingSurfaceCard>
+        </div>
       </MarketingHero>
+      <div
+        className='homepage-claim-hero__explanation'
+        data-testid='homepage-hero-explanation'
+      >
+        <p className='marketing-lead-linear text-secondary-token'>
+          {copy.subhead}
+        </p>
+        <div data-testid='homepage-hero-identity'>
+          <p className='text-sm text-secondary-token'>{preview.label}</p>
+          <p className='text-primary-token'>
+            {claim.domain}
+            {preview.name}
+          </p>
+          <p className='text-sm text-secondary-token'>{preview.role}</p>
+        </div>
+      </div>
     </div>
   );
 }

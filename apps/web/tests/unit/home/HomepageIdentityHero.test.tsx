@@ -96,9 +96,9 @@ describe('HomepageIdentityHero', () => {
       'data-marketing-owner',
       'apps/web/components/homepage/HomepageIdentityHero.tsx'
     );
-    expect(hero).toHaveAttribute('data-marketing-variant', 'split-claim-card');
+    expect(hero).toHaveAttribute('data-marketing-variant', 'centered-claim');
     const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).toHaveTextContent('Be found.Be understood.');
+    expect(heading).toHaveTextContent('Start with your name');
     expect(hero).toHaveAttribute('aria-labelledby', heading.id);
     expect(
       screen.getByText(HOMEPAGE_IDENTITY_COPY.hero.subhead)
@@ -113,11 +113,10 @@ describe('HomepageIdentityHero', () => {
     expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
       'Claim'
     );
-    // Phones: the claim leads the card so the consent banner never covers it.
-    expect(screen.getByTestId('homepage-editorial-hero-search')).toHaveClass(
-      'order-first',
-      'sm:order-none'
-    );
+    expect(within(hero).getByRole('img', { name: 'Jovie logo' })).toBeVisible();
+    expect(
+      within(hero).queryByText(HOMEPAGE_IDENTITY_COPY.hero.subhead)
+    ).toBeNull();
     expect(screen.queryByText('Search your name')).toBeNull();
     expect(screen.queryByText('Request access')).toBeNull();
     expect(screen.queryAllByRole('link')).toHaveLength(0);
@@ -146,25 +145,20 @@ describe('HomepageIdentityHero', () => {
     expect(document.querySelectorAll('video, canvas')).toHaveLength(0);
   });
 
-  it('preserves the narrow claim-card geometry at 768 (JOV-7126)', () => {
+  it('keeps explanatory copy after the entry rather than above its input', () => {
     render(<HomepageIdentityHero />);
-
-    // Pen x4j9f (768 split): the claim card is ~340px (max-w-85), not the
-    // wider max-w-120 the split shell's half-width column at 768 can't fit
-    // alongside the headline. Real layout/line-wrap coverage
-    // lives in the Playwright regression at tests/e2e/homepage.spec.ts,
-    // since jsdom does not lay out text.
-    const card = screen.getByTestId('homepage-claim-card');
-    expect(card.className).toContain('max-w-85');
-    expect(card.className).not.toContain('max-w-120');
-
-    const source = css();
-    expect(source).toMatch(
-      /@media\s*\(min-width:\s*768px\)\s*and\s*\(max-width:\s*1279px\)/
-    );
+    const hero = screen.getByTestId('marketing-section-hero');
+    const explanation = screen.getByTestId('homepage-hero-explanation');
+    expect(hero).not.toContainElement(explanation);
+    expect(hero.nextElementSibling).toBe(explanation);
+    expect(within(hero).queryByTestId('homepage-hero-identity')).toBeNull();
+    expect(
+      within(explanation).getByText(HOMEPAGE_IDENTITY_COPY.hero.subhead)
+    ).toBeVisible();
+    // Real fold, reflow and focus geometry are measured by the Storybook browser spec.
   });
 
-  it('keeps the copy and claim in the direct scoped grid slots', () => {
+  it('keeps the headline and real claim in the existing centered owner', () => {
     render(<HomepageIdentityHero />);
 
     const layout = screen.getByTestId('marketing-section-hero');
@@ -180,18 +174,16 @@ describe('HomepageIdentityHero', () => {
     expect(card).toHaveClass('homepage-claim-hero__card');
     expect(Array.from(layout.children)).toEqual([copy, card]);
     expect(
-      within(copy).getByText(HOMEPAGE_IDENTITY_COPY.hero.kicker)
+      within(copy).getByRole('img', { name: 'Jovie logo' })
     ).toBeInTheDocument();
     expect(
-      within(copy).getByText(HOMEPAGE_IDENTITY_COPY.hero.subhead)
-    ).toBeInTheDocument();
+      within(copy).queryByText(HOMEPAGE_IDENTITY_COPY.hero.subhead)
+    ).toBeNull();
     expect(within(copy).queryByRole('textbox')).toBeNull();
     expect(within(card).getByTestId('homepage-claim-form')).toContainElement(
       screen.getByRole('textbox')
     );
-    expect(
-      within(card).getByTestId('homepage-hero-identity')
-    ).toBeInTheDocument();
+    expect(within(card).queryByTestId('homepage-hero-identity')).toBeNull();
   });
 
   it('describes the free artist profile without inventing a paid launch benefit', () => {

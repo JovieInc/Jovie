@@ -46,10 +46,8 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(componentSource).not.toContain('HOMEPAGE_MEDIA_MAP');
   });
 
-  it('uses the exact identity headline and one support line (Tim 2026-09-28)', () => {
-    expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
-      'Be found. Be understood.'
-    );
+  it('uses the approved entry headline and retains explanation below it (Tim 2026-10-21)', () => {
+    expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe('Start with your name');
     expect(HOMEPAGE_IDENTITY_COPY.hero.subhead).toBe(
       'Claim your name. Jovie makes you easy to reach, for people and for agents.'
     );
