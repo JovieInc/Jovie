@@ -1,11 +1,12 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ComponentProps, type ReactNode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ChatInput } from '@/components/jovie/components/ChatInput';
+import { installBrowserChatProbe } from '../../helpers/chat-performance-probe';
 
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => ({ data: [], isLoading: false }),
@@ -155,6 +156,35 @@ function ControlledComposer(props: Partial<ComponentProps<typeof ChatInput>>) {
 }
 
 describe('shared composer palette', () => {
+  it('acknowledges native edits through the real controlled composer before the probe reports presentation', async () => {
+    render(withProviders(<ControlledComposer />));
+    const composer = screen.getByRole('textbox') as HTMLTextAreaElement;
+    vi.spyOn(composer, 'getBoundingClientRect').mockReturnValue({
+      top: 10,
+      bottom: 40,
+      left: 10,
+      right: 210,
+      width: 200,
+      height: 30,
+    } as DOMRect);
+    installBrowserChatProbe({ user: 'Sent', assistant: 'Reply' });
+    const probe = window.__jovieChatPerformanceProbe!;
+    try {
+      let edit: ReturnType<typeof probe.edit> | undefined;
+      act(() => {
+        edit = probe.edit('Real next draft');
+      });
+      const timing = await edit!;
+      expect(composer.value).toBe('Real next draft');
+      expect(composer.defaultValue).toBe('Real next draft');
+      expect(composer).toHaveFocus();
+      expect(timing.presentedMs).toBeGreaterThanOrEqual(timing.handledMs);
+    } finally {
+      probe.dispose();
+      delete window.__jovieChatPerformanceProbe;
+    }
+  });
+
   it.each(['plus', 'slash'])(
     'uses the same ordered attachments and filters audio through %s',
     async entry => {
