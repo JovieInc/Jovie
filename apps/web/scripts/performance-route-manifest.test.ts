@@ -110,7 +110,9 @@ describe('performance route manifest', () => {
       expect(route?.warmupStrategy).toBe('authenticated-shell');
       expect(route?.warmNavigationStartPath).not.toBe(item.href);
       expect(route?.readySelectors.navTrigger).toContain(
-        `a[href="${item.href}"]`
+        item.id === 'home'
+          ? `a[href="${item.href}"][data-navigation-item-id="home"]`
+          : `a[href="${item.href}"]`
       );
       expect(route?.readySelectors.content?.length ?? 0).toBeGreaterThan(0);
       expect(
@@ -129,7 +131,7 @@ describe('performance route manifest', () => {
 
     expect(
       warmRoutesByNavigationItem.get('home')?.readySelectors.navTrigger?.[0]
-    ).toBe(`a[href="${APP_ROUTES.DASHBOARD}"]:has-text("Home")`);
+    ).toBe(`a[href="${APP_ROUTES.DASHBOARD}"][data-navigation-item-id="home"]`);
   });
 
   it('uses Inbox readiness for /app and treats Releases as a Library redirect', () => {

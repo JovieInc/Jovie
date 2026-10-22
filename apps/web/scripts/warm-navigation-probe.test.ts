@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  homeNavItem,
+  inboxNavItem,
+} from '../components/features/dashboard/dashboard-nav/config';
+import {
   clearWarmNavProbe,
   installWarmNavigationProbe,
   type WarmNavigationProbeWindow,
@@ -84,6 +88,27 @@ describe('browser navigation acknowledgment receipt', () => {
       'wrong navigation item identity'
     );
   });
+
+  it.each([inboxNavItem.id, null])(
+    'rejects a shared home URL with identity %s without recording input or acknowledgment',
+    async identity => {
+      const link = document.createElement('a');
+      link.setAttribute('href', homeNavItem.href);
+      if (identity !== null) {
+        link.setAttribute('data-navigation-item-id', identity);
+      }
+
+      expect(() => installWarmNavigationProbe(link, homeNavItem.id)).toThrow(
+        'wrong navigation item identity'
+      );
+      link.dispatchEvent(new Event('pointerdown'));
+      link.setAttribute('data-navigation-pending', 'true');
+      await Promise.resolve();
+
+      expect(probe.__perfWarmNavStart).toBeUndefined();
+      expect(probe.__perfWarmNavAcknowledgedAt).toBeUndefined();
+    }
+  );
 
   it('rejects an acknowledgment left over from an earlier navigation', () => {
     const link = navigationLink();
