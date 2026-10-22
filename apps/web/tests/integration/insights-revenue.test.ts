@@ -203,6 +203,41 @@ const cases = [
 }>;
 
 describe('Insights tip revenue (real compiled SQL, isolated PostgreSQL)', () => {
+  it('excludes prior and future tips from current-period city totals', async () => {
+    runSql(`insert into tips values
+      (${literal(randomUUID())}, ${literal(profile)}, 'fan1@example.invalid', 500, '2026-01-10'),
+      (${literal(randomUUID())}, ${literal(profile)}, 'fan1@example.invalid', 700, '2025-12-10'),
+      (${literal(randomUUID())}, ${literal(profile)}, 'fan1@example.invalid', 900, '2026-02-10');
+      insert into click_events values (${literal(profile)}, ${literal(fan1)}, 'Austin', 'US');`);
+    const revenue = await aggregateRevenue(profile, period, previous);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(revenue).toMatchObject({
+      totalTipsCurrent: 500,
+      totalTipsPrevious: 700,
+      tipCountCurrent: 1,
+      tipCountPrevious: 1,
+      tipsByCity: [city('Austin', 500, 1)],
+    });
+  });
+
+  it('uses inclusive start and exclusive end for city totals and tip counts', async () => {
+    runSql(`insert into tips values
+      (${literal(randomUUID())}, ${literal(profile)}, 'fan1@example.invalid', 500, '2026-01-01'),
+      (${literal(randomUUID())}, ${literal(profile)}, 'fan1@example.invalid', 900, '2026-01-31 23:59:59.999999'),
+      (${literal(randomUUID())}, ${literal(profile)}, 'fan1@example.invalid', 300, '2025-12-31 23:59:59.999999'),
+      (${literal(randomUUID())}, ${literal(profile)}, 'fan1@example.invalid', 700, '2026-02-01');
+      insert into click_events values (${literal(profile)}, ${literal(fan1)}, 'Austin', 'US');`);
+    const revenue = await aggregateRevenue(profile, period, previous);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(revenue).toMatchObject({
+      totalTipsCurrent: 1400,
+      totalTipsPrevious: 300,
+      tipCountCurrent: 2,
+      tipCountPrevious: 1,
+      tipsByCity: [city('Austin', 1400, 2)],
+    });
+  });
+
   it.each(cases)('$name', async fixture => {
     const statements = fixture.tips.map(
       (amount, index) => `insert into tips values (

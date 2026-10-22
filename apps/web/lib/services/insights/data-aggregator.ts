@@ -560,6 +560,8 @@ export async function aggregateRevenue(
                       and city is not null
                     having count(distinct (city, country)) = 1
                   ) ce on true
+                  where t.created_at >= ${sqlTimestamp(period.start)}
+                    and t.created_at < ${sqlTimestamp(period.end)}
                   group by ce.city
                   order by total_cents desc
                   limit 10
