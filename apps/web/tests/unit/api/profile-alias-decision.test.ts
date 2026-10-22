@@ -14,7 +14,7 @@ vi.mock('@/app/[username]/[slug]/_lib/data', () => ({
   getUnpublishedReleasePresence: mocks.getUnpublishedReleasePresence,
 }));
 
-vi.mock('@/app/[username]/_lib/content-candidate', () => ({
+vi.mock('@/app/[username]/[...slug]/_lib/content-candidate', () => ({
   hasProfileModeAliasContentCandidate:
     mocks.hasProfileModeAliasContentCandidate,
 }));

@@ -1,22 +1,12 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  buildProfileAliasDecisionUrl,
-  resolveProfileModeAliasAtEdge,
-} from '@/lib/routing/profile-alias-edge';
+import { resolveProfileModeAliasAtEdge } from '@/lib/routing/profile-alias-edge';
 
 function aliasRequest(
   path = '/dualipa/listen',
   origin = 'https://jovie-abc123-jovie.vercel.app'
 ): NextRequest {
   return new NextRequest(new URL(path, origin));
-}
-
-function decisionEndpoint(
-  params: Record<string, string>,
-  origin = 'https://jovie-abc123-jovie.vercel.app'
-): string {
-  return `${origin}/api/profile-alias-decision?${new URLSearchParams(params).toString()}`;
 }
 
 function jsonResponse(body: unknown, init?: { status?: number }): Response {
@@ -61,9 +51,13 @@ describe('resolveProfileModeAliasAtEdge', () => {
       'https://jovie-abc123-jovie.vercel.app/dualipa?mode=listen'
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0][0])).toBe(
-      decisionEndpoint({ alias: 'listen', username: 'dualipa' })
-    );
+    const decisionUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(decisionUrl.origin).toBe('https://jovie-abc123-jovie.vercel.app');
+    expect(decisionUrl.pathname).toBe('/api/profile-alias-decision');
+    expect(Object.fromEntries(decisionUrl.searchParams)).toEqual({
+      alias: 'listen',
+      username: 'dualipa',
+    });
   });
 
   it('keeps supported link/qr sources in the decision key and href', async () => {
@@ -81,9 +75,12 @@ describe('resolveProfileModeAliasAtEdge', () => {
       'listen'
     );
 
-    expect(String(fetchMock.mock.calls[0][0])).toBe(
-      decisionEndpoint({ alias: 'listen', source: 'qr', username: 'dualipa' })
-    );
+    const decisionUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(Object.fromEntries(decisionUrl.searchParams)).toEqual({
+      alias: 'listen',
+      source: 'qr',
+      username: 'dualipa',
+    });
     expect(response?.headers.get('location')).toContain('source=qr');
   });
 
@@ -94,35 +91,29 @@ describe('resolveProfileModeAliasAtEdge', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('emits a permanent 308 for a moved decision', async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse({
-        creatorUsername: 'dualipa',
-        href: '/dualipa/renamed-slug',
-        kind: 'moved',
-      })
-    );
+  it.each(['', '?source=qr'])(
+    'emits a permanent 308 without attribution for a moved decision (%s)',
+    async search => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({
+          creatorUsername: 'dualipa',
+          href: '/dualipa/renamed-slug',
+          kind: 'moved',
+        })
+      );
 
-    const response = await resolveProfileModeAliasAtEdge(
-      aliasRequest(),
-      'dualipa',
-      'listen'
-    );
+      const response = await resolveProfileModeAliasAtEdge(
+        aliasRequest(`/dualipa/listen${search}`),
+        'dualipa',
+        'listen'
+      );
 
-    expect(response?.status).toBe(308);
-    expect(response?.headers.get('location')).toBe(
-      'https://jovie-abc123-jovie.vercel.app/dualipa/renamed-slug'
-    );
-    expect(
-      (
-        await resolveProfileModeAliasAtEdge(
-          aliasRequest('/dualipa/listen?source=qr'),
-          'dualipa',
-          'listen'
-        )
-      )?.headers.get('location')
-    ).toContain('source=qr');
-  });
+      expect(response?.status).toBe(308);
+      expect(response?.headers.get('location')).toBe(
+        'https://jovie-abc123-jovie.vercel.app/dualipa/renamed-slug'
+      );
+    }
+  );
 
   it('falls through on content collisions so the resolver page owns them', async () => {
     fetchMock.mockResolvedValue(

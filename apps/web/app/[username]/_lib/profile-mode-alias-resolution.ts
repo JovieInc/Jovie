@@ -6,6 +6,7 @@ import {
   isLegacyProfileModeAlias,
 } from '@/app/[username]/_lib/mode-route-redirect';
 import { shouldBypassPublicProfileQaCache } from '@/app/[username]/_lib/public-profile-qa';
+import { hasProfileModeAliasContentCandidate } from '@/app/[username]/[...slug]/_lib/content-candidate';
 import {
   getContentBySlug,
   getCreatorByUsername,
@@ -13,7 +14,6 @@ import {
 } from '@/app/[username]/[slug]/_lib/data';
 import { sanitizeCacheTags } from '@/lib/cache/tags';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
-import { hasProfileModeAliasContentCandidate } from './content-candidate';
 
 /**
  * Single owner for the legacy profile-mode alias resolution decision
