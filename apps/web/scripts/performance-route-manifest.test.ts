@@ -134,7 +134,6 @@ describe('performance route manifest', () => {
         `canonical nav path "${item.href}" must not also be modeled as a redirect`
       ).toBe(false);
     }
-
   });
 
   it('uses Inbox readiness for /app and treats Releases as a Library redirect', () => {
