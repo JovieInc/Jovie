@@ -21,8 +21,25 @@ import {
 
 type CheckoutStep = {
   uses?: string;
-  with?: { ref?: string; 'persist-credentials'?: boolean };
+  with?: {
+    ref?: string;
+    repository?: string;
+    path?: string;
+    'persist-credentials'?: boolean;
+  };
 };
+
+const CANDIDATE_CHECKOUT_REF = '${{ inputs.expected_sha }}';
+
+/** The gate CLIs are checked out from the workflow file, not the candidate. */
+function isTrustedGateToolingCheckout(step: CheckoutStep): boolean {
+  return (
+    step.with?.ref === '${{ job.workflow_sha }}' &&
+    step.with?.repository === '${{ job.workflow_repository }}' &&
+    step.with?.path === 'promotion-gate-tooling' &&
+    step.with?.['persist-credentials'] === false
+  );
+}
 
 function assertAuthorizedCheckouts(workflow: string) {
   const parsed = parseYaml(workflow) as {
@@ -34,8 +51,9 @@ function assertAuthorizedCheckouts(workflow: string) {
   expect(checkouts.length).toBeGreaterThan(0);
   for (const step of checkouts) {
     expect(step.uses).toMatch(/^actions\/checkout@[a-f0-9]{40}$/);
-    expect(step.with?.ref).toBe('${{ inputs.expected_sha }}');
     expect(step.with?.['persist-credentials']).toBe(false);
+    if (isTrustedGateToolingCheckout(step)) continue;
+    expect(step.with?.ref).toBe(CANDIDATE_CHECKOUT_REF);
   }
 }
 
@@ -4659,6 +4677,19 @@ describe('production promotion exact-artifact contract', () => {
       { ...safe, with: { 'persist-credentials': false } },
       { ...safe, with: { ...safe.with, 'persist-credentials': true } },
       { ...safe, uses: 'actions/checkout@v7' },
+      {
+        ...safe,
+        with: { ...safe.with, ref: '${{ job.workflow_sha }}' },
+      },
+      {
+        ...safe,
+        with: {
+          ...safe.with,
+          ref: '${{ job.workflow_sha }}',
+          repository: '${{ job.workflow_repository }}',
+          path: 'not-the-gate-tooling',
+        },
+      },
     ]) {
       expect(() =>
         assertAuthorizedCheckouts(
