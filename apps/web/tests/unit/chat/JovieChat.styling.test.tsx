@@ -333,9 +333,6 @@ describe('JovieChat styling regressions', () => {
       this.unobserve = vi.fn();
       this.disconnect = vi.fn();
       this.takeRecords = vi.fn(() => []);
-      this.root = null;
-      this.rootMargin = '';
-      this.thresholds = [];
     }) as unknown as typeof IntersectionObserver;
 
     try {
