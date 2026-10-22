@@ -55,6 +55,9 @@ describe('SidebarThreadsSection', () => {
 
     expect(chatActionIcon).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
     expect(allChatsIcon).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
+    const recent = screen.getByText('Recent');
+    expect(recent.className).toContain('text-sidebar-muted');
+    expect(recent.className).not.toMatch(/text-sidebar-muted\/\d+/);
 
     rerender(
       <SidebarThreadsSection

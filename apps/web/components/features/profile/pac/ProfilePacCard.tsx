@@ -637,9 +637,13 @@ export function ProfilePacCard({
 
   const releaseTitle = release?.title ?? artist.name;
   // The featured card reads "{title} / {artist}" (Pen D14lo6); the rail keeps
-  // the release type and year.
+  // the release type and year. Without a release the title already falls back
+  // to the artist name, so the featured byline stays empty instead of
+  // repeating it ("{artist} / {artist}").
   const releaseMeta = isFeatured
-    ? artist.name
+    ? release
+      ? artist.name
+      : ''
     : formatPacReleaseMeta(release, artist.name);
 
   switch (state.kind) {
