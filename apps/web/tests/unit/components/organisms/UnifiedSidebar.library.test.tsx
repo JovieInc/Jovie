@@ -214,6 +214,14 @@ function renderUnifiedSidebar({
 }
 
 describe('UnifiedSidebar library route', () => {
+  it('pins the sidebar content scrollport so focusing New Chat does not shift the shell', () => {
+    renderUnifiedSidebar();
+
+    expect(document.querySelector('[data-sidebar="content"]')).toHaveClass(
+      '[overflow-anchor:none]'
+    );
+  });
+
   afterEach(() => {
     document.cookie = 'sidebar:state=; path=/; max-age=0';
     electronRuntimeMock.isElectronRuntime = true;
