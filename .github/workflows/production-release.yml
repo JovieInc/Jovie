@@ -1354,6 +1354,8 @@ jobs:
       # unknown) needs fresh exact-SHA Golden Path evidence from a run that
       # really executed the journeys, or an audited manual override receipt.
       # Missing base SHA, range, or evidence blocks. Post-deploy smoke is separate.
+      # Inspect JSON has no commit field. Keep it on disk (the builds payload
+      # blows the shell limit) and bind its deployment id to build-info.
       - name: Pre-promotion auth/billing journey gate
         id: journey-gate
         if: ${{ steps.final-current.outputs.is_current == 'true' }}
@@ -1368,7 +1370,19 @@ jobs:
         run: |
           gate_dir="$RUNNER_TEMP/journey-gate"
           mkdir -p "$gate_dir"
-          base_sha="$(./node_modules/.bin/vercel inspect jov.ie --format=json 2>/dev/null | jq -r '.meta.githubCommitSha // ""' || true)"
+          inspect_file="$gate_dir/inspect.json"
+          build_info_file="$gate_dir/build-info.json"
+          if ! ./node_modules/.bin/vercel inspect jov.ie --format=json --scope "$VERCEL_ORG_ID" >"$inspect_file"; then
+            echo "::error::vercel inspect jov.ie failed; live production deployment id is unresolved."
+            : >"$inspect_file"
+          fi
+          if ! curl --fail --silent --show-error \
+            --connect-timeout 5 --max-time 15 --retry 2 --retry-all-errors \
+            https://jov.ie/api/health/build-info >"$build_info_file"; then
+            echo "::error::Canonical production build-info is unavailable."
+            : >"$build_info_file"
+          fi
+          base_sha="$(node scripts/promotion-gate-ci.mjs resolve-base --inspect "$inspect_file" --build-info "$build_info_file")"
           node scripts/promotion-gate-ci.mjs range --base "$base_sha" --candidate "$CANDIDATE_SHA" --out "$gate_dir/range.json"
           node scripts/promotion-gate-ci.mjs fetch-evidence --repo "$REPO" --candidate "$CANDIDATE_SHA" --out-dir "$gate_dir/evidence"
           args=(--range "$gate_dir/range.json" --out "$gate_dir/decision.json")
