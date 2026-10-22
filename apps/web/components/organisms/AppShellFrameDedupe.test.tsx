@@ -68,6 +68,8 @@ describe('AppShellFrameDedupe', () => {
       'data-app-shell-frame'
     );
     expect(screen.getByTestId('stale-main')).not.toHaveAttribute('id');
+    expect(screen.getByTestId('stale-frame')).toHaveTextContent('');
+    expect(screen.getByTestId('live-frame')).toHaveTextContent('Live');
     expect(screen.getByTestId('live-main')).toHaveAttribute(
       'id',
       'main-content'
@@ -280,6 +282,7 @@ describe('AppShellFrameDedupe', () => {
       'Live tasks'
     );
     expect(screen.getByTestId('hidden-only')).toBeInTheDocument();
+    expect(screen.getByTestId('stale-frame')).toHaveTextContent('');
     expect(screen.getByTestId('stale-frame')).not.toHaveAttribute(
       'data-app-shell-frame'
     );
