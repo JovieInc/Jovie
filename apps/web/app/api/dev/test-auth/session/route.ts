@@ -6,6 +6,7 @@ import {
   DEV_TEST_AUTH_COOKIE_NAMES,
   ensureDevTestAuthActor,
   ensureExistingDevTestAuthActor,
+  provisionDeterministicFreshDevTestActor,
   getCachedDevTestAuthSession,
   getDevTestAuthAvailability,
   parseDevTestAuthPersona,
@@ -33,6 +34,12 @@ function readExistingUserIdFromBody(body: unknown): string | null {
   return typeof body.existingUserId === 'string'
     ? body.existingUserId.trim()
     : '';
+}
+
+function readEmailFromBody(body: unknown): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  if (!('email' in body)) return null;
+  return typeof body.email === 'string' ? body.email.trim() : '';
 }
 
 function applyNoStore(response: NextResponse): NextResponse {
@@ -133,6 +140,7 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.json().catch(() => null);
   const requestedPersona = readPersonaFromBody(rawBody);
   const existingUserId = readExistingUserIdFromBody(rawBody);
+  const email = readEmailFromBody(rawBody);
 
   if (requestedPersona === '' || existingUserId === '') {
     return NextResponse.json(
@@ -151,9 +159,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const actor = existingUserId
+  let actor = existingUserId
     ? await ensureExistingDevTestAuthActor(existingUserId, parsedPersona)
     : await ensureDevTestAuthActor(persona);
+  if (!actor && existingUserId && email) {
+    const provisioned = await provisionDeterministicFreshDevTestActor({
+      existingUserId,
+      email,
+    });
+    if (provisioned) {
+      actor = await ensureExistingDevTestAuthActor(
+        existingUserId,
+        parsedPersona
+      );
+    }
+  }
   if (!actor) {
     return NextResponse.json(
       { success: false, error: 'Unknown Better Auth test user' },
