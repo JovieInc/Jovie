@@ -704,6 +704,68 @@ describe('dead-man liveness', () => {
     expect(rowFor(report, 'gem:lanes-tick').status).toBe('unknown');
   });
 
+  // JOV-8799: Summer's observeReceipt reports a succeeded read as `stale`
+  // once it is older than the 10-minute provider TTL. This dead-man keeps
+  // its own 60-minute silence budget and still rejects unknown or failed reads.
+  it.each([
+    ['verified', 5, 'fresh'],
+    ['stale', 11, 'fresh'],
+    ['stale', 59, 'fresh'],
+    ['stale', 60, 'fresh'],
+    ['stale', 61, 'stale'],
+    ['verified', 61, 'stale'],
+    ['unknown', 1, 'missing'],
+    ['failed', 1, 'missing'],
+    [undefined, 1, 'missing'],
+  ])(
+    'gbrain read status %s at age %im respects the heartbeat budget (%s)',
+    async (status, ageMinutes, expected) => {
+      const { report } = await runLiveness({
+        registry: only('derived:gbrain:read-path'),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          'summer.jov.ie/runtime/v1/health': {
+            receiptFreshness: {
+              gbrainRead: { status, observedAt: iso(ageMinutes) },
+            },
+          },
+        }),
+      });
+      const accepted = status === 'verified' || status === 'stale';
+      expect(rowFor(report, 'derived:gbrain:read-path')).toMatchObject({
+        status: expected,
+        budgetMinutes: 60,
+        lastProofAt: accepted ? iso(ageMinutes) : null,
+        ageMinutes: accepted ? ageMinutes : null,
+      });
+      expect(livenessDecisions(report).map(row => row.action)).toEqual(
+        expected === 'fresh' ? [] : ['red']
+      );
+      expect(
+        livenessDecisions(report, {
+          'automation-liveness-derived-gbrain-read-path': 'red',
+        }).map(row => row.action)
+      ).toEqual([expected === 'fresh' ? 'green' : 'red']);
+    }
+  );
+
+  it.each([null, undefined, 'invalid'])(
+    'a stale gbrain receipt without a valid timestamp (%s) is red',
+    async observedAt => {
+      const { report } = await runLiveness({
+        registry: only('derived:gbrain:read-path'),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          'summer.jov.ie/runtime/v1/health': {
+            receiptFreshness: { gbrainRead: { status: 'stale', observedAt } },
+          },
+        }),
+      });
+      expect(rowFor(report, 'derived:gbrain:read-path').status).toBe('missing');
+      expect(livenessDecisions(report)[0].action).toBe('red');
+    }
+  );
+
   // (c) Summer's model turns failed for two days with no escalation, while
   // its provider-read receipts stayed fresh.
   it('(c) failing Summer model turns alert even while provider receipts are fresh', async () => {
