@@ -3,6 +3,7 @@ import {
   applyPendingClaimCookie,
   writePendingClaimContext,
 } from '@/lib/claim/context';
+import { buildClaimRedirectUrl } from '@/lib/claim/redirect-origin';
 import {
   clearLeadAttributionCookie,
   lookupLeadByClaimToken,
@@ -28,7 +29,7 @@ interface ClaimTokenRouteContext {
 }
 
 function buildAbsoluteUrl(request: NextRequest, pathname: string): URL {
-  return new URL(pathname, request.url);
+  return buildClaimRedirectUrl(request, pathname);
 }
 
 export async function GET(
