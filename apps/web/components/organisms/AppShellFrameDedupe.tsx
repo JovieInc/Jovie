@@ -4,6 +4,9 @@ import { useLayoutEffect } from 'react';
 
 function isNonLayoutHidden(frame: HTMLElement): boolean {
   for (let node: HTMLElement | null = frame; node; node = node.parentElement) {
+    // Author `display: flex` overrides the UA `[hidden] { display: none }`,
+    // so a retained shell can stay painted and duplicate `#main-content`.
+    if (node.hidden || node.hasAttribute('hidden')) return true;
     const style = getComputedStyle(node);
     if (
       style.display === 'none' ||
@@ -76,7 +79,15 @@ function releaseHiddenDuplicateFrames(): void {
     for (const id of collectTestIds(frame)) liveIds.add(id);
   }
   for (const frame of drop) stripDuplicateTestIds(frame, liveIds);
-  for (const frame of drop) frame.removeAttribute('data-app-shell-frame');
+  for (const frame of drop) {
+    frame.removeAttribute('data-app-shell-frame');
+    if (frame.id === 'main-content') frame.removeAttribute('id');
+    for (const landmark of frame.querySelectorAll<HTMLElement>(
+      '[id="main-content"]'
+    )) {
+      landmark.removeAttribute('id');
+    }
+  }
 }
 
 let observer: MutationObserver | null = null;
