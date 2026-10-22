@@ -687,9 +687,11 @@ print(json.dumps(result))
                    "coordination": self.coord, **fields}
         # One CLI transition verifies several immutable objects through real
         # tracked helpers (13 calls for claim, 22 for an ambiguous boundary).
-        # Bound the whole fixture without imposing a 10s budget on all helpers.
+        # The four concurrent coverage shards can push their combined startup
+        # past 30s. Bound the complete fixture request separately from each
+        # production transport call; retain all lifecycle and fencing checks.
         result = subprocess.run([sys.executable, str(self.enabled if enabled else MODULE)], input=json.dumps(request),
-                                capture_output=True, text=True, env=self.env, timeout=30)
+                                capture_output=True, text=True, env=self.env, timeout=120)
         return result.returncode, json.loads(result.stdout)
     def claim(self, *, enabled=False):
         return self.cli("claim", enabled=enabled, owner=owner(), policy=policy(), trigger={"triggerId": "same"}, now=100)
