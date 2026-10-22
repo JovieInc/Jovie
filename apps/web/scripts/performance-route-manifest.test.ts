@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   canonicalSidebarNavigation,
   chatNavItem,
+  homeNavItem,
+  inboxNavItem,
 } from '../components/features/dashboard/dashboard-nav/config';
 import { APP_ROUTES } from '../constants/routes';
 import {
@@ -18,6 +20,23 @@ import {
 } from './performance-route-manifest';
 
 describe('performance route manifest', () => {
+  it('selects the intended home identity when another Inbox link shares its href', () => {
+    const route = getEndUserPerfRouteManifest().find(
+      route => route.id === 'creator-inbox-nav'
+    );
+    expect(route).toBeDefined();
+    expect(route?.navigationItemId).toBe(homeNavItem.id);
+    expect(route?.path).toBe(homeNavItem.href);
+    expect(inboxNavItem.href).toBe(homeNavItem.href);
+    expect(inboxNavItem.id).not.toBe(homeNavItem.id);
+    expect(route?.readySelectors.navTrigger?.length).toBeGreaterThan(0);
+    for (const selector of route?.readySelectors.navTrigger ?? []) {
+      expect(selector).toContain(
+        `[data-navigation-item-id="${homeNavItem.id}"]`
+      );
+    }
+  });
+
   it('exports normalized route budgets for every end-user route', () => {
     const routes = getEndUserPerfRouteManifest();
 

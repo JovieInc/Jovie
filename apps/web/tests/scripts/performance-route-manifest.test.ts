@@ -1,8 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import {
-  homeNavItem,
-  inboxNavItem,
-} from '../../components/features/dashboard/dashboard-nav/config';
 import { APP_ROUTES } from '../../constants/routes';
 import {
   assertAliasUsableResultUrl,
@@ -167,20 +163,6 @@ function expectBudgetCoverage(route: PerfRouteDefinition) {
 }
 
 describe('performance route manifest shell slice coverage', () => {
-  it('selects the intended home identity when another Inbox link shares its href', () => {
-    const route = requireRoute('creator-inbox-nav');
-    expect(route.navigationItemId).toBe(homeNavItem.id);
-    expect(route.path).toBe(homeNavItem.href);
-    expect(inboxNavItem.href).toBe(homeNavItem.href);
-    expect(inboxNavItem.id).not.toBe(homeNavItem.id);
-    expect(route.readySelectors.navTrigger?.length).toBeGreaterThan(0);
-    for (const selector of route.readySelectors.navTrigger ?? []) {
-      expect(selector).toContain(
-        `[data-navigation-item-id="${homeNavItem.id}"]`
-      );
-    }
-  });
-
   it.each([
     'public-profile-listen',
     'public-profile-music',
