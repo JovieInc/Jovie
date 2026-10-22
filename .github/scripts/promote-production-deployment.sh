@@ -140,15 +140,25 @@ read_vercel_json() {
   local result=""
   local status=0
   local reason=""
+  local stdout_file=""
   local stderr_file=""
   local diagnostics=""
 
   # Inspect writes JSON to stdout. Keep stderr separate: CLI notices can
   # arrive after (or during) a large JSON write and corrupt merged streams.
   stderr_file="$(mktemp)" || return 1
-  raw="$(vercel "$@" 2>"$stderr_file")" || status=$?
+  stdout_file="$(mktemp)" || { rm -f "$stderr_file"; return 1; }
+  vercel "$@" >"$stdout_file" 2>"$stderr_file" || status=$?
+  # Validate and project inspection data before it enters shell variables.
+  # Copying multi-megabyte build logs through Bash is slow on shared runners.
+  if [ "$status" -eq 0 ] && { [ "$schema" = current ] || [ "$schema" = alias ]; } &&
+    validate_vercel_json "$schema" <"$stdout_file"; then
+    raw="$(jq -c '{id, url, readyState, target}' "$stdout_file")" || status=$?
+  else
+    raw="$(cat "$stdout_file")"
+  fi
   diagnostics="$(cat "$stderr_file")"
-  rm -f "$stderr_file"
+  rm -f "$stdout_file" "$stderr_file"
   if [ "$status" -ne 0 ]; then
     reason="$(safe_vercel_failure_reason "$raw")"
     if [ "$reason" = unclassified ]; then

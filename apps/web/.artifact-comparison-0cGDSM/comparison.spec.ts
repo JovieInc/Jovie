@@ -1,0 +1,1 @@
+import{expect,test}from'@playwright/test';test('comparison',async({page})=>{await page.setContent('<style>html,body{margin:0;width:16px;height:16px;background:#fff}</style>');await expect(page).toHaveScreenshot('comparison.png',{animations:'disabled'})})

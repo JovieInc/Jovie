@@ -771,6 +771,8 @@ import json
 import sys
 
 current, scenario = sys.argv[1:]
+if scenario.endswith("banner"):
+    sys.stdout.write("Vercel inspection status\n")
 payload = json.dumps({
     "id": current, "url": f"{current}.vercel.app",
     "readyState": "READY", "target": "production",
@@ -787,6 +789,8 @@ sys.stdout.write(payload[split:] + "\n")
 sys.stdout.flush()
 sys.stderr.write("Run the package manager to update.\n")
 PYTHON
+  elif [ "$FAKE_SCENARIO" = "inspect-schema-invalid" ]; then
+    printf '{"id":"%s","url":"%s.vercel.app","readyState":{},"target":"production"}\n' "$current" "$current"
   elif [[ "$FAKE_SCENARIO" == inspect-stdout-* ]]; then
     if [ "$FAKE_SCENARIO" = "inspect-stdout-invalid" ]; then echo '{'; fi
     printf '{"id":"%s","url":"%s.vercel.app","readyState":"READY","target":"production"}\n' "$current" "$current" >&2
@@ -963,7 +967,7 @@ def test_promotion_controller_promotes_once_and_requires_terminal_current(
     assert "Production Current is terminal on dpl_target" in result.stdout
 
 
-@pytest.mark.parametrize("size", ["small", "large"])
+@pytest.mark.parametrize("size", ["small", "large", "banner"])
 def test_promotion_controller_keeps_inspect_json_separate_from_cli_diagnostics(
     tmp_path: Path, size: str,
 ) -> None:
@@ -978,7 +982,10 @@ def test_promotion_controller_keeps_inspect_json_separate_from_cli_diagnostics(
 
 
 @pytest.mark.parametrize(
-    "scenario", ["inspect-stdout-empty", "inspect-stdout-invalid", "inspect-nonzero-json"],
+    "scenario", [
+        "inspect-stdout-empty", "inspect-stdout-invalid", "inspect-nonzero-json",
+        "inspect-schema-invalid",
+    ],
 )
 def test_promotion_controller_rejects_unproven_inspect_stdout(
     tmp_path: Path, scenario: str,
@@ -993,6 +1000,22 @@ def test_promotion_controller_rejects_unproven_inspect_stdout(
     assert "promote dpl_target" not in calls
     assert "rolling-release fetch" not in calls
     assert "do-not-leak-sensitive-marker" not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "scenario", ["standard", "inspect-stdout-invalid", "inspect-nonzero-json"],
+)
+def test_promotion_controller_cleans_cli_capture_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scenario: str,
+) -> None:
+    capture_dir = tmp_path / "cli-captures"
+    capture_dir.mkdir()
+    monkeypatch.setenv("TMPDIR", str(capture_dir))
+
+    result = _run_promotion_controller(tmp_path, scenario)
+
+    assert result.returncode == (0 if scenario == "standard" else 1)
+    assert list(capture_dir.iterdir()) == []
 
 
 def test_promotion_controller_accepts_legacy_rollout_json_on_stdout(

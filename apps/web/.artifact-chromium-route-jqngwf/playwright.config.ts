@@ -1,0 +1,1 @@
+import{defineConfig}from'@playwright/test';export default defineConfig({captureGitInfo:{commit:false,diff:false},testDir:'.',outputDir:'test-results',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:1440,height:900},deviceScaleFactor:2}})
