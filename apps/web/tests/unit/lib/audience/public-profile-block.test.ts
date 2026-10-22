@@ -182,6 +182,39 @@ describe('public profile audience block helper', () => {
     expect(mocks.select).not.toHaveBeenCalled();
   });
 
+  it('fails open without Postgres when the lookup is aborted during Redis', async () => {
+    process.env.NODE_ENV = 'production';
+    const controller = new AbortController();
+    mocks.getRedis.mockImplementation((options?: { signal?: AbortSignal }) => ({
+      get: () =>
+        new Promise((_resolve, reject) => {
+          const abort = () =>
+            reject(
+              new DOMException('The operation was aborted.', 'AbortError')
+            );
+          if (options?.signal?.aborted) {
+            abort();
+            return;
+          }
+          options?.signal?.addEventListener('abort', abort, { once: true });
+        }),
+      set: vi.fn().mockResolvedValue(undefined),
+      del: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    const pending = checkProfileVisitorBlocked(
+      'tim',
+      '1.2.3.4',
+      'Mozilla',
+      controller.signal
+    );
+    setTimeout(() => controller.abort(), 20);
+
+    await expect(pending).resolves.toBe(false);
+    expect(mocks.select).not.toHaveBeenCalled();
+    expect(mocks.createFingerprintEdge).not.toHaveBeenCalled();
+  });
+
   it('keeps audience-block telemetry enabled in Vercel preview even when E2E bypass is set', async () => {
     process.env.NODE_ENV = 'production';
     delete process.env.PUBLIC_NOAUTH_SMOKE;
