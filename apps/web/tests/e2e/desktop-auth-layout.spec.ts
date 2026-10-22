@@ -181,6 +181,23 @@ test('rejects three semantically correct controls with dispersed spacing or comp
     'data-variant',
     'link'
   );
+  // Firefox can report the margin before the appearance override paints
+  // background and width. Wait for that paint, then assert the same set.
+  await expect
+    .poll(() =>
+      page.locator('[data-auth-action="options"]').evaluate(node => {
+        const style = getComputedStyle(node);
+        const primary = node
+          .closest('[data-testid="desktop-auth-hierarchy"]')
+          ?.querySelector('[data-auth-action="primary"]');
+        const primaryWidth = primary?.getBoundingClientRect().width ?? 0;
+        return (
+          style.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+          node.getBoundingClientRect().width >= primaryWidth * 0.8
+        );
+      })
+    )
+    .toBe(true);
   expect(await hierarchyViolations(page)).toEqual(
     expect.arrayContaining(['competing-emphasis', 'dispersed-utilities'])
   );
