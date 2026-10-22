@@ -218,7 +218,7 @@ describe('synthetic monitoring workflow parser', () => {
     }
   });
 
-  it('fails visibly for the unimplemented production onboarding robot without an auth bypass', () => {
+  it('warns for the deferred production onboarding robot without an auth bypass', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const step = getStepBlock(
       workflow,
@@ -227,7 +227,7 @@ describe('synthetic monitoring workflow parser', () => {
 
     const failureStep = getStepBlock(
       workflow,
-      'Fail loudly while the onboarding robot is not implemented'
+      'Warn while the onboarding robot is deferred'
     );
     const directory = mkdtempSync(join(tmpdir(), 'jovie-onboarding-robot-'));
     const output = join(directory, 'output');
@@ -246,23 +246,30 @@ describe('synthetic monitoring workflow parser', () => {
       const result = runStep(step);
       expect(result.status).toBe(0);
       expect(result.stdout).toContain(
-        '::error title=Onboarding robot NOT IMPLEMENTED::'
+        '::warning title=Onboarding robot skipped::'
       );
+      expect(result.stdout).toContain('synthetic-robot-auth-unavailable');
+      expect(result.stdout).toContain('JOV-8809');
       expect(readFileSync(output, 'utf8')).toContain(
-        'robot_skip_reason=synthetic-robot-not-implemented:'
+        'robot_skip_reason=synthetic-robot-auth-unavailable:'
       );
+      expect(readFileSync(output, 'utf8')).toContain('JOV-8809');
       expect(readFileSync(output, 'utf8')).toContain(
         'robot_status=not_implemented\n'
       );
-      expect(readFileSync(summary, 'utf8')).toContain('NOT IMPLEMENTED.');
+      expect(readFileSync(summary, 'utf8')).toContain(
+        'synthetic-robot-auth-unavailable'
+      );
       expect(failureStep).toContain(
         "if: ${{ always() && steps.onboarding-robot.outputs.robot_status == 'not_implemented' }}"
       );
+      expect(failureStep).toContain('JOV-8809');
       expect(failureStep).not.toContain('continue-on-error:');
+      expect(failureStep).not.toContain('::error::');
       const failure = runStep(failureStep);
-      expect(failure.status).toBe(1);
+      expect(failure.status).toBe(0);
       expect(failure.stdout).toContain(
-        '::error::The onboarding robot is not implemented (JOV-7656)'
+        '::warning title=Onboarding robot skipped::synthetic-robot-auth-unavailable: deferred while JOV-8809 is open.'
       );
     } finally {
       rmSync(directory, { recursive: true, force: true });
