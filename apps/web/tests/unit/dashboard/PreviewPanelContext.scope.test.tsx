@@ -1,7 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   PreviewPanelProvider,
@@ -66,6 +66,10 @@ function ReversibleRightRailProbe() {
 }
 
 describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('starts closed', () => {
     renderShell('chat');
     expect(screen.getByTestId('rail-open').textContent).toBe('false');
@@ -82,6 +86,42 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
     );
     expect(screen.getByTestId('rail-open').textContent).toBe('true');
     window.history.pushState({}, '', '/');
+  });
+
+  it('reopens a default-open profile surface after a scope round trip', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('768'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+
+    const { rerender } = render(
+      <PreviewPanelProvider defaultOpen scope='artist-profile-settings'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+
+    rerender(
+      <PreviewPanelProvider scope='app-shell'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('false');
+    });
+
+    rerender(
+      <PreviewPanelProvider defaultOpen scope='artist-profile-settings'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
   });
 
   it('closes the rail when the surface scope changes to chat', () => {
