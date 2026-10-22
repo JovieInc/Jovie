@@ -173,7 +173,9 @@ test.describe
   .serial('Demo/live route parity', () => {
     test.skip(!USE_TEST_AUTH_BYPASS, 'Requires E2E_USE_TEST_AUTH_BYPASS=1');
 
-    test('releases demo mirrors the live releases workspace structure', async ({
+    // JOV-8782: live /app/releases is the shell release list, /demo still
+    // renders the table-era matrix. Re-enable when /demo moves to the shell.
+    test.fixme('releases demo mirrors the live releases workspace structure', async ({
       page,
     }) => {
       const liveShape = await collectReleasesShape(

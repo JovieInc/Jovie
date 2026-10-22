@@ -47,4 +47,21 @@ export const HARDCODED_LEGACY_PRICES: readonly LegacyPriceDefinition[] = [
     interval: 'year',
     description: 'Standard Yearly (legacy)',
   },
+  {
+    // Artist Presence $199/month limited-access price (JOV-6257, live).
+    // Retired from checkout 2026-10-20 when Pro became $12/month self-serve.
+    priceId: 'price_1UFL1xAAI1NrDqJS0eIWHFMn',
+    plan: 'pro',
+    amount: 19900,
+    interval: 'month',
+    description: 'Artist Presence $199 (legacy)',
+  },
+  {
+    // Same retired $199 offer in the Stripe test account (JOV-6218).
+    priceId: 'price_1UEyImASl9B9udHv1kDNLG8C',
+    plan: 'pro',
+    amount: 19900,
+    interval: 'month',
+    description: 'Artist Presence $199 test (legacy)',
+  },
 ] as const;

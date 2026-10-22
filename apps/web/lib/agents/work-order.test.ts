@@ -90,6 +90,24 @@ describe('work order sealing and routing', () => {
     expect(() => sealWorkOrder(founderOrder({ founderAsk: null }))).toThrow(/founder ask/);
   });
 
+  it('carries the default-plus-deadline contract onto the founder card', () => {
+    const declared = sealWorkOrder(founderOrder({ founderAsk: { ...founderAsk, defaultIfSilent: 'Keep the current copy', defaultDecision: 'approve' } }));
+    const card = summerCardInputSchema.parse(toSummerCard(declared, { priorResults: [] }));
+    expect(card).toMatchObject({ decideBy: new Date(declared.budget.deadline).toISOString(), defaultDecision: 'approve', defaultIfSilent: 'Keep the current copy' });
+    // Orders sealed before the contract keep their digest and default to reject.
+    expect(sealWorkOrder(founderOrder()).digest).toBe(sealWorkOrder({ ...founderOrder(), founderAsk: { ...founderAsk } }).digest);
+    expect(summerCardInputSchema.parse(toSummerCard(sealWorkOrder(founderOrder()), { priorResults: [] })).defaultDecision).toBeNull();
+    expect(() => sealWorkOrder(founderOrder({ requiredCapabilities: ['spend'], founderAsk: { ...founderAsk, defaultIfSilent: 'Buy it', defaultDecision: 'approve' } }))).toThrow(/never approve by default/);
+    expect(() => sealWorkOrder(founderOrder({ founderAsk: { ...founderAsk, defaultIfSilent: null, defaultDecision: 'reject' } }))).toThrow(/say what happens/);
+  });
+
+  it('labels a decision recorded by the deadline default, not the founder', () => {
+    const { orders, acks } = threeActorResults();
+    const byDefault = fromSummerCard(orders[1], { ack: acks[1], observedAt: at(31), card: { ...card('approved', founderCardKey(orders[1])), resolution: 'default' } });
+    expect(byDefault.terminalState).toBe('succeeded');
+    expect(byDefault.actionsTaken[0]).toMatch(/^default approved at the .* deadline; founder feedback may still revise it$/);
+  });
+
   it('emits transport payloads existing owners already accept', () => {
     const founder = sealWorkOrder(founderOrder());
     expect(summerCardInputSchema.parse(toSummerCard(founder, { priorResults: [] })).idempotencyKey).toBe(founderCardKey(founder));

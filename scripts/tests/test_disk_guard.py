@@ -484,6 +484,10 @@ class RetiredHostLoopTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
+        import worktree_sweep
+        scan = patch.object(worktree_sweep, "scan_snapshot", return_value=None)  # scanners: own tests
+        scan.start()
+        self.addCleanup(scan.stop)
         self.root = Path(self.tmp.name).resolve()
         self.env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
         self.env.update(GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.com",
@@ -606,7 +610,10 @@ class RetiredHostLoopTest(unittest.TestCase):
             guard.sweep_retired_workspaces(SimpleNamespace(state=self.root), self.run_cmd, NOW, report, roots=[root])
         self.assertFalse(clean.exists())
         self.assertFalse(dirty.exists())
-        backups = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/heads/backup"],
+        branches = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/heads/backup"],
+                                  cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
+        self.assertEqual(branches, [], "a retired-workspace snapshot is never a branch")
+        backups = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/sweep/"],
                                  cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
         self.assertEqual(len(backups), 1, report)
         self.assertTrue(backups[0].endswith("/JOV-2-" + guard.datetime.fromtimestamp(NOW, guard.timezone.utc).strftime("%Y%m%d")))

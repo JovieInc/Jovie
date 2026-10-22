@@ -739,6 +739,9 @@ export function OnboardingV2Form({
   const [discoverySnapshot, setDiscoverySnapshot] =
     useState<DiscoverySnapshot | null>(null);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [verificationNotice, setVerificationNotice] = useState<string | null>(
+    null
+  );
   const [isDiscoveryLoading, setIsDiscoveryLoading] = useState(false);
   const [isArtistConnectPending, setIsArtistConnectPending] = useState(false);
   const [lateArrivals, setLateArrivals] = useState<LateArrival[]>([]);
@@ -1087,6 +1090,7 @@ export function OnboardingV2Form({
       setCurrentStep('artist-confirm');
       setIsArtistConnectPending(true);
       setDiscoveryError(null);
+      setVerificationNotice(null);
 
       try {
         const connectResult = await connectOnboardingSpotifyArtist({
@@ -1096,6 +1100,14 @@ export function OnboardingV2Form({
           spotifyArtistId: artist.id,
           spotifyArtistUrl: artist.url,
         });
+
+        if (connectResult.verificationPending) {
+          // High-reach artist: not linked until ownership is verified. The
+          // user keeps going (plan + profile work); no enrichment runs.
+          setIsArtistConnectPending(false);
+          setVerificationNotice(connectResult.message);
+          return;
+        }
 
         if (!connectResult.success) {
           throw new Error(
@@ -1706,12 +1718,17 @@ export function OnboardingV2Form({
           isConnecting ||
           isEnriching ||
           isDiscoveryLoading;
+        const isVerificationPending = Boolean(verificationNotice) && !hasError;
         const artistConfirmTitle = hasError
           ? 'Import ran into an issue'
-          : 'Spotify connected';
+          : isVerificationPending
+            ? 'Verification in progress'
+            : 'Spotify connected';
         const artistConfirmPrompt = hasError
           ? 'You can try connecting again or skip ahead.'
-          : "We'll import your discography in the background. You can keep going.";
+          : isVerificationPending
+            ? (verificationNotice ?? '')
+            : "We'll import your discography in the background. You can keep going.";
         const chooseArtistLabel = hasError
           ? 'Try again'
           : 'Choose a different artist';

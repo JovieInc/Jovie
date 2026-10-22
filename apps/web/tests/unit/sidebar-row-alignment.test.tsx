@@ -54,7 +54,11 @@ describe('Sidebar row alignment', () => {
   it('uses px-2.5 for section labels', () => {
     render(<SidebarGroupLabel>General</SidebarGroupLabel>);
 
-    expect(screen.getByText('General').className).toContain('px-2.5');
+    const label = screen.getByText('General');
+    expect(label.className).toContain('px-2.5');
+    // Group labels use the opaque muted token. /90 measured under 4.5:1.
+    expect(label.className).toContain('text-sidebar-muted');
+    expect(label.className).not.toMatch(/text-sidebar-muted\/\d+/);
   });
 
   it('stages section labels on the rail-motion contract (JOV-4522)', () => {
@@ -87,9 +91,13 @@ describe('Sidebar row alignment', () => {
       </SidebarCollapsibleGroup>
     );
 
-    expect(
-      screen.getByRole('button', { name: /general/i }).className
-    ).toContain('px-2.5');
+    const header = screen.getByRole('button', { name: /general/i });
+    const railLabel = screen.getByText('General');
+    expect(header.className).toContain('px-2.5');
+    expect(header.className).toContain('text-sidebar-muted');
+    expect(header.className).not.toMatch(/text-sidebar-muted\/\d+/);
+    expect(railLabel.className).toContain('text-sidebar-muted');
+    expect(railLabel.className).not.toMatch(/text-sidebar-muted\/\d+/);
   });
 
   it('can default a persisted collapsible section closed without removing its slot', () => {
