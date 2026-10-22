@@ -76,10 +76,12 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
   ).toBe(false);
 
   // Keep this as a URL sanity check so test data still anchors to local app.
+  // The full matrix serves the app on 127.0.0.1; local Playwright uses localhost.
+  const homepageHost = new URL(currentUrl).hostname;
   expect(
-    currentUrl,
+    ['localhost', '127.0.0.1', '[::1]'],
     `Homepage should stay on the local app: ${currentUrl}`
-  ).toContain('localhost');
+  ).toContain(homepageHost);
 
   await expect(
     page.locator('h1').first(),

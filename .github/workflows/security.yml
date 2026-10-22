@@ -92,6 +92,10 @@ jobs:
               ./scripts/security/scan-secrets.sh ci-pr "${{ github.event.before }}"
             fi
           else
+            # Worktree-sweep snapshots live under refs/jovie-preserved/* in this
+            # public repo; checkout fetches only branches and tags, so map them
+            # into local heads for the full-history scan.
+            git fetch --no-tags origin '+refs/jovie-preserved/*:refs/heads/jovie-preserved/*'
             ./scripts/security/scan-secrets.sh full
           fi
 
@@ -125,7 +129,7 @@ jobs:
             exit "$code"
           fi
       - name: Upload osv SARIF
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: osv.sarif
           category: osv
@@ -156,7 +160,7 @@ jobs:
             exit "$code"
           fi
       - name: Upload Semgrep SARIF
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: semgrep.sarif
           category: semgrep
@@ -222,6 +226,7 @@ jobs:
               ./scripts/security/scan-secrets.sh ci-pr-trufflehog "${{ github.event.before }}"
             fi
           else
+            git fetch --no-tags origin '+refs/jovie-preserved/*:refs/heads/jovie-preserved/*'
             ./scripts/security/scan-secrets.sh full-trufflehog
           fi
 
@@ -264,7 +269,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy-filesystem'
@@ -299,7 +304,7 @@ jobs:
         run: node scripts/lib/scorecard-credential-guard.mjs
 
       - name: Upload Scorecard results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: 'scorecard-results.sarif'
           category: 'ossf-scorecard'

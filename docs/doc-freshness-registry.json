@@ -119,6 +119,21 @@
         }
       ]
     },
+    ".claude/rules/external-apis.md": {
+      "owner": "@itstimwhite",
+      "claim": "Every third-party API call goes through packages/api-client or scripts/apiclient, enforced by the external API guard ratchet.",
+      "documentSha256": "411824f1f7767facc09e589d7a1cb480a71a7044aade3b4bc432203011f545f9",
+      "sources": [
+        {
+          "path": "packages/api-client/providers.json",
+          "sha256": "e8ade045fdaa69c64417b3cf7707fae0e20e073650086f0a117883a1b7a86dd0"
+        },
+        {
+          "path": "scripts/lib/external-api-guard.mjs",
+          "sha256": "376b4cc66aeab4d87e18c5b1844a76794b01f2d73372f149eec1b3688cfb5f57"
+        }
+      ]
+    },
     ".claude/rules/gstack.md": {
       "owner": "@itstimwhite",
       "claim": "Skill templates and regeneration follow the existing context contract, not copied provider policy.",
@@ -166,12 +181,16 @@
     },
     ".claude/rules/linear.md": {
       "owner": "@itstimwhite",
-      "claim": "Issue closure behavior is implemented by the existing merge synchronizer.",
-      "documentSha256": "8ec6b7b5551e8b1acc8325927f68eb366510817c5b095f7e8edfcf51cf7a1978",
+      "claim": "Issue closure uses the existing merge synchronizer; literal observation registrations use the maintained inspector with complete current binding and episode history.",
+      "documentSha256": "cd1bdb0f8c77605807980013ccc7eb37a4c882f43f2696fee289ae1adfe140b0",
       "sources": [
         {
           "path": "scripts/lib/linear-sync-on-merge.mjs",
-          "sha256": "00c2eb0bbe938ff5552ba168d7889cf10c724846e200b55646834fd69b19513d"
+          "sha256": "55ae102c0547d154a549ee73e2f54e798666420aae1ac1011c95b616f21a140e"
+        },
+        {
+          "path": "scripts/lib/sentry-validation-observation.mjs",
+          "sha256": "ca426cad8d486d9904acbde2255fa8875640f345bb13712daf5c7a950084c476"
         }
       ]
     },
@@ -537,6 +556,21 @@
         {
           "path": "scripts/backlog-orchestrator/private-task.mjs",
           "sha256": "46e9fd81de86670fca59bf19d113786428b7b189f758cad75e682bb8d68924a1"
+        }
+      ]
+    },
+    "docs/metrics/STAGE_EVENTS.md": {
+      "owner": "@itstimwhite",
+      "claim": "The stage-event contract, sources, outputs and emitter specs match the manifest and the stage-timings code.",
+      "documentSha256": "eeffe1bc1cafcf3bfe51b63bc58d365dcb4c559a115a701d28bed0f1ef52435b",
+      "sources": [
+        {
+          "path": "docs/metrics/stage-manifest.json",
+          "sha256": "fa5745efcb81b1853db6a3840eba3ba23591ec4663d8df42fb357aef60532f72"
+        },
+        {
+          "path": "scripts/lib/stage-events.mjs",
+          "sha256": "a95585faa55a5b2cd6368db65da13c9ecc50f9a137de49e5b60938b278813cd9"
         }
       ]
     }

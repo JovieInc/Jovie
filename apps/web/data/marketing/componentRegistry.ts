@@ -289,8 +289,8 @@ const SECTION_RESOLUTIONS = {
       },
       {
         variantId: 'split-claim-card',
-        componentPath: 'apps/web/components/homepage/HomepageIdentityHero.tsx',
-        rootBinding: "testId='marketing-section-hero'",
+        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
+        rootBinding: "sectionVariant='split-claim-card'",
       },
       {
         variantId: 'left-none',
@@ -395,12 +395,6 @@ const SECTION_RESOLUTIONS = {
         componentPath:
           'apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.tsx',
         rootBinding: "sectionVariant='phone-left'",
-      },
-      {
-        variantId: 'editorial',
-        componentPath:
-          'apps/web/components/homepage/HomepageIdentitySections.tsx',
-        rootBinding: "data-testid='marketing-section-feature-split'",
       },
       {
         variantId: 'editorial',
@@ -540,14 +534,9 @@ const SECTION_RESOLUTIONS = {
         rootBinding: 'data-pen-contract={penContractId}',
       },
       {
-        variantId: 'editorial-search',
-        componentPath: 'apps/web/components/homepage/HomepageIdentityClose.tsx',
-        rootBinding: "data-marketing-variant='editorial-search'",
-      },
-      {
-        variantId: 'editorial-search',
-        componentPath: 'apps/web/components/homepage/HomepageClose.tsx',
-        rootBinding: "data-marketing-variant='editorial-search'",
+        variantId: 'final-single-claim',
+        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
+        rootBinding: "sectionVariant='final-single-claim'",
       },
       {
         variantId: 'included-single',
@@ -582,6 +571,11 @@ const SECTION_RESOLUTIONS = {
         variantId: 'profile-grid',
         componentPath:
           'apps/web/components/marketing/MarketingShippedSitesShowcase.tsx',
+        rootBinding: "sectionVariant='profile-grid'",
+      },
+      {
+        variantId: 'profile-grid',
+        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
         rootBinding: "sectionVariant='profile-grid'",
       },
       {
@@ -667,9 +661,34 @@ const SECTION_RESOLUTIONS = {
     MARKETING_PEN_CONTRACT_IDS.section.contentProse,
     'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.contentProse}'
   ),
-  'blog-feed': unresolved(
-    'The registered BlogCard path does not resolve to the shared BlogFeed root.'
-  ),
+  'blog-feed': {
+    sourceBacked: true,
+    resolvedSource: 'apps/web/app/(marketing)/blog/BlogFeed.tsx',
+    exportName: 'BlogFeed',
+    penRootId: null,
+    penRootIds: [],
+    penIdentityReason:
+      'The blog index is source-owned by BlogFeed and BlogCategoryContent. It has no Pen root; BlogCard is a nested card, not the section root.',
+    rootProofs: [
+      {
+        source: 'apps/web/app/(marketing)/blog/BlogFeed.tsx',
+        binding: "data-testid='marketing-section-blog-feed'",
+        occurrences: 1,
+      },
+    ],
+    occurrenceProofs: [
+      {
+        variantId: 'featured-grid',
+        componentPath: 'apps/web/app/(marketing)/blog/BlogFeed.tsx',
+        rootBinding: "data-marketing-variant='featured-grid'",
+      },
+      {
+        variantId: 'category-filtered-grid',
+        componentPath: 'apps/web/components/organisms/BlogCategoryContent.tsx',
+        rootBinding: "data-marketing-variant='category-filtered-grid'",
+      },
+    ],
+  },
 } as const satisfies Record<MarketingSectionId, SourceResolution>;
 
 export const MARKETING_SECTION_REGISTRY: readonly MarketingSectionRegistryEntry[] =
@@ -708,11 +727,11 @@ const RECIPE_RESOLUTIONS = {
     resolvedSource: 'apps/web/app/(home)/page.tsx',
     exportName: 'HomePage',
     // oPZHQ remains the legacy HomepageV2Route contract. Do not transfer its
-    // native identity to the selected identity assembly without owner proof.
+    // native identity to the artist-profile homepage without owner proof.
     penRootId: null,
     penRootIds: [],
     penIdentityReason:
-      'The selected / identity assembly has no verified native mapping. The legacy HomepageV2Route contract is not its Pen owner; native reference resolution remains with the existing certification owner.',
+      'The artist-profile / assembly (EVENT 2026-10-20) has no verified native mapping. The legacy HomepageV2Route contract is not its Pen owner; native reference resolution remains with the existing certification owner.',
     rootProofs: [
       {
         source: 'apps/web/app/(home)/page.tsx',
@@ -722,7 +741,7 @@ const RECIPE_RESOLUTIONS = {
       },
       {
         source: 'apps/web/app/(home)/page.tsx',
-        binding: '<HomepageIdentityStoryStack />',
+        binding: '<HomepageFanStates />',
         occurrences: 1,
         kind: 'source',
       },

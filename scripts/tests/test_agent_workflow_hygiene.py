@@ -669,7 +669,7 @@ def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() 
     assert "gh pr update-branch" not in fleet
     assert "JOV-INV-021" in workflow
     assert "fx ask" in workflow
-    assert "FX_MODEL: openai/gpt-5.6-sol" in workflow
+    assert "FX_MODEL: zai/glm-5.3" in workflow
     assert workflow.count("actions/create-github-app-token@") >= 2
     assert (
         workflow.count(
@@ -1505,11 +1505,16 @@ def test_triage_catch_up_uses_trusted_main_and_preserves_wake_receipts() -> None
     )[0]
     assert "steps.debounce" not in catch_up
     assert (
-        "timeout 90s node scripts/backlog-orchestrator/triage-event-assess.mjs"
+        "timeout 300s node scripts/backlog-orchestrator/triage-event-assess.mjs"
         in catch_up
     )
     assert '--sweep > "$RECEIPT_FILE"' in catch_up
     assert "summer-bottleneck-signing.env" in catch_up
+    # Guarded preparation gets a complete step window without increasing either job budget.
+    assert "timeout-minutes: 8" in block
+    exact_event = _job_block("fleet-gate-refresh.yml", "assess")
+    assert "timeout-minutes: 5" in exact_event
+    assert "timeout 180s node scripts/backlog-orchestrator/triage-event-assess.mjs" in exact_event
     receipt = block.split("- name: Preserve Triage catch-up receipt", 1)[1]
     assert "if: always()" in receipt
     assert (

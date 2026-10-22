@@ -112,6 +112,7 @@ const nextConfig = {
   // Build optimizations
   poweredByHeader: false,
   compress: true,
+  // JOV-7985: Node.js is supported; enable after the dated migration exception clears.
   // JOV-7987: Cache Components requires migrating route-segment exports and
   // validating this entire app. Node.js is supported; the explicit `runtime`
   // export is rejected in 16.4.1. Keep the rendering migration separate from
@@ -502,6 +503,9 @@ const nextConfig = {
         source: '/app/admin/ingest',
         destination: '/app/ov/growth?view=ingest',
       },
+      // Needs You folded into Ovie Home's asks (Tim 2026-10-21: one Home).
+      { source: '/app/ov/needs-you', destination: '/app/ov' },
+      { source: '/app/admin/needs-you', destination: '/app/ov' },
       {
         source: '/app/admin/:path*',
         destination: '/app/ov/:path*',

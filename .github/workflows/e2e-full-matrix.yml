@@ -50,6 +50,14 @@ jobs:
           NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_BETTER_AUTH_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_E2E_MODE: '1'
+          # Footer theme controls and light-mode shell specs read this flag
+          # from the client bundle. The managed Playwright server sets it;
+          # this standalone build must too.
+          NEXT_PUBLIC_FEATURE_THEME_SWITCHING: '1'
+          # Cloudflare's documented always-pass Turnstile test site key (same
+          # as ci.yml). Without it the /start widget never renders, so the
+          # controlled-verification specs never reach their provider fixture.
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_IGNORE_ESLINT: '1'
@@ -158,7 +166,12 @@ jobs:
           mkdir -p .next/standalone/apps/web/.next
           cp -r .next/static .next/standalone/apps/web/.next/static
           cp -r public .next/standalone/apps/web/public
-          PORT=3100 HOSTNAME=localhost node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/e2e-full-web.log" 2>&1 &
+          # Next builds request.url from HOSTNAME, so it must be the same host
+          # Playwright browses (BASE_URL). With HOSTNAME=localhost every
+          # absolute redirect jumped 127.0.0.1 -> localhost and dropped
+          # host-only cookies set on the first hop (the pending-claim cookie
+          # in claim-prebuilt.smoke).
+          PORT=3100 HOSTNAME=127.0.0.1 node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/e2e-full-web.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/e2e-full-web.pid"
           for _ in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:3100/api/dev/test-auth/session >/dev/null; then
@@ -189,7 +202,7 @@ jobs:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
           VERCEL_ENV: development
-          HOSTNAME: localhost
+          HOSTNAME: 127.0.0.1
           PORT: '3100'
           BASE_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
@@ -200,7 +213,24 @@ jobs:
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_FAST_ONBOARDING: '1'
           E2E_TEST_AUTH_PERSONA: creator
+          # Same anonymous-onboarding arming as the CI E2E lanes (JOV-4179).
+          # Without SESSION_SECRET the first /start message 503s
+          # (SESSION_SECRET_NOT_CONFIGURED). E2E_TEST_MODE selects the
+          # in-memory limiter so a missing Upstash store does not 503 as
+          # RATE_LIMIT_UNAVAILABLE. Production deploys ignore both.
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          E2E_TEST_MODE: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_PUBLIC_FEATURE_THEME_SWITCHING: '1'
+          # Honors x-jovie-e2e-llm-failure on the onboarding failure spec only.
+          # Requests without that header still use the normal chat path.
+          CHAT_LLM_FAILURE_INJECTION: '1'
+          # Cloudflare's always-pass Turnstile test keys (same as ci.yml).
+          # Without the secret, a gated first onboarding message fails closed
+          # with 503 TURNSTILE_NOT_CONFIGURED instead of the 403
+          # TURNSTILE_REQUIRED contract the canary asserts.
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_DISABLE_TOOLBAR: '1'
@@ -249,8 +279,10 @@ jobs:
             # @red is the intentional Sentry failure lane. The OAuth suite is a
             # deployed-origin proof (staging.jov.ie / jov.ie) and still runs by
             # file path in production-release. This localhost matrix must not
-            # invert every @production-smoke test.
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --grep-invert "@red|candidate-bound Better Auth OAuth runtime" --reporter=line 2>&1 | tee "$log"
+            # invert every @production-smoke test. The authenticated prod chat
+            # canary needs Doppler prd secrets and stays in synthetic-monitoring;
+            # the spec itself must not silent-skip.
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --grep-invert "@red|candidate-bound Better Auth OAuth runtime|Authenticated prod chat turn" --reporter=line 2>&1 | tee "$log"
           fi
         env:
           BASE_URL: ${{ (github.event_name == 'push' || github.event.inputs.test_filter == '') && 'http://127.0.0.1:3100' || '' }}
@@ -283,9 +315,11 @@ jobs:
           # Required so auth.setup + dashboard resolvers do not need sk_live_ keys.
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
+          E2E_TEST_MODE: '1'
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_PUBLIC_FEATURE_THEME_SWITCHING: '1'
 
       - name: File login-timeout remediation
         if: ${{ always() && steps.e2e-matrix.outcome != 'skipped' }}

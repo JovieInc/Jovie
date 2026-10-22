@@ -363,6 +363,58 @@ class RouterLadderTest(unittest.TestCase):
                     remediation.classify_blocker(pr(number=21810, body=body, **red))["cls"],
                     "needs-human-decision")
 
+    def test_excluded_credentials_are_assurance_not_a_human_gate(self):
+        assurance = (
+            "Ordinary runs remain report-only. The current CLI boundary cannot "
+            "attest or isolate child tools, credentials, and egress. Raw arguments, "
+            "prompts, executable paths, headers, environment values, credentials, "
+            "and OTPs are excluded from route receipts; dispatch references are hashed."
+        )
+        red = {"statusCheckRollup": [
+            {"name": "Source Validation", "status": "COMPLETED", "conclusion": "FAILURE"}]}
+        classified = remediation.classify_blocker(pr(
+            number=21903, body=assurance, mergeStateStatus="BLOCKED", **red),
+            {"sha": HEAD, "reason": "diff-too-large"})
+        self.assertEqual((classified["cls"], classified["subtype"]),
+                         ("fixable-by-model", "check"))
+        for extra in ({"title": "Update pricing"},
+                      {"files": ["canon/strategy/pricing.md"]},
+                      {"files": ["scripts/credential-store.py"]}):
+            with self.subTest(extra=extra):
+                self.assertEqual(remediation.classify_blocker(
+                    pr(body=assurance, **red, **extra))["cls"], "needs-human-decision")
+
+    def test_assurance_removal_preserves_each_independent_credential_mention(self):
+        # PR #22238 removed every mention in a sentence after matching one
+        # assurance. Unknown verbs must remain protected too, without a verb list.
+        assurances = (
+            "Credentials are excluded from receipts",
+            "Credentials, and OTPs are excluded from receipts",
+            "The CLI cannot attest or isolate child tools, credentials, and egress",
+        )
+        actions = (
+            "copy credentials to a new provider",
+            "upload credentials to the service",
+            "share credentials with the provider",
+            "print credentials in the logs",
+            "rotate the credential before launch",
+            "synchronize credentials with the provider",
+            "credentials need rotation",
+        )
+        for assurance in assurances:
+            self.assertEqual(remediation.classify_blocker(pr(body=assurance))["cls"], "ready")
+            for action in actions:
+                for body in (f"{assurance} and {action}", f"{action} and {assurance}"):
+                    with self.subTest(body=body):
+                        self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"],
+                                         "needs-human-decision")
+        for body in ("Copy credentials to the provider and logs are excluded",
+                     "Credentials need rotation and headers are excluded",
+                     "We cannot rotate the credential"):
+            with self.subTest(body=body):
+                self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"],
+                                 "needs-human-decision")
+
     def test_direct_permission_asks_cover_github_token_and_app_scopes(self):
         for text in (
             "Please add contents:write permission to GITHUB_TOKEN.",

@@ -14,6 +14,7 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
+  ASSURANCE_MATRIX_COVERAGE_COMMAND,
   affectsWebTestTypecheck,
   BILLING_COVERAGE_COMMAND,
   BILLING_PROVENANCE_COVERAGE_COMMAND,
@@ -26,7 +27,9 @@ import {
   formatLaneDuration,
   LANE_COMMANDS,
   LANE_GROUPS,
+  LANES_PYTEST_FILES,
   LANES_PYTEST_SHARD_EXPRESSION,
+  LANES_PYTEST_SHARDS,
   listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
   NODE_RUNTIME_CONTRACT_COMMAND,
@@ -35,6 +38,9 @@ import {
   runBiome,
   runCopyGate,
   runEslintServerBoundaries,
+  runStructural,
+  SCRIPT_CONTRACT_NODE_COMMAND,
+  SCRIPT_CONTRACT_NODE_TESTS,
   SOURCE_GUARDS_COMMAND,
   STRUCTURAL_PYTEST_FILES,
   STRUCTURAL_PYTEST_SHARD_COMMANDS,
@@ -106,6 +112,57 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it('discovers assurance behavior tests and executes them once with structural coverage', async () => {
+    const test = 'scripts/invariants/assurance-matrix.test.mjs';
+    expect(SCRIPT_CONTRACT_NODE_TESTS).toContain(test);
+    expect(SCRIPT_CONTRACT_NODE_COMMAND).toContain(
+      ASSURANCE_MATRIX_COVERAGE_COMMAND
+    );
+    expect(SCRIPT_CONTRACT_NODE_COMMAND.split(test)).toHaveLength(2);
+    const selectedCommands = [];
+    vi.stubEnv('GITHUB_EVENT_NAME', 'workflow_dispatch');
+    vi.stubEnv('CI_PRODUCT_LANES', 'operations');
+    vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
+    vi.stubEnv('CI_FAST_STRUCTURAL_PYTEST', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_WEB', '');
+    vi.stubEnv('CI_FAST_STRUCTURAL_ABORT_STATUS_FILE', '');
+    try {
+      const selected = await runStructural({
+        execute: command => {
+          selectedCommands.push(command);
+          return { code: 0, output: '' };
+        },
+        stop: () => false,
+        concurrency: 1,
+      });
+      expect(selected.code).toBe(0);
+      expect(
+        selectedCommands.filter(command =>
+          command.includes(ASSURANCE_MATRIX_COVERAGE_COMMAND)
+        )
+      ).toHaveLength(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    const [command, ...args] = ASSURANCE_MATRIX_COVERAGE_COMMAND.split(' ');
+    expect(command).toBe('node');
+    expect(args).toContain('--test-coverage-lines=90');
+    expect(args).toContain('--test-coverage-branches=55');
+    expect(args).toContain('--test-coverage-functions=100');
+    const result = spawnSync(process.execPath, args, {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      timeout: 60_000,
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/tests 29\b/u);
+    expect(result.stdout).toMatch(/pass 29\b/u);
+    expect(result.stdout).toMatch(/fail 0\b/u);
+    expect(result.stdout).toContain('assurance-matrix.mjs');
+    expect(result.stdout).toContain('coverage report');
+  }, 90_000);
+
   it.each(
     STRUCTURAL_PYTHON_REGRESSION_COMMANDS.flatMap((command, index) =>
       [
@@ -227,6 +284,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_brand_scrub.py',
       'scripts/tests/test_agent_workflow_hygiene.py',
       'scripts/tests/test_runner_routing.py',
+      'scripts/tests/test_signal_watch.py',
+      'scripts/tests/test_x_grok.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
@@ -260,15 +319,17 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
-  it('partitions the lanes coverage suite into complementary concurrent shards', () => {
-    // One coverage map used to come from one serial pytest (174.5s, the
-    // remaining job's long pole). Both shards must select the identical files
-    // with complementary -k expressions, both must pass, and their maps must
-    // be combined before any per-module threshold reads the data file.
+  it('partitions the lanes coverage suite into four balanced concurrent shards', () => {
+    // The lanes pytest is the remaining job's long pole (308.5s in merge group
+    // 39479966697). Every lanes test file must run exactly once across the
+    // shards: the two keyword shards split test_lane_runner.py with
+    // complementary -k expressions over that one file, and the other shards
+    // own disjoint whole files. All four maps are combined before any
+    // per-module threshold reads the data file.
     const [command] = STRUCTURAL_PYTHON_REGRESSION_COMMANDS;
     const shards = [
       ...command.matchAll(
-        /COVERAGE_FILE="([^"]+)" python3 -m coverage run --branch -m pytest ((?:scripts\/tests\/\S+\.py ?)+) -q -p no:cacheprovider --basetemp="([^"]+)" -k "([^"]+)"/gu
+        /COVERAGE_FILE="([^"]+)" python3 -m coverage run --branch -m pytest ((?:scripts\/tests\/\S+\.py ?)+) -q -p no:cacheprovider --basetemp="([^"]+)"(?: -k "([^"]+)")?/gu
       ),
     ].map(([, data, files, basetemp, keyword]) => ({
       data,
@@ -276,18 +337,27 @@ describe('ci-fast bounded parallel workflow', () => {
       basetemp,
       keyword,
     }));
-    expect(shards.map(shard => shard.keyword)).toEqual([
+    expect(shards).toHaveLength(LANES_PYTEST_SHARDS.length);
+    expect(shards).toHaveLength(4);
+    const keyed = shards.filter(shard => shard.keyword);
+    expect(keyed.map(shard => shard.keyword)).toEqual([
       LANES_PYTEST_SHARD_EXPRESSION,
       `not (${LANES_PYTEST_SHARD_EXPRESSION})`,
     ]);
-    expect(shards[1].files).toEqual(shards[0].files);
-    expect(shards[0].files).toContain('scripts/tests/test_lane_runner.py');
-    expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(2);
-    expect(command).toContain(
-      'lanes_b=$?; wait "$lanes_a" && test "$lanes_b" -eq 0; } && '
+    expect(keyed[1].files).toEqual(keyed[0].files);
+    expect(keyed[0].files).toEqual(['scripts/tests/test_lane_runner.py']);
+    // Whole-file shards plus the keyed file cover the suite exactly once.
+    const whole = shards.filter(shard => !shard.keyword).flatMap(s => s.files);
+    expect(new Set(whole).size).toBe(whole.length);
+    expect([...whole, ...keyed[0].files].sort()).toEqual(
+      [...LANES_PYTEST_FILES].sort()
     );
+    expect(LANES_PYTEST_FILES).toHaveLength(28);
+    expect(whole).toContain('scripts/tests/test_model_radar.py');
+    expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
+    expect(new Set(shards.map(shard => shard.data)).size).toBe(4);
     const combine = command.indexOf(
-      `python3 -m coverage combine "${shards[0].data}" "${shards[1].data}"`
+      `python3 -m coverage combine ${shards.map(shard => `"${shard.data}"`).join(' ')}`
     );
     expect(combine).toBeGreaterThan(-1);
     expect(command.indexOf('python3 -m coverage report')).toBeGreaterThan(
@@ -295,9 +365,9 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
-  it('fails the lanes coverage command when either shard fails', () => {
+  it('fails the lanes coverage command when any shard fails', () => {
     const [command] = STRUCTURAL_PYTHON_REGRESSION_COMMANDS;
-    for (const failing of ['a', 'b', '']) {
+    for (const failing of ['a', 'b', 'c', 'd', '']) {
       const root = mkdtempSync(join(tmpdir(), 'lanes-shards-'));
       try {
         const bin = join(root, 'bin');
@@ -316,8 +386,12 @@ describe('ci-fast bounded parallel workflow', () => {
           },
         });
         const calls = readFileSync(join(root, 'calls.log'), 'utf8');
+        // Every shard runs, even when an earlier one failed.
+        for (const id of ['a', 'b', 'c', 'd'])
+          expect(calls).toContain(`jovie-lanes-${id}.coverage -m coverage run`);
         if (failing) {
-          expect(result.status, failing).not.toBe(0);
+          // The failing shard's own exit status (9) is propagated.
+          expect(result.status, failing).toBe(9);
           expect(calls).not.toContain('-m coverage report');
         } else {
           expect(result.status, result.stderr).toBe(0);
@@ -848,6 +922,23 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(surfaces).toContain('guard-playwright-artifacts.mjs" --run --');
     expect(surfaces).toContain('--project=chromium --reporter=line');
     expect(surfaces).toContain('--workers=2');
+  });
+
+  it('runs destructive Button contrast proof through the guarded Storybook matrix', () => {
+    const surfaces = jobBlock(
+      'ci-storybook-surfaces',
+      'ci-cross-product-integration'
+    );
+    const invocation = surfaces.match(
+      /pnpm exec playwright test ([\s\S]*?)--config=playwright\.config\.storybook\.ts/
+    );
+    expect(invocation).not.toBeNull();
+    const selected =
+      invocation[1].match(/tests\/e2e\/storybook-[a-z0-9-]+\.spec\.ts/g) ?? [];
+    const contrast = 'tests/e2e/storybook-destructive-button.spec.ts';
+    expect(selected.filter(path => path === contrast)).toHaveLength(1);
+    expect(existsSync(resolve(REPO_ROOT, 'apps/web', contrast))).toBe(true);
+    expect(surfaces).toContain('guard-playwright-artifacts.mjs" --run --');
   });
 
   it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {
@@ -1898,7 +1989,10 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check'
+    );
+    expect(PACKAGE_JSON.scripts['ownership:check']).toBe(
+      'node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report'
     );
     const controlStages = buildControlTestCommands();
     expect(controlStages).toContainEqual([
@@ -3186,6 +3280,21 @@ it('selects and enforces offline failure behavior coverage for module-only and t
       `--coverage.thresholds.${metric}`
     );
   }
+});
+
+it('selects hosted structural coverage for doctor census fixture-only edits', () => {
+  const pattern = structuralControlPattern();
+  const selected = spawnSync('grep', ['-qE', pattern], {
+    input: 'scripts/tests/test_design_gate.py\n',
+  });
+  expect(selected.status).toBe(0);
+  expect(STRUCTURAL_PYTHON_REGRESSION_COMMANDS[0]).toContain(
+    'scripts/tests/test_design_gate.py'
+  );
+  const unrelated = spawnSync('grep', ['-qE', pattern], {
+    input: 'README.md\n',
+  });
+  expect(unrelated.status).toBe(1);
 });
 
 it('reads structural control paths from data, one alternative per line (JOV-6837)', () => {

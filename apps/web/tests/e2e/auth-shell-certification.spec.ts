@@ -426,6 +426,66 @@ test('valid email pending, send transport failure and retry retain claim context
   await expectClaim(page);
 });
 
+// Production regression (2026-10-18/20): an email typed or autofilled before
+// hydration was wiped by the first client render, so the click showed "Enter
+// your email address." and no OTP request was made. Script chunks are held
+// until the field is filled so the typing always lands before hydration.
+test('email typed before hydration survives and is sent @auth-certification', async ({
+  page,
+}) => {
+  const typedEmail = 'e2e+prehydration@example.com';
+  let releaseScripts: (() => void) | undefined;
+  const scriptsReleased = new Promise<void>(resolve => {
+    releaseScripts = resolve;
+  });
+  // Hold JavaScript only; stylesheets share the chunks path and must load
+  // for the server-rendered form to become visible.
+  await page.route(
+    url =>
+      url.pathname.startsWith('/_next/static/chunks/') &&
+      url.pathname.endsWith('.js'),
+    async route => {
+      await scriptsReleased;
+      await route.continue();
+    }
+  );
+  const sentBodies: string[] = [];
+  await page.route(
+    '**/api/auth/email-otp/send-verification-otp',
+    async route => {
+      sentBodies.push(route.request().postData() ?? '');
+      await route.abort('internetdisconnected');
+    }
+  );
+
+  try {
+    await page.goto(APP_ROUTES.SIGNIN, { waitUntil: 'commit' });
+    const email = page.locator('#auth-email');
+    await email.waitFor({ state: 'visible' });
+    await expect(page.locator(SHELL)).toHaveAttribute(
+      'data-auth-shell-hydrated',
+      'false'
+    );
+    await email.fill(typedEmail);
+  } finally {
+    releaseScripts?.();
+  }
+
+  const shell = await expectLiveShell(page);
+  const email = shell.getByRole('textbox', { name: 'Email', exact: true });
+  await expect(email).toHaveValue(typedEmail);
+  await shell
+    .getByRole('button', { name: 'Send sign-in code', exact: true })
+    .click();
+
+  await expect.poll(() => sentBodies.length).toBe(1);
+  expect(JSON.parse(sentBodies[0])).toMatchObject({ email: typedEmail });
+  await expect(email).toHaveValue(typedEmail);
+  await expect(page.locator('#auth-email-error')).not.toHaveText(
+    'Enter your email address.'
+  );
+});
+
 // JOV-8342: abort every auth POST even when the client validator regresses.
 // A generic transport failure is not evidence of client validation.
 for (const width of [390, 768, 1440]) {

@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { formatDeprecationObservation } from '../deprecation-observation.mjs';
 import {
   COMMISSIONING_PARENT_ALLOWLIST,
+  conflictRemediationResolved,
   extractMergeIssueRef,
   failureDisposition,
   installationQuotaClassifierReady,
@@ -131,7 +132,302 @@ function sweep(fetchImpl) {
   });
 }
 
+function blockingRelation(name = 'Merging', overrides = {}) {
+  return {
+    id: 'relation-8316',
+    type: 'blocks',
+    issue: {
+      id: 'uuid-8316',
+      identifier: 'JOV-8316',
+      state: {
+        id: `state-${name}`,
+        name,
+        type:
+          name === 'Done'
+            ? 'completed'
+            : name === 'Canceled'
+              ? 'canceled'
+              : 'started',
+      },
+    },
+    ...overrides,
+  };
+}
+
 describe('linear sync on merge', () => {
+  it.each(['Merging', 'Rework', 'Canceled', 'Unknown'])(
+    'keeps passing acceptance open for an incoming %s prerequisite',
+    async name => {
+      const { world, fetchImpl } = createWorld();
+      const issue = world.issues['JOV-1'];
+      issue.state = 'Validating';
+      issue.inverseRelations = [blockingRelation(name)];
+      const result = await mergeEvent(fetchImpl, 101);
+      expect(result.results[0].target).toBe('Validating');
+      expect(world.updates).toEqual([]);
+      expect(result.results[0].comment).toContain(
+        `Blocking prerequisite JOV-8316 is ${name}`
+      );
+      const count = world.comments.length;
+      await mergeEvent(fetchImpl, 101);
+      expect(world.comments).toHaveLength(count);
+      // Changed dependency state needs an actionable comment even when this
+      // issue's own updatedAt and receipt set have not changed.
+      issue.inverseRelations = [blockingRelation('In Progress')];
+      await mergeEvent(fetchImpl, 101);
+      expect(world.comments).toHaveLength(count + 1);
+    }
+  );
+
+  it('closes when incoming prerequisites are Done and ignores unrelated/outgoing edges', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].inverseRelations = [
+      blockingRelation('Done'),
+      { id: 'related', type: 'related' },
+    ];
+    // No outgoing relation is queried: this issue blocking another is not
+    // evidence that this issue depends on the downstream work.
+    world.issues['JOV-1'].relations = [blockingRelation('Merging')];
+    expect((await mergeEvent(fetchImpl, 101)).results[0].target).toBe('Done');
+    expect(world.updates).toEqual(['JOV-1:Done']);
+  });
+
+  it('routes a required failed outcome to Rework despite an open prerequisite', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.description = '- [ ] Verify production outcome';
+    issue.comments.push(
+      receiptComment('JOV-1', { status: 'fail' }, '2026-10-03T11:30:00Z')
+    );
+    issue.inverseRelations = [blockingRelation()];
+    expect((await mergeEvent(fetchImpl, 101)).results[0].target).toBe('Rework');
+    expect(world.updates).toEqual(['JOV-1:Rework']);
+  });
+
+  it.each([
+    ['Done', false, 'Done'],
+    ['Merging', false, 'Validating'],
+    ['Done', true, 'Rework'],
+  ])(
+    'reads a %s prerequisite from another team without expanding its writer scope (failure %s)',
+    async (name, failed, target) => {
+      const { world, fetchImpl } = createWorld();
+      const issue = world.issues['JOV-1'];
+      issue.state = 'Validating';
+      const relation = blockingRelation(name);
+      relation.issue.identifier = 'LYB-123';
+      issue.inverseRelations = [relation];
+      if (failed) {
+        issue.description = '- [ ] Verify outcome';
+        issue.comments.push(
+          receiptComment('JOV-1', { status: 'fail' }, '2026-10-03T11:30:00Z')
+        );
+      }
+      expect((await mergeEvent(fetchImpl, 101)).results[0].target).toBe(target);
+      expect(world.updates.every(update => update.startsWith('JOV-1:'))).toBe(
+        true
+      );
+      expect(issue.state).toBe(target);
+    }
+  );
+
+  it.each([
+    { id: 'state-done', name: 'Done', type: 'started' },
+    { id: 'state-accepted', name: 'Accepted', type: 'completed' },
+  ])(
+    'does not equate an inconsistent or noncanonical terminal state with Done: %j',
+    async state => {
+      const { world, fetchImpl } = createWorld();
+      const relation = blockingRelation();
+      relation.issue.state = state;
+      world.issues['JOV-1'].state = 'Validating';
+      world.issues['JOV-1'].inverseRelations = [relation];
+      expect((await mergeEvent(fetchImpl, 101)).results[0].target).toBe(
+        'Validating'
+      );
+      expect(world.updates).toEqual([]);
+    }
+  );
+
+  it.each(['new edge', 'reopened prerequisite', 'removed edge'])(
+    'defers closure on a changed blocking dependency without an issue-version change: %s',
+    async change => {
+      const { world, fetchImpl } = createWorld();
+      const issue = world.issues['JOV-1'];
+      issue.state = 'Validating';
+      issue.inverseRelations =
+        change === 'new edge' ? [] : [blockingRelation('Done')];
+      let changed = false;
+      const racing = intercept(fetchImpl, async url => {
+        if (!changed && url.includes('/pulls/101/files')) {
+          changed = true;
+          issue.inverseRelations =
+            change === 'removed edge' ? [] : [blockingRelation('Merging')];
+        }
+        return null;
+      });
+      expect((await mergeEvent(racing, 101)).action).toBe('skip');
+      expect(changed).toBe(true);
+      expect(world.updates).toEqual([]);
+      expect(world.comments).toEqual([]);
+    }
+  );
+
+  it('reads a blocking prerequisite on a later relation page before acceptance', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Validating';
+    let laterReads = 0;
+    const paginated = intercept(fetchImpl, async (_url, body, next) => {
+      if (body?.query?.includes('IssueLifecycle(')) {
+        const data = await (await next()).json();
+        data.data.issue.inverseRelations = {
+          nodes: [],
+          pageInfo: { hasNextPage: true, endCursor: 'next-blocker' },
+        };
+        return json(data);
+      }
+      if (body?.query?.includes('IssueLifecycleBlockers')) {
+        laterReads++;
+        expect(body.variables.after).toBe('next-blocker');
+        return json({
+          data: {
+            issue: {
+              inverseRelations: {
+                nodes: [blockingRelation()],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        });
+      }
+      return null;
+    });
+    expect((await mergeEvent(paginated, 101)).results[0].target).toBe(
+      'Validating'
+    );
+    expect(laterReads).toBe(1);
+    expect(world.updates).toEqual([]);
+  });
+
+  it('re-reads a later-page prerequisite state before writing Done', async () => {
+    const { world, fetchImpl } = createWorld();
+    world.issues['JOV-1'].state = 'Validating';
+    let laterReads = 0;
+    const racing = intercept(fetchImpl, async (_url, body, next) => {
+      if (body?.query?.includes('IssueLifecycle(')) {
+        const data = await (await next()).json();
+        data.data.issue.inverseRelations = {
+          nodes: [],
+          pageInfo: { hasNextPage: true, endCursor: 'next-blocker' },
+        };
+        return json(data);
+      }
+      if (body?.query?.includes('IssueLifecycleBlockers')) {
+        laterReads++;
+        return json({
+          data: {
+            issue: {
+              inverseRelations: {
+                nodes: [
+                  blockingRelation(laterReads === 1 ? 'Done' : 'Merging'),
+                ],
+                pageInfo: { hasNextPage: false },
+              },
+            },
+          },
+        });
+      }
+      return null;
+    });
+    expect((await mergeEvent(racing, 101)).action).toBe('skip');
+    expect(laterReads).toBe(2);
+    expect(world.updates).toEqual([]);
+    expect(world.comments).toEqual([]);
+  });
+
+  it.each(
+    [
+      'missing connection',
+      'malformed edge',
+      'duplicate relation',
+      'missing state',
+      'missing cursor',
+      'repeated cursor',
+      'page bound',
+      'unreadable next page',
+    ].flatMap(condition =>
+      ['snapshot', 'prewrite'].map(stage => [condition, stage])
+    )
+  )(
+    'fails closed on incomplete blocking evidence: %s during %s',
+    async (condition, stage) => {
+      const { world, fetchImpl } = createWorld();
+      world.issues['JOV-1'].state = 'Validating';
+      let pages = 0;
+      let reads = 0;
+      const broken = intercept(fetchImpl, async (_url, body, next) => {
+        if (body?.query?.includes('IssueLifecycle(')) {
+          reads++;
+          if (stage === 'prewrite' && reads !== 2) return null;
+          const data = await (await next()).json();
+          const connection = data.data.issue.inverseRelations;
+          if (condition === 'missing connection')
+            delete data.data.issue.inverseRelations;
+          else if (condition === 'malformed edge')
+            connection.nodes = [{ id: 'unknown' }];
+          else if (condition === 'missing state')
+            connection.nodes = [
+              blockingRelation('Done', {
+                issue: { id: 'uuid-8316', identifier: 'JOV-8316', state: null },
+              }),
+            ];
+          else {
+            if (condition === 'duplicate relation')
+              connection.nodes = [blockingRelation('Done')];
+            connection.pageInfo = {
+              hasNextPage: true,
+              endCursor: condition === 'missing cursor' ? null : 'first',
+            };
+          }
+          return json(data);
+        }
+        if (body?.query?.includes('IssueLifecycleBlockers')) {
+          pages++;
+          return json({
+            data: {
+              issue: {
+                inverseRelations:
+                  condition === 'unreadable next page'
+                    ? null
+                    : {
+                        nodes:
+                          condition === 'duplicate relation'
+                            ? [blockingRelation('Done')]
+                            : [],
+                        pageInfo: {
+                          hasNextPage: condition !== 'duplicate relation',
+                          endCursor:
+                            condition === 'repeated cursor'
+                              ? 'first'
+                              : `page-${pages}`,
+                        },
+                      },
+              },
+            },
+          });
+        }
+        return null;
+      });
+      await expect(mergeEvent(broken, 101)).rejects.toThrow(
+        /blocking dependency/i
+      );
+      expect(pages).toBeLessThanOrEqual(19);
+      expect(world.updates).toEqual([]);
+      expect(world.comments).toEqual([]);
+    }
+  );
+
   it.each([
     'reopened episode',
     'acceptance edit',
@@ -341,6 +637,10 @@ describe('linear sync on merge', () => {
       ['JOV-2', 'completed', '2026-10-03T11:00:00Z'],
       ['JOV-3', 'completed', '2026-10-03T11:00:00Z'],
     ];
+    issue.inverseRelations = [
+      blockingRelation('Done'),
+      blockingRelation('Done', { id: 'relation-other' }),
+    ];
     issue.comments.push(
       { body: 'Earlier note', createdAt: '2026-10-03T11:00:00Z' },
       receiptComment('JOV-1', {}, '2026-10-03T11:30:00Z')
@@ -351,7 +651,12 @@ describe('linear sync on merge', () => {
       reads += 1;
       if (reads !== 2) return null;
       const response = await (await next()).json();
-      for (const key of ['labels', 'children', 'comments']) {
+      for (const key of [
+        'labels',
+        'children',
+        'comments',
+        'inverseRelations',
+      ]) {
         response.data.issue[key].nodes = [
           ...response.data.issue[key].nodes,
         ].reverse();
@@ -527,6 +832,20 @@ describe('linear sync on merge', () => {
       expect(issue.state).toBe('Done');
     }
   );
+
+  // Linear's Duplicate state type is closed work: a duplicate child must not
+  // hold its parent open (72 parents waited on sub-issues on 2026-10-21).
+  it('treats a Duplicate-state child as closed for the parent gate', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'In Progress';
+    issue.children = [['JOV-2', 'duplicate', '2026-10-03T12:00:00Z']];
+    issue.attachments = [];
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    await sweep(fetchImpl);
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Done');
+  });
 
   it('retains a parent without its own outcome, then closes from fresh verified proof without inventing a parent PR', async () => {
     const { world, fetchImpl } = createWorld();
@@ -1026,6 +1345,32 @@ describe('linear sync on merge', () => {
           body: 'See JOV-6586 for context.',
           headRef: 'codex/jov-65860-other',
         },
+        issue
+      )
+    ).toBe(false);
+  });
+
+  it('matches explicit PR identifiers exactly when deciding closure holds', () => {
+    const issue = { identifier: 'JOV-8616', issueId: 'uuid-8616' };
+    const pull = { title: 'lifecycle repair', headRef: 'feature/no-ticket' };
+    expect(
+      pullRequestLinksIssue(
+        {
+          ...pull,
+          body: '<!-- linear-issue-identifier:JOV-86160 -->\n<!-- linear-issue-identifier:jov-8616 -->',
+        },
+        issue
+      )
+    ).toBe(true);
+    expect(
+      pullRequestLinksIssue(
+        { ...pull, body: '<!-- linear-issue-identifier:JOV-86160 -->' },
+        issue
+      )
+    ).toBe(false);
+    expect(
+      pullRequestLinksIssue(
+        { ...pull, body: '<!-- linear-issue-id:uuid-unrelated -->' },
         issue
       )
     ).toBe(false);
@@ -2020,4 +2365,33 @@ it('a recurring warning retains the remediation hold after a previous green obse
     'Fingerprinted remediation issues stay open'
   );
   expect(world.updates).toEqual([]);
+});
+
+describe('conflictRemediationResolved', () => {
+  const issue = { labels: ['remediation:pr-20235-conflict', 'bug'] };
+  it('resolves when a complete open-PR scan no longer lists the pull request', () => {
+    expect(
+      conflictRemediationResolved(issue, {
+        pulls: [{ number: 1 }],
+        complete: true,
+      })
+    ).toBe(true);
+    expect(
+      conflictRemediationResolved(issue, {
+        pulls: [{ number: 20235 }],
+        complete: true,
+      })
+    ).toBe(false);
+  });
+  it('proves nothing from an incomplete scan or an unrelated issue', () => {
+    expect(
+      conflictRemediationResolved(issue, { pulls: [], complete: false })
+    ).toBeNull();
+    expect(
+      conflictRemediationResolved(
+        { labels: ['remediation:screen-audit:web.x'] },
+        { pulls: [], complete: true }
+      )
+    ).toBeNull();
+  });
 });

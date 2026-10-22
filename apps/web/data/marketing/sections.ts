@@ -437,7 +437,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         media: 'none',
         alignment: 'left',
         chooseWhen:
-          'explicit YouTube paste-first source binding only; no automatic selection',
+          'explicit informational source binding, including planned announcements without an approved capture; no automatic selection',
         exemplar: { route: '/youtube-thumbnails', section: 'hero' },
         status: 'active',
       },
@@ -1514,6 +1514,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         'content-prose',
         'pricing',
         'blog-feed',
+        // Real product states are value proof (homepage, EVENT 2026-10-20).
+        'product-gallery',
       ],
     ],
     contentBudgets: [

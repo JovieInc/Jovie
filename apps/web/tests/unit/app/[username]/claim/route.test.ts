@@ -33,6 +33,15 @@ vi.mock('@/lib/claim/context', () => ({
   clearPendingClaimContext: mockClearPendingClaimContext,
   readPendingClaimContext: mockReadPendingClaimContext,
   writePendingClaimContext: mockWritePendingClaimContext,
+  applyPendingClaimCookie: (
+    response: {
+      cookies: { set: (name: string, value: string) => void };
+    },
+    _context: unknown
+  ) => {
+    response.cookies.set('jovie_pending_claim', 'attached');
+    return response;
+  },
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -237,6 +246,29 @@ describe('Claim route', () => {
     );
     expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
   });
+  it('routes high-profile artists to the verification path before writing claim context', async () => {
+    mockGetProfileByUsername.mockResolvedValueOnce({
+      id: 'profile_famous',
+      username: 'famousartist',
+      usernameNormalized: 'famousartist',
+      displayName: 'Famous Artist',
+      spotifyId: 'spotify_famous',
+      spotifyUrl: 'https://open.spotify.com/artist/spotify_famous',
+      spotifyFollowers: 25_000_000,
+      isClaimed: false,
+    });
+
+    const response = await GET(
+      new NextRequest('http://localhost/famousartist/claim?next=auth'),
+      { params: Promise.resolve({ username: 'famousartist' }) }
+    );
+
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/claim/start?spotify=spotify_famous'
+    );
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+  });
+
   it('sends a signed-in owner with an active profile to the dashboard, keyed on users.id (JOV-5401)', async () => {
     mockGetOptionalAuth.mockResolvedValue({ userId: 'app-user-uuid' });
     mockUserLimit.mockResolvedValue([{ activeProfileId: 'profile_owned' }]);

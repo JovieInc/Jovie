@@ -1,5 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { writePendingClaimContext } from '@/lib/claim/context';
+import {
+  applyPendingClaimCookie,
+  writePendingClaimContext,
+} from '@/lib/claim/context';
 import {
   clearLeadAttributionCookie,
   lookupLeadByClaimToken,
@@ -79,7 +82,7 @@ export async function GET(
 
   await setLeadAttributionCookieFromToken(token);
   await markLeadClaimPageViewedFromToken(token);
-  await writePendingClaimContext({
+  const context = await writePendingClaimContext({
     mode: 'token_backed',
     creatorProfileId: profile.id,
     username: profile.usernameNormalized,
@@ -88,10 +91,13 @@ export async function GET(
     expectedSpotifyArtistId: profile.spotifyId ?? null,
   });
 
-  return NextResponse.redirect(
-    buildAbsoluteUrl(
-      request,
-      `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
-    )
+  return applyPendingClaimCookie(
+    NextResponse.redirect(
+      buildAbsoluteUrl(
+        request,
+        `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
+      )
+    ),
+    context
   );
 }

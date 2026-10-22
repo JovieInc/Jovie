@@ -840,6 +840,8 @@ export const DashboardAudienceTableUnified = memo(
                     actions={bulkActions}
                   />
                   <AudienceTableSubheader
+                    mode={mode}
+                    profileId={profileId}
                     view={view}
                     onViewChange={onViewChange}
                     filters={filters}

@@ -218,6 +218,54 @@ test('applies one source-fenced rewrite, verifies readback, and dedupes replay',
   assert.equal(replayed.outcomes[0].status, 'unchanged');
 });
 
+test('commissions Next and TanStack deltas through one commit-bound Summer path', () => {
+  const root = process.cwd();
+  const nowUtc = '2026-10-14T00:00:00.000Z';
+  // biome-ignore format: compact commissioning fixture keeps the guarded diff bounded
+  const inventory = reconciliation.buildStackInventory(root, 'commissioning-sha');
+  const makeDelta = (packageName, missedEvent = false) => {
+    const next = packageName === 'next';
+    // biome-ignore format: official source pairing is clearer as one expression
+    const sourceUrl = next ? 'https://nextjs.org/blog/next-16-4' : 'https://tanstack.com/query/latest/docs/framework/react/guides/advanced-ssr';
+    // biome-ignore format: compact commissioning fixture keeps the guarded diff bounded
+    return { packageName, externalId: next ? 'next-16.4' : 'advanced-ssr-current-guidance', changeType: 'recommendation-change', capabilityIds: [next ? 'next-cache-components' : 'tanstack-rsc-ownership'], summary: next ? 'Cache Components is recommended for every app and defaults on for new apps.' : 'Current guidance separates Server Component and client cache ownership.', sourceUrl, observedAt: next ? '2026-10-06T00:00:00.000Z' : '2026-10-07T00:00:00.000Z', missedEvent, lifecycle: [{ attribute: 'recommended', scope: next ? 'every Next.js app' : 'React Query with Next App Router', evidenceUrl: sourceUrl, effectiveAt: next ? '2026-10-06T00:00:00.000Z' : '2026-10-07T00:00:00.000Z' }, ...(next ? [{ attribute: 'default-new-apps', scope: 'create-next-app', evidenceUrl: sourceUrl, effectiveAt: '2026-10-06T00:00:00.000Z' }] : [])] };
+  };
+  // biome-ignore format: decision matrix is deliberately compact
+  const makeDecisions = dispositions => dispositions.map((disposition, index) => ({ kind: ['upgrade', 'capability', 'architecture'][index], disposition, owner: 'web-platform', confidence: 'high', rationale: 'Official guidance was compared with current source.', evidence: 'commit inventory plus bounded source audit', nextReevaluation: 'source revision, blocker, or review date changes', outcomes: JSON.parse('{"futureUpgradeEffort":"bounded","supportTrajectory":"current","agentPatternConsistency":"ratcheted","maintenanceBurden":"measured","performanceOutcome":"no regression required"}') }));
+  const run = (delta, dispositions, exception = null, priorReceipts = []) => {
+    const source = { status: 'ok', revision: delta.externalId };
+    const preview = reconciliation.adaptStackDelta(delta, source, [], nowUtc);
+    const legacy = input();
+    legacy.benchmark.eventId = preview.event.id;
+    // biome-ignore format: keep the completed-foundation proof visible as one record
+    legacy.capabilityGraph.push({ id: delta.capabilityIds[0], dependsOn: [], linearIssues: [{ id: 'JOV-7339', role: 'foundation' }] });
+    // biome-ignore format: compact completed foundation fixture
+    legacy.issues.push({ identifier: 'JOV-7339', state: { type: 'completed' } });
+    // biome-ignore format: compact integration call keeps the guarded diff bounded
+    return reconciliation.planStackCapabilityReconciliation({ root, nowUtc, delta, source, inventory, stackDecisions: makeDecisions(dispositions), exception, verifiedAt: dispositions[1] === 'ADOPT' ? nowUtc : null, priorReceipts, reconciliation: legacy });
+  };
+  // biome-ignore format: the three dispositions are the asserted decision boundary
+  const next = run(makeDelta('next'), ['ADOPT', 'DEFER', 'ADOPT'], reconciliation.NEXT_CACHE_COMPONENTS_EXCEPTION);
+  // biome-ignore format: compact assertions keep commissioning evidence together
+  assert.equal(inventory.rows.find(row => row.app === 'apps/web' && row.package === 'next').resolvedVersion, '16.4.1');
+  // biome-ignore format: explicit denominator equality is the coverage contract
+  assert.equal(next.assessment.coverage.denominator, Object.values(next.assessment.coverage.counts).reduce((sum, count) => sum + count, 0));
+  // biome-ignore format: exact completed-foundation impact receipt
+  assert.deepEqual(next.backlog.impacts, [{ issueId: 'JOV-7339', role: 'foundation', terminal: true, mutationEligible: false }]);
+  // biome-ignore format: replay must remain a one-line no-op assertion
+  assert.equal(run(makeDelta('next'), ['ADOPT', 'DEFER', 'ADOPT'], reconciliation.NEXT_CACHE_COMPONENTS_EXCEPTION, [next]).status, 'unchanged');
+  // biome-ignore format: current-package feature review uses the same path
+  const tanstack = run(makeDelta('@tanstack/react-query', true), ['KEEP', 'ADOPT', 'INVESTIGATE']);
+  assert.equal(tanstack.discovery, 'catch-up');
+  assert.ok(tanstack.assessment.coverage.counts.unknown > 0);
+  // biome-ignore format: cache reuse proves source changes, not clocks, refresh inventory
+  assert.deepEqual([reconciliation.buildStackInventory(root, 'new-sha', inventory).status, reconciliation.buildStackInventory(root, 'new-sha', { ...inventory, sourceDigest: 'superseded-by-source-change' }).status], ['reused', 'refreshed']);
+  // biome-ignore format: failed-source bounded staleness proof
+  assert.deepEqual(Object.entries(reconciliation.adaptStackDelta(makeDelta('next'), { status: 'failed', attempts: 2, error: 'timeout' }, [], nowUtc)).filter(([key]) => ['status', 'freshness', 'retryAt'].includes(key)).map(([, value]) => value), ['stale', 'unknown', '2026-10-14T04:00:00.000Z']);
+  // biome-ignore format: exact ratchet receipt
+  assert.deepEqual(reconciliation.assertStackPatternRatchet(root), { legacyFiles: 245 });
+});
+
 const hash = value => createHash('sha256').update(value).digest('hex');
 const NOW = new Date('2026-10-15T18:00:00.000Z');
 
@@ -509,4 +557,113 @@ test('completed commerce work stays closed while the runtime block survives appl
     priorReceipts: [applied],
   });
   assert.deepEqual(replay.commerceInvalidations, receipt.commerceInvalidations);
+});
+
+test('stack inventory digests source, not generated outputs written during the scan', async () => {
+  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import(
+    'node:fs'
+  );
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const root = mkdtempSync(join(tmpdir(), 'stack-inventory-'));
+  try {
+    const write = (path, content) => {
+      mkdirSync(join(root, path, '..'), { recursive: true });
+      writeFileSync(join(root, path), content);
+    };
+    write('package.json', '{"name":"fixture","private":true}');
+    write(
+      'apps/web/package.json',
+      '{"name":"web","dependencies":{"next":"16.4.1"}}'
+    );
+    write(
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\nimporters:\n  .: {}\n  apps/web:\n    dependencies:\n      next:\n        specifier: 16.4.1\n        version: 16.4.1\n"
+    );
+    write(
+      'apps/web/app/page.tsx',
+      "import Link from 'next/link';\nexport default Link;\n"
+    );
+    const first = reconciliation.buildStackInventory(root, 'sha-1');
+    // Concurrent CI lanes write coverage and report JSON under the app.
+    write(
+      'apps/web/coverage/jov-5603-acquisition/coverage-final.json',
+      '{"x":1}'
+    );
+    write('apps/web/test-results/results.json', '{}');
+    write('apps/web/.turbo/turbo-test.log.json', '{}');
+    write('apps/web/playwright-report/data.json', '{}');
+    assert.equal(
+      reconciliation.buildStackInventory(root, 'sha-2', first).status,
+      'reused'
+    );
+    write('apps/web/app/other.ts', "export * from 'next/server';\n");
+    assert.equal(
+      reconciliation.buildStackInventory(root, 'sha-3', first).status,
+      'refreshed'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('stack inventory in a git checkout digests tracked source only (JOV-8749)', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import(
+    'node:fs'
+  );
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const root = mkdtempSync(join(tmpdir(), 'stack-inventory-git-'));
+  try {
+    const write = (path, content) => {
+      mkdirSync(join(root, path, '..'), { recursive: true });
+      writeFileSync(join(root, path), content);
+    };
+    write('package.json', '{"name":"fixture","private":true}');
+    write(
+      'apps/web/package.json',
+      '{"name":"web","dependencies":{"next":"16.4.1"}}'
+    );
+    write(
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\nimporters:\n  .: {}\n  apps/web:\n    dependencies:\n      next:\n        specifier: 16.4.1\n        version: 16.4.1\n"
+    );
+    write(
+      'apps/web/app/page.tsx',
+      "import Link from 'next/link';\nexport default Link;\n"
+    );
+    const git = args =>
+      execFileSync('git', ['-C', root, ...args], { stdio: 'ignore' });
+    git(['init', '-q']);
+    git(['add', '.']);
+    git([
+      '-c',
+      'user.email=t@example.com',
+      '-c',
+      'user.name=t',
+      'commit',
+      '-q',
+      '-m',
+      'fixture',
+    ]);
+    const first = reconciliation.buildStackInventory(root, 'sha-1');
+    // An untracked report outside the excluded output directories (the 2026-10-21 recurrence).
+    write('apps/web/reports/live-run.json', '{"x":1}');
+    write('apps/web/app/scratch.ts', 'export const x = 1;\n');
+    assert.equal(
+      reconciliation.buildStackInventory(root, 'sha-2', first).status,
+      'reused'
+    );
+    write(
+      'apps/web/app/page.tsx',
+      "import Link from 'next/link';\nexport default Link; // changed\n"
+    );
+    assert.equal(
+      reconciliation.buildStackInventory(root, 'sha-3', first).status,
+      'refreshed'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

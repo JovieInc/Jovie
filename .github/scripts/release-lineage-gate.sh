@@ -58,17 +58,84 @@ emit() {
   fi
 }
 
+# Returns 1 (shippable) unless the successor provably cannot ship, setting
+# successor_skip_reason. Production Controller run names are
+# "Production Controller <staging run name>"; staging run names are
+# "<sha> from CI <id> attempt <n>".
+successor_scan_limit="${SUCCESSOR_SCAN_LIMIT:-10}"
+successor_skip_reason=""
+successor_shippable() {
+  local title="$1" staging_title staging_run staging_id staging_attempt artifact_id outcome zip
+  successor_skip_reason=""
+  [[ "$title" =~ ^Production\ Controller\ ([0-9a-f]{40})\ from\ CI\ [1-9][0-9]*\ attempt\ [1-9][0-9]*$ ]] || return 0
+  local successor_sha="${BASH_REMATCH[1]}"
+  staging_title="${title#Production Controller }"
+  if [ -z "$staging_runs_json" ]; then
+    staging_runs_json="$("$gh_cli" api "repos/$repository/actions/workflows/staging-controller.yml/runs?branch=main&event=workflow_run&per_page=50" 2>/dev/null)" || {
+      staging_runs_json='{"workflow_runs":[]}'
+      return 0
+    }
+  fi
+  staging_run="$(jq -c --arg title "$staging_title" '
+    [(.workflow_runs // [])[] | select(.display_title == $title and .status == "completed")]
+    | if length == 1 then .[0] else empty end
+  ' <<<"$staging_runs_json" 2>/dev/null || true)"
+  [ -n "$staging_run" ] || return 0
+  if [ "$(jq -r '.conclusion' <<<"$staging_run")" != success ]; then
+    successor_skip_reason="staging $(jq -r '.id' <<<"$staging_run") concluded $(jq -r '.conclusion' <<<"$staging_run")"
+    return 1
+  fi
+  staging_id="$(jq -r '.id' <<<"$staging_run")"
+  staging_attempt="$(jq -r '.run_attempt' <<<"$staging_run")"
+  [[ "$staging_id" =~ ^[1-9][0-9]*$ && "$staging_attempt" =~ ^[1-9][0-9]*$ ]] || return 0
+  artifact_id="$("$gh_cli" api "repos/$repository/actions/runs/$staging_id/artifacts?per_page=100" 2>/dev/null |
+    jq -r --arg name "staging-completion-$staging_attempt" '
+      [(.artifacts // [])[] | select(.name == $name and .expired == false)]
+      | if length == 1 then .[0].id else empty end
+    ' 2>/dev/null || true)"
+  [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] || return 0
+  zip="$(mktemp)"
+  if "$gh_cli" api "repos/$repository/actions/artifacts/$artifact_id/zip" >"$zip" 2>/dev/null; then
+    outcome="$(unzip -p "$zip" staging-completion.json 2>/dev/null |
+      jq -r --arg sha "$successor_sha" 'if .sha == $sha then .outcome else empty end' 2>/dev/null || true)"
+  else
+    outcome=""
+  fi
+  rm -f "$zip"
+  if [ "$outcome" = superseded ]; then
+    successor_skip_reason="staging $staging_id finished superseded"
+    return 1
+  fi
+  return 0
+}
+
 iso_to_epoch() {
   date -u -d "$1" +%s 2>/dev/null || date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s
 }
 
 lineage=exact
 if [ "$current" != "$expected" ]; then
-  status="$("$gh_cli" api "repos/$repository/compare/${expected}...${current}" --jq '.status // empty' 2>/dev/null || true)"
-  case "$status" in
-    ahead) lineage=ancestor ;;
-    *) lineage=diverged ;;
-  esac
+  lookup_status=0
+  status="$("$gh_cli" api "repos/$repository/compare/${expected}...${current}" --jq '.status // empty' 2>/dev/null)" || lookup_status=$?
+  lineage=unknown
+  if [ "$lookup_status" -eq 0 ]; then
+    case "$status" in
+      ahead) lineage=ancestor ;;
+      behind|diverged) lineage=diverged ;;
+    esac
+  fi
+  # A failed/empty compare proves no rewrite. In particular, installation
+  # quota exhaustion must fail the controller so its existing recovery path
+  # can run, rather than recording a successful supersession (JOV-7674).
+  if [ "$lineage" = unknown ]; then
+    emit lineage unknown
+    emit lineage_lookup_exit "$lookup_status"
+    emit gate_decision error
+    emit gate_reason lineage_lookup_unavailable
+    echo "::error::Release ancestry is unknown (exit=$lookup_status); inspect GitHub compare access/response before superseding $expected." >&2
+    printf 'decision=error\n'
+    exit 1
+  fi
 fi
 
 successor_pending=false
@@ -104,9 +171,28 @@ elif [ "$lineage" = ancestor ]; then
     printf 'decision=error\n'
     exit 1
   fi
-  if [ "$pending" -gt 0 ]; then
-    successor_pending=true
-  fi
+  # Only a successor that can ship counts. A queued controller generation
+  # whose staging run failed or finished `superseded` skips at release-source
+  # and never promotes; yielding to it strands production. 2026-10-20: 826b00a
+  # (staging deployed) yielded to four queued generations whose staging was
+  # superseded by a397d64, whose staging then failed, so nothing shipped.
+  # Newest first; stop at the first shippable one. Unknown evidence keeps the
+  # conservative yield.
+  skipped_successors=0
+  staging_runs_json=""
+  while IFS=$'\t' read -r successor_id successor_title; do
+    [ -n "$successor_id" ] || continue
+    if [ "$skipped_successors" -ge "$successor_scan_limit" ] ||
+      successor_shippable "$successor_title"; then
+      successor_pending=true
+      break
+    fi
+    skipped_successors=$((skipped_successors + 1))
+    echo "::notice::Queued controller run $successor_id cannot ship ($successor_skip_reason); not yielding to it." >&2
+  done < <(jq -r --argjson run "$run_id" '
+    [.workflow_runs[] | select(.status != "completed" and .id > $run)]
+    | sort_by(.id) | reverse[] | [.id, (.display_title // "")] | @tsv
+  ' <<<"$runs_json")
 
   # Starvation bound: how long has main carried commits production lacks?
   build_info="$(curl --fail --silent --connect-timeout 5 --max-time 15 \
@@ -142,6 +228,9 @@ elif [ "$lineage" = ancestor ]; then
   else
     reason="$pending newer generation(s) already queued behind $expected; yielding the lease"
   fi
+  if [ "$successor_pending" = false ] && [ "$pending" -gt 0 ]; then
+    reason="$reason ($skipped_successors queued successor(s) cannot ship)"
+  fi
 fi
 
 decision=yield
@@ -155,6 +244,7 @@ emit lineage "$lineage"
 emit successor_pending "$successor_pending"
 emit starving "$starving"
 emit in_flight "$in_flight"
+emit skipped_successors "${skipped_successors:-0}"
 emit live_sha "$live_sha"
 emit unshipped_commits "$unshipped_commits"
 emit unshipped_age_seconds "$unshipped_age_seconds"

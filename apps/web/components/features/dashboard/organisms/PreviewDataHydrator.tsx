@@ -66,8 +66,11 @@ export function PreviewDataHydrator({
   readonly initialLinks: ProfileSocialLink[];
   readonly connectedDSPs: readonly AvailableDSP[];
 }) {
-  const { setPreviewData } = usePreviewPanelData();
+  const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
+  // Scope changes clear the rail after this effect has already hydrated it.
+  // Hydrate again when that clear leaves the panel empty.
+  const previewCleared = previewData == null;
 
   // Register ProfileContactSidebar in the unified right panel system
   useRegisterRightPanel(
@@ -118,7 +121,13 @@ export function PreviewDataHydrator({
     // Functional merge keeps concurrent optimistic rail paints from snapping
     // back to a stale dashboard snapshot when links/profile props refresh.
     setPreviewData(current => mergePreviewPanelHydration(current, incoming));
-  }, [selectedProfile, previewLinks, setPreviewData, connectedDSPs]);
+  }, [
+    connectedDSPs,
+    previewCleared,
+    previewLinks,
+    selectedProfile,
+    setPreviewData,
+  ]);
 
   return null;
 }
