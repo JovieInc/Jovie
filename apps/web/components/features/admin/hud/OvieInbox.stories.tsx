@@ -28,6 +28,7 @@ const pending: Inbox = {
       createdAt: '2026-10-02T12:00:00Z',
       nextAction: 'Review',
       waitingUntil: null,
+      decisionDefault: null,
       confidence: null,
       evidence: ['https://example.com/release-proof'],
       decisionTarget: {

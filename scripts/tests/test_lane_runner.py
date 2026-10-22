@@ -1623,12 +1623,14 @@ class LinearClientTest(unittest.TestCase):
         self.assertEqual(str(missing), "linear: Entity not found: Comment")
 
     def test_graphql_error_diagnostics_retain_only_allowlisted_metadata(self):
-        client = lane.Linear.__new__(lane.Linear); client.key = "test-only-no-live-credential"
+        client = lane.Linear.__new__(lane.Linear); client.key = "linear-app:test"; client.app = ("test", "fixture")
         class Response:
             def __enter__(self): return self
             def __exit__(self, *args): return False
             def read(self): return json.dumps({"errors": [{"message": "private payload secret-token", "extensions": {"code": "FORBIDDEN", "statusCode": 403, "payload": "secret-token"}}]}).encode()
-        with patch.object(lane, "linear_cooldown_until", return_value=None), patch.object(lane, "record_linear_budget"), patch.object(lane.urllib.request, "urlopen", return_value=Response()):
+        with patch.object(lane, "linear_cooldown_until", return_value=None), patch.object(lane, "record_linear_budget"), \
+                patch.object(lane.linear_app_token, "token", return_value="fixture-token"), \
+                patch.object(lane.urllib.request, "urlopen", return_value=Response()):
             with self.assertRaises(lane.LinearRequestError) as caught:
                 client.gql("mutation", {"body": "private payload"})
         self.assertEqual(caught.exception.diagnostic, {"class": "linear-graphql", "code": "FORBIDDEN", "httpStatus": 403})
@@ -1654,10 +1656,10 @@ class LinearClientTest(unittest.TestCase):
 
     def test_reads_key_and_maps_lane_issues_from_the_local_mirror(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_STATE": tmp}):
-            env = Path(tmp) / "linear.env"
-            env.write_text('export LINEAR_API_KEY="lin_api_x"\n')
-            client = lane.Linear(env)
-            self.assertEqual(client.key, "lin_api_x")
+            app_env = Path(tmp) / "linear-app.env"
+            app_env.write_text('LINEAR_CLIENT_ID=cid\nLINEAR_CLIENT_SECRET=sec\n')
+            client = lane.Linear(app_env=app_env)
+            self.assertEqual(client.key, "linear-app:cid")
             lane.linear_sync.apply(Path(tmp), "JOV", [{
                 "id": "i1", "identifier": "JOV-5", "title": "t", "description": None, "priority": 2,
                 "createdAt": "2026-09-01T00:00:00Z", "updatedAt": "2026-10-11T00:00:00.000Z",
@@ -1672,7 +1674,8 @@ class LinearClientTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             env = Path(tmp) / "linear.env"
             env.write_text("OTHER=1\n")
-            with self.assertRaises(SystemExit):
+            # #22378: no personal-key fallback; a RuntimeError the doctor and watchdog degrade on.
+            with self.assertRaises(lane.LinearAppCredentialMissing):
                 lane.Linear(env)
 
 
@@ -1781,9 +1784,13 @@ class LinearRateLimitTest(unittest.TestCase):
             else:
                 os.environ["LANES_STATE"] = previous
         self.addCleanup(restore_state)
-        self.env = self.state / "linear.env"
-        self.env.write_text('export LINEAR_API_KEY="lin_api_test_secret"\n')
-        self.client = lane.Linear(self.env)
+        self.env = self.state / "linear-app.env"
+        self.env.write_text('LINEAR_CLIENT_ID=cid\nLINEAR_CLIENT_SECRET=lin_api_test_secret\n')
+        for patcher in (patch.object(lane.linear_app_token, "token", return_value="lin_api_test_secret"),
+                        patch.object(lane.linear_app_token, "default_path", return_value=self.env)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.client = lane.Linear(app_env=self.env)
         self.real_open = lane.urllib.request.urlopen
         self.addCleanup(lambda: setattr(lane.urllib.request, "urlopen", self.real_open))
 
@@ -4917,6 +4924,26 @@ class TerminalRevisitTest(unittest.TestCase):
         self.assertEqual((visits["5"]["action"], visits["5"]["ok"]), ("partial-main-sync", False),
                          "an unreadable head proves no clean main commit")
 
+    def test_a_held_terminal_pr_takes_no_slot_and_is_not_a_failed_revisit(self):
+        # 2026-10-21: ~334 revisit-failed rows/day were holds that never called GitHub.
+        spent = {"sha": "h", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}
+        self.write("fix-attempts.json", {str(n): {**spent, "sha": f"h{n}"} for n in (1, 2, 3, 4)})
+        prs = [self.pr(n) for n in (1, 2, 3, 4)]
+        with patch.object(lane.pr_events, "maintenance_hold",
+                          side_effect=lambda host, l, pr, now, **kw: "repair-active" if pr["number"] < 3 else None):
+            self.assertEqual(lane.revisit_terminal_prs(self.host, prs, now=TERMINAL_NOW), [3, 4])
+        rows = [json.loads(line) for line in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
+        self.assertFalse([row for row in rows if row.get("verdict") == "revisit-failed"])
+        self.assertNotIn("1", json.loads((self.host.state / "terminal-revisits.json").read_text()))
+
+    def test_a_refused_update_branch_records_githubs_reason(self):
+        refused = SimpleNamespace(returncode=1, stdout='{"message":"merge conflict between base and head","status":"422"}',
+                                  stderr="gh: merge conflict between base and head (HTTP 422)")
+        self.assertEqual(lane.pr_events.sync_failure_reason(refused),
+                         "update-branch:merge conflict between base and head")
+        self.assertEqual(lane.pr_events.sync_failure_reason(SimpleNamespace(returncode=4, stdout="", stderr="")),
+                         "update-branch:exit-4")
+
     def test_the_longest_unvisited_terminal_pr_goes_first(self):
         self.write("fix-attempts.json", {str(n): {"sha": f"h{n}", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}
                                           for n in range(1, 6)})
@@ -5589,6 +5616,8 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertIsNone(marker["pr"], "source-safe cleanup retained the checkout without a target binding")
         self.assertNotIn("preservedWorktree", prior)
         self.calls.clear()
+        # A busy checkout still hands off with the canonical reason and keeps its source.
+        self.active = f"p123\nn{self.path}\n"
         with patch.object(lane.execution_attempt, "claim") as claim, patch.object(lane, "run_agent") as agent:
             receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
         self.assertEqual(receipt["verdict"], "recovery-handoff")
@@ -5597,6 +5626,49 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertEqual((self.path / "repair.txt").read_text(), "preserved useful edit")
         claim.assert_not_called()
         agent.assert_not_called()
+
+    def test_a_cancel_for_a_moved_pr_or_a_revoked_run_never_resumes(self):
+        prior = self.cancelled_predecessor(commit=True)  # target-pr-queued: may resume
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, prior["runId"]))
+        ledger = self.host.state / "runs/ledger.jsonl"
+        rows = [{"runId": "r-sup", "endedAt": "x", "verdict": "cancelled", "reasons": ["target-head-superseded"]},
+                {"runId": "r-rev", "endedAt": "x", "verdict": "revoked", "reasons": ["publication-revoked"]},
+                {"runId": "r-tsu", "endedAt": "x", "verdict": "cancelled", "reasons": ["target-state-unavailable"]}]
+        with ledger.open("a") as out:
+            out.write("".join(json.dumps(row) + "\n" for row in rows))
+        self.assertTrue(lane._ended_on_its_own_terms(self.host, "r-sup"))
+        self.assertTrue(lane._ended_on_its_own_terms(self.host, "r-rev"))
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, "r-tsu"))
+
+    def test_finished_predecessor_leftovers_are_archived_at_once_and_the_repair_runs(self):
+        # 2026-10-20 on Gem: a fix-no-change run left regenerated artifacts, and every later
+        # repair of that PR handed off for 6h (72 handoffs/24h) waiting for an owner that is gone.
+        def predecessor(cmd, cwd, log, timeout, **kwargs):
+            (cwd / "repair.txt").write_text("preserved useful edit")
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=predecessor):
+            prior = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        self.assertEqual(prior["verdict"], "fix-no-change")
+        self.path = Path(prior["worktree"])
+        self.calls.clear()
+        ran = []
+        def agent(cmd, cwd, log, timeout, **kwargs):
+            ran.append(cwd)
+            return SimpleNamespace(returncode=0)
+        with patch.object(lane, "run_agent", side_effect=agent):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+        ref = lane.PRESERVED_ARCHIVE_REF + self.path.name
+        self.assertEqual(receipt["archivedPreserved"], [ref])
+        self.assertEqual(receipt["verdict"], "fix-no-change")
+        self.assertEqual(len(ran), 1)
+        self.assertFalse(self.path.exists())
+        self.assertEqual(self.git(self.host.repo, "show", f"{ref}:repair.txt"), "preserved useful edit")
+
+    def test_interrupted_predecessor_still_waits_for_reconciliation(self):
+        prior = self.cancelled_predecessor(commit=True)  # queued, same head: resumable
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, prior["runId"]))
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, None))
+        self.assertFalse(lane._ended_on_its_own_terms(self.host, "no-such-run"))
 
     def test_competing_checkout_after_reconciliation_is_refused_safely(self):
         competitor = self.host.state / "worktrees/competing-owner"
@@ -11373,6 +11445,15 @@ class SelftestForeignLineageTest(unittest.TestCase):
             helper.kill()
             helper.wait(timeout=10)
 
+    def test_an_unproven_hold_records_its_parent_chain(self):
+        procs = {10: (self.UID, 200, "linux:5"), 200: (self.UID, 1, "linux:2"),
+                 500: (self.UID, 200, "linux:100")}
+        hops = lane._lineage_evidence(500, self.CLEANUP, identity=procs.get)
+        self.assertEqual([(h["pid"], h["ownerAncestor"], h["sameUid"]) for h in hops], [(500, False, True), (200, True, True)])
+        held = lane.SelftestCleanupHeld("selftest-process-custody-unreadable", pid=500, start="linux:100",
+                                        source="proc-environ", lineage=hops)
+        self.assertEqual(held.observation["lineage"][1]["pid"], 200)
+
     def test_anything_short_of_proof_keeps_the_hold(self):
         for name, table in {
             "owner-descendant": {500: (self.UID, 10, "linux:100")},
@@ -11387,10 +11468,35 @@ class SelftestForeignLineageTest(unittest.TestCase):
                 self.assertFalse(self.lineage(table))
 
 
+def _own_subtree(pid: int, me: int) -> bool:
+    """True when /proc's ppid chain from pid reaches me (this test process)."""
+    for _ in range(64):
+        if pid == me:
+            return True
+        try:
+            pid = int((Path("/proc") / str(pid) / "stat").read_text().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return False
+        if pid <= 1:
+            return False
+    return False
+
+
 class OperatorInstallerGlueTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="operator-installer-glue-")
         self.addCleanup(self.tmp.cleanup)
+        # Every self-test custody scan in this class sees only this test's own process
+        # subtree. CI's structural lane runs ~30 commands at once; their non-dumpable
+        # children (chromium etc.) refuse /proc environ and held these tests at random
+        # (runs 39533866177, 39536019717: selftest-process-custody-unreadable). Production
+        # custody is unchanged: it scans every same-UID process and fails closed.
+        real_row, me = lane._selftest_process_row, os.getpid()
+        scoped = patch.object(lane, "_selftest_process_row",
+                              side_effect=lambda entry, pid, uid: real_row(entry, pid, uid)
+                              if _own_subtree(pid, me) else None)
+        scoped.start()
+        self.addCleanup(scoped.stop)
         self.root = Path(self.tmp.name).resolve()
         self.host = SimpleNamespace(state=self.root / "state", repo=self.root / "repo", gate_slots=2)
         self.host.state.mkdir()
@@ -11599,7 +11705,15 @@ class OperatorInstallerGlueTest(unittest.TestCase):
         self.assertEqual(diagnostic["stderrSha256"], hashlib.sha256(stderr.encode()).hexdigest())
         self.assertEqual(diagnostic["stderrBytes"], len(stderr.encode()))
         self.assertEqual((stage / ".selftest-stderr.log").read_text(), stderr)
-        self.assertNotIn("test_bound", console.getvalue())
+        # The raw FAIL header sits outside the 2000-character console tail. The
+        # refusal still names that selector on its own lines (2026-10-21).
+        console_text = console.getvalue()
+        tail, separator, named = console_text.partition("release self-test retry:")
+        self.assertEqual(separator, "release self-test retry:")
+        self.assertEqual(tail, "x" * 2000 + "\n")
+        self.assertNotIn("test_bound", tail)
+        self.assertIn("release self-test failed selector(s): scripts.tests.test_fixture.Example.test_bound", named)
+        self.assertIn("release self-test failure: FAIL: test_bound (scripts.tests.test_fixture.Example)", named)
         for name in [".selftest-diagnostic.json", ".selftest-stderr.log"]:
             self.assertEqual((stage / name).stat().st_mode & 0o777, 0o600)
 
@@ -11694,6 +11808,10 @@ class OperatorInstallerGlueTest(unittest.TestCase):
                     safe["source"] = observation["source"]
                 if type(observation.get("errno")) is int:
                     safe["errno"] = observation["errno"]
+                if isinstance(observation.get("lineage"), list):
+                    safe["lineage"] = [{key: hop.get(key) for key in ("pid", "comm", "sameUid", "birth", "baseline",
+                                                                      "owner", "ownerAncestor", "parent", "gone")
+                                        if key in hop} for hop in observation["lineage"][:16] if isinstance(hop, dict)]
                 digest = cleanup.get("sourceSha256")
                 if isinstance(digest, str) and len(digest) == 64 and set(digest) <= set("0123456789abcdef"):
                     safe["sourceSha256"] = digest
@@ -13460,7 +13578,9 @@ class SelftestCleanupScopeTest(unittest.TestCase):
                 lane.reap_selftest_processes(receipt)
         self.assertEqual(receipt["diagnostic"]["observation"], {
             "pid": 201, "start": "linux:2000", "source": "proc-environ",
-            "errorCode": "selftest-process-custody-unreadable", "errno": 13})
+            "errorCode": "selftest-process-custody-unreadable", "errno": 13,
+            "lineage": [{"pid": 201, "comm": "", "sameUid": True, "birth": "linux:2000",
+                         "baseline": False, "owner": False, "ownerAncestor": False, "parent": 1}]})
         self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
 
     def test_denied_environment_and_reused_zombie_birth_still_holds(self):
@@ -13598,3 +13718,77 @@ class SelftestCleanupScopeTest(unittest.TestCase):
         self.assertEqual(receipt["diagnostic"]["observation"]["pid"], 100)
         self.assertEqual(receipt["diagnostic"]["outcome"], "held")
         self.pidfd.assert_not_called(); self.send.assert_not_called(); self.kill.assert_not_called()
+
+
+class SelftestProcessAbsenceTest(unittest.TestCase):
+    """ESRCH from an exiting process's proc entry is proof of absence, like ENOENT (CI #22351)."""
+
+    def entry(self, read_error, later_stats):
+        stats = iter([SimpleNamespace(st_uid=os.getuid()), *later_stats])
+
+        class Entry:
+            def stat(self_inner):
+                value = next(stats)
+                if isinstance(value, BaseException):
+                    raise value
+                return value
+
+            def __truediv__(self_inner, _name):
+                return SimpleNamespace(read_text=lambda: (_ for _ in ()).throw(read_error))
+        return Entry()
+
+    def test_esrch_or_enoent_on_reread_proves_absence(self):
+        for read_error in (FileNotFoundError(2, "gone"), ProcessLookupError(3, "exiting")):
+            for gone in (FileNotFoundError(2, "gone"), ProcessLookupError(3, "exiting")):
+                with self.subTest(read=type(read_error).__name__, gone=type(gone).__name__):
+                    self.assertIsNone(lane._selftest_process_row(self.entry(read_error, [gone]), 201, os.getuid()))
+
+    def test_a_still_present_or_unreadable_entry_still_holds(self):
+        present = SimpleNamespace(st_uid=os.getuid())
+        with self.assertRaises(lane.SelftestCleanupHeld):
+            lane._selftest_process_row(self.entry(ProcessLookupError(3, "exiting"), [present]), 201, os.getuid())
+        with self.assertRaises(lane.SelftestCleanupHeld):
+            lane._selftest_process_row(self.entry(ProcessLookupError(3, "x"), [PermissionError(13, "denied")]),
+                                       201, os.getuid())
+        with self.assertRaises(lane.SelftestCleanupHeld):
+            lane._selftest_process_row(self.entry(PermissionError(13, "denied"), []), 201, os.getuid())
+
+
+class SelftestRetryDiagnosticTest(unittest.TestCase):
+    """A refused release names the selector that failed twice (CI summaries keep only stderr)."""
+
+    def test_failed_retry_prints_selectors_and_failure_lines(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = Path(tmp)
+            rerun = subprocess.CompletedProcess([], 1, stdout="", stderr=(
+                "FAIL: test_bound (scripts.tests.test_x.Example.test_bound)\n"
+                "Traceback (most recent call last):\n  noise\n"
+                "AssertionError: 2 != 0\n"))
+            with patch.object(lane, "selftest_env", return_value={}), \
+                 patch.object(lane, "reap_selftest_processes", return_value=0), \
+                 patch.object(lane, "_selftest_cleanup_summary", return_value={"outcome": "clean"}), \
+                 patch.object(lane.lifecycle, "run", return_value=rerun), \
+                 contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertFalse(lane.retry_failed_selectors(
+                    stage, "FAIL: test_bound (scripts.tests.test_x.Example.test_bound)\n"))
+            text = err.getvalue()
+            self.assertIn("release self-test failed selector(s): scripts.tests.test_x.Example.test_bound", text)
+            self.assertIn("release self-test failure: FAIL: test_bound", text)
+            self.assertIn("release self-test failure: AssertionError: 2 != 0", text)
+            self.assertNotIn("noise", text)
+
+
+class AdoptionShareTest(unittest.TestCase):
+    """A fixed share of selection passes tries green drafts before red repairs (2026-10-21)."""
+
+    def test_every_nth_pass_is_an_adoption_turn_and_zero_disables_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = SimpleNamespace(state=Path(tmp))
+            with patch.dict(os.environ, {"LANES_ADOPT_SHARE_EVERY": "4"}):
+                self.assertEqual([lane.adoption_turn_due(host) for _ in range(8)],
+                                 [False, False, False, True, False, False, False, True])
+            with patch.dict(os.environ, {"LANES_ADOPT_SHARE_EVERY": "0"}):
+                self.assertFalse(any(lane.adoption_turn_due(host) for _ in range(8)))
+            (host.state / "adopt-share.json").write_text("not json")
+            with patch.dict(os.environ, {"LANES_ADOPT_SHARE_EVERY": "bogus"}):
+                self.assertEqual(sum(lane.adoption_turn_due(host) for _ in range(lane.ADOPT_SHARE_EVERY)), 1)

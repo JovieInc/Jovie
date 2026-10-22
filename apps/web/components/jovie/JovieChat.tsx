@@ -4,6 +4,7 @@
 // JovieChat.styling.test.tsx component render suite.
 // @coverage-via apps/web/tests/unit/chat/JovieChat.styling.test.tsx
 
+import { Button } from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -95,6 +96,7 @@ export function JovieChat({
   username,
   chatMode,
   homeCanvas,
+  homeCanvasMode = 'empty-state',
   ambientOwnedByShell = false,
 }: JovieChatProps) {
   // TanStack Virtual returns fresh rows from a stable `virtualizer` object. React
@@ -525,8 +527,13 @@ export function JovieChat({
 
   // Pin mode uses the thread chrome (docked composer + header) so the card
   // stays above the transcript, matching inbox → pinned-card behavior.
-  const showThreadView =
+  const livingCanvas = homeCanvas != null && homeCanvasMode === 'living';
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const hasThread =
     conversationExists || conversationInProgress || pinnedOpportunity !== null;
+  // A living canvas keeps owning the surface after messages arrive; the
+  // transcript is an explicit disclosure.
+  const showThreadView = hasThread && (!livingCanvas || transcriptOpen);
   const showBottomComposer = showThreadView;
   // Shared shell (founder decision 2026-10-20): any persona may supply a
   // living Home canvas that owns the empty state above the docked composer.
@@ -945,8 +952,17 @@ export function JovieChat({
                   <ChatEmptyStateComposerRegion
                     stableDocked
                     fullBleed
-                    alignAbove='top'
-                    above={homeCanvas}
+                    alignAbove={livingCanvas ? 'fill' : 'top'}
+                    above={
+                      typeof homeCanvas === 'function'
+                        ? homeCanvas({
+                            messages,
+                            isStreaming:
+                              status === 'submitted' || status === 'streaming',
+                            onOpenTranscript: () => setTranscriptOpen(true),
+                          })
+                        : homeCanvas
+                    }
                   >
                     <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
                       {composerSurface}
@@ -982,6 +998,19 @@ export function JovieChat({
               </div>
             ) : (
               <>
+                {livingCanvas ? (
+                  <div className='mb-3 flex justify-start'>
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => setTranscriptOpen(false)}
+                      data-testid='chat-back-to-home-canvas'
+                    >
+                      Back To Home
+                    </Button>
+                  </div>
+                ) : null}
                 {pinnedOpportunity ? (
                   <ChatPinnedOpportunityHeader
                     card={pinnedOpportunity}

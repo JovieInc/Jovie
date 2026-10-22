@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import { deriveOpsExceptions } from '@/lib/hud/cockpit';
 import { HUD_SOURCE_STALE_AFTER_MS } from '@/lib/hud/source-trust';
 import type { HudMetricSourceTrust, HudMetrics } from '@/types/hud';
@@ -86,6 +87,93 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('Hud exception policy', () => {
+  it.each([
+    ['degraded', 'Sentry is degraded'],
+    ['unauthorized', 'Sentry is needs re-authorization'],
+    ['unavailable', 'Sentry is unreachable'],
+    ['not_configured', 'Sentry is not connected'],
+    ['no_data', 'Sentry is reporting no data'],
+  ])(
+    'source state %s surfaces as "%s" with its next step and dashboard',
+    (state, label) => {
+      const metrics = healthyMetrics();
+      metrics.sources.sentry = okSource('sentry', 'Sentry', {
+        state,
+        nextStep: 'Rotate the token.',
+        errorMessage: 'HTTP 500',
+        dashboardUrl: 'https://sentry.example',
+      });
+      expect(deriveOpsExceptions(metrics)).toEqual([
+        {
+          id: 'source-sentry',
+          label,
+          detail: 'Rotate the token.',
+          href: 'https://sentry.example',
+        },
+      ]);
+    }
+  );
+
+  it('falls back to the source error message when there is no next step', () => {
+    const metrics = healthyMetrics();
+    metrics.sources.github = okSource('github', 'GitHub', {
+      state: 'unavailable',
+      errorMessage: 'HTTP 502',
+    });
+    expect(deriveOpsExceptions(metrics)).toEqual([
+      {
+        id: 'source-github',
+        label: 'GitHub is unreachable',
+        detail: 'HTTP 502',
+        href: null,
+      },
+    ]);
+  });
+
+  it('describes a stale ok source by its observation age unless a next step exists', () => {
+    const metrics = healthyMetrics();
+    metrics.sources.sentry = okSource('sentry', 'Sentry', {
+      fetchedAtIso: new Date(GENERATED_AT_MS - 6 * 60_000).toISOString(),
+      dashboardUrl: 'https://sentry.example',
+    });
+    metrics.sources.github = okSource('github', 'GitHub', {
+      fetchedAtIso: new Date(GENERATED_AT_MS - 2 * 60 * 60_000).toISOString(),
+      nextStep: 'Re-run the GitHub sync.',
+    });
+    expect(deriveOpsExceptions(metrics)).toEqual([
+      {
+        id: 'source-stale-sentry',
+        label: 'Sentry data is stale',
+        detail: 'Last observed 6 min ago',
+        href: 'https://sentry.example',
+      },
+      {
+        id: 'source-stale-github',
+        label: 'GitHub data is stale',
+        detail: 'Re-run the GitHub sync.',
+        href: null,
+      },
+    ]);
+  });
+
+  it('keeps an ok source fresh exactly at the staleness budget', () => {
+    const metrics = healthyMetrics();
+    metrics.sources.sentry = okSource('sentry', 'Sentry', {
+      fetchedAtIso: new Date(
+        GENERATED_AT_MS - HUD_SOURCE_STALE_AFTER_MS
+      ).toISOString(),
+    });
+    expect(deriveOpsExceptions(metrics)).toEqual([]);
+  });
+
+  it('does not report a future-dated observation as stale', () => {
+    const metrics = healthyMetrics();
+    metrics.sources.sentry = okSource('sentry', 'Sentry', {
+      fetchedAtIso: new Date(GENERATED_AT_MS + 60_000).toISOString(),
+    });
+    expect(deriveOpsExceptions(metrics)).toEqual([]);
+  });
+
   it('uses wall-clock age and reports stale money observations without claiming contradiction', () => {
     const metrics = healthyMetrics({
       overview: { financialDataAvailable: false },
@@ -165,8 +253,28 @@ describe('Hud exception policy', () => {
     const contradiction = deriveOpsExceptions(metrics).find(
       entry => entry.id === 'money-sources-contradiction'
     );
-    expect(contradiction?.label).toBe('Revenue sources disagree');
-    expect(contradiction?.href).toBeTruthy();
+    expect(contradiction).toEqual({
+      id: 'money-sources-contradiction',
+      label: 'Revenue sources disagree',
+      detail:
+        'Stripe and Mercury report healthy but financial data is unavailable',
+      href: APP_ROUTES.ADMIN_OPERATIONS,
+    });
+  });
+
+  it('does not claim a contradiction when financial availability is unknown', () => {
+    const metrics = healthyMetrics({ overview: undefined });
+    expect(deriveOpsExceptions(metrics)).toEqual([]);
+  });
+
+  it('does not claim a contradiction unless both money sources are fresh', () => {
+    const metrics = healthyMetrics({
+      overview: { financialDataAvailable: false },
+    });
+    metrics.sources.mercury = okSource('mercury', 'Mercury', {
+      fetchedAtIso: new Date(GENERATED_AT_MS + 60_000).toISOString(),
+    });
+    expect(deriveOpsExceptions(metrics)).toEqual([]);
   });
 
   it('does not flag contradiction when a money source is already honest about failure', () => {

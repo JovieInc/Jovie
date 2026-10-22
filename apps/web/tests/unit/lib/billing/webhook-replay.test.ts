@@ -7,6 +7,7 @@ const mockUpdate = vi.hoisted(() => vi.fn());
 const mockProcessStripeWebhookEvent = vi.hoisted(() => vi.fn());
 const mockMerchCheckout = vi.hoisted(() => vi.fn());
 const mockMerchRefund = vi.hoisted(() => vi.fn());
+const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
   db: { select: mockSelect, update: mockUpdate },
@@ -23,6 +24,9 @@ vi.mock('@/lib/merch/orders', () => ({
   handleMerchChargeRefunded: mockMerchRefund,
   handleMerchCheckoutCompleted: mockMerchCheckout,
 }));
+vi.mock('@/lib/error-tracking', () => ({
+  captureCriticalError: mockCaptureCriticalError,
+}));
 vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
@@ -31,6 +35,7 @@ import {
   parseStoredEvent,
   replayUnprocessedStripeWebhooks,
 } from '@/lib/billing/webhook-replay';
+import { StripeReconciliationRequiredError } from '@/lib/stripe/webhooks/reconciliation';
 
 const now = new Date('2026-10-04T12:00:00.000Z');
 
@@ -115,7 +120,12 @@ describe('replayUnprocessedStripeWebhooks', () => {
 
     const summary = await replayUnprocessedStripeWebhooks(now);
 
-    expect(summary).toEqual({ processed: 1, blocked: [], failed: [] });
+    expect(summary).toEqual({
+      processed: 1,
+      blocked: [],
+      failed: [],
+      needsReconciliation: [],
+    });
     expect(mockProcessStripeWebhookEvent).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'evt_sub' }),
       new Date(1_759_276_800 * 1000)
@@ -204,7 +214,9 @@ describe('replayUnprocessedStripeWebhooks', () => {
     fixture.exec(`CREATE TABLE stripe_webhook_events (
       id TEXT PRIMARY KEY, stripe_event_id TEXT, type TEXT, payload TEXT,
       stripe_created_at TEXT, created_at TEXT, processed_at TEXT,
-      processing_started_at TEXT
+      processing_started_at TEXT, reconciliation_status TEXT,
+      reconciliation_reason TEXT, reconciliation_context TEXT,
+      reconciliation_flagged_at TEXT, reconciled_at TEXT
     )`);
     try {
       const insert = fixture.prepare(
@@ -268,6 +280,92 @@ describe('replayUnprocessedStripeWebhooks', () => {
       expect(retry.blocked).toHaveLength(10);
       expect(retry.processed).toBe(0);
       expect(mockProcessStripeWebhookEvent).toHaveBeenCalledOnce();
+    } finally {
+      fixture.close();
+    }
+  });
+  it('keeps an unmapped-price event queued for reconciliation, then applies it once mapped', async () => {
+    // Real Drizzle statements against an isolated SQL fixture (see above).
+    const fixture = new DatabaseSync(':memory:');
+    fixture.exec(`CREATE TABLE stripe_webhook_events (
+      id TEXT PRIMARY KEY, stripe_event_id TEXT, type TEXT, payload TEXT,
+      stripe_created_at TEXT, created_at TEXT, processed_at TEXT,
+      processing_started_at TEXT, reconciliation_status TEXT,
+      reconciliation_reason TEXT, reconciliation_context TEXT,
+      reconciliation_flagged_at TEXT, reconciled_at TEXT
+    )`);
+    try {
+      const row = candidate('evt_unmapped', 'customer.subscription.updated', {
+        id: 'sub_unmapped',
+      });
+      fixture
+        .prepare(
+          'INSERT INTO stripe_webhook_events (id, stripe_event_id, type, payload, stripe_created_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+        )
+        .run(
+          'row_1',
+          row.stripeEventId,
+          row.type,
+          JSON.stringify(row.payload),
+          row.stripeCreatedAt.toISOString(),
+          new Date(now.getTime() - 24 * 60 * 60_000).toISOString()
+        );
+      const database = drizzle(async (query, params) => {
+        const statement = fixture.prepare(query);
+        statement.setReturnArrays(true);
+        const bindings = Object.fromEntries(
+          params.map((value, index) => [`$${index + 1}`, value])
+        );
+        return { rows: statement.all(bindings).map(r => Object.values(r)) };
+      });
+      mockSelect.mockImplementation(database.select.bind(database));
+      mockUpdate.mockImplementation(database.update.bind(database));
+      const readRow = () =>
+        fixture
+          .prepare(
+            'SELECT processed_at, reconciliation_status, reconciliation_reason, reconciled_at FROM stripe_webhook_events WHERE id = ?'
+          )
+          .get('row_1');
+
+      mockProcessStripeWebhookEvent.mockRejectedValueOnce(
+        new StripeReconciliationRequiredError(
+          'unknown_price_id',
+          'Unknown price ID: price_unmapped',
+          { priceIds: ['price_unmapped'] }
+        )
+      );
+      const blocked = await replayUnprocessedStripeWebhooks(now);
+
+      expect(blocked).toMatchObject({
+        processed: 0,
+        failed: [],
+        needsReconciliation: [{ stripeEventId: 'evt_unmapped' }],
+      });
+      expect(readRow()).toMatchObject({
+        processed_at: null,
+        reconciliation_status: 'needs_reconciliation',
+        reconciliation_reason: 'unknown_price_id',
+      });
+      expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+        'Stripe event needs reconciliation',
+        expect.any(StripeReconciliationRequiredError),
+        expect.objectContaining({ stripeEventId: 'evt_unmapped' })
+      );
+
+      // Price mapped: the next run after the lease expires applies it once.
+      const later = new Date(now.getTime() + 11 * 60_000);
+      const applied = await replayUnprocessedStripeWebhooks(later);
+      expect(applied.processed).toBe(1);
+      expect(readRow()).toMatchObject({
+        processed_at: expect.any(String),
+        reconciliation_status: 'reconciled',
+        reconciled_at: expect.any(String),
+      });
+      const again = await replayUnprocessedStripeWebhooks(
+        new Date(later.getTime() + 11 * 60_000)
+      );
+      expect(again.processed).toBe(0);
+      expect(mockProcessStripeWebhookEvent).toHaveBeenCalledTimes(2);
     } finally {
       fixture.close();
     }

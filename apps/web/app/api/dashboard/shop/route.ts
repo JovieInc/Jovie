@@ -13,7 +13,11 @@ import { getShopifyUrl, isShopifyDomain } from '@/lib/profile/shop-settings';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-async function getProfileForUser(clerkUserId: string) {
+/**
+ * `withDbSession` hands over the app `users.id` (see getCachedAuth), not a
+ * Clerk id. Matching `users.clerkId` returned 404 for every Better Auth user.
+ */
+async function getProfileForUser(appUserId: string) {
   const [result] = await db
     .select({
       id: creatorProfiles.id,
@@ -23,7 +27,7 @@ async function getProfileForUser(clerkUserId: string) {
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(eq(users.clerkId, clerkUserId))
+    .where(eq(users.id, appUserId))
     .limit(1);
 
   return result ?? null;
@@ -31,8 +35,8 @@ async function getProfileForUser(clerkUserId: string) {
 
 export async function GET() {
   try {
-    return await withDbSession(async clerkUserId => {
-      const profile = await getProfileForUser(clerkUserId);
+    return await withDbSession(async appUserId => {
+      const profile = await getProfileForUser(appUserId);
       if (!profile) {
         return NextResponse.json(
           { error: 'Profile not found' },
@@ -65,7 +69,7 @@ export async function GET() {
 
 export async function PUT(req: Request) {
   try {
-    return await withDbSession(async clerkUserId => {
+    return await withDbSession(async appUserId => {
       const parsedBody = await parseJsonBody<{
         shopifyUrl?: string | null;
       }>(req, {
@@ -89,7 +93,7 @@ export async function PUT(req: Request) {
         );
       }
 
-      const profile = await getProfileForUser(clerkUserId);
+      const profile = await getProfileForUser(appUserId);
       if (!profile) {
         return NextResponse.json(
           { error: 'Profile not found' },
