@@ -1,6 +1,20 @@
+import { createRequire } from 'node:module';
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  buildLegacyAliasHoldCookie,
+  readLegacyAliasHash,
+} from '@/lib/routing/legacy-profile-alias-recovery';
 import { AliasCollisionRecovery } from './AliasCollisionRecovery';
+
+const require = createRequire(import.meta.url);
+const { legacyProfileAliasRedirects } =
+  require('../../../lib/routing/legacy-profile-alias-redirects.js') as {
+    legacyProfileAliasRedirects: () => {
+      destination: string;
+      missing: { type: string; key: string }[];
+    }[];
+  };
 
 function installLocation(hash: string, protocol = 'https:') {
   const replace = vi.fn();
@@ -112,4 +126,25 @@ describe('AliasCollisionRecovery', () => {
     });
     expect(replace).not.toHaveBeenCalled();
   });
+
+  it.each(legacyProfileAliasRedirects())(
+    'client recovery writes the edge bypass for $destination',
+    ({ destination, missing }) => {
+      const url = new URL(
+        destination.replace(':username', 'dualipa'),
+        'https://jov.ie'
+      );
+      const alias = readLegacyAliasHash(url.hash);
+      expect(alias).not.toBeNull();
+
+      const cookie = buildLegacyAliasHoldCookie('dualipa', alias ?? '', true);
+      expect(cookie).toBe(
+        `jovie_alias_content=1; Path=/dualipa/${alias}; Max-Age=300; SameSite=Lax; Secure`
+      );
+      expect(missing).toContainEqual({
+        type: 'cookie',
+        key: cookie?.split('=')[0],
+      });
+    }
+  );
 });
