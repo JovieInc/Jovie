@@ -4976,6 +4976,24 @@ class TerminalRevisitTest(unittest.TestCase):
                 self.assertEqual(json.loads((self.host.state / "held.json").read_text()), held)
                 self.main = "m2"
 
+    def test_mergeable_exhaustion_hold_syncs_main_and_lifts_the_label(self):
+        # JOV-8810: #22473 was MERGEABLE with a fix-exhausted hold. The conflict
+        # path (JOV-8533) reached partial sync; a non-DIRTY head never called
+        # update-branch, so lane-fix-exhausted stayed past 24h.
+        attempts = {"22473": {"sha": "h22473", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}}
+        held = {"22473": lane.pr_events.held_record("h22473", ["fix-exhausted"])}
+        self.write("fix-attempts.json", attempts)
+        self.write("held.json", held)
+        pr = self.pr(22473, isDraft=True, mergeStateStatus="UNSTABLE",
+                     labels=[{"name": "lane-fix-exhausted"}, {"name": "lane-fix-green"}])
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [pr], now=TERMINAL_NOW), [22473])
+        self.assertEqual([args[4] for args in self.updates()],
+                         [f"repos/{lane.REPO_SLUG}/pulls/22473/update-branch"])
+        lifts = [args[4] for args in self.calls if args[:4] == ["gh", "api", "-X", "DELETE"]]
+        self.assertEqual(lifts, [f"repos/{lane.REPO_SLUG}/issues/22473/labels/lane-fix-exhausted"])
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text()), attempts)
+        self.assertEqual(json.loads((self.host.state / "held.json").read_text()), held)
+
     def test_exhaustion_does_not_mask_nonfixable_policy_holds(self):
         for evidence in ("secret-like-file-changed", "empty-diff"):
             with self.subTest(evidence=evidence):
