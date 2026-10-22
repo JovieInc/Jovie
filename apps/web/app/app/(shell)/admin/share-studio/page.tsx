@@ -12,8 +12,8 @@ import {
   buildDisplayUrl,
   buildMailtoHref,
   buildTrackedShareUrl,
+  shareStoryPreviewSrc,
 } from '@/lib/share/copy';
-import { shareStoryPreviewSrc } from '@/lib/share/context';
 import type { ShareContext } from '@/lib/share/types';
 import {
   loadShareStudioData,

@@ -181,20 +181,3 @@ export function buildPlaylistShareContext(params: {
     },
   });
 }
-
-/**
- * `next/image` rejects absolute story URLs that are not in `remotePatterns`.
- * The story route is same-origin, so the preview uses the path and the
- * download link keeps the absolute URL.
- */
-export function shareStoryPreviewSrc(assetUrl: string): string {
-  try {
-    const url = new URL(assetUrl, 'http://127.0.0.1');
-    if (url.pathname.startsWith('/api/share/story/')) {
-      return `${url.pathname}${url.search}`;
-    }
-  } catch {
-    return assetUrl;
-  }
-  return assetUrl;
-}

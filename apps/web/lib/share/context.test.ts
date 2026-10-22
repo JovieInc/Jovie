@@ -4,8 +4,8 @@ import {
   buildPlaylistShareContext,
   buildProfileShareContext,
   buildReleaseShareContext,
-  shareStoryPreviewSrc,
 } from './context';
+import { shareStoryPreviewSrc } from './copy';
 
 describe('share context builders', () => {
   it('builds a canonical release share context with tracked metadata', () => {
