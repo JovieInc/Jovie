@@ -472,7 +472,7 @@ export function DashboardNav({
   return (
     <>
       <nav
-        className='flex min-h-0 flex-1 transform-gpu flex-col [overflow-anchor:none]'
+        className='flex min-h-0 flex-1 transform-gpu flex-col overflow-anchor-none'
         aria-label='Dashboard Navigation'
       >
         {isInSettings ? (

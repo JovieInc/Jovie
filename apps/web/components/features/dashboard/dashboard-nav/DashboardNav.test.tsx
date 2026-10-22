@@ -314,7 +314,7 @@ describe('DashboardNav route warming', () => {
     expect(newChatAction.className).toContain('focus-visible:ring-inset');
     expect(newChatAction.closest('nav')?.className).toContain('transform-gpu');
     expect(newChatAction.closest('nav')?.className).toContain(
-      '[overflow-anchor:none]'
+      'overflow-anchor-none'
     );
     expect(
       newChatAction.closest('[data-sidebar-search-slot]')?.className

@@ -218,7 +218,7 @@ describe('UnifiedSidebar library route', () => {
     renderUnifiedSidebar();
 
     expect(document.querySelector('[data-sidebar="content"]')).toHaveClass(
-      '[overflow-anchor:none]'
+      'overflow-anchor-none'
     );
   });
 
