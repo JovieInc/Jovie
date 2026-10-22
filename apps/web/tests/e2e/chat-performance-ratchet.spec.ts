@@ -271,6 +271,7 @@ async function measureDroppedScrollFrames(page: Page) {
     scrollElement.scrollTop = 0;
     const frameIntervals: number[] = [];
     const frameCount = 24;
+    const distance = scrollElement.scrollHeight - scrollElement.clientHeight;
 
     await new Promise<void>(resolve => {
       let previousTime: number | undefined;
@@ -282,9 +283,7 @@ async function measureDroppedScrollFrames(page: Page) {
         }
         previousTime = time;
         currentFrame += 1;
-        scrollElement.scrollTop =
-          (scrollElement.scrollHeight - scrollElement.clientHeight) *
-          (currentFrame / frameCount);
+        scrollElement.scrollTop = distance * (currentFrame / frameCount);
 
         if (currentFrame >= frameCount) {
           resolve();
@@ -323,6 +322,53 @@ function trackChatApiRequests(page: Page) {
   page.on('requestfinished', request => inFlight.delete(request));
   page.on('requestfailed', request => inFlight.delete(request));
   return { pendingCount: () => inFlight.size };
+}
+
+/**
+ * Scored clicks and the scroll probe share the runner with the rest of the
+ * smoke lane. A frame that is already late is runner stall, and p95 of five
+ * samples is the slowest sample. Wait until the event loop can deliver frames
+ * before starting the clock. Give up after a few seconds so a wedged runner
+ * still records the real interaction instead of hanging the lane.
+ */
+async function waitForQuietFrames(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>(resolve => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        const started = performance.now();
+        const gaps: number[] = [];
+        let previous: number | undefined;
+        const step = (time: number) => {
+          if (settled) return;
+          if (previous !== undefined) gaps.push(time - previous);
+          previous = time;
+          const recent = gaps.slice(-4);
+          if (
+            recent.length === 4 &&
+            recent.every(gap => gap < 40) &&
+            performance.now() - started > 50
+          ) {
+            finish();
+            return;
+          }
+          if (performance.now() - started > 8_000) {
+            finish();
+            return;
+          }
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+        // rAF can stop entirely on a backgrounded page. The timeout is the
+        // same 8s cap, so a frozen frame clock cannot hang the smoke lane.
+        setTimeout(finish, 8_000);
+      })
+  );
 }
 
 /** Resolves after two painted frames and an idle main-thread slot. */
@@ -408,10 +454,12 @@ async function exchangeChatRoundTrip(
   composer: Locator,
   sendButton: Locator,
   userText: string,
-  assistantText: string
+  assistantText: string,
+  settleMainThread = false
 ) {
   await expect(composer).toBeEnabled();
   await composer.fill(userText);
+  if (settleMainThread) await waitForQuietFrames(page);
   await installChatProbe(page, userText, assistantText);
   await triggerMeasuredSend(sendButton);
   await expect(
@@ -484,7 +532,8 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
       composer,
       sendButton,
       copy.userText,
-      copy.assistantText
+      copy.assistantText,
+      true
     );
     samples.push({
       ...timings,
@@ -493,6 +542,7 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
     });
   }
 
+  await waitForQuietFrames(page);
   const droppedFrameCount = await measureDroppedScrollFrames(page);
   const completeSamples = samples.map(sample => ({
     ...sample,
