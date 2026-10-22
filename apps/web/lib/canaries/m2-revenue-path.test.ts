@@ -8,6 +8,7 @@ import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 import {
   buildM2RevenuePathRepro,
   evaluateActivationSurface,
+  evaluateClaimEntry,
   evaluateClaimSurface,
   evaluateProCheckout199,
   evaluateSignedOutSurface,
@@ -43,6 +44,8 @@ const HOME_HTML = `
     <form data-testid="homepage-claim-form"></form>
   </body></html>
 `;
+
+const CLAIM_HTML = `<html><body>${'claim '.repeat(120)}<input data-testid="claim-artist-search" /><p>$12/mo. Cancel anytime.</p></body></html>`;
 
 const SUCCESS_HTML = `
   <html><body>
@@ -182,6 +185,41 @@ describe('evaluateClaimSurface', () => {
   });
 });
 
+describe('evaluateClaimEntry', () => {
+  it('requires the artist search, $12/mo, and a bare /claim/start bounce', () => {
+    expect(
+      evaluateClaimEntry({
+        claimStatus: 200,
+        claimBody: CLAIM_HTML,
+        claimStartStatus: 307,
+        claimStartLocation: 'https://jov.ie/claim',
+      })
+    ).toMatchObject({ ok: true });
+  });
+
+  it('fails when /claim drops the $12/mo offer', () => {
+    expect(
+      evaluateClaimEntry({
+        claimStatus: 200,
+        claimBody: CLAIM_HTML.replace('$12/mo', '$39/mo'),
+        claimStartStatus: 307,
+        claimStartLocation: '/claim',
+      }).detail
+    ).toMatch(/\$12\/mo/);
+  });
+
+  it('fails when a bare /claim/start does anything but bounce to /claim', () => {
+    expect(
+      evaluateClaimEntry({
+        claimStatus: 200,
+        claimBody: CLAIM_HTML,
+        claimStartStatus: 307,
+        claimStartLocation: '/signup?plan=pro',
+      }).ok
+    ).toBe(false);
+  });
+});
+
 describe('evaluateProCheckout199', () => {
   const livePricing = JSON.stringify({
     pricingOptions: [
@@ -315,6 +353,15 @@ describe('runM2RevenuePathCanary', () => {
         const url = String(input);
         if (!capturedHeaders) {
           capturedHeaders = new Headers(init?.headers);
+        }
+        if (url.endsWith('/claim/start')) {
+          return new Response(null, {
+            status: 307,
+            headers: { location: 'https://jov.ie/claim' },
+          });
+        }
+        if (url.endsWith('/claim')) {
+          return htmlResponse(200, CLAIM_HTML);
         }
         if (url.endsWith('/') || url.endsWith('jov.ie')) {
           return htmlResponse(200, HOME_HTML, 'https://jov.ie/');
