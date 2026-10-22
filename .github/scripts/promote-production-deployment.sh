@@ -168,7 +168,13 @@ read_vercel_json() {
     return 1
   fi
 
-  printf '%s\n' "$result"
+  # Inspection includes megabytes of build output the controller never uses.
+  # Keep only its validated state fields so subsequent reads stay bounded.
+  if [ "$schema" = current ] || [ "$schema" = alias ]; then
+    jq -c '{id, url, readyState, target}' <<<"$result"
+  else
+    printf '%s\n' "$result"
+  fi
 }
 
 inspect_current() {
