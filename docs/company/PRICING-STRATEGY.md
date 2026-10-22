@@ -1,5 +1,36 @@
 # Jovie AI Pricing Strategy
 
+## Current paid offer (2026-10-20)
+
+EVENT: Tim, 2026-10-20 — Jovie's first paid offer is a **$12/month
+self-serve artist profile** (plan id `pro`, display name Artist Presence),
+bought through `/claim` → sign-in → Stripe Checkout. It replaces the $199/month
+"Artist Presence, limited access" tier and supersedes the $39/$149 Pro/Max
+table below for new purchases. Context: $0 MRR and under three months of
+runway; the wedge is musicians (artist profile plus the release/YouTube loop),
+sold founder-led.
+
+- Canonical price source: `apps/web/lib/config/plan-prices.ts`
+  (`ARTIST_VISIBILITY_OFFER.pro.monthlyUsd = 12`). The pricing page, checkout
+  price contract, entitlements registry and Stripe startup checks all derive
+  from it.
+- Monthly only. No annual Pro, no public Max price; Enterprise is contact sales.
+- Payment never grants verification. High-profile artists (≥100k Spotify
+  followers) cannot be claimed self-serve; they need manual verification.
+- The retired $199 Stripe prices stay mapped to `pro` so existing subscribers
+  keep their entitlements; they are no longer offered at checkout.
+- The $199 Digital Footprint & Visibility Audit remains a separate one-off
+  Payment Link and is no longer described as a first-month credit.
+
+Ship now: $12/month with the existing Pro entitlements, including the
+70-message weekly AI allowance.
+Re-evaluate when: 30 paid users with two active weeks, or observed p90 AI cost
+per paid user exceeds $6/month (50% gross margin at $12).
+Then: lower the Pro weekly AI allowance or raise the price; do not cut the
+profile, claim or release features that the offer is sold on.
+
+## Historical packaging (superseded for new purchases)
+
 > Status: weekly packaging approved for launch on 2026-08-17. Paid overage is
 > still a proposal and must not launch until the telemetry, billing, and consent
 > gates below pass. Governing principles live in
@@ -19,7 +50,7 @@ steps, retries, and tokens are implementation details, not customer units.
 |---|---:|---:|---|
 | Free | $0 | 15/week | Hard stop, upgrade to Pro |
 | Pro Trial | $0 for 14 days | 50/week | Hard stop, upgrade to Pro |
-| Pro | $39/month or $375/year | 70/week | Hard stop until paid overage is explicitly enabled |
+| Pro | $39/month or $375/year (superseded: $12/month, 2026-10-20) | 70/week | Hard stop until paid overage is explicitly enabled |
 | Max | $149/month or $1,430/year | 250/week | Hard stop until paid overage is explicitly enabled |
 
 The plan quota is a rolling seven-day window. A separate 30-message hourly burst

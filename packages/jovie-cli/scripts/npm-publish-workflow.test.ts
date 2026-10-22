@@ -651,3 +651,17 @@ describe('independent manual CLI release cadence', () => {
     }
   );
 });
+
+describe('push-triggered publication', () => {
+  // On push, `inputs.publish_mcp_only` renders as '' and `test "" = false`
+  // failed every push publish since 2026-10-13 (JOV-7919).
+  it('renders PUBLISH_MCP_ONLY as a literal boolean for push events', () => {
+    const lines = workflow.match(/PUBLISH_MCP_ONLY: .*/g) ?? [];
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line).toBe(
+        'PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only == true }}'
+      );
+    }
+  });
+});

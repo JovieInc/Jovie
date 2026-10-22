@@ -17,21 +17,28 @@ then promotes). CI refuses `proven` without a reference route. (Charter's 11 +
 
 ## #recipe-homepage (proven)
 
-**Reference:** `/` (selected company-level identity homepage; `/new` redirects
-here). **Audience:** general. **Sections (4):** hero → feature-split (presence)
-→ feature-split (structure) → cta. Permissioned logo proof is conditional and
-omitted by default; available FAQ copy is not a mounted FAQ section.
+**Reference:** `/` (EVENT 2026-10-20: the homepage sells the artist profile;
+`/new` redirects here). **Audience:** general metadata, artist-profile body.
+**Sections (3):** hero (`split-claim-card`: claim + live profile capture) →
+product-gallery (`profile-grid`: three real profile states) → cta
+(`final-single-claim`: the free offer from offer truth + the same claim).
+Permissioned logo proof is conditional and omitted by default.
 
-**Arc:** promise → comprehension → depth → action, using the selected
-homepage's existing identity, presence, structure and claim content authority.
+**Arc:** promise → proof → action. Copy: `apps/web/data/homepageCopy.ts`
+(light; the proxy's markdown projection imports it) and
+`homepageFanStatesCopy.ts` (reuses `ARTIST_PROFILE_COPY`).
 
-**CTA cadence:** sparse, "Claim", hero-and-close.
+**CTA cadence:** sparse, "Claim", hero-and-close. The header names the same
+action ("Claim your profile").
+
+**Offer:** the price and terms render through `MarketingOfferSummary` from
+`lib/billing/offer-truth.ts`. A paid artist-profile offer appears only after
+JOV-8368 publishes it there; never type a price into copy.
 
 **Decision tree:** `traffic=home OR (audience=general AND intent=category)`.
-The artist-specific capture/reactivation story belongs to its scoped recipe.
 
-**Never:** for audience=artist specifically (use artist-lp); as a feature page
-(use feature — narrower scope).
+**Never:** as a feature page (use feature — narrower scope). The rendered
+contract lives in `apps/web/tests/unit/home/homepage-contract.test.tsx`.
 
 ## #recipe-pricing (proven)
 

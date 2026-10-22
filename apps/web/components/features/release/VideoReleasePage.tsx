@@ -139,7 +139,9 @@ export function VideoReleasePage({
         </div>
 
         <div className='mt-auto pt-6'>
-          <SmartLinkPoweredByFooter />
+          <SmartLinkPoweredByFooter
+            reportTarget={`/${artist.handle}/${release.slug}`}
+          />
         </div>
       </div>
       <ProfileDrawerShell

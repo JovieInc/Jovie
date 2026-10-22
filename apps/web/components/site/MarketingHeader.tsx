@@ -58,8 +58,11 @@ const MARKETING_HEADER_CTA_BY_PATH: Readonly<
 > = {
   // Homepage conversion lock (JOV-5085): the homepage never shows Request
   // access, even while waitlisting; /start runs the waitlist gate after auth.
-  // ui-casing-allow: canonical Pen header CTA copy (sentence case)
-  [APP_ROUTES.HOME]: { label: 'Find yourself', href: APP_ROUTES.START },
+  // The label names the homepage's one action, the artist-profile claim
+  // (EVENT 2026-10-20); marketing-header-cta-consistency pins it to the
+  // shared claim-profile CTA intent label.
+  // ui-casing-allow: shared CTA intent copy (sentence case, as on /artist-profiles)
+  [APP_ROUTES.HOME]: { label: 'Claim your profile', href: APP_ROUTES.START },
 };
 
 /**

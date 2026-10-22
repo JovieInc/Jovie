@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { mockFitLayout } from './fit-layout.test-utils';
 import {
+  HOME_LOOP_FIXTURE_BUSY_DONE,
   HOME_LOOP_FIXTURE_DONE,
   HOME_LOOP_FIXTURE_PULSE,
   HOME_LOOP_FIXTURE_ROWS,
@@ -109,6 +111,33 @@ describe('HomeLoopStageRows', () => {
   });
 });
 
+describe('Home loop fit', () => {
+  it('hides pulse tiles that do not fit one row, keeping priority order', () => {
+    const restore = mockFitLayout('home-loop-pulse', 250);
+    try {
+      render(<HomeLoopPulse tiles={HOME_LOOP_FIXTURE_PULSE} />);
+      const tiles = screen.getAllByTestId(/^home-loop-tile-/);
+      expect(
+        tiles.filter(tile => tile.getAttribute('aria-hidden') !== 'true')
+      ).toEqual(tiles.slice(0, 2));
+    } finally {
+      restore();
+    }
+  });
+
+  it('collapses done chips that do not fit into +N more', () => {
+    const restore = mockFitLayout('home-loop-done', 250);
+    try {
+      render(<HomeLoopDoneChips items={HOME_LOOP_FIXTURE_BUSY_DONE} fit />);
+      expect(screen.getByTestId('home-loop-done-more')).toHaveTextContent(
+        `+${HOME_LOOP_FIXTURE_BUSY_DONE.length - 2} more`
+      );
+    } finally {
+      restore();
+    }
+  });
+});
+
 describe('HomeLoopSection', () => {
   function section(
     status: 'loading' | 'error' | 'ready',
@@ -164,6 +193,28 @@ describe('HomeLoopSection', () => {
     rerender(section('ready', false));
     expect(screen.getByText('Body')).toBeVisible();
     expect(screen.getByTestId('section-count')).toHaveTextContent('3');
+  });
+
+  it('replaces a clear empty line when a source warning is present', () => {
+    render(
+      <HomeLoopSection
+        title='Blocked On You'
+        status='ready'
+        isEmpty
+        emptyLabel='Nothing here'
+        errorLabel='Could not load'
+        notice='Some sources are unavailable.'
+        skeleton={<p>Skeleton</p>}
+        testId='section'
+      >
+        <p>Body</p>
+      </HomeLoopSection>
+    );
+    expect(screen.getByTestId('section-notice')).toHaveTextContent(
+      'Some sources are unavailable.'
+    );
+    expect(screen.queryByText('Nothing here')).not.toBeInTheDocument();
+    expect(screen.queryByText('Body')).not.toBeInTheDocument();
   });
 });
 

@@ -736,6 +736,52 @@ describe('JovieChat styling regressions', () => {
     expect(container.querySelector('[data-testid="chat-usage"]')).toBeNull();
   });
 
+  it('keeps a living Home canvas as the surface after messages, with the transcript on request', () => {
+    const states: { isStreaming: boolean; count: number }[] = [];
+    const { container, getByRole } = renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        chatMode='ov'
+        homeCanvasMode='living'
+        homeCanvas={state => {
+          states.push({
+            isStreaming: state.isStreaming,
+            count: state.messages.length,
+          });
+          return (
+            <button type='button' onClick={state.onOpenTranscript}>
+              Open Transcript Fixture
+            </button>
+          );
+        }}
+      />
+    );
+
+    expect(
+      container
+        .querySelector('[data-testid="chat-empty-state-viewport"]')
+        ?.getAttribute('data-empty-affordance')
+    ).toBe('home-canvas');
+    expect(states.at(-1)).toEqual({ isStreaming: true, count: 1 });
+    // Living Home fills the space above the composer (no page scroll).
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-above-scroll"]')
+    ).toHaveClass('lg:overflow-hidden');
+
+    act(() => {
+      getByRole('button', { name: 'Open Transcript Fixture' }).click();
+    });
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-viewport"]')
+    ).toBeNull();
+    act(() => {
+      getByRole('button', { name: 'Back To Home' }).click();
+    });
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-viewport"]')
+    ).toBeTruthy();
+  });
+
   it('keeps the bare Jovie empty state when no Home canvas is supplied', () => {
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;

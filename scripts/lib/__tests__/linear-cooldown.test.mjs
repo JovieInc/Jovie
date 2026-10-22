@@ -256,3 +256,12 @@ process.on('exit', () => {
   if (previous.key === undefined) delete process.env.LINEAR_API_KEY;
   else process.env.LINEAR_API_KEY = previous.key;
 });
+
+describe('linearAuthorization', () => {
+  it('sends personal keys raw and OAuth tokens as Bearer', async () => {
+    const { linearAuthorization } = await import('../linear-cooldown.mjs');
+    assert.equal(linearAuthorization('lin_api_abc'), 'lin_api_abc');
+    assert.equal(linearAuthorization('lin_oauth_abc'), 'Bearer lin_oauth_abc');
+    assert.equal(linearAuthorization('Bearer xyz'), 'Bearer xyz');
+  });
+});

@@ -16,6 +16,7 @@ import {
   test,
 } from '@playwright/test';
 import { UX_LATENCY_STORAGE_KEY } from '@/lib/monitoring/interaction-latency';
+import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { selectInteractionHotPaths } from '@/scripts/performance-interaction-manifest';
 import {
   buildInteractionLatencyReport,
@@ -35,8 +36,9 @@ const SAMPLE_COUNT = 5;
  * Cold `/app/chat` mounts on CI decay across the first few full reloads
  * (route compile and hydration). Five samples make p95 the worst sample, so
  * scoring those cold mounts fails a steady-state budget the warm samples
- * already meet. Discard this many unmeasured round trips, then score the
- * same five-sample p50/p95 budgets. A hot-path regression still fails.
+ * already meet. Discard this many unmeasured round trips, then score five
+ * sends on that same warmed document. Remounting before each scored send
+ * made p95 a cold mount again. A hot-path regression still fails.
  *
  * Oct 2 Extended Smoke knee (usable ms): 580, 314, 273, then 142 and 148.
  */
@@ -309,11 +311,10 @@ function isChatApiRequest(request: Request): boolean {
  * Counts in-flight chat-owned API requests (all served by `mockChatBackend`).
  *
  * `networkidle` is not a usable readiness signal on the chat route: the shell
- * sidebar full-prefetches every nav destination (`prefetch={true}`) and warms
- * the Library route plus its release-matrix data ~300ms after mount. Those are
- * real, DB-backed renders of other routes whose duration is not bounded by the
- * chat surface, so on a loaded CI server they can keep the network busy past
- * any timeout (and get aborted mid-stream by the next navigation).
+ * must not full-prefetch every nav destination (that burst exceeds the shell
+ * RSC budget). Query warming can still fetch Library data after mount. Those
+ * requests are not bounded by the chat surface, so on a loaded CI server they
+ * can keep the network busy past any timeout.
  */
 function trackChatApiRequests(page: Page) {
   const inFlight = new Set<Request>();
@@ -377,10 +378,30 @@ async function remountChatRoute(
   composer: Locator,
   chatApi: ReturnType<typeof trackChatApiRequests>
 ): Promise<void> {
-  // A full route mount makes each sample independent and resets the
-  // intentional one-message-per-second composer pacer without sleeping.
+  // Warmup only. A scored sample that reloads measures route compile and
+  // hydration, which the steady-state budget does not describe.
   await page.goto('/app/chat', { waitUntil: 'domcontentloaded' });
   await waitForChatRouteReady(page, chatContent, composer, chatApi);
+}
+
+/**
+ * The composer allows one send per window and rejects the next click.
+ * The last warmup send is already on this document, so the first scored
+ * sample has to wait too. The probe clock is the click that armed the
+ * limiter.
+ */
+async function waitForChatSendPacer(page: Page): Promise<void> {
+  const windowMs = PACER_TIMING.CHAT_RATE_LIMIT_MS;
+  await page.waitForFunction(limitMs => {
+    const probe = (
+      window as Window & {
+        __jovieChatPerformanceProbe?: { start: number };
+      }
+    ).__jovieChatPerformanceProbe;
+    return (
+      probe !== undefined && performance.now() - probe.start >= limitMs + 100
+    );
+  }, windowMs);
 }
 
 async function exchangeChatRoundTrip(
@@ -457,7 +478,7 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
   const samples: InteractionLatencySample[] = [];
 
   for (let runIndex = 0; runIndex < SAMPLE_COUNT; runIndex += 1) {
-    await remountChatRoute(page, chatContent, composer, chatApi);
+    await waitForChatSendPacer(page);
     const copy = roundTripCopy('Performance', runIndex);
     const timings = await exchangeChatRoundTrip(
       page,

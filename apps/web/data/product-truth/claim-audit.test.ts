@@ -154,7 +154,7 @@ describe('marketing copy claim coverage', () => {
     ).toBeUndefined();
 
     const homepageSource = readFileSync(
-      path.join(__dirname, '../homepageIdentityCopy.ts'),
+      path.join(__dirname, '../homepageCopy.ts'),
       'utf8'
     );
     const companySource = readFileSync(

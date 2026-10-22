@@ -16,9 +16,11 @@ from typing import Callable, Optional
 from urllib.parse import urlsplit
 
 from .cache import MemoryResponseCache, cache_key, cacheable, to_cached
-from .contract import DEFAULTS, priority_policy, provider_spec, resource_for
+from .contract import DEFAULTS, callable_spec, priority_policy, resource_for
 from .headers import classify_failure, failure, parse_budget
-from .policy import backoff_ms, bump, credential_state, decide, observe, record_outcome
+from .policy import (
+    backoff_ms, bump, credential_state, decide, observe, record_outcome, refund_spend, reserve_spend,
+)
 from .store import credential_label, default_store, now_ms
 
 EX_TEMPFAIL = 75
@@ -37,6 +39,16 @@ class ApiError(Exception):
         self.retry_at = retry_at
         self.status = status
         self.failure = failure_kind
+
+
+class BudgetExhaustedError(ApiError):
+    """Money, not quota (mirror of BudgetExhaustedError): cap reached, no cap for a priced call, or HTTP 402."""
+
+    def __init__(self, provider: str, message: str, price_usd: float, spent_usd=None, cap_usd=None, retry_at=None):
+        super().__init__("budget_exhausted", provider, message, retry_at=retry_at, status=402)
+        self.price_usd = price_usd
+        self.spent_usd = spent_usd
+        self.cap_usd = cap_usd
 
 
 class ApiResponse:
@@ -94,10 +106,12 @@ class ApiClient:
     def __init__(self, provider: str, credential: str, authorize: Optional[Callable[[dict], None]] = None,
                  store=None, cache=None, transport=None, now: Callable[[], int] = now_ms,
                  sleep: Optional[Callable[[float], None]] = None, random: Callable[[], float] = _random.random,
-                 log: Callable[[dict], None] = _log_stderr, hooks=None):
+                 log: Callable[[dict], None] = _log_stderr, hooks=None, daily_spend_cap_usd: Optional[float] = None):
         self.provider = provider
         self.credential = credential
-        self.spec = provider_spec(provider)
+        self.spec = callable_spec(provider)
+        pricing = self.spec.get("pricing") or {}
+        self.spend_cap = daily_spend_cap_usd if daily_spend_cap_usd is not None else pricing.get("dailyCapUsd")
         self.authorize = authorize
         self.store = store if store is not None else default_store()
         self.cache = cache if cache is not None else MemoryResponseCache()
@@ -126,7 +140,8 @@ class ApiClient:
                 priority: str = "default", costs: Optional[dict] = None, write: Optional[bool] = None,
                 idempotent: Optional[bool] = None, cache_ttl_ms: Optional[int] = None,
                 conditional: Optional[bool] = None, max_attempts: Optional[int] = None,
-                max_wait_ms: Optional[int] = None, timeout_ms: Optional[int] = None) -> ApiResponse:
+                max_wait_ms: Optional[int] = None, timeout_ms: Optional[int] = None,
+                price_usd: Optional[float] = None) -> ApiResponse:
         method = method.upper()
         text_body = body if body is None or isinstance(body, str) else json.dumps(body)
         is_graphql = urlsplit(url).path.endswith("/graphql")
@@ -142,6 +157,7 @@ class ApiClient:
         key = cache_key([self.provider, self.credential, method, url, (headers or {}).get("accept", ""),
                          "" if method == "GET" else (text_body or "")])
         timeout_s = (timeout_ms or DEFAULTS["timeoutMs"]) / 1000
+        price = price_usd if price_usd is not None else (self.spec.get("pricing") or {}).get("perCallUsd", 0)
 
         if read and cache_ttl_ms:
             hit = self.cache.get(key)
@@ -152,6 +168,7 @@ class ApiClient:
         attempt = 0
         while True:
             prepared = self.hooks.prepare() if self.hooks else None
+            denied: list = []
 
             def admit(s, at):
                 if self.hooks:
@@ -164,10 +181,25 @@ class ApiClient:
                     bump(s, priority, "waited", at)
                 if d["action"] == "go" and attempt > 0:
                     bump(s, priority, "retries", at)
+                if d["action"] == "go" and price > 0:
+                    spend = reserve_spend(s, price, self.spend_cap, at)
+                    if not spend["ok"]:
+                        denied.append(spend)
                 return d
 
             d = self._ledger(admit)
             self._transition(d.get("transition"), self.now())
+            if denied:
+                spend = denied[0]
+                self.log({"schema": "jovie.api-client.spend/v1", "provider": self.provider,
+                          "credential": credential_label(self.credential), "outcome": "budget_exhausted",
+                          "priceUsd": price, "spentUsd": spend["spentUsd"], "capUsd": spend["capUsd"],
+                          "at": self.now()})
+                message = (f"priced call (${price}) with no daily spend cap configured" if spend["capUsd"] is None
+                           else f"daily spend cap ${spend['capUsd']} reached (${spend['spentUsd']} spent, "
+                                f"call costs ${price})")
+                raise BudgetExhaustedError(self.provider, message, price, spend["spentUsd"], spend["capUsd"],
+                                           spend["retryAt"])
             if d["action"] == "shed":
                 raise ApiError("shed", self.provider, f"{priority} shed ({d['reason']})", retry_at=d["until"])
             if d["action"] == "wait":
@@ -201,7 +233,11 @@ class ApiClient:
                                         network_error=status is None, now_ms=at)
             observations = parse_budget(self.spec, resp_headers, at, resource) if status is not None else []
 
+            paid_failed = price > 0 and not not_modified and (status is None or status >= 400)
+
             def settle(s, t):
+                if paid_failed:
+                    refund_spend(s, price, t)
                 observe(s, observations, t)
                 if not_modified:
                     bump(s, priority, "notModified", t)
@@ -212,6 +248,9 @@ class ApiClient:
             self._transition(change, at)
             if self.hooks:
                 self.hooks.publish(state, fail, settled_at)
+            if status == 402:
+                raise BudgetExhaustedError(self.provider, f"{method} {urlsplit(url).path} answered 402 "
+                                           "(provider wallet or plan exhausted)", price)
             if status is not None and fail["kind"] in ("none", "client"):
                 if not_modified:
                     return ApiResponse(stored["status"], dict(stored["headers"]), stored["body"], "etag", attempt)

@@ -58,6 +58,22 @@
           "source": "github-pr"
         },
         {
+          "id": "gate-seat",
+          "meaning": "lane gate waiting for a host gate seat (admission deferrals exit as abandoned)",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "gate",
+          "meaning": "lane gate run on the exact head (seat acquired to verdict)",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
           "id": "ready",
           "meaning": "pull request ready for review (non-draft)",
           "producer": "github",
@@ -165,6 +181,27 @@
         }
       ]
     },
+    "release-replay": {
+      "entityId": "<controller workflow file>#<run id>@<run attempt> (the failed controller attempt)",
+      "description": "One failed Staging/Production Controller attempt, from its failure to the replay decision of controller-quota-replay.yml. Only transient failures (quota, GitHub 5xx, network, runner loss) are replayed, at most to attempt 3.",
+      "endToEnd": [["blocked", "replayed"]],
+      "stages": [
+        {
+          "id": "blocked",
+          "meaning": "the controller attempt failed; exits at the replay decision (advanced = replayed, abandoned = not transient or superseded, failed = attempt or wait cap)",
+          "producer": "controller-quota-replay.yml",
+          "status": "pushed",
+          "source": "release-replay-receipts"
+        },
+        {
+          "id": "replayed",
+          "meaning": "gh run rerun --failed was accepted for the attempt",
+          "producer": "controller-quota-replay.yml",
+          "status": "pushed",
+          "source": "release-replay-receipts"
+        }
+      ]
+    },
     "ios-release": {
       "entityId": "JovieInc/LogYourBody@sha",
       "description": "LogYourBody iOS build from merge to App Store release.",
@@ -245,13 +282,81 @@
           "status": "spec",
           "source": "revenue-funnel-timings",
           "owner": "apps/web"
+        },
+        {
+          "id": "pending-verification",
+          "meaning": "branch after paid: a high-reach artist claim (>=50k Spotify followers) is held for ownership verification instead of going live (acquisition_journey_stages, lib/claim/claim-verification.ts)",
+          "producer": "apps/web Stripe checkout webhook (markClaimVerificationsPaid)",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        },
+        {
+          "id": "claim-verified",
+          "meaning": "branch after pending-verification: an operator approved the claim and the artist was linked",
+          "producer": "apps/web claim verification review (decideClaimVerification)",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        },
+        {
+          "id": "claim-rejected",
+          "meaning": "branch after pending-verification: an operator rejected the claim; first month refunded and subscription canceled",
+          "producer": "apps/web claim verification review (decideClaimVerification)",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        }
+      ]
+    },
+    "automation-run": {
+      "entityId": "<automationId>@<runRef> (registry id in canon/automation-registry.jsonl plus the run's own reference)",
+      "description": "One run of a registered automation, from start to its terminal receipt, as observed by the dead-man liveness check.",
+      "endToEnd": [["started", "finished"]],
+      "stages": [
+        {
+          "id": "started",
+          "meaning": "the automation's run started (from its receipt)",
+          "producer": "automation-liveness",
+          "status": "pushed",
+          "source": "automation-liveness-receipts"
+        },
+        {
+          "id": "finished",
+          "meaning": "the run reached a terminal receipt (completed or failed)",
+          "producer": "automation-liveness",
+          "status": "pushed",
+          "source": "automation-liveness-receipts"
+        }
+      ]
+    },
+    "linear-intake": {
+      "entityId": "Linear issue identifier (JOV-123, LYB-45)",
+      "description": "One issue that entered Triage, from entry to classification (team, priority, labels, out of Triage) or an explicit Ovie card for Tim. Dwell SLO 15 min (.claude/rules/event-driven.md); dead-man summer:triage-dwell.",
+      "endToEnd": [["triage", "classified"]],
+      "stages": [
+        {
+          "id": "triage",
+          "meaning": "issue entered Triage (create or move) until Summer's scoped triage turn read back its effect",
+          "producer": "summer-config",
+          "status": "spec",
+          "source": "summer-stage-feed",
+          "owner": "summer-config"
+        },
+        {
+          "id": "classified",
+          "meaning": "terminal: completed when moved out of Triage with priority set, failed when held as an Ovie card for Tim",
+          "producer": "summer-config",
+          "status": "spec",
+          "source": "summer-stage-feed",
+          "owner": "summer-config"
         }
       ]
     },
     "summer-turn": {
-      "entityId": "summer conversation id + turn number",
+      "entityId": "<hashed conversation>:<hashed turn> (summer-config hashes both)",
       "description": "One Summer turn from triggering event to measured outcome.",
-      "endToEnd": [["event", "outcome"]],
+      "endToEnd": [["event", "outcome"], ["model-turn", "outcome"]],
       "stages": [
         {
           "id": "event",
@@ -265,25 +370,73 @@
           "id": "model-turn",
           "meaning": "model call started",
           "producer": "summer-config",
-          "status": "spec",
-          "source": "summer-stage-feed",
-          "owner": "summer-config"
+          "status": "pushed",
+          "source": "summer-stage-feed"
         },
         {
           "id": "action",
           "meaning": "tool/action dispatched",
           "producer": "summer-config",
-          "status": "spec",
-          "source": "summer-stage-feed",
-          "owner": "summer-config"
+          "status": "pushed",
+          "source": "summer-stage-feed"
         },
         {
           "id": "outcome",
           "meaning": "terminal receipt with outcome recorded",
           "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        }
+      ]
+    },
+    "claim-dogfood": {
+      "entityId": "claim-checkout-dogfood#<run id>@<run attempt>",
+      "description": "One browser dogfood of the $12 artist claim (Stripe test mode, fixture artists): from the staging deploy (or dispatch) that made it due to the journey verdict.",
+      "endToEnd": [["wait", "journey"]],
+      "stages": [
+        {
+          "id": "wait",
+          "meaning": "staging deploy finished (Staging Controller completed) or dispatch, until the dogfood job started",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        },
+        {
+          "id": "setup",
+          "meaning": "job start to app ready: ephemeral Neon branch, migrations, build, server",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        },
+        {
+          "id": "journey",
+          "meaning": "browser journey; outcome completed (green) or failed (red)",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        }
+      ]
+    },
+    "market-signal": {
+      "entityId": "<item id> (x-post:<snowflake id> for X posts)",
+      "description": "INTERNAL ONLY. One external market signal seen by scripts/signals/signal_watch.py. X has no push trigger, so X posts come from a backstop poll (one Grok CLI call per watcher run, every 6 h). The published stage measures that poll's cost; this is the documented exception to event-driven.",
+      "endToEnd": [["published", "delivered"]],
+      "stages": [
+        {
+          "id": "published",
+          "meaning": "from the post's own createdAt (snowflake time) to the watcher run that observed it",
+          "producer": "signal-watch",
           "status": "spec",
-          "source": "summer-stage-feed",
-          "owner": "summer-config"
+          "source": "signal-watch-feed",
+          "owner": "signals"
+        },
+        {
+          "id": "delivered",
+          "meaning": "from the card entering the outbox to Summer's signed ingress answering 202 (or rejecting it)",
+          "producer": "signal-watch",
+          "status": "spec",
+          "source": "signal-watch-feed",
+          "owner": "signals"
         }
       ]
     }
@@ -315,9 +468,23 @@
       "url": null,
       "owner": "LogYourBody release loop"
     },
-    "summer-stage-feed": {
+    "automation-liveness-receipts": {
       "kind": "events",
       "url": null,
+      "artifact": "automation-liveness-receipts/stage-events.ndjson",
+      "workflow": "automation-liveness.yml",
+      "owner": "automation registry (scripts/automation-liveness.mjs)"
+    },
+    "release-replay-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "release-replay-receipts/stage-events.ndjson",
+      "workflow": "controller-quota-replay.yml",
+      "owner": "release path (.github/scripts/controller-quota-replay.mjs)"
+    },
+    "summer-stage-feed": {
+      "kind": "events",
+      "url": "https://summer.jov.ie/runtime/v1/summer-stage-events.ndjson",
       "owner": "summer-config"
     },
     "revenue-funnel-timings": {
@@ -325,14 +492,35 @@
       "url": "https://jov.ie/api/cron/stage-timings",
       "auth": "CRON_SECRET",
       "owner": "apps/web"
+    },
+    "claim-dogfood-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "claim-dogfood-receipts/stage-events.ndjson",
+      "workflow": "claim-checkout-dogfood.yml",
+      "owner": "revenue path (scripts/claim-dogfood-report.mjs)"
+    },
+    "signal-watch-feed": {
+      "kind": "events",
+      "url": null,
+      "artifact": "stage-events.ndjson next to the watcher state (rolling 28 d, written by scripts/signals/signal_watch.py)",
+      "owner": "signals; published through the lanes status feed once the Gem tick is live"
     }
   },
   "producers": {
     "workflows": {
+      "automation-liveness.yml": [
+        "automation-run:started",
+        "automation-run:finished"
+      ],
       "ci.yml": ["shipping:ready", "remediation:red", "remediation:green"],
       "lane-fix-relay.yml": ["remediation:classified"],
       "staging-controller.yml": ["release:staging"],
       "production-controller.yml": ["release:verified", "shipping:verified"],
+      "controller-quota-replay.yml": [
+        "release-replay:blocked",
+        "release-replay:replayed"
+      ],
       "production-release.yml": [
         "release:canary",
         "release:prod",

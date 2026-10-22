@@ -50,6 +50,14 @@ import {
   throughputTrend,
   validateBaseline,
 } from './lib/shipping-slo.mjs';
+import { collectStageRaw } from './lib/stage-collect.mjs';
+import { deriveStageEvents } from './lib/stage-derive.mjs';
+import {
+  buildStageSummary,
+  compactStageTimings,
+  computeStageTimings,
+  validateStageManifest,
+} from './lib/stage-events.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -66,6 +74,15 @@ const BLOG_LATENCY_PATH = resolve(
 // Validation is the PR gate, so it feeds the pull_request wall-time and PR
 // red→green metrics that otherwise stay null.
 const DEFAULT_WORKFLOWS = 'ci.yml,source-validation.yml';
+const STAGE_MANIFEST_PATH = resolve(
+  REPO_ROOT,
+  'docs/metrics/stage-manifest.json'
+);
+const STAGE_TIMINGS_PATH = resolve(
+  REPO_ROOT,
+  'docs/metrics/stage-timings-latest.json'
+);
+const API_CLIENT_CLI = resolve(REPO_ROOT, 'packages/api-client/cli.ts');
 const TIMELINE_PR_LIMIT = 80;
 const DEPLOYMENT_LIMIT = 60;
 
@@ -392,7 +409,11 @@ export function collectRaw({ workflows, days }) {
 }
 
 /** Raw input → metrics → flat values → evaluation. Pure after collection. */
-export function buildReport(raw, baseline, { now = Date.now() } = {}) {
+export function buildReport(
+  raw,
+  baseline,
+  { now = Date.now(), stageManifest = null } = {}
+) {
   const nowMs = typeof now === 'number' ? now : Date.parse(now);
   const weekMs = 7 * 86_400_000;
   const sinceMs = nowMs - weekMs;
@@ -489,6 +510,37 @@ export function buildReport(raw, baseline, { now = Date.now() } = {}) {
 
   const evaluation = evaluateShippingSlo(flat, baseline, {});
   const gistSlo = buildGistSloBlock(flat, evaluation, { now: nowMs });
+  const stageTimings =
+    raw.stages && stageManifest
+      ? computeStageTimings(
+          deriveStageEvents(raw.stages, stageManifest),
+          stageManifest,
+          {
+            now: nowMs,
+            sources: raw.stages.sources ?? {},
+            external: raw.stages.external ?? {},
+          }
+        )
+      : null;
+  if (stageTimings) {
+    // Stage derivation joins each merge to the production generation whose
+    // head is at or after its merge commit across the full window; the legacy
+    // join only saw the last 50 controller runs and inflated the lag.
+    const lag = stageTimings.entities.shipping?.endToEnd?.['merged->verified'];
+    if (lag?.['7d']?.n) {
+      metrics.productionLag.lag = lag['7d'];
+      flat['production_lag.merged_to_verified.p95'] = lag['7d'].p95;
+      const refreshed = evaluateShippingSlo(flat, baseline, {});
+      evaluation.regressions = refreshed.regressions;
+      evaluation.tightenCandidates = refreshed.tightenCandidates;
+      evaluation.flatStall = refreshed.flatStall;
+      Object.assign(
+        gistSlo,
+        buildGistSloBlock(flat, evaluation, { now: nowMs })
+      );
+    }
+    gistSlo.stages = buildStageSummary(stageTimings);
+  }
 
   return {
     schemaVersion: 1,
@@ -503,6 +555,7 @@ export function buildReport(raw, baseline, { now = Date.now() } = {}) {
       flatStall: evaluation.flatStall,
     },
     gistSlo,
+    stageTimings,
     sampled: {
       ciRuns:
         (raw.runs?.pull_request?.length ?? 0) +
@@ -586,17 +639,56 @@ export function markdownSummary(report) {
         `- \`${c.key}\`: ${c.baseline} → ${c.observed} (held ${c.heldDays}d)`
       );
   }
+  if (report.stageTimings)
+    lines.push('', ...stageMarkdown(report.stageTimings));
   return lines.join('\n');
 }
 
-function main() {
+/** Stage dwell table (7d/28d) with the regression flag per stage. */
+export function stageMarkdown(timings) {
+  const lines = [
+    '## Stage timings (jovie-stage-event/v1)',
+    '',
+    '| Stage | status | 24h n | 7d p50 | 7d p95 | 7d n | 28d p95 | 28d n | regression |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+  ];
+  for (const [type, entity] of Object.entries(timings.entities)) {
+    const rows = [
+      ...Object.entries(entity.stages).map(([id, row]) => [
+        `${type}:${id}`,
+        row,
+      ]),
+      ...Object.entries(entity.endToEnd).map(([pair, row]) => [
+        `${type}:${pair}`,
+        { ...row, status: 'end-to-end' },
+      ]),
+    ];
+    for (const [name, row] of rows)
+      lines.push(
+        `| ${name} | ${row.status}${row.terminal ? ' (terminal: arrivals)' : ''} | ${row['24h']?.n ?? 0} | ${fmtSeconds(row['7d']?.p50)} | ${fmtSeconds(row['7d']?.p95)} | ${row['7d']?.n ?? 0} | ${fmtSeconds(row['28d']?.p95)} | ${row['28d']?.n ?? 0} | ${row.regression?.regressed ? `yes (${row.regression.ratio.toFixed(2)}x)` : ''} |`
+      );
+  }
+  const down = Object.entries(timings.sources ?? {}).filter(([, s]) => !s.ok);
+  if (down.length)
+    lines.push(
+      '',
+      `**Stage sources unavailable:** ${down.map(([id, s]) => `${id} (${s.error})`).join('; ')}`
+    );
+  return lines;
+}
+
+async function main() {
   const args = process.argv.slice(2);
   const command = args[0] && !args[0].startsWith('--') ? args[0] : 'report';
 
   const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+  const stageManifest = JSON.parse(readFileSync(STAGE_MANIFEST_PATH, 'utf8'));
 
   if (command === 'validate') {
-    const { ok, errors } = validateBaseline(baseline);
+    const base = validateBaseline(baseline);
+    const stages = validateStageManifest(stageManifest);
+    const ok = base.ok && stages.ok;
+    const errors = [...base.errors, ...stages.errors];
     if (!ok) {
       for (const e of errors) console.error(`[shipping-slo] ✗ ${e}`);
       process.exitCode = 1;
@@ -660,7 +752,29 @@ function main() {
         days: Number(argValue(args, '--days', '21')),
       });
 
-  const report = buildReport(raw, baseline, {});
+  if (!raw.stages && !hasArg(args, '--no-stages') && !inputPath)
+    raw.stages = await collectStageRaw({
+      gh: ghArgs =>
+        execFileSync(
+          process.execPath,
+          [API_CLIENT_CLI, 'gh', '--priority', 'report', '--', ...ghArgs],
+          {
+            encoding: 'utf8',
+            maxBuffer: 256 * 1024 * 1024,
+            env: {
+              ...process.env,
+              GH_PAGER: 'cat',
+              // Read-only token that also covers JovieInc/LogYourBody.
+              GH_TOKEN: process.env.STAGE_GH_TOKEN || process.env.GH_TOKEN,
+            },
+          }
+        ),
+      manifest: stageManifest,
+      repository: repo(),
+      days: Number(argValue(args, '--stage-days', '29')),
+    });
+
+  const report = buildReport(raw, baseline, { stageManifest });
 
   if (hasArg(args, '--ratchet')) {
     const { next, tightened } = ratchetBaseline(
@@ -684,6 +798,11 @@ function main() {
       BLOG_LATENCY_PATH,
       formatBiomeJson(report.blogPublishLatency)
     );
+    if (report.stageTimings)
+      writeFileSync(
+        STAGE_TIMINGS_PATH,
+        formatBiomeJson(compactStageTimings(report.stageTimings))
+      );
   }
 
   const jsonOut = argValue(args, '--json', null);
@@ -695,4 +814,8 @@ function main() {
 const isMain =
   process.argv[1] &&
   fileURLToPath(import.meta.url) === resolve(process.argv[1]);
-if (isMain) main();
+if (isMain)
+  main().catch(error => {
+    console.error(`[shipping-slo] ${error?.stack ?? error}`);
+    process.exitCode = 1;
+  });
