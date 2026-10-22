@@ -973,7 +973,12 @@ def test_promotion_controller_keeps_inspect_json_separate_from_cli_diagnostics(
     calls = (tmp_path / "vercel-calls").read_text()
     assert calls.count("promote dpl_target") == 1
     assert "Production Current is terminal on dpl_target." in result.stdout
-    assert "do-not-leak-sensitive-marker" not in result.stdout + result.stderr
+    # Inspect build output and the CLI update notice stay off the controller's
+    # streams. The 10s subprocess budget is what fails if the builds payload
+    # is copied through shell parameters instead of projected from a file.
+    combined = result.stdout + result.stderr
+    assert "do-not-leak-sensitive-marker" not in combined
+    assert "x" * 64 not in combined
     assert "failure_subtype=" not in (tmp_path / "github-output").read_text()
 
 
