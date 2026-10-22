@@ -253,4 +253,26 @@ describe('Ovie Inbox', () => {
       ).toBeInTheDocument()
     );
   });
+
+  it('keeps a loaded decision inside a fixed scrollport', async () => {
+    mount(
+      response([
+        {
+          ...item,
+          body: `${'A long founder decision. '.repeat(40)}\n`,
+        },
+      ])
+    );
+
+    const scrollport = screen.getByTestId('ovie-inbox-scrollport');
+    expect(scrollport.className).toContain('h-64');
+    expect(scrollport.className).toContain('overflow-hidden');
+    expect(scrollport.className).not.toContain('min-h-64');
+    expect(scrollport.querySelector('.overflow-y-auto')).not.toBeNull();
+
+    await screen.findByTestId('ovie-inbox-decision');
+    expect(scrollport).toContainElement(
+      screen.getByTestId('ovie-inbox-decision')
+    );
+  });
 });

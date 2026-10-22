@@ -263,6 +263,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         {thread.href ? (
           <Link
             href={thread.href}
+            prefetch={false}
             aria-current={active ? 'page' : undefined}
             className={rowClasses}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
