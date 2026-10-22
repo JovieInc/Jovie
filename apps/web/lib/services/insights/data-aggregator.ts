@@ -509,7 +509,7 @@ async function aggregateSubscribers(
 // Revenue aggregation
 // ---------------------------------------------------------------------------
 
-async function aggregateRevenue(
+export async function aggregateRevenue(
   profileId: string,
   period: { start: Date; end: Date },
   comparisonPeriod: { start: Date; end: Date }
@@ -545,13 +545,21 @@ async function aggregateRevenue(
                     sum(t.amount_cents)::int as total_cents,
                     count(*)::int as count
                   from all_tips t
-                  inner join ${clickEvents} ce on ce.audience_member_id = (
-                    select id from ${audienceMembers}
-                    where ${audienceMembers.creatorProfileId} = ${profileId}
-                      and email = t.contact_email
-                    limit 1
-                  )
-                  where ce.city is not null
+                  inner join lateral (
+                    -- Repeated clicks must contribute at most one location per tip.
+                    -- Conflicting locations remain unattributed, rather than guessed.
+                    select min(city) as city
+                    from ${clickEvents}
+                    where audience_member_id = (
+                      select id from ${audienceMembers}
+                      where ${audienceMembers.creatorProfileId} = ${profileId}
+                        and email = t.contact_email
+                      limit 1
+                    )
+                      and creator_profile_id = ${profileId}
+                      and city is not null
+                    having count(distinct (city, country)) = 1
+                  ) ce on true
                   group by ce.city
                   order by total_cents desc
                   limit 10
