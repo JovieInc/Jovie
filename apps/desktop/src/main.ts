@@ -197,13 +197,9 @@ import {
 // sessions coexist without sharing cookies or corrupted renderer state.
 const sourceProfile = sourceHostProfile(app.isPackaged, APP_ENV, process.env);
 if (sourceProfile) {
-  app.setPath('userData', sourceProfile);
+  app.setPath('userData', sourceProfile.directory);
   // Playwright injects these; preserve real Electron visibility scheduling.
-  for (const flag of [
-    'disable-background-timer-throttling',
-    'disable-backgrounding-occluded-windows',
-    'disable-renderer-backgrounding',
-  ])
+  for (const flag of sourceProfile.switchesToRemove)
     app.commandLine.removeSwitch(flag);
 } else if (APP_ENV === 'staging') {
   app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Staging'));

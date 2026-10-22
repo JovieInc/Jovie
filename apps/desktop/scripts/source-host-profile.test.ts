@@ -4,7 +4,14 @@ import { sourceHostProfile } from '../src/source-host-profile';
 describe('source-host session isolation', () => {
   const env = { JOVIE_DEV: '1', JOVIE_DEV_USER_DATA_DIR: '/tmp/source-host' };
   it('uses an explicit absolute profile for local source opt-in', () => {
-    expect(sourceHostProfile(false, 'local', env)).toBe('/tmp/source-host');
+    expect(sourceHostProfile(false, 'local', env)).toEqual({
+      directory: '/tmp/source-host',
+      switchesToRemove: [
+        'disable-background-timer-throttling',
+        'disable-backgrounding-occluded-windows',
+        'disable-renderer-backgrounding',
+      ],
+    });
     expect(() =>
       sourceHostProfile(false, 'local', {
         ...env,

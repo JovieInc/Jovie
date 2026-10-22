@@ -107,26 +107,17 @@ export async function mockChatBackend(page: Page) {
     const createdAt = new Date(
       Date.UTC(2026, 6, 23, 0, 0, currentRun * 2)
     ).toISOString();
-    persistedMessages.push(
-      {
-        id: `user-chat-performance-${currentRun}`,
-        role: 'user',
-        content: userText,
+    for (const role of ['user', 'assistant'] as const)
+      persistedMessages.push({
+        id: `${role}-chat-performance-${currentRun}`,
+        role,
+        content: role === 'user' ? userText : assistantText,
         toolCalls: null,
-        clientMessageId: `client-chat-performance-${currentRun}`,
+        clientMessageId:
+          role === 'user' ? `client-chat-performance-${currentRun}` : null,
         turnId,
         createdAt,
-      },
-      {
-        id: `assistant-chat-performance-${currentRun}`,
-        role: 'assistant',
-        content: assistantText,
-        toolCalls: null,
-        clientMessageId: null,
-        turnId,
-        createdAt,
-      }
-    );
+      });
     runIndex += 1;
     return route.fulfill({
       status: 200,
@@ -195,7 +186,6 @@ export async function measureChatScrollFrames(
     const scrollElement = element as HTMLElement;
     if (scrollElement.scrollHeight <= scrollElement.clientHeight)
       throw new Error('Chat message list must overflow for the scroll ratchet');
-    // Swapping the virtual window and mounting scroll-to-latest are not scroll frames.
     scrollElement.scrollTop = 0;
   });
   await beforeFrames?.(page);
