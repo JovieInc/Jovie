@@ -911,6 +911,17 @@ export async function smokeNavigateWithRetry(
  * Check if an error is a transient infrastructure issue (server crash,
  * network timeout, browser closed) rather than a real test failure.
  */
+/**
+ * Playwright throws this when `page.evaluate` races a navigation. It is not a
+ * product failure, and it is intentionally absent from
+ * `isTransientNavigationError` so page-health checks do not record it as a
+ * redirect.
+ */
+export function isDestroyedExecutionContext(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes('Execution context was destroyed');
+}
+
 export function isTransientNavigationError(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error);
   return (

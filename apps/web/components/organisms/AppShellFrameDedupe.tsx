@@ -87,7 +87,24 @@ function releaseHiddenDuplicateFrames(): void {
     )) {
       landmark.removeAttribute('id');
     }
+    // Author `display: flex` keeps a `[hidden]` shell painted. Attribute
+    // stripping leaves its text in the accessibility tree, so a strict
+    // text query sees two copies of the same assistant paragraph.
+    clearRetainedShellText(frame);
   }
+}
+
+function clearRetainedShellText(frame: HTMLElement): void {
+  frame.setAttribute('hidden', '');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.inert = true;
+  frame.style.setProperty('display', 'none', 'important');
+  const walker = document.createTreeWalker(frame, NodeFilter.SHOW_TEXT);
+  const textNodes: Text[] = [];
+  while (walker.nextNode()) {
+    textNodes.push(walker.currentNode as Text);
+  }
+  for (const node of textNodes) node.textContent = '';
 }
 
 let observer: MutationObserver | null = null;
