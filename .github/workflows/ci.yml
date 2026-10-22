@@ -6429,7 +6429,12 @@ jobs:
     outputs:
       journey_outcome: ${{ steps.canonical_journey.outcome }}
       certification_outcome: ${{ steps.canonical_certification.outcome }}
-    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      # Preview – jovie secret STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY is
+      # the active test-mode USD 1200/month price. The assertion stays
+      # fail-closed; true reports a contract breach instead of a missing secret.
+      FEATURE_STRIPE_TEST_PRICE_CONFIGURED: 'true'
     # Scope pending replacement to one PR. GitHub replaces the older pending job in
     # a constant concurrency group even when cancel-in-progress is false, which can
     # cancel a required check before it obtains a runner. Golden-path cleanup only
