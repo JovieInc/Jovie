@@ -320,6 +320,155 @@ describe('data-aggregator.ts', () => {
     });
   });
 
+  describe('geographic identity from aggregate query results', () => {
+    type City = { city: string; country: string; count: number };
+
+    async function geographicSnapshot({
+      current = [],
+      previous = [],
+      audience = [],
+      shows = [],
+    }: {
+      current?: City[];
+      previous?: City[];
+      audience?: City[];
+      shows?: Array<{
+        city: string;
+        country: string;
+        startDate: Date;
+        venueName: string;
+      }>;
+    }) {
+      mockDashboardQuery
+        .mockResolvedValueOnce({
+          current_top_cities: current,
+          previous_top_cities: previous,
+        })
+        .mockResolvedValueOnce({ top_cities: audience })
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined);
+      mockDbLimit
+        .mockResolvedValueOnce(shows)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+      const { aggregateMetrics } = await import(
+        '@/lib/services/insights/data-aggregator'
+      );
+      return aggregateMetrics('profile-city-identity');
+    }
+
+    it('compares a same-named city only with its own country in either period', async () => {
+      const snapshot = await geographicSnapshot({
+        current: [
+          { city: 'Cambridge', country: 'US', count: 20 },
+          { city: 'Cambridge', country: 'GB', count: 10 },
+        ],
+        previous: [
+          { city: 'Cambridge', country: 'US', count: 10 },
+          { city: 'Cambridge', country: 'GB', count: 40 },
+        ],
+      });
+      expect(snapshot.geographic.cityGrowthRates).toEqual([
+        {
+          city: 'Cambridge',
+          country: 'US',
+          currentCount: 20,
+          previousCount: 10,
+          growthPct: 100,
+        },
+        {
+          city: 'Cambridge',
+          country: 'GB',
+          currentCount: 10,
+          previousCount: 40,
+          growthPct: -75,
+        },
+      ]);
+      expect(snapshot.geographic.newCities).toEqual([]);
+      expect(snapshot.geographic.decliningCities).toEqual([
+        { city: 'Cambridge', country: 'GB', declinePct: 75 },
+      ]);
+    });
+
+    it('does not hide a newly observed city because its namesake exists in another country', async () => {
+      const city = { city: 'Victoria', country: 'CA', count: 12 };
+      const snapshot = await geographicSnapshot({
+        current: [city],
+        previous: [{ city: 'Victoria', country: 'AU', count: 30 }],
+      });
+      expect(snapshot.geographic.newCities).toEqual([city]);
+      expect(snapshot.geographic.cityGrowthRates[0].previousCount).toBe(0);
+      expect(snapshot.geographic.decliningCities).toEqual([]);
+    });
+
+    it('matches a show to its country while retaining the gap for a foreign namesake', async () => {
+      const snapshot = await geographicSnapshot({
+        audience: [
+          { city: 'London', country: 'GB', count: 50 },
+          { city: 'London', country: 'CA', count: 20 },
+        ],
+        shows: [
+          {
+            city: 'LONDON',
+            country: 'ca',
+            startDate: new Date('2027-01-01T12:00:00Z'),
+            venueName: 'Local venue',
+          },
+        ],
+      });
+      expect(snapshot.tour.audienceCitiesWithoutShows).toEqual([
+        { city: 'London', country: 'GB', audienceCount: 50 },
+      ]);
+    });
+
+    it('accepts equivalent casing and whitespace without inventing a new or declining city', async () => {
+      const snapshot = await geographicSnapshot({
+        current: [{ city: ' Austin ', country: 'us', count: 15 }],
+        previous: [{ city: 'austin', country: 'US', count: 15 }],
+      });
+      expect(snapshot.geographic.newCities).toEqual([]);
+      expect(snapshot.geographic.decliningCities).toEqual([]);
+      expect(snapshot.geographic.cityGrowthRates[0]).toMatchObject({
+        previousCount: 15,
+        growthPct: 0,
+      });
+    });
+
+    it('conserves counts when equivalent location labels occupy multiple query buckets', async () => {
+      const snapshot = await geographicSnapshot({
+        current: [
+          { city: 'Austin', country: 'US', count: 12 },
+          { city: ' austin ', country: 'us', count: 8 },
+        ],
+        previous: [
+          { city: 'Austin', country: 'US', count: 6 },
+          { city: 'austin', country: 'us', count: 4 },
+        ],
+        audience: [
+          { city: 'Austin', country: 'US', count: 6 },
+          { city: 'austin', country: 'us', count: 5 },
+        ],
+      });
+      expect(snapshot.geographic.currentTopCities).toEqual([
+        { city: 'Austin', country: 'US', count: 20 },
+      ]);
+      expect(snapshot.geographic.cityGrowthRates).toEqual([
+        {
+          city: 'Austin',
+          country: 'US',
+          currentCount: 20,
+          previousCount: 10,
+          growthPct: 100,
+        },
+      ]);
+      expect(snapshot.geographic.newCities).toEqual([]);
+      expect(snapshot.tour.audienceCitiesWithoutShows).toEqual([
+        { city: 'Austin', country: 'US', audienceCount: 11 },
+      ]);
+    });
+  });
+
   // =========================================================================
   // 3. aggregateClicks
   // =========================================================================
