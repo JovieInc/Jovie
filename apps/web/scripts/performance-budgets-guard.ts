@@ -1513,17 +1513,79 @@ async function createContext(
  * body itself are already fast. Memory cache stays off so each sample is
  * still a network fetch, and the collision hold cookie cannot leak into
  * the next sample and skip the edge redirect.
+ *
+ * Sharing the context is not enough on the controller runner. The first
+ * few document commits inside that context still stall, then later loads
+ * in the same context commit quickly (Production Controller 39862813865:
+ * listen redirects 618/744/920ms, then 81/115ms). warmRoute cannot absorb
+ * those stalls because it closes its own context before measurement.
  */
+export const ALIAS_SHARED_CONTEXT_WARMUPS = 3;
+
 export function usesSharedAliasBrowserContext(
   route: Pick<PerfRouteDefinition, 'aliasUsableResult'>
 ): boolean {
   return route.aliasUsableResult !== undefined;
 }
 
+export function sharedAliasContextWarmupCount(
+  route: Pick<PerfRouteDefinition, 'aliasUsableResult'>
+): number {
+  return usesSharedAliasBrowserContext(route)
+    ? ALIAS_SHARED_CONTEXT_WARMUPS
+    : 0;
+}
+
 async function bypassBrowserMemoryCache(context: BrowserContext, page: Page) {
   const session = await context.newCDPSession(page);
   await session.send('Network.enable');
   await session.send('Network.setCacheDisabled', { cacheDisabled: true });
+}
+
+async function discardSharedAliasContextWarmup(
+  context: BrowserContext,
+  route: Pick<PerfRouteDefinition, 'readySelectors'>,
+  url: string
+) {
+  await context.clearCookies({
+    name: LEGACY_PROFILE_ALIAS_CONTENT_COOKIE,
+  });
+  const page = await context.newPage();
+  try {
+    await bypassBrowserMemoryCache(context, page);
+    await page.goto(url, {
+      timeout: NAVIGATION_TIMEOUT_MS,
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForAnyVisible(page, route.readySelectors.content).catch(
+      () => undefined
+    );
+    await page
+      .waitForLoadState('networkidle', { timeout: 10_000 })
+      .catch(() => undefined);
+  } finally {
+    await page.close();
+  }
+}
+
+/**
+ * Pay the runner's first-load document-commit stalls before any timed
+ * sample. Each discarded load is a network fetch in the same context the
+ * samples will use.
+ */
+export async function discardSharedAliasContextWarmups(
+  context: BrowserContext,
+  route: Pick<PerfRouteDefinition, 'aliasUsableResult' | 'readySelectors'>,
+  url: string
+): Promise<readonly number[]> {
+  const warmupCount = sharedAliasContextWarmupCount(route);
+  const elapsedMs: number[] = [];
+  for (let index = 0; index < warmupCount; index += 1) {
+    const startedAt = Date.now();
+    await discardSharedAliasContextWarmup(context, route, url);
+    elapsedMs.push(Date.now() - startedAt);
+  }
+  return elapsedMs;
 }
 
 export function applyProfileWarmTransitionTimings(
@@ -2195,6 +2257,19 @@ async function measureRoutesAgainstBudgets(
           )
         : undefined;
       try {
+        if (sharedContext) {
+          const discardedMs = await discardSharedAliasContextWarmups(
+            sharedContext,
+            route,
+            url
+          );
+          discardedMs.forEach((elapsedMs, index) => {
+            logInfo(
+              `  warmup ${index + 1}/${discardedMs.length}: discarded in ${elapsedMs}ms`,
+              options
+            );
+          });
+        }
         for (let index = 0; index < options.runs; index += 1) {
           const sample = await measureRouteSample(
             browser,
