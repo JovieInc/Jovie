@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  EVIDENCE_LIST_PAGE,
   bindLiveProductionSha,
   buildGitFetchInvocation,
   changedPaths,
+  EVIDENCE_LIST_PAGE,
   evidenceArtifactName,
   evidenceListPath,
   projectInspectDeployment,
@@ -79,9 +79,7 @@ describe('live production SHA binds build-info to the inspect id', () => {
 
   it('fail-closes when build-info is empty, short, or a different deployment', () => {
     const inspect = projectInspectDeployment(JSON.stringify(inspectDoc()));
-    expect(
-      bindLiveProductionSha({ inspect, buildInfo: {} }).sha
-    ).toBe('');
+    expect(bindLiveProductionSha({ inspect, buildInfo: {} }).sha).toBe('');
     expect(
       bindLiveProductionSha({
         inspect,
@@ -170,9 +168,9 @@ describe('release-range git fetch stays authenticated and out of argv', () => {
     );
     expect(plan.args).toContain('https://github.com/JovieInc/Jovie.git');
     expect(plan.args.slice(-2)).toEqual([BASE, CANDIDATE]);
-    expect(plan.env.JOVIE_GIT_AUTH_HEADER.startsWith('AUTHORIZATION: basic ')).toBe(
-      true
-    );
+    expect(
+      plan.env.JOVIE_GIT_AUTH_HEADER.startsWith('AUTHORIZATION: basic ')
+    ).toBe(true);
   });
 
   it('returns no paths when the checkout has no token', () => {
@@ -182,7 +180,9 @@ describe('release-range git fetch stays authenticated and out of argv', () => {
 
 describe('exact-candidate evidence lookup', () => {
   it('asks for one page of the SHA-named artifact', () => {
-    expect(evidenceArtifactName(CANDIDATE)).toBe(`journey-evidence-${CANDIDATE}`);
+    expect(evidenceArtifactName(CANDIDATE)).toBe(
+      `journey-evidence-${CANDIDATE}`
+    );
     expect(evidenceListPath('JovieInc/Jovie', CANDIDATE)).toBe(
       `repos/JovieInc/Jovie/actions/artifacts?name=journey-evidence-${CANDIDATE}&per_page=${EVIDENCE_LIST_PAGE}`
     );

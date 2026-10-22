@@ -149,7 +149,9 @@ describe('workflow wiring', () => {
     expect(gateStep['continue-on-error']).toBeUndefined();
     expect(job.permissions.actions).toBe('read');
     const budgets = job.steps.find(s => s.id === 'performance-gate');
-    expect(names.indexOf(budgets.name)).toBeLessThan(names.indexOf(gateStep.name));
+    expect(names.indexOf(budgets.name)).toBeLessThan(
+      names.indexOf(gateStep.name)
+    );
     expect(budgets.run).toContain('performance-budgets-guard.ts');
   });
   it('Golden Path lane uploads exact-SHA evidence on every outcome', () => {
@@ -171,7 +173,9 @@ describe('workflow wiring', () => {
     expect(golden.if).not.toContain('pull_request');
     // One job. Path-changes success stays inside the manual arm. A push arm
     // ANDed behind that result never runs for a queue-proven main SHA.
-    expect(golden.if.indexOf("github.event_name == 'workflow_dispatch'")).toBeLessThan(
+    expect(
+      golden.if.indexOf("github.event_name == 'workflow_dispatch'")
+    ).toBeLessThan(
       golden.if.indexOf("needs.ci-path-changes.result == 'success'")
     );
     expect(golden.if.split('ci-path-changes').length - 1).toBe(1);
@@ -182,6 +186,8 @@ describe('workflow wiring', () => {
     expect(String(golden['continue-on-error'])).toBe(
       "${{ github.event_name == 'push' }}"
     );
-    expect(journey.run).toContain('mkdir -p "${{ runner.temp }}/journey-evidence"');
+    expect(journey.run).toContain(
+      'mkdir -p "${{ runner.temp }}/journey-evidence"'
+    );
   });
 });
