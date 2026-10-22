@@ -1,5 +1,6 @@
 import {
   lstat,
+  lutimes,
   mkdir,
   mkdtemp,
   readFile,
@@ -141,6 +142,18 @@ async function createRetentionDirectory(prefix: string): Promise<string> {
   return realpath(await mkdtemp(path.join(os.tmpdir(), prefix)));
 }
 
+// mkdir/writeFile take their mtime from the OS clock. prune compares that
+// mtime to Date.now(), which shift-clock moves. Stamp young entries at the
+// test clock so a seven-day shift does not age them into the stale window.
+async function stampAtTestClock(
+  target: string,
+  symlink = false
+): Promise<void> {
+  const clock = new Date();
+  if (symlink) await lutimes(target, clock, clock);
+  else await utimes(target, clock, clock);
+}
+
 describe('pruneCompletedVisualQaRuns', () => {
   let rootDirectory: string | undefined;
   let outsideDirectory: string | undefined;
@@ -182,6 +195,7 @@ describe('pruneCompletedVisualQaRuns', () => {
       }),
       mkdir(path.join(rootDirectory, 'in-progress-run'), { recursive: true }),
     ]);
+    await stampAtTestClock(path.join(rootDirectory, 'in-progress-run'));
 
     const removed = await pruneCompletedVisualQaRuns('current-run', {
       retainedCompletedRuns: 2,
@@ -313,6 +327,14 @@ describe('pruneCompletedVisualQaRuns', () => {
       path.join(rootDirectory, 'old-run-nested-link'),
       staleDate,
       staleDate
+    );
+    await stampAtTestClock(path.join(rootDirectory, 'young-in-progress'));
+    await stampAtTestClock(
+      path.join(rootDirectory, 'old-run-young-nested', 'capture', 'after.png')
+    );
+    await stampAtTestClock(
+      path.join(rootDirectory, 'old-run-nested-link', 'capture-link'),
+      true
     );
 
     const removed = await pruneCompletedVisualQaRuns('current-run', {
@@ -654,6 +676,10 @@ describe('pruneCompletedVisualQaRuns', () => {
     const removed = await pruneCompletedVisualQaRuns('current-run', {
       beforeCandidateRevalidation: async runId => {
         if (runId !== 'completed-old') return;
+        // This filesystem reuses the inode and can stamp the replacement with
+        // the same birthtime when the suite is warm. The guard keys on that
+        // identity, so the replacement has to land on a later timestamp.
+        await new Promise(resolve => setTimeout(resolve, 20));
         await rm(candidatePath, { recursive: true });
         await writeDiffSummary(rootDirectory ?? '', 'completed-old', {
           computedAt: '2026-06-01T00:00:00.000Z',
