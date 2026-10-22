@@ -17,6 +17,7 @@ function metadata() {
     name: '@jovie/cli',
     version,
     mcpName: 'io.github.JovieInc/jovie',
+    bin: { jovie: 'dist/cli.js' },
     repository: {
       url: 'git+https://github.com/JovieInc/Jovie.git',
       directory: 'packages/jovie-cli',
@@ -55,7 +56,7 @@ describe('published artifact and registry identity', () => {
     expect(manifest.packages[0].version).toBe(version);
     expect(manifest.$schema).toContain('/2025-12-11/');
   });
-  it.each(['name', 'version', 'mcpName', 'repository', 'dist'])(
+  it.each(['name', 'version', 'mcpName', 'repository', 'dist', 'bin'])(
     'rejects missing/wrong publication %s',
     field => {
       const value = metadata();
@@ -75,6 +76,12 @@ describe('published artifact and registry identity', () => {
     },
     value => {
       value.dist.integrity = 'sha512-forged';
+    },
+    value => {
+      value.bin = { jovie: 'dist/other.js' };
+    },
+    value => {
+      value.bin = { jovie: './dist/cli.js/escaped' };
     },
   ])('rejects mismatched provenance or digest', change => {
     const value = metadata();
@@ -149,10 +156,21 @@ describe('real staged archive receipts', () => {
     };
     writeFileSync(options.metadataPath, JSON.stringify(metadata()));
     writeFileSync(options.templatePath, JSON.stringify(template()));
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ name: '@jovie/cli', bin: { jovie: 'dist/cli.js' } })
+    );
     writeFileSync(join(dir, 'cli.tgz'), bytes);
     writeFileSync(
       options.packPath,
-      JSON.stringify([{ name: '@jovie/cli', version, filename: 'cli.tgz' }])
+      JSON.stringify([
+        {
+          name: '@jovie/cli',
+          version,
+          filename: 'cli.tgz',
+          files: [{ path: 'dist/cli.js', mode: 493, size: 12 }],
+        },
+      ])
     );
     return options;
   }
@@ -177,6 +195,55 @@ describe('real staged archive receipts', () => {
     const options = fixture();
     writeFileSync(options.packPath, JSON.stringify(receipt));
     expect(() => verifyAndStageRegistry(options)).toThrow(/archive receipt/);
+  });
+  it.each([
+    options => {
+      writeFileSync(
+        join(options.stagingDir, 'package.json'),
+        JSON.stringify({ name: '@jovie/cli' })
+      );
+    },
+    options => {
+      writeFileSync(
+        join(options.stagingDir, 'package.json'),
+        JSON.stringify({ name: '@jovie/cli', bin: { jovie: 'src/cli.ts' } })
+      );
+    },
+    options => {
+      writeFileSync(
+        options.packPath,
+        JSON.stringify([
+          {
+            name: '@jovie/cli',
+            version,
+            filename: 'cli.tgz',
+            files: [{ path: 'dist/index.js' }],
+          },
+        ])
+      );
+    },
+  ])(
+    'rejects a staged manifest or archive that omits the jovie bin',
+    change => {
+      const options = fixture();
+      change(options);
+      expect(() => verifyAndStageRegistry(options)).toThrow(/jovie bin/);
+    }
+  );
+  it('accepts the pre-fix published spelling of the bin target', () => {
+    const options = fixture();
+    writeFileSync(
+      join(options.stagingDir, 'package.json'),
+      JSON.stringify({ name: '@jovie/cli', bin: { jovie: './dist/cli.js' } })
+    );
+    writeFileSync(
+      options.metadataPath,
+      JSON.stringify({ ...metadata(), bin: { jovie: './dist/cli.js' } })
+    );
+    verifyAndStageRegistry(options);
+    expect(JSON.parse(readFileSync(options.outputPath, 'utf8')).version).toBe(
+      version
+    );
   });
 });
 
