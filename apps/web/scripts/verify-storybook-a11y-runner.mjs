@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { stripVTControlCharacters } from 'node:util';
 import { STORYBOOK_VITEST_RUN_TIMEOUT_MS } from '../../../scripts/component-live-storybook-lifecycle.mjs';
 
@@ -91,7 +90,7 @@ export function verifyA11yRunnerControls({ findings, cli, exitCode }) {
  */
 export function runA11yRunnerControls(outputDirectory, spawn = spawnSync) {
   const output = resolve(outputDirectory || '.cache/storybook-a11y-runner');
-  const web = fileURLToPath(new URL('..', import.meta.url));
+  const web = resolve(import.meta.dirname, '..');
   mkdirSync(output, { recursive: true });
   // A setup crash can exit 1 before reporters run. Never accept an older run's
   // valid negative-control receipts from a reused output directory.
