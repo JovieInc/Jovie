@@ -510,12 +510,7 @@ export function resolveTrustedScreenProof({
         trustedName,
       });
       if (decision === 'accept') {
-        job = producerJobs(
-          loaded.jobs,
-          runId,
-          attempt,
-          context.headSha
-        );
+        job = producerJobs(loaded.jobs, runId, attempt, context.headSha);
         break;
       }
       if (decision === 'reject' || index === delays.length - 1) {

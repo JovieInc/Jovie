@@ -14,6 +14,7 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { crc32 } from 'node:zlib';
+import { artifactContainsSecret } from '../../.github/scripts/guard-playwright-artifacts.mjs';
 import {
   readProductReferenceOwner,
   screenNeedsProductReferences,
@@ -46,7 +47,6 @@ import {
 } from './screen-certification.mjs';
 import { SCREEN_DECISION_SCHEMA } from './screen-decision-routing.mjs';
 import { emitScreenProof } from './screen-proof-emit.mjs';
-import { artifactContainsSecret } from '../../.github/scripts/guard-playwright-artifacts.mjs';
 import {
   MARKETING_EVIDENCE_SCHEMA,
   marketingArtifactName,
@@ -155,7 +155,13 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     const blocked =
       'screen web.legal-cookies blocked (viewport desktop is missing a decision)';
     const receipt = JSON.stringify(
-      { issues: [finding, blocked, 'missing exact-head proof for web.legal-cookies'] },
+      {
+        issues: [
+          finding,
+          blocked,
+          'missing exact-head proof for web.legal-cookies',
+        ],
+      },
       null,
       2
     );
@@ -167,7 +173,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       ),
       true
     );
-    assert.equal(artifactContainsSecret('COOKIE=session-token-value', {}), true);
+    assert.equal(
+      artifactContainsSecret('COOKIE=session-token-value', {}),
+      true
+    );
   });
 
   it('decides product-reference membership without loading typescript', () => {
