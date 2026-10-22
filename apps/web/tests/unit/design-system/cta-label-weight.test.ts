@@ -74,8 +74,8 @@ describe('CTA label weight lock (JOV-5317)', () => {
     expect(source).toContain(
       'static let labelWeight = JovieFont.actionLabelWeight'
     );
-    expect(source).toContain(
-      'JovieFont.body(size: 14, numericWeight: JovieActionButtonMetrics.labelWeight)'
+    expect(source).toMatch(
+      /@ScaledMetric\(relativeTo: \.body\) private var labelSize: CGFloat = 14\b[\s\S]*?JovieFont\.body\(size: labelSize, numericWeight: JovieActionButtonMetrics\.labelWeight\)/
     );
     expect(source).not.toMatch(
       /static let actionLabelWeight: CGFloat = (?:400|450|590|600)/

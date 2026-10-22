@@ -59,7 +59,6 @@ Eval:
 - iPad size-class layouts.
 - Regenerating `docs/design-system/native-ui-convergence-registry.md` as a mega-inventory.
 
-
 ## JOV-5331 — shell / production What’s New enforcement
 
 `JovieTheme.swift` remains the color owner. `apps/ios/scripts/native-design-system.manifest.json` projects all five ZiaWI JSON elevations/six accents and product `:root.dark` CSS semantics; JSON has no text-role map. Entity aliases share that owner; error copy uses primary ink and decorative glyphs use neutral ink. Regenerate with `node apps/ios/scripts/native-design-system.mjs --write`; omit `--write` to check and run `node --test apps/ios/scripts/native-design-system.test.mjs` for controls.

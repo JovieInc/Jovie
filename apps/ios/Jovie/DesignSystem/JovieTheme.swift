@@ -314,10 +314,11 @@ struct JoviePillButtonStyle: ButtonStyle {
             lineWidth: 1
           )
       }
+      .opacity(configuration.isPressed ? JoviePillButtonStyle.pressedOpacity : 1)
+      .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
+      .animation(JovieMotion.subtle, value: configuration.isPressed)
       .padding(.vertical, JoviePillButtonStyle.hitInset)
       .contentShape(Rectangle())
-      .opacity(configuration.isPressed ? JoviePillButtonStyle.pressedOpacity : 1)
-      .animation(JovieMotion.subtle, value: configuration.isPressed)
   }
 }
 
