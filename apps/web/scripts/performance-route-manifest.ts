@@ -1321,9 +1321,8 @@ const CREATOR_SHELL_ROUTES = [
       content: ['[data-testid="opportunity-inbox-page"]'],
       loading: ['[data-testid="dashboard-segment-skeleton"]'],
       navTrigger: [
-        `a[href="${APP_ROUTES.DASHBOARD}"]:has-text("Home")`,
-        `a[href="${APP_ROUTES.DASHBOARD}"]`,
-        `a[href^="${APP_ROUTES.DASHBOARD}?"]`,
+        `a[href="${APP_ROUTES.DASHBOARD}"][data-navigation-item-id="home"]`,
+        `a[href^="${APP_ROUTES.DASHBOARD}?"][data-navigation-item-id="home"]`,
       ],
     },
     timings: [
