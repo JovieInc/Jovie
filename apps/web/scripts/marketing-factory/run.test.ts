@@ -549,7 +549,7 @@ describe('harness rules', () => {
     );
   });
 
-  it('clamps out-of-range copy judge scores into the receipt range', async () => {
+  it('rejects out-of-range copy judge scores and keeps receipt scores bounded', async () => {
     const manifest = await run({
       providers: dryProviders(brief, {
         transport: fixtureTransport(() =>
@@ -558,9 +558,14 @@ describe('harness rules', () => {
       }),
     });
 
-    expect(manifest.chain.map(link => link.stage)).toContain('copy');
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'copy' });
+    expect(manifest.chain.map(link => link.stage)).not.toContain('copy');
     const copy = record('09-copy.attempt-1.json').receipt;
-    expect(copy.evaluators.every(e => e.score <= 1)).toBe(true);
+    expect(copy.passed).toBe(false);
+    expect(copy.invariantsFailed).toContain('copy-gate');
+    expect(copy.evaluators.length).toBeGreaterThan(0);
+    expect(copy.evaluators.every(e => e.score >= 0 && e.score <= 1)).toBe(true);
+    expect(copy.evaluators.every(e => e.verdict === 'revise')).toBe(true);
   });
 
   it('reports credentials-unavailable instead of passing without models', async () => {
