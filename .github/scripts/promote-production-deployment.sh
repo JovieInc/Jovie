@@ -140,14 +140,29 @@ read_vercel_json() {
   local result=""
   local status=0
   local reason=""
+  local stderr_file=""
+  local diagnostics=""
 
-  raw="$(vercel "$@" 2>&1)" || status=$?
+  # Inspect writes JSON to stdout. Keep stderr separate: CLI notices can
+  # arrive after (or during) a large JSON write and corrupt merged streams.
+  stderr_file="$(mktemp)" || return 1
+  raw="$(vercel "$@" 2>"$stderr_file")" || status=$?
+  diagnostics="$(cat "$stderr_file")"
+  rm -f "$stderr_file"
   if [ "$status" -ne 0 ]; then
     reason="$(safe_vercel_failure_reason "$raw")"
+    if [ "$reason" = unclassified ]; then
+      reason="$(safe_vercel_failure_reason "$diagnostics")"
+    fi
     echo "Vercel ${operation} failed (exit ${status}, reason=${reason})." >&2
     return 1
   fi
 
+  # Older rolling-release commands emit their JSON through stderr. Only use
+  # that stream for rollout reads with no stdout, never as inspection proof.
+  if [ "$schema" = rollout ] && [ -z "$raw" ]; then
+    raw="$diagnostics"
+  fi
   if ! result="$(extract_vercel_json "$raw" "$schema")"; then
     echo "Vercel ${operation} returned malformed JSON (${#raw} captured bytes)." >&2
     return 1
