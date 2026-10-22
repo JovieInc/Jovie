@@ -656,9 +656,6 @@
       "gh-subprocess": 1,
       "provider-host": 1
     },
-    "scripts/shipping-slo-intake.mjs": {
-      "gh-subprocess": 1
-    },
     "scripts/shipping-slo-report.mjs": {
       "gh-subprocess": 2
     },

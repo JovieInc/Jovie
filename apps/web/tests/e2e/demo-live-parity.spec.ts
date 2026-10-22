@@ -21,20 +21,48 @@ function normalizeTexts(values: string[]) {
   return values.map(value => value.replace(/\s+/g, ' ').trim()).filter(Boolean);
 }
 
-async function collectAudienceContentSurface(page: Page) {
-  const audienceTable = page
-    .locator('table, [role="grid"], [data-testid="unified-table"]')
-    .first();
-  const emptyState = page.getByTestId('dashboard-audience-empty-state');
+const AUDIENCE_COLUMN_HEADERS = [
+  'Fan',
+  'State',
+  'Alerts',
+  'Engagement',
+  'Last Seen',
+  'Action',
+] as const;
 
-  return Promise.any([
-    audienceTable
-      .waitFor({ state: 'visible', timeout: 60_000 })
-      .then(() => 'table' as const),
-    emptyState
-      .waitFor({ state: 'visible', timeout: 60_000 })
-      .then(() => 'empty' as const),
-  ]);
+async function classifyAudienceSurface(
+  page: Page
+): Promise<'table' | 'empty' | 'pending'> {
+  if ((await page.getByTestId('dashboard-audience-loading').count()) > 0) {
+    return 'pending';
+  }
+
+  const headers = normalizeTexts(
+    await page.getByRole('columnheader').allInnerTexts()
+  );
+  if (AUDIENCE_COLUMN_HEADERS.every(header => headers.includes(header))) {
+    return 'table';
+  }
+
+  const visibleEmptyStates = await page
+    .locator('[data-testid="dashboard-audience-empty-state"]:visible')
+    .count();
+  return visibleEmptyStates > 0 ? 'empty' : 'pending';
+}
+
+async function collectAudienceContentSurface(page: Page) {
+  let settled: 'table' | 'empty' = 'table';
+  await expect
+    .poll(
+      async () => {
+        const next = await classifyAudienceSurface(page);
+        if (next !== 'pending') settled = next;
+        return next;
+      },
+      { timeout: 60_000 }
+    )
+    .not.toBe('pending');
+  return settled;
 }
 
 async function collectReleasesShape(

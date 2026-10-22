@@ -10,12 +10,19 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
     main,
     rightPanel,
+    flushContent,
   }: {
     readonly main: ReactNode;
     readonly rightPanel?: ReactNode;
+    readonly flushContent?: boolean;
   }) => (
     <>
-      <div data-testid='onboarding-shell-main'>{main}</div>
+      <div
+        data-testid='onboarding-shell-main'
+        data-flush-content={flushContent ? 'true' : 'false'}
+      >
+        {main}
+      </div>
       <div data-testid='onboarding-shell-overlay'>{rightPanel}</div>
     </>
   ),
@@ -112,6 +119,10 @@ describe('OnboardingShell status', () => {
         onRestart={restart}
         onLogout={logout}
       />
+    );
+    expect(screen.getByTestId('onboarding-shell-main')).toHaveAttribute(
+      'data-flush-content',
+      'true'
     );
     fireEvent.click(screen.getByRole('button', { name: 'Start Over' }));
     fireEvent.click(screen.getByRole('button', { name: 'Log Out' }));
