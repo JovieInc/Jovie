@@ -763,6 +763,10 @@ describe('JovieChat styling regressions', () => {
         ?.getAttribute('data-empty-affordance')
     ).toBe('home-canvas');
     expect(states.at(-1)).toEqual({ isStreaming: true, count: 1 });
+    // Living Home fills the space above the composer (no page scroll).
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-above-scroll"]')
+    ).toHaveClass('lg:overflow-hidden');
 
     act(() => {
       getByRole('button', { name: 'Open Transcript Fixture' }).click();
