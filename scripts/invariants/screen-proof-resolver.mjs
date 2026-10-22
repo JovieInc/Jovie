@@ -463,8 +463,16 @@ export function resolveTrustedArtifactId({
     return null;
   }
 }
-/** Owned GitHub transport; tests replace `gh` on PATH, never a verifier result. */
-export function resolveTrustedScreenProof({ artifactId, context, lagDelays }) {
+/**
+ * Owned GitHub transport; tests replace `gh` on PATH, never a verifier result.
+ * `lagDelays` is test-only. Production reads use the fixed producer-lag budget.
+ * @param {{ artifactId?: unknown, context?: any, lagDelays?: number[] }} [request]
+ */
+export function resolveTrustedScreenProof({
+  artifactId,
+  context,
+  lagDelays,
+} = {}) {
   const now = Date.now();
   const expectedSources = paths(context?.sourcePaths);
   const viewports = Array.isArray(context?.viewports)
