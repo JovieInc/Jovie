@@ -1,7 +1,15 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { load as yamlLoad } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import {
@@ -139,8 +147,16 @@ describe('workflow wiring', () => {
       "steps.final-current.outputs.is_current == 'true'"
     );
     expect(promote.if).toContain("steps.journey-gate.outcome == 'success'");
-    expect(gateStep.run).toContain('promotion-gate-ci.mjs range');
-    expect(gateStep.run).toContain('promotion-gate-ci.mjs resolve-base');
+    expect(gateStep.run).toContain(
+      '"$gate_tools/scripts/promotion-gate-ci.mjs" range'
+    );
+    expect(gateStep.run).toContain(
+      '"$gate_tools/scripts/promotion-gate-ci.mjs" resolve-base'
+    );
+    expect(gateStep.run).not.toMatch(/node scripts\/promotion-gate-ci\.mjs/);
+    expect(gateStep.run).not.toMatch(
+      /node scripts\/promotion-journey-gate\.mjs/
+    );
     expect(gateStep.run).toContain('https://jov.ie/api/health/build-info');
     expect(gateStep.run).toContain('--scope "$VERCEL_ORG_ID"');
     expect(gateStep.run).not.toContain('githubCommitSha');
@@ -152,7 +168,22 @@ describe('workflow wiring', () => {
     expect(names.indexOf(budgets.name)).toBeLessThan(
       names.indexOf(gateStep.name)
     );
-    expect(budgets.run).toContain('performance-budgets-guard.ts');
+    expect(budgets.run).toContain(
+      'pnpm exec tsx scripts/performance-budgets-guard.ts'
+    );
+    expect(budgets.run).not.toContain('promotion-gate-tooling');
+    const tooling = job.steps.find(
+      s => s.name === 'Checkout trusted promotion gate tooling'
+    );
+    expect(names.indexOf(tooling.name)).toBe(names.indexOf(gateStep.name) - 1);
+    expect(tooling.if).toBe(gateStep.if);
+    expect(tooling.with.repository).toBe('${{ job.workflow_repository }}');
+    expect(tooling.with.ref).toBe('${{ job.workflow_sha }}');
+    expect(tooling.with.path).toBe('promotion-gate-tooling');
+    expect(tooling.with['persist-credentials']).toBe(false);
+    expect(tooling.with['fetch-depth']).toBe(1);
+    expect(tooling.with['sparse-checkout-cone-mode']).toBe(false);
+    expect(tooling.with.ref).not.toContain('expected_sha');
   });
   it('Golden Path lane uploads exact-SHA evidence on every outcome', () => {
     const golden = yaml('ci.yml').jobs['ci-golden-path'];
@@ -190,4 +221,229 @@ describe('workflow wiring', () => {
       'mkdir -p "${{ runner.temp }}/journey-evidence"'
     );
   });
+});
+
+const OLD_CANDIDATE = 'e806124e86032850ab67ceeffacb0b399e488495';
+const CURRENT_MAIN = 'ce8fb43d5d9e89e3226ed1de5cad1bab16f4e087';
+const LIVE_BASE = 'c'.repeat(40);
+const DEPLOYMENT = 'dpl_7Gu4wr3uUeGn8jkVhWFBq4Z6n5Xa';
+const OLD_USAGE = 'usage: promotion-gate-ci.mjs range|fetch-evidence ...';
+const OLD_CLI = readFileSync(
+  join(root, 'scripts/lib/__tests__/fixtures/promotion-gate-ci.e806124.mjs'),
+  'utf8'
+);
+
+function toolingPaths() {
+  const step = yaml('production-release.yml').jobs[
+    'promote-production'
+  ].steps.find(s => s.name === 'Checkout trusted promotion gate tooling');
+  return step.with['sparse-checkout']
+    .trim()
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+}
+
+function copyRepoFiles(dest, paths) {
+  for (const rel of paths) {
+    const target = join(dest, rel);
+    mkdirSync(dirname(target), { recursive: true });
+    copyFileSync(join(root, rel), target);
+  }
+}
+
+function writeExecutable(path, body) {
+  writeFileSync(path, body);
+  chmodSync(path, 0o755);
+}
+
+/**
+ * Runs the promote job's journey-gate shell. Vercel, curl, git, and gh are
+ * local stand-ins so the proof does not touch production or GitHub.
+ */
+function runTrustedGate(candidateCli, candidateSha) {
+  const workspace = mkdtempSync(join(tmpdir(), 'promo-gate-step-'));
+  const paths = toolingPaths();
+  copyRepoFiles(workspace, paths);
+  writeFileSync(join(workspace, 'scripts/promotion-gate-ci.mjs'), candidateCli);
+  copyRepoFiles(join(workspace, 'promotion-gate-tooling'), paths);
+  const bin = join(workspace, '.proof-bin');
+  const inspectFile = join(workspace, 'proof-inspect.json');
+  const buildInfoFile = join(workspace, 'proof-build-info.json');
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    inspectFile,
+    JSON.stringify({
+      id: DEPLOYMENT,
+      url: 'jovie-abc.vercel.app',
+      readyState: 'READY',
+      target: 'production',
+      meta: { githubCommitSha: 'd'.repeat(40) },
+    })
+  );
+  writeFileSync(
+    buildInfoFile,
+    JSON.stringify({
+      commitSha: LIVE_BASE,
+      deploymentId: DEPLOYMENT,
+      environment: 'production',
+    })
+  );
+  writeExecutable(
+    join(bin, 'git'),
+    '#!/bin/sh\ncase " $* " in\n  *" diff "*) printf \'%s\\n\' \'apps/web/lib/auth/session.ts\' ;;\nesac\nexit 0\n'
+  );
+  writeExecutable(
+    join(bin, 'gh'),
+    "#!/bin/sh\necho 'proof gh unavailable' >&2\nexit 1\n"
+  );
+  writeExecutable(join(bin, 'curl'), `#!/bin/sh\ncat '${buildInfoFile}'\n`);
+  const vercelDir = join(workspace, 'node_modules/.bin');
+  mkdirSync(vercelDir, { recursive: true });
+  writeExecutable(
+    join(vercelDir, 'vercel'),
+    `#!/bin/sh\ncat '${inspectFile}'\n`
+  );
+  const runnerTemp = join(workspace, 'runner-temp');
+  const githubOutput = join(workspace, 'github-output.txt');
+  mkdirSync(runnerTemp);
+  const gateStep = yaml('production-release.yml').jobs[
+    'promote-production'
+  ].steps.find(s => s.id === 'journey-gate');
+  const result = spawnSync('bash', ['-euo', 'pipefail', '-c', gateStep.run], {
+    cwd: workspace,
+    encoding: 'utf8',
+    env: {
+      PATH: `${bin}:${process.env.PATH ?? ''}`,
+      HOME: workspace,
+      GITHUB_WORKSPACE: workspace,
+      RUNNER_TEMP: runnerTemp,
+      GITHUB_OUTPUT: githubOutput,
+      CANDIDATE_SHA: candidateSha,
+      PROMOTION_JOURNEY_OVERRIDE: '',
+      VERCEL_ORG_ID: 'team_proof',
+      VERCEL_TOKEN: 'unused',
+      VERCEL_PROJECT_ID: 'unused',
+      REPO: 'JovieInc/Jovie',
+      GH_TOKEN: 'proof-token',
+      GITHUB_TOKEN: '',
+    },
+  });
+  const read = rel =>
+    readFileSync(join(runnerTemp, 'journey-gate', rel), 'utf8');
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    output: readFileSync(githubOutput, 'utf8'),
+    range: JSON.parse(read('range.json')),
+    decision: JSON.parse(read('decision.json')),
+    cleanup: () => rmSync(workspace, { recursive: true, force: true }),
+  };
+}
+
+function resolveBase(script, cwd) {
+  const dir = mkdtempSync(join(tmpdir(), 'promo-resolve-'));
+  const inspect = join(dir, 'inspect.json');
+  const info = join(dir, 'build-info.json');
+  writeFileSync(
+    inspect,
+    JSON.stringify({
+      id: DEPLOYMENT,
+      url: 'jovie-abc.vercel.app',
+      readyState: 'READY',
+      target: 'production',
+    })
+  );
+  writeFileSync(
+    info,
+    JSON.stringify({
+      commitSha: LIVE_BASE,
+      deploymentId: DEPLOYMENT,
+      environment: 'production',
+    })
+  );
+  const result = spawnSync(
+    'node',
+    [script, 'resolve-base', '--inspect', inspect, '--build-info', info],
+    { cwd, encoding: 'utf8' }
+  );
+  rmSync(dir, { recursive: true, force: true });
+  return result;
+}
+
+describe('trusted gate tooling grades older and current candidates', () => {
+  const shown = spawnSync(
+    'git',
+    ['show', `${OLD_CANDIDATE}:scripts/promotion-gate-ci.mjs`],
+    { cwd: root, encoding: 'utf8' }
+  );
+
+  it.skipIf(shown.status !== 0)(
+    'keeps the e806124 CLI fixture identical to that commit',
+    () => {
+      expect(shown.stdout).toBe(OLD_CLI);
+    }
+  );
+
+  it('reproduces the production usage failure from the e806124 CLI', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'promo-old-cli-'));
+    try {
+      copyRepoFiles(workspace, toolingPaths());
+      const script = join(workspace, 'scripts/promotion-gate-ci.mjs');
+      writeFileSync(script, OLD_CLI);
+      const result = resolveBase(script, workspace);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain(OLD_USAGE);
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves the base from the current main CLI', () => {
+    const current = readFileSync(
+      join(root, 'scripts/promotion-gate-ci.mjs'),
+      'utf8'
+    );
+    const mainBlob = spawnSync(
+      'git',
+      ['show', `${CURRENT_MAIN}:scripts/promotion-gate-ci.mjs`],
+      { cwd: root, encoding: 'utf8' }
+    );
+    if (mainBlob.status === 0) expect(mainBlob.stdout).toBe(current);
+    const result = resolveBase(
+      join(root, 'scripts/promotion-gate-ci.mjs'),
+      root
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout.trim()).toBe(LIVE_BASE);
+    expect(result.stderr).not.toContain(OLD_USAGE);
+  });
+
+  it.each([
+    ['e806124', OLD_CANDIDATE, OLD_CLI],
+    [
+      'current main',
+      CURRENT_MAIN,
+      readFileSync(join(root, 'scripts/promotion-gate-ci.mjs'), 'utf8'),
+    ],
+  ])(
+    'grades %s with the workflow-ref tooling and blocks on missing evidence',
+    (_label, candidateSha, cli) => {
+      const proof = runTrustedGate(cli, candidateSha);
+      try {
+        expect(proof.status, `${proof.stdout}\n${proof.stderr}`).toBe(1);
+        expect(`${proof.stdout}\n${proof.stderr}`).not.toContain(OLD_USAGE);
+        expect(proof.range.baseDeployedSha).toBe(LIVE_BASE);
+        expect(proof.range.candidateSha).toBe(candidateSha);
+        expect(proof.range.unknown).toBe(false);
+        expect(proof.range.affects.auth).toBe(true);
+        expect(proof.decision.decision).toBe('blocked');
+        expect(proof.output).toContain('failure_subtype=journey_gate_blocked');
+        expect(proof.stdout).not.toContain('PROMOTION_JOURNEY_OVERRIDE');
+      } finally {
+        proof.cleanup();
+      }
+    }
+  );
 });
