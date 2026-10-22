@@ -159,12 +159,12 @@ unless linked below.
 | `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
 | `deprecated-button-alias` | `error` | G | Yes | 91 |
 | `linear-namespace` | `error` | G + I | Yes | 701 |
-| `shadcn/no-restyle` | `error` | L + G | Yes | 218 files; 3106 messages (grandfathered) |
-| `source-identity` | `error` | I | Yes | 2076 |
-| `spacing-scale (conservative)` | `error` | S + G | Yes | 615; armed=true; marketing=47; packages/ui=11; web-other=304; web-shell=253 |
-| `spacing-scale (strict)` | `warn` | S + G | No | 2206; armed=false; marketing=147; packages/ui=60; web-other=1126; web-shell=851 |
+| `shadcn/no-restyle` | `error` | L + G | Yes | 217 files; 3105 messages (grandfathered) |
+| `source-identity` | `error` | I | Yes | 2057 |
+| `spacing-scale (conservative)` | `error` | S + G | Yes | 614; armed=true; marketing=46; packages/ui=11; web-other=304; web-shell=253 |
+| `spacing-scale (strict)` | `warn` | S + G | No | 2202; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=851 |
 | `touch-target` | `error` | D | Yes | 153 |
-| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=281; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=267; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
 
 The [raw-color baseline](apps/web/contrast-ratchet.baseline.json) and
 [computed pair config](apps/web/contrast-pairs.config.json) cover separate
