@@ -73,6 +73,7 @@ function controllerRun(id: number, sha: string, status = 'pending') {
     head_sha: MAIN_SHA,
     head_branch: 'main',
     event: 'workflow_run',
+    run_attempt: 1,
     display_title: `Production Controller ${sha} from CI 123 attempt 1`,
     created_at: '2026-10-22T20:00:01Z',
     status,
@@ -97,6 +98,13 @@ function supersedeFetch(
       updated_at: '2026-10-22T20:00:00Z',
     }));
     const stage = stages[0]!;
+    if (url.pathname.endsWith('/actions/runs/100')) {
+      return Response.json({
+        id: 100,
+        status: 'in_progress',
+        run_started_at: '2026-10-22T20:00:02Z',
+      });
+    }
     if (url.pathname.endsWith('/zip')) {
       return new Response(
         new Uint8Array(
@@ -345,6 +353,28 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
       })
     ).toMatchObject({ deferred: false });
   });
+
+  it.each([
+    ['2026-10-22T20:00:03Z', true],
+    ['2026-10-22T20:00:02Z', false],
+    ['2026-10-22T20:00:01Z', false],
+    ['unreadable', false],
+  ])(
+    'orders older-ID retries by attempt start: %s',
+    async (startedAt, deferred) => {
+      const run = {
+        ...controllerRun(99, INTERMEDIATE_SHA),
+        run_attempt: 2,
+        run_started_at: startedAt,
+      };
+      expect(
+        await deferToInFlightSupersede({
+          ...supersedeContext,
+          fetchImpl: supersedeFetch([run]),
+        })
+      ).toMatchObject({ deferred });
+    }
+  );
 
   it.each([
     { outcome: 'superseded' },

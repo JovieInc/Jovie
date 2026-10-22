@@ -282,6 +282,7 @@ export async function deferToInFlightSupersede({
     }
     const comparisons = new Map();
     let stagingRuns;
+    let currentRun;
     const ancestor = async (base, head) => {
       if (base === head) return true;
       const range = `${base}...${head}`;
@@ -294,12 +295,30 @@ export async function deferToInFlightSupersede({
     for (const run of payload.workflow_runs) {
       if (
         !Number.isSafeInteger(run?.id) ||
-        run.id <= currentRunId ||
+        run.id <= 0 ||
+        run.id === currentRunId ||
         run.head_branch !== 'main' ||
         run.event !== 'workflow_run' ||
         !IN_FLIGHT_RUN_STATUSES.includes(run.status)
       ) {
         continue;
+      }
+      // A retry rejoins the FIFO with its original ID. Require proof that
+      // its new attempt started after this attempt; older initial runs stay out.
+      if (run.id < currentRunId) {
+        if (!Number.isSafeInteger(run.run_attempt) || run.run_attempt <= 1)
+          continue;
+        currentRun ??= await api(`actions/runs/${currentRunId}`);
+        const currentStart = Date.parse(currentRun.run_started_at);
+        const retryStart = Date.parse(run.run_started_at);
+        if (
+          currentRun.id !== currentRunId ||
+          currentRun.status !== 'in_progress' ||
+          !Number.isFinite(currentStart) ||
+          !Number.isFinite(retryStart) ||
+          retryStart <= currentStart
+        )
+          continue;
       }
       // workflow_run head_sha is the policy checkout. The existing run-name
       // contract identifies the release SHA carried from the staging receipt.
