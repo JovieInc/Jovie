@@ -6421,12 +6421,16 @@ jobs:
     # Unlike ci-e2e-smoke this must NOT set NEXT_PUBLIC_CLERK_MOCK or
     # E2E_USE_TEST_AUTH_BYPASS — required mode fails closed if either is present.
     # PRs and the merge queue stay off this lane: the spec has a 900s timeout.
-    # Main pushes run it. Staging only follows a successful push CI, and the
-    # pre-promotion journey gate accepts evidence only for that exact SHA.
+    # Main pushes run this same job, including queue-proven pushes that skip
+    # ci-path-changes. That skip is the promotion SHA: staging follows this
+    # push, and the journey gate accepts evidence only for its exact SHA.
     # A workflow_dispatch can produce the artifact, but it cannot start staging.
     # Push leaves neon-db skipped; this job opens its own ephemeral branch.
+    # A red push run does not fail CI. The gate still blocks when the range
+    # requires a green journey.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ always() && !cancelled() && needs.ci-path-changes.result == 'success' && ((github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure' || needs.neon-db.result == 'skipped'))) }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_dispatch' && needs.ci-path-changes.result == 'success' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    continue-on-error: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     outputs:
@@ -6547,10 +6551,11 @@ jobs:
         id: canonical_journey
         continue-on-error: true
         run: |
+          mkdir -p "${{ runner.temp }}/journey-evidence"
           cd apps/web
 
           if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
-            echo "::error::Standalone server not found — ci-build-public artifact is required for the golden path"
+            echo "::error::Standalone server not found — the golden-path build did not produce the standalone server."
             exit 1
           fi
 

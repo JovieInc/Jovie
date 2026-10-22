@@ -140,17 +140,48 @@ describe('workflow wiring', () => {
     );
     expect(promote.if).toContain("steps.journey-gate.outcome == 'success'");
     expect(gateStep.run).toContain('promotion-gate-ci.mjs range');
+    expect(gateStep.run).toContain('promotion-gate-ci.mjs resolve-base');
+    expect(gateStep.run).toContain('https://jov.ie/api/health/build-info');
+    expect(gateStep.run).toContain('--scope "$VERCEL_ORG_ID"');
+    expect(gateStep.run).not.toContain('githubCommitSha');
+    expect(gateStep.run).not.toContain('|| true');
     expect(gateStep.run).toContain('promotion-journey-gate.mjs');
     expect(gateStep['continue-on-error']).toBeUndefined();
     expect(job.permissions.actions).toBe('read');
+    const budgets = job.steps.find(s => s.id === 'performance-gate');
+    expect(names.indexOf(budgets.name)).toBeLessThan(names.indexOf(gateStep.name));
+    expect(budgets.run).toContain('performance-budgets-guard.ts');
   });
   it('Golden Path lane uploads exact-SHA evidence on every outcome', () => {
-    const steps = yaml('ci.yml').jobs['ci-golden-path'].steps;
+    const golden = yaml('ci.yml').jobs['ci-golden-path'];
+    const steps = golden.steps;
     const emit = steps.find(s => s.name?.startsWith('Emit journey evidence'));
     const upload = steps.find(s => s.name === 'Upload journey evidence');
+    const journey = steps.find(s => s.id === 'canonical_journey');
     expect(emit.if).toContain('always()');
     expect(upload.if).toContain('always()');
     expect(upload.with.name).toBe('journey-evidence-${{ github.sha }}');
+    expect(upload.with['retention-days']).toBe(14);
     expect(upload.with['if-no-files-found']).toBe('error');
+    expect(golden.if).toContain("github.event_name == 'workflow_dispatch'");
+    expect(golden.if).toContain(
+      "|| (github.event_name == 'push' && github.ref == 'refs/heads/main')"
+    );
+    expect(golden.if).not.toContain('merge_group');
+    expect(golden.if).not.toContain('pull_request');
+    // One job. Path-changes success stays inside the manual arm. A push arm
+    // ANDed behind that result never runs for a queue-proven main SHA.
+    expect(golden.if.indexOf("github.event_name == 'workflow_dispatch'")).toBeLessThan(
+      golden.if.indexOf("needs.ci-path-changes.result == 'success'")
+    );
+    expect(golden.if.split('ci-path-changes').length - 1).toBe(1);
+    const pushClause = golden.if.split('||').at(-1) ?? '';
+    expect(pushClause).toContain("github.event_name == 'push'");
+    expect(pushClause).not.toContain('ci-path-changes');
+    expect(pushClause).not.toContain('ci-build-public');
+    expect(String(golden['continue-on-error'])).toBe(
+      "${{ github.event_name == 'push' }}"
+    );
+    expect(journey.run).toContain('mkdir -p "${{ runner.temp }}/journey-evidence"');
   });
 });
