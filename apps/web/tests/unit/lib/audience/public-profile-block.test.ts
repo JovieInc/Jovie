@@ -1,3 +1,4 @@
+import { addAbortListener } from 'node:events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -183,20 +184,15 @@ describe('public profile audience block helper', () => {
   });
 
   it('fails open without Postgres when the lookup is aborted during Redis', async () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     const controller = new AbortController();
     mocks.getRedis.mockImplementation((options?: { signal?: AbortSignal }) => ({
       get: () =>
         new Promise((_resolve, reject) => {
-          const abort = () =>
-            reject(
-              new DOMException('The operation was aborted.', 'AbortError')
-            );
-          if (options?.signal?.aborted) {
-            abort();
-            return;
+          const signal = options?.signal;
+          if (signal) {
+            addAbortListener(signal, () => reject(signal.reason));
           }
-          options?.signal?.addEventListener('abort', abort, { once: true });
         }),
       set: vi.fn().mockResolvedValue(undefined),
       del: vi.fn().mockResolvedValue(undefined),
