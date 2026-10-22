@@ -30,6 +30,11 @@ on:
         required: false
         default: true
         type: boolean
+      promotion_journey_override:
+        description: Optional manual recovery override receipt (JSON, jovie.promotion-recovery-override/v1) for the pre-promotion journey gate.
+        required: false
+        default: ''
+        type: string
     outputs:
       staging_eligible:
         description: Whether this generation remained exact-main through staging mutation.
@@ -831,6 +836,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      actions: read
     environment:
       name: Production – jovie
       url: https://jov.ie
@@ -839,7 +845,7 @@ jobs:
       # distinguish silent-no-op regressions from generic promote failures.
       # Values distinguish production artifact, promotion state, and canonical
       # alias convergence failures for deploy-notify and Gem diagnosis.
-      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype }}
+      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.journey-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype }}
       production_deployment_id: ${{ steps.stage-production.outputs.production_deployment_id }}
       production_deployment_url_b64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}
       previous_production_deployment_id: ${{ steps.promote.outputs.previous_production_deployment_id }}
@@ -1339,9 +1345,43 @@ jobs:
           --no-fallback --
           env -u DOPPLER_TOKEN node scripts/security/security-gate.mjs
 
+      # Pre-promotion journey gate (JOV-5937). Grades the full range from the
+      # live production SHA to this candidate; a range touching auth/billing (or
+      # unknown) needs fresh exact-SHA Golden Path evidence from a run that
+      # really executed the journeys, or an audited manual override receipt.
+      # Missing base SHA, range, or evidence blocks. Post-deploy smoke is separate.
+      - name: Pre-promotion auth/billing journey gate
+        id: journey-gate
+        if: ${{ steps.final-current.outputs.is_current == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          CANDIDATE_SHA: ${{ inputs.expected_sha }}
+          PROMOTION_JOURNEY_OVERRIDE: ${{ inputs.promotion_journey_override }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          REPO: ${{ github.repository }}
+        run: |
+          gate_dir="$RUNNER_TEMP/journey-gate"
+          mkdir -p "$gate_dir"
+          base_sha="$(./node_modules/.bin/vercel inspect jov.ie --format=json 2>/dev/null | jq -r '.meta.githubCommitSha // ""' || true)"
+          node scripts/promotion-gate-ci.mjs range --base "$base_sha" --candidate "$CANDIDATE_SHA" --out "$gate_dir/range.json"
+          node scripts/promotion-gate-ci.mjs fetch-evidence --repo "$REPO" --candidate "$CANDIDATE_SHA" --out-dir "$gate_dir/evidence"
+          args=(--range "$gate_dir/range.json" --out "$gate_dir/decision.json")
+          while IFS= read -r f; do args+=(--evidence "$f"); done < <(find "$gate_dir/evidence" -name 'journey-evidence-*.json' 2>/dev/null | sort)
+          if [ -n "$PROMOTION_JOURNEY_OVERRIDE" ]; then
+            printf '%s' "$PROMOTION_JOURNEY_OVERRIDE" > "$gate_dir/override.json"
+            args+=(--override "$gate_dir/override.json")
+          fi
+          if ! node scripts/promotion-journey-gate.mjs "${args[@]}"; then
+            echo "::error::Promotion blocked by the auth/billing journey gate (see decision above)."
+            echo "failure_subtype=journey_gate_blocked" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
       - name: Promote staged production deployment
         id: promote
-        if: ${{ steps.final-current.outputs.is_current == 'true' }}
+        if: ${{ steps.final-current.outputs.is_current == 'true' && steps.journey-gate.outcome == 'success' }}
         timeout-minutes: 15
         env:
           GH_TOKEN: ${{ github.token }}
