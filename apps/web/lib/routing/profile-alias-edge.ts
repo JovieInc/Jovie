@@ -95,7 +95,15 @@ export async function resolveProfileModeAliasAtEdge(
 
   if (!payload || typeof payload !== 'object') return null;
   const { href, kind } = payload;
-  if (typeof href !== 'string' || !href.startsWith('/')) return null;
+  if (
+    typeof href !== 'string' ||
+    // Reject protocol-relative hrefs ('//host') as defense-in-depth; the
+    // endpoint only ever produces root-relative paths.
+    !href.startsWith('/') ||
+    href.startsWith('//')
+  ) {
+    return null;
+  }
 
   if (kind === 'mode') return aliasDecisionResponse(req, href, 307);
   if (kind === 'moved') return aliasDecisionResponse(req, href, 308);
