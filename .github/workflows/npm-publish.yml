@@ -505,7 +505,28 @@ jobs:
             npm pack --ignore-scripts --json > "$MCP_PACK_PATH"
           )
           node packages/jovie-cli/scripts/verify-published-package.mjs
-          npm audit signatures --prefix '${{ steps.public_release.outputs.install_root }}'
+          # npm's attestations endpoint can lag the published packument by
+          # minutes. The signature audit waits for that 404 only; every other
+          # audit failure still fails the publication.
+          audit_log="$RUNNER_TEMP/jovie-cli-signature-audit.log"
+          audit_deadline=$((SECONDS + 900))
+          until npm audit signatures --prefix '${{ steps.public_release.outputs.install_root }}' 2> "$audit_log"; do
+            # if/else, not `grep && grep || exit`: that form is shellcheck SC2015
+            # and actionlint rejects the workflow.
+            if grep -q 'code E404' "$audit_log" && grep -q -- '-/npm/v1/attestations/' "$audit_log"; then
+              (( SECONDS < audit_deadline )) || {
+                echo "::error::npm attestations did not propagate for the published release."
+                cat "$audit_log"
+                exit 1
+              }
+              echo "npm attestations not propagated yet; retrying the signature audit."
+              sleep 15
+            else
+              echo "::error::Signature audit failed outside the attestations 404 window."
+              cat "$audit_log"
+              exit 1
+            fi
+          done
 
       - name: Publish exact MCP listing using GitHub OIDC
         shell: bash

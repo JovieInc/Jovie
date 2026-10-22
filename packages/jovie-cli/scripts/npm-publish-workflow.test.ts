@@ -114,6 +114,17 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain(
     'Published version was not installable from the public registry.'
   );
+  // Retry only while npm's attestations endpoint lags the published packument.
+  expect(source).toContain('until npm audit signatures --prefix');
+  expect(source).toContain('audit_deadline=$((SECONDS + 900))');
+  expect(source).toContain("grep -q 'code E404'");
+  expect(source).toContain("grep -q -- '-/npm/v1/attestations/'");
+  expect(source).toContain(
+    'Signature audit failed outside the attestations 404 window.'
+  );
+  expect(source).toContain(
+    'npm attestations did not propagate for the published release.'
+  );
   expect(source).toContain('metadata.dist?.attestations?.url');
   expect(source).toContain('metadata.dist?.attestations?.provenance');
   expect(source).toContain('Array.isArray(metadata.maintainers)');
@@ -229,6 +240,13 @@ describe('npm provenance workflow', () => {
     [
       'public install replication retry',
       workflow.replace('until npm install \\', 'npm install \\'),
+    ],
+    [
+      'attestations propagation retry',
+      workflow.replace(
+        'until npm audit signatures --prefix',
+        'npm audit signatures --prefix'
+      ),
     ],
     [
       'fresh install runtime receipt',
@@ -354,6 +372,127 @@ describe('bounded MCP publication authority', () => {
       'Checkout left origin/main before MCP publication.'
     );
     expect(workflow).toContain('verifyRegistryReadback(actual, expected)');
+  });
+});
+
+// Execute the workflow's signature-audit shell. Production waits 15s between
+// tries; these runs shorten that sleep so the suite checks the branch, not
+// the clock. The 900s deadline stays in place except for the expiry case.
+describe('signature audit attestations propagation', () => {
+  const extracted = workflow.match(
+    /# npm's attestations endpoint can lag[\s\S]*?\n          done/m
+  )?.[0];
+
+  function runSignatureAudit(
+    mode: 'lag' | 'other' | 'url-only' | 'other-endpoint' | 'persistent'
+  ) {
+    expect(
+      extracted,
+      'signature audit shell must stay in the workflow'
+    ).toEqual(expect.any(String));
+    const directory = mkdtempSync(resolve(tmpdir(), 'jovie-signature-audit-'));
+    try {
+      const calls = resolve(directory, 'calls');
+      writeFileSync(
+        resolve(directory, 'npm'),
+        `#!/bin/bash
+count=0
+if [ -f "$AUDIT_CALLS" ]; then count=$(cat "$AUDIT_CALLS"); fi
+count=$((count + 1))
+printf '%s' "$count" > "$AUDIT_CALLS"
+attest() {
+  printf '%s\\n' 'npm error code E404' 'npm error 404 Not Found - GET https://registry.npmjs.org/-/npm/v1/attestations/@jovie%2fcli@26.10.12 - Not found' >&2
+  exit 1
+}
+case "$AUDIT_MODE" in
+  lag)
+    if [ "$count" -le 2 ]; then attest; fi
+    exit 0
+    ;;
+  other)
+    printf '%s\\n' 'npm error code E500' >&2
+    exit 1
+    ;;
+  url-only)
+    printf '%s\\n' 'npm error 404 Not Found - GET https://registry.npmjs.org/-/npm/v1/attestations/@jovie%2fcli@26.10.12 - Not found' >&2
+    exit 1
+    ;;
+  other-endpoint)
+    printf '%s\\n' 'npm error code E404' 'npm error 404 Not Found - GET https://registry.npmjs.org/@jovie%2fcli - Not found' >&2
+    exit 1
+    ;;
+  persistent)
+    attest
+    ;;
+esac
+exit 99
+`
+      );
+      chmodSync(resolve(directory, 'npm'), 0o755);
+      let shell = extracted!.replace(/^          /gm, '');
+      if (mode === 'lag' || mode === 'persistent') {
+        expect(shell).toContain('sleep 15');
+        shell = shell.replace('sleep 15', 'sleep 0.1');
+      }
+      if (mode === 'persistent') {
+        shell = shell.replace(
+          'audit_deadline=$((SECONDS + 900))',
+          'audit_deadline=$((SECONDS + 1))'
+        );
+      }
+      const result = spawnSync('bash', ['-c', `set -euo pipefail\n${shell}`], {
+        encoding: 'utf8',
+        timeout: 10_000,
+        env: {
+          ...process.env,
+          PATH: `${directory}:${process.env.PATH}`,
+          RUNNER_TEMP: directory,
+          AUDIT_CALLS: calls,
+          AUDIT_MODE: mode,
+        },
+      });
+      return {
+        status: result.status,
+        output: `${result.stdout}${result.stderr}`,
+        callCount: existsSync(calls) ? Number(readFileSync(calls, 'utf8')) : 0,
+      };
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+
+  it('retries the attestations 404 twice and then accepts the audit', () => {
+    const result = runSignatureAudit('lag');
+    expect(result.status, result.output).toBe(0);
+    expect(result.callCount).toBe(3);
+    expect(result.output).toContain(
+      'npm attestations not propagated yet; retrying the signature audit.'
+    );
+  });
+
+  it.each([
+    ['non-404', 'other'],
+    ['404 without the code line', 'url-only'],
+    ['404 on another endpoint', 'other-endpoint'],
+  ] as const)('fails closed on a %s', (_label, mode) => {
+    const result = runSignatureAudit(mode);
+    expect(result.status, result.output).toBe(1);
+    expect(result.callCount).toBe(1);
+    expect(result.output).toContain(
+      'Signature audit failed outside the attestations 404 window.'
+    );
+  });
+
+  it('fails closed when the attestations 404 outlives the deadline', () => {
+    const result = runSignatureAudit('persistent');
+    expect(result.status, result.output).toBe(1);
+    expect(result.callCount).toBeGreaterThan(1);
+    expect(result.output).toContain(
+      'npm attestations did not propagate for the published release.'
+    );
+    expect(result.output).not.toContain(
+      'Signature audit failed outside the attestations 404 window.'
+    );
   });
 });
 
