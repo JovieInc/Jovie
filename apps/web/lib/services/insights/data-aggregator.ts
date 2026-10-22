@@ -37,10 +37,23 @@ function toNumber(value: AggregateValue): number {
   return Number(value ?? 0);
 }
 
+const countryNames = new Intl.DisplayNames(['en'], {
+  type: 'region',
+  fallback: 'none',
+});
+
+function countryIdentity(country: string): string {
+  const normalized = country.trim().toUpperCase();
+  // Existing manual tour dates also use USA; imported dates use country names.
+  const code = normalized === 'USA' ? 'US' : normalized;
+  const name = /^[A-Z]{2}$/.test(code) ? countryNames.of(code) : undefined;
+  return (name ?? normalized).toLowerCase();
+}
+
 function cityIdentity(location: { city: string; country: string }): string {
   return JSON.stringify([
     location.city.trim().toLowerCase(),
-    location.country.trim().toLowerCase(),
+    countryIdentity(location.country),
   ]);
 }
 

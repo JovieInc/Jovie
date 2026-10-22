@@ -467,6 +467,31 @@ describe('data-aggregator.ts', () => {
         { city: 'Austin', country: 'US', audienceCount: 11 },
       ]);
     });
+
+    it.each([
+      ['US', 'USA'],
+      ['US', 'United States'],
+      ['GB', 'UK'],
+      ['GB', 'United Kingdom'],
+      ['CA', 'Canada'],
+      ['DE', 'Germany'],
+    ])(
+      'matches country code %s with tour country %s',
+      async (code, country) => {
+        const snapshot = await geographicSnapshot({
+          audience: [{ city: 'Test City', country: code, count: 20 }],
+          shows: [
+            {
+              city: 'Test City',
+              country,
+              startDate: new Date('2027-01-01T12:00:00Z'),
+              venueName: 'Local venue',
+            },
+          ],
+        });
+        expect(snapshot.tour.audienceCitiesWithoutShows).toEqual([]);
+      }
+    );
   });
 
   // =========================================================================
