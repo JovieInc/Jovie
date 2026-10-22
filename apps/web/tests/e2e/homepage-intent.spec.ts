@@ -164,10 +164,30 @@ test.describe('Homepage chat intake — ID-keyed intent store + /start handoff',
 
     await page.goto('/start?intent_id=11111111-1111-4111-8111-111111111111');
 
-    // No real auth — we are only checking React's escaping and prompt restore.
-    await expect(page.getByLabel('Chat Message Input')).toHaveValue(
-      '<script>alert("xss")</script>'
-    );
+    // E2E mode auto-submits the restored starter prompt and clears the
+    // composer on the next frame. Require the literal string to settle as
+    // text: the user bubble after that send, or the composer when the send
+    // is held. A one-frame composer value is not the proof. It must never
+    // become a script node.
+    const htmlPrompt = '<script>alert("xss")</script>';
+    const composer = page.getByLabel('Chat Message Input');
+    const userBubble = page.getByTestId('chat-user-bubble');
+    let composerHeld = false;
+    await expect
+      .poll(async () => {
+        if ((await userBubble.count()) > 0) {
+          const bubbleText = await userBubble.first().innerText();
+          if (bubbleText.includes(htmlPrompt)) return 'text';
+        }
+        if ((await composer.inputValue()) === htmlPrompt) {
+          if (composerHeld) return 'text';
+          composerHeld = true;
+          return 'pending';
+        }
+        composerHeld = false;
+        return 'pending';
+      })
+      .toBe('text');
     const scriptCount = await page.locator('script:has-text("xss")').count();
     expect(scriptCount).toBe(0);
   });
