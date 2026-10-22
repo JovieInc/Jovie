@@ -493,6 +493,7 @@ export function SidebarThreadsSection({
         {hasThreads ? (
           <Link
             href={APP_ROUTES.CHATS}
+            prefetch={false}
             aria-current={allThreadsActive ? 'page' : undefined}
             className={cn(
               getSidebarNavRowClassName({
