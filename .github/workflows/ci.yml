@@ -6641,6 +6641,7 @@ jobs:
           # the artifact secret guard) and a reviewer-only gateway key
           # (AI Gateway key jovie-golden-path-review, $10 monthly budget).
           GOLDEN_PATH_KEYFRAME_DIR: ${{ github.workspace }}/apps/web/test-results/golden-path-keyframes/first
+          JOURNEY_EVIDENCE_REPORT: ${{ runner.temp }}/journey-evidence/playwright-report.json
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
@@ -6662,6 +6663,33 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY }}
           STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv
+
+      # Evidence for the pre-promotion gate (promotion-journey-gate.mjs). Built
+      # from the Playwright report of THIS run, so a skipped, mocked or red
+      # journey is recorded as such. Named by exact SHA so the production
+      # workflow can fetch it for the candidate.
+      - name: Emit journey evidence (jovie.journey-evidence/v1)
+        if: ${{ always() }}
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          JOURNEY_OUTCOME: ${{ steps.canonical_journey.outcome || 'skipped' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/emit-journey-evidence.mjs \
+            --report "${{ runner.temp }}/journey-evidence/playwright-report.json" \
+            --out-dir "${{ runner.temp }}/journey-evidence" \
+            --sha "${{ github.sha }}" --run-id "${{ github.run_id }}" \
+            --run-url "$RUN_URL" --outcome "$JOURNEY_OUTCOME"
+
+      - name: Upload journey evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: journey-evidence-${{ github.sha }}
+          overwrite: true
+          path: ${{ runner.temp }}/journey-evidence/journey-evidence-*.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Probe live $199 revenue path
         id: canonical_revenue
