@@ -699,7 +699,10 @@ def observe_main(repo: str) -> dict[str, Any]:
         # and the exact generation marker, not to every check run on the SHA.
         # Optional lanes (Generate Screenshots, agent suites) stay observable
         # in pendingChecks/failedChecks without classifying main.
-        latest = select_main_release_ready(release_attempts)
+        # A new main head can precede both its push CI and the skipped
+        # merge-group check. Keep that missing verdict in the normal unresolved
+        # path so the same bounded recent-CI fallback can evaluate it.
+        latest = select_main_release_ready(release_attempts) if release_attempts else {}
         marker = observe_generation_marker(repo, sha)
         required_checks, optional_checks = classify_main_checks(
             check_runs,

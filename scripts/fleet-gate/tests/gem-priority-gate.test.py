@@ -297,6 +297,62 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["sourceGate"]["ancestorSha"], "c" * 40)
         self.assertIn("fell back to the newest real Main Release Ready attempt", observed["error"])
 
+    def test_observe_main_uses_recent_ci_before_exact_gate_materializes(self):
+        """JOV-8148: no check/job exists yet on the newly merged main head."""
+        now = MODULE.datetime(2026, 10, 22, 14, 18, tzinfo=MODULE.UTC)
+        for case, expected in (
+            ("success", "green"),
+            ("failure", "red"),
+            ("timed_out", "red"),
+            ("skipped", "unknown"),
+            ("missing", "unknown"),
+            ("stale", "unknown"),
+            ("offline", "unknown"),
+        ):
+            with self.subTest(case=case):
+                exact_response = _main_fixture([], combined_state="pending")
+
+                def github_response(repo: str, endpoint: str):
+                    if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                        if case == "offline":
+                            raise OSError("GitHub observation unavailable")
+                        return {"workflow_runs": [] if case == "missing" else [{
+                            "id": 424245,
+                            "head_sha": "b" * 40,
+                            "created_at": "2026-10-22T10:00:00Z"
+                            if case == "stale" else "2026-10-22T13:55:21Z",
+                        }]}
+                    if endpoint == "actions/runs/424245/jobs?per_page=100":
+                        self.assertNotEqual(case, "stale")
+                        return {"jobs": [{
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": case,
+                            "started_at": "2026-10-22T13:56:00Z",
+                            "completed_at": "2026-10-22T13:56:38Z",
+                        }]}
+                    return exact_response(repo, endpoint)
+
+                with (
+                    mock.patch.object(MODULE, "gh_json", side_effect=github_response) as github,
+                    mock.patch.object(MODULE, "utc_now", return_value=now),
+                ):
+                    observed = MODULE.observe_main("JovieInc/Jovie")
+
+                self.assertEqual(observed["status"], expected)
+                self.assertEqual(observed["sha"], MAIN_SHA)
+                github.assert_any_call(
+                    "JovieInc/Jovie",
+                    "actions/workflows/ci.yml/runs?branch=main&event=push&per_page=10",
+                )
+                self.assertEqual(observed["requiredChecks"][0]["verdict"], "missing")
+                if expected in {"green", "red"}:
+                    self.assertEqual(observed["sourceGate"]["ancestorSha"], "b" * 40)
+                    self.assertEqual(observed["sourceGate"]["source"], "ancestor-ci-workflow-job")
+                else:
+                    self.assertEqual(observed["reason"], "required-check-missing")
+                    self.assertIn("no completed real attempt", observed["error"])
+
     def test_observe_main_ancestor_fallback_fails_closed_when_bound_exceeded(self):
         """No real attempt within the freshness bound: main stays unknown."""
 
@@ -381,23 +437,15 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertNotIn("error", observed)
 
     def test_observe_main_preserves_exact_sha_when_release_gate_is_missing(self):
-        def github_response(_repo: str, endpoint: str):
-            if endpoint == "branches/main":
-                return {"commit": {"sha": MAIN_SHA}}
-            if endpoint == f"commits/{MAIN_SHA}/status":
-                return {"state": "success"}
-            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
-                return {"check_runs": []}
-            if endpoint.startswith("actions/runs?"):
-                return {"workflow_runs": []}
-            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
-
-        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+        with mock.patch.object(
+            MODULE, "gh_json", side_effect=_main_fixture([], combined_state="success")
+        ):
             observed = MODULE.observe_main("JovieInc/Jovie")
 
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
-        self.assertIn("Main Release Ready check is missing", observed["error"])
+        self.assertEqual(observed["reason"], "required-check-missing")
+        self.assertIn("no completed real attempt", observed["error"])
 
     def test_observe_main_uses_ci_job_when_check_runs_are_flooded(self):
         def github_response(_repo: str, endpoint: str):
