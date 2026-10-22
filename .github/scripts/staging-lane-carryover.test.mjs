@@ -214,7 +214,7 @@ test('controller preserves sealed CI routing and consumes the qualified carryove
   assert.match(workflow, /if \[ "\$outcome" = not_applicable \]/);
   assert.match(workflow, /\.carryover=\$proof\[0\]/);
   assert.match(workflow, /persist-credentials: false/);
-  assert.match(workflow, /node-version: 24\.21\.0/);
+  assert.match(workflow, /node-version: 24\.22\.1/);
 });
 
 test('actual routing Bash handles no-op, stale generation, failed identity and wrong lineage', () => {

@@ -133,7 +133,7 @@ safe_vercel_failure_reason() {
 
 # CLI preambles and error bodies fit under this. Anything larger is inspect
 # build output, which must stay on disk: copying it through a shell parameter
-# is what exhausted the promotion harness.
+# is what exhausted the promotion harness (structural pytest's 10s budget).
 vercel_json_shell_limit=262144
 
 safe_vercel_failure_reason_file() {
@@ -150,13 +150,14 @@ safe_vercel_failure_reason_file() {
   safe_vercel_failure_reason "$raw"
 }
 
-# Project a complete JSON document from a file. Inspection keeps only the
-# fields later reads use, so a multi-megabyte builds payload never enters the
-# shell. Status-line and `> ` prefixed bodies are handled by the caller.
+# Project one JSON document from a file. Inspection keeps only the fields
+# later reads use, so a multi-megabyte builds payload never enters the shell.
+# Status-line and `> ` prefixed bodies are handled by the caller.
 project_whole_vercel_json_file() {
   local file="$1"
   local schema="$2"
   local projected=""
+  local bytes=0
 
   case "$schema" in
     current | alias)
@@ -166,6 +167,12 @@ project_whole_vercel_json_file() {
       ;;
     rollout)
       valid_rollout_json <"$file" || return 1
+      bytes="$(wc -c <"$file" | tr -d '[:space:]')"
+      # A rollout body has no builds payload. Refuse to copy an unexpectedly
+      # large document into a shell parameter; fail closed instead.
+      if [ "$bytes" -gt "$vercel_json_shell_limit" ]; then
+        return 1
+      fi
       cat "$file"
       ;;
     *)
@@ -214,8 +221,10 @@ read_vercel_json() {
 
   # Inspect writes JSON to stdout. Keep stderr in its own file: CLI notices
   # can arrive while a large JSON write is still draining, and merging the
-  # streams corrupts the document. Neither body is assigned to a shell
-  # parameter until it has been projected or proven small.
+  # streams corrupts the document. Capturing stdout with a command
+  # substitution also fills a pipe and then copies the builds payload through
+  # every later parameter and here-string. Neither body is assigned to a
+  # shell parameter until it has been projected or proven small.
   stdout_file="$(mktemp)" || return 1
   stderr_file="$(mktemp)" || {
     rm -f "$stdout_file"

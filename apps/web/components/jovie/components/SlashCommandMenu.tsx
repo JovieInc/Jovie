@@ -508,7 +508,18 @@ export function SlashCommandMenu({
       // IME composition (Japanese, Chinese, Korean): the user is mid-glyph
       // and Enter is "commit composition," not "submit." Bail before any
       // navigation key handling so we never swallow the composition.
-      if (e.isComposing || e.keyCode === 229) return;
+      // keyCode 229 is the IME composition signal. Firefox reports it for
+      // ArrowDown as well, while `key` stays ArrowDown. Only bail when the
+      // key itself is the composition commit.
+      if (
+        e.isComposing ||
+        (e.keyCode === 229 &&
+          e.key !== 'ArrowDown' &&
+          e.key !== 'ArrowUp' &&
+          e.key !== 'Escape')
+      ) {
+        return;
+      }
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         onMoveSelected(1, flatItems.length);

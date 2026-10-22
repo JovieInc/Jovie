@@ -181,9 +181,14 @@ test('rejects three semantically correct controls with dispersed spacing or comp
     'data-variant',
     'link'
   );
-  expect(await hierarchyViolations(page)).toEqual(
-    expect.arrayContaining(['competing-emphasis', 'dispersed-utilities'])
-  );
+  // Firefox can report the margin before the appearance override paints
+  // background or width. Poll the same violation set instead of failing the
+  // first paint and calling a retry the fix.
+  await expect
+    .poll(() => hierarchyViolations(page))
+    .toEqual(
+      expect.arrayContaining(['competing-emphasis', 'dispersed-utilities'])
+    );
 });
 
 test('preserves primary geometry through browser failure and makes long scaled copy scrollable', async ({

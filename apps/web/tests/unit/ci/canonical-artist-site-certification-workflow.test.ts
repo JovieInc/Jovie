@@ -178,6 +178,9 @@ node -e 'process.stdout.write(process.env.URL_ENCRYPTION_KEY)'`,
     expect(gate).toContain('always()');
     expect(gate).toContain('!cancelled()');
     expect(gate).toContain("github.event_name == 'workflow_dispatch'");
+    expect(gate).toContain(
+      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    );
     expect(gate).toContain("needs.neon-db.result == 'success'");
     expect(gate).toContain("needs.neon-db.result == 'failure'");
     expect(gate).not.toContain("'merge_group'");

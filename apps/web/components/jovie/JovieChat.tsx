@@ -43,14 +43,15 @@ import { ChatEmptyStateGreeting } from './components/ChatEmptyStateGreeting';
 import { ChatPinnedOpportunityHeader } from './components/ChatPinnedOpportunityHeader';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
+import { ChatStickScrollButton } from './components/ScrollToBottom';
 import {
   useChatFileAttachments,
   useChatJankMonitor,
   useJovieChatController,
-  useStickToBottom,
 } from './hooks';
 import { useChatRailContextTargets } from './hooks/useChatRailContextTargets';
 import { useComposerDraftIntent } from './hooks/useComposerDraft';
+import { useStickToBottomController } from './hooks/useStickToBottom';
 import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
   CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
@@ -154,14 +155,20 @@ export function JovieChat({
 
   // ─── Sticky scroll via ResizeObserver ────────────────────────────
   const {
-    isStuckToBottom,
     setStuckToBottom,
+    subscribe: subscribeStuckToBottom,
+    getSnapshot: getStuckToBottom,
     totalSizeRef,
     scrollContainerRef,
     bottomSentinelRef,
-  } = useStickToBottom(messages.length);
-  const isStuckToBottomRef = useRef(isStuckToBottom);
-  isStuckToBottomRef.current = isStuckToBottom;
+  } = useStickToBottomController(messages.length);
+  const isStuckToBottomRef = useRef(true);
+  useEffect(() => {
+    isStuckToBottomRef.current = getStuckToBottom();
+    return subscribeStuckToBottom(() => {
+      isStuckToBottomRef.current = getStuckToBottom();
+    });
+  }, [getStuckToBottom, subscribeStuckToBottom]);
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
@@ -171,7 +178,11 @@ export function JovieChat({
     conversationId: activeConversationId,
     messages,
     status,
-    isStuckToBottom,
+    // The boolean is ignored while the store subscription is set. Reading
+    // stick state here would re-render the transcript on every sentinel cross.
+    isStuckToBottom: true,
+    subscribeStuckToBottom,
+    getStuckToBottom,
     scrollContainerRef,
     enabled: jankMonitorEnabled,
   });
@@ -1017,6 +1028,7 @@ export function JovieChat({
                     onUnpin={handleUnpinOpportunity}
                   />
                 ) : null}
+                {/* Stick updates render ChatStickScrollButton only. */}
                 <ChatThreadMessages
                   messages={messages}
                   shouldVirtualizeMessages={shouldVirtualizeMessages}
@@ -1034,11 +1046,16 @@ export function JovieChat({
                   profileId={profileId}
                   knownMessageIds={knownMessageIdsRef.current}
                   inlineChatError={inlineChatError}
-                  isStuckToBottom={isStuckToBottom}
+                  isStuckToBottom
                   onScrollToBottom={() => scrollToBottom()}
                   conversationId={activeConversationId ?? conversationId}
                   collapsedFailureCount={collapsedSummerFailureCount}
                   onShowCollapsedFailures={showCollapsedSummerFailures}
+                />
+                <ChatStickScrollButton
+                  subscribe={subscribeStuckToBottom}
+                  getSnapshot={getStuckToBottom}
+                  onClick={() => scrollToBottom()}
                 />
               </>
             )}

@@ -702,6 +702,99 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
     expect((await response.json()).data).toHaveLength(365);
   });
 
+  it.each([false, true])(
+    'discards partial counts when GitHub times out (verified cache: %s)',
+    async hasVerifiedCache => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+      hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+      hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+      hoisted.env.HUD_GITHUB_REPO = 'jovie';
+      const cachedAt = '2026-08-30T11:55:00.000Z';
+      const verifiedData = [
+        {
+          date: '2026-08-30',
+          merged: 3,
+          opened: 1,
+          closed: 0,
+          mergeP50Hours: 2,
+        },
+      ];
+      const set = vi.fn();
+      hoisted.getRedis.mockReturnValue({
+        get: vi.fn().mockResolvedValue(
+          hasVerifiedCache
+            ? {
+                data: verifiedData,
+                range: '1y',
+                cachedAt,
+                observation: 'fresh',
+              }
+            : null
+        ),
+        set,
+      });
+      const stalledSignals: AbortSignal[] = [];
+      const fetchMock = vi
+        .fn((_input: RequestInfo | URL, options?: RequestInit) => {
+          const signal = options?.signal;
+          if (!signal) throw new Error('Expected an abort signal');
+          stalledSignals.push(signal);
+          return new Promise<Response>((_resolve, reject) => {
+            signal.onabort = () => reject(signal.reason);
+          });
+        })
+        .mockResolvedValueOnce(
+          Response.json({
+            data: {
+              repository: {
+                pullRequests: {
+                  nodes: [
+                    {
+                      state: 'MERGED',
+                      merged: true,
+                      createdAt: '2026-08-30T08:00:00.000Z',
+                      updatedAt: '2026-08-30T10:00:00.000Z',
+                      mergedAt: '2026-08-30T10:00:00.000Z',
+                      closedAt: '2026-08-30T10:00:00.000Z',
+                    },
+                  ],
+                  pageInfo: { hasNextPage: true, endCursor: 'cursor-1' },
+                },
+              },
+            },
+          })
+        );
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { GET } = await import(
+        '@/app/api/admin/hud/shipping-velocity/route'
+      );
+      const responsePromise = GET(
+        new Request('http://localhost/api/admin/hud/shipping-velocity?range=1y')
+      );
+      await vi.advanceTimersByTimeAsync(31_000);
+      const response = await responsePromise;
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      await expect(response.json()).resolves.toMatchObject({
+        data: hasVerifiedCache ? verifiedData : [],
+        range: '1y',
+        cachedAt: hasVerifiedCache ? cachedAt : expect.any(String),
+        observation: hasVerifiedCache ? 'stale' : 'unavailable',
+        errorMessage: 'Shipping velocity refresh timed out; try again shortly.',
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(stalledSignals).toHaveLength(2);
+      expect(stalledSignals.every(signal => signal.aborted)).toBe(true);
+      expect(set).not.toHaveBeenCalled();
+      expect(hoisted.captureError).not.toHaveBeenCalled();
+      expect(hoisted.logger.error).not.toHaveBeenCalled();
+      expect(hoisted.logger.warn).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('degrades to an unavailable observation without error reports when GitHub is rate limited', async () => {
     hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
     hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
