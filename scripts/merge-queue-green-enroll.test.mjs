@@ -495,7 +495,7 @@ async function withFetch(run) {
   const calls = [];
   globalThis.fetch = async (...args) => {
     calls.push(args);
-    return { ok: true, status: 204 };
+    return new Response(null, { status: 204 });
   };
   try {
     return { result: await run(), calls };
