@@ -170,6 +170,42 @@ describe('MarketingAmbientField', () => {
       );
     });
 
+    it('returns to the poster on GPU context loss without claiming a live field', async () => {
+      render(
+        <MarketingAmbientField
+          accent='blue'
+          variant='refracted'
+          motion='intro'
+        />
+      );
+      idleCallback?.();
+      await waitFor(() => expect(startAmbientField).toHaveBeenCalled());
+      const [canvas, , firstFrame, options] =
+        vi.mocked(startAmbientField).mock.calls[0];
+      expect(options).toEqual({ variant: 'refracted', motion: 'intro' });
+      act(() => firstFrame());
+      expect(screen.getByTestId('marketing-ambient-field')).toHaveAttribute(
+        'data-live',
+        'true'
+      );
+      act(() => canvas.dispatchEvent(new Event('webglcontextlost')));
+      expect(stop).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('marketing-ambient-field')).toHaveAttribute(
+        'data-live',
+        'false'
+      );
+    });
+
+    it('does not start pending GPU work after reduced motion is enabled', async () => {
+      render(<MarketingAmbientField accent='blue' />);
+      vi.stubGlobal('matchMedia', () => ({ matches: true }));
+      idleCallback?.();
+      await act(async () => {
+        await import('./ambient-field-gl');
+      });
+      expect(startAmbientField).not.toHaveBeenCalled();
+    });
+
     it('keeps the poster when the accent token does not resolve', async () => {
       vi.mocked(globalThis.getComputedStyle).mockReturnValue({
         backgroundColor: 'rgb(8, 9, 10)',

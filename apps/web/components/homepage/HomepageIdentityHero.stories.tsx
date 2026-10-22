@@ -1,3 +1,4 @@
+import '@/app/(home)/home.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { RenderedFamily } from '@/.storybook/rendered-family';
 import { HomepageIdentityHero } from './HomepageIdentityHero';
@@ -7,14 +8,16 @@ const meta = {
   component: HomepageIdentityHero,
   decorators: [
     Story => (
-      <RenderedFamily
-        name='homepage-identity-hero'
-        owner='HomepageIdentityHero'
-        keyboardTargetSelector='button[data-testid="homepage-primary-cta"]'
-        interactive
-      >
-        <Story />
-      </RenderedFamily>
+      <div className='home-viewport'>
+        <RenderedFamily
+          name='homepage-identity-hero'
+          owner='HomepageIdentityHero'
+          keyboardTargetSelector='button[data-testid="homepage-primary-cta"]'
+          interactive
+        >
+          <Story />
+        </RenderedFamily>
+      </div>
     ),
   ],
   parameters: {

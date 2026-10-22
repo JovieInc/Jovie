@@ -609,13 +609,76 @@
 
 /* The existing homepage owner stays centered around one claim control.
    A viewport of real entry space keeps explanation below the initial fold. */
+.homepage-claim-hero {
+  --homepage-hero-card-inset: clamp(var(--space-8), 4vw, var(--space-12));
+  --homepage-hero-scroll-distance: calc(var(--space-24) * 3);
+  background: var(--color-bg-page);
+}
+
+.homepage-claim-hero__frame {
+  position: relative;
+  isolation: isolate;
+  min-block-size: 100svh;
+  display: grid;
+  place-items: center;
+}
+
+.homepage-claim-hero__surface {
+  /* Constrain the decorative clip repaint to this plane, not the form. */
+  contain: paint;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
+  background: var(--color-bg-page);
+  clip-path: inset(
+    var(--homepage-hero-card-inset) round var(--system-b-radius-panel)
+  );
+}
+
+/* The surface moves; type, focus rings and the real form never scale. The
+   reserved inner column fits the settled card from the first frame. */
 .homepage-claim-hero .homepage-claim-hero__layout {
-  width: var(--homepage-identity-width);
+  width: min(
+    var(--ds-public-content-max),
+    calc(100% - (var(--homepage-hero-card-inset) + var(--space-4)) * 2)
+  );
   max-width: none;
   min-block-size: 100svh;
   justify-content: center;
   gap: var(--space-8);
   padding-inline: 0;
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .homepage-claim-hero__scroll-region {
+      min-block-size: calc(100svh + var(--homepage-hero-scroll-distance));
+    }
+
+    .homepage-claim-hero__frame {
+      position: sticky;
+      inset-block-start: 0;
+    }
+
+    .homepage-claim-hero__surface {
+      animation: homepage-claim-hero-frame linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0px var(--homepage-hero-scroll-distance);
+    }
+  }
+}
+
+@keyframes homepage-claim-hero-frame {
+  from {
+    clip-path: inset(0 round 0);
+  }
+  to {
+    clip-path: inset(
+      var(--homepage-hero-card-inset) round var(--system-b-radius-panel)
+    );
+  }
 }
 
 .homepage-claim-hero__copy {

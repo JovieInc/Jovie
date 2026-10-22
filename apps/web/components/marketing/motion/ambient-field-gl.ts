@@ -19,6 +19,11 @@ export interface AmbientFieldHandle {
   stop(): void;
 }
 
+export interface AmbientFieldOptions {
+  readonly variant?: 'bloom' | 'refracted';
+  readonly motion?: 'ambient' | 'intro';
+}
+
 const VERTEX = `#version 300 es
 in vec2 p;
 out vec2 uv;
@@ -38,6 +43,7 @@ uniform float t;
 uniform float aspect;
 uniform vec3 accent;
 uniform vec3 base;
+uniform float refracted;
 float hash(vec2 q) {
   return fract(sin(dot(q, vec2(127.1, 311.7))) * 43758.5453);
 }
@@ -69,6 +75,14 @@ void main() {
   float rays = pow(noise(vec2(angle * 5.0, t * 0.06)), 3.0);
   float reach = exp(-length(d) * 1.6);
   float glow = bloom * (0.55 + 0.45 * drift) + rays * reach * 0.24;
+  if (refracted > 0.5) {
+    // One broad folded field, brighter near the edges and quiet behind
+    // the HTML controls. No particles, bloom pass or fluid simulation.
+    vec2 p = vec2(uv.x * aspect, uv.y);
+    float fold = sin(p.x * 2.4 + p.y * 3.2 + fbm(p * 1.1 + t * 0.018) * 3.0);
+    float edge = smoothstep(0.15, 0.68, abs(uv.x - 0.5) + abs(uv.y - 0.5) * 0.25);
+    glow = (0.08 + pow(0.5 + 0.5 * fold, 3.0) * 0.55) * edge;
+  }
   vec3 c = mix(base, accent, clamp(glow * 0.62, 0.0, 1.0));
   c += (hash(gl_FragCoord.xy + t) - 0.5) / 255.0;
   color = vec4(c, 1.0);
@@ -98,7 +112,8 @@ function compile(
 export function startAmbientField(
   canvas: HTMLCanvasElement,
   colors: AmbientFieldColors,
-  onFirstFrame: () => void
+  onFirstFrame: () => void,
+  options: AmbientFieldOptions = {}
 ): AmbientFieldHandle | null {
   const gl = canvas.getContext('webgl2', {
     alpha: false,
@@ -135,6 +150,10 @@ export function startAmbientField(
   const uAspect = gl.getUniformLocation(program, 'aspect');
   gl.uniform3fv(gl.getUniformLocation(program, 'accent'), colors.accent);
   gl.uniform3fv(gl.getUniformLocation(program, 'base'), colors.base);
+  gl.uniform1f(
+    gl.getUniformLocation(program, 'refracted'),
+    options.variant === 'refracted' ? 1 : 0
+  );
 
   const resize = () => {
     const rect = canvas.getBoundingClientRect();
@@ -151,31 +170,40 @@ export function startAmbientField(
       gl.viewport(0, 0, width, height);
     }
     gl.uniform1f(uAspect, width / height);
+    // Resizing clears the buffer. Repaint the held frame without restarting
+    // decorative motion after its short introduction.
+    if (settled && painted) gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 
   let frame = 0;
   let last = 0;
   let visible = false;
   let painted = false;
+  let settled = false;
   const origin = performance.now();
 
   const draw = (now: number) => {
     frame = 0;
     if (!visible || document.hidden) return;
+    const elapsedSeconds = (now - origin) / 1000;
     if (now - last >= FRAME_INTERVAL_MS) {
       last = now;
-      gl.uniform1f(uTime, (now - origin) / 1000);
+      gl.uniform1f(uTime, elapsedSeconds);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       if (!painted) {
         painted = true;
         onFirstFrame();
       }
     }
+    if (options.motion === 'intro' && elapsedSeconds >= 4) {
+      settled = true;
+      return;
+    }
     frame = requestAnimationFrame(draw);
   };
 
   const schedule = () => {
-    if (frame === 0 && visible && !document.hidden) {
+    if (frame === 0 && visible && !document.hidden && !settled) {
       frame = requestAnimationFrame(draw);
     }
   };

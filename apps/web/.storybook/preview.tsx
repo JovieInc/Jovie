@@ -71,10 +71,15 @@ function installDeterministicFixtures(): void {
     };
   }
 
-  // Inject CSS that freezes animation/transition for Chromatic + a11y runs.
-  const style = document.createElement('style');
-  style.setAttribute('data-jovie-storybook-fixtures', 'true');
-  style.textContent = `
+  // Snapshot runs remain frozen. The explicit local motion-review URL keeps
+  // native media preferences and real timing without weakening CI fixtures.
+  const liveMotionReview =
+    new URLSearchParams(window.location.search).get('jovie-motion') === 'live';
+  if (!liveMotionReview) {
+    // Inject CSS that freezes animation/transition for Chromatic + a11y runs.
+    const style = document.createElement('style');
+    style.setAttribute('data-jovie-storybook-fixtures', 'true');
+    style.textContent = `
     *, *::before, *::after {
       animation-duration: 0s !important;
       animation-delay: 0s !important;
@@ -86,32 +91,33 @@ function installDeterministicFixtures(): void {
       animation: none !important;
     }
   `;
-  document.head.appendChild(style);
+    document.head.appendChild(style);
 
-  // Keep responsive media queries real; only motion is deterministic.
-  const nativeMatchMedia = window.matchMedia.bind(window);
-  try {
-    Object.defineProperty(window, 'matchMedia', {
-      writable: true,
-      configurable: true,
-      value: (query: string) => {
-        if (!query.includes('prefers-reduced-motion'))
-          return nativeMatchMedia(query);
-        const reduced = true;
-        return {
-          matches: reduced,
-          media: query,
-          onchange: null,
-          addListener: () => undefined,
-          removeListener: () => undefined,
-          addEventListener: () => undefined,
-          removeEventListener: () => undefined,
-          dispatchEvent: () => false,
-        } as MediaQueryList;
-      },
-    });
-  } catch {
-    // ignore if already non-configurable
+    // Keep responsive media queries real; only motion is deterministic.
+    const nativeMatchMedia = window.matchMedia.bind(window);
+    try {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: (query: string) => {
+          if (!query.includes('prefers-reduced-motion'))
+            return nativeMatchMedia(query);
+          const reduced = true;
+          return {
+            matches: reduced,
+            media: query,
+            onchange: null,
+            addListener: () => undefined,
+            removeListener: () => undefined,
+            addEventListener: () => undefined,
+            removeEventListener: () => undefined,
+            dispatchEvent: () => false,
+          } as MediaQueryList;
+        },
+      });
+    } catch {
+      // ignore if already non-configurable
+    }
   }
 
   // Stable id helper for stories that need an explicit id prop.

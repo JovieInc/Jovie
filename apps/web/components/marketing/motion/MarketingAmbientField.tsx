@@ -21,6 +21,9 @@ export interface MarketingAmbientFieldProps {
   /** The section's one accent. Neighbouring sections must not share it. */
   readonly accent: MarketingAmbientAccent;
   readonly className?: string;
+  readonly variant?: 'bloom' | 'refracted';
+  /** A short decorative introduction then a still frame, with no replay. */
+  readonly motion?: 'ambient' | 'intro';
 }
 
 interface WindowHints {
@@ -71,6 +74,8 @@ function readRgb(
 export function MarketingAmbientField({
   accent,
   className,
+  variant = 'bloom',
+  motion = 'ambient',
 }: MarketingAmbientFieldProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -94,25 +99,28 @@ export function MarketingAmbientField({
     };
 
     const start = () => {
-      void import('./ambient-field-gl').then(({ startAmbientField }) => {
-        if (cancelled) return;
-        const probe = document
-          .createElement('canvas')
-          .getContext('2d', { willReadFrequently: true });
-        if (!probe) return;
-        const styles = getComputedStyle(root);
-        const accentRgb = readRgb(
-          probe,
-          styles.getPropertyValue('--ambient-accent').trim()
-        );
-        const baseRgb = readRgb(probe, styles.backgroundColor);
-        if (!accentRgb || !baseRgb) return;
-        handle = startAmbientField(
-          canvas,
-          { accent: accentRgb, base: baseRgb },
-          () => setLive(true)
-        );
-      });
+      void import('./ambient-field-gl')
+        .then(({ startAmbientField }) => {
+          if (cancelled || !shouldRunAmbientField()) return;
+          const probe = document
+            .createElement('canvas')
+            .getContext('2d', { willReadFrequently: true });
+          if (!probe) return;
+          const styles = getComputedStyle(root);
+          const accentRgb = readRgb(
+            probe,
+            styles.getPropertyValue('--ambient-accent').trim()
+          );
+          const baseRgb = readRgb(probe, styles.backgroundColor);
+          if (!accentRgb || !baseRgb) return;
+          handle = startAmbientField(
+            canvas,
+            { accent: accentRgb, base: baseRgb },
+            () => setLive(true),
+            { variant, motion }
+          );
+        })
+        .catch(() => setLive(false));
     };
 
     const usesIdleCallback = 'requestIdleCallback' in globalThis;
@@ -124,15 +132,17 @@ export function MarketingAmbientField({
       : globalThis.setTimeout(start, 600);
 
     reducedMotion.addEventListener('change', stop);
+    canvas.addEventListener('webglcontextlost', stop);
 
     return () => {
       cancelled = true;
       if (usesIdleCallback) globalThis.cancelIdleCallback(idleId);
       if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
       reducedMotion.removeEventListener('change', stop);
+      canvas.removeEventListener('webglcontextlost', stop);
       handle?.stop();
     };
-  }, []);
+  }, [variant, motion]);
 
   return (
     <div
@@ -140,6 +150,7 @@ export function MarketingAmbientField({
       aria-hidden='true'
       className={cn('marketing-ambient-field', className)}
       data-accent={accent}
+      data-variant={variant}
       data-live={live ? 'true' : 'false'}
       data-testid='marketing-ambient-field'
     >

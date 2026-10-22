@@ -75,7 +75,7 @@ describe('mounted homepage hero System B source contract', () => {
     expect(heroComponentSource).toContain("variant='centered'");
     // Explanatory identity remains below the fold, never a product screenshot.
     expect(heroComponentSource).not.toContain('<ArtistProfilePhoneFrame');
-    for (const primitive of ['<MarketingHero', '<MarketingHeroPhoto']) {
+    for (const primitive of ['<MarketingHero', '<MarketingAmbientField']) {
       expect(heroComponentSource).toContain(primitive);
     }
   });

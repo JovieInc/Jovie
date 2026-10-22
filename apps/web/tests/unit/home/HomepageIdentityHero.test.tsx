@@ -142,7 +142,15 @@ describe('HomepageIdentityHero', () => {
     expect(identity).toHaveTextContent('Your artist profile');
     expect(within(identity).queryByRole('img')).toBeNull();
     expect(screen.queryByText(/Tim White|Founder|Claimed|Avery/)).toBeNull();
-    expect(document.querySelectorAll('video, canvas')).toHaveLength(0);
+    expect(document.querySelectorAll('video')).toHaveLength(0);
+    expect(screen.getByTestId('marketing-ambient-field')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    expect(screen.getByTestId('marketing-ambient-field')).toHaveAttribute(
+      'data-variant',
+      'refracted'
+    );
   });
 
   it('keeps explanatory copy after the entry rather than above its input', () => {
@@ -150,7 +158,9 @@ describe('HomepageIdentityHero', () => {
     const hero = screen.getByTestId('marketing-section-hero');
     const explanation = screen.getByTestId('homepage-hero-explanation');
     expect(hero).not.toContainElement(explanation);
-    expect(hero.nextElementSibling).toBe(explanation);
+    expect(
+      screen.getByTestId('homepage-hero-scroll-region').nextElementSibling
+    ).toBe(explanation);
     expect(within(hero).queryByTestId('homepage-hero-identity')).toBeNull();
     expect(
       within(explanation).getByText(HOMEPAGE_IDENTITY_COPY.hero.subhead)

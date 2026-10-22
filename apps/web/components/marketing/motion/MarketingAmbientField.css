@@ -32,6 +32,21 @@
   --ambient-accent: var(--color-accent-red);
 }
 
+/* Broad refracted light at the perimeter; the decision surface stays quiet. */
+.marketing-ambient-field[data-variant="refracted"] {
+  background-image:
+    radial-gradient(
+      ellipse 75% 65% at 0% 15%,
+      color-mix(in oklab, var(--ambient-accent) 30%, transparent),
+      transparent 75%
+    ),
+    radial-gradient(
+      ellipse 55% 80% at 100% 80%,
+      color-mix(in oklab, var(--ambient-accent) 20%, transparent),
+      transparent 80%
+    );
+}
+
 .marketing-ambient-field__canvas {
   position: absolute;
   inset: 0;
