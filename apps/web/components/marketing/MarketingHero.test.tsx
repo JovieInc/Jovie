@@ -16,7 +16,7 @@ vi.mock('@/components/features/home/HomeTrustSection', () => ({
 
 describe('MarketingHero source-backed default story', () => {
   it('puts an explicit delegated owner on the semantic root in both shell and content modes', () => {
-    const owner = 'apps/web/components/homepage/HomepageIdentityHero.tsx';
+    const owner = 'apps/web/components/homepage/HomepageArtistProfile.tsx';
     const shell = render(
       <MarketingHero
         variant='split'
