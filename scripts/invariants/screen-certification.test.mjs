@@ -14,7 +14,6 @@ import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { crc32 } from 'node:zlib';
-import { artifactContainsSecret } from '../../.github/scripts/guard-playwright-artifacts.mjs';
 import {
   readProductReferenceOwner,
   screenNeedsProductReferences,
@@ -150,33 +149,32 @@ function findings(patch, screen = gated()[0]) {
 
 describe('JOV-INV-018 screen-certification/v2', () => {
   it('does not write a legal-cookies screen id as a credential assignment', () => {
-    const finding =
-      'trusted producer artifact 12435475550 is not acceptable for web.legal-cookies (artifact run, workflow, or exact producer attempt is not trusted)';
-    const blocked =
-      'screen web.legal-cookies blocked (viewport desktop is missing a decision)';
-    const receipt = JSON.stringify(
-      {
+    const guard = join(ROOT, '.github/scripts/guard-playwright-artifacts.mjs');
+    const script = `
+      import { artifactContainsSecret } from ${JSON.stringify(guard)};
+      const receipt = JSON.stringify({
         issues: [
-          finding,
-          blocked,
+          'trusted producer artifact 12435475550 is not acceptable for web.legal-cookies (artifact run, workflow, or exact producer attempt is not trusted)',
+          'screen web.legal-cookies blocked (viewport desktop is missing a decision)',
           'missing exact-head proof for web.legal-cookies',
         ],
-      },
-      null,
-      2
+      }, null, 2);
+      const checks = [
+        [artifactContainsSecret(receipt, {}), false],
+        [artifactContainsSecret('web.legal-cookies: trusted producer artifact 1 is not acceptable', {}), true],
+        [artifactContainsSecret('COOKIE=session-token-value', {}), true],
+      ];
+      if (checks.some(([actual, expected]) => actual !== expected)) {
+        console.error(JSON.stringify(checks));
+        process.exit(1);
+      }
+    `;
+    const result = spawnSync(
+      process.execPath,
+      ['--input-type=module', '-e', script],
+      { encoding: 'utf8' }
     );
-    assert.equal(artifactContainsSecret(receipt, {}), false);
-    assert.equal(
-      artifactContainsSecret(
-        'web.legal-cookies: trusted producer artifact 1 is not acceptable',
-        {}
-      ),
-      true
-    );
-    assert.equal(
-      artifactContainsSecret('COOKIE=session-token-value', {}),
-      true
-    );
+    assert.equal(result.status, 0, result.stderr || result.stdout);
   });
 
   it('decides product-reference membership without loading typescript', () => {

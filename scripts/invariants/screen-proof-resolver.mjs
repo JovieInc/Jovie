@@ -464,11 +464,7 @@ export function resolveTrustedArtifactId({
   }
 }
 /** Owned GitHub transport; tests replace `gh` on PATH, never a verifier result. */
-export function resolveTrustedScreenProof({
-  artifactId,
-  context,
-  lagDelays,
-} = {}) {
+export function resolveTrustedScreenProof({ artifactId, context, lagDelays }) {
   const now = Date.now();
   const expectedSources = paths(context?.sourcePaths);
   const viewports = Array.isArray(context?.viewports)
