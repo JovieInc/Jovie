@@ -1,6 +1,9 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { command } from './staging-release-source.mjs';
 
 export const PRODUCTION_BUILD_INFO_URL = 'https://jov.ie/api/health/build-info';
 export const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -250,9 +253,10 @@ export async function deferToInFlightSupersede({
   }
 
   try {
-    // One deadline bounds the listing and all ancestry reads; no polling.
+    // One deadline bounds all network reads and native artifact decoding.
+    const deadline = Date.now() + LIVE_BIND_FETCH_TIMEOUT_MS;
     const signal = AbortSignal.timeout(LIVE_BIND_FETCH_TIMEOUT_MS);
-    const api = async path => {
+    const api = async (path, archive = false) => {
       const response = await fetchImpl(`${apiBaseUrl}/repos/${repo}/${path}`, {
         headers: {
           Accept: 'application/vnd.github+json',
@@ -266,7 +270,9 @@ export async function deferToInFlightSupersede({
           `Production Controller evidence failed: HTTP ${response?.status ?? 'unknown'}`
         );
       }
-      return response.json();
+      return archive
+        ? Buffer.from(await response.arrayBuffer())
+        : response.json();
     };
     const payload = await api(
       `actions/workflows/${workflowPath}/runs?branch=main&event=workflow_run&per_page=30`
@@ -275,6 +281,7 @@ export async function deferToInFlightSupersede({
       throw new Error('Production Controller run listing is malformed.');
     }
     const comparisons = new Map();
+    let stagingRuns;
     const ancestor = async (base, head) => {
       if (base === head) return true;
       const range = `${base}...${head}`;
@@ -296,12 +303,13 @@ export async function deferToInFlightSupersede({
       }
       // workflow_run head_sha is the policy checkout. The existing run-name
       // contract identifies the release SHA carried from the staging receipt.
-      const generation =
+      const source =
         typeof run.display_title === 'string'
           ? run.display_title.match(
-              /^Production Controller ([0-9a-f]{40}) from CI [1-9][0-9]* attempt [1-9][0-9]*$/
-            )?.[1]
+              /^Production Controller ([0-9a-f]{40}) from CI ([1-9][0-9]*) attempt ([1-9][0-9]*)$/
+            )
           : null;
+      const generation = source?.[1];
       if (
         !generation ||
         generation === expected ||
@@ -311,6 +319,84 @@ export async function deferToInFlightSupersede({
       ) {
         continue;
       }
+      // Pending controllers also exist for superseded staging completions.
+      // Such a run skips release-source and cannot own the live-bind proof.
+      stagingRuns ??= await api(
+        'actions/workflows/staging-controller.yml/runs?branch=main&event=workflow_run&per_page=50'
+      );
+      const stages = stagingRuns.workflow_runs?.filter(
+        stage =>
+          stage.display_title ===
+          run.display_title.slice('Production Controller '.length)
+      );
+      if (!Array.isArray(stages) || stages.length !== 1) continue;
+      const stage = stages[0];
+      const completedAt = Date.parse(stage.updated_at);
+      const queuedAt = Date.parse(run.created_at);
+      if (
+        !Number.isSafeInteger(stage.id) ||
+        stage.id <= 0 ||
+        !Number.isSafeInteger(stage.run_attempt) ||
+        stage.run_attempt <= 0 ||
+        stage.head_branch !== 'main' ||
+        stage.event !== 'workflow_run' ||
+        stage.status !== 'completed' ||
+        stage.conclusion !== 'success' ||
+        !Number.isFinite(completedAt) ||
+        !Number.isFinite(queuedAt) ||
+        completedAt > queuedAt
+      )
+        continue;
+      const listing = await api(
+        `actions/runs/${stage.id}/artifacts?per_page=100`
+      );
+      if (
+        !Array.isArray(listing.artifacts) ||
+        listing.total_count !== listing.artifacts.length
+      )
+        continue;
+      const artifacts = listing.artifacts.filter(
+        a =>
+          a.name === `staging-completion-${stage.run_attempt}` &&
+          a.expired === false &&
+          a.workflow_run?.id === stage.id &&
+          Number.isSafeInteger(a.id) &&
+          a.id > 0
+      );
+      if (artifacts.length !== 1) continue;
+      const bytes = await api(`actions/artifacts/${artifacts[0].id}/zip`, true);
+      if (bytes.length > 64 * 1024)
+        throw new Error('Oversized staging completion');
+      signal.throwIfAborted();
+      const directory = mkdtempSync(join(tmpdir(), 'live-bind-completion-'));
+      let completion;
+      try {
+        const zip = join(directory, 'completion.zip');
+        writeFileSync(zip, bytes);
+        // Reuse the established native data-entry reader; never extract code.
+        completion = JSON.parse(
+          command(['unzip', '-p', zip, 'staging-completion.json'], {
+            timeout: Math.max(1, deadline - Date.now()),
+            maxBuffer: 64 * 1024,
+          })
+        );
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+      if (Date.now() >= deadline)
+        throw new Error('Staging completion deadline exceeded');
+      if (
+        completion.schema !== 'jovie-staging-completion/v1' ||
+        completion.terminal !== true ||
+        completion.repository !== repo ||
+        completion.sha !== generation ||
+        completion.controllerRunId !== String(stage.id) ||
+        completion.controllerRunAttempt !== String(stage.run_attempt) ||
+        completion.sourceCiRunId !== source?.[2] ||
+        completion.sourceCiRunAttempt !== source?.[3] ||
+        !['deployed', 'not_applicable'].includes(completion.outcome)
+      )
+        continue;
       return {
         deferred: true,
         reason: SUPERSEDE_DEFER_REASONS.supersedingRunInFlight,

@@ -19,6 +19,7 @@ import {
   planProductionLaneRange,
   WEB_BIND_REASONS,
 } from '../../../../../scripts/lib/production-lane-range.mjs';
+import { storedZip } from '../../../../../scripts/lib/real-gh-harness.mjs';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
@@ -73,23 +74,72 @@ function controllerRun(id: number, sha: string, status = 'pending') {
     head_branch: 'main',
     event: 'workflow_run',
     display_title: `Production Controller ${sha} from CI 123 attempt 1`,
+    created_at: '2026-10-22T20:00:01Z',
     status,
   };
 }
 
 function supersedeFetch(
   runs: ReturnType<typeof controllerRun>[],
-  comparisons: Record<string, string> = {}
+  comparisons: Record<string, string> = {},
+  completionOverrides: Record<string, unknown> = {}
 ) {
   return vi.fn(async (input: Parameters<typeof fetch>[0]) => {
     const url = new URL(String(input));
     const comparison = url.pathname.split('/compare/')[1];
+    const stages = runs.map(run => ({
+      ...run,
+      id: run.id + 1000,
+      run_attempt: 1,
+      display_title: run.display_title.replace('Production Controller ', ''),
+      status: 'completed',
+      conclusion: 'success',
+      updated_at: '2026-10-22T20:00:00Z',
+    }));
+    const stage = stages[0]!;
+    if (url.pathname.endsWith('/zip')) {
+      return new Response(
+        new Uint8Array(
+          storedZip({
+            'staging-completion.json': JSON.stringify({
+              schema: 'jovie-staging-completion/v1',
+              terminal: true,
+              repository: 'JovieInc/Jovie',
+              sha: stage.display_title.split(' ')[0],
+              controllerRunId: String(stage.id),
+              controllerRunAttempt: '1',
+              sourceCiRunId: '123',
+              sourceCiRunAttempt: '1',
+              outcome: 'deployed',
+              ...completionOverrides,
+            }),
+          })
+        )
+      );
+    }
+    if (url.pathname.endsWith('/artifacts')) {
+      return Response.json({
+        total_count: 1,
+        artifacts: [
+          {
+            id: 2001,
+            name: 'staging-completion-1',
+            expired: false,
+            workflow_run: { id: stage.id },
+          },
+        ],
+      });
+    }
     return {
       ok: true,
       json: async () =>
         comparison
           ? { status: comparisons[comparison] ?? 'ahead' }
-          : { workflow_runs: runs },
+          : {
+              workflow_runs: url.pathname.includes('staging-controller')
+                ? stages
+                : runs,
+            },
     } as Response;
   });
 }
@@ -296,6 +346,29 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
     ).toMatchObject({ deferred: false });
   });
 
+  it.each([
+    { outcome: 'superseded' },
+    { outcome: 'unknown' },
+    { sha: EXPECTED_SHA },
+    { controllerRunAttempt: '2' },
+    { sourceCiRunId: '456' },
+    { terminal: false },
+  ])(
+    'rejects an ineligible or unbound staging completion: %j',
+    async completion => {
+      expect(
+        await deferToInFlightSupersede({
+          ...supersedeContext,
+          fetchImpl: supersedeFetch(
+            [controllerRun(101, INTERMEDIATE_SHA)],
+            {},
+            completion
+          ),
+        })
+      ).toMatchObject({ deferred: false });
+    }
+  );
+
   it('stays fail-closed when the in-flight check cannot run', async () => {
     expect(
       await deferToInFlightSupersede({
@@ -352,14 +425,78 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
     });
   });
 
-  it('CLI passes live identity and expected generation into non-mutating deferral', () => {
-    const preload = `globalThis.fetch = async () => ({
-      ok: true,
-      json: async () => ({
-        workflow_runs: [${JSON.stringify(controllerRun(101, INTERMEDIATE_SHA))}],
-        status: 'ahead'
+  it('accepts an exact not-applicable staging completion', async () => {
+    expect(
+      await deferToInFlightSupersede({
+        ...supersedeContext,
+        fetchImpl: supersedeFetch(
+          [controllerRun(101, INTERMEDIATE_SHA)],
+          {},
+          { outcome: 'not_applicable' }
+        ),
       })
-    });`;
+    ).toMatchObject({ deferred: true });
+  });
+
+  it('does not bind a queued successor to a later staging rerun', async () => {
+    const fixture = supersedeFetch([controllerRun(101, INTERMEDIATE_SHA)]);
+    expect(
+      await deferToInFlightSupersede({
+        ...supersedeContext,
+        fetchImpl: async input => {
+          const response = await fixture(input);
+          if (!String(input).includes('staging-controller.yml/runs'))
+            return response;
+          const data = await response.json();
+          data.workflow_runs[0].updated_at = '2026-10-22T20:00:02Z';
+          return Response.json(data);
+        },
+      })
+    ).toMatchObject({ deferred: false });
+  });
+
+  it.each([
+    ['staging-controller.yml/runs', { workflow_runs: [] }],
+    ['/artifacts?', { total_count: 0, artifacts: [] }],
+    ['/zip', 'invalid archive'],
+  ])(
+    'fails closed on missing or unreadable staging evidence: %s',
+    async (route, payload) => {
+      const fixture = supersedeFetch([controllerRun(101, INTERMEDIATE_SHA)]);
+      expect(
+        await deferToInFlightSupersede({
+          ...supersedeContext,
+          fetchImpl: async input =>
+            String(input).includes(String(route))
+              ? typeof payload === 'string'
+                ? new Response(payload)
+                : Response.json(payload)
+              : fixture(input),
+        })
+      ).toMatchObject({ deferred: false });
+    }
+  );
+
+  it('CLI passes live identity and expected generation into non-mutating deferral', async () => {
+    const fixture = supersedeFetch([controllerRun(101, INTERMEDIATE_SHA)]);
+    const prefix = 'https://api.github.com/repos/JovieInc/Jovie/';
+    const responses: Record<string, unknown> = {};
+    for (const route of [
+      'actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&per_page=30',
+      'actions/workflows/staging-controller.yml/runs?branch=main&event=workflow_run&per_page=50',
+      'actions/runs/1101/artifacts?per_page=100',
+    ])
+      responses[new URL(prefix + route).pathname] = await (
+        await fixture(prefix + route)
+      ).json();
+    const archive = Buffer.from(
+      await (await fixture(prefix + 'actions/artifacts/2001/zip')).arrayBuffer()
+    ).toString('base64');
+    const preload = `globalThis.fetch = async input => {
+      const path = new URL(input).pathname;
+      if (path.endsWith('/zip')) return new Response(Buffer.from('${archive}', 'base64'));
+      return Response.json(path.includes('/compare/') ? { status: 'ahead' } : ${JSON.stringify(responses)}[path]);
+    };`;
     const ran = spawnSync(
       process.execPath,
       [
