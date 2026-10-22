@@ -218,20 +218,56 @@ describe('synthetic monitoring workflow parser', () => {
     }
   });
 
-  it('skips the production onboarding robot with a logged warning and no auth bypass', () => {
+  it('fails visibly for the unimplemented production onboarding robot without an auth bypass', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const step = getStepBlock(
       workflow,
       'Run Onboarding Robot Full Synthetic (JOV-2681)'
     );
 
-    expect(step).toContain(
-      'synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot.'
+    const failureStep = getStepBlock(
+      workflow,
+      'Fail loudly while the onboarding robot is not implemented'
     );
-    expect(step).toContain(
-      '::warning title=Onboarding robot skipped::${reason}'
-    );
-    expect(step).toContain('robot_skip_reason=${reason}');
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-onboarding-robot-'));
+    const output = join(directory, 'output');
+    const summary = join(directory, 'summary');
+    const runStep = (block: string) =>
+      spawnSync('bash', ['-e', '-c', block.split('        run: |\n')[1]!], {
+        env: {
+          ...process.env,
+          GITHUB_OUTPUT: output,
+          GITHUB_STEP_SUMMARY: summary,
+        },
+        encoding: 'utf8',
+      });
+
+    try {
+      const result = runStep(step);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain(
+        '::error title=Onboarding robot NOT IMPLEMENTED::'
+      );
+      expect(readFileSync(output, 'utf8')).toContain(
+        'robot_skip_reason=synthetic-robot-not-implemented:'
+      );
+      expect(readFileSync(output, 'utf8')).toContain(
+        'robot_status=not_implemented\n'
+      );
+      expect(readFileSync(summary, 'utf8')).toContain('NOT IMPLEMENTED.');
+      expect(failureStep).toContain(
+        "if: ${{ always() && steps.onboarding-robot.outputs.robot_status == 'not_implemented' }}"
+      );
+      expect(failureStep).not.toContain('continue-on-error:');
+      const failure = runStep(failureStep);
+      expect(failure.status).toBe(1);
+      expect(failure.stdout).toContain(
+        '::error::The onboarding robot is not implemented (JOV-7656)'
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+
     expect(step).not.toContain('onboarding-robot.full.spec.ts');
     expect(step).not.toContain('/api/dev/test-auth/session');
     expect(step).not.toContain('DOPPLER_TOKEN');
