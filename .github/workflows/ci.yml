@@ -6425,10 +6425,13 @@ jobs:
     # branch so certification writes a certificate (JOV-8614).
     # Unlike ci-e2e-smoke this must NOT set NEXT_PUBLIC_CLERK_MOCK or
     # E2E_USE_TEST_AUTH_BYPASS — required mode fails closed if either is present.
-    # Path-triggered (not always-on): the spec has a 900s timeout, so always-on would
-    # blow the CI budget and churn the external Spotify/Stripe fixtures.
+    # PRs and the merge queue stay off this lane: the spec has a 900s timeout.
+    # Main pushes run it. Staging only follows a successful push CI, and the
+    # pre-promotion journey gate accepts evidence only for that exact SHA.
+    # A workflow_dispatch can produce the artifact, but it cannot start staging.
+    # Push leaves neon-db skipped; this job opens its own ephemeral branch.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ always() && !cancelled() && needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure') }}
+    if: ${{ always() && !cancelled() && needs.ci-path-changes.result == 'success' && ((github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure' || needs.neon-db.result == 'skipped'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     outputs:
