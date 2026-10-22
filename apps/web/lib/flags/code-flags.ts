@@ -59,12 +59,10 @@ export const CODE_FLAGS = {
   // off. FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER=true is reserved for a future
   // isolated provider and still fails closed until that provider exists.
   SOCIAL_HTML_ISOLATED_PROVIDER: false,
-  // Golden Path reads GitHub Actions secret
-  // STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY. Default off until that secret
-  // is the active test-mode USD 1200/month price. The price contract still
-  // fails closed either way; off names the missing secret instead of a bare
-  // amount mismatch. FEATURE_STRIPE_TEST_PRICE_CONFIGURED=true after the
-  // secret is updated.
+  // Golden Path sets FEATURE_STRIPE_TEST_PRICE_CONFIGURED=true. That job's
+  // STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY secret is the active test-mode
+  // USD 1200/month price. Default stays off everywhere else: a mismatch still
+  // fails closed and names the GitHub secret.
   STRIPE_TEST_PRICE_CONFIGURED: false,
   // JOV-5862: paste-channel thumbnail redo generation (model spend). Ships
   // OFF per cert-sla-v1 — the lander + channel lookup work without it; the
