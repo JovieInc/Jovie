@@ -493,7 +493,31 @@ describe('merge_group workflow contract', () => {
       "policy='scripts/lib/merge-group-admission.mjs'"
     );
     expect(admission).toContain('node "$policy"');
-    expect(admission).not.toContain('secrets.');
+    // JOV-8754: the only secret admission may touch is the Jovie Bot key for a
+    // read-only installation token (the ci-merge-group-supersede pattern),
+    // with GITHUB_TOKEN as the fail-closed fallback.
+    expect(admission.match(/secrets\.[A-Z_]+/g)).toEqual([
+      'secrets.JOVIE_BOT_PRIVATE_KEY',
+    ]);
+    expect(admission).toContain('continue-on-error: true');
+    for (const scope of [
+      'permission-actions: read',
+      'permission-checks: read',
+      'permission-contents: read',
+      'permission-pull-requests: read',
+    ])
+      expect(admission).toContain(scope);
+    expect(admission).not.toMatch(/permission-[a-z-]+: write/);
+    expect(admission).toContain(
+      'ADMISSION_APP_TOKEN: ${{ steps.admission-token.outputs.token }}'
+    );
+    expect(admission).toContain(
+      'GH_TOKEN="$ADMISSION_APP_TOKEN" GITHUB_OUTPUT="$attempt_output" node "$policy"'
+    );
+    expect(admission).toContain(
+      'GITHUB_OUTPUT="$attempt_output" node "$policy"\n'
+    );
+    expect(admission).toContain('cat "$attempt_output" >> "$GITHUB_OUTPUT"');
     expect(MEMBER_POLICY).not.toContain("from 'node:child_process'");
     expect(MEMBER_POLICY).not.toContain("runGit(['fetch'");
     expect(MEMBER_POLICY).toContain('/git/trees/${treeSha}?recursive=1');
@@ -1171,7 +1195,7 @@ describe('merge_group workflow contract', () => {
     // merges the shard reports and runs the changed-line ratchet.
     const shard = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage-shard');
     const coverage = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage');
-    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(60);
+    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(20);
     for (const job of [shard, coverage]) {
       const timeout = Number(job.match(/timeout-minutes:\s*(\d+)/)?.[1]);
       expect(timeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);
@@ -3275,6 +3299,45 @@ ${selectedGateScript}`,
       const block = getMergeGroupReachableJobText(
         getJobBlock(CI_WORKFLOW, job)
       );
+      if (job === 'ci-merge-group-admission') {
+        // Tim-approved exception (2026-10-21, JOV-8754): admission alone may
+        // mint a READ-ONLY Jovie Bot token, because the repo GITHUB_TOKEN
+        // bucket runs dry hourly and stalls every merge group. It checks out
+        // only main's admission policy (no PR code). Exactly one secret, in
+        // exactly one step, with exactly these read scopes. Do not widen.
+        expect(block.match(/secrets\.[A-Z0-9_]+/g), job).toEqual([
+          'secrets.JOVIE_BOT_PRIVATE_KEY',
+        ]);
+        expect(block, job).not.toMatch(/secrets:\s*inherit/);
+        const mint = block.slice(
+          block.indexOf('- name: Generate Jovie Bot admission read token'),
+          block.indexOf(
+            '- name: Require live queue membership and external admission checks'
+          )
+        );
+        expect(mint, job).toContain('secrets.JOVIE_BOT_PRIVATE_KEY');
+        expect(mint, job).toContain('continue-on-error: true');
+        expect(mint.match(/permission-[a-z-]+: [a-z]+/g), job).toEqual([
+          'permission-actions: read',
+          'permission-checks: read',
+          'permission-contents: read',
+          'permission-pull-requests: read',
+        ]);
+        expect(
+          block
+            .match(
+              /sparse-checkout: \|\n([\s\S]*?)\n\s+sparse-checkout-cone-mode/
+            )?.[1]
+            .trim()
+            .split(/\s+/),
+          job
+        ).toEqual([
+          'scripts/lib/merge-group-admission.mjs',
+          'scripts/lib/github-rate-limit.mjs',
+        ]);
+        expect(block, job).toContain('ref: main');
+        continue;
+      }
       expect(block, job).not.toMatch(/secrets\.[A-Z0-9_]+/);
 
       const reusable = block.match(

@@ -30,7 +30,8 @@ const mocks = vi.hoisted(() => {
     submitCard: vi.fn().mockResolvedValue({ outcome: 'created' }),
     decideCard: vi.fn().mockResolvedValue({ outcome: 'decided' }),
     refund: vi.fn(),
-    assertIdentity: vi.fn().mockResolvedValue(undefined),
+    lockIdentity: vi.fn().mockResolvedValue(undefined),
+    holders: [] as unknown[],
     syncReleases: vi.fn().mockResolvedValue({ success: true }),
     invalidateProfileCache: vi.fn().mockResolvedValue(undefined),
     captureError: vi.fn(),
@@ -65,7 +66,12 @@ vi.mock('@/lib/discography/spotify-import', () => ({
 vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.captureError }));
 vi.mock('@/lib/ingestion/session', () => ({
   withSystemIngestionSession: (op: (tx: unknown) => Promise<unknown>) =>
-    op({ update: mocks.update }),
+    op({
+      update: mocks.update,
+      select: () => ({
+        from: () => ({ where: () => Promise.resolve(mocks.holders) }),
+      }),
+    }),
 }));
 vi.mock('@/lib/ovie/summer-cards.server', () => ({
   submitSummerCard: mocks.submitCard,
@@ -74,7 +80,7 @@ vi.mock('@/lib/ovie/summer-cards.server', () => ({
 vi.mock('@/lib/profile/spotify-profile-identity', () => {
   class SpotifyProfileIdentityConflictError extends Error {}
   return {
-    assertSpotifyProfileIdentityAvailable: mocks.assertIdentity,
+    lockSpotifyProfileIdentity: mocks.lockIdentity,
     SpotifyProfileIdentityConflictError,
   };
 });
@@ -83,7 +89,6 @@ vi.mock('@/lib/stripe/claim-rejection-refund', () => ({
 }));
 vi.mock('@/lib/utils/logger', () => ({ logger: { info: vi.fn() } }));
 
-import { SpotifyProfileIdentityConflictError } from '@/lib/profile/spotify-profile-identity';
 import {
   buildClaimVerificationRequest,
   markClaimVerificationPaid,
@@ -131,7 +136,7 @@ describe('claim verification review', () => {
       amount: 1200,
       canceled: true,
     });
-    mocks.assertIdentity.mockResolvedValue(undefined);
+    mocks.holders = [];
   });
 
   it('files a deterministic decision card in the Ovie inbox', async () => {
@@ -169,10 +174,9 @@ describe('claim verification review', () => {
       outcome: 'decided',
       record: { status: 'verified', decidedBy: 'tim@jov.ie' },
     });
-    expect(mocks.assertIdentity).toHaveBeenCalledWith(
+    expect(mocks.lockIdentity).toHaveBeenCalledWith(
       expect.anything(),
-      '06HL4z0CvFAxyc27GXpf02',
-      PROFILE
+      '06HL4z0CvFAxyc27GXpf02'
     );
     expect(mocks.state.updates[0]).toMatchObject({
       spotifyId: '06HL4z0CvFAxyc27GXpf02',
@@ -197,18 +201,62 @@ describe('claim verification review', () => {
     });
   });
 
-  it('approve reports an identity conflict without changing the request', async () => {
+  it('approve takes the identity over from an unclaimed prebuilt profile', async () => {
     queueProfile(pending);
-    mocks.assertIdentity.mockRejectedValueOnce(
-      new SpotifyProfileIdentityConflictError()
-    );
-    await expect(
-      decideClaimVerification({
-        profileId: PROFILE,
-        decision: 'approve',
-        decidedBy: 'tim@jov.ie',
-      })
-    ).resolves.toEqual({ outcome: 'identity_conflict' });
+    mocks.holders = [
+      {
+        id: 'prebuilt-1',
+        handle: 'famousartist',
+        isClaimed: false,
+        userId: null,
+        settings: { source: 'ingest' },
+      },
+    ];
+
+    const result = await decideClaimVerification({
+      profileId: PROFILE,
+      decision: 'approve',
+      decidedBy: 'tim@jov.ie',
+      now,
+    });
+
+    expect(result.outcome).toBe('decided');
+    expect(mocks.state.updates[0]).toMatchObject({
+      spotifyId: null,
+      spotifyUrl: null,
+      isPublic: false,
+      settings: {
+        source: 'ingest',
+        supersededByVerifiedClaim: expect.objectContaining({
+          toProfileId: PROFILE,
+          spotifyArtistId: '06HL4z0CvFAxyc27GXpf02',
+        }),
+      },
+    });
+    expect(mocks.state.updates[1]).toMatchObject({
+      spotifyId: '06HL4z0CvFAxyc27GXpf02',
+    });
+    expect(mocks.invalidateProfileCache).toHaveBeenCalledWith('famousartist');
+    expect(mocks.invalidateProfileCache).toHaveBeenCalledWith('requester');
+  });
+
+  it('approve never takes over a claimed, held or reserved identity', async () => {
+    for (const holder of [
+      { isClaimed: true, userId: 'other', handle: 'realowner' },
+      { isClaimed: false, userId: 'other', handle: 'midclaim' },
+      { isClaimed: false, userId: null, handle: 'taylorswift' },
+    ]) {
+      queueProfile(pending);
+      mocks.holders = [{ id: 'holder', settings: {}, ...holder }];
+      await expect(
+        decideClaimVerification({
+          profileId: PROFILE,
+          decision: 'approve',
+          decidedBy: 'tim@jov.ie',
+        })
+      ).resolves.toEqual({ outcome: 'identity_conflict' });
+    }
+    expect(mocks.update).not.toHaveBeenCalled();
     expect(mocks.recordStage).not.toHaveBeenCalled();
     expect(mocks.decideCard).not.toHaveBeenCalled();
   });
@@ -226,7 +274,7 @@ describe('claim verification review', () => {
 
     expect(mocks.refund).toHaveBeenCalledWith({
       subscriptionId: 'sub_1',
-      idempotencyKey: `claim-verification-reject:${PROFILE}`,
+      idempotencyKey: `claim-verification-reject:${PROFILE}:sub_1`,
     });
     expect(result).toMatchObject({
       outcome: 'decided',

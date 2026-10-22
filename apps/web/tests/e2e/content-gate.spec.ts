@@ -270,11 +270,13 @@ test.describe('Content Gate — Public Pages', () => {
 
     const routes = [
       {
+        // /ai is the public, noindex AI brief (#19086), no longer a
+        // token-gated investor-portal redirect.
         path: '/ai',
-        name: 'AI workflow redirect',
-        expectedUrl: /\/investor-portal(?:\/index\.html)?$/,
-        minLength: 20,
-        tokenGatedRedirect: true,
+        name: 'AI brief',
+        expectedUrl: /\/ai$/,
+        readyText: /the ai operating system behind every jovie profile/i,
+        minLength: 250,
       },
       {
         path: APP_ROUTES.ARTIST_NOTIFICATIONS,
@@ -305,10 +307,11 @@ test.describe('Content Gate — Public Pages', () => {
         minLength: 20,
       },
       {
+        // Legacy /tips permanently redirects to /pay (#7301).
         path: '/tips',
-        name: 'Tips',
-        expectedUrl: /\/tips$/,
-        readyText: /turn every tip into a fan|scan\.\s*tip\.\s*stream\./i,
+        name: 'Legacy tips redirect',
+        expectedUrl: /\/pay$/,
+        readyText: /turn every payment into a follower/i,
         minLength: 120,
       },
       {
@@ -334,33 +337,15 @@ test.describe('Content Gate — Public Pages', () => {
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
 
-      if (!route.tokenGatedRedirect) {
-        await expect(
-          page.getByText(route.readyText).first(),
-          `${route.name}: ready signal did not render`
-        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-      }
+      await expect(
+        page.getByText(route.readyText).first(),
+        `${route.name}: ready signal did not render`
+      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
       const main = page.locator('main').first();
       const hasMain = await main
         .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
         .catch(() => false);
-
-      if (route.tokenGatedRedirect) {
-        const bodyText = await page
-          .locator('body')
-          .innerText()
-          .catch(() => '');
-        const lowerBody = bodyText.toLowerCase();
-        if (bodyText.length > 0) {
-          expect(
-            lowerBody,
-            `${route.name}: token-gated redirect should not crash`
-          ).not.toContain('application error');
-          expect(lowerBody).not.toContain('internal server error');
-        }
-        continue;
-      }
 
       if (hasMain) {
         await assertMainContent(page, route.name, {

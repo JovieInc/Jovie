@@ -30,6 +30,11 @@ on:
         required: false
         default: true
         type: boolean
+      promotion_journey_override:
+        description: Optional manual recovery override receipt (JSON, jovie.promotion-recovery-override/v1) for the pre-promotion journey gate.
+        required: false
+        default: ''
+        type: string
     outputs:
       staging_eligible:
         description: Whether this generation remained exact-main through staging mutation.
@@ -831,6 +836,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      actions: read
     environment:
       name: Production – jovie
       url: https://jov.ie
@@ -839,7 +845,11 @@ jobs:
       # distinguish silent-no-op regressions from generic promote failures.
       # Values distinguish production artifact, promotion state, and canonical
       # alias convergence failures for deploy-notify and Gem diagnosis.
-      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype }}
+      # Journey-gate stays last. GitHub || returns the first truthy subtype, and
+      # the deploy contract matches the stage → performance → promote → verify
+      # chain verbatim. The gate runs before promote, so a block still surfaces
+      # when those earlier subtypes are empty.
+      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype || steps.journey-gate.outputs.failure_subtype }}
       production_deployment_id: ${{ steps.stage-production.outputs.production_deployment_id }}
       production_deployment_url_b64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}
       previous_production_deployment_id: ${{ steps.promote.outputs.previous_production_deployment_id }}
@@ -1297,9 +1307,11 @@ jobs:
 
           # Staging policy is independent from the canonical production-alias
           # policy below. Only exact immutable staged-build executions count
-          # here; a production streak can never graduate staging. Keep this
-          # advisory until its own 14 consecutive five-sample nearest-rank p95
-          # receipts are <=1500ms. Recheck by 2026-10-21 under JOV-8338.
+          # here; a production streak can never graduate staging. Its own
+          # 2026-10-21 receipt qualifies 14/14 five-sample nearest-rank p95
+          # executions <=1500ms: enforce this budget closed (JOV-8338).
+          # Recheck by 2026-10-28 under JOV-8737; evidence is in
+          # docs/performance/public-profile-alias-graduation.json.
           if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
             --base-url "$deployment_url" \
             --runs 5 \
@@ -1309,11 +1321,9 @@ jobs:
             --route-id public-profile-tip \
             --route-id public-profile-tour \
             --route-id public-profile-releases; then
-            echo "::warning::Exact staged-build public-profile alias budgets failed. Staging remains independently advisory; review by 2026-10-21 (JOV-8338)."
-            echo "performance_status=warn" >> "$GITHUB_OUTPUT"
-          else
-            echo "performance_status=passed" >> "$GITHUB_OUTPUT"
+            fail_performance_gate "Exact staged-build public-profile alias budgets failed."
           fi
+          echo "performance_status=passed" >> "$GITHUB_OUTPUT"
 
       - name: Recheck main immediately before production promotion
         id: final-current
@@ -1339,9 +1349,46 @@ jobs:
           --no-fallback --
           env -u DOPPLER_TOKEN node scripts/security/security-gate.mjs
 
+      # Pre-promotion journey gate (JOV-5937). Grades the full range from the
+      # live production SHA to this candidate; a range touching auth/billing (or
+      # unknown) needs fresh exact-SHA Golden Path evidence from a run that
+      # really executed the journeys, or an audited manual override receipt.
+      # Missing base SHA, range, or evidence blocks. Post-deploy smoke is separate.
+      - name: Pre-promotion auth/billing journey gate
+        id: journey-gate
+        if: ${{ steps.final-current.outputs.is_current == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          CANDIDATE_SHA: ${{ inputs.expected_sha }}
+          PROMOTION_JOURNEY_OVERRIDE: ${{ inputs.promotion_journey_override }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          REPO: ${{ github.repository }}
+        run: |
+          gate_dir="$RUNNER_TEMP/journey-gate"
+          mkdir -p "$gate_dir"
+          base_sha="$(./node_modules/.bin/vercel inspect jov.ie --format=json 2>/dev/null | jq -r '.meta.githubCommitSha // ""' || true)"
+          node scripts/promotion-gate-ci.mjs range --base "$base_sha" --candidate "$CANDIDATE_SHA" --out "$gate_dir/range.json"
+          node scripts/promotion-gate-ci.mjs fetch-evidence --repo "$REPO" --candidate "$CANDIDATE_SHA" --out-dir "$gate_dir/evidence"
+          args=(--range "$gate_dir/range.json" --out "$gate_dir/decision.json")
+          while IFS= read -r f; do args+=(--evidence "$f"); done < <(find "$gate_dir/evidence" -name 'journey-evidence-*.json' 2>/dev/null | sort)
+          if [ -n "$PROMOTION_JOURNEY_OVERRIDE" ]; then
+            printf '%s' "$PROMOTION_JOURNEY_OVERRIDE" > "$gate_dir/override.json"
+            args+=(--override "$gate_dir/override.json")
+          fi
+          if ! node scripts/promotion-journey-gate.mjs "${args[@]}"; then
+            echo "::error::Promotion blocked by the auth/billing journey gate (see decision above)."
+            echo "failure_subtype=journey_gate_blocked" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
       - name: Promote staged production deployment
         id: promote
-        if: ${{ steps.final-current.outputs.is_current == 'true' }}
+        # JOV-1958 lineage predicate. Quoted, not a second condition: characters
+        # outside ${{ }} make a GitHub if always true (actions/runner#1173).
+        # if: ${{ steps.final-current.outputs.is_current == 'true' }}
+        if: ${{ steps.final-current.outputs.is_current == 'true' && steps.journey-gate.outcome == 'success' }}
         timeout-minutes: 15
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1682,10 +1729,10 @@ jobs:
     permissions:
       contents: read
     # Production canonical-alias policy is measured independently from staging.
-    # Ship now: WARN; the 2026-10-14 receipt has 12/14 qualifying runs and a
-    # current streak of 1/14 after tail misses at 1507.5ms and 2041.1ms.
+    # Ship now: WARN; the 2026-10-21 receipt has 11/14 qualifying runs and a
+    # current streak of 0/14 after tail misses at 1626.2, 2083.1 and 2431.6ms.
     # Re-evaluate when: 14 eligible canonical-alias executions are consecutive,
-    # and no later than 2026-10-21 (JOV-8338). Then: hard-fail this gate when all
+    # and no later than 2026-10-28 (JOV-8737). Then: hard-fail this gate when all
     # six routes' five-sample nearest-rank p95 values are <=1500ms. Evidence:
     # docs/performance/public-profile-alias-graduation.json.
     outputs:
@@ -1705,7 +1752,7 @@ jobs:
         run: |
           set -euo pipefail
           # The checked-in 14-run receipt does not yet authorize fail-closed
-          # enforcement. Keep measuring; JOV-8338 owns the dated recheck.
+          # enforcement. Keep measuring; JOV-8737 owns the dated recheck.
           if ! pnpm exec tsx scripts/performance-budgets-guard.ts \
             --base-url https://jov.ie \
             --runs 5 \
@@ -1715,7 +1762,7 @@ jobs:
             --route-id public-profile-tip \
             --route-id public-profile-tour \
             --route-id public-profile-releases; then
-            echo "::warning::Production public-profile alias budgets failed on jov.ie. Latest receipt: 12/14 qualifying, current streak 1/14, measured 2026-10-14; review by 2026-10-21 (JOV-8338)."
+            echo "::warning::Production public-profile alias budgets failed on jov.ie. Latest receipt: 11/14 qualifying, current streak 0/14, measured 2026-10-21; review by 2026-10-28 (JOV-8737)."
             echo "performance_status=warn" >> "$GITHUB_OUTPUT"
           else
             echo "performance_status=passed" >> "$GITHUB_OUTPUT"

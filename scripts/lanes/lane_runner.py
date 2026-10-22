@@ -2011,23 +2011,28 @@ class LinearRequestError(RuntimeError):
         super().__init__("linear: Entity not found: Comment" if missing else "linear: request rejected")
 
 
+class LinearAppCredentialMissing(RuntimeError):
+    """No Jovie Lanes app credential: lanes Linear access fails closed (doctor alert
+    `linear-app-credential-missing`). There is no personal-key fallback. A RuntimeError, so
+    every `except Exception` around Linear (the doctor's tracker, the watchdog) degrades
+    instead of exiting the process."""
+
+
 class Linear:
-    def __init__(self, env_file: Path, app_env: Path | None = None):
-        # The Jovie Lanes app (own quota) when its credentials are installed; Tim's personal
-        # key only when they are absent. `key` scopes cooldowns and caches: for the app it is
-        # the app identity, never the rotating token, so a re-mint keeps the same cooldown.
-        self.app = linear_app_token.credentials(app_env if app_env is not None else linear_app_token.default_path())
-        if self.app:
-            self.key = f"linear-app:{self.app[0]}"
-            return
-        key = linear_app_token.env_values(env_file).get("LINEAR_API_KEY", "")
-        if not key:
-            raise SystemExit(f"no LINEAR_API_KEY in {env_file}")
-        self.key = key
+    def __init__(self, env_file: Path | None = None, app_env: Path | None = None):
+        # Only the Jovie Lanes app credential (own quota, revocable on its own). Tim
+        # 2026-10-20: lanes never fall back to a personal LINEAR_API_KEY, so that key can be
+        # revoked without breaking lanes. `env_file` is accepted for call compatibility and
+        # never read. `key` scopes cooldowns and caches: the app identity, never the token.
+        path = app_env if app_env is not None else linear_app_token.default_path()
+        self.app = linear_app_token.credentials(path)
+        if not self.app:
+            raise LinearAppCredentialMissing(f"no Jovie Lanes Linear app credential at {path}")
+        self.key = f"linear-app:{self.app[0]}"
 
     def _authorization(self, rejected: str | None = None) -> tuple[str, str | None]:
         if not getattr(self, "app", None):
-            return self.key, None
+            raise LinearAppCredentialMissing("no Jovie Lanes Linear app credential")
         try:
             access = linear_app_token.token(*self.app, lane_state_dir(), rejected=rejected)
         except linear_app_token.TokenUnavailable as error:
@@ -4191,6 +4196,11 @@ def revisit_terminal_prs(host: Host, prs: list[dict], now: float | None = None) 
         if last.get("main") == main or publication_revocation(host, pr.get("headRefName")) \
                 or claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
             continue
+        # A held PR (preservation hold, live repair) is not a revisit: it took one of the few
+        # per-pass slots and was ledgered as revisit-failed without any GitHub call (~334/day).
+        if not dependabot and pr.get("mergeStateStatus") != "DIRTY" and pr_events.maintenance_hold(
+                host, THIS, pr, now, terminal_ok=True):
+            continue
         if dependabot:
             action = "dependabot-recreate"
             result = sh(["gh", "pr", "comment", str(pr["number"]), "--repo", REPO_SLUG,
@@ -6069,7 +6079,8 @@ INTERRUPTED_VERDICTS = frozenset({"cancelled", "revoked", "reconcile-unavailable
 
 
 def _ended_on_its_own_terms(host: Host, run_id) -> bool:
-    """The preserved run finished (e.g. fix-no-change) instead of being interrupted: nobody
+    """The preserved run finished (e.g. fix-no-change), was revoked, or was cancelled because
+    its PR moved on (NEVER_RESUMED_CANCELS) instead of being interrupted for later resume: nobody
     will ever reconcile it, so waiting PRESERVED_ARCHIVE_AFTER_S only blocks the PR.
     2026-10-20 on Gem: 72 preserved-target-needs-reconciliation handoffs in 24h, mostly
     fix-no-change runs that left regenerated artifacts behind (PR #22420: screenshot PNGs)."""
@@ -6085,8 +6096,23 @@ def _ended_on_its_own_terms(host: Host, run_id) -> bool:
         except ValueError:
             continue
         if isinstance(row, dict) and row.get("runId") == run_id:
-            return bool(row.get("endedAt")) and row.get("verdict") not in INTERRUPTED_VERDICTS
+            if not row.get("endedAt"):
+                return False
+            verdict = row.get("verdict")
+            if verdict == "revoked":
+                return True  # its branch can never publish again
+            if verdict == "cancelled" and set(row.get("reasons") or []) & NEVER_RESUMED_CANCELS:
+                return True
+            return verdict not in INTERRUPTED_VERDICTS
     return False
+
+
+# A cancel for one of these reasons can never be resumed: the PR moved on (a new head, merged
+# or closed). 2026-10-21 on Gem, after #22430: most remaining 1-8/h
+# preserved-target-needs-reconciliation handoffs were target-head-superseded, waiting 6h for
+# nobody. target-pr-queued is NOT here: the head is unchanged and the work may resume if the
+# queue rejects the PR.
+NEVER_RESUMED_CANCELS = frozenset({"target-head-superseded", "target-pr-merged", "target-pr-closed"})
 
 
 def archive_unresumable_preserved(host: Host, path: Path, reason: str) -> str | None:
@@ -8917,6 +8943,15 @@ def retry_failed_selectors(staging: Path, stderr) -> bool:
         raise failure
     print(f"release self-test retry: {len(ids)} selector(s) {'passed' if passed else 'failed again'}; "
           "see .selftest-retry.json", file=sys.stderr)
+    if not passed:
+        # The staged tree and its receipt are gone once the update is refused, and CI
+        # summaries keep only these lines: name what failed (2026-10-21 merge-group ejections
+        # said only "release tests failed").
+        print("release self-test failed selector(s): " + ", ".join(ids), file=sys.stderr)
+        text = raw.decode(errors="replace")
+        for line in [line for line in text.splitlines()
+                     if re.match(r"^(FAIL|ERROR): |^\w*(Error|Exception|Held)\b", line)][:8]:
+            print("release self-test failure: " + line[:300], file=sys.stderr)
     return passed
 
 

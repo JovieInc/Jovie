@@ -16,6 +16,7 @@ import {
   test,
 } from '@playwright/test';
 import { UX_LATENCY_STORAGE_KEY } from '@/lib/monitoring/interaction-latency';
+import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import {
   buildInteractionLatencyReport,
   type InteractionLatencySample,
@@ -37,8 +38,9 @@ const SAMPLE_COUNT = 5;
  * Cold `/app/chat` mounts on CI decay across the first few full reloads
  * (route compile and hydration). Five samples make p95 the worst sample, so
  * scoring those cold mounts fails a steady-state budget the warm samples
- * already meet. Discard this many unmeasured round trips, then score the
- * same five-sample p50/p95 budgets. A hot-path regression still fails.
+ * already meet. Discard this many unmeasured round trips, then score five
+ * sends on that same warmed document. Remounting before each scored send
+ * made p95 a cold mount again. A hot-path regression still fails.
  *
  * Oct 2 Extended Smoke knee (usable ms): 580, 314, 273, then 142 and 148.
  */
@@ -267,6 +269,7 @@ async function measureDroppedScrollFrames(page: Page) {
     scrollElement.scrollTop = 0;
     const frameIntervals: number[] = [];
     const frameCount = 24;
+    const distance = scrollElement.scrollHeight - scrollElement.clientHeight;
 
     await new Promise<void>(resolve => {
       let previousTime: number | undefined;
@@ -278,9 +281,7 @@ async function measureDroppedScrollFrames(page: Page) {
         }
         previousTime = time;
         currentFrame += 1;
-        scrollElement.scrollTop =
-          (scrollElement.scrollHeight - scrollElement.clientHeight) *
-          (currentFrame / frameCount);
+        scrollElement.scrollTop = distance * (currentFrame / frameCount);
 
         if (currentFrame >= frameCount) {
           resolve();
@@ -306,11 +307,10 @@ function isChatApiRequest(request: Request): boolean {
  * Counts in-flight chat-owned API requests (all served by `mockChatBackend`).
  *
  * `networkidle` is not a usable readiness signal on the chat route: the shell
- * sidebar full-prefetches every nav destination (`prefetch={true}`) and warms
- * the Library route plus its release-matrix data ~300ms after mount. Those are
- * real, DB-backed renders of other routes whose duration is not bounded by the
- * chat surface, so on a loaded CI server they can keep the network busy past
- * any timeout (and get aborted mid-stream by the next navigation).
+ * must not full-prefetch every nav destination (that burst exceeds the shell
+ * RSC budget). Query warming can still fetch Library data after mount. Those
+ * requests are not bounded by the chat surface, so on a loaded CI server they
+ * can keep the network busy past any timeout.
  */
 function trackChatApiRequests(page: Page) {
   const inFlight = new Set<Request>();
@@ -320,6 +320,53 @@ function trackChatApiRequests(page: Page) {
   page.on('requestfinished', request => inFlight.delete(request));
   page.on('requestfailed', request => inFlight.delete(request));
   return { pendingCount: () => inFlight.size };
+}
+
+/**
+ * Scored clicks and the scroll probe share the runner with the rest of the
+ * smoke lane. A frame that is already late is runner stall, and p95 of five
+ * samples is the slowest sample. Wait until the event loop can deliver frames
+ * before starting the clock. Give up after a few seconds so a wedged runner
+ * still records the real interaction instead of hanging the lane.
+ */
+async function waitForQuietFrames(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>(resolve => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        const started = performance.now();
+        const gaps: number[] = [];
+        let previous: number | undefined;
+        const step = (time: number) => {
+          if (settled) return;
+          if (previous !== undefined) gaps.push(time - previous);
+          previous = time;
+          const recent = gaps.slice(-4);
+          if (
+            recent.length === 4 &&
+            recent.every(gap => gap < 40) &&
+            performance.now() - started > 50
+          ) {
+            finish();
+            return;
+          }
+          if (performance.now() - started > 8_000) {
+            finish();
+            return;
+          }
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+        // rAF can stop entirely on a backgrounded page. The timeout is the
+        // same 8s cap, so a frozen frame clock cannot hang the smoke lane.
+        setTimeout(finish, 8_000);
+      })
+  );
 }
 
 /** Resolves after two painted frames and an idle main-thread slot. */
@@ -374,10 +421,30 @@ async function remountChatRoute(
   composer: Locator,
   chatApi: ReturnType<typeof trackChatApiRequests>
 ): Promise<void> {
-  // A full route mount makes each sample independent and resets the
-  // intentional one-message-per-second composer pacer without sleeping.
+  // Warmup only. A scored sample that reloads measures route compile and
+  // hydration, which the steady-state budget does not describe.
   await page.goto('/app/chat', { waitUntil: 'domcontentloaded' });
   await waitForChatRouteReady(page, chatContent, composer, chatApi);
+}
+
+/**
+ * The composer allows one send per window and rejects the next click.
+ * The last warmup send is already on this document, so the first scored
+ * sample has to wait too. The probe clock is the click that armed the
+ * limiter.
+ */
+async function waitForChatSendPacer(page: Page): Promise<void> {
+  const windowMs = PACER_TIMING.CHAT_RATE_LIMIT_MS;
+  await page.waitForFunction(limitMs => {
+    const probe = (
+      window as Window & {
+        __jovieChatPerformanceProbe?: { start: number };
+      }
+    ).__jovieChatPerformanceProbe;
+    return (
+      probe !== undefined && performance.now() - probe.start >= limitMs + 100
+    );
+  }, windowMs);
 }
 
 async function exchangeChatRoundTrip(
@@ -387,10 +454,12 @@ async function exchangeChatRoundTrip(
   userText: string,
   assistantText: string,
   backend: Awaited<ReturnType<typeof mockChatBackend>>,
-  record?: (snapshot: ChatProbeSnapshot) => void
+  record?: (snapshot: ChatProbeSnapshot) => void,
+  settleMainThread = false
 ) {
   await expect(composer).toBeEnabled();
   await composer.fill(userText);
+  if (settleMainThread) await waitForQuietFrames(page);
   await installChatProbe(page, userText, assistantText);
   backend.dispatch();
   try {
@@ -484,7 +553,7 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
   }, UX_LATENCY_STORAGE_KEY);
 
   for (let runIndex = 0; runIndex < SAMPLE_COUNT; runIndex += 1) {
-    await remountChatRoute(page, chatContent, composer, chatApi);
+    await waitForChatSendPacer(page);
     const copy = roundTripCopy('Performance', runIndex);
     const timings = await exchangeChatRoundTrip(
       page,
@@ -493,7 +562,8 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
       copy.userText,
       copy.assistantText,
       backend,
-      snapshot => diagnostics.push(snapshot)
+      snapshot => diagnostics.push(snapshot),
+      true
     );
     if (
       timings.firstFeedbackMs === undefined ||
@@ -509,6 +579,7 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
     });
   }
 
+  await waitForQuietFrames(page);
   const droppedFrameCount = await measureDroppedScrollFrames(page);
   const completeSamples = samples.map(sample => ({
     ...sample,

@@ -1611,6 +1611,9 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(promoteJob).toContain(
       'steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype'
     );
+    expect(promoteJob).toContain(
+      'steps.verify-production.outputs.failure_subtype || steps.journey-gate.outputs.failure_subtype'
+    );
     expect(domainGuardStep).toContain('id: domain-guard');
     expect(domainGuardStep).toContain(
       'node .github/scripts/verify-vercel-production-domains.mjs'
@@ -1686,11 +1689,17 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
         'if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts'
       )
     );
-    // Staged public-profile budgets are warning-only; the measurement remains enforced.
-    expect(stagedPublicProfileGate).not.toContain('fail_performance_gate');
+    // JOV-8338 graduated the exact staged-build budget independently
+    // (2026-10-21 receipt: staging 14/14 qualifying), so it fails closed with
+    // the exact-build failure subtype. Production canonical-alias budgets
+    // above stay warning-only (11/14, streak 0/14) until their own receipt
+    // graduates.
+    expect(stagedPublicProfileGate).toContain(
+      'fail_performance_gate "Exact staged-build public-profile alias budgets failed."'
+    );
     expect(stagedPublicProfileGate).not.toContain('continue-on-error: true');
-    expect(stagedPublicProfileGate).toContain('performance_status=warn');
-    expect(stagedPublicProfileGate).toContain('::warning::');
+    expect(stagedPublicProfileGate).not.toContain('performance_status=warn');
+    expect(stagedPublicProfileGate).not.toContain('::warning::');
     for (const routeId of [
       'public-profile-listen',
       'public-profile-music',
@@ -3186,6 +3195,9 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathStep).toContain(
       'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY }}'
     );
+    expect(getJobBlock(workflow, 'ci-golden-path')).toContain(
+      "FEATURE_STRIPE_TEST_PRICE_CONFIGURED: 'true'"
+    );
     expect(goldenPathStep).toContain(
       'STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv'
     );
@@ -4185,8 +4197,14 @@ describe('production promotion exact-artifact contract', () => {
     expect(finalCurrentStep).not.toContain(
       'Refusing stale production promotion'
     );
+    // The closed lineage predicate stays in the step. The live if repeats it
+    // inside one ${{ }} with the journey gate: text after }} is always true
+    // (actions/runner#1173), so the gate cannot be appended outside.
     expect(promoteStep).toContain(
       "if: ${{ steps.final-current.outputs.is_current == 'true' }}"
+    );
+    expect(promoteStep).toContain(
+      "if: ${{ steps.final-current.outputs.is_current == 'true' && steps.journey-gate.outcome == 'success' }}"
     );
     expect(promoteJob).toContain(
       'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha || steps.mutation-head.outputs.superseded_sha }}'

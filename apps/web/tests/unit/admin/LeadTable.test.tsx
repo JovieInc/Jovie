@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { LeadTable } from '@/components/features/admin/leads/LeadTable';
 import type { AdminLead } from '@/lib/queries';
 
 // Mock the queries
@@ -85,7 +85,7 @@ function createMockLead(overrides: Partial<AdminLead> = {}): AdminLead {
   };
 }
 
-function renderWithProviders(ui: ReactElement) {
+function renderWithProviders() {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -94,16 +94,10 @@ function renderWithProviders(ui: ReactElement) {
   });
 
   return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <LeadTable />
+    </QueryClientProvider>
   );
-}
-
-// Lazy import to allow mocks to be set up first
-async function getLeadTable() {
-  const { LeadTable } = await import(
-    '@/components/features/admin/leads/LeadTable'
-  );
-  return LeadTable;
 }
 
 describe('LeadTable', () => {
@@ -129,8 +123,7 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
-    renderWithProviders(<LeadTable />);
+    renderWithProviders();
 
     // UnifiedTable shows skeleton rows during loading — verify no data rows appear
     expect(screen.queryByText('Test Lead')).not.toBeInTheDocument();
@@ -149,8 +142,7 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
-    renderWithProviders(<LeadTable />);
+    renderWithProviders();
 
     expect(
       screen.getAllByText('No leads have been discovered yet').length
@@ -168,8 +160,7 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
-    renderWithProviders(<LeadTable />);
+    renderWithProviders();
 
     expect(screen.getByText('Test Artist')).toBeInTheDocument();
     expect(screen.getByText('@testartist')).toBeInTheDocument();
@@ -191,6 +182,84 @@ describe('LeadTable', () => {
     );
   });
 
+  it('hides enrichment columns that no loaded lead has data for', async () => {
+    const leads = [
+      createMockLead({
+        id: '1',
+        fitScore: null,
+        hasPaidTier: false,
+        hasSpotifyLink: false,
+        hasInstagram: false,
+        hasTrackingPixels: false,
+        contactEmail: null,
+        musicToolsDetected: [],
+      }),
+      createMockLead({
+        id: '2',
+        displayName: 'Second Artist',
+        linktreeHandle: 'second',
+        fitScore: null,
+        hasPaidTier: false,
+        hasSpotifyLink: false,
+        hasInstagram: false,
+        hasTrackingPixels: false,
+        contactEmail: null,
+        musicToolsDetected: [],
+      }),
+    ];
+    mockLeadsInfiniteQuery.mockReturnValue({
+      data: { pages: [{ rows: leads, total: 2 }], pageParams: [1] },
+      isLoading: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders();
+
+    expect(screen.getByText('Second Artist')).toBeInTheDocument();
+    for (const header of ['Score', 'Signals', 'Tools']) {
+      expect(
+        screen.queryByRole('columnheader', { name: header })
+      ).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText('-')).not.toBeInTheDocument();
+  });
+
+  it('labels unscored and signal-less rows consistently when columns stay visible', async () => {
+    const leads = [
+      createMockLead({ id: '1' }),
+      createMockLead({
+        id: '2',
+        displayName: 'Bare Artist',
+        linktreeHandle: 'bare',
+        fitScore: null,
+        hasPaidTier: false,
+        hasSpotifyLink: false,
+        hasInstagram: false,
+        hasTrackingPixels: false,
+        contactEmail: null,
+        musicToolsDetected: [],
+      }),
+    ];
+    mockLeadsInfiniteQuery.mockReturnValue({
+      data: { pages: [{ rows: leads, total: 2 }], pageParams: [1] },
+      isLoading: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      fetchNextPage: vi.fn(),
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders();
+
+    expect(screen.getByText('Not scored')).toBeInTheDocument();
+    expect(screen.getByText('None')).toBeInTheDocument();
+    expect(screen.getByText('None detected')).toBeInTheDocument();
+    expect(screen.queryByText('-')).not.toBeInTheDocument();
+  });
+
   it('renders status filter tabs', async () => {
     mockLeadsInfiniteQuery.mockReturnValue({
       data: { pages: [{ rows: [], total: 0 }], pageParams: [1] },
@@ -201,8 +270,7 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
-    renderWithProviders(<LeadTable />);
+    renderWithProviders();
 
     expect(screen.getByText('All')).toBeInTheDocument();
     expect(screen.getByText('Discovered')).toBeInTheDocument();
@@ -221,8 +289,7 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
-    renderWithProviders(<LeadTable />);
+    renderWithProviders();
 
     const user = userEvent.setup();
     await user.click(screen.getByText('Qualified'));
@@ -251,8 +318,7 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
-    renderWithProviders(<LeadTable />);
+    renderWithProviders();
 
     expect(screen.getByLabelText(/^Approve /)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Reject /)).toBeInTheDocument();
@@ -269,8 +335,7 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
-    renderWithProviders(<LeadTable />);
+    renderWithProviders();
 
     // The "Approve & ingest" title should not appear as an action button
     expect(screen.queryByTitle('Approve & ingest')).not.toBeInTheDocument();
@@ -294,8 +359,7 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
-    renderWithProviders(<LeadTable />);
+    renderWithProviders();
 
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.getByText('IG')).toBeInTheDocument();
@@ -315,8 +379,7 @@ describe('LeadTable', () => {
       refetch,
     });
 
-    const LeadTable = await getLeadTable();
-    renderWithProviders(<LeadTable />);
+    renderWithProviders();
 
     expect(screen.getByText('Unable to load leads')).toBeInTheDocument();
     const retryButton = screen.getByRole('button', { name: 'Retry' });
@@ -340,8 +403,7 @@ describe('LeadTable', () => {
       refetch: vi.fn(),
     });
 
-    const LeadTable = await getLeadTable();
-    renderWithProviders(<LeadTable />);
+    renderWithProviders();
 
     expect(screen.getByText('Admin verification required')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Unlock' })).toBeInTheDocument();

@@ -6,35 +6,46 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 import { profileUpdateSchema } from '@/lib/validation/schemas';
-import { normalizeUsername, validateUsername } from '@/lib/validation/username';
+import { normalizeUsername } from '@/lib/validation/username';
+import { validateUsernameCore } from '@/lib/validation/username-core';
 import { ALLOWED_PROFILE_FIELDS, NO_STORE_HEADERS } from './constants';
 
 /**
  * Extended profile update schema with username validation.
  *
- * Extends the centralized profileUpdateSchema with route-specific
- * username validation using validateUsername and normalizeUsername.
+ * A profile that already owns a reserved fixture handle must still be able to
+ * save other fields. Renaming onto a reserved handle stays rejected.
  */
-export const ProfileUpdateSchema = profileUpdateSchema
-  .superRefine((data, ctx) => {
-    if (data.username !== undefined) {
-      const validation = validateUsername(data.username);
-      if (!validation.isValid) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['username'],
-          message: validation.error ?? 'Username is invalid or reserved',
-        });
+function profileUpdateSchemaFor(currentUsername?: string | null) {
+  return profileUpdateSchema
+    .superRefine((data, ctx) => {
+      if (data.username === undefined) return;
+      const validation = validateUsernameCore(data.username);
+      if (validation.isValid) return;
+      const normalized = normalizeUsername(data.username);
+      const keepingOwnedReservedHandle =
+        currentUsername != null &&
+        normalizeUsername(currentUsername) === normalized &&
+        validation.errorCode === 'RESERVED' &&
+        isReservedPublicProfileIdentity(normalized);
+      if (keepingOwnedReservedHandle) return;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['username'],
+        message: validation.error ?? 'Username is invalid or reserved',
+      });
+    })
+    .transform(data => {
+      if (data.username !== undefined) {
+        return { ...data, username: normalizeUsername(data.username) };
       }
-    }
-  })
-  .transform(data => {
-    if (data.username !== undefined) {
-      return { ...data, username: normalizeUsername(data.username) };
-    }
-    return data;
-  });
+      return data;
+    });
+}
+
+export const ProfileUpdateSchema = profileUpdateSchemaFor();
 
 export type ProfileUpdateInput = z.infer<typeof ProfileUpdateSchema>;
 
@@ -95,9 +106,12 @@ export type ParsedUpdatesResult =
   | { ok: false; response: NextResponse };
 
 export function parseProfileUpdates(
-  updates: Record<string, unknown>
+  updates: Record<string, unknown>,
+  options?: { readonly currentUsername?: string | null }
 ): ParsedUpdatesResult {
-  const parsedUpdatesResult = ProfileUpdateSchema.safeParse(updates);
+  const parsedUpdatesResult = profileUpdateSchemaFor(
+    options?.currentUsername
+  ).safeParse(updates);
   if (!parsedUpdatesResult.success) {
     const firstError = parsedUpdatesResult.error.issues[0]?.message;
     return {

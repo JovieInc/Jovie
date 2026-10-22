@@ -34,6 +34,27 @@ describe('ChatEmptyStateComposerRegion', () => {
     ).toHaveAttribute('data-dock', 'bottom');
   });
 
+  it('gives a fill canvas exactly the height above the composer from lg, with no scroll', () => {
+    render(
+      <ChatEmptyStateComposerRegion
+        stableDocked
+        fullBleed
+        alignAbove='fill'
+        above={<div>Ovie Home</div>}
+      >
+        <div>Composer</div>
+      </ChatEmptyStateComposerRegion>
+    );
+    const scroll = screen.getByTestId('chat-empty-state-above-scroll');
+    expect(scroll).toHaveClass('lg:overflow-hidden');
+    const group = scroll.querySelector('[data-empty-chat-suggestions]');
+    expect(group).toHaveClass('lg:flex-1', 'lg:min-h-0');
+    expect(group).not.toHaveClass('mt-auto');
+    expect(
+      screen.getByTestId('chat-empty-state-centered-composer')
+    ).toHaveAttribute('data-dock', 'bottom');
+  });
+
   it('centers only the opted-in Home above content while preserving the bottom composer', () => {
     render(
       <ChatEmptyStateComposerRegion

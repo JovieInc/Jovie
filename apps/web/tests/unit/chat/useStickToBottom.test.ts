@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SCROLL_THRESHOLD,
   useStickToBottom,
+  useStickToBottomController,
 } from '@/components/jovie/hooks/useStickToBottom';
 
 type IntersectionCallback = (
@@ -96,9 +97,12 @@ describe('useStickToBottom', () => {
   };
 
   const attachSentinel = (
-    result: ReturnType<
-      typeof renderHook<ReturnType<typeof useStickToBottom>>
-    >['result'],
+    result: {
+      current: {
+        scrollContainerRef: { current: HTMLDivElement | null };
+        bottomSentinelRef: (node: HTMLDivElement | null) => void;
+      };
+    },
     container: HTMLDivElement = document.createElement('div')
   ) => {
     result.current.scrollContainerRef.current = container;
@@ -128,6 +132,24 @@ describe('useStickToBottom', () => {
         rootMargin: `0px 0px ${SCROLL_THRESHOLD}px 0px`,
       }
     );
+  });
+
+  it('updates stick state without rerendering the controller caller', () => {
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders += 1;
+      return useStickToBottomController();
+    });
+    attachSentinel(result);
+
+    act(() => {
+      intersectionCallback?.([
+        { isIntersecting: false } as IntersectionObserverEntry,
+      ]);
+    });
+
+    expect(result.current.getSnapshot()).toBe(false);
+    expect(renders).toBe(1);
   });
 
   it('releases sticky state when the sentinel leaves the viewport', () => {
