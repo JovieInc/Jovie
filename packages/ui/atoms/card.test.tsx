@@ -20,8 +20,8 @@ describe('Card', () => {
     expect(card.className).toContain('border-subtle');
     expect(card.className).toContain('bg-surface-1');
     expect(card).toHaveAttribute('data-variant', 'default');
-    expect(card.className).toContain('transition-[border-color,box-shadow]');
-    expect(card.className).not.toContain('transition-[background-color');
+    expect(card.className).toContain('transition-card-chrome');
+    expect(card.className).not.toContain('transition-[');
     expect(card.className).toContain('duration-subtle');
     expect(card.className).toContain('ease-subtle');
     expect(card.className).toContain('motion-reduce:transition-none');
