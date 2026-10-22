@@ -4001,6 +4001,22 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/profile-alias-decision/[username]/[slug]/route.ts",
+      "kind": "handler",
+      "route": "/api/profile-alias-decision/[username]/[slug]",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/profile-alias-decision/route.ts",
+      "kind": "handler",
+      "route": "/api/profile-alias-decision",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/profile-surfaces/[id]/qualification/route.ts",
       "kind": "handler",
       "route": "/api/profile-surfaces/[id]/qualification",

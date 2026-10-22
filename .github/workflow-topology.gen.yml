@@ -173,6 +173,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
     jobCount: 64
+  - name: Claim Checkout Dogfood
+    path: .github/workflows/claim-checkout-dogfood.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:dogfood
+    jobCount: 1
   - name: CLI Chaos Nightly
     path: .github/workflows/cli-chaos-nightly.yml
     active: true
@@ -429,6 +441,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Claim Checkout Dogfood
       - Lane Fix Relay
     triggeringStateTransition:
       - schedule
@@ -1221,6 +1234,7 @@ nodes:
     authoritativeProducer: Production Controller
     authoritativeFor: []
     allowedConsumers:
+      - Claim Checkout Dogfood
       - Controller Quota Replay
       - Production Controller
       - Production Release
@@ -1384,6 +1398,12 @@ edges:
   - from: CI
     to: Mac CI
     type: workflow_call
+  - from: Staging Controller
+    to: Claim Checkout Dogfood
+    type: workflow_run
+  - from: Golden Path Nightly
+    to: Claim Checkout Dogfood
+    type: workflow_run
   - from: CLI Chaos
     to: Mac Lane Route
     type: workflow_call

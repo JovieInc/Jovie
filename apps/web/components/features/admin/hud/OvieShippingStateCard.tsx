@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { computeRatePercent } from '@/lib/analytics/metrics';
+import { redactFilesystemPaths } from '@/lib/ovie/home/operator-copy';
 import type {
   CapacityHorizonLease,
   CountMeasurement,
@@ -117,8 +118,11 @@ function CapacityLeaseRow({ row }: { readonly row: CapacityHorizonLease }) {
         {row.forecast.sustainablePercentPerHour ?? '?'}%/h · unused{' '}
         {row.forecast.projectedUnused ?? '?'}% · coverage{' '}
         {row.forecast.qualifiedWork.length} · {row.concurrency ?? '?'}{' '}
-        concurrency · {row.compatibility.cli ?? '?'}+
-        {row.compatibility.harness ?? '?'} · {row.freshness.status}
+        concurrency ·{' '}
+        {row.compatibility.cli
+          ? row.compatibility.cli.split(/[\\/]/).at(-1)
+          : '?'}
+        +{row.compatibility.harness ?? '?'} · {row.freshness.status}
       </p>
       {/* axe nested-interactive (WCAG 4.1.2): <summary> is itself a native
           toggle control, so the Linear link must sit outside it rather than
@@ -306,7 +310,7 @@ function ShippingStateBody({
         </p>
       )}
       <p className='min-h-4 truncate text-2xs leading-4 text-secondary-token'>
-        {delivery.lanes.alerts.join(' · ')}
+        {delivery.lanes.alerts.map(redactFilesystemPaths).join(' · ')}
       </p>
       <p
         className='min-h-4 break-words text-2xs leading-4 text-tertiary-token'

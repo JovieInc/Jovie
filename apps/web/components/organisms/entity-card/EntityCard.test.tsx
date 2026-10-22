@@ -797,6 +797,25 @@ describe('ProfilePacCard landscape states', () => {
     expect(listen.className).not.toContain('profile-glass-pill');
   });
 
+  it('leaves the featured byline empty when there is no release', () => {
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        presentation='featured'
+        renderMode='preview'
+        captureEnabled={false}
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Tim White' })
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('Tim White')).toHaveLength(1);
+    expect(screen.queryByText('Tim White / Tim White')).toBeNull();
+  });
+
   it('keeps the featured capture form stacked and hides the art while prompting', async () => {
     render(
       <ProfilePacCard

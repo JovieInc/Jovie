@@ -1538,39 +1538,26 @@ describe('marketing adversarial-review invariants', () => {
 
 // Source inventory checks only. Mounted identity remains the route-health gate.
 describe('current acquisition source inventory (JOV-4065)', () => {
-  it('retains the current identity homepage beats and their actual outer-section owners', async () => {
-    const { HOMEPAGE_IDENTITY_COPY } = await import(
-      '@/data/homepageIdentityCopy'
-    );
+  it('binds the homepage beats to the recipe and one source owner', () => {
     const entry = MARKETING_ROUTE_MANIFEST.find(route => route.url === '/')!;
     const bindings = entry.renderedSections.filter(
       binding => binding.kind === 'approved-section'
     );
     expect(entry.specVersion).toBe(MARKETING_SPEC_VERSION);
-    const rows = HOMEPAGE_IDENTITY_COPY.sections;
-    expect(bindings.slice(1, -1).map(binding => binding.occurrenceId)).toEqual(
-      rows.map(row => row.id)
+    // EVENT 2026-10-20: the artist-profile homepage. The rendered contract
+    // (order, owners, copy, prices, media) lives in homepage-contract.test.
+    expect(bindings.map(binding => binding.sectionId)).toEqual(
+      MARKETING_RECIPES.find(recipe => recipe.id === 'homepage')?.sectionOrder
     );
-    // Latest founder direction replaces the legacy relationships/changelog page.
-    expect(rows.map(row => row.id)).toEqual(['presence', 'structure']);
-    expect(bindings.map(binding => binding.sectionId)).toEqual([
-      'hero',
-      ...rows.map(() => 'feature-split'),
-      'cta',
-    ]);
-    expect(bindings.map(binding => binding.componentPath)).toEqual([
-      'apps/web/components/homepage/HomepageIdentityHero.tsx',
-      ...Array(rows.length).fill(
-        'apps/web/components/homepage/HomepageIdentitySections.tsx'
-      ),
-      'apps/web/components/homepage/HomepageIdentityClose.tsx',
-    ]);
+    expect(new Set(bindings.map(binding => binding.componentPath))).toEqual(
+      new Set(['apps/web/components/homepage/HomepageArtistProfile.tsx'])
+    );
     // Source inventory is separate from deployed mounted and visual certification.
     expect(entry.bindingEvidence.status).toBe('verified');
     expect(bindings.map(binding => binding.variantId)).toEqual([
       'split-claim-card',
-      ...rows.map(() => 'editorial'),
-      'editorial-search',
+      'profile-grid',
+      'final-single-claim',
     ]);
   });
 

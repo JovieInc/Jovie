@@ -42,6 +42,7 @@ import {
   resolveWarmNavigationStartPath,
   runPerformanceBudgetsGuard,
   selectGuardRoutes,
+  usesSharedAliasBrowserContext,
   waitForWarmDestinationReady,
 } from './performance-budgets-guard';
 import type {
@@ -903,6 +904,27 @@ describe('performance budgets guard', () => {
     expect(selected.length).toBeGreaterThan(1);
     expect(selected.every(route => route.group === 'creator-shell')).toBe(true);
     expect(selected.some(route => route.id === 'creator-releases')).toBe(true);
+  });
+
+  it('shares one browser context across public alias samples', async () => {
+    const routes = await loadGuardManifestRoutes();
+    const aliasIds = [
+      'public-profile-listen',
+      'public-profile-music',
+      'public-profile-subscribe',
+      'public-profile-tip',
+      'public-profile-releases',
+      'public-profile-tour',
+    ];
+
+    for (const id of aliasIds) {
+      const route = routes.find(candidate => candidate.id === id);
+      expect(route?.aliasUsableResult).toBeDefined();
+      expect(usesSharedAliasBrowserContext(route!)).toBe(true);
+    }
+
+    const home = routes.find(candidate => candidate.id === 'home');
+    expect(usesSharedAliasBrowserContext(home!)).toBe(false);
   });
 
   it('selects manifest routes by route id even when the path contains placeholders', async () => {

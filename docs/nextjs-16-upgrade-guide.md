@@ -24,10 +24,10 @@ React 19; no React or package-manager migration is needed for this patch.
 
 | App | Decision | Source deployment boundary / compatibility |
 | --- | --- | --- |
-| `apps/console` | Upgrade to 16.4.1 | Separate Next project; Node >=24.21.0 <25 |
-| `apps/docs` | Upgrade to 16.4.1 | Vercel / Nextra 4.6.1; Node >=24.21.0 |
+| `apps/console` | Upgrade to 16.4.1 | Separate Next project; Node >=24.22.1 <25 |
+| `apps/docs` | Upgrade to 16.4.1 | Vercel / Nextra 4.6.1; Node >=24.22.1 |
 | `apps/ovie` | Upgrade to 16.4.1 | Vercel standalone / Workflow 4.8.13; Node 24 |
-| `apps/should-i-make` | Upgrade to 16.4.1 | Vercel standalone; Node >=24.21.0 |
+| `apps/should-i-make` | Upgrade to 16.4.1 | Vercel standalone; Node >=24.22.1 |
 | `apps/web` | Upgrade to 16.4.1 | Vercel standalone / Better Auth 1.7.7 / Workflow 4.8.13; Node 24 |
 | LYB `apps/web` | Patch 15.5.27 to 15.5.28; hold major migration | Vercel web plus conditional Capacitor static export; Node 22 / pnpm 10.34.1 |
 
@@ -38,7 +38,7 @@ not implemented in this Jovie PR. Preserve LYB-103 / merged PR #1206's
 `minimumReleaseAgeExclude` entries. Next 15 remains Maintenance LTS; do not
 force a major upgrade before proving web and Capacitor compatibility.
 
-Jovie uses pnpm 9.15.9, `.nvmrc` 24.21.0, and no pnpm minimum-release-age setting.
+Jovie uses pnpm 9.15.9, `.nvmrc` 24.22.1, and no pnpm minimum-release-age setting.
 Dependabot cooldowns are 7/3/1 days for major/minor/patch; security updates are
 unaffected. No age/security setting was relaxed. There is no existing Next patch.
 Web's analyzer and ESLint config resolve to 16.4.0 before, 16.4.1 after.
