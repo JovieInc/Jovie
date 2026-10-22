@@ -155,6 +155,8 @@ export function ActionDial({
       if (pointerRef.current?.id !== event.pointerId) return;
       const distance = event.clientY - pointerRef.current.y;
       if (Math.abs(distance) > TAP_SLOP_PX) pointerRef.current.moved = true;
+      // A release at the origin must return the incoming icon to its last side.
+      if (distance !== 0) setSettledTieSign(distance > 0 ? -1 : 1);
       setDragY(Math.max(-84, Math.min(84, distance)));
     },
     []

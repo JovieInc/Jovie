@@ -255,6 +255,37 @@ describe('ActionDial', () => {
     }
   );
 
+  it('returns a reversed two-provider row drag on its incoming side', () => {
+    vi.useFakeTimers();
+    const onSelect = vi.fn();
+    render(
+      <ActionDial
+        options={OPTIONS.slice(0, 2)}
+        selectedId='spotify'
+        onSelect={onSelect}
+        actionLabel='Stream Now'
+        groupLabel='Choose a streaming service'
+      />
+    );
+    const row = screen.getByRole('button', { name: 'Select Apple Music' });
+    dispatchTouchPointer(row, 'pointerdown', 120);
+    dispatchTouchPointer(row, 'pointermove', 137);
+    expect(screen.getByTestId('action-dial-icon-apple')).toHaveStyle({
+      transform: 'translateY(-75%)',
+    });
+    // A release can return to the origin without delivering another move.
+    dispatchTouchPointer(row, 'pointerup', 120);
+    expect(screen.getByTestId('action-dial-icon-apple')).toHaveStyle({
+      transform: 'translateY(-100%)',
+    });
+    fireEvent.click(row);
+    act(() => vi.advanceTimersByTime(180));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('link', { name: 'Stream Now with Spotify' })
+    ).toBeInTheDocument();
+  });
+
   it('rebases the hidden third icon without sweeping it through the CTA', () => {
     render(<Fixture />);
     const dial = screen.getByTestId('action-dial');
