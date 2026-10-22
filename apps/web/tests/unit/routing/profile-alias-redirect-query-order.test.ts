@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { IncomingMessage, ServerResponse } from 'node:http';
 import { createRequire } from 'node:module';
+import { Socket } from 'node:net';
 import { format as formatUrl } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -66,6 +68,76 @@ function locationForAlias(alias: string, mode: string): string {
 }
 
 describe('profile alias redirect query order', () => {
+  it('resolves every deep link through the installed Next router', async () => {
+    const { getResolveRoutes } =
+      require('next/dist/server/lib/router-utils/resolve-routes') as {
+        getResolveRoutes: (
+          checker: object,
+          config: object,
+          getAssetPrefix: () => string,
+          options: object
+        ) => (request: {
+          req: IncomingMessage;
+          res: ServerResponse;
+          isUpgradeReq: boolean;
+          invokedOutputs: Set<string>;
+        }) => Promise<{ statusCode: number; parsedUrl: ParsedDestination }>;
+      };
+    const { buildCustomRoute } =
+      require('next/dist/server/lib/router-utils/filesystem') as {
+        buildCustomRoute: (type: string, route: object) => object;
+      };
+    const { defaultConfig } = require('next/dist/server/config-shared') as {
+      defaultConfig: object;
+    };
+    const { legacyProfileAliasRedirects } =
+      require('../../../lib/routing/legacy-profile-alias-redirects') as {
+        legacyProfileAliasRedirects: () => object[];
+      };
+    const resolve = getResolveRoutes(
+      {
+        headers: [],
+        redirects: legacyProfileAliasRedirects().map(route =>
+          buildCustomRoute('redirect', route)
+        ),
+        rewrites: { beforeFiles: [], afterFiles: [], fallback: [] },
+        buildId: 'test',
+        getMiddlewareMatchers: () => undefined,
+      },
+      defaultConfig,
+      () => '',
+      { dir: process.cwd(), dev: false, hostname: '127.0.0.1', port: 3100 }
+    );
+    const aliases = {
+      contact: 'contact',
+      listen: 'listen',
+      music: 'listen',
+      releases: 'releases',
+      subscribe: 'subscribe',
+      tip: 'pay',
+      tour: 'tour',
+      shows: 'tour',
+      events: 'tour',
+    };
+    for (const [alias, mode] of Object.entries(aliases)) {
+      for (const source of ['qr', 'link']) {
+        const req = new IncomingMessage(new Socket());
+        req.url = `/dualipa/${alias}?source=${source}`;
+        req.headers = { host: '127.0.0.1:3100' };
+        const result = await resolve({
+          req,
+          res: new ServerResponse(req),
+          isUpgradeReq: false,
+          invokedOutputs: new Set(),
+        });
+        expect(result.statusCode).toBe(307);
+        expect(formatUrl(result.parsedUrl)).toBe(
+          `/dualipa?mode=${mode}&source=${source}#alias=${alias}`
+        );
+      }
+    }
+  });
+
   it('emits mode before source for every legacy deep link', () => {
     const cases = [
       ['listen', 'listen'],

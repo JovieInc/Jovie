@@ -34,7 +34,7 @@
                                  res.appendHeader(key, v);
 --- a/dist/server/lib/router-utils/resolve-routes.js
 +++ b/dist/server/lib/router-utils/resolve-routes.js
-@@ -37,6 +37,41 @@
+@@ -37,6 +37,42 @@
          default: obj
      };
  }
@@ -77,7 +77,7 @@
  const debug = (0, _debug.default)('next:router-server:resolve-routes');
  function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, renderServer, renderServerOpts, ensureMiddleware) {
      let clientHashes = undefined;
-@@ -533,7 +568,7 @@
+@@ -533,7 +569,7 @@
                      });
                      const { query } = parsedDestination;
                      delete parsedDestination.query;
@@ -88,7 +88,7 @@
                          finished: true,
 --- a/dist/esm/server/lib/router-utils/resolve-routes.js
 +++ b/dist/esm/server/lib/router-utils/resolve-routes.js
-@@ -22,6 +22,41 @@
+@@ -22,6 +22,42 @@
  import { isRSCRequestHeader } from '../is-rsc-request';
  import { compileNonPath, matchHas, prepareDestination } from '../../../shared/lib/router/utils/prepare-destination';
  import { NEXT_REWRITTEN_PATH_HEADER, NEXT_REWRITTEN_QUERY_HEADER, RSC_HEADER } from '../../../client/components/app-router-headers';
@@ -131,7 +131,7 @@
  const debug = setupDebug('next:router-server:resolve-routes');
  export function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, renderServer, renderServerOpts, ensureMiddleware) {
      let clientHashes = undefined;
-@@ -518,7 +553,7 @@
+@@ -518,7 +554,7 @@
                      });
                      const { query } = parsedDestination;
                      delete parsedDestination.query;
