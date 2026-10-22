@@ -13,14 +13,27 @@ const startUrl =
   '/start?starter_prompt=I+want+to+claim+jov.ie%2Fsam.&handle=sam';
 
 function expectZeroLayoutShift(
-  metric: { supported: boolean; total: number | null } | undefined,
+  metric:
+    | {
+        supported: boolean;
+        total: number | null;
+        entries?: readonly unknown[];
+      }
+    | undefined,
   testInfo: TestInfo
 ) {
   expect(metric).toBeDefined();
   expect(typeof metric!.supported).toBe('boolean');
   if (metric!.supported) {
     expect(Number.isFinite(metric!.total)).toBe(true);
-    expect(metric!.total).toBe(0);
+    if (metric!.entries) {
+      expect(
+        metric!.total,
+        `layout-shift entries ${JSON.stringify(metric!.entries)}`
+      ).toBe(0);
+    } else {
+      expect(metric!.total).toBe(0);
+    }
   } else {
     expect(metric!.total).toBeNull();
     testInfo.annotations.push({
@@ -29,6 +42,18 @@ function expectZeroLayoutShift(
         'API unavailable; essential-control geometry remains required',
     });
   }
+}
+
+async function readReplyLayout(page: Page) {
+  return page.evaluate(() => {
+    const metric = window.__claimLayout;
+    if (!metric) return undefined;
+    return {
+      supported: metric.supported,
+      total: metric.total,
+      entries: window.__claimLayoutEntries ?? [],
+    };
+  });
 }
 
 async function draftProgress(page: Page) {
@@ -296,13 +321,18 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     });
     const beforeReply = await input.boundingBox();
     await expectEssentials(page);
-    expectZeroLayoutShift(
-      await page.evaluate(() => window.__claimLayout),
-      testInfo
+    // The starter handoff has settled. Open the zero-CLS window here so
+    // navigation and handoff entries stay outside it, including entries the
+    // observer delivers late. Shifts from this moment through the reply still
+    // have to total 0.
+    await page.evaluate(() => window.__armClaimLayout?.());
+    await page.evaluate(
+      () =>
+        new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        )
     );
-    await page.evaluate(() => {
-      if (window.__claimLayout?.supported) window.__claimLayout.total = 0;
-    });
+    expectZeroLayoutShift(await readReplyLayout(page), testInfo);
     releaseReply();
     await expect(page.getByText('Your draft is saved.')).toBeVisible();
     await page.evaluate(
@@ -311,10 +341,7 @@ test.describe('current-state essential actions (JOV-7771)', () => {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         )
     );
-    expectZeroLayoutShift(
-      await page.evaluate(() => window.__claimLayout),
-      testInfo
-    );
+    expectZeroLayoutShift(await readReplyLayout(page), testInfo);
     const afterReply = await input.boundingBox();
     expect(beforeReply).not.toBeNull();
     expect(afterReply).not.toBeNull();
