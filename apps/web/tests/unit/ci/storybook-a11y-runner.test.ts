@@ -1,9 +1,18 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { verifyA11yRunnerControls } from '../../../scripts/verify-storybook-a11y-runner.mjs';
+import {
+  runA11yRunnerControls,
+  verifyA11yRunnerControls,
+} from '../../../scripts/verify-storybook-a11y-runner.mjs';
 
 function observedPattern() {
   const healthy = (name: string) => ({
@@ -162,6 +171,75 @@ const corruptions: [string, (value: Observation) => void][] = [
 ];
 
 describe('Storybook a11y runner diagnostic', () => {
+  it('invokes the canonical bounded runner and verifies newly written reports', () => {
+    const directory = mkdtempSync(resolve(tmpdir(), 'a11y-runner-command-'));
+    try {
+      writeFileSync(resolve(directory, 'findings.json'), 'stale');
+      writeFileSync(resolve(directory, 'cli.json'), 'stale');
+      // Wrapper integration double only; separate real Chromium receipt is required.
+      const result = runA11yRunnerControls(
+        directory,
+        (command, args, options) => {
+          expect(command).toBe('pnpm');
+          expect(args).toContain('--config=vitest.config.storybook.mts');
+          expect(args).toContain('--maxWorkers=1');
+          expect(args).toContain('--retry=0');
+          expect(resolve(String(options.cwd))).toBe(
+            resolve(import.meta.dirname, '../../..')
+          );
+          expect(options.env?.JOVIE_STORYBOOK_A11Y_CONTROLS).toBe('1');
+          expect(options.env?.JOVIE_LIVE_STORYBOOK_CERT).toBe('0');
+          expect(options.env?.JOVIE_STORYBOOK_MANUAL_AXE).toBe('0');
+          expect(existsSync(resolve(directory, 'findings.json'))).toBe(false);
+          expect(existsSync(resolve(directory, 'cli.json'))).toBe(false);
+          const observed = observedPattern();
+          writeFileSync(
+            resolve(directory, 'findings.json'),
+            JSON.stringify(observed.findings)
+          );
+          writeFileSync(
+            resolve(directory, 'cli.json'),
+            JSON.stringify(observed.cli)
+          );
+          return {
+            status: 1,
+            signal: null,
+            stdout: 'expected negative control',
+            stderr: '',
+          };
+        }
+      );
+      expect(result.expectedPatternObserved).toBe(true);
+      expect(result.output).toBe(directory);
+      expect(readFileSync(resolve(directory, 'runner.log'), 'utf8')).toBe(
+        'expected negative control'
+      );
+      expect(
+        JSON.parse(readFileSync(resolve(directory, 'run.json'), 'utf8'))
+          .exitCode
+      ).toBe(1);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a launch failure before consuming reports', () => {
+    const directory = mkdtempSync(resolve(tmpdir(), 'a11y-runner-launch-'));
+    try {
+      expect(() =>
+        runA11yRunnerControls(directory, () => ({
+          status: null,
+          signal: null,
+          error: new Error('launch failed'),
+          stdout: '',
+          stderr: '',
+        }))
+      ).toThrow('runner must complete without a launch/timeout error');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('rejects stale receipts when a new runner fails before writing any results', () => {
     const directory = mkdtempSync(resolve(tmpdir(), 'a11y-stale-receipts-'));
     try {

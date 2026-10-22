@@ -85,8 +85,12 @@ export function verifyA11yRunnerControls({ findings, cli, exitCode }) {
   };
 }
 
-function main() {
-  const output = resolve(process.argv[2] || '.cache/storybook-a11y-runner');
+/**
+ * @param {string} [outputDirectory]
+ * @param {(command: string, args: string[], options: import('node:child_process').SpawnSyncOptionsWithStringEncoding) => {status: number|null, signal: string|null, error?: Error, stdout?: string, stderr?: string}} [spawn]
+ */
+export function runA11yRunnerControls(outputDirectory, spawn = spawnSync) {
+  const output = resolve(outputDirectory || '.cache/storybook-a11y-runner');
   const web = fileURLToPath(new URL('..', import.meta.url));
   mkdirSync(output, { recursive: true });
   // A setup crash can exit 1 before reporters run. Never accept an older run's
@@ -95,7 +99,7 @@ function main() {
     rmSync(resolve(output, name), { force: true });
   }
   const started = performance.now();
-  const child = spawnSync(
+  const child = spawn(
     'pnpm',
     [
       'exec',
@@ -149,10 +153,8 @@ function main() {
     cli: read('cli.json'),
     exitCode: child.status,
   });
-  console.log(
-    JSON.stringify({ ...result, durationMs: run.durationMs, output })
-  );
+  return { ...result, durationMs: run.durationMs, output };
 }
 
 if (process.argv[1] && import.meta.url === `file://${resolve(process.argv[1])}`)
-  main();
+  console.log(JSON.stringify(runA11yRunnerControls(process.argv[2])));
