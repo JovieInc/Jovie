@@ -15,6 +15,41 @@ const holdout = JSON.parse(readFileSync(join(root, 'holdout.json'), 'utf8'));
 const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
 
 describe('ui escape holdout', () => {
+  it('preserves the separate fuller-page document-like rejection', () => {
+    const provenance = JSON.parse(
+      readFileSync(
+        join(root, 'homepage-document-rejection-2026-10-22.json'),
+        'utf8'
+      )
+    );
+    const capture = provenance.negativeCapture;
+    const item = holdout.items.find(item => item.id === provenance.caseId);
+    assert.equal(item?.humanLabel, 'fail');
+    assert.equal(item?.mustReject, true);
+    assert.equal(item?.caseId, capture.file);
+    const png = readFileSync(join(root, capture.file));
+    assert.equal(
+      createHash('sha256').update(png).digest('hex'),
+      capture.sha256
+    );
+    assert.equal(png.readUInt32BE(16), capture.width);
+    assert.equal(png.readUInt32BE(20), capture.height);
+    assert.equal(
+      capture.libraryFileId,
+      'libfile_6ece57e899988191829e40b555afc105'
+    );
+    assert.equal(
+      provenance.companionCapture.libraryFileId,
+      'libfile_62c14d865d748191934dabc88d0f207d'
+    );
+    assert.notEqual(provenance.caseId, provenance.earlierCase);
+    assert.equal(
+      holdout.items.find(item => item.id === provenance.earlierCase)
+        ?.mustReject,
+      true
+    );
+  });
+
   it('binds the required homepage rejection to the exact reviewed desktop bytes', () => {
     const provenance = JSON.parse(
       readFileSync(join(root, 'homepage-rejection-2026-10-22.json'), 'utf8')

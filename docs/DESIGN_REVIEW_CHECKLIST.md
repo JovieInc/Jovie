@@ -30,6 +30,15 @@ checks extend that process; icon, lint and DOM compliance do not certify design.
   sparse, repetitive or convincing requires pixel review. A hero screenshot,
   section count or footer link inventory is not full-page narrative evidence.
   Do not add filler sections or unsupported product claims to satisfy a count.
+- [ ] **Composed hierarchy:** content coverage alone cannot set visual status
+  to pass. Compare typography, product-image emphasis, section rhythm and
+  transitions against the intended reference pixels. Explain how the eye moves
+  from product proof to action, and where repeated text blocks flatten that
+  hierarchy into a document-like mockup. Cite visible relationships rather than
+  a section count or an invented repetition/imagery quota. Intentional repetition
+  can work when the rendered reference and visual rationale support it. Preserve
+  each user rejection separately: a fuller page can improve coverage while still
+  failing art direction; that does not relabel every element or the earlier case.
 - [ ] **Separate outcomes:** record functional and visual results independently
   for the same source and states. Keyboard, forms, overflow, accessibility and
   test counts cannot set visual status to pass. Text-only Jev can inspect text

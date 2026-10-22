@@ -58,40 +58,46 @@ afterEach(() => {
 });
 
 describe('calibrateVisualJudges', () => {
-  it('does not let high aggregate agreement override a required founder rejection', async () => {
-    const corpus = loadHumanHoldoutSet(
-      join(
-        dirname(fileURLToPath(import.meta.url)),
-        '../../../../docs/screenshots/ui-escape-holdout/holdout.json'
-      )
-    );
-    const rejected = corpus.items.find(
-      item => item.id === 'esc-ui-homepage-wide-profile-sparse-1440'
-    )!;
-    const required = {
-      ...corpus,
-      items: corpus.items.map(item =>
-        item.id === rejected.id ? { ...item, mustReject: true as const } : item
-      ),
-    };
-    const labels = Object.fromEntries(
-      corpus.items.map(item => [item.caseId, item.humanLabel])
-    );
-    labels[rejected.caseId] = 'pass';
-    const lenient = judge('fixture/false-approval', labels);
-    const receipt = await calibrateVisualJudges({
-      holdout: required,
-      judges: [lenient],
-      baseDir: '/corpus',
-    });
-    expect(receipt.judges[0]?.kappa).toBeGreaterThan(DEFAULT_KAPPA_THRESHOLD);
-    expect(receipt.judges[0]?.passed).toBe(false);
-    expect(receipt.judges[0]?.disagreements).toEqual([rejected.id]);
-    dir = mkdtempSync(join(tmpdir(), 'required-visual-rejection-'));
-    const path = join(dir, 'judge-calibration.json');
-    writeJson(path, receipt);
-    expect(failedCalibrationJudges(path).has(lenient.id!)).toBe(true);
-  });
+  it.each([
+    'esc-ui-homepage-wide-profile-sparse-1440',
+    'esc-ui-homepage-document-like-1440',
+  ])(
+    'does not let high aggregate agreement override required rejection %s',
+    async caseId => {
+      const corpus = loadHumanHoldoutSet(
+        join(
+          dirname(fileURLToPath(import.meta.url)),
+          '../../../../docs/screenshots/ui-escape-holdout/holdout.json'
+        )
+      );
+      const rejected = corpus.items.find(item => item.id === caseId)!;
+      const required = {
+        ...corpus,
+        items: corpus.items.map(item =>
+          item.id === rejected.id
+            ? { ...item, mustReject: true as const }
+            : item
+        ),
+      };
+      const labels = Object.fromEntries(
+        corpus.items.map(item => [item.caseId, item.humanLabel])
+      );
+      labels[rejected.caseId] = 'pass';
+      const lenient = judge('fixture/false-approval', labels);
+      const receipt = await calibrateVisualJudges({
+        holdout: required,
+        judges: [lenient],
+        baseDir: '/corpus',
+      });
+      expect(receipt.judges[0]?.kappa).toBeGreaterThan(DEFAULT_KAPPA_THRESHOLD);
+      expect(receipt.judges[0]?.passed).toBe(false);
+      expect(receipt.judges[0]?.disagreements).toEqual([rejected.id]);
+      dir = mkdtempSync(join(tmpdir(), 'required-visual-rejection-'));
+      const path = join(dir, 'judge-calibration.json');
+      writeJson(path, receipt);
+      expect(failedCalibrationJudges(path).has(lenient.id!)).toBe(true);
+    }
+  );
 
   it.each([false, true])(
     'preserves correct required rejection with ordinary disagreement=%s',

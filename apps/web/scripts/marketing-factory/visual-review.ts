@@ -80,7 +80,7 @@ export const VISUAL_REVIEW_ROW: RoutedInvariantRow = {
   route: 'visual',
   routeEvidence: ['apps/web/scripts/marketing-factory/visual-review.ts'],
   policyFingerprintSource: {
-    rule: 'One focal point/section; no competing heroes, clipped/stranded text, misalignment or stock imagery. Judge full-page narrative and mockup/section balance with reference pixels. Tests/text-only Jev cannot certify visuals; founder rejection overrides hold.',
+    rule: 'Compare hierarchy, product imagery, rhythm and mockup balance to reference pixels; coverage cannot excuse document-like repetition. No clipping/misalignment/stock. Tests/text-only Jev cannot certify pixels; founder rejection overrides hold.',
     color: MARKETING_VISUAL_REVIEW_COLOR_CONTRACT.promptBlock,
   },
 };

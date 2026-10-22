@@ -18,8 +18,9 @@ or accessibility work.
 For rendered-page review, apply
 [`docs/DESIGN_REVIEW_CHECKLIST.md` — Rendered page review](../../../../../docs/DESIGN_REVIEW_CHECKLIST.md#rendered-page-review)
 before declaring a visual result. It requires reference comparison, mockup and
-container proportions, complete-page narrative coverage, and separate functional
-and visual outcomes. This supplement records the founder-rejection follow-up;
+container proportions, complete-page narrative coverage, composed hierarchy
+beyond section coverage, and separate functional and visual outcomes. This
+supplement records the founder-rejection follow-up;
 it is not an additional rule from the pinned external handbook. Test passes and
 text-only Jev do not certify visuals. Preserve an exact founder-rejected capture
 in the existing calibration corpus; never silently restore its earlier hold.
