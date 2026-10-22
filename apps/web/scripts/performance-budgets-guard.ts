@@ -840,14 +840,26 @@ export function createAliasPhaseProbeConfig(
   };
 }
 
+/**
+ * Sample count the hosted alias tail estimator requires. A nearest-rank p95
+ * is only a real tail estimate when it is not also the maximum: at 5 samples
+ * the nearest-rank p95 degenerates to the single worst sample, so one cold
+ * instance on an isolated staged build decides the gate. At 20 samples the
+ * p95 is the 19th of 20 ordered samples and tolerates exactly one
+ * environmental cold-start outlier while still failing any systematic tail
+ * regression. The workflow's `--runs` stays 5 for every non-alias route;
+ * alias routes escalate to this floor internally.
+ */
+export const ALIAS_TAIL_RUNS = 20;
+
 export function assertHostedAliasRunCount(
   route: PerfRouteDefinition,
   runs: number,
   isDevMode: boolean
 ) {
-  if (route.aliasUsableResult && !isDevMode && runs !== 5) {
+  if (route.aliasUsableResult && !isDevMode && runs !== ALIAS_TAIL_RUNS) {
     throw new TypeError(
-      `Hosted production alias route ${route.id} requires exactly 5 fresh browser-context runs; received ${runs}.`
+      `Hosted production alias route ${route.id} requires exactly ${ALIAS_TAIL_RUNS} fresh browser-context runs for the nearest-rank p95 tail estimate; received ${runs}.`
     );
   }
 }
@@ -1374,6 +1386,26 @@ function medianResourceValue(
   return medianNumber(samples.map(sample => sample.resourceValues[metric]));
 }
 
+/**
+ * Nearest-rank percentile (ceil(rank) into the ascending-sorted values),
+ * matching the estimator named in
+ * docs/performance/public-profile-alias-graduation.json (`p95Estimator:
+ * nearest-rank`). At 5 samples the 95th rank is the 5th of 5, i.e. the
+ * maximum — one environmental cold-start decides the gate; at 20 samples it
+ * is the 19th of 20 and tolerates exactly one such outlier.
+ */
+export function nearestRankPercentile(
+  values: readonly number[],
+  percentile: number
+) {
+  if (values.length === 0) {
+    throw new TypeError('Percentile of an empty sample set is undefined.');
+  }
+  const sorted = [...values].sort((a, b) => a - b);
+  const rank = Math.ceil((percentile / 100) * sorted.length);
+  return sorted[Math.min(Math.max(rank, 1), sorted.length) - 1];
+}
+
 function assertExactHostCookieScope(
   cookie: PerformanceContextCookie,
   expectedHostname: string
@@ -1843,8 +1875,9 @@ export function createPageResult(
     timings.push(
       buildMetricResult(
         'usable-alias-result-max',
-        Math.max(
-          ...samples.map(sample => sample.timingValues['usable-alias-result'])
+        nearestRankPercentile(
+          samples.map(sample => sample.timingValues['usable-alias-result']),
+          95
         ),
         1500 * timingFactor,
         'ms'
@@ -2137,7 +2170,13 @@ async function measureRoutesAgainstBudgets(
         authCookies
       );
       assertResolvedPerfRoutePath(route, resolvedPath);
-      assertHostedAliasRunCount(route, options.runs, devMode);
+      // Alias routes escalate the workflow's --runs to the tail-estimator
+      // floor; non-alias routes keep the operator's count.
+      const routeRuns =
+        route.aliasUsableResult && !devMode
+          ? Math.max(options.runs, ALIAS_TAIL_RUNS)
+          : options.runs;
+      assertHostedAliasRunCount(route, routeRuns, devMode);
       const url = resolveRouteUrl(options.baseUrl, resolvedPath);
       logInfo(`Checking ${route.id} -> ${resolvedPath}`, options);
 
@@ -2151,7 +2190,7 @@ async function measureRoutesAgainstBudgets(
       );
 
       const samples: GuardSample[] = [];
-      for (let index = 0; index < options.runs; index += 1) {
+      for (let index = 0; index < routeRuns; index += 1) {
         const sample = await measureRouteSample(
           browser,
           route,
@@ -2174,7 +2213,7 @@ async function measureRoutesAgainstBudgets(
             })
             .join('') ?? '';
         logInfo(
-          `  sample ${index + 1}/${options.runs}: ${formatMetric(sample.timingValues[getPrimaryTimingMetricName(route)], 'ms')}${aliasPhaseSummary}${aliasHopSummary}`,
+          `  sample ${index + 1}/${routeRuns}: ${formatMetric(sample.timingValues[getPrimaryTimingMetricName(route)], 'ms')}${aliasPhaseSummary}${aliasHopSummary}`,
           options
         );
       }
