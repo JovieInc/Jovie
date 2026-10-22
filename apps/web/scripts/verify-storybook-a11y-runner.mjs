@@ -155,5 +155,5 @@ export function runA11yRunnerControls(outputDirectory, spawn = spawnSync) {
   return { ...result, durationMs: run.durationMs, output };
 }
 
-if (process.argv[1] && import.meta.url === `file://${resolve(process.argv[1])}`)
+if (import.meta.main)
   console.log(JSON.stringify(runA11yRunnerControls(process.argv[2])));

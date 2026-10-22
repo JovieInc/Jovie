@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -240,41 +241,50 @@ describe('Storybook a11y runner diagnostic', () => {
     }
   });
 
-  it('rejects stale receipts when a new runner fails before writing any results', () => {
-    const directory = mkdtempSync(resolve(tmpdir(), 'a11y-stale-receipts-'));
-    try {
-      const old = observedPattern();
-      writeFileSync(resolve(directory, 'cli.json'), JSON.stringify(old.cli));
-      writeFileSync(
-        resolve(directory, 'findings.json'),
-        JSON.stringify(old.findings)
-      );
-      // Failure-path unit double only; actual Chromium controls run separately.
-      writeFileSync(resolve(directory, 'pnpm'), '#!/bin/sh\nexit 1\n', {
-        mode: 0o755,
-      });
-      const result = spawnSync(
-        process.execPath,
-        [
-          resolve(
-            import.meta.dirname,
-            '../../../scripts/verify-storybook-a11y-runner.mjs'
-          ),
-          directory,
-        ],
-        {
-          encoding: 'utf8',
-          env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
-        }
-      );
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('ENOENT');
-      expect(existsSync(resolve(directory, 'cli.json'))).toBe(false);
-      expect(existsSync(resolve(directory, 'findings.json'))).toBe(false);
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
+  it.each(['checkout', 'checkout with spaces #é'])(
+    'rejects stale receipts when a new runner in %s fails before writing any results',
+    checkoutName => {
+      const directory = mkdtempSync(resolve(tmpdir(), 'a11y-stale-receipts-'));
+      try {
+        const checkout = resolve(directory, checkoutName);
+        symlinkSync(
+          resolve(import.meta.dirname, '../../../../..'),
+          checkout,
+          'dir'
+        );
+        const old = observedPattern();
+        writeFileSync(resolve(directory, 'cli.json'), JSON.stringify(old.cli));
+        writeFileSync(
+          resolve(directory, 'findings.json'),
+          JSON.stringify(old.findings)
+        );
+        // Failure-path unit double only; actual Chromium controls run separately.
+        writeFileSync(resolve(directory, 'pnpm'), '#!/bin/sh\nexit 1\n', {
+          mode: 0o755,
+        });
+        const result = spawnSync(
+          process.execPath,
+          [
+            resolve(
+              checkout,
+              'apps/web/scripts/verify-storybook-a11y-runner.mjs'
+            ),
+            directory,
+          ],
+          {
+            encoding: 'utf8',
+            env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
+          }
+        );
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain('ENOENT');
+        expect(existsSync(resolve(directory, 'cli.json'))).toBe(false);
+        expect(existsSync(resolve(directory, 'findings.json'))).toBe(false);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
     }
-  });
+  );
 
   it('accepts real-addon healthy/warning/error pattern, including thrown-error metadata loss', () => {
     expect(verifyA11yRunnerControls(observedPattern())).toEqual({
