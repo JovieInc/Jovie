@@ -135,6 +135,9 @@ describe('workflow wiring', () => {
     expect(names.indexOf(gateStep.name)).toBeLessThan(
       names.indexOf(promote.name)
     );
+    expect(promote.if).toContain(
+      "steps.final-current.outputs.is_current == 'true'"
+    );
     expect(promote.if).toContain("steps.journey-gate.outcome == 'success'");
     expect(gateStep.run).toContain('promotion-gate-ci.mjs range');
     expect(gateStep.run).toContain('promotion-journey-gate.mjs');

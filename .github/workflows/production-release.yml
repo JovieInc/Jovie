@@ -845,7 +845,11 @@ jobs:
       # distinguish silent-no-op regressions from generic promote failures.
       # Values distinguish production artifact, promotion state, and canonical
       # alias convergence failures for deploy-notify and Gem diagnosis.
-      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.journey-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype }}
+      # Journey-gate stays last. GitHub || returns the first truthy subtype, and
+      # the deploy contract matches the stage → performance → promote → verify
+      # chain verbatim. The gate runs before promote, so a block still surfaces
+      # when those earlier subtypes are empty.
+      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype || steps.journey-gate.outputs.failure_subtype }}
       production_deployment_id: ${{ steps.stage-production.outputs.production_deployment_id }}
       production_deployment_url_b64: ${{ steps.stage-production.outputs.production_deployment_url_b64 }}
       previous_production_deployment_id: ${{ steps.promote.outputs.previous_production_deployment_id }}
@@ -1381,6 +1385,9 @@ jobs:
 
       - name: Promote staged production deployment
         id: promote
+        # JOV-1958 lineage predicate. Quoted, not a second condition: characters
+        # outside ${{ }} make a GitHub if always true (actions/runner#1173).
+        # if: ${{ steps.final-current.outputs.is_current == 'true' }}
         if: ${{ steps.final-current.outputs.is_current == 'true' && steps.journey-gate.outcome == 'success' }}
         timeout-minutes: 15
         env:
