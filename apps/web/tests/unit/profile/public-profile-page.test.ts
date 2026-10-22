@@ -10,7 +10,8 @@
  * Includes the small server-rendered recovery surface used by the page.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
@@ -72,7 +73,16 @@ const PUBLIC_PROFILE_TEMPLATE_SOURCE = readFileSync(
 type RedirectRule = {
   readonly source: string;
   readonly destination: string;
-  readonly permanent: boolean;
+  readonly permanent?: boolean;
+  readonly has?: readonly {
+    readonly type: string;
+    readonly key: string;
+    readonly value?: string;
+  }[];
+  readonly missing?: readonly {
+    readonly type: string;
+    readonly key: string;
+  }[];
 };
 
 type RewriteRule = Omit<RedirectRule, 'permanent'>;
@@ -84,6 +94,30 @@ const PRIVATE_PROFILE_MODE_PAGE_SOURCE = readFileSync(
   ),
   'utf8'
 );
+
+function collectStaticRoutes(directory: string): string[][] {
+  const routes: string[][] = [];
+  const walk = (current: string, segments: readonly string[]) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const isGroup =
+        entry.name.startsWith('(') ||
+        entry.name.startsWith('@') ||
+        entry.name.startsWith('_');
+      if (entry.isDirectory()) {
+        walk(
+          path.join(current, entry.name),
+          isGroup ? segments : [...segments, entry.name]
+        );
+        continue;
+      }
+      if (entry.name === 'page.tsx' || entry.name === 'route.ts') {
+        routes.push([...segments]);
+      }
+    }
+  };
+  walk(directory, []);
+  return routes;
+}
 
 function getAfterFilesRewrites(
   rewrites:
@@ -1039,15 +1073,76 @@ sourceDescribe('profile mode route redirects', () => {
     }
   });
 
-  it('does not shadow smart-link slugs with config-level redirects', async () => {
+  it('edge-redirects legacy aliases without stealing reserved roots or collisions', async () => {
     const nextConfigModule = await import('../../../next.config.js');
+    const redirectModule = await import(
+      '../../../lib/routing/legacy-profile-alias-redirects.js'
+    );
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as RedirectRule[];
     const profileRedirects = redirects.filter(rule =>
-      rule.source.startsWith('/:username/')
+      rule.source.startsWith('/:username(')
     );
+    const aliasModes = Object.entries(LEGACY_PROFILE_MODE_BY_SLUG);
+    const require = createRequire(import.meta.url);
+    const { pathToRegexp } = require('next/dist/compiled/path-to-regexp') as {
+      pathToRegexp: (source: string) => RegExp;
+    };
 
-    expect(profileRedirects).toEqual([]);
+    expect(redirectModule.LEGACY_PROFILE_MODE_ALIAS_MODES).toEqual(aliasModes);
+    expect(profileRedirects).toEqual(
+      redirectModule.legacyProfileAliasRedirects()
+    );
+    expect(profileRedirects).toHaveLength(aliasModes.length * 2);
+
+    for (const [alias, mode] of aliasModes) {
+      const [attributed, plain] = profileRedirects.filter(rule =>
+        rule.source.endsWith(`/${alias}`)
+      );
+      expect(attributed).toMatchObject({
+        destination: `/:username?mode=${mode}&source=:profileSource#alias=${alias}`,
+        permanent: false,
+        missing: [
+          { type: 'query', key: 'alias-content' },
+          { type: 'cookie', key: 'jovie_alias_content' },
+        ],
+      });
+      expect(plain).toMatchObject({
+        destination: `/:username?mode=${mode}#alias=${alias}`,
+        permanent: false,
+      });
+      expect(plain?.missing).toEqual([
+        { type: 'query', key: 'alias-content' },
+        { type: 'cookie', key: 'jovie_alias_content' },
+        { type: 'query', key: 'source' },
+      ]);
+      expect(plain?.has).toBeUndefined();
+
+      const matcher = pathToRegexp(plain?.source ?? '');
+      expect(matcher.test(`/dualipa/${alias}`)).toBe(true);
+      expect(matcher.test(`/app/${alias}`)).toBe(false);
+      expect(matcher.test(`/api/${alias}`)).toBe(false);
+      expect(matcher.test(`/investor-portal/${alias}`)).toBe(false);
+      expect(matcher.test(`/application/${alias}`)).toBe(true);
+    }
+
+    const aliasSlugs = new Set(aliasModes.map(([slug]) => slug));
+    const reservedRoots = new Set(
+      redirectModule.LEGACY_PROFILE_ALIAS_RESERVED_ROOTS
+    );
+    const staticAliasRoutes = collectStaticRoutes(
+      path.join(WEB_ROOT, 'app')
+    ).filter(
+      segments =>
+        segments.length === 2 &&
+        aliasSlugs.has(segments[1] ?? '') &&
+        segments.every(segment => !segment.startsWith('['))
+    );
+    expect(staticAliasRoutes.length).toBeGreaterThan(0);
+    for (const [root] of staticAliasRoutes) {
+      expect(reservedRoots.has(root ?? '')).toBe(true);
+    }
+    expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('<AliasCollisionRecovery');
   });
 
   it('routes legacy aliases through the collision-safe resolver after filesystem matches', async () => {

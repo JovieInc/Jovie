@@ -372,4 +372,5 @@ test('real repository .vercelignore parses and re-includes runtime files', () =>
   assert.equal(ignore.ignores('docs/screenshots/pitch-v1/deck.png'), true);
   assert.equal(ignore.ignores('apps/web/tests/quarantine.json'), false);
   assert.equal(ignore.ignores('apps/web/tests/e2e/foo.spec.ts'), true);
+  assert.equal(ignore.ignores('scripts/funnel-judge/trend.jsonl'), false);
 });

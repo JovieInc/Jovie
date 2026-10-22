@@ -143,9 +143,9 @@ function getDuplicateAliasSourceRedirect(
   const sources = req.nextUrl.searchParams.getAll('source');
   if (sources.length <= 1) return null;
 
-  // The established redirect helper keeps the first non-empty source. Next's
-  // rewrite matcher otherwise selects the last repeated value, so collapse the
-  // request once at the public boundary before it can become an ISR cache key.
+  // A single source=link|qr is an edge redirect and never gets here. Repeated
+  // sources still collapse to the first non-empty value. Next's rewrite
+  // matcher would otherwise keep the last one and turn it into an ISR key.
   const source = sources.find(value => value.length > 0);
   const canonicalUrl = req.nextUrl.clone();
   canonicalUrl.searchParams.delete('source');
