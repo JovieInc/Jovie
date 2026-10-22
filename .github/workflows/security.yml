@@ -244,6 +244,7 @@ jobs:
             exit 1
           fi
           TRUFFLEHOG_BIN="$trufflehog_bin" ./scripts/security/scan-secrets.test.sh
+          node --test scripts/security/prepare-ci-secret-scan-range.test.mjs
 
   trivy:
     name: Trivy Vulnerability Scanning
