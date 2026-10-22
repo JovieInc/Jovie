@@ -22,6 +22,7 @@ export function AdminVerificationRequired({
   return (
     <div
       role='status'
+      data-testid='admin-verification-required'
       className='flex flex-wrap items-center gap-2 text-app text-secondary-token'
     >
       <Fingerprint className='h-4 w-4 shrink-0' aria-hidden='true' />

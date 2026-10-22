@@ -248,7 +248,7 @@ function SettingsNavigation({
       <div>
         <span
           className={cn(
-            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
+            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted',
             SHELL_RAIL_LABEL
           )}
         >
@@ -259,7 +259,7 @@ function SettingsNavigation({
       <div>
         <span
           className={cn(
-            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
+            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted',
             SHELL_RAIL_LABEL
           )}
         >
