@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { describe, expect, it } from 'vitest';
 import {
   filterCriticalErrors,
+  isDestroyedExecutionContext,
   isExpectedError,
   isExpectedWarning,
   isTransientNavigationError,
@@ -121,6 +122,14 @@ describe('smoke-test-utils', () => {
           new Error('expect(locator).toBeVisible() failed')
         )
       ).toBe(false);
+    });
+
+    it('does not treat a destroyed execution context as a page-health redirect', () => {
+      const error = new Error(
+        'page.evaluate: Execution context was destroyed, most likely because of a navigation'
+      );
+      expect(isDestroyedExecutionContext(error)).toBe(true);
+      expect(isTransientNavigationError(error)).toBe(false);
     });
   });
 
