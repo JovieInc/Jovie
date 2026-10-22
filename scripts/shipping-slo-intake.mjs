@@ -13,6 +13,13 @@ const fail = reason => {
   throw Object.assign(new Error(reason), { reason });
 };
 
+// Same identity the historical SLO findings already use. A sha256 is 64 hex
+// characters, so this path never builds a Linear label and cannot hit the
+// 80-character label-name limit.
+export function sloFingerprint(repo, metric) {
+  return hash(JSON.stringify(['shipping-slo', repo, metric]));
+}
+
 export async function upsertSloFinding(
   { repo, metric, title, body, runUrl },
   { apiKey = process.env.LINEAR_API_KEY, fetchImpl = fetch } = {}
@@ -40,7 +47,7 @@ export async function upsertSloFinding(
     }
     return result.data.data;
   };
-  // Use the current SLO owner's team, triage state and assignee; no GitHub fallback.
+  // Use the current SLO owner's team, triage state and assignee. No GitHub issue fallback.
   const { issue: owner } = await request(
     `query ShippingSloOwner {
     issue(id: "JOV-6783") {
@@ -57,7 +64,7 @@ export async function upsertSloFinding(
   if (!owner?.id || !owner.team?.id || !triage?.id)
     fail('owner_routing_missing');
 
-  const fingerprint = hash(JSON.stringify(['shipping-slo', repo, metric]));
+  const fingerprint = sloFingerprint(repo, metric);
   // Plain markers survive Linear's Markdown normalization.
   const marker = `Shipping SLO fingerprint: ${fingerprint}`;
   const observation = `Shipping SLO observation: ${hash(runUrl)}`;
@@ -185,8 +192,12 @@ export async function upsertSloFinding(
 
 export async function deliverReport(
   report,
-  { repo, runUrl },
-  dependencies = {}
+  { repo, runUrl, apiKey, fetchImpl } = /** @type {{
+    repo?: string,
+    runUrl?: string,
+    apiKey?: string,
+    fetchImpl?: typeof fetch,
+  }} */ ({})
 ) {
   const findings = (report.evaluation?.regressions ?? []).map(row => ({
     metric: row.key,
@@ -237,7 +248,10 @@ export async function deliverReport(
     try {
       receipt.findings.push({
         status: 'succeeded',
-        ...(await upsertSloFinding({ ...finding, repo, runUrl }, dependencies)),
+        ...(await upsertSloFinding(
+          { ...finding, repo, runUrl },
+          { apiKey, fetchImpl }
+        )),
       });
     } catch (error) {
       receipt.status = 'failed';

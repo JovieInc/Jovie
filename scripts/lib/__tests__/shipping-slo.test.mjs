@@ -4,7 +4,11 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { describe, expect, it, vi } from 'vitest';
-import { deliverReport, upsertSloFinding } from '../../shipping-slo-intake.mjs';
+import {
+  deliverReport,
+  sloFingerprint,
+  upsertSloFinding,
+} from '../../shipping-slo-intake.mjs';
 import { buildReport, collectRaw } from '../../shipping-slo-report.mjs';
 import { fakeLinear } from './fixtures/shipping-slo-fake-linear.mjs';
 
@@ -456,12 +460,47 @@ describe('shipping SLO intake delivery', () => {
     offenders: { slowestPrs: [], slowestCiRuns: [] },
   });
   const run = (state, id = 'oct05', input = report()) =>
-    deliverReport(
-      input,
-      { repo, runUrl: `https://github.com/${repo}/actions/runs/${id}` },
-      { apiKey: 'slo-test-key', fetchImpl: fakeLinear(state) }
-    );
+    deliverReport(input, {
+      repo,
+      runUrl: `https://github.com/${repo}/actions/runs/${id}`,
+      apiKey: 'slo-test-key',
+      fetchImpl: fakeLinear(state),
+    });
 
+  it('keeps merge-queue metric identity in a stable 64-hex fingerprint', () => {
+    const fingerprint = sloFingerprint(repo, 'merge_queue.wait.p95');
+    expect(fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(fingerprint).toBe(sloFingerprint(repo, 'merge_queue.wait.p95'));
+    expect(fingerprint).not.toBe(sloFingerprint(repo, 'lead_time.codex.p95'));
+  });
+  it('files merge_queue.wait.p95 in Linear and dedupes the next run using delivery options', async () => {
+    const state = makeState();
+    const input = report('merge_queue.wait.p95');
+    expect((await run(state, '39782428315', input)).findings[0]).toMatchObject({
+      action: 'created',
+      issue: 'JOV-9001',
+      fingerprint: sloFingerprint(repo, 'merge_queue.wait.p95'),
+    });
+    const original = state.issues[0].description;
+    expect((await run(state, 'next', input)).findings[0]).toMatchObject({
+      action: 'observed',
+      issue: 'JOV-9001',
+    });
+    expect((await run(state, 'next', input)).findings[0].action).toBe(
+      'replayed'
+    );
+    expect(state.issues).toHaveLength(1);
+    expect(state.issues[0].description).toBe(original);
+    expect(state.issues[0].comments).toEqual([
+      expect.objectContaining({
+        body: expect.stringContaining('/actions/runs/next'),
+      }),
+    ]);
+    expect(
+      state.calls.filter(call => call.query.includes('ShippingSloCreate'))
+    ).toHaveLength(1);
+    expect(state.calls.some(call => /label/i.test(call.query))).toBe(false);
+  });
   it('delivers to the current Linear SLO owner with no labels, appends runs once and replays safely', async () => {
     const state = makeState();
     expect(await run(state)).toMatchObject({
@@ -527,11 +566,12 @@ describe('shipping SLO intake delivery', () => {
   );
   it('missing credentials or owner routing never falls back to GitHub', async () => {
     const state = makeState();
-    const receipt = await deliverReport(
-      report(),
-      { repo, runUrl: `https://github.com/${repo}/actions/runs/1` },
-      { apiKey: '', fetchImpl: fakeLinear(state) }
-    );
+    const receipt = await deliverReport(report(), {
+      repo,
+      runUrl: `https://github.com/${repo}/actions/runs/1`,
+      apiKey: '',
+      fetchImpl: fakeLinear(state),
+    });
     expect(receipt.findings[0].reason).toBe('missing_linear_api_key');
     expect(state.calls).toHaveLength(0);
     state.owner = null;
@@ -640,7 +680,7 @@ describe('shipping SLO intake delivery', () => {
         parseYaml(WORKFLOW)
       );
     const step = workflow.jobs.measure.steps.find(
-      step => step.name === 'File deduped Linear SLO regressions'
+      step => step.name === 'File deduped slo-regression issues'
     );
     expect(step.env.LINEAR_API_KEY).toBe('${{ secrets.LINEAR_API_KEY }}');
     expect(step.env.GH_TOKEN).toBeUndefined();
