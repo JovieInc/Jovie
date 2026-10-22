@@ -178,6 +178,11 @@ describe('server analytics contract', () => {
   });
 
   it('keeps attribution groupings without storing public query text', async () => {
+    const occurredAt = new Date('2026-10-22T15:47:25.415Z');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // Reproduce the audit failure when the timestamp contains the phone prefix.
+    vi.setSystemTime(occurredAt);
+
     await trackServerEvent('smart_link_clicked', {
       profileId: 'attacker@example.com',
       releaseId: RELEASE_ID,
@@ -192,14 +197,15 @@ describe('server analytics contract', () => {
 
     expect(mocks.values).toHaveBeenCalledWith(
       expect.objectContaining({
-        properties: expect.objectContaining({
+        properties: {
           provider: 'spotify',
           releaseId: RELEASE_ID,
           utm_source: 'instagram',
           utm_medium: 'social',
           utm_content: 'other',
           utm_campaign_matches_release: true,
-        }),
+        },
+        occurredAt,
         sourceEntityId: RELEASE_ID,
         sourceEntityType: 'release',
       })
@@ -207,7 +213,6 @@ describe('server analytics contract', () => {
     expect(JSON.stringify(mocks.values.mock.calls[0])).not.toContain(
       'attacker@example.com'
     );
-    expect(JSON.stringify(mocks.values.mock.calls[0])).not.toContain('415');
   });
 
   it('normalizes country codes and never source-links notification payloads', async () => {

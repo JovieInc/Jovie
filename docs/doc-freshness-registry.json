@@ -95,12 +95,12 @@
     ".claude/rules/environment.md": {
       "owner": "@itstimwhite",
       "claim": "Runtime versions follow the checked-in pins. Branch switches stop the local dev server; competing editor writes are resolved before committing, as recorded in the corresponding lessons.",
-      "documentSha256": "05cf43adb22321fcf70cff341154d3224d082533dde122784b4bd524a86de9ea",
+      "documentSha256": "c4a1143e376d69e48921178c88186d4c47f365c0b837140e8fc459c3e6122cfa",
       "sources": [
         {
           "path": ".nvmrc",
-          "documentValue": "24.21.0",
-          "sha256": "73fb1b615e2043a933be1c0895cde4358036acc28d785692509b822aa53c761f"
+          "documentValue": "24.22.1",
+          "sha256": "d9f318747a126ce2247661af67852b185def7789492eabfad7bba322be087c33"
         },
         {
           "path": "package.json",
@@ -384,7 +384,7 @@
     "CODEX.md": {
       "owner": "@itstimwhite",
       "claim": "Local hooks reference canonical setup and cleanup wrappers, with Node pinned locally.",
-      "documentSha256": "1f321d71333739508b611c530b0f08e9ce29ed63220642370942873aa779ae7f",
+      "documentSha256": "0e48aae82be60bac72a8f0f7b934435c99648d45939f58cd9273a4f1895ea6ee",
       "sources": [
         {
           "path": ".codex/hooks.json",
@@ -392,8 +392,8 @@
         },
         {
           "path": ".nvmrc",
-          "documentValue": "24.21.0",
-          "sha256": "73fb1b615e2043a933be1c0895cde4358036acc28d785692509b822aa53c761f"
+          "documentValue": "24.22.1",
+          "sha256": "d9f318747a126ce2247661af67852b185def7789492eabfad7bba322be087c33"
         }
       ]
     },

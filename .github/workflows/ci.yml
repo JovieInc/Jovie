@@ -162,7 +162,7 @@ jobs:
             --volume "$PWD:/repo:ro" \
             "$IMAGE_TAG" -lc '
               set -euo pipefail
-              test "$(node --version)" = v24.21.0
+              test "$(node --version)" = v24.22.1
               test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.9
 
               dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
@@ -291,7 +291,7 @@ jobs:
           assert_line 'pnpm store path' 'pnpm_store_path=/opt/jovie-pnpm-store' "$dependency_status"
           assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
           assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
-          assert_equal 'Node version' v24.21.0 "$(node --version)"
+          assert_equal 'Node version' v24.22.1 "$(node --version)"
           assert_equal 'pnpm version' 9.15.9 "$(pnpm --version)"
           assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
           assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
@@ -6429,7 +6429,12 @@ jobs:
     outputs:
       journey_outcome: ${{ steps.canonical_journey.outcome }}
       certification_outcome: ${{ steps.canonical_certification.outcome }}
-    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      # Preview – jovie secret STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY is
+      # the active test-mode USD 1200/month price. The assertion stays
+      # fail-closed; true reports a contract breach instead of a missing secret.
+      FEATURE_STRIPE_TEST_PRICE_CONFIGURED: 'true'
     # Scope pending replacement to one PR. GitHub replaces the older pending job in
     # a constant concurrency group even when cancel-in-progress is false, which can
     # cancel a required check before it obtains a runner. Golden-path cleanup only

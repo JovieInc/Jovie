@@ -86,34 +86,41 @@ export async function observeGithubWorkflow(
   const branch = receipt.branch
     ? `&branch=${encodeURIComponent(receipt.branch)}`
     : '';
-  const base = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=30${branch}`;
+  const base = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs`;
   const events = receipt.events ?? null;
-  // Filter by event server-side: a busy push/PR workflow would otherwise
-  // push its scheduled runs out of the 30-run window (security.yml, 2026-10-21).
-  const urls = events
-    ? events.map(event => `${base}&event=${encodeURIComponent(event)}`)
-    : [base];
+  const acceptsRun = row =>
+    conclusions.includes(row?.conclusion) &&
+    (!events || events.includes(row?.event));
   const runs = [];
-  for (const url of urls) {
-    const read = await readJson(fetchImpl, url, githubHeaders(token));
-    if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
-    if (!Array.isArray(read.body?.workflow_runs))
-      return { ok: false, reason: 'github-runs-unreadable' };
-    runs.push(...read.body.workflow_runs);
+  // A single completed-run page can be empty transiently (JOV-8832), or
+  // crowded with skipped/cancelled runs. Before declaring silence, confirm
+  // with one bounded lookup per accepted conclusion. Healthy reads stay cheap.
+  for (const statuses of [['completed'], conclusions]) {
+    const urls = statuses.flatMap(status => {
+      const query = `${base}?status=${encodeURIComponent(status)}&per_page=30${branch}`;
+      // Keep trigger filtering server-side so pushes cannot hide scheduled runs.
+      return events
+        ? events.map(event => `${query}&event=${encodeURIComponent(event)}`)
+        : [query];
+    });
+    for (const url of urls) {
+      const read = await readJson(fetchImpl, url, githubHeaders(token));
+      if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
+      if (!Array.isArray(read.body?.workflow_runs))
+        return { ok: false, reason: 'github-runs-unreadable' };
+      runs.push(...read.body.workflow_runs);
+    }
+    if (runs.some(acceptsRun)) break;
   }
   runs.sort((a, b) =>
     String(b?.updated_at ?? '').localeCompare(String(a?.updated_at ?? ''))
   );
-  const run = runs.find(
-    row =>
-      conclusions.includes(row?.conclusion) &&
-      (!events || events.includes(row?.event))
-  );
+  const run = runs.find(acceptsRun);
   if (!run)
     return {
       ok: true,
       lastProofAt: null,
-      reason: `no-${conclusions.join('-or-')}${events ? `-${events.join('-or-')}` : ''}-run-in-last-30`,
+      reason: `no-${conclusions.join('-or-')}${events ? `-${events.join('-or-')}` : ''}-run-found`,
     };
   return {
     ok: true,

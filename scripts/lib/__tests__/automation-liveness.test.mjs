@@ -1078,6 +1078,134 @@ describe('dead-man liveness', () => {
 });
 
 describe('liveness run receipts', () => {
+  // JOV-8832: run 39808881974 reported no M2 runs despite daily successes.
+  // It also disagreed with itself about identical continuity receipts.
+  it.each([
+    ['github:jovie:m2-revenue-path-canary', false],
+    ['github:jovie:m2-revenue-path-canary', true],
+    ['github:jovie:production-continuity', false],
+    ['github:jovie:production-continuity', true],
+  ])(
+    'confirms an empty or skipped-only history for %s (skipped=%s)',
+    async (id, skipped) => {
+      const seen = [];
+      const { report, events } = await runLiveness({
+        registry: only(id),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          '/runs?': url => {
+            const query = new URL(url).searchParams;
+            seen.push(query);
+            if (query.get('status') === 'success')
+              return runs([10, 'success', 1]);
+            if (query.get('status') === 'failure')
+              return runs([2, 'failure', 2]);
+            return skipped
+              ? runs(
+                  ...Array.from({ length: 30 }, (_, i) => [
+                    1,
+                    'skipped',
+                    100 + i,
+                  ])
+                )
+              : runs();
+          },
+        }),
+      });
+      expect(rowFor(report, id)).toMatchObject({
+        status: 'fresh',
+        lastProofAt: iso(2),
+        url: 'https://github.com/JovieInc/Jovie/actions/runs/2',
+      });
+      expect(events.map(row => row.outcome)).toEqual(['advanced', 'failed']);
+      expect(
+        livenessDecisions(report, { [livenessFingerprint(id)]: 'red' })
+      ).toEqual([expect.objectContaining({ action: 'green', id })]);
+      expect(seen.map(query => query.get('status'))).toEqual([
+        'completed',
+        'success',
+        'failure',
+      ]);
+      expect(seen.every(query => query.get('branch') === 'main')).toBe(true);
+    }
+  );
+
+  it('keeps confirmed absence and old heartbeats red with bounded reads', async () => {
+    const id = 'github:jovie:m2-revenue-path-canary';
+    for (const stale of [false, true]) {
+      let reads = 0;
+      const { report } = await runLiveness({
+        registry: only(id),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          '/runs?': url => {
+            reads += 1;
+            return stale &&
+              new URL(url).searchParams.get('status') === 'success'
+              ? runs([4000, 'success', 1])
+              : runs();
+          },
+        }),
+      });
+      expect(reads).toBe(3);
+      expect(rowFor(report, id)).toMatchObject({
+        status: stale ? 'stale' : 'missing',
+        lastProofAt: stale ? iso(4000) : null,
+      });
+      expect(livenessDecisions(report)[0].action).toBe('red');
+    }
+  });
+
+  it.each([
+    [503, 'github-http-503'],
+    [{}, 'github-runs-unreadable'],
+    [new Response('not-json'), 'github-transport'],
+  ])('keeps unreadable confirmation red (%j)', async (response, reason) => {
+    const id = 'github:jovie:m2-revenue-path-canary';
+    const { report } = await runLiveness({
+      registry: only(id),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        '/runs?': url =>
+          new URL(url).searchParams.get('status') === 'completed'
+            ? runs()
+            : response,
+      }),
+    });
+    expect(rowFor(report, id)).toMatchObject({ status: 'unknown', reason });
+    expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
+  it('preserves trigger filters while confirming a missing scheduled heartbeat', async () => {
+    const seen = [];
+    const { report } = await runLiveness({
+      registry: only('github:jovie:security'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'security.yml/runs': url => {
+          const query = new URL(url).searchParams;
+          seen.push(query);
+          return query.get('status') === 'success' &&
+            query.get('event') === 'schedule'
+            ? runs([1, 'success', 2, 'push'], [120, 'success', 1, 'schedule'])
+            : runs();
+        },
+      }),
+    });
+    expect(rowFor(report, 'github:jovie:security')).toMatchObject({
+      status: 'fresh',
+      lastProofAt: iso(120),
+    });
+    expect(seen).toHaveLength(4);
+    expect(seen.every(query => query.get('branch') === 'main')).toBe(true);
+    expect(seen.map(query => query.get('event'))).toEqual([
+      'schedule',
+      'workflow_dispatch',
+      'schedule',
+      'workflow_dispatch',
+    ]);
+  });
+
   it('reads scheduled runs that 30 newer push runs would hide', async () => {
     const pushes = Array.from({ length: 30 }, (_, i) => [
       i + 1,
@@ -1101,13 +1229,17 @@ describe('liveness run receipts', () => {
   });
 
   it('emits receipts for observed runs during a liveness pass', async () => {
+    const fetchImpl = vi.fn(
+      fakeFetch({
+        'production-continuity.yml/runs': runs([2, 'failure', 7]),
+      })
+    );
     const { events } = await runLiveness({
       registry: only('github:jovie:production-continuity'),
       nowMs: NOW,
-      fetchImpl: fakeFetch({
-        'production-continuity.yml/runs': runs([2, 'failure', 7]),
-      }),
+      fetchImpl,
     });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(events.map(row => [row.stage, row.outcome])).toEqual([
       ['started', 'advanced'],
       ['finished', 'failed'],
