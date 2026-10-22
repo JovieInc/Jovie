@@ -20,8 +20,10 @@ from typing import Callable, Optional
 
 from .policy import LEDGER_SCHEMA, empty_ledger, prune_ledger
 
-LOCK_STALE_MS = 10_000
-LOCK_TIMEOUT_MS = 2_000
+LOCK_STALE_MS = 10_000  # a lock dir older than this belongs to a crashed holder
+LOCK_TIMEOUT_MS = 5_000  # wait this long for another process, then run without persisting
+_PROCESS_LOCKS: dict = {}
+_PROCESS_LOCKS_GUARD = threading.Lock()
 
 
 def now_ms() -> int:
@@ -75,11 +77,60 @@ class MemoryLedgerStore:
         return json.loads(json.dumps(self._ledgers.get(provider) or empty_ledger(provider)))
 
 
+def _wall_ms() -> int:
+    return int(time.time() * 1000)
+
+
+def _claim_owner(path: Path) -> Optional[str]:
+    """Exclusive-create the owner file in the lock dir we just made; None if we lost it."""
+    token = f"{os.getpid()}-{uuid.uuid4()}"
+    try:
+        fd = os.open(str(path / "owner"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except (FileExistsError, FileNotFoundError):
+        return None
+    with os.fdopen(fd, "w") as handle:
+        handle.write(token)
+    return token
+
+
+def _is_stale(path: Path) -> bool:
+    try:
+        return _wall_ms() - path.stat().st_mtime * 1000 > LOCK_STALE_MS
+    except OSError:
+        return False  # released between mkdir and stat
+
+
+def _break_stale(path: Path) -> None:
+    """Only the holder of <lock>.break may remove a stale lock, and only if it is still stale."""
+    breaker = path.with_name(path.name + ".break")
+    try:
+        os.mkdir(breaker, 0o700)
+    except FileExistsError:
+        if _is_stale(breaker):
+            shutil.rmtree(breaker, ignore_errors=True)
+        time.sleep(0.005)
+        return
+    try:
+        if _is_stale(path):
+            shutil.rmtree(path, ignore_errors=True)
+    finally:
+        shutil.rmtree(breaker, ignore_errors=True)
+
+
 class FileLedgerStore:
-    def __init__(self, root=None, now: Callable[[], int] = now_ms):
+    """Lock protocol shared with store.ts: see the FileLedgerStore comment there.
+
+    mkdir lock + owner token, stale locks broken under <lock>.break after a re-check,
+    and on timeout the transaction runs on a fresh read but is not persisted. Threads
+    in one process queue on an in-process lock first.
+    """
+
+    def __init__(self, root=None, now: Callable[[], int] = now_ms, lock_timeout_ms: int = LOCK_TIMEOUT_MS):
         self.dir = Path(root if root is not None else default_state_root()) / "api-ledger"
         self.now = now
-        self._warned = False
+        self.lock_timeout_ms = lock_timeout_ms
+        # Transactions that ran without persisting after a lock timeout (see store.ts).
+        self.unpersisted = 0
 
     def path(self, provider: str) -> Path:
         return self.dir / f"{provider}.json"
@@ -96,41 +147,51 @@ class FileLedgerStore:
     def transact(self, provider: str, fn: Callable[[dict], object]):
         self.dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         lock = self.dir / f"{provider}.lock.d"
-        held = self._lock(lock)
-        try:
-            ledger = self.read(provider)
-            result = fn(ledger)
-            prune_ledger(ledger, self.now())
-            write_json_atomic(self.path(provider), ledger)
-            return result
-        finally:
-            if held:
-                shutil.rmtree(lock, ignore_errors=True)
+        with _PROCESS_LOCKS_GUARD:
+            local = _PROCESS_LOCKS.setdefault(str(lock), threading.RLock())
+        with local:
+            token = self._lock(lock)
+            try:
+                ledger = self.read(provider)
+                result = fn(ledger)
+                if token:
+                    prune_ledger(ledger, self.now())
+                    write_json_atomic(self.path(provider), ledger)
+                return result
+            finally:
+                if token:
+                    self._release(lock, token)
 
-    def _lock(self, path: Path) -> bool:
-        """mkdir is atomic; a stale lock is renamed away so only one breaker wins."""
-        deadline = self.now() + LOCK_TIMEOUT_MS
+    def _lock(self, path: Path) -> Optional[str]:
+        """Returns the owner token, or None after a timeout (caller must not persist)."""
+        deadline = _wall_ms() + self.lock_timeout_ms
         while True:
             try:
                 os.mkdir(path, 0o700)
-                return True
             except FileExistsError:
                 pass
-            try:
-                if self.now() - path.stat().st_mtime * 1000 > LOCK_STALE_MS:
-                    stale = path.with_name(f"{path.name}.stale-{os.getpid()}-{uuid.uuid4()}")
-                    os.rename(path, stale)
-                    shutil.rmtree(stale, ignore_errors=True)
-                    continue
-            except OSError:
-                continue  # released between mkdir and stat
-            if self.now() > deadline:
-                if not self._warned:
-                    self._warned = True
-                    sys.stderr.write(json.dumps({"schema": "jovie.api-client.lock/v1", "lock": str(path),
-                                                 "outcome": "timeout-unlocked"}) + "\n")
-                return False
+            else:
+                token = _claim_owner(path)
+                if token:
+                    return token
+            if _is_stale(path):
+                _break_stale(path)
+                continue
+            if _wall_ms() > deadline:
+                self.unpersisted += 1
+                sys.stderr.write(json.dumps({"schema": "jovie.api-client.lock/v1", "lock": str(path),
+                                             "outcome": "timeout-unpersisted", "count": self.unpersisted}) + "\n")
+                return None
             time.sleep((5 + random.randint(0, 19)) / 1000)
+
+    @staticmethod
+    def _release(path: Path, token: str) -> None:
+        try:
+            owner = (path / "owner").read_text()
+        except OSError:
+            return
+        if owner == token:
+            shutil.rmtree(path, ignore_errors=True)
 
 
 def default_store(env=None):

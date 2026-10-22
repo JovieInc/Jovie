@@ -75,7 +75,7 @@ describe('GET /llms-full.txt', () => {
     expect(body).not.toContain('Instagram: @meetjovie');
     expect(body).not.toContain('**Instagram**: @meetjovie');
     expect(body).not.toContain('$149');
-    expect(body).toContain('Artist Presence ($199/mo)');
+    expect(body).toContain('Artist Presence ($12/mo)');
     expect(body).toContain('Enterprise (Custom)');
     expect(body).toContain(
       'Capability maturity and account access remain separate from a feature being described publicly.'

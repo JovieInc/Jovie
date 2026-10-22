@@ -6,9 +6,10 @@
  *   - "Accept all" and "Reject all" are same-layer, equally prominent, and clickable
  *   - "Customize" button opens the modal which contains "Save Preferences"
  *
- * The banner is only rendered when `jv_cc_required=1` cookie is present
- * (set by middleware for EU/EEA visitors). For smoke purposes we set it
- * programmatically via addCookies so the test is deterministic.
+ * The banner is only rendered when `jv_cc_required=1` is visible to
+ * `document.cookie`. Middleware sets that for EU/EEA visitors. This spec
+ * also writes the cookie from an init script because Firefox does not
+ * expose the Playwright cookie jar to document.cookie on http://127.0.0.1.
  *
  * Run:
  *   doppler run -- pnpm --filter web exec playwright test cookies.spec --project=chromium
@@ -33,13 +34,14 @@ async function openPublicPathWithBanner(
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
 
   // Remove stored consent so the banner renders even on repeat runs
-  await page.addInitScript(() => {
+  await page.addInitScript(cookieName => {
     try {
       localStorage.removeItem('jv_cc');
     } catch {
       // ignore
     }
-  });
+    document.cookie = `${cookieName}=1; Path=/; SameSite=Lax`;
+  }, CONSENT_REQUIRED_COOKIE);
 
   // Middleware refreshes the region flag on every request. Send the same
   // deterministic EU geo signal used by production edge requests so it cannot
@@ -293,9 +295,13 @@ test.describe('Cookie banner @smoke', () => {
         await menuButton.click();
         const mobileNav = page.locator('#mobile-nav-panel');
         await expect(mobileNav).toBeVisible();
-        await expect(
-          mobileNav.getByRole('link', { name: 'Get started', exact: true })
-        ).toBeVisible();
+        // Homepage header CTA (EVENT 2026-10-20): "Claim your profile" -> /start.
+        const frontDoor = mobileNav.getByRole('link', {
+          name: 'Claim your profile',
+          exact: true,
+        });
+        await expect(frontDoor).toBeVisible();
+        await expect(frontDoor).toHaveAttribute('href', '/start');
       }
     });
   }

@@ -41,7 +41,7 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 
 ### GITHUB_TOKEN budget per group
 
-Every workflow in the repo shares one GITHUB_TOKEN REST bucket (1,000 calls/h),
+Default-branch workflows share one GITHUB_TOKEN REST bucket (5,000 calls/h, measured 2026-10-21 by the `api-quota` notices; demand was ~4,500/h),
 and each rebuild runs a group's CI again. In a green merge group, ci.yml jobs
 other than Merge Group Admission spend no REST calls. Their token-bearing steps
 only authenticate git fetches, which are git traffic and not REST, or they never
@@ -58,7 +58,7 @@ is classified, and the green-group total must stay at 5 or less.
 A failed merge-group lane used to post a failing `PR Ready` commit status
 immediately (`ejected before the slowest lane`). GitHub ejected that entry and
 rebuilt every group behind it. Each rebuild ran PR Size Guard and Merge Group
-Admission again on the shared GITHUB_TOKEN bucket (1,000 REST calls/hour),
+Admission again on the shared GITHUB_TOKEN bucket (5,000 REST calls/hour),
 which is what exhausted the quota before the hourly reset. A red lane no longer
 posts that status. `ci-merge-group-ready` still runs with `always()` and fails
 `PR Ready` when the group is actually red, so the entry is ejected once, after
@@ -88,14 +88,14 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
 - Minimum entries to merge: `1`.
 - Minimum entries wait: `0` minutes. A source-green PR forms a group
   immediately instead of waiting for a cohort.
-- Maximum entries per merge: `5`. Each entry still builds its own synthetic
+- Maximum entries per merge: `10`. Each entry still builds its own synthetic
   head layered on the entry ahead (one member per group), so per-member lanes
-  and member policy are unchanged; up to five green entries land in one push.
-- Maximum entries building concurrently: checked-in ceiling `6`. Lower live
+  and member policy are unchanged; up to ten green entries land in one push.
+- Maximum entries building concurrently: checked-in ceiling `10`. Lower live
   values remain supported as a reversible runner-capacity brake. Raise the
   file and the live ruleset together.
-- Check response timeout: `60` minutes (source-first cutover and live readback
-  verified 2026-09-24). Required checks and ALLGREEN remain unchanged.
+- Check response timeout: `20` minutes (Tim-approved tuning and live readback
+  verified 2026-10-21). Required checks and ALLGREEN remain unchanged.
 - Production health governs deployment and promotion through the existing
   production controls. Native source admission uses the required checks above;
   the retired Auto-Enroll fleet gate does not create a second admission gate.
@@ -131,14 +131,18 @@ inside each per-member synthetic head. The trusted changed-path classifier runs
 only the selected Web, Mac, iOS, operations/tooling, and shared-contract lanes,
 so a fast-only change does not inherit an unrelated PR's slow product lane.
 
-**Ship now:** immediate groups (`min=1`, `wait=0`), up to five green entries
-per merge push, six building concurrently, ALLGREEN. HEADGREEN is unsafe here:
+**Ship now:** immediate groups (`min=1`, `wait=0`), up to ten green entries
+per merge push, ten building concurrently, ALLGREEN, 20-minute check response
+budget (2026-10-21, Tim-approved; 3 of 287 group runs exceeded 20 minutes in
+the first 12 hours, with no timeout removals). HEADGREEN is unsafe here:
 member policy validates only the newest member and lanes are path-selected per
 member, so an earlier member could land without its own lanes passing.
 **Re-evaluate when:** the group failure rate stays under 10% and the repo
-GITHUB_TOKEN bucket stays healthy for a day. **Then:** raise
-`max_entries_to_build` toward 8 in this file and the live ruleset together,
-watching hosted macOS pickup (the org shares five hosted macOS slots).
+GITHUB_TOKEN bucket stays healthy for a day. **Then:** keep 10/10; if
+merge-group runs selecting the 30/40-minute iOS or Mac lanes start timing out
+at the 20-minute response budget (the 2026-09-23 failure mode), raise the
+budget in this file and the live ruleset together, watching hosted macOS pickup
+(the org shares five hosted macOS slots).
 
 ### Tuning log
 
@@ -149,6 +153,8 @@ watching hosted macOS pickup (the org shares five hosted macOS slots).
 | 2026-10-13 02:37 | live `max_entries_to_build` 6 → 8 | throughput |
 | 2026-10-13 03:47 | live `max_entries_to_build` 8 → 6 | GITHUB_TOKEN quota storm |
 | 2026-10-13 | source synced to live (build 6, merge 5) | keep the daily verify green |
+| 2026-10-21 04:47 | live `max_entries_to_build` 6 → 10, `max_entries_to_merge` 5 → 10, `check_response_timeout_minutes` 60 → 20 (Tim-approved) | queue 40 deep at ~5 merges/h; stuck checks held the head for an hour |
+| 2026-10-21 | source synced to live (build 10, merge 10, timeout 20) | keep the daily verify green (JOV-8205) |
 
 ## Reconciliation and loop prevention
 
@@ -306,6 +312,20 @@ runtime behavior, or Summer commissioning.
   merge-group attempts per merge plus deterministic same-head recurrence.
 - Emergency response: inspect the native ruleset and exact queue entry,
   repair the source or required check, and prove a fresh native canary.
+- Groups stuck in AWAITING_CHECKS with a CI run named
+  `.github/workflows/ci.yml`, zero jobs and event `push` on the
+  `gh-readonly-queue/*` ref: GitHub could not load ci.yml, so no merge_group
+  check reports. The known cause is an interpolated `run:` script whose
+  `format()` expression exceeds GitHub's 21,000-character limit (2026-10-20,
+  #21826). `node scripts/workflow-expression-budget.mjs --ref HEAD --merge-with
+  origin/main` reproduces it. Source Validation runs that check on the head and
+  its merge with main. In the queue, PR Size Guard's `Workflow Load Guard` job
+  ("Require combined-head workflows to load") fails only for the group that
+  introduced it; a group stacked on an already broken base passes. The failure
+  hold then records `jovie-queue-failure-hold/v1` on the exact source head and
+  reports `PR Ready` failed on the synthetic group head, so the queue ejects it
+  at once. The ruleset's 20-minute check response timeout remains the backstop
+  for any other cause.
 
 ## Queue freeze (queue-watch runbook)
 

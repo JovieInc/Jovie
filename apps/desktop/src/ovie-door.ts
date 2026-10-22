@@ -2,8 +2,10 @@
 
 export const PRODUCTION_DESKTOP_APP_ID = 'app.jov.ie' as const;
 export const STAGING_DESKTOP_APP_ID = 'app.jov.ie.staging' as const;
-export const OVIE_OPERATOR_TALK_ROUTE = '/app/ov/chat' as const;
-export const OVIE_OPERATOR_OPS_ROUTE = '/hud' as const;
+// Both doors open Ovie Home (founder decision 2026-10-20): one composer and
+// the living canvas. `ovie=mac` stays as the packaged-door marker.
+export const OVIE_OPERATOR_TALK_ROUTE = '/app/ov' as const;
+export const OVIE_OPERATOR_OPS_ROUTE = '/app/ov' as const;
 export const OVIE_OPERATOR_OPS_SEARCH = 'ovie=mac' as const;
 export const CUSTOMER_JOVIE_ENTRY_ROUTE = '/app/chat' as const;
 

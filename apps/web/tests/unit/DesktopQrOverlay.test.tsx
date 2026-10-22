@@ -70,7 +70,10 @@ describe('DesktopQrOverlay', () => {
       expect.stringContaining('api.qrserver.com')
     );
     expect(qrCode.getAttribute('src')).toContain('testartist');
-    expect(qrCode.closest('[popover="manual"]')).not.toBeNull();
+    const card = qrCode.closest('[popover="manual"]');
+    expect(card).not.toBeNull();
+    // The pay drawer's modal focus boundary must leave this card usable.
+    expect(card).toHaveAttribute('data-modal-companion');
     window.history.pushState({}, '', '/');
   });
 

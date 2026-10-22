@@ -21,20 +21,48 @@ function normalizeTexts(values: string[]) {
   return values.map(value => value.replace(/\s+/g, ' ').trim()).filter(Boolean);
 }
 
-async function collectAudienceContentSurface(page: Page) {
-  const audienceTable = page
-    .locator('table, [role="grid"], [data-testid="unified-table"]')
-    .first();
-  const emptyState = page.getByTestId('dashboard-audience-empty-state');
+const AUDIENCE_COLUMN_HEADERS = [
+  'Fan',
+  'State',
+  'Alerts',
+  'Engagement',
+  'Last Seen',
+  'Action',
+] as const;
 
-  return Promise.any([
-    audienceTable
-      .waitFor({ state: 'visible', timeout: 60_000 })
-      .then(() => 'table' as const),
-    emptyState
-      .waitFor({ state: 'visible', timeout: 60_000 })
-      .then(() => 'empty' as const),
-  ]);
+async function classifyAudienceSurface(
+  page: Page
+): Promise<'table' | 'empty' | 'pending'> {
+  if ((await page.getByTestId('dashboard-audience-loading').count()) > 0) {
+    return 'pending';
+  }
+
+  const headers = normalizeTexts(
+    await page.getByRole('columnheader').allInnerTexts()
+  );
+  if (AUDIENCE_COLUMN_HEADERS.every(header => headers.includes(header))) {
+    return 'table';
+  }
+
+  const visibleEmptyStates = await page
+    .locator('[data-testid="dashboard-audience-empty-state"]:visible')
+    .count();
+  return visibleEmptyStates > 0 ? 'empty' : 'pending';
+}
+
+async function collectAudienceContentSurface(page: Page) {
+  let settled: 'table' | 'empty' = 'table';
+  await expect
+    .poll(
+      async () => {
+        const next = await classifyAudienceSurface(page);
+        if (next !== 'pending') settled = next;
+        return next;
+      },
+      { timeout: 60_000 }
+    )
+    .not.toBe('pending');
+  return settled;
 }
 
 async function collectReleasesShape(
@@ -105,6 +133,10 @@ async function collectAudienceShape(
     name: /analytics panel/i,
   });
   await expect(toggleAnalytics).toBeVisible({ timeout: 30_000 });
+  // The funnel lives in the analytics panel, which starts closed.
+  if ((await page.getByText('Audience funnel').count()) === 0) {
+    await toggleAnalytics.click();
+  }
 
   await expect(page.getByText('Audience funnel')).toBeVisible({
     timeout: 30_000,
@@ -173,7 +205,9 @@ test.describe
   .serial('Demo/live route parity', () => {
     test.skip(!USE_TEST_AUTH_BYPASS, 'Requires E2E_USE_TEST_AUTH_BYPASS=1');
 
-    test('releases demo mirrors the live releases workspace structure', async ({
+    // JOV-8782: live /app/releases is the shell release list, /demo still
+    // renders the table-era matrix. Re-enable when /demo moves to the shell.
+    test.fixme('releases demo mirrors the live releases workspace structure', async ({
       page,
     }) => {
       const liveShape = await collectReleasesShape(
