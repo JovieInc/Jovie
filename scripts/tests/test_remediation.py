@@ -325,6 +325,31 @@ class RouterLadderTest(unittest.TestCase):
                 result = remediation.classify_blocker(subject)
                 self.assertEqual(result["cls"], "fixable-by-model")
 
+    def test_pricing_test_path_is_not_a_founder_gate(self):
+        """PR #22426 exhausted on a style-guard filename that contained
+        "pricing". A test path is not a founder decision. A production
+        pricing or strategy path still is."""
+        red = {"statusCheckRollup": [
+            {"name": "Source Validation", "status": "COMPLETED", "conclusion": "FAILURE"}]}
+        copy_fix = pr(
+            number=22426,
+            title="fix(marketing): retire the limited-access front-door copy",
+            body="Refs JOV-8811. Waitlist-on headers use the claim label.",
+            files=[
+                "apps/web/components/organisms/HeaderNav.tsx",
+                "apps/web/tests/unit/home/mounted-home-pricing-system-b-style-guard.test.ts",
+            ],
+            mergeStateStatus="BLOCKED",
+            **red,
+        )
+        classified = remediation.classify_blocker(copy_fix)
+        self.assertEqual(classified["cls"], "fixable-by-model")
+        self.assertNotIn(
+            "strategy/pricing/credential/taste content", classified["evidence"])
+        production = pr(files=["apps/web/app/(marketing)/pricing/page.tsx"], **red)
+        self.assertEqual(
+            remediation.classify_blocker(production)["cls"], "needs-human-decision")
+
     def test_negated_credentials_do_not_mask_positive_strategy_or_paths(self):
         for extra in (
             {"title": "Update pricing", "body": "No new credentials or permissions are changed."},

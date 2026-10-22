@@ -84,6 +84,12 @@ STRATEGY_TEXT = re.compile(
     r"canon/strategy|founder strategy|pricing|taste\b|credential",
     re.IGNORECASE,
 )
+# A test path is not a founder decision. PR #22426 exhausted because a
+# style-guard filename contained "pricing" while the change was front-door copy.
+_TEST_PATH = re.compile(
+    r"(?:^|/)(?:__tests__|tests?)/|\.(?:test|spec)\.[^/]+$",
+    re.IGNORECASE,
+)
 # An ordinary engineering repair frequently states what it did NOT touch
 # ("No credentials or permissions are changed"); a negated credential/secret
 # mention is assurance, not a founder decision surface (JOV-8495 re-review).
@@ -265,10 +271,17 @@ def _strip_negated_policy(text: str) -> str:
     return "".join(stripped)
 
 
+def _strategy_path(path: str) -> bool:
+    text = str(path)
+    if _TEST_PATH.search(text):
+        return False
+    return bool(STRATEGY_TEXT.search(text))
+
+
 def _strategy(pr: dict) -> bool:
     files = pr.get("files") or pr.get("paths") or pr.get("conflictFiles") or []
     # Protected paths are independent evidence; prose assurances cannot negate them.
-    if any(STRATEGY_TEXT.search(str(path)) for path in files):
+    if any(_strategy_path(path) for path in files):
         return True
     # Remove only the negated credential mention. A pricing/taste/strategy ask
     # in the same sentence or a separate title still requires authority.
