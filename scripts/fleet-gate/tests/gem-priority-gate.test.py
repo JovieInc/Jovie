@@ -566,8 +566,11 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         covered by the poll tests.
         """
 
+        calls: list[str] = []
+
         def run(command, **_kwargs):
             endpoint = command[-1]
+            calls.append(endpoint)
             if endpoint.endswith("/branches/main"):
                 body = {"commit": {"sha": MAIN_SHA}}
             elif endpoint.endswith(f"/commits/{MAIN_SHA}/status"):
@@ -575,6 +578,10 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
             elif f"/commits/{MAIN_SHA}/check-runs?" in endpoint:
                 body = {"total_count": 0, "check_runs": []}
             elif "/actions/runs?" in endpoint:
+                body = {"total_count": 0, "workflow_runs": []}
+            elif endpoint.startswith("repos/JovieInc/Jovie/actions/artifacts?"):
+                body = {"artifacts": []}
+            elif "/actions/workflows/ci.yml/runs?" in endpoint:
                 body = {"total_count": 0, "workflow_runs": []}
             else:
                 raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
@@ -591,17 +598,31 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
                     "FLEET_GATE_RELEASE_READY_POLL_SECONDS": "0",
                 },
             ),
-            mock.patch.object(MODULE.subprocess, "run", side_effect=run) as run_mock,
+            mock.patch.object(MODULE.subprocess, "run", side_effect=run),
             mock.patch.object(MODULE.time, "sleep") as sleep,
         ):
             observed = MODULE.observe_main("JovieInc/Jovie")
 
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
-        self.assertIn("Main Release Ready check is missing", observed["error"])
+        self.assertEqual(observed["reason"], "required-check-missing")
+        self.assertIn("no completed real attempt", observed["error"])
+        self.assertIn("unresolved: missing", observed["error"])
         sleep.assert_not_called()
-        # Branch, status, unfiltered check-runs, name-filtered check-runs, push jobs.
-        self.assertEqual(run_mock.call_count, 5)
+        # Absent checks stay on the unresolved path: marker plus ancestor
+        # history, with no 5xx retry. Empty history still fails closed.
+        self.assertEqual(
+            [endpoint.split("repos/JovieInc/Jovie/", 1)[-1] for endpoint in calls],
+            [
+                "branches/main",
+                f"commits/{MAIN_SHA}/status",
+                f"commits/{MAIN_SHA}/check-runs?per_page=100&page=1",
+                f"commits/{MAIN_SHA}/check-runs?check_name=Main%20Release%20Ready&filter=all&per_page=100&page=1",
+                f"actions/runs?head_sha={MAIN_SHA}&event=push&per_page=30",
+                f"actions/artifacts?per_page=100&name=production-generation-verified-{MAIN_SHA}",
+                "actions/workflows/ci.yml/runs?branch=main&event=push&per_page=10",
+            ],
+        )
 
     def test_observe_main_red_check_fails_closed_without_retry(self):
         def run(command, **_kwargs):
@@ -1020,7 +1041,9 @@ class MainReleaseReadyPageAndPollTests(unittest.TestCase):
 
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
-        self.assertIn("Main Release Ready check is missing", observed["error"])
+        self.assertEqual(observed["reason"], "required-check-missing")
+        self.assertIn("no completed real attempt", observed["error"])
+        self.assertIn("unresolved: missing", observed["error"])
         self.assertEqual(sleeps, [5, 5])
         self.assertLessEqual(sum(sleeps), 10)
         self.assertEqual(observations["n"], 3)
