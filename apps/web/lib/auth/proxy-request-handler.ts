@@ -42,27 +42,27 @@ import { isReservedUsername } from '@/lib/validation/username-core';
 const META_BOT_REGEX =
   /facebookexternalhit|facebot|facebook|instagram|whatsapp/i;
 
-// The public profile HTML can be cached at the edge; a cold audience lookup
-// must not hold that response behind a multi-second Redis/Neon recovery. The
-// full check keeps running through waitUntil and warms durable state, while the
-// visitor-facing path preserves the helper's established fail-open policy.
+// The public profile HTML is cached at the edge, but the Node proxy runs
+// first. Keeping the audience lookup alive with waitUntil (or an unaborted
+// Redis REST call) holds that cached document until the 500ms Redis deadline.
+// Alias navigations measure that hold as the redirect phase. Abort at the
+// budget instead, and fail open — the same policy as a Redis/Neon timeout.
 const AUDIENCE_BLOCK_RESPONSE_BUDGET_MS = 150;
 
 async function resolveAudienceBlockWithinResponseBudget(
-  checkPromise: Promise<boolean>,
+  check: (signal: AbortSignal) => Promise<boolean>,
   event?: Pick<NextFetchEvent, 'waitUntil'>
 ): Promise<boolean> {
-  if (!event) return checkPromise;
-
-  const settledCheck = checkPromise.catch(() => false);
-  event.waitUntil(settledCheck.then(() => undefined));
+  const controller = new AbortController();
+  const settledCheck = check(controller.signal).catch(() => false);
+  if (!event) return settledCheck;
 
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const responseBudget = new Promise<boolean>(resolve => {
-    timeoutId = setTimeout(
-      () => resolve(false),
-      AUDIENCE_BLOCK_RESPONSE_BUDGET_MS
-    );
+    timeoutId = setTimeout(() => {
+      controller.abort();
+      resolve(false);
+    }, AUDIENCE_BLOCK_RESPONSE_BUDGET_MS);
   });
 
   try {
@@ -273,7 +273,8 @@ export async function handleProxyRequest(
         const rawIp = getAudienceBlockIpFromHeaders(req.headers);
         const ua = req.headers.get('user-agent');
         const isBlocked = await resolveAudienceBlockWithinResponseBudget(
-          checkProfileVisitorBlocked(profileUsername, rawIp, ua),
+          signal =>
+            checkProfileVisitorBlocked(profileUsername, rawIp, ua, signal),
           event
         );
         if (isBlocked) {
