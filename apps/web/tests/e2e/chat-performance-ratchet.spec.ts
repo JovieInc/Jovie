@@ -255,13 +255,27 @@ async function waitForChatSendPacer(page: Page): Promise<void> {
   }, windowMs);
 }
 
+async function openChatTranscript(
+  page: Page,
+  composer: Locator
+): Promise<void> {
+  await page
+    .getByRole('button', { name: 'Open Conversation', exact: true })
+    .click();
+  await expect(page.getByTestId('chat-back-to-home-canvas')).toBeVisible();
+  // Disclosure remounts the composer and moves focus to its button. Restore
+  // typing focus during setup, before the steady-state samples begin.
+  await composer.focus();
+}
+
 async function exchangeChatRoundTrip(
   page: Page,
   composer: Locator,
   sendButton: Locator,
   userText: string,
   assistantText: string,
-  keyboard = false
+  keyboard = false,
+  openTranscript = false
 ) {
   await expect(composer).toBeEnabled();
   await installChatProbe(page, userText, assistantText);
@@ -270,6 +284,9 @@ async function exchangeChatRoundTrip(
     userText
   );
   await triggerMeasuredSend(keyboard ? composer : sendButton, keyboard);
+  // Living Home discloses its transcript explicitly. Only unmeasured warmup
+  // and recovery turns open it; scored sends keep the warmed transcript.
+  if (openTranscript) await openChatTranscript(page, composer);
   await expect(
     page.getByTestId('chat-user-bubble').filter({ hasText: userText })
   ).toBeVisible();
@@ -344,7 +361,8 @@ async function exerciseComposerRecovery(
     sendButton,
     copy.userText,
     copy.assistantText,
-    true
+    true,
+    route === APP_ROUTES.ADMIN_CHAT
   );
   // The response has presented its first content but has not finished.
   expect(
@@ -387,6 +405,7 @@ async function exerciseComposerRecovery(
     failed.userText
   );
   await triggerMeasuredSend(composer, true);
+  if (route === APP_ROUTES.ADMIN_CHAT) await openChatTranscript(page, composer);
   const retry = chat.getByRole('button', { name: /retry message/i });
   await expect(retry).toBeVisible();
   // A new draft and attachment must survive retrying the failed turn.
@@ -504,7 +523,9 @@ async function runComposerProfile(
       composer,
       sendButton,
       copy.userText,
-      copy.assistantText
+      copy.assistantText,
+      false,
+      surface.id === 'ovie'
     );
   }
 
