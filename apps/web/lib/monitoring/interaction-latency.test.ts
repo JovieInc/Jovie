@@ -216,6 +216,7 @@ describe('UX latency telemetry', () => {
 
 describe('interaction performance marks', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -249,7 +250,9 @@ describe('interaction performance marks', () => {
     const mark = vi.fn();
     vi.stubGlobal('performance', { mark, measure: vi.fn() });
     vi.stubGlobal('crypto', {});
-    vi.spyOn(Date, 'now').mockReturnValue(1234);
+    // shift-clock.mjs proxies Date and ignores vi.spyOn(Date, 'now').
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(1234);
 
     const first = markInteractionStart('fallback')?.id;
     const second = markInteractionStart('fallback')?.id;

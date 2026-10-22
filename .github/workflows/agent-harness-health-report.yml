@@ -1,3 +1,7 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# capability-gap: A read-only weekly digest of stuck agent PRs, retired hold labels and recent CI failures; GitHub has no native report for these, and the report only writes a job summary (no mutations).
+# revisit-trigger: Remove when Summer's shipping read (company_shipping_lanes_read) or the Ovie Home ops view reports stuck agent PRs, retired hold labels and CI failures, and this report has had no reader for 30 days.
 name: Agent Harness Health Report
 
 # On-demand snapshot of open agent PRs and recent CI runs; no clock. The weekly
@@ -32,8 +36,18 @@ jobs:
           NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           NOW_SECONDS=$(date -u +%s)
 
-          PRS=$(gh pr list --repo "$GH_REPO" --state open --limit 100 \
-            --json number,title,headRefName,headRefOid,isDraft,labels,updatedAt,autoMergeRequest,mergeStateStatus)
+          # One 100-PR GraphQL query with mergeStateStatus returned HTTP 502 (2026-10-21 run
+          # 39644519804; JOV-7954). Page 25 at a time; preserve the report's existing JSON shape.
+          PRS=$(gh api graphql --paginate -F owner="${GH_REPO%%/*}" -F name="${GH_REPO#*/}" -f query='
+            query($owner: String!, $name: String!, $endCursor: String) {
+              repository(owner: $owner, name: $name) {
+                pullRequests(states: OPEN, first: 25, after: $endCursor) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes { number title headRefName headRefOid isDraft updatedAt mergeStateStatus
+                          labels(first: 50) { nodes { name } } autoMergeRequest { enabledAt } }
+                }
+              }
+            }' --jq '.data.repository.pullRequests.nodes[] | .labels = .labels.nodes' | jq -s '.')
           AGENT_PRS=$(echo "$PRS" | jq '[.[] | select((.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)"; "i")) or (.headRefName | test("(^|/)jov-[0-9]+"; "i")))]')
           SYSTEMIC_PRS=$(gh pr list --repo "$GH_REPO" --state open --label systemic-blocker --limit 50 --json number,title,headRefName,updatedAt)
           RETIRED_HOLD_PRS=$(echo "$PRS" | jq '[.[] | select([.labels[].name] | any(. == "needs-human" or . == "needs-human-review" or . == "human-review-required" or . == "no-auto" or . == "no-auto-merge" or . == "no-automerge" or . == "needs:taste" or . == "needs-human-taste"))]')

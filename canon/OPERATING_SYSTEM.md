@@ -1,9 +1,9 @@
 # Jovie Operating System
 
-Version: 1.1
+Version: 1.2
 Status: Constitution (highest authority)
 Owner: Tim White
-Last updated: 2026-08-13
+Last updated: 2026-10-20
 
 This document is the highest-level operating philosophy for Jovie.
 
@@ -55,6 +55,13 @@ Every proposal answers:
 - How will we verify success?
 
 If these cannot be answered, keep gathering evidence.
+
+**Hard rule: unmeasured is unfinished.** Everything that can be measured and
+verified must be. A new pipeline, loop, lane, controller or feature is done only
+when each stage it adds is registered in `docs/metrics/stage-manifest.json`,
+emits timestamped `jovie-stage-event/v1` rows (or is derived from durable
+receipts), and reports p50/p95/n in the stage-timings snapshot. Those p95s are
+metrics to drive down. Contract: [`docs/metrics/STAGE_EVENTS.md`](../docs/metrics/STAGE_EVENTS.md).
 
 ### Law 3 — Prefer boring technology
 
@@ -246,6 +253,7 @@ When operating-principles or a `.claude/rules/*` file gives concrete implementat
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-20 | Law 2 hard rule: new pipelines and features must emit stage timestamps and a metric to be done. | Tim White |
 | 2026-08-17 | Point at `FLEET.md` as the closed-loop / default-alive operating contract. | Tim White interview |
 | 2026-08-13 | Added phase-dependent capital policy: survival before selectivity, fast-path clean SAFEs, and no investor-theater requirement. | Tim White |
 | 2026-07-17 | Created `/canon/OPERATING_SYSTEM.md` as company constitution (Theory of Constraints operating model). | Tim White |

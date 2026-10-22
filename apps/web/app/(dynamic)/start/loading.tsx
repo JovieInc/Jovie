@@ -25,6 +25,7 @@ export default function StartLoading() {
       <AppShellFrame
         placeholder
         sidebar={null}
+        flushContent
         containerClassName='[color-scheme:dark]'
         contentClassName='overflow-hidden!'
         main={

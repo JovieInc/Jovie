@@ -1,5 +1,5 @@
 // biome-ignore-all format: compact table-driven regressions keep full behavior coverage below the hard PR cap.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
@@ -53,7 +53,17 @@ const rich = () => seed({ creatorProfiles: [{ id: 'p1', bio: 'Analytical engine 
 
 const certifiable = () => seed({ dspArtistMatches: [{ id: 'dsp1', providerId: 'spotify', externalArtistName: 'Ada Lovelace', matchSource: 'isrc', matchingIsrcCount: 3, matchingUpcCount: 0, totalTracksChecked: 3, confidenceScore: '0.99', updatedAt: NOW }], profileSurfaces: [{ id: 's1', kind: 'social', platform: 'instagram', handle: 'ada', url: 'https://instagram.com/ada', qualificationStatus: 'qualified', identityConfidence: '0.95', lastObservedAt: NOW, updatedAt: NOW }], discogReleases: [{ id: 'rel1', title: 'Engines', upc: '123456789012', sourceType: 'spotify', totalTracks: 2, updatedAt: NOW }], profileSearchRuns: [{ id: 'run1', provider: 'brave', completedAt: NOW }] });
 
-beforeEach(() => { state.rows.clear(); state.inserts.length = 0; state.updates.length = 0; });
+beforeEach(() => {
+  // certifyContactEvidence reads new Date() rather than the NOW argument.
+  // A spy does not survive the shift-clock proxy, so the Sept 29 evidence
+  // goes stale on the 30-day freshness window (2026-10-29).
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
+  state.rows.clear();
+  state.inserts.length = 0;
+  state.updates.length = 0;
+});
+afterEach(() => { vi.useRealTimers(); });
 
 describe('contact certification inspection', () => {
   it('groups every supported source and ignores retired or dismissed evidence', async () => { rich(); const result = await getContactCertificationInspection(contact(), NOW); expect(new Set(result.items.map(row => row.category))).toEqual(new Set(['identity', 'dsp', 'social', 'websites', 'catalog', 'destinations', 'facts', 'search', 'conflicts'])); expect(result.items.map(row => row.key)).not.toEqual(expect.arrayContaining(['surface:s3', 'surface:s4', 'catalog-conflict:mm2'])); expect(result).toMatchObject({ status: 'conflicted', coverage: { missingSourceClasses: [] } }); });

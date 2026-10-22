@@ -821,6 +821,53 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
             {"check:Generate Screenshots"},
         )
 
+    def test_absent_main_gate_uses_recent_ci_for_production_admission(self):
+        """JOV-8148: reach deployment projection during gate materialization."""
+        def github_response(_repo, endpoint):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": SHA}}
+            if endpoint == f"commits/{SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{SHA}/check-runs?"):
+                return {"check_runs": []}
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        for conclusion, integrity, allowed in (
+            ("success", "clear", True),
+            ("failure", "clear", False),
+            (None, "clear", False),
+            ("success", "active", False),
+        ):
+            with self.subTest(conclusion=conclusion, integrity=integrity):
+                fallback = {
+                    "name": "Main Release Ready", "status": "completed",
+                    "conclusion": conclusion, "completedAt": now_iso(),
+                    "source": "ancestor-ci-workflow-job", "ancestorSha": "b" * 40,
+                } if conclusion else None
+                with (
+                    mock.patch.object(GATE_MODULE, "gh_json", side_effect=github_response),
+                    mock.patch.object(GATE_MODULE, "observe_main_release_ready_jobs", return_value=[]),
+                    mock.patch.object(GATE_MODULE, "observe_recent_real_release_ready", return_value=fallback),
+                ):
+                    main = GATE_MODULE.observe_main("JovieInc/Jovie")
+                receipt = evaluate_receipt(
+                    main=main, production=production_health("green"),
+                    integrity={"status": integrity},
+                )
+                projected = PROJECT.project_fleet_admission_receipt(
+                    receipt, scoped_request(risk_lane="high")
+                )
+                admission = projected["scopedAdmission"]
+                self.assertEqual(admission["allowed"], allowed)
+                self.assertEqual(admission["revision"], SHA)
+                if not allowed:
+                    self.assertEqual(
+                        {row["signal"] for row in admission["relevantBlockers"]},
+                        {"global-integrity"} if integrity == "active" else {"main"},
+                    )
+
     def test_pending_screenshot_check_never_blocks_promotion(self):
         """The incident shape: optional pending lane stays observable only."""
         main = {

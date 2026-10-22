@@ -45,9 +45,7 @@ export const FEATURE_FLAGS = {
   SHOW_MARKETING_CENTER_NAV: true,
   // V1_DESIGN flags have INVERTED semantics: true = render the OLD design.
   // #11484 ("default feature flags on") blanket-flipped every flag false→true,
-  // which silently reverted the homepage to HomeV1Design and bypassed the V2
-  // hero + sections that same PR enabled. Restore the pre-#11484 known-good state.
-  SHOW_HOME_V1_DESIGN: false,
+  // which silently reverted a page to its V1 design. Keep this one false.
   SHOW_PUBLIC_PROFILE_V1_DESIGN: false,
   // Public About body and commercial footer links. Stays off so production
   // keeps the current page until this refresh is explicitly flipped.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One classifier for GitHub API failures that say nothing about the code under
 // test: primary quota exhaustion, secondary/abuse limits (403/429) and transient
-// 5xx/network errors. Every repo-wide GITHUB_TOKEN workflow shares ~1,000 REST
+// 5xx/network errors. Every repo-wide GITHUB_TOKEN workflow shares ~5,000 REST
 // calls per hour; when that bucket hit zero on 2026-10-11 20:07Z, PR Size Guard,
 // Source Validation and PR Ready failed red, and Lane Fix Relay queued the PRs
 // for repair. A quota failure is retried after the reset or deferred; it is

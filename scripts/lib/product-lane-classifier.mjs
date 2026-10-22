@@ -192,6 +192,13 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^packages\/api-client\//,
   ],
   [
+    // @jovie/research: agent research router + decision log (CLI/MCP only).
+    'operations-research',
+    'operations-tooling',
+    [],
+    /^packages\/research\//,
+  ],
+  [
     'operations-tooling',
     'operations-tooling',
     [],

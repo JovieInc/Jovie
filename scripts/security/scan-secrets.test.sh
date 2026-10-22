@@ -3,6 +3,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCAN_SCRIPT="$REPO_ROOT/scripts/security/scan-secrets.sh"
+# The repair path is CI-only by default; these scenarios exercise it locally.
+export SECRET_SCAN_ALLOW_LOCAL_REPAIR=1
 TEST_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
@@ -415,5 +417,15 @@ PATH="$DL_BIN:/usr/bin:/bin" TMPDIR="$TEST_ROOT/dl-tmp2" \
   || fail 'download must stop after exactly 3 attempts'
 grep -q 'Secret scanner download failed' "$TEST_ROOT/download-fail.output" \
   || fail 'download failure must emit an explicit CI classification'
+
+# Outside CI and without a partial clone (e.g. a git worktree on an ops host),
+# the repair must refuse instead of running a full `git fetch --refetch`.
+status="$(SECRET_SCAN_ALLOW_LOCAL_REPAIR= CI= GITHUB_ACTIONS= run_gitleaks_scenario gitleaks-corruption publication 2>/dev/null || true)"
+[[ "$status" -ne 0 ]] || fail 'local corruption without CI must fail closed'
+if grep -q '^fetch ' "$TEST_ROOT/gitleaks-corruption.publication.git-calls"; then
+  fail 'local corruption without CI must not refetch'
+fi
+grep -q 'Secret scan repair refused' "$TEST_ROOT/gitleaks-corruption.publication.output" \
+  || fail 'local repair refusal must explain how to run history scans'
 
 echo 'PASS: scan-secrets corruption recovery regression tests'
