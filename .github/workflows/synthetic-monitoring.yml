@@ -122,14 +122,17 @@ jobs:
       - name: Run Onboarding Robot Full Synthetic (JOV-2681)
         id: onboarding-robot
         run: |
-          reason="synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot."
-          echo "::warning title=Onboarding robot skipped::${reason}"
+          # JOV-7656 owns the real robot. Until it exists this step must never
+          # read as passing: it records not_implemented and the job fails in
+          # the "Fail loudly" step below.
+          reason="synthetic-robot-not-implemented: no onboarding robot runs against production (JOV-7656)."
+          echo "::error title=Onboarding robot NOT IMPLEMENTED::${reason}"
           {
             echo "### Onboarding robot"
-            echo "${reason}"
+            echo "NOT IMPLEMENTED. ${reason}"
           } >> "$GITHUB_STEP_SUMMARY"
           echo "robot_skip_reason=${reason}" >> "$GITHUB_OUTPUT"
-          exit 0
+          echo "robot_status=not_implemented" >> "$GITHUB_OUTPUT"
 
       - name: Run Legacy OTP Signup Canary (gated, JOV-2446 cutover)
         # Skip this step entirely once Layer A is proven green and the Clerk
@@ -331,7 +334,7 @@ jobs:
                     },
                     {
                       "title": "Status",
-                      "value": "Production auth UI, onboarding robot, signup health, and public-profile synthetic checks passing",
+                      "value": "Production auth UI, signup health, and public-profile synthetic checks passing (onboarding robot is not implemented and is not covered)",
                       "short": false
                     },
                     {
@@ -353,6 +356,12 @@ jobs:
         if: ${{ always() && (failure() || steps.test-results.outputs.test_status != 'passed') }}
         run: |
           echo "Marking job as failed because synthetic status is '${{ steps.test-results.outputs.test_status }}'"
+          exit 1
+
+      - name: Fail loudly while the onboarding robot is not implemented
+        if: ${{ always() && steps.onboarding-robot.outputs.robot_status == 'not_implemented' }}
+        run: |
+          echo "::error::The onboarding robot is not implemented (JOV-7656); synthetic monitoring cannot report it passing."
           exit 1
 
   web-ai-health:
