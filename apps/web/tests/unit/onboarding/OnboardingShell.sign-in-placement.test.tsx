@@ -71,6 +71,31 @@ describe('onboarding sign-in placement', () => {
     );
   });
 
+  it('preserves the typed name and chosen address in the existing signin return intent', () => {
+    render(
+      <OnboardingShell
+        sessionLabel='pending'
+        entryProfile={{
+          status: 'available',
+          handle: 'tim-white',
+          displayName: 'Tim White',
+        }}
+      />
+    );
+    const href = screen
+      .getByRole('link', { name: 'Sign in' })
+      .getAttribute('href')!;
+    const signIn = new URL(href, 'https://jov.ie');
+    expect(signIn.pathname).toBe(APP_ROUTES.SIGNIN);
+    const resume = new URL(
+      signIn.searchParams.get('redirect_url')!,
+      'https://jov.ie'
+    );
+    expect(resume.pathname).toBe(APP_ROUTES.START);
+    expect(resume.searchParams.get('handle')).toBe('tim-white');
+    expect(resume.searchParams.get('display_name')).toBe('Tim White');
+  });
+
   it('hides sign-in after the server resolves an authenticated session', () => {
     render(<OnboardingShell sessionLabel='pending' isSignedIn />);
 

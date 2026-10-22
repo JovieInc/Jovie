@@ -42,6 +42,86 @@ beforeEach(() => {
 });
 
 describe('homepage product claim entry', () => {
+  function nameEntry(value: string) {
+    render(
+      <ProductClaimHandleForm
+        domain='jov.ie/'
+        placeholder='you'
+        submitLabel='Claim'
+        entryMode='name-or-handle'
+        testIdPrefix='homepage'
+      />
+    );
+    const input = screen.getByRole('textbox', { name: 'Your Name or Handle' });
+    fireEvent.change(input, { target: { value } });
+    return { input, form: screen.getByTestId('homepage-claim-form') };
+  }
+
+  it('accepts a normal name, shows the candidate explicitly and keeps both through submit', () => {
+    const { input, form } = nameEntry('tim white');
+    expect(input).toHaveValue('tim white');
+    expect(input).not.toHaveAttribute('aria-invalid');
+    expect(
+      screen.getByText('Suggested address: jov.ie/tim-white')
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Claim' })).toBeEnabled();
+    expect(new FormData(form as HTMLFormElement).get('entry')).toBe(
+      'tim white'
+    );
+    expect(new FormData(form as HTMLFormElement).get('handle')).toBe(
+      'tim-white'
+    );
+    expect(new FormData(form as HTMLFormElement).get('display_name')).toBe(
+      'tim white'
+    );
+    fireEvent.submit(form);
+    expect(push).toHaveBeenCalledExactlyOnceWith(
+      buildClaimProfileStartHref('tim-white', 'tim white')
+    );
+    expect(input).toHaveValue('tim white');
+    expect(input).toHaveAttribute('readonly');
+  });
+
+  it('retains a non-Latin name while an explicit address is edited', () => {
+    const { input, form } = nameEntry('宇多田 ヒカル');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Address' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Profile Address' }), {
+      target: { value: 'hikki' },
+    });
+    fireEvent.submit(form);
+    expect(input).toHaveValue('宇多田 ヒカル');
+    expect(push).toHaveBeenCalledExactlyOnceWith(
+      buildClaimProfileStartHref('hikki', '宇多田 ヒカル')
+    );
+  });
+
+  it('keeps incomplete typing quiet, then associates the submit error and focus', () => {
+    validation.handleError = 'Handle must be at least 3 characters';
+    const { input, form } = nameEntry('@t');
+    expect(input).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.submit(form);
+    expect(push).not.toHaveBeenCalled();
+    expect(input).toHaveFocus();
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input.getAttribute('aria-describedby')).toContain(
+      screen.getByRole('alert').id
+    );
+  });
+
+  it('does not submit partial IME composition or silently rewrite a pasted URL', () => {
+    const { input, form } = nameEntry('Beyoncé Knowles');
+    fireEvent.compositionStart(input);
+    fireEvent.submit(form);
+    expect(push).not.toHaveBeenCalled();
+    fireEvent.compositionEnd(input);
+    fireEvent.change(input, { target: { value: 'https://jov.ie/tim' } });
+    fireEvent.submit(form);
+    expect(push).not.toHaveBeenCalled();
+    expect(input).toHaveValue('https://jov.ie/tim');
+    expect(screen.getByRole('alert')).toHaveTextContent('rather than a link');
+  });
+
   it('acknowledges Enter synchronously and sends one canonical intent for repeated submit events', () => {
     const { input, form } = entry();
     act(() => {

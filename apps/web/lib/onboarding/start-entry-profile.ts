@@ -1,9 +1,11 @@
+import { APP_ROUTES } from '@/constants/routes';
 import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
 } from '@/lib/validation/username-core';
+import { resolveClaimNameEntry } from './claim-name-entry';
 
 const MAX_ENTRY_LINKS = 8;
 
@@ -47,7 +49,12 @@ export type StartEntryProfile =
       readonly displayName: string;
       readonly avatarUrl: string | null;
     }
-  | { readonly status: 'available'; readonly handle: string };
+  | {
+      readonly status: 'available';
+      readonly handle: string;
+      /** Visitor-entered draft text; never verified catalog identity. */
+      readonly displayName?: string;
+    };
 
 export interface StartEntryProfileSource {
   readonly id?: string;
@@ -71,7 +78,12 @@ export interface StartEntryProfileSource {
 export function readStartEntryHandle(
   params: Readonly<Record<string, string | string[] | undefined>>
 ): string | null {
-  const raw = params.handle;
+  const raw =
+    typeof params.handle === 'string' && params.handle.trim()
+      ? params.handle
+      : typeof params.entry === 'string'
+        ? resolveClaimNameEntry(params.entry).handle
+        : params.handle;
   if (typeof raw !== 'string') return null;
   const handle = raw.trim().replace(/^@/, '').toLowerCase();
   if (
@@ -82,6 +94,28 @@ export function readStartEntryHandle(
     return null;
   }
   return handle;
+}
+
+/** Retain the visitor's name only for a new draft, never override a real page. */
+export function withStartEntryDisplayName(
+  entry: StartEntryProfile | null,
+  params: Readonly<Record<string, string | string[] | undefined>>
+): StartEntryProfile | null {
+  if (entry?.status !== 'available') return entry;
+  const raw = params.display_name ?? params.entry;
+  const name =
+    typeof raw === 'string' ? resolveClaimNameEntry(raw).displayName : null;
+  return name ? { ...entry, displayName: name } : entry;
+}
+
+export function buildStartEntryResumeHref(
+  entry?: StartEntryProfile | null
+): string {
+  if (!entry) return `${APP_ROUTES.START}?resume=1`;
+  const params = new URLSearchParams({ handle: entry.handle });
+  if (entry.status === 'available' && entry.displayName)
+    params.set('display_name', entry.displayName);
+  return `${APP_ROUTES.START}?${params.toString()}`;
 }
 
 function httpsLinks(links: StartEntryProfileSource['socialLinks']) {
@@ -158,5 +192,8 @@ export function buildStartEntryDraft(
   entry: StartEntryProfile | null
 ): string | null {
   if (!entry || entry.status === 'claimed') return null;
+  if (entry.status === 'available' && entry.displayName) {
+    return `My name is ${JSON.stringify(entry.displayName)}. I want to preview jov.ie/${entry.handle} before saving.`;
+  }
   return `I want to claim jov.ie/${entry.handle}.`;
 }

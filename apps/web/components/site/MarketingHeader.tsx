@@ -93,6 +93,8 @@ export interface MarketingHeaderProps
     readonly primaryCta?: MarketingHeaderCta;
     readonly showHomepageCenterNav?: boolean;
     readonly variant?: MarketingHeaderVariant;
+    /** Intentional transparent instance over a full-bleed opening surface. */
+    readonly overlay?: boolean;
   }> {}
 
 interface ResolvedNavConfig {
@@ -134,6 +136,7 @@ export function MarketingHeader({
   primaryCta,
   showHomepageCenterNav = true,
   variant = 'landing',
+  overlay = false,
 }: MarketingHeaderProps) {
   const pathname = usePathname();
   useEffect(() => {
@@ -204,6 +207,17 @@ export function MarketingHeader({
       }
       logoVariant={resolvedLogoVariant}
       logoReveal={resolvedLogoVariant === 'icon'}
+      trackScroll={overlay}
+      style={
+        overlay
+          ? {
+              backgroundColor: 'transparent',
+              borderColor: 'transparent',
+              backdropFilter: 'none',
+              WebkitBackdropFilter: 'none',
+            }
+          : undefined
+      }
       authMode='public-static'
       hideNav={isMinimal}
       hideDesktopNav={hideCenterNav}

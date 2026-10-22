@@ -49,6 +49,21 @@ describe('homepage availability observations', () => {
     expect(result.current.available).toBe(false);
   });
 
+  it('never carries an old availability receipt into incomplete or invalid typing', async () => {
+    fetchAvailability.mockResolvedValueOnce({ available: true });
+    const { result, rerender } = renderHook(
+      ({ handle }) => useHandleValidation(handle),
+      { initialProps: { handle: 'previous-valid-address' } }
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(401);
+    });
+    expect(result.current.available).toBe(true);
+    rerender({ handle: 't' });
+    expect(result.current.available).toBeNull();
+    expect(result.current.availError).toBeNull();
+  });
+
   it('expires an unchanged availability observation instead of implying a reservation', async () => {
     fetchAvailability.mockResolvedValueOnce({ available: true });
     const { result } = renderHook(() =>

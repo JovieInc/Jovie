@@ -23,6 +23,7 @@ export interface PublicPageShellProps {
   readonly footerClassName?: string;
   readonly footerVariant?: 'auto' | 'expanded' | 'minimal';
   readonly headerVariant?: MarketingHeaderVariant;
+  readonly headerOverlay?: boolean;
   /** Overrides the per-page header brand config (icon-only vs lockup). */
   readonly headerBrand?: MarketingHeaderBrand;
   readonly headerCta?: MarketingHeaderCta;
@@ -48,6 +49,7 @@ export function PublicPageShell({
   headerBrand,
   headerCta,
   headerVariant = 'landing',
+  headerOverlay = false,
   logoSize = 'xs',
   logoVariant,
   mainClassName,
@@ -72,6 +74,7 @@ export function PublicPageShell({
         primaryCta={headerCta}
         showHomepageCenterNav={showHomepageCenterNav}
         variant={headerVariant}
+        overlay={headerOverlay}
       />
       <main
         id='main-content'

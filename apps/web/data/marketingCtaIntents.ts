@@ -66,8 +66,18 @@ function buildOpenClaimProfileStartHref(trimmedHandle: string): string {
   return `${APP_ROUTES.START}?${params.toString()}`;
 }
 
-export function buildClaimProfileStartHref(handle?: string): string {
-  return buildOpenClaimProfileStartHref(handle?.trim().replace(/^@/, '') ?? '');
+export function buildClaimProfileStartHref(
+  handle?: string,
+  displayName?: string | null
+): string {
+  const href = buildOpenClaimProfileStartHref(
+    handle?.trim().replace(/^@/, '') ?? ''
+  );
+  if (!displayName) return href;
+  const [path, search] = href.split('?');
+  const params = new URLSearchParams(search);
+  params.set('display_name', displayName);
+  return `${path}?${params.toString()}`;
 }
 
 export function getClaimProfileIntent(

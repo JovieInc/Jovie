@@ -108,12 +108,12 @@ describe('HomepageIdentityHero', () => {
     expect(claim).toHaveAttribute('action', '/start');
     expect(within(claim).getByRole('textbox')).toHaveAttribute(
       'placeholder',
-      'you'
+      'Your name or handle'
     );
     expect(screen.getByTestId('homepage-primary-cta')).toHaveTextContent(
       'Claim'
     );
-    expect(within(hero).getByRole('img', { name: 'Jovie logo' })).toBeVisible();
+    expect(within(hero).queryByRole('img', { name: 'Jovie logo' })).toBeNull();
     expect(
       within(hero).queryByText(HOMEPAGE_IDENTITY_COPY.hero.subhead)
     ).toBeNull();
@@ -183,9 +183,7 @@ describe('HomepageIdentityHero', () => {
     expect(copy).toHaveClass('homepage-claim-hero__copy');
     expect(card).toHaveClass('homepage-claim-hero__card');
     expect(Array.from(layout.children)).toEqual([copy, card]);
-    expect(
-      within(copy).getByRole('img', { name: 'Jovie logo' })
-    ).toBeInTheDocument();
+    expect(within(copy).queryByRole('img', { name: 'Jovie logo' })).toBeNull();
     expect(
       within(copy).queryByText(HOMEPAGE_IDENTITY_COPY.hero.subhead)
     ).toBeNull();
@@ -214,6 +212,23 @@ describe('HomepageIdentityHero', () => {
       /\$12|\$199|continuous monitoring|unattended|advanced analytics/i
     );
     expect(container.textContent ?? '').not.toContain('—');
+  });
+
+  it('loads the production variable font assets for the homepage review', () => {
+    const preview = readFileSync(
+      resolve(process.cwd(), '.storybook/production-fonts.css'),
+      'utf8'
+    );
+    const production = readFileSync(
+      resolve(process.cwd(), 'app/layout.tsx'),
+      'utf8'
+    );
+    for (const font of ['Inter-Latin.woff2', 'Satoshi-Latin.woff2']) {
+      expect(production).toContain(font);
+      expect(preview).toContain(font);
+    }
+    expect(preview).toContain('100 900');
+    expect(preview).toContain('300 900');
   });
 
   it('keeps the hero stylesheet tokenized', () => {

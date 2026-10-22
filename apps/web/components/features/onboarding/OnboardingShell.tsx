@@ -20,7 +20,10 @@ import { track } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
-import type { StartEntryProfile } from '@/lib/onboarding/start-entry-profile';
+import {
+  buildStartEntryResumeHref,
+  type StartEntryProfile,
+} from '@/lib/onboarding/start-entry-profile';
 import {
   getBrowserTurnstileHostname,
   resolveOnboardingTurnstileSiteKey,
@@ -265,9 +268,7 @@ export function OnboardingShell({
   );
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
-  const resumePath = entryProfile?.handle
-    ? `${APP_ROUTES.START}?${new URLSearchParams({ handle: entryProfile.handle })}`
-    : `${APP_ROUTES.START}?resume=1`;
+  const resumePath = buildStartEntryResumeHref(entryProfile);
   const signInPath = `${APP_ROUTES.SIGNIN}?${new URLSearchParams({ redirect_url: resumePath })}`;
   const entryBuilderState = useMemo(
     () => buildEntryProfileBuilderState(entryProfile),

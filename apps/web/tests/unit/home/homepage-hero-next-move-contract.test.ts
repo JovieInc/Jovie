@@ -133,8 +133,10 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(headerSource).toContain('MARKETING_CUSTOMERS_FLYOUT');
     expect(headerSource).toContain("presentation === 'marketing-glass'");
     // Default landing header (marketing glass), docked over the hero.
-    expect(layoutSource).not.toContain('headerVariant=');
-    expect(layoutSource).not.toContain('mainOffset={false}');
+    expect(layoutSource).toContain("headerVariant='minimal'");
+    expect(layoutSource).toContain("headerBrand='icon'");
+    expect(layoutSource).toContain('navLinks={[]}');
+    expect(layoutSource).toContain('mainOffset={false}');
     expect(layoutSource).toContain("footerVariant='expanded'");
     expect(layoutSource).toContain("logoSize='sm'");
     expect(layoutSource).not.toContain("logoVariant='word'");

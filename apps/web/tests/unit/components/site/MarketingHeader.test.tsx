@@ -320,6 +320,60 @@ describe('MarketingHeader', () => {
     }
   });
 
+  it('preserves the minimal overlay and exposes scroll state for its no-timeline fallback', () => {
+    const observations: {
+      callback: IntersectionObserverCallback;
+      element: Element;
+    }[] = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(readonly callback: IntersectionObserverCallback) {}
+        observe(element: Element) {
+          observations.push({ callback: this.callback, element });
+        }
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    try {
+      const { unmount } = render(
+        <MarketingHeader variant='minimal' overlay brand='icon' navLinks={[]} />
+      );
+      const header = screen.getByTestId('header-nav');
+      expect(header.style.backgroundColor).toBe('transparent');
+      expect(header.style.backdropFilter).toBe('none');
+      expect(header).not.toHaveClass('header-nav--docked');
+      expect(within(header).getAllByRole('link')).toHaveLength(2);
+      expect(
+        within(header).getByRole('link', { name: 'Sign in' })
+      ).toHaveAttribute('href', '/signin');
+      expect(header).not.toHaveAttribute('data-scrolled');
+      const observation = observations.find(
+        item =>
+          item.element === screen.getByTestId('header-nav-scroll-sentinel')
+      );
+      if (!observation) throw new Error('Overlay sentinel must be observed');
+      act(() =>
+        observation.callback(
+          [{ isIntersecting: false } as IntersectionObserverEntry],
+          {} as IntersectionObserver
+        )
+      );
+      expect(header).toHaveAttribute('data-scrolled', 'true');
+      act(() =>
+        observation.callback(
+          [{ isIntersecting: true } as IntersectionObserverEntry],
+          {} as IntersectionObserver
+        )
+      );
+      expect(header).not.toHaveAttribute('data-scrolled');
+      unmount();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('keeps the desktop wordmark lockup by default and marks it for the reveal guard', () => {
     render(<MarketingHeader />);
 

@@ -51,7 +51,9 @@ function getHandleEntryCopy(entry: StartEntryProfile): {
       };
     case 'available':
       return {
-        title: `Claim jov.ie/${entry.handle}`,
+        title: entry.displayName
+          ? `Preview ${entry.displayName}`
+          : `Claim jov.ie/${entry.handle}`,
         support:
           "Preview your profile first. We'll confirm the handle when you save.",
       };
