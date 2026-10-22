@@ -1611,6 +1611,9 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(promoteJob).toContain(
       'steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype'
     );
+    expect(promoteJob).toContain(
+      'steps.verify-production.outputs.failure_subtype || steps.journey-gate.outputs.failure_subtype'
+    );
     expect(domainGuardStep).toContain('id: domain-guard');
     expect(domainGuardStep).toContain(
       'node .github/scripts/verify-vercel-production-domains.mjs'
@@ -4194,8 +4197,14 @@ describe('production promotion exact-artifact contract', () => {
     expect(finalCurrentStep).not.toContain(
       'Refusing stale production promotion'
     );
+    // The closed lineage predicate stays in the step. The live if repeats it
+    // inside one ${{ }} with the journey gate: text after }} is always true
+    // (actions/runner#1173), so the gate cannot be appended outside.
     expect(promoteStep).toContain(
       "if: ${{ steps.final-current.outputs.is_current == 'true' }}"
+    );
+    expect(promoteStep).toContain(
+      "if: ${{ steps.final-current.outputs.is_current == 'true' && steps.journey-gate.outcome == 'success' }}"
     );
     expect(promoteJob).toContain(
       'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha || steps.mutation-head.outputs.superseded_sha }}'
