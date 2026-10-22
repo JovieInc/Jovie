@@ -44,9 +44,11 @@ vi.mock('@/lib/db/schema/profiles', () => ({
   },
 }));
 
+const eqMock = vi.hoisted(() => vi.fn());
+
 vi.mock('drizzle-orm', () => ({
   sql: vi.fn(),
-  eq: vi.fn(),
+  eq: eqMock,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -209,5 +211,29 @@ describe('PUT /api/dashboard/shop', () => {
     const response = await PUT(request);
 
     expect(response.status).toBe(500);
+  });
+});
+
+describe('shop profile lookup', () => {
+  it('matches the session app user id, never the retired Clerk id', async () => {
+    vi.clearAllMocks();
+    hoisted.withDbSessionMock.mockImplementation(async (callback: Function) =>
+      callback('app-user-uuid')
+    );
+    hoisted.selectLimitMock.mockResolvedValue([]);
+    hoisted.selectWhereMock.mockReturnValue({ limit: hoisted.selectLimitMock });
+    hoisted.selectInnerJoinMock.mockReturnValue({
+      where: hoisted.selectWhereMock,
+    });
+    hoisted.selectFromMock.mockReturnValue({
+      innerJoin: hoisted.selectInnerJoinMock,
+    });
+    hoisted.selectMock.mockReturnValue({ from: hoisted.selectFromMock });
+
+    const { GET } = await import('@/app/api/dashboard/shop/route');
+    await GET();
+
+    expect(eqMock).toHaveBeenCalledWith('id', 'app-user-uuid');
+    expect(eqMock).not.toHaveBeenCalledWith('clerkId', expect.anything());
   });
 });

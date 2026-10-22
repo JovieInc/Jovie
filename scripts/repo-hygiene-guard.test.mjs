@@ -708,6 +708,35 @@ test('tracked-bytes budget raise stays within the documented +10% cap', () => {
   );
 });
 
+test('snapshot-file budget raise stays within the documented +10% cap', () => {
+  // 2026-10-21: origin/main measured 110/110 canonical visual baselines, so
+  // the required Admin Home pair could not land. No unreferenced baseline was
+  // safe to delete. The policy caps a single payload raise at +10%.
+  const previousBudget = 110;
+  assert.equal(HYGIENE_LIMITS.maxSnapshotFiles, 121);
+  assert.ok(
+    HYGIENE_LIMITS.maxSnapshotFiles <= previousBudget * 1.1,
+    'payload budget raises are capped at +10% per docs/ci/repository-health.md'
+  );
+});
+
+test('canonical visual baselines stay inside the snapshot file budget', () => {
+  const root = resolve('apps/web/tests/e2e/__snapshots__');
+  let files = 0;
+  const visit = directory => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) visit(path);
+      else if (entry.isFile()) files += 1;
+    }
+  };
+  visit(root);
+  assert.ok(
+    files <= HYGIENE_LIMITS.maxSnapshotFiles,
+    `${files} canonical visual baselines exceed the ${HYGIENE_LIMITS.maxSnapshotFiles}-file budget`
+  );
+});
+
 test('tracked payload skips missing paths and symlinks without following them', () => {
   const root = mkdtempSync(join(tmpdir(), 'jovie-hygiene-repo-links-'));
   try {

@@ -80,14 +80,18 @@ test.describe('Homepage', () => {
       'action',
       '/start'
     );
-    // The claim card proves the claim with Tim's real jov.ie/tim profile
-    // (JOV-INV-038, #19163 onward) — no illustrative placeholder proof.
+    // JOV-7750 (#22180): the claim card shows the visitor's own jov.ie/you
+    // identity beside the claim, never a founder or claimed customer.
+    const identity = hero.getByTestId('homepage-hero-identity');
+    const { preview, claim } = HOMEPAGE_IDENTITY_COPY.hero;
     await expect(
-      hero.getByText(HOMEPAGE_IDENTITY_COPY.hero.preview.name)
+      identity.getByText(preview.label, { exact: true })
     ).toBeVisible();
+    await expect(identity).toContainText(`${claim.domain}${preview.name}`);
     await expect(
-      hero.getByText(HOMEPAGE_IDENTITY_COPY.hero.preview.label)
+      identity.getByText(preview.role, { exact: true })
     ).toBeVisible();
+    await expect(hero.getByText(/Tim White|Founder, Jovie/)).toHaveCount(0);
     await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
     await expect(page.getByText('Request access')).toHaveCount(0);
   });
@@ -113,16 +117,21 @@ test.describe('Homepage', () => {
     await startRequest;
   });
 
-  test('aligns the founder proof card on desktop and mobile', async ({
+  test('aligns the claim identity card on desktop and mobile', async ({
     page,
   }) => {
+    const { preview, claim } = HOMEPAGE_IDENTITY_COPY.hero;
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });
-      const proof = page.getByTestId('homepage-hero-real-profile');
-      await proof.scrollIntoViewIfNeeded();
-      await expect(proof.getByText('Tim White')).toBeVisible();
-      await expect(proof.getByText('Founder, Jovie')).toBeVisible();
-      await expect(proof.getByText(/jov\.ie\/tim/)).toBeVisible();
+      const identity = page.getByTestId('homepage-hero-identity');
+      await identity.scrollIntoViewIfNeeded();
+      await expect(
+        identity.getByText(preview.label, { exact: true })
+      ).toBeVisible();
+      await expect(identity).toContainText(`${claim.domain}${preview.name}`);
+      await expect(
+        identity.getByText(preview.role, { exact: true })
+      ).toBeVisible();
       const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
       expect(
         snapshot.findings.filter(
