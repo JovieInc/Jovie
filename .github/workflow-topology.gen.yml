@@ -127,6 +127,17 @@ nodes:
       - workflow_call
     terminalReceipt: job:canary-health-gate
     jobCount: 1
+  - name: Chat Round Trip Smoke
+    path: .github/workflows/chat-round-trip-smoke.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+    terminalReceipt: job:dispatch
+    jobCount: 1
   - name: CI Duration Ratchet
     path: .github/workflows/ci-duration-ratchet.yml
     active: true
