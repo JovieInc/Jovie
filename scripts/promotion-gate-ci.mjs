@@ -43,7 +43,8 @@ export function projectInspectDeployment(raw) {
   const trimmed = text.trim();
   if (trimmed) candidates.push(trimmed);
   const prefixedAt = text.search(/^> /m);
-  if (prefixedAt >= 0) candidates.push(text.slice(prefixedAt).replace(/^> /, ''));
+  if (prefixedAt >= 0)
+    candidates.push(text.slice(prefixedAt).replace(/^> /, ''));
   const braceAt = text.search(/^\s*\{/m);
   if (braceAt >= 0) candidates.push(text.slice(braceAt));
   for (const candidate of candidates) {
@@ -86,7 +87,8 @@ export function bindLiveProductionSha({ inspect, buildInfo }) {
     return { sha: '', reason: `vercel inspect target is ${inspect.target}` };
   if (!buildInfo || typeof buildInfo !== 'object' || Array.isArray(buildInfo))
     return { sha: '', reason: 'production build-info was not valid JSON' };
-  const sha = typeof buildInfo.commitSha === 'string' ? buildInfo.commitSha : '';
+  const sha =
+    typeof buildInfo.commitSha === 'string' ? buildInfo.commitSha : '';
   if (!SHA.test(sha))
     return {
       sha: '',
@@ -138,18 +140,22 @@ export function buildGitFetchInvocation(base, candidate, env = process.env) {
 }
 
 export function diffNameOnly(base, candidate, spawn = spawnSync) {
-  const diff = spawn(
-    'git',
-    ['diff', '--name-only', `${base}..${candidate}`],
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
-  );
+  const diff = spawn('git', ['diff', '--name-only', `${base}..${candidate}`], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
   if (diff.status !== 0) return null;
   return String(diff.stdout ?? '')
     .split('\n')
     .filter(Boolean);
 }
 
-export function changedPaths(base, candidate, env = process.env, spawn = spawnSync) {
+export function changedPaths(
+  base,
+  candidate,
+  env = process.env,
+  spawn = spawnSync
+) {
   const plan = buildGitFetchInvocation(base, candidate, env);
   if (!plan) return null;
   const fetch = spawn('git', plan.args, { encoding: 'utf8', env: plan.env });
@@ -248,7 +254,9 @@ export async function main(argv) {
     const payload = jsonObject(listed ?? '');
     const runIds = unexpiredEvidenceRunIds(payload, o.candidate);
     if (runIds.length === 0) {
-      console.error(`no unexpired ${name} artifact for candidate ${o.candidate}`);
+      console.error(
+        `no unexpired ${name} artifact for candidate ${o.candidate}`
+      );
       return 0;
     }
     for (const runId of runIds) {

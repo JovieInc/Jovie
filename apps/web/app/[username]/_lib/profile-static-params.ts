@@ -1,4 +1,4 @@
-import { PROFILE_MODE_ALIAS_MARKER } from '@/lib/render-fixture-policy';
+import { aliasBudgetProfileModeParams } from '@/lib/routing/alias-budget-static-params';
 import {
   getProfilesByUsernames,
   getTopProfilesForStaticGeneration,
@@ -6,7 +6,7 @@ import {
 import { logger } from '@/lib/utils/logger';
 
 /**
- * Public `?mode=` documents that must ship with the build.
+ * Public seeded alias `?mode=` documents that must ship with the build.
  *
  * The featured/claimed prerender set does not include the unclaimed tipping
  * seed. Without a canonical static page, `next.config` rewrites
@@ -16,10 +16,6 @@ import { logger } from '@/lib/utils/logger';
  * `sfo1::iad1`. These params keep the rewrite, the server `pay` mode, and
  * the edge redirect, and deploy the document with the build.
  */
-const EDGE_CACHED_PROFILE_MODE_PARAMS = [
-  { username: 'testartist', profileMode: 'pay' },
-] as const;
-
 export async function getProfileStaticParams(limit = 100): Promise<
   Array<{
     username: string;
@@ -50,20 +46,13 @@ export async function getProfileModeRenderStaticParams(): Promise<
   }>
 > {
   try {
-    const usernames = [
-      ...new Set(EDGE_CACHED_PROFILE_MODE_PARAMS.map(mode => mode.username)),
-    ];
+    const modes = aliasBudgetProfileModeParams();
+    const usernames = [...new Set(modes.map(mode => mode.username))];
     const profiles = await getProfilesByUsernames(usernames);
-    return EDGE_CACHED_PROFILE_MODE_PARAMS.flatMap(mode => {
+    return modes.flatMap(mode => {
       const profile = profiles.get(mode.username);
       if (!profile?.isPublic) return [];
-      return [
-        {
-          username: mode.username,
-          profileMode: mode.profileMode,
-          marker: PROFILE_MODE_ALIAS_MARKER,
-        },
-      ];
+      return [mode];
     });
   } catch (error) {
     logger.error(

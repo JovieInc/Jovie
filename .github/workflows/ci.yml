@@ -6425,6 +6425,9 @@ jobs:
     # path-changes: the promotion gate needs this exact SHA's evidence before
     # CI completes and staging starts. A red push run does not fail CI;
     # the gate still blocks when that range requires a green journey.
+    # PRs and the merge queue stay off this lane. Push leaves neon-db
+    # skipped; this job opens its own ephemeral branch. Manual dispatch
+    # can produce evidence but cannot start staging.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
     if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_dispatch' && needs.ci-path-changes.result == 'success' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     continue-on-error: ${{ github.event_name == 'push' }}
