@@ -1,0 +1,24 @@
+● JOVIE · SYMPHONY · lanes unknown-release on gem · ! hud≠release · ! tick ? ✕ …
+ CONSTRAINT ? UNKNOWN   evidence · lanes-status unread
+ PRODUCTION  ? UNKNOWN served build unknown · not-read-yet
+ FLOW 24h    prepared ? → queued ? → merged ? → deployed ? → verified ?
+ WORKERS   ? UNKNOWN 0 running / unknown (codex 0/? · grok 0/?) · gate seats 2
+○ codex      vacant ×3 · no codex account available
+○ grok       vacant · no worker process · the minute timer restarts idle lanes
+  codex      24h started 0 · productive 0 · PR 0 · landed unknown
+ SUPPLY    ? UNKNOWN Todo ? → eligible ? → new issues ?
+  codex      new issues unknown (doctor unread)
+  +2 more
+ REPAIR    ? UNKNOWN open lane PRs unknown · draft unknown · non-draft unknown
+  ? PR list: not read yet
+  ? repair demand unknown (lanes-status unread)
+  hold records 0
+
+ QUEUE     ? UNKNOWN merge queue unknown · wait p50 ? · ejections ?
+ SHIPPED   ? UNKNOWN merged unknown
+  ? merged PRs: not-read-yet (source age unknown)
+ BUDGETS   ? UNKNOWN GitHub budget unknown
+ HOST      ✓ OK      disk 41% free · mem ? free · load ? / 16 cores
+ ALERTS    ? UNKNOWN 1 active · 0 critical/failing
+? lanes-status unread · owner doctor.py on the primary host
+● running ○ idle ✓ ok ! warn ✕ fail ? unknown

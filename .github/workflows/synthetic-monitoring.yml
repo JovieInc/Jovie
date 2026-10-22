@@ -122,14 +122,17 @@ jobs:
       - name: Run Onboarding Robot Full Synthetic (JOV-2681)
         id: onboarding-robot
         run: |
-          reason="synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot."
+          # JOV-7656 owns the real robot. While JOV-8809 is open this step
+          # skips with synthetic-robot-auth-unavailable. A skip that lacks
+          # that marker still fails in the parser.
+          reason="synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot (JOV-8809)."
           echo "::warning title=Onboarding robot skipped::${reason}"
           {
             echo "### Onboarding robot"
             echo "${reason}"
           } >> "$GITHUB_STEP_SUMMARY"
           echo "robot_skip_reason=${reason}" >> "$GITHUB_OUTPUT"
-          exit 0
+          echo "robot_status=not_implemented" >> "$GITHUB_OUTPUT"
 
       - name: Run Legacy OTP Signup Canary (gated, JOV-2446 cutover)
         # Skip this step entirely once Layer A is proven green and the Clerk
@@ -331,7 +334,7 @@ jobs:
                     },
                     {
                       "title": "Status",
-                      "value": "Production auth UI, onboarding robot, signup health, and public-profile synthetic checks passing",
+                      "value": "Production auth UI, signup health, and public-profile synthetic checks passing (onboarding robot is not implemented and is not covered)",
                       "short": false
                     },
                     {
@@ -354,6 +357,14 @@ jobs:
         run: |
           echo "Marking job as failed because synthetic status is '${{ steps.test-results.outputs.test_status }}'"
           exit 1
+
+      - name: Warn while the onboarding robot is deferred
+        # JOV-7656 used to fail this job on every run. While JOV-8809 is open
+        # the same gate only warns. Other step failures still fail the job.
+        if: ${{ always() && steps.onboarding-robot.outputs.robot_status == 'not_implemented' }}
+        run: |
+          echo "::warning title=Onboarding robot skipped::synthetic-robot-auth-unavailable: deferred while JOV-8809 is open."
+          exit 0
 
   web-ai-health:
     name: Web AI Health (Daily)

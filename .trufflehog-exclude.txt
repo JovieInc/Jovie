@@ -43,3 +43,6 @@ apps/web/scripts/download-current-spotify-images.ts
 scripts/download-current-spotify-images.ts
 apps/web/scripts/fetch-current-artist-images.ts
 scripts/fetch-current-artist-images.ts
+# JOV-7495 public work link test: URI-detector bait for a userinfo origin
+# (https://user:…@example.com/) asserting that such links are rejected.
+apps/web/lib/agent/public-work-links.test.ts

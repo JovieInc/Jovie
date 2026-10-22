@@ -305,10 +305,20 @@ async function resolveChatConversationPathWithRetry(
 }
 
 async function openLibraryReleasesView(page: Page): Promise<void> {
-  const link = page.locator('a[href="/app/library"]').first();
-  await expect(link).toBeVisible({ timeout: 30_000 });
-  await link.evaluate(element => {
-    element.setAttribute('href', '/app/library?view=releases');
+  // Releases has no sidebar row: it is a Work view reached through
+  // /app/releases -> /app/library?view=releases. Rewriting a Work link's DOM
+  // href does not change next/link's client navigation target, so use the
+  // shell command palette, which navigates client-side like a user would.
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('Meta+k');
+  const paletteInput = page
+    .locator('input[aria-label="Command Palette Search"]')
+    .filter({ visible: true })
+    .first();
+  await expect(paletteInput).toBeVisible({ timeout: 15_000 });
+  await paletteInput.fill('Releases');
+  await expect(page.locator('[data-cmdk-item]').first()).toBeVisible({
+    timeout: 10_000,
   });
   await Promise.all([
     page.waitForURL(
@@ -317,7 +327,7 @@ async function openLibraryReleasesView(page: Page): Promise<void> {
         url.searchParams.get('view') === 'releases',
       { timeout: 60_000, waitUntil: 'commit' }
     ),
-    link.click({ noWaitAfter: true }),
+    page.keyboard.press('Enter'),
   ]);
 }
 

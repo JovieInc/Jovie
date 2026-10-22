@@ -68,6 +68,8 @@
   --leading-relaxed: 1.625;
   --leading-loose: 2;
   /* Map app-level button tokens to Tailwind v4 color tokens so classes like bg-btn-primary work */
+  --color-btn-destructive: var(--color-btn-destructive-bg);
+  --color-btn-destructive-foreground: var(--color-btn-destructive-fg);
   --color-btn-primary: var(--color-btn-primary-bg);
   --color-btn-primary-foreground: var(--color-btn-primary-fg);
   --color-btn-secondary: var(--color-btn-secondary-bg);
@@ -198,6 +200,12 @@
 /* Surface chrome eases while text paints immediately for accessible contrast. */
 @utility transition-surface {
   transition-property: background-color, border-color;
+}
+
+/* Card border and shadow ease. Background snaps so a theme-class change
+   cannot be sampled mid-blend. */
+@utility transition-card-chrome {
+  transition-property: border-color, box-shadow;
 }
 
 /* Canonical allocation transition shared by sidebar, inspector, and drawers. */

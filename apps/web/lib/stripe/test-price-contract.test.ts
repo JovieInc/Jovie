@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ARTIST_VISIBILITY_PRICE_METADATA,
   type ArtistVisibilityStripePrice,
   assertArtistVisibilityStripeTestPrice,
   assertStripeTestAccount,
@@ -18,11 +19,11 @@ const validPrice: ArtistVisibilityStripePrice = {
   billing_scheme: 'per_unit',
   currency: 'usd',
   livemode: false,
-  metadata: { issue: 'JOV-6218', offer: 'artist_visibility_pro' },
+  metadata: { ...ARTIST_VISIBILITY_PRICE_METADATA },
   recurring: validRecurring,
   transform_quantity: null,
   type: 'recurring',
-  unit_amount: 19_900,
+  unit_amount: 1_200,
 };
 
 const validConfig = {
@@ -128,6 +129,13 @@ describe('Artist Visibility Stripe test price contract', () => {
       { transform_quantity: { divide_by: 10, round: 'up' } },
     ],
     ['wrong offer metadata', { metadata: { issue: 'JOV-17747' } }],
+    [
+      'the retired $199 fixture',
+      {
+        metadata: { issue: 'JOV-6218', offer: 'artist_visibility_pro' },
+        unit_amount: 19_900,
+      },
+    ],
     ['one-time price', { recurring: null }],
   ])(
     'rejects %s before using it for the money-path test',

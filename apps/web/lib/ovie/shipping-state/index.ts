@@ -10,6 +10,7 @@ export {
   type DeliveryCertifiedHead,
   type DeliveryLane,
   type DeliveryLanes,
+  type DeliveryMergedPullRequest,
   type DeliveryMergeRepo,
   type DeliveryMerges,
   type DeliveryPatch,
@@ -64,6 +65,8 @@ export {
   type ShippingSourceId,
   type ShippingStateProjection,
   type SourceObservation,
+  type StageSummary,
+  type StageTiming,
 } from './contract';
 export {
   detectClockSkew,
