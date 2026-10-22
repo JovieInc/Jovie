@@ -51,6 +51,38 @@ function stripDuplicateTestIds(
   }
 }
 
+const SHELL_FRAME_ATTR = 'data-app-shell-frame';
+/** Stays on a dropped frame after `data-app-shell-frame` is removed so later
+ *  mutations in that copy can be cleared without scanning the live frame. */
+const SUPPRESSED_SHELL_ATTR = 'data-jovie-shell-suppressed';
+
+function elementFrom(target: Node): Element | null {
+  return target instanceof Element ? target : target.parentElement;
+}
+
+function shellFrameOf(target: Node): HTMLElement | null {
+  return (
+    elementFrom(target)?.closest<HTMLElement>(`[${SHELL_FRAME_ATTR}]`) ?? null
+  );
+}
+
+function suppressedShellOf(target: Node): HTMLElement | null {
+  return (
+    elementFrom(target)?.closest<HTMLElement>(`[${SUPPRESSED_SHELL_ATTR}]`) ??
+    null
+  );
+}
+
+function nodeCarriesShellFrame(node: Node): boolean {
+  if (!(node instanceof Element)) return false;
+  return (
+    node.hasAttribute(SHELL_FRAME_ATTR) ||
+    node.hasAttribute(SUPPRESSED_SHELL_ATTR) ||
+    node.querySelector(`[${SHELL_FRAME_ATTR}], [${SUPPRESSED_SHELL_ATTR}]`) !==
+      null
+  );
+}
+
 /** A retained shell can stay in the DOM while a second live frame paints.
  *  Playwright's strict `[data-app-shell-frame]` locator then waits on the
  *  hidden copy. Drop the attribute from hidden copies only when a visible
@@ -78,9 +110,12 @@ function releaseHiddenDuplicateFrames(): void {
     if (dropSet.has(frame)) continue;
     for (const id of collectTestIds(frame)) liveIds.add(id);
   }
-  for (const frame of drop) stripDuplicateTestIds(frame, liveIds);
   for (const frame of drop) {
-    frame.removeAttribute('data-app-shell-frame');
+    frame.setAttribute(SUPPRESSED_SHELL_ATTR, 'true');
+    stripDuplicateTestIds(frame, liveIds);
+  }
+  for (const frame of drop) {
+    frame.removeAttribute(SHELL_FRAME_ATTR);
     if (frame.id === 'main-content') frame.removeAttribute('id');
     for (const landmark of frame.querySelectorAll<HTMLElement>(
       '[id="main-content"]'
@@ -95,16 +130,54 @@ function releaseHiddenDuplicateFrames(): void {
 }
 
 function clearRetainedShellText(frame: HTMLElement): void {
-  frame.setAttribute('hidden', '');
-  frame.setAttribute('aria-hidden', 'true');
-  frame.inert = true;
-  frame.style.setProperty('display', 'none', 'important');
+  // Same-value attribute writes still notify MutationObserver in jsdom, and
+  // `hidden` is observed. A second write from that notification loops.
+  if (!frame.hasAttribute('hidden')) frame.setAttribute('hidden', '');
+  if (frame.getAttribute('aria-hidden') !== 'true') {
+    frame.setAttribute('aria-hidden', 'true');
+  }
+  if (!frame.inert) frame.inert = true;
+  if (frame.style.getPropertyValue('display') !== 'none') {
+    frame.style.setProperty('display', 'none', 'important');
+  }
+  // Empty copies stay empty. Walking every text node when the live chat
+  // commits a message is a 50–150ms long task and misses the round-trip
+  // budget (first feedback p50 100ms, usable p95 300ms).
+  if (!frame.textContent) return;
   const walker = document.createTreeWalker(frame, NodeFilter.SHOW_TEXT);
   const textNodes: Text[] = [];
   while (walker.nextNode()) {
-    textNodes.push(walker.currentNode as Text);
+    const text = walker.currentNode as Text;
+    if (text.data.length > 0) textNodes.push(text);
   }
   for (const node of textNodes) node.textContent = '';
+}
+
+/**
+ * Chat commits are childList mutations inside the live frame. Those must not
+ * force layout or walk a retained shell. Attribute changes and a frame
+ * mounted outside the live shell still run a full pass. Text that reappears
+ * inside an already suppressed copy is cleared on that copy only.
+ */
+function onDocumentMutations(records: MutationRecord[]): void {
+  let fullPass = false;
+  const suppressed = new Set<HTMLElement>();
+  for (const record of records) {
+    const suppressedFrame = suppressedShellOf(record.target);
+    if (suppressedFrame) {
+      suppressed.add(suppressedFrame);
+      continue;
+    }
+    if (record.type === 'attributes') {
+      fullPass = true;
+      continue;
+    }
+    if (shellFrameOf(record.target)) continue;
+    const nodes = [...record.addedNodes, ...record.removedNodes];
+    if (nodes.some(nodeCarriesShellFrame)) fullPass = true;
+  }
+  if (fullPass) releaseHiddenDuplicateFrames();
+  for (const frame of suppressed) clearRetainedShellText(frame);
 }
 
 let observer: MutationObserver | null = null;
@@ -113,8 +186,8 @@ let subscribers = 0;
 function subscribeFrameDedupe(): () => void {
   subscribers += 1;
   if (observer === null && typeof MutationObserver !== 'undefined') {
-    observer = new MutationObserver(() => {
-      releaseHiddenDuplicateFrames();
+    observer = new MutationObserver(records => {
+      onDocumentMutations(records);
     });
     observer.observe(document.documentElement, {
       subtree: true,
