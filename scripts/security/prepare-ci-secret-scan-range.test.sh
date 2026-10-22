@@ -226,6 +226,35 @@ fail() {
   exit 1
 }
 
+# TruffleHog 3.99.4 no longer prints "scanning repo" at the default log
+# level. Require completed, nonempty work beyond that progress message;
+# an aborted traversal can exit zero after scanning no data.
+trufflehog_scanned_data() {
+  awk '
+    /finished scanning/ &&
+      /"chunks":[[:space:]]*[1-9][0-9]*[[:space:]]*[,}]/ &&
+      /"bytes":[[:space:]]*[1-9][0-9]*[[:space:]]*[,}]/ { scanned = 1 }
+    /encountered errors during scan/ { incomplete = 1 }
+    END { exit !(scanned && !incomplete) }
+  '
+}
+
+completion_log='info-0 trufflehog finished scanning {"chunks": 7, "bytes": 1068}'
+trufflehog_scanned_data <<<"$completion_log" \
+  || fail 'a completed nonempty scan must pass without a progress message'
+for scan_log in \
+  '' \
+  'scanning repo' \
+  'finished scanning {}' \
+  'finished scanning {"chunks": 0, "bytes": 0}' \
+  'finished scanning {"chunks": 7, "bytes": 0}' \
+  'finished scanning {"chunks": 0, "bytes": 1068}' \
+  "$completion_log"$'\nencountered errors during scan'; do
+  if trufflehog_scanned_data <<<"$scan_log"; then
+    fail 'missing, empty, or aborted scan evidence must fail closed'
+  fi
+done
+
 assert_complete_range() {
   local checkout="$1"
   local base_sha="$2"
@@ -496,8 +525,8 @@ if TRUFFLEHOG_BIN="${TRUFFLEHOG_BIN:-$(command -v trufflehog || true)}" \
     || fail 'trufflehog could not scan the older-dated anchored merge group'
   grep 'scanning repo' "$TEST_ROOT/skewed-trufflehog.output" | grep -q "$BASE_SHA" \
     || fail 'trufflehog did not emit a positive repository-scan receipt'
-  ! grep -q 'encountered errors during scan' "$TEST_ROOT/skewed-trufflehog.output" \
-    || fail 'trufflehog still aborted its older-dated merge-group scan'
+  trufflehog_scanned_data <"$TEST_ROOT/skewed-trufflehog.output" \
+    || fail 'trufflehog did not complete a nonempty older-dated merge-group scan'
   echo 'PASS: trufflehog scanned the older-dated anchored merge group'
 else
   echo 'SKIP: trufflehog binary unavailable for older-dated merge-group assertion'
