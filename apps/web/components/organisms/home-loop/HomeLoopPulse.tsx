@@ -86,6 +86,15 @@ export function HomeLoopConstraintBanner({
           >
             {constraint ? constraint.text : emptyLabel}
           </span>
+          {constraint?.detailsHref ? (
+            <a
+              href={constraint.detailsHref}
+              className='ml-auto shrink-0 text-xs text-secondary-token underline-offset-2 hover:text-primary-token hover:underline focus-visible:underline'
+              data-testid='home-loop-constraint-details'
+            >
+              Details
+            </a>
+          ) : null}
         </>
       )}
     </div>
