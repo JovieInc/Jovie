@@ -410,13 +410,6 @@ export function buildFeatureReviewItems(
     const itemId = `feature.${stableId(row.productArea)}.${stableId(
       row.feature
     )}`;
-    const shipped = row.status.startsWith('Shipped');
-    const testEvidence =
-      shipped && row.flagOrGate !== 'None'
-        ? `Flag/gate evidence: ${row.flagOrGate}`
-        : shipped
-          ? 'Shipped registry status with entitlement or rollout evidence'
-          : null;
     const packet = founderPacket(
       itemId,
       'feature',
@@ -428,12 +421,9 @@ export function buildFeatureReviewItems(
           'Canonical feature registry entry',
           registrySource,
         ],
-        invariant: shipped
-          ? ['shipped-status', `Registry status: ${row.status}`, registrySource]
-          : undefined,
-        tests: testEvidence
-          ? ['gate-or-test-evidence', testEvidence, registrySource]
-          : undefined,
+        // Registry status, gates and entitlement names describe the feature;
+        // they are not executed invariant or test receipts. Keep those tiers
+        // missing until their evidence producers supply proof to the kernel.
         visual: media.dedicated
           ? [
               'item-specific-capture',
