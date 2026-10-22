@@ -99,7 +99,7 @@ describe('mounted homepage pricing System B source contract', () => {
     expect(source).toContain("getPublicPriceClaim('pro')");
     expect(source).toContain('proClaim.priceLabel');
     expect(source).not.toContain('release tools');
-    expect(source).toContain('with limited access');
+    expect(source).not.toContain('limited access');
 
     // JOV-naming-sweep (2026-09-26): outside the artist ICP pages the product
     // is "your Jovie profile," never "artist profile" — guard against

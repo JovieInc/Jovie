@@ -131,6 +131,10 @@ describe('public CTA guard', () => {
 
     expect(authActionsSource).toContain('export function AuthActions');
     expect(headerNavSource).toContain('export function HeaderNav');
+    expect(headerNavSource).toContain('getHomepageFrontDoorCtaContract(');
+    expect(headerNavSource).toContain('FEATURE_FLAGS.WAITLIST_ENABLED');
+    expect(headerNavSource).toContain('publicCta = DEFAULT_PUBLIC_CTA');
+    expect(headerNavSource).not.toContain("label: 'Request Access'");
   });
 
   it('keeps legacy public CTA classnames out of production marketing and key public feature surfaces', () => {

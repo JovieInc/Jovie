@@ -160,8 +160,8 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
   },
   pricing: {
     headline: 'Free to start.',
-    body: 'Jovie profiles are free forever. Pro has limited access.',
-    supportLine: 'Profiles stay free. Paid plans open from the waitlist.',
+    body: 'Jovie profiles are free forever.',
+    supportLine: 'Profiles stay free. Upgrade when you need more.',
     ctaLabel: 'See Pricing',
     href: APP_ROUTES.PRICING,
   },
