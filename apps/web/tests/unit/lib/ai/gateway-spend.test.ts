@@ -154,7 +154,11 @@ describe('AI Gateway daily spend', () => {
         updatedAt: NOW,
       })
     );
-    expect(mockWhere).toHaveBeenCalledTimes(1);
+    expect(mockSet).toHaveBeenCalledWith({
+      costsLastRefreshedAt: NOW,
+      updatedAt: NOW,
+    });
+    expect(mockWhere).toHaveBeenCalledTimes(2);
     expect(mockCaptureError).toHaveBeenCalledWith(
       'AI Gateway daily spend alert',
       expect.any(Error),

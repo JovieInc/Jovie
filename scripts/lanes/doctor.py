@@ -183,6 +183,14 @@ def provider_payloads(state: Path, providers, proc: Path = Path("/proc")) -> dic
     return result
 
 
+def _linear_app_credential(lane) -> bool | None:
+    """Installed Jovie Lanes app credential (presence only; never read into the report).
+    None where no host file applies (self-test, fixtures)."""
+    tokens = getattr(lane, "linear_app_token", None)
+    path = tokens.default_path() if tokens else None
+    return None if path is None else bool(tokens.credentials(path))
+
+
 # #22354 shipped the registry at canon/ (the repo-root allowlist rejects new top-level dirs).
 # Reading a path that is not on main must alert, never read as "nothing silent" (2026-10-21:
 # the doctor watched ops/automation/registry.jsonl, which never existed, so no row was checked).
@@ -487,6 +495,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         **automation_observation(host, lane, now),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
+        "linearAppCredential": _linear_app_credential(lane),
         "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
                       if key not in ("ownerlessSince", "evidenceNoted", "moved", "claimsReleased")},
         "merged24h": merged, "mergedAttributionError": merged_error,
@@ -861,6 +870,10 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    if obs.get("linearAppCredential") is False:
+        alerts["linear-app-credential-missing"] = (
+            "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
+            "access fails closed (no personal-key fallback) until the lanes host owner reinstalls it")
     for automation_id, row in sorted(((obs.get("automation") or {}).get("silent") or {}).items()):
         age = row.get("ageS")
         alerts[f"automation-silent:{automation_id}"] = (

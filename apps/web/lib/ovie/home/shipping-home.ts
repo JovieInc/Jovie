@@ -64,16 +64,35 @@ export type OvieDoneItem = HomeLoopDoneItem;
 export type OvieConstraint = HomeLoopConstraint;
 export type OvieAsk = HomeLoopAsk;
 
+/** Priority order: the row shows as many as fit, left to right. */
 export type OviePulseKey =
   | 'prod'
+  | 'merges-hour'
+  | 'queue'
+  | 'red-prs'
+  | 'lanes'
+  | 'eligible'
+  | 'held'
+  | 'ownerless'
   | 'merges-today'
   | 'merges-7d'
-  | 'lanes'
-  | 'queue'
-  | 'held'
   | 'gem-disk';
 
 export type OviePulseTile = HomeLoopTile<OviePulseKey>;
+
+const PULSE_ORDER: readonly OviePulseKey[] = [
+  'prod',
+  'merges-hour',
+  'queue',
+  'red-prs',
+  'lanes',
+  'eligible',
+  'held',
+  'ownerless',
+  'merges-today',
+  'merges-7d',
+  'gem-disk',
+];
 export type OviePulseMemory = HomeLoopTileMemory<OviePulseKey>;
 
 export interface OvieHomeShipping {
@@ -242,8 +261,16 @@ function rawPulse(
   const queue = countValue(delivery.mergeQueueDepth);
   const held = lanes.publishedAt ? sumValues(lanes.heldByReason) : null;
   const disk = lanes.diskFreePct;
+  const flow = lanes.flow ?? null;
+  const perHour = flow?.mergesPerHour ?? null;
+  const ejection = flow?.queueEjectionRate ?? null;
+  const red = flow?.redPrs ?? null;
+  const open = flow?.openPrs ?? null;
+  const eligible = flow?.eligiblePool ?? null;
+  const candidates = flow?.candidatePool ?? null;
+  const ownerless = flow?.ownerless ?? null;
 
-  return [
+  const tiles: Omit<OviePulseTile, 'was'>[] = [
     {
       key: 'prod',
       label: 'Prod',
@@ -255,6 +282,42 @@ function rawPulse(
           : behind === 0
             ? 'good'
             : 'warn',
+    },
+    {
+      key: 'merges-hour',
+      label: 'Merges / h',
+      value: perHour === null ? OVIE_NOT_MEASURED : String(perHour),
+      measured: perHour !== null,
+      tone: perHour === null ? 'neutral' : perHour >= 1 ? 'good' : 'warn',
+    },
+    {
+      key: 'queue',
+      label:
+        ejection === null
+          ? 'Queue'
+          : `Queue · ${Math.round(ejection * 100)}% ejected`,
+      value: formatCount(queue),
+      measured: queue !== null,
+      tone:
+        ejection === null
+          ? 'neutral'
+          : ejection > 0.3
+            ? 'bad'
+            : ejection > 0.1
+              ? 'warn'
+              : 'good',
+    },
+    {
+      key: 'red-prs',
+      label: 'Red PRs',
+      value:
+        red === null
+          ? OVIE_NOT_MEASURED
+          : open === null
+            ? String(red)
+            : `${red}/${open}`,
+      measured: red !== null,
+      tone: red === null ? 'neutral' : red === 0 ? 'good' : 'warn',
     },
     {
       key: 'merges-today',
@@ -291,11 +354,16 @@ function rawPulse(
             : 'warn',
     },
     {
-      key: 'queue',
-      label: 'Queue',
-      value: formatCount(queue),
-      measured: queue !== null,
-      tone: 'neutral',
+      key: 'eligible',
+      label: 'Eligible',
+      value:
+        eligible === null
+          ? OVIE_NOT_MEASURED
+          : candidates === null
+            ? String(eligible)
+            : `${eligible}/${candidates}`,
+      measured: eligible !== null,
+      tone: eligible === null ? 'neutral' : eligible > 0 ? 'good' : 'warn',
     },
     {
       key: 'held',
@@ -303,6 +371,13 @@ function rawPulse(
       value: formatCount(held),
       measured: held !== null,
       tone: held === null ? 'neutral' : held === 0 ? 'good' : 'bad',
+    },
+    {
+      key: 'ownerless',
+      label: 'Ownerless',
+      value: formatCount(ownerless),
+      measured: ownerless !== null,
+      tone: ownerless === null ? 'neutral' : ownerless === 0 ? 'good' : 'bad',
     },
     {
       key: 'gem-disk',
@@ -319,6 +394,9 @@ function rawPulse(
               : 'good',
     },
   ];
+  return [...tiles].sort(
+    (a, b) => PULSE_ORDER.indexOf(a.key) - PULSE_ORDER.indexOf(b.key)
+  );
 }
 
 function sourceWas(
@@ -486,6 +564,29 @@ function decisionDefaultOf(item: OvieInboxCase): OvieAsk['decisionDefault'] {
   };
 }
 
+/**
+ * `escalation` on no-default inbox cases (#22371): only levels 1 (24h) and
+ * 2 (48h) badge on Home. Parsed leniently; anything else means none.
+ */
+function escalationOf(item: OvieInboxCase): OvieAsk['escalation'] {
+  const wire = (
+    item as {
+      readonly escalation?: {
+        readonly level?: unknown;
+        readonly waitingHours?: unknown;
+      } | null;
+    }
+  ).escalation;
+  if (
+    !wire ||
+    (wire.level !== 1 && wire.level !== 2) ||
+    typeof wire.waitingHours !== 'number' ||
+    !Number.isFinite(wire.waitingHours)
+  )
+    return null;
+  return { level: wire.level, waitingHours: Math.floor(wire.waitingHours) };
+}
+
 function askFromCase(item: OvieInboxCase): OvieAsk {
   return {
     id: item.id,
@@ -501,6 +602,7 @@ function askFromCase(item: OvieInboxCase): OvieAsk {
     decisionDefault: decisionDefaultOf(item),
     // Summer cards accept post-ship feedback once decided.
     canFeedback: item.decisionTarget?.kind === 'summer',
+    escalation: escalationOf(item),
   };
 }
 

@@ -355,6 +355,16 @@ describe('UnifiedSidebar library route', () => {
     expect(
       within(panel).getByRole('link', { name: /Public Profile/i })
     ).toHaveAttribute('href', '/timwhite');
+    const settingsNav = screen.getByRole('navigation', {
+      name: 'settings navigation',
+    });
+    for (const label of ['Account', 'Artist']) {
+      const group = within(settingsNav)
+        .getAllByText(label)
+        .find(node => node.className.includes('font-caption'));
+      expect(group?.className).toContain('text-sidebar-muted');
+      expect(group?.className).not.toMatch(/text-sidebar-muted\/\d+/);
+    }
   });
 
   it('keeps the unified user panel when a route-owned sidebar override replaces nav', () => {
