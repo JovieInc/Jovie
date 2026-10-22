@@ -105,6 +105,10 @@ async function collectAudienceShape(
     name: /analytics panel/i,
   });
   await expect(toggleAnalytics).toBeVisible({ timeout: 30_000 });
+  // The funnel lives in the analytics panel, which starts closed.
+  if ((await page.getByText('Audience funnel').count()) === 0) {
+    await toggleAnalytics.click();
+  }
 
   await expect(page.getByText('Audience funnel')).toBeVisible({
     timeout: 30_000,
