@@ -141,33 +141,21 @@ export async function mockChatBackend(page: Page) {
     });
   });
 }
-export async function installChatProbe(
-  page: Page,
-  userText: string,
-  assistantText: string
-) {
-  await page.evaluate(installBrowserChatProbe, {
-    assistant: assistantText,
-    user: userText,
-  });
-}
+export const installChatProbe = (page: Page, user: string, assistant: string) =>
+  page.evaluate(installBrowserChatProbe, { assistant, user });
 export async function triggerMeasuredSend(
   sendButton: ReturnType<Page['getByRole']>
 ): Promise<void> {
   await sendButton.evaluate(button => {
-    const probeWindow = window as ChatProbeWindow;
-    const probe = probeWindow.__jovieChatPerformanceProbe;
-    if (!probe) {
-      throw new Error('Chat performance probe was not installed');
-    }
+    const probe = (window as ChatProbeWindow).__jovieChatPerformanceProbe;
+    if (!probe) throw new Error('Chat performance probe was not installed');
     probe.start = performance.now();
     (button as HTMLButtonElement).click();
   });
 }
 export async function readChatProbe(page: Page) {
   await page.waitForFunction(() => {
-    const probeWindow = window as ChatProbeWindow;
-    const probe = probeWindow.__jovieChatPerformanceProbe;
+    const probe = (window as ChatProbeWindow).__jovieChatPerformanceProbe;
     return (
       probe?.firstFeedbackMs !== undefined &&
       probe.usableStateMs !== undefined &&
@@ -175,8 +163,7 @@ export async function readChatProbe(page: Page) {
     );
   });
   return page.evaluate(() => {
-    const probeWindow = window as ChatProbeWindow;
-    const probe = probeWindow.__jovieChatPerformanceProbe;
+    const probe = (window as ChatProbeWindow).__jovieChatPerformanceProbe;
     if (
       !probe ||
       probe.firstFeedbackMs === undefined ||
@@ -199,12 +186,22 @@ export async function readChatProbe(page: Page) {
     };
   });
 }
-export async function measureChatScrollFrames(page: Page) {
-  return page.getByTestId('chat-message-scroll').evaluate(async element => {
+export async function measureChatScrollFrames(
+  page: Page,
+  beforeFrames?: (page: Page) => Promise<void>
+) {
+  const scroll = page.getByTestId('chat-message-scroll');
+  await scroll.evaluate(element => {
     const scrollElement = element as HTMLElement;
     if (scrollElement.scrollHeight <= scrollElement.clientHeight)
       throw new Error('Chat message list must overflow for the scroll ratchet');
+    // Swapping the virtual window and mounting scroll-to-latest are not scroll frames.
     scrollElement.scrollTop = 0;
+  });
+  await beforeFrames?.(page);
+
+  return scroll.evaluate(async element => {
+    const scrollElement = element as HTMLElement;
     const frameIntervals: number[] = [];
     let rendererHidden = false;
     const frameCount = 24;
@@ -215,17 +212,13 @@ export async function measureChatScrollFrames(page: Page) {
       const step = (time: number) => {
         rendererHidden ||=
           document.visibilityState !== 'visible' || !document.hasFocus();
-        if (previousTime !== undefined) {
+        if (previousTime !== undefined)
           frameIntervals.push(time - previousTime);
-        }
         previousTime = time;
         currentFrame += 1;
         scrollElement.scrollTop = distance * (currentFrame / frameCount);
-        if (currentFrame >= frameCount) {
-          resolve();
-          return;
-        }
-        requestAnimationFrame(step);
+        if (currentFrame < frameCount) requestAnimationFrame(step);
+        else resolve();
       };
       requestAnimationFrame(step);
     });
@@ -237,15 +230,13 @@ export async function measureChatScrollFrames(page: Page) {
     };
   });
 }
-function isChatApiRequest(request: Request): boolean {
-  const { pathname } = new URL(request.url());
-  return pathname === '/api/chat' || pathname.startsWith('/api/chat/');
-}
 // Avoid networkidle: Library warming is unrelated; full nav prefetch exceeds the RSC budget.
 export function trackChatApiRequests(page: Page) {
   const inFlight = new Set<Request>();
   page.on('request', request => {
-    if (isChatApiRequest(request)) inFlight.add(request);
+    const { pathname } = new URL(request.url());
+    if (pathname === '/api/chat' || pathname.startsWith('/api/chat/'))
+      inFlight.add(request);
   });
   page.on('requestfinished', request => inFlight.delete(request));
   page.on('requestfailed', request => inFlight.delete(request));

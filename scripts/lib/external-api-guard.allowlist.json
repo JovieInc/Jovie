@@ -2,6 +2,12 @@
   "schema": "jovie-external-api-allowlist/v1",
   "entries": [
     {
+      "path": ".github/workflows/merge-queue-green-enroll.yml",
+      "rule": "provider-host",
+      "max": 2,
+      "reason": "The quota sample already calls api.github.com. A required-green BLOCKED head dispatches this same workflow with the job GITHUB_TOKEN because the Jovie Bot installation has no actions: write and another github-script or gh step would grow the shrink-only ratchet."
+    },
+    {
       "path": "scripts/lanes/gh_app_token.py",
       "rule": "provider-host",
       "max": 2,

@@ -9,6 +9,7 @@
  */
 
 import { expect, type Page, test } from '@playwright/test';
+import { CHAT_TRANSCRIPT_WINDOW } from '@/lib/chat/transcript-window';
 import { UX_LATENCY_STORAGE_KEY } from '@/lib/monitoring/interaction-latency';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import {
@@ -27,6 +28,20 @@ import {
   WARMUP_ROUND_TRIPS,
   waitForChatRouteReady,
 } from '../helpers/chat-performance-scenario';
+
+/** User plus assistant. The remounting warmup leaves one pair on the document. */
+const MESSAGES_PER_ROUND_TRIP = 2;
+/**
+ * Virtualizing is a one-time commit. p95 of five samples is the slowest
+ * sample, so that commit has to land before the clock starts. The scroll
+ * probe still runs on the virtualized thread.
+ */
+const VIRTUAL_WINDOW_WARMUP_ROUND_TRIPS = Math.ceil(
+  (CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount +
+    1 -
+    MESSAGES_PER_ROUND_TRIP) /
+    MESSAGES_PER_ROUND_TRIP
+);
 
 /**
  * Scored clicks and the scroll probe share the runner with the rest of the
@@ -139,6 +154,25 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
     );
   }
 
+  // The virtualizer turns on once the thread passes the window threshold.
+  // That commit is not a steady-state send. Cross it on this document, then
+  // drop every warmup sample before scoring.
+  for (
+    let warmupIndex = 0;
+    warmupIndex < VIRTUAL_WINDOW_WARMUP_ROUND_TRIPS;
+    warmupIndex += 1
+  ) {
+    await waitForChatSendPacer(page);
+    const copy = roundTripCopy('Warmup', WARMUP_ROUND_TRIPS + warmupIndex);
+    await exchangeChatRoundTrip(
+      page,
+      composer,
+      sendButton,
+      copy.userText,
+      copy.assistantText
+    );
+  }
+
   // Warmup sends are real product interactions and land in the UX latency
   // store. Drop them so the assertion below still proves exactly the scored
   // samples were recorded.
@@ -167,7 +201,10 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
   }
 
   await waitForQuietFrames(page);
-  const { droppedFrameCount } = await measureChatScrollFrames(page);
+  const { droppedFrameCount } = await measureChatScrollFrames(
+    page,
+    waitForQuietFrames
+  );
   const completeSamples = samples.map(sample => ({
     ...sample,
     droppedFrameCount,

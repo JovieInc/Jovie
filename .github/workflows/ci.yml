@@ -6387,7 +6387,12 @@ jobs:
           fi
 
           cd "$GITHUB_WORKSPACE"
-          CI=true BASE_URL=http://localhost:3240 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --reporter=line
+          # The round-trip ratchet's p95 is the slowest of five samples. Score
+          # it after the rest of the lane, on one worker, so a sibling
+          # Chromium's CPU spike is not recorded as chat latency. Budgets are
+          # unchanged. The test is not skipped.
+          CI=true BASE_URL=http://localhost:3240 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --grep-invert "deploy-gating responsiveness budget" --reporter=line
+          CI=true PLAYWRIGHT_WORKERS=1 BASE_URL=http://localhost:3240 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/chat-performance-ratchet.spec.ts --config=playwright.config.smoke.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           BETTER_AUTH_URL: http://localhost:3240
@@ -6420,10 +6425,13 @@ jobs:
     # branch so certification writes a certificate (JOV-8614).
     # Unlike ci-e2e-smoke this must NOT set NEXT_PUBLIC_CLERK_MOCK or
     # E2E_USE_TEST_AUTH_BYPASS — required mode fails closed if either is present.
-    # Path-triggered (not always-on): the spec has a 900s timeout, so always-on would
-    # blow the CI budget and churn the external Spotify/Stripe fixtures.
+    # PRs and the merge queue stay off this lane: the spec has a 900s timeout.
+    # Main pushes run it. Staging only follows a successful push CI, and the
+    # pre-promotion journey gate accepts evidence only for that exact SHA.
+    # A workflow_dispatch can produce the artifact, but it cannot start staging.
+    # Push leaves neon-db skipped; this job opens its own ephemeral branch.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ always() && !cancelled() && needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure') }}
+    if: ${{ always() && !cancelled() && needs.ci-path-changes.result == 'success' && ((github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure' || needs.neon-db.result == 'skipped'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     outputs:
@@ -8299,13 +8307,19 @@ jobs:
             exit 1
           fi
 
-          # Run smoke tests with BASE_URL set (skips Playwright webServer config)
+          # Run smoke tests with BASE_URL set (skips Playwright webServer config).
+          # The ratchet follows on one worker. See the E2E Smoke step.
           cd "$GITHUB_WORKSPACE"
           set +e
-          CI=true BASE_URL=http://localhost:3260 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --reporter=line
-          EXIT_CODE=$?
+          CI=true BASE_URL=http://localhost:3260 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --grep-invert "deploy-gating responsiveness budget" --reporter=line
+          SUITE_EXIT=$?
+          CI=true PLAYWRIGHT_WORKERS=1 BASE_URL=http://localhost:3260 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/chat-performance-ratchet.spec.ts --config=playwright.config.smoke.ts --reporter=line
+          RATCHET_EXIT=$?
           set -e
-          exit $EXIT_CODE
+          if [ "$SUITE_EXIT" -ne 0 ]; then
+            exit "$SUITE_EXIT"
+          fi
+          exit "$RATCHET_EXIT"
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           BETTER_AUTH_URL: http://localhost:3260
