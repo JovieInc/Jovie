@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ProfileUpdateSchema } from './validation';
+import { parseProfileUpdates, ProfileUpdateSchema } from './validation';
 
 describe('dashboard profile username updates', () => {
   it('rejects renaming a profile to the token-only claim fixture', () => {
@@ -19,5 +19,29 @@ describe('dashboard profile username updates', () => {
     expect(
       ProfileUpdateSchema.safeParse({ username: 'realartist' }).success
     ).toBe(true);
+  });
+
+  it('saves other fields when the owned handle is a reserved fixture', () => {
+    const result = parseProfileUpdates(
+      {
+        username: 'browse-ready-user',
+        careerHighlights: 'Golden path test',
+      },
+      { currentUsername: 'browse-ready-user' }
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.parsed.username).toBe('browse-ready-user');
+    expect(result.parsed.careerHighlights).toBe('Golden path test');
+  });
+
+  it('still rejects claiming a reserved fixture from a different handle', () => {
+    const result = parseProfileUpdates(
+      { username: 'browse-ready-user', careerHighlights: 'Golden path test' },
+      { currentUsername: 'real-artist' }
+    );
+
+    expect(result.ok).toBe(false);
   });
 });
