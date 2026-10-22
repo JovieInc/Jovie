@@ -39,6 +39,12 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
+def setUpModule() -> None:
+    # observe_main polls while Main Release Ready is missing or pending.
+    # Existing fixtures are one-shot reads; a positive budget would sleep.
+    os.environ["FLEET_GATE_RELEASE_READY_POLL_SECONDS"] = "0"
+
+
 class FakeResponse:
     def __init__(self, url: str, payload: dict[str, object], status: int = 200):
         self._url = url
@@ -406,6 +412,7 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         read must be allowed to grade the check. Backoff stays bounded.
         """
         calls = {"check_runs": 0}
+        check_endpoints: list[str] = []
 
         def run(command, **_kwargs):
             endpoint = command[-1]
@@ -415,6 +422,7 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
                 body = {"state": "success"}
             elif f"/commits/{MAIN_SHA}/check-runs?" in endpoint:
                 calls["check_runs"] += 1
+                check_endpoints.append(endpoint)
                 if calls["check_runs"] == 1:
                     return _gh_completed(
                         command,
@@ -444,7 +452,13 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
             )
 
         with (
-            mock.patch.dict(os.environ, {"FLEET_GATE_HTTP_CACHE": "off"}),
+            mock.patch.dict(
+                os.environ,
+                {
+                    "FLEET_GATE_HTTP_CACHE": "off",
+                    "FLEET_GATE_RELEASE_READY_POLL_SECONDS": "0",
+                },
+            ),
             mock.patch.object(MODULE.subprocess, "run", side_effect=run),
             mock.patch.object(MODULE.time, "sleep") as sleep,
         ):
@@ -454,7 +468,14 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["sha"], MAIN_SHA)
         self.assertEqual(observed["sourceGate"]["conclusion"], "success")
         self.assertNotIn("Main Release Ready check is missing", observed.get("error", ""))
-        self.assertEqual(calls["check_runs"], 2)
+        # Unfiltered page 502, its retry, then the name-filtered read.
+        self.assertEqual(calls["check_runs"], 3)
+        self.assertTrue(
+            any(
+                "check_name=Main%20Release%20Ready" in endpoint and "filter=all" in endpoint
+                for endpoint in check_endpoints
+            )
+        )
         sleep.assert_called_once_with(1)
 
     def test_observe_main_fail_closed_after_transient_budget_is_not_a_missing_check(self):
@@ -467,7 +488,13 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
             )
 
         with (
-            mock.patch.dict(os.environ, {"FLEET_GATE_HTTP_CACHE": "off"}),
+            mock.patch.dict(
+                os.environ,
+                {
+                    "FLEET_GATE_HTTP_CACHE": "off",
+                    "FLEET_GATE_RELEASE_READY_POLL_SECONDS": "0",
+                },
+            ),
             mock.patch.object(MODULE.subprocess, "run", side_effect=always_502) as run,
             mock.patch.object(MODULE.time, "sleep") as sleep,
         ):
@@ -486,8 +513,9 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
     def test_observe_main_missing_check_fails_closed_without_retry(self):
         """A completed read with no Main Release Ready check is not a 502.
 
-        Retrying that verdict would weaken the gate. The exact SHA is kept
-        and deployment stays fail-closed.
+        The 5xx retry must not run. With the poll budget forced to 0, a
+        still-absent check fails closed on that read. The bounded wait is
+        covered by the poll tests.
         """
 
         def run(command, **_kwargs):
@@ -508,7 +536,13 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
             )
 
         with (
-            mock.patch.dict(os.environ, {"FLEET_GATE_HTTP_CACHE": "off"}),
+            mock.patch.dict(
+                os.environ,
+                {
+                    "FLEET_GATE_HTTP_CACHE": "off",
+                    "FLEET_GATE_RELEASE_READY_POLL_SECONDS": "0",
+                },
+            ),
             mock.patch.object(MODULE.subprocess, "run", side_effect=run) as run_mock,
             mock.patch.object(MODULE.time, "sleep") as sleep,
         ):
@@ -518,7 +552,8 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["sha"], MAIN_SHA)
         self.assertIn("Main Release Ready check is missing", observed["error"])
         sleep.assert_not_called()
-        self.assertEqual(run_mock.call_count, 4)
+        # Branch, status, unfiltered check-runs, name-filtered check-runs, push jobs.
+        self.assertEqual(run_mock.call_count, 5)
 
     def test_observe_main_red_check_fails_closed_without_retry(self):
         def run(command, **_kwargs):
@@ -550,7 +585,13 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
             )
 
         with (
-            mock.patch.dict(os.environ, {"FLEET_GATE_HTTP_CACHE": "off"}),
+            mock.patch.dict(
+                os.environ,
+                {
+                    "FLEET_GATE_HTTP_CACHE": "off",
+                    "FLEET_GATE_RELEASE_READY_POLL_SECONDS": "60",
+                },
+            ),
             mock.patch.object(MODULE.subprocess, "run", side_effect=run) as run_mock,
             mock.patch.object(MODULE.time, "sleep") as sleep,
         ):
@@ -561,7 +602,8 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["failedChecks"], ["Main Release Ready"])
         self.assertNotIn("error", observed)
         sleep.assert_not_called()
-        self.assertEqual(run_mock.call_count, 4)
+        # Branch, status, unfiltered check-runs, name-filtered check-runs, marker.
+        self.assertEqual(run_mock.call_count, 5)
 
     def test_observe_main_uses_ci_job_when_check_runs_are_flooded(self):
         def github_response(_repo: str, endpoint: str):
@@ -661,6 +703,386 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
             red = MODULE.observe_main("JovieInc/gbrain")
 
         self.assertEqual(red["status"], "red")
+
+
+def _release_ready_success(started_at: str = "2026-10-22T14:10:00Z") -> dict[str, object]:
+    return {
+        "name": "Main Release Ready",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": started_at,
+        "completed_at": "2026-10-22T14:12:00Z",
+    }
+
+
+def _deployment_closed(observed: dict[str, object], code: str) -> None:
+    signals = dict(GREEN_SIGNALS)
+    signals["main"] = observed
+    receipt = MODULE.evaluate(signals, "2026-10-22T14:16:00Z")
+    if receipt["deploymentAdmission"]["allowed"]:
+        raise AssertionError("deployment admission stayed open")
+    codes = [reason["code"] for reason in receipt["reasons"]]
+    if code not in codes:
+        raise AssertionError(f"{code} not in {codes}")
+
+
+class MainReleaseReadyPageAndPollTests(unittest.TestCase):
+    """JOV-8338 wave 39794210914: d15d0c50's Main Release Ready lived on
+    check-run page 3, and the push CI run did not exist yet when the gate
+    observed main."""
+
+    def _page_three_response(self, page_three: dict[str, object]):
+        requested: list[str] = []
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if (
+                endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?")
+                and "check_name=" not in endpoint
+            ):
+                # Short unfiltered page. The old scanner stops here and never
+                # reaches the named check on page 3.
+                return {
+                    "total_count": 250,
+                    "check_runs": [_check_run("enroll")],
+                }
+            if (
+                f"commits/{MAIN_SHA}/check-runs?" in endpoint
+                and "check_name=Main%20Release%20Ready" in endpoint
+                and "filter=all" in endpoint
+                and "per_page=100" in endpoint
+            ):
+                requested.append(endpoint)
+                if endpoint.endswith("&page=1"):
+                    return {
+                        "total_count": 250,
+                        "check_runs": [_check_run("enroll")],
+                    }
+                if endpoint.endswith("&page=2"):
+                    return {
+                        "total_count": 250,
+                        "check_runs": [_check_run("enroll") for _ in range(100)],
+                    }
+                if endpoint.endswith("&page=3"):
+                    return {"total_count": 250, "check_runs": [page_three]}
+                raise AssertionError(f"unexpected named page: {endpoint}")
+            if endpoint.startswith("actions/runs/424242/jobs"):
+                return {
+                    "jobs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "started_at": "2026-10-10T02:25:00Z",
+                            "completed_at": "2026-10-10T02:26:00Z",
+                            "html_url": "https://example.test/job/424242",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": 424242,
+                            "head_sha": "b" * 40,
+                            "created_at": "2026-10-10T02:11:50Z",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        return github_response, requested
+
+    def test_named_check_on_page_three_is_found_when_first_page_is_short(self):
+        github_response, requested = self._page_three_response(_release_ready_success())
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(
+            [endpoint.rsplit("page=", 1)[-1] for endpoint in requested],
+            ["1", "2", "3"],
+        )
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["sourceGate"]["conclusion"], "success")
+        self.assertEqual(observed["reason"], "required-checks-green-generation-unverified")
+        self.assertNotIn("ancestor", observed["reason"])
+
+    def test_skipped_page_three_check_falls_back_when_push_ci_is_absent(self):
+        """The wave shape: merge-group Main Release Ready is on page 3, and
+        the exact-SHA push run does not exist yet. Finding the skipped check
+        lets the ancestor fallback grade main. Missing it fails closed."""
+        github_response, requested = self._page_three_response(
+            {
+                "name": "Main Release Ready",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-10-22T14:02:51Z",
+                "completed_at": "2026-10-22T14:02:52Z",
+            }
+        )
+        now = MODULE.datetime(2026, 10, 10, 2, 50, tzinfo=MODULE.UTC)
+        with (
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+            mock.patch.object(MODULE, "utc_now", return_value=now),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(
+            [endpoint.rsplit("page=", 1)[-1] for endpoint in requested],
+            ["1", "2", "3"],
+        )
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["reason"], "required-checks-green-ancestor-fallback")
+        self.assertEqual(observed["sourceGate"]["ancestorSha"], "b" * 40)
+        self.assertNotIn("Main Release Ready check is missing", observed["error"])
+
+    def test_poll_budget_fits_inside_fleet_promotion_timeout(self):
+        self.assertLessEqual(MODULE.MAIN_RELEASE_READY_POLL_BUDGET_SECONDS, 60)
+        self.assertLess(
+            MODULE.MAIN_RELEASE_READY_POLL_BUDGET_SECONDS + 120 + 40,
+            5 * 60,
+        )
+        self.assertGreaterEqual(MODULE.CHECK_RUN_MAX_PAGES, 3)
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("FLEET_GATE_RELEASE_READY_POLL_SECONDS", None)
+            self.assertEqual(MODULE._release_ready_poll_budget(), 60.0)
+        with mock.patch.dict(
+            os.environ, {"FLEET_GATE_RELEASE_READY_POLL_SECONDS": "nope"}
+        ):
+            self.assertEqual(
+                MODULE._release_ready_poll_budget(),
+                float(MODULE.MAIN_RELEASE_READY_POLL_BUDGET_SECONDS),
+            )
+
+    def _clock(self, budget: str):
+        state = {"now": 0.0}
+        sleeps: list[float] = []
+
+        def monotonic() -> float:
+            return state["now"]
+
+        def sleep(seconds: float) -> None:
+            state["now"] += seconds
+            sleeps.append(seconds)
+
+        return (
+            sleeps,
+            mock.patch.dict(
+                os.environ, {"FLEET_GATE_RELEASE_READY_POLL_SECONDS": budget}
+            ),
+            mock.patch.object(MODULE.time, "monotonic", side_effect=monotonic),
+            mock.patch.object(MODULE.time, "sleep", side_effect=sleep),
+        )
+
+    def _polling_response(self, checks_for_observation):
+        observations = {"n": 0}
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                observations["n"] += 1
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return checks_for_observation(observations["n"])
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        return github_response, observations
+
+    def test_polls_until_absent_release_ready_check_appears(self):
+        def checks(observation: int):
+            if observation < 3:
+                return {"total_count": 0, "check_runs": []}
+            return {"total_count": 1, "check_runs": [_release_ready_success()]}
+
+        github_response, observations = self._polling_response(checks)
+        sleeps, budget, monotonic, sleep = self._clock("15")
+        with (
+            budget,
+            monotonic,
+            sleep,
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["sourceGate"]["conclusion"], "success")
+        self.assertEqual(sleeps, [5, 5])
+        self.assertEqual(observations["n"], 3)
+        self.assertLess(sum(sleeps), 15)
+
+    def test_polls_while_release_ready_is_pending_then_reads_green(self):
+        def checks(observation: int):
+            if observation == 1:
+                return {
+                    "total_count": 1,
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "in_progress",
+                            "conclusion": None,
+                            "started_at": "2026-10-22T14:10:00Z",
+                        }
+                    ],
+                }
+            return {"total_count": 1, "check_runs": [_release_ready_success()]}
+
+        github_response, observations = self._polling_response(checks)
+        sleeps, budget, monotonic, sleep = self._clock("15")
+        with (
+            budget,
+            monotonic,
+            sleep,
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["reason"], "required-checks-green-generation-unverified")
+        self.assertEqual(sleeps, [5])
+        self.assertEqual(observations["n"], 2)
+
+    def test_absent_check_fails_closed_after_poll_budget(self):
+        def checks(_observation: int):
+            return {"total_count": 0, "check_runs": []}
+
+        github_response, observations = self._polling_response(checks)
+        sleeps, budget, monotonic, sleep = self._clock("10")
+        with (
+            budget,
+            monotonic,
+            sleep,
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertIn("Main Release Ready check is missing", observed["error"])
+        self.assertEqual(sleeps, [5, 5])
+        self.assertLessEqual(sum(sleeps), 10)
+        self.assertEqual(observations["n"], 3)
+        _deployment_closed(observed, "main-unknown")
+
+    def test_pending_check_fails_closed_after_poll_budget(self):
+        def checks(_observation: int):
+            return {
+                "total_count": 1,
+                "check_runs": [
+                    {
+                        "name": "Main Release Ready",
+                        "status": "in_progress",
+                        "conclusion": None,
+                        "started_at": "2026-10-22T14:10:00Z",
+                    }
+                ],
+            }
+
+        github_response, observations = self._polling_response(checks)
+        sleeps, budget, monotonic, sleep = self._clock("10")
+        with (
+            budget,
+            monotonic,
+            sleep,
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["reason"], "required-check-pending")
+        self.assertIn("no completed real attempt", observed["error"])
+        self.assertEqual(sleeps, [5, 5])
+        self.assertEqual(observations["n"], 3)
+        _deployment_closed(observed, "main-unknown")
+
+    def test_pending_then_red_fails_closed_without_treating_it_as_green(self):
+        def checks(observation: int):
+            if observation == 1:
+                return {
+                    "total_count": 1,
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "in_progress",
+                            "conclusion": None,
+                            "started_at": "2026-10-22T14:10:00Z",
+                        }
+                    ],
+                }
+            return {
+                "total_count": 1,
+                "check_runs": [
+                    {
+                        "name": "Main Release Ready",
+                        "status": "completed",
+                        "conclusion": "failure",
+                        "started_at": "2026-10-22T14:10:00Z",
+                        "completed_at": "2026-10-22T14:12:00Z",
+                    }
+                ],
+            }
+
+        github_response, observations = self._polling_response(checks)
+        sleeps, budget, monotonic, sleep = self._clock("60")
+        with (
+            budget,
+            monotonic,
+            sleep,
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "red")
+        self.assertEqual(observed["reason"], "required-check-failed")
+        self.assertEqual(observed["failedChecks"], ["Main Release Ready"])
+        self.assertEqual(sleeps, [5])
+        self.assertEqual(observations["n"], 2)
+        _deployment_closed(observed, "main-not-green")
+
+    def test_completed_red_does_not_poll(self):
+        def checks(_observation: int):
+            return {
+                "total_count": 1,
+                "check_runs": [
+                    {
+                        "name": "Main Release Ready",
+                        "status": "completed",
+                        "conclusion": "failure",
+                        "started_at": "2026-10-22T14:10:00Z",
+                        "completed_at": "2026-10-22T14:12:00Z",
+                    }
+                ],
+            }
+
+        github_response, observations = self._polling_response(checks)
+        sleeps, budget, monotonic, sleep = self._clock("60")
+        with (
+            budget,
+            monotonic,
+            sleep,
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "red")
+        self.assertEqual(observed["reason"], "required-check-failed")
+        self.assertEqual(sleeps, [])
+        self.assertEqual(observations["n"], 1)
+        _deployment_closed(observed, "main-not-green")
 
 
 def _main_fixture(

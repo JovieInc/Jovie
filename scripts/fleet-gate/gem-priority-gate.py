@@ -580,6 +580,82 @@ def observe_generation_marker(repo: str, sha: object) -> dict[str, Any]:
     return result
 
 
+# fleet-promotion timeout is 5 minutes (production-controller.yml). Closure
+# observation may use 120s and the queue snapshot may use ~40s, so this poll
+# stays inside the remainder (60 + 120 + 40 < 300).
+MAIN_RELEASE_READY_POLL_BUDGET_SECONDS = 60
+MAIN_RELEASE_READY_POLL_INTERVAL_SECONDS = 5
+CHECK_RUN_PAGE_SIZE = 100
+CHECK_RUN_MAX_PAGES = 20
+
+
+def _release_ready_poll_budget() -> float:
+    raw = os.environ.get("FLEET_GATE_RELEASE_READY_POLL_SECONDS")
+    if raw is None or not raw.strip():
+        return float(MAIN_RELEASE_READY_POLL_BUDGET_SECONDS)
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return float(MAIN_RELEASE_READY_POLL_BUDGET_SECONDS)
+
+
+def list_named_check_runs(repo: str, sha: object, name: str) -> list[dict[str, Any]]:
+    """Read every attempt of one check name, including attempts past page 1.
+
+    JOV-8338 wave 39794210914: merge-group Main Release Ready for d15d0c50
+    sat on check-run page 3. An unfiltered first page can be short while
+    later pages still hold the named check, and the old 1k cap can drop it.
+    ``check_name`` plus ``filter=all`` keeps reading while a page is full
+    or ``total_count`` still points at a later page. A short first page
+    therefore cannot hide the named check.
+    """
+    encoded = urllib.parse.quote(name, safe="")
+    collected: list[dict[str, Any]] = []
+    for page in range(1, CHECK_RUN_MAX_PAGES + 1):
+        checks = gh_json(
+            repo,
+            f"commits/{sha}/check-runs?check_name={encoded}&filter=all&per_page={CHECK_RUN_PAGE_SIZE}&page={page}",
+        )
+        page_runs = checks.get("check_runs")
+        if not isinstance(page_runs, list):
+            raise ValueError(f"{name} check-run page was not a list")
+        collected.extend(
+            run for run in page_runs if isinstance(run, dict) and run.get("name") == name
+        )
+        total = checks.get("total_count")
+        more = (
+            isinstance(total, int)
+            and not isinstance(total, bool)
+            and page * CHECK_RUN_PAGE_SIZE < total
+        )
+        if len(page_runs) < CHECK_RUN_PAGE_SIZE and not more:
+            break
+    return collected
+
+
+def _awaiting_exact_head_release_ready(observed: dict[str, Any]) -> bool:
+    """True when push CI has not created the check yet, or it is still pending.
+
+    A completed green or red verdict is terminal. Transport failures are not
+    this wait: gh_json already retried those.
+    """
+    if observed.get("status") in {"green", "red"}:
+        return False
+    reason = observed.get("reason")
+    if reason in {
+        "required-check-pending",
+        "required-check-missing",
+        "required-check-no-verdict",
+    }:
+        return True
+    error = str(observed.get("error") or "")
+    if "Main Release Ready check is missing" in error:
+        return True
+    if "no completed real attempt" in error:
+        return True
+    return False
+
+
 def observe_main_release_ready_jobs(repo: str, sha: object) -> list[dict[str, Any]]:
     """Read Main Release Ready from the exact-SHA CI push run.
 
@@ -691,6 +767,25 @@ def _real_release_attempts(attempts: list[dict[str, Any]]) -> list[dict[str, Any
 
 
 def observe_main(repo: str) -> dict[str, Any]:
+    """Observe main, polling while the exact-head release check is not created or pending.
+
+    The wait is bounded by ``MAIN_RELEASE_READY_POLL_BUDGET_SECONDS`` so it
+    fits in the fleet-promotion job. A completed red check returns immediately.
+    A check that is still absent when the budget expires fails closed.
+    """
+    budget = _release_ready_poll_budget()
+    deadline = time.monotonic() + budget
+    while True:
+        observed = _observe_main_once(repo)
+        if not _awaiting_exact_head_release_ready(observed):
+            return observed
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return observed
+        time.sleep(min(MAIN_RELEASE_READY_POLL_INTERVAL_SECONDS, remaining))
+
+
+def _observe_main_once(repo: str) -> dict[str, Any]:
     sha: object = UNKNOWN_MAIN_SHA
     try:
         branch = gh_json(repo, "branches/main")
@@ -699,16 +794,18 @@ def observe_main(repo: str) -> dict[str, Any]:
             raise ValueError("main SHA missing")
         combined = gh_json(repo, f"commits/{sha}/status")
         check_runs: list[dict[str, Any]] = []
-        release_attempts: list[dict[str, Any]] = []
         for page in range(1, 11):
             checks = gh_json(repo, f"commits/{sha}/check-runs?per_page=100&page={page}")
             page_runs = checks.get("check_runs", [])
+            if not isinstance(page_runs, list):
+                page_runs = []
             check_runs.extend(page_runs)
-            release_attempts.extend(
-                run for run in page_runs if run.get("name") == "Main Release Ready"
-            )
             if len(page_runs) < 100:
                 break
+        # Name-filtered pagination. The unfiltered scan above is optional-check
+        # evidence and stops on a short page; Main Release Ready on a later
+        # page (d15d0c50 page 3) still has to be found.
+        release_attempts = list_named_check_runs(repo, sha, "Main Release Ready")
         if not _real_release_attempts(release_attempts):
             if is_jovie_repository(repo):
                 release_attempts.extend(observe_main_release_ready_jobs(repo, sha))
@@ -848,9 +945,8 @@ def observe_main(repo: str) -> dict[str, Any]:
 
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
         # Transport failures reach here only after gh_json's bounded
-        # 5xx/network backoff. "Main Release Ready check is missing" is a
-        # completed read (ValueError) and is not retried. A red conclusion
-        # never raises.
+        # 5xx/network backoff. A missing or pending Main Release Ready check
+        # is polled by observe_main. A red conclusion never raises.
         observed_sha = sha if valid_commit_sha(sha, exact=True) else UNKNOWN_MAIN_SHA
         return {
             "status": "unknown",
