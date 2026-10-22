@@ -21,9 +21,14 @@ function installObserver(supported: boolean) {
   );
 }
 
-function deliverShifts(entries: { value: number; hadRecentInput: boolean }[]) {
+function deliverShifts(
+  entries: { value: number; hadRecentInput: boolean; startTime?: number }[]
+) {
   deliverEntries(
-    { getEntries: () => entries } as unknown as PerformanceObserverEntryList,
+    {
+      getEntries: () =>
+        entries.map(entry => ({ startTime: entry.startTime ?? 0, ...entry })),
+    } as unknown as PerformanceObserverEntryList,
     {} as PerformanceObserver
   );
 }
@@ -73,6 +78,8 @@ afterEach(() => {
   document.head.querySelectorAll('style').forEach(style => style.remove());
   delete window.__claimInitialLayout;
   delete window.__claimLayout;
+  delete window.__claimLayoutEntries;
+  delete window.__armClaimLayout;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -153,17 +160,95 @@ describe('start entry layout probes', () => {
   it('reports unavailable reply CLS explicitly instead of a fabricated zero', () => {
     installObserver(false);
     installReplyLayoutProbe();
+    window.__armClaimLayout?.();
     expect(window.__claimLayout).toEqual({ supported: false, total: null });
+    expect(window.__claimLayoutEntries).toEqual([]);
     expect(observe).not.toHaveBeenCalled();
   });
 
   it('continues collecting reply CLS where the browser supports it', () => {
     installObserver(true);
     installReplyLayoutProbe();
+    expect(observe).toHaveBeenCalledWith({ type: 'layout-shift' });
     deliverShifts([
       { value: 0.1, hadRecentInput: false },
       { value: 0.4, hadRecentInput: true },
     ]);
     expect(window.__claimLayout).toEqual({ supported: true, total: 0.1 });
+  });
+
+  it('drops handoff shifts from before the reply window, including late delivery, and still fails on an in-window shift', () => {
+    installObserver(true);
+    installReplyLayoutProbe();
+    const node = document.createElement('div');
+    node.id = 'composer';
+    node.dataset.testid = 'onboarding-centered-composer';
+    deliverEntries(
+      {
+        getEntries: () => [
+          {
+            value: 0.1503125,
+            hadRecentInput: false,
+            startTime: 40,
+            sources: [
+              {
+                node,
+                previousRect: { x: 0, y: 280, width: 1280, height: 319 },
+                currentRect: { x: 0, y: 442, width: 1280, height: 319 },
+              },
+            ],
+          },
+          { value: 0.4, hadRecentInput: true, startTime: 50, sources: [] },
+        ],
+      } as unknown as PerformanceObserverEntryList,
+      {} as PerformanceObserver
+    );
+    expect(window.__claimLayout?.total).toBe(0.1503125);
+    vi.spyOn(performance, 'now').mockReturnValue(1_000);
+    window.__armClaimLayout?.();
+    expect(window.__claimLayout?.total).toBe(0);
+    expect(window.__claimLayoutEntries?.[0]).toMatchObject({
+      value: 0.1503125,
+      startTime: 40,
+      counted: false,
+      sources: [
+        {
+          node: {
+            nodeName: 'DIV',
+            id: 'composer',
+            testId: 'onboarding-centered-composer',
+          },
+          previous: { y: 280, height: 319 },
+          current: { y: 442, height: 319 },
+        },
+      ],
+    });
+    // The same pre-window entry, delivered after the window opens, stays out.
+    deliverShifts([{ value: 0.1503125, hadRecentInput: false, startTime: 40 }]);
+    expect(window.__claimLayout?.total).toBe(0);
+    deliverShifts([
+      { value: 0.02, hadRecentInput: false, startTime: 1_200 },
+      { value: 0.4, hadRecentInput: true, startTime: 1_300 },
+    ]);
+    expect(window.__claimLayout?.total).toBe(0.02);
+    expect(
+      window.__claimLayoutEntries?.find(entry => entry.startTime === 1_200)
+        ?.counted
+    ).toBe(true);
+  });
+
+  it('poisons the reply window when an in-window shift value is not finite', () => {
+    installObserver(true);
+    installReplyLayoutProbe();
+    vi.spyOn(performance, 'now').mockReturnValue(100);
+    window.__armClaimLayout?.();
+    deliverShifts([
+      { value: Number.NaN, hadRecentInput: false, startTime: 10 },
+    ]);
+    expect(window.__claimLayout?.total).toBe(0);
+    deliverShifts([
+      { value: Number.NaN, hadRecentInput: false, startTime: 150 },
+    ]);
+    expect(window.__claimLayout?.total).toBeNaN();
   });
 });
