@@ -58,10 +58,17 @@ afterEach(() => {
 });
 
 describe('calibrateVisualJudges', () => {
-  it.each([
-    'esc-ui-homepage-wide-profile-sparse-1440',
-    'esc-ui-homepage-document-like-1440',
-  ])(
+  // Every explicitly required corpus case must exercise the veto independently.
+  const requiredIds = loadHumanHoldoutSet(
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      '../../../../docs/screenshots/ui-escape-holdout/holdout.json'
+    )
+  )
+    .items.filter(item => item.mustReject)
+    .map(item => item.id);
+
+  it.each(requiredIds)(
     'does not let high aggregate agreement override required rejection %s',
     async caseId => {
       const corpus = loadHumanHoldoutSet(
