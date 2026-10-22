@@ -41,6 +41,7 @@ function parseOutputs(path) {
 function runGate({
   main = EXPECTED_SHA,
   lineageStatus = 'ahead',
+  lineageExit = 0,
   pendingSuccessors = 0,
   runsFail = false,
   runsResponse = /** @type {string | undefined} */ (undefined),
@@ -130,7 +131,7 @@ function runGate({
     join(bin, 'gh'),
     `#!/bin/sh
 case "$*" in
-  *compare/${EXPECTED_SHA}...*) printf '%s\\n' "${lineageStatus}" ;;
+  *compare/${EXPECTED_SHA}...*) printf '%s\\n' "${lineageStatus}"; exit ${lineageExit} ;;
   *compare/${liveSha}...*) ${compareFails ? 'exit 1' : `cat <<'JSON'\n${compare}\nJSON\n`}
   ;;
   *production-controller.yml/runs*) ${runsFail ? 'exit 22' : ''}
@@ -186,12 +187,32 @@ describe('release lineage gate', () => {
   });
 
   it('yields when the generation left main lineage', () => {
-    for (const status of ['diverged', 'behind', '']) {
+    for (const status of ['diverged', 'behind']) {
       const run = runGate({ main: NEWER_SHA, lineageStatus: status });
       expect(run.result.status, run.result.stderr).toBe(0);
       expect(run.decision).toBe('decision=yield');
       expect(run.outputs.lineage).toBe('diverged');
     }
+  });
+
+  it.each([
+    { lineageStatus: '', lineageExit: 1 },
+    { lineageStatus: 'ahead', lineageExit: 22 },
+    { lineageStatus: '', lineageExit: 0 },
+    { lineageStatus: 'not json', lineageExit: 0 },
+    { lineageStatus: 'identical', lineageExit: 0 },
+  ])('rejects unreadable ancestry instead of superseding: %j', overrides => {
+    const run = runGate({ main: NEWER_SHA, ...overrides });
+    expect(run.result.status).toBe(1);
+    expect(run.decision).toBe('decision=error');
+    expect(run.outputs).toMatchObject({
+      lineage: 'unknown',
+      lineage_lookup_exit: String(overrides.lineageExit),
+      gate_decision: 'error',
+      gate_reason: 'lineage_lookup_unavailable',
+    });
+    expect(run.result.stderr).toContain('Release ancestry is unknown');
+    expect(run.result.stderr).not.toContain('left main');
   });
 
   it.each([

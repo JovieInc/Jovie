@@ -147,7 +147,7 @@ function survivalMetric(metrics: HudMetrics, now: number): CompanyCoreMetric {
         ? DEADLINE_NOT_DECLARED
         : metricFreshnessDeadline([stripe, mercury]),
       owner: 'Summer',
-      drillDownHref: drillDownSource.dashboardUrl ?? APP_ROUTES.HUD,
+      drillDownHref: drillDownSource.dashboardUrl ?? APP_ROUTES.ADMIN_OPS,
       drillDownLabel: `Inspect ${drillDownSource.label}`,
     };
   }
@@ -175,7 +175,7 @@ function survivalMetric(metrics: HudMetrics, now: number): CompanyCoreMetric {
     observedAt: metricObservedAt([stripe, mercury]),
     freshnessDeadline: metricFreshnessDeadline([stripe, mercury]),
     owner: 'Summer',
-    drillDownHref: drillDownSource.dashboardUrl ?? APP_ROUTES.HUD,
+    drillDownHref: drillDownSource.dashboardUrl ?? APP_ROUTES.ADMIN_OPS,
     drillDownLabel: `Inspect ${drillDownSource.label}`,
   };
 }

@@ -78,7 +78,7 @@ export const FUNNEL_STEPS = [
   },
   {
     id: 'upgrade',
-    label: 'Upgrade offer and checkout ($199/mo Pro)',
+    label: 'Upgrade offer and checkout ($12/mo Pro)',
     context: 'Jovie offers the paid plan.',
     kind: 'interactive',
     requires: 'signed-in session + Stripe test mode',

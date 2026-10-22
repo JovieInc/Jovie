@@ -420,11 +420,23 @@ export async function inspectRouteDom(
         // 4. Headings must not be truncated (JOV-6906). Tight display
         //    leading makes glyphs overflow their box without hiding text, so
         //    measure the clamp itself: the unclamped height must fit.
+        const inkContext = document.createElement('canvas').getContext('2d');
         for (const heading of Array.from(root.querySelectorAll('h1, h2, h3'))) {
           if (!visibleIn(heading) || !(heading instanceof HTMLElement)) {
             continue;
           }
           const style = getComputedStyle(heading);
+          const headingRect = heading.getBoundingClientRect();
+          // Tailwind's sr-only headings remain accessible but have no visible
+          // ink, just as in the image-contrast detector.
+          if (
+            headingRect.width <= 1 &&
+            headingRect.height <= 1 &&
+            (style.clip === 'rect(0px, 0px, 0px, 0px)' ||
+              style.clipPath === 'inset(50%)')
+          ) {
+            continue;
+          }
           const clamp = style.getPropertyValue('-webkit-line-clamp');
           const clipsY =
             style.overflowY === 'hidden' || style.overflowY === 'clip';
@@ -459,13 +471,67 @@ export async function inspectRouteDom(
             style.textOverflow === 'ellipsis'
               ? heading.scrollWidth - heading.clientWidth
               : 0;
-          if (hiddenY < lineHeight / 2 && hiddenX <= 2) continue;
+          // scrollHeight includes the font box's empty descent and positioned
+          // descendants. Measure painted text instead: Range locates each
+          // glyph's baseline; canvas gives its actual ascent/descent.
+          let clippedInk = 0;
+          if (
+            clipsY &&
+            inkContext &&
+            heading.scrollHeight > heading.clientHeight + 1
+          ) {
+            const clipTop = headingRect.top + px(style.borderTopWidth);
+            const clipBottom = headingRect.bottom - px(style.borderBottomWidth);
+            const walker = document.createTreeWalker(
+              heading,
+              NodeFilter.SHOW_TEXT
+            );
+            for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+              const parent = node.parentElement;
+              if (!parent || !visibleIn(parent)) continue;
+              const textStyle = getComputedStyle(parent);
+              inkContext.font = `${textStyle.fontStyle} ${textStyle.fontWeight} ${textStyle.fontSize} ${textStyle.fontFamily}`;
+              const range = document.createRange();
+              const text = node.textContent ?? '';
+              let offset = 0;
+              for (const glyph of text) {
+                range.setStart(node, offset);
+                offset += glyph.length;
+                range.setEnd(node, offset);
+                if (!glyph.trim()) continue;
+                const rect = range.getBoundingClientRect();
+                const paintedGlyph =
+                  textStyle.textTransform === 'uppercase'
+                    ? glyph.toLocaleUpperCase()
+                    : textStyle.textTransform === 'lowercase'
+                      ? glyph.toLocaleLowerCase()
+                      : glyph;
+                const ink = inkContext.measureText(paintedGlyph);
+                const baseline = rect.top + ink.fontBoundingBoxAscent;
+                clippedInk = Math.max(
+                  clippedInk,
+                  clipTop - (baseline - ink.actualBoundingBoxAscent),
+                  baseline + ink.actualBoundingBoxDescent - clipBottom
+                );
+              }
+            }
+          }
+          if (clippedInk <= 1) clippedInk = 0;
+          if (hiddenY < lineHeight / 2 && hiddenX <= 2 && clippedInk === 0) {
+            continue;
+          }
           findings.push({
             kind: 'clipped-heading',
             message:
-              'A heading is clamped or clipped and hides part of its text.',
+              clippedInk > 0 && hiddenY < lineHeight / 2 && hiddenX <= 2
+                ? 'A heading clips glyph ink (descenders) at its block-size cap.'
+                : 'A heading is clamped or clipped and hides part of its text.',
             elements: [describe(heading)],
-            measurements: { hiddenY: round(hiddenY), hiddenX: round(hiddenX) },
+            measurements: {
+              hiddenY: round(hiddenY),
+              hiddenX: round(hiddenX),
+              clippedInk: round(clippedInk),
+            },
           });
         }
 

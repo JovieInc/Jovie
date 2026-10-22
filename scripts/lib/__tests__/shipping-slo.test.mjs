@@ -105,6 +105,11 @@ describe('shipping SLO workflow credentials', () => {
     expect(WORKFLOW).toContain('docs/metrics/blog-publish-latency-latest.json');
   });
 
+  it('requests check and status read for stage evidence queries', () => {
+    expect(WORKFLOW).toContain('permission-checks: read');
+    expect(WORKFLOW).toContain('permission-statuses: read');
+  });
+
   it('publishes generated snapshots through a pull request instead of protected main', () => {
     expect(WORKFLOW).toContain(
       'BRANCH="bot/shipping-slo-snapshot-${{ github.run_id }}-${{ github.run_attempt }}"'

@@ -31,6 +31,8 @@
       "!docs/postmortems/reports/**",
       "!canon/design-refs/corpus.json",
       "!canon/design-refs/scout-seeds.json",
+      "!canon/agent-identities.json",
+      "!canon/ownership.json",
       "!packages/action-contracts/generated/**",
       "!**/*.a11y-red.tsx",
       "!scripts/invariants/fixtures/done-sprint-invariants/**"

@@ -205,10 +205,18 @@ describe('ProfileCompactSurface identity header layout', () => {
     const lastMedia = contents.lastIndexOf('@media', declarationIndex);
     const lastTopLevelClose = contents.lastIndexOf('\n}', declarationIndex);
     expect(lastMedia).toBeLessThan(lastTopLevelClose);
-    // Embedded previews render no dock, so they keep the in-box padding.
+    // Previews render no dock, so they keep the in-box padding. The live
+    // md+ profile uses presentation="embedded" yet renders the dock, so the
+    // exclusion must key off the render mode, never data-presentation.
     const ruleStart = contents.lastIndexOf(':where(', declarationIndex);
     expect(contents.slice(ruleStart, declarationIndex)).toContain(
-      'data-presentation="embedded"'
+      'data-render-mode="preview"'
+    );
+    expect(contents).not.toMatch(
+      /profile-compact-surface"\]:not\(\s*\[data-presentation="embedded"\]/
+    );
+    expect(readFileSync(PROFILE_COMPACT_SURFACE, 'utf8')).toContain(
+      'data-render-mode={renderMode}'
     );
     expect(contents).toContain(
       'height: calc(100% - var(--profile-bottom-nav-height));'
