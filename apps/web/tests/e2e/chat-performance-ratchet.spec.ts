@@ -15,6 +15,7 @@ import {
   type Request,
   test,
 } from '@playwright/test';
+import { CHAT_TRANSCRIPT_WINDOW } from '@/lib/chat/transcript-window';
 import { UX_LATENCY_STORAGE_KEY } from '@/lib/monitoring/interaction-latency';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import {
@@ -42,6 +43,19 @@ const SAMPLE_COUNT = 5;
  * Oct 2 Extended Smoke knee (usable ms): 580, 314, 273, then 142 and 148.
  */
 const WARMUP_ROUND_TRIPS = 3;
+/** User plus assistant. The remounting warmup leaves one pair on the document. */
+const MESSAGES_PER_ROUND_TRIP = 2;
+/**
+ * Virtualizing is a one-time commit. p95 of five samples is the slowest
+ * sample, so that commit has to land before the clock starts. The scroll
+ * probe still runs on the virtualized thread.
+ */
+const VIRTUAL_WINDOW_WARMUP_ROUND_TRIPS = Math.ceil(
+  (CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount +
+    1 -
+    MESSAGES_PER_ROUND_TRIP) /
+    MESSAGES_PER_ROUND_TRIP
+);
 
 interface PersistedMessage {
   readonly id: string;
@@ -262,13 +276,20 @@ async function readChatProbe(page: Page) {
 }
 
 async function measureDroppedScrollFrames(page: Page) {
-  return page.getByTestId('chat-message-scroll').evaluate(async element => {
+  const scroll = page.getByTestId('chat-message-scroll');
+  await scroll.evaluate(element => {
     const scrollElement = element as HTMLElement;
     if (scrollElement.scrollHeight <= scrollElement.clientHeight) {
       throw new Error('Chat message list must overflow for the scroll ratchet');
     }
-
+    // Jumping to the top swaps the virtual window and mounts the
+    // scroll-to-latest control. Those commits are not scroll frames.
     scrollElement.scrollTop = 0;
+  });
+  await waitForQuietFrames(page);
+
+  return scroll.evaluate(async element => {
+    const scrollElement = element as HTMLElement;
     const frameIntervals: number[] = [];
     const frameCount = 24;
     const distance = scrollElement.scrollHeight - scrollElement.clientHeight;
@@ -506,6 +527,25 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
       await remountChatRoute(page, chatContent, composer, chatApi);
     }
     const copy = roundTripCopy('Warmup', warmupIndex);
+    await exchangeChatRoundTrip(
+      page,
+      composer,
+      sendButton,
+      copy.userText,
+      copy.assistantText
+    );
+  }
+
+  // The virtualizer turns on once the thread passes the window threshold.
+  // That commit is not a steady-state send. Cross it on this document, then
+  // drop every warmup sample before scoring.
+  for (
+    let warmupIndex = 0;
+    warmupIndex < VIRTUAL_WINDOW_WARMUP_ROUND_TRIPS;
+    warmupIndex += 1
+  ) {
+    await waitForChatSendPacer(page);
+    const copy = roundTripCopy('Warmup', WARMUP_ROUND_TRIPS + warmupIndex);
     await exchangeChatRoundTrip(
       page,
       composer,
