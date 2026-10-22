@@ -741,11 +741,7 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
           if (!signal) throw new Error('Expected an abort signal');
           stalledSignals.push(signal);
           return new Promise<Response>((_resolve, reject) => {
-            signal.addEventListener(
-              'abort',
-              () => reject(new DOMException('Aborted', 'AbortError')),
-              { once: true }
-            );
+            signal.onabort = () => reject(signal.reason);
           });
         })
         .mockResolvedValueOnce(
