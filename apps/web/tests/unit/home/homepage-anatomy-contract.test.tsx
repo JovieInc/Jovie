@@ -72,6 +72,11 @@ describe('homepage anatomy contract', { timeout: 60_000 }, () => {
     const footer = screen.getByTestId('marketing-footer');
 
     expect(header, 'header').not.toBeNull();
+    expect(within(header!).getAllByRole('link')).toHaveLength(2);
+    expect(
+      within(header!).getByRole('link', { name: 'Sign in' })
+    ).toHaveAttribute('href', '/signin');
+    expect(within(hero).queryByRole('img', { name: 'Jovie logo' })).toBeNull();
     expect(products.length, 'product sections').toBeGreaterThanOrEqual(2);
 
     const sequence = [header!, hero, ...products, close, footer].map(node =>
@@ -84,7 +89,9 @@ describe('homepage anatomy contract', { timeout: 60_000 }, () => {
     for (const region of [hero, close]) {
       expect(within(region).getByRole('textbox')).toHaveAttribute(
         'placeholder',
-        HOMEPAGE_IDENTITY_COPY.hero.claim.placeholder
+        region === hero
+          ? 'Your name or handle'
+          : HOMEPAGE_IDENTITY_COPY.hero.claim.placeholder
       );
     }
 

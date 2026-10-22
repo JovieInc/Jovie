@@ -99,7 +99,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .home-viewport
-  [data-testid="header-nav"]:not([data-presentation="marketing-glass"]) {
+  [data-testid="header-nav"][data-presentation="homepage-embedded"] {
   --linear-text-primary: var(--color-text-primary-token);
   top: 0 !important;
   min-height: var(--homepage-header-height);
@@ -116,7 +116,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .home-viewport[data-scrolled="true"]
-  [data-testid="header-nav"]:not([data-presentation="marketing-glass"]) {
+  [data-testid="header-nav"][data-presentation="homepage-embedded"] {
   background: rgba(8, 8, 10, 0.55) !important;
   backdrop-filter: blur(18px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
@@ -124,7 +124,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .home-viewport
-  [data-testid="header-nav"]:not([data-presentation="marketing-glass"])
+  [data-testid="header-nav"][data-presentation="homepage-embedded"]
   nav {
   width: min(
     var(--homepage-grid-max),
@@ -136,7 +136,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .home-viewport
-  [data-testid="header-nav"]:not([data-presentation="marketing-glass"])
+  [data-testid="header-nav"][data-presentation="homepage-embedded"]
   nav
   > div {
   height: var(--homepage-header-height);

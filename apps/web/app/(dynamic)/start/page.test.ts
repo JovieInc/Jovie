@@ -127,8 +127,10 @@ describe('StartPage', () => {
     expect(result.props.entryProfile).toEqual(entry);
   });
 
-  it('skips the handle lookup when an explicit starter prompt drives the chat', async () => {
+  it('retains known public profile context alongside an explicit starter prompt', async () => {
     mocks.resolveStartEntryProfile.mockClear();
+    const entry = { status: 'available', handle: 'megaran' } as const;
+    mocks.resolveStartEntryProfile.mockResolvedValueOnce(entry);
 
     const result = await StartPage({
       searchParams: Promise.resolve({
@@ -137,8 +139,15 @@ describe('StartPage', () => {
       }),
     });
 
-    expect(mocks.resolveStartEntryProfile).not.toHaveBeenCalled();
-    expect(result.props.entryProfile).toBeNull();
+    expect(mocks.resolveStartEntryProfile).toHaveBeenCalledExactlyOnceWith({
+      handle: 'megaran',
+      starter_prompt: 'I want to claim jov.ie/megaran.',
+    });
+    expect(result.props.entryProfile).toEqual(entry);
+    expect(result.props.starterHandoff).toMatchObject({
+      kind: 'prompt',
+      prompt: 'I want to claim jov.ie/megaran.',
+    });
   });
 
   it('lets a pending account resume without an advisory waitlist read', async () => {

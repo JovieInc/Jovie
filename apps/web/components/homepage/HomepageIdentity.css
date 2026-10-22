@@ -607,18 +607,71 @@
    The rules above for .homepage-identity-hero* are retired with the old hero
    and removed in the follow-up cleanup PR. ─────────────────────────────── */
 
+/* One constraint owns both the header content edges and settled card. */
+.home-viewport {
+  --homepage-hero-scroll-distance: calc(var(--space-16) * 2);
+  --homepage-entry-gutter: max(
+    clamp(var(--space-4), 2vw, var(--space-6)),
+    env(safe-area-inset-left),
+    env(safe-area-inset-right)
+  );
+  --homepage-entry-width: min(
+    var(--ds-public-content-max),
+    calc(100vw - var(--homepage-entry-gutter) * 2)
+  );
+  --homepage-entry-header-height: calc(
+    var(--homepage-header-height) +
+    var(--space-px) +
+    env(safe-area-inset-top)
+  );
+}
+
+.home-viewport > .header-nav[data-presentation="default"] > nav {
+  width: var(--homepage-entry-width);
+  max-width: none;
+  padding-inline: 0;
+}
+.home-viewport > .header-nav[data-presentation="default"] > nav > div {
+  height: var(--homepage-header-height);
+}
+
+.homepage-claim-hero > [data-homepage-testid="homepage-logo-strip"] {
+  width: var(--homepage-entry-width);
+  margin-inline: auto;
+}
+
 /* The existing homepage owner stays centered around one claim control.
    A viewport of real entry space keeps explanation below the initial fold. */
 .homepage-claim-hero {
-  --homepage-hero-card-inset: clamp(var(--space-8), 4vw, var(--space-12));
-  --homepage-hero-scroll-distance: calc(var(--space-24) * 3);
+  --homepage-hero-card-inset: calc((100vw - var(--homepage-entry-width)) / 2);
+  --homepage-hero-viewport: 100svh;
+  --homepage-hero-card-block-inset: var(--homepage-entry-gutter);
   background: var(--color-bg-page);
+}
+
+/* Keep the canonical header's existing persistent positioning. No duplicate
+   header, placeholder, or change in flow is introduced during the transition. */
+@media (min-width: 1024px) {
+  .homepage-claim-hero {
+    --homepage-hero-card-block-inset: max(
+      var(--homepage-entry-gutter),
+      calc(
+        (
+          var(--homepage-hero-viewport) -
+          var(--homepage-entry-header-height) -
+          var(--homepage-entry-width) /
+          2
+        ) /
+        2
+      )
+    );
+  }
 }
 
 .homepage-claim-hero__frame {
   position: relative;
   isolation: isolate;
-  min-block-size: 100svh;
+  min-block-size: var(--homepage-hero-viewport);
   display: grid;
   place-items: center;
 }
@@ -632,9 +685,7 @@
   pointer-events: none;
   z-index: -1;
   background: var(--color-bg-page);
-  clip-path: inset(
-    var(--homepage-hero-card-inset) round var(--system-b-radius-panel)
-  );
+  clip-path: inset(0);
 }
 
 /* The surface moves; type, focus rings and the real form never scale. The
@@ -645,7 +696,7 @@
     calc(100% - (var(--homepage-hero-card-inset) + var(--space-4)) * 2)
   );
   max-width: none;
-  min-block-size: 100svh;
+  min-block-size: var(--homepage-hero-viewport);
   justify-content: center;
   gap: var(--space-8);
   padding-inline: 0;
@@ -653,20 +704,68 @@
 
 @supports (animation-timeline: scroll()) {
   @media (prefers-reduced-motion: no-preference) {
-    .homepage-claim-hero__scroll-region {
-      min-block-size: calc(100svh + var(--homepage-hero-scroll-distance));
-    }
-
-    .homepage-claim-hero__frame {
-      position: sticky;
-      inset-block-start: 0;
-    }
-
     .homepage-claim-hero__surface {
-      animation: homepage-claim-hero-frame linear both;
+      animation: homepage-claim-hero-frame var(--ease-in-out) both;
       animation-timeline: scroll(root);
       animation-range: 0px var(--homepage-hero-scroll-distance);
     }
+  }
+}
+
+/* The canonical header stays one persistent surface. Only its small backdrop
+   plane fades with scroll; unsupported filtering keeps an opaque surface. */
+.home-viewport > .header-nav[data-presentation="default"] {
+  isolation: isolate;
+}
+.home-viewport > .header-nav[data-presentation="default"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--color-bg-page);
+  opacity: 0;
+}
+@supports (backdrop-filter: blur(1px)) {
+  .home-viewport > .header-nav[data-presentation="default"]::before {
+    background: color-mix(in oklab, var(--color-bg-page) 82%, transparent);
+    backdrop-filter: blur(var(--blur-header));
+  }
+}
+@supports (animation-timeline: scroll()) {
+  .home-viewport > .header-nav[data-presentation="default"]::before {
+    animation: homepage-claim-header-glass var(--ease-in-out) both;
+    animation-timeline: scroll(root);
+    /* The card clears the header first. Over this final gutter of native
+       scroll its top remains below headerBottom, including on phones. */
+    animation-range: var(--homepage-hero-scroll-distance)
+      calc(var(--homepage-hero-scroll-distance) + var(--homepage-entry-gutter));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-viewport > .header-nav[data-presentation="default"]::before {
+    /* With no card motion, wait until the original hero has passed. */
+    animation-range: 100svh calc(100svh + var(--homepage-entry-gutter));
+  }
+}
+@supports not (animation-timeline: scroll()) {
+  .home-viewport
+    > .header-nav[data-presentation="default"][data-scrolled="true"]::before {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .home-viewport > .header-nav[data-presentation="default"]::before {
+    background: var(--color-bg-page);
+    backdrop-filter: none;
+  }
+}
+@keyframes homepage-claim-header-glass {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
@@ -676,7 +775,13 @@
   }
   to {
     clip-path: inset(
-      var(--homepage-hero-card-inset) round var(--system-b-radius-panel)
+      calc(
+          var(--homepage-entry-header-height) +
+          var(--homepage-hero-card-block-inset) +
+          var(--homepage-hero-scroll-distance)
+        )
+        var(--homepage-hero-card-inset) var(--homepage-hero-card-block-inset)
+        var(--homepage-hero-card-inset) round var(--system-b-radius-panel)
     );
   }
 }

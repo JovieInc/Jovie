@@ -241,8 +241,10 @@ export function useHandleValidation(handle: string): HandleValidationResult {
     checkingAvail,
     // An answer for the previous input must disappear in the same render,
     // including the debounce window before the new request starts.
-    available: checkingAvail ? null : availabilityState.available,
-    availError: checkingAvail ? null : availabilityState.availError,
+    available:
+      checkingAvail || !isValidHandle ? null : availabilityState.available,
+    availError:
+      checkingAvail || !isValidHandle ? null : availabilityState.availError,
     cancel,
   };
 }

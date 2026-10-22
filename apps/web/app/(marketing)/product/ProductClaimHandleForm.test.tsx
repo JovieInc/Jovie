@@ -99,7 +99,9 @@ describe('ProductClaimHandleForm server draft retention', () => {
       );
       expect(
         within(container).getByTestId('homepage-handle-status')
-      ).toHaveTextContent(`@${normalized} is available`);
+      ).toHaveTextContent(
+        `@${normalized} was available at last check; not reserved.`
+      );
       expect(input).toHaveValue(normalized);
       fireEvent.click(within(container).getByRole('button', { name: 'Claim' }));
       const target = new URL(push.mock.calls[0][0], 'https://jov.ie');
@@ -111,11 +113,12 @@ describe('ProductClaimHandleForm server draft retention', () => {
   it('retains invalid early text and prevents a wrong-handle handoff', async () => {
     const { input, container } = await hydrateDraft('not valid');
     expect(input).toHaveValue('not valid');
+    expect(input).not.toHaveAttribute('aria-invalid');
+    fireEvent.submit(within(container).getByTestId('homepage-claim-form'));
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(
       within(container).getByTestId('homepage-handle-status')
     ).toHaveTextContent('Handle can only contain');
-    fireEvent.submit(within(container).getByTestId('homepage-claim-form'));
     expect(push).not.toHaveBeenCalled();
     expect(input).toHaveFocus();
   });
@@ -137,7 +140,9 @@ describe('ProductClaimHandleForm server draft retention', () => {
     expect(input).toHaveValue('loaded-draft');
     expect(
       within(container).getByTestId('homepage-handle-status')
-    ).toHaveTextContent('@loaded-draft is available');
+    ).toHaveTextContent(
+      '@loaded-draft was available at last check; not reserved.'
+    );
   });
 
   it('preserves an early draft when availability returns an error', async () => {

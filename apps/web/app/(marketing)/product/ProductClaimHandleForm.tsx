@@ -10,7 +10,9 @@ import { useHandleValidation } from '@/components/features/home/claim-handle/use
 import { InputAuraFrame } from '@/components/features/home/InputAuraFrame';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildClaimProfileStartHref } from '@/data/marketingCtaIntents';
+import { resolveClaimNameEntry } from '@/lib/onboarding/claim-name-entry';
 import { cn } from '@/lib/utils';
+import './ProductClaimHandleForm.css';
 
 interface ProductClaimHandleFormProps {
   readonly domain: string;
@@ -19,6 +21,7 @@ interface ProductClaimHandleFormProps {
   readonly inputId?: string;
   readonly testIdPrefix?: string;
   readonly submitTestId?: string;
+  readonly entryMode?: 'handle' | 'name-or-handle';
 }
 
 export function ProductClaimHandleForm({
@@ -28,24 +31,48 @@ export function ProductClaimHandleForm({
   inputId = 'product-handle-input',
   testIdPrefix = 'product',
   submitTestId = `${testIdPrefix}-claim-cta`,
+  entryMode = 'handle',
 }: ProductClaimHandleFormProps) {
   const statusId = `${inputId}-status`;
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const navigationRef = useRef(false);
-  const [handle, setHandle] = useState('');
+  const [entry, setEntry] = useState('');
+  const [addressOverride, setAddressOverride] = useState<string | null>(null);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [touched, setTouched] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
+  const isNameEntry = entryMode === 'name-or-handle';
+  const parsed = isNameEntry
+    ? resolveClaimNameEntry(entry)
+    : { handle: entry, displayName: null, error: null };
+  const handle = addressOverride ?? parsed.handle;
+  const addressRef = useRef<HTMLInputElement>(null);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [navigating, setNavigating] = useState(false);
   const [navigationError, setNavigationError] = useState<string | null>(null);
   const { handleError, checkingAvail, available, availError } =
-    useHandleValidation(handle);
+    useHandleValidation(isComposing ? '' : handle);
+  const entryError =
+    parsed.error ||
+    handleError ||
+    (!handle && parsed.displayName
+      ? 'Choose an address using letters, numbers or hyphens.'
+      : formSubmitted && !handle
+        ? isNameEntry
+          ? 'Enter your name or handle.'
+          : 'Enter a handle to continue.'
+        : null);
+  const showFormatError =
+    !isComposing && (touched || formSubmitted) && Boolean(entryError);
 
   useLayoutEffect(() => {
     // Retain edits accepted by the native SSR input before client handlers attach.
     // Capture before passive validation updates can render the empty initial draft.
     const earlyDraft = inputRef.current?.value;
-    if (earlyDraft) setHandle(earlyDraft.toLowerCase());
-  }, []);
+    if (earlyDraft)
+      setEntry(isNameEntry ? earlyDraft : earlyDraft.toLowerCase());
+  }, [isNameEntry]);
 
   useEffect(() => {
     const restore = () => {
@@ -57,14 +84,16 @@ export function ProductClaimHandleForm({
     return () => globalThis.removeEventListener('pageshow', restore);
   }, []);
 
-  const unavailable = Boolean(handleError || availError || available === false);
-  const statusVisible = Boolean(handle || formSubmitted);
+  const unavailable = Boolean(
+    showFormatError || availError || available === false
+  );
+  const statusVisible = Boolean(entry || formSubmitted);
   const statusText = navigationError
     ? navigationError
     : navigating
       ? `Opening setup for @${handle}…`
-      : handleError
-        ? handleError
+      : showFormatError
+        ? entryError
         : checkingAvail
           ? 'Checking availability…'
           : availError
@@ -72,17 +101,22 @@ export function ProductClaimHandleForm({
             : available === false
               ? 'Handle already taken'
               : available === true
-                ? `@${handle} is available. Select Claim to continue.`
-                : 'Use lowercase letters, numbers, or hyphens (3–24 chars).';
+                ? `@${handle} was available at last check; not reserved.`
+                : isNameEntry
+                  ? 'Choose an address, then preview your profile.'
+                  : 'Use lowercase letters, numbers, or hyphens (3–24 chars).';
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (navigationRef.current) return;
+    if (navigationRef.current || isComposing) return;
     setFormSubmitted(true);
 
     const normalizedHandle = handle.trim().toLowerCase();
-    if (!normalizedHandle || handleError) {
-      inputRef.current?.focus();
+    if (!normalizedHandle || entryError) {
+      if (parsed.displayName && !parsed.error) {
+        setEditingAddress(true);
+        requestAnimationFrame(() => addressRef.current?.focus());
+      } else inputRef.current?.focus();
       return;
     }
 
@@ -90,7 +124,9 @@ export function ProductClaimHandleForm({
     setNavigating(true);
     setNavigationError(null);
     try {
-      router.push(buildClaimProfileStartHref(normalizedHandle));
+      router.push(
+        buildClaimProfileStartHref(normalizedHandle, parsed.displayName)
+      );
     } catch {
       navigationRef.current = false;
       setNavigating(false);
@@ -108,53 +144,69 @@ export function ProductClaimHandleForm({
       noValidate
       aria-busy={checkingAvail || navigating}
     >
-      <InputAuraFrame treatment='editorial' className='rounded-full'>
-        <div className='relative flex min-h-12 w-full items-center gap-2 overflow-hidden rounded-full border border-transparent bg-page px-2 py-2 pl-4'>
+      <InputAuraFrame
+        treatment='editorial'
+        className='product-claim-field rounded-full'
+      >
+        <div className='relative flex min-h-12 w-full items-center gap-2 rounded-full border border-transparent bg-page p-2 pl-4'>
           <label htmlFor={inputId} className='sr-only'>
-            Choose Your Handle
+            {isNameEntry ? 'Your Name or Handle' : 'Choose Your Handle'}
           </label>
-          <span className='shrink-0 select-none text-base text-secondary-token'>
-            {domain}
-          </span>
+          {!isNameEntry && (
+            <span className='shrink-0 select-none text-base text-secondary-token'>
+              {domain}
+            </span>
+          )}
           <input
             ref={inputRef}
             id={inputId}
-            name='handle'
+            name={isNameEntry ? 'entry' : 'handle'}
             type='text'
-            value={handle}
-            onChange={event => setHandle(event.target.value.toLowerCase())}
-            placeholder={placeholder}
+            readOnly={navigating}
+            value={entry}
+            onChange={event => {
+              setEntry(
+                isNameEntry
+                  ? event.target.value
+                  : event.target.value.toLowerCase()
+              );
+              setAddressOverride(null);
+              setTouched(false);
+              setFormSubmitted(false);
+              setNavigationError(null);
+            }}
+            onBlur={() => setTouched(true)}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={() => setIsComposing(false)}
+            placeholder={isNameEntry ? 'Your name or handle' : placeholder}
             autoCapitalize='none'
             autoCorrect='off'
             autoComplete='off'
-            aria-label='Choose Your Handle'
-            aria-invalid={unavailable ? 'true' : undefined}
-            aria-describedby={statusId}
+            aria-label={
+              isNameEntry ? 'Your Name or Handle' : 'Choose Your Handle'
+            }
+            aria-invalid={
+              unavailable && !parsed.displayName ? 'true' : undefined
+            }
+            aria-describedby={`${statusId}${isNameEntry ? ` ${inputId}-suggestion` : ''}`}
             className={cn(
-              // JOV-INV-019: tailwind-merge collapses focus-visible:outline
-              // and focus-visible:outline-2 into the same conflict group and
-              // keeps only the last one, so outline-style never actually
-              // turns on (outline-width without outline-style paints
-              // nothing) — and focus-visible:border-focus had no border
-              // width on this bare input to make a color change visible.
-              // focus-ring-themed is the shared box-shadow-based ring the
-              // rest of the app uses for exactly this reason.
-              'product-claim-card__handle-input min-w-0 flex-1 bg-transparent text-base text-primary-token focus-ring-themed',
-              unavailable && 'text-error'
+              'product-claim-card__handle-input min-w-0 flex-1 bg-transparent text-base text-primary-token'
             )}
           />
-          <HandleStatusIcon
-            showChecking={checkingAvail}
-            handle={handle}
-            available={available}
-            handleError={handleError}
-            unavailable={unavailable}
-          />
+          <span className='grid h-4 w-4 shrink-0 place-items-center'>
+            <HandleStatusIcon
+              showChecking={checkingAvail}
+              handle={handle}
+              available={available}
+              handleError={showFormatError ? entryError : null}
+              unavailable={unavailable}
+            />
+          </span>
           <Button
             type='submit'
             size='marketing'
             variant='primary'
-            disabled={navigating || Boolean(handleError)}
+            disabled={navigating}
             data-testid={submitTestId}
             data-primary-action='true'
             aria-busy={checkingAvail || navigating}
@@ -179,25 +231,70 @@ export function ProductClaimHandleForm({
           </Button>
         </div>
       </InputAuraFrame>
+      {isNameEntry && <input type='hidden' name='handle' value={handle} />}
+      {parsed.displayName && (
+        <input type='hidden' name='display_name' value={parsed.displayName} />
+      )}
+      {isNameEntry && (
+        <div
+          className='mt-2 grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 px-1 text-xs text-secondary-token'
+          id={`${inputId}-suggestion`}
+        >
+          {parsed.displayName && (
+            <>
+              <span className='min-w-0 break-words'>
+                {handle
+                  ? `Suggested address: ${domain}${handle}`
+                  : 'Choose a profile address'}
+              </span>
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                onClick={() => {
+                  setEditingAddress(true);
+                  requestAnimationFrame(() => addressRef.current?.focus());
+                }}
+              >
+                Edit Address
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+      {editingAddress && parsed.displayName && (
+        <label className='mt-2 block text-xs text-secondary-token'>
+          Profile Address
+          <input
+            ref={addressRef}
+            aria-label='Profile Address'
+            aria-describedby={statusId}
+            aria-invalid={showFormatError ? 'true' : undefined}
+            className='mt-1 block min-h-11 w-full rounded-lg border border-subtle bg-page px-3 text-base text-primary-token focus-ring-themed'
+            value={handle}
+            onChange={event => {
+              setAddressOverride(event.target.value.toLowerCase());
+              setFormSubmitted(false);
+              setTouched(false);
+            }}
+            onBlur={() => setTouched(true)}
+            autoCapitalize='none'
+            autoCorrect='off'
+          />
+        </label>
+      )}
       <p
         id={statusId}
         data-testid={`${testIdPrefix}-handle-status`}
         className={cn(
           // Reserve two readable status lines so error → pending cannot
           // recenter the hero and move the focused input on a phone.
-          'min-h-10 px-1 pt-2 text-xs text-secondary-token',
-          !navigating && (unavailable || navigationError) && 'text-error',
-          available === true &&
-            !unavailable &&
-            !navigating &&
-            !navigationError &&
-            'text-success'
+          'min-h-12 px-1 pt-2 text-xs leading-relaxed text-secondary-token',
+          !navigating && (unavailable || navigationError) && 'text-error'
         )}
         aria-live='polite'
         role={
-          formSubmitted && (handleError || navigationError)
-            ? 'alert'
-            : undefined
+          formSubmitted && (entryError || navigationError) ? 'alert' : undefined
         }
         aria-hidden={statusVisible ? undefined : 'true'}
       >

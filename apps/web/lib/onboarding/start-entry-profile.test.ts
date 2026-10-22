@@ -2,9 +2,61 @@ import { describe, expect, it } from 'vitest';
 import {
   buildStartEntryDraft,
   buildStartEntryProfile,
+  buildStartEntryResumeHref,
   readStartEntryHandle,
   type StartEntryProfileSource,
+  withStartEntryDisplayName,
 } from './start-entry-profile';
+
+describe('name-to-claim context', () => {
+  it('supports the native GET name entry without client normalization', () => {
+    expect(readStartEntryHandle({ entry: 'Beyoncé Knowles', handle: '' })).toBe(
+      'beyonce-knowles'
+    );
+    expect(
+      readStartEntryHandle({ entry: 'tim white', handle: 'chosen-address' })
+    ).toBe('chosen-address');
+    expect(
+      readStartEntryHandle({ entry: 'https://jov.ie/tim', handle: '' })
+    ).toBeNull();
+  });
+  it('preserves the name through reload, explicit continuation and the signin return path', () => {
+    const entry = withStartEntryDisplayName(
+      { status: 'available', handle: 'tim-white' },
+      { display_name: 'Tim White' }
+    );
+    expect(entry).toEqual({
+      status: 'available',
+      handle: 'tim-white',
+      displayName: 'Tim White',
+    });
+    expect(buildStartEntryDraft(entry)).toContain('My name is "Tim White"');
+    const resumed = new URL(buildStartEntryResumeHref(entry), 'https://jov.ie');
+    expect(resumed.searchParams.get('handle')).toBe('tim-white');
+    expect(resumed.searchParams.get('display_name')).toBe('Tim White');
+    expect(
+      withStartEntryDisplayName(
+        { status: 'available', handle: 'tim-white' },
+        Object.fromEntries(resumed.searchParams)
+      )
+    ).toEqual(entry);
+    expect(buildStartEntryDraft(entry)).not.toMatch(
+      /saved|verified|available|reserved/i
+    );
+  });
+  it('never overrides known catalog identity with a name hint', () => {
+    const entry = buildStartEntryProfile('megaran', PREBUILT);
+    expect(
+      withStartEntryDisplayName(entry, { display_name: 'Someone Else' })
+    ).toEqual(entry);
+    expect(
+      withStartEntryDisplayName(
+        { status: 'available', handle: 'draft' },
+        { display_name: 'https://example.com' }
+      )
+    ).toEqual({ status: 'available', handle: 'draft' });
+  });
+});
 
 const PREBUILT: StartEntryProfileSource = {
   usernameNormalized: 'megaran',

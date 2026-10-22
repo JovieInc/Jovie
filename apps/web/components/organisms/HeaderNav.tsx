@@ -40,6 +40,8 @@ export interface HeaderNavProps {
   readonly includePublicLoginInMobileNav?: boolean;
   readonly publicCta?: HeaderNavCta;
   readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
+  /** Reuse the dock sentinel for an overlaid header's no-timeline fallback. */
+  readonly trackScroll?: boolean;
   readonly flyoutMenus?: readonly HeaderFlyoutMenu[];
   readonly showContactLink?: boolean;
   readonly penContractId?: MarketingPenContractId;
@@ -395,6 +397,7 @@ export function HeaderNav({
   includePublicLoginInMobileNav = true,
   publicCta,
   presentation = 'default',
+  trackScroll = false,
   flyoutMenus,
   showContactLink = true,
   penContractId,
@@ -408,7 +411,8 @@ export function HeaderNav({
   const isMarketingGlass = presentation === 'marketing-glass';
   const isHomepagePresentation = presentation === 'homepage-embedded';
   const isDocked = isMarketingGlass || isHomepagePresentation;
-  const { isScrolled, sentinelRef } = useDockScrolled(isDocked);
+  const tracksDockScroll = isDocked || trackScroll;
+  const { isScrolled, sentinelRef } = useDockScrolled(tracksDockScroll);
   const resolvedFlyoutMenus = isMarketingGlass ? (flyoutMenus ?? []) : [];
 
   const clearFlyoutCloseTimer = useCallback(() => {
@@ -603,7 +607,7 @@ export function HeaderNav({
     !!leadingMarketingLinks?.some(link => link.treatment === 'wordmark');
   return (
     <>
-      {isDocked ? (
+      {tracksDockScroll ? (
         <span
           ref={sentinelRef}
           aria-hidden='true'

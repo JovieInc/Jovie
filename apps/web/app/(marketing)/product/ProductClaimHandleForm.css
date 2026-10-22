@@ -1,0 +1,10 @@
+/* One canonical focus outline around the entire field, not a square nested
+   ring around its editable text. The submit button retains its own focus. */
+.product-claim-field:has(input:focus-visible) {
+  outline: var(--space-0-5) solid var(--color-focus-ring);
+  outline-offset: var(--space-0-5);
+}
+.product-claim-field .product-claim-card__handle-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}

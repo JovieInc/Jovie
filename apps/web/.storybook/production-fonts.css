@@ -1,0 +1,28 @@
+/* The homepage review loads the exact production font assets/axes from
+   app/layout.tsx; next/font's generated classes do not mount in Storybook. */
+@font-face {
+  font-family: "Inter Variable";
+  src: url("/fonts/Inter-Latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Satoshi";
+  src: url("/fonts/Satoshi-Latin.woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+.storybook-production-fonts {
+  --font-inter: "Inter Variable";
+  --font-satoshi: "Satoshi";
+  --font-sans:
+    var(--font-inter, "Inter Variable"), "Inter", "SF Pro Display",
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  --font-display:
+    var(--font-satoshi, "Satoshi"), -apple-system, "system-ui", sans-serif;
+  --font-body: var(--font-sans);
+  font-family: var(--font-sans);
+}

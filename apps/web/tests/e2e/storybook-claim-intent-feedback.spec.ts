@@ -3,6 +3,61 @@ import { expect, test } from '@playwright/test';
 
 // Presentation fixtures only. Real claim/auth acceptance stays in golden-path.
 for (const width of [390, 1280]) {
+  test(`normal name entry retains its name and shows an explicit address at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(
+      '/iframe.html?id=marketing-homepageidentityhero--default&viewMode=story'
+    );
+    await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(() => {
+      (
+        window as Window & {
+          __jovieApiMock?: (request: { url: URL }) => Response | undefined;
+        }
+      ).__jovieApiMock = ({ url }) =>
+        url.pathname === '/api/handle/check'
+          ? Response.json({ available: true, reserved: false })
+          : undefined;
+    });
+    const hero = page.getByTestId('marketing-section-hero');
+    const input = hero.getByRole('textbox', { name: 'Your Name or Handle' });
+    await input.focus();
+    const before = await input.boundingBox();
+    await input.fill('tim white');
+    await expect(input).toHaveValue('tim white');
+    await expect(input).not.toHaveAttribute('aria-invalid');
+    await expect(
+      hero.getByText('Suggested address: jov.ie/tim-white')
+    ).toBeVisible();
+    await expect(
+      hero.getByRole('button', { name: 'Claim', exact: true })
+    ).toBeEnabled();
+    await expect(page.getByTestId('homepage-handle-status')).toContainText(
+      'not reserved'
+    );
+    expect(await input.boundingBox()).toEqual(before);
+    expect(await input.evaluate(n => getComputedStyle(n).boxShadow)).toBe(
+      'none'
+    );
+    expect(
+      await input.evaluate(
+        n => getComputedStyle(n.closest('.product-claim-field')!).outlineStyle
+      )
+    ).toBe('solid');
+    await page.screenshot({
+      path: testInfo.outputPath('normal-name-focused.png'),
+    });
+    await input.press('Enter');
+    await expect(hero.getByRole('button', { name: /opening/i })).toBeDisabled();
+    await expect(input).toHaveValue('tim white');
+    await expect(hero.locator('input[name="handle"]')).toHaveValue('tim-white');
+    await expect(hero.locator('input[name="display_name"]')).toHaveValue(
+      'tim white'
+    );
+  });
+
   test(`actual homepage entry retains its handle through pending and Back at ${width}px`, async ({
     page,
   }, testInfo) => {
@@ -12,12 +67,18 @@ for (const width of [390, 1280]) {
     await page.goto(
       '/iframe.html?id=marketing-homepageidentityhero--default&viewMode=story'
     );
+    await page.evaluate(() => document.fonts.ready);
     const hero = page.getByTestId('marketing-section-hero');
     await expect(
       hero.getByRole('heading', { name: 'Start with your name', exact: true })
     ).toBeVisible();
-    await expect(hero.getByRole('img', { name: 'Jovie logo' })).toBeVisible();
-    const input = hero.getByRole('textbox', { name: 'Choose Your Handle' });
+    await expect(
+      page
+        .getByTestId('header-nav')
+        .getByRole('img', { name: 'Jovie', exact: true })
+    ).toBeVisible();
+    await expect(hero.getByRole('img', { name: 'Jovie logo' })).toHaveCount(0);
+    const input = hero.getByRole('textbox', { name: 'Your Name or Handle' });
     await expect(input).toBeInViewport();
     const explanation = await page
       .getByTestId('homepage-hero-explanation')

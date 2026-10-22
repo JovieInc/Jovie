@@ -6,9 +6,8 @@ import {
 } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HomepageEditorialChangelog } from '@/components/homepage/HomepageEditorialChangelog';
-import { HomepageIdentityClose } from '@/components/homepage/HomepageIdentityClose';
 import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
-import { HomepageIdentitySections } from '@/components/homepage/HomepageIdentitySections';
+import { HomepageIdentityStoryStack } from '@/components/homepage/HomepageIdentityStoryStack';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
@@ -160,21 +159,6 @@ function HomepageStoryStack() {
       <HomepageUnlockedSections />
       <HomepageEditorialChangelog />
       <HomepageClose />
-    </div>
-  );
-}
-
-// Canonical Pen v3 body: the permission-gated logo strip, presence,
-// structure, and the close, on the shared page background. The live
-// story stack is unchanged while off.
-function HomepageIdentityStoryStack() {
-  return (
-    <div
-      className='homepage-identity-stack'
-      data-testid='homepage-identity-story-stack'
-    >
-      <HomepageIdentitySections />
-      <HomepageIdentityClose />
     </div>
   );
 }

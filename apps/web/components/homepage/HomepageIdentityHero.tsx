@@ -1,6 +1,6 @@
 // @coverage-via apps/web/tests/unit/home/HomepageIdentityHero.test.tsx
+import type { ReactNode } from 'react';
 import { ProductClaimHandleForm } from '@/app/(marketing)/product/ProductClaimHandleForm';
-import { Logo } from '@/components/atoms/Logo';
 import { MarketingHero } from '@/components/marketing';
 import { MarketingAmbientField } from '@/components/marketing/motion/MarketingAmbientField';
 import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
@@ -13,6 +13,8 @@ export type HomepageIdentityHeroCopy = typeof HOMEPAGE_IDENTITY_COPY.hero;
 export interface HomepageIdentityHeroProps {
   readonly copy?: HomepageIdentityHeroCopy;
   readonly headingId?: string;
+  /** Component previews can reuse the canonical bar without production grants. */
+  readonly logoStrip?: ReactNode;
 }
 
 /**
@@ -22,6 +24,7 @@ export interface HomepageIdentityHeroProps {
 export function HomepageIdentityHero({
   copy = HOMEPAGE_IDENTITY_COPY.hero,
   headingId = 'homepage-identity-hero-heading',
+  logoStrip = <HomepageLogoStrip />,
 }: HomepageIdentityHeroProps) {
   const { preview, claim } = copy;
 
@@ -56,7 +59,6 @@ export function HomepageIdentityHero({
             sectionOwner='apps/web/components/homepage/HomepageIdentityHero.tsx'
           >
             <div className='homepage-claim-hero__copy'>
-              <Logo variant='word' size='md' />
               <h1
                 id={headingId}
                 className='marketing-h1-linear text-primary-token'
@@ -73,6 +75,7 @@ export function HomepageIdentityHero({
                 data-testid='homepage-editorial-hero-search'
               >
                 <ProductClaimHandleForm
+                  entryMode='name-or-handle'
                   domain={claim.domain}
                   placeholder={claim.placeholder}
                   submitLabel={claim.action}
@@ -85,7 +88,7 @@ export function HomepageIdentityHero({
           </MarketingHero>
         </div>
       </div>
-      <HomepageLogoStrip />
+      {logoStrip}
       <div
         className='homepage-claim-hero__explanation'
         data-testid='homepage-hero-explanation'

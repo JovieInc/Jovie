@@ -7,6 +7,7 @@ import {
   buildStartEntryProfile,
   readStartEntryHandle,
   type StartEntryProfile,
+  withStartEntryDisplayName,
 } from './start-entry-profile';
 
 /**
@@ -20,7 +21,10 @@ export async function resolveStartEntryProfile(
   if (!handle || isReservedPublicProfileIdentity(handle)) return null;
 
   try {
-    return buildStartEntryProfile(handle, await getProfileWithLinks(handle));
+    return withStartEntryDisplayName(
+      buildStartEntryProfile(handle, await getProfileWithLinks(handle)),
+      params
+    );
   } catch (error) {
     await captureWarning('[start] entry profile lookup failed', error, {
       operation: 'resolveStartEntryProfile',
