@@ -773,6 +773,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/lib/__tests__/production-unbound-repair-attestation.test.mjs',
   'scripts/lib/__tests__/projected-tree-budget.test.mjs',
+  'scripts/lib/__tests__/promotion-gate-wiring.test.mjs',
   'scripts/lib/__tests__/promotion-journey-evidence.test.mjs',
   'scripts/lib/__tests__/qa-swarm.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release.test.mjs',
