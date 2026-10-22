@@ -136,6 +136,8 @@ jobs:
           ref: main
           persist-credentials: false
           sparse-checkout: |
+            packages/api-client/providers.json
+            scripts/apiclient
             scripts/lanes
             scripts/lib/github-rate-limit.mjs
           sparse-checkout-cone-mode: false
@@ -160,8 +162,28 @@ jobs:
           permission-statuses: read
 
       - name: Label the PR for the lanes
+        id: relay
         env:
           GH_TOKEN: ${{ github.token }}
           GH_READ_TOKEN: ${{ steps.read-token.outputs.token }}
           MODE: ${{ github.event_name == 'workflow_dispatch' && 'backfill' || 'relay' }}
         run: python3 scripts/lanes/pr_events.py "$MODE"
+
+      # GITHUB_TOKEN label writes do not trigger pull_request_target. The green
+      # wake can reach enroll before this relay clears lane-fix-red (JOV-8788),
+      # so explicitly wake the existing writer for only the released PRs. It
+      # revalidates the current head, draft state, holds and required checks.
+      - name: Wake enrollment after releasing stale red labels
+        if: steps.relay.outputs.cleared_red_prs != '' && steps.relay.outputs.cleared_red_prs != '[]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONPATH: scripts
+          CLEARED_RED_PRS: ${{ steps.relay.outputs.cleared_red_prs }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -r '.[]' <<< "$CLEARED_RED_PRS" | while IFS= read -r pr_number; do
+            python3 -m apiclient gh --priority merge -- api --method POST \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/merge-queue-green-enroll.yml/dispatches" \
+              -f ref=main -f "inputs[pr_number]=$pr_number"
+          done

@@ -14,6 +14,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import textwrap
 import time
 import unittest
 from unittest.mock import patch, Mock
@@ -507,6 +508,56 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, exhausted, set()), [])
         self.assertEqual(exhausted.made("gh", "api", "-X", "POST"), [],
                          "a terminal head never gets another repair signal")
+
+    def test_relay_exports_released_red_heads_for_an_explicit_enrollment_wake(self):
+        # JOV-8788: enroll saw lane-fix-red at 02:50:04; the relay deleted it
+        # at 02:50:07 with GITHUB_TOKEN, so no unlabeled workflow followed.
+        payload = {"workflow_run": {"event": "pull_request", "conclusion": "success",
+                                   "head_sha": "h1", "pull_requests": [{"number": 5}]}}
+        original_relay = events.relay
+        for delete_code, expected in ((0, [5]), (1, [])):
+            with self.subTest(delete_code=delete_code), tempfile.TemporaryDirectory() as tmp:
+                view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+                shell = Shell({("gh", "pr", "view"): view,
+                               ("gh", "api", "-X", "DELETE"): (delete_code, "")})
+                event_path, output_path = Path(tmp) / "event.json", Path(tmp) / "output"
+                event_path.write_text(json.dumps(payload))
+                with patch.dict(os.environ, {"GITHUB_EVENT_NAME": "workflow_run",
+                                             "GITHUB_EVENT_PATH": str(event_path),
+                                             "GITHUB_OUTPUT": str(output_path)}), \
+                     patch.object(events, "relay", side_effect=lambda event, body:
+                                  original_relay(event, body, shell, set())):
+                    self.assertEqual(events.main(["relay"]), 0)
+                self.assertTrue(output_path.exists(), "release must leave an explicit admission wake receipt")
+                outputs = dict(line.split("=", 1) for line in output_path.read_text().splitlines())
+                self.assertEqual(json.loads(outputs["cleared_red_prs"]), expected)
+                self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1)
+
+    def test_released_red_dispatches_are_targeted_and_failures_remain_visible(self):
+        workflow = (ROOT / ".github/workflows/lane-fix-relay.yml").read_text()
+        wake = workflow.split("- name: Wake enrollment after releasing stale red labels", 1)
+        self.assertEqual(len(wake), 2, "the relay must consume its release receipt")
+        script = textwrap.dedent(wake[1].split("        run: |\n", 1)[1])
+        with tempfile.TemporaryDirectory() as tmp:
+            executable, log = Path(tmp) / "python3", Path(tmp) / "calls"
+            executable.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$DISPATCH_LOG"\nexit "${DISPATCH_EXIT:-0}"\n')
+            executable.chmod(0o755)
+            env = {**os.environ, "PATH": f"{tmp}:{os.environ['PATH']}", "DISPATCH_LOG": str(log),
+                   "CLEARED_RED_PRS": "[5,7]", "GITHUB_REPOSITORY": events.REPO}
+            def execute(**overrides):
+                return subprocess.run(["bash", "-c", script], env={**env, **overrides},
+                                      capture_output=True, text=True)
+            self.assertEqual(execute().returncode, 0)
+            command = ("-m apiclient gh --priority merge -- api --method POST "
+                       f"repos/{events.REPO}/actions/workflows/merge-queue-green-enroll.yml/dispatches "
+                       "-f ref=main -f inputs[pr_number]=")
+            self.assertEqual(log.read_text().splitlines(), [command + "5", command + "7"])
+            log.unlink()
+            self.assertEqual(execute(CLEARED_RED_PRS="[]").returncode, 0)
+            self.assertFalse(log.exists(), "no release must not start a global admission sweep")
+            self.assertEqual(execute(DISPATCH_EXIT="75").returncode, 75)
+            self.assertEqual(log.read_text().splitlines(), [command + "5"],
+                             "a deferred dispatch must fail the step before reporting success")
 
     def test_required_green_success_clears_stale_lane_fix_red_and_a_red_head_keeps_it(self):
         def success(status, **extra):

@@ -2478,6 +2478,12 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(__doc__, file=sys.stderr)
         return 2
+    # GITHUB_TOKEN label deletions emit no Actions wake. Hand the released
+    # PRs to the existing enrollment writer after this step completes.
+    if output := os.environ.get("GITHUB_OUTPUT"):
+        released = sorted({number for number, kind in added if kind == "cleared-red"})
+        with Path(output).open("a") as stream:
+            stream.write(f"cleared_red_prs={json.dumps(released, separators=(',', ':'))}\n")
     for number, kind in added:
         if kind == "cleared-red":
             print(f"#{number} cleared lane-fix-red")
