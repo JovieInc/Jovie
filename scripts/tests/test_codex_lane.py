@@ -117,13 +117,53 @@ class AccountsTest(Isolated):
         handle.close()
 
 
+def _lanes_conftest():
+    name = "jovie_lanes_pytest_conftest"
+    cached = sys.modules.get(name)
+    if cached is not None:
+        return cached
+    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / "tests" / "conftest.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+class HostLaneEnvTest(unittest.TestCase):
+    def test_scrub_drops_codex_slot_knobs_that_deadlock_metadata_reap(self):
+        # CODEX_LANE_LOGIN_SLOTS=5 lets lease() take a free slot while the
+        # metadata child still holds one. The assertion inside the mocked wait
+        # then raises, and reap_current_metadata retries that Exception forever.
+        env = {
+            "CODEX_LANE_LOGIN_SLOTS": "5",
+            "CODEX_LANE_AUTH_MODE": "subscription-pool",
+            "CODEX_LANE_CLI": "/tmp/codex",
+            "CODEX_LANE_SUBSCRIPTION_PROFILES": "{}",
+            "CODEX_LEDGER_CADENCE_S": "30",
+            "LANES_STATE": "/tmp/lanes",
+            "PATH": "/usr/bin",
+            "CODEX_HOME": "/home/example/.codex",
+        }
+        _lanes_conftest().scrub_ambient_lane_env(env)
+        for name in (
+            "CODEX_LANE_LOGIN_SLOTS", "CODEX_LANE_AUTH_MODE", "CODEX_LANE_CLI",
+            "CODEX_LANE_SUBSCRIPTION_PROFILES", "CODEX_LEDGER_CADENCE_S", "LANES_STATE",
+        ):
+            self.assertNotIn(name, env)
+        self.assertEqual((env["PATH"], env["CODEX_HOME"]), ("/usr/bin", "/home/example/.codex"))
+
+
 class CurrentLoginTest(Isolated):
     def setUp(self):
         super().setUp()
         self.root = Path(self.tmp.name)
         self.cli = self.root / "codex"
+        # Pin one slot. An ambient CODEX_LANE_LOGIN_SLOTS above 1 makes
+        # test_real_metadata_child_retains_lease_until_delayed_reap loop in
+        # reap_current_metadata. Collection also scrubs the host value.
         self.env = patch.dict(os.environ, {
             "CODEX_LANE_AUTH_MODE": "current-login", "CODEX_LANE_CLI": str(self.cli),
+            "CODEX_LANE_LOGIN_SLOTS": "1",
             "CODEX_HOME": str(self.root / "existing-login"), "OPENAI_API_KEY": "must-not-reach-child",
             "OPENAI_BASE_URL": "https://unavailable.invalid", "CODEX_API_KEY": "must-not-reach-child",
         })

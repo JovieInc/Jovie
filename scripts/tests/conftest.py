@@ -2,9 +2,11 @@
 
 The structural pytest lane runs wherever the pre-push gate runs, including the
 lanes host itself, whose shell exports live lane configuration (LANES_SLOTS_*,
-LANES_STATE, LANES_REPO, ...). Those ambient values silently override the
-module constants the tests exercise, so the same suite passes in CI and fails
-on a configured host. Scrub host-injected lane config once at collection so
+LANES_STATE, LANES_REPO, CODEX_LANE_*, ...). Those ambient values silently
+override the module constants the tests exercise, so the same suite passes in
+CI and fails on a configured host. CODEX_LANE_LOGIN_SLOTS above 1 makes
+CurrentLoginTest's metadata reap assertion retry forever inside
+reap_current_metadata. Scrub host-injected lane config once at collection so
 the suite is hermetic; tests that need a knob set it via patch.dict.
 """
 
@@ -23,7 +25,7 @@ import git_housekeeping  # noqa: E402
 git_housekeeping.install_process_fixture_env()
 git_housekeeping.install_isolated_tempdirs()
 
-_SCRUB_PREFIXES = ("LANES_", "SYMPHONY_")
+_SCRUB_PREFIXES = ("LANES_", "SYMPHONY_", "CODEX_LANE_")
 _SCRUB_EXACT = {
     "LINEAR_API_KEY",
     "LINEAR_API_URL",
@@ -31,8 +33,17 @@ _SCRUB_EXACT = {
     "LINEAR_COOLDOWN_STATE_DIR",
     "LINEAR_COOLDOWNS",
     "LINEAR_RATE_LIMIT_BASE_S",
+    # Host cadence is not the suite's default. A short override changes ledger
+    # freshness without the test opting in.
+    "CODEX_LEDGER_CADENCE_S",
 }
 
-for _name in list(os.environ):
-    if _name in _SCRUB_EXACT or _name.startswith(_SCRUB_PREFIXES):
-        os.environ.pop(_name, None)
+
+def scrub_ambient_lane_env(env: dict) -> None:
+    """Drop host lane knobs. Tests that need one set it with patch.dict."""
+    for name in list(env):
+        if name in _SCRUB_EXACT or name.startswith(_SCRUB_PREFIXES):
+            env.pop(name, None)
+
+
+scrub_ambient_lane_env(os.environ)
