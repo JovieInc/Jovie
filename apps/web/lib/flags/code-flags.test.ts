@@ -44,6 +44,14 @@ describe('code flags', () => {
     delete process.env.FEATURE_SOCIAL_HTML_ISOLATED_PROVIDER;
   });
 
+  it('keeps the Stripe test-price secret flag off until the GitHub secret is updated', () => {
+    expect(CODE_FLAGS.STRIPE_TEST_PRICE_CONFIGURED).toBe(false);
+    expect(isCodeFlagEnabled('STRIPE_TEST_PRICE_CONFIGURED')).toBe(false);
+    process.env.FEATURE_STRIPE_TEST_PRICE_CONFIGURED = 'true';
+    expect(isCodeFlagEnabled('STRIPE_TEST_PRICE_CONFIGURED')).toBe(true);
+    delete process.env.FEATURE_STRIPE_TEST_PRICE_CONFIGURED;
+  });
+
   it('keeps the auth offer summary off unless the env override is true', () => {
     expect(CODE_FLAGS.AUTH_OFFER_SUMMARY).toBe(false);
     expect(isCodeFlagEnabled('AUTH_OFFER_SUMMARY')).toBe(false);

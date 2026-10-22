@@ -118,18 +118,23 @@ vi.mock('@/components/jovie/components', () => ({
       {children}
     </div>
   ),
-  ChatInput: forwardRef<HTMLTextAreaElement, { readonly placeholder?: string }>(
-    function MockChatInput({ placeholder }, ref) {
-      return (
-        <textarea
-          ref={ref}
-          aria-label='Chat Message Input'
-          data-testid='chat-input'
-          placeholder={placeholder}
-        />
-      );
+  ChatInput: forwardRef<
+    HTMLTextAreaElement,
+    {
+      readonly placeholder?: string;
+      readonly pickerPlacement?: 'flow' | 'overlay';
     }
-  ),
+  >(function MockChatInput({ placeholder, pickerPlacement }, ref) {
+    return (
+      <textarea
+        ref={ref}
+        aria-label='Chat Message Input'
+        data-testid='chat-input'
+        data-picker-placement={pickerPlacement}
+        placeholder={placeholder}
+      />
+    );
+  }),
   ChatMessage: ({
     parts,
   }: {
@@ -365,6 +370,32 @@ describe('OnboardingChat empty intro', () => {
       ).toBe(headerOverlay === true);
     }
   );
+
+  it('overlays the slash picker on a blank start and flows it under a paused message', async () => {
+    render(
+      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+    );
+
+    expect(screen.getByTestId('chat-input')).toHaveAttribute(
+      'data-picker-placement',
+      'overlay'
+    );
+
+    chatMocks.errorMetadata = {};
+    act(() => {
+      chatMocks.onError?.(new Error('Network interrupted'));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('onboarding-message-recovery')
+      ).toHaveTextContent('Message paused');
+    });
+    expect(screen.getByTestId('chat-input')).toHaveAttribute(
+      'data-picker-placement',
+      'flow'
+    );
+  });
 
   it('surfaces a turnstile recovery row instead of swallowing the error (JOV-7294)', async () => {
     chatMocks.errorMetadata = { errorCode: 'TURNSTILE_REQUIRED' };

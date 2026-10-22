@@ -1215,7 +1215,11 @@ export function OnboardingChat({
           isSubmitted={isSubmitted}
         />
       ) : null}
-      <ChatInput ref={composerInputRef} {...onboardingChatInputProps} />
+      <ChatInput
+        ref={composerInputRef}
+        {...onboardingChatInputProps}
+        pickerPlacement={sendLocalError ? 'flow' : 'overlay'}
+      />
     </div>
   );
 

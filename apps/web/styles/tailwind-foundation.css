@@ -213,6 +213,11 @@
   transition-property: flex-basis, width, border-width, opacity, transform;
 }
 
+/* Keep scrollports from shifting when a descendant receives focus. */
+@utility overflow-anchor-none {
+  overflow-anchor: none;
+}
+
 @utility scale-press {
   scale: var(--scale-press);
 }
