@@ -12,10 +12,7 @@ describe('buildClaimRedirectUrl', () => {
     expect(request.url.startsWith('http://localhost:3100/')).toBe(true);
     expect(request.headers.get('host')).toBe('127.0.0.1:3100');
     expect(
-      buildClaimRedirectUrl(
-        request,
-        '/e2eclaimartist?claim=1'
-      ).toString()
+      buildClaimRedirectUrl(request, '/e2eclaimartist?claim=1').toString()
     ).toBe('http://127.0.0.1:3100/e2eclaimartist?claim=1');
   });
 
