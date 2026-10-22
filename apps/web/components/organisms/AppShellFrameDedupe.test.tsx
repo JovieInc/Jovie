@@ -42,6 +42,44 @@ describe('AppShellFrameDedupe', () => {
     );
   });
 
+  it('drops a hidden shell whose display is overridden and keeps one main landmark', () => {
+    render(
+      <>
+        <AppShellFrameDedupe />
+        <div
+          data-testid='stale-frame'
+          data-app-shell-frame='true'
+          hidden
+          style={{ display: 'flex' }}
+        >
+          <main id='main-content' data-testid='stale-main'>
+            Stale
+          </main>
+        </div>
+        <div data-testid='live-frame' data-app-shell-frame='true' ref={paint}>
+          <main id='main-content' data-testid='live-main'>
+            Live
+          </main>
+        </div>
+      </>
+    );
+
+    expect(screen.getByTestId('stale-frame')).not.toHaveAttribute(
+      'data-app-shell-frame'
+    );
+    expect(screen.getByTestId('stale-main')).not.toHaveAttribute('id');
+    expect(screen.getByTestId('stale-frame')).toHaveTextContent('');
+    expect(screen.getByTestId('live-frame')).toHaveTextContent('Live');
+    expect(screen.getByTestId('live-main')).toHaveAttribute(
+      'id',
+      'main-content'
+    );
+    expect(screen.getByTestId('live-frame')).toHaveAttribute(
+      'data-app-shell-frame',
+      'true'
+    );
+  });
+
   it('drops a display:none duplicate once another frame has a painted box', () => {
     render(
       <>
@@ -244,6 +282,7 @@ describe('AppShellFrameDedupe', () => {
       'Live tasks'
     );
     expect(screen.getByTestId('hidden-only')).toBeInTheDocument();
+    expect(screen.getByTestId('stale-frame')).toHaveTextContent('');
     expect(screen.getByTestId('stale-frame')).not.toHaveAttribute(
       'data-app-shell-frame'
     );

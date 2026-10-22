@@ -184,7 +184,9 @@ export function chainStages(
         ? 'completed'
         : next
           ? 'advanced'
-          : (stamp.outcome ?? 'open'),
+          : OUTCOMES.includes(stamp.outcome)
+            ? stamp.outcome
+            : 'open',
       sourceReceipt: stamp.sourceReceipt,
     });
   }
@@ -206,7 +208,9 @@ const seconds = (from, to) => {
 function dwellSamples(events) {
   const out = {};
   for (const event of events) {
-    if (!event.exitedAt || event.outcome === 'completed') continue;
+    // Terminal stages are reported as arrivals by computeStageTimings, so a
+    // dwell sample is kept for every exited stage whatever its outcome.
+    if (!event.exitedAt) continue;
     const value = seconds(event.enteredAt, event.exitedAt);
     if (value === null) continue;
     const key = `${event.entityType}:${event.stage}`;
@@ -422,5 +426,49 @@ export function buildStageSummary(timings) {
     regressions: timings.regressions,
     slowestP95_7d: stage7d.sort((a, b) => b.p95 - a.p95).slice(0, 5),
     endToEnd7d: endToEnd,
+  };
+}
+
+const packWindow = (w, terminal) => [
+  w?.n ?? 0,
+  w?.p50 ?? null,
+  w?.p95 ?? null,
+  ...(terminal ? [w?.failed ?? null, w?.failRate ?? null] : []),
+];
+const packRegression = r =>
+  r
+    ? [
+        Boolean(r.regressed),
+        r.ratio === null ? null : Math.round(r.ratio * 100) / 100,
+        r.recentP95,
+        r.baselineP95,
+        r.recentN,
+        r.baselineN,
+      ]
+    : null;
+export function compactStageTimings(timings) {
+  const packRows = rows => {
+    const out = {};
+    for (const [id, { source: _source, ...row }] of Object.entries(rows)) {
+      for (const w of timings.windows)
+        row[w] = packWindow(row[w], row.terminal);
+      out[id] = { ...row, regression: packRegression(row.regression) };
+    }
+    return out;
+  };
+  const entities = {};
+  for (const [type, entity] of Object.entries(timings.entities))
+    entities[type] = {
+      stages: packRows(entity.stages),
+      endToEnd: packRows(entity.endToEnd),
+    };
+  return {
+    ...timings,
+    schema: 'jovie-stage-timings-compact/v1',
+    windowFormat: ['n', 'p50', 'p95'],
+    terminalWindowFormat: ['n', 'p50', 'p95', 'failed', 'failRate'],
+    regressionFormat:
+      'regressed ratio recentP95 baselineP95 recentN baselineN'.split(' '),
+    entities,
   };
 }

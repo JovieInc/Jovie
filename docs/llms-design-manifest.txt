@@ -252,7 +252,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-sidebar-icon-size`: 1rem
 - `--app-shell-sidebar-item-foreground-rgb`: 88 90 96
 - `--app-shell-sidebar-item-icon-rgb`: 122 125 132
-- `--app-shell-sidebar-muted-rgb`: 112 116 124
+- `--app-shell-sidebar-muted-rgb`: 98 104 114
 - `--app-shell-sidebar-nav-grid`: var(--app-shell-sidebar-icon-size) minmax(0, 1fr)
 - `--app-shell-sidebar-seam`: rgba(0, 0, 0, 0.05)
 - `--app-shell-sidebar-shadow`: 0 0 0 1px rgba(0, 0, 0, 0.022), 0 14px 28px rgba(0, 0, 0, 0.035)
@@ -445,7 +445,7 @@ Import from `@jovie/ui` — do not recreate local atom copies.
 
 These are the production review surfaces. Match their token usage and component families.
 
-- **Homepage** (`homepage`) — Primary marketing homepage and current live review surface. — family: `features/home`
+- **Homepage** (`homepage`) — Primary marketing homepage and current live review surface. — family: `components/homepage`
 - **Public Profile** (`public-profile`) — Canonical public artist profile surface rendered from StaticArtistPage and ProfileCompactTemplate. — family: `features/profile`
 - **Release Landing** (`release-landing`) — Canonical smart-link release destination sharing the public shell direction. — family: `features/release`
 - **Dashboard Releases** (`dashboard-releases`) — Canonical authenticated releases workspace and current dashboard review/capture surface. — family: `features/dashboard/organisms/release-provider-matrix`

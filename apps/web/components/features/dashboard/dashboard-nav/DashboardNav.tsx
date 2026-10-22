@@ -394,11 +394,10 @@ export function DashboardNav({
               : () => cancelPendingNavigation(item.id)
           }
           shortcut={shortcut}
-          // Warm the approved customer destinations without a route flash.
-          // Next's automatic mode skips full payloads for dynamic routes;
-          // forcing `true` warms the complete route while preserving the
-          // current-page warm-navigation contract (no loading.tsx flash).
-          prefetch={!isDemo && !isInSettings ? true : undefined}
+          // Full prefetch (`true`) downloads every dynamic destination's RSC
+          // payload on mount and blows the shell persistence request budget.
+          // Click-time navigation still loads the route.
+          prefetch={false}
           onClick={demoUnavailable ? () => handleDemoNavClick(item) : undefined}
           onActivate={
             demoUnavailable
@@ -444,7 +443,7 @@ export function DashboardNav({
           ? 'page'
           : undefined
       }
-      prefetch={!isDemo}
+      prefetch={false}
       aria-label='New Chat'
       data-navigation-item-id={chatNavItem.id}
       data-navigation-pending={
@@ -519,7 +518,7 @@ export function DashboardNav({
                   <Link
                     href={APP_ROUTES.DASHBOARD}
                     onClick={event => handleCommandClick(event, inboxNavItem)}
-                    prefetch={!isDemo}
+                    prefetch={false}
                     aria-busy={
                       pendingNavigation?.itemId === inboxNavItem.id || undefined
                     }

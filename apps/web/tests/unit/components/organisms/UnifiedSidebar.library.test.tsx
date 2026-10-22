@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
@@ -349,6 +355,16 @@ describe('UnifiedSidebar library route', () => {
     expect(
       within(panel).getByRole('link', { name: /Public Profile/i })
     ).toHaveAttribute('href', '/timwhite');
+    const settingsNav = screen.getByRole('navigation', {
+      name: 'settings navigation',
+    });
+    for (const label of ['Account', 'Artist']) {
+      const group = within(settingsNav)
+        .getAllByText(label)
+        .find(node => node.className.includes('font-caption'));
+      expect(group?.className).toContain('text-sidebar-muted');
+      expect(group?.className).not.toMatch(/text-sidebar-muted\/\d+/);
+    }
   });
 
   it('keeps the unified user panel when a route-owned sidebar override replaces nav', () => {
@@ -675,6 +691,32 @@ describe('UnifiedSidebar library route', () => {
     expect(screen.queryByTestId('operator-lists-nav')).not.toBeInTheDocument();
   });
 
+  it('keeps Tools collapsed on Ovie Home until the founder opens it', () => {
+    globalThis.localStorage?.removeItem('ovie.nav.tools-open.v1');
+    renderUnifiedSidebar({ pathname: APP_ROUTES.OV, section: 'ov' });
+    const operatorNavigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    expect(
+      within(operatorNavigation).getByRole('link', { name: 'Home' })
+    ).toBeVisible();
+    const tools = within(operatorNavigation).getByRole('button', {
+      name: 'Tools',
+    });
+    expect(tools).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      within(operatorNavigation).queryByRole('link', { name: 'Growth' })
+    ).toBeNull();
+    fireEvent.click(tools);
+    expect(tools).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      within(operatorNavigation).getByRole('link', { name: 'Growth' })
+    ).toBeVisible();
+    expect(globalThis.localStorage?.getItem('ovie.nav.tools-open.v1')).toBe(
+      '1'
+    );
+  });
+
   it('renders founder lists in the Ovie sidebar outside the canonical landmark', async () => {
     renderUnifiedSidebar({ pathname: APP_ROUTES.ADMIN_OPS, section: 'ov' });
     const operatorNavigation = screen.getByRole('navigation', {
@@ -683,10 +725,19 @@ describe('UnifiedSidebar library route', () => {
     // Lazy chunk: the lists block is split out of creator routes.
     const lists = await screen.findByTestId('operator-lists-nav');
     expect(operatorNavigation).not.toContainElement(lists);
-    const labels = within(operatorNavigation)
-      .getAllByText(/^(Workspaces|Utilities)$/)
-      .map(node => node.textContent);
-    expect(labels).toEqual(['Workspaces', 'Utilities']);
+    // Ovie is one Home plus Tools (Tim 2026-10-21). Tools holds the active
+    // Ops page, so it is open and cannot be collapsed over it.
+    expect(
+      within(operatorNavigation).queryByText(/^(Workspaces|Utilities)$/)
+    ).toBeNull();
+    const tools = within(operatorNavigation).getByRole('button', {
+      name: 'Tools',
+    });
+    expect(tools).toHaveAttribute('aria-expanded', 'true');
+    expect(tools).toBeDisabled();
+    expect(
+      within(operatorNavigation).getByRole('link', { name: 'Ops' })
+    ).toBeVisible();
     expect(lists).toBeInTheDocument();
 
     renderUnifiedSidebar({ pathname: APP_ROUTES.CHAT, section: 'dashboard' });

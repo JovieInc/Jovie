@@ -309,6 +309,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         {thread.href ? (
           <Link
             href={thread.href}
+            prefetch={false}
             aria-current={active ? 'page' : undefined}
             className={rowClasses}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
@@ -429,7 +430,7 @@ export function SidebarThreadsSection({
               ? // Founder lock 2026-09-25: sentence case, no letterspacing,
                 // 11px medium, quiet color.
                 'text-(length:--text-2xs) font-medium text-sidebar-muted'
-              : 'text-xs font-caption tracking-normal text-sidebar-muted/90'
+              : 'text-xs font-caption tracking-normal text-sidebar-muted'
           }
         >
           {calm

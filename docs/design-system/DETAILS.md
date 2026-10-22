@@ -900,7 +900,7 @@ Each focused surface declares its default-state control budget and covers loadin
 | Accent active RGB | `236 238 241` | `168 176 195 / 0.1` |
 | Item foreground RGB | `88 90 96` | `214 218 226` |
 | Item icon RGB | `122 125 132` | `116 120 128` |
-| Muted RGB | `112 116 124` | `107 111 118` |
+| Muted RGB | `98 104 114` | `107 111 118` |
 | Nav font | 12px / weight 500 | — |
 | Item font | 13px / weight 450 | — |
 

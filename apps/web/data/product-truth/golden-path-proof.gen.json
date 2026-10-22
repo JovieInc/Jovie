@@ -15,67 +15,56 @@
       "id": "homepage.hero.headline",
       "step": "homepage",
       "route": "/",
-      "source": "apps/web/data/homepageIdentityCopy.ts",
-      "copy": "Be found. Be understood.",
-      "nature": "outcome",
-      "evidenceClass": "dogfood",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "One profile. For every fan.",
+      "nature": "capability",
+      "evidenceClass": null,
       "status": "admissible",
-      "detail": "dogfood proof dogfood-tim-human-link-clicks-90d"
+      "detail": "certified: artist-profiles, public-profile"
     },
     {
       "id": "homepage.hero.subhead",
       "step": "homepage",
       "route": "/",
-      "source": "apps/web/data/homepageIdentityCopy.ts",
-      "copy": "Claim your name. Jovie makes you easy to reach, for people and for agents.",
-      "nature": "outcome",
-      "evidenceClass": "dogfood",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "A free profile for your music, bio, and links. Your latest release leads, with tour dates and updates one tap away.",
+      "nature": "capability",
+      "evidenceClass": null,
       "status": "admissible",
-      "detail": "dogfood proof dogfood-tim-known-contacts"
+      "detail": "certified: artist-profiles, public-profile, artist-notifications"
     },
     {
-      "id": "homepage.hero.artist-profile",
+      "id": "homepage.fan-states.headline",
       "step": "homepage",
       "route": "/",
-      "source": "apps/web/data/homepageIdentityCopy.ts",
-      "copy": "Your music and links, together.",
+      "source": "apps/web/data/homepageFanStatesCopy.ts",
+      "copy": "Each visit gets the right next step.",
+      "nature": "capability",
+      "evidenceClass": null,
+      "status": "admissible",
+      "detail": "certified: artist-profiles"
+    },
+    {
+      "id": "homepage.offer.headline",
+      "step": "homepage",
+      "route": "/",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "Free to claim. Yours to share.",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",
       "detail": "certified: public-profile"
     },
     {
-      "id": "homepage.presence.headline",
+      "id": "homepage.offer.smart-links",
       "step": "homepage",
       "route": "/",
-      "source": "apps/web/data/homepageIdentityCopy.ts",
-      "copy": "Your presence, resolved.",
-      "nature": "outcome",
-      "evidenceClass": "computed",
-      "status": "admissible",
-      "detail": "computed slot presence-signals: Jovie found the visitor’s real public identity and sources."
-    },
-    {
-      "id": "homepage.presence.next-step",
-      "step": "homepage",
-      "route": "/",
-      "source": "apps/web/data/homepageIdentityCopy.ts",
-      "copy": "Read the work. Start a conversation. Attend an event or send a payment.",
+      "source": "apps/web/data/homepageCopy.ts",
+      "copy": "Unlimited smart links",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",
-      "detail": "certified: artist-profiles, public-ask, pay"
-    },
-    {
-      "id": "homepage.structure.body",
-      "step": "homepage",
-      "route": "/",
-      "source": "apps/web/data/homepageIdentityCopy.ts",
-      "copy": "One identity. Room for everything you do, and whatever comes next.",
-      "nature": "positioning",
-      "evidenceClass": null,
-      "status": "admissible",
-      "detail": "no checkable assertion"
+      "detail": "certified: smart-links"
     },
     {
       "id": "claim.banner.ready",
@@ -200,13 +189,13 @@
     }
   ],
   "evidenceCounts": {
-    "computed": 5,
-    "dogfood": 2,
+    "computed": 4,
+    "dogfood": 0,
     "pilot": 0,
     "none": 0
   },
   "statusCounts": {
-    "admissible": 17,
+    "admissible": 16,
     "proof-gap": 0,
     "uncertified-capability": 0,
     "invented-number": 0,

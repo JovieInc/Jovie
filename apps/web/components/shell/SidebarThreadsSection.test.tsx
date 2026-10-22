@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -13,6 +14,16 @@ import {
   toSidebarThread,
   writeThreadReadState,
 } from './SidebarThreadsSection';
+
+// Expose the Next Link prefetch contract without starting a router in jsdom.
+vi.mock('next/link', () => ({
+  default: React.forwardRef<
+    HTMLAnchorElement,
+    React.ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+  >(function TestLink({ prefetch, ...props }, ref) {
+    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
+  }),
+}));
 
 const threads: SidebarThread[] = [
   {
@@ -56,6 +67,9 @@ describe('SidebarThreadsSection', () => {
 
     expect(chatActionIcon).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
     expect(allChatsIcon).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
+    const recent = screen.getByText('Recent');
+    expect(recent.className).toContain('text-sidebar-muted');
+    expect(recent.className).not.toMatch(/text-sidebar-muted\/\d+/);
 
     rerender(
       <SidebarThreadsSection
@@ -170,6 +184,34 @@ describe('SidebarThreadsSection', () => {
     );
     expect(inactiveThread).toHaveClass('focus-visible:ring-2');
   });
+
+  it.each([false, true])(
+    'disables prefetch for active and inactive thread links with calm=%s',
+    calm => {
+      render(
+        <SidebarThreadsSection
+          threads={threads}
+          activeThreadId='thread-newer'
+          tight
+          calm={calm}
+          collapsed={false}
+        />
+      );
+
+      for (const thread of threads) {
+        const link = screen.getByRole('link', { name: thread.title });
+        expect(link).toHaveAttribute('href', thread.href);
+        expect(link).toHaveAttribute('data-prefetch', 'false');
+      }
+      expect(screen.getByRole('link', { name: 'Pitch tasks' })).toHaveAttribute(
+        'aria-current',
+        'page'
+      );
+      expect(
+        screen.getByRole('link', { name: 'Release rollout' })
+      ).not.toHaveAttribute('aria-current');
+    }
+  );
 
   it('keeps thread action affordances opt-in and wired to the row thread', () => {
     const onThreadContextMenu = vi.fn();
