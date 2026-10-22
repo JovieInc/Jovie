@@ -17,6 +17,19 @@ describe('SmartLinksLanding', () => {
         name: 'Share your work with one link.',
       })
     ).toBeInTheDocument();
+    const demo = screen.getByTestId('smart-links-demo');
+    expect(demo.parentElement).toHaveClass('items-start');
+    expect(demo.parentElement).not.toHaveClass('items-center');
+    const art = screen.getByRole('img', { name: 'Never Say A Word cover art' });
+    expect(art.parentElement).toHaveClass(
+      'relative',
+      'aspect-square',
+      'max-w-62',
+      'overflow-hidden'
+    );
+    expect(screen.getByTestId('action-dial').querySelector('div')).toHaveClass(
+      'min-h-[13.25rem]'
+    );
     expect(
       screen.getByRole('link', { name: 'Open the live example' })
     ).toHaveAttribute('href', '/tim/never-say-a-word?noredirect=1');

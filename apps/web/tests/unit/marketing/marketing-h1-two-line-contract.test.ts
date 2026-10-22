@@ -38,6 +38,9 @@ describe('marketing H1 two-visual-line contract', () => {
     expect(globals).not.toContain(
       ':where(.home-viewport, .system-b-marketing) h1:not(.sr-only)'
     );
+    expect(globals).toMatch(
+      /\.marketing-h1-natural \{[\s\S]*?max-block-size: none;[\s\S]*?-webkit-line-clamp: unset;/
+    );
     expect(posterHero.match(/marketing-h1-max-two-lines/g)).toHaveLength(1);
     expect(marketingHero.match(/marketing-h1-max-two-lines/g)).toHaveLength(2);
     expect(posterHero).not.toContain('aria-label=');

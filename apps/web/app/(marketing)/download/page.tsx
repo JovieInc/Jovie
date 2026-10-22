@@ -172,14 +172,14 @@ export default function DownloadPage() {
               width='page'
               className='relative z-3 flex flex-1 flex-col'
             >
-              <div className='grid min-h-0 flex-1 items-center gap-12 pb-16 sm:pb-20 lg:grid-cols-2 lg:gap-16 lg:pb-24'>
-                <div className='max-w-xl'>
+              <div className='grid min-h-0 flex-1 items-start gap-12 pb-16 sm:pb-20 lg:grid-cols-2 lg:items-center lg:gap-16 lg:pb-24'>
+                <div className='max-w-xl max-sm:min-h-[25.75rem]'>
                   <p className='homepage-section-eyebrow'>
                     Mac app available now / iPhone alpha in TestFlight
                   </p>
                   <h1
                     id='download-hero-heading'
-                    className='mt-5 text-balance text-4xl font-bold leading-none tracking-normal text-(--system-b-text-primary) sm:text-6xl line-clamp-2'
+                    className='marketing-h1-natural mt-5 min-h-[4.5rem] text-balance text-4xl font-bold leading-none tracking-normal text-(--system-b-text-primary) sm:min-h-[7.5rem] sm:text-6xl'
                   >
                     Jovie, Installed Where You Work.
                   </h1>
