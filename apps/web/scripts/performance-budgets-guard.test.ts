@@ -24,6 +24,7 @@ import type {
   ViolationResult,
 } from './performance-budgets-guard';
 import {
+  ALIAS_SHARED_CONTEXT_WARMUPS,
   applyAliasPhaseTimings,
   applyProfileWarmTransitionTimings,
   assertAliasNavigationHopReceipts,
@@ -33,6 +34,7 @@ import {
   confirmTimingViolations,
   createAliasPhaseProbeScript,
   createContextOptions,
+  discardSharedAliasContextWarmups,
   evaluateTimingConfirmation,
   loadGuardManifestRoutes,
   loadPerformanceProtectedOriginCookies,
@@ -42,6 +44,7 @@ import {
   resolveWarmNavigationStartPath,
   runPerformanceBudgetsGuard,
   selectGuardRoutes,
+  sharedAliasContextWarmupCount,
   usesSharedAliasBrowserContext,
   waitForWarmDestinationReady,
 } from './performance-budgets-guard';
@@ -925,6 +928,78 @@ describe('performance budgets guard', () => {
 
     const home = routes.find(candidate => candidate.id === 'home');
     expect(usesSharedAliasBrowserContext(home!)).toBe(false);
+  });
+
+  it('discards three full loads in the shared alias context before timing', async () => {
+    expect(ALIAS_SHARED_CONTEXT_WARMUPS).toBe(3);
+
+    const routes = await loadGuardManifestRoutes();
+    const listen = routes.find(
+      candidate => candidate.id === 'public-profile-listen'
+    );
+    const home = routes.find(candidate => candidate.id === 'home');
+    expect(sharedAliasContextWarmupCount(listen!)).toBe(3);
+    expect(sharedAliasContextWarmupCount(home!)).toBe(0);
+
+    const sessionSend = vi.fn().mockResolvedValue(undefined);
+    const pages: Array<{
+      close: ReturnType<typeof vi.fn>;
+      goto: ReturnType<typeof vi.fn>;
+      locator: ReturnType<typeof vi.fn>;
+    }> = [];
+    const clearCookies = vi.fn().mockResolvedValue(undefined);
+    const context = {
+      clearCookies,
+      newCDPSession: vi.fn().mockResolvedValue({ send: sessionSend }),
+      newPage: vi.fn(async () => {
+        const page = {
+          close: vi.fn().mockResolvedValue(undefined),
+          goto: vi.fn().mockResolvedValue(undefined),
+          locator: vi.fn(() => ({
+            count: vi.fn().mockResolvedValue(1),
+            nth: vi.fn(() => ({
+              isVisible: vi.fn().mockResolvedValue(true),
+            })),
+          })),
+          waitForLoadState: vi.fn().mockResolvedValue(undefined),
+        };
+        pages.push(page);
+        return page;
+      }),
+    };
+
+    const elapsedMs = await discardSharedAliasContextWarmups(
+      context as unknown as BrowserContext,
+      listen!,
+      'https://staging.jov.ie/dualipa/listen'
+    );
+
+    expect(elapsedMs).toHaveLength(3);
+    expect(context.newPage).toHaveBeenCalledTimes(3);
+    expect(clearCookies).toHaveBeenCalledTimes(3);
+    expect(clearCookies).toHaveBeenCalledWith({ name: 'jovie_alias_content' });
+    expect(sessionSend).toHaveBeenCalledWith('Network.enable');
+    expect(sessionSend).toHaveBeenCalledWith('Network.setCacheDisabled', {
+      cacheDisabled: true,
+    });
+    for (const page of pages) {
+      expect(page.goto).toHaveBeenCalledWith(
+        'https://staging.jov.ie/dualipa/listen',
+        expect.objectContaining({ waitUntil: 'domcontentloaded' })
+      );
+      expect(page.locator).toHaveBeenCalledWith(
+        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]'
+      );
+      expect(page.close).toHaveBeenCalledOnce();
+    }
+
+    const homeElapsed = await discardSharedAliasContextWarmups(
+      context as unknown as BrowserContext,
+      home!,
+      'https://staging.jov.ie/'
+    );
+    expect(homeElapsed).toEqual([]);
+    expect(context.newPage).toHaveBeenCalledTimes(3);
   });
 
   it('selects manifest routes by route id even when the path contains placeholders', async () => {
