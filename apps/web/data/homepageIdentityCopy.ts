@@ -12,7 +12,7 @@ export const HOMEPAGE_IDENTITY_COPY = {
   },
   hero: {
     kicker: 'Jovie',
-    headline: 'Be found. Be understood.',
+    headline: 'Start with your name',
     // JOV-7581: do not claim web research here. profile-monitoring is
     // internal-only and has no public marketing block.
     subhead:

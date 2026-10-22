@@ -1,3 +1,4 @@
+import '@/app/(home)/home.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { RenderedFamily } from '@/.storybook/rendered-family';
 import { HomepageIdentityHero } from './HomepageIdentityHero';
@@ -7,14 +8,16 @@ const meta = {
   component: HomepageIdentityHero,
   decorators: [
     Story => (
-      <RenderedFamily
-        name='homepage-identity-hero'
-        owner='HomepageIdentityHero'
-        keyboardTargetSelector='button[data-testid="homepage-primary-cta"]'
-        interactive
-      >
-        <Story />
-      </RenderedFamily>
+      <div className='home-viewport'>
+        <RenderedFamily
+          name='homepage-identity-hero'
+          owner='HomepageIdentityHero'
+          keyboardTargetSelector='button[data-testid="homepage-primary-cta"]'
+          interactive
+        >
+          <Story />
+        </RenderedFamily>
+      </div>
     ),
   ],
   parameters: {
@@ -22,7 +25,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Existing split-claim hero with its technical texture, generic jov.ie/you artist-profile identity and the real handle-claim form. The identity does not depict a claimed customer or advertise a paid benefit. Existing motion and reduced-motion behavior are preserved.',
+          'Centered homepage entry with the canonical wordmark, one headline and the existing handle-claim form. Explanatory copy follows the first viewport. Claim routing and the populated profile review before auth stay with their existing owners.',
       },
     },
   },

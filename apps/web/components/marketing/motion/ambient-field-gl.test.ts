@@ -200,6 +200,28 @@ describe('startAmbientField', () => {
     expect(gl.drawArrays).toHaveBeenCalledTimes(2);
   });
 
+  it('holds an intro frame after four seconds and does not resume on visibility changes', () => {
+    vi.spyOn(performance, 'now').mockReturnValue(0);
+    try {
+      const gl = fakeGl();
+      startAmbientField(canvasWith(gl), colors, vi.fn(), {
+        variant: 'refracted',
+        motion: 'intro',
+      });
+      expect(gl.uniform1f).toHaveBeenCalledWith('refracted', 1);
+      intersect(true);
+      runFrame(100);
+      runFrame(4000);
+      expect(gl.drawArrays).toHaveBeenCalledTimes(2);
+      expect(rafQueue.size).toBe(0);
+      document.dispatchEvent(new Event('visibilitychange'));
+      intersect(true);
+      expect(rafQueue.size).toBe(0);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
   it('releases the frame loop, observers and GL context on stop', () => {
     const gl = fakeGl();
     const handle = startAmbientField(canvasWith(gl), colors, vi.fn());

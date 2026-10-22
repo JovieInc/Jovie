@@ -20,7 +20,7 @@ function readNameSearchCss(): string {
 }
 
 describe('homepage hero contract (JOV-5864)', () => {
-  it('mounts only the approved hero rasters, never CSS background images', () => {
+  it('uses the existing decorative field without raw media or CSS image URLs', () => {
     const pageSource = readFileSync(
       path.join(webRoot, 'app/(home)/page.tsx'),
       'utf8'
@@ -33,8 +33,8 @@ describe('homepage hero contract (JOV-5864)', () => {
       pageSource.indexOf('function HomepageHero()'),
       pageSource.indexOf('function HomepageUnlockedSections()')
     );
-    // The page mounts no media; the hero owns exactly the Pen texture photo
-    // plus Tim White's real avatar as proof (JOV-6946).
+    // Tim selected the shared shader experiment (2026-10-22). Keep media
+    // ownership in that primitive, never an ad hoc canvas or imported proof.
     expect(heroSource).not.toMatch(/<(?:picture|img|video|canvas)\b/i);
     expect(readHeroCss()).not.toMatch(/\b(?:url|image-set)\s*\(/i);
     expect(componentSource).not.toMatch(/<(?:picture|img|video|canvas)\b/);
@@ -42,14 +42,15 @@ describe('homepage hero contract (JOV-5864)', () => {
       [...componentSource.matchAll(/'\/assets\/generated\/[^']+'/g)].map(
         match => match[0]
       )
-    ).toEqual(["'/assets/generated/homepage-hero-technical-texture-v1.webp'"]);
+    ).toEqual([]);
+    expect(componentSource).toContain('<MarketingAmbientField');
+    expect(componentSource).toContain("variant='refracted'");
+    expect(componentSource).toContain("motion='intro'");
     expect(componentSource).not.toContain('HOMEPAGE_MEDIA_MAP');
   });
 
-  it('uses the exact identity headline and one support line (Tim 2026-09-28)', () => {
-    expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
-      'Be found. Be understood.'
-    );
+  it('uses the approved entry headline and retains explanation below it (Tim 2026-10-21)', () => {
+    expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe('Start with your name');
     expect(HOMEPAGE_IDENTITY_COPY.hero.subhead).toBe(
       'Claim your name. Jovie makes you easy to reach, for people and for agents.'
     );
@@ -100,7 +101,7 @@ describe('homepage hero contract (JOV-5864)', () => {
     );
   });
 
-  it('keeps the hero still: a static CSS light, no drift or reveal', () => {
+  it('does not restore the retired texture drift or content reveal', () => {
     const css = readHeroCss();
 
     expect(css).not.toContain('homepage-identity-texture-drift');
