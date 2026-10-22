@@ -32,6 +32,16 @@ surrounding transitions around it. Code reinserts the original text and claim
 references exactly, including whitespace, Unicode and line breaks. Missing,
 duplicated or reordered anchors fail generation. Unlocking is an explicit revision.
 Locks apply to the spoken script; the essay remains an independently editable draft.
+Inline spoken citation IDs, when present, must resolve to the research ledger
+and appear in that block's `claimIds`. This checks binding, not whether a source
+supports the words. New drafts keep citations in editorial metadata.
+
+`script show` also includes advisory table-read diagnostics: words per block,
+longest sentence, editorial references and an estimated duration at 150 words
+per minute before pauses. These whitespace-based counts are language-dependent.
+Read and time the script aloud to assess breath, rhythm and transitions. The
+diagnostics preserve every block and lock; they do not certify voice, factual
+support or delivery time.
 
 `project.jsonl` is the authoritative artifact. Each line is a complete revision,
 including raw input, research, review, essay, spoken blocks, global canon reference
