@@ -1,6 +1,8 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { stageForFunnelPath } from '@/lib/acquisition/artist-offer-funnel';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import {
   FIRST_TOUCH_COOKIE,
   openFirstTouchEnvelope,
@@ -16,6 +18,8 @@ const captureSchema = z.object({
   action: z.literal('capture').optional(),
   acquisitionId: z.string().uuid(),
   capturedAt: z.string().datetime(),
+  /** Current pathname; a funnel page view (e.g. /pricing) records its stage. */
+  currentPath: z.string().max(2000).optional(),
   firstTouch: z
     .object({
       source: z.string().max(200).optional(),
@@ -126,6 +130,11 @@ export async function POST(request: NextRequest) {
     WHERE pe.acquisition_id = claimed.id
       AND pe.user_id IS NULL
   `);
+
+  const funnelStage = stageForFunnelPath(parsed.data.currentPath);
+  if (funnelStage) {
+    await recordArtistOfferStage(acquisitionId, funnelStage);
+  }
 
   return NextResponse.json({
     recorded: true,

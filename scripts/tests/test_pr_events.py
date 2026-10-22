@@ -1580,6 +1580,36 @@ class GapTest(unittest.TestCase):
                                      events.iso_ts("2033-05-18T03:00:00Z"))
         self.assertEqual(plan["close"], [], "JOV-INV-011 requires explicit duplicate authority")
 
+    def test_reconcile_clears_fix_labels_whose_cause_is_gone(self):
+        # 2026-10-21: #22320 kept lane-fix-red after a superseded run; #22394 kept
+        # lane-fix-conflict/dequeued after Gem resolved the conflict.
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        names = lambda *kinds: [{"name": f"lane-fix-{kind}"} for kind in kinds]
+        prs = [self.node(1, mergeStateStatus="CLEAN", labels=names("red")),
+               self.node(2, mergeStateStatus="CLEAN", labels=names("conflict", "dequeued")),
+               self.node(3, mergeStateStatus="CLEAN", labels=names("dequeued")),
+               self.node(4, mergeStateStatus="CLEAN", labels=names("conflict", "dequeued") + [{"name": "queue-poison"}]),
+               self.node(5, mergeStateStatus="DIRTY", labels=names("conflict")),
+               self.node(6, mergeStateStatus="BLOCKED", rollup="FAILURE", labels=names("red")),
+               self.node(7, mergeStateStatus="CLEAN", isCrossRepository=True, labels=names("red"))]
+        plan = events.reconcile_plan(prs, {}, set(), 2, now)
+        self.assertEqual(sorted(plan["unlabel"]), [(1, "red"), (2, "conflict"), (2, "dequeued"), (4, "conflict")])
+
+    def test_only_a_failed_latest_run_is_red(self):
+        def reply(*nodes, code=0):
+            body = {"data": {"repository": {"pullRequest": {"commits": {"nodes": [
+                {"commit": {"statusCheckRollup": {"contexts": {"nodes": list(nodes)}}}}]}}}}}
+            return lambda args, **kwargs: SimpleNamespace(returncode=code, stdout=json.dumps(body), stderr="")
+        cancelled = {"name": "Source Validation", "conclusion": "CANCELLED", "completedAt": "2026-10-21T01:20:00Z"}
+        passed = {"name": "Source Validation", "conclusion": "SUCCESS", "completedAt": "2026-10-21T01:30:00Z"}
+        failed_old = {"name": "PR Ready", "conclusion": "FAILURE", "completedAt": "2026-10-21T01:00:00Z"}
+        passed_new = {"name": "PR Ready", "conclusion": "SUCCESS", "completedAt": "2026-10-21T01:40:00Z"}
+        self.assertIs(events.head_red(1, reply(cancelled, passed, failed_old, passed_new)), False)
+        self.assertIs(events.head_red(1, reply(passed, {**failed_old, "completedAt": "2026-10-21T02:00:00Z"})), True)
+        self.assertIs(events.head_red(1, reply({"context": "ci/legacy", "state": "ERROR", "createdAt": "x"})), True)
+        self.assertIsNone(events.head_red(1, reply(passed, code=1)))
+        self.assertIsNone(events.head_red(1, lambda *a, **k: SimpleNamespace(returncode=0, stdout="nope", stderr="")))
+
     def test_reconcile_labels_missed_events_and_names_orphans(self):
         now = events.iso_ts("2033-05-18T03:00:00Z")
         old = "2033-05-15T00:00:00Z"

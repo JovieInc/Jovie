@@ -194,6 +194,9 @@ function approvalCard(
       ]),
     ].slice(0, 16),
     preflightReceiptId: id,
+    // Deadline contract: 48h, then the safe default (no purchase) is recorded.
+    decideBy: null,
+    defaultDecision: null,
   };
 }
 

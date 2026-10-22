@@ -114,6 +114,13 @@ describe('UX latency telemetry', () => {
         p50Ms: null,
         p95Ms: null,
       },
+      {
+        metric: 'ovie_home_ready',
+        label: 'Ovie Home Ready',
+        sampleCount: 0,
+        p50Ms: null,
+        p95Ms: null,
+      },
     ]);
   });
 
@@ -208,7 +215,7 @@ describe('UX latency telemetry', () => {
 
     vi.stubGlobal('window', undefined);
     expect(recordUxLatency('chat_first_token', 100)).toBe(false);
-    expect(getUxLatencySummaries()).toHaveLength(5);
+    expect(getUxLatencySummaries()).toHaveLength(6);
     expect(() => resetUxLatencyForTests()).not.toThrow();
     expect(() => subscribeUxLatency(vi.fn())()).not.toThrow();
   });
@@ -216,6 +223,7 @@ describe('UX latency telemetry', () => {
 
 describe('interaction performance marks', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -249,7 +257,9 @@ describe('interaction performance marks', () => {
     const mark = vi.fn();
     vi.stubGlobal('performance', { mark, measure: vi.fn() });
     vi.stubGlobal('crypto', {});
-    vi.spyOn(Date, 'now').mockReturnValue(1234);
+    // shift-clock.mjs proxies Date and ignores vi.spyOn(Date, 'now').
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(1234);
 
     const first = markInteractionStart('fallback')?.id;
     const second = markInteractionStart('fallback')?.id;

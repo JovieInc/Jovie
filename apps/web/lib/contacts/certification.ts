@@ -100,14 +100,16 @@ export function deriveContactCertification(input: {
     stale === 0 &&
     missing.length === 0;
   const certified = input.certifiedRevision === evidenceRevision;
+  // "stale" means recertification: only a contact that was certified before
+  // can need it. Stale facts on a never-certified contact need review.
   const status: ContactCertificationStatus =
     certified && canCertify
       ? 'certified_for_outreach'
-      : stale > 0 || Boolean(input.certifiedRevision)
+      : input.certifiedRevision
         ? 'stale'
         : conflicts > 0
           ? 'conflicted'
-          : unresolved > 0 || missing.length > 0
+          : unresolved > 0 || missing.length > 0 || stale > 0
             ? 'needs_review'
             : input.items.length > 0
               ? 'human_reviewed'

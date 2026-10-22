@@ -61,9 +61,18 @@ function getRedirectName(path: string): string {
 
 const renderSurfaces = [
   {
+    id: 'home',
+    name: 'Admin Home',
+    path: APP_ROUTES.ADMIN_NOW,
+    rootTestId: 'chat-empty-state-viewport',
+    snapshotSlug: 'admin-home',
+    utilityRoot: false,
+    includeInFastHealth: true,
+  },
+  {
     id: 'ops',
-    name: 'Admin Now',
-    path: APP_ROUTES.HUD,
+    name: 'Admin Ops',
+    path: APP_ROUTES.ADMIN_OPS,
     rootTestId: 'hud-admin-page',
     snapshotSlug: 'admin-ops',
     utilityRoot: false,
@@ -84,15 +93,6 @@ const renderSurfaces = [
     path: APP_ROUTES.ADMIN_OPERATIONS,
     rootTestId: 'founder-operations-page',
     snapshotSlug: 'admin-operations',
-    utilityRoot: false,
-    includeInFastHealth: true,
-  },
-  {
-    id: 'needs-you',
-    name: 'Admin Needs You',
-    path: APP_ROUTES.ADMIN_NEEDS_YOU,
-    rootTestId: 'founder-needs-you-page',
-    snapshotSlug: 'admin-needs-you',
     utilityRoot: false,
     includeInFastHealth: true,
   },

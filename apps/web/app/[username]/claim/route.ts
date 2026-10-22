@@ -3,6 +3,11 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import {
+  claimStateHref,
+  requiresManualVerification,
+} from '@/lib/claim/artist-offer-claim';
+import {
+  applyPendingClaimCookie,
   clearPendingClaimContext,
   readPendingClaimContext,
   writePendingClaimContext,
@@ -136,7 +141,7 @@ export async function GET(
       const lead = await lookupLeadByClaimToken(token);
       await setLeadAttributionCookieFromToken(token);
       await markLeadClaimPageViewedFromToken(token);
-      await writePendingClaimContext({
+      const context = await writePendingClaimContext({
         mode: 'token_backed',
         creatorProfileId: profile.id,
         username: profile.usernameNormalized,
@@ -146,18 +151,24 @@ export async function GET(
       });
 
       if (searchParams.get('next') === 'auth') {
-        return redirectTo(
-          request,
-          buildAuthStartPath({
-            username: profile.usernameNormalized,
-            spotifyArtistName: profile.displayName ?? profile.username,
-            spotifyUrl: getCanonicalSpotifyUrl(profile),
-            isSignedIn: Boolean(userId),
-          })
+        return applyPendingClaimCookie(
+          redirectTo(
+            request,
+            buildAuthStartPath({
+              username: profile.usernameNormalized,
+              spotifyArtistName: profile.displayName ?? profile.username,
+              spotifyUrl: getCanonicalSpotifyUrl(profile),
+              isSignedIn: Boolean(userId),
+            })
+          ),
+          context
         );
       }
 
-      return redirectTo(request, claimPreviewUrl);
+      return applyPendingClaimCookie(
+        redirectTo(request, claimPreviewUrl),
+        context
+      );
     }
 
     await clearLeadAttributionCookie();
@@ -197,6 +208,19 @@ export async function GET(
       );
     }
 
+    // High-reach artists are never taken over self-serve: payment or a
+    // Spotify match alone must not hand over their identity. /claim/start
+    // sends the buyer to their own profile + checkout, and onboarding holds
+    // the artist as a verification request (lib/claim/claim-verification.ts).
+    if (requiresManualVerification(profile.spotifyFollowers)) {
+      return redirectTo(
+        request,
+        profile.spotifyId
+          ? `${APP_ROUTES.CLAIM_START}?spotify=${encodeURIComponent(profile.spotifyId)}`
+          : claimStateHref('verification_required')
+      );
+    }
+
     // Structured-credit profiles may enter the same direct flow, but the
     // pending cookie is only a routing hint. `connectOnboardingSpotifyArtist`
     // must still prove the exact Spotify ID before ownership is finalized.
@@ -207,21 +231,24 @@ export async function GET(
       );
     }
 
-    await writePendingClaimContext({
+    const context = await writePendingClaimContext({
       mode: 'direct_profile',
       creatorProfileId: profile.id,
       username: profile.usernameNormalized,
       expectedSpotifyArtistId: profile.spotifyId,
     });
 
-    return redirectTo(
-      request,
-      buildAuthStartPath({
-        username: profile.usernameNormalized,
-        spotifyArtistName: profile.displayName ?? profile.username,
-        spotifyUrl: getCanonicalSpotifyUrl(profile),
-        isSignedIn: Boolean(userId),
-      })
+    return applyPendingClaimCookie(
+      redirectTo(
+        request,
+        buildAuthStartPath({
+          username: profile.usernameNormalized,
+          spotifyArtistName: profile.displayName ?? profile.username,
+          spotifyUrl: getCanonicalSpotifyUrl(profile),
+          isSignedIn: Boolean(userId),
+        })
+      ),
+      context
     );
   }
 

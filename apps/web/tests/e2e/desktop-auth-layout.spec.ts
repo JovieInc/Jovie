@@ -167,9 +167,10 @@ test('rejects three semantically correct controls with dispersed spacing or comp
   expect(await hierarchyViolations(page)).toEqual([]);
   // Same production labels, variants and control count. Only painted geometry
   // changes, reproducing the blind spot in the old semantic-only fixture.
+  // Firefox native buttons ignore background and width until appearance is none.
   await page.addStyleTag({
     content:
-      '[data-auth-action="options"], [data-auth-action="cancel"] { background: red !important; width: 100% !important; margin-top: 56px !important; }',
+      '[data-auth-action="options"], [data-auth-action="cancel"] { appearance: none !important; -webkit-appearance: none !important; background: red !important; background-color: red !important; width: 100% !important; min-width: 100% !important; flex: 1 0 100% !important; margin-top: 56px !important; }',
   });
   await expect(page.locator('[data-auth-action]')).toHaveCount(3);
   await expect(page.locator('[data-auth-action="primary"]')).toHaveAttribute(
@@ -180,9 +181,14 @@ test('rejects three semantically correct controls with dispersed spacing or comp
     'data-variant',
     'link'
   );
-  expect(await hierarchyViolations(page)).toEqual(
-    expect.arrayContaining(['competing-emphasis', 'dispersed-utilities'])
-  );
+  // Firefox can report the margin before the appearance override paints
+  // background or width. Poll the same violation set instead of failing the
+  // first paint and calling a retry the fix.
+  await expect
+    .poll(() => hierarchyViolations(page))
+    .toEqual(
+      expect.arrayContaining(['competing-emphasis', 'dispersed-utilities'])
+    );
 });
 
 test('preserves primary geometry through browser failure and makes long scaled copy scrollable', async ({
