@@ -115,7 +115,10 @@ afterEach(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.spyOn(Date, 'now').mockReturnValue(now);
+  // shift-clock.mjs proxies Date and ignores vi.spyOn(Date, 'now'). Fake timers
+  // replace Date, so the Oct 3 fixture stays inside the one-hour snapshot TTL.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(now);
   hoisted.getCurrentUserEntitlementsMock.mockResolvedValue(makeEntitlements());
   hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'user_123' });
   hoisted.getRedisMock.mockReturnValue(null);

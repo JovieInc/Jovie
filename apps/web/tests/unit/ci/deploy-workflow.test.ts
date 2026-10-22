@@ -3192,6 +3192,9 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathStep).toContain(
       'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY }}'
     );
+    expect(getJobBlock(workflow, 'ci-golden-path')).toContain(
+      "FEATURE_STRIPE_TEST_PRICE_CONFIGURED: 'true'"
+    );
     expect(goldenPathStep).toContain(
       'STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv'
     );
