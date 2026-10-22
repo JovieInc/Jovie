@@ -129,11 +129,26 @@ class LinearClientAppModeTest(unittest.TestCase):
         self.app_env = self.state / "linear-app.env"
         self.app_env.write_text('LINEAR_CLIENT_ID="cid"\nexport LINEAR_CLIENT_SECRET=sec\n')
 
-    def test_app_credentials_win_and_the_key_falls_back_only_when_absent(self):
+    def test_only_the_app_credential_is_used_and_a_missing_one_fails_closed(self):
+        # Tim 2026-10-20: no personal-key fallback, so Tim's key can be revoked safely.
         client = lane.Linear(self.legacy, app_env=self.app_env)
         self.assertEqual(client.key, "linear-app:cid")
-        fallback = lane.Linear(self.legacy, app_env=self.state / "missing.env")
-        self.assertEqual((fallback.key, fallback._authorization()), ("lin_api_personal", ("lin_api_personal", None)))
+        with mock.patch.object(lane.urllib.request, "urlopen", side_effect=AssertionError("no request")):
+            for missing in (self.state / "missing.env", None):
+                with self.subTest(missing=missing), \
+                        mock.patch.object(app, "default_path", return_value=missing):
+                    with self.assertRaises(lane.LinearAppCredentialMissing) as raised:
+                        lane.Linear(self.legacy, app_env=missing) if missing else lane.Linear(self.legacy)
+                    self.assertNotIn("lin_api_personal", str(raised.exception))
+            incomplete = self.state / "incomplete.env"
+            incomplete.write_text("LINEAR_CLIENT_ID=cid\n")
+            with self.assertRaises(lane.LinearAppCredentialMissing):
+                lane.Linear(self.legacy, app_env=incomplete)
+            self.assertTrue(issubclass(lane.LinearAppCredentialMissing, Exception),
+                            "doctor/watchdog `except Exception` sites must degrade, not exit")
+            bare = lane.Linear.__new__(lane.Linear)
+            with self.assertRaises(lane.LinearAppCredentialMissing):
+                bare._authorization()
 
     def test_requests_carry_the_bearer_token_and_a_401_re_mints_once(self):
         client = lane.Linear(self.legacy, app_env=self.app_env)

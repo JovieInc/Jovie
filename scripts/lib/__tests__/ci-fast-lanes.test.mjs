@@ -2084,6 +2084,11 @@ describe('failing test identities in lane excerpts', () => {
 describe('source-read guard selection', () => {
   const selected = (event, files) =>
     selectSourceGuards(event, files).map(guard => guard.id);
+  // external-api-guard scans every source, script and workflow file.
+  const apiGuard = path =>
+    /\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$/u.test(path)
+      ? ['external-api-guard']
+      : [];
 
   it.each(['pull_request', 'merge_group', 'push'])(
     'runs profile conformance for adapters on %s',
@@ -2099,16 +2104,23 @@ describe('source-read guard selection', () => {
     ['merge_group', []],
     ['push', []],
   ])(
-    'runs ci-schedule-inventory on %s when a workflow changes',
+    'runs ci-schedule-inventory and automation-registry on %s when a workflow changes',
     (event, pr) => {
       expect(
         selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
-      ).toEqual(['ci-schedule-inventory', ...pr]);
+      ).toEqual([
+        'ci-schedule-inventory',
+        'automation-registry',
+        'external-api-guard',
+        ...pr,
+      ]);
     }
   );
 
   it.each([
     ['scripts/lib/ci-schedule-inventory.mjs', ['ci-schedule-inventory']],
+    ['canon/automation-registry.jsonl', ['automation-registry']],
+    ['scripts/lanes/continuity_clock.py', ['automation-registry']],
     [
       'scripts/lib/__tests__/ci-schedule-inventory.test.mjs',
       ['ci-schedule-inventory'],
@@ -2187,6 +2199,7 @@ describe('source-read guard selection', () => {
     // PR-wide guards narrow inside their scripts.
     expect(selected('pull_request', [path])).toEqual([
       ...guards,
+      ...apiGuard(path),
       'web-source-read-tests',
       'script-contracts',
     ]);
@@ -2226,7 +2239,7 @@ describe('source-read guard selection', () => {
     ]) {
       expect(classifyProductLanes([path]).selectedLanes).toContain('web');
       const expected = path.startsWith('apps/web/lib/')
-        ? ['artist-profile-conformance']
+        ? ['artist-profile-conformance', ...apiGuard(path)]
         : [];
       expect(selected('merge_group', [path])).toEqual(expected);
       expect(selected('push', [path])).toEqual(expected);
@@ -2253,7 +2266,9 @@ describe('source-read guard selection', () => {
       'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
+      'automation-registry',
       'playbook-authoring',
+      'external-api-guard',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
     expect(selected('pull_request', null)).toEqual(all);
@@ -2262,7 +2277,9 @@ describe('source-read guard selection', () => {
       'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
+      'automation-registry',
       'playbook-authoring',
+      'external-api-guard',
     ]);
   });
 
@@ -2295,6 +2312,12 @@ describe('source-read guard selection', () => {
             'utf8'
           )
         ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'external-api-guard') {
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/external-api-guard.mjs')
+        );
         continue;
       }
       if (guard.id === 'script-contracts') {

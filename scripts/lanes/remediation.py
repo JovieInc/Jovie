@@ -941,12 +941,16 @@ def remediation_summary(snapshot: dict | None, receipts: list[dict] | None, now:
     return report
 
 
-def alert_reason(report: dict) -> str | None:
-    surfaced = report.get("surfaced") or []
+def alert_reason(report: dict, open_prs: set[int] | None = None) -> str | None:
+    """Surfaced PRs that are still open, for the lanes repair owner (Tim's rule: never a
+    human by default). `surfaced` is append-only, so on Gem 2026-10-20 the alert listed 12
+    PRs that had all merged or closed by 10-13; with the open set known, those drop out."""
+    surfaced = [row for row in report.get("surfaced") or []
+                if open_prs is None or row.get("pr") in open_prs]
     if not surfaced:
         return None
     listed = ", ".join(f"#{row.get('pr')} {row.get('cls')}" for row in surfaced[:12])
-    return f"needs a human decision: {listed}"
+    return f"surfaced PRs need a repair-owner decision: {listed}"
 
 
 def intake_labels(ws: str) -> list[str]:

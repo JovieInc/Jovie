@@ -81,3 +81,49 @@ describe('CostsTable', () => {
     expect(screen.getByText(/1\/1 items observed/)).toBeInTheDocument();
   });
 });
+
+describe('CostsTable freshness', () => {
+  it('renders a stale source as unknown, never $0.00, and excludes it from observed', () => {
+    render(
+      <CostsTable
+        items={[
+          ITEM,
+          {
+            ...ITEM,
+            label: 'Anthropic',
+            observed30dUsd: 0,
+            monthlyUsd: 0,
+            period: 'usage-based',
+            periodLabel: 'Usage-based',
+            lastUpdatedLabel: 'May 20, 2026',
+            freshness: 'stale',
+          },
+        ]}
+        lastRefreshedLabel='Today'
+      />
+    );
+    expect(screen.getByText('Unknown · stale')).toBeInTheDocument();
+    expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        '2 items • $12.50 recorded in last 30d • 1/2 items observed • 1 stale'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('shows a value-or-unknown estimate and consistent period casing', () => {
+    render(
+      <CostsTable
+        items={[
+          { ...ITEM, monthlyUsd: 0, period: 'USAGE-BASED' },
+          { ...ITEM, label: 'Neon', period: 'monthly' },
+        ]}
+        lastRefreshedLabel='Today'
+      />
+    );
+    expect(screen.queryByText('usage')).not.toBeInTheDocument();
+    expect(screen.getByText('Not estimated')).toBeInTheDocument();
+    expect(screen.getByText('Usage-based')).toBeInTheDocument();
+    expect(screen.getByText('Monthly')).toBeInTheDocument();
+  });
+});

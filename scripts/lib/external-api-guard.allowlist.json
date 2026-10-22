@@ -1,0 +1,23 @@
+{
+  "schema": "jovie-external-api-allowlist/v1",
+  "entries": [
+    {
+      "path": "scripts/lanes/gh_app_token.py",
+      "rule": "provider-host",
+      "max": 2,
+      "reason": "Mints the Jovie Bot installation token the client layer itself authenticates with; the budget read moves to apiclient in the lanes migration."
+    },
+    {
+      "path": "packages/research/credentials.ts",
+      "rule": "provider-host",
+      "max": 1,
+      "reason": "Research router source: the literal is the url passed to @jovie/api-client ApiClient.request, so the call is budgeted."
+    },
+    {
+      "path": "packages/research/judge.ts",
+      "rule": "provider-host",
+      "max": 2,
+      "reason": "Research router source: the literal is the url passed to @jovie/api-client ApiClient.request, so the call is budgeted."
+    }
+  ]
+}

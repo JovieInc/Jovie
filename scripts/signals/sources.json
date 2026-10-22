@@ -1,0 +1,208 @@
+{
+  "schema": "jovie.signal-sources/v1",
+  "notes": "Curated changelog watch list. kind: feed (RSS/Atom), html-links (new links matching pattern), html-headings (new h2/h3 entries on a release-notes page). Disabled entries record why.",
+  "x": {
+    "notes": "INTERNAL USE ONLY (Tim 2026-10-21): read through the Grok CLI's X search on Tim's SuperGrok seat (scripts/signals/x_grok.py). It cannot read bookmarks; bookmarks come from the browser-export inbox. One backstop poll per watcher run; kill switch SIGNALS_X_DISABLED=1.",
+    "enabled": true,
+    "accounts": [
+      "AnthropicAI",
+      "claudeai",
+      "OpenAI",
+      "OpenAIDevs",
+      "xai",
+      "GoogleDeepMind",
+      "MistralAI",
+      "AIatMeta",
+      "vercel",
+      "supabase",
+      "Cloudflare",
+      "linear",
+      "github",
+      "Linktree_",
+      "Bandsintown"
+    ],
+    "queries": []
+  },
+  "sources": [
+    {
+      "id": "anthropic-news",
+      "name": "Anthropic news",
+      "category": "ai-lab",
+      "kind": "html-links",
+      "url": "https://www.anthropic.com/news",
+      "pattern": "^/news/[a-z0-9]+(?:-[a-z0-9]+)+$"
+    },
+    {
+      "id": "claude-release-notes",
+      "name": "Claude platform release notes",
+      "category": "ai-lab",
+      "kind": "html-headings",
+      "url": "https://docs.claude.com/en/release-notes/overview",
+      "level": 3
+    },
+    {
+      "id": "claude-code",
+      "name": "Claude Code releases",
+      "category": "ai-lab",
+      "kind": "feed",
+      "url": "https://github.com/anthropics/claude-code/releases.atom",
+      "skipTitle": "alpha|beta|-rc"
+    },
+    {
+      "id": "openai-news",
+      "name": "OpenAI news",
+      "category": "ai-lab",
+      "kind": "feed",
+      "url": "https://openai.com/news/rss.xml"
+    },
+    {
+      "id": "openai-codex",
+      "name": "OpenAI Codex releases",
+      "category": "ai-lab",
+      "kind": "feed",
+      "url": "https://github.com/openai/codex/releases.atom",
+      "skipTitle": "alpha|beta|-rc"
+    },
+    {
+      "id": "deepmind-blog",
+      "name": "Google DeepMind blog",
+      "category": "ai-lab",
+      "kind": "feed",
+      "url": "https://deepmind.google/blog/rss.xml"
+    },
+    {
+      "id": "google-ai-blog",
+      "name": "Google AI blog",
+      "category": "ai-lab",
+      "kind": "feed",
+      "url": "https://blog.google/technology/ai/rss/"
+    },
+    {
+      "id": "gemini-api-changelog",
+      "name": "Gemini API changelog",
+      "category": "ai-lab",
+      "kind": "html-headings",
+      "url": "https://ai.google.dev/gemini-api/docs/changelog",
+      "level": 2
+    },
+    {
+      "id": "xai-release-notes",
+      "name": "xAI API release notes",
+      "category": "ai-lab",
+      "kind": "html-headings",
+      "url": "https://docs.x.ai/developers/release-notes",
+      "level": 3
+    },
+    {
+      "id": "meta-ai-blog",
+      "name": "Meta AI blog",
+      "category": "ai-lab",
+      "kind": "html-links",
+      "url": "https://ai.meta.com/blog/",
+      "pattern": "^https://ai\\.meta\\.com/blog/[a-z0-9-]+/?$"
+    },
+    {
+      "id": "mistral-news",
+      "name": "Mistral news",
+      "category": "ai-lab",
+      "kind": "feed",
+      "url": "https://mistral.ai/rss.xml"
+    },
+    {
+      "id": "mistral-changelog",
+      "name": "Mistral API changelog",
+      "category": "ai-lab",
+      "kind": "html-headings",
+      "url": "https://docs.mistral.ai/resources/changelogs",
+      "level": 2
+    },
+    {
+      "id": "vercel-changelog",
+      "name": "Vercel changelog",
+      "category": "platform",
+      "kind": "feed",
+      "url": "https://vercel.com/atom"
+    },
+    {
+      "id": "cloudflare-changelog",
+      "name": "Cloudflare changelog",
+      "category": "platform",
+      "kind": "feed",
+      "url": "https://developers.cloudflare.com/changelog/rss/index.xml"
+    },
+    {
+      "id": "linear-changelog",
+      "name": "Linear changelog",
+      "category": "platform",
+      "kind": "feed",
+      "url": "https://linear.app/rss/changelog.xml"
+    },
+    {
+      "id": "github-changelog",
+      "name": "GitHub changelog",
+      "category": "platform",
+      "kind": "feed",
+      "url": "https://github.blog/changelog/feed/"
+    },
+    {
+      "id": "supabase-blog",
+      "name": "Supabase blog",
+      "category": "platform",
+      "kind": "feed",
+      "url": "https://supabase.com/rss.xml"
+    },
+    {
+      "id": "linktree-blog",
+      "name": "Linktree blog",
+      "category": "competitor",
+      "kind": "html-links",
+      "url": "https://linktr.ee/blog",
+      "pattern": "^/blog/[a-z0-9]+(?:-[a-z0-9]+)+$"
+    },
+    {
+      "id": "linkfire-blog",
+      "name": "Linkfire blog",
+      "category": "competitor",
+      "kind": "feed",
+      "url": "https://www.linkfire.com/blog/rss.xml"
+    },
+    {
+      "id": "laylo-blog",
+      "name": "Laylo blog",
+      "category": "competitor",
+      "kind": "html-links",
+      "url": "https://laylo.com/blog",
+      "pattern": "^/blog/[a-z0-9]+(?:-[a-z0-9]+)+$"
+    },
+    {
+      "id": "beacons-blog",
+      "name": "Beacons blog",
+      "category": "competitor",
+      "kind": "html-links",
+      "url": "https://beacons.ai/blog",
+      "pattern": "^/blog/[a-z0-9-]+$",
+      "enabled": false,
+      "disabledReason": "403 to non-browser clients (2026-10-20)"
+    },
+    {
+      "id": "bandsintown-artists",
+      "name": "Bandsintown for Artists blog",
+      "category": "competitor",
+      "kind": "html-links",
+      "url": "https://artists.bandsintown.com/blog",
+      "pattern": "^/blog/[a-z0-9-]+$",
+      "enabled": false,
+      "disabledReason": "client-rendered shell, no links server-side (2026-10-20)"
+    },
+    {
+      "id": "disco-news",
+      "name": "DISCO",
+      "category": "competitor",
+      "kind": "html-links",
+      "url": "https://www.disco.ac/blog",
+      "pattern": "^/blog/[a-z0-9-]+$",
+      "enabled": false,
+      "disabledReason": "no public blog or feed (404, 2026-10-20); monthly Idea Radar diff covers DISCO"
+    }
+  ]
+}

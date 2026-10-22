@@ -25,6 +25,7 @@ import {
   type BillingAuditEventType,
   updateUserBillingStatus,
 } from '@/lib/stripe/customer-sync';
+import { StripeReconciliationRequiredError } from '@/lib/stripe/webhooks/reconciliation';
 
 import type {
   HandlerResult,
@@ -126,9 +127,9 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
    *
    * Error Handling:
    * - Throws on unrecoverable errors (missing price ID)
-   * - Skips unknown price IDs with a captured critical error containing the
-   *   customerId, priceId, subscriptionId, and userId so webhook delivery can
-   *   be acknowledged without retry storms when Stripe price config drifts
+   * - Throws StripeReconciliationRequiredError for unknown price IDs. The
+   *   route acknowledges the delivery only after durably marking the stored
+   *   event needs_reconciliation; replay grants it once the price is mapped
    * - Returns error result on billing update failures
    *
    * @param options - Processing options including subscription, user ID, and event metadata
@@ -255,8 +256,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
    * Handle an active subscription by upgrading the user.
    *
    * @private
-   * @returns A skipped result with reason `unknown_price_id` when the price ID
-   * does not map to a known plan.
+   * @throws StripeReconciliationRequiredError when no item price maps to a plan
    * @throws If price ID is missing
    */
   private async handleActiveSubscription(
@@ -268,9 +268,13 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
     correlation?: CheckoutCorrelation,
     paymentFacts?: Readonly<Record<string, unknown>>
   ): Promise<ProcessSubscriptionResult> {
-    // Get the price ID from the subscription to determine the plan
-    const priceId = subscription.items.data[0]?.price.id;
-    if (!priceId) {
+    // Resolve the plan from any subscription item. A subscription can carry
+    // more than one item (an add-on next to the plan), so the first item is
+    // not necessarily the plan price.
+    const priceIds = subscription.items.data
+      .map(item => item.price?.id)
+      .filter((id): id is string => Boolean(id));
+    if (priceIds.length === 0) {
       await captureCriticalError(
         'No price ID found in subscription',
         new Error('Missing price ID'),
@@ -282,26 +286,27 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       throw new Error('No price ID in subscription');
     }
 
-    const plan = getPlanFromPriceId(priceId);
-    if (!plan) {
-      const customerId = getCustomerId(subscription.customer);
-      await captureCriticalError(
-        'Unknown price ID in subscription',
-        new Error(`Unknown price ID: ${priceId}`),
+    const resolved = priceIds
+      .map(id => ({ priceId: id, plan: getPlanFromPriceId(id) }))
+      .find(candidate => candidate.plan !== null);
+    if (!resolved?.plan) {
+      // A paid, active subscription on a price we cannot map. Never ack and
+      // forget it: the route durably marks the stored event
+      // needs_reconciliation before any 2xx, and replay grants it once the
+      // price is mapped.
+      throw new StripeReconciliationRequiredError(
+        'unknown_price_id',
+        `Unknown price ID: ${priceIds.join(',')}`,
         {
-          customerId,
-          priceId,
+          customerId: getCustomerId(subscription.customer),
+          priceIds,
           subscriptionId: subscription.id,
+          subscriptionStatus: subscription.status,
           userId,
-          route: '/api/stripe/webhooks',
         }
       );
-      return {
-        success: true,
-        skipped: true,
-        reason: 'unknown_price_id',
-      };
     }
+    const { priceId, plan } = resolved;
 
     // Update user's billing status
     const customerId = getCustomerId(subscription.customer);

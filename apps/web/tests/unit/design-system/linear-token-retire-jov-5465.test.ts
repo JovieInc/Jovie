@@ -9,59 +9,10 @@ function readSource(relativePath: string): string {
 }
 
 describe('JOV-5465 duration/ease/shadow/blur retire', () => {
-  it('keeps DeeplinksGrid on canonical duration tokens', () => {
-    const source = readSource('components/features/home/DeeplinksGrid.tsx');
-    expect(source).toContain('duration-(--duration-slow)');
-    expect(source).toContain('duration-(--duration-normal)');
-    expect(source).not.toMatch(/--linear-duration-/);
-  });
-
-  it('defers DeeplinksGrid scroll layout reads behind a passive listener', () => {
-    const source = readSource('components/features/home/DeeplinksGrid.tsx');
-    expect(source).toContain(
-      "addEventListener('scroll', handleScroll, { passive: true })"
-    );
-    expect(source).toContain('requestAnimationFrame');
-    expect(source).toContain('getBoundingClientRect');
-  });
-
-  it('keeps FloatingClaimBar on the canonical elevated card shadow', () => {
-    const source = readSource('components/features/home/FloatingClaimBar.tsx');
-    expect(source).toContain('var(--shadow-card-elevated)');
-    expect(source).not.toContain('--linear-shadow-card-elevated');
-  });
-
-  it('keeps PricingSection on canonical card shadows', () => {
-    const source = readSource('components/features/home/PricingSection.tsx');
-    expect(source).toContain('var(--shadow-card)');
-    expect(source).toContain('var(--shadow-card-elevated)');
-    expect(source).not.toMatch(/--linear-shadow-/);
-  });
-
-  it('keeps ReleaseNotificationsSection on canonical shadow and duration tokens', () => {
-    const source = readSource(
-      'components/features/home/ReleaseNotificationsSection.tsx'
-    );
-    expect(source).toContain('var(--shadow-card-elevated)');
-    expect(source).toContain('duration-(--duration-normal)');
-    expect(source).toContain(
-      'marketing-h2-linear text-primary-token line-clamp-2'
-    );
-    expect(source).not.toMatch(/--linear-(?:shadow-|duration-)/);
-  });
-
   it('keeps TestimonialCard on the canonical duration token', () => {
     const source = readSource('components/features/home/TestimonialCard.tsx');
     expect(source).toContain('duration-(--duration-normal)');
     expect(source).not.toMatch(/--linear-duration-/);
-  });
-
-  it('keeps DashboardLinksDemo on the canonical button shadow', () => {
-    const source = readSource(
-      'components/features/home/demo/DashboardLinksDemo.tsx'
-    );
-    expect(source).toContain('var(--shadow-button)');
-    expect(source).not.toContain('--linear-shadow-button');
   });
 
   it('keeps ConsentBanner on canonical spacing and card shadow tokens', () => {
@@ -70,32 +21,5 @@ describe('JOV-5465 duration/ease/shadow/blur retire', () => {
     expect(source).toContain('var(--shadow-card)');
     expect(source).not.toMatch(/--linear-(?:space|gap|container)-/);
     expect(source).not.toContain('--linear-shadow-card');
-  });
-
-  it('keeps PricingSection heading guarded by canonical-ui-label-casing (JOV-5747)', () => {
-    const source = readSource('components/features/home/PricingSection.tsx');
-    expect(source).toContain('Simple Pricing.');
-    expect(source).not.toContain('ui-casing-allow');
-  });
-
-  it('derives PricingSection offer claims from the typed offer-truth module', () => {
-    const source = readSource('components/features/home/PricingSection.tsx');
-
-    // Pricing copy, plan names, prices, and CTAs resolve through the typed
-    // offer-truth module instead of the retired entitlement-marketing lookup.
-    expect(source).toContain("getPublicPriceClaim('free')");
-    expect(source).toContain("getPublicPriceClaim('pro')");
-    expect(source).not.toContain('ENTITLEMENT_REGISTRY');
-    expect(source).not.toMatch(/APP_ROUTES\.SIGNUP/);
-    for (const claimKey of ['displayName', 'priceLabel', 'ctaLabel']) {
-      expect(source).toContain(`freeClaim.${claimKey}`);
-      expect(source).toContain(`proClaim.${claimKey}`);
-    }
-    expect(source).toContain('formatMonthlyPrice');
-
-    // Canonical plan naming (JOV-7809): the section must say Artist Presence,
-    // never the retired Artist Visibility Pro label.
-    expect(source).toContain('Artist Presence');
-    expect(source).not.toContain('Artist Visibility Pro');
   });
 });

@@ -47,6 +47,7 @@
 @source "../components/features/tracking";
 @source "../components/features/ui";
 @source "../components/jovie";
+@source "../components/organisms/home-loop";
 @source "../components/onboarding";
 @source "../components/canonical";
 @source "../components/design-studio";
@@ -4936,9 +4937,11 @@
   --sidebar-border: 0 0 0 / 0.06;
   /* Maps to --app-shell-sidebar-border-rgb */
   --sidebar-ring: 124 58 237;
-  --sidebar-muted: 112 116 124;
+  /* 98 104 114 = --color-text-tertiary-on-light: 12px group labels on the
+     247 248 248 sidebar need WCAG AA 4.5:1 (112 116 124 measured 4.4). */
+  --sidebar-muted: 98 104 114;
   /* Maps to --app-shell-sidebar-muted-rgb */
-  --sidebar-muted-foreground: 112 116 124;
+  --sidebar-muted-foreground: 98 104 114;
   --sidebar-surface: 247 248 248;
   /* Matches sidebar background */
   --sidebar-surface-hover: 242 243 245;

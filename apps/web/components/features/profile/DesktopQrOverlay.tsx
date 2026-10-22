@@ -135,6 +135,10 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
           key='qr'
           ref={openCardRef}
           popover='manual'
+          // Pay mode opens this card beside the aria-modal pay drawer. The
+          // drawer's focus boundary would otherwise mark it inert, leaving the
+          // close control visible but unusable.
+          data-modal-companion=''
           className={`group fixed bottom-4 right-4 m-0 w-fit border-0 ${PROFILE_Z.DRAWER_CONTENT} flex flex-col items-center overflow-hidden rounded-xl bg-surface-0 p-3 shadow-xl ring-1 ring-(--color-border-subtle) backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-cinematic ease-out motion-reduce:animate-none`}
         >
           <div className='pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-slower group-hover:opacity-100'>

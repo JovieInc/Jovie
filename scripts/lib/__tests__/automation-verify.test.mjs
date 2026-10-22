@@ -1,13 +1,14 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseCLI } from 'vitest/node';
 import { STRUCTURAL_PYTHON_REGRESSION_COMMANDS } from '../../ci-fast-lanes.mjs';
@@ -2130,6 +2131,64 @@ describe('automation-verify affected scope', () => {
     expect(script).toContain('pnpm ci:harness:check');
   });
 
+  describe('scripts typecheck selection', () => {
+    // The affected bundle runs the scripts/ ratchet only when scripts/ changed
+    // since the merge-base; execute that exact block against a temp repo.
+    const selection = script
+      .slice(
+        script.indexOf('if ! SCRIPTS_DIFF_BASE='),
+        script.indexOf('node scripts/turbo-local.mjs lint --affected')
+      )
+      .replace(
+        'node scripts/typecheck-scripts.mjs',
+        'echo RAN_SCRIPTS_TYPECHECK'
+      );
+
+    function runSelection(changedPath) {
+      const repo = mkdtempSync(resolve(tmpdir(), 'scripts-typecheck-select-'));
+      const git = args =>
+        spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+      try {
+        git(['init', '-q', '-b', 'main']);
+        git(['config', 'user.email', 'test@example.com']);
+        git(['config', 'user.name', 'test']);
+        writeFileSync(resolve(repo, 'README.md'), 'base\n');
+        git(['add', '.']);
+        git(['commit', '-q', '-m', 'base']);
+        git(['switch', '-q', '-c', 'feature']);
+        mkdirSync(dirname(resolve(repo, changedPath)), { recursive: true });
+        writeFileSync(resolve(repo, changedPath), 'change\n');
+        git(['add', '.']);
+        git(['commit', '-q', '-m', 'change']);
+        return spawnSync(
+          'bash',
+          ['-c', `set -euo pipefail\nBASE_REF=main\n${selection}`],
+          { cwd: repo, encoding: 'utf8' }
+        );
+      } finally {
+        rmSync(repo, { recursive: true, force: true });
+      }
+    }
+
+    it('runs the ratchet when scripts/ changed', () => {
+      const result = runSelection('scripts/lib/example.mjs');
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
+    });
+
+    it('skips the ratchet when scripts/ is untouched', () => {
+      const result = runSelection('apps/web/lib/example.ts');
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).not.toContain('RAN_SCRIPTS_TYPECHECK');
+      expect(result.stdout).toContain('scripts typecheck not selected');
+    });
+
+    it('keeps the ratchet in the full bundle', () => {
+      const full = script.slice(script.indexOf('  full)'));
+      expect(full).toContain('node scripts/typecheck-scripts.mjs');
+    });
+  });
+
   it('bounds local test fanout', () => {
     expect(script).toContain(
       '--max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}"'
@@ -2962,8 +3021,8 @@ describe('automation-verify affected scope', () => {
     expect(plan.mode).toBe('selected');
     expect(plan.selectedTests).toEqual(
       expect.arrayContaining([
-        'apps/web/tests/unit/home/mounted-home-artist-outcomes-system-b-style-guard.test.ts',
-        'apps/web/tests/unit/home/mounted-home-hero-system-b-style-guard.test.ts',
+        'apps/web/tests/unit/home/mounted-home-grid-spine-system-b-style-guard.test.ts',
+        'apps/web/tests/unit/home/mounted-home-faq-system-b-style-guard.test.ts',
         'apps/web/tests/unit/home/dead-home-actions-system-b-style-guard.test.ts',
       ])
     );
@@ -2971,17 +3030,17 @@ describe('automation-verify affected scope', () => {
       plan.selectedTests.filter(file =>
         file.startsWith('apps/web/tests/unit/home/')
       )
-    ).toHaveLength(15);
+    ).toHaveLength(8);
   });
 
   it('selects the homepage System B style guards for homepage component changes', () => {
     const plan = buildAffectedTestPlan([
-      'apps/web/components/homepage/HomepageMeetJovie.tsx',
+      'apps/web/components/homepage/HomepageIdentityHero.tsx',
     ]);
 
     expect(plan.mode).toBe('selected');
     expect(plan.selectedTests).toContain(
-      'apps/web/tests/unit/home/mounted-home-artist-outcomes-system-b-style-guard.test.ts'
+      'apps/web/tests/unit/home/mounted-home-grid-spine-system-b-style-guard.test.ts'
     );
     expect(plan.selectedTests).toContain(
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts'
