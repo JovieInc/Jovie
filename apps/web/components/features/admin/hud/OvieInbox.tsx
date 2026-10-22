@@ -6,6 +6,10 @@ import { FounderReviewRecorder } from '@/components/features/opportunity-inbox/F
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import {
+  redactFilesystemPaths,
+  summarizeSourceIssues,
+} from '@/lib/ovie/home/operator-copy';
+import {
   type OvieInbox as Inbox,
   inboxDecisionRequest,
 } from '@/lib/ovie/inbox';
@@ -250,9 +254,7 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
               </p>
             ) : null}
             {query.data?.issues.length ? (
-              <p role='status' className='text-xs text-secondary-token'>
-                Some sources are unavailable. {query.data.issues.join(' ')}
-              </p>
+              <SourceIssues issues={query.data.issues} />
             ) : null}
           </div>
           <details
@@ -271,5 +273,41 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
         </div>
       </div>
     </ContentSurfaceCard>
+  );
+}
+
+/**
+ * One line for the warning; several issues (one per uncertified component,
+ * say) stay behind a disclosure instead of inlining every name.
+ */
+function SourceIssues({
+  issues,
+}: Readonly<{ readonly issues: readonly string[] }>) {
+  const visibleIssues = [
+    ...new Set(
+      issues.map(issue => redactFilesystemPaths(issue.trim())).filter(Boolean)
+    ),
+  ];
+  const summary = summarizeSourceIssues(visibleIssues);
+  if (!summary) return null;
+  if (visibleIssues.length <= 1)
+    return (
+      <p role='status' className='text-xs text-secondary-token'>
+        {summary}
+      </p>
+    );
+  return (
+    <details
+      role='status'
+      className='text-xs text-secondary-token'
+      data-testid='ovie-inbox-source-issues'
+    >
+      <summary className='cursor-pointer'>{summary}</summary>
+      <ul className='mt-1 flex flex-col gap-0.5 pl-3 text-tertiary-token'>
+        {visibleIssues.map(issue => (
+          <li key={issue}>{issue}</li>
+        ))}
+      </ul>
+    </details>
   );
 }

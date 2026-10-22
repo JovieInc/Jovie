@@ -20,6 +20,11 @@ const toastMock = vi.hoisted(() =>
 );
 vi.mock('@/components/feedback', () => ({ toast: toastMock }));
 
+const readyTiming = vi.hoisted(() => vi.fn());
+vi.mock('./useOvieHomeReadyTiming', () => ({
+  useOvieHomeReadyTiming: readyTiming,
+}));
+
 const shipping = vi.hoisted(() => ({
   data: undefined as unknown,
   refetch: vi.fn(),
@@ -171,6 +176,7 @@ describe('OvieHomeCanvas', () => {
   let inbox: OvieInbox;
 
   beforeEach(() => {
+    readyTiming.mockReset();
     shipping.data = snapshot();
     inbox = INBOX;
     toastMock.mockClear();
@@ -295,6 +301,50 @@ describe('OvieHomeCanvas', () => {
       'data-state',
       'loading'
     );
+  });
+
+  it.each(['disconnected', 'unauthorized'])(
+    'settles a cold %s shipping failure as an error',
+    async connection => {
+      const base = snapshot();
+      shipping.data = {
+        ...base,
+        view: { ...base.view, connection },
+        operationalRequestState: 'error',
+        operationalTasks: {
+          ...base.operationalTasks,
+          syncState: 'syncing',
+          tasks: [],
+        },
+      };
+      renderCanvas();
+      expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
+        'data-state',
+        'error'
+      );
+      expect(
+        within(screen.getByTestId('home-loop-in-flight-section')).getByText(
+          'Shipping data could not load.'
+        )
+      ).toBeVisible();
+      await screen.findByTestId('home-loop-ask-approve');
+      expect(readyTiming).toHaveBeenLastCalledWith(true);
+    }
+  );
+
+  it('keeps reconciled tasks visible when a later shipping read fails', () => {
+    const base = snapshot();
+    shipping.data = {
+      ...base,
+      view: { ...base.view, connection: 'disconnected' },
+      operationalRequestState: 'error',
+    };
+    renderCanvas();
+    expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
+      'data-state',
+      'populated'
+    );
+    expect(screen.getByText('Blocked task')).toBeVisible();
   });
 
   it('records an approval only after the undo window closes', async () => {
@@ -492,7 +542,7 @@ describe('OvieHomeCanvas', () => {
     expect(
       screen.getByTestId('home-loop-asks-section-notice')
     ).toHaveTextContent(
-      'Some sources are unavailable. Requested work could not be loaded.'
+      'Source needs attention. Requested work could not be loaded.'
     );
     expect(screen.getByTestId('home-loop-asks-section')).toHaveAttribute(
       'data-state',
@@ -517,11 +567,31 @@ describe('OvieHomeCanvas', () => {
     expect(
       await screen.findByTestId('home-loop-asks-section-notice')
     ).toHaveTextContent(
-      'Some sources are unavailable. Requested work could not be loaded.'
+      'Source needs attention. Requested work could not be loaded.'
     );
     expect(
       screen.queryByText('Nothing needs your decision.')
     ).not.toBeInTheDocument();
+  });
+
+  it('collapses many source issues to a count with a link to the inbox', async () => {
+    const issues = Array.from(
+      { length: 27 },
+      (_, index) =>
+        `Marketing component ${index}: additional evidence is required.`
+    );
+    fetchMock.mockImplementation(async (url: string) =>
+      url === '/api/ovie/inbox'
+        ? new Response(JSON.stringify({ ...INBOX, issues }), { status: 200 })
+        : new Response('not found', { status: 404 })
+    );
+    renderCanvas();
+    const notice = await screen.findByTestId('home-loop-asks-section-notice');
+    expect(notice).toHaveTextContent('27 source issues need attention.');
+    expect(notice).not.toHaveTextContent('Marketing component');
+    expect(
+      screen.getByTestId('home-loop-asks-section-notice-link')
+    ).toHaveAttribute('href', '/app/ov/inbox');
   });
 
   it('renders the latest turn in place and restores earlier canvas states', async () => {

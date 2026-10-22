@@ -120,12 +120,23 @@ describe('Ovie Inbox', () => {
     await screen.findByText(
       'This decision is not in the current inbox. Refresh to check its status.'
     );
-    expect(
-      screen.getByText(/Some sources are unavailable/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Source needs attention/)).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Approve' })
     ).not.toBeInTheDocument();
+  });
+  it('collapses many source issues to a count with the full list behind a disclosure', async () => {
+    const issues = Array.from(
+      { length: 27 },
+      (_, index) =>
+        `Marketing component ${index}: additional evidence is required.`
+    );
+    mount(new Response(JSON.stringify({ cases: [], issues }), { status: 200 }));
+    const disclosure = await screen.findByTestId('ovie-inbox-source-issues');
+    const summary = disclosure.querySelector('summary');
+    expect(summary).toHaveTextContent('27 source issues need attention.');
+    expect(summary).not.toHaveTextContent('Marketing component');
+    expect(disclosure.querySelectorAll('li')).toHaveLength(27);
   });
   it('keeps the requested case and its notes across a reordered refresh', async () => {
     const other = { ...item, id: 'summer:other', title: 'Other decision' };

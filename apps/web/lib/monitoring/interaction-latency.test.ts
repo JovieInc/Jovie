@@ -114,6 +114,13 @@ describe('UX latency telemetry', () => {
         p50Ms: null,
         p95Ms: null,
       },
+      {
+        metric: 'ovie_home_ready',
+        label: 'Ovie Home Ready',
+        sampleCount: 0,
+        p50Ms: null,
+        p95Ms: null,
+      },
     ]);
   });
 
@@ -208,7 +215,7 @@ describe('UX latency telemetry', () => {
 
     vi.stubGlobal('window', undefined);
     expect(recordUxLatency('chat_first_token', 100)).toBe(false);
-    expect(getUxLatencySummaries()).toHaveLength(5);
+    expect(getUxLatencySummaries()).toHaveLength(6);
     expect(() => resetUxLatencyForTests()).not.toThrow();
     expect(() => subscribeUxLatency(vi.fn())()).not.toThrow();
   });
