@@ -76,6 +76,7 @@ describe('profile alias redirect query order', () => {
       ['tour', 'tour'],
       ['shows', 'tour'],
       ['events', 'tour'],
+      ['contact', 'contact'],
     ] as const;
 
     for (const [alias, mode] of cases) {

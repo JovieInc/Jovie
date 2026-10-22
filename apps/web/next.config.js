@@ -632,6 +632,7 @@ const nextConfig = {
       'tour',
       'shows',
       'events',
+      'contact',
     ].flatMap(alias => [
       {
         source: `/:username/${alias}`,

@@ -43,7 +43,8 @@
 +    'pay',
 +    'releases',
 +    'subscribe',
-+    'tour'
++    'tour',
++    'contact'
 +]);
 +// Next merges redirect queries as { ...requestQuery, ...destinationQuery }.
 +// Request keys stay in front, so /dualipa/listen?source=qr becomes
@@ -96,7 +97,8 @@
 +    'pay',
 +    'releases',
 +    'subscribe',
-+    'tour'
++    'tour',
++    'contact'
 +]);
 +// Next merges redirect queries as { ...requestQuery, ...destinationQuery }.
 +// Request keys stay in front, so /dualipa/listen?source=qr becomes
