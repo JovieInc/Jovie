@@ -153,9 +153,11 @@ export function useChatJankMonitor({
 
   const snapshots = useMemo(() => toMessageSnapshots(messages), [messages]);
   const snapshotsRef = useRef(snapshots);
-  snapshotsRef.current = snapshots;
   const statusRef = useRef(status);
-  statusRef.current = status;
+  useEffect(() => {
+    snapshotsRef.current = snapshots;
+    statusRef.current = status;
+  }, [snapshots, status]);
   const pendingTool = useMemo(() => hasActivePendingTool(messages), [messages]);
 
   // ── Observe messages (throttled while streaming) ─────────────

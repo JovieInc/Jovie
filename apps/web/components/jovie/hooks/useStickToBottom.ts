@@ -1,6 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { observeDesktopVisualActivity } from '@/lib/desktop/electron-bridge';
 
 /** Scroll distance (px) from bottom before considering "scrolled away". */
@@ -68,9 +74,7 @@ interface UseStickToBottomReturn extends StickToBottomController {
 export function useStickToBottomController(
   messageCount?: number
 ): StickToBottomController {
-  const storeRef = useRef<StuckStore | null>(null);
-  if (storeRef.current === null) storeRef.current = createStuckStore();
-  const store = storeRef.current;
+  const [store] = useState(createStuckStore);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
