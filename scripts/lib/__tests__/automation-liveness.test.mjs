@@ -89,12 +89,18 @@ describe('ls-remote main tip', () => {
   it('asks git for refs/heads/main and keeps the token out of argv', async () => {
     const token = 'actions-token';
     const encoded = Buffer.from(`x-access-token:${token}`).toString('base64');
-    let seen;
+    // Assigned inside the git callback. An uninitialized let stays
+    // possibly undefined under checkJs, which the scripts ratchet rejects.
+    const seen = {
+      args: /** @type {string[]} */ ([]),
+      env: /** @type {NodeJS.ProcessEnv} */ ({}),
+    };
     const sha = await lsRemoteMain(
       'JovieInc/Jovie',
       token,
       async (args, env) => {
-        seen = { args, env };
+        seen.args = args;
+        seen.env = env;
         return `${MAIN}\trefs/heads/main\n`;
       }
     );

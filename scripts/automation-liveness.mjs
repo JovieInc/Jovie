@@ -230,6 +230,9 @@ function mainRefFailure(error, status) {
 const execFileAsync = promisify(execFile);
 
 function gitProbeEnv(token) {
+  // Spreading process.env drops its index signature, so later GIT_CONFIG_*
+  // writes are not assignable unless the bag is typed as the real env.
+  /** @type {NodeJS.ProcessEnv} */
   const env = {
     ...process.env,
     GIT_TERMINAL_PROMPT: '0',
