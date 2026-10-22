@@ -1146,6 +1146,7 @@
   "tests/unit/profile/profile-deep-link-chunk-regression.test.ts",
   "tests/unit/profile/profile-liquid-glass-nav-regression.test.ts",
   "tests/unit/profile/profile-mode-alias-content-candidate.test.ts",
+  "tests/unit/profile/profile-mode-render-static-params.test.ts",
   "tests/unit/profile/profile-next-action.test.ts",
   "tests/unit/profile/profile-primary-card-width-regression.test.ts",
   "tests/unit/profile/profile-qa-public-surface.regression.test.ts",

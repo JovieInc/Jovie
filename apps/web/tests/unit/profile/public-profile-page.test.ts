@@ -1205,6 +1205,9 @@ sourceDescribe('profile mode route redirects', () => {
     expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain(
       'export function generateStaticParams()'
     );
+    expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain(
+      'return getProfileModeRenderStaticParams()'
+    );
     expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('searchParams');
   });
 
