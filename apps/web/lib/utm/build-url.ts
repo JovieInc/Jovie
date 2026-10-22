@@ -236,6 +236,23 @@ export function extractUTMParams(
   }, {});
 }
 
+/** Attribution stamped on smart-link DSP handoffs when the visit carried none. */
+export const SMART_LINK_DEFAULT_UTM_PARAMS: Readonly<PartialUTMParams> =
+  Object.freeze({ utm_source: 'jovie' });
+
+/**
+ * One attribution rule for every outbound smart-link DSP navigation (explicit
+ * tap, remembered-provider redirect, `?dsp=` redirect): forward the visit's
+ * own UTM params when present, otherwise stamp the Jovie default.
+ */
+export function resolveSmartLinkOutboundUtmParams(
+  searchParams: URLSearchParams,
+  defaults: PartialUTMParams = SMART_LINK_DEFAULT_UTM_PARAMS
+): PartialUTMParams {
+  const current = extractUTMParams(searchParams);
+  return Object.keys(current).length > 0 ? current : { ...defaults };
+}
+
 /**
  * Append UTM parameters to a URL while preserving existing query params.
  */

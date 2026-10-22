@@ -437,8 +437,12 @@ test.describe('Profile Modes @smoke @critical', () => {
           return;
         }
 
+        // /about is the profile page itself. Other legacy slugs still
+        // redirect onto the query-mode form.
         await expect(page).toHaveURL(
-          new RegExp(`/${TEST_PROFILES.DUALIPA}\\?mode=${deepLink.mode}`)
+          deepLink.path === 'about'
+            ? new RegExp(`/${TEST_PROFILES.DUALIPA}/about/?$`)
+            : new RegExp(`/${TEST_PROFILES.DUALIPA}\\?mode=${deepLink.mode}`)
         );
       });
     }

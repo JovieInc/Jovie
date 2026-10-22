@@ -151,7 +151,10 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   position: absolute;
   top: 0;
   left: 0;
-  -webkit-app-region: drag;
+  /* Drag lives on sibling strips, not this ancestor. Chromium reports
+     focus as inactive at 200% zoom when a no-drag control sits inside a
+     drag region. */
+  -webkit-app-region: no-drag;
   z-index: 60;
   display: flex;
   align-items: center;
@@ -944,6 +947,11 @@ body {
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+  }
+  /* The same ink allowance is needed by clamped section/CTA headings.
+     Their tight Satoshi leading can crop descenders even with no hidden line. */
+  :where(.home-viewport, .system-b-marketing) :where(h2, h3).line-clamp-2 {
+    padding-block-end: 0.16em;
   }
   @media (min-width: 768px) {
     .marketing-h1-linear {

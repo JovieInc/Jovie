@@ -21,7 +21,7 @@
  * --file applies the decisions through scripts/lib/remediation-signal.mjs
  * (needs LINEAR_API_KEY; REMEDIATION_INTAKE_DISABLED=1 skips).
  */
-import { execFile as execFileCb } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -30,6 +30,7 @@ import { promisify } from 'node:util';
 import { createApiClient } from '../packages/api-client/client.ts';
 import { createLinearClient } from '../packages/api-client/linear.ts';
 import { hashCredential } from '../packages/api-client/store.ts';
+import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
 import {
   evaluateLiveness,
   livenessDecisions,
@@ -45,99 +46,6 @@ const TIMEOUT_MS = 10_000;
 const SHA_RE = /^[0-9a-f]{40}$/;
 // Overridable per observer for tests; one literal for the external-api guard.
 const GITHUB_API = 'https://api.github.com';
-
-/**
- * @typedef {(
- *   file: string,
- *   args: readonly string[],
- *   options: import('node:child_process').ExecFileOptions
- * ) => Promise<{ stdout?: string, stderr?: string }>} GitExecFile
- * @typedef {(receipt: { repo?: string }) => Promise<string | null | undefined>} MainShaReader
- */
-
-const execFilePromisified = promisify(execFileCb);
-
-/** @type {GitExecFile} */
-const execFile = async (file, args, options) => {
-  const result = await execFilePromisified(file, args, options);
-  return {
-    stdout: String(result.stdout ?? ''),
-    stderr: String(result.stderr ?? ''),
-  };
-};
-
-/**
- * refs/heads/main over the git protocol. The Git Database REST ref answers
- * 403 to the Actions token (run 39646931368) even while other reads succeed.
- * Anonymous ls-remote does not spend that quota; the token is only the
- * fallback, and it never appears on the command line.
- * @param {{
- *   repo?: string,
- *   token?: string,
- *   execFileImpl?: GitExecFile,
- * }} [options]
- */
-export async function readMainShaViaGit({
-  repo,
-  token = '',
-  execFileImpl = execFile,
-} = {}) {
-  if (!/^[^/\s]+\/[^/\s]+$/.test(String(repo ?? ''))) return null;
-  const url = `https://github.com/${repo}.git`;
-  const args = ['ls-remote', '--refs', url, 'refs/heads/main'];
-  const baseEnv = {
-    PATH: process.env.PATH ?? '',
-    HOME: process.env.HOME ?? '',
-    GIT_CONFIG_GLOBAL: '/dev/null',
-    GIT_CONFIG_SYSTEM: '/dev/null',
-    GIT_CONFIG_NOSYSTEM: '1',
-    GIT_TERMINAL_PROMPT: '0',
-    GCM_INTERACTIVE: 'never',
-  };
-  const shaFrom = async env => {
-    const { stdout } = await execFileImpl('git', args, {
-      cwd: tmpdir(),
-      env,
-      timeout: TIMEOUT_MS,
-      maxBuffer: 8192,
-    });
-    const sha = String(stdout ?? '')
-      .trim()
-      .split(/\s+/)[0];
-    return SHA_RE.test(sha ?? '') ? sha : null;
-  };
-  try {
-    const anonymous = await shaFrom(baseEnv);
-    if (anonymous) return anonymous;
-  } catch {
-    // Authenticated git is the second read. A transport failure here is not
-    // yet silence.
-  }
-  if (!token) return null;
-  try {
-    return await shaFrom({
-      ...baseEnv,
-      GIT_CONFIG_COUNT: '2',
-      GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
-      GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`,
-      GIT_CONFIG_KEY_1: 'core.hooksPath',
-      GIT_CONFIG_VALUE_1: '/dev/null',
-    });
-  } catch {
-    return null;
-  }
-}
-
-async function mainRefFromRecovery(readMainSha, receipt) {
-  if (typeof readMainSha !== 'function') return null;
-  try {
-    const sha = await readMainSha(receipt);
-    if (!SHA_RE.test(sha ?? '')) return null;
-    return { ref: 'refs/heads/main', object: { type: 'commit', sha } };
-  } catch {
-    return null;
-  }
-}
 
 async function readJson(fetchImpl, url, headers = {}) {
   const controller = new AbortController();
@@ -179,34 +87,41 @@ export async function observeGithubWorkflow(
   const branch = receipt.branch
     ? `&branch=${encodeURIComponent(receipt.branch)}`
     : '';
-  const base = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=30${branch}`;
+  const base = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs`;
   const events = receipt.events ?? null;
-  // Filter by event server-side: a busy push/PR workflow would otherwise
-  // push its scheduled runs out of the 30-run window (security.yml, 2026-10-21).
-  const urls = events
-    ? events.map(event => `${base}&event=${encodeURIComponent(event)}`)
-    : [base];
+  const acceptsRun = row =>
+    conclusions.includes(row?.conclusion) &&
+    (!events || events.includes(row?.event));
   const runs = [];
-  for (const url of urls) {
-    const read = await readJson(fetchImpl, url, githubHeaders(token));
-    if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
-    if (!Array.isArray(read.body?.workflow_runs))
-      return { ok: false, reason: 'github-runs-unreadable' };
-    runs.push(...read.body.workflow_runs);
+  // A single completed-run page can be empty transiently (JOV-8832), or
+  // crowded with skipped/cancelled runs. Before declaring silence, confirm
+  // with one bounded lookup per accepted conclusion. Healthy reads stay cheap.
+  for (const statuses of [['completed'], conclusions]) {
+    const urls = statuses.flatMap(status => {
+      const query = `${base}?status=${encodeURIComponent(status)}&per_page=30${branch}`;
+      // Keep trigger filtering server-side so pushes cannot hide scheduled runs.
+      return events
+        ? events.map(event => `${query}&event=${encodeURIComponent(event)}`)
+        : [query];
+    });
+    for (const url of urls) {
+      const read = await readJson(fetchImpl, url, githubHeaders(token));
+      if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
+      if (!Array.isArray(read.body?.workflow_runs))
+        return { ok: false, reason: 'github-runs-unreadable' };
+      runs.push(...read.body.workflow_runs);
+    }
+    if (runs.some(acceptsRun)) break;
   }
   runs.sort((a, b) =>
     String(b?.updated_at ?? '').localeCompare(String(a?.updated_at ?? ''))
   );
-  const run = runs.find(
-    row =>
-      conclusions.includes(row?.conclusion) &&
-      (!events || events.includes(row?.event))
-  );
+  const run = runs.find(acceptsRun);
   if (!run)
     return {
       ok: true,
       lastProofAt: null,
-      reason: `no-${conclusions.join('-or-')}${events ? `-${events.join('-or-')}` : ''}-run-in-last-30`,
+      reason: `no-${conclusions.join('-or-')}${events ? `-${events.join('-or-')}` : ''}-run-found`,
     };
   return {
     ok: true,
@@ -293,37 +208,139 @@ async function landedOnMainAt(
     : committerDate;
 }
 
-/**
- * Production promotion heartbeat, independent of the continuity guard's own
- * verdict: production carrying main is a fresh proof; otherwise the proof is
- * as old as the oldest missing commit has been on main. Unreadable is unknown
- * (red), never healthy.
- */
-export async function observeProductionFreshness(
-  receipt,
-  { fetchImpl, token, nowMs, githubClient, apiUrl = GITHUB_API, readMainSha }
-) {
-  const build = await readJson(fetchImpl, receipt.buildInfoUrl);
-  const live = build.ok ? build.body?.commitSha : null;
-  if (!SHA_RE.test(live ?? ''))
-    return { ok: false, reason: 'live-sha-unreadable' };
-  const headers = githubHeaders(token);
-  // Only the branch identity is needed here. The commit endpoint also
-  // computes changed files and patches, adding avoidable work to this probe.
-  const client =
-    githubClient ??
-    createApiClient({
-      provider: 'github',
-      credential: hashCredential('github', token ?? ''),
-      fetch: fetchImpl,
-    });
-  let head;
-  let refDenied = false;
+function shaFromMainRef(head) {
+  return head?.ref === 'refs/heads/main' && head?.object?.type === 'commit'
+    ? head.object.sha
+    : null;
+}
+
+function shaFromCommitBody(text) {
+  const trimmed = String(text ?? '').trim();
+  if (SHA_RE.test(trimmed)) return trimmed;
   try {
-    const response = await client.request({
-      url: `${apiUrl}/repos/${receipt.repo}/git/ref/heads/main`,
+    const sha = JSON.parse(trimmed)?.sha;
+    return SHA_RE.test(sha ?? '') ? sha : null;
+  } catch {
+    return null;
+  }
+}
+
+function mainRefFailure(error, status) {
+  if (status) return { ok: false, reason: `main-ref-http-${status}` };
+  return {
+    ok: false,
+    reason: error?.status
+      ? `main-ref-http-${error.status}`
+      : `main-ref-${error?.failure ?? error?.kind ?? 'unreadable'}`,
+  };
+}
+
+const execFileAsync = promisify(execFile);
+
+function gitProbeEnv(token) {
+  // Keep the probe independent of inherited credentials and Git settings.
+  /** @type {NodeJS.ProcessEnv} */
+  const env = {
+    PATH: process.env.PATH ?? '',
+    // A non-directory also prevents libcurl from loading inherited ~/.netrc.
+    HOME: '/dev/null',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_SYSTEM: '/dev/null',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_TERMINAL_PROMPT: '0',
+    GCM_INTERACTIVE: 'never',
+  };
+  const pairs = [['core.hooksPath', '/dev/null']];
+  if (token) {
+    const encoded = Buffer.from(`x-access-token:${token}`).toString('base64');
+    pairs.push(
+      ['credential.helper', ''],
+      [
+        'http.https://github.com/.extraheader',
+        `AUTHORIZATION: basic ${encoded}`,
+      ]
+    );
+  }
+  env.GIT_CONFIG_COUNT = String(pairs.length);
+  for (const [index, [key, value]] of pairs.entries()) {
+    env[`GIT_CONFIG_KEY_${index}`] = key;
+    env[`GIT_CONFIG_VALUE_${index}`] = value;
+  }
+  return env;
+}
+
+async function defaultGit(args, env) {
+  const { stdout } = await execFileAsync('git', args, {
+    cwd: tmpdir(),
+    timeout: TIMEOUT_MS,
+    maxBuffer: 8192,
+    env,
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  return stdout;
+}
+
+/**
+ * refs/heads/main over the git protocol. Try anonymously before retrying
+ * with the token in the child environment, never in argv. A failure returns
+ * null so the REST fallback can still run.
+ */
+export async function lsRemoteMain(repo, token, gitExec = defaultGit) {
+  if (!/^[^/\s]+\/[^/\s]+$/.test(String(repo ?? ''))) return null;
+  const args = [
+    'ls-remote',
+    '--refs',
+    `https://github.com/${repo}.git`,
+    'refs/heads/main',
+  ];
+  const read = async authToken => {
+    const stdout = await gitExec(args, gitProbeEnv(authToken));
+    const sha = String(stdout ?? '')
+      .trim()
+      .split(/\s+/)[0];
+    return SHA_RE.test(sha ?? '') ? sha : null;
+  };
+  try {
+    const anonymous = await read(undefined);
+    if (anonymous) return anonymous;
+  } catch {
+    // A failed anonymous read may still recover with the Actions token.
+  }
+  if (!token) return null;
+  try {
+    return await read(token);
+  } catch {
+    return null;
+  }
+}
+
+async function shaFromGit(readGitTip) {
+  if (typeof readGitTip !== 'function') return null;
+  try {
+    const sha = await readGitTip();
+    return SHA_RE.test(sha ?? '') ? sha : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Branch tip for the promotion probe.
+ *
+ * `git/ref` is the cheap read. The Actions token answers that route with
+ * HTTP 403 while production is inside the silence budget (runs 39674054063
+ * and 39682307911; the second ran after the commits/main fallback landed).
+ * `GET /commits/main` is the same 403 the production controller already left
+ * for `git ls-remote`. On a 403, ask git for refs/heads/main, then try one
+ * last commit-SHA read. Any other failure stays unreadable.
+ */
+async function readMainSha(client, repo, headers, apiUrl, readGitTip) {
+  const request = (url, accept) =>
+    client.request({
+      url,
       headers: {
-        Accept: 'application/json',
+        Accept: accept,
         'Cache-Control': 'no-cache',
         ...headers,
       },
@@ -333,30 +350,72 @@ export async function observeProductionFreshness(
       maxWaitMs: TIMEOUT_MS,
       timeoutMs: TIMEOUT_MS,
     });
-    if (response.status === 200) head = response.json();
-    else if (response.status === 403) refDenied = true;
-    else return { ok: false, reason: `main-ref-http-${response.status}` };
-  } catch (error) {
-    if (error?.status === 403) refDenied = true;
-    else {
-      return {
-        ok: false,
-        reason: error?.status
-          ? `main-ref-http-${error.status}`
-          : `main-ref-${error?.failure ?? error?.kind ?? 'unreadable'}`,
-      };
+  let failure;
+  try {
+    const response = await request(
+      `${apiUrl}/repos/${repo}/git/ref/heads/main`,
+      'application/json'
+    );
+    if (response.status === 200) {
+      const sha = shaFromMainRef(response.json());
+      return SHA_RE.test(sha ?? '')
+        ? { ok: true, sha }
+        : { ok: false, reason: 'main-sha-unreadable' };
     }
+    failure = mainRefFailure(null, response.status);
+    if (response.status !== 403) return failure;
+  } catch (error) {
+    failure = mainRefFailure(error);
+    if (error?.status !== 403) return failure;
   }
-  if (refDenied) {
-    head = await mainRefFromRecovery(readMainSha, receipt);
-    if (!head) return { ok: false, reason: 'main-ref-http-403' };
+  const fromGit = await shaFromGit(readGitTip);
+  if (fromGit) return { ok: true, sha: fromGit };
+  try {
+    // application/vnd.github.sha is the raw tip. The default commit
+    // document also builds the patch, which this probe does not need.
+    const response = await request(
+      `${apiUrl}/repos/${repo}/commits/main`,
+      'application/vnd.github.sha'
+    );
+    if (response.status !== 200) return failure;
+    const sha = shaFromCommitBody(response.text);
+    return SHA_RE.test(sha ?? '') ? { ok: true, sha } : failure;
+  } catch {
+    return failure;
   }
-  const main =
-    head?.ref === 'refs/heads/main' && head?.object?.type === 'commit'
-      ? head.object.sha
-      : null;
-  if (!SHA_RE.test(main ?? ''))
-    return { ok: false, reason: 'main-sha-unreadable' };
+}
+
+/**
+ * Production promotion heartbeat, independent of the continuity guard's own
+ * verdict: production carrying main is a fresh proof; otherwise the proof is
+ * as old as the oldest missing commit has been on main. Unreadable is unknown
+ * (red), never healthy.
+ */
+export async function observeProductionFreshness(
+  receipt,
+  { fetchImpl, token, nowMs, githubClient, apiUrl = GITHUB_API, lsRemote }
+) {
+  const build = await readJson(fetchImpl, receipt.buildInfoUrl);
+  const live = build.ok ? build.body?.commitSha : null;
+  if (!SHA_RE.test(live ?? ''))
+    return { ok: false, reason: 'live-sha-unreadable' };
+  const headers = githubHeaders(token);
+  const client =
+    githubClient ??
+    createApiClient({
+      provider: 'github',
+      credential: hashCredential('github', token ?? ''),
+      fetch: fetchImpl,
+    });
+  const mainRead = await readMainSha(
+    client,
+    receipt.repo,
+    headers,
+    apiUrl,
+    () => lsRemote?.(receipt.repo, token)
+  );
+  if (!mainRead.ok) return mainRead;
+  const main = mainRead.sha;
   const now = new Date(nowMs).toISOString();
   if (live === main)
     return { ok: true, lastProofAt: now, reason: 'production-current' };
@@ -513,6 +572,7 @@ export async function observeLinearTriageDwell(receipt, { linear, nowMs }) {
 }
 
 const MERGEABLE_GREEN = new Set(['CLEAN', 'UNSTABLE', 'HAS_HOOKS']);
+const ADMISSION_BLOCKING = new Set(ADMISSION_BLOCKING_LABELS);
 const GREEN_TIMING_MAX_PRS = 10;
 const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
 const DEFECT_HOLD_CLASSES = new Set(['deterministic-source', 'unclassified']);
@@ -575,8 +635,10 @@ async function requiredGreenAt(
  * checks (CLEAN/UNSTABLE/HAS_HOOKS = required green and mergeable), so one
  * cheap list read finds candidates; only ready candidates (capped) pay for a
  * per-head timing read. Proof is "no ready, mergeable, required-green PR sits
- * outside the merge queue", else the earliest such green time. Green drafts
- * are counted in the reason; draft promotion is the writer's (JOV-INV-022).
+ * outside the merge queue", else the earliest such green time. Admission
+ * label holds are reported separately, using the writer's shared policy.
+ * Green drafts are counted in the reason; draft promotion is the writer's
+ * (JOV-INV-022).
  */
 export async function observeGreenToEnqueue(
   receipt,
@@ -586,7 +648,7 @@ export async function observeGreenToEnqueue(
   const [owner, name] = String(receipt.repo).split('/');
   const checks = receipt.requiredChecks ?? [];
   if (!checks.length) return { ok: false, reason: 'required-checks-missing' };
-  const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:40,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number isDraft isInMergeQueue mergeStateStatus baseRefName headRefOid}}}}`;
+  const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:40,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number isDraft isInMergeQueue mergeStateStatus baseRefName headRefOid labels(first:100){nodes{name} pageInfo{hasNextPage}}}}}}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let body;
@@ -629,9 +691,24 @@ export async function observeGreenToEnqueue(
   const drafts = green.filter(pr => pr.isDraft).map(pr => pr.number);
   const waiting = [];
   const held = [];
-  for (const pr of green
-    .filter(row => !row.isDraft)
-    .slice(0, GREEN_TIMING_MAX_PRS)) {
+  const labelHeld = [];
+  const ready = [];
+  for (const pr of green.filter(row => !row.isDraft)) {
+    if (
+      !Array.isArray(pr.labels?.nodes) ||
+      pr.labels?.pageInfo?.hasNextPage !== false ||
+      pr.labels.nodes.some(label => typeof label?.name !== 'string')
+    )
+      return { ok: false, reason: 'green-enqueue-labels-unreadable' };
+    if (
+      pr.labels.nodes.some(label =>
+        ADMISSION_BLOCKING.has(label.name.toLowerCase())
+      )
+    )
+      labelHeld.push(pr.number);
+    else ready.push(pr);
+  }
+  for (const pr of ready.slice(0, GREEN_TIMING_MAX_PRS)) {
     const timing = await requiredGreenAt(receipt.repo, pr.headRefOid, checks, {
       fetchImpl,
       token,
@@ -653,7 +730,7 @@ export async function observeGreenToEnqueue(
     .map(n => `#${n}`)
     .join(
       ','
-    )}];defect-held=${held.length}[${held.map(n => `#${n}`).join(',')}]`;
+    )}];defect-held=${held.length}[${held.map(n => `#${n}`).join(',')}];label-held=${labelHeld.length}[${labelHeld.map(n => `#${n}`).join(',')}]`;
   if (!waiting.length)
     return { ok: true, lastProofAt: new Date(nowMs).toISOString(), reason };
   return {
@@ -690,7 +767,7 @@ export async function observeEntry(entry, context) {
  *   nowMs?: number,
  *   githubClient?: import('../packages/api-client/client.ts').ApiClient,
  *   linear?: { graphql: (query: string, variables?: Record<string, unknown>) => Promise<any> } | null,
- *   readMainSha?: MainShaReader,
+ *   lsRemote?: (repo: string, token?: string) => Promise<string | null>,
  * }} options
  */
 export async function runLiveness({
@@ -700,18 +777,11 @@ export async function runLiveness({
   nowMs = Date.now(),
   githubClient,
   linear = null,
-  readMainSha,
+  lsRemote = lsRemoteMain,
 }) {
   const startedAt = new Date(nowMs).toISOString();
   const observations = new Map();
-  const context = {
-    fetchImpl,
-    token,
-    nowMs,
-    githubClient,
-    linear,
-    readMainSha,
-  };
+  const context = { fetchImpl, token, nowMs, githubClient, linear, lsRemote };
   for (const entry of registry.entries ?? []) {
     if (entry?.status !== 'live') continue;
     const observed = await observeEntry(entry, context);
@@ -806,12 +876,10 @@ export async function main({
     );
     return { automations };
   }
-  const token = env.GH_TOKEN ?? env.GITHUB_TOKEN ?? '';
   const { report, events, startedAt } = await runLiveness({
     registry,
     fetchImpl,
-    token,
-    readMainSha: receipt => readMainShaViaGit({ repo: receipt.repo, token }),
+    token: env.GH_TOKEN ?? env.GITHUB_TOKEN ?? '',
     linear: env.LINEAR_API_KEY
       ? createLinearClient({
           identity: env.LINEAR_API_KEY,

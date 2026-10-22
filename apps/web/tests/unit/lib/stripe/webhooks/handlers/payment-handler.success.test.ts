@@ -329,6 +329,17 @@ describe('@critical PaymentHandler - payment succeeded', () => {
     expect(result.reason).toBe('cannot_identify_user_for_payment_success');
     expect(mockGetUserIdFromStripeCustomer).toHaveBeenCalledWith('cus_unknown');
     expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
+    // A paid-but-unattributed invoice must never be a silent skip.
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Paid subscription invoice has no attributable user',
+      expect.any(Error),
+      expect.objectContaining({
+        event: 'invoice.payment_succeeded',
+        stripeEventId: 'evt_unknown_user',
+        invoiceId: 'in_unknown_user',
+        subscriptionId: 'sub_unknown_user',
+      })
+    );
   });
 
   it('throws on payment success errors so Stripe can retry', async () => {

@@ -54,9 +54,9 @@ export function isLegacyProfileModeAlias(slug: string): boolean {
 /**
  * Resolves a legacy profile-mode alias after the smart-link route has proved
  * that the slug does not belong to published, renamed, or unpublished music.
- * Alias requests are routed after filesystem matches into the catch-all
- * resolver, so static application routes retain priority and real releases
- * called `music` or `tour` keep their public URLs.
+ * The public URL itself is an edge redirect. This resolver still owns the
+ * collision hold (`jovie_alias_content` or `?alias-content=1`), so real
+ * releases called `music` or `tour` keep their public URLs.
  */
 export function getLegacyProfileModeRedirectHref(
   username: string,

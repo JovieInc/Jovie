@@ -104,6 +104,14 @@ vi.mock('@/lib/testing/test-user-provision.server', () => ({
   ensureSocialLinkRecord: mockEnsureSocialLinkRecord,
   ensureUserProfileClaim: mockEnsureUserProfileClaim,
   ensureUserRecord: mockEnsureUserRecord,
+  getDeterministicTestClerkId: (email: string) => {
+    const stableId = email
+      .trim()
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9]+/gi, '_')
+      .slice(0, 48);
+    return `user_dev_${stableId || 'browse'}`;
+  },
   invalidateTestUserCaches: mockInvalidateTestUserCaches,
   setActiveProfileForUser: mockSetActiveProfileForUser,
 }));
@@ -194,6 +202,30 @@ describe('dev-test-auth.server', () => {
       ensureExistingDevTestAuthActor('user_dev_unlinked', null)
     ).resolves.toBeNull();
     expect(mockCreateSession).not.toHaveBeenCalled();
+  });
+
+  it('recognizes only a deterministic golden-path mailbox for fresh provisioning', async () => {
+    const { isDeterministicFreshDevTestUser } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+    const email = 'gp-seed+clerk_test@test.jovie.com';
+    const existingUserId = 'user_dev_gp_seed_clerk_test_test_jovie_com';
+
+    expect(isDeterministicFreshDevTestUser({ existingUserId, email })).toBe(
+      true
+    );
+    expect(
+      isDeterministicFreshDevTestUser({
+        existingUserId: 'unknown-user',
+        email,
+      })
+    ).toBe(false);
+    expect(
+      isDeterministicFreshDevTestUser({
+        existingUserId,
+        email: 'person@example.com',
+      })
+    ).toBe(false);
   });
 
   it('fails closed when no persisted actor matches either identity id', async () => {

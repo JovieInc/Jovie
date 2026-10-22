@@ -86,6 +86,15 @@ const ciReporters: ReporterDescription[] = [
       ] as ReporterDescription[])),
 ];
 
+// Journey evidence (jovie.journey-evidence/v1) is built from this report; it
+// is written outside test-results so the artifact guard never stages it.
+if (process.env.JOURNEY_EVIDENCE_REPORT) {
+  ciReporters.push([
+    'json',
+    { outputFile: process.env.JOURNEY_EVIDENCE_REPORT },
+  ]);
+}
+
 if (sentryE2eEnabled) {
   ciReporters.push(['./tests/e2e/reporters/sentry-ci-reporter.ts']);
 }

@@ -6,6 +6,9 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 const { withWorkflow } = require('workflow/next');
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
+const {
+  legacyProfileAliasRedirects,
+} = require('./lib/routing/legacy-profile-alias-redirects');
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
 const screenshotCatalogTraceIncludes = [
   'screenshot-catalog/current/**/*',
@@ -553,6 +556,10 @@ const nextConfig = {
         permanent: false,
       },
       ...legacyAppRedirects,
+      // Legacy profile deep links (`/dualipa/listen`) redirect at the edge,
+      // before the Node proxy. The catch-all resolver remains for collisions
+      // via `?alias-content=1` or the `jovie_alias_content` hold cookie.
+      ...legacyProfileAliasRedirects(),
       // Old /tips landing page redirect
       {
         source: '/tips',

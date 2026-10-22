@@ -389,6 +389,34 @@
         }
       ]
     },
+    "claim-dogfood": {
+      "entityId": "claim-checkout-dogfood#<run id>@<run attempt>",
+      "description": "One browser dogfood of the $12 artist claim (Stripe test mode, fixture artists): from the staging deploy (or dispatch) that made it due to the journey verdict.",
+      "endToEnd": [["wait", "journey"]],
+      "stages": [
+        {
+          "id": "wait",
+          "meaning": "staging deploy finished (Staging Controller completed) or dispatch, until the dogfood job started",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        },
+        {
+          "id": "setup",
+          "meaning": "job start to app ready: ephemeral Neon branch, migrations, build, server",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        },
+        {
+          "id": "journey",
+          "meaning": "browser journey; outcome completed (green) or failed (red)",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        }
+      ]
+    },
     "market-signal": {
       "entityId": "<item id> (x-post:<snowflake id> for X posts)",
       "description": "INTERNAL ONLY. One external market signal seen by scripts/signals/signal_watch.py. X has no push trigger, so X posts come from a backstop poll (one Grok CLI call per watcher run, every 6 h). The published stage measures that poll's cost; this is the documented exception to event-driven.",
@@ -464,6 +492,13 @@
       "url": "https://jov.ie/api/cron/stage-timings",
       "auth": "CRON_SECRET",
       "owner": "apps/web"
+    },
+    "claim-dogfood-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "claim-dogfood-receipts/stage-events.ndjson",
+      "workflow": "claim-checkout-dogfood.yml",
+      "owner": "revenue path (scripts/claim-dogfood-report.mjs)"
     },
     "signal-watch-feed": {
       "kind": "events",
