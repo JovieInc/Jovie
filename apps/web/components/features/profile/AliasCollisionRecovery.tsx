@@ -5,7 +5,7 @@ import {
   buildLegacyAliasHoldCookie,
   isSafeRenamedAliasLocation,
   readLegacyAliasHash,
-} from '@/lib/routing/legacy-profile-alias-redirects';
+} from '@/lib/routing/legacy-profile-alias-recovery';
 
 interface AliasCollisionRecoveryProps {
   readonly username: string;
