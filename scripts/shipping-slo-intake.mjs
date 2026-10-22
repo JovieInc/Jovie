@@ -8,8 +8,8 @@ import {
   reopenLinearIssue,
 } from './lib/linear-issue-intake.mjs';
 
-const hash = (value) => createHash('sha256').update(value).digest('hex');
-const fail = (reason) => {
+const hash = value => createHash('sha256').update(value).digest('hex');
+const fail = reason => {
   throw Object.assign(new Error(reason), { reason });
 };
 
@@ -22,7 +22,7 @@ export function sloFingerprint(repo, metric) {
 
 export async function upsertSloFinding(
   { repo, metric, title, body, runUrl },
-  { apiKey = process.env.LINEAR_API_KEY, fetchImpl = fetch } = {},
+  { apiKey = process.env.LINEAR_API_KEY, fetchImpl = fetch } = {}
 ) {
   if (
     !/^[\w.-]+\/[\w.-]+$/.test(repo) ||
@@ -42,7 +42,7 @@ export async function upsertSloFinding(
       fail(
         result.reason === 'missing_linear_api_key' || result.rateLimited
           ? result.reason
-          : reason,
+          : reason
       );
     }
     return result.data.data;
@@ -56,10 +56,10 @@ export async function upsertSloFinding(
     }
   }`,
     {},
-    'owner_lookup_failed',
+    'owner_lookup_failed'
   );
   const triage = owner?.team?.states?.nodes?.find(
-    (state) => state.type === 'triage',
+    state => state.type === 'triage'
   );
   if (!owner?.id || !owner.team?.id || !triage?.id)
     fail('owner_routing_missing');
@@ -75,7 +75,7 @@ export async function upsertSloFinding(
     const cursors = new Set();
     for (let page = 0; page < 20; page++) {
       const connection = select(
-        await request(query, { ...variables, after }, reason),
+        await request(query, { ...variables, after }, reason)
       );
       if (
         !Array.isArray(connection?.nodes) ||
@@ -103,11 +103,11 @@ export async function upsertSloFinding(
     }
   }`,
     { teamId: owner.team.id, title, marker },
-    (data) => data.issues,
-    'issue_lookup_failed',
+    data => data.issues,
+    'issue_lookup_failed'
   );
   if (matches.length > 1) fail('ambiguous_canonical_issue');
-  const receipt = (issue) => ({
+  const receipt = issue => ({
     issue: issue.identifier,
     url: issue.url,
     metric,
@@ -131,7 +131,7 @@ export async function upsertSloFinding(
           priority: 2,
         },
       },
-      'create_result_unknown',
+      'create_result_unknown'
     );
     if (
       !issueCreate?.success ||
@@ -163,11 +163,11 @@ export async function upsertSloFinding(
     }
   }`,
     { id: issue.id },
-    (data) => data.issue?.comments,
-    'comment_lookup_failed',
+    data => data.issue?.comments,
+    'comment_lookup_failed'
   );
   if (
-    comments.some((comment) => String(comment.body ?? '').includes(observation))
+    comments.some(comment => String(comment.body ?? '').includes(observation))
   )
     return { action: 'replayed', ...receipt(issue) };
   // Reopen the same metric on recurrence while preserving human-owned content and assignment.
@@ -192,9 +192,14 @@ export async function upsertSloFinding(
 
 export async function deliverReport(
   report,
-  { repo, runUrl, apiKey, fetchImpl } = {},
+  { repo, runUrl, apiKey, fetchImpl } = /** @type {{
+    repo?: string,
+    runUrl?: string,
+    apiKey?: string,
+    fetchImpl?: typeof fetch,
+  }} */ ({})
 ) {
-  const findings = (report.evaluation?.regressions ?? []).map((row) => ({
+  const findings = (report.evaluation?.regressions ?? []).map(row => ({
     metric: row.key,
     title: `slo-regression: ${row.key} >20% over baseline`,
     body: [
@@ -206,14 +211,14 @@ export async function deliverReport(
       '',
       '## Top offenders',
       ...(report.offenders?.slowestPrs ?? []).map(
-        (pr) =>
-          `- #${pr.number} ${pr.title} — ${pr.lane} lane, ${Math.floor(pr.leadTimeSeconds / 360) / 10}h lead time`,
+        pr =>
+          `- #${pr.number} ${pr.title} — ${pr.lane} lane, ${Math.floor(pr.leadTimeSeconds / 360) / 10}h lead time`
       ),
       '',
       'Slowest CI gate runs in the window:',
       ...(report.offenders?.slowestCiRuns ?? []).map(
-        (run) =>
-          `- run ${run.id} \`${run.head_branch}\` — ${Math.floor(run.seconds / 6) / 10}m (${run.conclusion})`,
+        run =>
+          `- run ${run.id} \`${run.head_branch}\` — ${Math.floor(run.seconds / 6) / 10}m (${run.conclusion})`
       ),
       '',
       `Measurement run: ${runUrl}`,
@@ -244,7 +249,7 @@ export async function deliverReport(
         status: 'succeeded',
         ...(await upsertSloFinding(
           { ...finding, repo, runUrl },
-          { apiKey, fetchImpl },
+          { apiKey, fetchImpl }
         )),
       });
     } catch (error) {
@@ -270,13 +275,13 @@ if (
     Array.from({ length: (process.argv.length - 2) / 2 }, (_, i) => [
       process.argv[2 + i * 2],
       process.argv[3 + i * 2],
-    ]),
+    ])
   );
   let receipt;
   try {
     receipt = await deliverReport(
       JSON.parse(readFileSync(args['--report'], 'utf8')),
-      { repo: args['--repo'], runUrl: args['--run-url'] },
+      { repo: args['--repo'], runUrl: args['--run-url'] }
     );
   } catch {
     receipt = {

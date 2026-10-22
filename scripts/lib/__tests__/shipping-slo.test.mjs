@@ -2,10 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  deliverReport,
-  sloFingerprint,
-} from '../../shipping-slo-intake.mjs';
+import { deliverReport, sloFingerprint } from '../../shipping-slo-intake.mjs';
 import { buildReport, collectRaw } from '../../shipping-slo-report.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
@@ -456,11 +453,7 @@ describe('shipping SLO intake delivery', () => {
     sampled: { ciRuns: 1, mergedPrs: 0 },
     offenders: { slowestPrs: [], slowestCiRuns: [] },
   });
-  const json = body => ({
-    ok: true,
-    status: 200,
-    text: async () => JSON.stringify(body),
-  });
+  const json = body => new Response(JSON.stringify(body), { status: 200 });
   const fetchImpl = state => async (_url, init) => {
     const payload = JSON.parse(String(init.body));
     const query = payload.query;
@@ -533,7 +526,9 @@ describe('shipping SLO intake delivery', () => {
         body: payload.variables.body,
       });
       return json({
-        data: { commentCreate: { success: true, comment: { id: 'comment-1' } } },
+        data: {
+          commentCreate: { success: true, comment: { id: 'comment-1' } },
+        },
       });
     }
     if (query.includes('ReopenLinearIssue')) {
