@@ -46,6 +46,7 @@ import {
 } from './screen-certification.mjs';
 import { SCREEN_DECISION_SCHEMA } from './screen-decision-routing.mjs';
 import { emitScreenProof } from './screen-proof-emit.mjs';
+import { artifactContainsSecret } from '../../.github/scripts/guard-playwright-artifacts.mjs';
 import {
   MARKETING_EVIDENCE_SCHEMA,
   marketingArtifactName,
@@ -148,6 +149,27 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('does not write a legal-cookies screen id as a credential assignment', () => {
+    const finding =
+      'trusted producer artifact 12435475550 is not acceptable for web.legal-cookies (artifact run, workflow, or exact producer attempt is not trusted)';
+    const blocked =
+      'screen web.legal-cookies blocked (viewport desktop is missing a decision)';
+    const receipt = JSON.stringify(
+      { issues: [finding, blocked, 'missing exact-head proof for web.legal-cookies'] },
+      null,
+      2
+    );
+    assert.equal(artifactContainsSecret(receipt, {}), false);
+    assert.equal(
+      artifactContainsSecret(
+        'web.legal-cookies: trusted producer artifact 1 is not acceptable',
+        {}
+      ),
+      true
+    );
+    assert.equal(artifactContainsSecret('COOKIE=session-token-value', {}), true);
+  });
+
   it('decides product-reference membership without loading typescript', () => {
     assert.equal(screenNeedsProductReferences('web.presence'), true);
     assert.equal(screenNeedsProductReferences('web.library'), true);
@@ -942,6 +964,94 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         resolveProof().proof,
         'a downstream job in the same run may verify its completed producer job'
       );
+      records.jobs.jobs[0].conclusion = null;
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      writeFileSync(join(root, 'job-reads'), '0');
+      const originalGh = readFileSync(gh, 'utf8');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node
+const fs = require('node:fs');
+const p = process.argv.at(-1);
+const recordsPath = ${JSON.stringify(join(root, 'records.json'))};
+const hitsPath = ${JSON.stringify(join(root, 'job-reads'))};
+const r = JSON.parse(fs.readFileSync(recordsPath));
+if (p.endsWith('/zip')) {
+  process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));
+} else if (p.includes('/attempts/')) {
+  const n = Number(fs.readFileSync(hitsPath, 'utf8') || '0') + 1;
+  fs.writeFileSync(hitsPath, String(n));
+  const jobs = JSON.parse(JSON.stringify(r.jobs));
+  if (n === 1) jobs.jobs[0].conclusion = null;
+  else jobs.jobs[0].conclusion = 'success';
+  process.stdout.write(JSON.stringify(jobs));
+} else {
+  process.stdout.write(JSON.stringify(p.includes('/artifacts/') ? r.artifact : r.run));
+}
+`
+      );
+      chmodSync(gh, 0o755);
+      assert.ok(
+        resolveTrustedScreenProof({
+          artifactId: 42,
+          lagDelays: [0],
+          context: {
+            headSha: head,
+            screenId: 'web.homepage',
+            sourcePaths: home().sources,
+            viewports: home().viewports,
+            proofRoute: '/',
+          },
+        }).proof,
+        'same-run certification waits until the producer job row is success'
+      );
+      assert.equal(readFileSync(join(root, 'job-reads'), 'utf8'), '2');
+      records.jobs.jobs[0].conclusion = 'failure';
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      writeFileSync(join(root, 'job-reads'), '0');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node
+const fs = require('node:fs');
+const p = process.argv.at(-1);
+const recordsPath = ${JSON.stringify(join(root, 'records.json'))};
+const hitsPath = ${JSON.stringify(join(root, 'job-reads'))};
+const r = JSON.parse(fs.readFileSync(recordsPath));
+if (p.endsWith('/zip')) {
+  process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));
+} else if (p.includes('/attempts/')) {
+  const n = Number(fs.readFileSync(hitsPath, 'utf8') || '0') + 1;
+  fs.writeFileSync(hitsPath, String(n));
+  process.stdout.write(JSON.stringify(r.jobs));
+} else {
+  process.stdout.write(JSON.stringify(p.includes('/artifacts/') ? r.artifact : r.run));
+}
+`
+      );
+      chmodSync(gh, 0o755);
+      assert.equal(
+        resolveTrustedScreenProof({
+          artifactId: 42,
+          lagDelays: [0, 0, 0],
+          context: {
+            headSha: head,
+            screenId: 'web.homepage',
+            sourcePaths: home().sources,
+            viewports: home().viewports,
+            proofRoute: '/',
+          },
+        }).proof,
+        null
+      );
+      assert.equal(
+        readFileSync(join(root, 'job-reads'), 'utf8'),
+        '1',
+        'a failed producer job is not retried'
+      );
+      writeFileSync(gh, originalGh);
+      chmodSync(gh, 0o755);
+      records.jobs.jobs[0].conclusion = 'success';
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
       process.env.GITHUB_RUN_ATTEMPT = '4';
       assert.equal(resolveProof().proof, null);
       process.env.GITHUB_RUN_ATTEMPT = '3';
@@ -1505,11 +1615,11 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       const checkoutIssues = checkout.receipt.issues.join('\n');
       assert.match(
         checkoutIssues,
-        /web\.onboarding-checkout: trusted producer artifact 12050661649 is not acceptable/
+        /trusted producer artifact 12050661649 is not acceptable for web\.onboarding-checkout/
       );
       assert.equal(
         checkoutIssues.includes(
-          'web.onboarding-checkout: trusted producer artifact 12049160869'
+          'trusted producer artifact 12049160869 is not acceptable for web.onboarding-checkout'
         ),
         false,
         checkoutIssues
@@ -1521,7 +1631,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       );
       assert.match(
         checkoutIssues,
-        /web\.homepage: trusted producer artifact 12049160869 is not acceptable/
+        /trusted producer artifact 12049160869 is not acceptable for web\.homepage/
       );
       assert.deepEqual(
         [...checkout.receipt.changedScreens.map(screen => screen.id)].sort(),
