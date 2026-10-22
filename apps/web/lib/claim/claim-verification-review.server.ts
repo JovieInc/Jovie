@@ -1,10 +1,10 @@
 import 'server-only';
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, ne } from 'drizzle-orm';
 import { BASE_URL } from '@/constants/domains';
 import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import { invalidateProfileCache } from '@/lib/cache/profile';
-import { db } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { syncReleasesFromSpotify } from '@/lib/discography/spotify-import';
@@ -15,8 +15,9 @@ import {
   decideSummerCard,
   submitSummerCard,
 } from '@/lib/ovie/summer-cards.server';
+import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 import {
-  assertSpotifyProfileIdentityAvailable,
+  lockSpotifyProfileIdentity,
   SpotifyProfileIdentityConflictError,
 } from '@/lib/profile/spotify-profile-identity';
 import { refundFirstMonthAndCancel } from '@/lib/stripe/claim-rejection-refund';
@@ -89,6 +90,11 @@ export async function fileClaimVerificationCard(input: {
     amountUsd: null,
     preflightReceiptId: null,
     evidence,
+    // No automatic default (coordinator decision 2026-10-21): auto-reject
+    // would turn away a paying customer and auto-approve would defeat the
+    // guard. The card escalates on Home at 24h and 48h instead.
+    decideBy: null,
+    defaultDecision: 'none',
   });
   if (result.outcome === 'conflict') {
     throw new Error(
@@ -148,22 +154,91 @@ export type ClaimVerificationDecisionResult =
   | { readonly outcome: 'identity_conflict' }
   | { readonly outcome: 'no_subscription' };
 
+/**
+ * High-reach artists usually already have a prebuilt, unclaimed profile that
+ * holds their Spotify ID. A verified claim takes the identity over: the
+ * prebuilt row gives up the Spotify ID, is hidden, and records where the
+ * identity went (reversible by an operator). A claimed profile, a profile
+ * another account holds, or a reserved fixture identity is never released.
+ */
+async function releasePrebuiltSpotifyIdentity(
+  tx: DbOrTransaction,
+  input: { readonly spotifyArtistId: string; readonly toProfileId: string }
+): Promise<string[]> {
+  await lockSpotifyProfileIdentity(tx, input.spotifyArtistId);
+  const holders = await tx
+    .select({
+      id: creatorProfiles.id,
+      handle: creatorProfiles.usernameNormalized,
+      isClaimed: creatorProfiles.isClaimed,
+      userId: creatorProfiles.userId,
+      settings: creatorProfiles.settings,
+    })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.spotifyId, input.spotifyArtistId),
+        ne(creatorProfiles.id, input.toProfileId)
+      )
+    );
+
+  const releasable = holders.every(
+    holder =>
+      holder.isClaimed !== true &&
+      !holder.userId &&
+      !isReservedPublicProfileIdentity(holder.handle)
+  );
+  if (!releasable) throw new SpotifyProfileIdentityConflictError();
+
+  const at = new Date();
+  for (const holder of holders) {
+    const settings =
+      holder.settings && typeof holder.settings === 'object'
+        ? (holder.settings as Record<string, unknown>)
+        : {};
+    await tx
+      .update(creatorProfiles)
+      .set({
+        spotifyId: null,
+        spotifyUrl: null,
+        isPublic: false,
+        settings: {
+          ...settings,
+          supersededByVerifiedClaim: {
+            toProfileId: input.toProfileId,
+            spotifyArtistId: input.spotifyArtistId,
+            at: at.toISOString(),
+          },
+        },
+        updatedAt: at,
+      })
+      .where(eq(creatorProfiles.id, holder.id));
+    logger.info(
+      'Prebuilt profile released Spotify identity to verified claim',
+      {
+        fromProfileId: holder.id,
+        toProfileId: input.toProfileId,
+      }
+    );
+  }
+  return holders.map(holder => holder.handle);
+}
+
 async function linkVerifiedArtist(input: {
   readonly profileId: string;
   readonly settings: unknown;
   readonly next: ClaimVerificationRecord;
-}): Promise<void> {
+}): Promise<string[]> {
   const { next } = input;
   const base =
     input.settings && typeof input.settings === 'object'
       ? (input.settings as Record<string, unknown>)
       : {};
-  await withSystemIngestionSession(async tx => {
-    await assertSpotifyProfileIdentityAvailable(
-      tx,
-      next.spotifyArtistId,
-      input.profileId
-    );
+  return withSystemIngestionSession(async tx => {
+    const released = await releasePrebuiltSpotifyIdentity(tx, {
+      spotifyArtistId: next.spotifyArtistId,
+      toProfileId: input.profileId,
+    });
     await tx
       .update(creatorProfiles)
       .set({
@@ -181,6 +256,7 @@ async function linkVerifiedArtist(input: {
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.id, input.profileId));
+    return released;
   });
 }
 
@@ -253,9 +329,10 @@ export async function decideClaimVerification(input: {
   });
   if (!next) return { outcome: 'not_pending', record: current };
 
+  let releasedHandles: string[] = [];
   if (input.decision === 'approve') {
     try {
-      await linkVerifiedArtist({
+      releasedHandles = await linkVerifiedArtist({
         profileId: input.profileId,
         settings: row.settings,
         next,
@@ -305,7 +382,11 @@ export async function decideClaimVerification(input: {
   }
 
   if (input.decision === 'approve') {
-    await Promise.allSettled([invalidateProfileCache(row.handle)]);
+    await Promise.allSettled(
+      [row.handle, ...releasedHandles].map(handle =>
+        invalidateProfileCache(handle)
+      )
+    );
     await importAfterLink(input.profileId);
   }
 

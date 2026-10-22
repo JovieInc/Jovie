@@ -9,8 +9,11 @@ test.use({
 test('founder-led 90-second recording surface', async ({ page }) => {
   test.setTimeout(140_000);
 
+  // The recording surface keeps animating and polling, so networkidle never
+  // arrives (run 39629744941 rendered the page and still timed out). The
+  // surface assertion below is the readiness signal.
   await page.goto('/demo/founder-video', {
-    waitUntil: 'networkidle',
+    waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
 

@@ -952,7 +952,7 @@ export function JovieChat({
                   <ChatEmptyStateComposerRegion
                     stableDocked
                     fullBleed
-                    alignAbove='top'
+                    alignAbove={livingCanvas ? 'fill' : 'top'}
                     above={
                       typeof homeCanvas === 'function'
                         ? homeCanvas({

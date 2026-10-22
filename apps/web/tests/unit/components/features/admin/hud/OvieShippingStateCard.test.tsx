@@ -821,7 +821,9 @@ describe('OvieShippingStateCard', () => {
       expect(screen.queryByText('Token A secret')).toBeNull();
     });
     expect(
-      screen.getByText('Task cache unavailable. Retrying automatically.')
+      screen.getByText(
+        'Task cache unavailable. Active tasks are unknown. Retrying automatically.'
+      )
     ).toBeTruthy();
   });
 

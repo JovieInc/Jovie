@@ -38,7 +38,22 @@ export interface BudgetHeaderSpec {
   readonly resetUnit: ResetUnit;
 }
 
+/** Money a provider charges per call; enforced per credential per UTC day. */
+export interface PricingSpec {
+  /** Default price of one call when the request does not set priceUsd. */
+  readonly perCallUsd?: number;
+  /** Fail closed (BudgetExhaustedError) once a credential spends this today. */
+  readonly dailyCapUsd?: number;
+}
+
 export interface ProviderSpec {
+  /**
+   * `blocked`: registered only so the CI guard fails raw calls to its hosts;
+   * the client refuses to build one. Absent means active.
+   */
+  readonly status?: 'active' | 'blocked';
+  readonly blockedReason?: string;
+  readonly pricing?: PricingSpec;
   readonly hosts: readonly string[];
   readonly pathPrefix?: string;
   readonly defaultResource: string;
@@ -91,6 +106,26 @@ export const PROVIDERS = Object.keys(CONTRACT.providers);
 export function providerSpec(provider: string): ProviderSpec {
   const spec = CONTRACT.providers[provider];
   if (!spec) throw new Error(`unknown API provider: ${provider}`);
+  return spec;
+}
+
+export class BlockedProviderError extends Error {
+  readonly provider: string;
+  constructor(provider: string, reason: string) {
+    super(`${provider} is blocked: ${reason}`);
+    this.name = 'BlockedProviderError';
+    this.provider = provider;
+  }
+}
+
+/** The spec of a provider the client may call; blocked providers throw. */
+export function callableSpec(provider: string): ProviderSpec {
+  const spec = providerSpec(provider);
+  if (spec.status === 'blocked')
+    throw new BlockedProviderError(
+      provider,
+      spec.blockedReason ?? 'see packages/api-client/providers.json'
+    );
   return spec;
 }
 

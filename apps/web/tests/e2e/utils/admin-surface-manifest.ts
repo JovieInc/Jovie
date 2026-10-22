@@ -97,15 +97,6 @@ const renderSurfaces = [
     includeInFastHealth: true,
   },
   {
-    id: 'needs-you',
-    name: 'Admin Needs You',
-    path: APP_ROUTES.ADMIN_NEEDS_YOU,
-    rootTestId: 'founder-needs-you-page',
-    snapshotSlug: 'admin-needs-you',
-    utilityRoot: false,
-    includeInFastHealth: true,
-  },
-  {
     id: 'people-contacts',
     name: 'Admin People Customers',
     path: buildAdminPeopleHref('contacts'),
