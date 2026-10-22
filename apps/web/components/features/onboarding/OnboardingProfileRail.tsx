@@ -1,11 +1,14 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { ProfileIdentityHeader } from '@/features/profile/ProfileIdentityHeader';
 import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
 import {
   type CanonicalArtistMetrics,
   getDisplaySpotifyFollowers,
 } from '@/lib/onboarding/canonical-metrics';
+import type { OnboardingProfileDraft } from '@/lib/onboarding/profile-draft';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
@@ -16,6 +19,7 @@ import {
 } from './OnboardingToolArtifacts';
 
 export interface OnboardingProfileArtist {
+  readonly tagline?: string | null;
   readonly id: string;
   readonly name: string;
   readonly url: string;
@@ -32,6 +36,7 @@ export interface OnboardingProfileArtist {
 }
 
 export interface OnboardingProfileBuilderState {
+  readonly profileDraft?: OnboardingProfileDraft | null;
   readonly artist: OnboardingProfileArtist | null;
   readonly artistConfirmed: boolean;
   readonly handle: string | null;
@@ -184,12 +189,14 @@ function buildPreviewArtist(
     // Preview-only — not a real owner. Manage / claim chrome must stay off.
     owner_user_id: 'onboarding-preview',
     handle: handle ?? 'your-handle',
-    spotify_id: artist.id,
+    spotify_id: spotifyUrl ? artist.id : '',
     name: artist.name,
     image_url: artist.imageUrl ?? undefined,
-    tagline: followerLabel
-      ? `${followerLabel} Spotify followers (source: enrichment)`
-      : (firstGenre ?? undefined),
+    tagline:
+      artist.tagline ??
+      (followerLabel
+        ? `${followerLabel} Spotify followers (source: enrichment)`
+        : (firstGenre ?? undefined)),
     theme: undefined,
     settings: undefined,
     spotify_url: spotifyUrl,
@@ -300,6 +307,20 @@ function DspMatchStrip({
 export function resolvePreviewArtist(
   state: OnboardingProfileBuilderState
 ): OnboardingProfileArtist | null {
+  const draft = state.profileDraft;
+  if (draft && draft.activeRole !== 'artist') {
+    const source = draft.selectedSource;
+    if (!source || !draft.activeRole) return null;
+    return {
+      id: `source-${source.url}`,
+      name:
+        source.status === 'available' && source.title
+          ? source.title
+          : new URL(source.url).hostname,
+      url: '',
+      tagline: draft.outcome,
+    };
+  }
   if (state.artist) return state.artist;
   if (!state.handle || state.socialLinks.length === 0) return null;
   return { id: `handle-${state.handle}`, name: state.handle, url: '' };
@@ -322,9 +343,22 @@ export function OnboardingProfileRail({
   const previewLinks = buildPreviewLinks({
     artist,
     dspMatches,
-    socialLinks: state.socialLinks,
+    socialLinks:
+      state.profileDraft?.activeRole !== 'artist' &&
+      state.profileDraft?.selectedSource
+        ? [state.profileDraft.selectedSource.url]
+        : state.socialLinks,
   });
   const profileHref = `/${previewArtist.handle}`;
+  const draft = state.profileDraft;
+  const source = draft?.selectedSource;
+  const sourceLabels = {
+    artist: 'View music',
+    author: 'View writing',
+    creator: 'View channel or work',
+    expert: 'View services or credentials',
+    founder: 'View company or product',
+  };
 
   return (
     <aside
@@ -339,6 +373,7 @@ export function OnboardingProfileRail({
       }
       data-visible='true'
       data-placement={placement}
+      data-onboarding-stage={state.profileDraft?.awaiting}
     >
       <div
         className={cn(
@@ -347,6 +382,36 @@ export function OnboardingProfileRail({
         )}
       >
         <ProfilePreviewBento
+          phoneContent={
+            draft?.activeRole && draft.activeRole !== 'artist' && source ? (
+              <div
+                className='h-full overflow-y-auto bg-surface-1 px-4 pb-6 pt-19'
+                data-testid='onboarding-source-preview'
+              >
+                <ProfileIdentityHeader
+                  name={previewArtist.name}
+                  handle={previewArtist.handle}
+                  imageUrl={null}
+                  profileHref={source.url}
+                  listenHref={source.url}
+                  hasListenDestination={false}
+                  headingAs='p'
+                />
+                <p className='my-4 line-clamp-4 text-app text-secondary-token'>
+                  {draft.outcome ?? 'Profile draft'}
+                </p>
+                <Button asChild variant='secondary'>
+                  <a
+                    href={source.url}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                  >
+                    {sourceLabels[draft.activeRole]}
+                  </a>
+                </Button>
+              </div>
+            ) : undefined
+          }
           artist={previewArtist}
           socialLinks={previewLinks}
           genres={previewArtist.genres}
@@ -374,7 +439,11 @@ export function OnboardingProfileRail({
               Preview
             </span>
           }
-          caption='Preview — not claimed yet'
+          caption={
+            state.profileDraft?.activeRole
+              ? `Draft · ${state.profileDraft.activeRole} · ${state.profileDraft.awaiting === 'review' ? 'Review' : 'In progress'}`
+              : 'Preview — not claimed yet'
+          }
           overlay={<DspMatchStrip matches={dspMatches} />}
         />
       </div>

@@ -1,10 +1,17 @@
 import { render, screen } from '@testing-library/react';
+import type { UIMessage } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
+import {
+  advanceOnboardingProfileDraft,
+  emptyOnboardingProfileDraft,
+  onboardingRoleSchema,
+} from '@/lib/onboarding/profile-draft';
 import {
   type OnboardingProfileBuilderState,
   OnboardingProfileRail,
   resolvePreviewArtist,
 } from './OnboardingProfileRail';
+import { deriveProfileBuilderState } from './onboardingChatHelpers';
 
 vi.mock('@/features/profile/templates/ProfileCompactSurface', () => ({
   ProfileCompactSurface: ({ dataTestId }: { dataTestId?: string }) => (
@@ -35,6 +42,72 @@ const CONFIRMED_STATE: OnboardingProfileBuilderState = {
 };
 
 describe('OnboardingProfileRail', () => {
+  it.each(
+    onboardingRoleSchema.options.flatMap(role =>
+      ['tool', 'metadata'].map(transport => ({ role, transport }))
+    )
+  )(
+    'restores the $role draft from server $transport output',
+    ({ role, transport }) => {
+      const profileDraft = advanceOnboardingProfileDraft(
+        emptyOnboardingProfileDraft(),
+        {
+          id: role,
+          text: `I am a ${role} https://work.example I want a useful profile`,
+        }
+      );
+      const output = { action: 'profile_draft_recorded', profileDraft };
+      const message: UIMessage = {
+        id: 'draft',
+        role: 'assistant',
+        parts:
+          transport === 'tool'
+            ? [
+                {
+                  type: 'dynamic-tool',
+                  toolName: 'recordInterviewSignal',
+                  toolCallId: 'draft',
+                  state: 'output-available',
+                  input: {},
+                  output,
+                },
+              ]
+            : [],
+        metadata: transport === 'metadata' ? output : undefined,
+      };
+      expect(
+        deriveProfileBuilderState({
+          messages: [message],
+          handleDraft: null,
+          selectedArtist: null,
+        }).profileDraft
+      ).toEqual(profileDraft);
+    }
+  );
+  it('shows the chosen non-music source and goal even with an earlier artist selection', () => {
+    const profileDraft = advanceOnboardingProfileDraft(
+      emptyOnboardingProfileDraft(),
+      {
+        id: 'founder',
+        text: 'I am a founder https://company.example I want buyer contact',
+      }
+    );
+    const state = { ...CONFIRMED_STATE, profileDraft };
+    expect(resolvePreviewArtist(state)).toMatchObject({
+      name: 'company.example',
+      url: '',
+      tagline: 'buyer contact',
+    });
+    render(<OnboardingProfileRail placement='inline' state={state} />);
+    expect(
+      screen.getByTestId('onboarding-profile-rail-inline')
+    ).toHaveAttribute('data-onboarding-stage', 'review');
+    expect(
+      screen.queryByTestId('onboarding-dsp-match-strip')
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Draft · founder · Review')).toBeInTheDocument();
+    expect(screen.queryByText('Test Artist')).not.toBeInTheDocument();
+  });
   it('renders nothing when there is no preview artist', () => {
     const { container } = render(
       <OnboardingProfileRail

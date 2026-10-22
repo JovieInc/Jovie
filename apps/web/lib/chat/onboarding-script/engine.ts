@@ -5,6 +5,7 @@ import {
   buildPostSelectionWritingBrief,
   type PostSelectionWritingBriefResult,
 } from '@/lib/chat/post-selection-writing-brief';
+import { ONBOARDING_OPENER_PRIMARY } from '@/lib/chat/prompts/onboarding';
 import {
   type AccessDecision,
   decideOnboardingAccess,
@@ -14,6 +15,11 @@ import {
   buildConfirmSpotifyArtistOutput,
   type OnboardingTurnState,
 } from '@/lib/chat/tools/onboarding-tool-impls';
+import {
+  availableOnboardingModules,
+  onboardingDraftQuestion,
+} from '@/lib/onboarding/profile-draft';
+import { validateUsername } from '@/lib/validation/username';
 import { loadScriptBank, pickFromBank } from './line-source';
 import { renderLine, type ScriptLine, type ScriptStepId } from './script';
 import {
@@ -307,6 +313,7 @@ function decideAccess(
       ? Math.min(state.turnCount, 2)
       : state.turnCount;
   return decideOnboardingAccess({
+    activeRole: state.profileDraft?.activeRole,
     accessControlled: state.accessControlled,
     spotifyArtistId: state.spotifyArtistId,
     publicProfileUrl: state.publicProfileUrl,
@@ -469,6 +476,92 @@ export async function decideFallbackTurn(
   }>
 ): Promise<FallbackTurn> {
   const { uiMessages, state } = input;
+  const draft = state.profileDraft;
+  if (
+    draft &&
+    (draft.activeRole !== 'artist' || (state.spotifyArtistId && !draft.outcome))
+  ) {
+    const reply = (
+      text: string,
+      toolEvents: readonly FallbackToolEvent[] = []
+    ): FallbackTurn => ({
+      line: {
+        key: `greet:adaptive-${draft.awaiting}-v1`,
+        stepId: 'greet',
+        variant: 'adaptive-v1',
+        text,
+      },
+      text:
+        state.turnCount <= 1 && !text.includes('if you sign up')
+          ? `I'll remember this chat if you sign up. ${text}`
+          : text,
+      toolEvents,
+    });
+    if (draft.awaiting === 'role' && state.turnCount <= 1)
+      return reply(ONBOARDING_OPENER_PRIMARY);
+    const source = draft.selectedSource;
+    const lastReply = [...uiMessages]
+      .reverse()
+      .find(message => message.role === 'assistant');
+    const priorText = lastReply ? messageText(lastReply) : '';
+    const observation =
+      source?.status === 'available' && source.title
+        ? priorText.includes(source.title)
+          ? ''
+          : `The page is titled “${source.title}”. `
+        : source?.status === 'unavailable' &&
+            !priorText.includes('could not read')
+          ? 'I could not read that page; its details are still unknown. '
+          : '';
+    if (draft.awaiting !== 'review') {
+      return reply(
+        `${draft.awaiting === 'outcome' ? observation : ''}${onboardingDraftQuestion(draft)}`
+      );
+    }
+    if (!availableOnboardingModules(draft).includes('public-profile'))
+      return reply(
+        'Profile setup is unavailable right now. What part of this draft would you like to refine?'
+      );
+    if (!draft.selectedSource)
+      return reply(
+        'The draft can stay here without an imported source. What public link should it include when you have one?'
+      );
+    const existingHandle = findLatestToolOutput(uiMessages, 'check_handle');
+    if (!existingHandle) {
+      const latest = lastUserMessage(uiMessages);
+      const text = latest
+        ? messageText(latest).replace(/https?:\/\/\S+/gi, '')
+        : '';
+      const handle = /(?:^|\s)@([a-z0-9_-]{1,30})\b/i
+        .exec(text)?.[1]
+        ?.toLowerCase();
+      if (!handle || !validateUsername(handle).isValid)
+        return reply(
+          `${observation}What handle would you like for this draft?`
+        );
+      return reply(`Check @${handle} below.`, [
+        {
+          toolName: 'checkHandle',
+          input: { handle },
+          output: {
+            action: 'check_handle',
+            handle,
+            summary: `Checking @${handle}.`,
+          },
+        },
+      ]);
+    }
+    if (!hasHandleConfirmed(uiMessages))
+      return reply('Confirm your chosen handle below to continue.');
+    // Current access policy remains authoritative. A role, source or draft
+    // never grants paid access or promises a domain-specific integration.
+    const decision = decideAccess(state, null);
+    if (decision.kind === 'needs_more_info')
+      return reply('What are you using for this work today?');
+    return reply('Continue below to request access and keep this draft.', [
+      proposeNextStepEvent(decision),
+    ]);
+  }
   const sessionId = state.sessionId;
   // Seeds merged with nightly-promoted lines (DB failure degrades to seeds).
   const bank = await loadScriptBank();

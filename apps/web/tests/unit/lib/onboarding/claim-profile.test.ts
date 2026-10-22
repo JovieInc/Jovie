@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  advanceOnboardingProfileDraft,
+  emptyOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
 
 const mockRevenueFailure = vi.hoisted(() => vi.fn());
 const claimVerification = vi.hoisted(() => ({
@@ -765,6 +769,45 @@ describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-72
     mockReserveOnboardingHandle.mockResolvedValue('coolartist1');
     mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
   });
+
+  it.each(['artist', 'author', 'creator', 'expert', 'founder'] as const)(
+    'reserves a %s draft without an invented artist classification',
+    async role => {
+      const profileDraft = advanceOnboardingProfileDraft(
+        emptyOnboardingProfileDraft(),
+        { id: 'role', text: `I am a ${role}. I want a useful profile` }
+      );
+      mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+        artist: null,
+        handle: 'mywork',
+        socialLinks: [],
+        interviewSignals: [],
+        profileDraft,
+      });
+      setupOwnedConversationAndMessages();
+      setupExistingProfileSelect(null);
+      const [insertValues] = queueProfileInsert({ id: 'profile_reserved' });
+      queueReservedPostPersistWrites();
+      await materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+        visibility: 'reserved',
+        waitlistEntryId: 'entry_1',
+      });
+      expect(insertValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creatorType: role === 'artist' ? 'artist' : 'creator',
+          isPublic: false,
+          isClaimed: false,
+          settings: expect.objectContaining({
+            onboarding: expect.objectContaining({ profileDraft }),
+          }),
+        })
+      );
+    }
+  );
 
   it('creates a hidden, unclaimed profile that holds the handle for the waitlist entry', async () => {
     setupOwnedConversationAndMessages();

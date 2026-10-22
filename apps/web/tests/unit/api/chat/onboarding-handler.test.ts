@@ -27,6 +27,24 @@ const hoisted = vi.hoisted(() => ({
   dbOnConflictDoUpdateMock: vi.fn(),
 }));
 
+function expectOnlyDraftPersisted() {
+  expect(hoisted.dbOnConflictDoUpdateMock).toHaveBeenCalledTimes(1);
+  expect(hoisted.dbOnConflictDoUpdateMock.mock.calls[0]?.[0].set).toMatchObject(
+    {
+      content: '',
+      scriptLineKey: null,
+      toolCalls: [
+        {
+          output: {
+            action: 'profile_draft_recorded',
+            publicEvidenceOnly: true,
+          },
+        },
+      ],
+    }
+  );
+}
+
 vi.mock('server-only', () => ({}));
 
 vi.mock('@/lib/profile/spotify-profile-identity', () => ({
@@ -793,7 +811,10 @@ describe('tryHandleAnonymousOnboardingChat', () => {
 
     expect(result?.status).toBe(200);
     expect(result?.headers.get('x-onboarding-fallback')).toMatch(
-      /^get_artist:/
+      /^greet:adaptive-role-/
+    );
+    expect(await result?.text()).not.toMatch(
+      /open_artist_picker|I'll remember this chat/
     );
   });
 
@@ -821,7 +842,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
         set: expect.objectContaining({
           assistantSource: 'script',
           content: expect.any(String),
-          scriptLineKey: expect.stringMatching(/^greet:v\d+$/),
+          scriptLineKey: expect.stringMatching(/^greet:/),
         }),
       })
     );
@@ -906,7 +927,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     await finishPromise;
 
     expect(result?.status).toBe(200);
-    expect(hoisted.dbOnConflictDoUpdateMock).not.toHaveBeenCalled();
+    expectOnlyDraftPersisted();
   });
 
   it('uses safe unavailable copy when insufficient funds arrive mid-stream', async () => {
@@ -996,7 +1017,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     await finishPromise;
 
     expect(result?.status).toBe(200);
-    expect(hoisted.dbOnConflictDoUpdateMock).not.toHaveBeenCalled();
+    expectOnlyDraftPersisted();
   });
 
   it('ignores the injection header on production deploys even with the env flag', async () => {
@@ -1667,7 +1688,7 @@ describe('tryHandleAnonymousOnboardingChat', () => {
         errorCode: 'SPOTIFY_IDENTITY_LOOKUP_FAILED',
       });
       expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
-      expect(hoisted.dbOnConflictDoUpdateMock).not.toHaveBeenCalled();
+      expectOnlyDraftPersisted();
     });
 
     it('does not escape conflict recovery when its persistence fails', async () => {
