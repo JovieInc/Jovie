@@ -1,0 +1,200 @@
+# Temporary exact-SHA proof for the JOV-8338 alias gate. Deleted before merge.
+# Vercel's build container OOMs on `pnpm run build`. This uses the same
+# GitHub-runner prebuilt path as Production Controller, aimed at a preview
+# deployment of this SHA. It must not land: preview-env-contract rejects an
+# unregistered preview creator.
+name: Alias budget proof
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [cursor/legacy-alias-edge-redirect-42b8]
+    paths: [.github/workflows/alias-budget-proof.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    name: Exact alias budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Pull env (preview)
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          scope_args=()
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then
+            scope_args=(--scope "$VERCEL_ORG_ID")
+          fi
+          for i in 1 2 3; do
+            if ./node_modules/.bin/vercel pull --yes --environment=preview "${scope_args[@]}"; then
+              break
+            fi
+            echo "Vercel pull attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ "$i" -eq 3 ]; then exit 1; fi
+          done
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Strip deprecated Turbo env overrides (preview)
+        run: |
+          set -euo pipefail
+          for env_file in .vercel/.env.preview.local .vercel/.env.local; do
+            if [ -f "$env_file" ]; then
+              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
+              mv "${env_file}.tmp" "$env_file"
+            fi
+          done
+
+      - name: Strip invalid Upstash env (preview)
+        run: |
+          set -euo pipefail
+          for env_file in .vercel/.env.preview.local .vercel/.env.local; do
+            if [ ! -f "$env_file" ]; then
+              continue
+            fi
+            url_line="$(grep -E '^UPSTASH_REDIS_REST_URL=' "$env_file" | head -n 1 || true)"
+            if [ -z "$url_line" ]; then
+              continue
+            fi
+            url_value="${url_line#UPSTASH_REDIS_REST_URL=}"
+            url_value="${url_value#\"}"
+            url_value="${url_value%\"}"
+            url_value="${url_value#\'}"
+            url_value="${url_value%\'}"
+            case "$url_value" in
+              https://*) ;;
+              *)
+                echo "[env] dropping non-https UPSTASH_REDIS_REST_* entries from $env_file"
+                grep -v -E '^UPSTASH_REDIS_REST_(URL|TOKEN)=' "$env_file" > "${env_file}.tmp" || true
+                mv "${env_file}.tmp" "$env_file"
+                ;;
+            esac
+          done
+
+      - name: Build (prebuilt)
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          scope_args=()
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then
+            scope_args=(--scope "$VERCEL_ORG_ID")
+          fi
+          echo "commit=${{ github.sha }}"
+          for i in 1 2 3; do
+            if env -u TURBO_REMOTE_ONLY \
+              VERCEL_GIT_COMMIT_SHA="${{ github.sha }}" \
+              NEXT_PUBLIC_BUILD_SHA="${{ github.sha }}" \
+              ./node_modules/.bin/vercel build "${scope_args[@]}"; then
+              break
+            fi
+            echo "Vercel build attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ "$i" -eq 3 ]; then exit 1; fi
+          done
+          node .github/scripts/materialize-vercel-static.mjs
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+          COREPACK_ENABLE_STRICT: 0
+          SKIP_SKILLS_CATALOG_SYNC: '1'
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy (prebuilt preview)
+        id: pr_deploy
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          export VERCEL_GIT_COMMIT_SHA="${{ github.sha }}"
+          export NEXT_PUBLIC_BUILD_SHA="${{ github.sha }}"
+          export GIT_BRANCH="${{ github.ref_name }}"
+          if [ -z "${DATABASE_URL:-}" ] && [ -n "${DATABASE_URL_MAIN:-}" ]; then
+            export DATABASE_URL="$DATABASE_URL_MAIN"
+          fi
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "::error::DATABASE_URL is unset; the alias pages cannot render."
+            exit 1
+          fi
+          bash .github/scripts/vercel-prebuilt-deploy.sh deployment_url \
+            --env VERCEL_GIT_COMMIT_SHA \
+            --env NEXT_PUBLIC_BUILD_SHA \
+            --env DATABASE_URL \
+            --env GIT_BRANCH \
+            --meta "githubCommitSha=${{ github.sha }}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ENABLE_SOURCE_FALLBACK: 'false'
+          VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
+
+      - name: Wait for preview readiness
+        timeout-minutes: 10
+        env:
+          DEPLOYMENT_URL: ${{ steps.pr_deploy.outputs.deployment_url }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
+            --wait \
+            --timeout 8m \
+            --scope "$VERCEL_ORG_ID" || true
+          deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
+            --format=json \
+            --scope "$VERCEL_ORG_ID")"
+          deployment_state="$(jq -r '(.readyState // .state // .status // "unknown") | ascii_upcase' \
+            <<<"$deployment_json")"
+          echo "Preview deployment state: $deployment_state"
+          echo "deployment_url=$DEPLOYMENT_URL"
+          if [ "$deployment_state" != "READY" ]; then
+            echo "::error::Preview is $deployment_state; refusing to measure it."
+            exit 1
+          fi
+
+      - uses: ./.github/actions/setup-playwright
+
+      - name: Prove canonical alias budgets
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          deployment_url="${{ steps.pr_deploy.outputs.deployment_url }}"
+          if [[ ! "$deployment_url" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]]; then
+            echo "::error::Preview deployment URL is missing or invalid."
+            exit 1
+          fi
+          echo "deployment_url=$deployment_url"
+          echo "commit=${{ github.sha }}"
+          echo "JOV-8338 exact alias budget command:"
+          echo "CI=true pnpm exec tsx scripts/performance-budgets-guard.ts --base-url \"\$deployment_url\" --runs 5 --route-id public-profile-listen --route-id public-profile-music --route-id public-profile-subscribe --route-id public-profile-tip --route-id public-profile-tour --route-id public-profile-releases"
+          cd apps/web
+          CI=true \
+            EXPECTED_COMMIT_SHA="${{ github.sha }}" \
+            EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url" \
+            EXPECTED_VERCEL_ENVIRONMENT=preview \
+            pnpm exec tsx scripts/performance-budgets-guard.ts \
+              --base-url "$deployment_url" \
+              --runs 5 \
+              --route-id public-profile-listen \
+              --route-id public-profile-music \
+              --route-id public-profile-subscribe \
+              --route-id public-profile-tip \
+              --route-id public-profile-tour \
+              --route-id public-profile-releases
+        env:
+          PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
