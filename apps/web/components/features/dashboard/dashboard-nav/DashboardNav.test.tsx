@@ -110,7 +110,7 @@ describe('DashboardNav route warming', () => {
     ).toBeInTheDocument();
   });
 
-  it('fully prefetches every canonical dynamic customer route', () => {
+  it('does not full-prefetch customer routes on mount', () => {
     renderDashboardNav({
       renderFn: render,
       appFlags: { PROFILES_WORKSPACE: true },
@@ -119,13 +119,13 @@ describe('DashboardNav route warming', () => {
     for (const label of ['New Chat', 'Identity', 'Work', 'Audience']) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
         'data-prefetch',
-        'true'
+        'false'
       );
     }
     const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
     expect(homeLinks).toHaveLength(2);
     for (const link of homeLinks) {
-      expect(link).toHaveAttribute('data-prefetch', 'true');
+      expect(link).toHaveAttribute('data-prefetch', 'false');
     }
     for (const label of ['Library', 'Links', 'Contacts', 'Calendar', 'Tasks']) {
       expect(
