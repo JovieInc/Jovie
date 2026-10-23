@@ -3,6 +3,7 @@ import { ArtistNotificationsLanding } from '@/components/marketing/artist-notifi
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 
 export const revalidate = false;
 
@@ -39,8 +40,8 @@ export const metadata: Metadata = {
     title: ARTIST_NOTIFICATIONS_OG_TITLE,
     description: ARTIST_NOTIFICATIONS_COPY.seo.description,
     images: [ARTIST_NOTIFICATIONS_OG_IMAGE],
-    creator: '@meetjovie',
-    site: '@meetjovie',
+    creator: COMPANY_IDENTITY.xHandle,
+    site: COMPANY_IDENTITY.xHandle,
   },
   // No robots override: the capability is GA and publicly proof-authorized
   // (data/product-truth/registry.ts), so the root layout's index/follow

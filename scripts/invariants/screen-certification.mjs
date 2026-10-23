@@ -236,7 +236,7 @@ web.blog|web|blog|apps/web/app/(marketing)/blog/|desktop,mobile
 web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile
 web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
 web.marketing-card|web|marketing-card|apps/web/app/(marketing)/card/page.tsx|desktop,mobile
-web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx|desktop,mobile
+web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx,apps/web/app/(marketing)/compare/[slug]/page.tsx|desktop,mobile
 web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/page.tsx|desktop,mobile
 web.investor-portal|web|investor-portal|apps/web/app/investor-portal/|desktop,mobile
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
@@ -754,7 +754,10 @@ export function resolveTrustedProofForScreen(request) {
       proof: null,
       screen,
       findings: [
-        `${screen.id}: trusted producer artifact ${String(artifactId)} is not acceptable: ${(resolved.findings || []).join('; ')}`,
+        // Keep the screen id off the left of a colon. `web.legal-cookies: trusted`
+        // is credential-text to the Playwright artifact guard (COOKIES assignment)
+        // even though it is a screen id, and that blocked the receipt upload.
+        `trusted producer artifact ${String(artifactId)} is not acceptable for ${screen.id} (${(resolved.findings || []).join('; ')})`,
       ],
     };
   }
@@ -1221,7 +1224,7 @@ export function evaluateChangedScreens({
     );
     const commissioning = findings.length - blocking.length;
     if (blocking.length > 0)
-      issues.push(`${screen.id}: ${blocking.join('; ')}`);
+      issues.push(`screen ${screen.id} blocked (${blocking.join('; ')})`);
     changedScreens.push({
       id: screen.id,
       verdict: blocking.length === 0 ? 'pass' : 'block',

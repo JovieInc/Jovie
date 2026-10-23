@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactNode } from 'react';
+import {
+  type ComponentPropsWithoutRef,
+  forwardRef,
+  type ReactNode,
+} from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   formatPublicProfileDisplayHref,
@@ -19,6 +23,16 @@ import {
 } from '@/components/organisms/sidebar-identity-group/fixtures/split-layout';
 
 const pathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
+
+// Expose the Next Link contract without starting a router in jsdom.
+vi.mock('next/link', () => ({
+  default: forwardRef<
+    HTMLAnchorElement,
+    ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+  >(function TestLink({ prefetch, ...props }, ref) {
+    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
+  }),
+}));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => pathnameMock(),
@@ -155,6 +169,7 @@ describe('SidebarIdentityGroup', () => {
       name: PROFILE_LINK_NAME,
     });
     expect(profile).toHaveAttribute('href', PROFILE_HREF);
+    expect(profile).toHaveAttribute('data-prefetch', 'false');
     expect(group).toContainElement(identity);
     expect(group).toContainElement(profile);
     expect(getNestedInteractive(group)).toBeNull();

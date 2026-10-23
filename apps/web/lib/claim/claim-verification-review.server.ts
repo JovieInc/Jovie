@@ -10,7 +10,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { syncReleasesFromSpotify } from '@/lib/discography/spotify-import';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
-import { summerCardId } from '@/lib/ovie/summer-cards';
+import { summerCardId } from '@/lib/ovie/summer-card-digest';
 import {
   decideSummerCard,
   submitSummerCard,

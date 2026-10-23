@@ -8,6 +8,7 @@ import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
 import { getIndexedSolutionsPages } from '@/content/pages/solutions';
 import { pageRecordPath } from '@/data/marketing/factory/pageRecord';
+import { getRouteCapability } from '@/data/marketing/featureAvailability';
 import {
   getBlogPosts,
   isBlogPostIndexable,
@@ -30,7 +31,9 @@ import { filterPublicDiscoveryIdentities } from '@/lib/profile/public-profile-in
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
 import {
+  commercialHubContentRevision,
   getExactPublishedMarketingPaths,
+  getPublishedCommercialHubPaths,
   isEditorialSitemapPath,
   latestContentRevision,
   SITEMAP_PUBLISHED_LEGAL_PATHS,
@@ -246,10 +249,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     )
   );
 
+  const commercialHubs = new Set(getPublishedCommercialHubPaths());
   const marketingPages: MetadataRoute.Sitemap = [];
   for (const path of getExactPublishedMarketingPaths()) {
     if (isEditorialSitemapPath(path)) continue;
-    marketingPages.push(sitemapEntry(path));
+    marketingPages.push(
+      sitemapEntry(
+        path,
+        commercialHubs.has(path)
+          ? commercialHubContentRevision(
+              path,
+              getRouteCapability(path)?.contentRevision
+            )
+          : undefined
+      )
+    );
   }
 
   for (const path of SITEMAP_PUBLISHED_LEGAL_PATHS) {

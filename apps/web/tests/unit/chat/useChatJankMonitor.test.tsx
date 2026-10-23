@@ -224,6 +224,42 @@ describe('useChatJankMonitor', () => {
     createSpy.mockRestore();
   });
 
+  it('emits an unexpected scroll jump from the stick store', () => {
+    const emit = vi.fn<(e: JankEventName, p: JankPayload) => void>();
+    let stuck = true;
+    const listeners = new Set<() => void>();
+    const scrollRef = makeRef();
+
+    renderHook(() =>
+      useChatJankMonitor({
+        conversationId: 'c1',
+        messages: [makeMessage('a', 'assistant', 'hi')],
+        status: 'ready',
+        isStuckToBottom: true,
+        subscribeStuckToBottom: listener => {
+          listeners.add(listener);
+          return () => {
+            listeners.delete(listener);
+          };
+        },
+        getStuckToBottom: () => stuck,
+        scrollContainerRef: scrollRef,
+        enabled: true,
+        emit,
+      })
+    );
+
+    act(() => {
+      vi.setSystemTime(1_000);
+      stuck = false;
+      for (const listener of listeners) listener();
+    });
+
+    expect(emit.mock.calls.map(call => call[0])).toContain(
+      JANK_EVENT_NAMES.UNEXPECTED_SCROLL_JUMP
+    );
+  });
+
   it('cleans up the stall interval on unmount', () => {
     const emit = vi.fn();
     const scrollRef = makeRef();

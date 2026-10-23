@@ -80,6 +80,33 @@ export async function addLinearIssueComment({
   return { ok: true, id: result.data.commentCreate.comment?.id ?? null };
 }
 
+/** Reopen a measurement finding in its owning team's triage state. */
+export async function reopenLinearIssue({
+  issueId,
+  stateId,
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  if (!issueId || !stateId)
+    return { ok: false, reason: 'missing_reopen_routing' };
+  const result = await linearGraphql(
+    {
+      query: `mutation ReopenLinearIssue($id: String!, $input: IssueUpdateInput!) {
+      issueUpdate(id: $id, input: $input) { success }
+    }`,
+      variables: { id: issueId, input: { stateId } },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_reopen'
+  );
+  if (!result.ok) return result;
+  return result.data?.issueUpdate?.success
+    ? { ok: true }
+    : { ok: false, reason: 'linear_reopen_unsuccessful' };
+}
+
 /** List comments on a Linear issue (body + createdAt, oldest first). */
 export async function listLinearIssueComments({
   issueId,

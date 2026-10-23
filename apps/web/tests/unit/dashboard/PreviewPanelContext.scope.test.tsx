@@ -1,13 +1,15 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { useEffect } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   PreviewPanelProvider,
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { ProfilePreviewOpener } from '@/app/app/(shell)/dashboard/profile/ProfilePreviewOpener';
 import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
@@ -66,6 +68,10 @@ function ReversibleRightRailProbe() {
 }
 
 describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('starts closed', () => {
     renderShell('chat');
     expect(screen.getByTestId('rail-open').textContent).toBe('false');
@@ -82,6 +88,73 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
     );
     expect(screen.getByTestId('rail-open').textContent).toBe('true');
     window.history.pushState({}, '', '/');
+  });
+
+  it('reopens a default-open profile surface after a scope round trip', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('768'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+
+    const { rerender } = render(
+      <PreviewPanelProvider defaultOpen scope='artist-profile-settings'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+
+    rerender(
+      <PreviewPanelProvider scope='app-shell'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('false');
+    });
+
+    rerender(
+      <PreviewPanelProvider defaultOpen scope='artist-profile-settings'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+  });
+
+  it('keeps the profile rail open when the page opener remounts on the way back', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('768') || query.includes('1024'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+
+    const roundTrip = (scope: string, defaultOpen = false) => (
+      <PreviewPanelProvider defaultOpen={defaultOpen} scope={scope}>
+        <RailProbe />
+        {scope === 'artist-profile-settings' ? <ProfilePreviewOpener /> : null}
+      </PreviewPanelProvider>
+    );
+
+    const { rerender } = render(roundTrip('artist-profile-settings', true));
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+
+    rerender(roundTrip('app-shell'));
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('false');
+    });
+
+    rerender(roundTrip('artist-profile-settings', true));
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
   });
 
   it('closes the rail when the surface scope changes to chat', () => {
@@ -156,6 +229,69 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
       </PreviewPanelProvider>
     );
     expect(screen.getByTestId('rail-data').textContent).toBe('none');
+  });
+
+  it('keeps the reopened default-open rail hydrated after a scope round trip', async () => {
+    function MountOnlyHydrator() {
+      const { setPreviewData } = usePreviewPanelData();
+      useEffect(() => {
+        setPreviewData(current =>
+          current
+            ? current
+            : {
+                username: 'alex',
+                displayName: 'Alex',
+                avatarUrl: null,
+                bio: null,
+                genres: null,
+                location: null,
+                hometown: null,
+                activeSinceYear: null,
+                links: [],
+                profilePath: '/alex',
+                dspConnections: {
+                  spotify: { connected: false, artistName: null },
+                  appleMusic: { connected: false, artistName: null },
+                },
+              }
+        );
+        // Mount-only on purpose: the real page hydrator re-runs on its own
+        // dependencies and never re-runs after a provider-side wipe.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return null;
+    }
+
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('768'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+
+    const { rerender } = render(
+      <PreviewPanelProvider scope='app-shell'>
+        <MountOnlyHydrator />
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-data').textContent).toBe('alex');
+    });
+
+    rerender(
+      <PreviewPanelProvider defaultOpen scope='artist-profile-settings'>
+        <MountOnlyHydrator />
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+    // The scope reset reopens the rail; the wipe must not swallow the data
+    // the page hydrator already mounted, or the rail sticks on its empty
+    // skeleton (Account → Back round trip).
+    expect(screen.getByTestId('rail-data').textContent).toBe('alex');
   });
 
   it('certifies repeated cycles on the composed right rail and drawer', async () => {

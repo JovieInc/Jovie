@@ -1,5 +1,9 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import {
+  disabledRuleIds,
+  wcag22AaAxeOptions,
+} from '@/lib/a11y-gates/wcag-standard.cjs';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/auth';
 import { assertFastPageLoad } from './utils/performance-assertions';
 import {
@@ -117,20 +121,10 @@ function collectSameOriginApiFailures(
   });
 }
 
-/**
- * Quarantined axe rules (JOV-8781): real release-list violations surfaced by
- * axe-core 4.14. Every other WCAG 2.x A/AA rule still gates this spec. Delete
- * this list when JOV-8781 ships.
- */
-const JOV_8781_QUARANTINED_AXE_RULES = [
-  'label-content-name-mismatch',
-  'nested-interactive',
-];
-
 async function assertAccessible(page: import('@playwright/test').Page) {
+  // Quarantine lives in a11y-allowlist.json (releases-dashboard, JOV-8781).
   const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    .disableRules(JOV_8781_QUARANTINED_AXE_RULES)
+    .options(wcag22AaAxeOptions(disabledRuleIds('releases-dashboard')))
     .analyze();
 
   expect(results.violations).toEqual([]);

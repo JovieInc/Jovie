@@ -291,6 +291,9 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
     onChangeStatus,
     isSmartLinkLocked,
     getSmartLinkLockReason,
+    analyticsOverride,
+    tracksOverride,
+    showCredits,
   }: {
     release: ReleaseViewModel | null;
     onClose?: () => void;
@@ -302,6 +305,9 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
     ) => void;
     isSmartLinkLocked?: (id: string) => boolean;
     getSmartLinkLockReason?: (id: string) => 'scheduled' | 'cap' | null;
+    analyticsOverride?: unknown;
+    tracksOverride?: readonly unknown[];
+    showCredits?: boolean;
   }) =>
     release ? (
       <aside
@@ -312,6 +318,9 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
           isSmartLinkLocked && getSmartLinkLockReason
         )}
         data-is-smartlink-locked={isSmartLinkLocked?.(release.id) ?? false}
+        data-analytics={analyticsOverride ? 'override' : 'live'}
+        data-has-tracks={tracksOverride ? 'true' : 'false'}
+        data-show-credits={showCredits ? 'true' : 'false'}
       >
         <div>{release.title}</div>
         <input aria-label='Release title draft' defaultValue={release.title} />
@@ -1108,5 +1117,47 @@ describe('ShellReleasesView', () => {
 
       expect(rows[0]).toHaveAttribute('aria-selected', 'false');
     });
+  });
+
+  it('uses demo adapter fixtures and skips live sync and create', () => {
+    const onSync = vi.fn();
+    const onCreateRelease = vi.fn();
+    renderShell([fakeRelease({ id: 'r1', title: 'Demo Single' })], {
+      spotifyConnected: true,
+      experienceAdapter: {
+        mode: 'demo',
+        entitlements: {
+          isPro: true,
+          canCreateManualReleases: true,
+          canEditSmartLinks: true,
+          canAccessFutureReleases: true,
+          smartLinksLimit: null,
+        },
+        onSync,
+        onCreateRelease,
+        sidebarDataByReleaseId: {
+          r1: {
+            analytics: {
+              totalClicks: 12,
+              last7DaysClicks: 3,
+              lastClickAt: null,
+              providerClicks: [],
+            },
+            tracks: [],
+          },
+        },
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sync' }));
+    expect(onSync).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'New release' }));
+    expect(onCreateRelease).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('option', { name: /Demo Single/ }));
+    const sidebar = screen.getByTestId('release-sidebar');
+    expect(sidebar).toHaveAttribute('data-analytics', 'override');
+    expect(sidebar).toHaveAttribute('data-has-tracks', 'true');
+    expect(sidebar).toHaveAttribute('data-show-credits', 'false');
   });
 });

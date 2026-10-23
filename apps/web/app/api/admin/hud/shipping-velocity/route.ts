@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import { serverFetch } from '@/lib/http/server-fetch';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { medianNumber } from '@/lib/hud/number-series';
 import type { HudObservationState } from '@/lib/hud/observation';
 import { observationFromShippingVelocityBuckets } from '@/lib/hud/shipping-velocity-observation';
@@ -123,6 +123,9 @@ function rateLimitRetryMessage(error: GitHubRateLimitError): string {
 }
 
 function expectedRefreshErrorMessage(error: unknown): string | null {
+  if (error instanceof ServerFetchTimeoutError) {
+    return 'Shipping velocity refresh timed out; try again shortly.';
+  }
   if (error instanceof GitHubRateLimitError)
     return rateLimitRetryMessage(error);
   if (error instanceof GitHubScanBudgetError) {

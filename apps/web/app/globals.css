@@ -151,7 +151,10 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   position: absolute;
   top: 0;
   left: 0;
-  -webkit-app-region: drag;
+  /* Drag lives on sibling strips, not this ancestor. Chromium reports
+     focus as inactive at 200% zoom when a no-drag control sits inside a
+     drag region. */
+  -webkit-app-region: no-drag;
   z-index: 60;
   display: flex;
   align-items: center;
@@ -2097,6 +2100,12 @@ body {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
     --tw-ring-color: var(--color-focus-ring);
     --tw-ring-offset-color: var(--color-bg-page);
+  }
+
+  /* One ring on the field frame. An inner input ring nests a second rectangle
+     inside the pill, and outline utilities lose to the global input reset. */
+  .focus-field-inset:has(input:focus-visible) {
+    box-shadow: inset 0 0 0 2px var(--color-focus);
   }
 }
 

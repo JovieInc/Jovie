@@ -773,6 +773,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing:
       'internal ingestion routing kill switch; reserved for future isolated provider rollout',
   },
+  STRIPE_TEST_PRICE_CONFIGURED: {
+    nonMarketing:
+      'CI Stripe test-price secret readiness; default off names the missing GitHub secret and still fails closed',
+  },
   INVESTOR_PORTAL_YC_DECK: {
     nonMarketing:
       'investor brief section order; default off until founder design approval',

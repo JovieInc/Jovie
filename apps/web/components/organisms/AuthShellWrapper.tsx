@@ -115,10 +115,14 @@ function AuthShellWrapperInner({
   // Preview panel data hydration is available on dashboard routes and artist-profile settings
   const previewEnabled =
     config.section === 'dashboard' || config.isProfileSettings;
+  // Profile settings opens the companion on desktop the same way the
+  // dashboard does. A scope round trip (Account, then browser Back) resets
+  // the rail to closed; defaultOpen is what opens it again. The page-level
+  // opener runs first and loses to that reset. JOV-7150 still keeps chat closed.
   const shouldDefaultOpenPreviewPanel =
-    config.section === 'dashboard' &&
     !config.isChatRoute &&
-    previewPanelDefaultOpen;
+    Boolean(previewPanelDefaultOpen) &&
+    (config.section === 'dashboard' || config.isProfileSettings);
   // Chat gets its own rail scope: entering chat always starts with the
   // profile rail closed — it only opens from an explicit action
   // (rail toggle, `]`, or the ?panel=profile deep link). JOV-7150.

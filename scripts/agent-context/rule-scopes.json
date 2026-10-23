@@ -12,7 +12,7 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "9d9f1b83a05934600725671aebde9439c79e2e9f81ce9dc18304cdb5c8d99722"
+    "bodySha256": "d5f52bdb4af7fb39e6cf4eef8aaade5edbd285d900a3d13f9bf55f57f315d182"
   },
   {
     "file": ".claude/rules/db.md",
@@ -30,7 +30,7 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "b0c5be920c0f2f5b75be43e8325735d313b0167fd9148cdb49aa1af176ec59b1"
+    "bodySha256": "3dbed7e15801a9c4e7591606fb8402bf57d040e1b2afff3996ece2ccf18e9633"
   },
   {
     "file": ".claude/rules/event-driven.md",
@@ -177,6 +177,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "23a75b08079b5bd35a073dbae96ea95288b9737d3281183d423780590e6994a3"
+    "bodySha256": "37715f0474474518ed634c8b8c0d94c85c6e5cdf2ee194768eb15a8654da9a4d"
   }
 ]

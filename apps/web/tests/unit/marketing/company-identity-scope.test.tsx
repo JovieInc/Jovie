@@ -20,6 +20,7 @@ import {
   requiresSpotifyCatalogOrFollowers,
   SPECIALIST_API_IDENTITY_SURFACES,
 } from '@/lib/marketing/company-identity-policy';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
@@ -123,7 +124,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     const { metadata } = await import('../../../app/(marketing)/about/page');
     const expectedTitle = `About Jovie: ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`;
 
-    expect(metadata.title).toBe(expectedTitle);
+    expect(applyRootTitleTemplate(metadata.title)).toBe(expectedTitle);
     expect(String(metadata.description)).toContain(COMPANY_IDENTITY.definition);
     expect(isArtistOnlyCompanyDefinition(String(metadata.description))).toBe(
       false
@@ -142,7 +143,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     expect(schema.description).toBe(COMPANY_IDENTITY.definition);
     expect(schema.knowsAbout).toEqual([...COMPANY_IDENTITY.knowsAbout]);
     expect(schema.knowsAbout).toContain('Independent Creators');
-    expect(schema.knowsAbout).toContain('Music Marketing');
+    expect(schema.knowsAbout).toContain('Public Identity');
   });
 
   it('uses general root-layout and signup metadata defaults', async () => {
