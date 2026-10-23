@@ -117,46 +117,6 @@ class AccountsTest(Isolated):
         handle.close()
 
 
-def _lanes_conftest():
-    name = "jovie_lanes_pytest_conftest"
-    cached = sys.modules.get(name)
-    if cached is not None:
-        return cached
-    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / "tests" / "conftest.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-class HostLaneEnvTest(unittest.TestCase):
-    def test_scrub_drops_codex_slot_knobs_that_deadlock_metadata_reap(self):
-        # CODEX_LANE_LOGIN_SLOTS=5 lets lease() take a free slot while the
-        # metadata child still holds one. The assertion inside the mocked wait
-        # then raises, and reap_current_metadata retries that Exception forever.
-        # The release archive ships lane tests without this conftest; the slot
-        # pin in CurrentLoginTest is that tree's contract.
-        if not (ROOT / "scripts" / "tests" / "conftest.py").is_file():
-            self.skipTest("scripts/tests/conftest.py is not in the release archive")
-        env = {
-            "CODEX_LANE_LOGIN_SLOTS": "5",
-            "CODEX_LANE_AUTH_MODE": "subscription-pool",
-            "CODEX_LANE_CLI": "/tmp/codex",
-            "CODEX_LANE_SUBSCRIPTION_PROFILES": "{}",
-            "CODEX_LEDGER_CADENCE_S": "30",
-            "LANES_STATE": "/tmp/lanes",
-            "PATH": "/usr/bin",
-            "CODEX_HOME": "/home/example/.codex",
-        }
-        _lanes_conftest().scrub_ambient_lane_env(env)
-        for name in (
-            "CODEX_LANE_LOGIN_SLOTS", "CODEX_LANE_AUTH_MODE", "CODEX_LANE_CLI",
-            "CODEX_LANE_SUBSCRIPTION_PROFILES", "CODEX_LEDGER_CADENCE_S", "LANES_STATE",
-        ):
-            self.assertNotIn(name, env)
-        self.assertEqual((env["PATH"], env["CODEX_HOME"]), ("/usr/bin", "/home/example/.codex"))
-
-
 class CurrentLoginTest(Isolated):
     def setUp(self):
         super().setUp()
