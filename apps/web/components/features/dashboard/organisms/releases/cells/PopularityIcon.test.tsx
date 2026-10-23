@@ -1,10 +1,15 @@
+import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { PopularityIcon } from './PopularityIcon';
 
 describe('PopularityIcon', () => {
   it('lights one bar at low popularity on the muted token', () => {
-    render(<PopularityIcon popularity={20} />);
+    render(
+      <TooltipProvider>
+        <PopularityIcon popularity={20} />
+      </TooltipProvider>
+    );
 
     const control = screen.getByRole('button', {
       name: 'Popularity 20 out of 100',
@@ -19,7 +24,11 @@ describe('PopularityIcon', () => {
 
   it('lights every tier on the Ion accent token, never raw amber or emerald', () => {
     for (const popularity of [50, 90]) {
-      const { unmount } = render(<PopularityIcon popularity={popularity} />);
+      const { unmount } = render(
+        <TooltipProvider>
+          <PopularityIcon popularity={popularity} />
+        </TooltipProvider>
+      );
 
       const control = screen.getByRole('button', {
         name: `Popularity ${popularity} out of 100`,
