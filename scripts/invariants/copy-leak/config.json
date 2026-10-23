@@ -17,7 +17,7 @@
     { "path": "(?:^|/)[^/]*README\\.md$|^apps/web/lib/chat/knowledge/|^apps/web/lib/services/retouching/styles/", "reason": "Component engineering docs and private model knowledge/style guides, never directly rendered." },
     { "path": "^apps/web/app/(?:ui/|sandbox/page\\.tsx$)", "reason": "Both entrypoints call requireDevelopmentOnlyPage; production cannot render these galleries." }
   ],
-  "nonCopyAttributes": "^(?:.*[Cc]lass[Nn]ame|class|style|id|key|href|src|srcSet|role|rel|target|d|viewBox|xmlns|data-.+)$",
+  "nonCopyAttributes": "^(?:.*[Cc]lass[Nn]ame|class|style|id|key|href|src|srcSet|role|rel|target|d|viewBox|xmlns)$",
   "nonCopyBindings": "(?:CLASS|CLASSES|STYLES|TOKENS|ClassName|Styles)$",
   "patterns": [
     {
