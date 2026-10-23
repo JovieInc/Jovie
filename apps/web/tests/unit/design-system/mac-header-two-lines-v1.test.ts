@@ -60,6 +60,9 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // /product/release-scheduling keeps the full headline. Balance lives in
   // the page CSS class, so the heading does not use line-clamp.
   'apps/web/app/(marketing)/product/release-scheduling/ReleaseSchedulingLanding.tsx',
+  // /product/isrc is a new marketing h1. The shrink-only headline ratchet
+  // rejects a new line-clamp token, so the title stays complete.
+  'apps/web/app/(marketing)/product/isrc/IsrcLanding.tsx',
   // /card section titles wrap to three lines at 390px; the clamp cut
   // "An introduction. Not a list of usernames" mid-sentence.
   'apps/web/app/(marketing)/card/JovieCardLanding.tsx',

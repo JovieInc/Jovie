@@ -25,7 +25,7 @@ export function ReleaseSchedulingLanding() {
           <h1
             id='release-scheduling-title'
             data-wrap='editorial-title'
-            className='release-scheduling-title font-display text-2xl font-medium tracking-tight text-primary-token'
+            className='release-scheduling-title text-balance font-display text-2xl font-medium tracking-tight text-primary-token'
           >
             {headline}
           </h1>

@@ -718,6 +718,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/product/isrc/page.tsx",
+      "kind": "page",
+      "route": "/product/isrc",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/product/page.tsx",
       "kind": "page",
       "route": "/product",

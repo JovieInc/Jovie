@@ -268,6 +268,11 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     why: 'hero mounts the live release date and reveal date fields as the aha capture',
   },
   {
+    url: '/product/isrc',
+    input: { useCase: 'aha-capture', captureId: 'isrc-editor' },
+    why: 'hero mounts the live ISRC field as the aha capture',
+  },
+  {
     url: '/card',
     input: { useCase: 'informational' },
     why: 'planned Card announcement uses text until an approved Wallet capture exists',

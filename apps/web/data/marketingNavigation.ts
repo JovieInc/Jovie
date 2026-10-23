@@ -123,6 +123,7 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
         href: APP_ROUTES.PRODUCT_RELEASE_SCHEDULING,
         label: 'Release scheduling',
       },
+      { href: APP_ROUTES.PRODUCT_ISRC, label: 'ISRC' },
       { href: APP_ROUTES.CARD, label: 'Jovie Card' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },
     ],
