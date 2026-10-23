@@ -103,7 +103,7 @@ export function HomepageHeroCanvas({
               {subhead}
             </p>
             <div
-              className='homepage-artist-hero__claim w-full'
+              className='homepage-hero-canvas__conversion'
               data-testid='homepage-hero-claim'
             >
               <ProductClaimHandleForm
