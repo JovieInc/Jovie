@@ -35,6 +35,7 @@ export function HomepageArtistHero({
       supportNote={copy.supportNote}
       profile={copy.profile}
       sectionOwner={OWNER}
+      sectionVariant='split-claim-card'
     />
   );
 }

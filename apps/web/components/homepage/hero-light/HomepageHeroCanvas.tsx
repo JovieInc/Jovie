@@ -34,6 +34,7 @@ export function HomepageHeroCanvas({
   supportNote,
   profile,
   sectionOwner,
+  sectionVariant = 'split-claim-card',
 }: Readonly<{
   headingId: string;
   headline: HomepageCopy['hero']['headline'];
@@ -42,6 +43,12 @@ export function HomepageHeroCanvas({
   supportNote: HomepageCopy['hero']['supportNote'];
   profile: HomepageCopy['hero']['profile'];
   sectionOwner: string;
+  /**
+   * Registry identity for the section.hero occurrence this canvas renders.
+   * The occurrence owner (HomepageArtistProfile) wires the variant; the
+   * default keeps the shipped homepage look when it is omitted.
+   */
+  sectionVariant?: string;
 }>) {
   const rootRef = useRef<HTMLElement>(null);
 
@@ -59,7 +66,7 @@ export function HomepageHeroCanvas({
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}
       data-testid='marketing-section-hero'
       data-marketing-owner={sectionOwner}
-      data-marketing-variant='split-claim-card'
+      data-marketing-variant={sectionVariant}
       data-marketing-section='hero'
       data-accent='ion'
       data-hero-canvas=''
