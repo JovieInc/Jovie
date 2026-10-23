@@ -76,6 +76,8 @@ overrides:
   '@apidevtools/json-schema-ref-parser>js-yaml': ^5.2.2
   promptfoo>js-yaml: ^5.2.2
   '@peculiar/asn1-schema': 2.9.5
+  zod@4.1.11: 4.6.7
+  zod@4.3.6: 4.6.7
 
 patchedDependencies:
   '@better-auth/oauth-provider@1.7.6':
@@ -17024,12 +17026,6 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
-  zod@4.1.11:
-    resolution: {integrity: sha512-WPsqwxITS2tzx1bzhIKsEs19ABD5vmCVa4xBo2tq/SrV4RNZtfws1EnCWQXM6yh8bD08a1idvkB5MZSBiZsjwg==}
-
-  zod@4.3.6:
-    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
-
   zod@4.6.7:
     resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
@@ -24217,7 +24213,7 @@ snapshots:
       async-listen: 3.0.0
       open: 8.4.0
       xdg-app-paths: 5.5.1
-      zod: 4.1.11
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
 
   '@vercel/cli-auth@0.3.0':
     dependencies:
@@ -24225,17 +24221,17 @@ snapshots:
       '@vercel/cli-config': 0.2.0
       async-listen: 3.0.0
       open: 8.4.0
-      zod: 4.1.11
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
 
   '@vercel/cli-config@0.2.0':
     dependencies:
       xdg-app-paths: 5.5.1
-      zod: 4.1.11
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
 
   '@vercel/cli-config@0.3.1':
     dependencies:
       xdg-app-paths: 5.5.1
-      zod: 4.1.11
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
 
   '@vercel/cli-exec@1.0.1':
     dependencies:
@@ -24873,7 +24869,7 @@ snapshots:
       terminal-link: 5.0.0
       tinyglobby: 0.2.17
       xdg-app-paths: 5.1.0
-      zod: 4.3.6
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
     transitivePeerDependencies:
       - '@opentelemetry/api'
       - '@swc/helpers'
@@ -24900,7 +24896,7 @@ snapshots:
       seedrandom: 3.0.5
       semver: 7.7.4
       ulid: 3.0.2
-      zod: 4.3.6
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
     optionalDependencies:
       '@opentelemetry/api': 1.10.0
     transitivePeerDependencies:
@@ -25077,7 +25073,7 @@ snapshots:
       async-sema: 3.1.1
       ulid: 3.0.2
       undici: 8.12.2
-      zod: 4.3.6
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
     optionalDependencies:
       '@opentelemetry/api': 1.10.0
 
@@ -25089,14 +25085,14 @@ snapshots:
       '@workflow/world': 4.5.1
       cbor-x: 1.6.0
       undici: 8.12.2
-      zod: 4.3.6
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
     optionalDependencies:
       '@opentelemetry/api': 1.10.0
 
   '@workflow/world@4.5.1':
     dependencies:
       ulid: 3.0.2
-      zod: 4.3.6
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
 
   '@xhmikosr/archive-type@8.1.0':
     dependencies:
@@ -31487,7 +31483,7 @@ snapshots:
       react-compiler-runtime: 19.1.0-rc.3(react@19.3.0)
       react-dom: 19.3.0(react@19.3.0)
       scroll-into-view-if-needed: 3.1.0
-      zod: 4.3.6
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
       zustand: 5.0.12(@types/react@19.3.0)(immer@11.1.15)(react@19.3.0)(use-sync-external-store@1.7.0(react@19.3.0))
     transitivePeerDependencies:
       - '@types/react'
@@ -31537,7 +31533,7 @@ snapshots:
       unist-util-visit: 5.1.0
       unist-util-visit-children: 3.0.0
       yaml: 2.8.3
-      zod: 4.3.6
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
     transitivePeerDependencies:
       - supports-color
       - typescript
@@ -35373,7 +35369,7 @@ snapshots:
       sandbox: 3.4.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       smol-toml: 1.6.1
       undici: 8.11.2
-      zod: 4.1.11
+      zod: 4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm)
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
@@ -35989,10 +35985,6 @@ snapshots:
   zod@3.22.4: {}
 
   zod@3.25.76: {}
-
-  zod@4.1.11: {}
-
-  zod@4.3.6: {}
 
   zod@4.6.7(patch_hash=xgqys3kibty2pp6zwqlbzuvwbm): {}
 

@@ -24,6 +24,7 @@ const THEME_SWITCHING_ROUTE_POLICY = {
     '/integrations',
     '/youtube-thumbnails',
     '/product',
+    '/product/command-palette',
     '/product/release-scheduling',
     '/product/dsp-links',
     '/product/utm-links',

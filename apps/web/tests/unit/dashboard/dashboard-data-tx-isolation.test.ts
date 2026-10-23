@@ -460,6 +460,177 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 
+  it.each(['25P03', undefined])(
+    'JOV-8834: recovers an idle social-link read (%s) after cleanup with the same identity',
+    async code => {
+      const idle = new Error('Failed query: select', {
+        cause: Object.assign(
+          new Error(
+            'terminating connection due to idle-in-transaction timeout'
+          ),
+          code ? { code } : {}
+        ),
+      });
+      let releaseCleanup!: () => void;
+      let signalCleanup!: () => void;
+      const cleanupStarted = new Promise<void>(resolve => {
+        signalCleanup = resolve;
+      });
+      const pendingCleanup = new Promise<void>(resolve => {
+        releaseCleanup = resolve;
+      });
+      cleanupGates.set(1, () => {
+        signalCleanup();
+        return pendingCleanup;
+      });
+      queueReadsBeforeDistribution();
+      outcomes.splice(5, 0, fail(idle));
+
+      const resultPromise = getDashboardData();
+      await cleanupStarted;
+      try {
+        expect(txStates).toHaveLength(2);
+        expect(captureExceptionMock).not.toHaveBeenCalled();
+      } finally {
+        releaseCleanup();
+        await resultPromise;
+      }
+      const result = await resultPromise;
+      expect(result.hasSocialLinks).toBe(true);
+      expect(result.hasMusicLinks).toBe(true);
+      expect(result.tippingStats.totalReceivedCents).toBe(100);
+      expect(result.dashboardLoadError).toBeUndefined();
+      expect(txStates[1]).toMatchObject({ closed: true, rolledBack: true });
+      expect(txStates.every(state => state.closed)).toBe(true);
+      expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+      expect(withDbSessionTxMock).toHaveBeenNthCalledWith(
+        3,
+        expect.any(Function),
+        { clerkUserId: 'user_123' }
+      );
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('JOV-8834: retries an idle RLS setup failure before the social-link callback', async () => {
+    setupFailures.set(1, fail(idleDistributionError('25P03')));
+    queueReadsBeforeDistribution();
+    const result = await getDashboardData();
+    expect(result.hasSocialLinks).toBe(true);
+    expect(result.hasMusicLinks).toBe(true);
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(txStates[1]).toMatchObject({ closed: true, rolledBack: true });
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+  });
+
+  it('JOV-8834: falls back after two idle social-link failures have rolled back', async () => {
+    const first = idleDistributionError('25P03');
+    const second = idleDistributionError('25P03');
+    queueReadsBeforeDistribution();
+    outcomes.splice(5, 1, fail(first), fail(second));
+    captureExceptionMock.mockImplementation(error => {
+      if (error === second) {
+        expect(txStates[1]).toMatchObject({ closed: true, rolledBack: true });
+        expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+      }
+    });
+    const result = await getDashboardData();
+    expect(result.hasSocialLinks).toBe(false);
+    expect(result.hasMusicLinks).toBe(false);
+    expect(result.avatarQuality?.status).toBe('ok');
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(capturedErrors()).toEqual([second]);
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      second,
+      expect.objectContaining({
+        tags: {
+          query: 'social_links_existence',
+          context: 'dashboard_data_settled',
+        },
+      })
+    );
+  });
+
+  it.each(['57014', '25P02', '42501', '40001', '08006'])(
+    'JOV-8834: reports SQLSTATE %s after cleanup without replaying the social-link read',
+    async code => {
+      const error = idleDistributionError(code);
+      queueReadsBeforeDistribution();
+      outcomes.splice(5, 1, fail(error));
+      captureExceptionMock.mockImplementation(captured => {
+        if (captured === error) {
+          expect(txStates[1]).toMatchObject({ closed: true, rolledBack: true });
+        }
+      });
+      const result = await getDashboardData();
+      expect(result.hasSocialLinks).toBe(false);
+      expect(result.tippingStats.totalReceivedCents).toBe(100);
+      expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+      expect(capturedErrors()).toEqual([error]);
+    }
+  );
+
+  it('JOV-8834: declines social-link recovery once its retry admission budget expires', async () => {
+    const clock = vi.spyOn(performance, 'now');
+    queueReadsBeforeDistribution();
+    outcomes.splice(5, 1, () => {
+      clock.mockReturnValue(Number.MAX_SAFE_INTEGER);
+      return { error: idleDistributionError('25P03') };
+    });
+    try {
+      const result = await getDashboardData();
+      expect(result.hasSocialLinks).toBe(false);
+      expect(result.tippingStats.totalReceivedCents).toBe(100);
+      expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('JOV-8834: awaits asynchronous SQL timeout setup before querying or returning fallback', async () => {
+    const timeout = Object.assign(
+      new Error('canceling statement due to statement timeout'),
+      { code: '57014' }
+    );
+    let rejectSetup!: (error: Error) => void;
+    let signalSetup!: () => void;
+    const setupStarted = new Promise<void>(resolve => {
+      signalSetup = resolve;
+    });
+    const pendingSetup = new Promise<void>((_resolve, reject) => {
+      rejectSetup = reject;
+    });
+    void pendingSetup.catch(() => {});
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    vi.mocked(setStatementTimeout).mockImplementationOnce(() => {
+      signalSetup();
+      return pendingSetup;
+    });
+    queueReadsBeforeDistribution();
+    outcomes.splice(5, 1);
+    const resultPromise = getDashboardData();
+    await setupStarted;
+    try {
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+      expect(outcomes).toHaveLength(3);
+      expect(txStates).toHaveLength(2);
+      expect(txStates[1].closed).toBe(false);
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+    } finally {
+      rejectSetup(timeout);
+      await resultPromise;
+    }
+    const result = await resultPromise;
+    expect(result.hasSocialLinks).toBe(false);
+    expect(result.avatarQuality?.status).toBe('ok');
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(txStates[1]).toMatchObject({ closed: true, rolledBack: true });
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    expect(capturedErrors()).toEqual([timeout]);
+  });
+
   it('degrades the Inbox count read log-only on connector schema drift (JOV-5160)', async () => {
     // Prod fingerprint of Sentry issue 7673925206: the suggested_actions
     // pending-count read throws when prod predates migration 0048. Drizzle
@@ -874,7 +1045,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       const { setStatementTimeout } = await import('@/lib/db/query-timeout');
       let attempts = 0;
       vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
-        if (ms === 8000 && ++attempts === 1) {
+        if (ms === 8000 && txStates.length >= 5 && ++attempts === 1) {
           txStates[4].poisoned = true;
           throw idle;
         }
@@ -925,7 +1096,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     const { setStatementTimeout } = await import('@/lib/db/query-timeout');
     let attempts = 0;
     vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
-      if (ms === 8000 && ++attempts === 1) {
+      if (ms === 8000 && txStates.length >= 5 && ++attempts === 1) {
         signalSetup();
         await pendingSetup;
       }
@@ -962,7 +1133,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     const { setStatementTimeout } = await import('@/lib/db/query-timeout');
     let attempts = 0;
     vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
-      if (ms === 8000) {
+      if (ms === 8000 && txStates.length >= 5) {
         attempts++;
         throw idle;
       }
@@ -1012,7 +1183,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       });
       const { setStatementTimeout } = await import('@/lib/db/query-timeout');
       vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
-        if (ms === 8000) throw error;
+        if (ms === 8000 && txStates.length >= 5) throw error;
       });
       queueReadsBeforeDistribution();
       const result = await getDashboardData();
@@ -1022,7 +1193,8 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       expect(
         vi
           .mocked(setStatementTimeout)
-          .mock.calls.filter(([, ms]) => ms === 8000)
+          .mock.calls.slice(1)
+          .filter(([, ms]) => ms === 8000)
       ).toHaveLength(1);
       expect(txStates[4]).toMatchObject({ closed: true, rolledBack: true });
       expect(captureExceptionMock).toHaveBeenCalledWith(
@@ -1048,7 +1220,10 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     );
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
     expect(
-      vi.mocked(setStatementTimeout).mock.calls.filter(([, ms]) => ms === 8000)
+      vi
+        .mocked(setStatementTimeout)
+        .mock.calls.slice(1)
+        .filter(([, ms]) => ms === 8000)
     ).toHaveLength(1);
     expect(txStates.every(state => state.closed)).toBe(true);
     expect(captureExceptionMock).not.toHaveBeenCalled();
@@ -1146,9 +1321,11 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     // source accidentally stops awaiting timeout setup.
     void pendingSetup.catch(() => {});
     const { setStatementTimeout } = await import('@/lib/db/query-timeout');
-    vi.mocked(setStatementTimeout).mockImplementationOnce(() => {
-      signalSetup();
-      return pendingSetup;
+    vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
+      if (ms === 5000) {
+        signalSetup();
+        await pendingSetup;
+      }
     });
     let avatarOrTippingStarted = false;
     outcomes.push(

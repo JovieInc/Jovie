@@ -189,6 +189,15 @@ export const MARKETING_PAGE_CONTRACTS = {
     successEvent: 'visitor copies a tracked link',
     primaryCta: START_CTA,
   },
+  '(marketing)/product/command-palette/page.tsx': {
+    routeGlob: '(marketing)/product/command-palette/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_COMMAND_PALETTE,
+    job: 'filter workspace routes and skills from one search field',
+    proof: 'live command palette with registry routes and skills',
+    successEvent: 'visitor filters the command palette and commits a command',
+    primaryCta: START_CTA,
+  },
   '(marketing)/product/release-scheduling/page.tsx': {
     routeGlob: '(marketing)/product/release-scheduling/page.tsx',
     copyScope: 'shared',
