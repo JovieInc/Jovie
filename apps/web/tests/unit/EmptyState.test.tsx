@@ -200,7 +200,11 @@ describe('EmptyState (canonical molecule API)', () => {
     expect(heading.className).toContain('font-semibold');
     expect(heading.className).toContain('tracking-tight');
     expect(heading.className).toContain('text-primary-token');
-    expect(description.className).toContain('text-app');
+    expect(description.className).toContain('text-xs');
+    // text-xs (same 0.75rem as --text-app) because tailwind-merge classifies
+    // unknown text-* names into the color group and drops them when
+    // text-secondary-token follows — text-xs is the known utility that
+    // survives the merge at the dense 12px body size.
     expect(description.className).toContain('text-secondary-token');
     expect(description.className).toContain('max-w-md');
     expect(description.className).toContain('text-secondary-token');

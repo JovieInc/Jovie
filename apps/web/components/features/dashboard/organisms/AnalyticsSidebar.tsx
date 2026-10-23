@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/dashboard/AnalyticsSidebar.test.ts
+// @coverage-via apps/web/components/features/dashboard/organisms/AnalyticsSidebar.test.tsx
 
 import { Globe, Link2, MapPin } from 'lucide-react';
 import { type ComponentType, useState } from 'react';

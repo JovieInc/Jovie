@@ -293,10 +293,7 @@ export function EmptyState({
             'mb-5 max-w-sm text-app leading-[1.45]',
             styles.descriptionClassName,
             isWorkspacePresentation &&
-              cn(
-                'max-w-md text-app text-secondary-token',
-                !hasActions && 'mb-0'
-              )
+              cn('max-w-md text-xs text-secondary-token', !hasActions && 'mb-0')
           )}
         >
           {description}
