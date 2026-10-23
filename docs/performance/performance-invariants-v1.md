@@ -19,6 +19,26 @@ Rows 1–4 define certified surfaces; row 5 numbers are citable targets only. Wh
 sources disagree, the stricter number governs and the file is named in the audit report.
 The only current row 1 advisory exceptions are bounded by the graduation policy below.
 
+`apps/web/scripts/route-js-budget.mjs` blocks finished builds on per-route gzip
+budgets. Marketing targets are tighter; unlisted routes use the default.
+Targets and measured baselines shrink; raises require an unexpired registry
+override for the exact key. Initial measurements (2026-10-23) allow at most 2%
+headroom. Lower baselines after reductions and delete them at the target.
+Profiles remain visible in server HTML before JavaScript. Row 5 stays unwired.
+
+| Route | Measured KB | Baseline KB | Target KB |
+| --- | ---: | ---: | ---: |
+| `/demo/showcase/[surface]` | 1284 | 1309 | 800 |
+| `/start` | 1223 | 1247 | 800 |
+| `/demo/founder-video` | 1157 | 1180 | 800 |
+| `/exp/shell-v1` | 947 | 965 | 800 |
+| `/[username]` | 883 | 900 | 800 |
+| `/[username]/profile-mode-render/[profileMode]/[marker]` | 883 | 900 | 800 |
+| `/exp/page-builder` | 881 | 898 | 800 |
+| `/demo/audience` | 847 | 863 | 800 |
+| `/demo` | 815 | 831 | 800 |
+| `/` | 650 | 663 | 640 |
+
 ## Public-profile alias graduation
 
 Staging and production use separate evidence windows. Staging measures the exact immutable
@@ -109,3 +129,36 @@ allows them only inside a named scope that keeps a non-WebGL fallback and
 with no feature flag. The ambient field stays in scope because it already
 keeps a CSS poster and declines WebGL under reduced motion. Every other hit
 is on that check's shrink-only baseline.
+
+
+## Homepage hero WebGL exception
+
+The rules above are unchanged. This section does not add a row 1–3 budget.
+
+`night-dj-harmony-v1` still reads: Glow and glass stay CSS tokens. No canvas, WebGL, or video on a surface.
+
+approved by Tim, scoped to the flagged hero prototype only. Dated 2026-10-22 8:47 PM PT.
+
+The exception applies only to the homepage hero decorative layer. It does not apply
+to any other surface. The hero ships enabled. There is no feature flag. There is no
+video. The canvas is `aria-hidden` and `pointer-events: none`, and it loads after
+idle. No WebGL support, reduced motion, save-data, low-power, and context loss keep
+the CSS poster, with no layout shift. The glass bar stays on CSS tokens
+(`backdrop-filter` via `--blur-header`).
+
+<!-- hero-light-webgl-exception/v1
+{
+  "schema": "hero-light-webgl-exception/v1",
+  "status": "approved",
+  "approval": "approved by Tim, scoped to the flagged hero prototype only",
+  "approvedAt": "2026-10-22 8:47 PM PT",
+  "approver": "Tim",
+  "rule": "Glow and glass stay CSS tokens. No canvas, WebGL, or video on a surface.",
+  "invariant": "night-dj-harmony-v1",
+  "sibling": "performance-invariants-v1",
+  "amendsInvariant": false,
+  "surface": "homepage hero decorative layer",
+  "otherSurfaces": false,
+  "module": "apps/web/components/homepage/hero-light/hero-light-gl.ts"
+}
+-->

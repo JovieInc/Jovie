@@ -5,8 +5,6 @@ import { UTM_LINKS_COPY } from '@/data/utmLinksCopy';
 import { buildSoftwareSchema } from '@/lib/constants/schemas';
 import { UtmLinksLanding } from './UtmLinksLanding';
 
-export const revalidate = false;
-
 const PAGE_URL = `${BASE_URL}${APP_ROUTES.PRODUCT_UTM_LINKS}`;
 const PAGE_TITLE = `${UTM_LINKS_COPY.seo.title} | ${APP_NAME}`;
 
