@@ -1498,16 +1498,17 @@ describe('ProfileCompactTemplate', () => {
       );
     });
     expect(pushStateSpy).not.toHaveBeenCalled();
-    pushStateSpy.mockClear();
-    replaceStateSpy.mockClear();
 
     // A client Link (the about drawer's contact links) moves the URL to
     // contact mode; requestedMode is still 'about' until the shell's
     // location store syncs it. The history effect must not write the stale
-    // intent back over the navigation.
+    // intent back over the navigation. The Link's own pushState is the
+    // navigation under test, so only writes after it count.
     act(() => {
       window.history.pushState(null, '', '/test-artist?mode=contact');
     });
+    pushStateSpy.mockClear();
+    replaceStateSpy.mockClear();
     view.rerender(
       <ProfileCompactTemplate
         mode='about'
@@ -1593,34 +1594,53 @@ describe('ProfileCompactTemplate', () => {
       );
     });
     expect(pushStateSpy).not.toHaveBeenCalled();
-    pushStateSpy.mockClear();
-    replaceStateSpy.mockClear();
 
-    // A client Link to the bare profile path pushes a new history entry,
-    // where Next's landing strip replaces the landed entry in place. The
-    // landed-mode restore must not capture the Link and push the mode back.
+    // A client Link to the bare profile path pushes a new history entry.
+    // Next's landing strip replaces the landed entry in place and leaves
+    // history.length unchanged. Earlier cases in this file replace
+    // history.length with a constant, and jsdom does not grow that constant,
+    // so model the browser entry the guard actually reads. The landed-mode
+    // restore must not capture the Link.
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(
+      window.history,
+      'length'
+    );
+    const arrivalLength = window.history.length;
     act(() => {
       window.history.pushState(null, '', '/test-artist');
     });
-    view.rerender(
-      <ProfileCompactTemplate
-        mode='about'
-        artist={mockArtist}
-        socialLinks={[]}
-        contacts={[]}
-      />
-    );
-
-    await waitFor(() => {
-      expect(`${window.location.pathname}${window.location.search}`).toBe(
-        '/test-artist'
-      );
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: arrivalLength + 1,
     });
-    expect(pushStateSpy).not.toHaveBeenCalled();
-    expect(replaceStateSpy).not.toHaveBeenCalled();
+    pushStateSpy.mockClear();
+    replaceStateSpy.mockClear();
+    try {
+      view.rerender(
+        <ProfileCompactTemplate
+          mode='about'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
 
-    pushStateSpy.mockRestore();
-    replaceStateSpy.mockRestore();
+      await waitFor(() => {
+        expect(`${window.location.pathname}${window.location.search}`).toBe(
+          '/test-artist'
+        );
+      });
+      expect(pushStateSpy).not.toHaveBeenCalled();
+      expect(replaceStateSpy).not.toHaveBeenCalled();
+    } finally {
+      if (lengthDescriptor) {
+        Object.defineProperty(window.history, 'length', lengthDescriptor);
+      } else {
+        Reflect.deleteProperty(window.history, 'length');
+      }
+      pushStateSpy.mockRestore();
+      replaceStateSpy.mockRestore();
+    }
   });
 
   it('renders the alerts tab when ?mode=subscribe is in the URL', async () => {
