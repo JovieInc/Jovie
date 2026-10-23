@@ -98,11 +98,14 @@ describe('homepage hero light budget', () => {
     );
   });
 
-  it('stacks the hero copy and keeps the proof phone inside the field', () => {
+  it('stacks the hero copy on the shared spine and keeps the proof phone inside the field', () => {
     const css = readFileSync(join(DIR, 'HomepageHeroCanvas.css'), 'utf8');
     const copy = cssBlock(css, '.homepage-hero-canvas__copy');
     expect(copy).toContain('flex-direction: column');
-    expect(copy).toContain('align-items: center');
+    // The copy column is the shared ap-section-container spine, so its
+    // children align to the spine's left edge, not the field center.
+    expect(copy).toContain('align-items: flex-start');
+    expect(copy).toContain('margin-inline: auto');
     const phone = cssBlock(
       css,
       '.homepage-hero-canvas__proof .homepage-artist-hero__phone'

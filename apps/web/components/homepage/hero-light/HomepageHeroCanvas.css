@@ -1,11 +1,17 @@
 /*
  * Homepage hero canvas. The homepage always carries these classes.
  *
- * Progress 0 is a full-bleed 100svh field, header included, square corners.
- * Progress 1 insets that field and the header by the same gutter, rounds
- * the card, and turns the header from solid black into quiet glass.
- * --hero-canvas-progress is scroll-linked (42svh). It is not a timed tween
- * and it does not pin the page. Reduced motion leaves the variable at 0.
+ * The canonical docked marketing shell (PublicPageShell) owns the page
+ * header and stays visible; `marketing-hero-dock` on the section bleeds
+ * this field under that header to y=0. The __bar rules below no longer
+ * render in the product — they style the synthetic bar fixture in
+ * tests/e2e/homepage-hero-canvas-scroll.spec.ts, which reads this file.
+ *
+ * Progress 0 is a full-bleed 100svh field, square corners. Progress 1 insets
+ * that field by the same gutter, rounds the card, and turns the bar plate
+ * from solid black into quiet glass. --hero-canvas-progress is scroll-linked
+ * (42svh). It is not a timed tween and it does not pin the page. Reduced
+ * motion leaves the variable at 0.
  */
 /* NIGHT_DJ_HARMONY_V1: scoped WebGL exception — this hero's decorative
    layer only. See docs/design/night-dj-harmony-v1.md and the exception
@@ -20,7 +26,10 @@
   --hero-canvas-progress: 0;
   --hero-canvas-gutter: var(--space-4, 1rem);
   --hero-canvas-chrome: var(--space-4, 1rem);
-  --hero-canvas-bar: 8.25rem;
+  /* The stage's top reserve clears the docked shell header. The product
+     reads the shell's own offset token; the fallback is the desktop bar
+     height (the spec harness has no shell). */
+  --hero-canvas-bar: var(--public-shell-header-offset, 4.75rem);
   --hero-canvas-radius: var(--system-b-radius-panel, 1.5rem);
 
   position: relative;
@@ -29,19 +38,8 @@
   color: var(--color-text-primary-token, #f5f7fb);
 }
 
-@media (min-width: 64rem) {
-  .homepage-hero-canvas {
-    --hero-canvas-bar: 4.75rem;
-  }
-}
-
 .home-viewport--hero-canvas {
   background: var(--system-b-cinematic-black, #030406);
-}
-
-.home-viewport--hero-canvas [data-testid="header-nav"],
-.home-viewport--hero-canvas .marketing-header-growth-space {
-  display: none;
 }
 
 .homepage-hero-canvas__bar {
@@ -152,19 +150,28 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   box-sizing: border-box;
   height: 100%;
   margin: 0;
-  padding: var(--space-6, 1.5rem) var(--hero-canvas-chrome);
+  /* The copy column is the shared ap-section-container spine: its own
+     width and gutter come from that class, so the headline sits on the
+     same left edge as every section below (zero horizontal padding here). */
+  margin-inline: auto;
+  padding: var(--space-6, 1.5rem) 0;
   opacity: clamp(0, calc(1 - (var(--hero-canvas-progress) - 0.45) / 0.4), 1);
-  text-align: center;
+  text-align: left;
 }
 
 .homepage-hero-canvas__headline {
-  max-width: 16ch;
   margin: 0;
+}
+
+/* Each sentence beat paints on its own line: the last painted line keeps
+   at least two words at every width, on every browser's balance engine. */
+.homepage-hero-canvas__headline-beat {
+  display: block;
 }
 
 .homepage-hero-canvas__subhead,
