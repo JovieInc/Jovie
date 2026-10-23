@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
-  SMOOTH_RESIDUAL_MAX,
   analyzePixels,
   checkImages,
   classifyPlate,
+  SMOOTH_RESIDUAL_MAX,
 } from './images.mjs';
 
 function fill(width, height, paint) {
@@ -28,13 +28,21 @@ describe('marketing plates', () => {
       32,
       32
     );
-    const flat = analyzePixels(fill(32, 32, () => [20, 24, 28]), 32, 32);
+    const flat = analyzePixels(
+      fill(32, 32, () => [20, 24, 28]),
+      32,
+      32
+    );
     assert.ok(rough.residual >= SMOOTH_RESIDUAL_MAX);
     assert.ok(flat.residual < SMOOTH_RESIDUAL_MAX);
   });
 
   it('flags orange mass, a second hue, and generated-ui', () => {
-    const orange = analyzePixels(fill(16, 16, () => [255, 120, 0]), 16, 16);
+    const orange = analyzePixels(
+      fill(16, 16, () => [255, 120, 0]),
+      16,
+      16
+    );
     assert.ok(orange.orangeMass >= 0.04);
     const split = analyzePixels(
       fill(16, 16, x => (x < 8 ? [0, 180, 255] : [220, 40, 180])),
@@ -44,10 +52,14 @@ describe('marketing plates', () => {
     assert.ok(split.secondaryMass >= 0.18);
     const plate = 'apps/web/public/assets/generated/plate.webp';
     assert.deepEqual(
-      classifyPlate(plate, { residual: 0, secondaryMass: 0, orangeMass: 0 }, {
-        missing: false,
-        json: { accent: 'ion', kind: 'generated-ui' },
-      }).hard,
+      classifyPlate(
+        plate,
+        { residual: 0, secondaryMass: 0, orangeMass: 0 },
+        {
+          missing: false,
+          json: { accent: 'ion', kind: 'generated-ui' },
+        }
+      ).hard,
       [`generated-ui:${plate}`]
     );
   });

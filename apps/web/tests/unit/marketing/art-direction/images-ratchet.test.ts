@@ -4,11 +4,15 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../../../../../');
+const REPO_ROOT = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../../../../'
+);
 
 describe('marketing image plates', () => {
   it('requires a smooth plate, one accent sidecar, and no generated-ui', () => {
-    const plate = 'apps/web/public/assets/generated/homepage-hero-technical-texture-v1.webp';
+    const plate =
+      'apps/web/public/assets/generated/homepage-hero-technical-texture-v1.webp';
     const sidecar = readFileSync(`${join(REPO_ROOT, plate)}.meta.json`, 'utf8');
     expect(sidecar).toContain('"accent": "ion"');
     expect(sidecar).not.toContain('generated-ui');
