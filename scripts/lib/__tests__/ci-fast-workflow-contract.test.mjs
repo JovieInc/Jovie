@@ -35,6 +35,7 @@ import {
   NODE_RUNTIME_CONTRACT_COMMAND,
   NODE_RUNTIME_CONTRACT_PATHS,
   OFFLINE_FAILURE_COVERAGE_COMMAND,
+  PEN_TOKEN_PARITY_COMMAND,
   runBiome,
   runCopyGate,
   runEslintServerBoundaries,
@@ -1061,6 +1062,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast',
       'merge-group-guards',
       'node-runtime-contracts',
+      'pen-token-parity',
       'profile-admission',
       'scripts-typecheck',
       'shadcn-lint-contracts',
@@ -1625,6 +1627,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-system-source-ratchet',
       'design-exception-registry',
       'design-governance-enforcement',
+      'pen-token-parity',
       'design-conformance',
       'ios-fast',
       'profile-admission',
@@ -1673,6 +1676,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'copy-gate': COPY_GATE_COMMAND,
       'source-guards': SOURCE_GUARDS_COMMAND,
       'node-runtime-contracts': NODE_RUNTIME_CONTRACT_COMMAND,
+      'pen-token-parity': PEN_TOKEN_PARITY_COMMAND,
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
         ' && ' +
@@ -1893,7 +1897,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/tests/',
       'apps/web/styles/',
       'packages/ui/',
-      'chromatic\\.config\\.json$',
       'package\\.json$',
       'DESIGN\\.md$',
       'design\\.tokens\\.json$',
@@ -2760,7 +2763,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/.storybook/main.ts',
       'apps/web/.storybook/preview.tsx',
       'apps/web/.storybook/stories/elevation-matrix.stories.tsx',
-      'chromatic.config.json',
     ]) {
       expect(selectsStructural.test(storybookHarnessPath)).toBe(true);
     }
@@ -2802,7 +2804,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
   });
 
-  it('runs hosted structural CI for Storybook, Chromatic, and token-guard inputs', () => {
+  it('runs hosted structural CI for Storybook and token-guard inputs', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -2834,7 +2836,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(
       uiRe.test('apps/web/.storybook/stories/elevation-matrix.stories.tsx')
     ).toBe(true);
-    expect(uiRe.test('chromatic.config.json')).toBe(true);
+    expect(uiRe.test('chromatic.config.json')).toBe(false);
     expect(uiRe.test('scripts/shared-ui-visual-arbitrary-audit.mjs')).toBe(
       true
     );
