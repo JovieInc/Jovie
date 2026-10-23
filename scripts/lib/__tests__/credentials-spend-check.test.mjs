@@ -308,6 +308,30 @@ describe('committed registry', () => {
     expect(counts.unclaimedSecretNames).toBe(0);
   });
 
+  it.each([
+    ['2026-10-23T13:31:23Z', []],
+    ['2026-11-01T00:00:00Z', ['spend-expiry:codex-lyb-pro:banked-reset-1:7d']],
+    ['2026-11-06T00:00:00Z', ['spend-expiry:codex-lyb-pro:banked-reset-1:1d']],
+  ])(
+    'tracks the fourth alias credit only under lyb-pro at %s',
+    (now, expected) => {
+      const { findings } = evaluateRegistry({
+        credentials: creds,
+        spend: ledger,
+        nowMs: at(now),
+      });
+      const subjects = new Set([
+        'codex-fourth:banked-reset-1',
+        'codex-lyb-pro:banked-reset-1',
+      ]);
+      expect(
+        findings
+          .filter(item => subjects.has(item.subject))
+          .map(item => item.fingerprint)
+      ).toEqual(expected);
+    }
+  );
+
   it('loads every third-party grant with a platform, account and revoke URL', () => {
     const { thirdPartyGrants } = loadRegistry();
     expect(thirdPartyGrants.length).toBeGreaterThan(100);
