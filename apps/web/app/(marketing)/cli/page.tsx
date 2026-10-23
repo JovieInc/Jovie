@@ -7,11 +7,12 @@ import {
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `CLI — ${APP_NAME}`,
+  title: documentTitle(`CLI — ${APP_NAME}`),
   description: CLI_SUBTITLE,
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.CLI}`,
