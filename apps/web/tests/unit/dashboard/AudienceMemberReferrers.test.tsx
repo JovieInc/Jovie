@@ -33,10 +33,12 @@ describe('AudienceMemberReferrers', () => {
       <AudienceMemberReferrers member={memberWithoutSources} />
     );
 
-    const note = screen.getByText('No source data yet.').parentElement;
+    const content = screen.getByText('No source data yet.').parentElement;
+    const note = content?.parentElement;
 
+    expect(content).toHaveClass('min-h-22');
     expect(note).toHaveAttribute('data-surface-variant', 'flat');
-    expect(note).toHaveClass('min-h-22', 'bg-transparent', 'shadow-none');
+    expect(note).toHaveClass('bg-transparent', 'shadow-none');
     expect(
       container.querySelectorAll('[data-surface-variant="card"]')
     ).toHaveLength(0);
