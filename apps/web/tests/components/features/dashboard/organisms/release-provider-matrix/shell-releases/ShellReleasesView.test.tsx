@@ -602,7 +602,7 @@ describe('ShellReleasesView', () => {
   it('shows the connect-Spotify empty state when not yet connected', () => {
     renderShell([]);
     expect(
-      screen.getByText(/Connect Spotify to get started/)
+      screen.getByText(/Connect Spotify To Get Started/)
     ).toBeInTheDocument();
   });
 
@@ -612,7 +612,7 @@ describe('ShellReleasesView', () => {
     // disconnected state by role=heading 'Connect Spotify' — the same shape
     // the connected empty state already renders.
     expect(
-      screen.getByRole('heading', { name: /Connect Spotify to get started/ })
+      screen.getByRole('heading', { name: /Connect Spotify To Get Started/ })
     ).toBeInTheDocument();
   });
 

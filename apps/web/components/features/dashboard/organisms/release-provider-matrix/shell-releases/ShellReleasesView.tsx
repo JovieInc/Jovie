@@ -209,7 +209,7 @@ function ReleasesListContent({
               disconnected state by its 'Connect Spotify' heading, matching
               the h3 the connected empty state already renders. */}
           <h3 className='text-app font-caption text-primary-token'>
-            Connect Spotify to get started
+            Connect Spotify To Get Started
           </h3>
           <p className='mt-1 text-xs text-tertiary-token leading-normal'>
             Sync your catalog from Spotify or add a release manually to start
