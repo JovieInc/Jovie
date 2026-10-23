@@ -406,9 +406,11 @@ export function ProfileUnifiedDrawer({
 
               <div className='mx-1 my-1 h-px bg-[color:var(--color-border-subtle)]' />
 
+              {/* A plain destructive button: this notifications list is not
+                  an ARIA menu, so the unsubscription control must not claim
+                  `role="menuitem"` (axe aria-required-parent). */}
               <button
                 type='button'
-                role='menuitem'
                 className={PROFILE_DRAWER_DANGER_ITEM_CLASS}
                 onClick={onUnsubscribe}
                 disabled={isUnsubscribing}
