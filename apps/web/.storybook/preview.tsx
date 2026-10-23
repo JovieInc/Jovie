@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui/atoms/tooltip';
 import type { Preview } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MotionGlobalConfig } from 'motion/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import React from 'react';
 import { ToastProvider } from '../components/providers/ToastProvider';
@@ -87,6 +88,12 @@ function installDeterministicFixtures(): void {
     }
   `;
   document.head.appendChild(style);
+
+  // JS-driven (motion) enter animations start at opacity 0 and are still
+  // mid-fade when the axe pass runs, so axe measures a half-transparent
+  // foreground and reports false color-contrast failures. Settle them at once,
+  // exactly like the CSS freeze above; real UI motion is untouched.
+  MotionGlobalConfig.skipAnimations = true;
 
   // Keep responsive media queries real; only motion is deterministic.
   const nativeMatchMedia = window.matchMedia.bind(window);

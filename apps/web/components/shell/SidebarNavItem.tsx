@@ -138,6 +138,7 @@ export function SidebarNavItem({
       type='button'
       onClick={item.onActivate}
       aria-pressed={item.active || undefined}
+      aria-label={collapsed ? item.label : undefined}
       className={getSidebarNavRowClassName({
         active: item.active,
         collapsed,

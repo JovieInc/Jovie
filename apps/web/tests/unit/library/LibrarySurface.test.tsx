@@ -997,10 +997,10 @@ describe('LibrarySurface', () => {
     ).not.toBeInTheDocument();
     // Editable approval lives exactly once under Details.
     expect(
-      drawer.getByRole('button', { name: 'Approval Status' })
+      drawer.getByRole('button', { name: /^Approval Status: / })
     ).toBeInTheDocument();
     expect(
-      drawer.getAllByRole('button', { name: 'Approval Status' })
+      drawer.getAllByRole('button', { name: /^Approval Status: / })
     ).toHaveLength(1);
   });
 
@@ -1012,7 +1012,7 @@ describe('LibrarySurface', () => {
     const trigger = screen.getByTestId(
       'library-approval-status-select-release-1'
     );
-    expect(trigger).toHaveAccessibleName('Approval Status');
+    expect(trigger).toHaveAccessibleName('Approval Status: Draft');
     expect(trigger.tagName).toBe('BUTTON');
   });
 
@@ -1038,7 +1038,7 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
     // Approval status stays a single accessible editor on the Overview tab.
     expect(
-      drawer.getByRole('button', { name: 'Approval Status' })
+      drawer.getByRole('button', { name: /^Approval Status: / })
     ).toBeInTheDocument();
     expect(drawer.getByRole('link', { name: /Spotify/u })).toHaveAttribute(
       'href',
@@ -1832,7 +1832,7 @@ describe('LibrarySurface', () => {
       screen.getByTestId('library-catalog-waveform-release-1')
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText('View DSP Distribution Details')
+      screen.getByLabelText(/^View DSP Distribution Details:/)
     ).toBeInTheDocument();
 
     // Metrics the production schema does not carry render a stable em-dash
@@ -2266,7 +2266,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    fireEvent.click(screen.getByRole('button', { name: /Search Jovie$/ }));
 
     expect(screen.queryByLabelText('Filter work')).toBeNull();
     expect(
@@ -2431,9 +2431,9 @@ describe('LibrarySurface', () => {
 
     expect(screen.queryByLabelText('Search library by title')).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Search Jovie' })
+      screen.getByRole('button', { name: /Search Jovie$/ })
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    fireEvent.click(screen.getByRole('button', { name: /Search Jovie$/ }));
     expect(
       screen.queryByRole('searchbox', { name: 'Command Palette Search' })
     ).toBeNull();

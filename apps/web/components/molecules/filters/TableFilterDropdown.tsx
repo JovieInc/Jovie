@@ -223,6 +223,7 @@ export function TableFilterDropdown<T extends string = string>({
               (isOpen || hasAnyFilter) && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
               buttonClassName
             )}
+            inert={isOpen}
             aria-pressed={isOpen || hasAnyFilter}
           >
             <Icon
@@ -250,7 +251,9 @@ export function TableFilterDropdown<T extends string = string>({
         onCloseAutoFocus={event => event.preventDefault()}
       >
         {categories.length === 0 ? (
-          <DropdownEmptyRow message={emptyMessage} />
+          <DropdownMenuItem disabled>
+            <DropdownEmptyRow message={emptyMessage} />
+          </DropdownMenuItem>
         ) : (
           categories.map(category => (
             <TableFilterSubmenu

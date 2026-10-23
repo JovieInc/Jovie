@@ -10,7 +10,9 @@ const meta: Meta<typeof OpportunityRow> = {
   decorators: [
     Story => (
       <div className='w-[min(48rem,calc(100vw-2rem))] bg-base p-4'>
-        <Story />
+        <ul>
+          <Story />
+        </ul>
       </div>
     ),
   ],

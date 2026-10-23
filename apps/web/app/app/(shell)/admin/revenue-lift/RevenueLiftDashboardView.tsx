@@ -191,7 +191,11 @@ export function RevenueLiftDashboardView({
         >
           Metric → Signal → VC Interpretation
         </h2>
-        <ContentSurfaceCard surface='table' className='overflow-x-auto'>
+        <ContentSurfaceCard
+          surface='table'
+          tabIndex={0}
+          className='overflow-x-auto'
+        >
           <table className='w-full min-w-[40rem] text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
@@ -300,7 +304,11 @@ export function RevenueLiftDashboardView({
           </ContentSurfaceCard>
         </div>
         <SourceLine source={data.cohorts.source} />
-        <ContentSurfaceCard surface='table' className='mt-3 overflow-x-auto'>
+        <ContentSurfaceCard
+          surface='table'
+          tabIndex={0}
+          className='mt-3 overflow-x-auto'
+        >
           <table className='w-full min-w-[32rem] text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
@@ -384,7 +392,11 @@ export function RevenueLiftDashboardView({
         >
           Multi Agent Contribution
         </h2>
-        <ContentSurfaceCard surface='table' className='overflow-x-auto'>
+        <ContentSurfaceCard
+          surface='table'
+          tabIndex={0}
+          className='overflow-x-auto'
+        >
           <table className='w-full min-w-[36rem] text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>

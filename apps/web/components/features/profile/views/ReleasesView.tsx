@@ -191,7 +191,7 @@ export function ReleasesView({
                     </span>
                   ) : null}
                 </div>
-                <p className='truncate text-2xs font-medium tracking-tight text-white/42'>
+                <p className='truncate text-2xs font-medium tracking-tight text-white/50'>
                   {meta}
                 </p>
               </div>

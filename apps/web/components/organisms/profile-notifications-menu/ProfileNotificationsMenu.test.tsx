@@ -35,6 +35,14 @@ describe('ProfileNotificationsMenu', () => {
   it('renders Title Case section labels when open', () => {
     renderMenu();
 
+    const dialog = screen.getByRole('dialog', {
+      name: 'Notification Preferences',
+    });
+    const platform = screen.getByRole('combobox', {
+      name: 'Preferred streaming platform',
+    });
+    expect(dialog).toContainElement(platform);
+    expect(platform.closest('[role="menu"]')).toBeNull();
     expect(screen.getByText('How You Get Notified')).toBeInTheDocument();
     expect(screen.getByText('Listening Preference')).toBeInTheDocument();
     expect(screen.getByText('What You Hear About')).toBeInTheDocument();

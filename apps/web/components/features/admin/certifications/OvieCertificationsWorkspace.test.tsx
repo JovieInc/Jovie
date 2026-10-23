@@ -140,7 +140,7 @@ describe('OvieCertificationsWorkspace', () => {
     });
     render(<OvieCertificationsWorkspace />);
     fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'Certification Filters' }),
+      screen.getByRole('button', { name: /^Certification Filters: Filters/ }),
       { button: 0, ctrlKey: false }
     );
     fireEvent.click(
@@ -149,7 +149,7 @@ describe('OvieCertificationsWorkspace', () => {
     expect(screen.getByText('Flow signup-golden-path')).toBeInTheDocument();
     expect(screen.queryByText('Flow claim-profile')).not.toBeInTheDocument();
     fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'Certification Filters' }),
+      screen.getByRole('button', { name: /^Certification Filters: Filters/ }),
       { button: 0, ctrlKey: false }
     );
     fireEvent.click(
@@ -157,7 +157,7 @@ describe('OvieCertificationsWorkspace', () => {
     );
     expect(screen.getByText('Flow signup-golden-path')).toBeInTheDocument();
     fireEvent.pointerDown(
-      screen.getByRole('button', { name: 'Certification Filters' }),
+      screen.getByRole('button', { name: /^Certification Filters: Filters/ }),
       { button: 0, ctrlKey: false }
     );
     fireEvent.click(

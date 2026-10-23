@@ -44,7 +44,7 @@ describe('ProfileClaimFooter', () => {
     );
     const cta = screen.getByTestId('profile-claim-footer-cta');
     expect(cta).toHaveAttribute('href', '/waitlist?campaign=proof-to-claim');
-    expect(cta).toHaveAccessibleName('Request access');
+    expect(cta).toHaveAccessibleName('Jovie · Request access');
     expect(screen.getByText('Request access')).toBeInTheDocument();
     expect(screen.queryByText(/Claim Your Profile/i)).toBeNull();
     expect(screen.queryByText(/unclaimed/i)).toBeNull();

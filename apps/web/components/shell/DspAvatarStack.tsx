@@ -120,7 +120,10 @@ export function DspAvatarStack({
     >
       <button
         aria-describedby={popoverId}
-        aria-label='View DSP Distribution Details'
+        aria-label={`View DSP Distribution Details: ${visible
+          .filter(dsp => !dsp.iconPath)
+          .map(dsp => dsp.glyph)
+          .join('')}${others > 0 ? ` +${others}` : ''}`}
         className='inline-flex items-center gap-1.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--system-b-bg-page)'
         type='button'
       >

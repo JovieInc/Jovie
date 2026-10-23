@@ -127,7 +127,14 @@ function MenuItems({
         <>
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={onDelete} variant='destructive'>
+          <DropdownMenuItem
+            onClick={onDelete}
+            variant='destructive'
+            style={{
+              color:
+                'light-dark(var(--color-error), color-mix(in oklab, var(--color-error) 85%, var(--color-error-foreground)))',
+            }}
+          >
             <Trash2 className='h-3.5 w-3.5' />
             {profile.isClaimed ? 'Delete user' : 'Delete creator'}
           </DropdownMenuItem>
@@ -169,6 +176,7 @@ export function CreatorActionsMenu({
         <DropdownMenu open={open} onOpenChange={onOpenChange}>
           <DropdownMenuTrigger asChild>
             <AppIconButton
+              inert={open}
               ariaLabel='Open creator actions'
               className='h-8 w-8 rounded-full bg-transparent text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-ring/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
               disabled={isLoading}
@@ -197,6 +205,7 @@ export function CreatorActionsMenu({
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
+          inert={open}
           type='button'
           size='sm'
           variant='ghost'

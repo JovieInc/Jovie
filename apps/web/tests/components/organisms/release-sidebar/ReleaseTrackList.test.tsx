@@ -152,7 +152,7 @@ describe('ReleaseTrackList', () => {
     const control = screen.getByTestId('release-track-control-track_1');
 
     expect(
-      screen.getByRole('button', { name: 'Pause Static Skies' })
+      screen.getByRole('button', { name: 'Track 1: Pause Static Skies' })
     ).toBeInTheDocument();
     expect(within(control).queryByText('1')).not.toBeInTheDocument();
   });
@@ -194,7 +194,9 @@ describe('ReleaseTrackList', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Play Static Skies' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Track 1: Play Static Skies' })
+    );
 
     const expectedTrack = {
       id: 'track_1',
@@ -271,7 +273,9 @@ describe('ReleaseTrackList', () => {
 
     expect(controlLabels).toEqual(['1', '2', '3', '4', '5', '6']);
     expect(
-      screen.getByRole('button', { name: 'Play Miracle (with Ellie Goulding)' })
+      screen.getByRole('button', {
+        name: 'Track 4: Play Miracle (with Ellie Goulding)',
+      })
     ).toHaveTextContent('4');
   });
 

@@ -152,7 +152,7 @@ describe('IdentitySwitcher identity context selection', () => {
     render(<IdentitySwitcher />);
 
     expect(
-      screen.getByRole('button', { name: 'Switch Identity' })
+      screen.getByRole('button', { name: /^Switch Identity:/ })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Add Artist Identity' })
@@ -165,7 +165,7 @@ describe('IdentitySwitcher identity context selection', () => {
   it('stages the identity label exit on the shared rail-motion contract (JOV-4522)', () => {
     render(<IdentitySwitcher />);
 
-    const trigger = screen.getByRole('button', { name: 'Switch Identity' });
+    const trigger = screen.getByRole('button', { name: /^Switch Identity:/ });
     const label = within(trigger).getByText('Alpha Artist');
     // The label collapses on max-width + opacity + travel instead of
     // display:none, and the trigger releases its gap/padding so the avatar

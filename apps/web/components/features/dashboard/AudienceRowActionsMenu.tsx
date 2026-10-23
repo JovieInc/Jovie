@@ -12,6 +12,7 @@ import { useCallback, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import type { AudienceMember } from '@/types';
 
 interface AudienceRowActionsMenuProps {
@@ -65,11 +66,25 @@ export function AudienceRowActionsMenu({
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange} modal={modal}>
       <DropdownMenuTrigger asChild>
-        <AppIconButton ariaLabel='Open audience row actions'>
+        <AppIconButton
+          inert={open}
+          ariaLabel='Open audience row actions'
+          onClick={event => event.stopPropagation()}
+          onKeyDown={event =>
+            handleActivationKeyDown(event, e => e.stopPropagation())
+          }
+        >
           <MoreHorizontal className='h-4 w-4' />
         </AppIconButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align='end' sideOffset={8}>
+      <DropdownMenuContent
+        align='end'
+        sideOffset={8}
+        onClick={event => event.stopPropagation()}
+        onKeyDown={event =>
+          handleActivationKeyDown(event, e => e.stopPropagation())
+        }
+      >
         <DropdownMenuItem disabled={!hasEmail} onClick={handleCopyEmail}>
           <Copy className='h-4 w-4' />
           {copySuccess ? 'Copied!' : 'Copy email'}

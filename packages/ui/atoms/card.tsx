@@ -72,8 +72,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
             ? className
             : cn(
                 cardVariants({ variant: resolvedVariant, className }),
-                contentState === 'partial' &&
-                  'opacity-[var(--state-partial-opacity)] saturate-75'
+                contentState === 'partial' && 'saturate-75'
               )
         }
       />

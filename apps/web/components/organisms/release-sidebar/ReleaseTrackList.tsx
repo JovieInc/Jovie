@@ -340,7 +340,7 @@ function TrackListRow({
             !isActiveTrack &&
             'cursor-not-allowed text-quaternary-token hover:bg-transparent hover:text-quaternary-token'
         )}
-        aria-label={controlLabel}
+        aria-label={`Track ${trackLabel}: ${controlLabel}`}
         data-testid={`release-track-control-${track.id}`}
       >
         {trackButtonContent}

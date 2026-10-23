@@ -77,11 +77,14 @@ export const InContext: Story = {
         actions={[{ label: 'Retry', onClick: () => {} }]}
       />
       <div className='space-y-2'>
-        {
-          // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
-          <label className='text-sm font-medium'>Display Name</label>
-        }
+        <label
+          htmlFor='error-banner-display-name'
+          className='text-sm font-medium'
+        >
+          Display Name
+        </label>
         <input
+          id='error-banner-display-name'
           type='text'
           className='w-full px-3 py-2 border border-subtle rounded-lg'
           defaultValue='John Doe'

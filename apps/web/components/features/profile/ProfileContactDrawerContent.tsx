@@ -38,7 +38,7 @@ function TerritoryPills({
           <button
             type='button'
             className='inline-flex h-6 items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-2 text-2xs font-semibold text-white/58 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-            aria-label={`Show all territories for ${contact.roleLabel}`}
+            aria-label={`+${territories.length - 1} — Show all territories for ${contact.roleLabel}`}
           >
             +{territories.length - 1}
           </button>

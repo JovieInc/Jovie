@@ -29,10 +29,12 @@ export const ActionPillDone: Story = {
 
 export const Pill: StoryObj<typeof AudiencePill> = {
   render: () => (
-    <AudiencePill
-      accentIndex={0}
-      pill={ARTIST_NOTIFICATIONS_COPY.capture.audienceRails[0][0]}
-    />
+    <ul>
+      <AudiencePill
+        accentIndex={0}
+        pill={ARTIST_NOTIFICATIONS_COPY.capture.audienceRails[0][0]}
+      />
+    </ul>
   ),
 };
 

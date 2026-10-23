@@ -236,7 +236,11 @@ export function PaySelector({
                 ? `Opening ${resolvedMethod?.label ?? 'payment'}…`
                 : paymentActionLabel
             }
-            ariaLabel={paymentActionLabel}
+            ariaLabel={
+              isLoading
+                ? `Opening ${resolvedMethod?.label ?? 'payment'}… ${paymentActionLabel}`
+                : paymentActionLabel
+            }
             primary
             onClick={handleContinue}
             disabled={isLoading || !canContinue || !isMethodAvailable}
@@ -365,11 +369,7 @@ export function PaySelector({
         size='lg'
         disabled={isLoading || !canContinue || !isMethodAvailable}
         variant='primary'
-        aria-label={
-          resolvedMethod
-            ? paymentActionLabel
-            : `Continue with ${formatAmountForScreenReader(selectedAmount)}`
-        }
+        aria-label={continueLabel}
       >
         {resolvedMethod?.id === 'venmo' ? (
           <SocialIcon

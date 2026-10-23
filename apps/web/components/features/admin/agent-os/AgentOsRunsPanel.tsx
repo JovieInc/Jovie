@@ -219,7 +219,6 @@ function AgentOsBoardCard({
           type='button'
           variant='ghost'
           onClick={() => onSelect(artifact)}
-          aria-label={artifact.title}
           aria-pressed={isSelected}
           className='min-w-0 h-auto flex-1 justify-start rounded-md text-left hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
         >
@@ -298,7 +297,6 @@ function AgentOsBoard({
                   onStatusFilterChange(statusFilter === status ? null : status)
                 }
                 aria-pressed={statusFilter === status}
-                aria-label={`Filter by ${RUN_STATUS_LABEL[status]} (${laneRows.length})`}
                 className={cn(
                   'h-auto rounded px-1 text-2xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
                   statusFilter === status
@@ -306,6 +304,9 @@ function AgentOsBoard({
                     : 'text-tertiary-token hover:bg-surface-0 hover:text-secondary-token'
                 )}
               >
+                <span className='sr-only'>
+                  Filter by {RUN_STATUS_LABEL[status]}
+                </span>{' '}
                 {laneRows.length}
               </Button>
             </div>

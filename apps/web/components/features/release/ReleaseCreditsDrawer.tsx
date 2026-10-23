@@ -39,7 +39,7 @@ export function ReleaseCreditsDrawer({
           <section key={group.role} aria-labelledby={`credits-${group.role}`}>
             <h3
               id={`credits-${group.role}`}
-              className='text-2xs font-semibold uppercase tracking-[0.06em] text-white/35'
+              className='text-2xs font-semibold uppercase tracking-[0.06em] text-white/50'
             >
               {toSentenceCase(group.label)}
             </h3>

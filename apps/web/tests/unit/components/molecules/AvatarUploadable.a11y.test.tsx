@@ -38,7 +38,7 @@ describe('AvatarUploadable - Accessibility', () => {
     );
 
     const button = screen.getByRole('button');
-    expect(button).toHaveAttribute('aria-label', 'Upload profile photo');
+    expect(button).toHaveAccessibleName('Upload profile photo User avatar');
 
     const fileInput = screen.getByLabelText('Choose Profile Photo File');
     expect(fileInput).toHaveAttribute(

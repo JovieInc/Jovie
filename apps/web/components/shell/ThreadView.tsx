@@ -94,6 +94,8 @@ export function ThreadView({
         ref={scrollRef}
         onScroll={checkAtBottom}
         className='absolute inset-0 overflow-y-auto'
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region must be keyboard focusable (axe scrollable-region-focusable)
+        tabIndex={0}
       >
         <div className='mx-auto w-full max-w-[44rem] px-app-header pb-(--system-b-chat-composer-thread-scroll-padding) pt-5 sm:pt-6'>
           <header>

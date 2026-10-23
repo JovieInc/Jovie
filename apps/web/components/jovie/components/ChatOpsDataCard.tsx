@@ -115,7 +115,6 @@ export function ChatOpsDataCard({ card, summary }: ChatOpsDataCardProps) {
             </p>
             <ul
               className='mt-1.5 flex flex-col gap-1.5'
-              role='img'
               aria-label={`${card.series.label}: ${card.series.points
                 .map(point => `${point.label} ${point.value}`)
                 .join(', ')}`}

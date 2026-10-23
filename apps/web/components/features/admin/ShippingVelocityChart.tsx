@@ -340,7 +340,7 @@ export function ShippingVelocityChart({
               variant='ghost'
               onClick={() => setShowClosed(prev => !prev)}
               className='h-auto flex items-center gap-1 transition-opacity hover:opacity-100 hover:bg-transparent'
-              style={{ opacity: showClosed ? 0.8 : 0.4 }}
+              style={{ opacity: showClosed ? 1 : 0.8 }}
               aria-label='Toggle Closed Series Visibility'
               aria-pressed={showClosed}
             >

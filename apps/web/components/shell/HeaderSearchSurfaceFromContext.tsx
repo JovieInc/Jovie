@@ -64,7 +64,11 @@ export function HeaderSearchSurfaceFromContext({
             ),
         className
       )}
-      aria-label='Search Jovie'
+      aria-label={
+        compact
+          ? 'Search Jovie'
+          : `${calm ? 'Search chats' : 'Search'} ⌘K — Search Jovie`
+      }
     >
       <Icon
         name='Search'

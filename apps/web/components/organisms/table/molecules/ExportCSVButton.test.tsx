@@ -42,7 +42,9 @@ describe('ExportCSVButton confirmation', () => {
     const getData = vi.fn().mockResolvedValue(oldRows);
     render(<ExportCSVButton getData={getData} columns={columns} />);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Export data to CSV file' })
+      screen.getByRole('button', {
+        name: 'Export CSV — Export data to CSV file',
+      })
     );
     fireEvent.click(
       await screen.findByRole('button', { name: 'Download CSV' })
@@ -72,7 +74,9 @@ describe('ExportCSVButton confirmation', () => {
       />
     );
     fireEvent.click(
-      screen.getByRole('button', { name: 'Export data to CSV file' })
+      screen.getByRole('button', {
+        name: 'Export CSV — Export data to CSV file',
+      })
     );
     fireEvent.click(
       await screen.findByRole('button', { name: 'Download CSV' })
@@ -108,7 +112,9 @@ describe('ExportCSVButton confirmation', () => {
         />
       );
       fireEvent.click(
-        screen.getByRole('button', { name: 'Export data to CSV file' })
+        screen.getByRole('button', {
+          name: 'Export CSV — Export data to CSV file',
+        })
       );
       fireEvent.click(
         await screen.findByRole('button', { name: 'Download CSV' })
@@ -124,7 +130,9 @@ describe('ExportCSVButton confirmation', () => {
     const getData = vi.fn().mockResolvedValue(oldRows);
     render(<ExportCSVButton getData={getData} revalidateBeforeDownload />);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Export data to CSV file' })
+      screen.getByRole('button', {
+        name: 'Export CSV — Export data to CSV file',
+      })
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
     expect(
@@ -141,7 +149,7 @@ describe('ExportCSVButton confirmation', () => {
       const getData = vi.fn().mockResolvedValue(oldRows);
       render(<ExportCSVButton getData={getData} revalidateBeforeDownload />);
       const origin = screen.getByRole('button', {
-        name: 'Export data to CSV file',
+        name: 'Export CSV — Export data to CSV file',
       });
       await user.tab();
       expect(origin).toHaveFocus();
@@ -189,7 +197,7 @@ describe('ExportCSVButton confirmation', () => {
       />
     );
     const origin = screen.getByRole('button', {
-      name: 'Export data to CSV file',
+      name: 'Export CSV — Export data to CSV file',
     });
     await user.tab();
     await user.keyboard('{Enter}');
@@ -238,7 +246,7 @@ describe('ExportCSVButton confirmation', () => {
       />
     );
     const origin = screen.getByRole('button', {
-      name: 'Export data to CSV file',
+      name: 'Export CSV — Export data to CSV file',
     });
     await user.tab();
     await user.keyboard('{Enter}');
@@ -299,7 +307,9 @@ describe('ExportCSVButton confirmation', () => {
       />
     );
     fireEvent.click(
-      screen.getByRole('button', { name: 'Export data to CSV file' })
+      screen.getByRole('button', {
+        name: 'Export CSV — Export data to CSV file',
+      })
     );
     const confirm = await screen.findByRole('button', { name: 'Download CSV' });
     fireEvent.click(confirm);
@@ -330,7 +340,9 @@ describe('ExportCSVButton confirmation', () => {
       />
     );
     fireEvent.click(
-      screen.getByRole('button', { name: 'Export data to CSV file' })
+      screen.getByRole('button', {
+        name: 'Export CSV — Export data to CSV file',
+      })
     );
     fireEvent.click(
       await screen.findByRole('button', { name: 'Download CSV' })

@@ -75,7 +75,7 @@ export const AvatarCell = React.memo(function AvatarCell({
   ) : (
     <Link
       href={`/${username}`}
-      className='transition-colors hover:text-primary-token'
+      className='underline transition-colors hover:text-primary-token'
       onClick={event => event.stopPropagation()}
     >
       @{username}

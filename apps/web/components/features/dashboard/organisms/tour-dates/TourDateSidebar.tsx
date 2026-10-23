@@ -235,6 +235,7 @@ export function TourDateSidebar({
       <Button
         variant='ghost'
         onClick={handleDeleteClick}
+        aria-label='Delete Tour Date'
         disabled={isPending}
         className='h-8 rounded-full border border-destructive/15 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive'
       >

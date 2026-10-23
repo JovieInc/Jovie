@@ -427,7 +427,7 @@ export function PillSearch({
           size='sm'
           onClick={onClose}
           className='system-b-pill-search-close h-auto shrink-0'
-          aria-label='Close Search'
+          aria-label='Close Search — Esc'
         >
           Esc
         </Button>

@@ -111,6 +111,7 @@ export function DesktopUpdateModalView({
         <DialogBody
           data-testid='desktop-update-notes'
           className='h-48 overflow-y-auto'
+          tabIndex={0}
         >
           {loading ? (
             // The same scroll region bounds loading, notes and fallback content.

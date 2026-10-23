@@ -722,7 +722,7 @@ export function ProfileMobileNotificationsFlow({
           <div className='space-y-6'>
             <div className='space-y-3'>
               <p
-                className='text-app font-semibold tracking-tight text-white/42'
+                className='text-app font-semibold tracking-tight text-white/50'
                 data-testid='profile-mobile-notifications-sent-from'
               >
                 Sent from Jovie
@@ -763,7 +763,7 @@ export function ProfileMobileNotificationsFlow({
               <>
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
-                  <p className='text-app font-semibold tracking-tight text-white/42'>
+                  <p className='text-app font-semibold tracking-tight text-white/50'>
                     Sent by {artistName}
                   </p>
 

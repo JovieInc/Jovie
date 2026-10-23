@@ -587,7 +587,7 @@ describe('useUndoableAnswers', () => {
 });
 
 describe('HomeLoopCanvas answered ask dim (a11y AA floor)', () => {
-  it('dims an answered ask card at opacity-75, never 0.70', () => {
+  it('dims an answered ask card at opacity-80, never 0.70', () => {
     const askId = HOME_LOOP_FIXTURE_ASKS[0]!.id;
     render(
       <HomeLoopCanvas
@@ -603,11 +603,11 @@ describe('HomeLoopCanvas answered ask dim (a11y AA floor)', () => {
         name: HOME_LOOP_FIXTURE_ASKS[0]!.title,
       })
     );
-    expect(card).toHaveClass('opacity-75');
+    expect(card).toHaveClass('opacity-80');
     expect(card).not.toHaveClass('opacity-70');
     for (const openCard of cards.filter(candidate => candidate !== card)) {
       expect(openCard).toHaveAttribute('data-answer-state', 'open');
-      expect(openCard).not.toHaveClass('opacity-75');
+      expect(openCard).not.toHaveClass('opacity-80');
       expect(openCard).not.toHaveClass('opacity-70');
     }
   });

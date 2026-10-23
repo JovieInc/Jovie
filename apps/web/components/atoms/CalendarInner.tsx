@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { DayPicker } from 'react-day-picker';
+import { DayPicker, labelDayButton } from 'react-day-picker';
 import 'react-day-picker/style.css';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +19,7 @@ export default function CalendarInner({
   className,
   classNames,
   showOutsideDays = true,
+  labels,
   ...props
 }: CalendarProps) {
   return (
@@ -56,10 +57,19 @@ export default function CalendarInner({
         selected:
           '[&>button]:bg-btn-primary [&>button]:text-btn-primary-foreground [&>button]:hover:bg-btn-primary-hover [&>button]:font-medium',
         today: '[&>button]:text-primary-token [&>button]:font-medium',
-        outside: '[&>button]:text-tertiary-token [&>button]:opacity-50',
+        outside: '[&>button]:text-secondary-token',
         disabled: '[&>button]:opacity-40 [&>button]:pointer-events-none',
         hidden: 'invisible',
         ...classNames,
+      }}
+      labels={{
+        // Match the visible day number as a whole word (27, rather than 27th).
+        labelDayButton: (date, modifiers, options, dateLib) =>
+          labelDayButton(date, modifiers, options, dateLib).replace(
+            /\b(\d+)(?:st|nd|rd|th)\b/g,
+            '$1'
+          ),
+        ...labels,
       }}
       components={{
         Chevron: CalendarChevron,

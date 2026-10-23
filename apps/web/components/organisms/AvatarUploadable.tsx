@@ -194,10 +194,12 @@ export const AvatarUploadable = React.memo(
             onDragOver={canUpload ? handleDragOver : undefined}
             onDrop={canUpload ? handleDrop : undefined}
             onClick={handleClick}
-            aria-label={isInteractive ? uploadButtonLabel : undefined}
             aria-busy={isUploading || undefined}
             disabled={!isInteractive}
           >
+            {isInteractive && (
+              <span className='sr-only'>{uploadButtonLabel} </span>
+            )}
             <Avatar
               src={previewUrl ?? src}
               className={cn(

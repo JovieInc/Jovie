@@ -67,14 +67,24 @@ export const AnalyticsTabs: Story = {
 export const RetentionDisabled: Story = {
   name: 'Retention disabled',
   render: () => (
-    <TimeRangeSelector
-      value='7d'
-      onValueChange={fn()}
-      ranges={analyticsRanges}
-      variant='tabs'
-      tabsBaseId='analytics-retention'
-      panelId='analytics-retention-panel'
-      maxRetentionDays={30}
-    />
+    <>
+      <TimeRangeSelector
+        value='7d'
+        onValueChange={fn()}
+        ranges={analyticsRanges}
+        variant='tabs'
+        tabsBaseId='analytics-retention'
+        panelId='analytics-retention-panel'
+        maxRetentionDays={30}
+      />
+      <div
+        id='analytics-retention-panel'
+        role='tabpanel'
+        aria-labelledby='analytics-retention-tab-7d'
+        className='sr-only'
+      >
+        Audience trend for 7 days
+      </div>
+    </>
   ),
 };

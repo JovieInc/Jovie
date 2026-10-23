@@ -53,7 +53,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Portrait: Story = {};
+export const Portrait: Story = {
+  decorators: [
+    Story => (
+      <div className='h-96'>
+        <Story />
+      </div>
+    ),
+  ],
+};
 
 export const ProfileLandscape: Story = {
   args: {

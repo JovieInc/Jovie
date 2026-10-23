@@ -13,6 +13,13 @@ const meta = {
       uncoveredProps: ['rowId', 'onMouseEnter'],
     },
   },
+  decorators: [
+    Story => (
+      <div role='listbox' aria-label='Attachments'>
+        <Story />
+      </div>
+    ),
+  ],
   args: {
     item: {
       kind: 'action',

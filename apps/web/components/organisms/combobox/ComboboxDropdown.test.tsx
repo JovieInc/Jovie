@@ -1,21 +1,12 @@
+import { Combobox as HeadlessCombobox } from '@headlessui/react';
 import { render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ComboboxDropdown } from './ComboboxDropdown';
 
+vi.unmock('@headlessui/react');
+
 const legacyBgWhiteClass = ['bg', 'white'].join('-');
 const legacyRingWhiteClass = ['ring', 'white'].join('-');
-
-vi.mock('@headlessui/react', () => ({
-  ComboboxOptions: ({
-    children,
-    static: _static,
-    ...props
-  }: {
-    children: ReactNode;
-    static?: boolean;
-  }) => <div {...props}>{children}</div>,
-}));
 
 function renderDropdown({
   isLoading = false,
@@ -25,13 +16,15 @@ function renderDropdown({
   query?: string;
 }) {
   return render(
-    <ComboboxDropdown
-      listboxId='artist-results'
-      isOpen
-      isLoading={isLoading}
-      query={query}
-      filteredOptions={[]}
-    />
+    <HeadlessCombobox value={null} onChange={() => undefined}>
+      <ComboboxDropdown
+        listboxId='artist-results'
+        isOpen
+        isLoading={isLoading}
+        query={query}
+        filteredOptions={[]}
+      />
+    </HeadlessCombobox>
   );
 }
 
@@ -39,7 +32,7 @@ describe('ComboboxDropdown', () => {
   it('uses the shared select/listbox overlay surface tokens', () => {
     renderDropdown({ query: 'missing' });
 
-    const listbox = document.getElementById('artist-results');
+    const listbox = document.getElementById('artist-results')?.parentElement;
     expect(listbox?.className).toContain('rounded-(--system-b-radius-overlay)');
     expect(listbox?.className).toContain('bg-surface-elevated');
     expect(listbox?.className).toContain('border-default');
@@ -54,12 +47,23 @@ describe('ComboboxDropdown', () => {
       'data-tone',
       'primary'
     );
-    expect(screen.getByText('Searching artists...')).toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: /Searching artists/ })
+    ).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('renders the no-results guidance after a completed search', () => {
     renderDropdown({ query: 'missing' });
-    expect(screen.getByText(/No artists found for/)).toBeInTheDocument();
+    const listbox = screen.getByRole('listbox', { name: 'Artist Suggestions' });
+    expect(
+      screen.getByRole('option', { name: /No artists found for/ })
+    ).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      screen.getByRole('option', { name: /No artists found for/ })
+    ).toHaveAttribute('aria-selected', 'false');
+    expect(listbox).not.toContainElement(
+      screen.getByRole('link', { name: 'Verify your Spotify artist profile' })
+    );
     expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
   });
 });

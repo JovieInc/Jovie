@@ -14,7 +14,11 @@ const meta = {
   decorators: [
     Story => (
       <div className='flex h-screen min-h-0 overflow-hidden bg-surface-page'>
-        <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
+        <div
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable region must be keyboard focusable (axe scrollable-region-focusable)
+          tabIndex={0}
+          className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'
+        >
           <Story />
         </div>
       </div>

@@ -76,7 +76,7 @@ function getStackableClasses(stackable: boolean): string {
 function getStateClasses(state: PlatformPillState): string {
   switch (state) {
     case 'hidden':
-      return 'opacity-60';
+      return 'opacity-90';
     case 'loading':
       return 'animate-pulse motion-reduce:animate-none';
     default:

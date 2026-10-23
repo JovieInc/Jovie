@@ -36,13 +36,13 @@ export function ErrorDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      className='bg-white p-6 shadow-xl ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800'
+      className='bg-surface-1 p-6 shadow-xl ring-1 ring-subtle'
     >
       <div className='space-y-4' data-testid='app-error-dialog'>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
         <DialogBody>
-          <p className='text-sm text-zinc-600 dark:text-zinc-300'>
+          <p className='text-sm text-secondary-token'>
             Something went wrong while processing your request. You can retry
             the last action or close this dialog to continue where you left off.
           </p>
@@ -59,7 +59,7 @@ export function ErrorDialog({
             <button
               type='button'
               onClick={onSecondaryAction ?? onClose}
-              className='inline-flex items-center justify-center rounded-md border border-subtle px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800'
+              className='inline-flex items-center justify-center rounded-md border border-subtle px-4 py-2 text-sm font-medium text-secondary-token transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
             >
               {secondaryActionLabel}
             </button>
@@ -67,7 +67,7 @@ export function ErrorDialog({
           <button
             type='button'
             onClick={onPrimaryAction ?? onClose}
-            className='inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-zinc-900 dark:bg-white dark:text-black'
+            className='inline-flex items-center justify-center rounded-md bg-btn-primary px-4 py-2 text-sm font-medium text-btn-primary-foreground transition hover:bg-btn-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring'
             data-testid='error-dialog-primary-action'
           >
             {primaryActionLabel ?? 'Retry'}

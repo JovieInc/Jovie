@@ -148,6 +148,7 @@ export const LongContent: Story = {
     defaultValue:
       'An extremely long value that should not overflow the narrow input container in visual tests',
     id: 'input-long',
+    'aria-label': 'Profile description',
   },
   decorators: [
     Story => (

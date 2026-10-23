@@ -155,9 +155,8 @@ export function AiCrawlerIntelligenceCard({
         className
       )}
       data-testid='ai-crawler-intelligence-card'
-      aria-label='View AI Crawler Read Details'
     >
-      {rowContent}
+      <span className='sr-only'>View</span> {rowContent}
       <ChevronRight
         className='h-4 w-4 shrink-0 text-tertiary-token'
         aria-hidden='true'

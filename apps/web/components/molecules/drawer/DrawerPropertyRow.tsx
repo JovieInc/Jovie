@@ -8,6 +8,7 @@ type DrawerPropertyRowStyle = CSSProperties & {
 };
 
 export interface DrawerPropertyRowProps {
+  readonly definitionList?: boolean;
   readonly label: ReactNode;
   readonly value: ReactNode;
   readonly labelWidth?: number;
@@ -21,6 +22,7 @@ export interface DrawerPropertyRowProps {
 }
 
 export function DrawerPropertyRow({
+  definitionList = false,
   label,
   value,
   labelWidth,
@@ -33,6 +35,8 @@ export function DrawerPropertyRow({
   className,
 }: DrawerPropertyRowProps) {
   const Wrapper = interactive ? 'button' : 'div';
+  const Label = definitionList ? 'dt' : 'span';
+  const Value = definitionList ? 'dd' : 'span';
 
   const sizeClasses = {
     sm: {
@@ -73,7 +77,7 @@ export function DrawerPropertyRow({
       )}
       style={gridStyle}
     >
-      <span
+      <Label
         className={cn(
           'font-[500] text-quaternary-token',
           styles.label,
@@ -81,8 +85,8 @@ export function DrawerPropertyRow({
         )}
       >
         {label}
-      </span>
-      <span
+      </Label>
+      <Value
         className={cn(
           'min-w-0 font-[460] text-primary-token',
           styles.value,
@@ -90,7 +94,7 @@ export function DrawerPropertyRow({
         )}
       >
         {value}
-      </span>
+      </Value>
     </Wrapper>
   );
 }

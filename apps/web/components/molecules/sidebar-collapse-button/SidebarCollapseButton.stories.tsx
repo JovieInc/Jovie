@@ -17,7 +17,10 @@ const meta: Meta<typeof SidebarCollapseButton> = {
   decorators: [
     Story => (
       <SidebarProvider>
-        <div className='flex items-center gap-4 bg-surface-1 p-6'>
+        <div
+          id='shell-left-rail'
+          className='flex items-center gap-4 bg-surface-1 p-6'
+        >
           <Story />
           <span className='text-xs text-secondary-token'>
             Hover for circular highlight · no border

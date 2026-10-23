@@ -20,7 +20,12 @@ export const Default: Story = {
 };
 
 export const Disabled: Story = {
-  args: { disabled: true, defaultValue: 'Read only', id: 'ta-disabled' },
+  args: {
+    disabled: true,
+    defaultValue: 'Read only',
+    id: 'ta-disabled',
+    'aria-label': 'Release notes',
+  },
 };
 
 export const Error: Story = {
@@ -67,6 +72,7 @@ export const Sizes: Story = {
 export const LongContent: Story = {
   args: {
     id: 'ta-long',
+    'aria-label': 'Bio',
     defaultValue: Array.from(
       { length: 8 },
       (_, i) => `Line ${i + 1} of bio content.`

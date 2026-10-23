@@ -107,39 +107,42 @@ export function OpportunityInboxFeed({
       aria-label='Opportunity Inbox Feed'
     >
       <div className='system-b-opportunity-inbox-section-label'>Today</div>
-      <div className='system-b-opportunity-inbox-feed-list'>
+      <ul className='system-b-opportunity-inbox-feed-list'>
         {cards
           .filter(card => card.category !== 'workflow_capture')
           .map(card =>
             card.category === 'report' && card.report ? (
-              <OpportunityInboxReportCard
-                key={card.id}
-                card={card}
-                onNextStep={onNextStep ?? onApprove}
-                onDismiss={onDismiss}
-                isSubmittingNextStep={pendingNextStepId === card.id}
-                isDismissing={pendingActionId === card.id}
-              />
+              <li key={card.id}>
+                <OpportunityInboxReportCard
+                  card={card}
+                  onNextStep={onNextStep ?? onApprove}
+                  onDismiss={onDismiss}
+                  isSubmittingNextStep={pendingNextStepId === card.id}
+                  isDismissing={pendingActionId === card.id}
+                />
+              </li>
             ) : card.category === 'social_reply' && card.socialReply ? (
-              <OpportunityInboxSocialReplyCard
-                key={card.id}
-                card={card}
-                onApprove={id => void onApprove(id)}
-                onDismiss={id => void onDismiss(id)}
-                onRevise={onRevise ?? (() => undefined)}
-                isApproving={pendingActionId === card.id}
-                isDismissing={pendingActionId === card.id}
-                isRevising={pendingReviseId === card.id}
-              />
+              <li key={card.id}>
+                <OpportunityInboxSocialReplyCard
+                  card={card}
+                  onApprove={id => void onApprove(id)}
+                  onDismiss={id => void onDismiss(id)}
+                  onRevise={onRevise ?? (() => undefined)}
+                  isApproving={pendingActionId === card.id}
+                  isDismissing={pendingActionId === card.id}
+                  isRevising={pendingReviseId === card.id}
+                />
+              </li>
             ) : card.category === 'youtube_thumbnail' &&
               card.youtubeThumbnail ? (
-              <OpportunityInboxYoutubeThumbnailCard
-                key={card.id}
-                card={card}
-                onApprove={onApprove}
-                onReject={onDismiss}
-                isBusy={pendingActionId === card.id}
-              />
+              <li key={card.id}>
+                <OpportunityInboxYoutubeThumbnailCard
+                  card={card}
+                  onApprove={onApprove}
+                  onReject={onDismiss}
+                  isBusy={pendingActionId === card.id}
+                />
+              </li>
             ) : (
               <OpportunityRow
                 key={card.id}
@@ -159,7 +162,7 @@ export function OpportunityInboxFeed({
               />
             )
           )}
-      </div>
+      </ul>
     </section>
   );
 }

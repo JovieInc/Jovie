@@ -206,7 +206,7 @@ test.describe('OV responsive navigation exclusivity', () => {
           (async () => {
             if (entry === 'selector') {
               await page
-                .getByRole('button', { name: 'Switch Workspace' })
+                .getByRole('button', { name: /^Switch Workspace: / })
                 .click();
               await page
                 .getByRole('menuitem', {
@@ -225,7 +225,7 @@ test.describe('OV responsive navigation exclusivity', () => {
             } else {
               // The shortcut intentionally ignores focused text inputs.
               await page
-                .getByRole('button', { name: 'Switch Workspace' })
+                .getByRole('button', { name: /^Switch Workspace: / })
                 .focus();
               await page.keyboard.press('Alt+Shift+KeyW');
             }
@@ -233,7 +233,7 @@ test.describe('OV responsive navigation exclusivity', () => {
         ]);
         await expect(page).toHaveURL(new RegExp(`${destination.href}/?$`));
         await expect(
-          page.getByRole('button', { name: 'Switch Workspace' })
+          page.getByRole('button', { name: /^Switch Workspace: / })
         ).toHaveText(destination.label);
         if (destination.label === 'OV') {
           await expect(operatorNavigation).toBeVisible();

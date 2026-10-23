@@ -178,7 +178,7 @@ interface ReleasesListContentProps {
   readonly onSelect: (release: ReleaseViewModel) => void;
   readonly onClearFilters: () => void;
   /** Ref forwarded to the listbox element for keyboard-nav focus scoping. */
-  readonly listboxRef?: RefObject<HTMLUListElement | null>;
+  readonly listboxRef?: RefObject<HTMLDivElement | null>;
 }
 
 function ReleasesListContent({
@@ -308,11 +308,10 @@ function ReleasesListContent({
   }
 
   return (
-    <ul
+    // biome-ignore lint/a11y/useSemanticElements: context-menu hosts wrap the listitem rows, so an ARIA list keeps those transparent wrappers valid
+    <div
       ref={listboxRef}
-      // Native `ul` (implicit role=list) + `listitem` rows: each row owns
-      // real interactive controls, which an ARIA `option` cannot contain
-      // (axe nested-interactive).
+      role='list'
       aria-label='Releases'
       className='py-1.5 space-y-px px-2'
     >
@@ -337,7 +336,7 @@ function ReleasesListContent({
           </div>
         </TableContextMenu>
       ))}
-    </ul>
+    </div>
   );
 }
 
@@ -574,7 +573,7 @@ export function ShellReleasesView({
   );
 
   /** Ref for the listbox container — used to scope J/K nav to the releases list. */
-  const listboxRef = useRef<HTMLUListElement>(null);
+  const listboxRef = useRef<HTMLDivElement>(null);
 
   useAmbientListSelection({
     enabled: visibleReleases.length > 0,

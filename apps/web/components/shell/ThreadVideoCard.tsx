@@ -42,7 +42,7 @@ export function ThreadVideoCard({
           ? {
               type: 'button' as const,
               onClick: onPlay,
-              'aria-label': `Play ${title}`,
+              'aria-label': `Play ${title} — ${formatDuration(durationSec)}`,
             }
           : {})}
         className='system-b-thread-media-preview system-b-thread-video-preview group'

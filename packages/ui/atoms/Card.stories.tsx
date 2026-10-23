@@ -273,7 +273,7 @@ export const PartialData: Story = {
     docs: {
       description: {
         story:
-          'Partial-data state via data-content-state="partial" and --state-partial-opacity.',
+          'Partial-data state via data-content-state="partial" and reduced saturation without dimming text.',
       },
     },
   },

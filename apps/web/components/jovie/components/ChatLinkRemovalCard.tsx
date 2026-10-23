@@ -146,7 +146,7 @@ export function ChatLinkRemovalCard({
             disabled={state === 'removing'}
             className={cn(
               'system-b-chat-link-primary-action',
-              'bg-error text-error-foreground hover:bg-error/90',
+              'bg-(--color-btn-destructive-bg) text-(--color-btn-destructive-fg) hover:opacity-90',
               'disabled:opacity-50 transition-colors'
             )}
           >

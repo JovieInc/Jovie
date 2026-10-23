@@ -122,7 +122,7 @@ describe('StackableBadgeGroup', () => {
     );
 
     expect(screen.getByTitle('Selected')).toHaveClass('ring-1');
-    expect(screen.getByTitle('Disabled')).toHaveClass('opacity-50');
+    expect(screen.getByTitle('Disabled')).toHaveClass('text-tertiary-token');
     expect(screen.getByTitle('Selected')).toHaveAttribute(
       'data-selected',
       'true'

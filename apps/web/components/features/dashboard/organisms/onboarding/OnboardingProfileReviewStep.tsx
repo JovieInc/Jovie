@@ -424,8 +424,8 @@ export function OnboardingProfileReviewStep({
                         type='button'
                         onClick={startEditingName}
                         className='group cursor-pointer focus-ring-themed rounded-md'
-                        aria-label='Edit Display Name'
                       >
+                        <span className='sr-only'>Edit Display Name:</span>{' '}
                         <span className='text-base font-semibold text-primary-token transition-colors group-hover:text-accent'>
                           {editableDisplayName}
                         </span>

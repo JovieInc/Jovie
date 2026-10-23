@@ -9,8 +9,17 @@ const meta = {
     layout: 'centered',
   },
   decorators: [
-    Story => (
-      <div className='w-full max-w-sm text-primary-token'>{Story()}</div>
+    (Story, context) => (
+      <div className='w-full max-w-sm text-primary-token'>
+        <Story />
+        <div
+          id='audience-details'
+          hidden={!context.args.isOpen}
+          className='sr-only'
+        >
+          Audience details content
+        </div>
+      </div>
     ),
   ],
   args: {

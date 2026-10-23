@@ -142,7 +142,7 @@ describe('ConnectorCard', () => {
       />
     );
     expect(
-      screen.getByRole('button', { name: 'Disconnect Spotify' })
+      screen.getByRole('button', { name: 'Disconnecting… Spotify' })
     ).toBeDisabled();
     expect(screen.getByText('Disconnecting…')).toBeInTheDocument();
     expect(container.firstElementChild).toHaveAttribute('aria-busy', 'true');
@@ -175,6 +175,12 @@ describe('ConnectorCard', () => {
           name: `Gmail status: ${statusLabel}`,
         })
       ).toHaveAttribute('data-variant', statusVariant);
+
+      if (status === 'error') {
+        expect(
+          screen.getByRole('status', { name: 'Gmail status: Error' })
+        ).toHaveClass('text-primary-token');
+      }
 
       const action = screen.getByRole('button', {
         name: `${actionLabel} Gmail`,

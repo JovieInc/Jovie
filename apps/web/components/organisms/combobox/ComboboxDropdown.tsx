@@ -1,6 +1,9 @@
 'use client';
 
-import { ComboboxOptions } from '@headlessui/react';
+import {
+  ComboboxOptions,
+  ComboboxOption as HeadlessComboboxOption,
+} from '@headlessui/react';
 import { Spinner as LoadingSpinner } from '@jovie/ui';
 import {
   OVERLAY_CONTENT_RADIUS,
@@ -26,57 +29,66 @@ export const ComboboxDropdown = forwardRef<
   const hasResults = filteredOptions.length > 0;
   const showNoResults = query.length > 0 && !hasResults && !isLoading;
 
+  const surfaceClassName = cn(
+    'absolute z-50 mt-2 max-h-60 w-full overflow-y-auto overflow-x-hidden p-1 focus-visible:outline-none',
+    OVERLAY_CONTENT_RADIUS,
+    OVERLAY_SURFACE_BASE
+  );
+
   return (
-    <ComboboxOptions
-      ref={ref}
-      id={listboxId}
-      className={cn(
-        'absolute z-50 mt-2 max-h-60 w-full overflow-y-auto overflow-x-hidden p-1 focus-visible:outline-none',
-        OVERLAY_CONTENT_RADIUS,
-        OVERLAY_SURFACE_BASE
+    <div className={surfaceClassName} hidden={!isOpen}>
+      <ComboboxOptions
+        ref={ref}
+        id={listboxId}
+        static={isOpen}
+        aria-label='Artist Suggestions'
+      >
+        {isLoading && query.length > 0 ? (
+          <HeadlessComboboxOption
+            disabled
+            value='__loading__'
+            className='px-4 py-3 text-sm text-secondary-token'
+          >
+            <div className='flex items-center space-x-2'>
+              <LoadingSpinner size='sm' className='text-tertiary-token' />
+              <span>Searching artists...</span>
+            </div>
+          </HeadlessComboboxOption>
+        ) : showNoResults ? (
+          <HeadlessComboboxOption
+            disabled
+            value='__no-results__'
+            className='px-4 pt-4 pb-2 text-sm text-secondary-token'
+          >
+            No artists found for &quot;{query}&quot;
+          </HeadlessComboboxOption>
+        ) : (
+          filteredOptions.map((option, index) => (
+            <ComboboxOptionItem key={option.id} option={option} index={index} />
+          ))
+        )}
+      </ComboboxOptions>
+      {showNoResults && (
+        <p className='px-4 pb-4 text-xs text-tertiary-token'>
+          Can&apos;t find your artist?{' '}
+          <a
+            href='https://artists.spotify.com'
+            target='_blank'
+            rel='noopener noreferrer'
+            className='text-accent hover:text-accent-hover underline'
+          >
+            Verify your Spotify artist profile
+          </a>
+        </p>
       )}
-      static={isOpen}
-    >
-      {(() => {
-        if (isLoading && query.length > 0) {
-          return (
-            <output
-              className='px-4 py-3 text-sm text-secondary-token'
-              aria-live='polite'
-            >
-              <div className='flex items-center space-x-2'>
-                <LoadingSpinner size='sm' className='text-tertiary-token' />
-                <span>Searching artists...</span>
-              </div>
-            </output>
-          );
-        }
-        if (showNoResults) {
-          return (
-            <output
-              className='px-4 py-4 text-sm text-secondary-token'
-              aria-live='polite'
-            >
-              <p className='mb-2'>No artists found for &quot;{query}&quot;</p>
-              <p className='text-xs text-tertiary-token'>
-                Can&apos;t find your artist?{' '}
-                <a
-                  href='https://artists.spotify.com'
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className='text-accent hover:text-accent-hover underline'
-                >
-                  Verify your Spotify artist profile
-                </a>
-              </p>
-            </output>
-          );
-        }
-        return filteredOptions.map((option, index) => (
-          <ComboboxOptionItem key={option.id} option={option} index={index} />
-        ));
-      })()}
-    </ComboboxOptions>
+      <span role='status' className='sr-only'>
+        {isLoading && query.length > 0
+          ? 'Searching artists...'
+          : showNoResults
+            ? `No artists found for "${query}"`
+            : ''}
+      </span>
+    </div>
   );
 });
 

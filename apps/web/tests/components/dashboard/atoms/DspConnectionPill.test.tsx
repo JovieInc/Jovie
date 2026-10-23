@@ -36,7 +36,7 @@ describe('DspConnectionPill', () => {
     expect(screen.getByText('Jovie Artist')).toBeInTheDocument();
   });
 
-  it('uses provider label in disconnected aria-label', () => {
+  it('includes the provider and visible disconnected status in its name', () => {
     render(
       <DspConnectionPill
         provider='apple_music'
@@ -46,7 +46,7 @@ describe('DspConnectionPill', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: 'Connect Apple Music' })
+      screen.getByRole('button', { name: 'Connect Apple Music: Not Connected' })
     ).toBeInTheDocument();
     expect(screen.getByTestId('provider-icon-apple_music')).toBeInTheDocument();
   });

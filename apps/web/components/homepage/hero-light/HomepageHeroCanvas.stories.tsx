@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, within } from 'storybook/test';
+import { expect, waitFor, within } from 'storybook/test';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { HomepageHeroCanvas } from './HomepageHeroCanvas';
@@ -18,6 +18,9 @@ const meta = {
       },
     },
   },
+  beforeEach: () => {
+    globalThis.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  },
   args: {
     headingId: 'home-hero-heading',
     headline: hero.headline,
@@ -30,6 +33,9 @@ const meta = {
   decorators: [
     Story => (
       <div className='dark min-h-svh bg-base text-primary-token'>
+        {/* The preview freezes timed animations at 0s. Scroll timelines need
+            auto duration to preserve the real scroll position instead. */}
+        <style>{`.homepage-hero-canvas { animation-duration: auto !important; }`}</style>
         <Story />
       </div>
     ),
@@ -56,11 +62,14 @@ export const WithCanonicalHeader: Story = {
     </PublicPageShell>
   ),
   play: async ({ canvasElement }) => {
+    globalThis.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     const canvas = within(canvasElement);
     await expect(canvas.getByTestId('header-nav')).toBeVisible();
-    await expect(
-      canvas.getByRole('heading', { level: 1, name: hero.headline })
-    ).toBeVisible();
+    await waitFor(() =>
+      expect(
+        canvas.getByRole('heading', { level: 1, name: hero.headline })
+      ).toBeVisible()
+    );
     await expect(canvas.getAllByTestId('homepage-claim-form')).toHaveLength(1);
     await expect(canvas.getByTestId('homepage-primary-cta')).toBeVisible();
     await expect(canvas.getByTestId('homepage-claim-form')).toHaveAttribute(

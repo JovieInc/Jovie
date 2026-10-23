@@ -157,9 +157,9 @@ export function DspConnectionPill({
         'border-subtle bg-surface-0 text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token',
         className
       )}
-      aria-label={`Connect ${label}`}
     >
       <DspProviderIcon provider={provider} size='sm' className='gap-0' />
+      <span className='sr-only'>Connect {label}:</span>{' '}
       <span>Not Connected</span>
       <Plus className='h-4 w-4 shrink-0' />
     </button>

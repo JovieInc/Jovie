@@ -4,6 +4,13 @@ import { LyricRow } from './LyricRow';
 const meta = {
   title: 'Shell/LyricRow',
   component: LyricRow,
+  decorators: [
+    Story => (
+      <ul>
+        <Story />
+      </ul>
+    ),
+  ],
   parameters: {
     layout: 'centered',
   },
