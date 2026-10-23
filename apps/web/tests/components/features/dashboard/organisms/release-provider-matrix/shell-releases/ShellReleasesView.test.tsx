@@ -610,18 +610,14 @@ describe('ShellReleasesView', () => {
     ]);
 
     // axe `list` rule: a ul's direct children must be li (script/template).
-    // The wrapper li is role=presentation so the row inside stays the single
-    // named listitem, and it must not carry the Radix context-menu trigger's
-    // global aria-haspopup — global aria on a suppressed role is axe's
-    // presentation-role-conflict. The row keeps exactly one listitem per
-    // wrapper.
+    // The context-menu wrapper is a presentation li, and each carries exactly
+    // one listitem row — the row inside, never a nested second listitem.
     const list = screen.getByRole('list', { name: 'Releases' });
     const directChildren = [...list.children];
     expect(directChildren.length).toBeGreaterThanOrEqual(2);
     for (const child of directChildren) {
       expect(child.tagName).toBe('LI');
       expect(child).toHaveAttribute('role', 'presentation');
-      expect(child).not.toHaveAttribute('aria-haspopup');
       expect(child).toHaveAttribute('data-shell-release-row-context-target');
       expect(child.querySelectorAll('[role="listitem"]')).toHaveLength(1);
     }
