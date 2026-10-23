@@ -219,6 +219,18 @@ const COPY_ONLY_FIXTURE_ENTRY: Pick<
 };
 
 describe('product-evidence contract (JOV-6917)', () => {
+  it('binds the download hero to its complete accessible heading', () => {
+    const { getByRole, getByTestId } = render(<DownloadPage />);
+    const heading = getByRole('heading', {
+      level: 1,
+      name: 'Jovie, Installed Where You Work.',
+    });
+    expect(getByTestId('marketing-section-hero')).toHaveAttribute(
+      'aria-labelledby',
+      heading.id
+    );
+  });
+
   it('Card uses an honest planned description instead of a destination-profile screenshot', () => {
     const { container } = render(<JovieCardLanding />);
     const hero = container.querySelector<HTMLElement>(
