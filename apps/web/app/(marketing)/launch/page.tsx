@@ -481,8 +481,7 @@ export default function LaunchPage() {
                 <p className='system-b-launch-kicker'>Launch</p>
                 <h1
                   id='hero-heading'
-                  data-wrap='editorial-title'
-                  className='system-b-launch-hero-title text-balance'
+                  className='system-b-launch-hero-title marketing-h1-max-two-lines text-balance'
                 >
                   {/* ui-casing-allow: marketing display headline */}
                   Your entire music career. One intelligent link.

@@ -26,6 +26,17 @@ describe('DownloadPage hero layout', () => {
     expect(copy?.parentElement).not.toHaveClass('items-center');
   });
 
+  it('steps the split-column hero down so the full headline stays inside two lines', () => {
+    render(<DownloadPage />);
+
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Jovie, Installed Where You Work.',
+      })
+    ).toHaveClass('text-balance', 'sm:text-6xl', 'lg:text-5xl', 'xl:text-6xl');
+  });
+
   it('does not call the shipped Mac app native', () => {
     render(<DownloadPage />);
 

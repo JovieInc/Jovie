@@ -388,9 +388,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-23T20:43:34.826Z",
-        "ref": "PR 3 of the single-container work: home.css, section, blog and artist-profile widths moved onto the one .public-container token; /pricing edges re-measured with a Playwright run against the dev build of this branch (x 71-1369 at 1440, 24-366 at 390, no horizontal overflow); full-page captures at 1440 and 390 reviewed, no regression; ArtistProfileLandingPage.css only lost its unused homepage-grid aliases",
-        "sourceDigest": "512c534167adf8fb586d5fdda03f289fed7cfb0f0b5787ff6037161e177d6622"
+        "at": "2026-10-23T22:18:41.922Z",
+        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md. Merged with PR #22849: home, section, blog, and artist-profile widths use one .public-container token; pricing section and chart dropped the 64rem cap; /pricing edges stayed x 71-1369 at 1440 and x 24-366 at 390 with no horizontal overflow. JOV-8882 launch-hero selectors in the shared stylesheet match no /pricing elements.",
+        "sourceDigest": "8e04962d231d816b3936aaef2002e05d3d28994daa8a970035b91ce66eca8536"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
