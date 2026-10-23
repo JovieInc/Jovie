@@ -11,15 +11,15 @@ import {
 const webRoot = resolve(__dirname, '../../..');
 
 describe('commercial hub sitemap revisions', () => {
-  it('dates unbound commercial roots from cited route-manifest evidence', () => {
+  it('dates unbound commercial roots from their latest cited content changes', () => {
     expect(getPublishedCommercialHubPaths()).toEqual(
       expect.arrayContaining(['/', '/pricing'])
     );
     expect(commercialHubContentRevision('/')?.toISOString()).toBe(
-      '2026-10-20T00:00:00.000Z'
+      '2026-10-23T00:00:00.000Z'
     );
     expect(commercialHubContentRevision('/pricing')?.toISOString()).toBe(
-      '2026-09-29T00:00:00.000Z'
+      '2026-10-23T00:00:00.000Z'
     );
   });
 

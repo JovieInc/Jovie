@@ -110,13 +110,13 @@ export function getExactPublishedMarketingPaths(
 
 /**
  * Cited revisions for commercial hubs that have no capability binding.
- * Do not invent a date: each value is the route-manifest evidence date.
+ * Cite the latest substantive copy or metadata change, not a design audit date.
  */
 const UNBOUND_COMMERCIAL_HUB_REVISIONS = {
-  // EVENT 2026-10-20 artist-profile homepage.
-  '/': '2026-10-20',
-  // JOV-6220 source and live section census.
-  '/pricing': '2026-09-29',
+  // 879d26b2fba (#22715): homepage headline and SEO title.
+  '/': '2026-10-23',
+  // 12cad60b76a (#22725): pricing description and share metadata.
+  '/pricing': '2026-10-23',
 } as const;
 
 /**

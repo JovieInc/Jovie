@@ -1,5 +1,26 @@
 # Pricing certification
 
+Current renewal: 2026-10-23, PR #22727 after merging main at `ff8d67dc6a2`.
+The shared footer now uses named sections and paragraph column labels, keeping
+its titles out of the page heading outline. This renewal covers that owner change.
+
+- Node 24.22.1, Next 16.4.1, Chromium; local URL `http://localhost:33127/pricing`.
+- `PUBLIC_NOAUTH_SMOKE=1 NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_E2E_MODE=1`.
+- `BASE_URL=http://localhost:33127 E2E_SKIP_WEB_SERVER=1 E2E_SKIP_SEED=1 E2E_SKIP_WARMUP=1 pnpm --filter @jovie/web exec playwright test tests/e2e/pricing.spec.ts --config=playwright.config.noauth.ts --project=chromium --workers=1 --reporter=line`: **10 passed**.
+- Fresh captures replace the previous images: [320px](pricing-320.png),
+  [390px](pricing-390.png), [768px](pricing-768.png), [1440px](pricing-1440.png).
+  Reviewed at 320px and 1440px. No horizontal overflow; footer geometry stays
+  stable across two animation frames after fonts at all four widths.
+- The footer has 29 links, five named column sections, and no headings.
+  The pricing suite also checks keyboard navigation, both motion preferences,
+  comparison geometry, attribution and zero axe WCAG violations.
+- Footer and onboarding browser-backed Storybook checks: **5 passed** across
+  two story files, including named footer sections and the recovery H1.
+- Source digest: `5c405df5a1216b60d4b73849e16e2f527ff7666e367f213cc53ba75acef5ef68`.
+  This is local source/browser evidence, not a deployment receipt.
+
+## Previous renewal, 2026-10-21
+
 Current renewal: 2026-10-21, PR #22351 after merging PR #22382 from main.
 Local source/browser evidence only. The merged source preserves the $12/month
 self-serve offer and Pro claim CTA while moving shared container CSS into its
