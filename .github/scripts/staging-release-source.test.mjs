@@ -12,6 +12,7 @@ import { delimiter, join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import {
   command,
+  describeReleaseSource,
   resolveStagingReleaseSource,
   runStagingReleaseSource,
 } from './staging-release-source.mjs';
@@ -250,6 +251,13 @@ test('non-Web not-applicable completion still reaches cumulative production rang
     ].total_count = 1;
     const result = resolveStagingReleaseSource(f.input);
     assert.equal(result.eligible, outcome === 'not_applicable');
+    assert.equal(result.outcome, outcome);
+    assert.match(
+      describeReleaseSource(result, f.trigger),
+      outcome === 'superseded'
+        ? /finished as superseded .*production release skipped: a newer staging generation replaces it\./
+        : /finished as not_applicable .*production release is eligible\./
+    );
     assert.equal(result.stagingArtifactId, '');
     assert.equal(result.ci.id, ciId);
   }
@@ -495,6 +503,12 @@ test('real workflow command reads only authenticated data ZIP entries and writes
     );
     assert.equal(JSON.parse(output.ci).run_attempt, 2);
     assert.equal(output.eligible, 'true');
+    const summary = join(f.root, 'summary.md');
+    runStagingReleaseSource({ ...f.env, GITHUB_STEP_SUMMARY: summary });
+    assert.match(
+      readFileSync(summary, 'utf8'),
+      /### Staging release source\n\nStaging generation [0-9a-f]{40} finished as deployed \(staging run \d+ attempt \d+, CI run \d+ attempt 2\); production release is eligible\./
+    );
   } finally {
     process.env.PATH = previousPath;
   }

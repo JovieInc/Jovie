@@ -345,7 +345,7 @@ class AutoscaleTest(unittest.TestCase):
                     patch.object(lane, "provider_healthy", return_value=True), patch.object(lane, "ensure_full_history"), \
                     patch.object(lane.disk_guard, "check", return_value={"admitted": True, "freePct": 40}), \
                     patch.object(lane.subprocess, "Popen", side_effect=lambda args, **kw: spawned.append(args[-1])), \
-                    patch.object(lane.shipping_origin, "collect", return_value={}), \
+                    patch.object(lane, "collect_shipping_origin", return_value={}), \
                     patch.object(lane, "quota_pressure", return_value={"ok": True}), \
                     patch.object(lane.pr_events, "tick", return_value={}), patch.object(lane.reason_lane, "tick", return_value={}), \
                     patch.object(lane.yc_corpus, "tick", return_value={}), \
@@ -375,7 +375,8 @@ class AutoscaleTest(unittest.TestCase):
         def budget(name, slots):
             recorded["slots"] = slots; result = lane.new_issue_budget(name, slots, []); recorded["cap"], recorded["terminalCap"] = result["cap"], result["terminalCap"]; return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": None, "terminal": 0, "terminalCap": None}
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
-            root = Path(tmp); (root / "linear.env").write_text("LINEAR_API_KEY=test\n"); host = lane.Host(state=root / "state", repo=root, linear_env=root / "linear.env")
+            root = Path(tmp); (root / "linear-app.env").write_text("LINEAR_CLIENT_ID=cid\nLINEAR_CLIENT_SECRET=sec\n"); host = lane.Host(state=root / "state", repo=root, linear_env=root / "linear-app.env")
+            app = patch.object(lane.linear_app_token, "default_path", return_value=root / "linear-app.env"); app.start(); self.addCleanup(app.stop)
             with patch.object(lane.autoscale, "effective_slots", return_value=9), \
                     patch.object(lane.autoscale, "intake_slots", return_value=9), \
                     patch.object(lane.disk_guard, "check", return_value={"admitted": True, "freePct": 40}), \

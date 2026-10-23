@@ -12,6 +12,7 @@ import os
 import pathlib
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -36,6 +37,12 @@ if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"could not load {GATE}")
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+
+
+def setUpModule() -> None:
+    # observe_main polls while Main Release Ready is missing or pending.
+    # Existing fixtures are one-shot reads; a positive budget would sleep.
+    os.environ["FLEET_GATE_RELEASE_READY_POLL_SECONDS"] = "0"
 
 
 class FakeResponse:
@@ -296,6 +303,62 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["sourceGate"]["ancestorSha"], "c" * 40)
         self.assertIn("fell back to the newest real Main Release Ready attempt", observed["error"])
 
+    def test_observe_main_uses_recent_ci_before_exact_gate_materializes(self):
+        """JOV-8148: no check/job exists yet on the newly merged main head."""
+        now = MODULE.datetime(2026, 10, 22, 14, 18, tzinfo=MODULE.UTC)
+        for case, expected in (
+            ("success", "green"),
+            ("failure", "red"),
+            ("timed_out", "red"),
+            ("skipped", "unknown"),
+            ("missing", "unknown"),
+            ("stale", "unknown"),
+            ("offline", "unknown"),
+        ):
+            with self.subTest(case=case):
+                exact_response = _main_fixture([], combined_state="pending")
+
+                def github_response(repo: str, endpoint: str):
+                    if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                        if case == "offline":
+                            raise OSError("GitHub observation unavailable")
+                        return {"workflow_runs": [] if case == "missing" else [{
+                            "id": 424245,
+                            "head_sha": "b" * 40,
+                            "created_at": "2026-10-22T10:00:00Z"
+                            if case == "stale" else "2026-10-22T13:55:21Z",
+                        }]}
+                    if endpoint == "actions/runs/424245/jobs?per_page=100":
+                        self.assertNotEqual(case, "stale")
+                        return {"jobs": [{
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": case,
+                            "started_at": "2026-10-22T13:56:00Z",
+                            "completed_at": "2026-10-22T13:56:38Z",
+                        }]}
+                    return exact_response(repo, endpoint)
+
+                with (
+                    mock.patch.object(MODULE, "gh_json", side_effect=github_response) as github,
+                    mock.patch.object(MODULE, "utc_now", return_value=now),
+                ):
+                    observed = MODULE.observe_main("JovieInc/Jovie")
+
+                self.assertEqual(observed["status"], expected)
+                self.assertEqual(observed["sha"], MAIN_SHA)
+                github.assert_any_call(
+                    "JovieInc/Jovie",
+                    "actions/workflows/ci.yml/runs?branch=main&event=push&per_page=10",
+                )
+                self.assertEqual(observed["requiredChecks"][0]["verdict"], "missing")
+                if expected in {"green", "red"}:
+                    self.assertEqual(observed["sourceGate"]["ancestorSha"], "b" * 40)
+                    self.assertEqual(observed["sourceGate"]["source"], "ancestor-ci-workflow-job")
+                else:
+                    self.assertEqual(observed["reason"], "required-check-missing")
+                    self.assertIn("no completed real attempt", observed["error"])
+
     def test_observe_main_ancestor_fallback_fails_closed_when_bound_exceeded(self):
         """No real attempt within the freshness bound: main stays unknown."""
 
@@ -380,23 +443,236 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertNotIn("error", observed)
 
     def test_observe_main_preserves_exact_sha_when_release_gate_is_missing(self):
-        def github_response(_repo: str, endpoint: str):
-            if endpoint == "branches/main":
-                return {"commit": {"sha": MAIN_SHA}}
-            if endpoint == f"commits/{MAIN_SHA}/status":
-                return {"state": "success"}
-            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
-                return {"check_runs": []}
-            if endpoint.startswith("actions/runs?"):
-                return {"workflow_runs": []}
-            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
-
-        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+        with mock.patch.object(
+            MODULE, "gh_json", side_effect=_main_fixture([], combined_state="success")
+        ):
             observed = MODULE.observe_main("JovieInc/Jovie")
 
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
-        self.assertIn("Main Release Ready check is missing", observed["error"])
+        self.assertEqual(observed["reason"], "required-check-missing")
+        self.assertIn("no completed real attempt", observed["error"])
+
+    def test_observe_main_retries_transient_502_then_reads_release_ready(self):
+        """JOV-8338: a fast GitHub 502 on the release-ready read is retried.
+
+        Wave 39794210914 failed closed at main:unknown. A later successful
+        read must be allowed to grade the check. Backoff stays bounded.
+        """
+        calls = {"check_runs": 0}
+        check_endpoints: list[str] = []
+
+        def run(command, **_kwargs):
+            endpoint = command[-1]
+            if endpoint.endswith("/branches/main"):
+                body = {"commit": {"sha": MAIN_SHA}}
+            elif endpoint.endswith(f"/commits/{MAIN_SHA}/status"):
+                body = {"state": "success"}
+            elif f"/commits/{MAIN_SHA}/check-runs?" in endpoint:
+                calls["check_runs"] += 1
+                check_endpoints.append(endpoint)
+                if calls["check_runs"] == 1:
+                    return _gh_completed(
+                        command,
+                        'HTTP/2.0 502 Bad Gateway\r\n\r\n{"message":"Server Error"}\n',
+                        "gh: HTTP 502\n",
+                        1,
+                    )
+                body = {
+                    "total_count": 1,
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "started_at": "2026-10-22T14:10:00Z",
+                            "completed_at": "2026-10-22T14:12:00Z",
+                        }
+                    ],
+                }
+            elif endpoint.startswith("repos/JovieInc/Jovie/actions/artifacts?"):
+                body = {"artifacts": []}
+            else:
+                raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+            return _gh_completed(
+                command,
+                f"HTTP/2.0 200 OK\r\n\r\n{json.dumps(body)}\n",
+            )
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "FLEET_GATE_HTTP_CACHE": "off",
+                    "FLEET_GATE_RELEASE_READY_POLL_SECONDS": "0",
+                },
+            ),
+            mock.patch.object(MODULE.subprocess, "run", side_effect=run),
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["sourceGate"]["conclusion"], "success")
+        self.assertNotIn("Main Release Ready check is missing", observed.get("error", ""))
+        # Unfiltered page 502, its retry, then the name-filtered read.
+        self.assertEqual(calls["check_runs"], 3)
+        self.assertTrue(
+            any(
+                "check_name=Main%20Release%20Ready" in endpoint and "filter=all" in endpoint
+                for endpoint in check_endpoints
+            )
+        )
+        sleep.assert_called_once_with(1)
+
+    def test_observe_main_fail_closed_after_transient_budget_is_not_a_missing_check(self):
+        def always_502(command, **_kwargs):
+            return _gh_completed(
+                command,
+                "HTTP/2.0 502 Bad Gateway\r\n\r\n{}\n",
+                "gh: HTTP 502\n",
+                1,
+            )
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "FLEET_GATE_HTTP_CACHE": "off",
+                    "FLEET_GATE_RELEASE_READY_POLL_SECONDS": "0",
+                },
+            ),
+            mock.patch.object(MODULE.subprocess, "run", side_effect=always_502) as run,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["sha"], MODULE.UNKNOWN_MAIN_SHA)
+        self.assertIn("github-observation-failed", observed["error"])
+        self.assertNotIn("Main Release Ready check is missing", observed["error"])
+        self.assertEqual(run.call_count, MODULE.GH_TRANSIENT_OBSERVATION_ATTEMPTS)
+        self.assertEqual(
+            [call.args[0] for call in sleep.call_args_list],
+            [1, 2],
+        )
+
+    def test_observe_main_missing_check_fails_closed_without_retry(self):
+        """A completed read with no Main Release Ready check is not a 502.
+
+        The 5xx retry must not run. With the poll budget forced to 0, a
+        still-absent check fails closed on that read. The bounded wait is
+        covered by the poll tests.
+        """
+
+        calls: list[str] = []
+
+        def run(command, **_kwargs):
+            endpoint = command[-1]
+            calls.append(endpoint)
+            if endpoint.endswith("/branches/main"):
+                body = {"commit": {"sha": MAIN_SHA}}
+            elif endpoint.endswith(f"/commits/{MAIN_SHA}/status"):
+                body = {"state": "success"}
+            elif f"/commits/{MAIN_SHA}/check-runs?" in endpoint:
+                body = {"total_count": 0, "check_runs": []}
+            elif "/actions/runs?" in endpoint:
+                body = {"total_count": 0, "workflow_runs": []}
+            elif endpoint.startswith("repos/JovieInc/Jovie/actions/artifacts?"):
+                body = {"artifacts": []}
+            elif "/actions/workflows/ci.yml/runs?" in endpoint:
+                body = {"total_count": 0, "workflow_runs": []}
+            else:
+                raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+            return _gh_completed(
+                command,
+                f"HTTP/2.0 200 OK\r\n\r\n{json.dumps(body)}\n",
+            )
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "FLEET_GATE_HTTP_CACHE": "off",
+                    "FLEET_GATE_RELEASE_READY_POLL_SECONDS": "0",
+                },
+            ),
+            mock.patch.object(MODULE.subprocess, "run", side_effect=run),
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["reason"], "required-check-missing")
+        self.assertIn("no completed real attempt", observed["error"])
+        self.assertIn("unresolved: missing", observed["error"])
+        sleep.assert_not_called()
+        # Absent checks stay on the unresolved path: marker plus ancestor
+        # history, with no 5xx retry. Empty history still fails closed.
+        self.assertEqual(
+            [endpoint.split("repos/JovieInc/Jovie/", 1)[-1] for endpoint in calls],
+            [
+                "branches/main",
+                f"commits/{MAIN_SHA}/status",
+                f"commits/{MAIN_SHA}/check-runs?per_page=100&page=1",
+                f"commits/{MAIN_SHA}/check-runs?check_name=Main%20Release%20Ready&filter=all&per_page=100&page=1",
+                f"actions/runs?head_sha={MAIN_SHA}&event=push&per_page=30",
+                f"actions/artifacts?per_page=100&name=production-generation-verified-{MAIN_SHA}",
+                "actions/workflows/ci.yml/runs?branch=main&event=push&per_page=10",
+            ],
+        )
+
+    def test_observe_main_red_check_fails_closed_without_retry(self):
+        def run(command, **_kwargs):
+            endpoint = command[-1]
+            if endpoint.endswith("/branches/main"):
+                body = {"commit": {"sha": MAIN_SHA}}
+            elif endpoint.endswith(f"/commits/{MAIN_SHA}/status"):
+                body = {"state": "failure"}
+            elif f"/commits/{MAIN_SHA}/check-runs?" in endpoint:
+                body = {
+                    "total_count": 1,
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "failure",
+                            "started_at": "2026-10-22T14:10:00Z",
+                            "completed_at": "2026-10-22T14:12:00Z",
+                        }
+                    ],
+                }
+            elif endpoint.startswith("repos/JovieInc/Jovie/actions/artifacts?"):
+                body = {"artifacts": []}
+            else:
+                raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+            return _gh_completed(
+                command,
+                f"HTTP/2.0 200 OK\r\n\r\n{json.dumps(body)}\n",
+            )
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "FLEET_GATE_HTTP_CACHE": "off",
+                    "FLEET_GATE_RELEASE_READY_POLL_SECONDS": "60",
+                },
+            ),
+            mock.patch.object(MODULE.subprocess, "run", side_effect=run) as run_mock,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "red")
+        self.assertEqual(observed["reason"], "required-check-failed")
+        self.assertEqual(observed["failedChecks"], ["Main Release Ready"])
+        self.assertNotIn("error", observed)
+        sleep.assert_not_called()
+        # Branch, status, unfiltered check-runs, name-filtered check-runs, marker.
+        self.assertEqual(run_mock.call_count, 5)
 
     def test_observe_main_uses_ci_job_when_check_runs_are_flooded(self):
         def github_response(_repo: str, endpoint: str):
@@ -496,6 +772,388 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
             red = MODULE.observe_main("JovieInc/gbrain")
 
         self.assertEqual(red["status"], "red")
+
+
+def _release_ready_success(started_at: str = "2026-10-22T14:10:00Z") -> dict[str, object]:
+    return {
+        "name": "Main Release Ready",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": started_at,
+        "completed_at": "2026-10-22T14:12:00Z",
+    }
+
+
+def _deployment_closed(observed: dict[str, object], code: str) -> None:
+    signals = dict(GREEN_SIGNALS)
+    signals["main"] = observed
+    receipt = MODULE.evaluate(signals, "2026-10-22T14:16:00Z")
+    if receipt["deploymentAdmission"]["allowed"]:
+        raise AssertionError("deployment admission stayed open")
+    codes = [reason["code"] for reason in receipt["reasons"]]
+    if code not in codes:
+        raise AssertionError(f"{code} not in {codes}")
+
+
+class MainReleaseReadyPageAndPollTests(unittest.TestCase):
+    """JOV-8338 wave 39794210914: d15d0c50's Main Release Ready lived on
+    check-run page 3, and the push CI run did not exist yet when the gate
+    observed main."""
+
+    def _page_three_response(self, page_three: dict[str, object]):
+        requested: list[str] = []
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if (
+                endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?")
+                and "check_name=" not in endpoint
+            ):
+                # Short unfiltered page. The old scanner stops here and never
+                # reaches the named check on page 3.
+                return {
+                    "total_count": 250,
+                    "check_runs": [_check_run("enroll")],
+                }
+            if (
+                f"commits/{MAIN_SHA}/check-runs?" in endpoint
+                and "check_name=Main%20Release%20Ready" in endpoint
+                and "filter=all" in endpoint
+                and "per_page=100" in endpoint
+            ):
+                requested.append(endpoint)
+                if endpoint.endswith("&page=1"):
+                    return {
+                        "total_count": 250,
+                        "check_runs": [_check_run("enroll")],
+                    }
+                if endpoint.endswith("&page=2"):
+                    return {
+                        "total_count": 250,
+                        "check_runs": [_check_run("enroll") for _ in range(100)],
+                    }
+                if endpoint.endswith("&page=3"):
+                    return {"total_count": 250, "check_runs": [page_three]}
+                raise AssertionError(f"unexpected named page: {endpoint}")
+            if endpoint.startswith("actions/runs/424242/jobs"):
+                return {
+                    "jobs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "started_at": "2026-10-10T02:25:00Z",
+                            "completed_at": "2026-10-10T02:26:00Z",
+                            "html_url": "https://example.test/job/424242",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": 424242,
+                            "head_sha": "b" * 40,
+                            "created_at": "2026-10-10T02:11:50Z",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        return github_response, requested
+
+    def test_named_check_on_page_three_is_found_when_first_page_is_short(self):
+        github_response, requested = self._page_three_response(_release_ready_success())
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(
+            [endpoint.rsplit("page=", 1)[-1] for endpoint in requested],
+            ["1", "2", "3"],
+        )
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["sourceGate"]["conclusion"], "success")
+        self.assertEqual(observed["reason"], "required-checks-green-generation-unverified")
+        self.assertNotIn("ancestor", observed["reason"])
+
+    def test_skipped_page_three_check_falls_back_when_push_ci_is_absent(self):
+        """The wave shape: merge-group Main Release Ready is on page 3, and
+        the exact-SHA push run does not exist yet. Finding the skipped check
+        lets the ancestor fallback grade main. Missing it fails closed."""
+        github_response, requested = self._page_three_response(
+            {
+                "name": "Main Release Ready",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-10-22T14:02:51Z",
+                "completed_at": "2026-10-22T14:02:52Z",
+            }
+        )
+        now = MODULE.datetime(2026, 10, 10, 2, 50, tzinfo=MODULE.UTC)
+        with (
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+            mock.patch.object(MODULE, "utc_now", return_value=now),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(
+            [endpoint.rsplit("page=", 1)[-1] for endpoint in requested],
+            ["1", "2", "3"],
+        )
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["reason"], "required-checks-green-ancestor-fallback")
+        self.assertEqual(observed["sourceGate"]["ancestorSha"], "b" * 40)
+        self.assertNotIn("Main Release Ready check is missing", observed["error"])
+
+    def test_poll_budget_fits_inside_fleet_promotion_timeout(self):
+        self.assertLessEqual(MODULE.MAIN_RELEASE_READY_POLL_BUDGET_SECONDS, 60)
+        self.assertLess(
+            MODULE.MAIN_RELEASE_READY_POLL_BUDGET_SECONDS + 120 + 40,
+            5 * 60,
+        )
+        self.assertGreaterEqual(MODULE.CHECK_RUN_MAX_PAGES, 3)
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("FLEET_GATE_RELEASE_READY_POLL_SECONDS", None)
+            self.assertEqual(MODULE._release_ready_poll_budget(), 60.0)
+        with mock.patch.dict(
+            os.environ, {"FLEET_GATE_RELEASE_READY_POLL_SECONDS": "nope"}
+        ):
+            self.assertEqual(
+                MODULE._release_ready_poll_budget(),
+                float(MODULE.MAIN_RELEASE_READY_POLL_BUDGET_SECONDS),
+            )
+
+    def _clock(self, budget: str):
+        state = {"now": 0.0}
+        sleeps: list[float] = []
+
+        def monotonic() -> float:
+            return state["now"]
+
+        def sleep(seconds: float) -> None:
+            state["now"] += seconds
+            sleeps.append(seconds)
+
+        return (
+            sleeps,
+            mock.patch.dict(
+                os.environ, {"FLEET_GATE_RELEASE_READY_POLL_SECONDS": budget}
+            ),
+            mock.patch.object(MODULE.time, "monotonic", side_effect=monotonic),
+            mock.patch.object(MODULE.time, "sleep", side_effect=sleep),
+        )
+
+    def _polling_response(self, checks_for_observation):
+        observations = {"n": 0}
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                observations["n"] += 1
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return checks_for_observation(observations["n"])
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                return {"workflow_runs": []}
+            if endpoint.startswith("actions/artifacts?"):
+                return {"artifacts": []}
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        return github_response, observations
+
+    def test_polls_until_absent_release_ready_check_appears(self):
+        def checks(observation: int):
+            if observation < 3:
+                return {"total_count": 0, "check_runs": []}
+            return {"total_count": 1, "check_runs": [_release_ready_success()]}
+
+        github_response, observations = self._polling_response(checks)
+        sleeps, budget, monotonic, sleep = self._clock("15")
+        with (
+            budget,
+            monotonic,
+            sleep,
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["sourceGate"]["conclusion"], "success")
+        self.assertEqual(sleeps, [5, 5])
+        self.assertEqual(observations["n"], 3)
+        self.assertLess(sum(sleeps), 15)
+
+    def test_polls_while_release_ready_is_pending_then_reads_green(self):
+        def checks(observation: int):
+            if observation == 1:
+                return {
+                    "total_count": 1,
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "in_progress",
+                            "conclusion": None,
+                            "started_at": "2026-10-22T14:10:00Z",
+                        }
+                    ],
+                }
+            return {"total_count": 1, "check_runs": [_release_ready_success()]}
+
+        github_response, observations = self._polling_response(checks)
+        sleeps, budget, monotonic, sleep = self._clock("15")
+        with (
+            budget,
+            monotonic,
+            sleep,
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["reason"], "required-checks-green-generation-unverified")
+        self.assertEqual(sleeps, [5])
+        self.assertEqual(observations["n"], 2)
+
+    def test_absent_check_fails_closed_after_poll_budget(self):
+        def checks(_observation: int):
+            return {"total_count": 0, "check_runs": []}
+
+        github_response, observations = self._polling_response(checks)
+        sleeps, budget, monotonic, sleep = self._clock("10")
+        with (
+            budget,
+            monotonic,
+            sleep,
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["reason"], "required-check-missing")
+        self.assertIn("no completed real attempt", observed["error"])
+        self.assertIn("unresolved: missing", observed["error"])
+        self.assertEqual(sleeps, [5, 5])
+        self.assertLessEqual(sum(sleeps), 10)
+        self.assertEqual(observations["n"], 3)
+        _deployment_closed(observed, "main-unknown")
+
+    def test_pending_check_fails_closed_after_poll_budget(self):
+        def checks(_observation: int):
+            return {
+                "total_count": 1,
+                "check_runs": [
+                    {
+                        "name": "Main Release Ready",
+                        "status": "in_progress",
+                        "conclusion": None,
+                        "started_at": "2026-10-22T14:10:00Z",
+                    }
+                ],
+            }
+
+        github_response, observations = self._polling_response(checks)
+        sleeps, budget, monotonic, sleep = self._clock("10")
+        with (
+            budget,
+            monotonic,
+            sleep,
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["reason"], "required-check-pending")
+        self.assertIn("no completed real attempt", observed["error"])
+        self.assertEqual(sleeps, [5, 5])
+        self.assertEqual(observations["n"], 3)
+        _deployment_closed(observed, "main-unknown")
+
+    def test_pending_then_red_fails_closed_without_treating_it_as_green(self):
+        def checks(observation: int):
+            if observation == 1:
+                return {
+                    "total_count": 1,
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "in_progress",
+                            "conclusion": None,
+                            "started_at": "2026-10-22T14:10:00Z",
+                        }
+                    ],
+                }
+            return {
+                "total_count": 1,
+                "check_runs": [
+                    {
+                        "name": "Main Release Ready",
+                        "status": "completed",
+                        "conclusion": "failure",
+                        "started_at": "2026-10-22T14:10:00Z",
+                        "completed_at": "2026-10-22T14:12:00Z",
+                    }
+                ],
+            }
+
+        github_response, observations = self._polling_response(checks)
+        sleeps, budget, monotonic, sleep = self._clock("60")
+        with (
+            budget,
+            monotonic,
+            sleep,
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "red")
+        self.assertEqual(observed["reason"], "required-check-failed")
+        self.assertEqual(observed["failedChecks"], ["Main Release Ready"])
+        self.assertEqual(sleeps, [5])
+        self.assertEqual(observations["n"], 2)
+        _deployment_closed(observed, "main-not-green")
+
+    def test_completed_red_does_not_poll(self):
+        def checks(_observation: int):
+            return {
+                "total_count": 1,
+                "check_runs": [
+                    {
+                        "name": "Main Release Ready",
+                        "status": "completed",
+                        "conclusion": "failure",
+                        "started_at": "2026-10-22T14:10:00Z",
+                        "completed_at": "2026-10-22T14:12:00Z",
+                    }
+                ],
+            }
+
+        github_response, observations = self._polling_response(checks)
+        sleeps, budget, monotonic, sleep = self._clock("60")
+        with (
+            budget,
+            monotonic,
+            sleep,
+            mock.patch.object(MODULE, "gh_json", side_effect=github_response),
+        ):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "red")
+        self.assertEqual(observed["reason"], "required-check-failed")
+        self.assertEqual(sleeps, [])
+        self.assertEqual(observations["n"], 1)
+        _deployment_closed(observed, "main-not-green")
 
 
 def _main_fixture(
@@ -4609,29 +5267,80 @@ class GitHubConditionalGetTests(unittest.TestCase):
         self.assertNotIn("-H", calls[1])
 
     def test_http_error_and_non_object_keep_the_old_failure_modes(self):
-        with mock.patch.object(
-            MODULE.subprocess,
-            "run",
-            return_value=_gh_completed(
-                ["gh", "api", "--include", "repos/JovieInc/Jovie/branches/main"],
-                "HTTP/2.0 500\n\n",
-                "gh: HTTP 500\n",
-                1,
-            ),
+        with (
+            mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=_gh_completed(
+                    ["gh", "api", "--include", "repos/JovieInc/Jovie/branches/main"],
+                    "HTTP/2.0 500\n\n",
+                    "gh: HTTP 500\n",
+                    1,
+                ),
+            ) as run,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
         ):
             with self.assertRaises(subprocess.CalledProcessError):
                 MODULE.gh_json("JovieInc/Jovie", "branches/main")
+        self.assertEqual(run.call_count, MODULE.GH_TRANSIENT_OBSERVATION_ATTEMPTS)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [1, 2])
 
-        with mock.patch.object(
-            MODULE.subprocess,
-            "run",
-            return_value=_gh_completed(
-                ["gh", "api", "--include", "repos/JovieInc/Jovie/branches/main"],
-                "HTTP/2.0 200 OK\nEtag: W/\"cc\"\n\n[]\n",
-            ),
+        with (
+            mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=_gh_completed(
+                    ["gh", "api", "--include", "repos/JovieInc/Jovie/branches/main"],
+                    "HTTP/2.0 200 OK\nEtag: W/\"cc\"\n\n[]\n",
+                ),
+            ) as run,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
         ):
             with self.assertRaises(ValueError):
                 MODULE.gh_json("JovieInc/Jovie", "branches/main")
+        self.assertEqual(run.call_count, 1)
+        sleep.assert_not_called()
+
+    def test_gh_json_does_not_retry_client_errors(self):
+        with (
+            mock.patch.object(
+                MODULE.subprocess,
+                "run",
+                return_value=_gh_completed(
+                    ["gh", "api", "--include", "repos/JovieInc/Jovie/branches/main"],
+                    "HTTP/2.0 404 Not Found\r\n\r\n{}\n",
+                    "gh: Not Found (HTTP 404)\n",
+                    1,
+                ),
+            ) as run,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            with self.assertRaises(subprocess.CalledProcessError):
+                MODULE.gh_json("JovieInc/Jovie", "branches/main")
+        self.assertEqual(run.call_count, 1)
+        sleep.assert_not_called()
+
+    def test_gh_json_retries_a_network_timeout_once(self):
+        timeout = subprocess.TimeoutExpired(["gh", "api"], 20)
+        ok = _gh_completed(
+            ["gh"],
+            'HTTP/2.0 200 OK\r\n\r\n{"ok":true}\n',
+        )
+        with (
+            mock.patch.object(MODULE.subprocess, "run", side_effect=[timeout, timeout, ok]) as run,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                MODULE.gh_json("JovieInc/Jovie", "branches/main")
+        self.assertEqual(run.call_count, 2)
+        sleep.assert_called_once_with(1)
+
+        with (
+            mock.patch.object(MODULE.subprocess, "run", side_effect=[timeout, ok]),
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            self.assertEqual(MODULE.gh_json("JovieInc/Jovie", "branches/main"), {"ok": True})
+        sleep.assert_called_once_with(1)
 
     def test_old_gh_without_include_falls_back_to_a_plain_read(self):
         calls = []
@@ -5198,6 +5907,199 @@ class PublicTrustDiagnosticsTest(unittest.TestCase):
         self.assertFalse(result["accepted"])
         self.assertEqual(result["acceptedEvidence"], [])
         self.assertEqual(result["reason"], "capacity-evidence-trust-context-unavailable")
+
+
+class NativeUserBusEnvironmentTest(unittest.TestCase):
+    def fixture(self, tmp):
+        home = pathlib.Path(tmp) / "home"; home.mkdir()
+        root = pathlib.Path(tmp) / "run"; root.mkdir()
+        runtime = root / str(os.geteuid()); runtime.mkdir(mode=0o700)
+        bus = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(bus.close)
+        bus.bind(str(runtime / "bus"))
+        return home, root, runtime
+
+    def test_service_runner_without_login_variables_uses_its_existing_owned_bus(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"HOME": "fixture"}, clear=True):
+            home, root, runtime = self.fixture(tmp)
+            env = MODULE.native_user_bus_environment(home, runtime_root=root)
+            self.assertEqual(env["XDG_RUNTIME_DIR"], str(runtime))
+            self.assertEqual(env["DBUS_SESSION_BUS_ADDRESS"], "unix:path=" + str(runtime / "bus"))
+            self.assertEqual(env["HOME"], "fixture")
+            self.assertNotIn("XDG_RUNTIME_DIR", os.environ, "only the observation subprocess gets context")
+
+    def test_missing_or_non_socket_or_writable_runtime_never_manufactures_health(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {}, clear=True):
+            home, root, runtime = self.fixture(tmp)
+            (runtime / "bus").unlink()
+            with self.assertRaises(OSError): MODULE.native_user_bus_environment(home, runtime_root=root)
+            (runtime / "bus").write_text("not a socket")
+            with self.assertRaises(ValueError): MODULE.native_user_bus_environment(home, runtime_root=root)
+            (runtime / "bus").unlink(); (runtime / "bus").symlink_to(home)
+            with self.assertRaises(ValueError): MODULE.native_user_bus_environment(home, runtime_root=root)
+            (runtime / "bus").unlink()
+            other = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); self.addCleanup(other.close)
+            other.bind(str(runtime / "bus")); runtime.chmod(0o777)
+            with self.assertRaises(ValueError): MODULE.native_user_bus_environment(home, runtime_root=root)
+
+    def test_wrong_user_or_explicit_foreign_context_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {}, clear=True):
+            home, root, runtime = self.fixture(tmp)
+            with mock.patch.object(MODULE.os, "geteuid", return_value=os.geteuid()+1):
+                with self.assertRaises(ValueError): MODULE.native_user_bus_environment(home, runtime_root=root)
+            for key, value in (("XDG_RUNTIME_DIR", "/run/user/99999"),
+                               ("DBUS_SESSION_BUS_ADDRESS", "unix:path=/tmp/foreign-bus")):
+                with self.subTest(key=key), mock.patch.dict(os.environ, {key: value}):
+                    with self.assertRaises(ValueError): MODULE.native_user_bus_environment(home, runtime_root=root)
+
+    def test_existing_exact_context_is_preserved_without_creating_any_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home, root, runtime = self.fixture(tmp)
+            env = {"XDG_RUNTIME_DIR": str(runtime), "DBUS_SESSION_BUS_ADDRESS": "unix:path="+str(runtime / "bus")}
+            with mock.patch.dict(os.environ, env, clear=True):
+                self.assertEqual(MODULE.native_user_bus_environment(home, runtime_root=root), env)
+
+
+class NativeControllerObservationTest(unittest.TestCase):
+    def setUp(self):
+        bus = mock.patch.object(MODULE, "native_user_bus_environment", return_value={"fixture": "user-bus"})
+        bus.start(); self.addCleanup(bus.stop)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.home = pathlib.Path(self.tmp.name)
+        self.state = self.home / ".local/state/jovie-lanes"
+        self.revision, self.tree = "a" * 40, "b" * 40
+        self.objects = {"scripts/lanes": self.tree}
+        self.digest = hashlib.sha256(json.dumps(self.objects, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        self.release = self.state / "releases" / self.digest / "scripts/lanes"
+        self.release.mkdir(parents=True)
+        (self.state / "current").symlink_to(self.release, target_is_directory=True)
+        self.manifest = {"schema": "jovie-lane-release-bundle/v1", "sourceCommit": self.revision,
+                         "bundleDigest": self.digest, "objects": self.objects}
+        self.runner = b"# immutable native runner\n"
+        (self.release / "lane_runner.py").write_bytes(self.runner)
+        self.blob = hashlib.sha1(b"blob " + str(len(self.runner)).encode() + b"\0" + self.runner).hexdigest()
+        self.now = MODULE.parse_time("2026-10-16T15:30:00Z")
+        self.tick = {"at": "2026-10-16T15:29:50Z", "release": self.tree[:7], "error": None}
+        self.service = {"Id": "jovie-lanes.service", "ActiveState": "inactive", "SubState": "dead",
+                        "Result": "success", "ExecMainStatus": "0",
+                        "ExecStart": ("{ path=/bin/bash ; argv[]=/bin/bash -c python3 "
+                                      + str(self.state / "current/lane_runner.py") + " update; python3 "
+                                      + str(self.state / "current/codex_lane.py")
+                                      + " reconcile --if-due 3600; exec python3 "
+                                      + str(self.state / "current/lane_runner.py")
+                                      + " dispatch ; ignore_errors=no ; start_time=[fixture] ; }"),
+                        "FragmentPath": str(self.home / ".config/systemd/user/jovie-lanes.service")}
+        self.timer = {"Id": "jovie-lanes.timer", "ActiveState": "active", "SubState": "waiting",
+                      "Result": "success", "Unit": "jovie-lanes.service",
+                      "FragmentPath": str(self.home / ".config/systemd/user/jovie-lanes.timer")}
+        self.identities = [self.tree, self.blob]
+        self.write_receipts()
+
+    def write_receipts(self):
+        (self.release / ".release.json").write_text(json.dumps(self.manifest))
+        (self.state / "tick.json").write_text(json.dumps(self.tick))
+
+    def command(self, args, **kwargs):
+        if args[0] == "git":
+            self.assertEqual(args[-2:], [self.revision + ":scripts/lanes", self.revision + ":scripts/lanes/lane_runner.py"])
+            output = "\n".join(self.identities) + "\n"
+        elif args[:3] == ["systemctl", "--user", "show"]:
+            self.assertEqual(kwargs["env"], {"fixture": "user-bus"})
+            self.assertEqual(args[3:5], ["jovie-lanes.service", "jovie-lanes.timer"])
+            output = "\n\n".join("\n".join(k + "=" + v for k, v in row.items()) for row in [self.service, self.timer])
+        else:
+            self.fail("unexpected controller observation command")
+        return subprocess.CompletedProcess(args, 0, output, "")
+
+    def observe(self):
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=self.command), \
+                mock.patch.object(MODULE.urllib.request, "urlopen") as http:
+            result = MODULE.observe_controller("http://127.0.0.1:4041/api/v1/state",
+                                               now=self.now, native_state_dir=self.state)
+        http.assert_not_called()
+        return result
+
+    def test_cli_defaults_to_the_canonical_native_state(self):
+        with mock.patch.object(sys, "argv", ["gem-priority-gate.py"]), \
+                mock.patch.object(MODULE.Path, "home", return_value=self.home):
+            self.assertEqual(MODULE.parse_args().native_controller_state_dir, self.state)
+
+    def test_native_service_tick_and_committed_release_bind_controller_health(self):
+        result = self.observe()
+        self.assertEqual(result["status"], "green")
+        self.assertEqual(result["kind"], "native-lanes")
+        self.assertEqual(result["sourceCommit"], self.revision)
+        self.assertEqual(result["bundleDigest"], self.digest)
+        self.assertEqual(result["tickAt"], self.tick["at"])
+        self.assertNotIn("activeRuns", result)  # Worker permits are not provider payloads.
+        self.service.update(ActiveState="activating", SubState="start")
+        self.assertEqual(self.observe()["status"], "green")
+
+    def test_missing_failed_or_stale_tick_never_falls_back_to_retired_http(self):
+        for changes in ({"at": "2026-10-16T15:19:59Z"}, {"at": "2026-10-16T15:30:31Z"},
+                        {"at": None}, {"at": "2026-10-16T15:29:50"}, {"at": "2026-10-16+15:29"}, {"release": self.revision[:7]}, {"error": "controller failed"}):
+            with self.subTest(changes=changes):
+                old = self.tick.copy(); self.tick.update(changes); self.write_receipts()
+                self.assertEqual(self.observe()["status"], "failed")
+                self.tick = old
+        (self.state / "tick.json").unlink()
+        self.assertEqual(self.observe()["status"], "failed")
+
+    def test_failed_stopped_or_unbound_service_remains_failed(self):
+        for target, changes in ((self.service, {"Result": "exit-code"}),
+                                (self.service, {"ExecMainStatus": "1"}),
+                                (self.service, {"ActiveState": "failed"}),
+                                (self.service, {"ExecStart": "unrelated command"}),
+                                (self.service, {"FragmentPath": "/tmp/unverified.service"}),
+                                (self.timer, {"ActiveState": "inactive"}),
+                                (self.timer, {"FragmentPath": "/tmp/unverified.timer"}),
+                                (self.timer, {"Unit": "unrelated.service"}),
+                                (self.service, {"SubState": "failed"}),
+                                (self.service, {"ExecStart": self.service["ExecStart"].replace("path=/bin/bash", "path=/bin/echo")})):
+            with self.subTest(changes=changes):
+                old = target.copy(); target.update(changes)
+                self.assertEqual(self.observe()["status"], "failed")
+                target.clear(); target.update(old)
+
+    def test_missing_or_unknown_service_state_cannot_count_as_healthy(self):
+        for unknown in (False, True):
+            with self.subTest(unknown=unknown):
+                saved = self.service.copy()
+                self.service.pop("ActiveState", None)
+                self.service.pop("SubState", None)
+                if unknown:
+                    self.service["ActiveState"] = "unknown"
+                self.assertEqual(self.observe()["status"], "failed")
+                self.service = saved
+
+    def test_release_manifest_and_installed_runner_must_match_git_source(self):
+        self.identities = ["c" * 40, self.blob]
+        self.assertEqual(self.observe()["status"], "failed")
+        self.identities = [self.tree, "c" * 40]
+        self.assertEqual(self.observe()["status"], "failed")
+        self.identities = [self.tree, self.blob]
+        self.manifest["bundleDigest"] = "0" * 64; self.write_receipts()
+        self.assertEqual(self.observe()["status"], "failed")
+        self.manifest["bundleDigest"] = self.digest; self.write_receipts()
+        (self.release / "lane_runner.py").write_bytes(b"changed runner")
+        self.assertEqual(self.observe()["status"], "failed")
+
+    def test_release_switch_during_observation_is_unknown_not_green(self):
+        command = self.command
+        def switch(args, **kwargs):
+            result = command(args, **kwargs)
+            if args[0] == "systemctl":
+                (self.state / "tick.json").write_text(json.dumps({**self.tick, "at": "2026-10-16T15:29:59Z"}))
+            return result
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=switch):
+            self.assertEqual(MODULE.observe_native_controller(self.state, self.now)["status"], "failed")
+
+    def test_unavailable_native_evidence_never_grants_health(self):
+        for failure in (subprocess.TimeoutExpired("systemctl", 5), subprocess.CalledProcessError(1, "git")):
+            with self.subTest(failure=type(failure).__name__), \
+                    mock.patch.object(MODULE.subprocess, "run", side_effect=failure):
+                self.assertEqual(MODULE.observe_native_controller(self.state, self.now)["status"], "failed")
 
 
 if __name__ == "__main__":

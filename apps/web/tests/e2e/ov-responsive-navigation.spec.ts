@@ -30,6 +30,15 @@ async function enterPersona(
   await expect(page.locator('#main-content')).toBeVisible({ timeout: 60_000 });
 }
 
+/** Tools stays collapsed until the viewer opens it (Tim 2026-10-21). */
+async function expandOperatorTools(navigation: Locator) {
+  const tools = navigation.getByRole('button', { name: 'Tools', exact: true });
+  if ((await tools.count()) === 0) return;
+  if ((await tools.getAttribute('aria-expanded')) !== 'true') {
+    await tools.click();
+  }
+}
+
 async function visibleHrefSet(navigation: Locator) {
   return navigation.locator('a[href]').evaluateAll(links =>
     links
@@ -76,7 +85,25 @@ async function customerNavigationContract(
             aria: Object.fromEntries(
               Array.from(node.attributes)
                 .filter(attribute => attribute.name.startsWith('aria-'))
-                .map(attribute => [attribute.name, attribute.value])
+                .map(attribute => {
+                  // React useId values differ across sessions. Keep the
+                  // control relationship, not the generated id string.
+                  if (
+                    attribute.name === 'aria-controls' ||
+                    attribute.name === 'aria-owns'
+                  ) {
+                    const target = node.ownerDocument.getElementById(
+                      attribute.value
+                    );
+                    if (!target) return [attribute.name, 'missing-target'];
+                    const label =
+                      target.getAttribute('aria-label') ??
+                      target.getAttribute('role') ??
+                      target.tagName.toLowerCase();
+                    return [attribute.name, `controls:${label}`];
+                  }
+                  return [attribute.name, attribute.value];
+                })
             ),
           })
         )
@@ -163,7 +190,7 @@ test.describe('OV responsive navigation exclusivity', () => {
       );
 
       for (const destination of [
-        { label: 'OV', href: APP_ROUTES.ADMIN_CHAT },
+        { label: 'OV', href: APP_ROUTES.OV },
         { label: 'Jovie', href: APP_ROUTES.DASHBOARD },
       ]) {
         // An RSC fetch or changed URL alone does not prove the old server
@@ -211,6 +238,7 @@ test.describe('OV responsive navigation exclusivity', () => {
         if (destination.label === 'OV') {
           await expect(operatorNavigation).toBeVisible();
           await expect(customerNavigation).toHaveCount(0);
+          await expandOperatorTools(operatorNavigation);
           expect(new Set(await visibleHrefSet(operatorNavigation))).toEqual(
             new Set(ADMIN_NAV_REGISTRY.map(item => item.href))
           );
@@ -242,6 +270,7 @@ test.describe('OV responsive navigation exclusivity', () => {
       test.setTimeout(180_000);
       await page.setViewportSize(viewport);
       await enterPersona(page, 'admin', APP_ROUTES.OV);
+      // /app/ov is Ovie Home (founder decision 2026-10-20).
       await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.OV}/?$`));
 
       const mobileNavigation = page.getByRole('navigation', {
@@ -318,6 +347,7 @@ test.describe('OV responsive navigation exclusivity', () => {
           page.getByRole('navigation', { name: 'Dashboard Navigation' })
         ).toHaveCount(0);
 
+        await expandOperatorTools(desktopNavigation);
         const operatorLinks = desktopNavigation.getByRole('link');
         await expect(operatorLinks).toHaveCount(ADMIN_NAV_REGISTRY.length);
         for (const item of ADMIN_NAV_REGISTRY) {
@@ -328,8 +358,13 @@ test.describe('OV responsive navigation exclusivity', () => {
         expect(new Set(await visibleHrefSet(desktopNavigation))).toEqual(
           new Set(ADMIN_NAV_REGISTRY.map(item => item.href))
         );
+        // Desktop OV has no page-level Sign Out. The control is the Account
+        // menu item, sentence case, inside the identity group.
+        const account = page.getByRole('group', { name: 'Account' });
+        await expect(account).toBeVisible();
+        await account.getByRole('button').click();
         await expect(
-          page.getByRole('button', { name: 'Sign Out' })
+          page.getByRole('menuitem', { name: 'Sign out' })
         ).toBeVisible();
       }
     });

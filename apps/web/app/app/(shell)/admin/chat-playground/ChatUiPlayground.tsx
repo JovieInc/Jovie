@@ -19,14 +19,14 @@ import {
 import { ChatUploadManifest } from '@/components/jovie/components/ChatUploadManifest';
 import { ErrorDisplay } from '@/components/jovie/components/ErrorDisplay';
 import type { PendingFile } from '@/components/jovie/hooks/useChatFileAttachments';
+import { hydratePersistedMessageParts } from '@/components/jovie/message-parts';
 import type {
   ChatAlbumArtToolResult,
   MessagePart,
 } from '@/components/jovie/types';
-import {
-  type PersistedToolEvent,
-  type PersistedToolState,
-  toolEventToMessagePart,
+import type {
+  PersistedToolEvent,
+  PersistedToolState,
 } from '@/lib/chat/tool-events';
 import { cn } from '@/lib/utils';
 
@@ -88,21 +88,24 @@ function toolPart({
     | { state: 'running'; summary?: never }
   )
 >): MessagePart {
-  // Running SDK parts carry input only; their copy comes from the canonical tool registry.
-  return toolEventToMessagePart({
-    schemaVersion: 2,
-    toolCallId: id,
-    toolName,
-    state,
-    input: { fixture: true },
-    // The SDK renderer derives successful status copy from the output payload.
-    output: summary ? { ...output, summary } : output,
-    errorMessage,
-    retryable: state === 'failed',
-    summary,
-    uiHint: 'status',
-    approval,
-  });
+  // Seeded persisted events use the same validated receipt path as chat history.
+  // Running parts still need live execution; their copy comes from the tool registry.
+  return hydratePersistedMessageParts('', [
+    {
+      schemaVersion: 2,
+      toolCallId: id,
+      toolName,
+      state,
+      input: { fixture: true },
+      // The SDK renderer derives successful status copy from the output payload.
+      output: summary ? { ...output, summary } : output,
+      errorMessage,
+      retryable: state === 'failed',
+      summary,
+      uiHint: 'status',
+      approval,
+    } satisfies PersistedToolEvent,
+  ])[0];
 }
 
 function StateSample({
@@ -213,6 +216,7 @@ function ToolLifecycleFixture() {
         <ChatMessage
           {...ASSISTANT_MESSAGE_PROPS}
           id='playground-tool-running'
+          isStreaming
           parts={[
             toolPart({
               id: 'tool-running',
@@ -264,6 +268,7 @@ function GroupedToolsFixture() {
       <ChatMessage
         {...ASSISTANT_MESSAGE_PROPS}
         id='playground-grouped-tools'
+        isStreaming
         parts={[
           {
             type: 'text',

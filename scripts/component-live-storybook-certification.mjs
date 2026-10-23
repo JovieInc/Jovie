@@ -1314,6 +1314,10 @@ function collectViaSubprocess(
         },
       };
     }
+    // Surface the build's measured memory so the admission budget stays
+    // evidence-based on the runners that actually execute it.
+    for (const line of String(result.stderr ?? '').split('\n'))
+      if (line.startsWith('[live-storybook] build ')) console.error(line);
     const parsed = JSON.parse(readFileSync(receiptFile, 'utf8'));
     return parsed;
   } finally {

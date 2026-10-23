@@ -9,6 +9,7 @@ import {
 import { and, asc, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { isAiGatewayAvailable } from '@/lib/ai/gateway-availability';
 import {
   classifyGatewayAlert,
   isGatewayBudgetExceededError,
@@ -83,6 +84,25 @@ import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 
 /** Existing Statsig kill switch for all `/api/chat` traffic. */
 const CHAT_DISABLED_GATE = 'ai_chat_disabled';
+
+/**
+ * Nightly/QA-only (JOV-8500): when the standalone QA server sets
+ * `E2E_REQUIRE_TURNSTILE_GATE=1`, the local E2E Turnstile bypass below is
+ * disarmed so the gate runs exactly as it does in production. The canary
+ * spec asserts an anonymous first message reaches this gate (403
+ * TURNSTILE_REQUIRED); with the bypass armed that contract is unreachable.
+ * Inert on Vercel production/preview deploys regardless of value.
+ */
+function shouldRequireTurnstileGate(req: Request): boolean {
+  if (env.VERCEL_ENV === 'production' || env.VERCEL_ENV === 'preview') {
+    return false;
+  }
+  if (env.E2E_REQUIRE_TURNSTILE_GATE === '1') return true;
+  return (
+    publicEnv.NEXT_PUBLIC_E2E_MODE === '1' &&
+    req.headers.get('x-jovie-e2e-require-turnstile') === '1'
+  );
+}
 
 /** Maximum onboarding messages we accept in a single request payload. */
 const MAX_ONBOARDING_MESSAGES = 50;
@@ -243,6 +263,7 @@ function isSecureTurnstileEnvironment(req: Request): boolean {
 
 function shouldBypassTurnstileForLocalRuntime(req: Request): boolean {
   if (isSecureTurnstileEnvironment(req)) return false;
+  if (shouldRequireTurnstileGate(req)) return false;
 
   return (
     env.NODE_ENV === 'development' ||
@@ -828,6 +849,18 @@ export async function tryHandleAnonymousOnboardingChat(
   try {
     if (forcedFallbackReason) {
       return await serveScriptedFallback(forcedFallbackReason);
+    }
+
+    // Matrix and other keyless runtimes have no Gateway credential and no
+    // Vercel OIDC. `executeChatTurn` hangs there instead of throwing, so the
+    // catch below never serves the script. Answer from the script first.
+    if (
+      !isAiGatewayAvailable({
+        apiKey: env.AI_GATEWAY_API_KEY,
+        vercel: process.env.VERCEL,
+      })
+    ) {
+      return await serveScriptedFallback('llm_error');
     }
 
     let streamFailed = false;

@@ -329,7 +329,7 @@ def reconcile(lane, host, linear_factory, teams: list[str], now: float | None = 
                     result["epicsAwaitingValidation"].append(epic["identifier"])
             elif (status == "open" and epic["state"]["name"] == "Todo"
                   and len(result["epicsStarted"]) < RECONCILE_LIMIT):
-                linear.move(epic["id"], "In Progress")
+                linear.move(epic["id"], "In Progress", owner="epic-children")
                 linear.comment(epic["id"], "🤖 lanes: open child issues carry this epic's work; In Progress "
                                            "until they are done.")
                 result["epicsStarted"].append(epic["identifier"])

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 import {
-  closeLinearIssueByFingerprint,
   logRemediationDryRun,
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
 } from './lib/linear-issue-intake.mjs';
+import { runSentryValidationObservations } from './lib/sentry-validation-observation.mjs';
 
 const SENTRY_API = 'https://sentry.io/api/0';
 const GITHUB_API = 'https://api.github.com';
@@ -49,13 +49,14 @@ async function mirrorSentryRecurrenceToLinear({ incident, decision }) {
   }
   try {
     if (decision.action === 'resolve') {
-      return await closeLinearIssueByFingerprint({
-        fingerprint: key,
-        labelKey: key,
-        comment: 'Sentry autofix recurrence resolved the issue.',
-        runId: incident.issueId,
-        fetchImpl: fetch,
-      });
+      // Aggregate lastSeen and a merge soak cannot satisfy a current artifact,
+      // acceptance episode, or an issue's longer observation requirement.
+      // Only the canonical validation lifecycle may close the Linear issue.
+      return {
+        ok: true,
+        action: 'skip',
+        reason: 'validation_receipt_required',
+      };
     }
     return await upsertLinearIssueByTitleFingerprint({
       fingerprint: key,
@@ -413,9 +414,13 @@ export async function fetchWithRetry(
  *   soakMs?: number,
  *   now?: Date,
  *   maxPrs?: number,
+ *   linearApiKey?: string,
+ *   observationsOnly?: boolean,
  *   fetchImpl?: typeof fetch,
  *   sleepImpl?: (ms: number) => Promise<void>,
  * }} [options]
+ * @returns {Promise<{ok: boolean, reason?: string, currentMainSha?: string,
+ * results?: object[], observations?: Awaited<ReturnType<typeof runSentryValidationObservations>>}>}
  */
 export async function runSentryAutofixRecurrence({
   githubToken = process.env.GH_TOKEN,
@@ -426,6 +431,8 @@ export async function runSentryAutofixRecurrence({
   maxPrs = MAX_PRS_PER_RUN,
   fetchImpl = fetch,
   sleepImpl = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  linearApiKey = process.env.LINEAR_API_KEY,
+  observationsOnly = process.env.SENTRY_RECURRENCE_OBSERVATIONS_ONLY === '1',
 } = {}) {
   if (!githubToken) return { ok: false, reason: 'missing_github_token' };
   if (!sentryToken) return { ok: false, reason: 'missing_sentry_auth_token' };
@@ -435,6 +442,28 @@ export async function runSentryAutofixRecurrence({
 
   const [owner, repo] = String(repository).split('/');
   if (!owner || !repo) return { ok: false, reason: 'invalid_repository' };
+
+  // An explicitly configured empty secret is red. Older, unconfigured legacy
+  // callers remain supported; an observer-only invocation is always opted in.
+  const observations =
+    linearApiKey !== undefined || observationsOnly
+      ? await runSentryValidationObservations({
+          apiKey: linearApiKey,
+          githubToken,
+          sentryToken,
+          repository,
+          now,
+          fetchImpl,
+          writeReceipts: remediationTriggersEnabled(),
+        })
+      : null;
+  if (observationsOnly)
+    return {
+      ok: observations.ok,
+      results: [],
+      observations,
+      ...(!observations.ok ? { reason: observations.reason } : {}),
+    };
 
   const request = (url, init = {}) =>
     fetchWithRetry(url, init, { fetchImpl, sleepImpl });
@@ -595,18 +624,27 @@ export async function runSentryAutofixRecurrence({
     await mirrorSentryRecurrenceToLinear({ incident, decision });
   }
 
-  return { ok: true, currentMainSha, results };
+  return {
+    ok: observations?.ok ?? true,
+    currentMainSha,
+    results,
+    ...(observations ? { observations } : {}),
+    ...(observations && !observations.ok
+      ? { reason: observations.reason }
+      : {}),
+  };
 }
 
 async function main() {
   const result = await runSentryAutofixRecurrence({});
-  if (!result.ok) throw new Error(result.reason);
   console.log(JSON.stringify(result));
+  if (!result.ok) throw new Error(result.reason);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(error => {
     console.error(error instanceof Error ? error.message : error);
-    process.exit(1);
+    // Let the workflow pipe drain the structured failure result.
+    process.exitCode = 1;
   });
 }

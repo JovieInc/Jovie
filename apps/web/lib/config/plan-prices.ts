@@ -19,9 +19,17 @@ export const ARTIST_VISIBILITY_OFFER = {
   },
   pro: {
     displayName: 'Artist Presence',
-    monthlyUsd: 199,
+    /**
+     * EVENT: Tim, 2026-10-20 — first paid offer is a $12/month self-serve
+     * artist profile (claim → Stripe Checkout). Replaces the $199
+     * limited-access tier. See docs/company/PRICING-STRATEGY.md.
+     */
+    monthlyUsd: 12,
     currency: 'usd',
     interval: 'month',
+    capabilities: {
+      canAutoCreateLinks: true,
+    },
     outcomes: [
       'Continuous visibility monitoring',
       'Prioritized opportunities',

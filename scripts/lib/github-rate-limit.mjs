@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One classifier for GitHub API failures that say nothing about the code under
 // test: primary quota exhaustion, secondary/abuse limits (403/429) and transient
-// 5xx/network errors. Every repo-wide GITHUB_TOKEN workflow shares ~1,000 REST
+// 5xx/network errors. Every repo-wide GITHUB_TOKEN workflow shares ~5,000 REST
 // calls per hour; when that bucket hit zero on 2026-10-11 20:07Z, PR Size Guard,
 // Source Validation and PR Ready failed red, and Lane Fix Relay queued the PRs
 // for repair. A quota failure is retried after the reset or deferred; it is
@@ -16,6 +16,9 @@
 //             is past the wait budget.
 
 import { spawn, spawnSync } from 'node:child_process';
+import { closeSync, openSync, readFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const PRIMARY = 'primary-rate-limit';
@@ -172,7 +175,19 @@ export function planRetry({
   return nowMs + waitMs <= deadlineMs ? waitMs : null;
 }
 
+/** Artifact zip bodies are binary. gh refuses to write those to a pipe. */
+export function commandWantsFileStdout(command) {
+  return command.some(
+    arg => typeof arg === 'string' && /\/zip$/.test(arg.split('?')[0])
+  );
+}
+
 function capture(command, env) {
+  if (commandWantsFileStdout(command)) return captureToFile(command, env);
+  return capturePipe(command, env);
+}
+
+function capturePipe(command, env) {
   return new Promise(resolve => {
     const child = spawn(command[0], command.slice(1), {
       env,
@@ -191,6 +206,52 @@ function capture(command, env) {
         stdout: Buffer.concat(out).toString('utf8'),
         stderr: Buffer.concat(err).toString('utf8'),
       })
+    );
+  });
+}
+
+function captureToFile(command, env) {
+  return new Promise(resolve => {
+    const file = join(
+      tmpdir(),
+      `gh-body-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.bin`
+    );
+    const fd = openSync(file, 'w');
+    let child;
+    try {
+      child = spawn(command[0], command.slice(1), {
+        env,
+        stdio: ['inherit', fd, 'pipe'],
+      });
+    } catch (error) {
+      closeSync(fd);
+      unlinkSync(file);
+      resolve({ code: 127, stdout: Buffer.alloc(0), stderr: String(error) });
+      return;
+    }
+    closeSync(fd);
+    const err = [];
+    let settled = false;
+    const finish = (code, stderr) => {
+      if (settled) return;
+      settled = true;
+      let stdout = Buffer.alloc(0);
+      try {
+        stdout = readFileSync(file);
+      } catch {
+        stdout = Buffer.alloc(0);
+      }
+      try {
+        unlinkSync(file);
+      } catch {
+        // The body was already read, or the file was never created.
+      }
+      resolve({ code, stdout, stderr });
+    };
+    child.stderr.on('data', chunk => err.push(chunk));
+    child.on('error', error => finish(127, String(error)));
+    child.on('close', code =>
+      finish(code ?? 1, Buffer.concat(err).toString('utf8'))
     );
   });
 }
@@ -227,15 +288,25 @@ export async function runWithGitHubRetry(
 ) {
   const deadlineMs = now() + maxWaitMs;
   for (let attempt = 1; ; attempt += 1) {
-    const outcome = await run(command, {
-      ...env,
-      NO_COLOR: '1',
-      GH_FORCE_TTY: '0',
-    });
+    // gh 2.102 treats every GH_FORCE_TTY value, including 0, as a terminal
+    // and then refuses application/zip. JSON calls still force tty off so
+    // the body stays plain text. Zip calls must inherit a real file stdout.
+    // Fresh object so a zip call can drop GH_FORCE_TTY. Dot access is
+    // rejected: the spread collapses to `{ NO_COLOR: string }` under
+    // checkJs, and ProcessEnv is an index signature.
+    /** @type {NodeJS.ProcessEnv} */
+    const childEnv = { ...env, NO_COLOR: '1' };
+    if (commandWantsFileStdout(command)) delete childEnv['GH_FORCE_TTY'];
+    else childEnv['GH_FORCE_TTY'] = '0';
+    const outcome = await run(command, childEnv);
     if (outcome.code === 0) return { ...outcome, kind: NONE, deferred: false };
     // gh prints HTTP error bodies on stdout and the summary on stderr.
+    // Zip captures keep a Buffer so a successful body is not decoded as text.
+    const stdoutText = Buffer.isBuffer(outcome.stdout)
+      ? outcome.stdout.toString('utf8')
+      : outcome.stdout;
     const classification = classifyGitHubFailure({
-      message: `${outcome.stderr}\n${outcome.stdout}`,
+      message: `${outcome.stderr}\n${stdoutText}`,
       now: now(),
     });
     const quotaReset =
@@ -307,8 +378,8 @@ export async function main(argv = process.argv.slice(2)) {
   if (mode === 'run') {
     const { command, options } = parseRunArgs(rest);
     const outcome = await runWithGitHubRetry(command, options);
-    process.stdout.write(outcome.stdout);
-    process.stderr.write(outcome.stderr);
+    process.stdout.write(outcome.stdout ?? '');
+    process.stderr.write(outcome.stderr ?? '');
     if (outcome.code === 0) return 0;
     return outcome.deferred ? EX_TEMPFAIL : outcome.code;
   }

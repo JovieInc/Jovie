@@ -53,6 +53,7 @@ describe('M2 revenue-path canary workflow (JOV-6439)', () => {
   it('writes a receipt and files Linear plus Slack on red', () => {
     expect(workflow).toContain('--receipt');
     expect(workflow).toContain('m2-revenue-path-receipt.json');
+    expect(workflow).toContain('result.brokenArtistLoops');
     expect(workflow).toContain('scripts/m2-revenue-path-canary-intake.mjs');
     expect(workflow).toContain('LINEAR_API_KEY');
     expect(workflow).toContain('Slack alert on red');

@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -374,14 +375,50 @@ def _gh_api(endpoint: str, etag: str | None) -> subprocess.CompletedProcess[str]
     )
 
 
+# Fast 5xx and network failures get three attempts (sleep 1s, then 2s).
+# A client timeout already waited the gh timeout, so it gets one extra
+# attempt only. The fleet-promotion job is five minutes (JOV-8338: wave
+# 39794210914 failed closed on the first blip).
+GH_TRANSIENT_OBSERVATION_ATTEMPTS = 3
+
+
 def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
     """Read one GitHub REST object, revalidating with If-None-Match.
 
     A 304 does not count against the primary rate limit. The cached body is
     the last 200 for that exact endpoint. A rejected or missing validator
     refetches unconditionally.
+
+    Transient 5xx and network failures retry with bounded backoff before the
+    error is raised. A completed body is not retried: a missing or red Main
+    Release Ready check still fails closed in ``observe_main``, and a 4xx
+    fails on the first attempt.
     """
-    return _gh_json(repo, endpoint, revalidate=True)
+    return _gh_json_retrying(repo, endpoint, revalidate=True)
+
+
+def _retry_transient_read(error: BaseException, attempt: int) -> bool:
+    if attempt + 1 >= GH_TRANSIENT_OBSERVATION_ATTEMPTS:
+        return False
+    if not transient_gh_observation_error(error):
+        return False
+    if isinstance(error, subprocess.TimeoutExpired) and attempt >= 1:
+        return False
+    return True
+
+
+def _gh_json_retrying(repo: str, endpoint: str, *, revalidate: bool) -> dict[str, Any]:
+    last_error: BaseException | None = None
+    for attempt in range(GH_TRANSIENT_OBSERVATION_ATTEMPTS):
+        try:
+            return _gh_json(repo, endpoint, revalidate=revalidate)
+        except (OSError, subprocess.SubprocessError) as error:
+            last_error = error
+            if not _retry_transient_read(error, attempt):
+                raise
+            time.sleep(attempt + 1)
+    assert last_error is not None
+    raise last_error
 
 
 def _gh_json(repo: str, endpoint: str, *, revalidate: bool) -> dict[str, Any]:
@@ -543,6 +580,82 @@ def observe_generation_marker(repo: str, sha: object) -> dict[str, Any]:
     return result
 
 
+# fleet-promotion timeout is 5 minutes (production-controller.yml). Closure
+# observation may use 120s and the queue snapshot may use ~40s, so this poll
+# stays inside the remainder (60 + 120 + 40 < 300).
+MAIN_RELEASE_READY_POLL_BUDGET_SECONDS = 60
+MAIN_RELEASE_READY_POLL_INTERVAL_SECONDS = 5
+CHECK_RUN_PAGE_SIZE = 100
+CHECK_RUN_MAX_PAGES = 20
+
+
+def _release_ready_poll_budget() -> float:
+    raw = os.environ.get("FLEET_GATE_RELEASE_READY_POLL_SECONDS")
+    if raw is None or not raw.strip():
+        return float(MAIN_RELEASE_READY_POLL_BUDGET_SECONDS)
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return float(MAIN_RELEASE_READY_POLL_BUDGET_SECONDS)
+
+
+def list_named_check_runs(repo: str, sha: object, name: str) -> list[dict[str, Any]]:
+    """Read every attempt of one check name, including attempts past page 1.
+
+    JOV-8338 wave 39794210914: merge-group Main Release Ready for d15d0c50
+    sat on check-run page 3. An unfiltered first page can be short while
+    later pages still hold the named check, and the old 1k cap can drop it.
+    ``check_name`` plus ``filter=all`` keeps reading while a page is full
+    or ``total_count`` still points at a later page. A short first page
+    therefore cannot hide the named check.
+    """
+    encoded = urllib.parse.quote(name, safe="")
+    collected: list[dict[str, Any]] = []
+    for page in range(1, CHECK_RUN_MAX_PAGES + 1):
+        checks = gh_json(
+            repo,
+            f"commits/{sha}/check-runs?check_name={encoded}&filter=all&per_page={CHECK_RUN_PAGE_SIZE}&page={page}",
+        )
+        page_runs = checks.get("check_runs")
+        if not isinstance(page_runs, list):
+            raise ValueError(f"{name} check-run page was not a list")
+        collected.extend(
+            run for run in page_runs if isinstance(run, dict) and run.get("name") == name
+        )
+        total = checks.get("total_count")
+        more = (
+            isinstance(total, int)
+            and not isinstance(total, bool)
+            and page * CHECK_RUN_PAGE_SIZE < total
+        )
+        if len(page_runs) < CHECK_RUN_PAGE_SIZE and not more:
+            break
+    return collected
+
+
+def _awaiting_exact_head_release_ready(observed: dict[str, Any]) -> bool:
+    """True when push CI has not created the check yet, or it is still pending.
+
+    A completed green or red verdict is terminal. Transport failures are not
+    this wait: gh_json already retried those.
+    """
+    if observed.get("status") in {"green", "red"}:
+        return False
+    reason = observed.get("reason")
+    if reason in {
+        "required-check-pending",
+        "required-check-missing",
+        "required-check-no-verdict",
+    }:
+        return True
+    error = str(observed.get("error") or "")
+    if "Main Release Ready check is missing" in error:
+        return True
+    if "no completed real attempt" in error:
+        return True
+    return False
+
+
 def observe_main_release_ready_jobs(repo: str, sha: object) -> list[dict[str, Any]]:
     """Read Main Release Ready from the exact-SHA CI push run.
 
@@ -654,6 +767,25 @@ def _real_release_attempts(attempts: list[dict[str, Any]]) -> list[dict[str, Any
 
 
 def observe_main(repo: str) -> dict[str, Any]:
+    """Observe main, polling while the exact-head release check is not created or pending.
+
+    The wait is bounded by ``MAIN_RELEASE_READY_POLL_BUDGET_SECONDS`` so it
+    fits in the fleet-promotion job. A completed red check returns immediately.
+    A check that is still absent when the budget expires fails closed.
+    """
+    budget = _release_ready_poll_budget()
+    deadline = time.monotonic() + budget
+    while True:
+        observed = _observe_main_once(repo)
+        if not _awaiting_exact_head_release_ready(observed):
+            return observed
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return observed
+        time.sleep(min(MAIN_RELEASE_READY_POLL_INTERVAL_SECONDS, remaining))
+
+
+def _observe_main_once(repo: str) -> dict[str, Any]:
     sha: object = UNKNOWN_MAIN_SHA
     try:
         branch = gh_json(repo, "branches/main")
@@ -662,16 +794,18 @@ def observe_main(repo: str) -> dict[str, Any]:
             raise ValueError("main SHA missing")
         combined = gh_json(repo, f"commits/{sha}/status")
         check_runs: list[dict[str, Any]] = []
-        release_attempts: list[dict[str, Any]] = []
         for page in range(1, 11):
             checks = gh_json(repo, f"commits/{sha}/check-runs?per_page=100&page={page}")
             page_runs = checks.get("check_runs", [])
+            if not isinstance(page_runs, list):
+                page_runs = []
             check_runs.extend(page_runs)
-            release_attempts.extend(
-                run for run in page_runs if run.get("name") == "Main Release Ready"
-            )
             if len(page_runs) < 100:
                 break
+        # Name-filtered pagination. The unfiltered scan above is optional-check
+        # evidence and stops on a short page; Main Release Ready on a later
+        # page (d15d0c50 page 3) still has to be found.
+        release_attempts = list_named_check_runs(repo, sha, "Main Release Ready")
         if not _real_release_attempts(release_attempts):
             if is_jovie_repository(repo):
                 release_attempts.extend(observe_main_release_ready_jobs(repo, sha))
@@ -698,7 +832,10 @@ def observe_main(repo: str) -> dict[str, Any]:
         # and the exact generation marker, not to every check run on the SHA.
         # Optional lanes (Generate Screenshots, agent suites) stay observable
         # in pendingChecks/failedChecks without classifying main.
-        latest = select_main_release_ready(release_attempts)
+        # A new main head can precede both its push CI and the skipped
+        # merge-group check. Keep that missing verdict in the normal unresolved
+        # path so the same bounded recent-CI fallback can evaluate it.
+        latest = select_main_release_ready(release_attempts) if release_attempts else {}
         marker = observe_generation_marker(repo, sha)
         required_checks, optional_checks = classify_main_checks(
             check_runs,
@@ -810,6 +947,9 @@ def observe_main(repo: str) -> dict[str, Any]:
         return observed
 
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
+        # Transport failures reach here only after gh_json's bounded
+        # 5xx/network backoff. A missing or pending Main Release Ready check
+        # is polled by observe_main. A red conclusion never raises.
         observed_sha = sha if valid_commit_sha(sha, exact=True) else UNKNOWN_MAIN_SHA
         return {
             "status": "unknown",
@@ -818,10 +958,122 @@ def observe_main(repo: str) -> dict[str, Any]:
         }
 
 
+def native_user_bus_environment(home: Path, *, runtime_root: Path = Path("/run/user")) -> dict[str, str]:
+    """Supply the existing same-user bus when a service runner lacks login context."""
+    env = dict(os.environ)
+    uid = os.geteuid()
+    runtime = runtime_root / str(uid)
+    canonical = {"XDG_RUNTIME_DIR": str(runtime),
+                 "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + str(runtime / "bus")}
+    # Never redirect an explicitly different context or cross a user boundary.
+    if any(env.get(key) and env[key] != value for key, value in canonical.items()):
+        raise ValueError("native controller user bus identity mismatch")
+    if all(env.get(key) == value for key, value in canonical.items()):
+        return env
+    if home.stat().st_uid != uid:
+        raise ValueError("native controller user identity mismatch")
+    directory, socket = runtime.lstat(), (runtime / "bus").lstat()
+    if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != uid
+            or directory.st_mode & 0o022
+            or not stat.S_ISSOCK(socket.st_mode) or socket.st_uid != uid):
+        raise ValueError("native controller user bus unavailable")
+    return {**env, **canonical}
+
+
+def observe_native_controller(state_dir: Path, now: datetime) -> dict[str, Any]:
+    """Observe the installed lanes runtime; a retired HTTP endpoint is not authority."""
+    failed = {"status": "failed", "kind": "native-lanes", "source": "native-runtime",
+              "observedAt": isoformat(now)}
+    try:
+        state = state_dir.resolve(strict=True)
+        home = state.parents[2]
+        if state != home / ".local/state/jovie-lanes" or not (state / "current").is_symlink():
+            raise ValueError("native state identity unavailable")
+        release = (state / "current").resolve(strict=True)
+        parts = release.relative_to(state / "releases").parts
+        if len(parts) != 3 or parts[1:] != ("scripts", "lanes") or not re.fullmatch(r"[0-9a-f]{64}", parts[0]):
+            raise ValueError("installed release identity unavailable")
+        manifest_path, tick_path = release / ".release.json", state / "tick.json"
+        if manifest_path.is_symlink() or tick_path.is_symlink():
+            raise ValueError("native evidence is not a regular receipt")
+        manifest_bytes, tick_bytes = manifest_path.read_bytes(), tick_path.read_bytes()
+        manifest, tick = json.loads(manifest_bytes), json.loads(tick_bytes)
+        objects = manifest.get("objects")
+        revision = manifest.get("sourceCommit")
+        if (manifest.get("schema") != "jovie-lane-release-bundle/v1"
+                or not valid_commit_sha(revision, exact=True) or not isinstance(objects, dict)
+                or manifest.get("bundleDigest") != parts[0]
+                or hashlib.sha256(json.dumps(objects, sort_keys=True, separators=(",", ":")).encode()).hexdigest() != parts[0]):
+            raise ValueError("installed release manifest mismatch")
+        runner = release / "lane_runner.py"
+        if runner.is_symlink():
+            raise ValueError("installed runner identity unavailable")
+        runner_bytes = runner.read_bytes()
+        git = subprocess.run(
+            ["git", "--no-optional-locks", "-c", "core.hooksPath=" + os.devnull,
+             "-C", str(home / "devin-sweep/Jovie"), "rev-parse",
+             revision + ":scripts/lanes", revision + ":scripts/lanes/lane_runner.py"],
+            capture_output=True, text=True, check=True, timeout=5,
+            env={**{key: value for key, value in os.environ.items() if not key.startswith("GIT_")},
+                 "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
+                 "GIT_CONFIG_SYSTEM": os.devnull, "GIT_NO_REPLACE_OBJECTS": "1",
+                 "GIT_NO_LAZY_FETCH": "1", "GIT_OPTIONAL_LOCKS": "0"})
+        identities = git.stdout.splitlines()
+        runner_blob = hashlib.sha1(b"blob " + str(len(runner_bytes)).encode() + b"\0" + runner_bytes).hexdigest()
+        if identities != [objects.get("scripts/lanes"), runner_blob]:
+            raise ValueError("installed runner does not match its source revision")
+        tick_at = tick.get("at")
+        observed = (datetime.fromisoformat(tick_at.replace("Z", "+00:00"))
+                    if isinstance(tick_at, str) else None)
+        tick_revision = tick.get("release")
+        if (observed is None or observed.tzinfo is None or observed.utcoffset() is None
+                or not -timedelta(seconds=30) <= now - observed <= CONTROLLER_SNAPSHOT_TTL
+                or not isinstance(tick_revision, str) or not re.fullmatch(r"[0-9a-f]{7,40}", tick_revision)
+                or not str(objects.get("scripts/lanes", "")).startswith(tick_revision) or "error" not in tick or tick["error"] is not None):
+            raise ValueError("native controller tick is stale, failed or unbound")
+        unit_read = subprocess.run(
+            ["systemctl", "--user", "show", "jovie-lanes.service", "jovie-lanes.timer",
+             "--property=Id,ActiveState,SubState,Result,ExecMainStatus,ExecStart,FragmentPath,Unit"],
+            capture_output=True, text=True, check=True, timeout=5,
+            env=native_user_bus_environment(home))
+        units = {}
+        for block in unit_read.stdout.strip().split("\n\n"):
+            fields = dict(line.split("=", 1) for line in block.splitlines() if "=" in line)
+            units[fields.get("Id")] = fields
+        service, timer = units.get("jovie-lanes.service", {}), units.get("jovie-lanes.timer", {})
+        runner_command = "python3 " + str(state / "current/lane_runner.py")
+        expected_script = (runner_command + " update; python3 "
+                           + str(state / "current/codex_lane.py") + " reconcile --if-due 3600; exec "
+                           + runner_command + " dispatch")
+        expected_exec = "{ path=/bin/bash ; argv[]=/bin/bash -c " + expected_script + " ; ignore_errors=no ;"
+        service_states = {"active": "running", "activating": "start", "inactive": "dead"}
+        if (service.get("Result") != "success" or service.get("ExecMainStatus") != "0"
+                or service.get("ActiveState") not in service_states
+                or service_states[service["ActiveState"]] != service.get("SubState")
+                or service.get("FragmentPath") != str(home / ".config/systemd/user/jovie-lanes.service")
+                or not service.get("ExecStart", "").startswith(expected_exec)
+                or timer.get("ActiveState") != "active" or timer.get("Result") != "success"
+                or timer.get("SubState") not in {"waiting", "running"}
+                or timer.get("FragmentPath") != str(home / ".config/systemd/user/jovie-lanes.timer")
+                or timer.get("Unit") != "jovie-lanes.service"):
+            raise ValueError("native controller service identity or health unavailable")
+        if ((state / "current").resolve(strict=True) != release
+                or manifest_path.read_bytes() != manifest_bytes or tick_path.read_bytes() != tick_bytes
+                or runner.read_bytes() != runner_bytes):
+            raise ValueError("native controller evidence changed during observation")
+        return {"status": "green", "kind": "native-lanes", "source": "native-runtime",
+                "observedAt": isoformat(now), "tickAt": tick["at"],
+                "sourceCommit": revision, "bundleDigest": parts[0],
+                "service": "jovie-lanes.service", "timer": "jovie-lanes.timer"}
+    except (OSError, ValueError, TypeError, IndexError, AttributeError, subprocess.SubprocessError):
+        return {**failed, "error": "native-controller-evidence-unavailable"}
+
+
 def observe_controller(
     url: str,
     snapshot_path: Path | None = None,
     now: datetime | None = None,
+    native_state_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Observe Symphony :4041. Connection blips must not flip hold-intake to blocked.
 
@@ -831,6 +1083,8 @@ def observe_controller(
     queue observation (connection refused / timeout).
     """
     observed_at = now or utc_now()
+    if native_state_dir is not None:
+        return observe_native_controller(native_state_dir, observed_at)
     try:
         with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - fixed local URL by default
             value = json.loads(response.read().decode("utf-8"))
@@ -1645,17 +1899,24 @@ _TRANSIENT_OBSERVATION_MARKERS = (
 
 
 def transient_gh_observation_error(error: BaseException) -> bool:
-    """Whether an observer failure is a blip worth last-known reuse.
+    """Whether an observer failure is a blip worth a bounded retry or last-known reuse.
 
-    GitHub CLI 5xx/timeouts and Symphony :4041 connection refused during a
-    UI restart (live #16187 autoenroll) must not flip hold-intake to blocked.
+    GitHub CLI 5xx and network failures, including Symphony :4041 connection
+    refused during a UI restart (live #16187 autoenroll), must not flip
+    hold-intake to blocked on the first blip. A 4xx, an auth failure, and a
+    completed missing or red check are not transient.
     """
-    if isinstance(error, subprocess.TimeoutExpired):
+    if isinstance(error, (subprocess.TimeoutExpired, TimeoutError, ConnectionError)):
         return True
     if isinstance(error, subprocess.CalledProcessError):
+        status, _, _ = _parse_gh_include(str(error.stdout or ""))
+        if status is not None and 500 <= status <= 599:
+            return True
         detail = " ".join(
             str(value or "") for value in (error.stdout, error.stderr)
         ).lower()
+        if re.search(r"\bhttp\s+5\d\d\b", detail):
+            return True
         return any(marker in detail for marker in _TRANSIENT_OBSERVATION_MARKERS)
     if isinstance(error, (OSError, urllib.error.URLError)):
         return any(marker in str(error).lower() for marker in _TRANSIENT_OBSERVATION_MARKERS)
@@ -3461,6 +3722,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--queue-target", type=int, default=15)
     parser.add_argument("--production-url", default=None)
     parser.add_argument("--symphony-url", default="http://127.0.0.1:4041/api/v1/state")
+    parser.add_argument("--native-controller-state-dir", type=Path,
+                        default=Path.home() / ".local/state/jovie-lanes")
     parser.add_argument(
         "--lease-guard-bin",
         default=os.environ.get("SYMPHONY_LEASE_GUARD_BIN")
@@ -3520,12 +3783,16 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         args.independent_review_receipt
         or fleet_sidecar_path(args.state_dir, args.repo, "independent-review.json")
     )
+    native_state = (getattr(args, "native_controller_state_dir", None)
+                    if args.symphony_url.rstrip("/") == "http://127.0.0.1:4041/api/v1/state" else None)
+    controller_options = {"native_state_dir": native_state} if native_state is not None else {}
     controller = observe_controller(
         args.symphony_url,
         snapshot_path=fleet_sidecar_path(
             args.state_dir, args.repo, "controller-snapshot.json"
         ),
         now=now,
+        **controller_options,
     )
     closure = observe_closure_health(
         args.repo,

@@ -41,7 +41,7 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 
 ### GITHUB_TOKEN budget per group
 
-Every workflow in the repo shares one GITHUB_TOKEN REST bucket (1,000 calls/h),
+Default-branch workflows share one GITHUB_TOKEN REST bucket (5,000 calls/h, measured 2026-10-21 by the `api-quota` notices; demand was ~4,500/h),
 and each rebuild runs a group's CI again. In a green merge group, ci.yml jobs
 other than Merge Group Admission spend no REST calls. Their token-bearing steps
 only authenticate git fetches, which are git traffic and not REST, or they never
@@ -53,19 +53,17 @@ PR Size Guard member policy, are budgeted in their own scripts.
 token-bearing step with its per-group cost. A new one fails that test until it
 is classified, and the green-group total must stay at 5 or less.
 
-### Fail-fast ejection
+### Red lanes do not rebuild the queue
 
-A merge-group `PR Ready` waits for its slowest lane, so a failed group used to
-report at about 7 minutes even when its first lane failed at about 3, and every
-group behind it kept building on a dead base. Each lane listed in
-`scripts/lib/__tests__/merge-group-fail-fast.test.mjs` ends with one
-`failure() && merge_group` step that posts a failing `PR Ready` commit status
-on the exact combined head. GitHub ejects the entry and rebuilds the groups
-behind it right away. That is one API call per failed lane and none per green
-group. The run itself still finishes, so the failure hold classifies the
-complete terminal run as before. The status only ever reports `failure`. It
-grants nothing a queued head could not already request, because
-`merge_group` workflow definitions come from the synthetic head.
+A failed merge-group lane used to post a failing `PR Ready` commit status
+immediately (`ejected before the slowest lane`). GitHub ejected that entry and
+rebuilt every group behind it. Each rebuild ran PR Size Guard and Merge Group
+Admission again on the shared GITHUB_TOKEN bucket (5,000 REST calls/hour),
+which is what exhausted the quota before the hourly reset. A red lane no longer
+posts that status. `ci-merge-group-ready` still runs with `always()` and fails
+`PR Ready` when the group is actually red, so the entry is ejected once, after
+the lanes already in flight finish. No job in `ci.yml` holds `statuses: write`.
+`scripts/lib/__tests__/merge-group-fail-fast.test.mjs` locks that.
 
 Preview, Neon, E2E, Lighthouse, a11y, Storybook, golden-path, and extended-smoke
 lanes are hosted manual, scheduled, repository-event, or post-merge work. They
@@ -90,14 +88,14 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
 - Minimum entries to merge: `1`.
 - Minimum entries wait: `0` minutes. A source-green PR forms a group
   immediately instead of waiting for a cohort.
-- Maximum entries per merge: `5`. Each entry still builds its own synthetic
+- Maximum entries per merge: `10`. Each entry still builds its own synthetic
   head layered on the entry ahead (one member per group), so per-member lanes
-  and member policy are unchanged; up to five green entries land in one push.
-- Maximum entries building concurrently: checked-in ceiling `6`. Lower live
+  and member policy are unchanged; up to ten green entries land in one push.
+- Maximum entries building concurrently: checked-in ceiling `10`. Lower live
   values remain supported as a reversible runner-capacity brake. Raise the
   file and the live ruleset together.
-- Check response timeout: `60` minutes (source-first cutover and live readback
-  verified 2026-09-24). Required checks and ALLGREEN remain unchanged.
+- Check response timeout: `20` minutes (Tim-approved tuning and live readback
+  verified 2026-10-21). Required checks and ALLGREEN remain unchanged.
 - Production health governs deployment and promotion through the existing
   production controls. Native source admission uses the required checks above;
   the retired Auto-Enroll fleet gate does not create a second admission gate.
@@ -133,14 +131,18 @@ inside each per-member synthetic head. The trusted changed-path classifier runs
 only the selected Web, Mac, iOS, operations/tooling, and shared-contract lanes,
 so a fast-only change does not inherit an unrelated PR's slow product lane.
 
-**Ship now:** immediate groups (`min=1`, `wait=0`), up to five green entries
-per merge push, six building concurrently, ALLGREEN. HEADGREEN is unsafe here:
+**Ship now:** immediate groups (`min=1`, `wait=0`), up to ten green entries
+per merge push, ten building concurrently, ALLGREEN, 20-minute check response
+budget (2026-10-21, Tim-approved; 3 of 287 group runs exceeded 20 minutes in
+the first 12 hours, with no timeout removals). HEADGREEN is unsafe here:
 member policy validates only the newest member and lanes are path-selected per
 member, so an earlier member could land without its own lanes passing.
 **Re-evaluate when:** the group failure rate stays under 10% and the repo
-GITHUB_TOKEN bucket stays healthy for a day. **Then:** raise
-`max_entries_to_build` toward 8 in this file and the live ruleset together,
-watching hosted macOS pickup (the org shares five hosted macOS slots).
+GITHUB_TOKEN bucket stays healthy for a day. **Then:** keep 10/10; if
+merge-group runs selecting the 30/40-minute iOS or Mac lanes start timing out
+at the 20-minute response budget (the 2026-09-23 failure mode), raise the
+budget in this file and the live ruleset together, watching hosted macOS pickup
+(the org shares five hosted macOS slots).
 
 ### Tuning log
 
@@ -151,6 +153,8 @@ watching hosted macOS pickup (the org shares five hosted macOS slots).
 | 2026-10-13 02:37 | live `max_entries_to_build` 6 → 8 | throughput |
 | 2026-10-13 03:47 | live `max_entries_to_build` 8 → 6 | GITHUB_TOKEN quota storm |
 | 2026-10-13 | source synced to live (build 6, merge 5) | keep the daily verify green |
+| 2026-10-21 04:47 | live `max_entries_to_build` 6 → 10, `max_entries_to_merge` 5 → 10, `check_response_timeout_minutes` 60 → 20 (Tim-approved) | queue 40 deep at ~5 merges/h; stuck checks held the head for an hour |
+| 2026-10-21 | source synced to live (build 10, merge 10, timeout 20) | keep the daily verify green (JOV-8205) |
 
 ## Reconciliation and loop prevention
 
@@ -173,7 +177,7 @@ queued, and cancelled checks do not imply a terminal source failure.
   current PR head. Source landing does not prove activation or a successful
   repair. An accepted webhook is not a repair or merge receipt. Repair findings
   in their source PR and let GitHub rebuild the group.
-- Revision failure hold (JOV-5117): a terminal `CI` `merge_group` run maps   `gh-readonly-queue/main/pr-N-*` to PR `N`, then uses the ordered queue/commit   timeline to bind the failed attempt to its exact source head. The trusted   `Merge Queue Green Enroll` controller writes   `jovie-queue-failure-hold/v1` on that source commit before attempting dequeue and   disabling native auto-merge. The Jovie Bot token for that job is not minted with merge-queue write, so `dequeuePullRequest` may return `Resource not accessible by integration`. That denial, and a `not in queue` response, are logged and do not fail the job: GitHub already removes a pull request when its merge_group run fails. The hold status and auto-merge disable still persist. Any other dequeue or auto-merge error fails the job. Deterministic source failures are held after   one attempt. Retryable or unclassified failures may consume exactly   one controller-owned retry; `jovie-queue-failure-retry/v1` spends it before   re-enrollment. A `transient-infrastructure` failure (runner startup, checkout, setup) says nothing about the source revision: each one gets its own retry and never counts toward the two attributable failures that hold the head. Main movement, elapsed time, labels, production completion,   and generic maintenance do not clear either receipt. A new source SHA has no   old commit status and may enroll after normal source checks. Required checks,   native queue membership, and exact combined-head CI remain authoritative and   unchanged.
+- Revision failure hold (JOV-5117): a terminal `CI` `merge_group` run maps   `gh-readonly-queue/main/pr-N-*` to PR `N`, then uses the ordered queue/commit   timeline to bind the failed attempt to its exact source head. The trusted   `Merge Queue Green Enroll` controller writes   `jovie-queue-failure-hold/v1` on that source commit before attempting dequeue and   disabling native auto-merge. The Jovie Bot token for that job is not minted with merge-queue write, so `dequeuePullRequest` may return `Resource not accessible by integration`. That denial, and a `not in queue` response, are logged and do not fail the job: GitHub already removes a pull request when its merge_group run fails. The hold status and auto-merge disable still persist. Any other dequeue or auto-merge error fails the job. Every attributable failure (deterministic, retryable product, or unclassified) holds its exact source head after one attempt (JOV-6620; #22280 re-entered twice at a failed head on 2026-10-20 under the old one-retry allowance). The head re-enters only with a new commit or when a person (never a bot) removes `hold` or `queue-poison` from that exact head; that release consumes one `jovie-queue-failure-retry/v1` reservation. jovie-bot lifting `queue-poison` is not a release. Victim rearm never re-enqueues the revision the failure hold names unless another group member owns the failing paths. A `transient-infrastructure` failure (runner startup, checkout, setup) says nothing about the source revision: each one gets its own automatic retry, which a person's manual dequeue of that head withdraws. Main movement, elapsed time, labels, production completion,   and generic maintenance do not clear either receipt. A new source SHA has no   old commit status and may enroll after normal source checks. Required checks,   native queue membership, and exact combined-head CI remain authoritative and   unchanged.
 - Pre-land CHANGELOG prohibition (JOV-5291 / JOV-5378): GitHub's server merge
   ignores local union drivers, so two Unreleased `CHANGELOG.md` edits in one
   group park the later entry. Implementation PRs never edit `CHANGELOG.md`.
@@ -199,11 +203,22 @@ required-green, non-draft, unlabeled-hold PRs on green checks so production
 holds never stall merging; required checks on the merge group remain the only
 gate. Required-green means `mergeStateStatus` CLEAN, HAS_HOOKS or UNSTABLE
 (UNSTABLE only adds a pending or red non-required context, such as a lane
-`jovie-execution/*` receipt). An UNKNOWN read right after main moves is
+`jovie-execution/*` receipt). `lane-fix-red` is machine admission state, not a
+hold-contract label. The Lane Fix Relay removes it with that workflow's
+existing GITHUB_TOKEN once the current head is required-green
+(`mergeStateStatus` CLEAN, HAS_HOOKS, or UNSTABLE) and the success event's
+head sha matches. A red, unknown, dirty, or behind head keeps the label.
+Green enroll does not remove the label and will not admit the PR while it
+remains. A GITHUB_TOKEN unlabel does not wake enroll, so admission is the
+next enroll read: the same success wake if the label is already gone,
+otherwise the next push-to-main sweep. Adding the label to a queued PR
+dequeues that PR.
+An UNKNOWN read right after main moves is
 re-read twice before the wake is dropped. An unchanged head removed from the
 queue stays out unless a typed retry/recovery applies, or the removal was
 `manual` and a blocking label (`hold`, `queue-poison`, ...) was removed after
-it. The enroll and rearm tokens carry `workflows: write` so heads that edit
+it. A head with a merge-group failure hold needs a person's label removal (see
+Revision failure hold above); a bot removal does not release it. The enroll and rearm tokens carry `workflows: write` so heads that edit
 `.github/workflows` can be enqueued. The Queue-Deferred Release workflow and
 its automatic label writer are also retired. Do not re-enable those paths to
 finish a PR.
@@ -297,6 +312,20 @@ runtime behavior, or Summer commissioning.
   merge-group attempts per merge plus deterministic same-head recurrence.
 - Emergency response: inspect the native ruleset and exact queue entry,
   repair the source or required check, and prove a fresh native canary.
+- Groups stuck in AWAITING_CHECKS with a CI run named
+  `.github/workflows/ci.yml`, zero jobs and event `push` on the
+  `gh-readonly-queue/*` ref: GitHub could not load ci.yml, so no merge_group
+  check reports. The known cause is an interpolated `run:` script whose
+  `format()` expression exceeds GitHub's 21,000-character limit (2026-10-20,
+  #21826). `node scripts/workflow-expression-budget.mjs --ref HEAD --merge-with
+  origin/main` reproduces it. Source Validation runs that check on the head and
+  its merge with main. In the queue, PR Size Guard's `Workflow Load Guard` job
+  ("Require combined-head workflows to load") fails only for the group that
+  introduced it; a group stacked on an already broken base passes. The failure
+  hold then records `jovie-queue-failure-hold/v1` on the exact source head and
+  reports `PR Ready` failed on the synthetic group head, so the queue ejects it
+  at once. The ruleset's 20-minute check response timeout remains the backstop
+  for any other cause.
 
 ## Queue freeze (queue-watch runbook)
 

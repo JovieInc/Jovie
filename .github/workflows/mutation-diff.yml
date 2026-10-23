@@ -4,11 +4,14 @@
 # revisit-trigger: Fold into Nightly Testing Agent if it gains per-job path filters, or retire when mutation testing moves into an existing PR check.
 name: Mutation Diff
 
-# Advisory, diff-scoped mutation testing for changed high-risk apps/web source
+# Diff-scoped mutation testing for changed high-risk apps/web source
 # (billing, entitlements, auth, Stripe, webhooks, claim). Runs after merge on
 # main, path-filtered, so it adds no PR or merge-group check. Scores and
-# surviving mutants land in the job summary. The job fails only when Stryker
-# itself breaks, so a dead harness cannot pass as a clean run.
+# surviving mutants land in the job summary. A file in
+# scripts/mutation-score-baseline.json fails the job when its score is under
+# that file's floor. Files without a floor stay advisory. The job also fails
+# when Stryker itself breaks, so a dead harness cannot pass as a clean run.
+# Not a merge-queue required check: it does not run on pull requests.
 
 on:
   push:
@@ -63,24 +66,7 @@ jobs:
           BEFORE: ${{ github.event.before }}
           HEAD_SHA: ${{ github.sha }}
           INPUT_FILES: ${{ inputs.files }}
-        run: |
-          set -euo pipefail
-          if [ "$EVENT" = workflow_dispatch ]; then
-            files="$INPUT_FILES"
-          else
-            base="$(gh api "repos/$REPO/actions/workflows/mutation-diff.yml/runs?branch=main&event=push&status=success&per_page=1" \
-              --jq '.workflow_runs[0].head_sha // empty')"
-            base="${base:-$BEFORE}"
-            if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
-              echo "::notice::No baseline commit to diff against; skipping."
-              files=""
-            else
-              echo "Diffing $base...$HEAD_SHA"
-              files="$(gh api "repos/$REPO/compare/$base...$HEAD_SHA" \
-                --jq '[.files[] | select(.status != "removed") | .filename] | join(" ")')"
-            fi
-          fi
-          echo "files=$files" >> "$GITHUB_OUTPUT"
+        run: node scripts/lib/github-installation-quota.mjs soft-fail -- bash .github/scripts/mutation-diff-resolve-files.sh
 
       - name: Setup Node.js and pnpm
         if: steps.files.outputs.files != ''

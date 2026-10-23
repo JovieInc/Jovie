@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { linearRequest } from './linear-cooldown.mjs';
 
 export const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
@@ -79,6 +80,33 @@ export async function addLinearIssueComment({
   return { ok: true, id: result.data.commentCreate.comment?.id ?? null };
 }
 
+/** Reopen a measurement finding in its owning team's triage state. */
+export async function reopenLinearIssue({
+  issueId,
+  stateId,
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  if (!issueId || !stateId)
+    return { ok: false, reason: 'missing_reopen_routing' };
+  const result = await linearGraphql(
+    {
+      query: `mutation ReopenLinearIssue($id: String!, $input: IssueUpdateInput!) {
+      issueUpdate(id: $id, input: $input) { success }
+    }`,
+      variables: { id: issueId, input: { stateId } },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_reopen'
+  );
+  if (!result.ok) return result;
+  return result.data?.issueUpdate?.success
+    ? { ok: true }
+    : { ok: false, reason: 'linear_reopen_unsuccessful' };
+}
+
 /** List comments on a Linear issue (body + createdAt, oldest first). */
 export async function listLinearIssueComments({
   issueId,
@@ -119,10 +147,24 @@ export async function listLinearIssueComments({
 const REMEDIATION_KEY_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const labelCache = new Map();
 
-/** Router intake label. Do not double-prefix fingerprints that already start with it. */
+// Linear rejects issue-label names longer than 80 characters with a GraphQL
+// error. Every existing remediation label is at most 80; the time-bomb label
+// for apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts is 83, so
+// the filing run failed on every schedule (JOV-8235).
+export const LINEAR_LABEL_NAME_MAX = 80;
+
+/**
+ * Router intake label. Do not double-prefix fingerprints that already start
+ * with it. Names over Linear's limit keep a readable prefix plus a stable
+ * 8-hex digest of the full name, so one fingerprint always maps to one label
+ * and the result is idempotent.
+ */
 export function remediationKey(fingerprint) {
-  const name = String(fingerprint ?? '').trim();
-  return name.startsWith('remediation:') ? name : `remediation:${name}`;
+  const raw = String(fingerprint ?? '').trim();
+  const name = raw.startsWith('remediation:') ? raw : `remediation:${raw}`;
+  if (name.length <= LINEAR_LABEL_NAME_MAX) return name;
+  const digest = createHash('sha256').update(name).digest('hex').slice(0, 8);
+  return `${name.slice(0, LINEAR_LABEL_NAME_MAX - digest.length - 1)}~${digest}`;
 }
 
 export function bareRemediationKey(value) {
@@ -220,9 +262,34 @@ export async function ensureLinearLabel({
     },
     'linear_label_create'
   );
-  if (!created.ok) return created;
+  if (!created.ok) {
+    // Linear rejects a duplicate issueLabelCreate with a GraphQL error
+    // (JOV-8235). The search response's label snapshot can already be stale —
+    // a sibling shard or the previous cron run may have created the label
+    // between the search and this create. Re-resolve the exact name before
+    // failing the whole filing run (case-insensitive: Linear enforces label-name uniqueness case-insensitively).
+    const recovered = await findLinearLabelId({
+      name,
+      apiKey,
+      fetchImpl,
+      teamId,
+      ignoreCase: true,
+    });
+    if (recovered.ok && recovered.id) return recovered;
+    return created;
+  }
   const id = created.data?.issueLabelCreate?.issueLabel?.id ?? null;
   if (!created.data?.issueLabelCreate?.success || !id) {
+    // Same stale-snapshot case without a transport failure: someone else
+    // created the label between the search and this mutation.
+    const recovered = await findLinearLabelId({
+      name,
+      apiKey,
+      fetchImpl,
+      teamId,
+      ignoreCase: true,
+    });
+    if (recovered.ok && recovered.id) return recovered;
     return {
       ok: false,
       reason: 'linear_label_create_unsuccessful',
@@ -239,6 +306,7 @@ export async function findLinearLabelId({
   apiKey,
   fetchImpl,
   teamId = JOVIE_TEAM_ID,
+  ignoreCase = false,
 }) {
   const cacheKey = `${teamId}:${name}`;
   if (labelCache.has(cacheKey)) {
@@ -249,7 +317,7 @@ export async function findLinearLabelId({
       query: `
         query FindTeamLabel($teamId: String!, $name: String!) {
           team(id: $teamId) {
-            labels(filter: { name: { eq: $name } }) { nodes { id name } }
+            labels(filter: { name: { ${ignoreCase ? 'eqIgnoreCase' : 'eq'}: $name } }) { nodes { id name } }
           }
         }
       `,
@@ -261,8 +329,12 @@ export async function findLinearLabelId({
   );
   if (!found.ok) return found;
   const id =
-    (found.data?.team?.labels?.nodes ?? []).find(label => label?.name === name)
-      ?.id ?? null;
+    (found.data?.team?.labels?.nodes ?? []).find(
+      label =>
+        label?.name === name ||
+        (ignoreCase &&
+          String(label?.name ?? '').toLowerCase() === name.toLowerCase())
+    )?.id ?? null;
   if (id) labelCache.set(cacheKey, id);
   return { ok: true, id };
 }

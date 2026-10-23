@@ -195,10 +195,36 @@ test('the relay skips the model-lane label only when a rerun was requested', () 
   assert.match(rerunJob.if, /workflow_run\.conclusion == 'failure'/);
   const step = rerunJob.steps.find(s => s.id === 'rerun');
   assert.equal(step.run, 'node scripts/pr-unacquired-runner-rerun.mjs');
+  assert.match(String(workflow.concurrency.group), /workflow_run\.head_sha/);
+  assert.match(
+    String(workflow.concurrency.group),
+    /conclusion == 'success' && format\('lane-fix-relay-success-\{0\}'/
+  );
+  assert.equal(
+    workflow.concurrency['cancel-in-progress'],
+    "${{ github.event_name == 'push' || github.event_name == 'workflow_run' }}"
+  );
+  assert.equal(
+    workflow.jobs.relay.steps[0].if,
+    "github.event_name == 'workflow_run'"
+  );
+  assert.doesNotMatch(String(workflow.concurrency.group), /github\.run_id/);
+  assert.doesNotMatch(
+    String(workflow.concurrency.group),
+    /event\.inputs\.pr_number/
+  );
+  assert.equal(workflow.on.workflow_dispatch, null);
   const relay = workflow.jobs.relay;
   assert.equal(relay.needs, 'rerun-unacquired');
+  const debounce = relay.steps[0];
+  assert.equal(debounce.name, 'Debounce repeated workflow completions');
+  assert.equal(debounce.run, 'sleep 20');
+  assert.ok(relay.steps.findIndex(step => step.id === 'read-token') > 0);
   assert.match(
     relay.if,
     /^always\(\) && needs\.rerun-unacquired\.outputs\.requested != 'true' && \(/
   );
+  assert.match(relay.if, /"success"/);
+  assert.equal(relay.permissions.issues, 'write');
+  assert.equal(relay.permissions['pull-requests'], 'write');
 });

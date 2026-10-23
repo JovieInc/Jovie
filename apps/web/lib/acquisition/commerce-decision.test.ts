@@ -1,5 +1,9 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
+import {
+  ARTIST_VISIBILITY_OFFER,
+  ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
+} from '@/lib/billing/offer-truth';
 import {
   type CommerceDecisionSource,
   projectCommerceDecisions,
@@ -185,5 +189,177 @@ describe('commerce decision projection', () => {
     const rejected = JSON.stringify(projectCommerceDecisions(poisoned, NOW));
     expect(rejected).not.toContain('pi_known_field_reusable');
     expect(rejected).toContain('"matrixRevision":"unavailable"');
+  });
+
+  it('consumes real reconciliation receipts and blocks only the exact rail and canary until recertified', async () => {
+    const {
+      capabilityEventFromCommerceEvidence,
+      planCapabilityReconciliation,
+    } = await import(
+      '../../../../scripts/capability-benchmark/capability-reconciliation.mjs'
+    );
+    const hash = (value: string) =>
+      createHash('sha256').update(value).digest('hex');
+    const canonicalPrice = {
+      priceId: 'price_canonical_fixture',
+      productId: 'prod_artist_presence_fixture',
+      amountCents: ARTIST_VISIBILITY_OFFER.pro.monthlyUsd * 100,
+      currency: ARTIST_VISIBILITY_OFFER.pro.currency,
+      interval: ARTIST_VISIBILITY_OFFER.pro.interval,
+    };
+    const wrongPrice = {
+      ...canonicalPrice,
+      priceId: 'price_different_fixture',
+    };
+    expect(canonicalPrice.amountCents).toBe(1200);
+    expect(wrongPrice.amountCents).toBe(canonicalPrice.amountCents);
+    const snapshot = {
+      matrixDigest: hash('matrix-r7'),
+      policyDigest: hash('approved-policy'),
+      geographyDigest: hash('us'),
+      merchantOfRecord: 'jovie',
+      eligible: true,
+      geographyCompatible: true,
+      hostedMerchReady: null,
+      observedAt: RECENT,
+      expiresAt: '2026-10-15T17:00:00.000Z',
+      access: {
+        digest: hash('access'),
+        state: 'supported',
+        observedAt: RECENT,
+        expiresAt: '2026-10-15T17:00:00.000Z',
+      },
+      price: {
+        canonicalIdentityDigest: hash(JSON.stringify(canonicalPrice)),
+        observedIdentityDigest: hash(JSON.stringify(canonicalPrice)),
+      },
+    };
+    const input = source();
+    input.decisions[0].canary = {
+      result: 'passed',
+      observedAt: RECENT,
+      maxAgeMs: DAY_MS,
+    };
+    const sibling = structuredClone(input.decisions[0]);
+    sibling.rail = 'stripe-spt';
+    input.decisions.push(sibling);
+    const otherChannel = structuredClone(input.decisions[0]);
+    otherChannel.channel = 'direct-web';
+    input.decisions.push(otherChannel);
+    const otherOffer = structuredClone(input.decisions[0]);
+    otherOffer.offer = 'hosted-merch';
+    input.decisions.push(otherOffer);
+    const decision = {
+      id: 'commerce-web-checkout',
+      capabilityId: 'agent-commerce',
+      scope: 'commerce-rail',
+      incumbent: { implementation: 'ordinary-web-checkout', owner: 'commerce' },
+      chosenDisposition: 'KEEP',
+      materialAssumptions: [{ id: 'current-rail-evidence' }],
+      evidence: {
+        id: 'evidence:approved-rail',
+        version: 'r4',
+        observedAt: RECENT,
+      },
+      alternativesConsidered: [],
+      switchingCost: 'bounded',
+      reversibility: 'disable rail',
+      invalidationTriggers: [
+        {
+          assumptionId: 'current-rail-evidence',
+          eventClasses: ['pricing-credit-or-quota'],
+        },
+      ],
+      nextReevaluation:
+        'canonical-price-identity-restored-and-canary-recertified',
+      commerceProjection: {
+        offer: input.decisions[0].offer,
+        channel: 'agent-handoff',
+        rail: 'ordinary-web-checkout',
+        decisionRevision: 'decision-r4',
+        issueIds: ['JOV-8218'],
+        evidence: snapshot,
+      },
+    };
+    const event = capabilityEventFromCommerceEvidence(
+      {
+        schema: 'jovie.canonical-evidence/v1',
+        id: 'evidence:price-drift',
+        provenance: { observedAt: RECENT },
+      },
+      {
+        decision,
+        current: {
+          ...snapshot,
+          price: {
+            ...snapshot.price,
+            observedIdentityDigest: hash(JSON.stringify(wrongPrice)),
+          },
+        },
+        provider: 'stripe',
+        now: NOW,
+      }
+    );
+    const receipt = planCapabilityReconciliation({
+      event,
+      decisions: [decision],
+      capabilityGraph: [
+        {
+          id: 'agent-commerce',
+          linearIssues: [{ id: 'JOV-8218', role: 'work' }],
+        },
+      ],
+      issues: [{ identifier: 'JOV-8218', state: { type: 'started' } }],
+      benchmark: null,
+    });
+    const result = projectCommerceDecisions(
+      { ...input, reconciliations: [receipt] },
+      NOW
+    );
+    expect(result.matrixRevision).toBe('matrix-r7');
+    expect(result.matrix[0]).toMatchObject({
+      eligible: false,
+      status: 'blocked',
+      canary: { readiness: 'blocked', result: 'stale' },
+    });
+    expect(result.matrix[0].evidence[0].status).toBe('red');
+    expect(result.matrix[0].invalidations[0]).toMatchObject({
+      priorDecision: 'commerce-web-checkout',
+      invalidatingEvidence: 'evidence:price-drift',
+      reasons: ['canonical-price-drift'],
+    });
+    expect(result.matrix[1]).toMatchObject({
+      eligible: true,
+      canary: { readiness: 'ready', result: 'passed' },
+      invalidations: [],
+    });
+    expect(result.matrix.slice(1).every(item => item.eligible)).toBe(true);
+    // Merely supplying the old green canary cannot restore an invalid decision.
+    expect(
+      projectCommerceDecisions({ ...input, reconciliations: [receipt] }, NOW)
+        .eligible
+    ).toBe(false);
+    input.decisions[0].decisionRevision = 'decision-r5';
+    expect(
+      projectCommerceDecisions({ ...input, reconciliations: [receipt] }, NOW)
+        .matrix[0]
+    ).toMatchObject({ eligible: false, canary: { result: 'stale' } });
+    input.decisions[0].canary.result = 'not-run';
+    const pending = projectCommerceDecisions(
+      { ...input, reconciliations: [receipt] },
+      NOW
+    );
+    expect(pending.matrix[0]).toMatchObject({
+      eligible: false,
+      status: 'supported',
+      invalidations: [],
+    });
+    input.decisions[0].canary.result = 'passed';
+    input.decisions[0].canary.decisionRevision = 'decision-r5';
+    expect(
+      projectCommerceDecisions({ ...input, reconciliations: [receipt] }, NOW)
+        .matrix[0].eligible
+    ).toBe(true);
+    expect(JSON.stringify(result)).not.toContain(wrongPrice.priceId);
   });
 });

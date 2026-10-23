@@ -1,0 +1,142 @@
+--- a/dist/build/templates/app-page-runtime.js
++++ b/dist/build/templates/app-page-runtime.js
+@@ -1366,6 +1366,14 @@
+                     }
+                     for (let [key, value] of Object.entries(headers)){
+                         if (typeof value === 'undefined') continue;
++                        // ISR miss renders already set singleton headers, then this
++                        // replay appends them again (vercel/next.js#82117, #99576).
++                        // Location must stay a single field or clients join the
++                        // duplicates into an unusable target.
++                        if (key.toLowerCase() === 'location' || key.toLowerCase() === 'x-nextjs-stale-time') {
++                            res.setHeader(key, value);
++                            continue;
++                        }
+                         if (Array.isArray(value)) {
+                             for (const v of value){
+                                 res.appendHeader(key, v);
+--- a/dist/esm/build/templates/app-page-runtime.js
++++ b/dist/esm/build/templates/app-page-runtime.js
+@@ -1385,6 +1385,14 @@
+                     }
+                     for (let [key, value] of Object.entries(headers)){
+                         if (typeof value === 'undefined') continue;
++                        // ISR miss renders already set singleton headers, then this
++                        // replay appends them again (vercel/next.js#82117, #99576).
++                        // Location must stay a single field or clients join the
++                        // duplicates into an unusable target.
++                        if (key.toLowerCase() === 'location' || key.toLowerCase() === 'x-nextjs-stale-time') {
++                            res.setHeader(key, value);
++                            continue;
++                        }
+                         if (Array.isArray(value)) {
+                             for (const v of value){
+                                 res.appendHeader(key, v);
+--- a/dist/server/lib/router-utils/resolve-routes.js
++++ b/dist/server/lib/router-utils/resolve-routes.js
+@@ -37,6 +37,42 @@
+         default: obj
+     };
+ }
++const PROFILE_ALIAS_REDIRECT_MODES = new Set([
++    'listen',
++    'pay',
++    'releases',
++    'subscribe',
++    'tour',
++    'contact'
++]);
++// Next merges redirect queries as { ...requestQuery, ...destinationQuery }.
++// Request keys stay in front, so /dualipa/listen?source=qr becomes
++// ?source=qr&mode=listen even when the destination is written
++// ?mode=listen&source=:profileSource. Canonical profile hrefs, alias cache
++// keys, and the public redirect contract are mode then source.
++function canonicalizeProfileAliasRedirectQuery(pathname, query) {
++    if (!query || typeof pathname !== 'string' || !/^\/[^/]+$/.test(pathname)) {
++        return query;
++    }
++    const mode = query.mode;
++    const source = query.source;
++    if (typeof mode !== 'string' || typeof source !== 'string') return query;
++    if ((source !== 'link' && source !== 'qr') || !PROFILE_ALIAS_REDIRECT_MODES.has(mode)) {
++        return query;
++    }
++    const keys = Object.keys(query);
++    if (keys[0] === 'mode' && keys[1] === 'source') return query;
++    const rest = {};
++    for (const key of keys){
++        if (key === 'mode' || key === 'source') continue;
++        rest[key] = query[key];
++    }
++    return {
++        mode,
++        source,
++        ...rest
++    };
++}
+ const debug = (0, _debug.default)('next:router-server:resolve-routes');
+ function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, renderServer, renderServerOpts, ensureMiddleware) {
+     let clientHashes = undefined;
+@@ -533,7 +569,7 @@
+                     });
+                     const { query } = parsedDestination;
+                     delete parsedDestination.query;
+-                    parsedDestination.search = (0, _serverrouteutils.stringifyQuery)(req, query);
++                    parsedDestination.search = (0, _serverrouteutils.stringifyQuery)(req, canonicalizeProfileAliasRedirectQuery(parsedDestination.pathname, query));
+                     parsedDestination.pathname = (0, _utils2.normalizeRepeatedSlashes)(parsedDestination.pathname);
+                     return {
+                         finished: true,
+--- a/dist/esm/server/lib/router-utils/resolve-routes.js
++++ b/dist/esm/server/lib/router-utils/resolve-routes.js
+@@ -22,6 +22,42 @@
+ import { isRSCRequestHeader } from '../is-rsc-request';
+ import { compileNonPath, matchHas, prepareDestination } from '../../../shared/lib/router/utils/prepare-destination';
+ import { NEXT_REWRITTEN_PATH_HEADER, NEXT_REWRITTEN_QUERY_HEADER, RSC_HEADER } from '../../../client/components/app-router-headers';
++const PROFILE_ALIAS_REDIRECT_MODES = new Set([
++    'listen',
++    'pay',
++    'releases',
++    'subscribe',
++    'tour',
++    'contact'
++]);
++// Next merges redirect queries as { ...requestQuery, ...destinationQuery }.
++// Request keys stay in front, so /dualipa/listen?source=qr becomes
++// ?source=qr&mode=listen even when the destination is written
++// ?mode=listen&source=:profileSource. Canonical profile hrefs, alias cache
++// keys, and the public redirect contract are mode then source.
++function canonicalizeProfileAliasRedirectQuery(pathname, query) {
++    if (!query || typeof pathname !== 'string' || !/^\/[^/]+$/.test(pathname)) {
++        return query;
++    }
++    const mode = query.mode;
++    const source = query.source;
++    if (typeof mode !== 'string' || typeof source !== 'string') return query;
++    if ((source !== 'link' && source !== 'qr') || !PROFILE_ALIAS_REDIRECT_MODES.has(mode)) {
++        return query;
++    }
++    const keys = Object.keys(query);
++    if (keys[0] === 'mode' && keys[1] === 'source') return query;
++    const rest = {};
++    for (const key of keys){
++        if (key === 'mode' || key === 'source') continue;
++        rest[key] = query[key];
++    }
++    return {
++        mode,
++        source,
++        ...rest
++    };
++}
+ const debug = setupDebug('next:router-server:resolve-routes');
+ export function getResolveRoutes(fsChecker, config, getAssetPrefix, opts, renderServer, renderServerOpts, ensureMiddleware) {
+     let clientHashes = undefined;
+@@ -518,7 +554,7 @@
+                     });
+                     const { query } = parsedDestination;
+                     delete parsedDestination.query;
+-                    parsedDestination.search = stringifyQuery(req, query);
++                    parsedDestination.search = stringifyQuery(req, canonicalizeProfileAliasRedirectQuery(parsedDestination.pathname, query));
+                     parsedDestination.pathname = normalizeRepeatedSlashes(parsedDestination.pathname);
+                     return {
+                         finished: true,

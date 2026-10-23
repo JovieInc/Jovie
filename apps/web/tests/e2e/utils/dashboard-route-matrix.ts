@@ -55,7 +55,6 @@ const CHAT_CONTENT_SELECTOR =
   '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], a[href="/app/chat"], textarea, [contenteditable="true"], main';
 const RELEASE_TASKS_ROUTE = `${APP_ROUTES.RELEASES}/[releaseId]/tasks`;
 const DASHBOARD_TIPPING_ROUTE = `${APP_ROUTES.DASHBOARD}/tipping`;
-const DASHBOARD_CONTACTS_ROUTE = `${APP_ROUTES.DASHBOARD}/contacts`;
 const DASHBOARD_TOUR_DATES_ROUTE = `${APP_ROUTES.DASHBOARD}/tour-dates`;
 
 const creatorRoutes = [
@@ -93,10 +92,22 @@ const creatorRoutes = [
   {
     path: APP_ROUTES.AUDIENCE,
     name: 'Audience',
+    kind: 'redirect',
+    surface: 'creator',
+    authRole: 'user',
+    acceptedDestinations: [APP_ROUTES.CONTACTS_AUDIENCE],
+    requiresUserButton: true,
+    performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
+  },
+  {
+    // /app/contacts is the canonical Contacts workspace (JOV-3764, #18801),
+    // not a legacy alias for settings contacts.
+    path: APP_ROUTES.CONTACTS,
+    name: 'Contacts',
     kind: 'render',
     surface: 'creator',
     authRole: 'user',
-    contentSelector: '[data-testid="dashboard-audience-client"]',
+    contentSelector: '[data-testid="contacts-workspace"]',
     requiresUserButton: true,
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
   },
@@ -126,12 +137,10 @@ const creatorRoutes = [
   {
     path: APP_ROUTES.RELEASES,
     name: 'Releases',
-    kind: 'render',
+    kind: 'redirect',
     surface: 'creator',
     authRole: 'user',
-    contentSelector: '[data-testid="releases-matrix"]',
-    contentFallbackSelector:
-      '[data-testid="releases-empty-state-enriching"], :text-matches("connect spotify|finding your music|no releases", "i")',
+    acceptedDestinations: [`${APP_ROUTES.LIBRARY}?view=releases`],
     requiresUserButton: true,
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
   },
@@ -301,14 +310,6 @@ const aliasRoutes = [
     acceptedDestinations: [APP_ROUTES.LINKS],
   },
   {
-    path: APP_ROUTES.CONTACTS,
-    name: 'Legacy Contacts Redirect',
-    kind: 'redirect',
-    surface: 'alias',
-    authRole: 'user',
-    acceptedDestinations: [APP_ROUTES.SETTINGS_CONTACTS],
-  },
-  {
     path: DASHBOARD_TIPPING_ROUTE,
     name: 'Legacy Tipping Redirect',
     kind: 'redirect',
@@ -320,7 +321,7 @@ const aliasRoutes = [
     ],
   },
   {
-    path: DASHBOARD_CONTACTS_ROUTE,
+    path: APP_ROUTES.DASHBOARD_CONTACTS,
     name: 'Legacy Dashboard Contacts Redirect',
     kind: 'redirect',
     surface: 'alias',

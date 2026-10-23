@@ -7,6 +7,7 @@ import {
   buildRunningToolEvent,
   buildSucceededToolEvent,
 } from '@/lib/onboarding/presence-build/tool-events';
+import { TOOL_STATUS_PARTS } from './fixtures/tool-status';
 import { ToolPartsRenderer } from './tool-ui';
 
 vi.mock('@/components/molecules/UpgradeButton', () => ({
@@ -278,4 +279,16 @@ describe('ToolPartsRenderer locked tool output', () => {
       screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     ).toBeInTheDocument();
   });
+});
+
+it('keeps an approval request pending with one accessible status owner', () => {
+  const { container } = render(
+    <ToolPartsRenderer variant='chat' parts={TOOL_STATUS_PARTS.pending} />
+  );
+  expect(screen.getByRole('status')).toHaveAttribute(
+    'data-operation-status',
+    'pending'
+  );
+  expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  expect(container.querySelector('[data-fill="check"]')).toBeNull();
 });

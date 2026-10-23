@@ -1,13 +1,15 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { expect, test } from './setup';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-async function gotoLanding(page: import('@playwright/test').Page) {
-  await page.goto(APP_ROUTES.LANDING_NEW, { waitUntil: 'domcontentloaded' });
+async function gotoLegacyNewLanding(page: import('@playwright/test').Page) {
+  const response = await page.goto(APP_ROUTES.LANDING_NEW, {
+    waitUntil: 'domcontentloaded',
+  });
   await page.waitForLoadState('domcontentloaded');
-  await page.getByTestId('homepage-v2-hero').waitFor({ state: 'visible' });
+  return response;
 }
 
 async function blockAnalytics(page: import('@playwright/test').Page) {
@@ -27,123 +29,75 @@ test.describe('/new landing page', () => {
     await blockAnalytics(page);
   });
 
-  test('renders the staged homepage v2 sections and product nav', async ({
+  test('redirects to the live homepage and keeps product nav', async ({
     page,
   }) => {
-    await gotoLanding(page);
+    const response = await gotoLegacyNewLanding(page);
+
+    expect(new URL(page.url()).pathname).toBe(APP_ROUTES.HOME);
+    expect(response?.request().redirectedFrom()).toBeTruthy();
 
     const headerNav = page.getByTestId('header-nav');
+    const hero = page.getByTestId('marketing-section-hero');
 
-    await expect(page.getByTestId('homepage-v2-shell')).toBeVisible();
+    await expect(hero).toBeVisible();
+    await expect(
+      hero.getByRole('heading', { level: 1, name: HOMEPAGE_COPY.hero.headline })
+    ).toBeVisible();
     await expect(
       headerNav.getByRole('link', { name: 'Product', exact: true })
     ).toHaveAttribute('href', APP_ROUTES.PRODUCT);
     await expect(
-      headerNav.getByRole('button', { name: /Customers/ })
-    ).toHaveCount(1);
-    await expect(
-      headerNav.getByRole('button', { name: 'For', exact: true })
-    ).toHaveCount(0);
-    await expect(
-      headerNav.getByRole('button', { name: 'Tools', exact: true })
-    ).toHaveCount(0);
-    await expect(
       headerNav.getByRole('link', { name: 'Pricing', exact: true })
     ).toHaveAttribute('href', APP_ROUTES.PRICING);
-    await expect(page.getByTestId('homepage-v2-hero')).toBeVisible();
-    await expect(
-      page.getByTestId('homepage-v2-hero-primary-cta')
-    ).toBeVisible();
-
-    await expect(
-      page.getByRole('heading', { name: /your ai presence manager/i })
-    ).toBeVisible();
-    await expect(
-      page.getByText(/plan launches, create assets, draft pitches/i)
-    ).toBeVisible();
-
-    await expect(page.getByTestId('homepage-v2-system-overview')).toBeVisible();
-    await expect(page.getByTestId('homepage-v2-spotlight')).toBeVisible();
-    await expect(
-      page.getByTestId('homepage-v2-capture-reactivate')
-    ).toBeVisible();
-    await expect(page.getByTestId('homepage-v2-power-grid')).toBeVisible();
-    await expect(page.getByTestId('homepage-v2-pricing')).toBeVisible();
-
-    await expect(
-      page.getByRole('heading', {
-        name: 'What Jovie Handles for You.',
-      })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'One Link. Always In Sync.' })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', {
-        name: 'Build the List Once. Keep It Working.',
-      })
-    ).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(
-      0
-    );
-
-    await expect(
-      page.getByRole('link', { name: 'Explore Artist Profiles' })
-    ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
     await expect(page.locator('body')).not.toContainText('Page not found');
+  });
 
-    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
-      'content',
-      /noindex, nofollow/
+  test('uses the claim form as the primary action', async ({ page }) => {
+    await gotoLegacyNewLanding(page);
+
+    const cta = page.getByTestId('homepage-primary-cta');
+    await expect(cta).toBeVisible();
+    await expect(cta).toHaveText(HOMEPAGE_COPY.hero.claim.action);
+    await expect(page.getByTestId('homepage-claim-form')).toHaveAttribute(
+      'action',
+      '/start'
     );
   });
 
-  test('navigates hero CTA to signup', async ({ page }) => {
-    await gotoLanding(page);
+  test('mounts the homepage sections after the redirect', async ({ page }) => {
+    await gotoLegacyNewLanding(page);
 
-    await expect(
-      page.getByTestId('homepage-v2-hero-primary-cta')
-    ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
+    const headings = await page
+      .locator('main h1:visible, main h2:visible')
+      .evaluateAll(nodes => nodes.map(node => node.textContent?.trim()));
+    expect(headings.filter(Boolean)[0]).toBe(HOMEPAGE_COPY.hero.headline);
+    await expect(page.getByTestId('homepage-close-claim-cta')).toHaveText(
+      HOMEPAGE_COPY.hero.claim.action
+    );
   });
 
-  test('routes deep links to artist profiles anchors', async ({ page }) => {
-    await gotoLanding(page);
-    await expect(
-      page.getByRole('link', { name: 'Explore Artist Profiles' })
-    ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
-  });
-
-  test('shows canonical pricing teaser and no live link for release pages', async ({
+  test('keeps the artist-profile hero on the redirected homepage', async ({
     page,
   }) => {
-    await gotoLanding(page);
+    await gotoLegacyNewLanding(page);
 
-    await expect(page.getByTestId('marketing-pricing-plan-free')).toContainText(
-      'Free'
-    );
-    await expect(page.getByTestId('marketing-pricing-plan-free')).toContainText(
-      '$0'
-    );
-    await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      'Artist Presence'
-    );
-    await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      '$199'
-    );
-    await expect(page.getByRole('link', { name: 'Release Pages' })).toHaveCount(
-      0
-    );
+    const hero = page.getByTestId('marketing-section-hero');
+    await expect(
+      hero.getByRole('heading', { level: 1, name: HOMEPAGE_COPY.hero.headline })
+    ).toBeVisible();
+    await expect(hero.getByText(/Tim White|Founder, Jovie/)).toHaveCount(0);
+    await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-v2-pricing')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-v2-hero')).toHaveCount(0);
   });
 
-  test('keeps the hero and pricing visible on mobile', async ({ page }) => {
+  test('keeps the hero and claim visible on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await gotoLanding(page);
+    await gotoLegacyNewLanding(page);
 
-    await expect(page.getByTestId('homepage-v2-shell')).toBeVisible();
-    await expect(
-      page.getByTestId('homepage-v2-hero-primary-cta')
-    ).toBeVisible();
-    await expect(page.getByTestId('homepage-v2-pricing')).toBeVisible();
+    await expect(page.getByTestId('marketing-section-hero')).toBeVisible();
+    await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible();
   });
 });

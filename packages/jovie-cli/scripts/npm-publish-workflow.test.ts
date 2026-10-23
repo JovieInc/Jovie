@@ -54,7 +54,7 @@ function assertPublishWorkflowContract(source: string): void {
   );
   expect(source).toMatch(/node-version-file: .nvmrc/);
   expect(source).toContain('registry-url: https://registry.npmjs.org');
-  expect(source).toMatch(/node --version.*v24\.21\.0/s);
+  expect(source).toMatch(/node --version.*v24\.22\.1/s);
   expect(source).toContain('pnpm install --frozen-lockfile');
   expect(source).toContain('pnpm --filter @jovie/cli run test:coverage');
   expect(source).toContain('pnpm --filter @jovie/cli run typecheck');
@@ -123,11 +123,11 @@ function assertPublishWorkflowContract(source: string): void {
   expect(source).toContain('"$PACKAGE_NAME@$RELEASE_VERSION"');
   expect(source).toContain('"$installed_cli" --version');
   expect(source).toContain('"$installed_cli" api openapi');
-  expect(source).toContain("contract.info?.title !== 'Jovie Artist API'");
+  expect(source).toContain("contract.info?.title !== 'Jovie Public API'");
   // JOV-7714: publish only bytes that passed the black-box chaos matrix.
   expect(source).toContain('needs: [chaos-tarball, chaos-matrix]');
   expect(source).toContain('os: [ubuntu-latest, macos-latest, windows-latest]');
-  expect(source).toMatch(/node: \[[^\]]*'24\.21\.0'[^\]]*'26'\]/);
+  expect(source).toMatch(/node: \[[^\]]*'24\.22\.1'[^\]]*'26'\]/);
   expect(source).toContain('fail-fast: false');
   // macOS cells try an idle self-hosted Mac first, hosted otherwise.
   expect(source).toContain('uses: ./.github/workflows/cli-chaos.yml');
@@ -236,6 +236,42 @@ describe('npm provenance workflow', () => {
     ],
   ])('fails closed when the %s is weakened', (_, unsafeWorkflow) => {
     expect(() => assertPublishWorkflowContract(unsafeWorkflow)).toThrow();
+  });
+});
+
+describe('published CLI OpenAPI readback (JOV-7915)', () => {
+  it.each([
+    ['current public contract', '3.1.0', 'Jovie Public API', 0],
+    ['unrelated API', '3.1.0', 'Other API', 1],
+    ['unsupported OpenAPI version', '2.0', 'Jovie Public API', 1],
+    ['missing metadata', '3.1.0', undefined, 1],
+  ])('validates the %s', (_, openapi, title, expected) => {
+    const directory = mkdtempSync(resolve(tmpdir(), 'jovie-openapi-readback-'));
+    try {
+      const path = resolve(directory, 'openapi.json');
+      writeFileSync(path, JSON.stringify({ openapi, info: { title } }));
+      // Execute the workflow's actual validator rather than a duplicate.
+      const validator = workflow.match(
+        /const contract = JSON\.parse\(readFileSync\(process\.env\.OPENAPI_PATH, 'utf8'\)\);[\s\S]*?(?=\n {10}NODE)/
+      )?.[0];
+      expect(validator).toBeDefined();
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import { readFileSync } from 'node:fs';\n${validator}`,
+        ],
+        {
+          encoding: 'utf8',
+          timeout: 10_000,
+          env: { ...process.env, OPENAPI_PATH: path },
+        }
+      );
+      expect(result.status, result.stdout + result.stderr).toBe(expected);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 
@@ -614,4 +650,18 @@ describe('independent manual CLI release cadence', () => {
       expect(result.versionOutput).toBe('');
     }
   );
+});
+
+describe('push-triggered publication', () => {
+  // On push, `inputs.publish_mcp_only` renders as '' and `test "" = false`
+  // failed every push publish since 2026-10-13 (JOV-7919).
+  it('renders PUBLISH_MCP_ONLY as a literal boolean for push events', () => {
+    const lines = workflow.match(/PUBLISH_MCP_ONLY: .*/g) ?? [];
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line).toBe(
+        'PUBLISH_MCP_ONLY: ${{ inputs.publish_mcp_only == true }}'
+      );
+    }
+  });
 });

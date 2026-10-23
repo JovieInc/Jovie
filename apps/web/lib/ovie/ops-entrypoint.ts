@@ -3,7 +3,9 @@ import { APP_ROUTES } from '@/constants/routes';
 /**
  * Canonical Ops entry for web and the packaged-app M1 owner.
  *
- * One product: the authenticated `/hud` Ops screen. Fullscreen and kiosk are
+ * Ovie Home (`/app/ov`) is the default door (founder decision 2026-10-20).
+ * The full Ops dashboard lives at `/app/ov/ops`; `/hud` redirects to Home
+ * except for the isolated kiosk and `?fs=1` presentations. Fullscreen and kiosk are
  * presentation modes of the same `OpsCockpitClient` + metrics contract;
  * browser fullscreen keeps that shell mounted and token kiosk uses the same
  * dashboard data contract.
@@ -13,7 +15,7 @@ export const OVIE_OPS_PRODUCT_NAME = 'Ops' as const;
 
 export const OVIE_OPS_COMPONENT = 'OpsCockpitClient' as const;
 
-export const OVIE_OPS_ROUTE = APP_ROUTES.HUD;
+export const OVIE_OPS_ROUTE = APP_ROUTES.ADMIN_OPS;
 
 export const OVIE_OPS_PRESENTATIONS = {
   shell: {
@@ -40,13 +42,12 @@ export const OVIE_OPS_PRESENTATIONS = {
 } as const;
 
 export const OVIE_OPS_COMPAT_ALIASES = {
-  [APP_ROUTES.OV]: APP_ROUTES.HUD,
-  [`${APP_ROUTES.OV}/ops`]: APP_ROUTES.HUD,
+  [APP_ROUTES.HUD]: APP_ROUTES.OV,
   [APP_ROUTES.HUD_TV]: APP_ROUTES.HUD,
 } as const;
 
-export const OVIE_PACKAGED_DEFAULT_ROUTE = APP_ROUTES.HUD;
-export const OVIE_PACKAGED_TALK_ROUTE = APP_ROUTES.ADMIN_CHAT;
+export const OVIE_PACKAGED_DEFAULT_ROUTE = APP_ROUTES.OV;
+export const OVIE_PACKAGED_TALK_ROUTE = APP_ROUTES.OV;
 
 export const OVIE_OPS_ENTRY = {
   productName: OVIE_OPS_PRODUCT_NAME,
@@ -60,7 +61,7 @@ export const OVIE_OPS_ENTRY = {
 
 export function ovieOpsFullscreenHref(): string {
   // Compatibility helper: fullscreen is now entered on the mounted surface.
-  return APP_ROUTES.HUD;
+  return APP_ROUTES.ADMIN_OPS;
 }
 
 export function ovieOpsKioskHref(token: string): string {

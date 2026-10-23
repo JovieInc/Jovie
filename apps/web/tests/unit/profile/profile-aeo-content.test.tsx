@@ -571,6 +571,39 @@ describe('Profile AEO content', () => {
     ]);
   });
 
+  it('adds ID-backed DSPs to the listen row when no social link exists', () => {
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        deezer_id: 'deezer-1',
+        tidal_id: 'tidal-1',
+        youtube_music_id: 'UCyoutube',
+        soundcloud_id: 'dualipa',
+      },
+      socialLinks,
+      now,
+    });
+
+    expect(content.listenLinks.map(link => link.label)).toEqual([
+      'Spotify',
+      'Apple Music',
+      'YouTube',
+      'YouTube Music',
+      'SoundCloud',
+      'Deezer',
+      'Tidal',
+    ]);
+    expect(content.listenLinks.map(link => link.url)).toEqual([
+      'https://open.spotify.com/artist/test',
+      'https://music.apple.com/artist/test',
+      'https://youtube.com/@djtest',
+      'https://music.youtube.com/channel/UCyoutube',
+      'https://soundcloud.com/dualipa',
+      'https://www.deezer.com/artist/deezer-1',
+      'https://tidal.com/browse/artist/tidal-1',
+    ]);
+  });
+
   it('suppresses malformed website links and uses Visit aria copy for websites', () => {
     const content = buildProfileAeoContent({
       artist: baseArtist,
@@ -797,9 +830,14 @@ describe('Profile AEO content', () => {
         location: null,
         active_since_year: null,
         genres: null,
+        spotify_id: '',
         spotify_url: undefined,
         apple_music_url: undefined,
         youtube_url: undefined,
+        deezer_id: undefined,
+        tidal_id: undefined,
+        youtube_music_id: undefined,
+        soundcloud_id: undefined,
       },
       socialLinks: [],
       now,

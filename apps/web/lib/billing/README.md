@@ -4,13 +4,14 @@ Stripe-backed billing concerns that don't belong in entitlement registries or qu
 
 What's here:
 
+- **[`commerce/`](commerce/README.md)** — versioned agentic-commerce support projection and evidence validator over canonical offer, price, product, and checkout sources.
 - **`verified-upgrade.ts`** — price selection and label formatting for the verified-upgrade flow. `getPreferredVerifiedPrice()` picks the right Stripe price based on the user's currency / locale; `formatVerifiedPriceLabel()` produces the marketing string.
 - **`reconciliation/`** — batch tooling that detects and repairs drift between local subscription state and Stripe.
 
 ## Plan tiers (canonical: `lib/entitlements/registry.ts`)
 
 - **Free** — limited analytics window, capped contacts, capped weekly AI messages
-- **Pro** — $39/mo or $375/yr — verified badge, full analytics, notifications, pre-save campaigns
+- **Pro** (Artist Presence) — $12/mo self-serve via `/claim` (EVENT: Tim, 2026-10-20; canonical: `lib/config/plan-prices.ts`). Retired $39 and $199 prices stay mapped as legacy. Verification is never granted by payment.
 - **Max** — $149/mo or $1430/yr — Pro plus team management, webhooks, white-label, email campaigns
 - **Trial** — 14-day reverse trial granting Pro-tier features (with a tighter notification cap, see `feedback_pricing_strategy` in memory)
 

@@ -18,6 +18,7 @@
 
 import { sql as drizzleSql } from 'drizzle-orm';
 import { captureError } from '@/lib/error-tracking';
+import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import {
   getDb,
   getInternalDb,
@@ -44,6 +45,15 @@ function reportRlsSetConfigFailure(
   error: unknown,
   metadata?: { readonly userId?: string }
 ): void {
+  captureRevenueSpineFailure({
+    stage: 'rls_setup',
+    severity:
+      context === 'applyRlsSessionUser_set_config_failed'
+        ? 'unknown'
+        : 'blocked',
+    userId: metadata?.userId,
+    error,
+  });
   void captureError('RLS set_config failed', error, {
     fingerprint: AUTH_RLS_SET_CONFIG_FAILED,
     error_class: AUTH_RLS_SET_CONFIG_FAILED,

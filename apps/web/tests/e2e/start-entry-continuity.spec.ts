@@ -1,12 +1,60 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { inspectEssentialViewport } from './helpers/golden-path-keyframes';
 import { installRuntimeAutomationBypass } from './utils/runtime-automation-bypass';
+import {
+  installDelayedGuidanceLayoutProbe,
+  installReplyLayoutProbe,
+} from './utils/start-entry-layout';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const prompt = 'I want to claim jov.ie/sam.';
 const startUrl =
   '/start?starter_prompt=I+want+to+claim+jov.ie%2Fsam.&handle=sam';
+
+function expectZeroLayoutShift(
+  metric:
+    | {
+        supported: boolean;
+        total: number | null;
+        entries?: readonly unknown[];
+      }
+    | undefined,
+  testInfo: TestInfo
+) {
+  expect(metric).toBeDefined();
+  expect(typeof metric!.supported).toBe('boolean');
+  if (metric!.supported) {
+    expect(Number.isFinite(metric!.total)).toBe(true);
+    if (metric!.entries) {
+      expect(
+        metric!.total,
+        `layout-shift entries ${JSON.stringify(metric!.entries)}`
+      ).toBe(0);
+    } else {
+      expect(metric!.total).toBe(0);
+    }
+  } else {
+    expect(metric!.total).toBeNull();
+    testInfo.annotations.push({
+      type: 'layout-shift',
+      description:
+        'API unavailable; essential-control geometry remains required',
+    });
+  }
+}
+
+async function readReplyLayout(page: Page) {
+  return page.evaluate(() => {
+    const metric = window.__claimLayout;
+    if (!metric) return undefined;
+    return {
+      supported: metric.supported,
+      total: metric.total,
+      entries: window.__claimLayoutEntries ?? [],
+    };
+  });
+}
 
 async function draftProgress(page: Page) {
   const intro = page.locator(
@@ -85,14 +133,6 @@ async function installControlledVerification(page: Page) {
 declare global {
   interface Window {
     __claimProviderFixture?: { interact: () => void; fail: () => void };
-    __claimLayout?: { supported: boolean; total: number };
-    __claimInitialLayout?: {
-      supported: boolean;
-      total: number;
-      unguidedFirst: boolean;
-      first: number[] | null;
-      guided: number[] | null;
-    };
   }
 }
 
@@ -110,81 +150,16 @@ test.describe('current-state essential actions (JOV-7771)', () => {
   ]) {
     test(`delayed verification guidance stays stable at ${viewport.width}x${viewport.height} with ${viewport.fontSize}px text`, async ({
       page,
-    }) => {
+    }, testInfo) => {
       await page.setViewportSize({
         width: viewport.width,
         height: viewport.height,
       });
       await installControlledVerification(page);
-      await page.addInitScript(fontSize => {
-        const metric = {
-          supported:
-            typeof PerformanceObserver === 'function' &&
-            PerformanceObserver.supportedEntryTypes.includes('layout-shift'),
-          total: 0,
-          unguidedFirst: false,
-          first: null as number[] | null,
-          guided: null as number[] | null,
-        };
-        window.__claimInitialLayout = metric;
-        if (!metric.supported) return;
-        new PerformanceObserver(list => {
-          for (const entry of list.getEntries()) {
-            const shift = entry as PerformanceEntry & {
-              hadRecentInput: boolean;
-              value: number;
-            };
-            if (!Number.isFinite(shift.value) || shift.value < 0) {
-              metric.total = Number.NaN;
-            } else if (!shift.hadRecentInput) {
-              metric.total += shift.value;
-            }
-          }
-        }).observe({ type: 'layout-shift', buffered: true });
-        const style = document.createElement('style');
-        const lineHeight = fontSize === 32 ? 40 : fontSize === 24 ? 32 : 16;
-        style.textContent = `[data-testid="onboarding-flow-status"] > p {font-size:${fontSize}px;line-height:${lineHeight}px}`;
-        // Delay only presentation, so even a fast hydration must expose the
-        // unguided first frame. Provider, token and send state stay unchanged.
-        const delay = document.createElement('style');
-        delay.id = 'claim-delay-guidance';
-        delay.textContent =
-          '[data-testid="onboarding-flow-status"] > p[role="status"] {display:none!important}';
-        const installTextSize = () => {
-          if (document.head && !style.isConnected)
-            document.head.append(style, delay);
-        };
-        new MutationObserver(installTextSize).observe(document, {
-          childList: true,
-          subtree: true,
-        });
-        installTextSize();
-        const sample = () => {
-          const elements = [
-            '[data-testid="onboarding-empty-intro"] h1',
-            '[data-testid="chat-empty-state-centered-composer"]',
-            '[aria-label="Chat message input" i]',
-            'button[aria-label="Send message"]',
-          ].map(selector => document.querySelector(selector));
-          const boxes = elements.map(element =>
-            element?.getBoundingClientRect()
-          );
-          if (boxes.every(box => box && box.width > 0 && box.height > 0)) {
-            const positions = boxes.map(box => box!.y);
-            const guidance = document.querySelector(
-              '[data-testid="onboarding-flow-status"] > p[role="status"]'
-            );
-            if (!metric.first) {
-              metric.first = positions;
-              metric.unguidedFirst = !guidance?.getBoundingClientRect().height;
-            }
-            if (guidance?.getBoundingClientRect().height)
-              metric.guided = positions;
-          }
-          if (!metric.guided) requestAnimationFrame(sample);
-        };
-        requestAnimationFrame(sample);
-      }, viewport.fontSize);
+      await page.addInitScript(
+        installDelayedGuidanceLayoutProbe,
+        viewport.fontSize
+      );
       await page.goto(startUrl);
       await expect
         .poll(() => page.evaluate(() => Boolean(window.__claimProviderFixture)))
@@ -213,9 +188,7 @@ test.describe('current-state essential actions (JOV-7771)', () => {
           )
       );
       const metric = await page.evaluate(() => window.__claimInitialLayout);
-      expect(metric?.supported).toBe(true);
-      expect(Number.isFinite(metric?.total)).toBe(true);
-      expect(metric?.total).toBe(0);
+      expectZeroLayoutShift(metric, testInfo);
       expect(metric?.first).toHaveLength(4);
       expect(metric?.guided).toHaveLength(4);
       for (let index = 0; index < 4; index++) {
@@ -314,29 +287,11 @@ test.describe('current-state essential actions (JOV-7771)', () => {
 
   test('fresh handoff submits once and restored history never resends its starter', async ({
     page,
-  }) => {
+  }, testInfo) => {
     // Presentation fixture only; real auth/provider acceptance stays in the
     // existing golden path. No ownership or access mutation occurs here.
     await page.addInitScript(installRuntimeAutomationBypass);
-    await page.addInitScript(() => {
-      const metric = {
-        supported:
-          typeof PerformanceObserver === 'function' &&
-          PerformanceObserver.supportedEntryTypes.includes('layout-shift'),
-        total: 0,
-      };
-      window.__claimLayout = metric;
-      if (!metric.supported) return;
-      new PerformanceObserver(list => {
-        for (const entry of list.getEntries()) {
-          const shift = entry as PerformanceEntry & {
-            hadRecentInput: boolean;
-            value: number;
-          };
-          if (!shift.hadRecentInput) metric.total += shift.value;
-        }
-      }).observe({ type: 'layout-shift' });
-    });
+    await page.addInitScript(installReplyLayoutProbe);
     let releaseReply: () => void = () => {
       throw new Error('Reply fixture is not initialized');
     };
@@ -366,12 +321,16 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     });
     const beforeReply = await input.boundingBox();
     await expectEssentials(page);
-    expect(await page.evaluate(() => window.__claimLayout?.supported)).toBe(
-      true
+    // Score every un-input shift from navigation through the settled handoff.
+    // The probe ignores hadRecentInput and keeps this window open from
+    // navigation, so a handoff shift stays inside the total.
+    await page.evaluate(
+      () =>
+        new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        )
     );
-    await page.evaluate(() => {
-      if (window.__claimLayout) window.__claimLayout.total = 0;
-    });
+    expectZeroLayoutShift(await readReplyLayout(page), testInfo);
     releaseReply();
     await expect(page.getByText('Your draft is saved.')).toBeVisible();
     await page.evaluate(
@@ -380,7 +339,7 @@ test.describe('current-state essential actions (JOV-7771)', () => {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         )
     );
-    expect(await page.evaluate(() => window.__claimLayout?.total)).toBe(0);
+    expectZeroLayoutShift(await readReplyLayout(page), testInfo);
     const afterReply = await input.boundingBox();
     expect(beforeReply).not.toBeNull();
     expect(afterReply).not.toBeNull();
@@ -451,6 +410,31 @@ test.describe('current-state essential actions (JOV-7771)', () => {
       (await inspectEssentialViewport(page, ['#action'])).findings
     ).toEqual([expect.objectContaining({ reason: 'occluded' })]);
     await page.locator('#cover').evaluate(el => el.remove());
+    await page.evaluate(() => {
+      const toast = document.createElement('p');
+      toast.id = 'toast';
+      toast.setAttribute('role', 'alert');
+      toast.style.cssText =
+        'position:fixed;left:20px;top:20px;width:350px;height:54px;z-index:40;pointer-events:none';
+      toast.textContent = 'Something went wrong';
+      document.body.append(toast);
+    });
+    expect(await inspectEssentialViewport(page, ['#toast'])).toEqual({
+      supported: true,
+      findings: [],
+    });
+    await page.evaluate(() => {
+      const cover = document.createElement('div');
+      cover.id = 'cover';
+      cover.style.cssText =
+        'position:fixed;inset:0;z-index:50;background:white';
+      document.body.append(cover);
+    });
+    expect((await inspectEssentialViewport(page, ['#toast'])).findings).toEqual(
+      [expect.objectContaining({ reason: 'occluded' })]
+    );
+    await page.locator('#cover').evaluate(el => el.remove());
+    await page.locator('#toast').evaluate(el => el.remove());
     await page.locator('#action').evaluate(el => el.after(el.cloneNode(true)));
     expect(
       (await inspectEssentialViewport(page, ['#action'])).findings
@@ -458,6 +442,46 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     expect(
       (await inspectEssentialViewport(page, ['#missing'])).findings
     ).toEqual([expect.objectContaining({ reason: 'missing' })]);
+  });
+
+  test('audits scaled composer controls in viewport coordinates and still rejects real clipping', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const [scaleX, scaleY] of [
+      [1.25, 1],
+      [1, 1.25],
+      [0.75, 0.75],
+    ]) {
+      await page.setContent(`
+        <div style="position:fixed;left:20px;top:20px;transform:scale(${scaleX},${scaleY});transform-origin:top left">
+          <div id="surface" style="position:relative;box-sizing:border-box;width:240px;height:120px;border:8px solid;overflow:hidden">
+            <button id="action" style="position:absolute;left:164px;top:64px;width:60px;height:32px;border:0">Send</button>
+          </div>
+        </div>
+      `);
+      expect(await inspectEssentialViewport(page, ['#action'])).toEqual({
+        supported: true,
+        findings: [],
+      });
+      // Each axis must keep rejecting a real overflow, including scale < 1
+      // where mixing client pixels and viewport pixels can hide the defect.
+      for (const position of [
+        { left: '215px', top: '64px' },
+        { left: '164px', top: '100px' },
+        { left: '-12px', top: '64px' },
+        { left: '164px', top: '-12px' },
+      ]) {
+        await page.locator('#action').evaluate((el, next) => {
+          Object.assign(el.style, next);
+        }, position);
+        expect(
+          (await inspectEssentialViewport(page, ['#action'])).findings
+        ).toEqual([
+          expect.objectContaining({ selector: '#action', reason: 'clipped' }),
+        ]);
+      }
+    }
   });
 
   for (const viewport of [

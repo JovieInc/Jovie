@@ -175,7 +175,7 @@ describe('@critical SubscriptionHandler - Errors', () => {
   });
 
   describe('price validation errors', () => {
-    it('skips and captures a critical error when subscription price ID is unknown', async () => {
+    it('requires reconciliation (never a silent skip) when the subscription price ID is unknown', async () => {
       mockGetPlanFromPriceId.mockReturnValue(null);
 
       const context: WebhookContext = {
@@ -197,21 +197,58 @@ describe('@critical SubscriptionHandler - Errors', () => {
         stripeEventTimestamp: new Date(),
       };
 
-      await expect(handler.handle(context)).resolves.toMatchObject({
-        success: true,
-        skipped: true,
+      await expect(handler.handle(context)).rejects.toMatchObject({
+        name: 'StripeReconciliationRequiredError',
         reason: 'unknown_price_id',
-      });
-
-      expect(mockCaptureCriticalError).toHaveBeenCalledWith(
-        'Unknown price ID in subscription',
-        expect.any(Error),
-        expect.objectContaining({
+        context: expect.objectContaining({
           customerId: 'cus_123',
-          priceId: 'price_unknown',
-          route: '/api/stripe/webhooks',
+          priceIds: ['price_unknown'],
           subscriptionId: 'sub_unknown_price',
           userId: 'user_test',
+        }),
+      });
+      // No entitlement write for an unmapped price.
+      expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
+    });
+
+    it('grants from the plan price when another subscription item is unmapped', async () => {
+      mockGetPlanFromPriceId.mockImplementation((priceId: string) =>
+        priceId === 'price_pro' ? 'pro' : null
+      );
+
+      const context: WebhookContext = {
+        event: {
+          id: 'evt_multi_item',
+          type: 'customer.subscription.created',
+          created: Math.floor(Date.now() / 1000),
+          data: {
+            object: {
+              id: 'sub_multi_item',
+              status: 'active',
+              customer: 'cus_123',
+              metadata: { clerk_user_id: 'user_test' },
+              items: {
+                data: [
+                  { price: { id: 'price_addon_unmapped' } },
+                  { price: { id: 'price_pro' } },
+                ],
+              },
+            } as unknown as Stripe.Subscription,
+          },
+        } as Stripe.Event,
+        stripeEventId: 'evt_multi_item',
+        stripeEventTimestamp: new Date(),
+      };
+
+      await expect(handler.handle(context)).resolves.toMatchObject({
+        success: true,
+        plan: 'pro',
+      });
+      expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isPro: true,
+          plan: 'pro',
+          stripePriceId: 'price_pro',
         })
       );
     });

@@ -31,7 +31,7 @@ large task-specific gstack playbooks remain and should be evaluated before split
   checker, decision grader and prompt renderer. CI calls the same package scripts
   in its existing dependency-free risk-classifier job.
 - 31 existing Node regressions pass: design-manifest generation, skill catalog,
-  skill governance and OKLCH guard. Run with repo-pinned Node 24.21.0.
+  skill governance and OKLCH guard. Run with repo-pinned Node 24.22.1.
 - 5 existing Vitest design-policy tests pass: icon alignment and layout stability.
 - Manifest freshness, document freshness, skill governance, palette guard,
   gstack generation dry-run, skill-size check, Biome and whitespace checks pass.
@@ -169,3 +169,55 @@ including every tier and host-root form. Repository hygiene is green at 179.94 M
 The generation dry-run passes. The legacy Bun generator test file cannot initialize
 because it imports the already-removed browse daemon; it provides no passing
 evidence. Current behavior is tested by the dependency-free Node runner.
+
+
+## Capability sourcing and IA integration — 2026-10-16 (JOV-6212)
+
+Source base: `65c807681aeb98160a7587e61a8287d34bc01c8f`; branch
+`codex/jov-6212-20261016t145133`. The final PR receipt binds the exact commit
+and canonical policy digest. GBrain query failed (localhost:7801 refused).
+Closed PR #19890, head `e673e0105e1cbacde881531f1c8b32eb4f03ede8`, retained
+its fix-exhausted history. This generation addresses the disclosed lack of a
+runtime consumer and the later IA correction; it does not refund old attempts.
+
+| Obligation | Evidence and limit |
+| --- | --- |
+| Policy written | ENGINEERING.md single authority, JOV-INV-044 shadow adoption |
+| Consumer integrated | Provider task packets, root Symphony workpad, trusted-base advisory reviewer; existing PR comment carries diagnostic bindings |
+| Deterministic red → green | Restoring main's packet builder fails all four provider subcases; restoring main's reviewer fails the new evidence-transport test. Candidate passes both. |
+| Fixture cases | Settings/Ovie/Work accretion fails; consolidation/reuse neighbors pass; proprietary auth/PDF, missing index/offline, stale bindings, self-authorization, structural proof, forks, duplicate scopes, rename and incident diagnostics exercised |
+| Local checks | Normal Node runner: 70/70 tests; PromptTest: 10/10; new module V8 coverage: 95% lines, 83.16% branches, 100% functions |
+| Broad checks | Typecheck: 18 packages; design conformance and copy gates pass. Sandbox initially denied subprocess/tsx IPC; normal runner rerun uses permitted execution. |
+| Agent behavior | Packet/manifest and simulated review I/O tests only; no live model trajectory or compaction-compliance certification |
+| Shadow qualification | Pending actual ships under JOV-8570; no production p95, throughput or cost claim |
+| Blocking enforcement | Not activated; diagnostic red cannot block existing delivery |
+| Product runtime | No product screen changed; Work/passkey canaries remain separately owned |
+
+The new module extends the existing issue/workpad/PR evidence with a
+`planningDecisions` JSON member; no parallel ledger. Bind `binding.repository`,
+`head`, `policyVersion: 1`, `policyDigest`, plus `outcome`, `requirementsRef`,
+`assumptionsRef`, `sourcing` and `ia`. The executable field contract and fixtures
+are in `scripts/invariants/capability-planning{,.test}.mjs`. Empty lists mean
+unaffected scope, subject to semantic review. `implementation-candidate` is a
+field-check result, never independent approval or verified citations/runtime.
+
+Two existing Python failures reproduce with main's original packet builder:
+context-manifest CLI admission (invalid FD/exit 75), and design priority after
+three attempts. JOV-8571 owns investigation; no tests/gates were weakened.
+
+Dependency security decision, checked 2026-10-16: reuse existing OSV v2.5.1,
+Trivy and production SBOM/license inventory in the current workflows. No package
+is added. [GitHub Dependency Review](https://docs.github.com/en/code-security/concepts/supply-chain-security/dependency-review)
+can compare manifest/lockfile changes and report vulnerabilities/licenses.
+It cannot cover a hand-rolled mechanism without a dependency change (scope
+inference). No dependency-review Action is present in the inspected workflows;
+adding a new job does not resolve this planning gap. Ship now: existing tooling
+plus semantic review. Re-evaluate under JOV-8570 if actual dependency-change
+ships expose a detection gap; then qualify the supported Action through existing
+authority rather than writing a scanner.
+
+Rollback: remove only the new task-packet projection, diagnostic import/call and
+receipt rendering through a normal revert; preserve existing reviewer,
+publication, security and CI gates. Diagnostic collection has no external writes
+beyond the reviewer's existing advisory comment. Live rollback qualification and
+workload-specific thresholds belong to JOV-8570.

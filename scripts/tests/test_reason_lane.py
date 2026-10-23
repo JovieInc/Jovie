@@ -97,7 +97,10 @@ class FakeLinear:
     def comment(self, issue_id, body):
         self.comments.append((issue_id, body))
 
-    def move(self, issue_id, state):
+    def move(self, issue_id, state, owner=None):
+        # The started-state guard: a fake client enforces it like the real one.
+        if state in ("In Progress", "In Review", "Rework", "Merging", "Validating") and not owner:
+            raise AssertionError(f"{state} without an owner")
         self.moves.append((issue_id, state))
         self.states[issue_id] = state
 
@@ -928,3 +931,146 @@ class CatalogTransportTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+OUTCOME_SPEC = importlib.util.spec_from_file_location("outcome_lane", ROOT / "scripts/lanes/outcome_lane.py")
+outcome = importlib.util.module_from_spec(OUTCOME_SPEC)
+OUTCOME_SPEC.loader.exec_module(outcome)
+SHA = "381a4282e16abd02365dd7f2328c9e65d56ab70e"
+
+
+def lifecycle_comment(next_missing="outcome", verified=True, issue="JOV-7771", extra_manifest=None):
+    manifest = {"schema": "jovie.validation-manifest/v1", "issue": issue,
+                "bindingPull": "https://github.com/JovieInc/Jovie/pull/21778",
+                "mergedPulls": ["https://github.com/JovieInc/Jovie/pull/21778"], **(extra_manifest or {})}
+    lines = ["Validation lifecycle kept JOV-7771 in Validating.",
+             "Binding merge: https://github.com/JovieInc/Jovie/pull/21778 (48075f7f9589).",
+             *([f"Verified production generation: {SHA}."] if verified else []),
+             f"Next missing receipt: {next_missing}.",
+             f"- {next_missing}: no current receipt (acceptance section names evidence a deploy cannot prove)",
+             "", "<!-- validation-manifest:v1", json.dumps(manifest), "-->",
+             "<!-- validation-lifecycle:v1 8051ff027979ff0f -->"]
+    return {"body": "\n".join(lines), "createdAt": "2026-10-21T11:27:54Z"}
+
+
+def outcome_issue(*comments):
+    return {"id": "uuid-7771", "identifier": "JOV-7771", "title": "Golden path", "url": "https://linear.app/x",
+            "description": "**Acceptance**\n* Sentence case for every /start title", "comments": {"nodes": list(comments)}}
+
+
+class OutcomeLaneTest(unittest.TestCase):
+    """The outcome lane verifies Validating issues owing `outcome` and records the receipt (2026-10-21)."""
+
+    def test_only_a_deployed_issue_that_owes_outcome_is_asked(self):
+        ask = outcome.lifecycle_ask(outcome_issue(lifecycle_comment()))
+        self.assertEqual((ask["sha"], ask["digest"]), (SHA, "8051ff027979ff0f"))
+        self.assertIsNone(outcome.lifecycle_ask(outcome_issue(lifecycle_comment(verified=False))))
+        self.assertIsNone(outcome.lifecycle_ask(outcome_issue(lifecycle_comment(next_missing="screen-audit"))))
+        self.assertIsNone(outcome.lifecycle_ask(outcome_issue(lifecycle_comment(issue="JOV-1"))))
+        older = {**lifecycle_comment(), "createdAt": "2026-10-20T00:00:00Z"}
+        newer = {**lifecycle_comment(verified=False), "createdAt": "2026-10-21T12:00:00Z"}
+        self.assertIsNone(outcome.lifecycle_ask(outcome_issue(older, newer)), "the newest lifecycle comment rules")
+
+    def test_the_lane_not_the_model_decides_and_any_doubt_fails(self):
+        item = lambda status, evidence="apps/web/app/start/page.tsx:42 renders 'Getting this ready'": {
+            "criterion": "Sentence case titles", "status": status, "evidence": evidence}
+        verdict = lambda *items, **kw: {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA,
+                                        "items": list(items), **kw}
+        self.assertEqual(outcome.judge(verdict(item("pass"), item("pass")), "JOV-7771", SHA)["status"], "pass")
+        self.assertEqual(outcome.judge(verdict(item("pass"), item("fail")), "JOV-7771", SHA)["status"], "fail")
+        held = outcome.judge(verdict(item("pass"), item("needs-authority", "founder taste on the build")),
+                             "JOV-7771", SHA)
+        self.assertEqual(held["status"], "fail")
+        self.assertIn("needs authority: Sentence case titles: founder taste", outcome.receipt_note(held))
+        self.assertEqual(outcome.judge(verdict(item("pass", "ok")), "JOV-7771", SHA)["status"], "fail",
+                         "a pass without concrete evidence is not a pass")
+        for broken in (None, {}, verdict(), verdict(item("maybe")), {**verdict(item("pass")), "sha": "0" * 40},
+                       {**verdict(item("pass")), "issue": "JOV-1"}):
+            self.assertEqual(outcome.judge(broken, "JOV-7771", SHA)["status"], "fail")
+        long = outcome.judge(verdict(*[item("fail", "x" * 500) for _ in range(10)]), "JOV-7771", SHA)
+        self.assertLessEqual(len(outcome.receipt_note(long)), outcome.NOTE_LIMIT)
+
+    def drain(self, verdict, *, authorization="Bearer app", receipt_rc=0, manifest_extra=None, per_day=None):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        calls, comments = [], []
+
+        class Locked:
+            def __init__(self, path, blocking=False):
+                self.held = True
+            def release(self):
+                pass
+
+        issue = outcome_issue(lifecycle_comment(extra_manifest=manifest_extra))
+
+        class Linear:
+            def __init__(self, env):
+                pass
+            def gql(self, query, variables):
+                return {"issues": {"nodes": [issue], "pageInfo": {"hasNextPage": False, "endCursor": None}}}
+            def comment(self, issue_id, body):
+                comments.append((issue_id, body))
+
+        lane = SimpleNamespace(Locked=Locked, Linear=Linear, LinearRateLimited=RuntimeError)
+        host = SimpleNamespace(state=state, repo=state / "repo", linear_env=None)
+
+        def run(args, **kwargs):
+            calls.append((list(args), kwargs))
+            if args[:4] == ["git", "-C", str(host.repo), "worktree"] and "add" in args:
+                Path(args[-2]).mkdir(parents=True)
+            if "codex_lane.py" in " ".join(map(str, args)):
+                cwd = Path(args[args.index("--cwd") + 1])
+                if verdict is not None:
+                    (cwd / outcome.VERDICT_FILE).write_text(json.dumps(verdict))
+            rc = receipt_rc if "linear-sync-on-merge.mjs" in " ".join(map(str, args)) else 0
+            return subprocess.CompletedProcess(args, rc, "", "")
+
+        patches = [patch.object(outcome, "app_authorization", return_value=authorization)]
+        if per_day is not None:
+            patches.append(patch.object(outcome, "PER_DAY", per_day))
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        result = outcome.drain(host, lane, run=run, now=time.time())
+        return result, calls, comments, state
+
+    def test_a_verified_issue_gets_an_itemized_comment_and_a_pass_receipt(self):
+        verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": [
+            {"criterion": "Sentence case titles", "status": "pass",
+             "evidence": "apps/web/app/start/copy.ts:12 'Getting this ready'; curl jov.ie/start shows it"}]}
+        result, calls, comments, state = self.drain(verdict, manifest_extra={"receiptNotBefore": "2026-10-20T00:00:00Z"})
+        self.assertEqual(result["done"][0]["result"], "recorded")
+        receipt = next(args for args, _ in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, args)))
+        self.assertEqual(receipt[receipt.index("--status") + 1], "pass")
+        self.assertEqual(receipt[receipt.index("--sha") + 1], SHA)
+        self.assertEqual(receipt[receipt.index("--episode-started-at") + 1], "2026-10-20T00:00:00Z")
+        env = next(kw["env"] for args, kw in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, args)))
+        self.assertEqual(env["LINEAR_API_KEY"], "Bearer app")
+        self.assertIn(outcome.COMMENT_MARKER, comments[0][1])
+        self.assertTrue(any("worktree" in args and "remove" in args for args, _ in calls), "checkout is dropped")
+        rows = [json.loads(line) for line in (state / "runs/ledger.jsonl").read_text().splitlines()]
+        self.assertEqual((rows[-1]["kind"], rows[-1]["decision"]), ("outcome-verify", "pass"))
+        # The same lifecycle ask is not verified twice.
+        self.assertEqual(outcome.candidates(SimpleNamespace(gql=lambda q, v: {"issues": {
+            "nodes": [outcome_issue(lifecycle_comment())], "pageInfo": {"hasNextPage": False}}}),
+            state, time.time()), [])
+
+    def test_no_verdict_no_app_credential_or_budget_means_no_receipt(self):
+        result, calls, comments, _ = self.drain(None)
+        self.assertEqual(result["done"][0]["result"], "verifier-failed")
+        self.assertFalse(comments, "a missing verdict is a verifier malfunction, never a fail receipt")
+        self.assertFalse([a for a, _ in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, a))])
+        verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": [
+            {"criterion": "x", "status": "pass", "evidence": "file.ts:1 shows the fix in place"}]}
+        result, calls, comments, _ = self.drain(verdict, authorization=None)
+        self.assertEqual(result["done"][0]["result"], "linear-app-unavailable")
+        self.assertFalse(comments)
+        self.assertFalse([a for a, _ in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, a))])
+        result, calls, _, _ = self.drain(verdict, per_day=0)
+        self.assertEqual(result["status"], "disabled")
+        self.assertFalse(calls)
+
+    def test_tick_never_runs_in_a_selftest(self):
+        with patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
+            self.assertEqual(outcome.tick(SimpleNamespace(), SimpleNamespace())["status"], "selftest-skipped")

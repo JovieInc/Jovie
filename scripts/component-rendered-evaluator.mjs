@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { wcag22AaAxeOptions } from '../apps/web/lib/a11y-gates/wcag-standard.cjs';
 import { evaluateRenderedSnapshots } from './component-rendered-invariant-policy.mjs';
 
 /**
@@ -249,7 +250,7 @@ async function clearInteractionState(page) {
   await page.waitForTimeout(20);
 }
 
-async function collectSnapshots(
+export async function collectSnapshots(
   page,
   story,
   viewport,
@@ -313,7 +314,7 @@ async function collectSnapshots(
     });
     const axe = await new AxeBuilder({ page })
       .include(`[data-jovie-eval-instance="${instanceId}"]`)
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+      .options(wcag22AaAxeOptions())
       .analyze();
 
     const snapshot = await root.evaluate(
@@ -593,7 +594,18 @@ async function collectSnapshots(
             node =>
               belongsToFamily(node, element) && isSequentiallyFocusable(node)
           );
-          const keyboardTarget = focusTargets[0] ?? null;
+          const declaredKeyboardTargetSelector =
+            wrapper.dataset.jovieEvalKeyboardTargetSelector;
+          // An explicit target must resolve to exactly one reachable control
+          // inside this variant/family. Never fall back after a bad declaration.
+          const keyboardTargets =
+            declaredKeyboardTargetSelector === undefined
+              ? focusTargets.slice(0, 1)
+              : focusTargets.filter(node =>
+                  node.matches(declaredKeyboardTargetSelector)
+                );
+          const keyboardTarget =
+            keyboardTargets.length === 1 ? keyboardTargets[0] : null;
           const keyboardTargetInstanceId = keyboardTarget
             ? `${variantInstanceId}-keyboard`
             : null;
@@ -694,7 +706,13 @@ async function collectSnapshots(
             overflowY: target.scrollHeight - target.clientHeight > 1,
             zoomOverflow: false,
             interactive,
-            keyboardReachable: !interactive || focusTargets.length > 0,
+            keyboardReachable: !interactive || Boolean(keyboardTarget),
+            declaredKeyboardTargetSelector:
+              declaredKeyboardTargetSelector ?? null,
+            keyboardTargetMatchCount: keyboardTargets.length,
+            keyboardTargetTag: keyboardTarget?.tagName ?? null,
+            keyboardTargetTestId:
+              keyboardTarget?.getAttribute('data-testid') ?? null,
             keyboardActivatable: !interactive,
             tabbableCount: focusTargets.length,
             text,
@@ -968,6 +986,22 @@ async function main() {
     missingRequests,
     missingFamilies,
     missingContracts,
+    keyboardTargets: snapshots.flatMap(snapshot =>
+      snapshot.variants
+        .filter(variant => variant.interactive)
+        .map(variant => ({
+          family: snapshot.family,
+          storyId: snapshot.storyId,
+          viewport: snapshot.viewport,
+          variant: variant.key,
+          declaredSelector: variant.declaredKeyboardTargetSelector,
+          matchCount: variant.keyboardTargetMatchCount,
+          tag: variant.keyboardTargetTag,
+          testId: variant.keyboardTargetTestId,
+          reachable: variant.keyboardReachable,
+          activatable: variant.keyboardActivatable,
+        }))
+    ),
     ...evaluated,
     ok:
       evaluated.ok &&

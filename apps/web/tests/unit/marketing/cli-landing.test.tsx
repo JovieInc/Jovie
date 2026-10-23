@@ -40,6 +40,13 @@ describe('CLI landing page', () => {
       screen.getByRole('heading', { level: 2, name: 'CLI Reference' })
     ).toHaveClass('line-clamp-2');
     expect(screen.getByText(CLI_SUBTITLE)).toBeVisible();
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
+      'data-marketing-variant',
+      'centered-none'
+    );
+    expect(
+      screen.getByTestId('marketing-section-content-prose')
+    ).toHaveAttribute('data-marketing-variant', 'article-body');
     expect(screen.getByTestId('cli-hero-install')).toHaveAttribute(
       'href',
       '#install'
@@ -130,9 +137,10 @@ describe('CLI landing page', () => {
       )
     ).toEqual([
       'hero/centered-none',
-      'content-prose',
+      'content-prose/article-body',
       'faq/structured-data-list',
       'cta/final-single-claim',
+      'capture/email-only',
     ]);
   });
 
@@ -181,8 +189,8 @@ describe('CLI landing page', () => {
       item => item.question === 'Which Node.js version does it need?'
     );
 
-    expect(packageJson.engines?.node).toBe('>=24.21.0');
-    expect(nodeFaq?.answer).toContain('Node.js 24.21.0');
+    expect(packageJson.engines?.node).toBe('>=24.22.1');
+    expect(nodeFaq?.answer).toContain('Node.js 24.22.1');
     expect(nodeFaq?.answer).toContain('including Node 26');
     expect(nodeFaq?.answer).toContain('published package engines field');
   });

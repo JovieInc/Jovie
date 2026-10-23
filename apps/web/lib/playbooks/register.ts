@@ -14,6 +14,7 @@ import {
 import type { SkillDefinition } from '@/lib/agents/types';
 import { db } from '@/lib/db';
 import { skillsCatalog, skillsCatalogVersions } from '@/lib/db/schema/agents';
+import { assertPlaybookRegistrationAllowed } from './growth-governance';
 
 export interface RegisterCompiledSkillResult {
   readonly skillId: string;
@@ -35,6 +36,7 @@ export async function registerCompiledSkill(
     readonly db?: typeof db;
   }
 ): Promise<RegisterCompiledSkillResult> {
+  assertPlaybookRegistrationAllowed(skill);
   const database = options?.db ?? db;
   const now = new Date();
   const normalized = normalizeSkillLifecycleState({

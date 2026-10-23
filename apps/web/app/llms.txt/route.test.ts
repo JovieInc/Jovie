@@ -75,4 +75,12 @@ describe('GET /llms.txt', () => {
     expect(body).not.toMatch(/public profile API access.*write/i);
     expect(body).not.toMatch(/MCP server for Jovie/i);
   });
+  it('exposes canonical offer truth and the decision-gated attribution handoff', async () => {
+    const body = await GET().text();
+    expect(body).toContain('$12/mo');
+    expect(body).toContain('Self-serve');
+    expect(body).not.toContain('Limited access');
+    expect(body).toContain('/api/acquisition/agent-handoff');
+    expect(body).toContain('requires human purchase confirmation');
+  });
 });

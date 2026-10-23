@@ -58,17 +58,245 @@ emit() {
   fi
 }
 
+# Returns 1 (shippable) unless the successor provably cannot ship, setting
+# successor_skip_reason. Production Controller run names are
+# "Production Controller <staging run name>"; staging run names are
+# "<sha> from CI <id> attempt <n>".
+successor_scan_limit="${SUCCESSOR_SCAN_LIMIT:-10}"
+successor_skip_reason=""
+successor_shippable() {
+  local title="$1" staging_title staging_run staging_id staging_attempt artifact_id outcome zip
+  successor_skip_reason=""
+  [[ "$title" =~ ^Production\ Controller\ ([0-9a-f]{40})\ from\ CI\ [1-9][0-9]*\ attempt\ [1-9][0-9]*$ ]] || return 0
+  local successor_sha="${BASH_REMATCH[1]}"
+  staging_title="${title#Production Controller }"
+  if [ -z "$staging_runs_json" ]; then
+    staging_runs_json="$("$gh_cli" api "repos/$repository/actions/workflows/staging-controller.yml/runs?branch=main&event=workflow_run&per_page=50" 2>/dev/null)" || {
+      staging_runs_json='{"workflow_runs":[]}'
+      return 0
+    }
+  fi
+  staging_run="$(jq -c --arg title "$staging_title" '
+    [(.workflow_runs // [])[] | select(.display_title == $title and .status == "completed")]
+    | if length == 1 then .[0] else empty end
+  ' <<<"$staging_runs_json" 2>/dev/null || true)"
+  [ -n "$staging_run" ] || return 0
+  if [ "$(jq -r '.conclusion' <<<"$staging_run")" != success ]; then
+    successor_skip_reason="staging $(jq -r '.id' <<<"$staging_run") concluded $(jq -r '.conclusion' <<<"$staging_run")"
+    return 1
+  fi
+  staging_id="$(jq -r '.id' <<<"$staging_run")"
+  staging_attempt="$(jq -r '.run_attempt' <<<"$staging_run")"
+  [[ "$staging_id" =~ ^[1-9][0-9]*$ && "$staging_attempt" =~ ^[1-9][0-9]*$ ]] || return 0
+  artifact_id="$("$gh_cli" api "repos/$repository/actions/runs/$staging_id/artifacts?per_page=100" 2>/dev/null |
+    jq -r --arg name "staging-completion-$staging_attempt" '
+      [(.artifacts // [])[] | select(.name == $name and .expired == false)]
+      | if length == 1 then .[0].id else empty end
+    ' 2>/dev/null || true)"
+  [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] || return 0
+  zip="$(mktemp)"
+  if "$gh_cli" api "repos/$repository/actions/artifacts/$artifact_id/zip" >"$zip" 2>/dev/null; then
+    outcome="$(unzip -p "$zip" staging-completion.json 2>/dev/null |
+      jq -r --arg sha "$successor_sha" 'if .sha == $sha then .outcome else empty end' 2>/dev/null || true)"
+  else
+    outcome=""
+  fi
+  rm -f "$zip"
+  if [ "$outcome" = superseded ]; then
+    successor_skip_reason="staging $staging_id finished superseded"
+    return 1
+  fi
+  return 0
+}
+
 iso_to_epoch() {
   date -u -d "$1" +%s 2>/dev/null || date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s
 }
 
+# Bounded REST retry. Stderr is classified and discarded: a rate-limit body
+# can carry an installation id, and a raw body must not become a log line.
+# gh_retry_status / gh_retry_class / gh_retry_http / gh_retry_message survive
+# for the caller. A completed HTTP success (including an empty or unexpected
+# status) returns 0 and is not retried.
+gh_retry_status=0
+gh_retry_class=""
+gh_retry_http=""
+gh_retry_message=""
+
+# Single bounded log-safe line for annotations: collapse whitespace, redact
+# credential-shaped text (token prefixes, bearer/token values, app
+# installation ids, long opaque strings) and cap the length. The raw response
+# body still never becomes a log line; only this classified excerpt does.
+sanitize_log_text() {
+  printf '%s' "$1" |
+    tr '\t\r\n' '   ' |
+    sed -e 's/[][`"\\|;$&<>]//g' \
+      -e 's/gh[pousr]_[A-Za-z0-9][A-Za-z0-9_]*/[redacted]/g' \
+      -e 's/github_pat_[A-Za-z0-9_][A-Za-z0-9_]*/[redacted]/g' \
+      -e 's/[Bb]earer[[:space:]][A-Za-z0-9._~+/=-]\{8,\}/[redacted]/g' \
+      -e 's/[Tt]oken[[:space:]][A-Za-z0-9._~+/=-]\{8,\}/[redacted]/g' \
+      -e 's/installation ID [0-9][0-9]*/installation [redacted]/g' \
+      -e 's/[A-Za-z0-9+/=]\{64,\}/[redacted]/g' \
+      -e 's/[[:space:]]\{2,\}/ /g' |
+    cut -c1-160
+}
+
+gh_retry() {
+  local label="$1"
+  shift
+  local attempt=1 max backoff err text http
+  max="${LINEAGE_COMPARE_ATTEMPTS:-3}"
+  backoff="${LINEAGE_COMPARE_BACKOFF_SECONDS:-2}"
+  [[ "$max" =~ ^[1-9][0-9]*$ ]] || max=3
+  [[ "$backoff" =~ ^[0-9]+$ ]] || backoff=2
+  while [ "$attempt" -le "$max" ]; do
+    err="$(mktemp)"
+    gh_retry_status=0
+    gh_retry_class=""
+    gh_retry_http=""
+    gh_retry_message=""
+    text="$("$gh_cli" "$@" 2>"$err")" || gh_retry_status=$?
+    if [ "$gh_retry_status" -eq 0 ]; then
+      rm -f "$err"
+      printf '%s\n' "$text"
+      return 0
+    fi
+    text="$(cat "$err" 2>/dev/null || true)"
+    rm -f "$err"
+    gh_retry_class=transport
+    http=""
+    if printf '%s\n' "$text" | grep -qiE 'secondary rate limit|API rate limit|rate limit exceeded'; then
+      gh_retry_class=rate_limit
+    fi
+    if [[ "$text" =~ HTTP[^0-9]*([0-9]{3}) ]]; then
+      http="${BASH_REMATCH[1]}"
+    elif [[ "$text" =~ HTTP/[0-9.]+[[:space:]]+([0-9]{3}) ]]; then
+      # curl-style status lines ("HTTP/1.1 403 ...") never match the first
+      # pattern: the minor-version digits interrupt it.
+      http="${BASH_REMATCH[1]}"
+    fi
+    if [ "$gh_retry_class" != rate_limit ] && [ "$http" = 429 ]; then
+      gh_retry_class=rate_limit
+    elif [ -n "$http" ] && [ "$gh_retry_class" = transport ]; then
+      gh_retry_class="http_${http}"
+    fi
+    gh_retry_http="$http"
+    gh_retry_message="$(sanitize_log_text "$text")"
+    echo "::warning::${label} attempt ${attempt}/${max} class=${gh_retry_class} http=${http:-none} exit=${gh_retry_status}." >&2
+    if [ "$attempt" -ge "$max" ]; then
+      return 1
+    fi
+    if [ "$backoff" -gt 0 ]; then
+      sleep "$backoff"
+      backoff=$((backoff * 2))
+    fi
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+# Git does not spend the shared installation REST quota. Used only after the
+# compare command itself failed. A 200 with an empty or unexpected status is
+# not overridden: that completed read stays unknown (JOV-7674). A missing
+# object stays unknown rather than diverged.
+prove_git_lineage() {
+  [ "${LINEAGE_PROVE_WITH_GIT:-1}" = 1 ] || return 1
+  local work tip token header url
+  work="$(mktemp -d)"
+  url="https://github.com/${repository}.git"
+  git_auth() {
+    if [ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
+      token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+      header="$(printf 'x-access-token:%s' "$token" | base64 | tr -d '\n')"
+      printf '::add-mask::%s\n' "$header" >&2
+      GIT_CONFIG_COUNT=2 \
+        GIT_CONFIG_KEY_0="http.https://github.com/.extraheader" \
+        GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${header}" \
+        GIT_CONFIG_KEY_1=core.hooksPath \
+        GIT_CONFIG_VALUE_1=/dev/null \
+        GIT_TERMINAL_PROMPT=0 \
+        git "$@"
+      return
+    fi
+    GIT_TERMINAL_PROMPT=0 git "$@"
+  }
+  git_auth init -q "$work" || {
+    rm -rf "$work"
+    return 1
+  }
+  for depth in 128 2048; do
+    if ! git_auth -C "$work" fetch --no-tags --filter=blob:none --depth="$depth" \
+      "$url" 'refs/heads/main:refs/heads/main'; then
+      rm -rf "$work"
+      return 1
+    fi
+    tip="$(git -C "$work" rev-parse refs/heads/main 2>/dev/null || true)"
+    if [ "$tip" != "$current" ]; then
+      echo "::warning::git main tip does not match the resolved main SHA; refusing the git lineage proof." >&2
+      rm -rf "$work"
+      return 1
+    fi
+    if git -C "$work" cat-file -e "${expected}^{commit}" 2>/dev/null; then
+      if git -C "$work" merge-base --is-ancestor "$expected" "$tip"; then
+        rm -rf "$work"
+        printf 'ahead\n'
+        return 0
+      fi
+      rm -rf "$work"
+      printf 'diverged\n'
+      return 0
+    fi
+  done
+  rm -rf "$work"
+  return 1
+}
+
 lineage=exact
+compare_error_class=""
 if [ "$current" != "$expected" ]; then
-  status="$("$gh_cli" api "repos/$repository/compare/${expected}...${current}" --jq '.status // empty' 2>/dev/null || true)"
-  case "$status" in
-    ahead) lineage=ancestor ;;
-    *) lineage=diverged ;;
-  esac
+  lookup_status=0
+  lineage=unknown
+  # Redirect instead of $(...): a command substitution runs the function in a
+  # subshell and would drop gh_retry_status.
+  compare_out="$(mktemp)"
+  if gh_retry "Release compare" api "repos/$repository/compare/${expected}...${current}" --jq '.status // empty' >"$compare_out"; then
+    status="$(cat "$compare_out")"
+    case "$status" in
+      ahead) lineage=ancestor ;;
+      behind|diverged) lineage=diverged ;;
+    esac
+  else
+    lookup_status="$gh_retry_status"
+    compare_error_class="${gh_retry_class:-transport}"
+    # 2026-10-23 03:52Z: installation REST quota was exhausted. The compare
+    # exited 1 while both SHAs were ancestors of main. Git still proved the
+    # tip (resolve-main-sha uses ls-remote). A failed command may be proven
+    # that way. An unproven read still fails closed.
+    if git_status="$(prove_git_lineage)"; then
+      case "$git_status" in
+        ahead) lineage=ancestor ;;
+        behind|diverged) lineage=diverged ;;
+      esac
+      if [ "$lineage" != unknown ]; then
+        echo "::warning::REST compare unavailable class=${compare_error_class} exit=${lookup_status}; git proved lineage=${lineage}." >&2
+      fi
+    fi
+  fi
+  rm -f "$compare_out"
+  # A failed or unexpected compare proves no rewrite. Installation quota
+  # exhaustion must still fail a mutating promotion (JOV-7674). The coalesce
+  # caller, which has not mutated, turns this decision=error into a yield
+  # receipt so an older generation does not fail the wave.
+  if [ "$lineage" = unknown ]; then
+    emit lineage unknown
+    emit lineage_lookup_exit "$lookup_status"
+    emit lineage_lookup_class "${compare_error_class:-none}"
+    emit gate_decision error
+    emit gate_reason lineage_lookup_unavailable
+    echo "::error::Release ancestry is unknown (exit=${lookup_status} class=${compare_error_class:-none} http=${gh_retry_http:-none} msg=\"${gh_retry_message:-}\"); inspect GitHub compare access/response before superseding $expected." >&2
+    printf 'decision=error\n'
+    exit 1
+  fi
 fi
 
 successor_pending=false
@@ -86,7 +314,14 @@ elif [ "$lineage" = ancestor ]; then
   # Unknown visibility must not become an empty-queue decision, including
   # under starvation. Emit bounded diagnostics without raw API response text.
   lookup_status=0
-  runs_json="$("$gh_cli" api "repos/$repository/actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&per_page=30" 2>/dev/null)" || lookup_status=$?
+  runs_out="$(mktemp)"
+  if gh_retry "Release successor lookup" api "repos/$repository/actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&per_page=30" >"$runs_out"; then
+    runs_json="$(cat "$runs_out")"
+  else
+    lookup_status="$gh_retry_status"
+    runs_json=""
+  fi
+  rm -f "$runs_out"
   if [ "$lookup_status" -ne 0 ] || ! pending="$(jq -er --argjson run "$run_id" '
     if (.workflow_runs | type) != "array" or
       any(.workflow_runs[]; (.id | type) != "number" or .id <= 0 or
@@ -104,9 +339,28 @@ elif [ "$lineage" = ancestor ]; then
     printf 'decision=error\n'
     exit 1
   fi
-  if [ "$pending" -gt 0 ]; then
-    successor_pending=true
-  fi
+  # Only a successor that can ship counts. A queued controller generation
+  # whose staging run failed or finished `superseded` skips at release-source
+  # and never promotes; yielding to it strands production. 2026-10-20: 826b00a
+  # (staging deployed) yielded to four queued generations whose staging was
+  # superseded by a397d64, whose staging then failed, so nothing shipped.
+  # Newest first; stop at the first shippable one. Unknown evidence keeps the
+  # conservative yield.
+  skipped_successors=0
+  staging_runs_json=""
+  while IFS=$'\t' read -r successor_id successor_title; do
+    [ -n "$successor_id" ] || continue
+    if [ "$skipped_successors" -ge "$successor_scan_limit" ] ||
+      successor_shippable "$successor_title"; then
+      successor_pending=true
+      break
+    fi
+    skipped_successors=$((skipped_successors + 1))
+    echo "::notice::Queued controller run $successor_id cannot ship ($successor_skip_reason); not yielding to it." >&2
+  done < <(jq -r --argjson run "$run_id" '
+    [.workflow_runs[] | select(.status != "completed" and .id > $run)]
+    | sort_by(.id) | reverse[] | [.id, (.display_title // "")] | @tsv
+  ' <<<"$runs_json")
 
   # Starvation bound: how long has main carried commits production lacks?
   build_info="$(curl --fail --silent --connect-timeout 5 --max-time 15 \
@@ -142,6 +396,9 @@ elif [ "$lineage" = ancestor ]; then
   else
     reason="$pending newer generation(s) already queued behind $expected; yielding the lease"
   fi
+  if [ "$successor_pending" = false ] && [ "$pending" -gt 0 ]; then
+    reason="$reason ($skipped_successors queued successor(s) cannot ship)"
+  fi
 fi
 
 decision=yield
@@ -155,6 +412,7 @@ emit lineage "$lineage"
 emit successor_pending "$successor_pending"
 emit starving "$starving"
 emit in_flight "$in_flight"
+emit skipped_successors "${skipped_successors:-0}"
 emit live_sha "$live_sha"
 emit unshipped_commits "$unshipped_commits"
 emit unshipped_age_seconds "$unshipped_age_seconds"

@@ -10,6 +10,7 @@ import {
   prepareBetterAuthEmailOtp,
 } from '../helpers/auth';
 import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
+import { openHomeWelcome } from './helpers/golden-path-home-welcome';
 import {
   captureKeyframe,
   inspectEssentialViewport,
@@ -90,28 +91,35 @@ async function verifyHomeWelcome(page: Page) {
   page.on('request', watchPosts);
   await page.route('**/api/insights/summary', async route => {
     await ready;
-    if (mode === 'error')
-      return route.fulfill({
-        status: 500,
-        json: { error: 'Controlled summary failure' },
-      });
-    await route.fulfill({
-      json: {
-        insights:
-          mode === 'empty'
-            ? []
-            : [
-                {
-                  ...insight,
-                  id: 'expired',
-                  expiresAt: new Date(Date.now() - 1000).toISOString(),
-                },
-                insight,
-              ],
-        totalActive: mode === 'empty' ? 0 : 1,
-        lastGeneratedAt: new Date().toISOString(),
-      },
-    });
+    if (mode === 'error') {
+      await route
+        .fulfill({
+          status: 500,
+          json: { error: 'Controlled summary failure' },
+        })
+        .catch(() => {});
+      return;
+    }
+    // An earlier aborted summary must not reject the live fulfill.
+    await route
+      .fulfill({
+        json: {
+          insights:
+            mode === 'empty'
+              ? []
+              : [
+                  {
+                    ...insight,
+                    id: 'expired',
+                    expiresAt: new Date(Date.now() - 1000).toISOString(),
+                  },
+                  insight,
+                ],
+          totalActive: mode === 'empty' ? 0 : 1,
+          lastGeneratedAt: new Date().toISOString(),
+        },
+      })
+      .catch(() => {});
   });
   const heading = page.getByTestId('chat-empty-state-greeting-text');
   const input = page.getByRole('textbox', {
@@ -190,16 +198,10 @@ async function verifyHomeWelcome(page: Page) {
       await page.emulateMedia({
         reducedMotion: viewport.width === 615 ? 'reduce' : 'no-preference',
       });
-      await page.goto(APP_ROUTES.CHAT);
-      await expect(heading).toBeVisible();
-      const initialGreeting = await heading.textContent();
-      const before = await input.boundingBox();
-      if (viewport.width === 1440) {
-        await expect(nextStep.getByRole('status')).toHaveText(
-          'Finding your next step…'
-        );
-        releaseSummary();
-      }
+      const { initialGreeting, before } = await openHomeWelcome(
+        page,
+        viewport.width === 1440 ? releaseSummary : undefined
+      );
       const action = page.getByRole('button', {
         name: 'Draft This With Jovie',
       });
@@ -247,7 +249,9 @@ async function verifyHomeWelcome(page: Page) {
       await assertGeometry();
       expect(chatPosts).toBe(0);
       if (process.env.GOLDEN_PATH_KEYFRAME_DIR)
-        await captureKeyframe(page, `home-welcome-${viewport.width}`);
+        await captureKeyframe(page, `home-welcome-${viewport.width}`, {
+          expectedArtistName: TEST_SPOTIFY_ARTIST.name,
+        });
     }
     for (const state of ['empty', 'error'] as const) {
       mode = state;
@@ -1102,7 +1106,7 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
       try {
         await ensureSignedInUser(adminPage, getAdminCredentials());
 
-        await adminPage.goto(APP_ROUTES.HUD, {
+        await adminPage.goto(APP_ROUTES.ADMIN_OPS, {
           waitUntil: 'domcontentloaded',
           timeout: 30_000,
         });

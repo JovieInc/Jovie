@@ -47,7 +47,7 @@ jobs:
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
-        with: {node-version: 24.21.0}
+        with: {node-version: 24.22.1}
       - id: source
         env: {GH_TOKEN: "${{ github.token }}"}
         run: node .github/scripts/staging-release-source.mjs
@@ -72,7 +72,10 @@ jobs:
     if: ${{ needs.release-source.outputs.eligible == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions: read lets the lineage gate read queued successors' staging
+    # completion artifacts so it never yields to a generation that cannot ship.
     permissions:
+      actions: read
       contents: read
     outputs:
       is_current: ${{ steps.coalesce.outputs.is_current }}
@@ -80,7 +83,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          sparse-checkout: .github/scripts/release-lineage-gate.sh
+          sparse-checkout: |
+            .github/scripts/release-lineage-gate.sh
+            .github/scripts/resolve-main-sha.sh
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Evaluate event-driven supersession
@@ -95,11 +100,9 @@ jobs:
           # queued behind it. Still-queued ancestors yield regardless, so a
           # stale backlog drains to the newest queued generation.
           PRODUCTION_STARVATION_SECONDS: '5400'
-          # A transient GitHub API failure (rate limit, 5xx) must not kill a
-          # release wave: each API read retries a bounded number of times
-          # (three attempts) before failing closed, well inside the 5-minute
-          # job budget.
-          GH_API_RETRY_SECONDS: '15'
+          # Main is resolved over the git protocol. A REST fallback may hold
+          # until x-ratelimit-reset only when that instant is inside this budget.
+          RESOLVE_MAIN_BUDGET_SECONDS: '90'
           # Retired fixed release-wave window; receipts record time saved
           # against it.
           FIXED_WINDOW_SECONDS_REPLACED: '60'
@@ -108,7 +111,7 @@ jobs:
           set -euo pipefail
           {
             echo "is_current=false"
-            echo "decision=superseded"
+            echo "decision=error"
             echo "replacement_sha=none"
             echo "wait_seconds=0"
             echo "time_saved_seconds=0"
@@ -153,25 +156,6 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           }
 
-          # Bounded retry for GitHub API reads: a transient rate limit or 5xx
-          # must not fail the release wave, but a persistent failure still
-          # fails closed so supersession evidence is never guessed.
-          gh_api() {
-            local attempt
-            for attempt in 1 2 3; do
-              if gh api "$@" > "$RUNNER_TEMP/gh-api-out.json" 2> "$RUNNER_TEMP/gh-api-err.log"; then
-                cat "$RUNNER_TEMP/gh-api-out.json"
-                return 0
-              fi
-              if [ "$attempt" -lt 3 ]; then
-                echo "::warning::gh api attempt $attempt failed ($(head -n 1 "$RUNNER_TEMP/gh-api-err.log")); retrying in ${GH_API_RETRY_SECONDS}s." >&2
-                sleep "$GH_API_RETRY_SECONDS"
-              fi
-            done
-            cat "$RUNNER_TEMP/gh-api-err.log" >&2
-            return 1
-          }
-
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Controller expected SHA must be a full commit."
             exit 1
@@ -181,7 +165,7 @@ jobs:
           # marked superseded, naming its replacement. Supersession is
           # monotonic because main only moves forward and idempotent because
           # no mutation has started for this lineage.
-          current_main_sha="$(gh_api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          current_main_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "$REPOSITORY")"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact current main during release supersession."
             exit 1
@@ -191,8 +175,21 @@ jobs:
             # behind this one, even past PRODUCTION_STARVATION_SECONDS —
             # a still-queued generation costs seconds to yield, so a stale
             # backlog drains to the newest queued generation (JOV-7149).
-            gate_decision="$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before evaluation" \
-              bash .github/scripts/release-lineage-gate.sh | tail -n 1)"
+            # No production mutation has started. The gate still fails closed
+            # when ancestry stays unreadable (JOV-7674), including at this
+            # pre-mutation boundary. Unknown lineage cannot prove that a
+            # replacement generation can supersede this one.
+            gate_log="$RUNNER_TEMP/lineage-gate-before-evaluation.txt"
+            set +e
+            CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before evaluation" \
+              bash .github/scripts/release-lineage-gate.sh >"$gate_log"
+            gate_status=$?
+            set -e
+            gate_decision="$(tail -n 1 "$gate_log" 2>/dev/null || true)"
+            if [ "$gate_status" -ne 0 ]; then
+              echo "::error::Release lineage gate failed before evaluation (exit=${gate_status})."
+              exit "$gate_status"
+            fi
             if [ "$gate_decision" != "decision=proceed" ]; then
               record_receipt "superseded" "newer main landed before evaluation" "$current_main_sha" 0 "yield the production lease to controller generation $current_main_sha"
               exit 0
@@ -234,6 +231,7 @@ jobs:
         id: risk
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '180'
           SOURCE_RUN_ID: ${{ fromJSON(needs.release-source.outputs.ci).id }}
           SOURCE_RUN_ATTEMPT: ${{ fromJSON(needs.release-source.outputs.ci).run_attempt }}
           SOURCE_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
@@ -249,13 +247,13 @@ jobs:
           else
             # Queue-proven main pushes skip the classifier by design; the exact SHA
             # was classified in its successful merge-group CI run (same head SHA).
-            proof="$(gh api "repos/$REPO/actions/runs?head_sha=$SOURCE_SHA&event=merge_group&status=success&per_page=20" \
+            proof="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/$REPO/actions/runs?head_sha=$SOURCE_SHA&event=merge_group&status=success&per_page=20" \
               --jq '[.workflow_runs[] | select(.path == ".github/workflows/ci.yml" and .head_sha == "'"$SOURCE_SHA"'" and .event == "merge_group" and .status == "completed" and .conclusion == "success")] | max_by(.run_started_at, .id) | if . == null then empty else [.id, .run_attempt] | @tsv end')"
             IFS=$'\t' read -r proof_run proof_attempt <<< "$proof"
             if [[ "$proof_run" =~ ^[0-9]+$ && "$proof_attempt" =~ ^[1-9][0-9]*$ ]]; then
               # Follow every artifact page and bind the receipt to this exact attempt.
               # gh --slurp cannot be combined with --jq; use the standalone parser.
-              proof_artifact="$(gh api --paginate --slurp "repos/$REPO/actions/runs/$proof_run/artifacts" \
+              proof_artifact="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api --paginate --slurp "repos/$REPO/actions/runs/$proof_run/artifacts" \
                 | jq -r --arg name "ci-risk-classification-$proof_run-$proof_attempt" --arg sha "$SOURCE_SHA" --argjson run "$proof_run" \
                   '[.[].artifacts[] | select(.name == $name and .expired == false and .workflow_run.id == $run and .workflow_run.head_sha == $sha)] | if length == 1 then .[0].name else empty end')"
               if [[ -n "$proof_artifact" ]] && gh run download "$proof_run" --name "$proof_artifact" --dir "$root"; then
@@ -277,6 +275,12 @@ jobs:
           surface: production-web
           mutation: promote-staged-web-release
           risk-lane: ${{ steps.risk.outputs.risk_lane }}
+      - name: Fail closed when fleet deployment is blocked
+        if: always() && steps.policy.outcome == 'success' && steps.policy.outputs.deployment_allowed != 'true'
+        shell: bash
+        run: |
+          echo "::error::Fleet gate blocked production deployment (mode=${{ steps.policy.outputs.mode }}). The authorize step stayed green while Production Release was skipped."
+          exit 2
 
   authorize-production:
     name: Authorize exact main CI evidence
@@ -300,6 +304,8 @@ jobs:
       deployed_sha: ${{ steps.authorize.outputs.deployed_sha }}
       web_evidence_sha: ${{ steps.authorize.outputs.web_evidence_sha }}
       lane_receipt_artifact_id: ${{ steps.authorize.outputs.lane_receipt_artifact_id }}
+      # Successful job outputs survive failed-jobs-only retries.
+      lane_range_artifact_name: production-lane-range-${{ steps.authorize.outputs.expected_sha }}-${{ github.run_attempt }}
       staging_verified: ${{ steps.authorize.outputs.staging_verified }}
       release_lane: ${{ steps.authorize.outputs.release_lane }}
       release_policy_version: ${{ steps.authorize.outputs.release_policy_version }}
@@ -326,6 +332,47 @@ jobs:
             .scopedAdmission.surface == "production-web" and
             .scopedAdmission.allowed == true
           ' "$RUNNER_TEMP/fleet-admission.json" >/dev/null
+      - name: Checkout the rate-limit hold from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # This job's primary checkout is the release SHA. Load the
+          # default-branch hold, which writes zip bytes to a file (and unsets
+          # GH_FORCE_TTY for application/zip) and still waits out a reset.
+          ref: ${{ github.sha }}
+          path: .rate-limit-hold
+          sparse-checkout: .github/scripts/gh-api-hold.sh
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Hold installation reads through a rate-limit reset
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Compare and artifact reads in the next step 403'd at
+          # 2026-10-15 21:48Z (run 38811356851) after main was already
+          # resolved. Hold those reads until x-ratelimit-reset when that fits
+          # this 35-minute job. 1500s is the existing cap; a later reset still
+          # fails closed. The wait lives in gh-api-hold.sh, not a workflow
+          # sleep (JOV-INV-042). Keep this step free of GitHub expressions.
+          # The next run block is already near the 21000-character expression cap.
+          real_gh="$(command -v gh)"
+          echo "REAL_GH=${real_gh}" >> "$GITHUB_ENV"
+          hold="$GITHUB_WORKSPACE/.rate-limit-hold/.github/scripts/gh-api-hold.sh"
+          test -f "$hold"
+          echo "GH_API_HOLD_SCRIPT=${hold}" >> "$GITHUB_ENV"
+          shim="$RUNNER_TEMP/gh-rate-limit-bin"
+          mkdir -p "$shim"
+          cat > "$shim/gh" << 'EOF'
+          #!/bin/bash
+          set -euo pipefail
+          if [[ "${1:-}" == "api" && "${2:-}" != "rate_limit" ]]; then
+            export GH_API_HOLD_BIN="$REAL_GH"
+            export GH_API_HOLD_BUDGET_SECONDS="${GH_API_HOLD_BUDGET_SECONDS:-1500}"
+            exec bash "$GH_API_HOLD_SCRIPT" "$@"
+          fi
+          exec "$REAL_GH" "$@"
+          EOF
+          chmod +x "$shim/gh"
+          echo "$shim" >> "$GITHUB_PATH"
       - name: Cross-prove exact successful push CI
         id: authorize
         env:
@@ -344,6 +391,10 @@ jobs:
           TRIGGER_HEAD_REPOSITORY: ${{ fromJSON(needs.release-source.outputs.ci).head_repository.full_name }}
           PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
         shell: bash
+        # Keep this run script free of ${{ }}: GitHub evaluates an interpolated
+        # script as one format() expression capped at ~21,000 chars, and crossing
+        # it fails the workflow with zero jobs (JOV-8706). Pass inputs via env;
+        # the runner already exports GITHUB_RUN_ID and GITHUB_RUN_ATTEMPT.
         run: |
           set -euo pipefail
           {
@@ -393,16 +444,18 @@ jobs:
             exit 1
           fi
 
-          current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+          current_main_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "$REPOSITORY")"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve exact current main while authorizing production."
             exit 1
           }
-          if [ "$current_main_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before production authorization" IN_FLIGHT=true \
-              bash .github/scripts/release-lineage-gate.sh | tail -n 1)" != "decision=proceed" ]; then
-            echo "::notice::Controller generation $EXPECTED_SHA yielded to $current_main_sha before production authorization."
-            exit 0
+          if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
+            gate_decision="$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before production authorization" IN_FLIGHT=true \
+              bash .github/scripts/release-lineage-gate.sh | tail -n 1)"
+            if [ "$gate_decision" != "decision=proceed" ]; then
+              echo "::notice::Controller generation $EXPECTED_SHA yielded to $current_main_sha before production authorization."
+              exit 0
+            fi
           fi
           echo "is_current=true" >> "$GITHUB_OUTPUT"
 
@@ -423,8 +476,8 @@ jobs:
             --sha "$EXPECTED_SHA" \
             --repo "$REPOSITORY" \
             --controller-workflow-id "$controller_workflow_id" \
-            --actor-run-id "${{ github.run_id }}" \
-            --actor-attempt "${{ github.run_attempt }}")"
+            --actor-run-id "${GITHUB_RUN_ID}" \
+            --actor-attempt "${GITHUB_RUN_ATTEMPT}")"
           jq -e '
             type == "object" and
             (.state | IN("none", "pending", "recovery_available", "verified", "manual")) and
@@ -450,8 +503,8 @@ jobs:
               exit 0
               ;;
             recovery_available)
-              if [ "${{ github.run_attempt }}" != "2" ] ||
-                [ "$(jq -r '.controllerRun // 0' <<<"$marker_state_json")" != "${{ github.run_id }}" ] ||
+              if [ "${GITHUB_RUN_ATTEMPT}" != "2" ] ||
+                [ "$(jq -r '.controllerRun // 0' <<<"$marker_state_json")" != "${GITHUB_RUN_ID}" ] ||
                 [ "$marker_reason" != "current_recovery_attempt_requires_lease" ]; then
                 echo "::error::Only the exact full controller attempt 2 may consume an interrupted-marker recovery."
                 exit 1
@@ -460,7 +513,7 @@ jobs:
               echo "marker_recovery=true" >> "$GITHUB_OUTPUT"
               ;;
             none)
-              if [ "${{ github.run_attempt }}" != "1" ]; then
+              if [ "${GITHUB_RUN_ATTEMPT}" != "1" ]; then
                 echo "::error::A controller rerun without durable marker evidence cannot authorize production."
                 exit 1
               fi
@@ -596,29 +649,9 @@ jobs:
               deployed_marker_json="$(node .github/scripts/production-marker-state.mjs \
                 --sha "$deployed_sha" \
                 --repo "$REPOSITORY" \
-                --controller-workflow-id "$controller_workflow_id")"
+                --controller-workflow-id "$controller_workflow_id" \
+                --release-base "$EXPECTED_SHA")" || exit 1
               deployed_marker_state="$(jq -r '.state // empty' <<<"$deployed_marker_json")"
-              case "$deployed_marker_state" in
-                verified)
-                  jq -e '
-                    (.deploymentId | type == "string" and test("^dpl_[A-Za-z0-9]+$"))
-                  ' >/dev/null <<<"$deployed_marker_json" || {
-                    echo "::error::Canonical production marker lacks an exact deployment ID."
-                    exit 1
-                  }
-                  ;;
-                none)
-                  if [ "$deployed_sha" = "$EXPECTED_SHA" ]; then
-                    echo "::error::Current production cannot bootstrap its own missing verified marker."
-                    exit 1
-                  fi
-                  echo "::warning::Bootstrapping the release range from exact canonical live SHA $deployed_sha; the new target still requires the full production path and its own durable marker."
-                  ;;
-                *)
-                  echo "::error::Canonical production marker state is not admissible as a release base ($deployed_marker_state)."
-                  exit 1
-                  ;;
-              esac
             fi
 
             lane_range_json="$RUNNER_TEMP/production-lane-range.json"
@@ -754,17 +787,19 @@ jobs:
               echo "staging_verified=true" >> "$GITHUB_OUTPUT"
             fi
 
-            final_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
+            final_main_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "$REPOSITORY")"
             [[ "$final_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
               echo "::error::Could not resolve exact main at the production authorization boundary."
               exit 1
             }
-            if [ "$final_main_sha" != "$EXPECTED_SHA" ] &&
-              [ "$(CURRENT_MAIN_SHA="$final_main_sha" BOUNDARY="at authorization" IN_FLIGHT=true \
-                bash .github/scripts/release-lineage-gate.sh | tail -n 1)" != "decision=proceed" ]; then
-              echo "::notice::Controller generation $EXPECTED_SHA yielded to $final_main_sha at authorization."
-              echo "is_current=false" >> "$GITHUB_OUTPUT"
-              exit 0
+            if [ "$final_main_sha" != "$EXPECTED_SHA" ]; then
+              gate_decision="$(CURRENT_MAIN_SHA="$final_main_sha" BOUNDARY="at authorization" IN_FLIGHT=true \
+                bash .github/scripts/release-lineage-gate.sh | tail -n 1)"
+              if [ "$gate_decision" != "decision=proceed" ]; then
+                echo "::notice::Controller generation $EXPECTED_SHA yielded to $final_main_sha at authorization."
+                echo "is_current=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
             fi
 
             {
@@ -1128,7 +1163,7 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: ${{ needs.authorize-production.outputs.authorized == 'true' }}
         with:
-          name: production-lane-range-${{ needs.authorize-production.outputs.expected_sha }}-${{ github.run_attempt }}
+          name: ${{ needs.authorize-production.outputs.lane_range_artifact_name }}
           path: ${{ runner.temp }}/release-lineage
       - name: Resolve current main before final verification
         id: current
@@ -1143,7 +1178,7 @@ jobs:
           {
             echo "superseded_before_marker=false"
           } >> "$GITHUB_OUTPUT"
-          current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          current_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}")"
           [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve an exact current main SHA."
             exit 1
@@ -1254,7 +1289,7 @@ jobs:
           # Main can advance while setup runs. The workflow-level production
           # lease prevents a same-SHA rerun from mutating canonical production;
           # recheck main immediately before reading the canonical alias.
-          boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          boundary_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}")"
           if [[ ! "$boundary_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Could not resolve exact main at the canonical verification boundary."
             exit 1
@@ -1309,7 +1344,7 @@ jobs:
           # bind proof gathered while this controller still holds the production
           # FIFO. Marker write-through happens in this same step so successful
           # verification cannot complete without local marker bytes. JOV-4442.
-          boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          boundary_sha="$(bash "$GITHUB_WORKSPACE/.github/scripts/resolve-main-sha.sh" "${{ github.repository }}")"
           if [[ ! "$boundary_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Could not resolve exact main at the finalization boundary."
             exit 1
@@ -1536,13 +1571,14 @@ jobs:
       - name: Prepare the one customer-notes release PR
         env:
           GH_TOKEN: ${{ steps.changelog-token.outputs.token }}
+          GH_API_HOLD_BUDGET_SECONDS: '480'
           JOVIE_AGENT_PROFILE: coder
         run: |
           set -euo pipefail
           # The release-writer token has an independent REST quota; avoid making
           # publication depend on the installation-wide GraphQL quota.
           open_notes="$(
-            gh api --paginate --slurp \
+            bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api --paginate --slurp \
               "repos/$GITHUB_REPOSITORY/pulls?state=open&base=main&per_page=100" \
             | jq '[.[][]? | select(.head.ref | startswith("release/daily-changelog-"))]'
           )"

@@ -13,6 +13,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/auth';
 import { ensureTestUserFree, setTestUserPlan } from './helpers/plan-helpers';
 import {
+  chatComposerInputLocator,
   smokeNavigateWithRetry,
   waitForHydration,
 } from './utils/smoke-test-utils';
@@ -70,7 +71,7 @@ test.describe
       // Prompt suggestion pills are not part of this shell convergence wave.
       // The paid tool remains reachable through the composer.
       const pitchSuggestion = page.getByText(/generate pitch/i);
-      const chatInput = page.getByPlaceholder(/ask jovie|chat message/i);
+      const chatInput = chatComposerInputLocator(page);
 
       await expect(chatInput).toBeVisible({ timeout: 15_000 });
       await expect(pitchSuggestion).not.toBeVisible({ timeout: 5_000 });
@@ -88,7 +89,7 @@ test.describe
       await waitForHydration(page);
 
       // Type a pitch request in the chat input
-      const chatInput = page.getByPlaceholder(/ask jovie|chat message/i);
+      const chatInput = chatComposerInputLocator(page);
       await expect(chatInput).toBeVisible({ timeout: 15_000 });
       await chatInput.fill('Generate a playlist pitch for my latest release.');
 
@@ -97,10 +98,14 @@ test.describe
       await expect(sendButton).toBeEnabled({ timeout: 5_000 });
       await sendButton.click();
 
-      // Wait for the actual pitch tool UI, not just "some assistant activity".
-      // The tool can surface either the loading title or the completed card.
-      const pitchToolUi = page.getByText(/Generating pitch|Generated Pitch/i);
-      await expect(pitchToolUi.first()).toBeVisible({ timeout: 30_000 });
+      // Since #15922 the pitch skill grills first (PITCH_GRILL_PROCEDURE):
+      // the model must not call generateReleasePitch until the curator
+      // checklist is resolved, so the first turn is one clarifying question,
+      // not the tool card. A pro user gets a real assistant reply that is not
+      // the free-plan upgrade gate.
+      const reply = page.getByTestId('chat-message-reply').last();
+      await expect(reply).toBeVisible({ timeout: 60_000 });
+      await expect(reply).not.toContainText(/available on the .* plan/i);
     });
 
     test('billing status reflects pro plan via API', async ({ page }) => {

@@ -12,6 +12,12 @@ import {
   handleMerchCheckoutCompleted,
 } from '@/lib/merch/orders';
 import { stripe } from '@/lib/stripe/client';
+import {
+  isStripeReconciliationRequiredError,
+  markStripeEventNeedsReconciliation,
+  reconciledAtOnSuccess,
+  reconciledStatusOnSuccess,
+} from '@/lib/stripe/webhooks/reconciliation';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -166,13 +172,41 @@ export async function POST(request: NextRequest) {
           logger.info(`[merch] Unhandled Stripe merch event: ${event.type}`);
       }
 
+      const processedAt = new Date();
       await withSystemIngestionSession(tx =>
         tx
           .update(stripeWebhookEvents)
-          .set({ processedAt: new Date(), processingStartedAt: null })
+          .set({
+            processedAt,
+            processingStartedAt: null,
+            reconciliationStatus: reconciledStatusOnSuccess,
+            reconciledAt: reconciledAtOnSuccess(processedAt),
+          })
           .where(eq(stripeWebhookEvents.id, webhookRecordId))
       );
     } catch (processingError) {
+      // Paid but unattributable: acknowledge only after the durable
+      // needs_reconciliation marker is written; otherwise 5xx so Stripe retries.
+      if (isStripeReconciliationRequiredError(processingError)) {
+        try {
+          await markStripeEventNeedsReconciliation({
+            webhookRecordId,
+            stripeEventId: event.id,
+            eventType: event.type,
+            route: '/api/webhooks/stripe-merch',
+            error: processingError,
+          });
+          return NextResponse.json(
+            { received: true, reconciliation: 'needs_reconciliation' },
+            { headers: NO_STORE_HEADERS }
+          );
+        } catch (captureError) {
+          logger.warn('[merch] reconciliation capture failed', {
+            eventId: event.id,
+            error: captureError,
+          });
+        }
+      }
       await clearStripeWebhookClaim(webhookRecordId);
       throw processingError;
     }

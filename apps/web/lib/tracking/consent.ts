@@ -18,6 +18,27 @@ const CONSENT_COOKIE_NAME = 'jv_tracking_consent';
 const CONSENT_STORAGE_KEY = 'jovie_tracking_consent';
 export const ACQUISITION_COOKIE_NAME = 'jv_acquisition_id';
 const ACQUISITION_STORAGE_KEY = 'jovie_acquisition_id';
+const ACQUISITION_ID_PATTERN = /^[0-9a-f-]{36}$/i;
+
+function isAcquisitionId(value: string): boolean {
+  return ACQUISITION_ID_PATTERN.test(value);
+}
+
+/** Read one first-party cookie. Invalid encoding yields an empty string. */
+function readCookie(name: string): string {
+  if (typeof document === 'undefined') return '';
+  for (const part of document.cookie.split(';')) {
+    const separator = part.indexOf('=');
+    if (separator === -1) continue;
+    if (part.slice(0, separator).trim() !== name) continue;
+    try {
+      return decodeURIComponent(part.slice(separator + 1).trim());
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
 
 function isConsentRequiredForCurrentVisitor(): boolean {
   try {
@@ -209,14 +230,19 @@ export function getOrCreateSessionId(): string {
  * Stable, random first-party acquisition key. It is created only with
  * analytics consent and stored in localStorage + a SameSite cookie so tabs,
  * auth redirects, server checkout and client events share one exact identity.
+ *
+ * localStorage wins when it already holds an id. When it does not, a valid
+ * cookie is adopted instead of minting a second id: the server may already
+ * have recorded pricing or claim-start against that cookie.
  */
 export function getOrCreateAcquisitionId(): string {
   if (typeof window === 'undefined' || !isAnalyticsAllowed()) return '';
 
   try {
     let id = globalThis.localStorage?.getItem(ACQUISITION_STORAGE_KEY) ?? '';
-    if (!/^[0-9a-f-]{36}$/i.test(id)) {
-      id = crypto.randomUUID();
+    if (!isAcquisitionId(id)) {
+      const fromCookie = readCookie(ACQUISITION_COOKIE_NAME);
+      id = isAcquisitionId(fromCookie) ? fromCookie : crypto.randomUUID();
       globalThis.localStorage?.setItem(ACQUISITION_STORAGE_KEY, id);
     }
     const secure = globalThis.location.protocol === 'https:' ? '; Secure' : '';
@@ -224,6 +250,19 @@ export function getOrCreateAcquisitionId(): string {
     return id;
   } catch {
     return '';
+  }
+}
+
+/** Adopt the server-verified identity after consented acquisition capture. */
+export function rememberAcquisitionId(id: unknown): void {
+  if (typeof id !== 'string' || !isAcquisitionId(id) || !isAnalyticsAllowed())
+    return;
+  try {
+    globalThis.localStorage?.setItem(ACQUISITION_STORAGE_KEY, id);
+    const secure = globalThis.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${ACQUISITION_COOKIE_NAME}=${id}; path=/; max-age=7776000; SameSite=Lax${secure}`;
+  } catch {
+    // Restricted storage must not break navigation.
   }
 }
 

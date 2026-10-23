@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import type {
   VisualQaCoverageEntry,
   VisualQaPlaywrightRouteSource,
@@ -72,14 +73,7 @@ export async function assertRegisteredQualityChecks(
 
   if (checks.has('accessibility')) {
     const results = await new AxeBuilder({ page })
-      .withTags([
-        'wcag2a',
-        'wcag2aa',
-        'wcag21a',
-        'wcag21aa',
-        'wcag22a',
-        'wcag22aa',
-      ])
+      .options(wcag22AaAxeOptions())
       .analyze();
     const blockingViolations = results.violations.filter(
       violation =>
@@ -238,8 +232,10 @@ export function collectBrowserErrors(
     const errorText = request.failure()?.errorText;
     const kind = classifySameOriginRequestFailure({
       errorText,
+      headers: request.headers(),
       resourceType: request.resourceType(),
       sameOrigin: url.startsWith(origin),
+      url,
     });
     if (kind === 'ignored') return;
     const detail = formatRequestFailure(url, errorText);

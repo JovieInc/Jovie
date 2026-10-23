@@ -43,6 +43,10 @@
     "__pycache__",
     "**/node_modules",
     "invariants/fixtures/done-sprint-invariants",
-    "invariants/fixtures/design-surfaces"
+    "invariants/fixtures/design-surfaces",
+    // Frozen promotion-gate-ci.mjs from e806124. Imports are relative to
+    // scripts/, so checkJs reports TS2307 from this fixture path. Same
+    // exclusion as the other non-typechecked fixture trees above.
+    "lib/__tests__/fixtures/promotion-gate-ci.e806124.mjs"
   ]
 }

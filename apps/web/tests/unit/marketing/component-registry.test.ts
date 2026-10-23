@@ -9,6 +9,7 @@ import { render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import * as ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
+import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
 import { HomepageV2Route } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import {
   BUTTON_PEN_PROPAGATION_FIXTURES,
@@ -33,6 +34,22 @@ import {
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
 const repoRoot = path.resolve(__dirname, '../../../../..');
+
+it('renders a standalone artist section with the shared page spine', () => {
+  const { container } = render(
+    createElement(
+      ArtistProfileSectionShell,
+      null,
+      createElement('h2', null, 'Your music, together')
+    )
+  );
+  const heading = screen.getByRole('heading', { name: 'Your music, together' });
+  expect(container.querySelectorAll('section')).toHaveLength(1);
+  expect(heading.parentElement).toHaveClass(
+    'ap-section-container',
+    'max-w-public-content'
+  );
+});
 
 interface MoleculeOwnershipFamily {
   readonly id: string;
@@ -959,7 +976,10 @@ describe('canonical marketing component registry', () => {
       entry => entry.sourceBacked
     );
     const unknown = sourceBacked.filter(entry => entry.penRootId === null);
-    expect(unknown.map(entry => entry.id)).toEqual(['recipe.homepage']);
+    expect(unknown.map(entry => entry.id)).toEqual([
+      'section.blog-feed',
+      'recipe.homepage',
+    ]);
     expect(validateMarketingPenRegistry(sourceBacked)).toEqual([]);
     expect(
       sourceBacked
@@ -1001,12 +1021,15 @@ describe('current-main Pen source contracts (JOV-4961)', () => {
       status: 'active',
       exemplar: { route: '/artist-profiles', section: 'outcomes' },
     });
-    for (const unsupported of [
-      '3-large',
-      '4-equal',
-      '6-compact',
-      'icon-list',
-    ]) {
+    expect(variant('feature-grid', '3-large')).toMatchObject({
+      status: 'active',
+      exemplar: { route: '/artist-notifications', section: 'benefits' },
+    });
+    expect(variant('feature-grid', '4-equal')).toMatchObject({
+      status: 'active',
+      exemplar: { route: '/pay', section: 'use-cases' },
+    });
+    for (const unsupported of ['6-compact', 'icon-list']) {
       expect(variant('feature-grid', unsupported)?.status).toBe('unproven');
     }
   });
@@ -1506,9 +1529,7 @@ it('binds priority pages and acquisition occurrences to their declared variant o
     '/youtube-thumbnails',
   ]) {
     const route = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === url)!;
-    expect(route.bindingEvidence.status).toBe(
-      url === '/youtube-thumbnails' ? 'unverified' : 'verified'
-    );
+    expect(route.bindingEvidence.status).toBe('verified');
     for (const binding of route.renderedSections) {
       expect(binding.kind).toBe('approved-section');
       if (binding.kind !== 'approved-section')
@@ -1661,10 +1682,6 @@ describe('CTA source identity and Pen mapping', () => {
     expect(countReturnedRootBindings(parsed, '{...props}')).toBe(1);
     expect(owner).toContain('return <section {...props} />');
     for (const [file, binding] of [
-      [
-        'apps/web/components/homepage/HomepageClose.tsx',
-        "data-marketing-variant='editorial-search'",
-      ],
       [
         'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
         "data-marketing-variant='included-single'",

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -115,7 +115,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(
       screen.getByText('Start 14-day Artist Presence trial')
     ).toBeInTheDocument();
-    expect(screen.getByText(/199\/month/)).toBeInTheDocument();
+    expect(screen.getByText(/\$12\/month/)).toBeInTheDocument();
     expect(screen.getByText(/No credit card/)).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')
@@ -200,7 +200,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     searchParamsState.value = 'plan=pro&interval=annual';
     const { rerender } = render(<AuthShell mode='sign-up' />);
     expect(screen.getByText('Choose an available plan')).toBeInTheDocument();
-    expect(screen.queryByText(/199\/month/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\$12\/month/)).not.toBeInTheDocument();
     searchParamsState.value = 'plan=max';
     rerender(<AuthShell mode='sign-up' />);
     expect(screen.getByText('Contact sales')).toBeInTheDocument();
@@ -214,6 +214,31 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(
       container.querySelector('[data-auth-shell-ready="true"]')
     ).not.toBeNull();
+  });
+
+  it('renders the full-page shell as one hairline focal card with left-aligned identity', () => {
+    const { container } = render(<AuthShell mode='sign-in' />);
+    const card = container.querySelector('[data-auth-surface-card]');
+    expect(card).not.toBeNull();
+    expect(card).toHaveClass('rounded-lg');
+    expect(card).toHaveClass('border-subtle');
+    expect(card).toHaveClass('bg-surface-1');
+    const identity = container.querySelector('[data-auth-shell-identity]');
+    expect(identity).toHaveClass('items-start');
+    expect(identity).toHaveClass('text-left');
+    const divider = container.querySelector('[data-auth-method-divider]');
+    expect(divider?.textContent).toContain('or use email');
+    expect(divider?.textContent).toBe('or use email');
+  });
+
+  it('keeps intercepted modal and marketing captures centered without the card', () => {
+    const { container } = render(<AuthShell mode='sign-in' compact />);
+    const modalCard = container.querySelector('[data-auth-surface-card]');
+    expect(modalCard).not.toBeNull();
+    expect(modalCard).not.toHaveClass('bg-surface-1');
+    expect(container.querySelector('[data-auth-shell-identity]')).toHaveClass(
+      'items-center'
+    );
   });
 
   it('keeps OAuth buttons disabled until client hydration attaches handlers', async () => {
@@ -458,6 +483,44 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('preserves legal navigation and focus while a claim provider fails', async () => {
+    const handle = 'a'.repeat(30);
+    searchParamsState.value = `handle=${handle}&redirect_url=%2Fstart`;
+    let rejectAttempt!: (error: Error) => void;
+    signInSocialMock.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectAttempt = reject;
+      })
+    );
+    const user = userEvent.setup();
+    render(<AuthShell mode='sign-up' />);
+    const terms = screen.getByRole('link', { name: 'Terms of Service' });
+    const privacy = screen.getByRole('link', { name: 'Privacy Policy' });
+    const signIn = screen.getByRole('link', { name: /^Sign in$/ });
+    const google = await screen.findByRole('button', { name: /google/i });
+    await user.click(google);
+    expect(google).toBeDisabled();
+    expect(terms).toHaveAttribute('href', APP_ROUTES.LEGAL_TERMS);
+    expect(privacy).toHaveAttribute('href', APP_ROUTES.LEGAL_PRIVACY);
+    expect(signIn).toHaveAttribute(
+      'href',
+      `/signin?handle=${handle}&redirect_url=%2Fstart`
+    );
+    terms.focus();
+    expect(terms).toHaveFocus();
+    await act(async () => {
+      rejectAttempt(new Error('provider cancelled'));
+    });
+    expect(await screen.findByRole('alert')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Terms of Service' })).toBe(terms);
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toBe(privacy);
+    expect(screen.getByRole('link', { name: /^Sign in$/ })).toBe(signIn);
+    expect(terms).toHaveFocus();
+    expect(google).toBeEnabled();
+    expect(signInSocialMock).toHaveBeenCalledTimes(1);
+    expect(sendOtpMock).not.toHaveBeenCalled();
+  });
+
   it('renders login, continue, and claim headings on the shared shell', () => {
     const { rerender } = render(<AuthShell mode='sign-in' />);
     expect(
@@ -516,5 +579,20 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
       ).toBeInTheDocument();
     });
     expect(screen.getByRole('button', { name: /google/i })).toBeInTheDocument();
+  });
+
+  it('stamps the waitlist email capture without marking other auth surfaces', () => {
+    const { rerender } = render(<AuthShell mode='sign-up' />);
+    expect(screen.queryByTestId('marketing-section-capture')).toBeNull();
+
+    rerender(<AuthShell mode='sign-up' marketingCapture />);
+    expect(screen.getByTestId('marketing-section-capture')).toHaveAttribute(
+      'data-marketing-variant',
+      'email-only'
+    );
+    expect(screen.getByTestId('marketing-section-capture')).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/features/auth/AuthShell.tsx'
+    );
   });
 });

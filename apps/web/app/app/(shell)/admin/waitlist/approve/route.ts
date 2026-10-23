@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
+import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { waitlistApproveSchema } from '@/lib/validation/schemas';
 import {
   approveWaitlistEntryInTx,
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await withSystemIngestionSession(
+    const result = await runAtomicDbOperation(
       async tx => {
         const approval = await approveWaitlistEntryInTx(
           tx,
@@ -70,7 +70,12 @@ export async function POST(request: Request) {
         }
         return approval;
       },
-      { isolationLevel: 'serializable' }
+      {
+        actorId: entitlements.userId!,
+        system: true,
+        retry: 'serialization',
+        isolationLevel: 'serializable',
+      }
     );
 
     if (result.outcome === 'not_found') {

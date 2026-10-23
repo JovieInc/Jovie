@@ -8,10 +8,12 @@ function Harness({
   side,
   resetKey = 'home',
   enabled = true,
+  previewTrigger,
 }: {
   side: 'left' | 'right';
   resetKey?: string;
   enabled?: boolean;
+  previewTrigger?: boolean;
 }) {
   const [pinned, setPinned] = useState(false);
   const { isPreview, isFloating, dismissPreview } = useRailPreview({
@@ -26,6 +28,7 @@ function Harness({
         type='button'
         data-testid='trigger'
         data-rail-toggle={side}
+        data-rail-preview-trigger={previewTrigger}
         onClick={() => {
           dismissPreview();
           setPinned(v => !v);
@@ -54,6 +57,19 @@ afterEach(() => vi.useRealTimers());
 describe.each(['left', 'right'] as const)(
   '%s shared transient rail owner',
   side => {
+    it('keeps an in-content manual control reachable until explicit activation', () => {
+      render(<Harness side={side} previewTrigger={false} />);
+      const trigger = screen.getByTestId('trigger');
+      const rail = screen.getByTestId('rail');
+      fireEvent.pointerOver(trigger);
+      expect(rail).toHaveAttribute('data-preview', 'false');
+      act(() => trigger.focus());
+      expect(rail).toHaveAttribute('data-preview', 'false');
+      fireEvent.click(trigger);
+      expect(rail).toHaveAttribute('data-pinned', 'true');
+      expect(trigger).toHaveFocus();
+    });
+
     it('bridges pointer travel, dismisses after grace and never changes pinned intent', () => {
       vi.useFakeTimers();
       render(<Harness side={side} />);
@@ -72,6 +88,111 @@ describe.each(['left', 'right'] as const)(
       act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_GRACE_MS));
       expect(rail).toHaveAttribute('data-preview', 'false');
       expect(rail).toHaveAttribute('data-pinned', 'false');
+    });
+
+    it('retains an open ARIA-owned menu across pointer travel and releases after removal', async () => {
+      vi.useFakeTimers();
+      render(<Harness side={side} />);
+      const rail = screen.getByTestId('rail');
+      const control = screen.getByRole('button', { name: 'Rail action' });
+      control.setAttribute('aria-expanded', 'true');
+      control.setAttribute('aria-controls', 'owned-menu');
+      const menu = document.createElement('div');
+      menu.id = 'owned-menu';
+      menu.setAttribute('role', 'menu');
+      document.body.append(menu);
+      fireEvent.pointerOver(rail);
+      fireEvent.pointerOut(rail, { relatedTarget: menu });
+      fireEvent.pointerOver(menu);
+      act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_GRACE_MS * 2));
+      expect(rail).toHaveAttribute('data-preview', 'true');
+      fireEvent.pointerDown(menu);
+      expect(rail).toHaveAttribute('data-preview', 'true');
+      await act(async () => menu.remove());
+      act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_GRACE_MS));
+      expect(rail).toHaveAttribute('data-preview', 'false');
+      expect(rail).toHaveAttribute('data-pinned', 'false');
+    });
+
+    it('follows nested owned menus but ignores unrelated and opposite rail portals', async () => {
+      vi.useFakeTimers();
+      render(<Harness side={side} />);
+      const rail = screen.getByTestId('rail');
+      const control = screen.getByRole('button', { name: 'Rail action' });
+      control.setAttribute('aria-expanded', 'true');
+      control.setAttribute('aria-controls', 'root-menu');
+      const menu = document.createElement('div');
+      menu.id = 'root-menu';
+      menu.setAttribute('role', 'menu');
+      const submenuControl = document.createElement('button');
+      submenuControl.setAttribute('aria-expanded', 'true');
+      submenuControl.setAttribute('aria-controls', 'nested-menu');
+      menu.append(submenuControl);
+      const submenu = document.createElement('div');
+      submenu.id = 'nested-menu';
+      submenu.setAttribute('role', 'menu');
+      document.body.append(menu, submenu);
+      fireEvent.pointerOver(rail);
+      fireEvent.pointerOut(rail, { relatedTarget: submenu });
+      fireEvent.pointerDown(submenu);
+      act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_GRACE_MS * 2));
+      expect(rail).toHaveAttribute('data-preview', 'true');
+      fireEvent.pointerOut(submenu);
+      await act(async () => {
+        control.setAttribute('aria-expanded', 'false');
+        menu.remove();
+        submenu.remove();
+      });
+      act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_GRACE_MS));
+      expect(rail).toHaveAttribute('data-preview', 'false');
+      const other = document.createElement('div');
+      other.dataset.railPreviewRegion = side === 'left' ? 'right' : 'left';
+      other.setAttribute('role', 'menu');
+      document.body.append(other);
+      fireEvent.pointerOver(screen.getByTestId('trigger'));
+      fireEvent.pointerDown(other);
+      expect(rail).toHaveAttribute('data-preview', 'false');
+      other.remove();
+    });
+
+    it('releases on ARIA dismissal and never adopts tooltip or opposite-rail portals', async () => {
+      vi.useFakeTimers();
+      render(<Harness side={side} />);
+      const rail = screen.getByTestId('rail');
+      const trigger = screen.getByRole('button', { name: 'Rail action' });
+      const menu = document.createElement('div');
+      menu.id = 'dismissed-menu';
+      menu.setAttribute('role', 'menu');
+      document.body.append(menu);
+      trigger.setAttribute('aria-expanded', 'true');
+      trigger.setAttribute('aria-controls', menu.id);
+      fireEvent.pointerOver(rail);
+      fireEvent.pointerOut(rail, { relatedTarget: menu });
+      fireEvent.pointerOver(menu);
+      await act(async () => trigger.setAttribute('aria-expanded', 'false'));
+      act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_GRACE_MS));
+      expect(rail).toHaveAttribute('data-preview', 'false');
+      menu.setAttribute('role', 'tooltip');
+      trigger.setAttribute('aria-expanded', 'true');
+      fireEvent.pointerOver(rail);
+      fireEvent.pointerOut(rail, { relatedTarget: menu });
+      act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_GRACE_MS));
+      expect(rail).toHaveAttribute('data-preview', 'false');
+      trigger.removeAttribute('aria-controls');
+      menu.setAttribute('role', 'menu');
+      const opposite = document.createElement('div');
+      opposite.dataset.railPreviewRegion = side === 'left' ? 'right' : 'left';
+      const oppositeControl = document.createElement('button');
+      oppositeControl.setAttribute('aria-expanded', 'true');
+      oppositeControl.setAttribute('aria-controls', menu.id);
+      opposite.append(oppositeControl);
+      document.body.append(opposite);
+      fireEvent.pointerOver(rail);
+      fireEvent.pointerOut(rail, { relatedTarget: menu });
+      act(() => vi.advanceTimersByTime(SHELL_RAIL_PREVIEW_GRACE_MS));
+      expect(rail).toHaveAttribute('data-preview', 'false');
+      menu.remove();
+      opposite.remove();
     });
 
     it('pins an active preview and never auto-hides the pin on leave', () => {

@@ -59,12 +59,21 @@ function cssLength(raw: string, label: string): number {
   throw new Error(`${label}: unsupported CSS length "${value}"`);
 }
 
-function cssVar(token: string): number {
+function cssVar(
+  token: string,
+  css = DESIGN_SYSTEM_CSS,
+  resolving: readonly string[] = []
+): number {
+  if (resolving.includes(token)) {
+    throw new Error(
+      `Circular CSS variable reference: ${[...resolving, token].join(' -> ')}`
+    );
+  }
   const escaped = token.replace(/[-]/g, '\\-');
-  const match = new RegExp(`^\\s*${escaped}:\\s*([^;]+);`, 'm').exec(
-    DESIGN_SYSTEM_CSS
-  );
+  const match = new RegExp(`^\\s*${escaped}:\\s*([^;]+);`, 'm').exec(css);
   if (!match) throw new Error(`${token} is not declared in design-system.css`);
+  const alias = /^var\(\s*(--[\w-]+)\s*\)$/.exec(match[1].trim());
+  if (alias) return cssVar(alias[1], css, [...resolving, token]);
   return cssLength(match[1], token);
 }
 
@@ -278,5 +287,39 @@ describe('app-screen Pen parity gate (JOV-6776)', () => {
     expect(utilityValue('lg:h-12 h-11', 'h', 't')).toBe(44);
     expect(utilityValue('gap-x-2 gap-1.5', 'gap', 't')).toBe(6);
     expect(() => utilityValue('flex', 'h', 't')).toThrow(/no `h-\*`/);
+  });
+
+  it('resolves the sidebar gap through its canonical spacing alias', () => {
+    expect(cssVar('--app-shell-sidebar-icon-gap')).toBe(8);
+    expect(
+      utilityValue('gap-x-(--app-shell-sidebar-icon-gap)', 'gap-x', 't')
+    ).toBe(8);
+  });
+
+  it('resolves chained aliases ending in rem or px lengths', () => {
+    const css = `
+      --outer: var( --middle );
+      --middle: var(--length);
+      --length: 0.5rem;
+      --pixels: 12px;
+      --inset: var(--pixels);
+    `;
+    expect(cssVar('--outer', css)).toBe(8);
+    expect(cssVar('--inset', css)).toBe(12);
+  });
+
+  it('fails closed on missing, unsupported, or cyclic alias targets', () => {
+    expect(() => cssVar('--gap', '--gap: var(--missing);')).toThrow(
+      /--missing is not declared/
+    );
+    expect(() =>
+      cssVar('--gap', '--gap: var(--length);\n--length: 1em;')
+    ).toThrow(/unsupported CSS length/);
+    expect(() => cssVar('--gap', '--gap: var(--gap);')).toThrow(
+      /Circular CSS variable reference/
+    );
+    expect(() => cssVar('--a', '--a: var(--b);\n--b: var(--a);')).toThrow(
+      /Circular CSS variable reference/
+    );
   });
 });

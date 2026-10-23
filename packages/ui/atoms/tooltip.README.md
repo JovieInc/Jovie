@@ -2,6 +2,15 @@
 
 A polished tooltip component with Radix primitives, tokenized design, and comprehensive accessibility. Built with Apple-level attention to detail.
 
+## Usage contract
+
+Follow [tooltip eligibility and input](../../../DESIGN.md#tooltip-eligibility-and-input).
+Readable row titles need no duplicate hint; clipped titles must remeasure on
+layout, font and typography changes. Touch activates immediately without a stuck
+hint, while mouse and hardware-keyboard hints remain available on hybrid devices.
+Keep essential actions visible for coarse/no-hover input. Interactive menus use
+the existing overlay owner and ARIA control relationships, including nested portals.
+
 ## Features
 
 ### 🎯 **Professional Implementation**

@@ -3,7 +3,11 @@
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
 import { clearLegacyClerkSessionMarker } from '@/lib/auth/auth-session-cookies';
 import { authClient } from '@/lib/auth/client';
-import { type JovieUser, toJovieUser } from '@/lib/auth/jovie-user';
+import {
+  type BetterAuthSessionUser,
+  type JovieUser,
+  toJovieUser,
+} from '@/lib/auth/jovie-user';
 import { applyCacheScope } from '@/lib/queries/cache-isolation';
 
 // ============================================================================
@@ -23,13 +27,12 @@ import { applyCacheScope } from '@/lib/queries/cache-isolation';
 // (ClerkSafeBootstrapProvider) that synthesized a fake Clerk user from
 // `/api/dev/test-auth` bootstrap data, because the dev bypass minted
 // app-side cookies Clerk's client SDK could not see. Under Better Auth the
-// bypass mints REAL `ba_sessions` rows + session cookies (plan commit ⑨,
-// "Local dev auth in 60 seconds" acceptance criterion), so
-// `authClient.useSession()` observes bypass sessions through the standard
-// cookie path and the bootstrap provider collapses into the live values
-// provider. Constraint this rests on: `/api/dev/test-auth/*` must keep
-// minting real Better Auth sessions — if that ever regresses to synthetic
-// client-only auth, a bootstrap provider must be reintroduced here.
+// bypass mints REAL `ba_sessions` rows + session cookies, so a settled
+// `authClient.useSession()` observes them. The server-resolved bootstrap
+// user is still the initial user: the account menu must not stay a
+// button-less skeleton for the whole time that round-trip is pending or
+// when the client session fetch never settles. A live session user always
+// replaces that initial user.
 // ============================================================================
 
 interface JovieSignOutOptions {
@@ -148,8 +151,15 @@ const JovieAuthContext = createContext<JovieAuthContextValue | null>(null);
  */
 export function JovieAuthValuesProvider({
   children,
+  initialUser = null,
 }: {
   readonly children: ReactNode;
+  /**
+   * Server-resolved user for the dev-test bypass. Shown until
+   * `useSession()` returns its own user, so the account control is not a
+   * skeleton with no button while that request is pending.
+   */
+  readonly initialUser?: BetterAuthSessionUser | null;
 }) {
   const { data, isPending } = authClient.useSession();
 
@@ -157,9 +167,12 @@ export function JovieAuthValuesProvider({
     // Clerk's isLoaded meant "Clerk JS finished booting"; the Better Auth
     // equivalent is "the initial session fetch settled". Refetches keep
     // isLoaded true (isRefetching is deliberately ignored) so consumers
-    // never flash loading states on revalidation.
-    const isLoaded = !isPending;
-    const user = data?.user ? toJovieUser(data.user) : null;
+    // never flash loading states on revalidation. A server-resolved
+    // initial user counts as loaded immediately.
+    const sessionUser = data?.user ? toJovieUser(data.user) : null;
+    const seededUser = initialUser ? toJovieUser(initialUser) : null;
+    const user = sessionUser ?? seededUser;
+    const isLoaded = !isPending || user !== null;
     const isSignedIn = user !== null;
 
     return {
@@ -181,7 +194,7 @@ export function JovieAuthValuesProvider({
       },
       canRenderAuthUi: true,
     };
-  }, [data, isPending]);
+  }, [data, initialUser, isPending]);
 
   return (
     <JovieAuthContext.Provider value={value}>
@@ -198,13 +211,18 @@ export function JovieAuthValuesProvider({
  */
 export function JovieAuthDefaultsProvider({
   children,
+  fixtureUser = null,
 }: {
   readonly children: ReactNode;
+  /** Local demo identity only. Never creates a session or enables auth UI. */
+  readonly fixtureUser?: JovieUser | null;
 }) {
   return (
     <JovieAuthContext.Provider
       value={{
-        user: DEFAULT_USER_RETURN,
+        user: fixtureUser
+          ? { isLoaded: true, isSignedIn: false, user: fixtureUser }
+          : DEFAULT_USER_RETURN,
         auth: DEFAULT_AUTH_RETURN,
         session: DEFAULT_SESSION_RETURN,
         canRenderAuthUi: false,

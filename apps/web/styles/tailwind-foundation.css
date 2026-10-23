@@ -68,6 +68,8 @@
   --leading-relaxed: 1.625;
   --leading-loose: 2;
   /* Map app-level button tokens to Tailwind v4 color tokens so classes like bg-btn-primary work */
+  --color-btn-destructive: var(--color-btn-destructive-bg);
+  --color-btn-destructive-foreground: var(--color-btn-destructive-fg);
   --color-btn-primary: var(--color-btn-primary-bg);
   --color-btn-primary-foreground: var(--color-btn-primary-fg);
   --color-btn-secondary: var(--color-btn-secondary-bg);
@@ -195,9 +197,25 @@
   max-height: calc(100dvh - var(--space-4));
 }
 
+/* Surface chrome eases while text paints immediately for accessible contrast. */
+@utility transition-surface {
+  transition-property: background-color, border-color;
+}
+
+/* Card border and shadow ease. Background snaps so a theme-class change
+   cannot be sampled mid-blend. */
+@utility transition-card-chrome {
+  transition-property: border-color, box-shadow;
+}
+
 /* Canonical allocation transition shared by sidebar, inspector, and drawers. */
 @utility transition-shell-rail-allocation {
   transition-property: flex-basis, width, border-width, opacity, transform;
+}
+
+/* Keep scrollports from shifting when a descendant receives focus. */
+@utility overflow-anchor-none {
+  overflow-anchor: none;
 }
 
 @utility scale-press {
@@ -317,5 +335,16 @@
     overflow: hidden;
     padding: var(--space-1-5);
     border-radius: var(--app-shell-radius);
+    /* A closed drawer is width 0, but fit-content still counts this padding,
+       so the rail's border box stays 12px and covers the main plane. Collapse
+       only after the phase settles closed; opening and closing keep the inset. */
+    &:has([data-rail-phase="closed"]):not(
+        :has([data-rail-phase="open"]),
+        :has([data-rail-phase="opening"]),
+        :has([data-rail-phase="closing"])
+      ) {
+      width: 0;
+      padding: 0;
+    }
   }
 }

@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import ANY, patch
@@ -19,6 +20,29 @@ from pathlib import Path
 from contextlib import redirect_stdout
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def read_ready_pid(path: Path, deadline: float) -> int | None:
+    """Wait until `path` holds a pid.
+
+    The metadata child used to create the ready file and then write the pid.
+    A reader that returns on existence can observe an empty file
+    (`int('')` raises ValueError). Publication is an atomic replace; this wait
+    still accepts only a parseable pid and fails closed when the deadline passes.
+    """
+    while True:
+        try:
+            text = path.read_text().strip()
+        except OSError:
+            text = ""
+        if text:
+            try:
+                return int(text)
+            except ValueError:
+                pass
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(0.01)
 SPEC = importlib.util.spec_from_file_location("codex_lane", ROOT / "scripts/lanes/codex_lane.py")
 codex = importlib.util.module_from_spec(SPEC)
 sys.modules["codex_lane"] = codex
@@ -98,8 +122,12 @@ class CurrentLoginTest(Isolated):
         super().setUp()
         self.root = Path(self.tmp.name)
         self.cli = self.root / "codex"
+        # Pin one slot. An ambient CODEX_LANE_LOGIN_SLOTS above 1 makes
+        # test_real_metadata_child_retains_lease_until_delayed_reap loop in
+        # reap_current_metadata. Collection also scrubs the host value.
         self.env = patch.dict(os.environ, {
             "CODEX_LANE_AUTH_MODE": "current-login", "CODEX_LANE_CLI": str(self.cli),
+            "CODEX_LANE_LOGIN_SLOTS": "1",
             "CODEX_HOME": str(self.root / "existing-login"), "OPENAI_API_KEY": "must-not-reach-child",
             "OPENAI_BASE_URL": "https://unavailable.invalid", "CODEX_API_KEY": "must-not-reach-child",
         })
@@ -409,6 +437,10 @@ for line in sys.stdin:
 
     def test_real_metadata_child_retains_lease_until_delayed_reap(self):
         # The child needs no model calls: EOF ends the fake public protocol.
+        # Pin one slot. CODEX_LANE_LOGIN_SLOTS>1 lets lease() take a free slot,
+        # the assertion raises inside reap_current_metadata, and that helper
+        # retries the error until the runner times out. The release archive
+        # does not ship scripts/tests/conftest.py, so this pin is the contract.
         self.cli.write_text(f'''#!{sys.executable}
 import json, sys
 for line in sys.stdin:
@@ -432,17 +464,39 @@ for line in sys.stdin:
             proc.wait = delay_wait
             proc.kill = lambda: kill() if len(waits) >= 2 else None
             return proc
-        handle = codex.lease('current-login')
-        try:
-            with patch.object(codex.subprocess, 'Popen', side_effect=tracked):
-                codex.current_subscription_snapshot('current-login', lease_handle=handle)
-            self.assertEqual(len(waits), 3)
-            self.assertIsNone(codex.lease('current-login'))
-        finally:
-            handle.close()
-        again = codex.lease('current-login')
-        self.assertIsNotNone(again)
-        again.close()
+        with patch.dict(os.environ, {'CODEX_LANE_LOGIN_SLOTS': '1'}):
+            handle = codex.lease('current-login')
+            try:
+                with patch.object(codex.subprocess, 'Popen', side_effect=tracked):
+                    codex.current_subscription_snapshot('current-login', lease_handle=handle)
+                self.assertEqual(len(waits), 3)
+                self.assertIsNone(codex.lease('current-login'))
+            finally:
+                handle.close()
+            again = codex.lease('current-login')
+            self.assertIsNotNone(again)
+            again.close()
+
+    def test_widened_host_slots_still_leave_the_held_metadata_slot_exclusive_at_one(self):
+        # Same occupancy the delayed reap asserts, proved without spawning pytest.
+        # A release self-test tree has no conftest scrub; the pin above is what
+        # keeps reap from retrying a failed lease assertion.
+        with patch.dict(os.environ, {'CODEX_LANE_LOGIN_SLOTS': '5'}):
+            held = codex.lease('current-login')
+            extra = codex.lease('current-login')
+            try:
+                self.assertIsNotNone(held)
+                self.assertIsNotNone(extra)
+            finally:
+                held.close()
+                if extra is not None:
+                    extra.close()
+        with patch.dict(os.environ, {'CODEX_LANE_LOGIN_SLOTS': '1'}):
+            held = codex.lease('current-login')
+            try:
+                self.assertIsNone(codex.lease('current-login'))
+            finally:
+                held.close()
 
     def test_interruption_during_cleanup_reaps_before_propagating(self):
         proc = SimpleNamespace(poll=lambda: None, terminate=lambda: None, kill=lambda: None)
@@ -458,7 +512,10 @@ for line in sys.stdin:
         self.cli.write_text(f'''#!{sys.executable}
 import os, time
 from pathlib import Path
-Path({str(ready)!r}).write_text(str(os.getpid()))
+ready = Path({str(ready)!r})
+pending = ready.with_name(ready.name + '.tmp')
+pending.write_text(str(os.getpid()))
+os.replace(pending, ready)
 time.sleep(30)
 ''')
         self.cli.chmod(0o755)
@@ -473,11 +530,8 @@ m.reconcile(1_000_000, 0)
                                         stdout=codex.subprocess.DEVNULL, stderr=codex.subprocess.DEVNULL)
         child = None
         try:
-            deadline = time.monotonic() + 5
-            while not ready.exists() and time.monotonic() < deadline:
-                time.sleep(.01)
-            self.assertTrue(ready.exists(), 'metadata process did not start')
-            child = int(ready.read_text())
+            child = read_ready_pid(ready, time.monotonic() + 5)
+            self.assertIsNotNone(child, 'metadata process did not publish its pid')
             parent.kill()
             parent.wait(timeout=2)
             self.assertIsNone(codex.lease('current-login'), 'live child lost inherited account lease')
@@ -498,6 +552,20 @@ m.reconcile(1_000_000, 0)
                 time.sleep(.01)
         self.assertIsNotNone(handle, 'drained metadata process kept account lease')
         handle.close()
+
+    def test_ready_pid_waits_until_the_file_is_parseable(self):
+        ready = self.root / 'metadata-child.pid'
+        ready.write_text('')
+
+        def publish():
+            time.sleep(0.05)
+            pending = ready.with_name(ready.name + '.tmp')
+            pending.write_text('4242')
+            os.replace(pending, ready)
+
+        threading.Thread(target=publish, daemon=True).start()
+        self.assertEqual(read_ready_pid(ready, time.monotonic() + 2), 4242)
+        self.assertIsNone(read_ready_pid(self.root / 'missing.pid', time.monotonic()))
 
     def test_concurrent_corruption_before_final_merge_is_preserved(self):
         def corrupt_after_metadata(_):
@@ -1291,6 +1359,38 @@ class SubscriptionPoolTest(Isolated):
         self.assertTrue(result["profiles"]["lyb-pro"]["reconciled"])
         codex.reconcile(self.NOW,fetch=fetch)
         self.assertEqual(seen,["current-login","lyb-pro"])
+
+    def test_identity_evidence_refreshes_before_it_lapses_and_a_failed_refresh_recovers(self):
+        # Gem 2026-10-20: a metadata timeout throttled the next attempt for a whole cadence,
+        # identity evidence lapsed on both accounts and the lane read "all-accounts-banked"
+        # with 99% capacity left. Refresh must start before the lapse and retry quickly.
+        calls = []
+        def fetch_at(at, fail=False):
+            def fetch(name):
+                calls.append((at, name))
+                if fail:
+                    raise TimeoutError("public subscription metadata unavailable")
+                value = current_snapshot(at)
+                value["account"]["account"].update(email=self.emails[name], planType="pro")
+                return value
+            return fetch
+        codex.reconcile(self.NOW, fetch=fetch_at(self.NOW))
+        lead = self.NOW + codex.LEDGER_CADENCE_S - codex.SUBSCRIPTION_REFRESH_LEAD_S
+        codex.reconcile(lead - 1, fetch=fetch_at(lead - 1))
+        self.assertEqual([at for at, _ in calls], [self.NOW, self.NOW], "fresh evidence keeps the cadence")
+        codex.reconcile(lead, fetch=fetch_at(lead, fail=True))
+        self.assertEqual(calls[2:], [(lead, "current-login"), (lead, "lyb-pro")])
+        codex.reconcile(lead + 1, fetch=fetch_at(lead + 1))
+        self.assertEqual(len(calls), 4, "a failed refresh is never hot-looped")
+        state = codex.read_state()
+        self.assertTrue(all(codex.available(name, state, lead) for name in self.profiles))
+        retry = lead + codex.SUBSCRIPTION_RETRY_S
+        result = codex.reconcile(retry, fetch=fetch_at(retry))
+        self.assertTrue(all(row["reconciled"] for row in result["profiles"].values()))
+        lapsed = self.NOW + codex.LEDGER_CADENCE_S + 60
+        state = codex.read_state()
+        self.assertTrue(all(codex.available(name, state, lapsed) for name in self.profiles))
+        self.assertLess(retry, self.NOW + codex.LEDGER_CADENCE_S)
 
     def test_auth_bank_clears_only_after_newer_bound_official_identity_observation(self):
         self.reconcile()

@@ -154,6 +154,12 @@ export const SCREEN_PROOF_ROUTES = Object.freeze({
   'web.brand': '/brand',
   'web.report': '/report',
   'web.start': '/start',
+  // JOV-8068: auth-gated checkout. The screenshot producer enters through
+  // the test-auth session (onboarding-checkout-screen-proof.spec.ts), then
+  // the page's isRenderFixtureEnabled branch renders without the noop
+  // database. Signed-out requests, including production, redirect to
+  // /signin.
+  'web.onboarding-checkout': '/onboarding/checkout',
   // /solutions/* registers the whole (marketing)/solutions directory;
   // /solutions/artists is the family's declared concrete health-check path.
   'web.marketing-solutions': '/solutions/artists',
@@ -230,7 +236,7 @@ web.blog|web|blog|apps/web/app/(marketing)/blog/|desktop,mobile
 web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile
 web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
 web.marketing-card|web|marketing-card|apps/web/app/(marketing)/card/page.tsx|desktop,mobile
-web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx|desktop,mobile
+web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx,apps/web/app/(marketing)/compare/[slug]/page.tsx|desktop,mobile
 web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/page.tsx|desktop,mobile
 web.investor-portal|web|investor-portal|apps/web/app/investor-portal/|desktop,mobile
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
@@ -297,11 +303,11 @@ web.investor-pipeline|web|investor-pipeline|apps/web/app/app/(shell)/admin/inves
 web.ovie-certifications|web|ovie-certifications|apps/web/app/app/(shell)/admin/certifications/page.tsx|desktop,mobile
 web.ovie-outbound|web|ovie-outbound|apps/web/app/app/(shell)/admin/outbound/page.tsx|desktop,mobile
 web.ov-hud-shell|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/hud/page.tsx|desktop,mobile
-web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx|desktop,mobile
+web.ov-chat|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat/page.tsx,apps/web/app/app/(shell)/admin/page.tsx|desktop,mobile
 web.ov-inbox|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/inbox/page.tsx|desktop,mobile
 web.ov-integrations|web|settings-connectors|apps/web/app/app/(shell)/admin/integrations/page.tsx|desktop,mobile
 web.admin-chat-playground|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat-playground/page.tsx,apps/web/app/app/(shell)/admin/chat-playground/layout.tsx|desktop,mobile
-web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/needs-you/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
+web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
 web.ov-company-presence|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/presence/page.tsx|desktop,mobile
 web.admin-costs|web|admin-costs|apps/web/app/app/(shell)/admin/costs/page.tsx|desktop,mobile
 web.admin-features|web|admin-features|apps/web/app/app/(shell)/admin/features/page.tsx|desktop,mobile
@@ -311,6 +317,7 @@ web.admin-growth|web|admin-growth|apps/web/app/app/(shell)/admin/growth/page.tsx
 web.admin-people|web|admin-people|apps/web/app/app/(shell)/admin/people/page.tsx|desktop,mobile
 web.admin-agent-runs|web|admin-agent-runs|apps/web/app/app/(shell)/admin/agent-runs/|desktop,mobile
 web.admin-ops-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/ops/page.tsx|desktop,mobile
+web.admin-yc-metrics-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/growth/yc-metrics/page.tsx|desktop,mobile
 web.ov-lists|web|ovie-lists|apps/web/app/app/(shell)/admin/lists/|desktop,mobile
 web.admin-screenshots|web|admin-screenshots|apps/web/app/app/(shell)/admin/screenshots/|desktop,mobile
 web.admin-share-studio|web|admin-share-studio|apps/web/app/app/(shell)/admin/share-studio/page.tsx|desktop,mobile
@@ -321,7 +328,7 @@ web.hud-tv|web|ovie-ops-isolated|apps/web/app/hud-tv/page.tsx|desktop,mobile
 web.hud-wiki|web|admin-wiki|apps/web/app/hud/wiki/|desktop,mobile
 web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(shell)/youtube/page.tsx|desktop,mobile
 web.shipping-statistics|web|shipping-statistics|apps/web/app/app/(shell)/admin/shipping/page.tsx|desktop,mobile
-web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx|desktop,mobile
+web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx,apps/web/app/(dynamic)/start/loading.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
@@ -331,6 +338,7 @@ web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|de
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx,apps/web/app/onboarding/checkout/loading.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
 web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile
+web.claim|web|artist-claim-checkout|apps/web/app/claim/page.tsx,apps/web/app/claim/ClaimArtistSearch.tsx|desktop,mobile
 web.account-shell|web|account-shell|apps/web/app/account/layout.tsx|desktop,mobile
 web.account-creation-recovery|web|account-creation-recovery|apps/web/app/error/user-creation-failed/page.tsx,apps/web/app/error/user-creation-failed/loading.tsx|desktop,mobile
 web.root-error-boundary|web|screen.errors.root|apps/web/app/error.tsx,apps/web/app/global-error.tsx|desktop,mobile
@@ -746,7 +754,10 @@ export function resolveTrustedProofForScreen(request) {
       proof: null,
       screen,
       findings: [
-        `${screen.id}: trusted producer artifact ${String(artifactId)} is not acceptable: ${(resolved.findings || []).join('; ')}`,
+        // Keep the screen id off the left of a colon. `web.legal-cookies: trusted`
+        // is credential-text to the Playwright artifact guard (COOKIES assignment)
+        // even though it is a screen id, and that blocked the receipt upload.
+        `trusted producer artifact ${String(artifactId)} is not acceptable for ${screen.id} (${(resolved.findings || []).join('; ')})`,
       ],
     };
   }
@@ -1103,6 +1114,14 @@ function evaluateDeliberateRed({ registry, headSha, fixtures }) {
   return { receipts, issues };
 }
 
+function screenHasMarketingRoute(screen) {
+  return (
+    isObject(screen) &&
+    typeof screen.id === 'string' &&
+    typeof SCREEN_MARKETING_ROUTES[screen.id] === 'string'
+  );
+}
+
 export function evaluateChangedScreens({
   changedFiles,
   registry = SCREEN_REGISTRY,
@@ -1164,6 +1183,18 @@ export function evaluateChangedScreens({
       continue;
     }
     const screen = classified.entry;
+    // A targeted invocation proves its own screen, plus marketing-bound
+    // changes that the shared marketing artifact can actually contain.
+    // Proof-route screens (public profile, artists, checkout, …) are
+    // certified by their own producer invocation. Requiring them here would
+    // bind them to the marketing zip, which has no route for them.
+    if (
+      targetScreenIds.length > 0 &&
+      !targetScreenIds.includes(screen.id) &&
+      !screenHasMarketingRoute(screen)
+    ) {
+      continue;
+    }
     if (seen.has(screen.id)) continue;
     seen.add(screen.id);
     screens.push(screen);
@@ -1193,7 +1224,7 @@ export function evaluateChangedScreens({
     );
     const commissioning = findings.length - blocking.length;
     if (blocking.length > 0)
-      issues.push(`${screen.id}: ${blocking.join('; ')}`);
+      issues.push(`screen ${screen.id} blocked (${blocking.join('; ')})`);
     changedScreens.push({
       id: screen.id,
       verdict: blocking.length === 0 ? 'pass' : 'block',
@@ -1315,8 +1346,12 @@ export function runScreenCertification(options = {}) {
     if (!wantsArtifact) {
       issues.push('controlled GitHub artifact resolver is unavailable');
     } else {
+      // The shared artifact is the marketing capture. Only screens with a
+      // registered marketing route can be proved from it. Applying it to a
+      // proof-route screen fails closed with "no registered marketing route
+      // binding" even when that screen's own producer artifact is valid.
       requested = routeArtifactRequests({
-        pendingScreens,
+        pendingScreens: pendingScreens.filter(screenHasMarketingRoute),
         requested,
         fallbackArtifactId: wantsArtifact,
       });

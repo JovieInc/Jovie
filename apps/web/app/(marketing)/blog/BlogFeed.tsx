@@ -4,6 +4,7 @@ import {
   MarketingEditorialHeroPhoto,
   MarketingHero,
 } from '@/components/marketing';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import type {
   BlogPostSummary,
   ResolvedAuthor,
@@ -29,7 +30,13 @@ function BlogHeroFrame({ children }: Readonly<{ children: ReactNode }>) {
         opacity={0.4}
         testId='blog-hero-photo'
       />
-      <MarketingHero variant='left' className='relative z-10'>
+      <MarketingHero
+        variant='left'
+        className='relative z-10'
+        testId='marketing-section-hero'
+        sectionVariant='left-none'
+        sectionOwner='apps/web/app/(marketing)/blog/BlogFeed.tsx'
+      >
         {children}
       </MarketingHero>
     </div>
@@ -48,7 +55,7 @@ export function BlogFeed({ entries }: Readonly<BlogFeedProps>) {
             Blog
           </h1>
           <p className='max-w-xl text-lg leading-relaxed text-secondary-token'>
-            Posts coming soon.
+            {COPY_FALLBACKS.posts}
           </p>
         </BlogHeroFrame>
       </div>
@@ -68,25 +75,32 @@ export function BlogFeed({ entries }: Readonly<BlogFeedProps>) {
         </p>
       </BlogHeroFrame>
 
-      <MarketingContainer width='page' className='pb-20 sm:pb-28'>
-        <div className='marketing-divider mb-10' />
+      <section
+        aria-label='Blog Posts'
+        data-testid='marketing-section-blog-feed'
+        data-marketing-variant='featured-grid'
+        data-marketing-owner='apps/web/app/(marketing)/blog/BlogFeed.tsx'
+      >
+        <MarketingContainer width='page' className='pb-20 sm:pb-28'>
+          <div className='marketing-divider mb-10' />
 
-        <div className='mb-10'>
-          <BlogCard
-            post={featured.post}
-            author={featured.author}
-            variant='featured'
-          />
-        </div>
-
-        {remaining.length > 0 && (
-          <div className='grid grid-cols-1 gap-8 md:grid-cols-2'>
-            {remaining.map(({ post, author }) => (
-              <BlogCard key={post.slug} post={post} author={author} />
-            ))}
+          <div className='mb-10'>
+            <BlogCard
+              post={featured.post}
+              author={featured.author}
+              variant='featured'
+            />
           </div>
-        )}
-      </MarketingContainer>
+
+          {remaining.length > 0 && (
+            <div className='grid grid-cols-1 gap-8 md:grid-cols-2'>
+              {remaining.map(({ post, author }) => (
+                <BlogCard key={post.slug} post={post} author={author} />
+              ))}
+            </div>
+          )}
+        </MarketingContainer>
+      </section>
     </div>
   );
 }

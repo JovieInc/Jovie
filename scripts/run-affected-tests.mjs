@@ -159,21 +159,14 @@ const VERCEL_CONGESTION_CONTROL_PYTHON_TESTS = [
 // otherwise sails through affected-test selection and only fails on the
 // merge-group full suite (PR #15566 looped enroll→group-red 3× on 2026-08-06).
 const HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS = [
-  'apps/web/tests/unit/home/bento-feature-grid-system-b-style-guard.test.tsx',
-  'apps/web/tests/unit/home/claim-handle-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/dead-home-actions-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/home-profile-showcase-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-artist-outcomes-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-closed-loop-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-command-center-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-faq-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-footer-cta-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-grid-spine-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-hero-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-pricing-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-product-statement-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-trust-strip-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-workspace-system-b-style-guard.test.ts',
 ];
 const HOMEPAGE_SYSTEM_B_GUARD_EXACT_INPUTS = new Set([
   'apps/web/components/marketing/ClientFaqAccordion.tsx',
@@ -287,6 +280,8 @@ const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',
   'scripts/sentry-autofix-recurrence.mjs',
+  'scripts/lib/sentry-validation-observation.mjs',
+  'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
 ]);
@@ -297,6 +292,7 @@ const SENTRY_AUTOFIX_RECURRENCE_LANE = new Set([
 ]);
 const SENTRY_AUTOFIX_RECURRENCE_SCRIPT_TESTS = [
   'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
+  'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -377,6 +373,7 @@ const OWNERLESS_RECOVERY_POLICY_TEST =
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs';
 const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/sentry-error-gate-request.test.mjs',
+  'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/native-queue-group-evidence.test.mjs',
   'scripts/lib/__tests__/native-queue-policy-evidence.test.mjs',
@@ -1118,7 +1115,10 @@ export function classifyBlogContentForAffectedTests(base, head, options) {
 
 const LANE_PYTHON_COVERAGE_INPUTS = new Set([
   ...[
+    'backlog_admission',
+    'backlog_writer_guard',
     'lane_runner',
+    'qualification_guard',
     'pr_events',
     'remediation',
     'reason_lane',
@@ -1503,7 +1503,7 @@ function planAffectedTests(
         '--coverage.include=lib/founder-taste-order.mjs',
         '--coverage.reporter=text',
         '--coverage.reporter=json-summary',
-        '--coverage.thresholds.perFile=true',
+        '--coverage.thresholds.perFile',
         '--coverage.thresholds.lines=85',
         '--coverage.thresholds.statements=85',
         '--coverage.thresholds.functions=80',
@@ -1682,9 +1682,17 @@ function planAffectedTests(
       mandatoryTests: [],
       selectedTests: [],
       rootVitestTests: [],
-      pythonTests: [],
-      pythonUnittestTests: SENTRY_AUTOFIX_RECURRENCE_PYTHON_TESTS,
+      pythonTests: SENTRY_AUTOFIX_RECURRENCE_PYTHON_TESTS,
+      pythonUnittestTests: [],
       scriptVitestTests: SENTRY_AUTOFIX_RECURRENCE_SCRIPT_TESTS,
+      scriptVitestCoverageArgs: [
+        '--coverage',
+        '--coverage.include=sentry-autofix-recurrence.mjs',
+        '--coverage.include=lib/sentry-validation-observation.mjs',
+        '--coverage.reporter=text',
+        '--coverage.reporter=json-summary',
+        controlCoverageReportsDirectory('sentry-recurrence'),
+      ],
       nodeTests: SENTRY_AUTOFIX_RECURRENCE_NODE_TESTS,
     };
   }
@@ -2812,6 +2820,7 @@ export function buildControlCoverageCommands() {
     '--coverage.include=lib/pr-conflict-event.mjs',
     '--coverage.include=lib/pr-conflict-handler.mjs',
     '--coverage.include=lib/product-lane-classifier.mjs',
+    '--coverage.include=lib/sentry-validation-observation.mjs',
     '--coverage.thresholds.perFile=true',
     '--coverage.thresholds.lines=85',
     '--coverage.thresholds.branches=75',

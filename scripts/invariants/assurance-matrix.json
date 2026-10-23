@@ -1167,7 +1167,7 @@
         "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
         "blindSpots": [
           "Rendered screen certification runs only after merge (screenshots.yml) and is red on main; nothing blocks before merge.",
-          "Header/title alignment tolerance in storybook-elevation equals 2px + content inset; title x has only a lower bound (JOV-7207 audit).",
+          "storybook-elevation bounds the desktop title to ±1px of the controls' right edge on both sides, with no content-inset allowance. Packaged macOS traffic-light certification remains JOV-7710 and is not a pre-merge gate.",
           "Zoom/text-resize never exercised."
         ],
         "remediationOwner": "JOV-7710"
@@ -1261,10 +1261,12 @@
       "owner": "design-system",
       "sources": ["JOV-7713", "JOV-4522", "JOV-4130"],
       "invalidatesOn": [
-        "apps/web/lib/animation",
+        "apps/web/components/jovie",
         "apps/web/components/organisms/sidebar",
         "apps/web/components/shell",
-        "apps/web/eslint-rules/no-raw-motion-values.js"
+        "apps/web/eslint-rules/no-raw-motion-values.js",
+        "apps/web/lib/animation",
+        "packages/ui/atoms/status-glyph.tsx"
       ],
       "layers": {
         "prevent": {
@@ -1295,6 +1297,10 @@
         ],
         "detectors": [
           {
+            "ref": "apps/web/components/jovie/tool-status.test.tsx",
+            "enforcement": "merge-group-blocking"
+          },
+          {
             "ref": "apps/web/eslint-rules/no-raw-motion-values.js",
             "enforcement": "pr-blocking",
             "inventory": ["ui:ownership-registry"],
@@ -1303,6 +1309,10 @@
           },
           {
             "ref": "apps/web/lib/hooks/useReducedMotion.test.ts",
+            "enforcement": "merge-group-blocking"
+          },
+          {
+            "ref": "apps/web/tests/e2e/storybook-agent-status.spec.ts",
             "enforcement": "merge-group-blocking"
           }
         ],
@@ -1322,9 +1332,12 @@
       "whatCanGoWrong": "A control works from one state only, open without close, stale state after hydration, pointer/keyboard desync, lost focus, hidden/inert control after transition, double-bound handlers.",
       "covers": ["ui:ownership-registry", "ui:app-screens"],
       "owner": "design-system",
-      "sources": ["JOV-7713", "JOV-7207", "JOV-7201"],
+      "sources": ["JOV-7201", "JOV-7207", "JOV-7713", "JOV-8019"],
       "invalidatesOn": [
         "apps/web/components/atoms/RailToggleButton.tsx",
+        "apps/web/components/features/admin/certifications",
+        "apps/web/components/jovie/components/EntityChipPopover.tsx",
+        "apps/web/components/jovie/components/EntityResolutionProvider.tsx",
         "apps/web/components/molecules/sidebar-collapse-button",
         "apps/web/components/organisms/sidebar",
         "apps/web/hooks/useSidebarKeyboardShortcut.ts"
@@ -1375,26 +1388,36 @@
         "authority": ["apps/web/data/designSystem/interactionRegistry.ts"],
         "detectors": [
           {
-            "ref": "apps/web/tests/e2e/storybook-overlay-collisions.spec.ts",
-            "enforcement": "path-selected-blocking"
-          },
-          {
-            "ref": "apps/web/components/atoms/RailToggleButton.test.tsx",
+            "ref": "apps/ovie/scripts/app-shell-invariants.test.mjs",
             "enforcement": "merge-group-blocking"
-          },
-          {
-            "ref": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
-            "enforcement": "merge-group-blocking",
-            "deliberateRed": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
-            "liveStatus": "green"
           },
           {
             "ref": "apps/ovie/scripts/desktop-sidebar-contract.test.mjs",
             "enforcement": "merge-group-blocking"
           },
           {
-            "ref": "apps/ovie/scripts/app-shell-invariants.test.mjs",
+            "ref": "apps/web/components/atoms/RailToggleButton.test.tsx",
             "enforcement": "merge-group-blocking"
+          },
+          {
+            "ref": "apps/web/components/features/admin/certifications/OvieCertificationsWorkspace.test.tsx",
+            "enforcement": "merge-group-blocking",
+            "deliberateRed": "apps/web/components/features/admin/certifications/OvieCertificationsWorkspace.test.tsx"
+          },
+          {
+            "ref": "apps/web/components/jovie/components/EntityReferences.contract.test.tsx",
+            "enforcement": "merge-group-blocking",
+            "deliberateRed": "apps/web/components/jovie/components/EntityReferences.contract.test.tsx"
+          },
+          {
+            "ref": "apps/web/tests/e2e/storybook-overlay-collisions.spec.ts",
+            "enforcement": "path-selected-blocking"
+          },
+          {
+            "ref": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
+            "enforcement": "merge-group-blocking",
+            "deliberateRed": "apps/web/tests/unit/design-system/reversible-control-certification.test.tsx",
+            "liveStatus": "green"
           }
         ],
         "requiredEvidence": ["web-desktop", "web-mobile", "macos-electron"],
@@ -1782,7 +1805,8 @@
       "id": "ESC-UI-002",
       "summary": "Old chevron/arrow-style rail controls re-entered the shell",
       "issue": "JOV-7207",
-      "caught": false,
+      "caught": true,
+      "fixture": "apps/web/tests/unit/design-system/rail-icon-family.test.tsx",
       "row": "AM-015"
     },
     {
@@ -1832,14 +1856,16 @@
       "id": "ESC-UI-009",
       "summary": "Titlebar/top-row grid seam: header origin inside an extra content inset",
       "issue": "JOV-7207",
-      "caught": false,
+      "caught": true,
+      "fixture": "apps/web/tests/unit/components/organisms/AppShellFrame.test.tsx",
       "row": "AM-016"
     },
     {
       "id": "ESC-UI-010",
       "summary": "Inset dark header strip inside rounded main surface (header/body seam)",
       "issue": "JOV-7207",
-      "caught": false,
+      "caught": true,
+      "fixture": "apps/web/tests/product-screenshots/route-dom-certification.spec.ts",
       "row": "AM-017"
     }
   ]

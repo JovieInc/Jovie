@@ -1,3 +1,4 @@
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 /**
  * AI Chat Route — POST /api/chat
  *
@@ -45,7 +46,10 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
+import { isAiGatewayAvailable } from '@/lib/ai/gateway-availability';
 import {
+  CHAT_STREAM_FAILED_ERROR_CODE,
+  CHAT_STREAM_FAILED_USER_MESSAGE,
   classifyChatStreamFailure,
   classifyGatewayAlert,
   resolveChatStreamErrorMessage,
@@ -142,6 +146,7 @@ import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { scheduleOnlineScoring } from '@/lib/eval/scorers/online';
 import { checkGatesForUser, getAppFlagValue } from '@/lib/flags/server';
@@ -1123,7 +1128,7 @@ function createGenerateAlbumArtTool(params: {
             ? target.release
             : {
                 id: null,
-                title: releaseTitle?.trim() || 'Untitled Release',
+                title: releaseTitle?.trim() || COPY_FALLBACKS.release,
                 artworkUrl: null,
               };
         const providerPrompt = buildAlbumArtBackgroundPrompt({
@@ -2579,6 +2584,7 @@ export async function POST(req: Request) {
         userMessage: userText || '(image attachment)',
         userId: sessionContext.user.id,
         creatorProfileId: resolvedProfileId,
+        audience: 'customer',
       });
     } catch (error) {
       await captureError(
@@ -3066,6 +3072,49 @@ export async function POST(req: Request) {
         errorMessage: failure.errorMessage,
       });
     };
+
+    // No static key and no Vercel OIDC: the gateway call does not throw, so
+    // the client waits out the reply budget. Stream the same recovery copy
+    // a failed turn would show, without calling the model.
+    if (
+      !isAiGatewayAvailable({
+        apiKey: env.AI_GATEWAY_API_KEY,
+        vercel: process.env.VERCEL,
+      })
+    ) {
+      const replyText = CHAT_STREAM_FAILED_USER_MESSAGE;
+      if (reservedTurn) {
+        await persistTerminalAssistantMessage({
+          conversationId: reservedTurn.conversationId,
+          turnId: reservedTurn.turnId,
+          status: 'failed_model_error',
+          content: replyText,
+          errorCode: CHAT_STREAM_FAILED_ERROR_CODE,
+          errorMessage: 'AI gateway is not configured',
+        });
+      }
+      return createAssistantTextStreamResponse({
+        text: replyText,
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-chat-preflight': 'gateway-unavailable',
+          ...(reservedTurn
+            ? {
+                'x-conversation-id': reservedTurn.conversationId,
+                'x-chat-turn-id': reservedTurn.turnId,
+              }
+            : {}),
+        },
+        metadata: reservedTurn
+          ? buildChatTurnMetadata({
+              conversationId: reservedTurn.conversationId,
+              turnId: reservedTurn.turnId,
+              requestId,
+            })
+          : undefined,
+      });
+    }
 
     if (reservedTurn) {
       await markChatTurnStreaming(reservedTurn.turnId);

@@ -25,6 +25,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import disk_guard  # noqa: E402
 import lifecycle  # noqa: E402
@@ -34,9 +35,13 @@ sys.path.insert(0, str(HERE))
 import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner import)
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
+LANE_FIX_RED = PREFIX + "red"
 FIX_KINDS = ("red", "conflict", "dequeued", "review", "stale")
 TICK_KINDS = ("green", "orphan")
 RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
+# Same required-green set green enroll admits on. Missing, UNKNOWN, BLOCKED,
+# DIRTY and BEHIND keep lane-fix-red.
+REQUIRED_GREEN = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
 HOLD_LABELS = frozenset({"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim",
                          "queue-deferred"})
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
@@ -145,6 +150,11 @@ def held_reason(evidence: list[str]) -> tuple[str, str]:
         if any(str(line).startswith(prefix) for line in evidence or []):
             return code, action
     return "unclassified", "fix-loop"
+
+
+def without_exhaustion_evidence(evidence: list | None) -> list:
+    """Drop the exhaustion marker so a terminal sync can see the hold underneath it."""
+    return [line for line in evidence or [] if not str(line).startswith("fix-exhausted")]
 
 
 def held_record(sha: str, evidence: list[str], at: float | None = None) -> dict:
@@ -401,6 +411,68 @@ def add_label(number: int, kind: str, sh=run) -> bool:
     """The issues API creates a missing label, so the queue needs no setup."""
     return sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels",
                "-f", f"labels[]={PREFIX}{kind}"]).returncode == 0
+
+
+def stale_fix_labels(pr: dict, labels: set) -> list[str]:
+    """Repair labels whose cause is gone on this exact head (2026-10-21: #22320 kept
+    lane-fix-red after its replacement run passed; #22394 kept lane-fix-conflict and
+    lane-fix-dequeued after Gem resolved the conflict). Only a required-green, open,
+    same-repo head clears anything; a poisoned PR keeps its dequeue signal."""
+    if (pr.get("isCrossRepository") or str(pr.get("state", "OPEN")).upper() != "OPEN"
+            or pr.get("mergeStateStatus") not in REQUIRED_GREEN):
+        return []
+    stale = [kind for kind in ("red", "conflict") if PREFIX + kind in labels]
+    if PREFIX + "conflict" in labels and PREFIX + "dequeued" in labels and POISON_LABEL not in labels:
+        stale.append("dequeued")  # the conflict was why the queue dropped it
+    return stale
+
+
+HEAD_CHECKS_QUERY = """query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){
+pullRequest(number:$number){commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){nodes{__typename
+... on CheckRun{name conclusion startedAt completedAt} ... on StatusContext{context state createdAt}}}}}}}}}}"""
+RED_CHECK_STATES = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ERROR"})
+
+
+def head_red(number: int, sh=run) -> bool | None:
+    """True only when the latest run of some check on the head failed. GitHub's rollup counts
+    a CANCELLED (superseded) run as FAILURE even after its replacement passed. None: unreadable."""
+    owner, name = REPO.split("/", 1)
+    read = sh(["gh", "api", "graphql", "-f", f"query={HEAD_CHECKS_QUERY}", "-F", f"owner={owner}",
+               "-F", f"name={name}", "-F", f"number={number}"])
+    try:
+        commits = json.loads(read.stdout)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
+        nodes = ((commits[0]["commit"].get("statusCheckRollup") or {}).get("contexts") or {})["nodes"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return None
+    if read.returncode:
+        return None
+    latest: dict = {}
+    for node in nodes:
+        key = node.get("name") or node.get("context")
+        at = node.get("completedAt") or node.get("startedAt") or node.get("createdAt") or ""
+        state = str(node.get("conclusion") or node.get("state") or "").upper()
+        if key and (key not in latest or at >= latest[key][0]):
+            latest[key] = (at, state)
+    return any(state in RED_CHECK_STATES for _, state in latest.values())
+
+
+def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
+    """Drop lane-fix-red once this head is required-green.
+
+    DELETE is not read-only, so `run` leaves it on GITHUB_TOKEN — the Lane Fix
+    Relay job's existing issues and pull-requests write. A red, unknown, dirty,
+    behind, closed or forked head keeps the label. Drafts are cleared too:
+    auto-ready undrafts a green draft, and the label would block enroll after that.
+    """
+    if pr.get("isCrossRepository") or str(pr.get("state", "OPEN")).upper() != "OPEN":
+        return False
+    if LANE_FIX_RED not in {label.lower() for label in label_names(pr)}:
+        return False
+    if pr.get("mergeStateStatus") not in REQUIRED_GREEN:
+        return False
+    deleted = sh(["gh", "api", "-X", "DELETE",
+                  f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
+    return deleted.returncode == 0
 
 
 # The dispatch tick re-read the same stuck PRs' claim comments every pass (~84 reads an hour on
@@ -855,6 +927,7 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
     if event == "workflow_run":
         payload = resolve_ci_pr(payload, sh)
     added = []
+    cleared = []
     targets = relay_targets(event, payload)
     if event == "workflow_run" and any(kind == "red" for _, kind, _ in targets):
         workflow_run = payload.get("workflow_run") or {}
@@ -867,12 +940,19 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
                 continue
             kind = "dequeued"
         viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO, "--json",
-                     "state,isDraft,headRefName,headRefOid,isCrossRepository,labels"])
+                     "state,isDraft,headRefName,headRefOid,isCrossRepository,mergeStateStatus,labels"])
         if viewed.returncode != 0:
             continue
         pr = json.loads(viewed.stdout or "{}")
         if sha and pr.get("headRefOid") != sha:
             continue  # a newer head is already running CI; its own events speak for it
+        # Only a success for this exact head. A red event can still show a lagging
+        # CLEAN, and a missing sha is not evidence the required checks passed.
+        if kind == "green" and sha and clear_stale_lane_fix_red(number, pr, sh):
+            cleared.append((number, "cleared-red"))
+            pr["labels"] = [label for label in (pr.get("labels") or [])
+                            if (label.get("name") if isinstance(label, dict) else str(label)).lower()
+                            != LANE_FIX_RED]
         if terminal_signal(pr) or not in_scope(pr, kind, disabled):
             continue
         if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
@@ -888,7 +968,7 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
         created = upsert_intake(intake, sh)
         if created:
             added.append((created, remediation.INTAKE_LABEL))
-    return added
+    return cleared + added
 
 
 def upsert_intake(event: dict, sh=run, now: float | None = None) -> int | None:
@@ -1107,6 +1187,10 @@ def label_backlog(sh=run, disabled: set[str] | None = None, kinds=("conflict", "
             continue
         if add_label(number, kind, sh):
             added.append((number, kind))
+    for pr in prs:
+        number = pr.get("number")
+        if isinstance(number, int) and clear_stale_lane_fix_red(number, pr, sh):
+            added.append((number, "cleared-red"))
     return added
 
 
@@ -1239,7 +1323,9 @@ def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict
 
     `terminal_ok` is only for deterministic main syncs of a terminal generation: a merge of
     main creates the new head that is that generation's material-change exit. Holds, active
-    repairs and diff-policy holds still refuse."""
+    repairs and diff-policy holds still refuse. Exhaustion evidence is the condition that
+    sync exists to clear, so the fix-exhausted marker must not refuse the sync or mask the
+    hold underneath it. A secret-file or empty-diff line that remains still refuses."""
     labels = {label.lower() for label in label_names(pr)}
     if not isinstance(pr.get("headRefOid"), str) or not pr["headRefOid"].strip():
         return "head-unavailable"
@@ -1252,6 +1338,9 @@ def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict
     if now is not None and in_flight(record, {"headRefOid": record.get("sha")}, now):
         return "repair-active"
     entry = held or {}
+    if terminal_ok and entry.get("sha") == pr.get("headRefOid"):
+        evidence = without_exhaustion_evidence(entry.get("evidence"))
+        entry = {**entry, "evidence": evidence, "reason": held_reason(evidence)[0]}
     if entry.get("sha") == pr.get("headRefOid") and not fixable_hold(entry, pr.get("headRefOid")):
         return entry.get("reason") or held_reason(entry.get("evidence") or [])[0]
     return None
@@ -1785,11 +1874,22 @@ def sync_main(host, lane, pr: dict, now: float, *, terminal_ok: bool = False) ->
     ok = result.returncode == 0
     lane.update_json(host.state / "synced.json",
                      lambda synced: synced.update({str(pr["number"]): {"from": pr["headRefOid"], "at": now, "ok": ok}}))
-    ledger(host, {"schema": "jovie-lane-run/v1", "kind": "sync-main", "origin": "autonomous-lane",
-                  "attribution": {"category": "finalizer-only", "provider": "lane-event"},
-                  "pr": pr["number"], "headBefore": pr["headRefOid"],
-                  "verdict": "synced" if ok else "sync-failed", "endedAt": lane.now_iso()})
+    receipt = {"schema": "jovie-lane-run/v1", "kind": "sync-main", "origin": "autonomous-lane",
+               "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+               "pr": pr["number"], "headBefore": pr["headRefOid"],
+               "verdict": "synced" if ok else "sync-failed", "endedAt": lane.now_iso()}
+    if not ok:
+        # 71 sync-failed rows/24h on 2026-10-21 carried no reason; keep GitHub's own answer.
+        receipt["reasons"] = [sync_failure_reason(result)]
+    ledger(host, receipt)
     return "synced" if ok else "sync-failed"
+
+
+def sync_failure_reason(result) -> str:
+    """GitHub's update-branch refusal, short and secret-free (the API message, not the token)."""
+    text = f"{getattr(result, 'stdout', '') or ''} {getattr(result, 'stderr', '') or ''}"
+    found = re.search(r'"message"\s*:\s*"([^"]{1,160})"', text) or re.search(r"(HTTP \d{3}[^\n]{0,120})", text)
+    return "update-branch:" + (found.group(1) if found else f"exit-{getattr(result, 'returncode', '?')}")
 
 
 def ledger(host, receipt: dict) -> None:
@@ -1798,12 +1898,217 @@ def ledger(host, receipt: dict) -> None:
         handle.write(json.dumps(receipt) + "\n")
 
 
-OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){
+OPEN_PRS_QUERY = """query($owner:String!,$name:String!,$cursor:String){repository(owner:$owner,name:$name){nameWithOwner
 pullRequests(states:OPEN,first:50,after:$cursor){pageInfo{hasNextPage endCursor} nodes{number title body url isDraft
-baseRefName headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue autoMergeRequest{enabledAt}
+state baseRefName baseRefOid baseRef{target{oid}} headRefName headRefOid mergeStateStatus reviewDecision isInMergeQueue autoMergeRequest{enabledAt}
 isCrossRepository createdAt updatedAt
-labels(first:100){totalCount nodes{name}} files(first:100){totalCount nodes{path additions deletions changeType}}
+labels(first:100){totalCount nodes{name}} files(first:100){totalCount pageInfo{hasNextPage} nodes{path additions deletions changeType}}
 commits(last:1){nodes{commit{committedDate statusCheckRollup{state}}}}}}}}"""
+
+
+
+# Same freshness budget as lane_runner.SUMMARY_TTL_S. This is scope evidence only:
+# it never grants PR custody, clears a seal, or refunds a repair attempt.
+TARGET_FILES_TTL_S = 60
+TARGET_FILES_SCHEMA = "jovie-target-pr-files/v1"
+TARGET_REMEDIATION_TITLE = re.compile(
+    r"PR #(\d+) has carried lane-fix-exhausted for more than 24h "
+    r"\(remediation:pr-(\d+)-conflict\)")
+
+
+def _fresh_file_time(value, now: float) -> bool:
+    return (type(value) in (int, float) and math.isfinite(value)
+            and 0 <= now - value <= TARGET_FILES_TTL_S)
+
+
+def _target_file_paths(rows, total) -> list[str] | None:
+    if type(total) is not int or not 0 < total <= 100 or not isinstance(rows, list) or len(rows) != total:
+        return None
+    paths = []
+    for row in rows:
+        if not isinstance(row, dict):
+            return None
+        path = row.get("path")
+        # Rename source paths are absent from this GraphQL shape. Keep those unknown,
+        # rather than pretending the destination is the complete conflict footprint.
+        if (not isinstance(path, str) or not path or path.startswith("/")
+                or any(part in ("", ".", "..") for part in path.split("/"))
+                or any(char in path for char in "\\*?")
+                or any(ord(char) < 32 or ord(char) == 127 for char in path)
+                or str(row.get("changeType", "")).upper() in {"RENAMED", "RENAMED_FILE"}):
+            return None
+        paths.append(path)
+    return paths if len(set(paths)) == total else None
+
+
+def _target_file_anchor(pr: dict) -> dict | None:
+    try:
+        values = {"number": pr["number"], "state": pr["state"],
+                  "headRefOid": pr["headRefOid"], "baseRefName": pr["baseRefName"],
+                  "baseRefOid": pr["baseRefOid"], "baseTipOid": pr["baseRef"]["target"]["oid"]}
+    except (KeyError, TypeError):
+        return None
+    if (type(values["number"]) is not int or values["number"] <= 0 or values["state"] != "OPEN"
+            or not isinstance(values["baseRefName"], str) or not values["baseRefName"]
+            or any(not isinstance(values[key], str) or not re.fullmatch(r"[0-9a-f]{40}", values[key])
+                   for key in ("headRefOid", "baseRefOid", "baseTipOid"))):
+        return None
+    return values
+
+
+def inline_file_evidence(pr: dict, repository, observed_at: float) -> dict | None:
+    """Tag a complete inline response before any legacy file-list fallback runs."""
+    anchor = _target_file_anchor(pr)
+    files = pr.get("files")
+    if (anchor is None or not isinstance(repository, str) or not isinstance(files, dict)
+            or (files.get("pageInfo") or {}).get("hasNextPage") is not False):
+        return None
+    paths = _target_file_paths(files.get("nodes"), files.get("totalCount"))
+    if paths is None:
+        return None
+    return {"schema": TARGET_FILES_SCHEMA, "source": "graphql-inline",
+            "repository": repository, **anchor, "paths": paths,
+            "totalCount": len(paths), "observedAt": observed_at}
+
+
+def _valid_target_file_evidence(row, repository: str, now: float, *, confirmed=False) -> bool:
+    if not isinstance(row, dict):
+        return False
+    if (row.get("schema") != TARGET_FILES_SCHEMA or row.get("source") != "graphql-inline"
+            or row.get("repository") != repository or row.get("state") != "OPEN"
+            or not _fresh_file_time(row.get("observedAt"), now)):
+        return False
+    anchor = _target_file_anchor({**row, "baseRef": {"target": {"oid": row.get("baseTipOid")}}})
+    paths = row.get("paths")
+    if anchor is None or not isinstance(paths, list) or _target_file_paths(
+            [{"path": path} for path in paths], row.get("totalCount")) is None:
+        return False
+    if confirmed:
+        return (all(_fresh_file_time(row.get(key), now) for key in ("sourceAt", "confirmedAt"))
+                and row["observedAt"] <= row["sourceAt"] <= row["confirmedAt"])
+    return True
+
+
+def capture_target_file_witnesses(lane, prs: list[dict], source_at, now: float | None = None) -> dict:
+    """Bounded read-only head/base confirmation. Call before acquiring claim.lock.
+
+    Bare caches, REST file pagination and incomplete inline rows remain unknown. The
+    consumer checks all timestamps again after waiting for the claim lock.
+    """
+    clock = time.time if now is None else lambda: now
+    started = clock()
+    repository = lane.REPO_SLUG
+    if not _fresh_file_time(source_at, started):
+        return {}
+    candidates = {}
+    for pr in prs:
+        evidence = pr.get("inlineFilesEvidence") if isinstance(pr, dict) else None
+        if not _valid_target_file_evidence(evidence, repository, started):
+            continue
+        anchor = _target_file_anchor(pr)
+        if (anchor is None or any(anchor[key] != evidence[key] for key in anchor)
+                or pr.get("filesComplete") is not True
+                or _target_file_paths(pr.get("files"), evidence["totalCount"]) != evidence["paths"]
+                or evidence["observedAt"] > source_at):
+            continue
+        number = anchor["number"]
+        if number in candidates:
+            return {}  # Ambiguous inventory never narrows a prediction.
+        candidates[number] = evidence
+        if len(candidates) == 50:
+            break
+    if not candidates:
+        return {}
+    owner, name = repository.split("/")
+    fields = "number state headRefOid baseRefName baseRefOid baseRef{target{oid}}"
+    selections = " ".join(f"p{number}:pullRequest(number:{number}){{{fields}}}" for number in candidates)
+    query = "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){nameWithOwner " + selections + "}}"
+    try:
+        result = lane.sh(["gh", "api", "graphql", "-f", "query=" + query,
+                          "-F", "owner=" + owner, "-F", "name=" + name], timeout=5)
+        body = json.loads(result.stdout) if result.returncode == 0 else {}
+        confirmed = body["data"]["repository"]
+        if body.get("errors") or confirmed.get("nameWithOwner") != repository:
+            return {}
+        confirmed_at = clock()
+        witnesses = {}
+        for number, evidence in candidates.items():
+            anchor = _target_file_anchor(confirmed.get(f"p{number}") or {})
+            if anchor is None or any(anchor[key] != evidence[key] for key in anchor):
+                continue
+            witness = {**evidence, "sourceAt": source_at, "confirmedAt": confirmed_at}
+            if _valid_target_file_evidence(witness, repository, confirmed_at, confirmed=True):
+                witnesses[number] = witness
+        return witnesses
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+        return {}
+
+
+
+def revalidate_target_file_witnesses(witnesses: dict, prs: list[dict], now: float | None = None,
+                                    repository: str = REPO) -> dict:
+    """Reject contradictions in the inventory already read by the selector; no I/O."""
+    now = time.time() if now is None else now
+    current = {}
+    duplicate = set()
+    for pr in prs:
+        number = pr.get("number") if isinstance(pr, dict) else None
+        if type(number) is not int:
+            continue
+        if number in current:
+            duplicate.add(number)
+        current[number] = pr
+    valid = {}
+    for number, witness in witnesses.items():
+        if number in duplicate or not _valid_target_file_evidence(witness, repository, now, confirmed=True):
+            continue
+        pr = current.get(number) or {}
+        anchor = _target_file_anchor(pr)
+        evidence = pr.get("inlineFilesEvidence")
+        if (anchor is None or any(anchor[key] != witness[key] for key in anchor)
+                or not _valid_target_file_evidence(evidence, repository, now)
+                or any(anchor[key] != evidence[key] for key in anchor)
+                or evidence["paths"] != witness["paths"] or pr.get("filesComplete") is not True
+                or _target_file_paths(pr.get("files"), witness["totalCount"]) != witness["paths"]):
+            continue
+        valid[number] = witness
+    return valid
+
+
+def target_issue_files(issue, witnesses: dict | None, now: float | None = None,
+                       repository: str = REPO) -> list[str] | None:
+    """Narrow only an unambiguous generated exhausted-PR remediation card."""
+    if not isinstance(witnesses, dict):
+        return None
+    get = issue.get if isinstance(issue, dict) else lambda key, default=None: getattr(issue, key, default)
+    match = TARGET_REMEDIATION_TITLE.fullmatch(get("title", ""))
+    if match is None or match[1] != match[2]:
+        return None
+    number = int(match[1])
+    fingerprint = f"remediation:pr-{number}-conflict"
+    labels = [value.get("name") if isinstance(value, dict) else value for value in get("labels", [])]
+    description = get("description", "")
+    refs = []
+    for value in re.findall(r"https?://[^\s<>()\[\]`]+", description):
+        try:
+            url = urlsplit(value)
+        except ValueError:
+            return None
+        if url.hostname == "github.com" and "/pull/" in url.path:
+            # Do not accept a numeric prefix, dot-segment traversal, suffix, query,
+            # credentials or a different repository as the machine card's target.
+            if (url.scheme != "https" or url.netloc != "github.com"
+                    or url.path != f"/{repository}/pull/{number}" or url.query or url.fragment):
+                return None
+            refs.append(value)
+    if (fingerprint not in labels or f"Fingerprint: `{fingerprint}`" not in description or not refs):
+        return None
+    witness = witnesses.get(number)
+    now = time.time() if now is None else now
+    if (not _valid_target_file_evidence(witness, repository, now, confirmed=True)
+            or witness["number"] != number):
+        return None
+    return list(witness["paths"])
 
 
 def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
@@ -1820,12 +2125,21 @@ def open_prs_state(lane, report: dict | None = None) -> list[dict] | None:
             args += ["-F", f"cursor={cursor}"]
         result = lane.sh(args, timeout=120)
         try:
-            page = json.loads(result.stdout)["data"]["repository"]["pullRequests"] if result.returncode == 0 else None
+            repository = json.loads(result.stdout)["data"]["repository"] if result.returncode == 0 else None
+            page = repository["pullRequests"] if repository else None
         except (ValueError, KeyError, TypeError):
             page = None
         if page is None:
             return None
+        observed_at = time.time()
         for node in page["nodes"]:
+            # Only the original inline GraphQL response can certify this diff. The legacy
+            # per-head cache and paginated fallback below remain useful to repair, but
+            # cannot narrow an intake prediction. Never renew this observation on cache use.
+            node.pop("inlineFilesEvidence", None)
+            evidence = inline_file_evidence(node, repository.get("nameWithOwner"), observed_at)
+            if evidence is not None:
+                node["inlineFilesEvidence"] = evidence
             commits = node.pop("commits", {}).get("nodes") or [{}]
             node["rollup"] = ((commits[0].get("commit") or {}).get("statusCheckRollup") or {}).get("state")
             node["lastCommitAt"] = (commits[0].get("commit") or {}).get("committedDate")
@@ -1911,6 +2225,9 @@ def reconcile_plan(prs: list[dict], attempts: dict, disabled: set[str], max_atte
         if preservation_reason(pr, attempts.get(str(number), {}), max_attempts,
                                held=(held or {}).get(str(number)), now=now):
             continue
+        stale_labels = stale_fix_labels(pr, labels)
+        plan["unlabel"].extend((number, kind) for kind in stale_labels)
+        labels -= {PREFIX + kind for kind in stale_labels}
         if pr.get("mergeStateStatus") == "CLEAN" or pr.get("isInMergeQueue"):
             plan["reset"].append(number)  # only synchronization housekeeping; attempts remain immutable here
         wanted = []
@@ -1996,6 +2313,8 @@ def reconcile(host, lane, linear_factory, now: float, force: bool = False) -> di
         if kind == "conflict" and claim_active(
                 number, by_number[number].get("headRefOid"), lane.sh, now):
             continue
+        if kind == "red" and head_red(number, lane.sh) is not True:
+            continue  # a cancelled/superseded run reddens the rollup; unknown waits a pass
         if add_label(number, kind, lane.sh):
             labeled.append((number, kind))
     for number, kind in plan["unlabel"]:
@@ -2170,7 +2489,10 @@ def main(argv: list[str] | None = None) -> int:
         print(__doc__, file=sys.stderr)
         return 2
     for number, kind in added:
-        print(f"#{number} {PREFIX}{kind}")
+        if kind == "cleared-red":
+            print(f"#{number} cleared lane-fix-red")
+        else:
+            print(f"#{number} {PREFIX}{kind}")
     print(f"labeled={len(added)}")
     return 0
 

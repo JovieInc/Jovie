@@ -62,6 +62,24 @@ describe('AboutPageContent', () => {
       'Frequently Asked Questions',
       'Ready to build your Jovie profile?',
     ]);
+    expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
+      'data-marketing-variant',
+      'left-none'
+    );
+    expect(
+      screen.getByTestId('marketing-section-content-prose')
+    ).toHaveAttribute('data-marketing-variant', 'article-body');
+    expect(
+      screen.getByTestId('marketing-section-feature-grid')
+    ).toHaveAttribute('data-marketing-variant', 'two-column-text');
+    expect(screen.getByTestId('marketing-section-faq')).toHaveAttribute(
+      'data-marketing-variant',
+      'objection-handler'
+    );
+    expect(screen.getByTestId('marketing-section-cta')).toHaveAttribute(
+      'data-marketing-variant',
+      'final-single-claim'
+    );
     expect(screen.getByText('Tim White, Founder')).toBeVisible();
     expect(
       screen.getByRole('img', { name: 'Tim White, founder of Jovie' })
@@ -90,7 +108,7 @@ describe('AboutPageContent', () => {
       {
         question: 'What is Jovie?',
         answer:
-          'Jovie is one product for presence, relationships, and growth. It helps artists, founders, authors, creators, and independent experts control how they are found and turn attention into relationships. Jovie is available at jov.ie.',
+          'Jovie is one product for presence, relationships, and growth. It helps any creator control how they are found and turn attention into relationships. Jovie is available at jov.ie.',
       },
       {
         question: 'Is Jovie related to Jovie childcare or babysitting?',
@@ -105,7 +123,7 @@ describe('AboutPageContent', () => {
       {
         question: 'What does Jovie do?',
         answer:
-          'Jovie gives you a living profile for your work, links, and story, plus a way to turn attention into a next step. For artists, that includes smart links, audience intelligence, release notifications, and AI that uses your actual career data.',
+          'Jovie gives you a living profile for your work, links, and story, plus a way to turn attention into a next step. That includes smart links, audience intelligence, release notifications, and AI that uses your actual career data.',
       },
       {
         question: 'Is Jovie free?',
@@ -115,7 +133,7 @@ describe('AboutPageContent', () => {
       {
         question: 'How is Jovie different from Linktree?',
         answer:
-          'Linktree is a general-purpose link list. Jovie keeps your work, links, and a clear next step in one living profile. For artists, that includes smart links for releases, fan capture, and notifications when new music drops.',
+          'Linktree is a general-purpose link list. Jovie keeps your work, links, and a clear next step in one living profile, including smart links and notifications when something new is ready.',
       },
     ]);
 

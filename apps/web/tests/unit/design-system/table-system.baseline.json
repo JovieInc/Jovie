@@ -11,14 +11,11 @@
     "components/features/admin/ShippingVelocityCanvas.tsx": 1,
     "components/features/admin/hud/FounderFunnelDrilldown.tsx": 1,
     "components/features/dev/NoirIonSpecimen.tsx": 1,
-    "components/features/home/demo/DashboardAudienceDemo.tsx": 1,
     "components/features/pricing/PricingComparisonChart.tsx": 2,
     "components/molecules/ContentTable.tsx": 1,
     "components/organisms/ComparisonPageContent.tsx": 1
   },
   "rawRowHeight": {
-    "components/features/dashboard/organisms/ReleaseTablePendingShell.tsx": 1,
-    "components/features/dashboard/organisms/dsp-presence/DspPresenceTable.tsx": 1,
-    "components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix.tsx": 1
+    "components/features/dashboard/organisms/dsp-presence/DspPresenceTable.tsx": 1
   }
 }

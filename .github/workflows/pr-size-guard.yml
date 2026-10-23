@@ -57,13 +57,18 @@ jobs:
     name: ${{ github.event_name == 'merge_group' && 'PR Size Guard' || 'PR Size Guard (merge-group inactive)' }}
     if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
-    # The trusted policy has a 45s aggregate API deadline. Keep this producer
-    # terminal well before merge-group admission's 6-minute external-check deadline.
-    # The job clock starts at runner assignment, before image provisioning: a
-    # 1-minute budget let a 69s provisioning stall mark a fully passing run
-    # CANCELLED, which admission (correctly) treats as a terminal failure
-    # (PR #18454, run 36271793816). Match Fork PR Gate's 3-minute budget.
+    # Transient 5xx and installation rate limits hold inside the policy's 100s
+    # job budget instead of failing this required check. The job clock starts
+    # at runner assignment, before image provisioning: a 1-minute budget let a
+    # 69s provisioning stall mark a fully passing run CANCELLED, which
+    # admission treats as a terminal failure (PR #18454, run 36271793816).
+    # 100s of in-script hold plus that stall still finishes inside 3 minutes.
+    # A cancelled required check ejects the group the same way a red one does.
     timeout-minutes: 3
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
     outputs:
       fork_verdict: ${{ steps.member-policy.outputs.fork_verdict }}
     steps:
@@ -75,10 +80,18 @@ jobs:
           ref: ${{ github.event.merge_group.base_sha == '7641ffa76d03326542541c62080735c28190a1f0' && '7641ffa76d03326542541c62080735c28190a1f0' || 'main' }}
           persist-credentials: false
           sparse-checkout: |
+            scripts/lib/merge-group-local-evidence.mjs
             scripts/lib/merge-group-member-policy.mjs
             scripts/lib/pr-size-guard-policy.mjs
             scripts/lib/repo-hygiene-limits.mjs
           sparse-checkout-cone-mode: false
+
+      - name: Restore per-head policy evidence
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/merge-group-policy-cache
+          key: merge-group-policy-${{ github.event.merge_group.head_sha }}
 
       - name: Run exact-base bootstrap size policy
         if: github.event.merge_group.base_sha == '7641ffa76d03326542541c62080735c28190a1f0'
@@ -113,11 +126,42 @@ jobs:
           # The synthetic head controls this workflow definition. Never expose
           # an App private key here; the read-only ephemeral token is enough.
           GH_TOKEN: ${{ github.token }}
+          GROUP_BASE: ${{ github.event.merge_group.base_sha }}
+          GROUP_HEAD: ${{ github.event.merge_group.head_sha }}
           MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
           MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
+          MERGE_GROUP_LOCAL_EVIDENCE: ${{ runner.temp }}/merge-group-local-evidence.json
+          MERGE_GROUP_POLICY_CACHE_DIR: ${{ runner.temp }}/merge-group-policy-cache
         # Publishes fork_verdict before any size failure, so the Fork PR Gate
-        # job below judges the members it was asked about.
-        run: node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork
+        # job below judges the members it was asked about. The helper is absent
+        # on the pinned bootstrap base; a missing file or a failed fetch falls
+        # back to the API inside the policy. Blob sizes are not in the tree
+        # object. This checkout is a blob:none partial clone, so a fetch
+        # without --refetch does not backfill those sizes. --refetch asks for
+        # the blobs. Otherwise ls-tree times out and the trees API 403 ejects
+        # an in-cap group.
+        run: |
+          set -euo pipefail
+          mkdir -p "$MERGE_GROUP_POLICY_CACHE_DIR"
+          if [[ -f scripts/lib/merge-group-local-evidence.mjs && "$GROUP_HEAD" =~ ^[0-9a-f]{40}$ && "$GROUP_BASE" =~ ^[0-9a-f]{40}$ ]]; then
+            AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+            (
+              trap 'unset AUTH_HEADER' EXIT
+              GIT_CONFIG_COUNT=2 \
+              GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+              GIT_CONFIG_VALUE_0="$AUTH_HEADER" \
+              GIT_CONFIG_KEY_1=core.hooksPath \
+              GIT_CONFIG_VALUE_1=/dev/null \
+              GIT_TERMINAL_PROMPT=0 \
+              GCM_INTERACTIVE=never \
+              GIT_LFS_SKIP_SMUDGE=1 \
+                timeout --kill-after=5s 70s \
+                  git fetch --refetch --filter=blob:limit=1g --no-tags --depth=2 origin "$GROUP_HEAD" \
+                  || true
+              node scripts/lib/merge-group-local-evidence.mjs || true
+            )
+          fi
+          node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork
 
   merge-group-fork:
     # The merge-group "Fork PR Gate" required context, decided from the size
@@ -138,6 +182,67 @@ jobs:
             exit 1
           fi
           echo "Every merge-group member passed the fork policy."
+
+  merge-group-workflow-load:
+    # A combined head whose workflows GitHub cannot load (an interpolated run
+    # script over the 21,000-character expression limit) gets a zero-job CI run
+    # attributed to push, never a merge_group check, so groups sat in
+    # AWAITING_CHECKS for 39 minutes on 2026-10-20 (#21826). This job fails only
+    # for the group whose own diff introduced it (a group stacked on an already
+    # broken base passes), and the failure hold then holds that exact head and
+    # reports the required PR Ready context failed so the queue ejects the
+    # group. Tool errors, unreadable trees and timeouts fail open. It stays out
+    # of the reviewed merge-group-size job (merge-group-size-bootstrap-contract).
+    name: ${{ github.event_name == 'merge_group' && 'Workflow Load Guard' || 'Workflow Load Guard (merge-group inactive)' }}
+    if: github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - name: Check out trusted workflow load guard
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/workflow-expression-budget.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Require combined-head workflows to load
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GROUP_BASE: ${{ github.event.merge_group.base_sha }}
+          GROUP_HEAD: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! -f scripts/workflow-expression-budget.mjs ]]; then
+            echo 'Trusted main predates the workflow load guard; nothing to check.'
+            exit 0
+          fi
+          [[ "$GROUP_HEAD" =~ ^[0-9a-f]{40}$ && "$GROUP_BASE" =~ ^[0-9a-f]{40}$ ]]
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          # The group commit and its parent, which is the group base.
+          GIT_CONFIG_COUNT=2 \
+          GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+          GIT_CONFIG_VALUE_0="$AUTH_HEADER" \
+          GIT_CONFIG_KEY_1=core.hooksPath \
+          GIT_CONFIG_VALUE_1=/dev/null \
+          GIT_TERMINAL_PROMPT=0 \
+          GIT_LFS_SKIP_SMUDGE=1 \
+            timeout --kill-after=5s 60s \
+              git fetch --filter=blob:limit=1g --no-tags --depth=2 origin "$GROUP_HEAD" \
+            || echo '::warning::Could not fetch the combined head; the guard fails open.'
+          unset AUTH_HEADER
+          status=0
+          timeout --kill-after=5s 45s \
+            node scripts/workflow-expression-budget.mjs --ref "$GROUP_HEAD" --introduced-since "$GROUP_BASE" \
+            || status=$?
+          if [[ "$status" -eq 124 || "$status" -eq 137 ]]; then
+            echo '::warning::Workflow load guard timed out; not blocking the group.'
+            status=0
+          fi
+          exit "$status"
 
   size:
     name: ${{ github.event_name == 'pull_request' && 'PR Size Guard' || 'PR Size Guard (source inactive)' }}

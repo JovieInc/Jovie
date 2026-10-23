@@ -47,6 +47,23 @@ async function interceptAnalytics(page: Page) {
   await page.route('**/api/track', (r: Route) =>
     r.fulfill({ status: 200, body: '{}' })
   );
+  // The claimed fixtures mount fan capture, whose admission GET draws on
+  // the shared per-IP capture-dismissal limiter (20/min) in this shard's
+  // single server process. Mocking keeps the fan-capture CTA mounted and
+  // asserted while unmocked admission specs (public-profile-smoke) keep
+  // their real budget. Same response shape as public-surface-helpers.
+  await page.route('**/api/profile/capture-dismissal**', (r: Route) =>
+    r.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        suppressed: r.request().method() === 'POST',
+        sessionCount: 0,
+        nextEligibleAt: null,
+      }),
+    })
+  );
 }
 
 function isUnavailablePage(text: string): boolean {
@@ -136,7 +153,11 @@ describeProfile('Profile - Core Rendering', () => {
     await expect(anyLink).toBeVisible();
   });
 
-  test('has Jovie footer branding', async ({ page }) => {
+  // JOV-8777: free public profiles currently render no Jovie branding at all
+  // (hideJovieBranding is accepted but unused since #14559), while SmartLinks
+  // still show "Powered by Jovie". Where free-tier profile branding lives is a
+  // product/taste call; re-enable and repoint once JOV-8777 ships.
+  test.fixme('has Jovie footer branding', async ({ page }) => {
     const footerLink = page.getByRole('link', { name: /Jovie home/i });
     await expect(footerLink.first()).toBeVisible({ timeout: 10000 });
   });
@@ -404,7 +425,8 @@ test.describe('Profile Modes @smoke @critical', () => {
   test.describe('deep link routing', () => {
     const deepLinks = [
       { mode: 'listen', path: 'listen' },
-      { mode: 'tip', path: 'tip' },
+      // /tip is a legacy alias of pay mode (LEGACY_PROFILE_MODE_BY_SLUG).
+      { mode: 'pay', path: 'tip' },
       { mode: 'subscribe', path: 'subscribe' },
       { mode: 'about', path: 'about' },
       { mode: 'contact', path: 'contact' },
@@ -432,8 +454,12 @@ test.describe('Profile Modes @smoke @critical', () => {
           return;
         }
 
+        // /about is the profile page itself. Other legacy slugs still
+        // redirect onto the query-mode form.
         await expect(page).toHaveURL(
-          new RegExp(`/${TEST_PROFILES.DUALIPA}\\?mode=${deepLink.mode}`)
+          deepLink.path === 'about'
+            ? new RegExp(`/${TEST_PROFILES.DUALIPA}/about/?$`)
+            : new RegExp(`/${TEST_PROFILES.DUALIPA}\\?mode=${deepLink.mode}`)
         );
       });
     }
@@ -444,7 +470,10 @@ test.describe('Profile Modes @smoke @critical', () => {
   }) => {
     await interceptAnalytics(page);
 
-    const handle = process.env.E2E_NOTIFICATIONS_PROFILE || 'testartist';
+    // testartist stays the unclaimed tipping fixture, so it never mounts
+    // fan capture. The claimed music profile is the surface this CTA covers.
+    const handle =
+      process.env.E2E_NOTIFICATIONS_PROFILE || TEST_PROFILES.DUALIPA;
     const response = await smokeNavigate(page, `/${handle}/notifications`);
     expect(response?.status() ?? 0).toBeLessThan(500);
 

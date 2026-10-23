@@ -1,8 +1,22 @@
 # Release Checklist
 
+## Web production releases
+
+Use the canonical [web release path](docs/release/web-release-path.md) for staging
+admission, production promotion, canary and post-deploy verification, centralized
+rollback, and the JOV-6688 break-glass boundary. It links the controlling workflows
+and scripts at reviewed commits and distinguishes blocking gates from warnings.
+A source merge or a historical evidence row below does not certify production;
+retain the exact controller attempt, deployment identity, and verified marker.
+
+## Platform hardening baseline (JOV-2712)
+
+These platform evidence tables retain the JOV-2712 baseline. Current web release
+controls are documented above; the deferred rows below are historical tracking.
+
 Tracking issue: [JOV-2712](https://linear.app/jovie/issue/JOV-2712/track-platform-hardening-deliverables-and-ios-evidence-baseline)
 
-## Required Gates
+### Platform evidence requirements
 
 | Gate | Status |
 | --- | --- |
@@ -15,7 +29,7 @@ Tracking issue: [JOV-2712](https://linear.app/jovie/issue/JOV-2712/track-platfor
 | Critical bug ledger clear or explicitly accepted | Evidence required under JOV-2712 |
 | Bot review comments addressed before merge | Required by `.claude/rules/release.md` |
 
-## Current iOS Evidence
+### iOS evidence (historical)
 
 | Check | Evidence | Result |
 | --- | --- | --- |

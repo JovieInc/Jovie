@@ -530,6 +530,13 @@ export const PRODUCT_CAPABILITIES = {
       routes: ['/pricing'],
     },
   },
+  'automatic-links': {
+    maturity: 'proposed',
+    publication: 'internal_only',
+    access: 'unavailable',
+    entitlementKeys: ['canAutoCreateLinks'],
+    evidence: { captureScenarios: [], routes: [] },
+  },
   'fan-crm': {
     maturity: 'limited_testing',
     publication: 'public',
@@ -765,6 +772,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   SOCIAL_HTML_ISOLATED_PROVIDER: {
     nonMarketing:
       'internal ingestion routing kill switch; reserved for future isolated provider rollout',
+  },
+  STRIPE_TEST_PRICE_CONFIGURED: {
+    nonMarketing:
+      'CI Stripe test-price secret readiness; default off names the missing GitHub secret and still fails closed',
   },
   INVESTOR_PORTAL_YC_DECK: {
     nonMarketing:

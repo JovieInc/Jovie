@@ -23,6 +23,19 @@ describe('cn', () => {
     expect(cn('mt-2 mb-4', 'mt-8')).toBe('mb-4 mt-8');
   });
 
+  it('merges surface transitions with inherited transitions and caller overrides', () => {
+    expect(cn('transition-colors', 'transition-surface')).toBe(
+      'transition-surface'
+    );
+    expect(
+      cn('transition-[background-color,color]', 'transition-surface')
+    ).toBe('transition-surface');
+    expect(cn('transition-surface', 'transition-none')).toBe('transition-none');
+    expect(cn('motion-reduce:transition-none', 'transition-surface')).toBe(
+      'motion-reduce:transition-none transition-surface'
+    );
+  });
+
   it('handles conditional class objects', () => {
     expect(cn({ foo: true, bar: false })).toBe('foo');
     expect(cn({ foo: true, bar: true })).toBe('foo bar');

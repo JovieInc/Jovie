@@ -28,6 +28,8 @@ export interface KeyframeRecord {
   readonly url: string;
   readonly file: string;
   readonly sha256: string;
+  /** Expected fixture identity, independent of the text rendered by the page. */
+  readonly expectedArtistName?: string;
   readonly audit: LayoutAudit;
   readonly pageErrors: readonly string[];
 }
@@ -78,13 +80,18 @@ export async function inspectEssentialViewport(
       for (let node = el.parentElement; node; node = node.parentElement) {
         const style = getComputedStyle(node);
         const clip = node.getBoundingClientRect();
+        // Motion's composer layout projection scales viewport bounds, while
+        // client dimensions and borders stay in layout pixels. Convert the
+        // clip's client box into the same coordinates as the control's rect.
+        const scaleX = node.offsetWidth > 0 ? clip.width / node.offsetWidth : 1;
+        const scaleY = node.offsetHeight > 0 ? clip.height / node.offsetHeight : 1;
         if (/(hidden|clip|auto|scroll)/.test(style.overflowX)) {
-          left = Math.max(left, clip.left + node.clientLeft);
-          right = Math.min(right, clip.left + node.clientLeft + node.clientWidth);
+          left = Math.max(left, clip.left + node.clientLeft * scaleX);
+          right = Math.min(right, clip.left + (node.clientLeft + node.clientWidth) * scaleX);
         }
         if (/(hidden|clip|auto|scroll)/.test(style.overflowY)) {
-          top = Math.max(top, clip.top + node.clientTop);
-          bottom = Math.min(bottom, clip.top + node.clientTop + node.clientHeight);
+          top = Math.max(top, clip.top + node.clientTop * scaleY);
+          bottom = Math.min(bottom, clip.top + (node.clientTop + node.clientHeight) * scaleY);
         }
       }
       if (rect.width <= 0 || rect.height <= 0 || rect.left < left - 1 || rect.top < top - 1 || rect.right > right + 1 || rect.bottom > bottom + 1) {
@@ -93,10 +100,21 @@ export async function inspectEssentialViewport(
       }
       const x = (rect.left + rect.right) / 2, y = (rect.top + rect.bottom) / 2;
       const points = [[x,y], [rect.left + 1,y], [rect.right - 1,y], [x,rect.top + 1], [x,rect.bottom - 1]];
-      if (points.some(([px,py]) => {
-        const hit = document.elementFromPoint(px,py);
+      // elementFromPoint skips pointer-events:none, so a painted status pill
+      // looks occluded by whatever sits underneath it. Sample with the target
+      // hit-testable, then restore. A real cover still wins.
+      const occludedAt = (px, py) => {
+        const previous = el.style.pointerEvents;
+        el.style.pointerEvents = 'auto';
+        let hit;
+        try {
+          hit = document.elementFromPoint(px, py);
+        } finally {
+          el.style.pointerEvents = previous;
+        }
         return !hit || (hit !== el && !el.contains(hit));
-      })) findings.push({ selector, reason: 'occluded', box });
+      };
+      if (points.some(([px,py]) => occludedAt(px, py))) findings.push({ selector, reason: 'occluded', box });
     }
     return { supported: true, findings };
   })(${JSON.stringify(selectors)})`);
@@ -236,7 +254,11 @@ export function watchKeyframeErrors(page: Page): void {
   if (process.env.GOLDEN_PATH_KEYFRAME_DIR) trackErrors(page);
 }
 
-export async function captureKeyframe(page: Page, id: string): Promise<void> {
+export async function captureKeyframe(
+  page: Page,
+  id: string,
+  context: Pick<KeyframeRecord, 'expectedArtistName'> = {}
+): Promise<void> {
   const dir = process.env.GOLDEN_PATH_KEYFRAME_DIR;
   if (!dir) return;
   mkdirSync(dir, { recursive: true });
@@ -262,6 +284,7 @@ export async function captureKeyframe(page: Page, id: string): Promise<void> {
     url: page.url(),
     file,
     sha256: createHash('sha256').update(image).digest('hex'),
+    expectedArtistName: context.expectedArtistName,
     audit: (await page.evaluate(LAYOUT_AUDIT_SOURCE)) as LayoutAudit,
     pageErrors: errors.splice(0),
   };

@@ -32,6 +32,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import autoscale  # noqa: E402  (sibling module of the release)
 import worktree_pool  # noqa: E402  (sibling module of the release)
+import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 
 # One threshold (Gem 2026-10-12 04:12Z): autoscale stops growth at or below this free %, so the
 # sweep must already run there. At exactly 15% growth was blocked and nothing was reclaimed
@@ -142,15 +143,50 @@ def busy_reason(path: Path, run=subprocess.run) -> str | None:
     proof of idleness."""
     if index_locked(path):
         return "git-index-locked"
+    holders = cwd_holders(path, run)
+    if holders is None:
+        return "process-state-unavailable"
+    return "process-still-running" if holders else None
+
+
+# Linux lsof warns once per mount it cannot stat (Docker overlay, nsfs). Such a warning
+# only leaves files on that mount incomplete, so it cannot hide a cwd under an unrelated
+# path; any other stderr, or a warning about a mount containing the path, fails closed.
+UNSTATTABLE_MOUNT = re.compile(r"^lsof: WARNING: can't stat\(\) \S+ file system (/\S*)$")
+INCOMPLETE_NOTICE = "Output information may be incomplete."
+
+
+def _lsof_warnings_unrelated(stderr: str, path: Path) -> bool:
+    for line in (stderr or "").splitlines():
+        line = line.strip()
+        if not line or line == INCOMPLETE_NOTICE:
+            continue
+        match = UNSTATTABLE_MOUNT.match(line)
+        if not match:
+            return False
+        mount = Path(match.group(1))
+        if mount == path or mount in path.parents:
+            return False
+    return True
+
+
+def cwd_holders(path: Path, run=subprocess.run) -> dict[int, Path] | None:
+    """{pid: cwd} of every process working under `path`; None when the inventory is
+    unreadable (callers fail closed)."""
+    resolved = path.resolve()
     try:
         active = run(["lsof", "-nP", "-a", "-d", "cwd", "-F", "pn"],
                      capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
-        return "process-state-unavailable"
-    if getattr(active, "returncode", None) not in (0, 1) or getattr(active, "stderr", ""):
-        return "process-state-unavailable"
-    resolved = path.resolve()
+        return None
+    if (getattr(active, "returncode", None) not in (0, 1)
+            or not _lsof_warnings_unrelated(getattr(active, "stderr", ""), resolved)):
+        return None
+    holders, pid = {}, None
     for line in active.stdout.splitlines():
+        if line.startswith("p") and line[1:].isdecimal():
+            pid = int(line[1:])
+            continue
         if not line.startswith("n"):
             continue
         try:
@@ -158,8 +194,28 @@ def busy_reason(path: Path, run=subprocess.run) -> str | None:
         except OSError:
             continue
         if cwd == resolved or resolved in cwd.parents:
-            return "process-still-running"
-    return None
+            holders[pid if pid is not None else -1] = cwd
+    return holders
+
+
+def reap_cwd_holders(path: Path, run=subprocess.run, kill=os.kill, grace_s: float = 5,
+                     sleep=time.sleep) -> list[int]:
+    """At the end of a run that owns `path`, stop processes still working in it (dev servers,
+    esbuild) that escaped the provider's process-group kill by reparenting. Never this
+    process; unreadable inventory reaps nothing and the idle check still preserves."""
+    import signal
+    holders = cwd_holders(path, run) or {}
+    pids = [pid for pid in holders if pid > 1 and pid != os.getpid()]
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        for pid in pids:
+            try:
+                kill(pid, sig)
+            except (ProcessLookupError, PermissionError):
+                pass
+        if sig == signal.SIGTERM and pids:
+            sleep(grace_s)
+            pids = [pid for pid in (cwd_holders(path, run) or {}) if pid in pids]
+    return sorted(holders)
 
 
 def prune_build_dirs(path: Path, report: dict) -> None:
@@ -279,7 +335,7 @@ def sweep_retired_workspaces(host, run, now: float, report: dict, roots=None,
     """Idle retired Symphony workspaces go, only from a filesystem that is itself under
     LOW_PCT. Never through a mount (a bind-mounted workspace is skipped whole), never a busy
     one, and never unsaved work: a git checkout with dirty or unpushed state is first pushed to
-    `backup/<host>/...` exactly as worktree_sweep does; if that fails, or the directory is not
+    `refs/jovie-preserved/sweep/<host>/...` exactly as worktree_sweep does; if that fails, or the directory is not
     a readable checkout, it only loses regenerable build output."""
     import worktree_sweep  # late: worktree_sweep imports this module
     roots = retired_workspace_roots() if roots is None else roots
@@ -292,7 +348,7 @@ def sweep_retired_workspaces(host, run, now: float, report: dict, roots=None,
         report["errors"].append("retired-workspaces:" + ("mounts-unavailable" if mounts is None
                                                         else "process-state-unavailable"))
         return
-    prefix = "backup/mac" if sys.platform == "darwin" else f"backup/{os.uname().nodename.split('.')[0]}"
+    prefix = worktree_sweep.sweep_prefix()
     date = datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d")
     deadline = time.monotonic() + budget_s
     for root in candidates:
@@ -309,19 +365,30 @@ def sweep_retired_workspaces(host, run, now: float, report: dict, roots=None,
                 continue
             if worktree_sweep.busy(resolved, live) or recently_touched(path, WORKTREE_IDLE_S, now):
                 continue
+            # inspect() is fail-closed when git cannot take the index. Wait out a
+            # detached maintenance writer first; a lock that outlives the wait still
+            # leaves the workspace in place.
+            git_housekeeping.quiesce(path)
             info = worktree_sweep.inspect(path, run) if (path / ".git").exists() else None
             if info is None:
                 worktree_sweep.strip_build_dirs(path)
                 report["actions"].append(f"stripped unverifiable workspace {path}")
                 continue
             if info["dirty"] or info["unpushed"] != "0":
-                saved = worktree_sweep.backup(path, info, run, prefix, date)
+                try:
+                    saved = worktree_sweep.backup(path, info, run, prefix, date)
+                except worktree_sweep.SnapshotHeld as held:
+                    report["actions"].append(f"kept workspace {path}: snapshot held ({held.reason})")
+                    continue
                 if not saved:
                     worktree_sweep.strip_build_dirs(path)
                     report["actions"].append(f"stripped workspace {path}: backup failed")
                     continue
                 report["actions"].append(f"backed up {path} to {saved}")
-            shutil.rmtree(path, ignore_errors=True)
+            try:
+                git_housekeeping.remove_tree(path)
+            except OSError:
+                pass
             (report["errors"] if path.exists() else report["actions"]).append(f"removed retired workspace {path}")
 
 

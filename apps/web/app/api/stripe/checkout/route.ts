@@ -5,10 +5,22 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { APP_ROUTES } from '@/constants/routes';
+import { agentCheckoutCorrelation } from '@/lib/acquisition/agent-checkout-correlation';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
+import {
+  FIRST_TOUCH_COOKIE,
+  openFirstTouchEnvelope,
+} from '@/lib/acquisition/first-touch-envelope';
 import { getCachedAuth } from '@/lib/auth/cached';
+import {
+  CLAIM_FLOW_COOKIE,
+  claimStateHref,
+} from '@/lib/claim/artist-offer-claim';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import {
   MAX_REFERRAL_CODE_LENGTH,
@@ -64,7 +76,10 @@ function normalizeReferralCode(raw: unknown): string | undefined {
   return isValid ? trimmed.toLowerCase() : undefined;
 }
 
-async function validatePriceId(priceId: string): Promise<NextResponse | null> {
+async function validatePriceId(
+  priceId: string,
+  userId: string
+): Promise<NextResponse | null> {
   const activePriceIds = getActivePriceIds();
 
   Sentry.addBreadcrumb({
@@ -78,6 +93,12 @@ async function validatePriceId(priceId: string): Promise<NextResponse | null> {
   });
 
   if (activePriceIds.length === 0) {
+    captureRevenueSpineFailure({
+      stage: 'checkout',
+      failureCode: 'configuration_missing',
+      severity: 'blocked',
+      userId,
+    });
     await captureCriticalError(
       'Checkout rejected: no active price IDs configured',
       new Error(
@@ -140,11 +161,14 @@ async function handleCheckoutError(error: unknown): Promise<NextResponse> {
 }
 
 export async function POST(request: NextRequest) {
+  let affectedUserId: string | null = null;
   try {
     const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) return jsonError('Unauthorized', 401);
+    affectedUserId = userId;
 
     const parsedBody = await parseJsonBody<{
+      humanConfirmed?: unknown;
       priceId?: unknown;
       referralCode?: unknown;
       returnTo?: unknown;
@@ -172,9 +196,16 @@ export async function POST(request: NextRequest) {
       source: rawSource,
     } = parsedBody.data;
 
+    const envelope = await openFirstTouchEnvelope(
+      request.cookies.get(FIRST_TOUCH_COOKIE)?.value
+    );
+    if (envelope?.agentIntent && parsedBody.data.humanConfirmed !== true) {
+      return jsonError('Confirm the purchase before starting checkout', 400);
+    }
     let correlation;
     try {
       correlation = mergeCheckoutCorrelation(
+        agentCheckoutCorrelation(envelope),
         parseCheckoutCorrelation(parsedBody.data),
         parseCheckoutCorrelation({
           acquisitionId: request.cookies.get(ACQUISITION_COOKIE_NAME)?.value,
@@ -198,7 +229,7 @@ export async function POST(request: NextRequest) {
     const referralCode = normalizeReferralCode(rawReferralCode);
     const onboardingReturnTo = normalizeOnboardingReturnTo(rawReturnTo);
 
-    const priceError = await validatePriceId(priceId);
+    const priceError = await validatePriceId(priceId, userId);
     if (priceError) return priceError;
 
     if (!isMaxPlanEnabled() && isMaxPriceId(priceId)) {
@@ -206,6 +237,9 @@ export async function POST(request: NextRequest) {
     }
 
     const priceDetails = getPriceMappingDetails(priceId);
+    if (envelope?.agentIntent && priceDetails?.plan !== 'pro') {
+      return jsonError('Invalid price for the selected offer', 400);
+    }
     logger.info('Creating checkout session for:', {
       userId,
       priceId,
@@ -247,10 +281,17 @@ export async function POST(request: NextRequest) {
     const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const idempotencyBucket = Math.floor(Date.now() / (5 * 60 * 1000));
 
+    // Self-serve claim (/claim/start) returns to the billing success state,
+    // which confirms payment and entitlement, and to /claim on cancel.
+    const isClaimFlow =
+      checkoutSource === 'onboarding' &&
+      request.cookies.get(CLAIM_FLOW_COOKIE)?.value === '1';
+
+    const sourceKey = isClaimFlow ? 'claim' : (checkoutSource ?? 'default');
     const correlationPart = checkoutCorrelationIdempotencyPart(correlation);
     const idempotencyKey = correlationPart
-      ? `checkout:${userId}:${priceId}:${checkoutSource ?? 'default'}:${correlationPart}:${idempotencyBucket}`
-      : `checkout:${userId}:${priceId}:${checkoutSource ?? 'default'}:${idempotencyBucket}`;
+      ? `checkout:${userId}:${priceId}:${sourceKey}:${correlationPart}:${idempotencyBucket}`
+      : `checkout:${userId}:${priceId}:${sourceKey}:${idempotencyBucket}`;
 
     const planIdSuffix = selectedPlan
       ? `&plan_id=${encodeURIComponent(selectedPlan)}`
@@ -258,7 +299,10 @@ export async function POST(request: NextRequest) {
 
     let successUrl: string;
     let cancelUrl: string;
-    if (checkoutSource === 'onboarding') {
+    if (isClaimFlow) {
+      successUrl = `${baseUrl}${APP_ROUTES.BILLING_SUCCESS}?session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
+      cancelUrl = `${baseUrl}${claimStateHref('checkout_canceled')}`;
+    } else if (checkoutSource === 'onboarding') {
       successUrl = `${baseUrl}${onboardingReturnTo}&upgrade=success&session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
       cancelUrl = `${baseUrl}${onboardingReturnTo}&upgrade=cancel`;
     } else if (checkoutSource === 'youtube_thumbnails') {
@@ -305,12 +349,19 @@ export async function POST(request: NextRequest) {
       undefined,
       { eventIdentity: `checkout:${session.id}` }
     );
+    await recordArtistOfferStage(correlation.acquisitionId, 'checkout');
 
     return NextResponse.json(
       { sessionId: session.id, url: session.url },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
+    captureRevenueSpineFailure({
+      stage: 'checkout',
+      severity: 'blocked',
+      userId: affectedUserId,
+      error,
+    });
     logger.error('Error creating checkout session:', error);
     return handleCheckoutError(error);
   }

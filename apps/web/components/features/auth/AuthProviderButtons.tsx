@@ -1,8 +1,8 @@
 // @coverage-via apps/web/tests/unit/auth/AuthProviderButtons.test.tsx
+import Image from 'next/image';
 import type { PrimaryAuthOAuthProvider } from '@/lib/auth/oauth-providers';
 import { getAuthOAuthProviderLabel } from '@/lib/auth/oauth-providers';
 import { cn } from '@/lib/utils';
-import { AuthAppleIcon, AuthGoogleIcon } from './atoms';
 
 interface AuthProviderButtonSlotProps {
   readonly provider: PrimaryAuthOAuthProvider;
@@ -11,28 +11,15 @@ interface AuthProviderButtonSlotProps {
   readonly pending?: boolean;
 }
 
-function AuthProviderIcon({
-  provider,
-}: Readonly<{ provider: PrimaryAuthOAuthProvider }>) {
-  const className = 'h-5 w-5 shrink-0';
-
-  if (provider === 'google') {
-    return <AuthGoogleIcon className={className} />;
-  }
-
-  return <AuthAppleIcon className={className} />;
-}
-
 /**
  * Provider buttons are the only branded exceptions on the auth form.
- * Apple and Google share one dark, 28/44 treatment so they read as a pair.
+ * Official artwork and provider-specific treatments live in the shared theme.
+ * Provider artwork and the Google Sans license are bundled under public/auth.
  */
 const AUTH_PROVIDER_BUTTON_CLASS = cn(
-  'relative flex h-7 min-h-7 w-full items-center justify-center gap-(--space-2) rounded-full border border-white/10 bg-transparent px-(--space-4) text-sm font-[510] tracking-normal text-primary-token',
-  'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+  'auth-provider-button focus-ring-themed w-full',
   'transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out',
-  'hover:bg-white/[0.04]',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+  'enabled:hover:opacity-90'
 );
 
 export function AuthProviderButtonSlot({
@@ -48,16 +35,23 @@ export function AuthProviderButtonSlot({
     <button
       type='button'
       disabled={isDisabled}
-      aria-label={isDisabled ? `${label} loading` : undefined}
+      aria-label={pending ? `${label} loading` : undefined}
       data-auth-provider-slot={provider}
       data-auth-provider-pending={pending ? 'true' : undefined}
       onClick={onClick}
       className={cn(
         AUTH_PROVIDER_BUTTON_CLASS,
-        isDisabled && 'cursor-wait opacity-75'
+        pending && 'cursor-wait opacity-75'
       )}
     >
-      <AuthProviderIcon provider={provider} />
+      <Image
+        src={`/auth/${provider}-logo.svg`}
+        width={provider === 'apple' ? 24 : 20}
+        height={provider === 'apple' ? 44 : 20}
+        alt=''
+        aria-hidden='true'
+        unoptimized
+      />
       <span>{label}</span>
     </button>
   );

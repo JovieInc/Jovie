@@ -17,6 +17,7 @@
  */
 
 import { z } from 'zod';
+import { GrowthGovernanceSchema } from './growth-governance';
 
 /** Minimum number of eval seed cases a playbook must ship with. */
 export const MIN_EVAL_SEEDS = 2;
@@ -43,7 +44,7 @@ export type MeasurableMetricSource = (typeof MEASURABLE_METRIC_SOURCES)[number];
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+$/;
 
-const PlaybookToolCallStepSchema = z.object({
+const PlaybookToolCallStepSchema = z.strictObject({
   kind: z.literal('tool_call'),
   /** Tool id invoked by this step. Must appear in `requiredTools`. */
   tool: z.string().min(1),
@@ -52,7 +53,7 @@ const PlaybookToolCallStepSchema = z.object({
   inputs: z.record(z.string(), z.string()).optional(),
 });
 
-const PlaybookPromptStepSchema = z.object({
+const PlaybookPromptStepSchema = z.strictObject({
   kind: z.literal('prompt'),
   description: z.string().min(1),
   /** Prompt text (may reference required inputs as {{placeholders}}). */
@@ -64,7 +65,7 @@ export const PlaybookStepSchema = z.discriminatedUnion('kind', [
   PlaybookPromptStepSchema,
 ]);
 
-export const PlaybookSuccessMetricSchema = z.object({
+export const PlaybookSuccessMetricSchema = z.strictObject({
   /** Human-readable metric name, e.g. "Smart link CTR". */
   name: z.string().min(1),
   /** Where the measurement comes from. Linted against MEASURABLE_METRIC_SOURCES. */
@@ -76,7 +77,7 @@ export const PlaybookSuccessMetricSchema = z.object({
   window: z.string().min(1),
 });
 
-export const PlaybookEvalSeedSchema = z.object({
+export const PlaybookEvalSeedSchema = z.strictObject({
   name: z.string().min(1),
   /** Concrete input fixture the eval harness feeds the playbook. */
   input: z.record(z.string(), z.unknown()),
@@ -85,7 +86,7 @@ export const PlaybookEvalSeedSchema = z.object({
 });
 
 export const PlaybookCostEstimateSchema = z
-  .object({
+  .strictObject({
     credits: z.number().nonnegative().optional(),
     usd: z.number().nonnegative().optional(),
     notes: z.string().optional(),
@@ -94,7 +95,8 @@ export const PlaybookCostEstimateSchema = z
     message: 'costEstimate must declare `credits` or `usd` (or both)',
   });
 
-export const PlaybookDefinitionSchema = z.object({
+export const PlaybookDefinitionSchema = z.strictObject({
+  growthGovernance: GrowthGovernanceSchema.optional(),
   /** Unique slug — doubles as the filename stem (`<id>.playbook.md`). */
   id: z.string().regex(SLUG_PATTERN, 'id must be a kebab-case slug'),
   title: z.string().min(1),
@@ -104,7 +106,7 @@ export const PlaybookDefinitionSchema = z.object({
   /** Conditions under which this playbook should fire. */
   triggerConditions: z.array(z.string().min(1)).min(1),
   requiredInputs: z.array(
-    z.object({
+    z.strictObject({
       name: z.string().min(1),
       description: z.string().min(1),
       example: z.string().optional(),
@@ -133,7 +135,8 @@ export type PlaybookValidationRule =
   | 'invalid-schema'
   | 'missing-eval-seeds'
   | 'unmeasurable-success-metric'
-  | 'undeclared-tool-deps';
+  | 'undeclared-tool-deps'
+  | 'unsafe-growth-preparation';
 
 export interface PlaybookValidationError {
   rule: PlaybookValidationRule;
@@ -172,6 +175,20 @@ function lintPlaybook(
   definition: PlaybookDefinition
 ): PlaybookValidationError[] {
   const errors: PlaybookValidationError[] = [];
+  const growth = definition.growthGovernance;
+  if (
+    (definition.id.startsWith('growth-') && !growth) ||
+    (growth &&
+      (definition.requiredTools.length > 0 ||
+        definition.requiredConnectors.length > 0 ||
+        definition.steps.some(step => step.kind !== 'prompt')))
+  ) {
+    errors.push({
+      rule: 'unsafe-growth-preparation',
+      message:
+        'growth drafts require preparation-only governance, prompt steps and no tools or connectors',
+    });
+  }
 
   if (definition.evalSeeds.length < MIN_EVAL_SEEDS) {
     errors.push({

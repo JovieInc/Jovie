@@ -148,6 +148,35 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('does not write a legal-cookies screen id as a credential assignment', () => {
+    const guard = join(ROOT, '.github/scripts/guard-playwright-artifacts.mjs');
+    const script = `
+      import { artifactContainsSecret } from ${JSON.stringify(guard)};
+      const receipt = JSON.stringify({
+        issues: [
+          'trusted producer artifact 12435475550 is not acceptable for web.legal-cookies (artifact run, workflow, or exact producer attempt is not trusted)',
+          'screen web.legal-cookies blocked (viewport desktop is missing a decision)',
+          'missing exact-head proof for web.legal-cookies',
+        ],
+      }, null, 2);
+      const checks = [
+        [artifactContainsSecret(receipt, {}), false],
+        [artifactContainsSecret('web.legal-cookies: trusted producer artifact 1 is not acceptable', {}), true],
+        [artifactContainsSecret('COOKIE=session-token-value', {}), true],
+      ];
+      if (checks.some(([actual, expected]) => actual !== expected)) {
+        console.error(JSON.stringify(checks));
+        process.exit(1);
+      }
+    `;
+    const result = spawnSync(
+      process.execPath,
+      ['--input-type=module', '-e', script],
+      { encoding: 'utf8' }
+    );
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  });
+
   it('decides product-reference membership without loading typescript', () => {
     assert.equal(screenNeedsProductReferences('web.presence'), true);
     assert.equal(screenNeedsProductReferences('web.library'), true);
@@ -400,10 +429,15 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       kindOf('apps/web/app/(dynamic)/start/layout.tsx'),
       'registered'
     );
+    assert.equal(
+      kindOf('apps/web/app/(dynamic)/start/loading.tsx'),
+      'registered'
+    );
     assert.equal(kindOf('apps/web/app/[username]/layout.tsx'), 'registered');
     const result = evaluateChangedScreens({
       changedFiles: [
         { path: 'apps/web/app/(dynamic)/start/layout.tsx', status: 'M' },
+        { path: 'apps/web/app/(dynamic)/start/loading.tsx', status: 'M' },
         { path: 'apps/web/app/[username]/layout.tsx', status: 'M' },
       ],
       headSha: HEAD,
@@ -437,7 +471,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     const sources = [
       'apps/web/app/app/(shell)/admin/activity/page.tsx',
       'apps/web/app/app/(shell)/admin/growth/page.tsx',
-      'apps/web/app/app/(shell)/admin/needs-you/page.tsx',
       'apps/web/app/app/(shell)/admin/operations/page.tsx',
       'apps/web/app/app/(shell)/admin/product/page.tsx',
     ];
@@ -938,6 +971,94 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         resolveProof().proof,
         'a downstream job in the same run may verify its completed producer job'
       );
+      records.jobs.jobs[0].conclusion = null;
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      writeFileSync(join(root, 'job-reads'), '0');
+      const originalGh = readFileSync(gh, 'utf8');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node
+const fs = require('node:fs');
+const p = process.argv.at(-1);
+const recordsPath = ${JSON.stringify(join(root, 'records.json'))};
+const hitsPath = ${JSON.stringify(join(root, 'job-reads'))};
+const r = JSON.parse(fs.readFileSync(recordsPath));
+if (p.endsWith('/zip')) {
+  process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));
+} else if (p.includes('/attempts/')) {
+  const n = Number(fs.readFileSync(hitsPath, 'utf8') || '0') + 1;
+  fs.writeFileSync(hitsPath, String(n));
+  const jobs = JSON.parse(JSON.stringify(r.jobs));
+  if (n === 1) jobs.jobs[0].conclusion = null;
+  else jobs.jobs[0].conclusion = 'success';
+  process.stdout.write(JSON.stringify(jobs));
+} else {
+  process.stdout.write(JSON.stringify(p.includes('/artifacts/') ? r.artifact : r.run));
+}
+`
+      );
+      chmodSync(gh, 0o755);
+      assert.ok(
+        resolveTrustedScreenProof({
+          artifactId: 42,
+          lagDelays: [0],
+          context: {
+            headSha: head,
+            screenId: 'web.homepage',
+            sourcePaths: home().sources,
+            viewports: home().viewports,
+            proofRoute: '/',
+          },
+        }).proof,
+        'same-run certification waits until the producer job row is success'
+      );
+      assert.equal(readFileSync(join(root, 'job-reads'), 'utf8'), '2');
+      records.jobs.jobs[0].conclusion = 'failure';
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      writeFileSync(join(root, 'job-reads'), '0');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node
+const fs = require('node:fs');
+const p = process.argv.at(-1);
+const recordsPath = ${JSON.stringify(join(root, 'records.json'))};
+const hitsPath = ${JSON.stringify(join(root, 'job-reads'))};
+const r = JSON.parse(fs.readFileSync(recordsPath));
+if (p.endsWith('/zip')) {
+  process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));
+} else if (p.includes('/attempts/')) {
+  const n = Number(fs.readFileSync(hitsPath, 'utf8') || '0') + 1;
+  fs.writeFileSync(hitsPath, String(n));
+  process.stdout.write(JSON.stringify(r.jobs));
+} else {
+  process.stdout.write(JSON.stringify(p.includes('/artifacts/') ? r.artifact : r.run));
+}
+`
+      );
+      chmodSync(gh, 0o755);
+      assert.equal(
+        resolveTrustedScreenProof({
+          artifactId: 42,
+          lagDelays: [0, 0, 0],
+          context: {
+            headSha: head,
+            screenId: 'web.homepage',
+            sourcePaths: home().sources,
+            viewports: home().viewports,
+            proofRoute: '/',
+          },
+        }).proof,
+        null
+      );
+      assert.equal(
+        readFileSync(join(root, 'job-reads'), 'utf8'),
+        '1',
+        'a failed producer job is not retried'
+      );
+      writeFileSync(gh, originalGh);
+      chmodSync(gh, 0o755);
+      records.jobs.jobs[0].conclusion = 'success';
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
       process.env.GITHUB_RUN_ATTEMPT = '4';
       assert.equal(resolveProof().proof, null);
       process.env.GITHUB_RUN_ATTEMPT = '3';
@@ -1156,6 +1277,65 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     }
   });
 
+  it('captures web.onboarding-checkout through the test-auth session', () => {
+    const workflow = readFileSync(
+      join(ROOT, '.github/workflows/screenshots.yml'),
+      'utf8'
+    );
+    const publicSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/public-screens-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    const checkoutSpec = readFileSync(
+      join(
+        ROOT,
+        'apps/web/tests/product-screenshots/onboarding-checkout-screen-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    assert.equal(
+      SCREEN_PROOF_ROUTES['web.onboarding-checkout'],
+      '/onboarding/checkout'
+    );
+    assert.doesNotMatch(publicSpec, /web\.onboarding-checkout/);
+    assert.match(checkoutSpec, /\/api\/dev\/test-auth\/enter/);
+    assert.match(
+      checkoutSpec,
+      /expect\(finalUrl\.pathname\)\.toBe\(proofRoute\)/
+    );
+    assert.match(checkoutSpec, /expect\(finalUrl\.search\)\.toBe\(''\)/);
+    assert.match(checkoutSpec, /expect\(finalUrl\.hash\)\.toBe\(''\)/);
+    assert.match(
+      workflow,
+      /tests\/product-screenshots\/onboarding-checkout-screen-proof\.spec\.ts/
+    );
+    // The status assertion names the route. Runs 38885464809 and 38887532509
+    // both failed this line with 404 and no path.
+    assert.match(
+      publicSpec,
+      /expect\(\s*response\?\.status\(\),\s*`\$\{screen\.screenId\} \$\{screen\.route\}`\s*\)\.toBe\(\s*200\s*\)/
+    );
+    // Checkout starts another Playwright process. It must not run until the
+    // public-screen proofs are uploaded: the default output directory is
+    // test-results/, and emptying it deletes those bundles.
+    const checkoutCapture = workflow.indexOf(
+      'Capture onboarding checkout screen proof'
+    );
+    const marketingUpload = workflow.indexOf(
+      'Upload marketing-solutions screen proof'
+    );
+    const aboutUpload = workflow.indexOf(
+      'Upload public-profile-about screen proof'
+    );
+    assert.ok(marketingUpload > 0);
+    assert.ok(aboutUpload > 0);
+    assert.ok(checkoutCapture > marketingUpload);
+    assert.ok(checkoutCapture > aboutUpload);
+  });
+
   it('keeps the /artists producer identity synchronized with the trusted resolver (JOV-7125)', () => {
     const workflow = readFileSync(
       join(ROOT, '.github/workflows/screenshots.yml'),
@@ -1348,6 +1528,132 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       }),
       [{ artifactId: 42, screenId: 'web.public-profile' }]
     );
+  });
+
+  it('does not bind the marketing artifact to web.public-profile from another screen (JOV-8068)', () => {
+    const priorArtifact = process.env.SCREEN_CERT_ARTIFACT_ID;
+    const priorName = process.env.SCREEN_CERT_MARKETING_ARTIFACT;
+    const priorPath = process.env.PATH;
+    const root = mkdtempSync(join(tmpdir(), 'screen-public-profile-binding-'));
+    const head = 'a'.repeat(40);
+    try {
+      writeFileSync(
+        join(root, 'gh'),
+        '#!/usr/bin/env node\nprocess.stderr.write("resolver offline\\n");process.exit(1);\n'
+      );
+      chmodSync(join(root, 'gh'), 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      process.env.SCREEN_CERT_ARTIFACT_ID = '12049160869';
+      process.env.SCREEN_CERT_MARKETING_ARTIFACT =
+        'marketing-route-screenshots-' + head;
+      const targeted = runScreenCertification({
+        headSha: head,
+        changedFiles: [
+          'apps/web/app/[username]/page.tsx',
+          'apps/web/app/onboarding/checkout/page.tsx',
+        ],
+        targetScreenIds: ['web.artists'],
+        proofRequests: [{ artifactId: 99, screenId: 'web.artists' }],
+      });
+      const targetedIssues = targeted.receipt.issues.join('\n');
+      assert.equal(
+        targetedIssues.includes('web.public-profile'),
+        false,
+        targetedIssues
+      );
+      assert.equal(
+        targetedIssues.includes('web.onboarding-checkout'),
+        false,
+        targetedIssues
+      );
+      assert.equal(
+        targetedIssues.includes('no registered marketing route binding'),
+        false,
+        targetedIssues
+      );
+      assert.deepEqual(
+        targeted.receipt.changedScreens.map(screen => screen.id),
+        ['web.artists']
+      );
+      const unbound = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/[username]/page.tsx'],
+        artifactId: 12049160869,
+      });
+      const unboundIssues = unbound.receipt.issues.join('\n');
+      assert.match(
+        unboundIssues,
+        /missing exact-head proof for web\.public-profile/
+      );
+      assert.equal(
+        unboundIssues.includes('no registered marketing route binding'),
+        false,
+        unboundIssues
+      );
+      const marketing = runScreenCertification({
+        headSha: head,
+        changedFiles: ['apps/web/app/(home)/page.tsx'],
+        targetScreenIds: ['web.artists'],
+        proofRequests: [{ artifactId: 99, screenId: 'web.artists' }],
+      });
+      assert.deepEqual(
+        [...marketing.receipt.changedScreens.map(screen => screen.id)].sort(),
+        ['web.artists', 'web.homepage']
+      );
+      // Run 38909991473 applied the marketing zip (12049743189) to
+      // web.onboarding-checkout on every invocation because checkout
+      // sources had changed. SCREEN_CERT_ARTIFACT_ID above is that zip.
+      // Checkout keeps its dedicated producer artifact; homepage still
+      // uses the marketing zip.
+      const checkout = runScreenCertification({
+        headSha: head,
+        changedFiles: [
+          'apps/web/app/onboarding/checkout/page.tsx',
+          'apps/web/app/(home)/page.tsx',
+        ],
+        targetScreenIds: ['web.onboarding-checkout'],
+        proofRequests: [
+          {
+            artifactId: 12050661649,
+            screenId: 'web.onboarding-checkout',
+          },
+        ],
+      });
+      const checkoutIssues = checkout.receipt.issues.join('\n');
+      assert.match(
+        checkoutIssues,
+        /trusted producer artifact 12050661649 is not acceptable for web\.onboarding-checkout/
+      );
+      assert.equal(
+        checkoutIssues.includes(
+          'trusted producer artifact 12049160869 is not acceptable for web.onboarding-checkout'
+        ),
+        false,
+        checkoutIssues
+      );
+      assert.equal(
+        checkoutIssues.includes('no registered marketing route binding'),
+        false,
+        checkoutIssues
+      );
+      assert.match(
+        checkoutIssues,
+        /trusted producer artifact 12049160869 is not acceptable for web\.homepage/
+      );
+      assert.deepEqual(
+        [...checkout.receipt.changedScreens.map(screen => screen.id)].sort(),
+        ['web.homepage', 'web.onboarding-checkout']
+      );
+    } finally {
+      process.env.PATH = priorPath;
+      if (priorArtifact === undefined)
+        delete process.env.SCREEN_CERT_ARTIFACT_ID;
+      else process.env.SCREEN_CERT_ARTIFACT_ID = priorArtifact;
+      if (priorName === undefined)
+        delete process.env.SCREEN_CERT_MARKETING_ARTIFACT;
+      else process.env.SCREEN_CERT_MARKETING_ARTIFACT = priorName;
+      rmSync(root, { force: true, recursive: true });
+    }
   });
 
   it('fails closed for invalid controlled artifact requests through the API and CLI', () => {
@@ -1950,6 +2256,56 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     }
   });
 
+  it('accepts Next catch-all sources for web.smartlink-release and still rejects traversal', () => {
+    const root = mkdtempSync(join(tmpdir(), 'screen-resolver-catchall-'));
+    const priorPath = process.env.PATH;
+    try {
+      const screen = SCREEN_REGISTRY.find(
+        entry => entry.id === 'web.smartlink-release'
+      );
+      assert.ok(screen);
+      assert.ok(screen.sources.some(source => source.includes('[...slug]')));
+      const gh = join(root, 'gh');
+      writeFileSync(gh, '#!/bin/sh\nexit 1\n');
+      chmodSync(gh, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      const context = {
+        headSha: HEAD,
+        screenId: screen.id,
+        sourcePaths: [...screen.sources],
+        viewports: [...screen.viewports],
+      };
+      const accepted = resolveTrustedScreenProof({
+        artifactId: 12045112840,
+        context,
+      });
+      assert.equal(accepted.proof, null);
+      assert.match(
+        accepted.findings.join('\n'),
+        /controlled GitHub artifact resolver is unavailable/
+      );
+      assert.doesNotMatch(
+        accepted.findings.join('\n'),
+        /controlled resolver request is invalid/
+      );
+
+      const traversed = resolveTrustedScreenProof({
+        artifactId: 12045112840,
+        context: {
+          ...context,
+          sourcePaths: ['apps/web/app/[username]/../../secrets.txt'],
+        },
+      });
+      assert.match(
+        traversed.findings.join('\n'),
+        /controlled resolver request is invalid/
+      );
+    } finally {
+      process.env.PATH = priorPath;
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
   it('fails resolver requests with specific reasons: forged, stale, wrong-build, incomplete, unavailable', () => {
     const root = mkdtempSync(join(tmpdir(), 'screen-resolver-fail-'));
     const priorPath = process.env.PATH;
@@ -2460,10 +2816,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       ['apps/web/app/artists/page.tsx', 'web.artists'],
       [
         'apps/web/app/(marketing)/artist-profiles/page.tsx',
-        'web.artist-profiles',
-      ],
-      [
-        'apps/web/app/(marketing)/artist-profiles/artist-profile-modes.ts',
         'web.artist-profiles',
       ],
       [
@@ -4042,7 +4394,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
 
   it('rejects unregistered visible boundary, desktop renderer, and iOS screen paths', () => {
     const paths = [
-      'apps/web/app/(dynamic)/start/loading.tsx',
       'apps/web/app/billing/success/error.tsx',
       'apps/web/app/billing/success/not-found.tsx',
       'apps/desktop/src/renderer/App.tsx',

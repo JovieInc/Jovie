@@ -6,6 +6,9 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 const { withWorkflow } = require('workflow/next');
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
+const {
+  legacyProfileAliasRedirects,
+} = require('./lib/routing/legacy-profile-alias-redirects');
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
 const screenshotCatalogTraceIncludes = [
   'screenshot-catalog/current/**/*',
@@ -108,13 +111,15 @@ const nextConfig = {
   // externalized, re-introduce the includes via a non-symlinked path
   // (e.g. `.npmrc` public-hoist-pattern or a post-build dereference
   // step) instead of pnpm virtual-store globs.
-  // Disable static generation to prevent Clerk context issues during build
   trailingSlash: false,
   // Build optimizations
   poweredByHeader: false,
   compress: true,
-  // Note: cacheComponents disabled due to incompatibility with runtime='nodejs' in API routes
-  // Using traditional caching (unstable_cache) instead
+  // JOV-7985: Node.js is supported; enable after the dated migration exception clears.
+  // JOV-7987: Cache Components requires migrating route-segment exports and
+  // validating this entire app. Node.js is supported; the explicit `runtime`
+  // export is rejected in 16.4.1. Keep the rendering migration separate from
+  // the security upgrade; existing persistent Data Cache boundaries remain.
   images: {
     localPatterns: [
       {
@@ -501,6 +506,9 @@ const nextConfig = {
         source: '/app/admin/ingest',
         destination: '/app/ov/growth?view=ingest',
       },
+      // Needs You folded into Ovie Home's asks (Tim 2026-10-21: one Home).
+      { source: '/app/ov/needs-you', destination: '/app/ov' },
+      { source: '/app/admin/needs-you', destination: '/app/ov' },
       {
         source: '/app/admin/:path*',
         destination: '/app/ov/:path*',
@@ -548,6 +556,10 @@ const nextConfig = {
         permanent: false,
       },
       ...legacyAppRedirects,
+      // Legacy profile deep links (`/dualipa/listen`) redirect at the edge,
+      // before the Node proxy. The catch-all resolver remains for collisions
+      // via `?alias-content=1` or the `jovie_alias_content` hold cookie.
+      ...legacyProfileAliasRedirects(),
       // Old /tips landing page redirect
       {
         source: '/tips',
@@ -620,6 +632,7 @@ const nextConfig = {
       'tour',
       'shows',
       'events',
+      'contact',
     ].flatMap(alias => [
       {
         source: `/:username/${alias}`,
@@ -738,8 +751,6 @@ const nextConfig = {
     // GitHub-hosted ubuntu-latest/24.04 runners are 4 vCPU / 16 GB RAM — cap
     // at 4 (was 2, which halved build parallelism; revert to 2 if OOM recurs).
     cpus: process.env.GITHUB_ACTIONS === 'true' ? 4 : undefined,
-    // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
-    // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup
     turbopackFileSystemCacheForDev: true,
     // Enable auth interrupts for unauthorized()/forbidden() in server components
@@ -798,7 +809,6 @@ const nextConfig = {
     swcTraceProfiling: false,
     // Web vitals attribution with valid metric names only
     webVitalsAttribution: ['CLS', 'FCP', 'INP', 'LCP', 'TTFB'],
-    // Note: cacheComponents removed due to incompatibility with runtime='nodejs' in API routes
   },
   compiler: {
     // Keep console logs in Vercel Preview builds for debugging

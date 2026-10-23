@@ -21,6 +21,9 @@ const hoisted = vi.hoisted(() => {
     notInArrayMock: vi.fn((col: unknown, vals: unknown) => ({
       notInArray: [col, vals],
     })),
+    notLikeMock: vi.fn((col: unknown, val: unknown) => ({
+      notLike: [col, val],
+    })),
     eqMock: vi.fn((col: unknown, val: unknown) => ({ eq: [col, val] })),
     descMock: vi.fn((col: unknown) => ({ desc: col })),
   };
@@ -37,6 +40,7 @@ vi.mock('drizzle-orm', () => ({
   isNull: hoisted.isNullMock,
   lt: vi.fn(),
   notInArray: hoisted.notInArrayMock,
+  notLike: hoisted.notLikeMock,
   or: hoisted.orMock,
   sql: vi.fn(() => ({ as: vi.fn(() => 'subquery') })),
 }));
@@ -48,6 +52,7 @@ vi.mock('@/lib/db/schema/chat', () => ({
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     creatorProfileId: 'creatorProfileId',
+    userId: 'userId',
   },
   chatMessages: {
     role: 'role',
@@ -105,17 +110,23 @@ describe('listCreatorConversations', () => {
 
     const result = await listCreatorConversations({
       creatorProfileId: 'profile-1',
+      userId: 'customer-1',
     });
 
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('conv-1');
     expect(hoisted.selectLeftJoinMock).toHaveBeenCalled();
+    expect(hoisted.eqMock).toHaveBeenCalledWith('userId', 'customer-1');
+    expect(hoisted.notLikeMock).toHaveBeenCalledWith('title', 'OV | %');
   });
 
   it('excludes conversations whose work record is done, cancelled, or archived', async () => {
     hoisted.selectLimitMock.mockResolvedValueOnce([]);
 
-    await listCreatorConversations({ creatorProfileId: 'profile-1' });
+    await listCreatorConversations({
+      creatorProfileId: 'profile-1',
+      userId: 'customer-1',
+    });
 
     // Work records with a terminal status must not leak into the active
     // listing (JOV-4514).

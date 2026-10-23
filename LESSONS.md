@@ -114,6 +114,26 @@ policy-only fingerprints are listed explicitly and do not prove executable preve
 
 ## Marketing Pages
 
+### A page change goes through one page contract, not a wall of locks
+**Mistake:** Replacing the homepage meant editing about 25 test files: per-component source-string locks, a role-invariant fixture, a stale redesign contract, grammar locks pinned to a retired "Find me" action, and section inventories that each re-declared the same page. The YouTube-MVP draft touched 50 files for a three-section page. Several of these locks asserted off-flag code that no visitor ever saw.
+
+**Rule:** Bind a marketing page through its typed records (recipe, route manifest, copy modules, offer truth). Test it with one rendered contract that reads those records, like `homepage-contract.test.tsx`: manifest order, one h1, one primary action, offer-truth prices, registry media and tokenized CSS. Do not add per-component source-string locks or literals that duplicate the records.
+
+### Marketing plan prices come only from offer truth
+**Mistake:** The artist-profile homepage brief asked for the $12 offer before it existed in `lib/billing/offer-truth.ts`. Typing "$12/mo" into page copy would have sold a price that billing does not charge. The offer is now published in offer truth; marketing reads it from that owner.
+
+**Rule:** Render plan prices through `MarketingOfferSummary` or `getPublicPriceClaim`, never as literals. Publish a new offer in offer truth first; marketing pages pick it up from there. `offer-price-source-guard` blocks recurring-price literals in marketing source.
+
+### Marketing pages share one spine and one type ramp
+**Mistake:** The homepage hero and the sections below it used two gutter definitions (24px against 20px at 390px). Three marketing type ramps also coexisted: `ap-shell-*`, the retired `marketing-*-linear` classes, and the unused `--ds-marketing-*` tokens. Each new page drifted a few pixels and re-declared sizes locally.
+
+**Rule:** Frame sections with `ArtistProfileSectionShell` and put any hero on `.ap-section-container`, so there is one width and one gutter. Set type with `.marketing-type-display`, `.marketing-type-section` and `.marketing-type-lede`. Do not add page-local gutters, widths or font-size clamps.
+
+### Two-line display clamps must not crop descenders
+**Mistake:** The shared two-line H1 clamp capped the block size at exactly `2lh` with `line-height: 1.06`, so the "y" in "every" was cropped on every marketing H1 with a descender on its last line. Hidden-line checks did not notice because no line was hidden.
+
+**Rule:** Clamped headings reserve descender room (`padding-block-end` inside the cap). The route DOM detector reports `clipped-heading` for hidden lines or cropped glyph ink, using browser Range and Canvas metrics to distinguish ink from overflowing font boxes.
+
 ### Never link to `/claim` from CTAs
 **Mistake:** PricingSection CTAs linked to `/claim` which 404s. The correct signup route is `/signup`.
 
@@ -247,3 +267,23 @@ policy-only fingerprints are listed explicitly and do not prove executable preve
 **Mistake:** Production and staging duplicated a Vercel bypass exchange in shell, while preview and release workflows exposed secrets and runtime values in process arguments. Exact-deployment probes assumed every target was `production`, searched only the newest deployment page, and accepted status-only page evidence. A 200 not-found profile, a 204 critical route, a duplicate same-SHA deployment, or a partially propagated READY record could therefore look healthy. Static auth liveness/configuration stood in for the actual provider UI and Better Auth catch-all, independently named auth secrets could be mixed, an interrupted marker upload could suppress same-SHA recovery forever, and workflow jobs carried credentials/permissions they did not need. Separate Lighthouse validation and upload also left a same-UID mutable, symlink-following artifact gap.
 
 **Rule:** All protected Vercel probes use `apps/web/scripts/vercel-protected-origin.cjs`. Read protection and CLI secrets only from process environment; never put `--token` or `--env KEY=value` on argv. Require the caller to choose `preview` or `production`, bind the exact URL and deployment ID through deadline-bounded pagination, retry only missing/known-transient evidence, fail immediately on present contradictions, verify the full commit through a host-only cookie, and require semantic HTTP-200 content. After exact staging alias ownership, click both real provider buttons and prove their Better Auth catch-all POST plus external navigation and callback URI; `/api/auth/ok` is not runtime auth proof. Select one complete named auth credential pair and derive auth status from the completed test result. Runtime cookies must be masked and included in artifact scans. Browser routes must be awaited before navigation. Lighthouse validation owns upload from one hash-sealed mode-0400 isolated copy, re-proves source and isolated file identity after the same-UID child, and rejects symlinks, FIFOs, directories, and mutation. Grant OIDC/attestation only to a dedicated no-checkout, no-secret attestation job; secret-bearing checkout/deploy jobs must never receive it. Disable persisted credentials on every checkout, and accept a production marker only with completed-success controller and verification evidence; consume the single SHA-bound interrupted-marker recovery lease before mutation.
+
+## Marketing copy guardrails
+
+### Banned names stay out of marketing and homepage surfaces (JOV-8603)
+
+**Mistake:** Marketing pages, homepage code, copy modules, and metadata have picked up real people's names that are not the product story. `Daniel Kang` and `Haruki` are the names this guard locks out.
+
+**Rule:** Those names fail the build when they appear in marketing routes, homepage and marketing components, marketing content, copy modules, or schema metadata. The check is blocking and the current tree is clean. Scraping and profile-import code are outside this scan.
+
+### Marketing copy and metadata ban niche-music framing and link-in-bio wording (JOV-8606)
+
+**Mistake:** Shared marketing copy and JSON-LD still describe Jovie as a link-in-bio or a musician-only product. Homepage schema ships `Jovie Link in Bio` (JOV-8565).
+
+**Rule:** Marketing copy, content, and metadata/JSON-LD are scanned for `link in bio` / `Link in Bio` (including hyphenated wording) and niche-music framing (`niche-music`, `for musicians`, `musician-first`, `music creators`, `music-only`). Warn mode keeps the current hits in a committed baseline, fails new keys, and rewrites the baseline when the live set shrinks. Import slugs, file paths, legal docs, and investor docs are not violations.
+
+### Marketing components source user-facing copy from the copy module (JOV-8607)
+
+**Mistake:** Marketing components paste user-facing sentences into JSX, so headlines drift away from the copy module.
+
+**Rule:** User-facing JSX text and `aria-label`, `alt`, `title`, and `placeholder` literals in homepage, marketing, and site components are a warn ratchet. New strings fail, and a smaller set tightens the baseline. The live homepage H1 stays `Be found. Be understood.` and is rendered from `HOMEPAGE_IDENTITY_COPY.hero.headline`.

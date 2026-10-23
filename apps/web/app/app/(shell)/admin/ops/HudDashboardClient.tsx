@@ -53,6 +53,7 @@ import {
   AgentOsRunsPanel,
   FounderFunnelBand,
   FounderMorningWalkCard,
+  HudDetectionCoveragePanel,
   HudDrilldownSearch,
   HudEnvExceptionsPanel,
   HudGithubBudgetPanel,
@@ -994,6 +995,16 @@ export function HudDashboardClient({
                 handleSourceRetry={handleSourceRetry}
               />
             </div>
+          </div>
+        );
+      case 'detection-coverage':
+        return (
+          <div
+            key={section.id}
+            className='flex flex-col gap-3'
+            data-testid={section.testId}
+          >
+            <HudDetectionCoveragePanel />
           </div>
         );
       case 'env-exceptions':

@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
@@ -9,8 +10,10 @@ type StreamChunk = Record<string, unknown>;
 const CHAT_PANEL = '[data-testid="onboarding-chat"]';
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
 const COMPOSER_TEXTAREA = '[aria-label="Chat message input" i]';
-const TEST_AVATAR_PNG_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeElEQVR4nO3PQQ3AIADAQMD+/5w9QnJ4QKZsZu2cJwAAAAAAAAAAAAAAANxq7g7wG7iBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9gB9bYCfQMD+LwAAAAASUVORK5CYII=';
+const TEST_AVATAR_PNG_PATH = join(
+  __dirname,
+  '../../public/avatars/default-user.png'
+);
 const IGNORABLE_CONSOLE_ERRORS = [
   /favicon/i,
   /ResizeObserver loop/i,
@@ -215,7 +218,7 @@ async function mockOnboardingChat(
     await route.fulfill({
       status: 200,
       contentType: 'image/png',
-      body: Buffer.from(TEST_AVATAR_PNG_BASE64, 'base64'),
+      path: TEST_AVATAR_PNG_PATH,
     });
   });
   await page.route('**/_next/image?**', async route => {
@@ -224,7 +227,7 @@ async function mockOnboardingChat(
       await route.fulfill({
         status: 200,
         contentType: 'image/png',
-        body: Buffer.from(TEST_AVATAR_PNG_BASE64, 'base64'),
+        path: TEST_AVATAR_PNG_PATH,
       });
       return;
     }
@@ -342,7 +345,8 @@ test.describe('canonical /start onboarding chat', () => {
     expect(navigations.length).toBeLessThanOrEqual(3);
 
     await page.goto('/waitlist', { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/\/start(?:\?|$)/);
+    await expect(page).toHaveURL(/\/waitlist(?:\?|$)/);
+    await expect(page.locator('#auth-form')).toBeVisible();
   });
 
   test('first screen and root picker are visually stable', async ({ page }) => {
@@ -482,9 +486,11 @@ test.describe('canonical /start onboarding chat', () => {
 
     const bubble = page.getByTestId('chat-user-bubble').first();
     await expect(bubble).toBeVisible();
+    // Chat body text follows --text-app, which #19154 consolidated onto the
+    // 10/12/14 scale (12px; was 13px).
     await expect(bubble.locator('.system-b-chat-user-text')).toHaveCSS(
       'font-size',
-      '13px'
+      '12px'
     );
     await expect(bubble).toHaveCSS('padding-top', '6px');
     await expect(bubble).toHaveCSS('padding-right', '12px');
@@ -693,8 +699,18 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       sideRail.getByTestId('onboarding-phone-preview')
     ).toBeVisible();
-    const sideRailText = await sideRail.innerText();
-    expect(sideRailText.match(/\bTest Artist\b/g) ?? []).toHaveLength(1);
+    await expect(sideRail.getByTestId('profile-identity-link')).toHaveCount(1);
+    await expect(sideRail.getByTestId('profile-identity-link')).toHaveText(
+      'Test Artist'
+    );
+    await expect(
+      sideRail.getByRole('heading', {
+        name: 'Profile Highlights From Test Artist',
+      })
+    ).toHaveCount(1);
+    await expect(
+      sideRail.getByRole('heading', { name: 'Test Artist', exact: true })
+    ).toHaveCount(1);
     await expect(sideRail.getByTitle('Apple Music').first()).toBeVisible();
     await expect(
       sideRail.getByText('12.3K Spotify followers').first()

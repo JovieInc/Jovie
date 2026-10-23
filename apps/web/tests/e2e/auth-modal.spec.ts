@@ -12,17 +12,13 @@ import { waitForHydration } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const AUTH_MODAL_TIMEOUT = 120_000;
+const AUTH_MODAL_TIMEOUT = 30_000;
 
-function expectedDialogName(mode: 'signin' | 'signup') {
-  const clerkUnavailable =
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
-    process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
-
-  if (clerkUnavailable) {
-    return 'Authentication unavailable';
-  }
-
+function renderedDialogName(
+  mode: 'signin' | 'signup',
+  authUnavailable: boolean
+) {
+  if (authUnavailable) return 'Authentication unavailable';
   return mode === 'signin' ? 'Log in to Jovie' : 'Continue to Jovie';
 }
 
@@ -61,20 +57,51 @@ async function prepareHomepage(page: import('@playwright/test').Page) {
   }
 }
 
+async function openRequestAccess(page: import('@playwright/test').Page) {
+  // Homepage conversion lock keeps Request access off `/`. The intercepted
+  // signup modal opens from the shared marketing-header CTA. Pricing also
+  // renders a plan link with the same name that goes to /waitlist; that
+  // link is not this surface.
+  await blockAnalytics(page);
+  await page.goto(APP_ROUTES.PRICING, {
+    waitUntil: 'domcontentloaded',
+    timeout: AUTH_MODAL_TIMEOUT,
+  });
+  await waitForHydration(page, { timeout: AUTH_MODAL_TIMEOUT });
+
+  const headerCta = page.locator('a.marketing-glass-header__cta:visible');
+  if (await headerCta.isVisible().catch(() => false)) {
+    await headerCta.click({
+      noWaitAfter: true,
+      timeout: AUTH_MODAL_TIMEOUT,
+    });
+    return;
+  }
+
+  // Below lg the glass header CTA is `hidden lg:flex`. The same signup
+  // action is the mobile panel's primary link. Pricing plan links share
+  // the Request access name and go to /waitlist, so this stays inside
+  // the menu and matches the signup href, not the label.
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  await page
+    .getByRole('navigation', { name: 'Mobile Navigation' })
+    .locator(`a[href="${APP_ROUTES.SIGNUP}"]`)
+    .click({
+      noWaitAfter: true,
+      timeout: AUTH_MODAL_TIMEOUT,
+    });
+}
+
 async function openInterceptedModal(
   page: import('@playwright/test').Page,
   mode: 'signin' | 'signup'
 ) {
-  await prepareHomepage(page);
-
-  if (mode === 'signin') {
-    await page
-      .getByRole('link', { name: /^sign in$/i })
-      .first()
-      .click({ noWaitAfter: true, timeout: AUTH_MODAL_TIMEOUT });
+  if (mode === 'signup') {
+    await openRequestAccess(page);
   } else {
+    await prepareHomepage(page);
     await page
-      .locator('[data-cta-sign-up="true"]')
+      .getByRole('link', { name: /^log in$/i })
       .first()
       .click({ noWaitAfter: true, timeout: AUTH_MODAL_TIMEOUT });
   }
@@ -129,18 +156,20 @@ test.describe('Intercepted auth modal', () => {
       timeout: AUTH_MODAL_TIMEOUT,
     });
     await expect(page.getByRole('dialog')).toHaveAccessibleName(
-      expectedDialogName('signin')
+      renderedDialogName('signin', await isAuthUnavailable(page))
     );
   });
 
-  test('opens sign-up from the homepage primary CTA', async ({ page }) => {
+  test('opens sign-up from the marketing header request access CTA', async ({
+    page,
+  }) => {
     await openInterceptedModal(page, 'signup');
 
     await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNUP, {
       timeout: AUTH_MODAL_TIMEOUT,
     });
     await expect(page.getByRole('dialog')).toHaveAccessibleName(
-      expectedDialogName('signup')
+      renderedDialogName('signup', await isAuthUnavailable(page))
     );
     await expectSharedAuthSurface(page);
   });
@@ -148,18 +177,13 @@ test.describe('Intercepted auth modal', () => {
   test('request access opens the same shared sign-up auth surface', async ({
     page,
   }) => {
-    await prepareHomepage(page);
-
-    await page
-      .getByRole('link', { name: /request access/i })
-      .first()
-      .click({ noWaitAfter: true, timeout: AUTH_MODAL_TIMEOUT });
+    await openRequestAccess(page);
 
     await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNUP, {
       timeout: AUTH_MODAL_TIMEOUT,
     });
     await expect(page.getByRole('dialog')).toHaveAccessibleName(
-      expectedDialogName('signup')
+      renderedDialogName('signup', await isAuthUnavailable(page))
     );
     await expectSharedAuthSurface(page);
   });

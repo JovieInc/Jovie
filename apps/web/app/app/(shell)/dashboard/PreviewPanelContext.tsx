@@ -103,7 +103,10 @@ export function PreviewPanelProvider({
   enabled = true,
   scope,
 }: Readonly<PreviewPanelProviderProps>) {
-  // Check if screen is large (md breakpoint: 768px).
+  // Check if the screen is in the rail's DESKTOP presentation (lg: 1024px).
+  // Below lg the drawer presents the rail as a full-screen modal sheet, so
+  // "large" must mean the same threshold here as the drawer's breakpoint —
+  // a 768 gate used to open an unsolicited modal on 768–1023 viewports.
   // Default to false during SSR to avoid hydration mismatch on mobile devices
   // (server would render panel open, client would compute closed).
   const [isLargeScreen, setIsLargeScreen] = useState(false);
@@ -114,7 +117,7 @@ export function PreviewPanelProvider({
   useEffect(() => {
     if (globalThis.window?.matchMedia === undefined) return;
 
-    const mediaQuery = globalThis.window.matchMedia('(min-width: 768px)');
+    const mediaQuery = globalThis.window.matchMedia('(min-width: 1024px)');
     setIsLargeScreen(mediaQuery.matches);
 
     const handleChange = (e: MediaQueryListEvent) => {
@@ -138,13 +141,32 @@ export function PreviewPanelProvider({
 
   // Surface change (dashboard ↔ chat ↔ artist-profile settings) resets the
   // rail to closed — it only opens from an explicit user action afterward.
+  // `?panel=profile` is that explicit action: the scope reset used to close
+  // the rail after ChatPageClient opened it, so the deep link never stuck.
   const previousScopeRef = useRef(scope);
   useEffect(() => {
     if (previousScopeRef.current === scope) return;
     previousScopeRef.current = scope;
-    setIsOpen(false);
+    const panel = new URLSearchParams(globalThis.location.search).get('panel');
+    if (scope === 'chat' && panel === 'profile') {
+      setIsOpen(true);
+      return;
+    }
+    // A default-open surface (profile settings) must come back open on a
+    // large screen. Closing first and waiting for a later effect lets the
+    // page opener's close() win the round trip.
+    if (defaultOpen && isLargeScreen) {
+      setIsOpen(true);
+      return;
+    }
+    // Only a surface that stays closed clears the rail data. This effect
+    // runs after the page hydrator's mount hydration, and the hydrator's
+    // empty-panel dependency never transitions when the hydration and this
+    // wipe land in one flush — a wipe here would leave the reopened rail
+    // stuck on its empty skeleton (Account → Back round trip).
     setPreviewData(null);
-  }, [scope]);
+    setIsOpen(false);
+  }, [defaultOpen, isLargeScreen, scope]);
 
   // Open panel after mount on large screens when defaultOpen is requested.
   // Also close when switching to a small screen.

@@ -3,6 +3,7 @@ import {
   clearRemediationLabelCache,
   closeLinearIssueByFingerprint,
   ensureLinearLabel,
+  LINEAR_LABEL_NAME_MAX,
   remediationKey,
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
@@ -203,6 +204,24 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
       return new Response(JSON.stringify(hit.body));
     });
   }
+
+  it("fits long remediation labels into Linear's 80-character limit, stably", () => {
+    // JOV-8235: this 83-character label made every time-bomb filing run fail.
+    const fingerprint =
+      'time-bomb:apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts';
+    const label = remediationKey(fingerprint);
+    expect(label).toHaveLength(LINEAR_LABEL_NAME_MAX);
+    expect(label.startsWith('remediation:time-bomb:apps/web/tests/unit/')).toBe(
+      true
+    );
+    expect(label).toMatch(/~[0-9a-f]{8}$/);
+    expect(remediationKey(fingerprint)).toBe(label);
+    expect(remediationKey(label)).toBe(label);
+    expect(remediationKey(`remediation:${fingerprint}`)).toBe(label);
+    expect(remediationKey(`${fingerprint}x`)).not.toBe(label);
+    const exact = `remediation:${'a'.repeat(LINEAR_LABEL_NAME_MAX - 12)}`;
+    expect(remediationKey(exact)).toBe(exact);
+  });
 
   it('reopens after Done and re-files the same remediation label', async () => {
     const labelName = remediationKey(fingerprint);
@@ -439,6 +458,156 @@ describe('ensureLinearLabel', () => {
     });
     expect(present).toEqual({ ok: true, id: 'existing' });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers when the create hits an existing label (JOV-8235)', async () => {
+    clearRemediationLabelCache();
+    const labelName = 'remediation:time-bomb:apps/web/tests/unit/x.test.ts';
+    const fetchImpl = vi.fn(async (_url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('issueLabelCreate')) {
+        // Linear rejects a duplicate label create with GraphQL errors.
+        return new Response(
+          JSON.stringify({
+            errors: [
+              {
+                message: `Label ${labelName} already exists`,
+                extensions: { code: 'BAD_USER_INPUT' },
+              },
+            ],
+          })
+        );
+      }
+      if (payload.query.includes('FindTeamLabel')) {
+        expect(payload.variables.name).toBe(labelName);
+        return new Response(
+          JSON.stringify({
+            data: {
+              team: {
+                labels: { nodes: [{ id: 'label-existing', name: labelName }] },
+              },
+            },
+          })
+        );
+      }
+      throw new Error(`unexpected query: ${payload.query.slice(0, 60)}`);
+    });
+    await expect(
+      ensureLinearLabel({
+        name: labelName,
+        nodes: [],
+        apiKey: 'lin-key',
+        fetchImpl,
+      })
+    ).resolves.toEqual({ ok: true, id: 'label-existing' });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('recovers a case-different existing label after a rejected create', async () => {
+    clearRemediationLabelCache();
+    const fetchImpl = vi.fn(async (_url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('issueLabelCreate')) {
+        return new Response(
+          JSON.stringify({
+            errors: [{ message: 'A label with this name already exists' }],
+          })
+        );
+      }
+      if (payload.query.includes('FindTeamLabel')) {
+        expect(payload.query).toContain('eqIgnoreCase');
+        return new Response(
+          JSON.stringify({
+            data: {
+              team: {
+                labels: {
+                  nodes: [
+                    {
+                      id: 'label-cased',
+                      name: 'REMEDIATION:time-bomb:apps/web/x.test.ts',
+                    },
+                  ],
+                },
+              },
+            },
+          })
+        );
+      }
+      throw new Error(`unexpected query: ${payload.query.slice(0, 60)}`);
+    });
+    await expect(
+      ensureLinearLabel({
+        name: 'remediation:time-bomb:apps/web/x.test.ts',
+        nodes: [],
+        apiKey: 'lin-key',
+        fetchImpl,
+      })
+    ).resolves.toEqual({ ok: true, id: 'label-cased' });
+  });
+
+  it('fails through when the create fails and the label still cannot be found', async () => {
+    clearRemediationLabelCache();
+    const fetchImpl = vi.fn(async (_url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('issueLabelCreate')) {
+        return new Response(
+          JSON.stringify({
+            errors: [{ message: 'Label already exists' }],
+          })
+        );
+      }
+      if (payload.query.includes('FindTeamLabel')) {
+        return new Response(
+          JSON.stringify({ data: { team: { labels: { nodes: [] } } } })
+        );
+      }
+      throw new Error(`unexpected query: ${payload.query.slice(0, 60)}`);
+    });
+    await expect(
+      ensureLinearLabel({
+        name: 'remediation:genuinely-broken',
+        nodes: [],
+        apiKey: 'lin-key',
+        fetchImpl,
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      reason: 'linear_label_create_graphql_error',
+    });
+  });
+
+  it('recovers when a duplicate create reports unsuccessful without errors', async () => {
+    clearRemediationLabelCache();
+    const fetchImpl = vi.fn(async (_url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('issueLabelCreate')) {
+        return new Response(
+          JSON.stringify({ data: { issueLabelCreate: { success: false } } })
+        );
+      }
+      if (payload.query.includes('FindTeamLabel')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              team: {
+                labels: {
+                  nodes: [{ id: 'label-raced', name: 'remediation:raced' }],
+                },
+              },
+            },
+          })
+        );
+      }
+      throw new Error(`unexpected query: ${payload.query.slice(0, 60)}`);
+    });
+    await expect(
+      ensureLinearLabel({
+        name: 'remediation:raced',
+        nodes: [],
+        apiKey: 'lin-key',
+        fetchImpl,
+      })
+    ).resolves.toEqual({ ok: true, id: 'label-raced' });
   });
 });
 

@@ -17,12 +17,13 @@ import {
   groupCustomerChangelogByMonth,
   projectCustomerChangelogArchive,
 } from '@/lib/customer-changelog';
+import { documentTitle } from '@/lib/seo/document-title';
 import './changelog-editorial.css';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: 'Jovie Changelog: Product Updates & New Features',
+  title: documentTitle('Jovie Changelog: Product Updates & New Features'),
   description: `Audience and control updates in ${APP_NAME}. What got better for you, not every deploy.`,
   alternates: {
     canonical: `${BASE_URL}${APP_ROUTES.CHANGELOG}`,

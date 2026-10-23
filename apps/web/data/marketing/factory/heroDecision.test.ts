@@ -188,6 +188,17 @@ describe('hero code bindings', () => {
 });
 
 describe('route hero audit', () => {
+  it('keeps the planned Card announcement on the existing informational hero', () => {
+    const card = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/card')!;
+    const intent = HERO_ROUTE_INTENTS.find(entry => entry.url === '/card')!;
+    const decision = selectHeroDecision(intent.input);
+    expect(card.productEvidence?.kind).toBe('planned-description');
+    expect(decision).toMatchObject({ variant: 'left-content', penId: 'WQe2p' });
+    expect(
+      auditHeroRoutes(activeHeroBindings()).find(row => row.url === '/card')
+    ).toMatchObject({ observedCodeVariant: 'left-none', mismatch: null });
+  });
+
   it('declares a hero job for every active route that renders a hero', () => {
     const intentUrls = HERO_ROUTE_INTENTS.map(intent => intent.url).sort();
     expect(intentUrls).toEqual([...activeHeroBindings().keys()].sort());
@@ -209,26 +220,25 @@ describe('route hero audit', () => {
     expect(summary).toMatchInlineSnapshot(`
       {
         "/": "wrong-variant: split-claim-card -> centered-homepage",
-        "/about": "unbound: - -> left-content",
-        "/alternatives/*": "unbound: - -> left-content",
-        "/artist-notifications": "unbound: - -> split-link-claim",
+        "/about": "ok: left-content",
+        "/alternatives/*": "ok: left-content",
+        "/artist-notifications": "ok: f-layout-desktop-screenshot",
         "/artist-profiles": "unlocked-code-variant: centered-phone -> split-link-claim",
-        "/blog": "unbound: - -> left-content",
-        "/blog/category/*": "unbound: - -> left-content",
-        "/card": "ok: f-layout-desktop-screenshot",
+        "/blog": "ok: left-content",
+        "/blog/category/*": "ok: left-content",
+        "/card": "ok: left-content",
         "/cli": "unlocked-code-variant: centered-none -> npm-copy",
-        "/compare/*": "unbound: - -> left-content",
-        "/download": "unbound: - -> left-buttons",
-        "/instant-merch": "unbound: - -> left-buttons",
-        "/launch": "unbound: - -> left-buttons",
-        "/pay": "unbound: - -> split-link-claim",
+        "/compare/*": "ok: left-content",
+        "/download": "ok: f-layout-desktop-screenshot",
+        "/instant-merch": "ok: f-layout-desktop-screenshot",
+        "/launch": "ok: f-layout-desktop-screenshot",
+        "/pay": "ok: split-link-claim",
         "/pricing": "unlocked-code-variant: centered-none -> left-buttons",
-        "/product": "unbound: - -> split-link-claim",
-        "/smart-links": "unbound: - -> left-buttons",
-        "/solutions/*": "unbound: - -> split-link-claim",
-        "/support": "unbound: - -> left-content",
-        "/voice": "unbound: - -> left-buttons",
-        "/waitlist": "unbound: - -> left-content",
+        "/product": "ok: split-link-claim",
+        "/smart-links": "ok: f-layout-desktop-screenshot",
+        "/solutions/*": "unlocked-code-variant: centered-phone -> split-link-claim",
+        "/support": "ok: left-content",
+        "/voice": "ok: f-layout-desktop-screenshot",
         "/youtube-thumbnails": "ok: left-content",
       }
     `);

@@ -67,7 +67,9 @@ export function SidebarIdentityGroup({
       data-active={isPublicProfileActive ? 'true' : undefined}
       className={cn(
         'm-0 min-w-0 border-0',
-        calm ? 'px-3 py-0' : 'px-2.5 py-1.5'
+        calm
+          ? 'px-(--app-shell-sidebar-inset) py-0'
+          : 'px-(--app-shell-sidebar-inset) py-1.5'
       )}
     >
       <div
@@ -99,6 +101,7 @@ export function SidebarIdentityGroup({
           <Tooltip label={profileDisplayHref} side='right'>
             <Link
               href={profileHref}
+              prefetch={false}
               data-sidebar='identity-public-profile'
               aria-current={isPublicProfileActive ? 'page' : undefined}
               aria-label={publicProfileAccessibleName(profileDisplayHref)}

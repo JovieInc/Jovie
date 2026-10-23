@@ -1,0 +1,16 @@
+Error: Failed to launch the browser process:  Code: null
+
+stderr:
+[2575:2590:1016/195630.932125:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[1016/195631.049577:ERROR:third_party/crashpad/crashpad/util/file/file_io_posix.cc:145] open /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq: No such file or directory (2)
+[1016/195631.049633:ERROR:third_party/crashpad/crashpad/util/file/file_io_posix.cc:145] open /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq: No such file or directory (2)
+Received signal 11 SI_KERNEL000000000000
+ Possibly a General Protection Fault, can be due to a non-canonical address dereference.
+#0 0x55d91f5964d3 (/home/runner/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome+0x64044d2)
+#1 0x55d923b6a7d4 (/home/runner/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome+0xa9d87d3)
+[end of stack trace]
+
+TROUBLESHOOTING: https://pptr.dev/troubleshooting
+
+    at ChildProcess.onClose (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@puppeteer+browsers@3.0.6_proxy-agent@6.5.0_yauzl@3.4.0/node_modules/@puppeteer/browsers/lib/launch.js:339:24)
+    at ChildProcess.emit (node:events:526:24)

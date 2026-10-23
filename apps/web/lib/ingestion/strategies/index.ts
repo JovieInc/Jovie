@@ -93,14 +93,18 @@ import { isTikTokUrl } from './tiktok';
 import { isTwitterUrl } from './twitter';
 import { isYouTubeChannelUrl } from './youtube';
 
+/** Detection vocabulary, not a claim that remote profile reads are available. */
+export const INGESTION_PLATFORM_IDS = [
+  'beacons',
+  'instagram',
+  'laylo',
+  'linktree',
+  'tiktok',
+  'twitter',
+  'youtube',
+] as const;
 export type IngestionPlatform =
-  | 'linktree'
-  | 'beacons'
-  | 'laylo'
-  | 'instagram'
-  | 'tiktok'
-  | 'twitter'
-  | 'youtube'
+  | (typeof INGESTION_PLATFORM_IDS)[number]
   | 'unknown';
 
 /**

@@ -110,13 +110,6 @@ updates:
       # the migration. Then drop this ignore.
       - dependency-name: 'eve'
         update-types: ['version-update:semver-minor']
-      # Held at 16.3.x (2026-10-13): next 16.4.0 breaks @storybook/nextjs-vite
-      # 10.6.1 (useRouter reads `.data` of undefined under RedirectBoundary), so
-      # every story fails and the merge-group Storybook Surface Matrix hangs
-      # (run 38361065123, #21533). Re-evaluate when Storybook's Next integration
-      # supports 16.4 (JOV-8234). Then drop this ignore.
-      - dependency-name: 'next'
-        versions: ['>=16.4.0 <17']
       # Held at 1.60.0 (2026-10-13): the baked runner image ships Playwright
       # 1.60.0 browsers (.github/runner-image/prerequisites.json, chromium-1223)
       # and runner-setup-action.test.ts requires devDependencies.playwright to

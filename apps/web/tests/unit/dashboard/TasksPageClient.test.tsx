@@ -511,6 +511,7 @@ vi.mock('@/components/features/dashboard/tasks/TaskBoard', () => ({
     board,
     onOpenTask,
     onMoveTask,
+    showAssigneeChip = true,
   }: {
     readonly board?: TaskBoardResult;
     readonly onOpenTask: (task: TaskView) => void;
@@ -518,8 +519,12 @@ vi.mock('@/components/features/dashboard/tasks/TaskBoard', () => ({
       readonly taskId: string;
       readonly toStatus: TaskStatus;
     }) => void;
+    readonly showAssigneeChip?: boolean;
   }) => (
-    <div data-testid='tasks-board'>
+    <div
+      data-testid='tasks-board'
+      data-show-assignee-chip={String(showAssigneeChip)}
+    >
       {board?.columns.flatMap(column =>
         column.tasks.map(task => (
           <button
@@ -956,6 +961,24 @@ describe('TasksPageClient', () => {
     );
   });
 
+  it('keeps the assignee chip on a board filtered to Jovie', () => {
+    mockViewMode = 'board';
+    mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
+
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
+
+    expect(screen.getByTestId('tasks-board')).toHaveAttribute(
+      'data-show-assignee-chip',
+      'true'
+    );
+  });
+
   it('uses board data for subview counts when the list query is not loaded', () => {
     mockViewMode = 'board';
     mockListQueryData = undefined;
@@ -1195,6 +1218,27 @@ describe('TasksPageClient', () => {
     expect(screen.getAllByText('In Progress').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Medium').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Me').length).toBeGreaterThan(0);
+  });
+
+  it('names task metadata controls with their visible value (WCAG 2.5.3 Label in Name)', () => {
+    // @axe-core/playwright 4.14 flags label-content-name-mismatch when an
+    // aria-label omits the visible text; that red Generate Screenshots check
+    // blocked production promotion from 2026-10-19.
+    renderPage();
+    openTask();
+
+    for (const [action, value] of [
+      ['Change Task Status', 'In Progress'],
+      ['Change Task Priority', 'Medium'],
+      ['Change Task Assignee', 'Me'],
+    ]) {
+      const control = screen.getByRole('button', {
+        name: new RegExp(`^${action} .*${value}`),
+      });
+      // Named from content, so axe's label-in-name rule cannot diverge.
+      expect(control).not.toHaveAttribute('aria-label');
+      expect(control).not.toHaveAttribute('aria-labelledby');
+    }
   });
 
   it('renders separate list and document scroll regions on desktop', () => {
@@ -1705,6 +1749,10 @@ describe('TasksPageClient', () => {
     openTask(mockHelperTask);
 
     expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
+    expect(screen.getByLabelText('Task Title')).toHaveAttribute(
+      'placeholder',
+      'Task'
+    );
     expect(screen.getByLabelText('Task Description')).not.toHaveAttribute(
       'placeholder'
     );

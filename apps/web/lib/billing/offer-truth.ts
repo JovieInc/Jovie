@@ -39,7 +39,8 @@ export type MaxOfferStatus = 'purchase' | 'early_access' | 'contact_sales';
 
 export const PRO_TRIAL_TRUTH = `${PRO_TRIAL_DURATION_DAYS}-day ${ARTIST_VISIBILITY_OFFER.pro.displayName} trial. No credit card. Returns to Free unless you upgrade.`;
 
-export const PRO_LIMITED_ACCESS_TRUTH = 'Limited access.';
+/** EVENT: Tim, 2026-10-20 — Pro is self-serve; "Limited access" is retired. */
+export const PRO_SELF_SERVE_TRUTH = 'Self-serve. Cancel anytime.';
 
 export const FREE_PROFILE_TRUTH =
   'Your Jovie profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.';
@@ -202,11 +203,13 @@ export function getPublicPriceClaim(plan: PublicOfferPlan): PublicPriceClaim {
       annualPriceUsd: null,
       priceLabel: formatUsdAmount(priceUsd),
       cadence: '/mo',
-      badge: 'Limited access',
-      note: PRO_LIMITED_ACCESS_TRUTH,
-      ctaLabel: 'Request access',
-      ctaHref: APP_ROUTES.WAITLIST,
-      selfService: false,
+      badge: 'Self-serve',
+      note: PRO_SELF_SERVE_TRUTH,
+      ctaLabel: 'Claim your profile',
+      // `plan=pro` keeps the shared signup-intent contract on every
+      // self-serve CTA; /claim/start persists the Pro monthly intent.
+      ctaHref: `${APP_ROUTES.CLAIM}?plan=pro`,
+      selfService: true,
     };
   }
 

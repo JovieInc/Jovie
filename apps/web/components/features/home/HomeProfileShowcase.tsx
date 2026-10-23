@@ -358,7 +358,7 @@ export function HomeProfileShowcase({
           alt='Tim White mock home review'
           width={853}
           height={1844}
-          className='homepage-showcase-reference-image'
+          className='homepage-showcase-reference-image marketing-rounded-frame'
         />
       </div>
     );

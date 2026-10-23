@@ -52,13 +52,17 @@ const OAUTH_ERROR_COPY: Record<string, string> = {
 
 function SignInOauthErrorBanner() {
   const searchParams = useSearchParams();
-  const oauthError = searchParams.get('error');
+  // Better Auth returns `error`. Older deny links still use `oauth_error`.
+  const oauthError =
+    searchParams.getAll('error').filter(Boolean).at(-1) ||
+    searchParams.get('oauth_error');
 
   useEffect(() => {
     if (!oauthError) return;
 
     const url = new URL(globalThis.location.href);
     url.searchParams.delete('error');
+    url.searchParams.delete('oauth_error');
     globalThis.history.replaceState(
       globalThis.history.state,
       '',
@@ -213,6 +217,7 @@ export function SignInPageClient({
         showFormTitle={false}
         showFooterPrompt={false}
         layoutVariant='stack'
+        contentPlacement='center'
       >
         <AuthRoutePrefetch href={signUpUrl} />
         <SignInOauthErrorBanner />

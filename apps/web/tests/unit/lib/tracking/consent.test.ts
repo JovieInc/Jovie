@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearConsentState,
   getConsentState,
+  getOrCreateAcquisitionId,
   getOrCreateSessionId,
   isDNTEnabled,
   isGPCEnabled,
   isMarketingAllowed,
   isTrackingAllowed,
+  rememberAcquisitionId,
   setConsentState,
 } from '@/lib/tracking/consent';
 
@@ -310,6 +312,65 @@ describe('tracking consent', () => {
       const id = getOrCreateSessionId();
       expect(localStorage.getItem('jv_session_id')).toBe(id);
     });
+  });
+
+  describe('getOrCreateAcquisitionId', () => {
+    const existingId = '7f5bb735-8e88-4d78-ae32-5228cc12a8bb';
+
+    it('adopts a valid acquisition cookie when local storage is empty', () => {
+      setCookie(`jv_cc_required=0; jv_acquisition_id=${existingId}`);
+
+      expect(getOrCreateAcquisitionId()).toBe(existingId);
+      expect(localStorage.getItem('jovie_acquisition_id')).toBe(existingId);
+      expect(document.cookie).toContain(`jv_acquisition_id=${existingId}`);
+    });
+
+    it('keeps the stored id when it already exists', () => {
+      const storedId = '11111111-2222-4333-8444-555555555555';
+      localStorage.setItem('jovie_acquisition_id', storedId);
+      setCookie(`jv_acquisition_id=${existingId}`);
+
+      expect(getOrCreateAcquisitionId()).toBe(storedId);
+    });
+
+    it('mints a new id only when neither storage nor the cookie has one', () => {
+      const minted = getOrCreateAcquisitionId();
+
+      expect(minted).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      );
+      expect(minted).not.toBe(existingId);
+      expect(localStorage.getItem('jovie_acquisition_id')).toBe(minted);
+    });
+
+    it('does not adopt a cookie after analytics consent was refused', () => {
+      setConsentState('rejected');
+      setCookie(`jv_acquisition_id=${existingId}`);
+
+      expect(getOrCreateAcquisitionId()).toBe('');
+      expect(localStorage.getItem('jovie_acquisition_id')).toBeNull();
+    });
+  });
+
+  describe('rememberAcquisitionId', () => {
+    const acquisitionId = '7f5bb735-8e88-4d78-ae32-5228cc12a8bb';
+    it('retains the server identity for later events and revocation', () => {
+      rememberAcquisitionId(acquisitionId);
+      expect(localStorage.getItem('jovie_acquisition_id')).toBe(acquisitionId);
+      expect(document.cookie).toContain(`jv_acquisition_id=${acquisitionId}`);
+    });
+    it('does not adopt an id after consent was revoked', () => {
+      setConsentState('rejected');
+      rememberAcquisitionId(acquisitionId);
+      expect(localStorage.getItem('jovie_acquisition_id')).toBeNull();
+    });
+    it.each([undefined, 'malformed'])(
+      'ignores invalid server identities: %s',
+      value => {
+        rememberAcquisitionId(value);
+        expect(localStorage.getItem('jovie_acquisition_id')).toBeNull();
+      }
+    );
   });
 
   describe('clearConsentState', () => {

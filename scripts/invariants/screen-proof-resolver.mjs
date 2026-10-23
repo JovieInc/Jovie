@@ -42,6 +42,26 @@ const MAX_EXTRACTED_ARTIFACT_BYTES = 512 * 1024 * 1024;
 const MAX_ARTIFACT_DOWNLOAD_BYTES =
   MAX_EXTRACTED_ARTIFACT_BYTES + 128 * 1024 * 1024;
 const validId = value => Number.isSafeInteger(value) && value > 0;
+// Read-after-write on the jobs API. Runs 39786806070, 39791190562, and
+// 39795196640 rejected every screen with the trust failure while Generate
+// Screenshots had already concluded success; a later read of the same
+// attempt accepted the screens that were checked after the row appeared.
+// The sleeps below total 150s, which covers the ~117s lag before that row
+// was visible. This does not accept any other conclusion, repository,
+// workflow, head, or digest.
+export const PRODUCER_LAG_DELAYS_MS = Object.freeze([
+  10_000, 20_000, 30_000, 30_000, 30_000, 30_000,
+]);
+const TERMINAL_JOB_CONCLUSIONS = new Set([
+  'action_required',
+  'cancelled',
+  'failure',
+  'neutral',
+  'skipped',
+  'stale',
+  'startup_failure',
+  'timed_out',
+]);
 const isObject = value =>
   value && typeof value === 'object' && !Array.isArray(value);
 const sha256 = bytes =>
@@ -51,6 +71,9 @@ const time = value =>
   typeof value === 'string' && Number.isFinite(Date.parse(value))
     ? Date.parse(value)
     : null;
+// Reject parent-directory traversal as its own path segment. A substring
+// check treats Next.js catch-all sources (`[...slug]`, `[[...slug]]`) as
+// traversal and makes `web.smartlink-release` an invalid resolver request.
 const paths = value =>
   Array.isArray(value) &&
   value.every(
@@ -58,7 +81,7 @@ const paths = value =>
       typeof path === 'string' &&
       path &&
       !path.startsWith('/') &&
-      !path.includes('..')
+      !path.split('/').includes('..')
   )
     ? [...new Set(value)].sort()
     : null;
@@ -133,6 +156,98 @@ function run(command, args, binary = false) {
 }
 function api(path, binary = false) {
   return run('gh', ['api', `repos/${PRODUCER.repository}/${path}`], binary);
+}
+function pause(ms) {
+  if (!ms) return;
+  const result = spawnSync('sleep', [String(ms / 1000)]);
+  if (result.status !== 0) throw new Error('controlled transport unavailable');
+}
+function producerLagDelays(lagDelays) {
+  const source = Array.isArray(lagDelays) ? lagDelays : PRODUCER_LAG_DELAYS_MS;
+  return source.filter(
+    delay => Number.isSafeInteger(delay) && delay >= 0 && delay <= 60_000
+  );
+}
+function loadProducerAttempt(artifactId) {
+  const artifact = JSON.parse(api(`actions/artifacts/${artifactId}`));
+  const runId = artifact?.workflow_run?.id;
+  const workflowRun = JSON.parse(api(`actions/runs/${runId}`));
+  const attempt = workflowRun.run_attempt;
+  const jobs = JSON.parse(
+    api(`actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`)
+  );
+  return { artifact, workflowRun, jobs, runId, attempt };
+}
+function producerJobs(jobs, runId, attempt, headSha) {
+  return (jobs?.jobs || []).filter(
+    item =>
+      item?.name === PRODUCER.job &&
+      item.run_id === runId &&
+      item.run_attempt === attempt &&
+      item.head_sha?.toLowerCase() === headSha.toLowerCase()
+  );
+}
+/**
+ * @returns {'accept' | 'wait' | 'reject'}
+ */
+function classifyProducerAttempt({
+  artifact,
+  workflowRun,
+  jobs,
+  runId,
+  attempt,
+  artifactId,
+  context,
+  trustedName,
+}) {
+  const digestReady = /^sha256:[0-9a-f]{64}$/i.test(artifact.digest ?? '');
+  const currentRunId = Number(process.env.GITHUB_RUN_ID);
+  const currentAttempt = Number(process.env.GITHUB_RUN_ATTEMPT);
+  const completedRun = workflowRun.conclusion === 'success';
+  const downstreamCertificationRun =
+    runId === currentRunId &&
+    attempt === currentAttempt &&
+    workflowRun.status === 'in_progress' &&
+    workflowRun.conclusion == null;
+  const job = producerJobs(jobs, runId, attempt, context.headSha);
+  const identityTrusted =
+    validId(runId) &&
+    validId(attempt) &&
+    artifact.id === artifactId &&
+    trustedName &&
+    !artifact.expired &&
+    workflowRun.repository?.full_name === PRODUCER.repository &&
+    workflowRun.head_branch === 'main' &&
+    workflowRun.head_sha?.toLowerCase() === context.headSha.toLowerCase() &&
+    workflowRun.path === PRODUCER.workflow &&
+    ['push', 'workflow_dispatch'].includes(workflowRun.event);
+  if (
+    identityTrusted &&
+    digestReady &&
+    (completedRun || downstreamCertificationRun) &&
+    job.length === 1 &&
+    validId(job[0].id) &&
+    job[0].conclusion === 'success'
+  ) {
+    return 'accept';
+  }
+  const named = (jobs?.jobs || []).filter(
+    item => item?.name === PRODUCER.job && item.run_id === runId
+  );
+  const terminalProducer = named.some(item =>
+    TERMINAL_JOB_CONCLUSIONS.has(item?.conclusion)
+  );
+  // Same-run certification may wait out jobs-API lag. A finished failure,
+  // a different head, or a different workflow is rejected on the first read.
+  if (
+    downstreamCertificationRun &&
+    identityTrusted &&
+    !terminalProducer &&
+    (!digestReady || job.length !== 1 || job[0].conclusion !== 'success')
+  ) {
+    return 'wait';
+  }
+  return 'reject';
 }
 function bundleDigest(files) {
   const hash = createHash('sha256');
@@ -348,8 +463,16 @@ export function resolveTrustedArtifactId({
     return null;
   }
 }
-/** Owned GitHub transport; tests replace `gh` on PATH, never a verifier result. */
-export function resolveTrustedScreenProof({ artifactId, context }) {
+/**
+ * Owned GitHub transport; tests replace `gh` on PATH, never a verifier result.
+ * `lagDelays` is test-only. Production reads use the fixed producer-lag budget.
+ * @param {{ artifactId?: unknown, context?: any, lagDelays?: number[] }} [request]
+ */
+export function resolveTrustedScreenProof({
+  artifactId,
+  context,
+  lagDelays,
+} = {}) {
   const now = Date.now();
   const expectedSources = paths(context?.sourcePaths);
   const viewports = Array.isArray(context?.viewports)
@@ -366,51 +489,40 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
   )
     return fail('controlled resolver request is invalid');
   try {
-    const artifact = JSON.parse(api(`actions/artifacts/${artifactId}`));
-    const runId = artifact?.workflow_run?.id;
-    const workflowRun = JSON.parse(api(`actions/runs/${runId}`));
-    const attempt = workflowRun.run_attempt;
-    const jobs = JSON.parse(
-      api(`actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`)
-    );
-    const job = jobs?.jobs?.filter(
-      item =>
-        item?.name === PRODUCER.job &&
-        item.run_id === runId &&
-        item.run_attempt === attempt &&
-        item.head_sha?.toLowerCase() === context.headSha.toLowerCase()
-    );
-    const trustedName =
-      artifact.name === marketingName ||
-      artifact.name === screenProofArtifactName(context.screenId);
-    const currentRunId = Number(process.env.GITHUB_RUN_ID);
-    const currentAttempt = Number(process.env.GITHUB_RUN_ATTEMPT);
-    const completedRun = workflowRun.conclusion === 'success';
-    const downstreamCertificationRun =
-      runId === currentRunId &&
-      attempt === currentAttempt &&
-      workflowRun.status === 'in_progress' &&
-      workflowRun.conclusion == null;
-    if (
-      !validId(runId) ||
-      !validId(attempt) ||
-      artifact.id !== artifactId ||
-      !trustedName ||
-      artifact.expired ||
-      !/^sha256:[0-9a-f]{64}$/i.test(artifact.digest ?? '') ||
-      workflowRun.repository?.full_name !== PRODUCER.repository ||
-      workflowRun.head_branch !== 'main' ||
-      workflowRun.head_sha?.toLowerCase() !== context.headSha.toLowerCase() ||
-      workflowRun.path !== PRODUCER.workflow ||
-      !['push', 'workflow_dispatch'].includes(workflowRun.event) ||
-      (!completedRun && !downstreamCertificationRun) ||
-      job?.length !== 1 ||
-      !validId(job[0].id) ||
-      job[0].conclusion !== 'success'
-    )
-      return fail(
-        'artifact run, workflow, or exact producer attempt is not trusted'
-      );
+    const delays = [0, ...producerLagDelays(lagDelays)];
+    let artifact;
+    let runId;
+    let attempt;
+    let job;
+    for (let index = 0; index < delays.length; index += 1) {
+      pause(delays[index]);
+      const loaded = loadProducerAttempt(artifactId);
+      artifact = loaded.artifact;
+      runId = loaded.runId;
+      attempt = loaded.attempt;
+      const trustedName =
+        artifact.name === marketingName ||
+        artifact.name === screenProofArtifactName(context.screenId);
+      const decision = classifyProducerAttempt({
+        artifact,
+        workflowRun: loaded.workflowRun,
+        jobs: loaded.jobs,
+        runId,
+        attempt,
+        artifactId,
+        context,
+        trustedName,
+      });
+      if (decision === 'accept') {
+        job = producerJobs(loaded.jobs, runId, attempt, context.headSha);
+        break;
+      }
+      if (decision === 'reject' || index === delays.length - 1) {
+        return fail(
+          'artifact run, workflow, or exact producer attempt is not trusted'
+        );
+      }
+    }
     const created = time(artifact.created_at),
       started = time(job[0].started_at),
       completed = time(job[0].completed_at);

@@ -407,4 +407,21 @@ describe('BottomTabBar — liquid glass lens', () => {
       expect(glyph?.querySelector('svg')).not.toBeNull();
     }
   });
+
+  it('paints a solid nav when the document reduced-transparency hook is set', () => {
+    render(<BottomTabBar {...makeProps()} />);
+    const nav = screen.getByTestId('profile-bottom-nav');
+    expect(nav.style.getPropertyValue('backdrop-filter')).toBe('');
+
+    document.documentElement.dataset.reducedTransparency = 'true';
+    return waitFor(() => {
+      expect(nav.style.getPropertyValue('backdrop-filter')).toBe('none');
+      expect(nav.style.getPropertyPriority('backdrop-filter')).toBe(
+        'important'
+      );
+      expect(nav.style.getPropertyValue('background-image')).toBe('none');
+    }).finally(() => {
+      delete document.documentElement.dataset.reducedTransparency;
+    });
+  });
 });

@@ -116,13 +116,6 @@ export function ReleasesView({
       .join(' • ');
   };
 
-  const getReleaseAriaLabel = (release: PublicRelease): string => {
-    const collaborators = getCollaborators(release);
-    return collaborators.length > 0
-      ? `View ${release.title} by ${collaborators.join(', ')}`
-      : `View ${release.title}`;
-  };
-
   return (
     <div
       className='border-y border-white/[0.075] [contain:layout_style]'
@@ -166,12 +159,13 @@ export function ReleasesView({
                 })
               }
               className='group flex min-h-16 items-center gap-3 border-t border-white/[0.075] px-4 py-2.5 first:border-t-0 transition-colors duration-subtle hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
-              aria-label={getReleaseAriaLabel(release)}
             >
               <ArtworkFrame size={44} className='h-11 w-11 bg-white/[0.04]'>
+                {/* Artwork is decorative: the link's accessible name comes from the
+                    visible title + meta text (WCAG 2.5.3 label-in-name). */}
                 <ImageWithFallback
                   src={release.artworkUrl}
-                  alt={release.title}
+                  alt=''
                   fill
                   sizes='44px'
                   priority={index === 0}

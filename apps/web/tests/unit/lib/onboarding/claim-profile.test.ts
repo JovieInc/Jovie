@@ -1,5 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockRevenueFailure = vi.hoisted(() => vi.fn());
+const claimVerification = vi.hoisted(() => ({
+  getReach: vi.fn().mockResolvedValue(null),
+  request: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('@/lib/claim/claim-verification.server', () => ({
+  getClaimVerificationReach: claimVerification.getReach,
+  requestClaimVerification: claimVerification.request,
+}));
+vi.mock('@/lib/observability/revenue-spine', () => ({
+  captureRevenueSpineFailure: mockRevenueFailure,
+}));
+
 const {
   mockDbSelect,
   mockIdentityConflict,
@@ -303,6 +316,14 @@ describe('materializeClaimedOnboardingProfile', () => {
       status: 409,
     });
     expect(mockReserveOnboardingHandle).not.toHaveBeenCalled();
+    expect(mockRevenueFailure).toHaveBeenCalledWith({
+      stage: 'profile_claim',
+      severity: 'blocked',
+      userId: 'user_1',
+      error: expect.objectContaining({
+        errorCode: 'SPOTIFY_IDENTITY_CONFLICT',
+      }),
+    });
   });
 
   it('refuses to overwrite an owned profile identity from a stale transcript', async () => {
@@ -518,6 +539,54 @@ describe('materializeClaimedOnboardingProfile', () => {
         spotifyId: 'spotify_1',
         spotifyPopularity: 61,
         spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
+      })
+    );
+  });
+
+  it('holds a high-reach artist for verification instead of attaching it', async () => {
+    claimVerification.getReach.mockResolvedValueOnce(1_800_000);
+    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+      artist: {
+        id: 'spotify_famous',
+        name: 'Famous Artist',
+        url: 'https://open.spotify.com/artist/spotify_famous',
+        imageUrl: 'https://i.scdn.co/image/famous.jpg',
+        followers: null,
+        popularity: 90,
+        genres: ['pop'],
+      },
+      handle: 'lunawaves',
+      socialLinks: [],
+      interviewSignals: [],
+    });
+
+    setupOwnedConversationAndMessages();
+    setupExistingProfileSelect(null);
+    const [profileInsertValues] = queueProfileInsert({ id: 'profile_new' });
+    queuePostPersistWrites();
+
+    await expect(
+      materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+      })
+    ).resolves.toMatchObject({ profileId: 'profile_new', status: 'created' });
+
+    expect(mockFetchArtistBySpotifyUrl).not.toHaveBeenCalled();
+    const inserted = profileInsertValues.mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(inserted.spotifyId ?? null).toBeNull();
+    expect(inserted.displayName).not.toBe('Famous Artist');
+    expect(claimVerification.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'profile_new',
+        spotifyArtistId: 'spotify_famous',
+        reach: 1_800_000,
+        paid: false,
       })
     );
   });

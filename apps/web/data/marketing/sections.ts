@@ -437,7 +437,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         media: 'none',
         alignment: 'left',
         chooseWhen:
-          'explicit YouTube paste-first source binding only; no automatic selection',
+          'explicit informational source binding, including planned announcements without an approved capture; no automatic selection',
         exemplar: { route: '/youtube-thumbnails', section: 'hero' },
         status: 'active',
       },
@@ -661,7 +661,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         alignment: 'centered',
         chooseWhen:
           'items.length=3 AND emphasis=high (breadth survey before depth)',
-        status: 'unproven',
+        exemplar: { route: '/artist-notifications', section: 'benefits' },
+        status: 'active',
       },
       {
         id: '4-equal',
@@ -671,7 +672,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         density: 'large',
         alignment: 'centered',
         chooseWhen: 'items.length=4 AND emphasis=medium',
-        status: 'unproven',
+        exemplar: { route: '/pay', section: 'use-cases' },
+        status: 'active',
       },
       {
         id: '6-compact',
@@ -1093,7 +1095,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         alignment: 'centered',
         chooseWhen:
           'stats.length=3 AND placement=before-final-cta (B2B C2: scale metric as closing argument)',
-        status: 'unproven',
+        exemplar: { route: '/launch', section: 'why-now' },
+        status: 'active',
       },
       {
         id: '4-stat-band',
@@ -1511,6 +1514,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         'content-prose',
         'pricing',
         'blog-feed',
+        // Real product states are value proof (homepage, EVENT 2026-10-20).
+        'product-gallery',
       ],
     ],
     contentBudgets: [
@@ -1956,7 +1961,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         alignment: 'left',
         chooseWhen:
           'recipe=seo OR recipe=blog-landing article view (long-form prose body — 680px prose container)',
-        status: 'unproven',
+        exemplar: { route: '/alternatives/linktree', section: 'content-prose' },
+        status: 'active',
       },
       {
         id: 'centered-video',

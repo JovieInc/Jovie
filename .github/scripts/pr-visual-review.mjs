@@ -30,6 +30,9 @@ export const DEFAULT_CAPTURE_WORKERS = 2;
 export const CRITICAL_JOURNEY_CAPTURE_SCHEMA =
   'jovie.critical-journey-capture/v1';
 const PUBLIC_HOME_CAPTURE_ROUTE = '/';
+const PUBLIC_CARD_CAPTURE_ROUTE = '/card';
+const PUBLIC_CARD_CAPTURE_FILE =
+  /^(?:apps\/web\/app\/\(marketing\)\/card\/|apps\/web\/data\/jovieCardCopy\.ts$)/;
 const PUBLIC_PROFILE_CAPTURE_ROUTE = '/demo/showcase/public-profile';
 const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
 // Changes to the session boundary can leave a public route perfectly healthy
@@ -162,6 +165,7 @@ export function routeChangedFiles(files) {
   const changed = files.filter(
     file =>
       UI_FILE.test(file) ||
+      PUBLIC_CARD_CAPTURE_FILE.test(file) ||
       AUTHENTICATED_SHELL_CAPTURE_FILE.test(file) ||
       /(^|\/)DESIGN\.md$/.test(file)
   );
@@ -178,7 +182,9 @@ export function routeChangedFiles(files) {
     // UI changes belong on the public home surface; `/demo` and `/demo/admin`
     // require data/authentication that the capture runner intentionally does
     // not invent.
-    if (AUTHENTICATED_SHELL_CAPTURE_FILE.test(file))
+    if (PUBLIC_CARD_CAPTURE_FILE.test(file))
+      routes.add(PUBLIC_CARD_CAPTURE_ROUTE);
+    else if (AUTHENTICATED_SHELL_CAPTURE_FILE.test(file))
       routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);
     else if (/admin|console|ops/i.test(file))
       routes.add(PUBLIC_HOME_CAPTURE_ROUTE);

@@ -28,14 +28,20 @@ import {
   FAILURE_HOLD_CONTEXT,
   FAILURE_RETRY_CONTEXT,
   failureReceiptStatus,
+  humanFailureReleaseIntent,
+  humanReleaseDisposition,
+  isHeldWorkflowFailure,
   ownerHoldReleaseIntent,
+  PR_SIZE_GUARD_WORKFLOW_ID,
   parseMergeQueueBranch,
+  REVISION_FAILED_AT_HEAD,
   reenrollmentDisposition,
   retryReleasedDescription,
   retrySpentDescription,
   revisionFailureDisposition,
   sourceHeadForRun,
   supersededByLiveEntry,
+  WORKFLOW_LOAD_STEP,
 } from '../../merge-group-failure-hold.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
@@ -48,6 +54,104 @@ const classify = (conclusion, failedSteps = []) =>
   classifyMergeGroupFailure({ conclusion, failedSteps });
 const disposition = statuses =>
   revisionFailureDisposition({ repository: REPOSITORY, statuses });
+
+describe('human release of a failed head (JOV-6620)', () => {
+  const unlabeled = (overrides = {}) => ({
+    action: 'unlabeled',
+    label: { name: 'queue-poison' },
+    sender: { login: 'itstimwhite', type: 'User' },
+    pull_request: {
+      number: 22280,
+      state: 'open',
+      draft: false,
+      head: { sha: SOURCE },
+    },
+    ...overrides,
+  });
+  const failed = disposition([status({ classification: 'retryable-product' })]);
+
+  it('only a person removing hold or queue-poison from the exact head releases it', () => {
+    const release = humanFailureReleaseIntent({
+      eventName: 'pull_request_target',
+      event: unlabeled(),
+    });
+    expect(release).toMatchObject({ prNumber: 22280, headSha: SOURCE });
+    expect(
+      humanReleaseDisposition({
+        failure: failed,
+        release,
+        prNumber: 22280,
+        headSha: SOURCE,
+      })
+    ).toMatchObject({ action: 'retry-once', reason: 'human-failure-release' });
+    expect(
+      humanFailureReleaseIntent({
+        eventName: 'pull_request_target',
+        event: unlabeled({ label: { name: 'hold' } }),
+      })
+    ).not.toBeNull();
+    // A new head is its own revision; an old release never moves to it.
+    expect(
+      humanReleaseDisposition({
+        failure: failed,
+        release,
+        prNumber: 22280,
+        headSha: NEW_SOURCE,
+      })
+    ).toBe(failed);
+  });
+
+  it('replays #22280/#21869: jovie-bot lifting queue-poison never releases the failed head', () => {
+    for (const sender of [
+      { login: 'jovie-bot[bot]', type: 'Bot' },
+      { login: 'github-actions[bot]', type: 'Bot' },
+      { login: 'jovie-bot[bot]', type: 'User' },
+      undefined,
+    ])
+      expect(
+        humanFailureReleaseIntent({
+          eventName: 'pull_request_target',
+          event: unlabeled({ sender }),
+        })
+      ).toBeNull();
+    for (const event of [
+      unlabeled({ action: 'labeled' }),
+      unlabeled({ label: { name: 'lane-fix-red' } }),
+      unlabeled({ pull_request: { ...unlabeled().pull_request, draft: true } }),
+    ])
+      expect(
+        humanFailureReleaseIntent({ eventName: 'pull_request_target', event })
+      ).toBeNull();
+    expect(
+      humanFailureReleaseIntent({ eventName: 'push', event: unlabeled() })
+    ).toBeNull();
+  });
+
+  it('never releases a deterministic failure or an unblocked head', () => {
+    const release = humanFailureReleaseIntent({
+      eventName: 'pull_request_target',
+      event: unlabeled(),
+    });
+    const deterministic = disposition([status()]);
+    expect(
+      humanReleaseDisposition({
+        failure: deterministic,
+        release,
+        prNumber: 22280,
+        headSha: SOURCE,
+      })
+    ).toBe(deterministic);
+    const clean = disposition([]);
+    expect(
+      humanReleaseDisposition({
+        failure: clean,
+        release,
+        prNumber: 22280,
+        headSha: SOURCE,
+      })
+    ).toBe(clean);
+  });
+});
 
 it('restores only a current exact-head owner hold release, never an unchanged CI retry', () => {
   const event = {
@@ -596,6 +700,99 @@ process.stdout.write(JSON.stringify(result));
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it.each([
+  ['proven', 'ahead-22328-lanes-flake.txt', false],
+  ['unproven', 'poison-22331-api-guard.txt', true],
+])(
+  'CLI attributes against a completed failed ahead run from its job logs (%s)',
+  (_label, aheadLogName, waits) => {
+    const dir = mkdtempSync(join(tmpdir(), 'failure-hold-attribution-'));
+    try {
+      const logs = resolve(import.meta.dirname, 'fixtures/ahead-attribution');
+      const fixturePath = join(dir, 'fixture.json');
+      writeFileSync(
+        fixturePath,
+        JSON.stringify({
+          run,
+          timeline,
+          source: SOURCE,
+          currentLog: join(logs, 'poison-22331-api-guard.txt'),
+          // The unproven case feeds the poison log as the ahead evidence too:
+          // its own failing commands never passed there.
+          aheadLog: join(logs, aheadLogName),
+        })
+      );
+      writeFileSync(
+        join(dir, 'gh'),
+        `#!${process.execPath}
+const fs = require('node:fs');
+const fixture = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
+const args = process.argv.slice(2);
+const failed = id => [
+  { id, name: 'ci-fast (remaining)', conclusion: 'failure',
+    steps: [{ name: 'Run structural ci-fast lane', conclusion: 'failure' }] },
+  { id: id + 1, name: 'PR Ready', conclusion: 'failure',
+    steps: [{ name: 'Evaluate combined-head checks', conclusion: 'failure' }] },
+];
+let result;
+if (args[1] === 'graphql') {
+  const query = args.find(arg => arg.startsWith('query='));
+  const pr = query.includes('timelineItems')
+    ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
+    : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
+        isInMergeQueue: false, mergeQueueEntry: null, autoMergeRequest: null };
+  result = { data: { repository: { pullRequest: pr } } };
+} else if (args.includes('POST')) result = {};
+else if (args[1].endsWith('/actions/jobs/11/logs')) { process.stdout.write(fs.readFileSync(fixture.currentLog, 'utf8')); process.exit(0); }
+else if (args[1].endsWith('/actions/jobs/21/logs')) { process.stdout.write(fs.readFileSync(fixture.aheadLog, 'utf8')); process.exit(0); }
+else if (args[1].includes('/compare/')) result = { status: 'behind' };
+else if (args[1].includes('/actions/runs?head_sha=')) result = { workflow_runs: [
+  { id: 900, workflow_id: 178737329, created_at: '2026-10-12T08:43:05Z', conclusion: 'failure' },
+] };
+else if (args[1].includes('/runs/900/jobs?')) result = { jobs: args[1].includes('page=1') ? failed(21) : [] };
+else if (args[1].includes('/jobs?')) result = { jobs: args[1].includes('page=1') ? failed(11) : [] };
+else if (args[1].includes('/statuses')) result = [];
+else result = fixture.run;
+process.stdout.write(JSON.stringify(result));
+`,
+        { mode: 0o755 }
+      );
+      const eventPath = join(dir, 'event.json');
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          repository: { full_name: REPOSITORY },
+          workflow_run: { id: run.id },
+        })
+      );
+      const execution = spawnSync(
+        process.execPath,
+        [
+          resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
+          '--event-path',
+          eventPath,
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            HOLD_TEST_FIXTURE: fixturePath,
+            GITHUB_OUTPUT: join(dir, 'output'),
+          },
+        }
+      );
+      expect(execution.status, execution.stderr).toBe(0);
+      const receipt = JSON.parse(execution.stdout);
+      expect(Boolean(receipt.aheadEntryUnproven)).toBe(waits);
+      expect(receipt.statusWritten).toBe(!waits);
+      expect(receipt.aheadAttribution?.attributable).toBe(!waits);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);
 
 it.each([
   ['behind', 'in_progress', true],
@@ -1186,8 +1383,8 @@ describe('failure classification and revision-scoped suppression', () => {
       expect(enqueueWasRejected(error)).toBe(false);
   });
 
-  it('newest trusted release restores the unused retry; a later reservation blocks it', () => {
-    const first = status({ classification: 'unclassified' });
+  it('newest trusted release restores the unused infrastructure retry; a later reservation blocks it', () => {
+    const first = status({ classification: 'transient-infrastructure' });
     const spent = status({
       context: 'jovie-queue-failure-retry/v1',
       description: retrySpentDescription({ runId: 123, runAttempt: 1 }),
@@ -1219,14 +1416,10 @@ describe('failure classification and revision-scoped suppression', () => {
       action: 'block',
       reason: 'deterministic-source-failure',
     });
+    // A released reservation never re-admits an attributable failure.
     expect(
-      disposition([
-        released,
-        spent,
-        first,
-        status({ classification: 'unclassified', number: 2, runId: 124 }),
-      ])
-    ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
+      disposition([released, spent, status({ classification: 'unclassified' })])
+    ).toMatchObject({ action: 'block', reason: REVISION_FAILED_AT_HEAD });
   });
 
   it('blocks the unchanged deterministic head while a new head has no hold', () => {
@@ -1255,13 +1448,13 @@ describe('failure classification and revision-scoped suppression', () => {
     expect(
       disposition([infra(1, 123), spent(123), infra(2, 124), spent(124)])
     ).toMatchObject({ action: 'block', reason: 'revision-retry-spent' });
-    // One attributable failure plus infrastructure noise keeps its retry; a
-    // second attributable failure still exhausts the revision.
+    // An attributable failure blocks its head even after infrastructure
+    // noise; infrastructure after a released attributable failure retries.
     const unclassified = (number, runId) =>
       status({ classification: 'unclassified', number, runId });
     expect(
       disposition([infra(1, 123), spent(123), unclassified(2, 124)])
-    ).toMatchObject({ action: 'retry-once' });
+    ).toMatchObject({ action: 'block', reason: REVISION_FAILED_AT_HEAD });
     expect(
       disposition([unclassified(1, 123), spent(123), unclassified(2, 124)])
     ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
@@ -1270,27 +1463,17 @@ describe('failure classification and revision-scoped suppression', () => {
     ).toMatchObject({ action: 'retry-once' });
   });
 
-  it('allows one non-deterministic retry, then blocks the same revision', () => {
-    const first = status({ classification: 'unclassified' });
-    expect(disposition([first])).toMatchObject({ action: 'retry-once' });
-    const spent = status({
-      context: 'jovie-queue-failure-retry/v1',
-      description: retrySpentDescription({ runId: 123, runAttempt: 1 }),
-    });
-    expect(disposition([first, spent])).toMatchObject({
-      action: 'block',
-      reason: 'revision-retry-spent',
-    });
-    expect(
-      disposition([
-        first,
-        status({
-          classification: 'unclassified',
-          number: 2,
-          runId: 124,
-        }),
-      ])
-    ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
+  it('blocks a failed head at once, whatever non-infrastructure step failed (JOV-6620)', () => {
+    for (const classification of ['unclassified', 'retryable-product']) {
+      const first = status({ classification });
+      expect(disposition([first])).toMatchObject({
+        action: 'block',
+        reason: REVISION_FAILED_AT_HEAD,
+      });
+      expect(
+        disposition([first, status({ classification, number: 2, runId: 124 })])
+      ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
+    }
   });
 });
 
@@ -1477,10 +1660,20 @@ describe('terminal failure hold application', () => {
       },
       io()
     );
+    // JOV-6620: any attributable failure blocks its exact head at once.
     expect(afterInfra).toMatchObject({
       classification: 'unclassified',
       failureNumber: 2,
-      retryDisposition: 'one-queue-authority-retry',
+      retryDisposition: 'blocked-until-new-source-head',
+    });
+    const firstProduct = await applyMergeGroupFailure(
+      { ...failureInput, failedSteps: ['Run unit tests'], statuses: [] },
+      io()
+    );
+    expect(firstProduct).toMatchObject({
+      classification: 'retryable-product',
+      failureNumber: 1,
+      retryDisposition: 'blocked-until-new-source-head',
     });
   });
 
@@ -1614,6 +1807,65 @@ describe('terminal failure hold application', () => {
       expect(dequeuePullRequest).not.toHaveBeenCalled();
       expect(disableAutoMerge).not.toHaveBeenCalled();
     }
+  });
+
+  it('holds when the completed ahead run proves the failure is this entry own (#22331)', async () => {
+    const writeStatus = vi.fn();
+    const signatureAttribution = {
+      attributable: true,
+      reason: 'failing-signals-passed-on-ahead-run',
+    };
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        aheadGroup: {
+          baseOnMain: false,
+          aheadConclusion: 'failure',
+          aheadRunId: 39536019717,
+          signatureAttribution,
+        },
+      },
+      {
+        writeStatus,
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: false,
+          mergeQueueEntry: null,
+          autoMergeRequest: null,
+        })),
+        dequeuePullRequest: vi.fn(),
+        disableAutoMerge: vi.fn(),
+      }
+    );
+    expect(result).not.toHaveProperty('skipped');
+    expect(result).not.toHaveProperty('aheadEntryUnproven');
+    expect(result).toMatchObject({
+      statusWritten: true,
+      aheadAttribution: signatureAttribution,
+    });
+    expect(writeStatus).toHaveBeenCalled();
+  });
+
+  it('keeps waiting when ahead attribution is unproven', () => {
+    expect(
+      aheadEntryUnproven({
+        baseOnMain: false,
+        aheadConclusion: 'failure',
+        signatureAttribution: {
+          attributable: false,
+          reason: 'ci-fast-log-missing',
+        },
+      })
+    ).toBe(true);
+    expect(
+      aheadEntryUnproven({
+        baseOnMain: false,
+        aheadConclusion: 'failure',
+        signatureAttribution: { attributable: true, reason: 'x' },
+      })
+    ).toBe(false);
   });
 
   it('holds when the base is main, the group ahead passed, or the base is unreadable', () => {
@@ -1914,5 +2166,139 @@ describe('poison re-enqueue loop (JOV-7708, #20354)', () => {
       )
     ).toBe(true);
     expect(autoMergeWasNotArmed(new Error('Bad credentials'))).toBe(false);
+  });
+});
+
+// 2026-10-20 21:13–21:52Z: #21826 grew ci.yml's path-detect run script past
+// GitHub's 21,000-character expression limit. Every group containing it got a
+// zero-job CI run attributed to push, no merge_group check ever reported, and
+// ten entries sat in AWAITING_CHECKS. PR Size Guard's load step now fails the
+// group that introduced it; the hold must keep that exact head out.
+describe('workflow-load guard failures (2026-10-20 queue stall, #21826)', () => {
+  const sizeGuardRun = {
+    ...run,
+    workflow_id: PR_SIZE_GUARD_WORKFLOW_ID,
+    path: '.github/workflows/pr-size-guard.yml',
+  };
+  const queuedPr = () => ({
+    id: 'PR_42',
+    state: 'OPEN',
+    headRefOid: SOURCE,
+    isInMergeQueue: true,
+    mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+    autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+  });
+
+  it('classifies the load step as a source failure', () => {
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: [WORKFLOW_LOAD_STEP],
+      })
+    ).toBe('deterministic-source');
+  });
+
+  it('holds only the PR Size Guard load step, never other size failures', () => {
+    expect(isHeldWorkflowFailure(run, [])).toBe(true);
+    expect(isHeldWorkflowFailure(sizeGuardRun, [WORKFLOW_LOAD_STEP])).toBe(
+      true
+    );
+    expect(
+      isHeldWorkflowFailure(sizeGuardRun, [
+        'Enforce combined-tree payload and member size policy',
+      ])
+    ).toBe(false);
+    expect(
+      isHeldWorkflowFailure({ ...sizeGuardRun, workflow_id: 1 }, [
+        WORKFLOW_LOAD_STEP,
+      ])
+    ).toBe(false);
+  });
+
+  it('holds the exact head even while the group ahead is unproven', async () => {
+    // The guard fails only when the group's base loads, so the failure is
+    // this group's own diff whatever the group ahead is doing.
+    let state = queuedPr();
+    const writeStatus = vi.fn(async (/** @type {any} */ _receipt) => {});
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        run: sizeGuardRun,
+        failedSteps: [WORKFLOW_LOAD_STEP],
+        aheadGroup: { baseOnMain: false, aheadConclusion: null },
+      },
+      {
+        writeStatus,
+        readPullRequest: vi.fn(async () => structuredClone(state)),
+        dequeuePullRequest: vi.fn(async () => {
+          state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+        }),
+        disableAutoMerge: vi.fn(async () => {
+          state = { ...state, autoMergeRequest: null };
+        }),
+      }
+    );
+    // First the exact-head hold receipt, then the required context failed on
+    // the synthetic group head so the queue ejects it now.
+    expect(writeStatus.mock.calls.map(([receipt]) => receipt)).toEqual([
+      expect.objectContaining({
+        sha: SOURCE,
+        context: FAILURE_HOLD_CONTEXT,
+        state: 'success',
+        description: expect.stringContaining('class=deterministic-source'),
+      }),
+      expect.objectContaining({
+        sha: GROUP,
+        context: 'PR Ready',
+        state: 'failure',
+      }),
+    ]);
+    expect(result).toMatchObject({
+      prNumber: 42,
+      classification: 'deterministic-source',
+      retryDisposition: 'blocked-until-new-source-head',
+      autoMergeDisabled: true,
+      groupEjected: true,
+    });
+    expect(result.skipped).toBeUndefined();
+  });
+
+  it('never reports PR Ready failed for an ordinary CI failure', async () => {
+    let state = queuedPr();
+    const writeStatus = vi.fn(async (/** @type {any} */ _receipt) => {});
+    const result = await applyMergeGroupFailure(failureInput, {
+      writeStatus,
+      readPullRequest: vi.fn(async () => structuredClone(state)),
+      dequeuePullRequest: vi.fn(async () => {
+        state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+      }),
+      disableAutoMerge: vi.fn(async () => {
+        state = { ...state, autoMergeRequest: null };
+      }),
+    });
+    expect(
+      writeStatus.mock.calls.some(
+        ([receipt]) => receipt?.context === 'PR Ready'
+      )
+    ).toBe(false);
+    expect(result).not.toHaveProperty('groupEjected');
+  });
+
+  it('rejects a PR Size Guard run from any other workflow path', async () => {
+    await expect(
+      applyMergeGroupFailure(
+        {
+          ...failureInput,
+          run: { ...sizeGuardRun, path: '.github/workflows/ci.yml' },
+          failedSteps: [WORKFLOW_LOAD_STEP],
+        },
+        {
+          writeStatus: vi.fn(),
+          readPullRequest: vi.fn(),
+          dequeuePullRequest: vi.fn(),
+          disableAutoMerge: vi.fn(),
+        }
+      )
+    ).rejects.toThrow(/terminal merge-group CI failure/);
   });
 });
