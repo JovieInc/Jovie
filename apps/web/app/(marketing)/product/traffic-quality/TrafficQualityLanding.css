@@ -1,0 +1,12 @@
+.traffic-quality-stage {
+  min-height: 100svh;
+}
+
+.traffic-quality-glow {
+  height: 28rem;
+}
+
+.traffic-quality-card {
+  margin-bottom: -5.5rem;
+  padding-bottom: 7.5rem;
+}

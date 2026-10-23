@@ -180,6 +180,15 @@ export const MARKETING_PAGE_CONTRACTS = {
       label: PRODUCT_COPY.claimCard.cta,
     },
   },
+  '(marketing)/product/traffic-quality/page.tsx': {
+    routeGlob: '(marketing)/product/traffic-quality/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_TRAFFIC_QUALITY,
+    job: 'keep owner visits and bot visits out of stored counts',
+    proof: 'live traffic quality filter with High quality only and All traffic',
+    successEvent: 'visitor toggles the traffic quality filter',
+    primaryCta: START_CTA,
+  },
   '(marketing)/card/page.tsx': {
     routeGlob: '(marketing)/card/page.tsx',
     copyScope: 'shared',

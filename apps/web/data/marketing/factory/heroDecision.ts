@@ -260,6 +260,11 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     why: 'hero renders ProductClaimCard',
   },
   {
+    url: '/product/traffic-quality',
+    input: { useCase: 'aha-capture', captureId: 'traffic-quality-filter' },
+    why: 'hero mounts the live traffic quality filter as the aha capture',
+  },
+  {
     url: '/card',
     input: { useCase: 'informational' },
     why: 'planned Card announcement uses text until an approved Wallet capture exists',
