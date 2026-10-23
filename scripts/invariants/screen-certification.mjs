@@ -243,6 +243,7 @@ web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/
 web.investor-portal|web|investor-portal|apps/web/app/investor-portal/|desktop,mobile
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
 web.marketing-product|web|marketing-product|apps/web/app/(marketing)/product/page.tsx|desktop,mobile
+web.marketing-product-utm-links|web|marketing-product-utm-links|apps/web/app/(marketing)/product/utm-links/page.tsx|desktop,mobile
 web.marketing-isrc|web|marketing-isrc|apps/web/app/(marketing)/product/isrc/page.tsx|desktop,mobile
 web.marketing-link-analytics|web|marketing-link-analytics|apps/web/app/(marketing)/product/link-analytics/page.tsx|desktop,mobile
 web.marketing-smart-links|web|marketing-smart-links|apps/web/app/(marketing)/smart-links/page.tsx|desktop,mobile
