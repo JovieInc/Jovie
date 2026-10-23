@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-08-03
+Last updated: 2026-10-23
 
 Marketing exists to create qualified demand that moves the current company bottleneck.
 
@@ -74,6 +74,173 @@ Unknown means measure first.
 
 ---
 
+## Art-directed marketing surfaces
+
+Public marketing routes (`app/(marketing)` and the homepage in `app/(home)`)
+are art-directed. This section is the explicit exception to "clarity beats
+novelty" and "smallest design change" in [`DESIGN.md`](./DESIGN.md). Product
+UI, the app shell, auth, and settings stay on that rule. Tokens, contrast,
+art-cropping, truth, motion, and accessibility gates still apply.
+
+The homepage is inbound for founders and investors, and it sells the artist
+profile (EVENT 2026-10-20). The headline stays **Be found. Be understood.**
+(`COMPANY_IDENTITY.homepageHeadline` in
+`apps/web/data/companyIdentity.ts`). The typed homepage recipe still owns
+section order. Those sections carry the arc below.
+
+### Mood
+
+Apple meets Rekordbox. Cinematic, quiet confidence. One idea per viewport.
+
+### Dark first
+
+Dark is the design and review mode. Use the Noir Ion dark tokens: canvas
+`#030406`, card `#131417`, hairline `--noir-ion-border-subtle`
+(`rgba(168, 176, 195, 0.1)`), and Ion `#11AFFF` as the only hero accent. Pulse
+and aqua (aqua aliases mint) stay tiny status accents. Light is a derived
+variant, reviewed second.
+
+### Expensive polish
+
+Expensive polish is restraint plus materiality. One hero artifact per section
+may carry subtle glass and edge-light. Keep generous negative space, one
+controlled glow, and an 8-pt rhythm on the 4px grid. Motion is one long ease
+with the existing reduced-motion fallback. Glass on that artifact is CSS
+token glass only: a low-opacity fill, a 1px edge highlight, and a soft blur.
+No heavy frosting. ZiaWI stays at five elevations. Locked mixes stay in
+`apps/web/data/marketing/mediaRecipes.ts`.
+
+### Subtlety
+
+Technical, cyberpunk, and night cues are felt, not seen, with no explanatory
+text or UI: grid lines, edge-light lines like an iPhone focus-roll edge, and
+grain. Take the literal version, abstract it, then light and focus it so only
+what matters is noticed. Cue color is that section's single accent in
+Imagery and color.
+
+### Imagery and color
+
+One primary color per image. Never mix colors in one image. Each page
+section gets exactly one accent color, chosen from Scene Palette v1
+(`apps/web/data/marketing/imageColorPolicy.ts`): Ion `#3FAFF3`, Ultra
+`#A789F0`, or Pulse `#EB6AC6`. One of those hues per section and per image.
+They are never blended in the same image. The dark-first UI anchors stay the
+interface colors. Real product captures are not recolored.
+
+When an image has a gradient, its key color is the hue of that section's
+accent. Other tones are only neutral black falloff. Fades and light reveals
+are strongly asymmetric: a lit wedge, and the rest to black.
+
+Orange stays forbidden as a scene or cue color. A literal triad stays
+forbidden. Mixing colors, or blending these scene hues, is the same failure.
+Protected real-world color (skin, identity, safety) stays truthful and is not
+a second accent.
+
+Image-generation prompt templates name that single accent hue and forbid
+secondary hues. The same rule applies inside those prompts.
+
+These rules are enforced as blocking checks by the companion PRs from agent
+bc-385e97f8. This section is the wording. Those checks are the gate.
+
+### Focal point
+
+Every section has one focal point. Generate each plate for a specific layout,
+with the overlaid content in mind. Name a quiet content zone: low luminance,
+no light and no detail, reserved for the headline and UI. Place light away
+from or behind that zone, and never blow the zone out. Prompts name the
+zone's position and size. The template is `marketingImagePrompt` in
+`apps/web/scripts/marketing-media/image-adapter.ts`.
+
+Review a plate only with the real content composited on top. Text contrast
+over the zone must meet WCAG 2.2 AA.
+
+### Product as hero
+
+Use real product UI rendered from the app: Playwright captures at 2x or
+higher from seeded demo data (profile, claim flow, release, analytics). Crop
+and frame them at one consistent device scale. Callouts are thin leader lines
+and 12–13px labels, at most 3 per mockup. Dense screenshot collages and
+label-connector diagrams stay rejected
+([MKT-D05](../docs/marketing/DESIGN_INVARIANTS.md#mkt-d05--choose-the-medium-before-the-component)).
+
+### Focus
+
+One primary CTA per viewport. At most two type sizes per section. No all-caps
+eyebrows. Social proof only when it is verified.
+
+### Narrative arc
+
+Claim your handle, then be found, then be understood, then proof, then the
+path for investors and founders, then the final CTA.
+
+### References
+
+Raycast's marketing look is the light reference, taken at higher fidelity: dark
+glass and directed light. Scale follows Linear-style premium: tight
+proportions, small precise UI type, dense but calm layouts, hairline borders,
+and restrained color. Mockups read as a real pro tool at true scale.
+
+### Hero scroll behavior
+
+Design intent. This does not claim the current build is finished.
+
+The opening hero is full-bleed and 100vh, header included: no inset card and
+no rounded corners. The header is minimal: a 28px Jovie O on the left, Sign
+in on the right. The central name/handle input is the focus. The headline
+stays **Be found. Be understood.**
+
+Natural scroll zooms the hero out into a wide cinematic editorial card.
+Gutters grow, corners round, and the proportions become more cinematic.
+Spacing stays tight, not p-8 or p-12. The inset hero and the header share
+aligned outer edges. Scroll is native and fully reversible: no hijacking, no
+pinned dead zone.
+
+The sticky header turns from solid black into subtle dark glass (CSS token
+glass above). Hero content clears the header before any fade or overlap. A
+compact logo strip sits tight under the hero, with restrained glass and light.
+
+Motion follows Frame.io's creative canvas and Apple-like restraint: no bounce.
+The shader supplies atmosphere and does not fight the headline or the input.
+A live shader stays the flagged `night-dj-harmony-v1` exception.
+
+The same felt theme carries across Jovie: the audio player reveal, a canvas
+for video and lyrics, and generated imagery that leaves space for real UI and
+text overlays. Readability, performance, and reduced motion stay protected.
+Product UI rules are unchanged.
+
+### Hard negatives
+
+- Full-width sparse sections.
+- Repeating identical cards.
+- Gradient soup.
+- More than two accents per fold.
+- Document-like or flat screenshots.
+- A tall mockup in a wide section.
+- Oversized consumer scale, including Raycast's, and enlarged hero-sized UI.
+- An inset or rounded opening hero.
+- Scroll hijacking, a pinned dead zone, or bounce.
+- Hero padding at p-8 or p-12.
+- Payroll mentions.
+- Naming Daniel Kang or Haruki.
+- Literal music signals: headphones on people, notes, or instruments as decoration.
+- Orange as a scene or cue color.
+- A literal triad.
+- A second accent hue in one section or image.
+- Mixed colors in one image.
+- A gradient falloff that is not neutral black.
+- A symmetric fade or light reveal. Light is a lit wedge; the rest goes to black.
+- An image-generation prompt that omits its single accent hue or allows a secondary hue.
+- A section with more than one focal point.
+- Light or detail inside a quiet content zone.
+- A generated plate reviewed without the real content composited on top.
+- Text over a plate that misses WCAG 2.2 AA.
+- Canvas, WebGL, or video on the surface by default (`night-dj-harmony-v1`). Shaders and light are baked images plus CSS motion. WebGL only as a flagged, approved exception.
+- Heavy frosting, or glass that is not CSS token glass (low-opacity fill, a 1px edge highlight, soft blur).
+- AI-generated or hand-drawn illustrations of UI. AI images are lighting and mood plates only, with no UI, text, or logos; real UI is composited on top.
+- Product mockups that are not Playwright captures of the app at 2x or higher from seeded demo data.
+
+---
+
 ## Anti-Goals
 
 Do not optimize for:
@@ -98,6 +265,16 @@ The executable landing-page copy workflow is in
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-23 | Each section has one focal point. Plates reserve a named quiet zone for the headline and UI, and text over that zone must meet WCAG 2.2 AA. | Tim focal-point rule |
+| 2026-10-23 | Imagery color rules are also in the UI contract and MKT-D17. Blocking checks are the companion PRs from agent bc-385e97f8. | Tim color rule |
+| 2026-10-23 | Imagery never mixes colors in one image. Gradient falloff is neutral black. Fades and light reveals are a lit wedge, with the rest to black. | Tim color rule |
+| 2026-10-23 | Imagery uses one scene accent per section and image. Gradients fall off to neutral black. Prompt templates name that hue and forbid secondary hues. | Tim color rule |
+| 2026-10-23 | Added hero scroll behavior as design intent: full-bleed opening, native zoom into a cinematic card, token-glass header, felt theme. The current build is not claimed finished. | Tim hero-scroll intent |
+| 2026-10-23 | Marketing references: Raycast for dark glass and directed light at higher fidelity; Linear-style premium for true-scale proportions. | Tim reference rule |
+| 2026-10-23 | Marketing glass is CSS token glass only. Product UI is a Playwright capture at 2x or higher from seeded demo data. AI images are mood plates with no UI, text, or logos. | Tim glass and mockup rule |
+| 2026-10-23 | Night cues drop scan. Canvas, WebGL, and video stay off the surface by default; WebGL is a flagged, approved exception. | Tim subtlety rule |
+| 2026-10-23 | Added the felt-not-seen subtlety rule, scene-palette cue colors, and night-surface hard negatives to the art-directed marketing brief. | Tim subtlety rule |
+| 2026-10-23 | Added the art-directed marketing surface brief as the marketing-only exception to smallest-change design guidance. | Homepage art-direction brief; founder wording review |
 | 2026-10-02 | Added source-classified About/search guidance and distinct artist/ranking outcome boundaries. | Tim voice direction; JOV-7429; Google Search Central |
 | 2026-08-21 | Linked Jovie-owned generated campaign imagery to the scene-first design color contract. | Tim White approval |
 | 2026-08-04 | Added outcome-bound semantic guard against prompt/meta-copy leakage; shadow legacy, delta new/changed copy. | Tim White direction |
