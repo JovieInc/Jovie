@@ -714,12 +714,16 @@ const PROFILE_SURFACES = [
   {
     id: 'profile-contact',
     family: 'profile-core',
+    // /contact is a legacy alias. The public URL redirects to contact mode;
+    // overflow, axe, and exhaustive coverage follow that drawer.
     expectedState: 'ok',
     path: '/[username]/contact',
     resolvePath: () => `/${resolveProfileHandle('music')}/contact`,
-    readySelectors: [...INTENT_PAGE_READY_SELECTORS],
+    readySelectors: [...CONTACT_DRAWER_READY_SELECTORS],
     mainSelector: 'main',
-    minMainTextLength: 60,
+    allowMissingMain: true,
+    minMainTextLength: 30,
+    allowedFinalPaths: [/^\/[^/?#]+\?mode=contact$/],
     lighthouse: false,
     perfGroups: ['public-profile-core'],
     interactions: PROFILE_INTERACTIONS,

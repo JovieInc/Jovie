@@ -19,9 +19,11 @@ import {
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 import { MAC_APP_SUPPORT } from '@/lib/desktop/mac-compatibility';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
@@ -116,7 +118,7 @@ const REQUIREMENTS = [
 ] as const;
 
 export const metadata: Metadata = {
-  title: 'Download Jovie',
+  title: documentTitle('Download Jovie'),
   description: `Download the ${APP_NAME} desktop app for macOS. Code-signed, notarized by Apple, and updates itself in the background.`,
   alternates: {
     canonical: `${BASE_URL}/download`,
@@ -126,11 +128,13 @@ export const metadata: Metadata = {
     description: `${APP_NAME} for Mac, with iPhone in internal TestFlight alpha.`,
     url: `${BASE_URL}/download`,
     type: 'website',
+    images: [marketingOgImage('download')],
   },
   twitter: {
     card: 'summary_large_image',
     title: `Download ${APP_NAME}`,
     description: `${APP_NAME} for Mac, with iPhone in internal TestFlight alpha.`,
+    images: [marketingOgImage('download').url],
   },
 };
 
@@ -172,14 +176,14 @@ export default function DownloadPage() {
               width='page'
               className='relative z-3 flex flex-1 flex-col'
             >
-              <div className='grid min-h-0 flex-1 items-center gap-12 pb-16 sm:pb-20 lg:grid-cols-2 lg:gap-16 lg:pb-24'>
-                <div className='max-w-xl'>
+              <div className='grid min-h-0 flex-1 items-start gap-12 pb-16 sm:pb-20 lg:grid-cols-2 lg:items-center lg:gap-16 lg:pb-24'>
+                <div className='max-w-xl max-sm:min-h-103'>
                   <p className='homepage-section-eyebrow'>
                     Mac app available now / iPhone alpha in TestFlight
                   </p>
                   <h1
                     id='download-hero-heading'
-                    className='mt-5 text-balance text-4xl font-bold leading-none tracking-normal text-(--system-b-text-primary) sm:text-6xl line-clamp-2'
+                    className='mt-5 min-h-18 text-balance text-4xl font-bold leading-none tracking-normal text-(--system-b-text-primary) line-clamp-2 sm:min-h-30 sm:text-6xl'
                   >
                     Jovie, Installed Where You Work.
                   </h1>

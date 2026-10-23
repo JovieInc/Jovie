@@ -1,5 +1,9 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import {
+  disabledRuleIds,
+  wcag22AaAxeOptions,
+} from '@/lib/a11y-gates/wcag-standard.cjs';
 
 test('ancillary inspector restores a focused edit after loading without stealing moved focus', async ({
   page,
@@ -371,11 +375,12 @@ async function expectFocusInside(page: Page, container: Locator) {
 }
 
 async function expectNoSeriousA11yViolations(page: Page, selector: string) {
+  // Contrast is owned by the token contrast gates, not the overlay contract.
   const results = await new AxeBuilder({ page })
     .include(selector)
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    // Contrast is owned by the token contrast gates, not the overlay contract.
-    .disableRules(['color-contrast'])
+    .options(
+      wcag22AaAxeOptions(disabledRuleIds('storybook-overlay-collisions'))
+    )
     .analyze();
   const serious = results.violations.filter(
     violation =>

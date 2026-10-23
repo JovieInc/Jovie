@@ -1,5 +1,7 @@
 'use client';
 
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
+
 /**
  * CommandPalette — global Cmd+K shell.
  *
@@ -153,10 +155,12 @@ function CommandPaletteController() {
       if (isCommandPaletteOpen) closeCommandPalette();
       else openCommandPalette();
     }
-    globalThis.addEventListener('keydown', onKeyDown);
+    // Capture so a focused drawer or menu cannot swallow Cmd/Ctrl+K.
+    // Editors still own the shortcut via the isFormElement guard above.
+    globalThis.addEventListener('keydown', onKeyDown, true);
     globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, openCommandPalette);
     return () => {
-      globalThis.removeEventListener('keydown', onKeyDown);
+      globalThis.removeEventListener('keydown', onKeyDown, true);
       globalThis.removeEventListener(
         OPEN_COMMAND_PALETTE_EVENT,
         openCommandPalette
@@ -231,7 +235,7 @@ function CommandPaletteInner({
           const entity: EntityRef = {
             kind: 'track', // Reuses the generic Music2 fallback art.
             id: `thread:${convo.id}`,
-            label: convo.title || 'Untitled chat',
+            label: convo.title || COPY_FALLBACKS.conversation,
             meta: {
               kind: 'track',
               subtitle: getPaletteConversationSubtitle(

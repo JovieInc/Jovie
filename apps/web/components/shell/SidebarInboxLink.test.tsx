@@ -1,10 +1,21 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 const { runtimeUpdate } = vi.hoisted(() => ({
   runtimeUpdate: { available: false },
 }));
+// Expose the Next Link contract without starting a router in jsdom.
+vi.mock('next/link', () => ({
+  default: forwardRef<
+    HTMLAnchorElement,
+    ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+  >(function TestLink({ prefetch, ...props }, ref) {
+    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
+  }),
+}));
+
 vi.mock('./RuntimeUpdateProvider', () => ({
   useRuntimeUpdate: () => runtimeUpdate,
 }));
@@ -22,6 +33,7 @@ describe('central Inbox bell', () => {
       name: 'Inbox — 3 Items Need Attention',
     });
     expect(link).toHaveAttribute('href', '/app');
+    expect(link).toHaveAttribute('data-prefetch', 'false');
     await userEvent.tab();
     expect(link).toHaveFocus();
     expect(link).toHaveAttribute('data-inbox-attention', 'available');

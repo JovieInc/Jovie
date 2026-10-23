@@ -45,6 +45,9 @@ export const LEGACY_PROFILE_MODE_BY_SLUG: Readonly<
   // paths must resolve to tour mode.
   shows: 'tour',
   events: 'tour',
+  // /contact is a legacy deep link. The dedicated page stays for the
+  // alias-content hold; the public URL redirects to contact mode.
+  contact: 'contact',
 };
 
 export function isLegacyProfileModeAlias(slug: string): boolean {

@@ -309,6 +309,7 @@ function SidebarHeaderNav({
               <div className='flex w-full items-center gap-2'>
                 <Link
                   href={routeBackHref}
+                  prefetch={false}
                   aria-label={routeBackLabel}
                   className={cn(
                     'focus-ring-themed inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',

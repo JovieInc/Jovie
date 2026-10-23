@@ -675,11 +675,8 @@ jobs:
               echo "::error::merge_group base_sha/head_sha are not usable exact SHAs"
               exit 1
             fi
-            # JOV-4905: a coalesced/re-resolved head can make the event
-            # base...head range empty even when the combined tree still
-            # differs from live main. The helper retries against the live
-            # refs/heads/main merge-base and only then emits a typed no-op.
-            # A valid head never hard-fails on an empty event-base diff.
+            # Re-resolved heads can hide changes in an empty event range.
+            # Retry against live main before requiring exact no-op trees.
             PATH_DIFF_DIR="$RUNNER_TEMP/merge-group-path-diff"
             mkdir -p "$PATH_DIFF_DIR"
             TRUSTED_PATH_DIFF_RESOLVER="$PATH_DIFF_DIR/resolve-merge-group-path-diff.mjs"
@@ -709,9 +706,17 @@ jobs:
             if [[ "${IS_NOOP:-}" == "true" ]]; then
               # Typed no-op: Path Changes passes with all optional lanes off;
               # merge-group gates still validate the exact combined head.
+              NOOP_BASE_TREE=$(git rev-parse --verify "${MERGE_GROUP_BASE_SHA}^{tree}")
+              NOOP_HEAD_TREE=$(git rev-parse --verify "${MERGE_GROUP_HEAD_SHA}^{tree}")
+              if [[ "$NOOP_BASE_TREE" != "$NOOP_HEAD_TREE" ]]; then
+                echo "::error::Typed no-op requires equal exact event-base and head trees."
+                exit 1
+              fi
               PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
               mkdir -p "$PRODUCT_LANE_DIR"
               : > "$PRODUCT_LANE_DIR/changed-paths.txt"
+              echo "path_diff_base_sha=$MERGE_GROUP_BASE_SHA" >> "$GITHUB_OUTPUT"
+              echo "path_diff_head_sha=$MERGE_GROUP_HEAD_SHA" >> "$GITHUB_OUTPUT"
               echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"
               for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos run_web run_operations run_cross_product has_code_changes; do
                 echo "$output=false" >> "$GITHUB_OUTPUT"
@@ -988,7 +993,7 @@ jobs:
 
       - name: Classify blog qualification and seal intake receipts
         id: blog-detect
-        if: ${{ github.event_name != 'workflow_dispatch' && steps.detect.outputs.is_noop_merge_group != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         shell: bash
         env:
           BASE_SHA: ${{ steps.detect.outputs.path_diff_base_sha }}
@@ -1082,7 +1087,7 @@ jobs:
           fi
 
       - name: Preserve intake product-lane receipt
-        if: ${{ github.event_name != 'workflow_dispatch' && steps.detect.outputs.is_noop_merge_group != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: product-lane-intake-${{ github.sha }}-${{ github.run_attempt }}
@@ -2124,9 +2129,9 @@ jobs:
           # invariants' own scan roots; a node failure fails this step closed.
           STRUCTURAL_CONTROL_PATTERN+="|$(node scripts/invariants/scanned-paths.mjs --ere)"
 
-          # Component receipts are executable test evidence; Storybook/Chromatic
-          # config and the shared-UI token audit feed structural component proof.
-          STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-motion-css|lint-no-native-dialogs|lint-ui-feel|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|chromatic\.config\.json$|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
+          # Component receipts are executable test evidence; Storybook config and
+          # the shared-UI token audit feed structural component proof.
+          STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-motion-css|lint-no-native-dialogs|lint-ui-feel|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
           STRUCTURAL_DESKTOP_PATTERN='^scripts/desktop-release-(assets|guard|publisher)(\.test)?\.mjs$|^apps/desktop/electron-builder(\.staging)?\.yml$|^apps/desktop/scripts/notarize-release-dmg\.cjs$'
           # A new scripts test must prove it is wired into a lane (inventory guard)
           # before the queue; #18714 was ejected for an unwired one.
@@ -3724,7 +3729,6 @@ jobs:
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
-      needs.ci-path-changes.outputs.is_noop_merge_group != 'true' &&
       (github.event_name != 'merge_group' || needs.ci-merge-group-admission.result == 'success') &&
       (github.event_name != 'merge_group' || needs.ci-merge-group-admission.outputs.admitted == 'true') &&
       (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
@@ -6387,7 +6391,12 @@ jobs:
           fi
 
           cd "$GITHUB_WORKSPACE"
-          CI=true BASE_URL=http://localhost:3240 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --reporter=line
+          # The round-trip ratchet's p95 is the slowest of five samples. Score
+          # it after the rest of the lane, on one worker, so a sibling
+          # Chromium's CPU spike is not recorded as chat latency. Budgets are
+          # unchanged. The test is not skipped.
+          CI=true BASE_URL=http://localhost:3240 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --grep-invert "deploy-gating responsiveness budget" --reporter=line
+          CI=true PLAYWRIGHT_WORKERS=1 BASE_URL=http://localhost:3240 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/chat-performance-ratchet.spec.ts --config=playwright.config.smoke.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           BETTER_AUTH_URL: http://localhost:3240
@@ -6420,10 +6429,17 @@ jobs:
     # branch so certification writes a certificate (JOV-8614).
     # Unlike ci-e2e-smoke this must NOT set NEXT_PUBLIC_CLERK_MOCK or
     # E2E_USE_TEST_AUTH_BYPASS — required mode fails closed if either is present.
-    # Path-triggered (not always-on): the spec has a 900s timeout, so always-on would
-    # blow the CI budget and churn the external Spotify/Stripe fixtures.
+    # PRs and the merge queue stay off this lane: the spec has a 900s timeout.
+    # Main pushes run this same job, including queue-proven pushes that skip
+    # ci-path-changes. That skip is the promotion SHA: staging follows this
+    # push, and the journey gate accepts evidence only for its exact SHA.
+    # A workflow_dispatch can produce the artifact, but it cannot start staging.
+    # Push leaves neon-db skipped; this job opens its own ephemeral branch.
+    # A red push run does not fail CI. The gate still blocks when the range
+    # requires a green journey.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ always() && !cancelled() && needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure') }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_dispatch' && needs.ci-path-changes.result == 'success' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    continue-on-error: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     outputs:
@@ -6544,10 +6560,11 @@ jobs:
         id: canonical_journey
         continue-on-error: true
         run: |
+          mkdir -p "${{ runner.temp }}/journey-evidence"
           cd apps/web
 
           if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
-            echo "::error::Standalone server not found — ci-build-public artifact is required for the golden path"
+            echo "::error::Standalone server not found — the golden-path build did not produce the standalone server."
             exit 1
           fi
 
@@ -7635,9 +7652,7 @@ jobs:
             fi
           done
 
-          if [[ "$NOOP_GROUP" == "true" ]]; then
-            [ "$LANE_RECEIPT_RESULT" = skipped ] || { echo "::error::No-op receipt must skip."; exit 1; }
-          elif [[ "$LANE_RECEIPT_RESULT" != success ]]; then
+          if [[ "$LANE_RECEIPT_RESULT" != success ]]; then
             echo "::error::Final product-lane receipt did not pass ($LANE_RECEIPT_RESULT)."
             exit 1
           fi
@@ -8299,13 +8314,19 @@ jobs:
             exit 1
           fi
 
-          # Run smoke tests with BASE_URL set (skips Playwright webServer config)
+          # Run smoke tests with BASE_URL set (skips Playwright webServer config).
+          # The ratchet follows on one worker. See the E2E Smoke step.
           cd "$GITHUB_WORKSPACE"
           set +e
-          CI=true BASE_URL=http://localhost:3260 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --reporter=line
-          EXIT_CODE=$?
+          CI=true BASE_URL=http://localhost:3260 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --grep-invert "deploy-gating responsiveness budget" --reporter=line
+          SUITE_EXIT=$?
+          CI=true PLAYWRIGHT_WORKERS=1 BASE_URL=http://localhost:3260 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/chat-performance-ratchet.spec.ts --config=playwright.config.smoke.ts --reporter=line
+          RATCHET_EXIT=$?
           set -e
-          exit $EXIT_CODE
+          if [ "$SUITE_EXIT" -ne 0 ]; then
+            exit "$SUITE_EXIT"
+          fi
+          exit "$RATCHET_EXIT"
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           BETTER_AUTH_URL: http://localhost:3260

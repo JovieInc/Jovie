@@ -9,6 +9,7 @@ import { resolveUserState } from '@/lib/auth/gate';
 import { captureWarning } from '@/lib/error-tracking';
 import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import { resolveStartEntryProfile } from '@/lib/onboarding/start-entry-profile.server';
+import { documentTitle } from '@/lib/seo/document-title';
 import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 
 /**
@@ -30,7 +31,7 @@ import { resolveSyntheticPassage } from '@/lib/synthetic/passage.server';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Start with Jovie',
+  title: documentTitle('Start with Jovie'),
   // JOV-7794: no unmeasured speed claim, no single-ICP wording.
   description: 'Claim your name and start your Jovie profile.',
   robots: { index: false, follow: false },

@@ -283,6 +283,10 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     mainSource,
     /<a class="secondary" href="\$\{appOrigin\}">Open Jovie<\/a>/
   );
+  assert.match(
+    mainSource,
+    /a:focus-visible \{ outline: 2px solid var\(--system-b-text-primary\); outline-offset: 3px; \}/
+  );
   assert.doesNotMatch(
     mainSource,
     /box-shadow: var\(--system-b-shadow-popover\)/
@@ -445,6 +449,12 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(tokenSource, /SYSTEM_B_DESKTOP_TOKENS/);
   assert.match(tokenSource, /backgroundColor: '#06070a'/);
   assert.match(tokenSource, /radiusPill: '999px'/);
+});
+
+test('application menu Preferences label uses one ellipsis', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  assert.match(mainSource, /label: 'Preferences…'/);
+  assert.doesNotMatch(mainSource, /label: 'Preferences\.\.\.'/);
 });
 
 test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark', async () => {

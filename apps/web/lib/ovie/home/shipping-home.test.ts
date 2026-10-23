@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import type { OvieInbox, OvieInboxCase } from '@/lib/ovie/inbox';
 import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
@@ -339,7 +340,33 @@ describe('buildConstraint', () => {
         rows([task(1, 'blocked')]),
         'fresh'
       )
-    ).toEqual({ tone: 'bad', text: '0 of 28 Todo issues eligible' });
+    ).toEqual({
+      tone: 'bad',
+      text: '0 of 28 Todo issues eligible',
+      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+    });
+  });
+
+  it('names a raw doctor diagnostic in operator copy, never the raw string', () => {
+    const base = measuredDelivery();
+    const constraint = buildConstraint(
+      delivery({
+        ...base,
+        lanes: {
+          ...base.lanes,
+          alerts: [
+            'remediation action lacks authoritative acknowledgement; failed=45, exhausted=0, next retry=None; inspect event-delivery.json',
+          ],
+        },
+      }),
+      [],
+      'fresh'
+    );
+    expect(constraint).toEqual({
+      tone: 'bad',
+      text: 'Remediation alerts are not being acknowledged (45 failed delivery records)',
+      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+    });
   });
 
   it('names blocked, failing, behind-main, and stale conditions in order', () => {

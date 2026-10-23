@@ -6,6 +6,7 @@ import {
 } from '../helpers/cls-measurement';
 
 const FAQ_STORY_ID = 'marketing-sections-faqsection--default';
+const ARTIST_FAQ_STORY_ID = 'marketing-artist-profile-artistprofilefaq--faq';
 const STORYBOOK_RENDER_TIMEOUT_MS = 60_000;
 const VIEWPORTS = [
   { label: 'desktop', width: 1024, height: 1200 },
@@ -294,5 +295,113 @@ test.describe('canonical marketing FAQ disclosure geometry', () => {
       );
       expect(horizontalOverflow).toBeLessThanOrEqual(0);
     });
+  }
+});
+
+test.describe('artist FAQ mount visibility', () => {
+  for (const viewport of VIEWPORTS) {
+    for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+      test(`${viewport.label} ${reducedMotion} shows questions immediately and preserves disclosure`, async ({
+        page,
+      }, testInfo) => {
+        await page.setViewportSize(viewport);
+        await page.emulateMedia({ reducedMotion });
+        await page.addInitScript(() => {
+          Object.defineProperty(globalThis, 'matchMedia', {
+            value: globalThis.matchMedia.bind(globalThis),
+            configurable: false,
+            writable: false,
+          });
+        });
+        await page.goto(
+          `/iframe.html?id=${ARTIST_FAQ_STORY_ID}&viewMode=story`,
+          {
+            waitUntil: 'domcontentloaded',
+          }
+        );
+
+        const section = page.locator('.artist-profile-faq');
+        const heading = section.getByRole('heading');
+        const accordion = section.locator('.faq-accordion');
+        await expect(heading).toBeAttached({ timeout: 60_000 });
+
+        // Storybook suppresses all motion for snapshots. Exercise the actual
+        // component CSS and the browser's emulated media preference instead.
+        await page
+          .locator('style[data-jovie-storybook-fixtures]')
+          .evaluateAll(styles => styles.forEach(style => style.remove()));
+        expect(
+          await page.evaluate(
+            () => matchMedia('(prefers-reduced-motion: reduce)').matches
+          )
+        ).toBe(reducedMotion === 'reduce');
+
+        // Finished, fill-forwards animations still affect the rendered element.
+        // Rewind them so a slow story load cannot hide an invisible first frame.
+        for (const content of [heading, accordion]) {
+          const visibleAtMount = await content.evaluate(element => {
+            for (const animation of element.getAnimations()) {
+              animation.pause();
+              animation.currentTime = 0;
+            }
+            return element.checkVisibility({
+              checkOpacity: true,
+              checkVisibilityCSS: true,
+            });
+          });
+          expect(
+            visibleAtMount,
+            'FAQ content is visible at its first frame'
+          ).toBe(true);
+        }
+
+        await page.evaluate(() => document.fonts.ready.then(() => undefined));
+        const headingBox = await heading.boundingBox();
+        const triggers = accordion.getByRole('button');
+        const panels = accordion.locator('.faq-accordion__panel');
+        await expect(triggers).toHaveCount(4);
+        await expect(accordion.locator('[aria-expanded="true"]')).toHaveCount(
+          0
+        );
+
+        await triggers.first().focus();
+        await page.keyboard.press('ArrowDown');
+        await expect(triggers.nth(1)).toBeFocused();
+        await page.keyboard.press('Home');
+        await expect(triggers.first()).toBeFocused();
+
+        for (let cycle = 0; cycle < 3; cycle += 1) {
+          await page.keyboard.press('Enter');
+          await expect(triggers.first()).toHaveAttribute(
+            'aria-expanded',
+            'true'
+          );
+          await expect(panels.first()).toBeVisible();
+          expect(await heading.boundingBox()).toEqual(headingBox);
+          await page.keyboard.press('Space');
+          await expect(triggers.first()).toHaveAttribute(
+            'aria-expanded',
+            'false'
+          );
+          await expect(panels.first()).toBeHidden();
+          await expect(triggers.first()).toBeFocused();
+          expect(await heading.boundingBox()).toEqual(headingBox);
+        }
+
+        const fitsViewport = await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth
+        );
+        expect(fitsViewport, 'FAQ does not cause horizontal overflow').toBe(
+          true
+        );
+        await testInfo.attach(
+          `artist-faq-${viewport.label}-${reducedMotion}.png`,
+          {
+            body: await section.screenshot(),
+            contentType: 'image/png',
+          }
+        );
+      });
+    }
   }
 });

@@ -5,7 +5,10 @@ import {
   type ReversibleActivation,
 } from '../utils/reversible-control-detector';
 import { inspectShellMaterial } from './utils/shell-material-detector';
-import { waitForHydration } from './utils/smoke-test-utils';
+import {
+  gotoAuthenticatedChatRoute,
+  waitForHydration,
+} from './utils/smoke-test-utils';
 
 test.use({
   storageState: { cookies: [], origins: [] },
@@ -356,7 +359,9 @@ test('chat profile stays mounted through closed, opening and interrupted exits',
   await page.getByRole('link', { name: 'New Chat', exact: true }).click();
   // E2E chat intentionally disables this surface unless its existing
   // profile fixture parameter is set; production enables it by default.
-  await page.goto('/app/chat?panel=profile');
+  await gotoAuthenticatedChatRoute(page, {
+    path: '/app/chat?panel=profile',
+  });
   await expect(
     page.getByRole('heading', { name: 'New Chat', exact: true })
   ).toBeVisible();

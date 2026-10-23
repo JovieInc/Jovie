@@ -42,6 +42,33 @@ describe('HomeLoopConstraintBanner', () => {
   });
 });
 
+describe('HomeLoopConstraintBanner details', () => {
+  it('links the full diagnostic only when the constraint names a details view', () => {
+    const { rerender } = render(
+      <HomeLoopConstraintBanner
+        constraint={{
+          tone: 'bad',
+          text: 'Remediation alerts are not being acknowledged',
+          detailsHref: '/app/ov/product',
+        }}
+        emptyLabel='All clear'
+      />
+    );
+    expect(screen.getByRole('link', { name: 'Details' })).toHaveAttribute(
+      'href',
+      '/app/ov/product'
+    );
+
+    rerender(
+      <HomeLoopConstraintBanner
+        constraint={{ tone: 'warn', text: 'Lanes feed is stale' }}
+        emptyLabel='All clear'
+      />
+    );
+    expect(screen.queryByTestId('home-loop-constraint-details')).toBeNull();
+  });
+});
+
 describe('HomeLoopPulse', () => {
   it('shows each tile with its previous value and a named tone', () => {
     render(<HomeLoopPulse tiles={HOME_LOOP_FIXTURE_PULSE} />);
@@ -215,6 +242,37 @@ describe('HomeLoopSection', () => {
     );
     expect(screen.queryByText('Nothing here')).not.toBeInTheDocument();
     expect(screen.queryByText('Body')).not.toBeInTheDocument();
+  });
+});
+
+describe('HomeLoopSection notice link', () => {
+  it('links a summarized warning to its full list in both empty and populated states', () => {
+    const section = (isEmpty: boolean) => (
+      <HomeLoopSection
+        title='Blocked On You'
+        status='ready'
+        isEmpty={isEmpty}
+        emptyLabel='Nothing here'
+        errorLabel='Could not load'
+        notice='27 sources are unavailable or missing evidence.'
+        noticeHref='/app/ov/inbox'
+        skeleton={<p>Skeleton</p>}
+        testId='section'
+      >
+        <p>Body</p>
+      </HomeLoopSection>
+    );
+    const { rerender } = render(section(true));
+    expect(screen.getByTestId('section-notice-link')).toHaveAttribute(
+      'href',
+      '/app/ov/inbox'
+    );
+    rerender(section(false));
+    expect(screen.getByTestId('section-notice-link')).toHaveAttribute(
+      'href',
+      '/app/ov/inbox'
+    );
+    expect(screen.getByText('Body')).toBeVisible();
   });
 });
 

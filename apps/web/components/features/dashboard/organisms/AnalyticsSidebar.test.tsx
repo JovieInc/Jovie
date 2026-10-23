@@ -56,6 +56,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     activeTab,
     onTabChange,
     tabbedCardTestId,
+    tabbedSurfaceVariant = 'flat',
     testId,
   }: {
     children?: ReactNode;
@@ -65,6 +66,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     activeTab: string;
     onTabChange: (value: string) => void;
     tabbedCardTestId?: string;
+    tabbedSurfaceVariant?: 'card' | 'flat';
     testId?: string;
   }) => (
     <div
@@ -73,7 +75,10 @@ vi.mock('@/components/molecules/drawer', () => ({
       data-close-handler={onClose ? 'present' : 'none'}
     >
       {entityHeader}
-      <div data-testid={tabbedCardTestId} data-surface-variant='flat'>
+      <div
+        data-testid={tabbedCardTestId}
+        data-surface-variant={tabbedSurfaceVariant}
+      >
         <div role='tablist' aria-label='Analytics data tabs'>
           {tabOptions.map(option => (
             <button
@@ -141,16 +146,20 @@ describe('calculateConversionRate', () => {
 });
 
 describe('AnalyticsSidebar', () => {
-  it('renders the canonical tabbed rail without nested raised surfaces', () => {
+  it('renders the funnel and tabbed rail on the shared rounded drawer card', () => {
     const { container } = render(<AnalyticsSidebar isOpen onClose={vi.fn()} />);
 
     expect(screen.getByTestId('analytics-sidebar-tabbed-card')).toHaveAttribute(
       'data-surface-variant',
-      'flat'
+      'card'
     );
     expect(
       container.querySelectorAll('[data-surface-variant="card"]')
-    ).toHaveLength(0);
+    ).toHaveLength(2);
+    expect(screen.getByTestId('analytics-sidebar')).toHaveAttribute(
+      'data-surface-variant',
+      'flat'
+    );
     expect(screen.getByTestId('analytics-sidebar')).toHaveAttribute(
       'data-close-handler',
       'present'
@@ -191,7 +200,7 @@ describe('AnalyticsSidebar', () => {
 
     expect(
       container.querySelectorAll('[data-surface-variant="card"]')
-    ).toHaveLength(0);
+    ).toHaveLength(2);
     expect(screen.queryByText('Tip Link Visits')).not.toBeInTheDocument();
 
     rerender(

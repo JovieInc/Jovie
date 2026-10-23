@@ -312,7 +312,10 @@ describe('DashboardNav route warming', () => {
     expect(newChatAction).toBeInTheDocument();
     expect(newChatAction).toHaveAttribute('aria-label', 'New Chat');
     expect(newChatAction.className).toContain('focus-visible:ring-inset');
-    expect(newChatAction.closest('nav')?.className).toContain('transform-gpu');
+    expect(newChatAction.closest('nav')?.className).not.toContain(
+      'transform-gpu'
+    );
+    expect(newChatAction.closest('nav')?.className).toContain('overflow-clip');
     expect(newChatAction.closest('nav')?.className).toContain(
       'overflow-anchor-none'
     );

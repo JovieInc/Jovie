@@ -86,7 +86,7 @@ function rowFor(report, id) {
 }
 
 describe('ls-remote main tip', () => {
-  it('asks git for refs/heads/main and keeps the token out of argv', async () => {
+  it('reads main anonymously without exposing the token or inherited git config', async () => {
     const token = 'actions-token';
     const encoded = Buffer.from(`x-access-token:${token}`).toString('base64');
     // Assigned inside the git callback. An uninitialized let stays
@@ -114,8 +114,79 @@ describe('ls-remote main tip', () => {
     expect(JSON.stringify(seen.args)).not.toContain(token);
     expect(JSON.stringify(seen.args)).not.toContain(encoded);
     expect(seen.env.GIT_CONFIG_VALUE_0).toBe('/dev/null');
-    expect(seen.env.GIT_CONFIG_VALUE_2).toBe(`AUTHORIZATION: basic ${encoded}`);
+    expect(JSON.stringify(seen.env).includes(token)).toBe(false);
+    expect(JSON.stringify(seen.env).includes(encoded)).toBe(false);
+    expect(seen.env.GIT_CONFIG_GLOBAL).toBe('/dev/null');
+    expect(seen.env.GIT_CONFIG_SYSTEM).toBe('/dev/null');
+    expect(seen.env.GIT_CONFIG_NOSYSTEM).toBe('1');
     expect(seen.env.GIT_TERMINAL_PROMPT).toBe('0');
+  });
+
+  it.each(['transport', 'malformed'])(
+    'retries an anonymous %s failure with the token only in the child environment',
+    async failure => {
+      const token = 'actions-token';
+      const gitExec = vi.fn(async (_args, env) => {
+        if (env.GIT_CONFIG_COUNT === '1') {
+          if (failure === 'transport') throw new Error('anonymous failed');
+          return 'nope';
+        }
+        return `${MAIN}\trefs/heads/main\n`;
+      });
+      expect(await lsRemoteMain('JovieInc/Jovie', token, gitExec)).toBe(MAIN);
+      expect(gitExec).toHaveBeenCalledTimes(2);
+      const [args, env] = gitExec.mock.calls[1];
+      expect(JSON.stringify(args)).not.toContain(token);
+      expect(env.GIT_CONFIG_COUNT).toBe('3');
+      expect(env.GIT_CONFIG_VALUE_0).toBe('/dev/null');
+      expect(env.GIT_CONFIG_VALUE_1).toBe('');
+      expect(env.GIT_CONFIG_VALUE_2).toBe(
+        `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`
+      );
+    }
+  );
+
+  it('does not retry an anonymous failure without a token', async () => {
+    const gitExec = vi.fn(async () => {
+      throw new Error('network');
+    });
+    expect(await lsRemoteMain('JovieInc/Jovie', '', gitExec)).toBeNull();
+    expect(gitExec).toHaveBeenCalledTimes(1);
+  });
+
+  it('isolates the anonymous probe from inherited credentials and git config', async () => {
+    const inherited = {
+      HOME: '/tmp/inherited-home',
+      GITHUB_TOKEN: 'inherited-token',
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
+      GIT_CONFIG_VALUE_0: 'AUTHORIZATION: inherited',
+      GIT_CONFIG_PARAMETERS: "'http.extraheader=AUTHORIZATION: inherited'",
+    };
+    const previous = Object.fromEntries(
+      Object.keys(inherited).map(key => [key, process.env[key]])
+    );
+    Object.assign(process.env, inherited);
+    try {
+      const gitExec = vi.fn(
+        async (_args, _env) => `${MAIN}\trefs/heads/main\n`
+      );
+      expect(
+        await lsRemoteMain('JovieInc/Jovie', 'provided-token', gitExec)
+      ).toBe(MAIN);
+      const [, env] = gitExec.mock.calls[0];
+      expect(env.HOME).toBe('/dev/null');
+      expect(env.GITHUB_TOKEN).toBeUndefined();
+      expect(env.GIT_CONFIG_PARAMETERS).toBeUndefined();
+      expect(env.GIT_CONFIG_COUNT).toBe('1');
+      expect(env.GIT_CONFIG_KEY_0).toBe('core.hooksPath');
+      expect(env.GIT_CONFIG_VALUE_0).toBe('/dev/null');
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 
   it('returns null for a bad repo, a bad tip, or a git failure', async () => {
@@ -581,6 +652,83 @@ describe('dead-man liveness', () => {
       reason: 'main-ref-unreadable',
     });
     expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
+  it('ages an unshipped main recovered after a 403 ref read', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': 403,
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [{ commit: { committer: { date: iso(30) } } }],
+        },
+      }),
+      lsRemote: async () => MAIN,
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: '1-commits-unshipped',
+      ageMinutes: 30,
+    });
+  });
+
+  it('ages a 403-recovered main from when its push reached main', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': 403,
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(141) } },
+            },
+          ],
+        },
+        'event=push': {
+          total_count: 1,
+          workflow_runs: [{ created_at: iso(19), event: 'push' }],
+        },
+      }),
+      lsRemote: async () => MAIN,
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: '1-commits-unshipped',
+      ageMinutes: 19,
+      lastProofAt: iso(19),
+    });
+  });
+
+  it('recovers when the ref client throws HTTP 403', async () => {
+    const { report } = await runLivenessImpl({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+      }),
+      githubClient: {
+        provider: 'github',
+        credential: 'test',
+        state: async () => null,
+        request: async () => {
+          const denied = new Error('denied');
+          Object.assign(denied, { status: 403 });
+          throw denied;
+        },
+      },
+      lsRemote: async () => MAIN,
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: 'production-current',
+    });
   });
 
   it.each([401, 403, 404, 429, 503])(

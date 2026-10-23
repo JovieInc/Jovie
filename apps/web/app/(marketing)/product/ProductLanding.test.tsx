@@ -93,17 +93,12 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
   it('keeps the claim handle keyboard focus visible', () => {
     render(<ProductLanding />);
 
-    // JOV-INV-019: focus-visible:outline + focus-visible:outline-2 never
-    // actually rendered — tailwind-merge collapses them into one conflict
-    // group and keeps only the last, and outline-width without
-    // outline-style paints nothing regardless. focus-ring-themed is the
-    // shared box-shadow-based ring the rest of the app uses.
     const input = within(screen.getByTestId('product-claim-card')).getByRole(
       'textbox',
       { name: 'Choose Your Handle' }
     );
-    expect(input).toHaveClass('focus-ring-themed');
-    expect(input.className).not.toMatch(/focus-visible:outline\b/);
+    expect(input.closest('.focus-field-inset')).not.toBeNull();
+    expect(input).not.toHaveClass('focus-ring-themed');
   });
 
   it('keeps invalid handles local instead of navigating', () => {
@@ -125,7 +120,7 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
   it('keeps the homepage hero H1 on the homepage, not /product', () => {
     render(<ProductLanding />);
 
-    expect(HOMEPAGE_COPY.hero.headline).toBe('One profile. For every fan.');
+    expect(HOMEPAGE_COPY.hero.headline).toBe('Be found. Be understood.');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Your living identity on the internet.'
     );
