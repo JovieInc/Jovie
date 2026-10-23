@@ -33,7 +33,12 @@
     { "id": "coming-soon", "source": "\\bcoming\\s+soon\\b" },
     { "id": "writer-imperative", "source": "^(?:Use|Keep|Avoid|Don't)\\b", "headlineOnly": true },
     { "id": "trailing-instruction", "source": "\\((?:use|keep|avoid|don't|fits?|max|under|short|concise|write|make|tone|voice)\\b[^)]*\\)\\s*[.!]?$", "headlineOnly": true },
-    { "id": "unresolved-prompt", "raw": true, "source": "<(?:insert|your|headline|subhead|CTA|copy|replace|TODO|placeholder)\\b[^<>]*>|<(?:description|text)\\s+(?:here|goes\\b|insert\\b|your\\b|TODO\\b)[^<>]*>" }
+    { "id": "unresolved-prompt", "raw": true, "source": "<(?:insert|your|headline|subhead|CTA|copy|replace|TODO|placeholder)\\b[^<>]*>|<(?:description|text)\\s+(?:here|goes\\b|insert\\b|your\\b|TODO\\b)[^<>]*>" },
+    {
+      "id": "unresolved-prompt",
+      "raw": true,
+      "source": "(?<!\\(\\?)<(?!/|(?:a|abbr|address|area|article|aside|audio|b|base|bdi|bdo|blockquote|body|br|button|canvas|caption|center|cite|code|col|colgroup|data|datalist|dd|del|details|dfn|dialog|div|dl|dt|em|embed|fieldset|figcaption|figure|font|footer|form|h[1-6]|head|header|hgroup|hr|html|i|iframe|img|input|ins|kbd|label|legend|li|link|main|map|mark|menu|meta|meter|nav|noscript|object|ol|optgroup|option|output|p|picture|pre|progress|q|rp|rt|ruby|s|samp|script|search|section|select|slot|small|source|span|strong|style|sub|summary|sup|table|tbody|td|template|textarea|tfoot|th|thead|time|title|tr|track|u|ul|var|video|wbr|svg|g|defs|path|text|tspan|desc|use|symbol|view|circle|ellipse|line|polyline|polygon|rect|marker|mask|filter|foreignObject|clipPath|linearGradient|radialGradient|stop|pattern|image|animate|animateMotion|animateTransform|mpath|set|feColorMatrix|feComponentTransfer|feComposite|feConvolveMatrix|feDiffuseLighting|feDisplacementMap|feDistantLight|feDropShadow|feFlood|feFunc[ABGR]|feGaussianBlur|feImage|feMerge|feMergeNode|feMorphology|feOffset|fePointLight|feSpecularLighting|feSpotLight|feTile|feTurbulence|rss|channel|description|item|pubDate|guid|language|lastBuildDate|atom:link|media:content|feed|subtitle|id|updated|author|email|uri|rights|published|category|contributor|generator|icon|logo|urlset|url|loc|lastmod|changefreq|priority|sitemapindex|sitemap|image:image|image:loc)(?=[\\s/>])|name(?=[\\s/>])[^>]*>[^]*?<\\/name\\s*>|[!?]|https?://|[^<>\\s]+@[^<>\\s]+>|\\uE000)[^<>]+>"
+    }
   ],
   "allow": [
     { "path": "apps/web/app/(dynamic)/playlists/page.tsx", "rules": { "coming-soon": ["63a6373720bb487a"] }, "reason": "Truthful unreleased music or unavailable capability state; never claims that a shipped offer is available." },
@@ -371,7 +376,25 @@
     { "path": "apps/web/lib/db/schema/investors.ts", "rules": { "punctuation": ["6c71c3cff0d4cead"] }, "reason": "Exact styling constant, registry action ID, or SQL schema/query syntax; not displayed prose." },
     { "path": "apps/web/data/marketing/factory/sectionRequest.ts", "rules": { "markdown": ["57f20db91c3f0dd4"] }, "reason": "Exact composed Markdown serialization or structured SEO diagnostic, not leaked formatting or an author prompt." },
     { "path": "apps/web/lib/seo/metadata-ratchet.ts", "rules": { "unresolved-prompt": ["dc8389c992f3335c"] }, "reason": "Exact composed Markdown serialization or structured SEO diagnostic, not leaked formatting or an author prompt." },
-    { "path": "apps/web/lib/verification/notifications.ts", "rules": { "markdown": ["bf2906e234a69f21"] }, "reason": "Exact composed Markdown serialization or structured SEO diagnostic, not leaked formatting or an author prompt." }
+    { "path": "apps/web/lib/verification/notifications.ts", "rules": { "markdown": ["bf2906e234a69f21"] }, "reason": "Exact composed Markdown serialization or structured SEO diagnostic, not leaked formatting or an author prompt." },
+    { "path": "apps/web/app/api/agents/creator-lookup/route.ts", "rules": { "unresolved-prompt": ["1dbf7a10a9ece06e"] }, "reason": "API validation explains URL parameter syntax, not an editing prompt." },
+    { "path": "apps/web/app/api/agents/profiles/route.ts", "rules": { "unresolved-prompt": ["a39bcfe8d5a821d0"] }, "reason": "API validation explains the required JSON URL field syntax." },
+    { "path": "apps/web/components/marketing/CliLandingPage.tsx", "rules": { "unresolved-prompt": ["006a0cbd07706b94", "87404d64c5148e36", "8d0ef58ec79aeba1"] }, "reason": "Documented CLI positional metavariables intentionally show the argument to supply." },
+    { "path": "apps/web/data/designSystem/componentRegistry.ts", "rules": { "unresolved-prompt": ["769b8995b8bf4407"] }, "reason": "Component registry diagnostic sentinel for absent implementation metadata." },
+    { "path": "apps/web/data/marketing/componentRegistry.ts", "rules": { "unresolved-prompt": ["47f919ced363f2be", "547e9172e594a43b", "76040a4882296375", "e907d1e95f86e117"] }, "reason": "Registry examples show real component syntax for engineering consumers." },
+    { "path": "apps/web/lib/a11y-gates/touch-target-engine.ts", "rules": { "unresolved-prompt": ["36c61593f8e5e714"] }, "reason": "Audit diagnostic identifies an inline source, not rendered copy." },
+    { "path": "apps/web/lib/agent-os/gate-evidence.ts", "rules": { "unresolved-prompt": ["e748b13ed6a6d3ab"] }, "reason": "Operator command documents an artifact-file positional argument." },
+    { "path": "apps/web/lib/ai/tools/untrusted-source-fence.ts", "rules": { "unresolved-prompt": ["48aac367baf21aaf"] }, "reason": "Model-only XML boundary marks untrusted tool material." },
+    { "path": "apps/web/lib/docs/parseMarkdownFrontmatter.ts", "rules": { "unresolved-prompt": ["35495e780d4011ed"] }, "reason": "Parser diagnostic uses a virtual filename for Markdown input." },
+    { "path": "apps/web/lib/mobile/chat/tool-artifacts.ts", "rules": { "unresolved-prompt": ["72465f935ebed936"] }, "reason": "Serialized model tool-result protocol, not assistant display copy." },
+    { "path": "apps/web/lib/ovie/approvals.ts", "rules": { "unresolved-prompt": ["e7605912d1d41ecd"] }, "reason": "Validation explains the required SHA256 digest grammar." },
+    {
+      "path": "apps/web/lib/ovie/generated/preview-env-exceptions.json",
+      "rules": { "unresolved-prompt": ["083dc64cd8ca8dc0", "08ec00a883a3b506", "540901cf556796ec", "71bcf15977717cd6", "918c967fbcb3fa0f", "a8fda2c0ad26e2ff", "e99fc0174ad4172c", "f4be5dc858893f00"] },
+      "reason": "Generated audit records document isolated CI branch naming syntax."
+    },
+    { "path": "apps/web/lib/ovie/ops-entrypoint.ts", "rules": { "unresolved-prompt": ["ce0a17997dda46ba"] }, "reason": "Operator URL syntax documents the kiosk query parameter." },
+    { "path": "apps/web/lib/release-tasks/classify-task-cluster.ts", "rules": { "unresolved-prompt": ["d9b22aae8c1e471c"] }, "reason": "Private classifier prompt defines output schema for the model." }
   ],
   "nonCopyValues": [
     { "source": "^(?:https?://|@/|(?:GET|POST|PUT|PATCH|DELETE) /|/|apps/|app/|packages/)[^\\s]+$", "reason": "URLs, module imports, route templates and GraphQL documents are machine syntax." },

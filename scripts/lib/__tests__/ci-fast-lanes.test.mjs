@@ -2204,6 +2204,7 @@ describe('source-read guard selection', () => {
       ...apiGuard(path),
       'web-source-read-tests',
       'script-contracts',
+      ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
     ]);
   });
 
@@ -2241,8 +2242,8 @@ describe('source-read guard selection', () => {
     ]) {
       expect(classifyProductLanes([path]).selectedLanes).toContain('web');
       const expected = path.startsWith('apps/web/lib/')
-        ? ['artist-profile-conformance', ...apiGuard(path)]
-        : [];
+        ? ['artist-profile-conformance', ...apiGuard(path), 'copy-leak']
+        : ['copy-leak'];
       expect(selected('merge_group', [path])).toEqual(expected);
       expect(selected('push', [path])).toEqual(expected);
     }
@@ -2272,6 +2273,7 @@ describe('source-read guard selection', () => {
       'playbook-authoring',
       'icp-language',
       'external-api-guard',
+      'copy-leak',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
     expect(selected('pull_request', null)).toEqual(all);
@@ -2284,6 +2286,7 @@ describe('source-read guard selection', () => {
       'playbook-authoring',
       'icp-language',
       'external-api-guard',
+      'copy-leak',
     ]);
   });
 
@@ -2318,6 +2321,13 @@ describe('source-read guard selection', () => {
             'utf8'
           )
         ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'copy-leak') {
+        expect(guard.prOnly).toBe(false);
+        expect(guard.command).toContain('copy-leak/check.mjs');
+        expect(guard.command).toContain('--test-coverage-lines=95');
+        expect(guard.command).toContain('copy-leak.test.mjs');
         continue;
       }
       if (guard.id === 'codex-bootstrap') {
