@@ -57,9 +57,12 @@ describe('review deadlines (warn for 72h, then fail)', () => {
       /(nextReview|reviewAt|reviewBy|review_?deadline)[A-Za-z]*\)?\)?\.toBeGreaterThan(OrEqual)?\(\s*Date\.now\(\)/i.test(
         text
       );
-    expect(bare('expect(nextReviewAt).toBeGreaterThan(Date.now());')).toBe(
-      true
-    );
+    // Split so this positive control is not itself a committed git-grep hit.
+    const sample = [
+      'expect(nextReviewAt).toBeGreaterThan(',
+      'Date.now());',
+    ].join('');
+    expect(bare(sample)).toBe(true);
     let hits = '';
     try {
       hits = execFileSync(
