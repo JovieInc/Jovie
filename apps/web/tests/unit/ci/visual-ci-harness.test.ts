@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -15,20 +15,22 @@ const repositoryRoot = resolve(testDirectory, '../../../../..');
 const webWorkspace = resolve(repositoryRoot, 'apps/web');
 
 describe('visual CI harness', () => {
-  it('keeps the Chromatic config reachable from the filtered web workspace', () => {
-    const configPath = resolve(webWorkspace, '../../chromatic.config.json');
-    const config = JSON.parse(readFileSync(configPath, 'utf8')) as {
-      onlyChanged?: boolean;
-      projectId?: string;
-      zip?: boolean;
-    };
+  it('does not treat Chromatic as a live visual gate', () => {
+    expect(existsSync(resolve(repositoryRoot, 'chromatic.config.json'))).toBe(
+      false
+    );
+    const storybookMain = readFileSync(
+      resolve(webWorkspace, '.storybook/main.ts'),
+      'utf8'
+    );
+    const webPackage = JSON.parse(
+      readFileSync(resolve(webWorkspace, 'package.json'), 'utf8')
+    ) as { devDependencies?: Record<string, string> };
 
-    expect(configPath).toBe(resolve(repositoryRoot, 'chromatic.config.json'));
-    expect(config).toEqual({
-      onlyChanged: true,
-      projectId: 'Project:68a7da03dd53297b6349f724',
-      zip: true,
-    });
+    expect(storybookMain).not.toContain('@chromatic-com/storybook');
+    expect(webPackage.devDependencies?.['@chromatic-com/storybook']).toBe(
+      undefined
+    );
   });
 
   it('keeps database-backed redirects out of DB-free visual smoke', () => {
