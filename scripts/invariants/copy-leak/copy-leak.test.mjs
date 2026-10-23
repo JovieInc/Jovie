@@ -68,6 +68,7 @@ test('all visible source forms are scanned, including nested expressions and spl
     `const prompt = '${bad}';`,
     `export const metadata = {title: '${bad}', description: '${bad}', openGraph: {title: '${bad}'}, keywords: ['${bad}']};`,
     `<input placeholder='${bad}' aria-label='${bad}'/>`,
+    `<div data-placeholder='${bad}'/>`,
     `<img alt='${bad}'/>`,
     `throw new Error('${bad}');`,
     `toast.info('${bad}');`,
