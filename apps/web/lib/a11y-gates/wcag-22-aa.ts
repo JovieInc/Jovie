@@ -1,8 +1,8 @@
 /**
  * Browser-safe WCAG 2.2 AA tag list and Storybook addon parameters.
  * No Node APIs: Storybook preview bundles this file into the browser.
- * `apps/web/lib/a11y-gates/wcag-standard.cjs` reads this source for the
- * page-level axe options so the tag list has one definition.
+ * The runtime options inline this same list. The script check compares
+ * them so the tag list still has one definition.
  */
 export const WCAG_22_AA_TAGS = [
   'wcag2a',

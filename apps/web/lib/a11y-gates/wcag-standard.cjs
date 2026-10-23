@@ -1,7 +1,3 @@
-const { execFileSync } = require('node:child_process');
-const { existsSync, readFileSync } = require('node:fs');
-const { dirname, join } = require('node:path');
-
 /**
  * WCAG 2.2 Level AA axe options.
  *
@@ -11,86 +7,38 @@ const { dirname, join } = require('node:path');
  * the enable and any allowlisted disable have to be one object.
  * axe-core 4.14 has no separate level-A tag for 2.2.
  *
- * CommonJS so Playwright's spec transform can load it. Path lookup walks from
- * this file and from cwd so a bundled spec still finds the allowlist.
+ * CommonJS so Playwright's spec transform can load it. The tag list is
+ * inlined; `wcag-standard.test.ts` checks it against `wcag-22-aa.ts`.
+ * Repo sweeps that read files live in `apps/web/scripts/` so this module
+ * stays off the request-path thread-blocking ratchet (JOV-INV-031).
  */
 const TARGET_SIZE_RULE = 'target-size';
 const MIN_TARGET_PX = 24;
-const TAG_SOURCE = 'apps/web/lib/a11y-gates/wcag-22-aa.ts';
+const WCAG_22_AA_TAGS = Object.freeze([
+  'wcag2a',
+  'wcag2aa',
+  'wcag21a',
+  'wcag21aa',
+  'wcag22aa',
+]);
 
-function findRepoRoot(start) {
-  let dir = start;
-  for (let i = 0; i < 10; i += 1) {
-    if (
-      existsSync(join(dir, 'docs/ACCESSIBILITY.md')) &&
-      existsSync(join(dir, 'apps/web'))
-    ) {
-      return dir;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
-  return null;
-}
-
-const repoRoot = findRepoRoot(__dirname) || findRepoRoot(process.cwd());
-if (!repoRoot) {
-  throw new Error('a11y gate could not find the Jovie repo root');
-}
-
-const besideAllowlist = join(__dirname, 'a11y-allowlist.json');
-const allowlistPath = existsSync(besideAllowlist)
-  ? besideAllowlist
-  : join(repoRoot, 'apps/web/lib/a11y-gates/a11y-allowlist.json');
+const allowlist = require('./a11y-allowlist.json');
 
 function loadWcag22AaTags() {
-  const source = readFileSync(join(repoRoot, TAG_SOURCE), 'utf8');
-  const block = source.match(
-    /export const WCAG_22_AA_TAGS = \[([\s\S]*?)\] as const;/
-  );
-  if (!block) {
-    throw new Error(`${TAG_SOURCE} is missing WCAG_22_AA_TAGS`);
-  }
-  const tags = [...block[1].matchAll(/'([^']+)'/g)].map(match => match[1]);
+  const tags = [...WCAG_22_AA_TAGS];
   const levelATag = 'wcag22' + 'a';
   if (
     tags.length !== 5 ||
     !tags.includes('wcag22aa') ||
     tags.includes(levelATag)
   ) {
-    throw new Error(`${TAG_SOURCE} tag list is not WCAG 2.2 AA`);
+    throw new Error('WCAG 2.2 AA tag list is not the five canonical tags');
   }
   return tags;
 }
 
-function assertStorybookParameters() {
-  const source = readFileSync(join(repoRoot, TAG_SOURCE), 'utf8');
-  if (!source.includes("test: 'error'")) {
-    throw new Error('Storybook a11y test mode must be error');
-  }
-  if (
-    !source.includes("id: 'color-contrast'") ||
-    !source.includes("id: 'target-size'")
-  ) {
-    throw new Error(
-      'Storybook a11y parameters must enable contrast and target-size'
-    );
-  }
-  const preview = readFileSync(
-    join(repoRoot, 'apps/web/.storybook/preview.tsx'),
-    'utf8'
-  );
-  if (
-    !preview.includes("from '../lib/a11y-gates/wcag-22-aa.ts'") ||
-    !preview.includes('a11y: STORYBOOK_A11Y_PARAMETERS')
-  ) {
-    throw new Error('Storybook preview must use the shared a11y parameters');
-  }
-}
-
 function loadAllowlist() {
-  return JSON.parse(readFileSync(allowlistPath, 'utf8'));
+  return allowlist;
 }
 
 function isExpired(expires, now) {
@@ -104,21 +52,21 @@ function isExpired(expires, now) {
   return now.getTime() > end;
 }
 
-function assertAllowlist(allowlist, now) {
-  if (allowlist?.schema !== 'jovie.a11y-allowlist/v1') {
+function assertAllowlist(allowlistValue, now) {
+  if (allowlistValue?.schema !== 'jovie.a11y-allowlist/v1') {
     throw new Error('a11y allowlist schema mismatch');
   }
-  if (!Array.isArray(allowlist.entries)) {
+  if (!Array.isArray(allowlistValue.entries)) {
     throw new Error('a11y allowlist entries must be an array');
   }
-  if (allowlist.maxEntries !== allowlist.entries.length) {
+  if (allowlistValue.maxEntries !== allowlistValue.entries.length) {
     throw new Error(
-      `a11y allowlist maxEntries (${allowlist.maxEntries}) must equal entries (${allowlist.entries.length})`
+      `a11y allowlist maxEntries (${allowlistValue.maxEntries}) must equal entries (${allowlistValue.entries.length})`
     );
   }
   const ids = new Set();
   const surfaces = new Set();
-  for (const entry of allowlist.entries) {
+  for (const entry of allowlistValue.entries) {
     if (!entry || typeof entry.id !== 'string' || entry.id.length === 0) {
       throw new Error('a11y allowlist entry missing id');
     }
@@ -157,9 +105,9 @@ function assertAllowlistFresh(now = new Date()) {
 }
 
 function disabledRuleIds(surface, now = new Date()) {
-  const allowlist = loadAllowlist();
-  assertAllowlist(allowlist, now);
-  return allowlist.entries
+  const loaded = loadAllowlist();
+  assertAllowlist(loaded, now);
+  return loaded.entries
     .filter(entry => entry.surface === surface)
     .map(entry => entry.ruleId);
 }
@@ -173,9 +121,9 @@ function disabledRuleIds(surface, now = new Date()) {
  * }}
  */
 function wcag22AaAxeOptions(disabled = [], now = new Date()) {
-  const allowlist = loadAllowlist();
-  assertAllowlist(allowlist, now);
-  const allowed = new Set(allowlist.entries.map(entry => entry.ruleId));
+  const loaded = loadAllowlist();
+  assertAllowlist(loaded, now);
+  const allowed = new Set(loaded.entries.map(entry => entry.ruleId));
   for (const ruleId of disabled) {
     if (ruleId === TARGET_SIZE_RULE) {
       throw new Error('target-size cannot be disabled');
@@ -220,109 +168,6 @@ function legacyWcagTagCalls(source) {
   return hits;
 }
 
-function gitGrep(needle) {
-  return execFileSync(
-    'git',
-    ['grep', '-n', '-I', '-e', needle, '--', 'apps/web', 'scripts'],
-    { cwd: repoRoot, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }
-  );
-}
-
-function assertNoLegacyWcagTags() {
-  let listed = '';
-  try {
-    listed = gitGrep('with' + 'Tags');
-  } catch (error) {
-    const status =
-      typeof error === 'object' && error && 'status' in error
-        ? error.status
-        : undefined;
-    if (status === 1) listed = '';
-    else throw error;
-  }
-  const files = new Set();
-  for (const line of listed.split('\n')) {
-    if (!line) continue;
-    files.add(line.slice(0, line.indexOf(':')));
-  }
-  const violations = [];
-  for (const file of files) {
-    const source = readFileSync(join(repoRoot, file), 'utf8');
-    for (const call of legacyWcagTagCalls(source)) {
-      violations.push(`${file}: ${call.replace(/\s+/g, ' ')}`);
-    }
-  }
-  if (violations.length > 0) {
-    throw new Error(
-      `WCAG axe scans must call wcag22AaAxeOptions():\n${violations.join('\n')}`
-    );
-  }
-  const levelATag = 'wcag22' + 'a';
-  let bogus = '';
-  try {
-    bogus = gitGrep('wcag22');
-  } catch (error) {
-    const status =
-      typeof error === 'object' && error && 'status' in error
-        ? error.status
-        : undefined;
-    if (status === 1) bogus = '';
-    else throw error;
-  }
-  const bogusHits = bogus
-    .split('\n')
-    .filter(line => new RegExp(`${levelATag}(?!a)`).test(line));
-  if (bogusHits.length > 0) {
-    throw new Error(
-      `axe-core has no ${levelATag} tag:\n${bogusHits.join('\n')}`
-    );
-  }
-}
-
-const DOC_REQUIRED = [
-  'WCAG 2.2 Level AA',
-  'A11y (UI paths)',
-  'target-size',
-  'workflow_dispatch',
-  'lint:touch-target',
-  'not part of PR Ready',
-  'not a required pull request check',
-];
-
-const DOC_FORBIDDEN = [
-  'WCAG 2.1 Level AA',
-  'No CI failures',
-  'Runs in CI on every PR',
-  'Phase 1: Baseline',
-];
-
-function assertAccessibilityDocs() {
-  const doc = readFileSync(
-    join(repoRoot, 'docs/ACCESSIBILITY.md'),
-    'utf8'
-  ).replace(/\s+/g, ' ');
-  const missing = DOC_REQUIRED.filter(phrase => !doc.includes(phrase));
-  const present = DOC_FORBIDDEN.filter(phrase => doc.includes(phrase));
-  if (missing.length > 0 || present.length > 0) {
-    throw new Error(
-      `docs/ACCESSIBILITY.md drifted (missing: ${missing.join(', ') || 'none'}; forbidden: ${present.join(', ') || 'none'})`
-    );
-  }
-}
-
-function assertRepositoryWcagStandard() {
-  assertAllowlistFresh();
-  assertNoLegacyWcagTags();
-  assertAccessibilityDocs();
-  assertStorybookParameters();
-  loadWcag22AaTags();
-}
-
-if (require.main === module) {
-  assertRepositoryWcagStandard();
-  console.log('a11y wcag standard check passed');
-}
-
 module.exports = {
   loadWcag22AaTags,
   loadAllowlist,
@@ -333,7 +178,4 @@ module.exports = {
   wcag22AaAxeOptions,
   classifyRenderedTarget,
   legacyWcagTagCalls,
-  assertNoLegacyWcagTags,
-  assertAccessibilityDocs,
-  assertRepositoryWcagStandard,
 };

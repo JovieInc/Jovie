@@ -2,10 +2,10 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { assertNoLegacyWcagTags } from '../../scripts/a11y-wcag-standard-check.cjs';
 import { STORYBOOK_A11Y_PARAMETERS, WCAG_22_AA_TAGS } from './wcag-22-aa.ts';
 import {
   assertAllowlist,
-  assertNoLegacyWcagTags,
   classifyRenderedTarget,
   disabledRuleIds,
   isExpired,
