@@ -3,12 +3,13 @@
 import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { SIDEBAR_ENTRY_ROW_CLASS } from './sidebar-optical';
 
 const EASE_SUBTLE = 'var(--ds-motion-subtle-easing)';
 const DURATION_SUBTLE = 'var(--ds-motion-subtle-duration)';
 
-const TIGHT_ITEM_HEIGHT = 26;
-const DEFAULT_ITEM_HEIGHT = 30;
+/** Matches --app-shell-sidebar-row-height (1.75rem) for the collapse animation. */
+const ITEM_HEIGHT = 28;
 const SECTION_PADDING = 12;
 
 /**
@@ -56,7 +57,6 @@ export function SidebarSection({
   onToggle,
   itemCount,
   collapsed = false,
-  tight = false,
   className,
   children,
 }: {
@@ -74,8 +74,7 @@ export function SidebarSection({
     return <div className={cn('space-y-px', className)}>{children}</div>;
   }
 
-  const itemHeight = tight ? TIGHT_ITEM_HEIGHT : DEFAULT_ITEM_HEIGHT;
-  const bodyMaxHeight = open ? itemCount * itemHeight + SECTION_PADDING : 0;
+  const bodyMaxHeight = open ? itemCount * ITEM_HEIGHT + SECTION_PADDING : 0;
 
   return (
     <div className={className}>
@@ -83,15 +82,15 @@ export function SidebarSection({
         type='button'
         onClick={onToggle}
         className={cn(
-          'relative w-full flex items-center gap-2.5 pl-2.5 pr-2 rounded-md hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] transition-[background-color] duration-subtle ease-subtle',
-          tight ? 'h-6' : 'h-6.5'
+          SIDEBAR_ENTRY_ROW_CLASS,
+          'relative w-full rounded-md hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] transition-[background-color] duration-subtle ease-subtle'
         )}
         aria-expanded={open}
       >
         <ChevronDown
           aria-hidden='true'
           className={cn(
-            'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform duration-subtle ease-subtle',
+            'size-(--app-shell-sidebar-icon-size) shrink-0 text-tertiary-token transition-transform duration-subtle ease-subtle',
             !open && '-rotate-90'
           )}
           strokeWidth={2.25}

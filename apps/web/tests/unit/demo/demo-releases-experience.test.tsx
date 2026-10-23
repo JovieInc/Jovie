@@ -6,7 +6,9 @@ import {
   within,
 } from '@testing-library/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const captureQuery = vi.hoisted(() => ({ value: '' }));
 
 // Mock Clerk's useUser hook (pulled in transitively via DemoAuthShell → UnifiedSidebar → UserButton)
 vi.mock('@clerk/nextjs', () => ({
@@ -36,7 +38,7 @@ vi.mock('next/navigation', async importOriginal => {
   return {
     ...actual,
     usePathname: () => '/demo/releases',
-    useSearchParams: () => new URLSearchParams(),
+    useSearchParams: () => new URLSearchParams(captureQuery.value),
     useRouter: () => ({
       push: vi.fn(),
       replace: vi.fn(),
@@ -229,6 +231,21 @@ async function openReleaseDrawer(
 }
 
 describe('DemoReleasesExperience', () => {
+  afterEach(() => {
+    captureQuery.value = '';
+  });
+
+  it('uses the canonical founder catalog when the player capture URL opts in', async () => {
+    captureQuery.value = 'capturePlayer=1';
+    renderDemo();
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-shell-release-row]')
+      ).toHaveTextContent('The Deep End')
+    );
+    expect(screen.queryByText("I'm Not Alone Remixes")).toBeNull();
+  });
+
   it(
     'renders fixture data and opens the selected release in the drawer',
     async () => {
