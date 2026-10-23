@@ -22,7 +22,7 @@
   "patterns": [
     {
       "id": "instruction",
-      "source": "\\b(?:fits?\\s+(?:1\\s*[-\u2013]\\s*2|one\\s+or\\s+two)\\s+lines?|max(?:imum)?\\s+\\d+\\s+(?:characters?|words?)|under\\s+\\d+\\s+words?|concise\\s+headline|short\\s+headline|punchy|catchy|compelling|engaging|write\\s+a|rewrite|make\\s+it|tone\\s*:|voice\\s*:|(?:CTA|headline|subhead|description)\\s+here|copy\\s+goes\\s+here|replace\\s+this|your\\s+text)(?:(?=\\W|$)|(?<=[,:]))"
+      "source": "\\b(?:fits?\\s+(?:1\\s*[-–]\\s*2|one\\s+or\\s+two)\\s+lines?|max(?:imum)?\\s+\\d+\\s+(?:characters?|words?)|under\\s+\\d+\\s+words?|concise\\s+headline|short\\s+headline|punchy|catchy|compelling|engaging|write\\s+a|rewrite|make\\s+it|tone\\s*:|voice\\s*:|(?:CTA|headline|subhead|description)\\s+here|copy\\s+goes\\s+here|replace\\s+this|your\\s+text)(?:(?=\\W|$)|(?<=[,:]))"
     },
     { "id": "placeholder", "source": "\\b(?:lorem\\s+ipsum|TODO|TBD|FIXME|XXX|placeholder|sample\\s+text|example\\s+text|Untitled)\\b" },
     { "id": "unresolved-prompt", "source": "\\{\\{[^{}]+\\}\\}|\\[[^\\]\\n]+\\](?![(:])|<(?:insert|your|headline|subhead|description|CTA|text|copy|replace|TODO|placeholder)(?:\\s[^<>]*)?>" },
@@ -33,7 +33,12 @@
     { "id": "coming-soon", "source": "\\bcoming\\s+soon\\b" },
     { "id": "writer-imperative", "source": "^(?:Use|Keep|Avoid|Don't)\\b", "headlineOnly": true },
     { "id": "trailing-instruction", "source": "\\((?:use|keep|avoid|don't|fits?|max|under|short|concise|write|make|tone|voice)\\b[^)]*\\)\\s*[.!]?$", "headlineOnly": true },
-    { "id": "unresolved-prompt", "raw": true, "source": "<(?:insert|your|headline|subhead|CTA|copy|replace|TODO|placeholder)\\b[^<>]*>|<(?:description|text)\\s+(?:here|goes\\b|insert\\b|your\\b|TODO\\b)[^<>]*>" }
+    { "id": "unresolved-prompt", "raw": true, "source": "<(?:insert|your|headline|subhead|CTA|copy|replace|TODO|placeholder)\\b[^<>]*>|<(?:description|text)\\s+(?:here|goes\\b|insert\\b|your\\b|TODO\\b)[^<>]*>" },
+    {
+      "id": "unresolved-prompt",
+      "raw": true,
+      "source": "(?<!\\(\\?)<(?=[\\p{L}_.]|\\s*(?:\\d+\\s+\\p{L}|\\p{L}+\\s+\\p{L}))(?!/|(?:a|abbr|address|area|article|aside|audio|b|base|bdi|bdo|blockquote|body|br|button|canvas|caption|center|cite|code|col|colgroup|data|datalist|dd|del|details|dfn|dialog|div|dl|dt|em|embed|fieldset|figcaption|figure|font|footer|form|h[1-6]|head|header|hgroup|hr|html|i|iframe|img|input|ins|kbd|label|legend|li|link|main|map|mark|menu|meta|meter|nav|noscript|object|ol|optgroup|option|output|p|picture|pre|progress|q|rp|rt|ruby|s|samp|script|search|section|select|slot|small|source|span|strong|style|sub|summary|sup|table|tbody|td|template|textarea|tfoot|th|thead|time|title|tr|track|u|ul|var|video|wbr|svg|g|defs|path|text|tspan|desc|use|symbol|view|circle|ellipse|line|polyline|polygon|rect|marker|mask|filter|foreignObject|clipPath|linearGradient|radialGradient|stop|pattern|image|animate|animateMotion|animateTransform|mpath|set|feColorMatrix|feComponentTransfer|feComposite|feConvolveMatrix|feDiffuseLighting|feDisplacementMap|feDistantLight|feDropShadow|feFlood|feFunc[ABGR]|feGaussianBlur|feImage|feMerge|feMergeNode|feMorphology|feOffset|fePointLight|feSpecularLighting|feSpotLight|feTile|feTurbulence|rss|channel|description|item|pubDate|guid|language|lastBuildDate|atom:link|media:content|feed|entry|content|subtitle|id|updated|author|email|uri|rights|published|category|contributor|generator|icon|logo|urlset|url|loc|lastmod|changefreq|priority|sitemapindex|sitemap|image:image|image:loc)(?=[\\s/>\\uE000])|name(?=[\\s/>])[^>]*>[^]*?<\\/name\\s*>|[!?]|https?://|[^<>\\s]+@[^<>\\s]+>|\\uE000)[^<>]+>"
+    }
   ],
   "allow": [
     { "path": "apps/web/app/(dynamic)/playlists/page.tsx", "rules": { "coming-soon": ["63a6373720bb487a"] }, "reason": "Truthful unreleased music or unavailable capability state; never claims that a shipped offer is available." },
@@ -371,7 +376,87 @@
     { "path": "apps/web/lib/db/schema/investors.ts", "rules": { "punctuation": ["6c71c3cff0d4cead"] }, "reason": "Exact styling constant, registry action ID, or SQL schema/query syntax; not displayed prose." },
     { "path": "apps/web/data/marketing/factory/sectionRequest.ts", "rules": { "markdown": ["57f20db91c3f0dd4"] }, "reason": "Exact composed Markdown serialization or structured SEO diagnostic, not leaked formatting or an author prompt." },
     { "path": "apps/web/lib/seo/metadata-ratchet.ts", "rules": { "unresolved-prompt": ["dc8389c992f3335c"] }, "reason": "Exact composed Markdown serialization or structured SEO diagnostic, not leaked formatting or an author prompt." },
-    { "path": "apps/web/lib/verification/notifications.ts", "rules": { "markdown": ["bf2906e234a69f21"] }, "reason": "Exact composed Markdown serialization or structured SEO diagnostic, not leaked formatting or an author prompt." }
+    { "path": "apps/web/lib/verification/notifications.ts", "rules": { "markdown": ["bf2906e234a69f21"] }, "reason": "Exact composed Markdown serialization or structured SEO diagnostic, not leaked formatting or an author prompt." },
+    { "path": "apps/web/app/api/agents/creator-lookup/route.ts", "rules": { "unresolved-prompt": ["1dbf7a10a9ece06e"] }, "reason": "API validation explains URL parameter syntax, not an editing prompt." },
+    { "path": "apps/web/app/api/agents/profiles/route.ts", "rules": { "unresolved-prompt": ["a39bcfe8d5a821d0"] }, "reason": "API validation explains the required JSON URL field syntax." },
+    { "path": "apps/web/components/marketing/CliLandingPage.tsx", "rules": { "unresolved-prompt": ["006a0cbd07706b94", "87404d64c5148e36", "8d0ef58ec79aeba1"] }, "reason": "Documented CLI positional metavariables intentionally show the argument to supply." },
+    { "path": "apps/web/data/designSystem/componentRegistry.ts", "rules": { "unresolved-prompt": ["769b8995b8bf4407"] }, "reason": "Component registry diagnostic sentinel for absent implementation metadata." },
+    { "path": "apps/web/data/marketing/componentRegistry.ts", "rules": { "unresolved-prompt": ["47f919ced363f2be", "547e9172e594a43b", "76040a4882296375", "e907d1e95f86e117"] }, "reason": "Registry examples show real component syntax for engineering consumers." },
+    { "path": "apps/web/lib/a11y-gates/touch-target-engine.ts", "rules": { "unresolved-prompt": ["36c61593f8e5e714"] }, "reason": "Audit diagnostic identifies an inline source, not rendered copy." },
+    { "path": "apps/web/lib/agent-os/gate-evidence.ts", "rules": { "unresolved-prompt": ["e748b13ed6a6d3ab"] }, "reason": "Operator command documents an artifact-file positional argument." },
+    { "path": "apps/web/lib/ai/tools/untrusted-source-fence.ts", "rules": { "unresolved-prompt": ["48aac367baf21aaf"] }, "reason": "Model-only XML boundary marks untrusted tool material." },
+    { "path": "apps/web/lib/docs/parseMarkdownFrontmatter.ts", "rules": { "unresolved-prompt": ["35495e780d4011ed"] }, "reason": "Parser diagnostic uses a virtual filename for Markdown input." },
+    { "path": "apps/web/lib/mobile/chat/tool-artifacts.ts", "rules": { "unresolved-prompt": ["72465f935ebed936"] }, "reason": "Serialized model tool-result protocol, not assistant display copy." },
+    { "path": "apps/web/lib/ovie/approvals.ts", "rules": { "unresolved-prompt": ["e7605912d1d41ecd"] }, "reason": "Validation explains the required SHA256 digest grammar." },
+    {
+      "path": "apps/web/lib/ovie/generated/preview-env-exceptions.json",
+      "rules": { "unresolved-prompt": ["083dc64cd8ca8dc0", "08ec00a883a3b506", "540901cf556796ec", "71bcf15977717cd6", "918c967fbcb3fa0f", "a8fda2c0ad26e2ff", "e99fc0174ad4172c", "f4be5dc858893f00"] },
+      "reason": "Generated audit records document isolated CI branch naming syntax."
+    },
+    { "path": "apps/web/lib/ovie/ops-entrypoint.ts", "rules": { "unresolved-prompt": ["ce0a17997dda46ba"] }, "reason": "Operator URL syntax documents the kiosk query parameter." },
+    { "path": "apps/web/lib/release-tasks/classify-task-cluster.ts", "rules": { "unresolved-prompt": ["d9b22aae8c1e471c"] }, "reason": "Private classifier prompt defines output schema for the model." },
+    { "path": "apps/web/app/api/dsp/bio-sync/route.ts", "rules": { "instruction": ["79b0cf06ab7a3be8"] }, "reason": "The validation message describes the actual Zod maximum bio length of 5000 characters." },
+    {
+      "path": "apps/web/app/exp/shell-v1/ShellV1ExperimentClient.tsx",
+      "rules": { "markdown": ["4b377cade4ec4199", "54df6a842b50a33d", "67c2acca80e59a48", "c1367b293e08be6d", "fd2416ab025c9232"] },
+      "reason": "Intentional chat Markdown passed by ThreadView to ChatMarkdown, whose Streamdown renderer consumes lists and emphasis."
+    },
+    { "path": "apps/web/data/appScreens/assembly.ts", "rules": { "unresolved-prompt": ["3810f2e9c68ab682"], "markdown": ["3810f2e9c68ab682"] }, "reason": "Intentional issue-code/bullet formatting in deterministic engineering validation errors and CI diagnostics." },
+    { "path": "apps/web/data/appScreens/penExport.ts", "rules": { "unresolved-prompt": ["3810f2e9c68ab682"], "markdown": ["3810f2e9c68ab682"] }, "reason": "Intentional issue-code/bullet formatting in deterministic engineering validation errors and CI diagnostics." },
+    { "path": "apps/web/data/appScreens/validation.ts", "rules": { "unresolved-prompt": ["3810f2e9c68ab682"], "markdown": ["3810f2e9c68ab682"] }, "reason": "Intentional issue-code/bullet formatting in deterministic engineering validation errors and CI diagnostics." },
+    { "path": "apps/web/data/marketing/compositionValidation.ts", "rules": { "unresolved-prompt": ["3810f2e9c68ab682"], "markdown": ["3810f2e9c68ab682"] }, "reason": "Intentional issue-code/bullet formatting in deterministic engineering validation errors and CI diagnostics." },
+    { "path": "apps/web/data/marketing/copy.ts", "rules": { "markdown": ["cf64c9eb59bef1a5", "cf64c9eb59bef1a5"] }, "reason": "Intentional issue-code/bullet formatting in deterministic engineering validation errors and CI diagnostics." },
+    {
+      "path": "apps/web/data/marketing/factory/sectionRequest.ts",
+      "rules": { "markdown": ["06af5ac8096c847c", "188d37cbe124f748", "31223b5471d8153f", "3bbdee16347f2555", "7b450b234a07488b", "896c0f4b111780b7", "c6f87b2667a71105", "f99694e22b8ecedd"] },
+      "reason": "Intentional Markdown or readable bullet serialization for Linear issues, GBrain preference pages, or internal certification-review notes."
+    },
+    {
+      "path": "apps/web/lib/a11y/modal-focus-boundary.ts",
+      "rules": { "unresolved-prompt": ["1020b5fe614bb9b8", "251f752d7c01e685", "49973cc2d813cb8a", "5328328917690239", "7d04cdc1ac098fd1", "cdad4f9fc6ff46b9", "defbd30f4f7922c2"] },
+      "reason": "CSS selector fragments joined into selector lists for DOM focus/overlay logic; never rendered copy."
+    },
+    { "path": "apps/web/lib/a11y/overlay-interaction-lock.ts", "rules": { "unresolved-prompt": ["55164c4ec00678f4", "a39d8db8141e5796", "add6606742646fd9", "f12e598bca15b6e6", "f6d8945173aab69c"] }, "reason": "CSS selector fragments joined into selector lists for DOM focus/overlay logic; never rendered copy." },
+    { "path": "apps/web/lib/agent-os/departments/design-taste/index.ts", "rules": { "unresolved-prompt": ["fc0f634995e9f8b8"], "markdown": ["fc0f634995e9f8b8"] }, "reason": "Intentional Markdown or readable bullet serialization for Linear issues, GBrain preference pages, or internal certification-review notes." },
+    {
+      "path": "apps/web/lib/agent-os/design-lab/linear.ts",
+      "rules": { "markdown": ["57b651ddac46deb7", "6e845c8a6a8f94bf", "7955f0baa5223329", "a048a7a25cd3e3cd", "bb2f0b1af998a830"] },
+      "reason": "Intentional Markdown or readable bullet serialization for Linear issues, GBrain preference pages, or internal certification-review notes."
+    },
+    { "path": "apps/web/lib/agent-os/design-lab/profile-redesign-loop.ts", "rules": { "placeholder": ["257151711e916c0d"] }, "reason": "Explicitly writes a non-production mockup brief to agentos design-lab artifact files for D2 review, not a route or customer asset." },
+    { "path": "apps/web/lib/agent-os/design-reference-corpus/refs-context.ts", "rules": { "markdown": ["c6f87b2667a71105"] }, "reason": "Private model prompt context or review rubric; bullets and bracketed record IDs are intentional model input syntax." },
+    {
+      "path": "apps/web/lib/agent-os/design-taste-jury/issue-filing.ts",
+      "rules": { "markdown": ["1bd3a049e32ccce0", "71ccd6db149fc409", "87c28acd86b2eb0f", "fd8c9f6912d9566c"] },
+      "reason": "Intentional Markdown or readable bullet serialization for Linear issues, GBrain preference pages, or internal certification-review notes."
+    },
+    { "path": "apps/web/lib/agent-os/design-taste-jury/rubric.ts", "rules": { "markdown": ["6b0a554762bb2f76", "c6f87b2667a71105"] }, "reason": "Private model prompt context or review rubric; bullets and bracketed record IDs are intentional model input syntax." },
+    { "path": "apps/web/lib/blog/getBlogPosts.ts", "rules": { "markdown": ["c6f87b2667a71105"] }, "reason": "Intentional issue-code/bullet formatting in deterministic engineering validation errors and CI diagnostics." },
+    { "path": "apps/web/lib/blog/metadata.ts", "rules": { "markdown": ["c6f87b2667a71105"] }, "reason": "Intentional issue-code/bullet formatting in deterministic engineering validation errors and CI diagnostics." },
+    { "path": "apps/web/lib/brand/public-projection.ts", "rules": { "markdown": ["c6f87b2667a71105"] }, "reason": "Intentional issue-code/bullet formatting in deterministic engineering validation errors and CI diagnostics." },
+    { "path": "apps/web/lib/connectors/inbox-taste-mirror.ts", "rules": { "markdown": ["2d042baeb5161c64", "6398ac89a7bbcd9c", "fb6f42d011a31264"] }, "reason": "Intentional Markdown or readable bullet serialization for Linear issues, GBrain preference pages, or internal certification-review notes." },
+    { "path": "apps/web/lib/copy/rendered-surface.ts", "rules": { "markdown": ["cf64c9eb59bef1a5"] }, "reason": "Intentional issue-code/bullet formatting in deterministic engineering validation errors and CI diagnostics." },
+    { "path": "apps/web/lib/email/templates/promo-download-thank-you.ts", "rules": { "markdown": ["4fd7093e9a02069d"] }, "reason": "Intentional list bullets in a separately generated text/plain email body; not stray Markdown rendered as copy." },
+    { "path": "apps/web/lib/email/templates/release-day-notification.ts", "rules": { "markdown": ["cf64c9eb59bef1a5"] }, "reason": "Intentional list bullets in a separately generated text/plain email body; not stray Markdown rendered as copy." },
+    { "path": "apps/web/lib/hermes/allowed-paths.ts", "rules": { "markdown": ["c6f87b2667a71105"] }, "reason": "Intentional issue-code/bullet formatting in deterministic engineering validation errors and CI diagnostics." },
+    { "path": "apps/web/lib/interviews/summarize.ts", "rules": { "unresolved-prompt": ["3bb7feddd51cafc2", "7c829c3c766c7199"] }, "reason": "Intentional interview transcript absence markers for a private summary prompt or explicit PII/secret/path redaction tokens." },
+    { "path": "apps/web/lib/ovie/certifications/walkthrough.ts", "rules": { "markdown": ["e820c82097682e75"] }, "reason": "Intentional Markdown or readable bullet serialization for Linear issues, GBrain preference pages, or internal certification-review notes." },
+    {
+      "path": "apps/web/lib/ovie/conversation-insights.ts",
+      "rules": { "unresolved-prompt": ["1ade6d575faf5ddf", "cb4dccd71d5a7c1a", "daa7b94b18c709ea", "ecbc77bc88d616cd", "ecbc77bc88d616cd"] },
+      "reason": "Intentional interview transcript absence markers for a private summary prompt or explicit PII/secret/path redaction tokens."
+    },
+    { "path": "apps/web/lib/ovie/shipping-state/envelope.ts", "rules": { "unresolved-prompt": ["017ad73325fcf108", "017ad73325fcf108", "eb99f4815445aad9"] }, "reason": "Intentional interview transcript absence markers for a private summary prompt or explicit PII/secret/path redaction tokens." },
+    { "path": "apps/web/lib/ovie/spend-preflight.ts", "rules": { "writer-imperative": ["65801691d638a894"] }, "reason": "Validated paymentCredentialAction enum identifier, not imperative display copy." },
+    {
+      "path": "apps/web/lib/playlists/prompts.ts",
+      "rules": { "markdown": ["5d34a9a4925b1fc0", "83788542129bf896", "a42d315fb0637d2d", "b0d7a16207ab9f28", "c339311f9aa0adf6", "c6f87b2667a71105", "c76a5a58245da1d4", "d16372eae180c424"], "unresolved-prompt": ["5d34a9a4925b1fc0", "83788542129bf896", "a42d315fb0637d2d", "b0d7a16207ab9f28", "c76a5a58245da1d4"] },
+      "reason": "Private model prompt context or review rubric; bullets and bracketed record IDs are intentional model input syntax."
+    },
+    { "path": "apps/web/lib/release-tasks/classify-task-cluster.ts", "rules": { "markdown": ["87c28acd86b2eb0f"] }, "reason": "Private model prompt context or review rubric; bullets and bracketed record IDs are intentional model input syntax." },
+    { "path": "apps/web/lib/seo/surface-ratchet.ts", "rules": { "unresolved-prompt": ["a90863a413e3ee17"] }, "reason": "Intentional issue-code/bullet formatting in deterministic engineering validation errors and CI diagnostics." },
+    { "path": "apps/web/lib/submission-agent/artifacts/email-package.ts", "rules": { "markdown": ["c6f87b2667a71105"] }, "reason": "Intentional list bullets in a separately generated text/plain email body; not stray Markdown rendered as copy." },
+    { "path": "apps/web/lib/tasks/chat-work-record.ts", "rules": { "placeholder": ["602fae580f5863ab"] }, "reason": "Actual tasks.status enum value todo; leave executable task-state behavior intact." }
   ],
   "nonCopyValues": [
     { "source": "^(?:https?://|@/|(?:GET|POST|PUT|PATCH|DELETE) /|/|apps/|app/|packages/)[^\\s]+$", "reason": "URLs, module imports, route templates and GraphQL documents are machine syntax." },
