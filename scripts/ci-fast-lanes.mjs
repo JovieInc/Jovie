@@ -229,6 +229,16 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
+    // Marketing and public pages use one boxed width and one full-bleed
+    // override. New hits fail against origin/main. See MKT-D18.
+    id: 'marketing-container-width',
+    command:
+      'node --test scripts/invariants/art-direction/container-width.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage|site|features\/(?:home|pay|pricing|visibility-audit))\/|apps\/web\/components\/organisms\/(?:HeaderNav|AboutPage|Blog|ComparisonPage|PricingRecipe|SupportPage|VoicePage)|apps\/web\/styles\/design-system\.css$|scripts\/invariants\/art-direction\/container-width)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
     // Breaking changes to the public OpenAPI contract (ARTIST_OPENAPI_DOCUMENT,
     // served at /api/v1/openapi.json and /openapi.json) fail closed unless the
     // PR body carries an auditable `api-breaking: <reason>` marker line. The
