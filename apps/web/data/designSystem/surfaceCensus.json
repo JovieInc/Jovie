@@ -388,9 +388,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-23T19:00:44.000Z",
-        "ref": "PR 22831 single-container renewal: header, hero and footer share one .public-container edge on /pricing (x 71-1369 at 1440, 24-366 at 390, no horizontal overflow), measured with a Playwright run against the dev build of the PR source (merge base of main a4eb75a8627); full-page captures at 1440 and 390; prior JOV-8097 interaction states unchanged",
-        "sourceDigest": "c9b5369b7347ee82a453dd6ef25fec3f8ca61eeca9b0e43f60248c4fd8598c22"
+        "at": "2026-10-23T20:44:07.579Z",
+        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md",
+        "sourceDigest": "127c0cfad9c8c1c69b3335dcf21c043db9c3f4fc93967f9d073ee2f948fac7ad"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
