@@ -1465,6 +1465,101 @@ describe('ProfileCompactTemplate', () => {
     replaceStateSpy.mockRestore();
   });
 
+  it('does not revert a client Link navigation to a different mode', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseProfileShell.mockImplementation(() => ({
+      locationMode: 'about',
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    window.history.replaceState(null, '', '/test-artist?mode=about');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+
+    const view = render(
+      <ProfileCompactTemplate
+        mode='about'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+    await waitFor(() => {
+      expect(`${window.location.pathname}${window.location.search}`).toBe(
+        '/test-artist?mode=about'
+      );
+    });
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    pushStateSpy.mockClear();
+    replaceStateSpy.mockClear();
+
+    // A client Link (the about drawer's contact links) moves the URL to
+    // contact mode; requestedMode is still 'about' until the shell's
+    // location store syncs it. The history effect must not write the stale
+    // intent back over the navigation.
+    act(() => {
+      window.history.pushState(null, '', '/test-artist?mode=contact');
+    });
+    view.rerender(
+      <ProfileCompactTemplate
+        mode='about'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(`${window.location.pathname}${window.location.search}`).toBe(
+        '/test-artist?mode=contact'
+      );
+    });
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+
+    // Once the location sync flips requestedMode, the URL already agrees, so
+    // the reconciliation still writes nothing.
+    mockUseProfileShell.mockImplementation(() => ({
+      locationMode: 'contact',
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    view.rerender(
+      <ProfileCompactTemplate
+        mode='contact'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+    await waitFor(() => {
+      expect(`${window.location.pathname}${window.location.search}`).toBe(
+        '/test-artist?mode=contact'
+      );
+    });
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+
+    pushStateSpy.mockRestore();
+    replaceStateSpy.mockRestore();
+  });
+
   it('renders the alerts tab when ?mode=subscribe is in the URL', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=subscribe');
