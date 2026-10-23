@@ -84,7 +84,7 @@ export function ProductFeatureLanding({
             variant='floating'
             glowTone='none'
             testId={`${slug}-panel`}
-            className='w-full max-w-xl justify-self-end'
+            className='relative z-20 w-full max-w-xl justify-self-end'
             contentClassName='p-5 sm:p-6'
           >
             {children}
