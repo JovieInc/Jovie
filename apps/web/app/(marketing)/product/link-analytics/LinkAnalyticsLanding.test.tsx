@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/link', () => ({
@@ -61,5 +62,12 @@ describe('LinkAnalyticsLanding', () => {
         link.href
       );
     }
+  });
+
+  it('server-renders the analytics panel without wall-clock text', () => {
+    const html = renderToString(<LinkAnalyticsLanding />);
+
+    expect(html).toContain('Aug 20, 2026');
+    expect(html).not.toMatch(/(?:just now)|(?:\d+\s?(?:m|h|d|w|mo|y)\s?ago)/u);
   });
 });

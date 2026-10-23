@@ -291,10 +291,12 @@
         "apps/web/app/(marketing)/integrations/page.tsx",
         "apps/web/app/(marketing)/launch/page.tsx",
         "apps/web/app/(marketing)/pay/page.tsx",
+        "apps/web/app/(marketing)/product/command-palette/page.tsx",
         "apps/web/app/(marketing)/product/dsp-links/page.tsx",
         "apps/web/app/(marketing)/product/isrc/page.tsx",
         "apps/web/app/(marketing)/product/link-analytics/page.tsx",
         "apps/web/app/(marketing)/product/page.tsx",
+        "apps/web/app/(marketing)/product/pre-save/page.tsx",
         "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
         "apps/web/app/(marketing)/product/utm-links/page.tsx",
         "apps/web/app/(marketing)/smart-links/page.tsx",
@@ -386,9 +388,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-23T08:14:57.640Z",
-        "ref": "PR 22741 rounded-media renewal after the main merge (footer #22727): exact-source fdef998ff6270246923cc01af76e87a7af8139fe PR Visual Review production-build capture (desktop + mobile) on the changed marketing surfaces; fail-closed evidence gate completed success, zero findings; https://github.com/JovieInc/Jovie/actions/runs/39921828523/artifacts/12488081620; prior JOV-8097 interaction states unchanged",
-        "sourceDigest": "e66fa65ce71b5fe1d9989871ab8984c1038733ccc04c09ce9098b50d78bdbbd5"
+        "at": "2026-10-23T19:00:44.000Z",
+        "ref": "PR 22831 single-container renewal: header, hero and footer share one .public-container edge on /pricing (x 71-1369 at 1440, 24-366 at 390, no horizontal overflow), measured with a Playwright run against the dev build of the PR source (merge base of main a4eb75a8627); full-page captures at 1440 and 390; prior JOV-8097 interaction states unchanged",
+        "sourceDigest": "c9b5369b7347ee82a453dd6ef25fec3f8ca61eeca9b0e43f60248c4fd8598c22"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
@@ -665,6 +667,20 @@
       "to": "holdout",
       "at": "2026-10-23T16:05:01Z",
       "evidence": "PR #22801 re-registers the release scheduling product page after merging main. Original branch observation: 2026-10-23T12:00:00Z. Source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/pre-save/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T17:06:39Z",
+      "evidence": "PR #22823 re-registers the pre-save product page after merging main. Original branch observation: 2026-10-23T14:00:00Z. Source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/command-palette/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T18:26:27.418Z",
+      "evidence": "PR #22804 re-registers the command palette product page after merging main including pre-save. Original branch observation: 2026-10-23T12:30:00Z; previous repair registration: 2026-10-23T16:58:51Z. Source registration only, not rendered certification."
     }
   ]
 }

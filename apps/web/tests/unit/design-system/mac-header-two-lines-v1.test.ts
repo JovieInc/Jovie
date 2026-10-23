@@ -61,6 +61,12 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // isrc, link-analytics) share one hero. Its title stays complete; balance
   // comes from text-balance, so the heading does not use line-clamp.
   'apps/web/app/(marketing)/product/ProductFeatureLanding.tsx',
+  // /product/command-palette keeps the full headline with text-balance;
+  // the heading does not use line-clamp.
+  'apps/web/app/(marketing)/product/command-palette/CommandPaletteLanding.tsx',
+  // /product/pre-save is a new marketing h1. The shrink-only headline ratchet
+  // rejects a new line-clamp token, so the title stays complete.
+  'apps/web/app/(marketing)/product/pre-save/PreSaveLanding.tsx',
   // /card section titles wrap to three lines at 390px; the clamp cut
   // "An introduction. Not a list of usernames" mid-sentence.
   'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
