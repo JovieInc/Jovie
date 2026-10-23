@@ -230,7 +230,7 @@ export const SOURCE_GUARDS = Object.freeze([
   }),
   Object.freeze({
     // Marketing and public pages use one boxed width and one full-bleed
-    // override. Shrink-only baseline. See MKT-D18.
+    // override. New hits fail against origin/main. See MKT-D18.
     id: 'marketing-container-width',
     command:
       'node --test scripts/invariants/art-direction/container-width.test.mjs',

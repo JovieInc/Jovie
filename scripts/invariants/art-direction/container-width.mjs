@@ -10,17 +10,17 @@
  * A reading measure (a cap at or below 48rem, or in ch) is typography inside
  * the box, not a container. Anything wider that is not the token fails. A
  * container with its own horizontal padding fails, because the gutter is part
- * of the token. Existing hits live on a shrink-only baseline.
+ * of the token. A hit that is not already on origin/main fails, so the set
+ * only shrinks. There is no exception file.
  */
+import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-import { ancestorJson, evaluateRatchet } from './ratchet.mjs';
 
 export const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-export const CONTAINER_BASELINE =
-  'scripts/invariants/art-direction/container-width.baseline.json';
+export const ANCESTOR_REF = 'origin/main';
 export const MEASURE_LIMIT_REM = 48;
 export const GUIDANCE =
   'Use MarketingContainer or Container (the single .public-container width). The only override is bleed. Do not set a page max-width or container padding yourself.';
@@ -303,11 +303,96 @@ export function listContainerSources(repoRoot = REPO_ROOT) {
     if (existsSync(absolute)) files.push(absolute);
   }
   return [...new Set(files)]
-    .filter(file => {
-      const rel = relative(repoRoot, file).split('\\').join('/');
-      return !SKIP_FILE.test(rel) && /\.(?:tsx|ts|css)$/.test(rel);
-    })
+    .filter(file => isContainerSource(relative(repoRoot, file)))
     .sort();
+}
+
+/** Repo-relative path the container-width scan owns. */
+export function isContainerSource(relPath) {
+  const path = relPath.split('\\').join('/');
+  if (SKIP_FILE.test(path) || !/\.(?:tsx|ts|css)$/.test(path)) return false;
+  return (
+    EXTRAS.includes(path) || ROOTS.some(root => path.startsWith(`${root}/`))
+  );
+}
+
+function gitText(repoRoot, args) {
+  return spawnSync('git', args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+}
+
+/**
+ * Blob bytes for `ref:path` specs, in order. One missing object fails closed.
+ * @returns {{ ok: true, sources: string[] } | { ok: false, error: string }}
+ */
+function readRefBlobs(repoRoot, ref, paths) {
+  if (paths.length === 0) return { ok: true, sources: [] };
+  const result = spawnSync('git', ['cat-file', '--batch'], {
+    cwd: repoRoot,
+    input: `${paths.map(path => `${ref}:${path}`).join('\n')}\n`,
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      error: `${ref} is not available; the ratchet cannot prove it only shrinks`,
+    };
+  }
+  const buf = result.stdout;
+  const sources = [];
+  let offset = 0;
+  for (const path of paths) {
+    const headerEnd = buf.indexOf(0x0a, offset);
+    if (headerEnd < 0)
+      return { ok: false, error: `unable to read ${ref}:${path}` };
+    const header = buf.subarray(offset, headerEnd).toString('utf8');
+    if (header.endsWith(' missing')) {
+      return { ok: false, error: `unable to read ${ref}:${path}` };
+    }
+    const size = Number(header.split(' ').at(-1));
+    if (!Number.isInteger(size) || size < 0) {
+      return { ok: false, error: `unable to read ${ref}:${path}` };
+    }
+    const start = headerEnd + 1;
+    const end = start + size;
+    if (end > buf.length)
+      return { ok: false, error: `unable to read ${ref}:${path}` };
+    sources.push(buf.subarray(start, end).toString('utf8'));
+    offset = end + 1;
+  }
+  return { ok: true, sources };
+}
+
+/**
+ * Ids already on the ancestor ref. A missing ref fails closed.
+ * @returns {{ ok: true, ids: string[] } | { ok: false, error: string }}
+ */
+export function ancestorContainerIds(repoRoot = REPO_ROOT, ref = ANCESTOR_REF) {
+  const listed = gitText(repoRoot, ['ls-tree', '-r', '--name-only', ref]);
+  if (listed.status !== 0) {
+    return {
+      ok: false,
+      error: `${ref} is not available; the ratchet cannot prove it only shrinks`,
+    };
+  }
+  const paths = listed.stdout.split('\n').filter(isContainerSource);
+  const blobs = readRefBlobs(repoRoot, ref, paths);
+  if (blobs.ok === false) return blobs;
+  return {
+    ok: true,
+    ids: scanSources(
+      paths.map((path, index) => ({ path, source: blobs.sources[index] }))
+    ).ids,
+  };
+}
+
+/** Live ids the ancestor does not already contain. Shrinking is allowed. */
+export function idsBeyondAncestor(current, ancestor) {
+  const known = new Set(ancestor);
+  return current.filter(id => !known.has(id));
 }
 
 export function scanContainerWidth(repoRoot = REPO_ROOT) {
@@ -319,24 +404,23 @@ export function scanContainerWidth(repoRoot = REPO_ROOT) {
   );
 }
 
-export function checkContainerWidth(repoRoot = REPO_ROOT, recordedIds) {
+export function checkContainerWidth(repoRoot = REPO_ROOT, options = {}) {
   const { ids } = scanContainerWidth(repoRoot);
-  const recorded =
-    recordedIds ??
-    JSON.parse(readFileSync(join(repoRoot, CONTAINER_BASELINE), 'utf8')).ids;
-  const ancestor = ancestorJson(repoRoot, CONTAINER_BASELINE);
+  /** @type {ReturnType<typeof ancestorContainerIds>} */
+  const ancestor =
+    options.ancestorIds != null
+      ? { ok: true, ids: options.ancestorIds }
+      : ancestorContainerIds(repoRoot, options.ref ?? ANCESTOR_REF);
   const failures = [];
-  if (!ancestor.ok) failures.push(ancestor.error);
+  if (ancestor.ok === false) failures.push(ancestor.error);
   else {
-    const errors = evaluateRatchet({
-      current: ids,
-      recorded,
-      ancestor: ancestor.ancestor?.ids ?? null,
-    });
-    if (errors.length > 0) {
+    const grown = idsBeyondAncestor(ids, ancestor.ids);
+    if (grown.length > 0) {
       failures.push(
         `marketing pages use one boxed width and one full-bleed override. ${GUIDANCE}`,
-        ...errors
+        `new violations are not allowed (${grown.length}):\n${grown
+          .map(id => `  + ${id}`)
+          .join('\n')}`
       );
     }
   }
@@ -351,13 +435,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   if (process.argv.includes('--print')) {
     for (const id of ids) process.stdout.write(`${id}\n`);
   }
-  if (process.argv.includes('--write-baseline')) {
-    const { writeFileSync } = await import('node:fs');
-    writeFileSync(
-      join(REPO_ROOT, CONTAINER_BASELINE),
-      `${JSON.stringify({ schema: 'jovie.art-direction-container-width/v1', ids }, null, 2)}\n`
-    );
-  } else if (failures.length > 0) {
+  if (failures.length > 0) {
     process.stderr.write(`${failures.join('\n')}\n`);
     process.exitCode = 1;
   }
