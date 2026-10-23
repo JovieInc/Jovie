@@ -13,7 +13,7 @@
  *
  * ICP-specific language on general pages is not a diff-line rule: audience
  * routes are exempt. That block is `scripts/invariants/icp-language/check.mjs`
- * (MKT-D17). Do not reimplement it here.
+ * (MKT-D16). Do not reimplement it here.
  *
  *   node scripts/design-frontend-skill-check.mjs --diff-base origin/main
  *   node scripts/design-frontend-skill-check.mjs --files a.tsx b.css
