@@ -111,6 +111,10 @@ Tests are part of the deploy path. Slow tests slow shipping. Test runtime perfor
 
 **Default Bias:** When there's a tradeoff between test thoroughness and iteration speed in gated CI, bias toward speed and move thoroughness to nightly runs.
 
+## First-load JS budgets
+
+`apps/web/scripts/route-js-budget.mjs` is a blocking check after the web `next build` in Source Validation coverage and merge-group Build + Layout. It does not start a second build. `/app` initial JS stays on the client-reference ratchet. Other app routes use gzip first-load JS from `app-build-manifest.json`. Homepage, product, and feature pages have the tightest ceilings. Unlisted routes use the default. Ceilings are shrink-only: raising one fails unless `raises` in `route-js-budgets.json` is a valid, unexpired design-exception-registry override. Unit proof: `apps/web/scripts/route-js-budget.test.ts` (fake manifests, no production build).
+
 ## Test Coverage Guidelines (When to Write Tests)
 
 Tests must be written **at feature creation time**, not retroactively. Apply coverage selectively — don't slow iteration speed.

@@ -19,6 +19,15 @@ Rows 1–4 define certified surfaces; row 5 numbers are citable targets only. Wh
 sources disagree, the stricter number governs and the file is named in the audit report.
 The only current row 1 advisory exceptions are bounded by the graduation policy below.
 
+Per-route first-load JS gzip is a separate blocking gate. After `next build`,
+`apps/web/scripts/route-js-budget.mjs` compares the build manifests with
+`apps/web/scripts/route-js-budgets.json`. `/app` keeps the client-reference
+ratchet. Other app routes use first-load JS gzip. Homepage, product, and
+feature pages use the tightest ceiling; unlisted routes use the default.
+Numbers only shrink. A higher number fails unless that key's `raises` entry
+passes the design-exception-registry gate-weakening override and is unexpired.
+Row 5 targets stay unwired.
+
 ## Public-profile alias graduation
 
 Staging and production use separate evidence windows. Staging measures the exact immutable

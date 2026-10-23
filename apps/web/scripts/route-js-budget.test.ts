@@ -10,11 +10,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  ceilingFromMeasurement,
   checkBudgets,
+  checkFirstLoadBudgets,
+  evaluateBudgets,
   FORBIDDEN_CLIENT_CODE,
   findForbiddenClientCode,
+  gateWeakeningOverrideApplies,
+  grownBudgetNumbers,
+  HEADROOM_KB,
+  isMarketingRoute,
+  measureFirstLoadJs,
   measureRouteJs,
+  readBudgetAncestor,
   routeFromManifestKey,
+  validateBudgetShape,
 } from './route-js-budget.mjs';
 
 const fixtureRoots: string[] = [];
@@ -109,12 +119,35 @@ describe('route-js-budget', () => {
   it('ships budgets that name only real, stricter-than-default routes', () => {
     const budgets = JSON.parse(
       readFileSync(join(__dirname, 'route-js-budgets.json'), 'utf8')
-    ) as { defaultMaxGzipKb: number; routes: Record<string, number> };
+    ) as {
+      defaultMaxGzipKb: number;
+      routes: Record<string, number>;
+      firstLoad: {
+        marketingMaxGzipKb: number;
+        defaultMaxGzipKb: number;
+        headroomKb: number;
+      };
+    };
 
     expect(budgets.defaultMaxGzipKb).toBeGreaterThan(0);
     for (const [route, kb] of Object.entries(budgets.routes)) {
       expect(route.startsWith('/app')).toBe(true);
       expect(kb).toBeGreaterThan(budgets.defaultMaxGzipKb);
+    }
+    expect(validateBudgetShape(budgets)).toEqual([]);
+    expect(budgets.firstLoad.marketingMaxGzipKb).toBeLessThan(
+      budgets.firstLoad.defaultMaxGzipKb
+    );
+    expect(budgets.firstLoad.marketingMaxGzipKb).toBeLessThan(
+      budgets.defaultMaxGzipKb
+    );
+    expect(budgets.firstLoad.headroomKb).toBe(HEADROOM_KB);
+    expect(grownBudgetNumbers(budgets, budgets)).toEqual([]);
+    const ancestor = readBudgetAncestor(join(__dirname, '../..'), {
+      fetch: false,
+    });
+    if (ancestor.ok && ancestor.ancestor) {
+      expect(grownBudgetNumbers(budgets, ancestor.ancestor)).toEqual([]);
     }
   });
 
@@ -136,5 +169,218 @@ describe('route-js-budget', () => {
         routes: ['/app/chat'],
       },
     ]);
+  });
+});
+
+const NOW = new Date('2026-10-22T00:00:00.000Z');
+
+function firstLoadBudgets() {
+  return {
+    defaultMaxGzipKb: 900,
+    routes: { '/app/chat': 1385 } as Record<string, number>,
+    firstLoad: {
+      headroomKb: HEADROOM_KB,
+      marketingMaxGzipKb: 32,
+      defaultMaxGzipKb: 80,
+      marketingRoutes: ['/', '/product', '/solutions/*'],
+      routes: { '/': 32, '/product': 32 } as Record<string, number>,
+    },
+    raises: undefined as
+      | Record<string, ReturnType<typeof validRaise>>
+      | undefined,
+  };
+}
+
+function validRaise(overrides: Record<string, string> = {}) {
+  return {
+    owner: '@jovie',
+    reason: 'Measured first-load JS exceeded the previous ceiling',
+    issue: 'JOV-1001',
+    removalCondition: 'Split the route chunk and lower the ceiling',
+    evidence: 'apps/web/scripts/route-js-budget.test.ts',
+    ...overrides,
+  };
+}
+
+function judge(
+  budgets: ReturnType<typeof firstLoadBudgets>,
+  firstRows: ReturnType<typeof measureFirstLoadJs>,
+  ancestor: ReturnType<typeof firstLoadBudgets> = budgets
+) {
+  return evaluateBudgets({
+    appRows: [],
+    firstRows,
+    budgets,
+    ancestor,
+    now: NOW,
+  });
+}
+
+function buildFirstLoadFixture() {
+  const nextDir = mkdtempSync(join(tmpdir(), 'first-load-js-'));
+  fixtureRoots.push(nextDir);
+  const main = writeChunk(nextDir, 'main.js', 8 * 1024);
+  const home = writeChunk(nextDir, 'home.js', 8 * 1024);
+  const product = writeChunk(nextDir, 'product.js', 8 * 1024);
+  const about = writeChunk(nextDir, 'about.js', 40 * 1024);
+  writeFileSync(
+    join(nextDir, 'build-manifest.json'),
+    JSON.stringify({ rootMainFiles: [main], polyfillFiles: [] })
+  );
+  writeFileSync(
+    join(nextDir, 'app-build-manifest.json'),
+    JSON.stringify({
+      pages: {
+        '/page': [main, home],
+        '/product/page': [main, product],
+        '/about/page': [main, about],
+        '/solutions/[audience]/page': [main, product],
+        '/app/(shell)/chat/page': [main, about],
+      },
+    })
+  );
+  return nextDir;
+}
+
+describe('first-load JS budgets', () => {
+  it('adds a fixed headroom to a measured size', () => {
+    expect(HEADROOM_KB).toBe(16);
+    expect(ceilingFromMeasurement(100)).toBe(116);
+    expect(isMarketingRoute('/solutions/artists', ['/solutions/*'])).toBe(true);
+    expect(isMarketingRoute('/about', ['/', '/product'])).toBe(false);
+  });
+
+  it('passes routes under their ceiling and uses the tight marketing budget', () => {
+    const rows = measureFirstLoadJs(buildFirstLoadFixture());
+    const byRoute = Object.fromEntries(rows.map(row => [row.route, row]));
+    expect(byRoute['/']?.chunks).toBe(2);
+    expect(byRoute['/app/chat']?.chunks).toBe(2);
+    const budgets = firstLoadBudgets();
+    const result = checkFirstLoadBudgets(
+      rows.filter(row => !row.route.startsWith('/app')),
+      budgets.firstLoad
+    );
+    expect(result.violations).toEqual([]);
+    expect(result.rows.find(row => row.route === '/')?.budgetKb).toBe(32);
+    expect(result.rows.find(row => row.route === '/product')?.budgetKb).toBe(
+      32
+    );
+    expect(
+      result.rows.find(row => row.route === '/solutions/[audience]')?.budgetKb
+    ).toBe(32);
+    expect(result.rows.find(row => row.route === '/about')?.budgetKb).toBe(80);
+    expect(judge(budgets, rows).ok).toBe(true);
+  });
+
+  it('fails a marketing route over its ceiling while an unlisted route still fits', () => {
+    const nextDir = buildFirstLoadFixture();
+    writeChunk(nextDir, 'home.js', 80 * 1024);
+    const rows = measureFirstLoadJs(nextDir);
+    const result = checkFirstLoadBudgets(
+      rows.filter(row => row.route !== '/app/chat'),
+      firstLoadBudgets().firstLoad
+    );
+    expect(result.violations.map(row => row.route)).toEqual(['/']);
+    expect(result.rows.find(row => row.route === '/about')?.ok).toBe(true);
+  });
+
+  it('measures a marketing route from the client-reference manifest when the app manifest is absent', () => {
+    const nextDir = mkdtempSync(join(tmpdir(), 'first-load-fallback-'));
+    fixtureRoots.push(nextDir);
+    const main = writeChunk(nextDir, 'main.js', 8 * 1024);
+    const page = writeChunk(nextDir, 'page.js', 8 * 1024);
+    writeFileSync(
+      join(nextDir, 'build-manifest.json'),
+      JSON.stringify({ rootMainFiles: [main], polyfillFiles: [] })
+    );
+    const dir = join(nextDir, 'server', 'app', '(marketing)', 'product');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'page_client-reference-manifest.js'),
+      `globalThis.__RSC_MANIFEST = {};\n` +
+        `globalThis.__RSC_MANIFEST['/(marketing)/product/page'] = ${JSON.stringify(
+          { entryJSFiles: { page: [page] } }
+        )};\n`
+    );
+    const rows = measureFirstLoadJs(nextDir);
+    expect(rows.map(row => row.route)).toEqual(['/product']);
+    expect(rows[0]?.chunks).toBe(2);
+  });
+
+  it('deliberate red: a grown budget fails unless the gate-weakening override applies, and an over-budget route still fails', () => {
+    const budgets = firstLoadBudgets();
+    const rows = measureFirstLoadJs(buildFirstLoadFixture());
+    const grown = structuredClone(budgets);
+    grown.firstLoad.marketingMaxGzipKb += 8;
+    grown.firstLoad.routes['/'] += 8;
+    grown.firstLoad.routes['/product'] += 8;
+    const red = judge(grown, rows, budgets);
+    expect(red.ok).toBe(false);
+    expect(red.growth.join('\n')).toMatch(/firstLoad\.marketingMaxGzipKb grew/);
+    expect(red.growth.join('\n')).toMatch(/firstLoad\.routes\.\/ grew/);
+
+    grown.raises = {
+      'firstLoad.marketingMaxGzipKb': validRaise({ owner: '' }),
+      'firstLoad.routes./': validRaise(),
+      'firstLoad.routes./product': validRaise(),
+    };
+    expect(
+      gateWeakeningOverrideApplies(grown.raises['firstLoad.routes./'], NOW)
+    ).toBe(true);
+    expect(
+      gateWeakeningOverrideApplies(
+        grown.raises['firstLoad.marketingMaxGzipKb'],
+        NOW
+      )
+    ).toBe(false);
+    const incomplete = judge(grown, rows, budgets);
+    expect(incomplete.ok).toBe(false);
+    expect(incomplete.growth.join('\n')).toMatch(/marketingMaxGzipKb grew/);
+
+    grown.raises['firstLoad.marketingMaxGzipKb'] = validRaise({
+      expiresOn: '2020-01-01',
+    });
+    const expired = judge(grown, rows, budgets);
+    expect(expired.growth.join('\n')).toMatch(/marketingMaxGzipKb grew/);
+
+    grown.raises['firstLoad.marketingMaxGzipKb'] = validRaise();
+    const overridden = judge(grown, rows, budgets);
+    expect(overridden.growth).toEqual([]);
+    expect(overridden.ok).toBe(true);
+
+    const overRows = rows.map(row =>
+      row.route === '/'
+        ? { ...row, gzipKb: grown.firstLoad.routes['/'] + 5 }
+        : row
+    );
+    const stillOver = judge(grown, overRows, budgets);
+    expect(stillOver.ok).toBe(false);
+    expect(stillOver.first.violations.map(row => row.route)).toEqual(['/']);
+
+    const raisedApp = structuredClone(budgets);
+    raisedApp.routes['/app/chat'] += 1;
+    expect(grownBudgetNumbers(raisedApp, budgets, NOW).join('\n')).toMatch(
+      /routes\.\/app\/chat grew 1385 -> 1386/
+    );
+    const extraApp = structuredClone(budgets);
+    extraApp.routes['/app/new'] = 901;
+    expect(grownBudgetNumbers(extraApp, budgets, NOW).join('\n')).toMatch(
+      /routes\.\/app\/new grew 900 -> 901/
+    );
+    const extraPublic = structuredClone(budgets);
+    extraPublic.firstLoad.routes['/about'] = 90;
+    expect(grownBudgetNumbers(extraPublic, budgets, NOW).join('\n')).toMatch(
+      /firstLoad\.routes\.\/about grew 80 -> 90/
+    );
+    expect(
+      grownBudgetNumbers(
+        budgets,
+        {
+          defaultMaxGzipKb: budgets.defaultMaxGzipKb,
+          routes: budgets.routes,
+        },
+        NOW
+      )
+    ).toEqual([]);
   });
 });

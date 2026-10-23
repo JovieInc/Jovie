@@ -1,27 +1,38 @@
 #!/usr/bin/env node
 /**
- * Per-route initial client JS budget for authed /app routes.
+ * Per-route initial client JS budgets for the Next.js app.
  *
- * Reads a finished `next build` (.next): for each /app page, the initial JS
- * is the root main files plus every chunk in the page's client-reference
- * `entryJSFiles` (root layout, nested layouts, error/loading boundaries, and
- * the page). Sizes are gzip -9, which is deterministic for a given build.
+ * Reads a finished `next build` (.next). Authed /app pages keep the
+ * client-reference measurement: root main files plus each page's
+ * `entryJSFiles`. Every other app route uses first-load JS from
+ * `app-build-manifest.json` (shared root and polyfill files included),
+ * falling back to that route's client-reference manifest when the app
+ * manifest is absent. Sizes are gzip -9, which is deterministic for a build.
  *
- * Budgets live in route-js-budgets.json: a default for every /app route plus
- * per-route ceilings for routes that are heavier today. They are a ratchet,
- * set just above measured sizes, so any regression fails. Lower them when a
- * route gets lighter; raise one only with a measured reason in the PR.
+ * Budgets live in route-js-budgets.json. /app has a default plus heavier
+ * per-route ceilings. Other routes have per-route ceilings, a tighter
+ * ceiling for homepage / product / feature pages, and a default for anything
+ * unlisted. Numbers only shrink. A higher number fails unless `raises[key]`
+ * passes the design-exception-registry gate-weakening override and is
+ * unexpired. Lowering a number is allowed.
  *
  * Usage: node scripts/route-js-budget.mjs [--next-dir .next] [--budgets file] [--json]
  */
+import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { gzipSync } from 'node:zlib';
+import { exceptionMetadataIssues } from '../../../scripts/design-exception-registry.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(SCRIPT_DIR, '../..');
 const MANIFEST_NAME = 'page_client-reference-manifest.js';
+export const BUDGET_RELATIVE = 'apps/web/scripts/route-js-budgets.json';
+/** Fixed headroom added to a measured KB size when a ceiling is first set. */
+export const HEADROOM_KB = 16;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** @param {string} key */
 export function routeFromManifestKey(key) {
@@ -30,6 +41,35 @@ export function routeFromManifestKey(key) {
     .replace(/\/\([^/)]+\)/g, '')
     .replace(/\/@[^/]+/g, '');
   return route === '' ? '/' : route;
+}
+
+/** @param {string} route */
+export function isAuthedAppRoute(route) {
+  return route === '/app' || route.startsWith('/app/');
+}
+
+/**
+ * @param {string} route
+ * @param {readonly string[]} patterns
+ */
+export function isMarketingRoute(route, patterns) {
+  return patterns.some(pattern => {
+    if (pattern.endsWith('/*')) {
+      const prefix = pattern.slice(0, -2);
+      return route === prefix || route.startsWith(`${prefix}/`);
+    }
+    return route === pattern;
+  });
+}
+
+/** @param {number} measuredKb */
+export function ceilingFromMeasurement(measuredKb, headroomKb = HEADROOM_KB) {
+  if (!Number.isFinite(measuredKb) || measuredKb < 0) {
+    throw new Error(
+      `measured KB must be a non-negative number; got ${measuredKb}`
+    );
+  }
+  return Math.round(measuredKb) + headroomKb;
 }
 
 function findManifests(dir, out = []) {
@@ -84,26 +124,7 @@ function collectRouteFiles(nextDir) {
  * @returns {RouteJsMeasurement[]}
  */
 export function measureRouteJs(nextDir) {
-  const gzipCache = new Map();
-  const gzipBytes = file => {
-    if (!gzipCache.has(file)) {
-      const bytes = readFileSync(join(nextDir, file));
-      gzipCache.set(file, gzipSync(bytes, { level: 9 }).length);
-    }
-    return gzipCache.get(file);
-  };
-
-  return collectRouteFiles(nextDir)
-    .map(({ route, files }) => {
-      let bytes = 0;
-      for (const file of files) bytes += gzipBytes(file);
-      return {
-        route,
-        gzipKb: Math.round(bytes / 1024),
-        chunks: files.size,
-      };
-    })
-    .sort((a, b) => b.gzipKb - a.gzipKb);
+  return rowsFromRouteFiles(nextDir, collectRouteFiles(nextDir));
 }
 
 /**
@@ -167,6 +188,326 @@ export function checkBudgets(measurements, budgets) {
   return { rows, violations, staleBudgets };
 }
 
+function sharedJsFiles(buildManifest) {
+  return [
+    ...(buildManifest.rootMainFiles ?? []),
+    ...(buildManifest.polyfillFiles ?? []),
+  ].filter(file => typeof file === 'string' && file.endsWith('.js'));
+}
+
+function rememberRoute(routes, route, files) {
+  if (!route || route.startsWith('/_')) return;
+  let set = routes.get(route);
+  if (!set) {
+    set = new Set();
+    routes.set(route, set);
+  }
+  for (const file of files) {
+    if (typeof file === 'string' && file.endsWith('.js')) set.add(file);
+  }
+}
+
+/** First-load files per app route. Prefers `app-build-manifest.json`. */
+export function collectFirstLoadFiles(nextDir) {
+  const buildManifest = JSON.parse(
+    readFileSync(join(nextDir, 'build-manifest.json'), 'utf8')
+  );
+  const shared = sharedJsFiles(buildManifest);
+  /** @type {Map<string, Set<string>>} */
+  const routes = new Map();
+  const appManifestPath = join(nextDir, 'app-build-manifest.json');
+  if (existsSync(appManifestPath)) {
+    const pages = JSON.parse(readFileSync(appManifestPath, 'utf8')).pages;
+    if (!pages || typeof pages !== 'object' || Array.isArray(pages)) {
+      throw new Error(`${appManifestPath} is missing pages`);
+    }
+    for (const [key, files] of Object.entries(pages)) {
+      if (!Array.isArray(files)) {
+        throw new Error(`app-build-manifest pages[${key}] is not a file list`);
+      }
+      rememberRoute(routes, routeFromManifestKey(key), [...shared, ...files]);
+    }
+  } else {
+    const authedRoot = join(nextDir, 'server', 'app', 'app') + sep;
+    for (const manifestPath of findManifests(join(nextDir, 'server', 'app'))) {
+      if (manifestPath.startsWith(authedRoot)) continue;
+      const [key, manifest] = readClientManifest(manifestPath);
+      const files = [...shared];
+      for (const chunks of Object.values(manifest.entryJSFiles ?? {})) {
+        for (const chunk of chunks) files.push(chunk);
+      }
+      rememberRoute(routes, routeFromManifestKey(key), files);
+    }
+  }
+  return [...routes.entries()].map(([route, files]) => ({ route, files }));
+}
+
+/** @param {string} nextDir @returns {RouteJsMeasurement[]} */
+export function measureFirstLoadJs(nextDir) {
+  return rowsFromRouteFiles(nextDir, collectFirstLoadFiles(nextDir));
+}
+
+function rowsFromRouteFiles(nextDir, routeFiles) {
+  /** @type {Map<string, number>} */
+  const gzipCache = new Map();
+  const gzipBytes = file => {
+    if (!gzipCache.has(file)) {
+      const bytes = readFileSync(join(nextDir, file));
+      gzipCache.set(file, gzipSync(bytes, { level: 9 }).length);
+    }
+    return gzipCache.get(file);
+  };
+  return routeFiles
+    .map(({ route, files }) => {
+      let bytes = 0;
+      for (const file of files) bytes += gzipBytes(file);
+      return {
+        route,
+        gzipKb: Math.round(bytes / 1024),
+        chunks: files.size,
+      };
+    })
+    .sort((a, b) => b.gzipKb - a.gzipKb || a.route.localeCompare(b.route));
+}
+
+export function resolveFirstLoadBudget(route, firstLoad) {
+  if (firstLoad.routes && Object.hasOwn(firstLoad.routes, route)) {
+    return firstLoad.routes[route];
+  }
+  if (isMarketingRoute(route, firstLoad.marketingRoutes ?? [])) {
+    return firstLoad.marketingMaxGzipKb;
+  }
+  return firstLoad.defaultMaxGzipKb;
+}
+
+/**
+ * @param {RouteJsMeasurement[]} measurements
+ * @param {{ marketingMaxGzipKb: number, defaultMaxGzipKb: number, marketingRoutes?: string[], routes?: Record<string, number> }} firstLoad
+ */
+export function checkFirstLoadBudgets(measurements, firstLoad) {
+  const violations = [];
+  const rows = measurements.map(row => {
+    const budgetKb = resolveFirstLoadBudget(row.route, firstLoad);
+    const ok = row.gzipKb <= budgetKb;
+    if (!ok) violations.push({ ...row, budgetKb });
+    return { ...row, budgetKb, ok };
+  });
+  const measured = new Set(measurements.map(row => row.route));
+  const staleBudgets = Object.keys(firstLoad.routes ?? {}).filter(
+    route => !measured.has(route)
+  );
+  return { rows, violations, staleBudgets };
+}
+
+function isKb(value) {
+  return Number.isInteger(value) && value > 0;
+}
+
+export function validateBudgetShape(budgets) {
+  const errors = [];
+  const first = budgets?.firstLoad;
+  if (!first) {
+    errors.push('firstLoad budgets are required');
+    return errors;
+  }
+  if (first.headroomKb !== HEADROOM_KB) {
+    errors.push(`firstLoad.headroomKb must stay ${HEADROOM_KB}`);
+  }
+  if (
+    !isKb(first.marketingMaxGzipKb) ||
+    !isKb(first.defaultMaxGzipKb) ||
+    !isKb(budgets.defaultMaxGzipKb)
+  ) {
+    errors.push('budget ceilings must be positive integers');
+    return errors;
+  }
+  if (!(first.marketingMaxGzipKb < first.defaultMaxGzipKb)) {
+    errors.push(
+      'marketingMaxGzipKb must be tighter than the unlisted-route default'
+    );
+  }
+  if (!(first.marketingMaxGzipKb < budgets.defaultMaxGzipKb)) {
+    errors.push(
+      'marketing first-load budget must be tighter than the /app default'
+    );
+  }
+  const patterns = first.marketingRoutes;
+  if (!Array.isArray(patterns) || !patterns.includes('/')) {
+    errors.push('marketingRoutes must include the homepage');
+    return errors;
+  }
+  for (const pattern of patterns) {
+    if (pattern.includes('*')) continue;
+    if (!isKb(first.routes?.[pattern])) {
+      errors.push(`marketing route ${pattern} needs an explicit budget`);
+    }
+  }
+  for (const [route, kb] of Object.entries(first.routes ?? {})) {
+    if (!isKb(kb)) {
+      errors.push(`${route} budget must be a positive integer`);
+      continue;
+    }
+    if (isMarketingRoute(route, patterns) && kb > first.marketingMaxGzipKb) {
+      errors.push(
+        `${route} exceeds the marketing ceiling ${first.marketingMaxGzipKb}`
+      );
+    }
+    if (!isMarketingRoute(route, patterns) && kb <= first.marketingMaxGzipKb) {
+      errors.push(
+        `${route} is not a marketing route but sits inside the marketing ceiling`
+      );
+    }
+  }
+  return errors;
+}
+
+function budgetNumbers(budgets) {
+  /** @type {[string, number][]} */
+  const entries = [];
+  if (typeof budgets?.defaultMaxGzipKb === 'number') {
+    entries.push(['defaultMaxGzipKb', budgets.defaultMaxGzipKb]);
+  }
+  for (const [route, kb] of Object.entries(budgets?.routes ?? {})) {
+    entries.push([`routes.${route}`, kb]);
+  }
+  const first = budgets?.firstLoad;
+  if (!first) return entries;
+  for (const key of ['defaultMaxGzipKb', 'marketingMaxGzipKb', 'headroomKb']) {
+    if (typeof first[key] === 'number')
+      entries.push([`firstLoad.${key}`, first[key]]);
+  }
+  for (const [route, kb] of Object.entries(first.routes ?? {})) {
+    entries.push([`firstLoad.routes.${route}`, kb]);
+  }
+  return entries;
+}
+
+/** Design-exception-registry raise. An expired `expiresOn` does not apply. */
+export function gateWeakeningOverrideApplies(entry, now = new Date()) {
+  if (!entry || typeof entry !== 'object') return false;
+  if (exceptionMetadataIssues(entry, 'raise').length > 0) return false;
+  const expiresOn = /** @type {{ expiresOn?: string }} */ (entry).expiresOn;
+  if (ISO_DATE.test(expiresOn ?? '')) {
+    const expiry = Date.parse(`${expiresOn}T23:59:59.999Z`);
+    if (expiry < now.getTime()) return false;
+  }
+  return true;
+}
+
+/** New route keys grow from that section's default. A new section is a baseline. */
+function ancestorCeiling(key, ancestor, previous) {
+  if (previous.has(key)) return previous.get(key);
+  if (key.startsWith('routes.') && isKb(ancestor?.defaultMaxGzipKb)) {
+    return ancestor.defaultMaxGzipKb;
+  }
+  const prefix = 'firstLoad.routes.';
+  const first = ancestor?.firstLoad;
+  if (!key.startsWith(prefix) || !isKb(first?.defaultMaxGzipKb)) return;
+  const route = key.slice(prefix.length);
+  return isMarketingRoute(route, first.marketingRoutes ?? [])
+    ? first.marketingMaxGzipKb
+    : first.defaultMaxGzipKb;
+}
+
+export function grownBudgetNumbers(budgets, ancestor, now = new Date()) {
+  if (!ancestor) return [];
+  const previous = new Map(budgetNumbers(ancestor));
+  const raises = budgets.raises ?? {};
+  const failures = [];
+  for (const [key, next] of budgetNumbers(budgets)) {
+    const prev = ancestorCeiling(key, ancestor, previous);
+    if (prev === undefined || !(next > prev)) continue;
+    if (!gateWeakeningOverrideApplies(raises[key], now)) {
+      failures.push(`${key} grew ${prev} -> ${next}`);
+    }
+  }
+  return failures;
+}
+
+export function missingExplicitRoutes(measurements, firstLoad) {
+  const measured = new Set(measurements.map(row => row.route));
+  return Object.keys(firstLoad?.routes ?? {}).filter(
+    route => !route.includes('*') && !measured.has(route)
+  );
+}
+
+export function evaluateBudgets({
+  appRows,
+  firstRows,
+  budgets,
+  ancestor,
+  now = new Date(),
+}) {
+  const shape = validateBudgetShape(budgets);
+  const growth = grownBudgetNumbers(budgets, ancestor, now);
+  const app = checkBudgets(appRows, budgets);
+  const publicRows = firstRows.filter(row => !isAuthedAppRoute(row.route));
+  const first = checkFirstLoadBudgets(
+    publicRows,
+    budgets.firstLoad ?? {
+      marketingMaxGzipKb: 0,
+      defaultMaxGzipKb: 0,
+      marketingRoutes: [],
+      routes: {},
+    }
+  );
+  const missing = missingExplicitRoutes(publicRows, budgets.firstLoad);
+  const ok =
+    shape.length === 0 &&
+    growth.length === 0 &&
+    app.violations.length === 0 &&
+    first.violations.length === 0 &&
+    missing.length === 0;
+  return { shape, growth, app, first, missing, ok };
+}
+
+function git(repoRoot, args) {
+  return spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8' });
+}
+
+export function readBudgetAncestor(repoRoot = REPO_ROOT, options = {}) {
+  const spawn = options.spawn ?? git;
+  let rev = spawn(repoRoot, ['rev-parse', '--verify', 'origin/main']);
+  if (rev.status !== 0 && options.fetch !== false) {
+    const fetched = spawn(repoRoot, [
+      'fetch',
+      '--no-tags',
+      '--depth=1',
+      'origin',
+      'main',
+    ]);
+    if (fetched.status !== 0) {
+      return {
+        ok: false,
+        error:
+          'origin/main is not available; the bundle budget cannot prove it only shrinks',
+      };
+    }
+    rev = spawn(repoRoot, ['rev-parse', '--verify', 'origin/main']);
+  }
+  if (rev.status !== 0) {
+    return {
+      ok: false,
+      error:
+        'origin/main is not available; the bundle budget cannot prove it only shrinks',
+    };
+  }
+  const spec = `origin/main:${BUDGET_RELATIVE}`;
+  if (spawn(repoRoot, ['cat-file', '-e', spec]).status !== 0) {
+    return { ok: true, ancestor: null };
+  }
+  const show = spawn(repoRoot, ['show', spec]);
+  if (show.status !== 0) return { ok: false, error: `unable to read ${spec}` };
+  try {
+    return { ok: true, ancestor: JSON.parse(show.stdout) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `ancestor budget is not valid JSON: ${error.message}`,
+    };
+  }
+}
+
 function parseArgs(argv) {
   const options = {
     nextDir: resolve(SCRIPT_DIR, '..', '.next'),
@@ -183,44 +524,92 @@ function parseArgs(argv) {
   return options;
 }
 
+function printRows(rows) {
+  for (const row of rows) {
+    const mark = row.ok ? 'ok  ' : 'OVER';
+    console.log(
+      `${mark} ${String(row.gzipKb).padStart(5)} / ${String(row.budgetKb).padStart(5)} KB gz  ${row.route}`
+    );
+  }
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const budgets = JSON.parse(readFileSync(options.budgetsPath, 'utf8'));
-  const measurements = measureRouteJs(options.nextDir);
-  if (measurements.length === 0) {
+  const shape = validateBudgetShape(budgets);
+  for (const error of shape) console.error(`::error::${error}`);
+  const ancestor = readBudgetAncestor(REPO_ROOT);
+  if (!ancestor.ok) {
+    console.error(`::error::${ancestor.error}`);
+    process.exit(1);
+  }
+  const growth = grownBudgetNumbers(budgets, ancestor.ancestor);
+  for (const error of growth) {
+    console.error(
+      `::error::${error}. Budget numbers only shrink. A raise needs a raises[${error.split(' ')[0]}] entry that passes the design-exception-registry gate-weakening override.`
+    );
+  }
+  const appRows = measureRouteJs(options.nextDir);
+  if (appRows.length === 0) {
     console.error(`No /app client manifests under ${options.nextDir}`);
     process.exit(1);
   }
-  const result = checkBudgets(measurements, budgets);
-
+  let firstRows = [];
+  try {
+    firstRows = measureFirstLoadJs(options.nextDir);
+  } catch (error) {
+    console.error(
+      `::error::${error instanceof Error ? error.message : String(error)}`
+    );
+    process.exit(1);
+  }
+  const result = evaluateBudgets({
+    appRows,
+    firstRows,
+    budgets,
+    ancestor: ancestor.ancestor,
+  });
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));
   } else {
-    for (const row of result.rows) {
-      const mark = row.ok ? 'ok  ' : 'OVER';
+    printRows(result.app.rows);
+    console.log('');
+    printRows(result.first.rows);
+  }
+  for (const route of result.app.staleBudgets) {
+    console.log(
+      `::warning::route-js-budgets.json has no matching /app route: ${route}`
+    );
+  }
+  for (const route of result.missing) {
+    console.error(
+      `::error::${route} has a first-load budget but was not in the build manifest`
+    );
+  }
+  for (const route of result.first.staleBudgets) {
+    if (!result.missing.includes(route)) {
       console.log(
-        `${mark} ${String(row.gzipKb).padStart(5)} / ${String(row.budgetKb).padStart(5)} KB gz  ${row.route}`
+        `::warning::route-js-budgets.json first-load route was not measured: ${route}`
       );
     }
   }
-  for (const route of result.staleBudgets) {
-    console.log(
-      `::warning::route-js-budgets.json has no matching route: ${route}`
-    );
-  }
-  for (const row of result.violations) {
-    console.log(
-      `::error::${row.route} ships ${row.gzipKb} KB gzip initial JS; budget is ${row.budgetKb} KB. ` +
-        'Dynamic-import heavy client code, or raise the budget with a measured reason.'
+  for (const row of [...result.app.violations, ...result.first.violations]) {
+    console.error(
+      `::error::${row.route} ships ${row.gzipKb} KB gzip first-load JS; budget is ${row.budgetKb} KB. ` +
+        'Dynamic-import heavy client code. Do not raise the budget unless a measured gate-weakening override applies.'
     );
   }
   const forbidden = findForbiddenClientCode(options.nextDir);
   for (const hit of forbidden) {
-    console.log(
+    console.error(
       `::error::${hit.file} ships forbidden client code (${hit.id}) in ${hit.routes.length} /app routes, e.g. ${hit.routes[0]}. ${hit.fix}`
     );
   }
-  process.exit(result.violations.length > 0 || forbidden.length > 0 ? 1 : 0);
+  process.exit(
+    shape.length > 0 || growth.length > 0 || !result.ok || forbidden.length > 0
+      ? 1
+      : 0
+  );
 }
 
 if (

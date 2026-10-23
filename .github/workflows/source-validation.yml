@@ -414,7 +414,8 @@ jobs:
           export JOVIE_COVERAGE_INCLUDE JOVIE_COVERAGE_RELATED_TESTS
           pnpm --filter @jovie/web test:coverage --changed "$base_sha" --bail 1
           node scripts/check-changed-test-coverage.mjs --base "$base_sha" --head "$EXPECTED_HEAD" --coverage apps/web/coverage/coverage-final.json
-      # Route JS budgets and SEO certification read a finished `next build`,
+      # Route JS budgets (authed /app plus first-load JS) and SEO certification
+      # read a finished `next build`,
       # so until now only the merge group's Build + Layout ran them. They were
       # the top merge-group-only ejection: 61 group runs across 22 PRs in the
       # 7 days to 2026-10-12 (/app/admin/* a few KB over), plus 6 from
