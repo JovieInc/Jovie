@@ -26,7 +26,7 @@ export function DataCard({
     default: 'bg-surface-hover text-secondary',
     success: 'bg-success-subtle text-success',
     warning: 'bg-warning-subtle text-warning',
-    error: 'bg-error-subtle text-error',
+    error: 'bg-error-subtle text-primary-token',
   };
 
   return (

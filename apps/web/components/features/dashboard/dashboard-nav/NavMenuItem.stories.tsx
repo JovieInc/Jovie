@@ -23,9 +23,9 @@ const meta: Meta<typeof NavMenuItem> = {
   },
   decorators: [
     Story => (
-      <div className='w-60 bg-sidebar p-3'>
+      <ul className='m-0 w-60 list-none bg-sidebar p-3'>
         <Story />
-      </div>
+      </ul>
     ),
   ],
 };

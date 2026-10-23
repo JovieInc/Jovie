@@ -105,6 +105,12 @@ describe('ShellReleaseRow audio affordance', () => {
     );
 
     const row = container.querySelector('[data-shell-release-row]');
+    expect(row).toHaveAttribute('role', 'row');
+    expect(screen.getByRole('gridcell')).toContainElement(
+      screen.getByRole('link', {
+        name: 'Open smart link for Lost in the Light',
+      })
+    );
     expect(row).toHaveAttribute('aria-selected', 'true');
     expect(row).toHaveAttribute('data-selected', 'true');
     expect(row?.className).toContain('system-b-table-row-selected');

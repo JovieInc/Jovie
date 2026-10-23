@@ -305,9 +305,10 @@ function ReleasesListContent({
   }
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: The selectable grid contains independently operable row actions.
     <div
       ref={listboxRef}
-      role='listbox'
+      role='grid'
       aria-label='Releases'
       className='py-1.5 space-y-px px-2'
     >
