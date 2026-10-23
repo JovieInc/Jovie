@@ -15,7 +15,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, vi } from 'vitest';
-import { releaseIdleAuthClient } from '../lib/auth/auth-client-test-hooks';
+import { releaseIdleAuthClient } from './auth-client-test-hooks';
 
 const appRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

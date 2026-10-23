@@ -2,7 +2,7 @@
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { cleanup } from '@testing-library/react';
 import { afterEach, expect, vi } from 'vitest';
-import { releaseIdleAuthClient } from '../lib/auth/auth-client-test-hooks';
+import { releaseIdleAuthClient } from './auth-client-test-hooks';
 
 expect.extend(matchers);
 

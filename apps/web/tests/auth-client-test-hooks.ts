@@ -4,9 +4,12 @@
  * The session atom's unmount is delayed 1s by nanostores. Vitest deletes
  * the jsdom `window` binding before that timer fires, and Better Auth's
  * broadcast cleanup then throws `ReferenceError: window is not defined`.
- * The client module registers itself here when Vitest loads it. Setup
- * flushes idle atoms while `window` still exists, so the deferred timer
- * does not touch the DOM.
+ * `lib/auth/client.ts` stores the client on `jovie.vitest.authClient` when
+ * Vitest loads it. Setup flushes idle atoms while `window` still exists.
+ *
+ * This module stays under `tests/`. Exact-head Coverage passes coverable
+ * product files to `vitest related`, and a setup file that imports one of
+ * those files selects every test in the project.
  */
 
 const authClientSlot = Symbol.for('jovie.vitest.authClient');
@@ -52,11 +55,6 @@ function flushIdleAtom(store: object): void {
     const clean = (store as Record<symbol, unknown>)[key];
     if (typeof clean === 'function') clean();
   }
-}
-
-export function rememberAuthClientForTests(client: unknown): void {
-  if (process.env.VITEST !== 'true') return;
-  (globalThis as Record<symbol, unknown>)[authClientSlot] = client;
 }
 
 /** Flush Better Auth atoms whose listeners already dropped. */
