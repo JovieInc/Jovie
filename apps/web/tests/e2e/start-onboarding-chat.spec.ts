@@ -1,5 +1,4 @@
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
@@ -12,7 +11,7 @@ const CHAT_PANEL = '[data-testid="onboarding-chat"]';
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
 const COMPOSER_TEXTAREA = '[aria-label="Chat message input" i]';
 const TEST_AVATAR_PNG_PATH = join(
-  dirname(fileURLToPath(import.meta.url)),
+  __dirname,
   '../../public/avatars/default-user.png'
 );
 const IGNORABLE_CONSOLE_ERRORS = [
