@@ -2260,7 +2260,6 @@ export function TasksPageClient() {
         artistName={artistName}
         selectedTaskId={effectiveSelectedTaskId}
         compactColumnLabels={Boolean(selectedTask)}
-        showAssigneeChip={assigneeFilter === 'all'}
         onOpenTask={openTaskDocument}
         onCreateTask={() => setHeaderMode('create')}
         onMoveTask={handleMoveTask}
