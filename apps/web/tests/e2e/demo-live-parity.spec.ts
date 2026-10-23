@@ -93,33 +93,24 @@ async function collectReleasesShape(
   const matrix = page.getByTestId('releases-matrix');
   await expect(matrix).toBeVisible({ timeout: 60_000 });
 
-  const previewToggle = page.getByRole('button', {
-    name: 'Toggle release preview',
-  });
-  await expect(previewToggle).toBeVisible({ timeout: 30_000 });
-  await previewToggle.click();
+  const firstRow = matrix.locator('[data-shell-release-row]').first();
+  await expect(firstRow).toBeVisible({ timeout: 30_000 });
+  await firstRow.click();
 
   const drawer = page.getByTestId('release-sidebar');
   await expect(drawer).toBeVisible({ timeout: 30_000 });
 
   return {
-    toolbarButtons: {
-      display: await page
-        .getByRole('button', { name: 'Display' })
-        .first()
-        .isVisible(),
-      preview: await page
-        .getByRole('button', { name: 'Toggle release preview' })
-        .first()
-        .isVisible(),
-    },
-    matrixTabs: normalizeTexts(await matrix.getByRole('tab').allInnerTexts()),
+    shellList: await matrix
+      .getByRole('listbox', { name: 'Releases' })
+      .isVisible(),
     drawerTabs: normalizeTexts(await drawer.getByRole('tab').allInnerTexts()),
     drawerCards: {
       analytics: await drawer
         .getByTestId('release-smart-link-analytics')
         .isVisible(),
       metadata: await drawer.getByTestId('release-metadata-card').isVisible(),
+      tabbed: await drawer.getByTestId('release-tabbed-card').isVisible(),
     },
   };
 }
@@ -216,9 +207,7 @@ test.describe
   .serial('Demo/live route parity', () => {
     test.skip(!USE_TEST_AUTH_BYPASS, 'Requires E2E_USE_TEST_AUTH_BYPASS=1');
 
-    // JOV-8782: live /app/releases is the shell release list, /demo still
-    // renders the table-era matrix. Re-enable when /demo moves to the shell.
-    test.fixme('releases demo mirrors the live releases workspace structure', async ({
+    test('releases demo mirrors the live releases workspace structure', async ({
       page,
     }) => {
       const liveShape = await collectReleasesShape(
