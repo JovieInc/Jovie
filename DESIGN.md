@@ -259,6 +259,10 @@ for full tokens and sizing when changing this area.
 | Background RGB | `247 248 248` | `7 8 10` |
 
 
+## Tooltip eligibility and input
+
+[Details](docs/design-system/DETAILS.md#tooltip-eligibility-and-input).
+
 ## Full-Screen Status Screens
 
 Read [the full-screen status screens reference](docs/design-system/DETAILS.md#full-screen-status-screens) when changing this area.

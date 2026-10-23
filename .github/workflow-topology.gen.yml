@@ -813,6 +813,18 @@ nodes:
       - repository_dispatch
     terminalReceipt: job:sync-issue
     jobCount: 1
+  - name: Pen still diff (advisory)
+    path: .github/workflows/pen-still-diff.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - workflow_dispatch
+    terminalReceipt: job:comment
+    jobCount: 2
   - name: Post-Deploy Probes
     path: .github/workflows/postdeploy-probes.yml
     active: true

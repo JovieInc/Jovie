@@ -205,8 +205,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-21T09:25:41.903Z",
-    "gitSha": "da9c2dfb90b2fe08dfc2bc8e44d915d6351c05bd",
+    "capturedAt": "2026-10-23T03:20:54.028Z",
+    "gitSha": "7666cdac92499cb7ef444b5f590afae521696132",
     "imagePath": "artist-profile-faq-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-23T02:37:12.854Z",
-    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
+    "capturedAt": "2026-10-23T03:21:19.851Z",
+    "gitSha": "7666cdac92499cb7ef444b5f590afae521696132",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-10-23T02:39:36.062Z",
-    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
+    "capturedAt": "2026-10-23T03:23:43.813Z",
+    "gitSha": "7666cdac92499cb7ef444b5f590afae521696132",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -694,8 +694,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-23T00:35:55.703Z",
-    "gitSha": "f2748cdd1ce87ae67e4a446a7d5f99164c39499a",
+    "capturedAt": "2026-10-23T03:23:47.947Z",
+    "gitSha": "7666cdac92499cb7ef444b5f590afae521696132",
     "imagePath": "dashboard-analytics-desktop.png"
   },
   {
@@ -710,8 +710,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-23T02:39:44.275Z",
-    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
+    "capturedAt": "2026-10-23T03:23:52.050Z",
+    "gitSha": "7666cdac92499cb7ef444b5f590afae521696132",
     "imagePath": "dashboard-earnings-desktop.png"
   },
   {
@@ -726,8 +726,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin"],
-    "capturedAt": "2026-10-23T02:39:48.371Z",
-    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
+    "capturedAt": "2026-10-23T03:23:56.251Z",
+    "gitSha": "7666cdac92499cb7ef444b5f590afae521696132",
     "imagePath": "settings-profile-desktop.png"
   },
   {
