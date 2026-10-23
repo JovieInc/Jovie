@@ -260,6 +260,11 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     why: 'hero renders ProductClaimCard',
   },
   {
+    url: '/product/dsp-links',
+    input: { useCase: 'aha-capture', captureId: 'dsp-links' },
+    why: 'hero mounts the live DSP rows as the aha capture',
+  },
+  {
     url: '/card',
     input: { useCase: 'informational' },
     why: 'planned Card announcement uses text until an approved Wallet capture exists',

@@ -180,6 +180,15 @@ export const MARKETING_PAGE_CONTRACTS = {
       label: PRODUCT_COPY.claimCard.cta,
     },
   },
+  '(marketing)/product/dsp-links/page.tsx': {
+    routeGlob: '(marketing)/product/dsp-links/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_DSP_LINKS,
+    job: 'store one outbound link per service',
+    proof: 'live service rows with saved links and a Find action',
+    successEvent: 'visitor opens a saved service link',
+    primaryCta: START_CTA,
+  },
   '(marketing)/card/page.tsx': {
     routeGlob: '(marketing)/card/page.tsx',
     copyScope: 'shared',

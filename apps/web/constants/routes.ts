@@ -206,6 +206,8 @@ export const APP_ROUTES = {
   PAY: '/pay',
   /** Live DESIGN_READY marketing page — never 410 / reserved-gone. */
   PRODUCT: '/product',
+  /** Per-service DSP links. Nested under /product so it is not a profile handle. */
+  PRODUCT_DSP_LINKS: '/product/dsp-links',
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */
   SOLUTIONS_ARTISTS: '/solutions/artists',
   INSTANT_MERCH: '/instant-merch',
