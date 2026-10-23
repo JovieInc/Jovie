@@ -1465,6 +1465,58 @@ describe('ProfileCompactTemplate', () => {
     replaceStateSpy.mockRestore();
   });
 
+  it('does not push the profile URL over a navigation that left the surface', async () => {
+    // Golden Path claim smoke regression: the claim CTA routes to
+    // /{handle}/claim?next=auth and on into /signup while this template is
+    // still mounted through the client transition. The history sync must
+    // not push the profile href back over the router's new URL, or the
+    // click is swallowed and never reaches the auth funnel.
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    window.history.replaceState(null, '', '/test-artist?claim=1');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    const template = (
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+    const view = render(template);
+
+    // The claim-intent landing settles without touching history.
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({ modeOverride: 'profile' })
+      );
+    });
+    expect(pushStateSpy).not.toHaveBeenCalled();
+
+    // The router moves the URL to the auth funnel during the transition,
+    // exactly as the Next history updater does once the claim route's
+    // redirect has been followed.
+    window.history.replaceState(
+      window.history.state,
+      '',
+      '/signup?handle=test-artist'
+    );
+    view.rerender(template);
+
+    await waitFor(() => {
+      expect(`${window.location.pathname}${window.location.search}`).toBe(
+        '/signup?handle=test-artist'
+      );
+    });
+    expect(pushStateSpy).not.toHaveBeenCalledWith(
+      expect.anything(),
+      '',
+      '/test-artist'
+    );
+
+    pushStateSpy.mockRestore();
+  });
+
   it('renders the alerts tab when ?mode=subscribe is in the URL', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=subscribe');

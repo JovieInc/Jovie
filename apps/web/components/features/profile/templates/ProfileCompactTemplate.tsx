@@ -790,6 +790,17 @@ export function ProfileCompactTemplate({
       return;
     }
 
+    // Mode state lives on this profile's root pathname (`?mode=…`). Any
+    // other pathname means the document is navigating away from this
+    // surface — the claim CTA routes to `/{handle}/claim?next=auth` and on
+    // into the auth funnel — while this template stays mounted through the
+    // client transition. Pushing the profile href from inside that window
+    // swallows the navigation: the claim CTA click never reached /signup
+    // (Golden Path claim smoke). Only the root path is ours to write.
+    if (globalThis.location.pathname !== `/${artist.handle}`) {
+      return;
+    }
+
     const landedMode = landedHistoryModeRef.current;
     const correctingStrippedLanding =
       profileHistoryDepthRef.current === 0 &&
