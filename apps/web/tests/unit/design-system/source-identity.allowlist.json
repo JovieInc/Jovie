@@ -90,6 +90,12 @@
       "rule": "arbitrary-value",
       "value": "transition-[max-width,opacity,transform]",
       "reason": "JOV-4522: menu-button label variant stages the last span on the same max-width/opacity/travel contract as SHELL_RAIL_LABEL; the descendant selector must live in the cva variant, so the shared constant cannot be composed here. No canonical design token covers the property list."
+    },
+    {
+      "file": "apps/web/components/features/dashboard/organisms/releases/cells/ReleaseCell.tsx",
+      "rule": "arbitrary-value",
+      "value": "max-w-[45%]",
+      "reason": "PR #22736: caps the inline artist line at 45% of the release row so the 32px dense row keeps title room. Percentage max-width has repo precedent (max-w-[66%]/[70%]/[78%] grandfathered) and no canonical token exists for fractional row caps."
     }
   ],
   "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value (or {file, rule, value}). Prefer deleting the debt over adding an escape. The JOV-[1-9] entry is a zod issue-key validation regex in that route (identifier: /^JOV-[1-9][0-9]*$/u), not a style token; no canonical design token applies."

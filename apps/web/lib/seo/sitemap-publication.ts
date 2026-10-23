@@ -108,6 +108,39 @@ export function getExactPublishedMarketingPaths(
     .map(entry => entry.url);
 }
 
+/**
+ * Cited revisions for commercial hubs that have no capability binding.
+ * Do not invent a date: each value is the route-manifest evidence date.
+ */
+const UNBOUND_COMMERCIAL_HUB_REVISIONS = {
+  // EVENT 2026-10-20 artist-profile homepage.
+  '/': '2026-10-20',
+  // JOV-6220 source and live section census.
+  '/pricing': '2026-09-29',
+} as const;
+
+/**
+ * Real content revision for a commercial hub. Capability `contentRevision`
+ * wins. Unbound hubs use the cited dates above. Anything else stays undated
+ * so lastmod is never request time.
+ */
+export function commercialHubContentRevision(
+  path: string,
+  capabilityRevision?: string | null
+): Date | undefined {
+  const revision =
+    capabilityRevision ??
+    UNBOUND_COMMERCIAL_HUB_REVISIONS[
+      path as keyof typeof UNBOUND_COMMERCIAL_HUB_REVISIONS
+    ];
+  if (!revision) return undefined;
+  return toContentRevisionDate(
+    /^\d{4}-\d{2}-\d{2}$/.test(revision)
+      ? `${revision}T00:00:00.000Z`
+      : revision
+  );
+}
+
 export function getPublishedCommercialHubPaths(
   manifest: readonly SitemapManifestRoute[] = MARKETING_ROUTE_MANIFEST
 ): string[] {
