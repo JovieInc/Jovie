@@ -1401,7 +1401,7 @@ describe('ProfileCompactTemplate', () => {
   });
 
   it('replaces a stripped deep-link landing instead of pushing a second profile entry', async () => {
-    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    mockCanonicalProfileDSPs.mockReturnValue([]);
     mockUseProfileShell.mockImplementation(() => ({
       locationMode: 'listen',
       notificationsContextValue: {
