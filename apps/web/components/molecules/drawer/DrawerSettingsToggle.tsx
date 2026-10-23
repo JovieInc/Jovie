@@ -67,9 +67,6 @@ export function DrawerSettingsToggle({
         {label}
       </label>
       <Switch
-        stateStyling='owner'
-        className='h-6 bg-transparent before:h-4 before:w-7 before:rounded-full before:border before:border-subtle before:bg-surface-2 data-[state=checked]:before:border-transparent data-[state=checked]:before:bg-btn-primary'
-        thumbClassName='relative'
         id={id}
         checked={checked}
         onCheckedChange={onCheckedChange}

@@ -33,11 +33,7 @@ export function ErrorDialog({
   error,
 }: ErrorDialogProps) {
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      className='bg-surface-1 p-6 shadow-xl ring-1 ring-subtle'
-    >
+    <Dialog open={open} onClose={onClose}>
       <div className='space-y-4' data-testid='app-error-dialog'>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>

@@ -50,7 +50,9 @@ export const ComboboxDropdown = forwardRef<
             className='px-4 py-3 text-sm text-secondary-token'
           >
             <div className='flex items-center space-x-2'>
-              <LoadingSpinner size='sm' className='text-tertiary-token' />
+              <span className='inline-flex text-tertiary-token'>
+                <LoadingSpinner size='sm' />
+              </span>
               <span>Searching artists...</span>
             </div>
           </HeadlessComboboxOption>

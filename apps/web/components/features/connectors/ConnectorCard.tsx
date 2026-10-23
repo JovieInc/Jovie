@@ -185,11 +185,6 @@ export function ConnectorCard({
             </span>
             <Badge
               variant={statusVariant}
-              className={
-                statusVariant === 'destructive'
-                  ? 'text-primary-token'
-                  : undefined
-              }
               size='sm'
               role='status'
               aria-label={`${definition.label} status: ${statusLabel}`}

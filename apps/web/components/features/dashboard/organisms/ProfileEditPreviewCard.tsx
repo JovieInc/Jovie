@@ -118,18 +118,20 @@ export function ProfileEditPreviewCard({
   // Show completed state
   if (applied) {
     return (
-      <ContentSurfaceCard className='p-3'>
-        <div className='flex items-center justify-between gap-2'>
-          <div className='min-w-0 space-y-0.5'>
-            <p className='truncate text-app font-semibold tracking-tight text-primary-token'>
-              {preview.fieldLabel}
-            </p>
-            <p className='text-xs text-secondary-token'>Updated</p>
+      <ContentSurfaceCard>
+        <div className='p-3'>
+          <div className='flex items-center justify-between gap-2'>
+            <div className='min-w-0 space-y-0.5'>
+              <p className='truncate text-app font-semibold tracking-tight text-primary-token'>
+                {preview.fieldLabel}
+              </p>
+              <p className='text-xs text-secondary-token'>Updated</p>
+            </div>
+            <span className='inline-flex shrink-0 items-center gap-1 rounded-md border border-subtle bg-surface-1 px-1.5 py-0.5 text-2xs font-caption tracking-tight text-success'>
+              <Check className='h-3.5 w-3.5' />
+              Applied
+            </span>
           </div>
-          <span className='inline-flex shrink-0 items-center gap-1 rounded-md border border-subtle bg-surface-1 px-1.5 py-0.5 text-2xs font-caption tracking-tight text-success'>
-            <Check className='h-3.5 w-3.5' />
-            Applied
-          </span>
         </div>
       </ContentSurfaceCard>
     );
@@ -138,19 +140,23 @@ export function ProfileEditPreviewCard({
   // Show cancelled state — single "Cancelled" verb (JOV-3551); keep field label + badge only
   if (cancelled) {
     return (
-      <ContentSurfaceCard className='p-3 opacity-70'>
-        <div className='flex items-center justify-between gap-2'>
-          <div className='min-w-0 space-y-0.5'>
-            <p className='truncate text-app font-semibold tracking-tight text-primary-token'>
-              {preview.fieldLabel}
-            </p>
+      <div className='opacity-70'>
+        <ContentSurfaceCard>
+          <div className='p-3'>
+            <div className='flex items-center justify-between gap-2'>
+              <div className='min-w-0 space-y-0.5'>
+                <p className='truncate text-app font-semibold tracking-tight text-primary-token'>
+                  {preview.fieldLabel}
+                </p>
+              </div>
+              <span className='inline-flex shrink-0 items-center gap-1 rounded-md bg-surface-0 px-1.5 py-0.5 text-2xs font-caption tracking-tight text-secondary-token'>
+                <X className='h-3.5 w-3.5' />
+                Cancelled
+              </span>
+            </div>
           </div>
-          <span className='inline-flex shrink-0 items-center gap-1 rounded-md bg-surface-0 px-1.5 py-0.5 text-2xs font-caption tracking-tight text-secondary-token'>
-            <X className='h-3.5 w-3.5' />
-            Cancelled
-          </span>
-        </div>
-      </ContentSurfaceCard>
+        </ContentSurfaceCard>
+      </div>
     );
   }
 
@@ -219,18 +225,18 @@ export function ProfileEditPreviewCard({
           tone='primary'
           onClick={handleApply}
           disabled={confirmEdit.isPending}
-          className='flex-1 justify-center gap-1.5'
+          className='flex-1 justify-center'
         >
           {confirmEdit.isPending ? (
-            <>
+            <span className='inline-flex items-center gap-1.5'>
               <Loader2 className='h-3.5 w-3.5 animate-spin' />
               Applying...
-            </>
+            </span>
           ) : (
-            <>
+            <span className='inline-flex items-center gap-1.5'>
               <Check className='h-3.5 w-3.5' />
               Apply
-            </>
+            </span>
           )}
         </DrawerButton>
         <DrawerButton
@@ -238,10 +244,12 @@ export function ProfileEditPreviewCard({
           tone='secondary'
           onClick={handleCancel}
           disabled={confirmEdit.isPending}
-          className='justify-center gap-1.5'
+          className='justify-center'
         >
-          <X className='h-3.5 w-3.5' />
-          Cancel
+          <span className='inline-flex items-center gap-1.5'>
+            <X className='h-3.5 w-3.5' />
+            Cancel
+          </span>
         </DrawerButton>
       </div>
     </ContentSurfaceCard>

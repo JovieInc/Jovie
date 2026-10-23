@@ -179,7 +179,7 @@ describe('ConnectorCard', () => {
       if (status === 'error') {
         expect(
           screen.getByRole('status', { name: 'Gmail status: Error' })
-        ).toHaveClass('text-primary-token');
+        ).toHaveClass('text-error-text');
       }
 
       const action = screen.getByRole('button', {
