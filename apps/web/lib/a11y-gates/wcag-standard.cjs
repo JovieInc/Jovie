@@ -164,6 +164,14 @@ function disabledRuleIds(surface, now = new Date()) {
     .map(entry => entry.ruleId);
 }
 
+/**
+ * @param {readonly string[]} [disabled]
+ * @param {Date} [now]
+ * @returns {{
+ *   runOnly: { type: 'tag', values: string[] },
+ *   rules: Record<string, { enabled: boolean }>
+ * }}
+ */
 function wcag22AaAxeOptions(disabled = [], now = new Date()) {
   const allowlist = loadAllowlist();
   assertAllowlist(allowlist, now);
