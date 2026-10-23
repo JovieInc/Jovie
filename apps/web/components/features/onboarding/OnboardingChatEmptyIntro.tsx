@@ -156,7 +156,7 @@ export function OnboardingChatEmptyIntro({
           <EntryProfileCard entry={entryProfile} />
         )}
         <div className='mb-6 text-center'>
-          <h1 className='text-lg font-medium text-primary-token'>
+          <h1 className='text-balance text-lg font-medium text-primary-token'>
             {copy.title}
           </h1>
           <p className='mx-auto mt-2 max-w-112 text-sm leading-6 text-secondary-token'>
@@ -198,7 +198,9 @@ export function OnboardingChatEmptyIntro({
       ) : null}
 
       <div className='mb-6 text-center'>
-        <h1 className='text-lg font-medium text-primary-token'>{copy.title}</h1>
+        <h1 className='text-balance text-lg font-medium text-primary-token'>
+          {copy.title}
+        </h1>
         {!isBlank && copy.support ? (
           <p className='mt-2 text-sm leading-6 text-secondary-token'>
             {copy.support}
