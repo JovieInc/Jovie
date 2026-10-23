@@ -7,11 +7,12 @@ import {
   buildFaqSchema,
   buildOrganizationSchema,
 } from '@/lib/constants/schemas';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: ABOUT_COPY.metadataTitle,
+  title: documentTitle(ABOUT_COPY.metadataTitle),
   description: ABOUT_COPY.metadataDescription,
   keywords: [...ABOUT_COPY.keywords],
   alternates: {
