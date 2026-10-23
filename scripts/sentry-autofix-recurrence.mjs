@@ -420,7 +420,8 @@ export async function fetchWithRetry(
  *   sleepImpl?: (ms: number) => Promise<void>,
  * }} [options]
  * @returns {Promise<{ok: boolean, reason?: string, currentMainSha?: string,
- * results?: object[], observations?: Awaited<ReturnType<typeof runSentryValidationObservations>>}>}
+ * results?: object[], deferred?: import('./lib/sentry-validation-observation.mjs').ObservationDeferral,
+ * observations?: Awaited<ReturnType<typeof runSentryValidationObservations>>}>}}
  */
 export async function runSentryAutofixRecurrence({
   githubToken = process.env.GH_TOKEN,
@@ -462,6 +463,7 @@ export async function runSentryAutofixRecurrence({
       ok: observations.ok,
       results: [],
       observations,
+      ...(observations.deferred ? { deferred: observations.deferred } : {}),
       ...(!observations.ok ? { reason: observations.reason } : {}),
     };
 
@@ -629,6 +631,7 @@ export async function runSentryAutofixRecurrence({
     currentMainSha,
     results,
     ...(observations ? { observations } : {}),
+    ...(observations?.deferred ? { deferred: observations.deferred } : {}),
     ...(observations && !observations.ok
       ? { reason: observations.reason }
       : {}),

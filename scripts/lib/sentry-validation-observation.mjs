@@ -26,6 +26,8 @@ const SENTRY_API = 'https://sentry.io/api/0';
  * incidents: { shortId: string, issueId?: string }[],
  * originalObservation?: ObservationPlan }} ObservationPlan */
 /** @typedef {{ status: 'unknown', reason: string }} UnknownObservation */
+/** @typedef {{ reason: 'verified_production_artifact_pending', sha: string,
+ * detail?: string, retry: string }} ObservationDeferral */
 /** @typedef {UnknownObservation | { status: 'pending', reason: string, earliestCompletion?: string }
  * | { status: 'fail', reason: string, source: string, release: string, evidence: string }} ObservationResult */
 /** @typedef {{sha: string, evidence: string, recordedAt: string, bindingSha: string,
@@ -651,6 +653,9 @@ export async function collectObservationCoverage({ plan, now, sentry }) {
  * @param {{apiKey?: string, githubToken?: string, sentryToken?: string,
  * repository?: string, now?: Date, fetchImpl?: typeof fetch, facts?: ObservationFacts,
  * writeReceipts?: boolean, recordReceipt?: typeof recordValidationReceipt}} options
+ * @returns {Promise<{ok: boolean, results: object[],
+ *   artifact?: {status: string, sha: string | null}, reason?: string,
+ *   deferred?: ObservationDeferral}>}
  */
 export async function runSentryValidationObservations({
   apiKey,
@@ -678,6 +683,25 @@ export async function runSentryValidationObservations({
       });
     const served = await facts.servedGeneration();
     const artifact = { status: served.status, sha: served.sha ?? null };
+    if (artifact.status === 'pending' && FULL_SHA.test(artifact.sha ?? '')) {
+      // The clock fires around deploy time: a served build that resolved to a
+      // commit but has not yet been marked Production Verified is an expected
+      // promotion transient, not a red run. Defer this tick — the hourly
+      // backstop and the Gem lanes clock re-dispatch until the marker lands.
+      return {
+        ok: true,
+        artifact,
+        results,
+        deferred: {
+          reason: 'verified_production_artifact_pending',
+          sha: artifact.sha,
+          ...(typeof served.detail === 'string'
+            ? { detail: served.detail }
+            : {}),
+          retry: 'next sentry-autofix-recurrence clock tick re-dispatches',
+        },
+      };
+    }
     if (artifact.status !== 'verified' || !FULL_SHA.test(artifact.sha ?? ''))
       return {
         ok: false,

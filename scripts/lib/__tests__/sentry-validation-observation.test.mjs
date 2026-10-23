@@ -1326,6 +1326,63 @@ describe('existing recurrence producer owner handoff', () => {
   });
 });
 
+describe('verified production artifact gating', () => {
+  it('defers a pending served build non-fatally without scanning Sentry history', async () => {
+    const h = harness();
+    h.facts.servedGeneration.mockResolvedValue({
+      status: 'pending',
+      sha: ARTIFACT,
+      detail: `served build ${ARTIFACT.slice(0, 12)} has no Production Verified marker`,
+    });
+    const result = await runSentryValidationObservations(h.options);
+    expect(result).toMatchObject({
+      ok: true,
+      artifact: { status: 'pending', sha: ARTIFACT },
+      deferred: {
+        reason: 'verified_production_artifact_pending',
+        sha: ARTIFACT,
+        detail: `served build ${ARTIFACT.slice(0, 12)} has no Production Verified marker`,
+      },
+    });
+    expect(result.deferred.retry).toContain('clock tick');
+    expect(result.results).toEqual([]);
+    expect(h.recordReceipt).not.toHaveBeenCalled();
+    // Deferral happens before any Sentry event-history read.
+    expect(
+      h.fetchImpl.mock.calls.every(
+        ([url]) => !String(url).includes('sentry.io/api/0')
+      )
+    ).toBe(true);
+  });
+
+  it('still fails closed when the artifact is unknown or pending without a resolvable sha', async () => {
+    for (const served of [
+      { status: 'unknown', detail: 'production version HTTP 503' },
+      { status: 'unknown', sha: ARTIFACT },
+      { status: 'pending', sha: '224c791e' },
+    ]) {
+      const h = harness();
+      h.facts.servedGeneration.mockResolvedValue(served);
+      const result = await runSentryValidationObservations(h.options);
+      expect(result).toMatchObject({
+        ok: false,
+        reason: 'verified_production_artifact_unavailable',
+        artifact: { status: served.status },
+      });
+      expect(result.deferred).toBeUndefined();
+      expect(h.recordReceipt).not.toHaveBeenCalled();
+    }
+  });
+
+  it('runs observations without a deferred summary once the artifact verifies', async () => {
+    const h = harness();
+    const result = await runSentryValidationObservations(h.options);
+    expect(result.ok).toBe(true);
+    expect(result.artifact).toEqual({ status: 'verified', sha: ARTIFACT });
+    expect(result.deferred).toBeUndefined();
+  });
+});
+
 describe('supplementary existing-authority error coverage join', () => {
   const now = new Date('2026-10-16T15:22:48Z');
   const stats = () => ({
