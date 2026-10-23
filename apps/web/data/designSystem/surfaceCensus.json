@@ -89,7 +89,9 @@
       "status": "holdout",
       "owner": "@itstimwhite",
       "issue": "JOV-8392",
-      "expectedOwners": ["apps/web/components/features/auth/AuthLayout.tsx"],
+      "expectedOwners": [
+        "apps/web/components/features/auth/AuthLayout.tsx"
+      ],
       "divergence": "Auth and native-return states have not been certified in this census.",
       "remainingScope": "Auth and native-return states have not been certified in this census.",
       "evidence": {
@@ -125,7 +127,9 @@
       "status": "holdout",
       "owner": "@itstimwhite",
       "issue": "JOV-8392",
-      "expectedOwners": ["apps/web/components/features/auth/AuthLayout.tsx"],
+      "expectedOwners": [
+        "apps/web/components/features/auth/AuthLayout.tsx"
+      ],
       "divergence": "Checkout/return states require shell and interaction audit; preserve billing semantics.",
       "remainingScope": "Checkout/return states require shell and interaction audit; preserve billing semantics.",
       "evidence": {
@@ -165,7 +169,9 @@
         "at": "2026-10-20T22:14:00Z",
         "ref": "334dc8c4413326cad5832ed2b0e74780da7e3467:apps/web/app/claim/page.tsx"
       },
-      "sources": ["apps/web/app/claim/page.tsx"]
+      "sources": [
+        "apps/web/app/claim/page.tsx"
+      ]
     },
     {
       "id": "home",
@@ -178,7 +184,9 @@
       "status": "holdout",
       "owner": "@itstimwhite",
       "issue": "JOV-8101",
-      "expectedOwners": ["apps/web/components/site/PublicPageShell.tsx"],
+      "expectedOwners": [
+        "apps/web/components/site/PublicPageShell.tsx"
+      ],
       "divergence": "Homepage source registration does not certify current responsive and interaction states.",
       "remainingScope": "Homepage source registration does not certify current responsive and interaction states.",
       "evidence": {
@@ -186,7 +194,9 @@
         "at": "2026-10-15T04:36:00Z",
         "ref": "48075f7f958"
       },
-      "sources": ["apps/web/app/(home)/page.tsx"]
+      "sources": [
+        "apps/web/app/(home)/page.tsx"
+      ]
     },
     {
       "id": "investor",
@@ -199,7 +209,9 @@
       "status": "holdout",
       "owner": "@itstimwhite",
       "issue": "JOV-8392",
-      "expectedOwners": ["apps/web/components/organisms/DocPage.tsx"],
+      "expectedOwners": [
+        "apps/web/components/organisms/DocPage.tsx"
+      ],
       "divergence": "Private portal composition and document states require audit.",
       "remainingScope": "Private portal composition and document states require audit.",
       "evidence": {
@@ -311,7 +323,9 @@
       "status": "holdout",
       "owner": "@itstimwhite",
       "issue": "JOV-8392",
-      "expectedOwners": ["apps/web/components/features/auth/AuthLayout.tsx"],
+      "expectedOwners": [
+        "apps/web/components/features/auth/AuthLayout.tsx"
+      ],
       "divergence": "Onboarding/loading/error/checkout state certification outstanding.",
       "remainingScope": "Onboarding/loading/error/checkout state certification outstanding.",
       "evidence": {
@@ -339,7 +353,9 @@
       "status": "holdout",
       "owner": "@itstimwhite",
       "issue": "JOV-8098",
-      "expectedOwners": ["apps/web/components/organisms/AppShellFrame.tsx"],
+      "expectedOwners": [
+        "apps/web/components/organisms/AppShellFrame.tsx"
+      ],
       "divergence": "Standalone HUD/operator surfaces require canonical shell audit.",
       "remainingScope": "Standalone HUD/operator surfaces require canonical shell audit.",
       "evidence": {
@@ -381,11 +397,13 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-23T07:48:45.448Z",
-        "ref": "PR 22741 rounded-media renewal: exact-source 7db92251ffdeb0c448a3081d9f4e324d6cc72c2d production-build Playwright /pricing desktop 1440x900 and mobile 390x844 DOM/contrast receipts, zero findings; https://github.com/JovieInc/Jovie/actions/runs/39919560122/artifacts/12485938109; prior JOV-8097 interaction states unchanged",
-        "sourceDigest": "4a1953d5fed4f632e76e32041ddeec7d0c4fcd067cc84ab967608af30f71ae2c"
+        "at": "2026-10-23T08:14:57.640Z",
+        "ref": "PR 22741 rounded-media renewal after the main merge (footer #22727): exact-source fdef998ff6270246923cc01af76e87a7af8139fe PR Visual Review production-build capture (desktop + mobile) on the changed marketing surfaces; fail-closed evidence gate completed success, zero findings; https://github.com/JovieInc/Jovie/actions/runs/39921828523/artifacts/12488081620; prior JOV-8097 interaction states unchanged",
+        "sourceDigest": "e66fa65ce71b5fe1d9989871ab8984c1038733ccc04c09ce9098b50d78bdbbd5"
       },
-      "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
+      "sources": [
+        "apps/web/app/(marketing)/pricing/page.tsx"
+      ]
     },
     {
       "id": "product",
@@ -521,7 +539,9 @@
       "status": "holdout",
       "owner": "@itstimwhite",
       "issue": "JOV-8101",
-      "expectedOwners": ["apps/web/components/site/PublicPageShell.tsx"],
+      "expectedOwners": [
+        "apps/web/components/site/PublicPageShell.tsx"
+      ],
       "divergence": "Directory and playlist content shells require current certification.",
       "remainingScope": "Directory and playlist content shells require current certification.",
       "evidence": {
@@ -548,7 +568,9 @@
       "status": "holdout",
       "owner": "@itstimwhite",
       "issue": "JOV-8392",
-      "expectedOwners": ["apps/web/components/organisms/DocPage.tsx"],
+      "expectedOwners": [
+        "apps/web/components/organisms/DocPage.tsx"
+      ],
       "divergence": "Redirect, report and shared-link entrypoints require explicit destination/state audit.",
       "remainingScope": "Redirect, report and shared-link entrypoints require explicit destination/state audit.",
       "evidence": {
