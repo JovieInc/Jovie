@@ -24,7 +24,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
   const description = COMPANY_IDENTITY.seoDescription;
   const keywords = [
-    'artist profile',
     'Jovie profile',
     'online identity',
     'public profile',
