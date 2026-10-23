@@ -213,6 +213,44 @@ jobs:
             --retries=0 \
             -g "deliberate-red|$tests"
 
+      # The exact-route capture (console errors, HTTP/request failures,
+      # registered axe quality checks per marketing route) ran only on main
+      # push in screenshots.yml, so failing feature pages merged untested and
+      # re-reddened main. Run the same spec, config and flags here, on the
+      # server above, for any PR that changes marketing inputs. Nothing is
+      # skipped or excluded; the merge queue repeats it in ci.yml.
+      - name: Capture exact marketing routes (marketing-routes.spec.ts)
+        id: marketing_routes
+        if: steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success'
+        env:
+          BASE_URL: http://127.0.0.1:3100
+          SCREENSHOT_BUILD_MODE: pr-premerge
+        run: |
+          set -euo pipefail
+          marketing_surface='^(apps/web/(app/\((marketing|home)\)/|components/(marketing|site|homepage)/|data/marketing/|styles/|lib/agent-os/visual-qa/|tests/product-screenshots/(marketing-routes|helpers|source-provenance)|tests/visual-qa/)|packages/ui/|\.github/workflows/pr-visual-review\.yml)'
+          if ! grep -Eq "$marketing_surface" "$RUNNER_TEMP/changed-files.txt"; then
+            echo "No marketing input changed; exact route capture skipped."
+            exit 0
+          fi
+          # Exact-head provenance refuses a dirty tree and the build can dirty
+          # tracked files. Restore cleanliness, keeping this lane's own
+          # evidence and the test output out of git's view.
+          printf 'pr-visual-artifacts/\napps/web/test-results/\n' >> .git/info/exclude
+          git checkout -- .
+          git clean -fd -e pr-visual-artifacts -e apps/web/test-results
+          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+            echo "::error::Source tree is dirty after restore; exact-route capture requires a clean checkout."
+            git status --porcelain --untracked-files=all
+            exit 1
+          fi
+          cd apps/web
+          pnpm exec playwright test \
+            tests/product-screenshots/marketing-routes.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=4 \
+            --retries=0
+
       # JOV-7713: per-PR screen audit manifest for the Validating lifecycle
       # (changed inventory screens, their producer, invalidated UI matrix
       # rows) plus the audit ledger over this run's route DOM receipts.

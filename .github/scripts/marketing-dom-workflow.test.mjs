@@ -131,3 +131,39 @@ test('compare job also runs the exact marketing route spec pre-merge, unskipped 
     assert.ok(capture.run.includes(part), `pre-merge capture lost ${part}`);
   }
 });
+test('PR visual review lane runs the same exact marketing route spec on PRs, unskipped', () => {
+  const lane = load(
+    readFileSync(
+      new URL('../workflows/pr-visual-review.yml', import.meta.url),
+      'utf8'
+    )
+  ).jobs.capture;
+  const capture = lane.steps.find(
+    s => s.name === 'Capture exact marketing routes (marketing-routes.spec.ts)'
+  );
+  assert.ok(capture, 'PR-time exact-route capture step is missing');
+  assert.equal(
+    capture.continueOnError ?? capture['continue-on-error'],
+    undefined
+  );
+  assert.doesNotMatch(
+    capture.run,
+    /--grep|-g |--grep-invert|--project=(?!screenshots)/
+  );
+  const production = load(
+    readFileSync(
+      new URL('../workflows/screenshots.yml', import.meta.url),
+      'utf8'
+    )
+  ).jobs.generate.steps.find(s => s.name === 'Capture exact marketing routes');
+  for (const part of [
+    'tests/product-screenshots/marketing-routes.spec.ts',
+    '--config=playwright.config.screenshots.ts',
+    '--project=screenshots',
+    '--workers=4',
+  ]) {
+    assert.ok(production.run.includes(part), `screenshots.yml lost ${part}`);
+    assert.ok(capture.run.includes(part), `PR-time capture lost ${part}`);
+  }
+  assert.match(capture.run, /--retries=0/);
+});

@@ -1616,7 +1616,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    timeout-minutes: 30
+    timeout-minutes: 25
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
       PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'

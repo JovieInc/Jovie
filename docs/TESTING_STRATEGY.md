@@ -330,12 +330,17 @@ Sensitive changes are classified deterministically on source PRs. Smoke and prev
 
 ### Pre-merge exact marketing route capture
 
-When a PR or merge-group head selects marketing inputs (`run_marketing_dom`),
-`Visual Snapshot Compare` also runs `tests/product-screenshots/marketing-routes.spec.ts`
-unchanged (every registered route, console/HTTP/axe quality checks, no retries)
-on the build it already made. `PR Ready` requires that job whenever marketing
-inputs are selected, so no ruleset change is needed. Before this, the same spec
-ran only on main push in `screenshots.yml` and feature pages merged untested.
+`tests/product-screenshots/marketing-routes.spec.ts` (every registered marketing
+route, console/HTTP/axe quality checks, no retries) used to run only on main push
+in `screenshots.yml`, so failing feature pages merged untested. It now also runs
+before merge, unchanged, in two places on builds those lanes already make:
+
+- PRs that change marketing inputs: `PR Visual Review` -> `Capture changed UI
+  (desktop + mobile)` -> step `Capture exact marketing routes (marketing-routes.spec.ts)`.
+- The merge queue (`run_marketing_dom`): `Visual Snapshot Compare` -> the same
+  step name. `PR Ready` requires that job whenever marketing inputs are
+  selected, so a failing route is ejected from the queue before it reaches main.
+
 Keep the spec, config and flags identical to `screenshots.yml`'s
 `Capture exact marketing routes` step; `.github/scripts/marketing-dom-workflow.test.mjs`
 fails if they drift.
