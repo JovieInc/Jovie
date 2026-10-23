@@ -379,9 +379,15 @@ export function run(root = process.cwd(), baseRef = 'origin/main') {
   const findings = files.flatMap(path =>
     scan(path, readFileSync(join(root, path), 'utf8'))
   );
-  const baseline = JSON.parse(
-    readFileSync(join(root, POLICY, 'baseline.json'), 'utf8')
-  );
+  // Absence permits zero debt; malformed or unreadable baselines still fail.
+  let baseline = { schema: config.schema, entries: {} };
+  try {
+    baseline = JSON.parse(
+      readFileSync(join(root, POLICY, 'baseline.json'), 'utf8')
+    );
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
   // Missing base ref is an error. Only the first introduction may lack a baseline.
   git(['rev-parse', '--verify', baseRef]);
   const base = git([

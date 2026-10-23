@@ -212,7 +212,6 @@ test('deliberate-red CLI proof: a tracked production route exits 1; clean exits 
     );
     mkdirSync(join(root, POLICY), { recursive: true });
     mkdirSync(join(root, 'apps/web/app/demo/copy'), { recursive: true });
-    writeFileSync(join(root, POLICY, 'baseline.json'), JSON.stringify(clean));
     writeFileSync(join(root, fixture), 'export const title = "Listen now";');
     git(['init', '-q']);
     git(['add', 'apps', 'scripts']);
@@ -228,8 +227,22 @@ test('deliberate-red CLI proof: a tracked production route exits 1; clean exits 
       'fixture',
     ]);
     git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    // No baseline means zero debt, including the guard's first introduction.
+    assert.equal(run(root, 'HEAD'), 0);
+    const baselinePath = join(root, POLICY, 'baseline.json');
+    writeFileSync(baselinePath, '{');
+    assert.throws(() => run(root, 'HEAD'), SyntaxError);
+    writeFileSync(baselinePath, JSON.stringify({ schema: 'invalid' }));
+    assert.throws(() => run(root, 'HEAD'), /schema/);
+    writeFileSync(baselinePath, JSON.stringify(clean));
     assert.equal(run(root, 'HEAD'), 0);
     writeFileSync(join(root, fixture), `export const headline = '${bad}';`);
+    const entries = Object.fromEntries(
+      scan(fixture, `export const headline = '${bad}';`).map(h => [h.key, 1])
+    );
+    writeFileSync(baselinePath, JSON.stringify({ ...clean, entries }));
+    assert.equal(run(root, 'HEAD'), 1);
+    rmSync(baselinePath);
     const result = spawnSync(process.execPath, [script], {
       cwd: root,
       encoding: 'utf8',
