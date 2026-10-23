@@ -456,8 +456,12 @@ describe('first-load JS budgets', () => {
     lowered.firstLoad.baselines['/about'] = 85;
     expect(grownBudgetNumbers(lowered, budgets, NOW)).toEqual([]);
 
-    const withoutBaselines = structuredClone(budgets);
-    delete withoutBaselines.firstLoad.baselines;
+    const { baselines: _baselines, ...firstLoadWithoutBaselines } =
+      structuredClone(budgets.firstLoad);
+    const withoutBaselines = {
+      ...structuredClone(budgets),
+      firstLoad: firstLoadWithoutBaselines,
+    };
     expect(grownBudgetNumbers(budgets, withoutBaselines, NOW)).toEqual([]);
 
     const unmeasured = evaluateBudgets({
