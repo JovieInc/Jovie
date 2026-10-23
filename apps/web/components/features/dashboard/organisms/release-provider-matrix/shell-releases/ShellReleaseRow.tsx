@@ -82,9 +82,9 @@ export const shellReleaseRowTypography = {
   // min-h-6 keeps the title target at the 24px WCAG 2.5.8 floor inside the
   // dense h-8 row (axe target-size is enabled at WCAG 2.2 AA and cannot be
   // allowlisted); items-center on the hover link keeps the glyphs centered.
-  title:
+  titleClassName:
     'truncate text-app font-caption text-primary-token leading-[1.2] min-h-6',
-  subtitle: 'truncate text-2xs text-tertiary-token leading-[1.3]',
+  subtitleClassName: 'truncate text-2xs text-tertiary-token leading-[1.3]',
 } as const;
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
@@ -397,7 +397,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
           <EntityHoverLink
             entity={releaseEntity}
             className={cn(
-              shellReleaseRowTypography.title,
+              shellReleaseRowTypography.titleClassName,
               'inline-flex min-w-0 hover:no-underline'
             )}
           >
@@ -413,7 +413,10 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
                 ·
               </span>
               <span
-                className={cn(shellReleaseRowTypography.subtitle, 'min-w-0')}
+                className={cn(
+                  shellReleaseRowTypography.subtitleClassName,
+                  'min-w-0'
+                )}
               >
                 {artistLabel}
               </span>
