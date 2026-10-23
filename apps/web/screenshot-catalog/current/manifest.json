@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-23T00:31:41.344Z",
-    "gitSha": "f2748cdd1ce87ae67e4a446a7d5f99164c39499a",
+    "capturedAt": "2026-10-23T02:35:26.698Z",
+    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
     "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
   {
@@ -192,8 +192,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-23T01:45:43.139Z",
-    "gitSha": "6a26ad9fc099ada3e11faa75135d3375dbae2248",
+    "capturedAt": "2026-10-23T02:36:21.455Z",
+    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
     "imagePath": "artist-profile-how-it-works-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-23T01:46:32.680Z",
-    "gitSha": "6a26ad9fc099ada3e11faa75135d3375dbae2248",
+    "capturedAt": "2026-10-23T02:37:12.854Z",
+    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -609,8 +609,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-10-23T01:48:19.189Z",
-    "gitSha": "6a26ad9fc099ada3e11faa75135d3375dbae2248",
+    "capturedAt": "2026-10-23T02:39:08.807Z",
+    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
   },
@@ -626,8 +626,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-10-23T01:48:25.627Z",
-    "gitSha": "6a26ad9fc099ada3e11faa75135d3375dbae2248",
+    "capturedAt": "2026-10-23T02:39:15.753Z",
+    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
   },
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-10-23T01:48:44.781Z",
-    "gitSha": "6a26ad9fc099ada3e11faa75135d3375dbae2248",
+    "capturedAt": "2026-10-23T02:39:36.062Z",
+    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -710,8 +710,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-23T01:48:52.226Z",
-    "gitSha": "6a26ad9fc099ada3e11faa75135d3375dbae2248",
+    "capturedAt": "2026-10-23T02:39:44.275Z",
+    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
     "imagePath": "dashboard-earnings-desktop.png"
   },
   {
@@ -726,8 +726,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin"],
-    "capturedAt": "2026-10-23T01:48:55.857Z",
-    "gitSha": "6a26ad9fc099ada3e11faa75135d3375dbae2248",
+    "capturedAt": "2026-10-23T02:39:48.371Z",
+    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
     "imagePath": "settings-profile-desktop.png"
   },
   {
@@ -742,8 +742,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-23T01:48:59.472Z",
-    "gitSha": "6a26ad9fc099ada3e11faa75135d3375dbae2248",
+    "capturedAt": "2026-10-23T02:39:52.319Z",
+    "gitSha": "814306a8c832b4f8940251465a522df90d7ebde1",
     "imagePath": "settings-links-desktop.png"
   },
   {
