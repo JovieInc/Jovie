@@ -31,11 +31,8 @@ describe('DownloadPage hero layout', () => {
 
     expect(document.body.textContent).not.toMatch(/\bnative\b/i);
     expect(
-      screen.getByRole('heading', {
-        level: 2,
-        name: 'Mac desktop\u00a0workspace',
-      })
+      screen.getByRole('heading', { level: 2, name: 'Mac workspace' })
     ).toBeInTheDocument();
-    expect(screen.getByText(/Open the Mac app today\./)).toBeInTheDocument();
+    expect(screen.getByText(/Download the Mac app\./)).toBeInTheDocument();
   });
 });

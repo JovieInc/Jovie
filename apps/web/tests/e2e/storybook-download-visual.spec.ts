@@ -22,7 +22,7 @@ for (const viewport of [
         name: 'Jovie, Installed Where You Work.',
       })
     ).toBeVisible();
-    await expect(hero.getByText(/Open the Mac app today\./)).toBeVisible();
+    await expect(hero.getByText(/Download the Mac app\./)).toBeVisible();
     await expect(surface).not.toContainText(/\bnative\b/i);
     await page.evaluate(() => document.fonts.ready);
     await prepareImagesForScreenshot(page);
@@ -38,7 +38,7 @@ for (const viewport of [
 
     const platformHeading = surface.getByRole('heading', {
       level: 2,
-      name: /^Mac desktop\s+workspace$/,
+      name: /^Mac workspace$/,
     });
     await platformHeading.scrollIntoViewIfNeeded();
     await expect(platformHeading).toBeVisible();
