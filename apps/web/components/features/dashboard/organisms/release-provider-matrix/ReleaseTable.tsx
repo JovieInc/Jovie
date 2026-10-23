@@ -53,7 +53,8 @@ export function ReleaseTable({
   onGeneratePitch,
   onChangeStatus,
   columnVisibility,
-  rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
+  rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
+  rowMode,
   onFocusedRowChange,
   showTracks = false,
   groupByYear = false,
@@ -226,7 +227,8 @@ export function ReleaseTable({
           onGeneratePitch={onGeneratePitch}
           onChangeStatus={onChangeStatus}
           columnVisibility={columnVisibility}
-          rowHeight={rowHeight}
+          rowHeight={rowMode ? undefined : rowHeight}
+          rowMode={rowMode}
           onFocusedRowChange={onFocusedRowChange}
           showTracks={showTracks}
           groupByYear={groupByYear}
@@ -287,7 +289,8 @@ export function ReleaseTable({
       getRowTestId={getRowTestId}
       getRowClassName={getRowClassName}
       enableVirtualization={!groupByYear}
-      rowHeight={rowHeight}
+      rowHeight={rowMode ? undefined : rowHeight}
+      rowMode={rowMode}
       minWidth={minWidth}
       hideHeader
       caption='Releases'

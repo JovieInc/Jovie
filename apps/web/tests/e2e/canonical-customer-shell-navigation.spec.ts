@@ -98,6 +98,17 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
     { width: 768, height: 1024 },
   ]) {
     await page.setViewportSize(viewport);
+    // The ?panel=profile deep link leaves the profile rail open. Below lg
+    // it presents as a modal sheet whose focus boundary marks the shell
+    // inert + aria-hidden, so landmark role queries cannot resolve while
+    // it is up. Dismiss the sheet (a chat rail stays closed until its next
+    // explicit action, JOV-7150) and assert the nav contract on the
+    // exposed shell.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#shell-artist-profile-rail')).toHaveAttribute(
+      'data-rail-phase',
+      'closed'
+    );
     const tabs = page.getByRole('navigation', { name: 'Dashboard Tabs' });
     await expect(tabs).toBeVisible();
     await expect(

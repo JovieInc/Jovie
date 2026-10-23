@@ -1215,7 +1215,7 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
   }
   assert.equal(
     workflow.jobs.ready.steps[0].run,
-    'test "$RESULTS" = \'success,success,success,success,success\''
+    'test "$RESULTS" = \'success,success,success,success,success,success\''
   );
 });
 
@@ -1420,6 +1420,88 @@ test('affected unit tests gate PR Ready and select only unit-affecting diffs (JO
       'false',
       'false',
       'false'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('UI-path axe gate blocks PR Ready and stays quiet for non-UI diffs', () => {
+  const workflow = sourceValidationWorkflow();
+  const job = workflow.jobs.a11y;
+  assert.equal(job.name, 'A11y (UI paths)');
+  assert.equal(job['continue-on-error'], undefined);
+  assert.equal(job.if, undefined);
+  assert.deepEqual(workflow.jobs.ready.needs, [
+    'deterministic',
+    'security',
+    'migration',
+    'coverage',
+    'unit',
+    'a11y',
+  ]);
+  const run = job.steps.find(
+    step => step.name === 'Run rendered WCAG 2.2 AA gate'
+  );
+  assert.match(run.run, /playwright\.a11y-gate\.config\.ts/);
+  assert.match(run.if, /steps\.scope\.outputs\.ui == 'true'/);
+  assert.equal(run['continue-on-error'], undefined);
+  assert.match(
+    workflow.jobs.deterministic.steps.find(
+      step => step.name === 'Run deterministic source contract'
+    ).run,
+    /node apps\/web\/scripts\/a11y-wcag-standard-check\.cjs/
+  );
+  const script = job.steps
+    .find(step => step.id === 'scope')
+    .run.replace(/\$\{\{\s*github\.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-a11y-scope-'));
+  const repo = join(root, 'repo');
+  mkdirSync(repo, { recursive: true });
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  const write = path => {
+    mkdirSync(join(repo, path, '..'), { recursive: true });
+    writeFileSync(join(repo, path), `${path}\n`);
+  };
+  try {
+    git('init', '--quiet', '--initial-branch=main');
+    git('config', 'user.name', 'A11y scope test');
+    git('config', 'user.email', 'a11y-scope@example.invalid');
+    write('README.md');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'base');
+    git('remote', 'add', 'origin', repo);
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    const scope = paths => {
+      git('checkout', '--quiet', '-B', 'head', 'origin/main');
+      for (const path of paths) write(path);
+      git('add', '.');
+      git('commit', '--quiet', '--allow-empty', '-m', 'head');
+      const output = join(root, `output-${Math.random()}`);
+      const result = spawnSync('/bin/bash', ['-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          GITHUB_OUTPUT: output,
+        },
+      });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      return readFileSync(output, 'utf8');
+    };
+    assert.match(scope(['README.md']), /ui=false/);
+    assert.match(scope(['apps/web/lib/billing/plan.ts']), /ui=false/);
+    assert.match(scope(['apps/web/components/Button.tsx']), /ui=true/);
+    assert.match(scope(['docs/ACCESSIBILITY.md']), /ui=true/);
+    assert.match(
+      scope(['apps/web/lib/a11y-gates/wcag-standard.cjs']),
+      /ui=true/
+    );
+    assert.match(
+      scope(['apps/web/scripts/a11y-wcag-standard-check.cjs']),
+      /ui=true/
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

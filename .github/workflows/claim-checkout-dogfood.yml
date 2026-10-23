@@ -1,7 +1,7 @@
 name: Claim Checkout Dogfood
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: Staging Controller completion is the only event that says a new main generation reached staging; this hop runs the $12 claim journey in a browser for that exact SHA against an ephemeral Neon branch with Stripe test mode and the local test-auth bypass. It holds Stripe test, Neon and Linear/Slack secrets only; no production credential, no deploy permission.
+# necessary-trust-boundary: Staging Controller completion is the only event that says a new main generation reached staging; this hop runs the $12 claim journey in a browser for that exact SHA against an ephemeral Neon branch with Stripe test mode and the local test-auth bypass. It holds Stripe test, Neon, protected database comparison references and existing Linear/Slack intake secrets; no deploy permission.
 # removal-trigger: Remove the hop when Staging Controller runs the claim dogfood as its own post-alias job.
 #
 # Tim, 2026-10-21: the end-to-end claim check is a dogfood process run by
@@ -68,6 +68,7 @@ jobs:
           echo "RECEIPT_DIR=$RUNNER_TEMP/claim-dogfood-receipts" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/claim-dogfood-receipts"
           echo "JOB_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+          echo "DOGFOOD_RESOLVED_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -86,18 +87,57 @@ jobs:
         id: resolve-db
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
-          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
-          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+          # Branch credentials come only from the action's private artifact.
+          # Shared database credentials are comparison references, never fallback.
+          connection_file: ${{ steps.neon-branch.outputs.connection_file }}
+          candidate_json_key: db_url_pooled
+          fallback_json_key: db_url
 
       - name: Export DATABASE_URL
+        env:
+          RESOLVED_DATABASE_URL: ${{ steps.resolve-db.outputs.database_url }}
         run: |
-          if [ -z "${{ steps.resolve-db.outputs.database_url }}" ]; then
+          if [ -z "$RESOLVED_DATABASE_URL" ]; then
             echo "::error::No ephemeral Neon DATABASE_URL. Refusing to run the dogfood against a shared database."
             exit 1
           fi
-          echo "DATABASE_URL=${{ steps.resolve-db.outputs.database_url }}" >> "$GITHUB_ENV"
+          printf 'DATABASE_URL=%s\n' "$RESOLVED_DATABASE_URL" >> "$GITHUB_ENV"
+
+      - name: Emit isolated claim-test admission
+        env:
+          BRANCH_NAME: claim-dogfood-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          node scripts/ci/preview-env-admission.mjs emit-admission \
+            --kind neon-branch --work-id scheduled-evidence \
+            --sha "$DOGFOOD_RESOLVED_SHA" \
+            --policy "event-driven or manual claim checkout dogfood" \
+            --reason "Isolated synthetic claim and Stripe test persistence; shared staging is production-backed." \
+            --evidence "Claim/billing integration, local auth bypass and signed fixture webhook; not real OTP signup." \
+            --owner "revenue path / checkout-dogfood" \
+            --surface "Runner-local claim test database" --environment "$BRANCH_NAME" \
+            --ttl-hours 2 --cleanup-trigger terminal-proof \
+            --cleanup-proof "Run-owned branch disposition receipt" \
+            --cost-budget "One branch, existing two-hour maximum" \
+            --out "$RUNNER_TEMP/claim-dogfood-admission.json"
+
+      - name: Verify isolated claim-test target before writes
+        env:
+          CLAIM_CONNECTION_FILE: ${{ steps.neon-branch.outputs.connection_file }}
+          CLAIM_ADMISSION_FILE: ${{ runner.temp }}/claim-dogfood-admission.json
+          CLAIM_ENV_RECEIPT: ${{ runner.temp }}/claim-dogfood-receipts/environment-check.json
+          CLAIM_EXPECTED_BRANCH_ID: ${{ steps.neon-branch.outputs.branch_id }}
+          CLAIM_EXPECTED_BRANCH_NAME: claim-dogfood-${{ github.run_id }}-${{ github.run_attempt }}
+          CLAIM_APP_ORIGIN: http://localhost:3260
+          CLAIM_AUTH_MODE: local-test-auth-bypass
+          PROTECTED_DATABASE_URL: ${{ secrets.DATABASE_URL_MAIN }}
+          PROTECTED_FALLBACK_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv
+          STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: price_1USkjzASl9B9udHvEYkZLYZp
+        run: |
+          chmod 600 "$CLAIM_CONNECTION_FILE"
+          node scripts/claim-test-environment.mjs
 
       - name: Run migrations (ephemeral Neon)
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
@@ -200,7 +240,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: claim-dogfood-receipts
-          path: ${{ runner.temp }}/claim-dogfood-receipts/stage-events.ndjson
+          path: |
+            ${{ runner.temp }}/claim-dogfood-receipts/stage-events.ndjson
+            ${{ runner.temp }}/claim-dogfood-receipts/environment-check.json
           if-no-files-found: warn
           retention-days: 30
 
