@@ -4,6 +4,7 @@ import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternative, getAlternativeSlugs } from '@/content/alternatives';
+import { marketingOgImage } from '@/data/marketingOgCopy';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 
 export const revalidate = false;
@@ -21,6 +22,11 @@ export const metadata: Metadata = {
       'Find a musician-first alternative to generic link-in-bio tools, with smart links and release workflows instead of a list of links.',
     url: `${BASE_URL}${APP_ROUTES.ALTERNATIVES}`,
     type: 'website',
+    images: [marketingOgImage('alternatives')],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: [marketingOgImage('alternatives').url],
   },
 };
 

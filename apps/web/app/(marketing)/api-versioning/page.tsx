@@ -4,6 +4,7 @@ import Link from 'next/link';
 import '@/components/marketing/MarketingRouteHero.css';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { marketingOgImage } from '@/data/marketingOgCopy';
 import {
   PUBLIC_ARTIST_API_OPENAPI_URL,
   PUBLIC_ARTIST_API_POLICY_URL,
@@ -31,6 +32,11 @@ export const metadata: Metadata = {
       'The canonical lifecycle policy for Jovie’s public artist API: URL versioning, active v1 status, and future Deprecation or Sunset signals.',
     url: PAGE_URL,
     type: 'article',
+    images: [marketingOgImage('api-versioning')],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: [marketingOgImage('api-versioning').url],
   },
 };
 

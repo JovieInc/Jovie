@@ -4,6 +4,7 @@ import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getComparison, getComparisonSlugs } from '@/content/comparisons';
+import { marketingOgImage } from '@/data/marketingOgCopy';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 
 export const revalidate = false;
@@ -21,6 +22,11 @@ export const metadata: Metadata = {
       'See how Jovie compares with the tools musicians already use to share music.',
     url: `${BASE_URL}${APP_ROUTES.COMPARE}`,
     type: 'website',
+    images: [marketingOgImage('compare')],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: [marketingOgImage('compare').url],
   },
 };
 

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { ComparisonPageContent } from '@/components/organisms/ComparisonPageContent';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getComparison, getComparisonSlugs } from '@/content/comparisons';
+import { comparisonOgImage } from '@/data/marketingOgCopy';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 
 interface ComparePageProps {
@@ -33,6 +34,11 @@ export async function generateMetadata({
       description: data.metaDescription,
       url: `${BASE_URL}/compare/${data.slug}`,
       type: 'website',
+      images: [comparisonOgImage(data.slug)],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      images: [comparisonOgImage(data.slug).url],
     },
   };
 }

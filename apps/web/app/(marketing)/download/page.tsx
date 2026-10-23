@@ -19,6 +19,7 @@ import {
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { marketingOgImage } from '@/data/marketingOgCopy';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 import { MAC_APP_SUPPORT } from '@/lib/desktop/mac-compatibility';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
@@ -126,11 +127,13 @@ export const metadata: Metadata = {
     description: `${APP_NAME} for Mac, with iPhone in internal TestFlight alpha.`,
     url: `${BASE_URL}/download`,
     type: 'website',
+    images: [marketingOgImage('download')],
   },
   twitter: {
     card: 'summary_large_image',
     title: `Download ${APP_NAME}`,
     description: `${APP_NAME} for Mac, with iPhone in internal TestFlight alpha.`,
+    images: [marketingOgImage('download').url],
   },
 };
 

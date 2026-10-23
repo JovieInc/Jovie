@@ -10,6 +10,7 @@ import {
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getAlternative, getAlternativeSlugs } from '@/content/alternatives';
+import { alternativeOgImage } from '@/data/marketingOgCopy';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 
@@ -41,6 +42,11 @@ export async function generateMetadata({
       description: data.metaDescription,
       url: `${BASE_URL}/alternatives/${data.slug}`,
       type: 'website',
+      images: [alternativeOgImage(data.slug)],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      images: [alternativeOgImage(data.slug).url],
     },
   };
 }

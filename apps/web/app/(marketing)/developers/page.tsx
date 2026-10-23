@@ -6,6 +6,7 @@ import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { marketingOgImage } from '@/data/marketingOgCopy';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 
 export const revalidate = false;
@@ -23,6 +24,11 @@ export const metadata: Metadata = {
       'Jovie’s public, anonymous, read-only profile API pairs with machine-readable site resources.',
     url: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
     type: 'website',
+    images: [marketingOgImage('developers')],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: [marketingOgImage('developers').url],
   },
 };
 
