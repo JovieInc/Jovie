@@ -10,11 +10,11 @@ export const PRE_SAVE_COPY = {
   seo: {
     title: 'Pre-save',
     description:
-      'The unreleased page renders a countdown to the release date. Spotify stores an encrypted refresh token for each account. A daily job saves the release into that library after the date passes.',
+      'The unreleased page renders a countdown to the release date. Jovie stores an encrypted refresh token for each account. A daily job saves the release into that library after the date passes.',
   },
   headline: 'Pre-save',
   support:
-    'The unreleased page renders a countdown to the release date. Spotify stores an encrypted refresh token for each account. A daily job saves the release into that library after the date passes.',
+    'The unreleased page renders a countdown to the release date. Jovie stores an encrypted refresh token for each account. A daily job saves the release into that library after the date passes.',
   links: [
     { href: APP_ROUTES.PRODUCT, label: 'Product' },
     { href: APP_ROUTES.SMART_LINKS, label: 'Smart Links' },
