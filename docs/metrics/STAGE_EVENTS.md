@@ -107,6 +107,7 @@ PATCH as `lanes-status.json`). Keep 28 days, drop older rows, cap at 8 MB.
 | `shipping:worker-start` | `shipping` / `JovieInc/Jovie#<pr>` once the run has a PR, else `JOV-<n>` | ledger receipt `startedAt` | receipt `endedAt` | `runs/ledger.jsonl` issue receipt (`kind` issue) |
 | `shipping:gate-seat` | `shipping` / `JovieInc/Jovie#<pr>` | adopt receipt `startedAt` | `startedAt + gateWaitS` (no seat: `endedAt`, outcome `abandoned`) | `runs/ledger.jsonl` (`kind` adopt) |
 | `shipping:gate` | `shipping` / `JovieInc/Jovie#<pr>` | `startedAt + gateWaitS` | receipt `endedAt` (`advanced` landing/verified, `failed` held/timeout) | `runs/ledger.jsonl` (`kind` adopt) |
+| `shipping:outcome-receipt` | `shipping` / `JOV-<n>` | lifecycle comment that owes `outcome` | outcome lane records the receipt (`advanced` pass, `failed` fail, `abandoned` no receipt) | `runs/ledger.jsonl` (`kind` outcome-verify) |
 | `remediation:repair-start` | `remediation` / `JovieInc/Jovie#<pr>@<first 12 chars of the red head sha>` | fix-red receipt `startedAt` | receipt `endedAt` | `runs/ledger.jsonl` (`kind` fix-red) |
 
 `actor` = provider (`codex`, `claude`, ...). `outcome`: `advanced` when the run
@@ -139,15 +140,16 @@ failed, pre-fix; fixed in summer-config #270).
 Live emitter: `.github/scripts/controller-quota-replay.mjs` (workflow
 `controller-quota-replay.yml`, on Staging/Production Controller completion).
 It replays only transient failures (GitHub quota, 5xx, network, runner loss)
-of the newest run of that controller while production lags main, up to
-controller attempt 3, after waiting for the token's quota reset or
-2^(attempt-1) x 120s. Rows go to the artifact
+of controller attempt 1 for the generation at current main, before any
+Production Release job started, by rerunning the exact source CI run (a
+controller rerun is refused at authorization), up to CI attempt 3, after
+waiting for the token's quota reset or 2^(attempt-1) x 120s. Rows go to the artifact
 `release-replay-receipts/stage-events.ndjson`, next to `decision.json`.
 
 | Stage | Timestamp |
 | --- | --- |
-| `release-replay:blocked` | the failed attempt's `updated_at`; exits at the decision. `outcome` `advanced` (replayed), `abandoned` (not transient, superseded, or prod already on main) or `failed` (attempt/wait cap, rejected rerun) |
-| `release-replay:replayed` | the accepted `gh run rerun --failed` request |
+| `release-replay:blocked` | the failed attempt's `updated_at`; exits at the decision. `outcome` `advanced` (replayed), `abandoned` (not transient, manual rerun, post-mutation, superseded, or prod already on main) or `failed` (CI attempt/wait cap, rejected rerun) |
+| `release-replay:replayed` | the accepted `gh run rerun` request for the source CI run |
 
 `entityId` = `<workflow file>#<run id>@<attempt>`. The source is an artifact
 (see "Where events live").

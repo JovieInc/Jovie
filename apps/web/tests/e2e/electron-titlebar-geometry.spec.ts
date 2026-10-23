@@ -200,9 +200,23 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
 
   const tokens = await page.evaluate(() => {
     const rootStyle = getComputedStyle(document.documentElement);
+    // Custom properties compute to their substituted token stream, not a
+    // resolved length: a token declared as calc() (the traffic-light safe
+    // width) never matches a bare px literal via getPropertyValue. Plain px
+    // tokens read directly; anything else resolves through a hidden probe
+    // element so the calc computes to its used px width.
     const readPx = (name: string) => {
       const raw = rootStyle.getPropertyValue(name).trim();
-      const match = /^([\d.]+)px$/.exec(raw);
+      const direct = /^([\d.]+)px$/.exec(raw);
+      if (direct) return Number.parseFloat(direct[1]);
+      const probe = document.createElement('div');
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      probe.style.width = `var(${name})`;
+      document.documentElement.appendChild(probe);
+      const used = getComputedStyle(probe).width;
+      probe.remove();
+      const match = /^([\d.]+)px$/.exec(used);
       return match ? Number.parseFloat(match[1]) : null;
     };
     return {
@@ -211,13 +225,14 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
       trafficLightX: readPx('--electron-traffic-light-x'),
       trafficLightY: readPx('--electron-traffic-light-y'),
       sidebarWidth: readPx('--electron-sidebar-width'),
+      shellGap: readPx('--app-shell-gap'),
       collapsedSidebarWidth: readPx('--electron-sidebar-collapsed-width'),
     };
   });
 
   // If we can read the token, check the sidebar column width matches.
   expect(tokens.titlebarHeight).toBe(40);
-  expect(tokens.trafficLightSafeWidth).toBe(72);
+  expect(tokens.trafficLightSafeWidth).toBe(70);
   expect(tokens.trafficLightX).toBe(20);
   expect(tokens.trafficLightY).toBe(17);
   expect(tokens.collapsedSidebarWidth).toBe(52);
@@ -238,16 +253,18 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
     ).toBeGreaterThan(0);
 
     if (box !== null) {
-      // Inside Electron the titlebar is visible. The row spans exactly the
-      // sidebar column; its shell-gap padding insets the cell to the rail's
-      // own content edge, so measure the row's border box against the token.
+      // Inside Electron the titlebar is visible. Padding-left is the shell
+      // gap, and the border box includes that gap so the content box matches
+      // the rail [gap, gap + sidebar].
       const rowBox = await page
         .locator('[data-testid="electron-titlebar-row"]')
         .boundingBox();
       expect(rowBox).not.toBeNull();
+      const expectedRowWidth =
+        (tokens.sidebarWidth ?? 0) + (tokens.shellGap ?? 0);
       expect(
-        Math.abs((rowBox?.width ?? 0) - tokens.sidebarWidth),
-        `titlebar row width (${rowBox?.width}px) matches sidebar-width token (${tokens.sidebarWidth}px)`
+        Math.abs((rowBox?.width ?? 0) - expectedRowWidth),
+        `titlebar row width (${rowBox?.width}px) matches sidebar + shell gap (${expectedRowWidth}px)`
       ).toBeLessThanOrEqual(1);
       expect(
         box.width,

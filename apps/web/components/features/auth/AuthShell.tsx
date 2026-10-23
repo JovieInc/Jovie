@@ -46,6 +46,7 @@ import {
   MOBILE_RETURN_PARAM,
   sanitizeMobileReturnRoute,
 } from '@/lib/mobile/auth-return';
+import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
 import { preserveAuthTouchOwnership } from './constants';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
@@ -409,6 +410,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           redirectUrl={resolvedRedirect}
           initialEmailAddress={props.initialValues?.emailAddress}
           onOtpStepChange={handleOtpStepChange}
+          isPageSurface={!compact && !marketingCapture}
         />
       </div>
     );
@@ -457,6 +459,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         redirectUrl={resolvedRedirect}
         initialEmailAddress={props.initialValues?.emailAddress}
         onOtpStepChange={handleOtpStepChange}
+        isPageSurface={!compact && !marketingCapture}
       />
     </div>
   );
@@ -484,15 +487,21 @@ function AuthShellIdentity({
   intent,
   claimHandle,
   back,
+  align = 'center',
 }: Readonly<{
   intent: AuthShellIntent;
   claimHandle?: string;
   back: AuthShellBackLink | null;
+  /** Full-page shells read left-aligned and tight (Linear/Frame.io benchmark). */
+  align?: 'left' | 'center';
 }>) {
   return (
     <div
       data-auth-shell-identity
-      className='mb-6 flex flex-col items-center text-center'
+      className={cn(
+        'mb-6 flex flex-col',
+        align === 'left' ? 'items-start text-left' : 'items-center text-center'
+      )}
     >
       {back ? <AuthQuietBackLink href={back.href} label={back.label} /> : null}
       <Link
@@ -525,6 +534,7 @@ function AuthOAuthStartSurface({
   redirectUrl,
   initialEmailAddress,
   onOtpStepChange,
+  isPageSurface = false,
 }: Readonly<{
   mode: AuthShellMode;
   intent: AuthShellIntent;
@@ -545,76 +555,100 @@ function AuthOAuthStartSurface({
   redirectUrl: string;
   initialEmailAddress?: string;
   onOtpStepChange?: (active: boolean) => void;
+  /**
+   * Full-page routes render one hairline-bordered focal card with tight
+   * left-aligned type. Intercepted modals and the marketing email capture
+   * keep their centered overlay presentation.
+   */
+  isPageSurface?: boolean;
 }>) {
   const hasProviders = providers.length > 0;
   const providersBusy = !interactive || Boolean(pendingProvider);
+  const align = isPageSurface ? 'left' : 'center';
 
   return (
     <div data-auth-sso-surface>
-      <AuthShellIdentity
-        intent={intent}
-        claimHandle={claimHandle}
-        back={back}
-      />
-      {offerSummary ? (
-        <div
-          data-auth-offer-summary
-          className='mb-4 text-center text-secondary-token'
-        >
-          <p>{offerSummary.title}</p>
-          {offerSummary.detail ? <p>{offerSummary.detail}</p> : null}
+      <div
+        data-auth-surface-card
+        className={cn(
+          isPageSurface &&
+            'rounded-lg border border-subtle bg-surface-1 p-5 sm:p-6'
+        )}
+      >
+        <AuthShellIdentity
+          intent={intent}
+          claimHandle={claimHandle}
+          back={back}
+          align={align}
+        />
+        {offerSummary ? (
+          <div
+            data-auth-offer-summary
+            className={cn(
+              'mb-4 text-secondary-token',
+              align === 'left' ? 'text-left' : 'text-center'
+            )}
+          >
+            <p>{offerSummary.title}</p>
+            {offerSummary.detail ? <p>{offerSummary.detail}</p> : null}
+          </div>
+        ) : null}
+
+        {hasProviders ? (
+          <fieldset
+            data-auth-provider-slots
+            className='grid grid-cols-1 gap-3'
+            aria-busy={providersBusy ? 'true' : undefined}
+          >
+            <legend className='sr-only'>Social sign-in options</legend>
+            {providers.map(provider => (
+              <AuthProviderButtonSlot
+                key={provider}
+                provider={provider}
+                disabled={!interactive || Boolean(pendingProvider)}
+                pending={interactive && pendingProvider === provider}
+                onClick={() => onProviderSelect(provider)}
+              />
+            ))}
+          </fieldset>
+        ) : null}
+
+        <div data-auth-email-form-slot className='mt-4'>
+          {hasProviders ? <AuthMethodDivider /> : null}
+          <EmailCodeAuthForm
+            mode={mode}
+            redirectUrl={redirectUrl}
+            initialEmailAddress={initialEmailAddress}
+            onOtpStepChange={onOtpStepChange}
+            align={align}
+          />
         </div>
-      ) : null}
 
-      {hasProviders ? (
-        <fieldset
-          data-auth-provider-slots
-          className='grid grid-cols-1 gap-3'
-          aria-busy={providersBusy ? 'true' : undefined}
+        <div
+          data-auth-oauth-error-slot
+          className={cn(
+            'mt-3 min-h-5',
+            align === 'left' ? 'text-left' : 'text-center'
+          )}
+          aria-live='polite'
         >
-          <legend className='sr-only'>Social sign-in options</legend>
-          {providers.map(provider => (
-            <AuthProviderButtonSlot
-              key={provider}
-              provider={provider}
-              disabled={!interactive || Boolean(pendingProvider)}
-              pending={interactive && pendingProvider === provider}
-              onClick={() => onProviderSelect(provider)}
-            />
-          ))}
-        </fieldset>
-      ) : null}
+          {errorMessage ? (
+            <p
+              className='text-caption font-caption text-destructive'
+              role='alert'
+            >
+              {errorMessage}
+            </p>
+          ) : null}
+        </div>
 
-      <div data-auth-email-form-slot className='mt-4'>
-        {hasProviders ? <AuthMethodDivider /> : null}
-        <EmailCodeAuthForm
+        <AuthModeSwitchLink
           mode={mode}
-          redirectUrl={redirectUrl}
-          initialEmailAddress={initialEmailAddress}
-          onOtpStepChange={onOtpStepChange}
+          oppositeModeUrl={oppositeModeUrl}
+          forceHardNavigation={forceHardNavigation}
+          align={align}
         />
       </div>
-
-      <div
-        data-auth-oauth-error-slot
-        className='mt-3 min-h-5 text-center'
-        aria-live='polite'
-      >
-        {errorMessage ? (
-          <p
-            className='text-caption font-caption text-destructive'
-            role='alert'
-          >
-            {errorMessage}
-          </p>
-        ) : null}
-      </div>
-
-      <AuthModeSwitchLink
-        mode={mode}
-        oppositeModeUrl={oppositeModeUrl}
-        forceHardNavigation={forceHardNavigation}
-      />
 
       <AuthLegalText mode={mode} />
     </div>
@@ -628,9 +662,7 @@ function AuthMethodDivider() {
         className='h-px flex-1 bg-(--linear-border-subtle)'
         aria-hidden='true'
       />
-      <span className='text-2xs uppercase tracking-wide text-secondary-token'>
-        or use email
-      </span>
+      <span className='text-2xs text-secondary-token'>or use email</span>
       <span
         className='h-px flex-1 bg-(--linear-border-subtle)'
         aria-hidden='true'
@@ -643,10 +675,12 @@ function AuthModeSwitchLink({
   mode,
   oppositeModeUrl,
   forceHardNavigation,
+  align = 'center',
 }: Readonly<{
   mode: AuthShellMode;
   oppositeModeUrl: string;
   forceHardNavigation: boolean;
+  align?: 'left' | 'center';
 }>) {
   const isSignUp = mode === 'sign-up';
   const className =
@@ -656,7 +690,10 @@ function AuthModeSwitchLink({
   return (
     <div
       data-auth-mode-switch
-      className='mt-5 flex flex-col items-center gap-2 text-center text-app text-secondary-token'
+      className={cn(
+        'mt-5 flex flex-col gap-2 text-app text-secondary-token',
+        align === 'left' ? 'items-start text-left' : 'items-center text-center'
+      )}
     >
       {isSignUp ? (
         <span>

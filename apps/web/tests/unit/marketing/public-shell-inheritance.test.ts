@@ -16,6 +16,16 @@ describe('public marketing shell inheritance', () => {
     expect(source).toContain('<PublicPageShell');
   });
 
+  it('starts the homepage hero at the viewport top', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'app/(home)/layout.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('home-viewport--hero-canvas');
+    expect(source).toContain('mainOffset={false}');
+  });
+
   it('keeps the brand page on the homepage chrome while sharing the shell owner', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'app/brand/layout.tsx'),

@@ -41,6 +41,12 @@ describe('sidebar menu', () => {
     const className = button?.className ?? '';
     expect(className).toContain('duration-fast');
     expect(className).toContain('ease-interactive');
+    expect(button).toHaveClass(
+      'gap-(--app-shell-sidebar-icon-gap)',
+      'px-(--app-shell-sidebar-inset)',
+      '[&>svg]:size-(--app-shell-sidebar-icon-size)'
+    );
+    expect(button).not.toHaveClass('gap-2.5', 'px-2.5');
   });
 
   it('renders a sub button with nav font weight', () => {

@@ -129,6 +129,15 @@ describe('SidebarIdentityGroup', () => {
     pathnameMock.mockReturnValue('/app');
   });
 
+  it.each([false, true])('shares the nav inset when calm=%s', calm => {
+    render(<SidebarIdentityGroup calm={calm} profileHref={undefined} />);
+    expect(screen.getByTestId(SIDEBAR_USER_PANEL_TEST_ID)).toHaveClass(
+      'px-(--app-shell-sidebar-inset)',
+      calm ? 'py-0' : 'py-1.5'
+    );
+    expect(screen.getByRole('button', { name: /Tim White/i })).toBeEnabled();
+  });
+
   it('forwards collapsed dock badges and status to the compact user control', () => {
     render(
       <SidebarIdentityGroup

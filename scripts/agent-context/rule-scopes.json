@@ -7,7 +7,7 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "66d966ab9feb4df050a3fc10c034c966ab5938defff365eacced22ce2a5d93ca"
+    "bodySha256": "43e227649b57a96160f38afb85023e0bdefde8e551f69235e49765ae80fa052d"
   },
   {
     "file": ".claude/rules/code-style.md",
@@ -17,7 +17,7 @@
   {
     "file": ".claude/rules/db.md",
     "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
-    "bodySha256": "dd8a0de6daeb7b37b8507fd9c2f6ea6e19ada223aad91f1adf9ea7c612e0b8a1"
+    "bodySha256": "827454729d91ae084f5accd102eda950842fccfeb8094182866d04e0c323df32"
   },
   {
     "file": ".claude/rules/environment.md",
@@ -146,7 +146,7 @@
       ".github/**",
       "scripts/**"
     ],
-    "bodySha256": "fde7b500d8f9bc41f224183ffd4ccbeb7d357bb3bf324a753384e3565580fc37"
+    "bodySha256": "2f5b5b01bd34142deb0a9a71784152ebe60d1be2c18e56bb7cd6aaa44a68d3fa"
   },
   {
     "file": ".claude/rules/swarm.md",
@@ -166,7 +166,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "bb2d6eacdd0a036124803cd36a17404d048fcd45ef780b0b3612d667b1aa5f55"
+    "bodySha256": "07808bc5df7c7a6f5ffbaba2c2547ca58d6223b47f976708a4abe960a754dea3"
   },
   {
     "file": ".claude/rules/ui.md",
@@ -177,6 +177,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "37715f0474474518ed634c8b8c0d94c85c6e5cdf2ee194768eb15a8654da9a4d"
+    "bodySha256": "d658f8e48f3cd948d64e2676b020486b9c945618bbb163d09d0a6614da590bf2"
   }
 ]

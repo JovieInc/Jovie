@@ -116,7 +116,7 @@ export function AiCrawlerIntelligenceCard({
       </span>
       <span className='sr-only'>{CRAWLER_READ_DISCLOSURE.description}</span>
       {model.status ? (
-        <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium uppercase tracking-wide text-secondary-token'>
+        <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium text-secondary-token'>
           <span
             className='h-1.5 w-1.5 shrink-0 rounded-full'
             style={{ background: statusDotVar(model.status.tone) }}

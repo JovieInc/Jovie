@@ -50,18 +50,17 @@ describe('ClaimHandleForm', () => {
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
     expect(input).toHaveAttribute('required');
-    // The field frame draws one inset ring. A ring on the input nests a
-    // second rectangle inside the row.
-    expect(input.closest('.focus-field-inset')).not.toBeNull();
-    expect(input).not.toHaveClass('focus-ring-themed');
+    // JOV-INV-019: the input carries the shared box-shadow ring itself — the
+    // locked route-quality focus check reads the focused control's own
+    // computed styles, so a ring on the field frame is invisible to it.
+    expect(input).toHaveClass('focus-ring-themed');
     const focusCss = readFileSync(
       resolve(__dirname, '../../app/globals.css'),
       'utf8'
     );
-    expect(focusCss).toContain('.focus-field-inset:has(input:focus-visible)');
-    expect(focusCss).toContain(
-      'box-shadow: inset 0 0 0 2px var(--color-focus)'
-    );
+    expect(focusCss).toContain('.focus-ring-themed');
+    expect(focusCss).toContain('--tw-ring-color: var(--color-focus-ring)');
+    expect(focusCss).not.toContain('.focus-field-inset');
 
     // No helper text shown when handle is empty (removed redundant hint)
     const helpText = screen.queryByText(/Your Jovie profile will live at/i);

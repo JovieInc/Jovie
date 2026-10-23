@@ -18,12 +18,19 @@ interface AudienceRowActionsMenuProps {
   readonly row: AudienceMember;
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
+  /**
+   * Radix menu modality. Default `true` (production behavior). Stories pass
+   * `false` so the portaled open menu does not `hideOthers`-ARIA-hide the
+   * canvas (axe aria-hidden-focus on the focusable trigger).
+   */
+  readonly modal?: boolean;
 }
 
 export function AudienceRowActionsMenu({
   row,
   open,
   onOpenChange,
+  modal = true,
 }: AudienceRowActionsMenuProps) {
   const notifications = useNotifications();
   const [copySuccess, setCopySuccess] = useState(false);
@@ -56,7 +63,7 @@ export function AudienceRowActionsMenu({
   const hasPhone = typeof row.phone === 'string' && row.phone.length > 0;
 
   return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange}>
+    <DropdownMenu open={open} onOpenChange={onOpenChange} modal={modal}>
       <DropdownMenuTrigger asChild>
         <AppIconButton ariaLabel='Open audience row actions'>
           <MoreHorizontal className='h-4 w-4' />

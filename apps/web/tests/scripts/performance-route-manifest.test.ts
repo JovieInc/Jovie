@@ -383,9 +383,63 @@ describe('public-profile alias usable-result guard', () => {
     expect(result.terminalStatus).toBe('fail');
   });
 
-  it.each([1, 3, 4, 6])('rejects hosted alias runs of %s', runs => {
+  it.each([1, 3, 4, 5, 6, 19, 21])('rejects hosted alias runs of %s', runs => {
     expect(() =>
       assertHostedAliasRunCount(aliasGuardRoute, runs, false)
-    ).toThrow(/exactly 5 fresh browser-context runs/);
+    ).toThrow(/exactly 20 fresh browser-context runs/);
+  });
+
+  it('accepts the escalated 20-run tail-estimator floor in hosted mode', () => {
+    expect(() =>
+      assertHostedAliasRunCount(aliasGuardRoute, 20, false)
+    ).not.toThrow();
+  });
+
+  it('keeps dev mode free of the hosted alias run floor', () => {
+    expect(() =>
+      assertHostedAliasRunCount(aliasGuardRoute, 5, true)
+    ).not.toThrow();
+  });
+
+  it('estimates the alias tail with the nearest-rank p95 instead of the worst sample', () => {
+    // 20 samples, one cold-start outlier at 2216ms: the p95 (19th of 20) is
+    // 980ms and passes, while the old max-of-5 estimator fails on the same
+    // distribution whenever the outlier lands in a 5-sample window.
+    const samples = Array.from({ length: 20 }, (_, i) =>
+      aliasGuardSample(i < 19 ? 600 + i * 20 : 2216)
+    );
+    const result = createPageResult(
+      aliasGuardRoute,
+      '/dualipa/listen',
+      samples,
+      false
+    );
+    expect(result.rawTimings['usable-alias-result']).toBe(800);
+    expect(result.timings).toContainEqual(
+      expect.objectContaining({
+        name: 'usable-alias-result-max',
+        measured: 960,
+        passed: true,
+      })
+    );
+  });
+
+  it('still fails a systematic tail regression: two outliers decide the p95', () => {
+    const samples = Array.from({ length: 20 }, (_, i) =>
+      aliasGuardSample(i < 18 ? 600 + i * 20 : 1600 + i)
+    );
+    const result = createPageResult(
+      aliasGuardRoute,
+      '/dualipa/listen',
+      samples,
+      false
+    );
+    expect(result.timings).toContainEqual(
+      expect.objectContaining({
+        name: 'usable-alias-result-max',
+        passed: false,
+      })
+    );
+    expect(result.terminalStatus).toBe('fail');
   });
 });

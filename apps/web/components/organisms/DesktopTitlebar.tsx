@@ -167,7 +167,7 @@ export function DesktopTitlebar() {
         <div
           data-testid='electron-titlebar-sidebar-cell'
           data-electron-no-drag='true'
-          className='flex w-full min-w-0 items-center gap-1.5 px-2.5'
+          className='flex w-full min-w-0 items-center gap-(--app-shell-sidebar-icon-gap)'
           style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
         >
           <div

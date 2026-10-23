@@ -221,6 +221,14 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Marketing images and cards use a radius token. Zero exceptions.
+    id: 'marketing-rounded-media',
+    command: 'node --test scripts/invariants/art-direction/rounded.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage|features\/(?:home|pricing|visibility-audit))\/|apps\/web\/components\/organisms\/(?:AboutPage|Blog|ComparisonPage|PricingRecipe|SupportPage|VoicePage)|apps\/web\/components\/site\/Marketing|apps\/web\/tests\/unit\/marketing\/art-direction\/rounded|scripts\/invariants\/art-direction\/rounded)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
     // Breaking changes to the public OpenAPI contract (ARTIST_OPENAPI_DOCUMENT,
     // served at /api/v1/openapi.json and /openapi.json) fail closed unless the
     // PR body carries an auditable `api-breaking: <reason>` marker line. The
@@ -278,6 +286,27 @@ export const SOURCE_GUARDS = Object.freeze([
     command: `node ${JSON.stringify(
       fileURLToPath(
         new URL('./lib/script-contract-affected.mjs', import.meta.url)
+      )
+    )}`,
+    inputs: /./u,
+    prOnly: true,
+  }),
+  Object.freeze({
+    id: 'copy-leak',
+    // Trusted-base scanner/policy, checked against the PR checkout. PR Ready
+    // inherits Source Validation failures; merge groups and main also run it.
+    command: `node ${shellQuote(fileURLToPath(new URL('./invariants/copy-leak/check.mjs', import.meta.url)))} && node --test --test-isolation=none --experimental-test-coverage ${shellQuote(`--test-coverage-include=${fileURLToPath(new URL('./invariants/copy-leak/check.mjs', import.meta.url))}`)} --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=85 ${shellQuote(fileURLToPath(new URL('./invariants/copy-leak/copy-leak.test.mjs', import.meta.url)))}`,
+    inputs:
+      /^(?:apps\/web\/|scripts\/invariants\/copy-leak\/|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
+    // JOV-INV-045. Trusted-base copy scans the pull request diff and fails
+    // when the diff loosens a blocking gate. Pull requests only.
+    id: 'gate-weakening-detector',
+    command: `node ${shellQuote(
+      fileURLToPath(
+        new URL('./invariants/gate-weakening-detector.mjs', import.meta.url)
       )
     )}`,
     inputs: /./u,
@@ -625,6 +654,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.claude/hooks/post-task-validate.test.mjs',
@@ -654,6 +684,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/capability-benchmark/computer-use-decision.test.mjs',
   'scripts/capability-benchmark/capability-reconciliation.test.mjs',
   'scripts/ci-cache-policy.test.mjs',
+  'scripts/db/lint-changed-migrations.test.mjs',
   'scripts/ci-release-incident-contract.test.mjs',
   'scripts/company-assets/company-assets.test.mjs',
   'scripts/deprecation-intake.test.mjs',
@@ -678,6 +709,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/assurance-matrix.test.mjs',
   'scripts/invariants/browser-owned-input.test.mjs',
   'scripts/invariants/founder-calibration.test.mjs',
+  'scripts/invariants/gate-weakening-detector.test.mjs',
   'scripts/invariants/jev-revision-report.test.mjs',
   'scripts/invariants/jev-writing-readiness.test.mjs',
   'scripts/time-bomb/scan.test.mjs',

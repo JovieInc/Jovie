@@ -100,6 +100,15 @@ Required variables are defined in `lib/env.ts` with Zod validation.
 - Do not add secrets to `CLAUDE.md`, `AGENTS.md`, `CODEX.md`, `.claude/`, `.cursor/`, `.codex/`, docs, tests, or fixtures.
 - If a secret appears in the repo, stop and report it.
 
+## Dependency Review Blocks Vulnerable or Copyleft Upgrades
+
+Source Validation's Security Evidence job runs `actions/dependency-review-action` at `a1d282b36b6f3519aa1f3fc636f609c47dddb294` (`v5.0.0`) on `pull_request`. The config is `.github/dependency-review-config.yml`.
+
+- Fail the pull request when an added or upgraded dependency has a high or critical vulnerability, or a GPL/AGPL-family license. `fail-on-severity: high` includes critical. `warn-only` stays false.
+- The action compares only the pull request's manifest and lockfile diff. It does not rescan the whole tree, and it does not replace the scheduled osv-scanner or Trivy jobs.
+- The denylist covers the GPL and AGPL SPDX ids, including the deprecated short forms. LGPL is not on it. Do not drop an id, lower the severity, or remove the step.
+- `comment-summary-in-pr` stays `never`. The job token is read-only.
+
 ## CI Seeding Guardrail
 
 - In shared CI lanes that audit public routes (`Lighthouse`, `a11y`, public smoke), seed scripts must fail only on required schema.

@@ -22,6 +22,22 @@ import {
   CommandPaletteMainSurface,
 } from '@/components/organisms/CommandPalette';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+
+const preloadCommandPaletteChunk = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve())
+);
+
+vi.mock(
+  '@/components/organisms/command-palette-events',
+  async importOriginal => {
+    const actual =
+      await importOriginal<
+        typeof import('@/components/organisms/command-palette-events')
+      >();
+    return { ...actual, preloadCommandPaletteChunk };
+  }
+);
+
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -621,5 +637,12 @@ describe('CommandPalette', () => {
     });
     expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
     await waitFor(() => expect(origin).toHaveFocus());
+  });
+});
+
+describe('CommandPalette preload', () => {
+  it('warms the palette chunk at idle so the first open is instant', async () => {
+    render(withDashboard(<CommandPalette />));
+    await waitFor(() => expect(preloadCommandPaletteChunk).toHaveBeenCalled());
   });
 });
