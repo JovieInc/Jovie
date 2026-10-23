@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '@/lib/queries/keys';
 
 vi.mock('@jovie/ui', () => ({
@@ -45,9 +45,24 @@ vi.mock('@/components/providers/NuqsProvider', () => ({
 vi.mock('@/hooks/useClerkSafe', () => ({
   ClerkSafeDefaultsProvider: ({
     children,
+    fixtureUser,
   }: {
     readonly children: ReactNode;
-  }) => <>{children}</>,
+    readonly fixtureUser?: { fullName: string | null } | null;
+  }) => (
+    <div data-testid='demo-identity' data-name={fixtureUser?.fullName}>
+      {children}
+    </div>
+  ),
+}));
+
+let params = new URLSearchParams();
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => params,
+}));
+
+vi.mock('./DemoPlayerCapture', () => ({
+  DemoPlayerCapture: () => <span data-testid='capture-player' />,
 }));
 
 import { DemoAuthShell } from './DemoAuthShell';
@@ -74,6 +89,34 @@ function DemoQueryProbe() {
 }
 
 describe('DemoAuthShell', () => {
+  afterEach(() => {
+    params = new URLSearchParams();
+  });
+
+  it('only mounts the capture player for the exact opt-in URL value', () => {
+    params.set('capturePlayer', 'true');
+    const view = render(
+      <DemoAuthShell>
+        <DemoQueryProbe />
+      </DemoAuthShell>
+    );
+    expect(screen.queryByTestId('capture-player')).toBeNull();
+    expect(screen.getByTestId('demo-identity')).toHaveAttribute(
+      'data-name',
+      'Calvin Harris'
+    );
+    params.set('capturePlayer', '1');
+    view.rerender(
+      <DemoAuthShell>
+        <DemoQueryProbe />
+      </DemoAuthShell>
+    );
+    expect(screen.getByTestId('capture-player')).toBeInTheDocument();
+    expect(screen.getByTestId('demo-identity')).toHaveAttribute(
+      'data-name',
+      'Tim White'
+    );
+  });
   it('keeps the standalone demo on the shared tooltip timing scope', () => {
     render(
       <DemoClientProviders>

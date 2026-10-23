@@ -444,6 +444,8 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       route: '/demo',
       waitFor: '[data-testid="releases-matrix"]',
       publicExportPath: 'releases-dashboard-full.png',
+      playerTimestamp: '1:18',
+      fixedNow: '2026-06-12T16:00:00.000Z',
     },
     {
       id: 'dashboard-releases-sidebar-desktop',
@@ -452,6 +454,8 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       waitFor: '[data-testid="release-sidebar"]',
       interaction: 'open-first-release',
       publicExportPath: 'releases-dashboard-sidebar.png',
+      playerTimestamp: '1:42',
+      fixedNow: '2026-06-12T16:00:00.000Z',
     },
     {
       id: 'dashboard-release-sidebar-detail-desktop',
@@ -479,6 +483,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       route: '/demo/audience',
       waitFor: 'table, [role="grid"], [data-testid="unified-table"]',
       publicExportPath: 'audience-crm.png',
+      playerTimestamp: '0:56',
     },
   ]),
   ...defineScenarios('dashboard', ADMIN_AND_INVESTOR, [
@@ -487,12 +492,14 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       title: 'Analytics Overview',
       route: '/demo/showcase/analytics',
       waitFor: '[data-testid="demo-showcase-analytics"]',
+      playerTimestamp: '2:06',
     },
     {
       id: 'dashboard-earnings-desktop',
       title: 'Earnings Overview',
       route: '/demo/showcase/earnings',
       waitFor: '[data-testid="demo-showcase-earnings"]',
+      playerTimestamp: '0:32',
     },
   ]),
   ...defineScenarios('settings', ADMIN_ONLY, [
