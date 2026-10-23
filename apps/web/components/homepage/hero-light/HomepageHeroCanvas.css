@@ -33,7 +33,7 @@
   --hero-canvas-radius: var(--system-b-radius-panel, 1.5rem);
 
   position: relative;
-  height: 100svh;
+  min-height: 100svh;
   background: var(--system-b-cinematic-black, #030406);
   color: var(--color-text-primary-token, #f5f7fb);
 }
@@ -130,7 +130,7 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  height: 100%;
+  min-height: 100svh;
   padding-top: var(--hero-canvas-bar);
   padding-inline: calc(var(--hero-canvas-progress) * var(--hero-canvas-gutter));
   padding-bottom: calc(var(--hero-canvas-progress) * var(--space-4, 1rem));
@@ -139,7 +139,7 @@
 .homepage-hero-canvas__field {
   position: relative;
   flex: 1;
-  min-height: 0;
+  min-height: calc(100svh - var(--hero-canvas-bar));
   overflow: hidden;
   border-radius: calc(var(--hero-canvas-progress) * var(--hero-canvas-radius))
     calc(var(--hero-canvas-progress) * var(--hero-canvas-radius)) 0 0;
@@ -153,7 +153,7 @@
   align-items: flex-start;
   justify-content: center;
   box-sizing: border-box;
-  height: 100%;
+  min-height: calc(100svh - var(--hero-canvas-bar));
   margin: 0;
   /* The copy column is the shared ap-section-container spine: its own
      width and gutter come from that class, so the headline sits on the
@@ -196,13 +196,10 @@
 }
 
 /* Phone-width field: the proof phone joins the field's flow under the
-   copy, so it cannot cover the headline at any viewport height. The phone
-   is sized by height (the screen keeps its 402/874 aspect) and shrinks
-   first on a short field: the height ceiling reserves the bar plus a
-   20rem copy budget, so the phone yields before the copy clips, and the
-   floor only binds on fields shorter than that. Once both bounds are
-   reached the copy clips inside itself, bottom-up — the headline and the
-   phone stay separated either way. */
+   copy. Preserve the copy's natural height, including the claim form's
+   reserved status line; short viewports grow the field instead of
+   shrinking the headline or clipping the conversion control. The phone
+   keeps the real screen aspect and yields space before the field grows. */
 @media (max-width: 63.99rem) {
   .homepage-hero-canvas__field {
     display: flex;
@@ -210,7 +207,7 @@
   }
 
   .homepage-hero-canvas__copy {
-    flex: 1 1 auto;
+    flex: 1 0 auto;
     min-height: 0;
     height: auto;
     overflow: hidden;
