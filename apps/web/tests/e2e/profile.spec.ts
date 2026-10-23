@@ -453,7 +453,10 @@ test.describe('Profile Modes @smoke @critical', () => {
   }) => {
     await interceptAnalytics(page);
 
-    const handle = process.env.E2E_NOTIFICATIONS_PROFILE || 'testartist';
+    // testartist stays the unclaimed tipping fixture, so it never mounts
+    // fan capture. The claimed music profile is the surface this CTA covers.
+    const handle =
+      process.env.E2E_NOTIFICATIONS_PROFILE || TEST_PROFILES.DUALIPA;
     const response = await smokeNavigate(page, `/${handle}/notifications`);
     expect(response?.status() ?? 0).toBeLessThan(500);
 

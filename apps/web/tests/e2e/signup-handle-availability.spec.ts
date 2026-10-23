@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { test as baseTest, expect, type Page } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { USERNAME_MAX_LENGTH } from '@/lib/validation/client-username';
 import {
   expectAuthPendingStatusContained,
@@ -801,7 +802,7 @@ for (const width of [320, 390, 768, 1440]) {
     };
     const axe = await new AxeBuilder({ page })
       .include('output')
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
+      .options(wcag22AaAxeOptions())
       .analyze();
     expect(axe.violations).toEqual([]);
     await page.screenshot({

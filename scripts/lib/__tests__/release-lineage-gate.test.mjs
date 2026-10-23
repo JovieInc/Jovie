@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -52,6 +53,10 @@ function runGate({
   buildInfoFails = false,
   starvationSeconds = 5400,
   inFlight = false,
+  lineageFailTimes = 0,
+  lineageFailureText = 'API rate limit exceeded for installation ID 1. (HTTP 403)',
+  // 'ahead' | 'diverged' | 'missing' | 'tip-moved'. Unset keeps git proof off.
+  gitLineage = /** @type {string | undefined} */ (undefined),
   // Queued successors with staging evidence: { sha, staging: 'deployed' |
   // 'superseded' | 'not_applicable' | 'failure' | 'missing' | 'no-artifact' }.
   successors = /** @type {{sha: string, staging: string}[]} */ ([]),
@@ -131,7 +136,16 @@ function runGate({
     join(bin, 'gh'),
     `#!/bin/sh
 case "$*" in
-  *compare/${EXPECTED_SHA}...*) printf '%s\\n' "${lineageStatus}"; exit ${lineageExit} ;;
+  *compare/${EXPECTED_SHA}...*)
+    n=0
+    [ -f "${root}/compare-count" ] && n="$(cat "${root}/compare-count")"
+    n=$((n + 1))
+    printf '%s' "$n" > "${root}/compare-count"
+    if [ "$n" -le ${lineageFailTimes} ]; then
+      printf '%s\\n' '${lineageFailureText}' >&2
+      exit 1
+    fi
+    printf '%s\\n' "${lineageStatus}"; exit ${lineageExit} ;;
   *compare/${liveSha}...*) ${compareFails ? 'exit 1' : `cat <<'JSON'\n${compare}\nJSON\n`}
   ;;
   *production-controller.yml/runs*) ${runsFail ? 'exit 22' : ''}
@@ -152,6 +166,24 @@ esac
       : `#!/bin/sh\nprintf '{"commitSha":"${liveSha}"}\\n'\n`
   );
   chmodSync(join(bin, 'curl'), 0o755);
+  if (gitLineage) {
+    const objectPresent = gitLineage === 'missing' ? '0' : '1';
+    const isAncestor = gitLineage === 'ahead' ? '0' : '1';
+    const tip =
+      gitLineage === 'tip-moved' ? 'd'.repeat(40) : '$CURRENT_MAIN_SHA';
+    writeFileSync(
+      join(bin, 'git'),
+      `#!/bin/sh
+case "$*" in
+  *rev-parse*) printf '%s\\n' "${tip}" ;;
+  *cat-file*) [ "${objectPresent}" = 1 ] || exit 1 ;;
+  *merge-base*) [ "${isAncestor}" = 1 ] && exit 1 || exit 0 ;;
+  *) exit 0 ;;
+esac
+`
+    );
+    chmodSync(join(bin, 'git'), 0o755);
+  }
   const result = spawnSync('bash', [GATE], {
     cwd: root,
     encoding: 'utf8',
@@ -164,14 +196,20 @@ esac
       GITHUB_OUTPUT: output,
       GITHUB_RUN_ID: '100',
       IN_FLIGHT: inFlight ? 'true' : 'false',
+      LINEAGE_COMPARE_BACKOFF_SECONDS: '0',
+      LINEAGE_PROVE_WITH_GIT: gitLineage ? '1' : '0',
       PRODUCTION_STARVATION_SECONDS: String(starvationSeconds),
       REPOSITORY: 'JovieInc/Jovie',
     },
   });
+  const countPath = join(root, 'compare-count');
   return {
     result,
     decision: result.stdout.trim(),
     outputs: parseOutputs(output),
+    compareAttempts: existsSync(countPath)
+      ? Number(readFileSync(countPath, 'utf8'))
+      : 0,
   };
 }
 
@@ -213,6 +251,69 @@ describe('release lineage gate', () => {
     });
     expect(run.result.stderr).toContain('Release ancestry is unknown');
     expect(run.result.stderr).not.toContain('left main');
+    expect(run.result.stderr).not.toContain('installation ID');
+  });
+
+  it('retries a rate-limited compare and keeps the ancestor lease', () => {
+    const run = runGate({
+      main: NEWER_SHA,
+      lineageFailTimes: 1,
+      lineageStatus: 'ahead',
+      lineageExit: 0,
+      pendingSuccessors: 0,
+    });
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.decision).toBe('decision=proceed');
+    expect(run.compareAttempts).toBe(2);
+    expect(run.outputs.lineage).toBe('ancestor');
+    expect(run.result.stderr).toContain(
+      'Release compare attempt 1/3 class=rate_limit http=403 exit=1.'
+    );
+    expect(run.result.stderr).not.toContain('installation ID');
+  });
+
+  it('proves an ancestor with git when the compare command keeps failing', () => {
+    const run = runGate({
+      main: NEWER_SHA,
+      lineageExit: 1,
+      lineageFailureText: 'HTTP 403: API rate limit exceeded for installation',
+      gitLineage: 'ahead',
+      pendingSuccessors: 0,
+    });
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.decision).toBe('decision=proceed');
+    expect(run.outputs.lineage).toBe('ancestor');
+    expect(run.compareAttempts).toBe(3);
+    expect(run.result.stderr).toContain('git proved lineage=ancestor');
+    expect(run.result.stderr).not.toContain('installation ID');
+  });
+
+  it('accepts a git proof that the generation left main', () => {
+    const run = runGate({
+      main: NEWER_SHA,
+      lineageExit: 1,
+      gitLineage: 'diverged',
+    });
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.decision).toBe('decision=yield');
+    expect(run.outputs.lineage).toBe('diverged');
+  });
+
+  it('stays fail-closed when git cannot see the expected commit', () => {
+    for (const gitLineage of ['missing', 'tip-moved']) {
+      const run = runGate({
+        main: NEWER_SHA,
+        lineageExit: 1,
+        gitLineage,
+      });
+      expect(run.result.status, run.result.stderr).toBe(1);
+      expect(run.decision).toBe('decision=error');
+      expect(run.outputs).toMatchObject({
+        lineage: 'unknown',
+        gate_reason: 'lineage_lookup_unavailable',
+      });
+      expect(run.result.stderr).toContain('Release ancestry is unknown');
+    }
   });
 
   it.each([
