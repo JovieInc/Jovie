@@ -22,18 +22,28 @@
 
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { NuqsProvider } from '@/components/providers/NuqsProvider';
 import { ClerkSafeDefaultsProvider } from '@/hooks/useClerkSafe';
+import { toJovieUser } from '@/lib/auth/jovie-user';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { queryKeys } from '@/lib/queries';
 import type { BillingStatusData } from '@/lib/queries/useBillingStatusQuery';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
-import { DEMO_DASHBOARD_DATA } from './mock-dashboard-data';
-import { DEMO_RELEASE_VIEW_MODELS } from './mock-release-data';
+import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
+import { DemoPlayerCapture } from './DemoPlayerCapture';
+import {
+  DEMO_DASHBOARD_DATA,
+  FOUNDER_DEMO_DASHBOARD_DATA,
+} from './mock-dashboard-data';
+import {
+  DEMO_RELEASE_VIEW_MODELS,
+  FOUNDER_DEMO_RELEASE_VIEW_MODELS,
+} from './mock-release-data';
 
 /**
  * Creates a QueryClient pre-seeded with demo data.
@@ -85,6 +95,25 @@ function createDemoQueryClient(
     warningThreshold: 50,
     isNearLimit: false,
   });
+  client.setQueryData<AiCrawlerAnalyticsResponse>(
+    queryKeys.dashboard.aiCrawlers(),
+    {
+      totalRequests: 216,
+      weeklyRequests: 64,
+      crawlers: [
+        {
+          id: 'gptbot',
+          name: 'GPTBot',
+          requests: 216,
+          previousPeriodRequests: 152,
+        },
+      ],
+      dailyTrend: [{ date: '2026-04-15', requests: 18 }],
+      syncedAt: '2026-04-15T16:00:00.000Z',
+      isPro: true,
+      isTeaser: false,
+    }
+  );
   seedQueryClient?.(client, dashboardData);
 
   return client;
@@ -104,25 +133,42 @@ interface DemoAuthShellProps {
 export function DemoAuthShell({
   children,
   dashboardData,
-  releasesForQuery = DEMO_RELEASE_VIEW_MODELS,
+  releasesForQuery,
   seedQueryClient,
 }: DemoAuthShellProps) {
-  const data = dashboardData ?? DEMO_DASHBOARD_DATA;
+  const capturePlayer = useSearchParams().get('capturePlayer') === '1';
+  const data = capturePlayer
+    ? FOUNDER_DEMO_DASHBOARD_DATA
+    : (dashboardData ?? DEMO_DASHBOARD_DATA);
+  const queryReleases = capturePlayer
+    ? FOUNDER_DEMO_RELEASE_VIEW_MODELS
+    : (releasesForQuery ?? DEMO_RELEASE_VIEW_MODELS);
   const profileId = data.selectedProfile?.id ?? '';
+  const profile = data.selectedProfile;
+  const fixtureUser = profile
+    ? toJovieUser({
+        id: data.user?.id ?? 'demo-user-001',
+        name: profile.displayName ?? profile.username,
+        image: profile.avatarUrl,
+        username: profile.username,
+        email: '',
+      })
+    : null;
 
   // Stable QueryClient instance per component mount
   const demoQueryClient = useMemo(
     () =>
-      createDemoQueryClient(profileId, data, releasesForQuery, seedQueryClient),
-    [data, profileId, releasesForQuery, seedQueryClient]
+      createDemoQueryClient(profileId, data, queryReleases, seedQueryClient),
+    [data, profileId, queryReleases, seedQueryClient]
   );
 
   return (
-    <ClerkSafeDefaultsProvider>
+    <ClerkSafeDefaultsProvider fixtureUser={fixtureUser}>
       <QueryClientProvider client={demoQueryClient}>
         <NuqsProvider>
           <TooltipProvider>
             <DashboardDataProvider value={data}>
+              {capturePlayer ? <DemoPlayerCapture /> : null}
               <AuthShellWrapper
                 persistSidebarCollapsed={noopPersist}
                 sidebarDefaultOpen
