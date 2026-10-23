@@ -16,7 +16,10 @@ import { fileURLToPath } from 'node:url';
 import { chromium, type Page } from '@playwright/test';
 
 import { measureInteractionLatency } from '../tests/e2e/utils/interaction-latency-utils';
-import { getInteractionHotPathManifest } from './performance-interaction-manifest';
+import {
+  getInteractionHotPathManifest,
+  type InteractionLatencyBudget,
+} from './performance-interaction-manifest';
 import {
   buildInteractionLatencyReport,
   type InteractionLatencySample,
@@ -37,6 +40,10 @@ interface Harness {
   startFrames: () => void;
   dropped: () => number;
   renderToInteractiveMs: number | null;
+}
+
+interface HarnessWindow extends Window {
+  __jovieHarness?: Harness;
 }
 
 function harnessHtml(scenarioId: string) {
@@ -195,8 +202,8 @@ harness.reset();
 
 async function readHarness(page: Page) {
   return page.evaluate(() => {
-    const harness = (window as Window & { __jovieHarness: Harness })
-      .__jovieHarness;
+    const harness = (window as HarnessWindow).__jovieHarness;
+    if (!harness) throw new Error('Interaction harness is not initialized');
     return {
       droppedFrameCount: harness.dropped(),
       renderToInteractiveMs: harness.renderToInteractiveMs,
@@ -206,7 +213,9 @@ async function readHarness(page: Page) {
 
 async function prepare(page: Page) {
   await page.evaluate(() => {
-    (window as Window & { __jovieHarness: Harness }).__jovieHarness.reset();
+    const harness = (window as HarnessWindow).__jovieHarness;
+    if (!harness) throw new Error('Interaction harness is not initialized');
+    harness.reset();
   });
   await page.evaluate(
     () =>
@@ -217,9 +226,9 @@ async function prepare(page: Page) {
       })
   );
   await page.evaluate(() => {
-    (
-      window as Window & { __jovieHarness: Harness }
-    ).__jovieHarness.startFrames();
+    const harness = (window as HarnessWindow).__jovieHarness;
+    if (!harness) throw new Error('Interaction harness is not initialized');
+    harness.startFrames();
   });
 }
 
@@ -262,27 +271,7 @@ function receiptDate(generatedAt: string) {
   return generatedAt.slice(0, 10);
 }
 
-function renderMarkdown(receipt: {
-  date: string;
-  measurementSurface: string;
-  device: ReturnType<typeof deviceInfo>;
-  browser: string;
-  viewport: string;
-  warmupRuns: number;
-  runsPerScenario: number;
-  scenarios: readonly {
-    id: string;
-    interactionClass: string;
-    medianFirstFeedbackMs: number;
-    p95FirstFeedbackMs: number;
-    medianUsableStateMs: number | null;
-    p95UsableStateMs: number | null;
-    p95RenderToInteractiveMs: number | null;
-    maxDroppedFrameCount: number | null;
-    targetLabel: string;
-    passed: boolean;
-  }[];
-}) {
+function renderMarkdown(receipt: ReturnType<typeof buildReceipt>) {
   const ms = (value: number | null) =>
     value === null ? 'n/a' : `${value.toFixed(1)}ms`;
   const rows = receipt.scenarios.map(
@@ -311,7 +300,7 @@ function renderMarkdown(receipt: {
     '',
     'Budgets were not changed. Median is nearest-rank p50 (`ceil(p/100*n)-1`).',
     `Machine-readable receipt: docs/performance/generated/interaction-latency-${receipt.date}.json`,
-    'measureInteractionLatency records first feedback after two animation frames and usable state after another paint. On this 60Hz run that is about 64ms and 97ms. Budgets that require 50ms fail on that floor.',
+    'measureInteractionLatency observes next paint, first feedback and usable state concurrently from the action start. Each visible milestone waits two animation frames to include a paint; simultaneous milestones share that paint instead of accumulating extra frame waits.',
     '',
     `- Device: ${receipt.device.os}; kernel ${receipt.device.kernel}; ${receipt.device.arch}`,
     `- CPU: ${receipt.device.cpuCount} x ${receipt.device.cpuModel}`,
@@ -449,6 +438,7 @@ function buildReceipt(
     const usable = scenarioSamples
       .map(sample => sample.usableStateMs)
       .filter((value): value is number => typeof value === 'number');
+    const budget: InteractionLatencyBudget = scenario.budget;
     return {
       id: scenario.id,
       title: scenario.title,
@@ -460,13 +450,12 @@ function buildReceipt(
       p95UsableStateMs: summary.p95UsableStateMs,
       p95RenderToInteractiveMs: summary.p95RenderToInteractiveMs,
       maxDroppedFrameCount: summary.maxDroppedFrameCount,
-      firstFeedbackP50BudgetMs: scenario.budget.firstFeedbackP50Ms ?? null,
-      firstFeedbackP95BudgetMs: scenario.budget.firstFeedbackP95Ms,
-      usableStateP95BudgetMs: scenario.budget.usableStateP95Ms ?? null,
-      renderToInteractiveP95BudgetMs:
-        scenario.budget.renderToInteractiveP95Ms ?? null,
-      maxDroppedFramesBudget: scenario.budget.maxDroppedFrames ?? null,
-      targetLabel: scenario.budget.targetLabel,
+      firstFeedbackP50BudgetMs: budget.firstFeedbackP50Ms ?? null,
+      firstFeedbackP95BudgetMs: budget.firstFeedbackP95Ms,
+      usableStateP95BudgetMs: budget.usableStateP95Ms ?? null,
+      renderToInteractiveP95BudgetMs: budget.renderToInteractiveP95Ms ?? null,
+      maxDroppedFramesBudget: budget.maxDroppedFrames ?? null,
+      targetLabel: budget.targetLabel,
       passed: summary.passed,
       firstFeedbackMs: scenarioSamples.map(sample => sample.firstFeedbackMs),
     };
