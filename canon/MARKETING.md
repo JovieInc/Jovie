@@ -266,7 +266,7 @@ The executable landing-page copy workflow is in
 | Date | Change | Source |
 |---|---|---|
 | 2026-10-23 | Each section has one focal point. Plates reserve a named quiet zone for the headline and UI, and text over that zone must meet WCAG 2.2 AA. | Tim focal-point rule |
-| 2026-10-23 | Imagery color rules are also in the UI contract and MKT-D16. Blocking checks are the companion PRs from agent bc-385e97f8. | Tim color rule |
+| 2026-10-23 | Imagery color rules are also in the UI contract and MKT-D17. Blocking checks are the companion PRs from agent bc-385e97f8. | Tim color rule |
 | 2026-10-23 | Imagery never mixes colors in one image. Gradient falloff is neutral black. Fades and light reveals are a lit wedge, with the rest to black. | Tim color rule |
 | 2026-10-23 | Imagery uses one scene accent per section and image. Gradients fall off to neutral black. Prompt templates name that hue and forbid secondary hues. | Tim color rule |
 | 2026-10-23 | Added hero scroll behavior as design intent: full-bleed opening, native zoom into a cinematic card, token-glass header, felt theme. The current build is not claimed finished. | Tim hero-scroll intent |
