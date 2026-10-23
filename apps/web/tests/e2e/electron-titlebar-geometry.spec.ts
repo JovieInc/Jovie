@@ -200,9 +200,23 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
 
   const tokens = await page.evaluate(() => {
     const rootStyle = getComputedStyle(document.documentElement);
+    // Custom properties compute to their substituted token stream, not a
+    // resolved length: a token declared as calc() (the traffic-light safe
+    // width) never matches a bare px literal via getPropertyValue. Plain px
+    // tokens read directly; anything else resolves through a hidden probe
+    // element so the calc computes to its used px width.
     const readPx = (name: string) => {
       const raw = rootStyle.getPropertyValue(name).trim();
-      const match = /^([\d.]+)px$/.exec(raw);
+      const direct = /^([\d.]+)px$/.exec(raw);
+      if (direct) return Number.parseFloat(direct[1]);
+      const probe = document.createElement('div');
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      probe.style.width = `var(${name})`;
+      document.documentElement.appendChild(probe);
+      const used = getComputedStyle(probe).width;
+      probe.remove();
+      const match = /^([\d.]+)px$/.exec(used);
       return match ? Number.parseFloat(match[1]) : null;
     };
     return {

@@ -191,7 +191,7 @@
     },
     "release-replay": {
       "entityId": "<controller workflow file>#<run id>@<run attempt> (the failed controller attempt)",
-      "description": "One failed Staging/Production Controller attempt, from its failure to the replay decision of controller-quota-replay.yml. Only transient failures (quota, GitHub 5xx, network, runner loss) are replayed, at most to attempt 3.",
+      "description": "One failed Staging/Production Controller attempt, from its failure to the replay decision of controller-quota-replay.yml. Only transient failures (quota, GitHub 5xx, network, runner loss) of attempt 1 at current main are replayed, by rerunning the source CI run, at most to CI attempt 3.",
       "endToEnd": [["blocked", "replayed"]],
       "stages": [
         {
@@ -203,7 +203,7 @@
         },
         {
           "id": "replayed",
-          "meaning": "gh run rerun --failed was accepted for the attempt",
+          "meaning": "gh run rerun of the exact source CI run was accepted",
           "producer": "controller-quota-replay.yml",
           "status": "pushed",
           "source": "release-replay-receipts"

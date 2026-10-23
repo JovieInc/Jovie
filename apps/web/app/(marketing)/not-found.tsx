@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { MarketingContainer } from '@/components/marketing';
 
-export const revalidate = false;
+// Fully static through `(marketing)/layout.tsx`, which already exports
+// `revalidate = false`. This file stays out of the legacy segment-cache count.
 
 /**
  * Not-found page for all marketing routes.
