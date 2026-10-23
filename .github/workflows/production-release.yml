@@ -1288,6 +1288,10 @@ jobs:
               fail_performance_gate "Authenticated exact-build browser state was not persisted."
             fi
 
+            # JOV-8557: authenticated six-route budgets graduated independently
+            # at 14/14 on 2026-10-23. Receipt and native job/log identities:
+            # docs/performance/authenticated-performance-graduation.json.
+            # Neither staging.jov.ie nor public-profile alias results count.
             if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
               --base-url "$deployment_url" \
               --auth-path "$auth_state" \
@@ -1298,8 +1302,7 @@ jobs:
               --route-id creator-contacts \
               --route-id creator-calendar \
               --route-id creator-tasks; then
-              echo "::warning::Canonical six-route browser budgets failed on the exact staged build."
-              echo "authenticated_performance_status=warn" >> "$GITHUB_OUTPUT"
+              fail_performance_gate "Canonical six-route browser budgets failed on the exact staged build (JOV-8557)."
             else
               echo "authenticated_performance_status=passed" >> "$GITHUB_OUTPUT"
             fi
