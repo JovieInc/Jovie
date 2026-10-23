@@ -965,6 +965,37 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/product/traffic-quality/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/traffic-quality/TrafficQualityLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'Traffic quality filter ships on /product/traffic-quality',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live traffic quality filter. A signed-in owner visit or click is not stored. A bot visit is dropped before it is stored. Counts skip click rows marked as bots. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/traffic-quality',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/molecules/settings/SettingsToggleRow.tsx',
+      testId: 'traffic-quality-filter',
+    },
+    healthCheck: {
+      path: '/product/traffic-quality',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
     glob: '(marketing)/product/isrc/page.tsx',
     recipeId: 'feature',
     renderedSections: [

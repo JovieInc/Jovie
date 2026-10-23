@@ -1,0 +1,22 @@
+/* The marketing shell clamps every h1 to two painted lines at zero
+   specificity. This class keeps the page title complete. */
+.traffic-quality-title {
+  display: block;
+  max-block-size: none;
+  overflow: visible;
+  -webkit-box-orient: initial;
+  -webkit-line-clamp: unset;
+}
+
+.traffic-quality-stage {
+  min-height: 100svh;
+}
+
+.traffic-quality-glow {
+  height: 28rem;
+}
+
+.traffic-quality-card {
+  margin-bottom: -5.5rem;
+  padding-bottom: 7.5rem;
+}

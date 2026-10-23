@@ -189,6 +189,15 @@ export const MARKETING_PAGE_CONTRACTS = {
     successEvent: 'visitor copies a tracked link',
     primaryCta: START_CTA,
   },
+  '(marketing)/product/traffic-quality/page.tsx': {
+    routeGlob: '(marketing)/product/traffic-quality/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_TRAFFIC_QUALITY,
+    job: 'keep owner visits and bot visits out of stored counts',
+    proof: 'live traffic quality filter with High quality only and All traffic',
+    successEvent: 'visitor toggles the traffic quality filter',
+    primaryCta: START_CTA,
+  },
   '(marketing)/product/isrc/page.tsx': {
     routeGlob: '(marketing)/product/isrc/page.tsx',
     copyScope: 'shared',
