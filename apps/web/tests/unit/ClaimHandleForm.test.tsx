@@ -58,9 +58,7 @@ describe('ClaimHandleForm', () => {
       resolve(__dirname, '../../app/globals.css'),
       'utf8'
     );
-    expect(focusCss).toContain(
-      '.focus-field-inset:has(input:focus-visible)'
-    );
+    expect(focusCss).toContain('.focus-field-inset:has(input:focus-visible)');
     expect(focusCss).toContain(
       'box-shadow: inset 0 0 0 2px var(--color-focus)'
     );

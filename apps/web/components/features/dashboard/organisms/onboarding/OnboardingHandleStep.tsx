@@ -43,7 +43,7 @@ function SubmitButtonIcon({
   autoSubmitClaimed: boolean;
 }>) {
   if (isLoading || checking) {
-    return <LoadingSpinner size='sm' className='text-current' />;
+    return <LoadingSpinner size='sm' tone='inverse' />;
   }
   if (autoSubmitClaimed) {
     return (
