@@ -401,3 +401,32 @@ describe('EmailCodeAuthForm pre-hydration guard', () => {
     );
   });
 });
+
+describe('EmailCodeAuthForm page alignment', () => {
+  it('left-aligns the code step on full-page shells without touching overlay centering', async () => {
+    render(
+      <EmailCodeAuthForm mode='sign-in' redirectUrl='/app' align='left' />
+    );
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'artist@example.com' },
+    });
+    fireEvent.submit(
+      screen.getByLabelText(/email/i).closest('form') as HTMLFormElement
+    );
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-auth-email-code-step="code"]')
+      ).toBeTruthy()
+    );
+    const step = document.querySelector('[data-auth-email-code-step="code"]');
+    const intro = step?.querySelector('p');
+    expect(intro?.className).toContain('text-left');
+    expect(intro?.className).not.toContain('text-center');
+  });
+
+  it('keeps overlay captures centered by default', () => {
+    render(<EmailCodeAuthForm mode='sign-up' redirectUrl='/start' />);
+    const form = document.querySelector('[data-auth-email-code-step="email"]');
+    expect(form?.querySelector('label')?.className).toContain('text-sm');
+  });
+});
