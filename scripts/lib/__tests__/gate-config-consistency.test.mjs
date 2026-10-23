@@ -167,6 +167,27 @@ flags:
     );
   });
 
+  it('treats the Chromatic GitHub action as a live workflow', () => {
+    const root = mkdtempSync(join(tmpdir(), 'gate-config-'));
+    writeWorkflow(root, 'coverage.yml', NIGHTLY_COVERAGE);
+    writeWorkflow(
+      root,
+      'chromatic.yml',
+      `name: Chromatic
+on:
+  pull_request:
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: chromaui/action@v11
+`
+    );
+    writeFileSync(join(root, 'codecov.yml'), MATCHING_CODECOV);
+    writeFileSync(join(root, 'chromatic.config.json'), '{}\n');
+    expect(auditGateConfigs(root)).toEqual([]);
+  });
+
   it('rejects Chromatic config and the Storybook addon when no workflow runs Chromatic', () => {
     const root = mkdtempSync(join(tmpdir(), 'gate-config-'));
     writeWorkflow(root, 'coverage.yml', NIGHTLY_COVERAGE);

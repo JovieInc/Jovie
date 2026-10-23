@@ -25,7 +25,7 @@ export const WEB_PACKAGE = 'apps/web/package.json';
 const WORKFLOW_DIR = '.github/workflows';
 
 const CHROMATIC_RUN =
-  /(?:chromatic-com\/action@|uses:\s*['"]?chromatic\/|npx\s+chromatic\b|\bpnpm\s+(?:exec\s+)?chromatic\b)/u;
+  /(?:chromaui\/action@|chromatic-com\/action@|uses:\s*['"]?chromatic\/|npx\s+chromatic\b|\bpnpm\s+(?:exec\s+)?chromatic\b)/u;
 
 /** @param {unknown} value @returns {Record<string, unknown>} */
 function asMapping(value) {
