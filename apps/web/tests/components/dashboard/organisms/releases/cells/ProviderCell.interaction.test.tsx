@@ -1,9 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { AvailabilityCell } from '@/features/dashboard/organisms/releases/cells/AvailabilityCell';
 import { ProviderCell } from '@/features/dashboard/organisms/releases/cells/ProviderCell';
+import { NotFoundCopyButton } from '@/features/dashboard/organisms/releases/components/NotFoundCopyButton';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 vi.mock('@/lib/utils/platform-detection', () => ({
@@ -112,5 +115,72 @@ describe('ProviderCell actions', () => {
         'utf8'
       )
     ).toContain("'border-success/15 bg-success/10 text-success'");
+  });
+});
+
+describe('Ion-token feedback on availability surfaces', () => {
+  it('renders the manual-status ring and copied feedback on tokens inside the availability popover', async () => {
+    const onCopy = vi.fn().mockResolvedValue('copied');
+    const manualRelease: ReleaseViewModel = {
+      ...release,
+      providers: [
+        {
+          key: 'spotify' as ProviderKey,
+          url: 'https://open.spotify.com/track/abc',
+          path: '/r/midnight-signal?utm_source=spotify',
+          label: 'Spotify',
+          isPrimary: true,
+          source: 'manual',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+
+    render(
+      <TooltipProvider>
+        <AvailabilityCell
+          release={manualRelease}
+          allProviders={['spotify']}
+          providerConfig={{ spotify: { label: 'Spotify', accent: '#1DB954' } }}
+          onCopy={onCopy}
+        />
+      </TooltipProvider>
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show Provider Availability Details' })
+    );
+
+    const statusDot = document.querySelector('span.ring-2');
+    expect(statusDot).not.toBeNull();
+    expect(statusDot?.className).toContain('ring-quaternary-token/40');
+    expect(statusDot?.className).not.toContain('amber');
+
+    await user.click(screen.getByRole('button', { name: 'Copy Spotify link' }));
+    await waitFor(() => {
+      const copied = screen.getByRole('button', {
+        name: 'Copied Spotify link',
+      });
+      expect(copied.className).toContain('text-success');
+      expect(copied.className).not.toMatch(/emerald|amber/);
+    });
+  });
+
+  it('renders the not-found copy feedback on the success token when copied', () => {
+    render(
+      <NotFoundCopyButton
+        testId='copy-not-found-release-1'
+        releaseTitle='Midnight Signal'
+        smartLinkPath='/r/midnight-signal'
+        isCopied
+        onCopy={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+
+    const button = screen.getByRole('button');
+    expect(button.className).toContain('border-success/15');
+    expect(button.className).toContain('bg-success/10');
+    expect(button.className).toContain('text-success');
+    expect(button.className).not.toMatch(/emerald|amber/);
   });
 });
