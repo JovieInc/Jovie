@@ -54,6 +54,7 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.marketing-release-scheduling': '/product/release-scheduling',
   'web.marketing-dsp-links': '/product/dsp-links',
   'web.marketing-isrc': '/product/isrc',
+  'web.marketing-pre-save': '/product/pre-save',
   'web.marketing-link-analytics': '/product/link-analytics',
   'web.marketing-card': '/card',
   'web.marketing-smart-links': '/smart-links',
@@ -249,6 +250,7 @@ web.marketing-release-scheduling|web|marketing-release-scheduling|apps/web/app/(
 web.marketing-dsp-links|web|marketing-dsp-links|apps/web/app/(marketing)/product/dsp-links/page.tsx|desktop,mobile
 web.marketing-product-utm-links|web|marketing-product-utm-links|apps/web/app/(marketing)/product/utm-links/page.tsx|desktop,mobile
 web.marketing-isrc|web|marketing-isrc|apps/web/app/(marketing)/product/isrc/page.tsx|desktop,mobile
+web.marketing-pre-save|web|marketing-pre-save|apps/web/app/(marketing)/product/pre-save/page.tsx|desktop,mobile
 web.marketing-link-analytics|web|marketing-link-analytics|apps/web/app/(marketing)/product/link-analytics/page.tsx|desktop,mobile
 web.marketing-smart-links|web|marketing-smart-links|apps/web/app/(marketing)/smart-links/page.tsx|desktop,mobile
 web.marketing-pay|web|marketing-pay|apps/web/app/(marketing)/pay/page.tsx|desktop,mobile

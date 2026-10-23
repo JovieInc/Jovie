@@ -472,6 +472,7 @@ export const NAV_LABEL_DESTINATIONS = Object.freeze({
   'DSP Links': ['PRODUCT_DSP_LINKS'],
   'UTM Links': ['PRODUCT_UTM_LINKS'],
   ISRC: ['PRODUCT_ISRC'],
+  'Pre-save': ['PRODUCT_PRE_SAVE'],
   'Link analytics': ['PRODUCT_LINK_ANALYTICS'],
   Pricing: ['PRICING'],
   'Log in': ['SIGNIN'],

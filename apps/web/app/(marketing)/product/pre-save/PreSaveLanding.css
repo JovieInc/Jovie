@@ -1,0 +1,22 @@
+/* The marketing shell clamps every h1 to two painted lines at zero
+   specificity. This class keeps the page title complete. */
+.pre-save-title {
+  display: block;
+  max-block-size: none;
+  overflow: visible;
+  -webkit-box-orient: initial;
+  -webkit-line-clamp: unset;
+}
+
+.pre-save-stage {
+  min-height: 100svh;
+}
+
+.pre-save-glow {
+  height: 28rem;
+}
+
+.pre-save-card {
+  margin-bottom: -5.5rem;
+  padding-bottom: 7.5rem;
+}
