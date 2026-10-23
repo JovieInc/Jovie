@@ -25,9 +25,9 @@ import {
   CATALOG_OUTPUT_DIR,
   hideTransientUI,
   PUBLIC_EXPORT_DIR,
+  prepareImagesForScreenshot,
   SCREENSHOT_CLOCK_ISO,
   TIMEOUTS,
-  prepareImagesForScreenshot,
   waitForSettle,
 } from './helpers';
 import { captureOnlyWhenImagesReady } from './image-prep-policy';

@@ -3,12 +3,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { PRODUCER } from './screen-proof-resolver.mjs';
 import {
   resolveProducerJobId,
   selectProducerJobId,
   UNKNOWN_PRODUCER_JOB_NAME,
 } from './resolve-screenshot-producer-job.mjs';
+import { PRODUCER } from './screen-proof-resolver.mjs';
 
 const producer = (id, conclusion = 'success') => ({
   name: PRODUCER.job,
