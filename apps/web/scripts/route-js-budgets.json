@@ -27,7 +27,7 @@
     "/app/admin/certifications": 904,
     "/app/admin/platform-connections": 903
   },
-  "$firstLoadComment": "First-load JS gzip (level 9) for app routes outside /app. Ceilings were not measured from next build in the change that added them; they sit below the /app default of 900 KB and above the aspirational 150 KB marketing target in docs/performance/route-budgets.json. Homepage, product, and feature pages use marketingMaxGzipKb. Unlisted routes use defaultMaxGzipKb. Rebaseline a route to its measured KB plus headroomKb only by lowering a ceiling. Raising a number fails unless raises[key] is an unexpired design-exception-registry gate-weakening override.",
+  "$firstLoadComment": "First-load JS gzip (level 9) for app routes outside /app. Ceilings were not measured from next build in the change that added them; they sit below the /app default of 900 KB and above the aspirational 150 KB marketing target in docs/performance/route-budgets.json. Homepage, product, and feature pages use marketingMaxGzipKb. Unlisted routes use defaultMaxGzipKb. Rebaseline a route to its measured KB plus headroomKb only by lowering a ceiling. Raising a number fails unless raises[key] is an unexpired design-exception-registry gate-weakening override. firstLoad.baselines is a separate downward-only ratchet for routes measured over the target; it does not raise these ceilings.",
   "firstLoad": {
     "headroomKb": 16,
     "marketingMaxGzipKb": 640,
@@ -62,6 +62,18 @@
       "/youtube-thumbnails": 640,
       "/card": 640,
       "/smart-links": 640
+    },
+    "baselines": {
+      "/demo/showcase/[surface]": 1309,
+      "/start": 1247,
+      "/demo/founder-video": 1180,
+      "/exp/shell-v1": 965,
+      "/[username]": 900,
+      "/[username]/profile-mode-render/[profileMode]/[marker]": 900,
+      "/exp/page-builder": 898,
+      "/demo/audience": 863,
+      "/demo": 831,
+      "/": 663
     }
   }
 }

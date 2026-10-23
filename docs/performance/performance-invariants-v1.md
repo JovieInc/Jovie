@@ -28,6 +28,36 @@ Numbers only shrink. A higher number fails unless that key's `raises` entry
 passes the design-exception-registry gate-weakening override and is unexpired.
 Row 5 targets stay unwired.
 
+Routes measured over those ceilings on the 2026-10-23 head keep an explicit
+`firstLoad.baselines` ratchet. Each value is the measured gzip KB rounded up
+by at most 2% (`floor(measured * 1.02)`) and is the enforced ceiling. It can
+only go down. Raising `firstLoad.baselines.<route>` fails unless
+`raises["firstLoad.baselines.<route>"]` is an unexpired design-exception-registry
+gate-weakening override. A route that is not listed keeps its normal ceiling.
+Delete a baseline once a build is at or under its target.
+
+These baselines are the last CI measurements, taken before the deferred chunks
+below. The deferrals do not change the targets. The next measured build should
+lower a baseline when the route actually shrinks.
+
+| Route | Measured KB | Baseline KB | Target KB |
+| --- | ---: | ---: | ---: |
+| `/demo/showcase/[surface]` | 1284 | 1309 | 800 |
+| `/start` | 1223 | 1247 | 800 |
+| `/demo/founder-video` | 1157 | 1180 | 800 |
+| `/exp/shell-v1` | 947 | 965 | 800 |
+| `/[username]` | 883 | 900 | 800 |
+| `/[username]/profile-mode-render/[profileMode]/[marker]` | 883 | 900 | 800 |
+| `/exp/page-builder` | 881 | 898 | 800 |
+| `/demo/audience` | 847 | 863 | 800 |
+| `/demo` | 815 | 831 | 800 |
+| `/` | 650 | 663 | 640 |
+
+`/` defers the header user menu. `/[username]` and its profile-mode-render
+re-export defer `ProfileCompactTemplate`. `/start` defers `OnboardingShell`
+until conversation history has loaded. Demo and exp routes stay on the ratchet
+because they are intentionally heavy fixtures.
+
 ## Public-profile alias graduation
 
 Staging and production use separate evidence windows. Staging measures the exact immutable

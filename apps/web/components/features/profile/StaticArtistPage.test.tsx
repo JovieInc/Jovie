@@ -34,7 +34,7 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
 }));
 
 describe('StaticArtistPage', () => {
-  it('forwards catalog load failure instead of an empty catalog', () => {
+  it('forwards catalog load failure instead of an empty catalog', async () => {
     render(
       <StaticArtistPage
         mode='listen'
@@ -47,13 +47,13 @@ describe('StaticArtistPage', () => {
         releases={[]}
       />
     );
-    expect(screen.getByTestId('mock-compact-template')).toHaveAttribute(
+    expect(await screen.findByTestId('mock-compact-template')).toHaveAttribute(
       'data-catalog-load-failed',
       'true'
     );
   });
 
-  it('forwards the proof-to-claim footer onto the compact template', () => {
+  it('forwards the proof-to-claim footer onto the compact template', async () => {
     render(
       <StaticArtistPage
         mode='profile'
@@ -68,7 +68,7 @@ describe('StaticArtistPage', () => {
         proofClaim
       />
     );
-    const template = screen.getByTestId('mock-compact-template');
+    const template = await screen.findByTestId('mock-compact-template');
     expect(template).toHaveAttribute('data-proof-claim', 'true');
     expect(template).toHaveAttribute(
       'data-claim-footer-href',
@@ -80,7 +80,7 @@ describe('StaticArtistPage', () => {
     );
   });
 
-  it('forwards release credits onto the compact template', () => {
+  it('forwards release credits onto the compact template', async () => {
     render(
       <StaticArtistPage
         mode='profile'
@@ -106,13 +106,13 @@ describe('StaticArtistPage', () => {
         ]}
       />
     );
-    expect(screen.getByTestId('mock-compact-template')).toHaveAttribute(
+    expect(await screen.findByTestId('mock-compact-template')).toHaveAttribute(
       'data-release-credits',
       'Producer'
     );
   });
 
-  it('forwards selected-credit segments onto the compact template (JOV-6199)', () => {
+  it('forwards selected-credit segments onto the compact template (JOV-6199)', async () => {
     render(
       <StaticArtistPage
         mode='profile'
@@ -132,7 +132,7 @@ describe('StaticArtistPage', () => {
         ]}
       />
     );
-    expect(screen.getByTestId('mock-compact-template')).toHaveAttribute(
+    expect(await screen.findByTestId('mock-compact-template')).toHaveAttribute(
       'data-credit-segments',
       'text|release|text'
     );

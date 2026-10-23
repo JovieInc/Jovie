@@ -2,10 +2,20 @@
 
 import { Button } from '@jovie/ui';
 import type { UIMessage } from 'ai';
+import dynamic from 'next/dynamic';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { useJovieAuth } from '@/hooks/useJovieAuth';
-import { OnboardingShell, type OnboardingShellProps } from './OnboardingShell';
+import type { OnboardingShellProps } from './OnboardingShell';
+
+// Chat shell (AI SDK, app frame, profile rail) loads after history resolves.
+const OnboardingShell = dynamic(
+  () =>
+    import('./OnboardingShell').then(mod => ({
+      default: mod.OnboardingShell,
+    })),
+  { loading: () => null }
+);
 
 interface Snapshot {
   readonly identityId: string | null;

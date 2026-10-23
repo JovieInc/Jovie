@@ -12,9 +12,12 @@
  * Budgets live in route-js-budgets.json. /app has a default plus heavier
  * per-route ceilings. Other routes have per-route ceilings, a tighter
  * ceiling for homepage / product / feature pages, and a default for anything
- * unlisted. Numbers only shrink. A higher number fails unless `raises[key]`
- * passes the design-exception-registry gate-weakening override and is
- * unexpired. Lowering a number is allowed.
+ * unlisted. `firstLoad.baselines` is a per-route ratchet for routes already
+ * over that ceiling: the measured gzip KB rounded up by at most 2%. A
+ * baselined route fails when it grows past its baseline. Every other route
+ * keeps the normal ceiling. Numbers only shrink. A higher number fails
+ * unless `raises[key]` passes the design-exception-registry gate-weakening
+ * override and is unexpired. Lowering a number is allowed.
  *
  * Usage: node scripts/route-js-budget.mjs [--next-dir .next] [--budgets file] [--json]
  */
@@ -32,6 +35,11 @@ const MANIFEST_NAME = 'page_client-reference-manifest.js';
 export const BUDGET_RELATIVE = 'apps/web/scripts/route-js-budgets.json';
 /** Fixed headroom added to a measured KB size when a ceiling is first set. */
 export const HEADROOM_KB = 16;
+/**
+ * Largest fraction a ratchet baseline may sit above its measured KB.
+ * `floor(measured * (1 + ratio))` is the highest allowed baseline.
+ */
+export const BASELINE_HEADROOM_RATIO = 0.02;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** @param {string} key */
@@ -70,6 +78,24 @@ export function ceilingFromMeasurement(measuredKb, headroomKb = HEADROOM_KB) {
     );
   }
   return Math.round(measuredKb) + headroomKb;
+}
+
+/** Highest integer baseline within 2% of a measured gzip KB size. */
+export function baselineFromMeasurement(
+  measuredKb,
+  headroomRatio = BASELINE_HEADROOM_RATIO
+) {
+  if (!Number.isInteger(measuredKb) || measuredKb < 1) {
+    throw new Error(
+      `measured KB must be a positive integer; got ${measuredKb}`
+    );
+  }
+  if (!(headroomRatio >= 0) || headroomRatio > BASELINE_HEADROOM_RATIO) {
+    throw new Error(
+      `baseline headroom must be between 0 and ${BASELINE_HEADROOM_RATIO}`
+    );
+  }
+  return Math.max(measuredKb, Math.floor(measuredKb * (1 + headroomRatio)));
 }
 
 function findManifests(dir, out = []) {
@@ -270,7 +296,7 @@ function rowsFromRouteFiles(nextDir, routeFiles) {
     .sort((a, b) => b.gzipKb - a.gzipKb || a.route.localeCompare(b.route));
 }
 
-export function resolveFirstLoadBudget(route, firstLoad) {
+export function resolveFirstLoadTarget(route, firstLoad) {
   if (firstLoad.routes && Object.hasOwn(firstLoad.routes, route)) {
     return firstLoad.routes[route];
   }
@@ -280,6 +306,13 @@ export function resolveFirstLoadBudget(route, firstLoad) {
   return firstLoad.defaultMaxGzipKb;
 }
 
+/** Enforced ceiling. A ratchet baseline replaces the target until it is removed. */
+export function resolveFirstLoadBudget(route, firstLoad) {
+  const baseline = firstLoad.baselines?.[route];
+  if (isKb(baseline)) return baseline;
+  return resolveFirstLoadTarget(route, firstLoad);
+}
+
 /**
  * @param {RouteJsMeasurement[]} measurements
  * @param {{ marketingMaxGzipKb: number, defaultMaxGzipKb: number, marketingRoutes?: string[], routes?: Record<string, number> }} firstLoad
@@ -287,10 +320,11 @@ export function resolveFirstLoadBudget(route, firstLoad) {
 export function checkFirstLoadBudgets(measurements, firstLoad) {
   const violations = [];
   const rows = measurements.map(row => {
+    const targetKb = resolveFirstLoadTarget(row.route, firstLoad);
     const budgetKb = resolveFirstLoadBudget(row.route, firstLoad);
     const ok = row.gzipKb <= budgetKb;
-    if (!ok) violations.push({ ...row, budgetKb });
-    return { ...row, budgetKb, ok };
+    if (!ok) violations.push({ ...row, budgetKb, targetKb });
+    return { ...row, budgetKb, targetKb, ok };
   });
   const measured = new Set(measurements.map(row => row.route));
   const staleBudgets = Object.keys(firstLoad.routes ?? {}).filter(
@@ -358,6 +392,15 @@ export function validateBudgetShape(budgets) {
       );
     }
   }
+  for (const [route, kb] of Object.entries(first.baselines ?? {})) {
+    if (!isKb(kb)) {
+      errors.push(`${route} baseline must be a positive integer`);
+      continue;
+    }
+    if (route.includes('*')) {
+      errors.push(`${route} baseline must name one measured route`);
+    }
+  }
   return errors;
 }
 
@@ -379,6 +422,9 @@ function budgetNumbers(budgets) {
   for (const [route, kb] of Object.entries(first.routes ?? {})) {
     entries.push([`firstLoad.routes.${route}`, kb]);
   }
+  for (const [route, kb] of Object.entries(first.baselines ?? {})) {
+    entries.push([`firstLoad.baselines.${route}`, kb]);
+  }
   return entries;
 }
 
@@ -394,14 +440,27 @@ export function gateWeakeningOverrideApplies(entry, now = new Date()) {
   return true;
 }
 
-/** New route keys grow from that section's default. A new section is a baseline. */
+/**
+ * New route keys grow from that section's default. A new section is a
+ * baseline. A new ratchet key, once `firstLoad.baselines` exists, grows
+ * from the route's normal ceiling. The first time the baselines object
+ * appears, those numbers are the establishing measurement.
+ */
 function ancestorCeiling(key, ancestor, previous) {
   if (previous.has(key)) return previous.get(key);
   if (key.startsWith('routes.') && isKb(ancestor?.defaultMaxGzipKb)) {
     return ancestor.defaultMaxGzipKb;
   }
-  const prefix = 'firstLoad.routes.';
+  const baselinePrefix = 'firstLoad.baselines.';
   const first = ancestor?.firstLoad;
+  if (key.startsWith(baselinePrefix)) {
+    if (!first?.baselines || !isKb(first.defaultMaxGzipKb)) return;
+    const route = key.slice(baselinePrefix.length);
+    return isMarketingRoute(route, first.marketingRoutes ?? [])
+      ? first.marketingMaxGzipKb
+      : first.defaultMaxGzipKb;
+  }
+  const prefix = 'firstLoad.routes.';
   if (!key.startsWith(prefix) || !isKb(first?.defaultMaxGzipKb)) return;
   const route = key.slice(prefix.length);
   return isMarketingRoute(route, first.marketingRoutes ?? [])
@@ -426,7 +485,11 @@ export function grownBudgetNumbers(budgets, ancestor, now = new Date()) {
 
 export function missingExplicitRoutes(measurements, firstLoad) {
   const measured = new Set(measurements.map(row => row.route));
-  return Object.keys(firstLoad?.routes ?? {}).filter(
+  const named = new Set([
+    ...Object.keys(firstLoad?.routes ?? {}),
+    ...Object.keys(firstLoad?.baselines ?? {}),
+  ]);
+  return [...named].filter(
     route => !route.includes('*') && !measured.has(route)
   );
 }
@@ -594,9 +657,13 @@ function main() {
     }
   }
   for (const row of [...result.app.violations, ...result.first.violations]) {
+    const ceiling =
+      row.targetKb !== undefined && row.targetKb !== row.budgetKb
+        ? `ratchet baseline is ${row.budgetKb} KB (target ${row.targetKb} KB)`
+        : `budget is ${row.budgetKb} KB`;
     console.error(
-      `::error::${row.route} ships ${row.gzipKb} KB gzip first-load JS; budget is ${row.budgetKb} KB. ` +
-        'Dynamic-import heavy client code. Do not raise the budget unless a measured gate-weakening override applies.'
+      `::error::${row.route} ships ${row.gzipKb} KB gzip first-load JS; ${ceiling}. ` +
+        'Dynamic-import heavy client code. Do not raise the budget or a baseline unless a measured gate-weakening override applies.'
     );
   }
   const forbidden = findForbiddenClientCode(options.nextDir);

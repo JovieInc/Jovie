@@ -49,10 +49,10 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
 }));
 
 describe('PublicProfileFixture', () => {
-  it('keeps the short unclaimed fixture source-backed', () => {
+  it('keeps the short unclaimed fixture source-backed', async () => {
     render(<PublicProfileFixture />);
 
-    expect(screen.getByTestId('profile-template')).toHaveAttribute(
+    expect(await screen.findByTestId('profile-template')).toHaveAttribute(
       'data-preview',
       'false'
     );
@@ -76,30 +76,30 @@ describe('PublicProfileFixture', () => {
     );
   });
 
-  it('exercises the maximum-name and claimed neighbors', () => {
+  it('exercises the maximum-name and claimed neighbors', async () => {
     render(<PublicProfileFixture longName state='claimed' />);
 
     expect(
-      screen.getByRole('heading', {
+      await screen.findByRole('heading', {
         name: 'The Extraordinary Midnight Radio Orchestra',
       })
     ).toBeInTheDocument();
   });
 
-  it('forwards the selected event dataset to the profile template', () => {
+  it('forwards the selected event dataset to the profile template', async () => {
     const populatedDates = HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES.slice(0, 1);
     const { rerender } = render(
       <PublicProfileFixture tourDates={populatedDates} />
     );
 
-    expect(screen.getByTestId('profile-template')).toHaveAttribute(
+    expect(await screen.findByTestId('profile-template')).toHaveAttribute(
       'data-tour-dates',
       '1'
     );
 
     rerender(<PublicProfileFixture tourDates={[]} />);
 
-    expect(screen.getByTestId('profile-template')).toHaveAttribute(
+    expect(await screen.findByTestId('profile-template')).toHaveAttribute(
       'data-tour-dates',
       '0'
     );

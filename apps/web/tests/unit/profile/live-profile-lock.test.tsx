@@ -223,10 +223,13 @@ describe('live public profile lock', () => {
       </>
     );
 
-    expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
-      'data-layout',
-      'compact'
-    );
+    // ProfileCompactTemplate is a deferred chunk, so the first render waits
+    // out its compile instead of the default one-second findBy.
+    expect(
+      await screen.findByTestId('public-profile-layout-shell', undefined, {
+        timeout: 20000,
+      })
+    ).toHaveAttribute('data-layout', 'compact');
     // The desktop surface is server-rendered (hidden) on mobile (JOV-6452);
     // jsdom ignores the CSS that hides it, so scope to the compact slot.
     const compact = within(

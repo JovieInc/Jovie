@@ -87,7 +87,9 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-compact-template')).toBeInTheDocument();
+    expect(
+      await screen.findByTestId('profile-compact-template')
+    ).toBeInTheDocument();
   });
 
   it('passes the profile banner into the fixed compact shell', async () => {
@@ -107,10 +109,9 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
-      'data-has-profile-banner',
-      'true'
-    );
+    expect(
+      await screen.findByTestId('profile-compact-template')
+    ).toHaveAttribute('data-has-profile-banner', 'true');
   });
 
   it('renders the compact preview presentation when requested', async () => {
@@ -130,7 +131,9 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-compact-template')).toBeInTheDocument();
+    expect(
+      await screen.findByTestId('profile-compact-template')
+    ).toBeInTheDocument();
   });
 
   it('marks compact previews as embedded so the viewport lock skips them (JOV-4932)', async () => {
@@ -150,10 +153,9 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
-      'data-embedded-preview',
-      'true'
-    );
+    expect(
+      await screen.findByTestId('profile-compact-template')
+    ).toHaveAttribute('data-embedded-preview', 'true');
   });
 
   it('keeps the live public profile as the outer (non-embedded) document', async () => {
@@ -172,10 +174,9 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
-      'data-embedded-preview',
-      'false'
-    );
+    expect(
+      await screen.findByTestId('profile-compact-template')
+    ).toHaveAttribute('data-embedded-preview', 'false');
   });
 
   it('forwards mode to the live compact presentation by default', async () => {
@@ -195,7 +196,9 @@ describe('StaticArtistPage', () => {
     );
 
     expect(
-      screen.getByTestId('profile-compact-template').getAttribute('data-mode')
+      (await screen.findByTestId('profile-compact-template')).getAttribute(
+        'data-mode'
+      )
     ).toBe('listen');
   });
 
@@ -217,7 +220,7 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    const template = screen.getByTestId('profile-compact-template');
+    const template = await screen.findByTestId('profile-compact-template');
     expect(template.getAttribute('data-mode')).toBe('tour');
     expect(
       template.getAttribute('data-show-subscription-confirmed-banner')
@@ -242,10 +245,9 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
-      'data-hide-more-menu',
-      'true'
-    );
+    expect(
+      await screen.findByTestId('profile-compact-template')
+    ).toHaveAttribute('data-hide-more-menu', 'true');
   });
 
   it('remounts the active renderer when artist identity changes', async () => {
@@ -264,9 +266,9 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    const firstMountId = screen
-      .getByTestId('profile-compact-template')
-      .getAttribute('data-mount-id');
+    const firstMountId = (
+      await screen.findByTestId('profile-compact-template')
+    ).getAttribute('data-mount-id');
 
     rerender(
       <StaticArtistPage
@@ -284,9 +286,9 @@ describe('StaticArtistPage', () => {
       />
     );
 
-    const secondMountId = screen
-      .getByTestId('profile-compact-template')
-      .getAttribute('data-mount-id');
+    const secondMountId = (
+      await screen.findByTestId('profile-compact-template')
+    ).getAttribute('data-mount-id');
 
     expect(firstMountId).not.toBe(secondMountId);
   });

@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  baselineFromMeasurement,
   ceilingFromMeasurement,
   checkBudgets,
   checkFirstLoadBudgets,
@@ -126,6 +127,8 @@ describe('route-js-budget', () => {
         marketingMaxGzipKb: number;
         defaultMaxGzipKb: number;
         headroomKb: number;
+        routes: Record<string, number>;
+        baselines: Record<string, number>;
       };
     };
 
@@ -142,6 +145,23 @@ describe('route-js-budget', () => {
       budgets.defaultMaxGzipKb
     );
     expect(budgets.firstLoad.headroomKb).toBe(HEADROOM_KB);
+    expect(budgets.firstLoad.marketingMaxGzipKb).toBe(640);
+    expect(budgets.firstLoad.defaultMaxGzipKb).toBe(800);
+    expect(budgets.defaultMaxGzipKb).toBe(900);
+    expect(budgets.firstLoad.routes['/']).toBe(640);
+    expect(budgets.firstLoad.baselines).toEqual({
+      '/demo/showcase/[surface]': baselineFromMeasurement(1284),
+      '/start': baselineFromMeasurement(1223),
+      '/demo/founder-video': baselineFromMeasurement(1157),
+      '/exp/shell-v1': baselineFromMeasurement(947),
+      '/[username]': baselineFromMeasurement(883),
+      '/[username]/profile-mode-render/[profileMode]/[marker]':
+        baselineFromMeasurement(883),
+      '/exp/page-builder': baselineFromMeasurement(881),
+      '/demo/audience': baselineFromMeasurement(847),
+      '/demo': baselineFromMeasurement(815),
+      '/': baselineFromMeasurement(650),
+    });
     expect(grownBudgetNumbers(budgets, budgets)).toEqual([]);
     const ancestor = readBudgetAncestor(join(__dirname, '../..'), {
       fetch: false,
@@ -184,6 +204,7 @@ function firstLoadBudgets() {
       defaultMaxGzipKb: 80,
       marketingRoutes: ['/', '/product', '/solutions/*'],
       routes: { '/': 32, '/product': 32 } as Record<string, number>,
+      baselines: {} as Record<string, number>,
     },
     raises: undefined as
       | Record<string, ReturnType<typeof validRaise>>
@@ -246,6 +267,11 @@ describe('first-load JS budgets', () => {
   it('adds a fixed headroom to a measured size', () => {
     expect(HEADROOM_KB).toBe(16);
     expect(ceilingFromMeasurement(100)).toBe(116);
+    expect(baselineFromMeasurement(1284)).toBe(1309);
+    expect(baselineFromMeasurement(650)).toBe(663);
+    expect(baselineFromMeasurement(650)).toBeLessThanOrEqual(
+      Math.floor(650 * 1.02)
+    );
     expect(isMarketingRoute('/solutions/artists', ['/solutions/*'])).toBe(true);
     expect(isMarketingRoute('/about', ['/', '/product'])).toBe(false);
   });
@@ -382,5 +408,66 @@ describe('first-load JS budgets', () => {
         NOW
       )
     ).toEqual([]);
+  });
+
+  it('enforces a downward-only ratchet and leaves every other route on its target', () => {
+    const budgets = firstLoadBudgets();
+    budgets.firstLoad.baselines = { '/about': 90, '/': 40 };
+    const rows = measureFirstLoadJs(buildFirstLoadFixture());
+    const result = checkFirstLoadBudgets(
+      rows.filter(row => row.route !== '/app/chat'),
+      budgets.firstLoad
+    );
+    expect(result.violations).toEqual([]);
+    expect(result.rows.find(row => row.route === '/about')?.budgetKb).toBe(90);
+    expect(result.rows.find(row => row.route === '/about')?.targetKb).toBe(80);
+    expect(result.rows.find(row => row.route === '/')?.budgetKb).toBe(40);
+    expect(result.rows.find(row => row.route === '/')?.targetKb).toBe(32);
+    expect(result.rows.find(row => row.route === '/product')?.budgetKb).toBe(
+      32
+    );
+    expect(judge(budgets, rows).ok).toBe(true);
+
+    const overBaseline = rows.map(row =>
+      row.route === '/about' ? { ...row, gzipKb: 91 } : row
+    );
+    const stillOver = judge(budgets, overBaseline);
+    expect(stillOver.ok).toBe(false);
+    expect(stillOver.first.violations.map(row => row.route)).toEqual([
+      '/about',
+    ]);
+
+    const raised = structuredClone(budgets);
+    raised.firstLoad.baselines['/about'] = 100;
+    expect(grownBudgetNumbers(raised, budgets, NOW).join('\n')).toMatch(
+      /firstLoad\.baselines\.\/about grew 90 -> 100/
+    );
+    raised.raises = { 'firstLoad.baselines./about': validRaise() };
+    expect(grownBudgetNumbers(raised, budgets, NOW)).toEqual([]);
+    expect(judge(raised, rows, budgets).ok).toBe(true);
+
+    const added = structuredClone(budgets);
+    added.firstLoad.baselines['/extra'] = 200;
+    expect(grownBudgetNumbers(added, budgets, NOW).join('\n')).toMatch(
+      /firstLoad\.baselines\.\/extra grew 80 -> 200/
+    );
+
+    const lowered = structuredClone(budgets);
+    lowered.firstLoad.baselines['/about'] = 85;
+    expect(grownBudgetNumbers(lowered, budgets, NOW)).toEqual([]);
+
+    const withoutBaselines = structuredClone(budgets);
+    delete withoutBaselines.firstLoad.baselines;
+    expect(grownBudgetNumbers(budgets, withoutBaselines, NOW)).toEqual([]);
+
+    const unmeasured = evaluateBudgets({
+      appRows: [],
+      firstRows: rows.filter(row => row.route !== '/about'),
+      budgets,
+      ancestor: budgets,
+      now: NOW,
+    });
+    expect(unmeasured.ok).toBe(false);
+    expect(unmeasured.missing).toContain('/about');
   });
 });

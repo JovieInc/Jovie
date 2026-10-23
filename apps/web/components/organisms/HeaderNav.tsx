@@ -4,6 +4,7 @@
 import './HeaderNav.css';
 import { Button } from '@jovie/ui';
 import { ArrowUpRight, ChevronDown } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
@@ -11,11 +12,19 @@ import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { MobileNav } from '@/components/molecules/MobileNav';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
-import { UserButton } from '@/components/organisms/user-button';
 import { APP_ROUTES } from '@/constants/routes';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
+
+// User menu is client-only. Keep it out of marketing first-load JS.
+const UserButton = dynamic(
+  () =>
+    import('@/components/organisms/user-button').then(mod => ({
+      default: mod.UserButton,
+    })),
+  { loading: () => null }
+);
 
 // Linear header structure: full-width header with centered ~1000px content
 // Linear uses ~224px margins on 1440px viewport = ~984px content width
