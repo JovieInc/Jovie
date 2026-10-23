@@ -206,6 +206,8 @@ export const APP_ROUTES = {
   PAY: '/pay',
   /** Live DESIGN_READY marketing page — never 410 / reserved-gone. */
   PRODUCT: '/product',
+  /** ISRC field. Nested under /product so it is not a profile handle. */
+  PRODUCT_ISRC: '/product/isrc',
   /** Tracked-link builder. Nested under /product so it is not a profile handle. */
   PRODUCT_UTM_LINKS: '/product/utm-links',
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */

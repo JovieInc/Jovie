@@ -2880,6 +2880,11 @@ if (p.endsWith('/zip')) {
         '/instant-merch',
         'apps/web/app/(marketing)/instant-merch/page.tsx',
       ],
+      [
+        'web.marketing-product-utm-links',
+        '/product/utm-links',
+        'apps/web/app/(marketing)/product/utm-links/page.tsx',
+      ],
     ];
     for (const [screenId, route, sourcePath] of cases) {
       const root = mkdtempSync(join(tmpdir(), 'screen-registry-gap-'));
