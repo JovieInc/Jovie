@@ -96,3 +96,38 @@ test('actual PR-ready shell rejects skipped, failed, cancelled and missing selec
     0
   );
 });
+test('compare job also runs the exact marketing route spec pre-merge, unskipped and unforked from screenshots.yml', () => {
+  const capture = compare.steps.find(
+    s => s.name === 'Capture exact marketing routes (marketing-routes.spec.ts)'
+  );
+  assert.ok(capture, 'pre-merge exact-route capture step is missing');
+  assert.equal(
+    capture.if,
+    "needs.ci-path-changes.outputs.run_marketing_dom == 'true'"
+  );
+  assert.equal(
+    capture.continueOnError ?? capture['continue-on-error'],
+    undefined
+  );
+  assert.match(capture.run, /guard-playwright-artifacts\.mjs"? --run/);
+  assert.match(capture.run, /--retries=0/);
+  assert.doesNotMatch(
+    capture.run,
+    /--grep|-g |--grep-invert|--project=(?!screenshots)/
+  );
+  const production = load(
+    readFileSync(
+      new URL('../workflows/screenshots.yml', import.meta.url),
+      'utf8'
+    )
+  ).jobs.generate.steps.find(s => s.name === 'Capture exact marketing routes');
+  for (const part of [
+    'tests/product-screenshots/marketing-routes.spec.ts',
+    '--config=playwright.config.screenshots.ts',
+    '--project=screenshots',
+    '--workers=4',
+  ]) {
+    assert.ok(production.run.includes(part), `screenshots.yml lost ${part}`);
+    assert.ok(capture.run.includes(part), `pre-merge capture lost ${part}`);
+  }
+});

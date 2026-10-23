@@ -328,6 +328,18 @@ Sensitive changes are classified deterministically on source PRs. Smoke and prev
 | Public UI and profile surfaces | medium | no | yes | no |
 <!-- ci-harness:end -->
 
+### Pre-merge exact marketing route capture
+
+When a PR or merge-group head selects marketing inputs (`run_marketing_dom`),
+`Visual Snapshot Compare` also runs `tests/product-screenshots/marketing-routes.spec.ts`
+unchanged (every registered route, console/HTTP/axe quality checks, no retries)
+on the build it already made. `PR Ready` requires that job whenever marketing
+inputs are selected, so no ruleset change is needed. Before this, the same spec
+ran only on main push in `screenshots.yml` and feature pages merged untested.
+Keep the spec, config and flags identical to `screenshots.yml`'s
+`Capture exact marketing routes` step; `.github/scripts/marketing-dom-workflow.test.mjs`
+fails if they drift.
+
 ### Adopting intentional visual changes
 
 `Visual Snapshot Compare` is fail-closed (JOV-5459/JOV-5960): a PR that
