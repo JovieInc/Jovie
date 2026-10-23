@@ -89,8 +89,8 @@ export async function generateMetadata(): Promise<Metadata> {
           height: 630,
         },
       ],
-      creator: '@meetjovie',
-      site: '@meetjovie',
+      creator: COMPANY_IDENTITY.xHandle,
+      site: COMPANY_IDENTITY.xHandle,
     },
     robots: {
       index: true,
@@ -118,7 +118,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const WEBSITE_SCHEMA = buildWebsiteSchema({
-  alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
+  alternateName: [...COMPANY_IDENTITY.schemaAlternateNames],
   description: COMPANY_IDENTITY.seoDescription,
 });
 
