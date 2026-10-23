@@ -98,6 +98,37 @@ jobs:
     expect(auditGateConfigs(root)).toEqual([]);
   });
 
+  it.each(['nightly-unittests', '[nightly-unittests]'])(
+    'does not treat non-mapping flags %s as declared coverage flags',
+    flags => {
+      const root = mkdtempSync(join(tmpdir(), 'gate-config-'));
+      writeWorkflow(root, 'coverage.yml', NIGHTLY_COVERAGE);
+      writeFileSync(
+        join(root, 'codecov.yml'),
+        MATCHING_CODECOV.replace(/flags:[\s\S]*/u, `flags: ${flags}\n`)
+      );
+      expect(auditGateConfigs(root)).toEqual([
+        'a workflow uploads coverage flag "nightly-unittests" but codecov.yml does not declare it',
+      ]);
+    }
+  );
+
+  it.each([
+    'null',
+    'false',
+    '[coverage]',
+    'coverage: false',
+    'coverage: {status: false}',
+    'coverage: {status: {patch: false}}',
+    'coverage: {status: {patch: {default: false}}}',
+  ])('keeps the patch gate fail-closed for non-mapping YAML: %s', config => {
+    const root = mkdtempSync(join(tmpdir(), 'gate-config-'));
+    writeFileSync(join(root, 'codecov.yml'), config);
+    expect(auditGateConfigs(root)).toEqual([
+      'codecov.yml patch status is blocking, but no pull_request workflow uploads coverage. Exact-head Coverage in ci.yml is the pull-request line-coverage gate.',
+    ]);
+  });
+
   it('rejects a blocking patch check and a coverage flag with no producer', () => {
     const root = mkdtempSync(join(tmpdir(), 'gate-config-'));
     writeWorkflow(root, 'coverage.yml', NIGHTLY_COVERAGE);
