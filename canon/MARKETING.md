@@ -115,12 +115,28 @@ No heavy frosting. ZiaWI stays at five elevations. Locked mixes stay in
 Technical, cyberpunk, and night cues are felt, not seen, with no explanatory
 text or UI: grid lines, edge-light lines like an iPhone focus-roll edge, and
 grain. Take the literal version, abstract it, then light and focus it so only
-what matters is noticed.
+what matters is noticed. Cue color is that section's single accent in
+Imagery and color.
 
-Scene color for the cues is Scene Palette v1
+### Imagery and color
+
+One primary color per image. Each page section gets exactly one accent color,
+chosen from Scene Palette v1
 (`apps/web/data/marketing/imageColorPolicy.ts`): Ion `#3FAFF3`, Ultra
-`#A789F0`, Pulse `#EB6AC6`. The dark-first UI anchors above stay the interface
-colors.
+`#A789F0`, or Pulse `#EB6AC6`. One of those hues per section and per image.
+They are never blended in the same image. The dark-first UI anchors stay the
+interface colors. Real product captures are not recolored.
+
+When an image has a gradient, its key color is the hue of that section's
+accent. Other tones are only neutral black or near-black falloff.
+
+Orange stays forbidden as a scene or cue color. A literal triad stays
+forbidden. Blending these scene hues in one image is the same failure.
+Protected real-world color (skin, identity, safety) stays truthful and is not
+a second accent.
+
+Image-generation prompt templates name that single accent hue and forbid
+secondary hues.
 
 ### Product as hero
 
@@ -193,6 +209,9 @@ Product UI rules are unchanged.
 - Literal music signals: headphones on people, notes, or instruments as decoration.
 - Orange as a scene or cue color.
 - A literal triad.
+- A second accent hue in one section or image.
+- A gradient falloff that is not neutral black or near-black.
+- An image-generation prompt that omits its single accent hue or allows a secondary hue.
 - Canvas, WebGL, or video on the surface by default (`night-dj-harmony-v1`). Shaders and light are baked images plus CSS motion. WebGL only as a flagged, approved exception.
 - Heavy frosting, or glass that is not CSS token glass (low-opacity fill, a 1px edge highlight, soft blur).
 - AI-generated or hand-drawn illustrations of UI. AI images are lighting and mood plates only, with no UI, text, or logos; real UI is composited on top.
@@ -224,6 +243,7 @@ The executable landing-page copy workflow is in
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-23 | Imagery uses one scene accent per section and image. Gradients fall off to neutral black. Prompt templates name that hue and forbid secondary hues. | Tim color rule |
 | 2026-10-23 | Added hero scroll behavior as design intent: full-bleed opening, native zoom into a cinematic card, token-glass header, felt theme. The current build is not claimed finished. | Tim hero-scroll intent |
 | 2026-10-23 | Marketing references: Raycast for dark glass and directed light at higher fidelity; Linear-style premium for true-scale proportions. | Tim reference rule |
 | 2026-10-23 | Marketing glass is CSS token glass only. Product UI is a Playwright capture at 2x or higher from seeded demo data. AI images are mood plates with no UI, text, or logos. | Tim glass and mockup rule |
