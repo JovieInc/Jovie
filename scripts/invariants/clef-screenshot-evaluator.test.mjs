@@ -16,6 +16,7 @@ import {
   CAPTURE_VIEWPORTS,
   CONNECT_ATTEMPT_TIMEOUT_MS,
   callClef,
+  captureSurfacePng,
   ensureConnectAttemptBudget,
   evaluateScreenshots,
   MAX_REVISIONS,
@@ -69,6 +70,63 @@ test('capture viewports stay 1440 and 390, and dark is the default scheme', () =
   assert.equal(resolveCaptureViewport('unknown'), CAPTURE_VIEWPORTS.desktop);
   assert.equal(CAPTURE_COLOR_SCHEME_DEFAULT, 'dark');
   assert.equal(resolveCaptureColorScheme('light'), 'light');
+});
+
+test('capture measures browser-owned DOM geometry and closes its page', async () => {
+  const calls = [];
+  const mockup = {
+    getBoundingClientRect: () => ({ x: 42, y: 104, width: 192, height: 256 }),
+  };
+  const heading = {
+    getBoundingClientRect: () => ({ x: 26, y: 36, width: 120, height: 24 }),
+  };
+  const root = {
+    getBoundingClientRect: () => ({ x: 10, y: 20, width: 320, height: 480 }),
+    querySelector: selector =>
+      selector === '[data-pen-mockup]' ? mockup : null,
+    querySelectorAll: () => [heading],
+  };
+  const documentElement = {
+    ownerDocument: {
+      querySelector: selector => (selector === '.hero' ? root : null),
+    },
+  };
+  const page = {
+    goto: async url => calls.push(['goto', url]),
+    waitForTimeout: async wait => calls.push(['wait', wait]),
+    locator: selector => ({
+      first: () => ({ screenshot: async () => PNG }),
+      evaluate: async (callback, arg) => {
+        assert.equal(selector, 'html');
+        return callback(documentElement, arg);
+      },
+    }),
+    close: async () => calls.push(['close']),
+  };
+  const browser = /** @type {import('playwright').Browser} */ (
+    /** @type {unknown} */ ({
+      newPage: async options => {
+        calls.push(['newPage', options]);
+        return page;
+      },
+    })
+  );
+  const captured = await captureSurfacePng(browser, {
+    url: 'http://127.0.0.1/fixture',
+    viewport: 390,
+    selector: '.hero',
+    wait: 0,
+  });
+  assert.equal(captured.png, PNG);
+  assert.equal(captured.viewport, 390);
+  assert.equal(captured.mode, 'dark');
+  assert.deepEqual(captured.geometry, {
+    section: { width: 320, height: 480 },
+    mockup: { x: 32, y: 84, width: 192, height: 256 },
+    textBlocks: [{ x: 16, y: 16, width: 120, height: 24 }],
+  });
+  assert.equal(calls[0][1].colorScheme, 'dark');
+  assert.deepEqual(calls.at(-1), ['close']);
 });
 
 test('profiles select rules; app drops marketing-only rules', () => {

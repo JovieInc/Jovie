@@ -21,9 +21,9 @@ export async function withCaptureBrowser(run) { const { chromium } = await impor
 const browser = await chromium.launch(); try { return await run(browser); } finally { await browser.close(); } }
 /**
 * @param {import('playwright').Browser} browser
-* @param {{url: string, viewport?: string | number, mode?: string, selector?: string, mockupSelector?: string, click?: string, wait?: number}} [options]
+* @param {{url: string, viewport?: string | number, mode?: string, selector?: string, mockupSelector?: string, click?: string, wait?: number}} options
 */
-export async function captureSurfacePng(browser, options = {}) {
+export async function captureSurfacePng(browser, options) {
 const { url, viewport = 'desktop', mode, selector, mockupSelector, click, wait = 1500 } = options;
 const target = resolveCaptureViewport(viewport); const page = await browser.newPage({
 viewport: { width: target.width, height: target.height }, deviceScaleFactor: target.deviceScaleFactor,
@@ -32,8 +32,8 @@ await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 });
 if (click) await page.click(click, { timeout: 5_000 }).catch(() => {}); await page.waitForTimeout(wait);
 const png = selector ? await page.locator(selector).first().screenshot()
 : await page.screenshot({ fullPage: true });
-const geometry = await page.evaluate(({ sectionSelector, mockup }) => {
-const root = sectionSelector ? document.querySelector(sectionSelector) : document.documentElement;
+const geometry = await page.locator('html').evaluate((documentElement, { sectionSelector, mockup }) => {
+const root = sectionSelector ? documentElement.ownerDocument.querySelector(sectionSelector) : documentElement;
 if (!root) return null; const rect = root.getBoundingClientRect();
 const mockupEl = mockup ? root.querySelector(mockup) : root.querySelector('[data-pen-mockup]');
 const box = el => { if (!el) return null; const r = el.getBoundingClientRect();

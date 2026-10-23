@@ -50,7 +50,10 @@ else active.push(frame); } active.sort((a, b) => {
 const mode = Number(a.mode !== 'dark') - Number(b.mode !== 'dark'); if (mode) return mode;
 const viewport = Number(a.viewport !== 1440) - Number(b.viewport !== 1440); if (viewport) return viewport;
 return String(a.sectionId).localeCompare(String(b.sectionId)); }); return { active, excluded }; }
-/** @param {{route?: string, story?: string}} frame */
+/**
+* @param {{route?: string, story?: string}} frame
+* @param {{baseUrl?: string, storybookUrl?: string}} [options]
+*/
 export function frameCaptureUrl(frame, { baseUrl, storybookUrl } = {}) { if (frame.story && storybookUrl) {
 const id = encodeURIComponent(frame.story);
 return `${String(storybookUrl).replace(/\/$/, '')}/iframe.html?id=${id}&viewMode=story`; }
@@ -65,8 +68,16 @@ export function syntheticComparison() { const { pen, render } = syntheticPair();
 const compared = compareImages(pen, render); return { kind: 'synthetic', reason:
 'No canonical Pen still is on disk. This triptych exercises the diff and is not a design verdict.',
 pass: compared.judgment.pass, judgment: compared.judgment, triptych: compared.triptych, }; }
+/**
+* @typedef {ReturnType<typeof frameId> & {
+*   verdict: string, reason?: string, judgment?: ReturnType<typeof judgePair>,
+*   triptych?: ReturnType<typeof composeTriptych>
+* }} FrameResult
+*/
 export async function evaluateManifest(manifest, options = {}) { const root = options.root ?? REPO_ROOT;
-const { active, excluded } = selectFrames(manifest); const frames = []; for (const frame of active) {
+const { active, excluded } = selectFrames(manifest);
+/** @type {FrameResult[]} */
+const frames = []; for (const frame of active) {
 const stillPath = resolve(root, frame.stillPath); if (!existsSync(stillPath)) { frames.push({ ...frameId(frame),
 verdict: 'waiting', reason: 'canonical-still-missing', }); continue; } const actualHash = createHash('sha256')
 .update(readFileSync(stillPath)) .digest('hex');
