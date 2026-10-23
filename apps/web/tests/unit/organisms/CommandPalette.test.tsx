@@ -345,6 +345,22 @@ describe('CommandPalette', () => {
     await waitFor(() => expect(origin).toHaveFocus());
   });
 
+  it('opens on Cmd+K from a non-editor control that stops bubbling', async () => {
+    render(
+      withDashboard(
+        <>
+          <button type='button'>Drawer action</button>
+          <CommandPalette />
+        </>
+      )
+    );
+    const button = screen.getByRole('button', { name: 'Drawer action' });
+    button.addEventListener('keydown', event => event.stopPropagation());
+    button.focus();
+    fireEvent.keyDown(button, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
+  });
+
   it('opens the same main plane from the sidebar Search trigger', async () => {
     render(
       withDashboard(
