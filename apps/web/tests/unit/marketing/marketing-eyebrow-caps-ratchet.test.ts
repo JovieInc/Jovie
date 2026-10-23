@@ -47,9 +47,10 @@ describe('marketing eyebrow caps ratchet', () => {
     ]);
     expect(baseline.armed).toBe(true);
     const status = evaluateWarnOnlyCount(measured.count, baseline.count);
-    expect(status, measured.hits.map(hit => `${hit.file}:${hit.line}`).join('\n')).toBe(
-      'ok'
-    );
+    expect(
+      status,
+      measured.hits.map(hit => `${hit.file}:${hit.line}`).join('\n')
+    ).toBe('ok');
   });
 });
 
