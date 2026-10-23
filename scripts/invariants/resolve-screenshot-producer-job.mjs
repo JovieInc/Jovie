@@ -21,7 +21,7 @@ const positiveJobId = value =>
 /**
  * Accept only the exact Generate Screenshots job. `unknown-job` and a missing
  * row stay pending so the caller can retry. Ambiguous or invalid ids reject.
- * @param {{ jobs?: Array<{ name?: string, id?: number }> } | null | undefined} payload
+ * @param {{ jobs?: Array<{ name?: string, id?: number, conclusion?: string | null }> } | null | undefined} payload
  */
 export function selectProducerJobId(payload) {
   const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
@@ -44,8 +44,9 @@ export function selectProducerJobId(payload) {
 export async function resolveProducerJobId({
   fetchJobs,
   delays = PRODUCER_JOB_RESOLVE_DELAYS_MS,
-  sleep = async () => undefined,
+  sleep = async _ms => undefined,
 }) {
+  /** @type {ReturnType<typeof selectProducerJobId>} */
   let last = { status: 'pending', reason: 'missing-producer' };
   for (const delay of delays) {
     if (delay > 0) await sleep(delay);
