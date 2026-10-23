@@ -3859,6 +3859,51 @@ if (p.endsWith('/zip')) {
     ]);
   });
 
+  it('registers comparison detail changes separately from the index without certifying them', () => {
+    const source = 'apps/web/app/(marketing)/compare/[slug]/page.tsx';
+    for (const status of ['A', 'M']) {
+      const changedFiles = [{ path: source, status }];
+      const registration = runScreenCertification({
+        changedFiles,
+        headSha: HEAD,
+        registrationOnly: true,
+      });
+      assert.equal(
+        registration.ok,
+        true,
+        registration.receipt.issues.join('\n')
+      );
+      assert.equal(registration.receipt.status, 'source-registered');
+      assert.equal(registration.receipt.certified, false);
+      assert.deepEqual(registration.receipt.changedScreens, [
+        {
+          id: 'web.marketing-compare-detail',
+          verdict: 'evidence-required',
+          findings: [],
+        },
+      ]);
+
+      const certification = runScreenCertification({
+        changedFiles,
+        headSha: HEAD,
+      });
+      assert.equal(certification.ok, false);
+      assert.equal(certification.receipt.certified, false);
+      assert.match(
+        certification.receipt.issues.join('\n'),
+        /missing exact-head proof/
+      );
+    }
+    assert.equal(
+      classifyScreenPath('apps/web/app/(marketing)/compare/page.tsx').entry.id,
+      'web.marketing-compare'
+    );
+    assert.equal(
+      kindOf('apps/web/app/(marketing)/compare/unregistered/page.tsx'),
+      'unregistered'
+    );
+  });
+
   it('registers the alternatives marketing surfaces for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/alternatives/';
     const screen = SCREEN_REGISTRY.find(
