@@ -51,46 +51,45 @@ export function validateMutationScoreBaseline(raw) {
       continue;
     }
     const row = /** @type {Record<string, unknown>} */ (entry);
-    if (
-      typeof row.measured !== 'number' ||
-      row.measured < 0 ||
-      row.measured > 100
-    ) {
+    const measured = row.measured;
+    const floor = row.floor;
+    const valid = row.valid;
+    const runId = row.runId;
+    const sha = row.sha;
+    if (typeof measured !== 'number' || measured < 0 || measured > 100) {
       errors.push(`${file}: measured must be between 0 and 100`);
     }
-    if (typeof row.floor !== 'number' || !(row.floor > 0) || row.floor > 100) {
+    if (typeof floor !== 'number' || !(floor > 0) || floor > 100) {
       errors.push(`${file}: floor must be in (0, 100]`);
     }
     if (
-      typeof row.measured === 'number' &&
-      typeof row.floor === 'number' &&
-      row.floor > row.measured
+      typeof measured === 'number' &&
+      typeof floor === 'number' &&
+      floor > measured
     ) {
       errors.push(`${file}: floor cannot exceed the measured score`);
     }
-    if (!Number.isInteger(row.valid) || row.valid < 1) {
+    if (typeof valid !== 'number' || !Number.isInteger(valid) || valid < 1) {
       errors.push(`${file}: valid must be a positive integer`);
     }
-    if (!Number.isInteger(row.runId) || row.runId < 1) {
+    if (typeof runId !== 'number' || !Number.isInteger(runId) || runId < 1) {
       errors.push(`${file}: runId must be a positive integer`);
     }
-    if (typeof row.sha !== 'string' || !SHA_RE.test(row.sha)) {
+    if (typeof sha !== 'string' || !SHA_RE.test(sha)) {
       errors.push(`${file}: sha must be a 40-character commit`);
     }
     if (
-      typeof row.floor === 'number' &&
-      row.floor > 0 &&
-      Number.isInteger(row.valid) &&
-      row.valid > 0 &&
-      typeof row.measured === 'number'
+      typeof floor === 'number' &&
+      floor > 0 &&
+      typeof valid === 'number' &&
+      Number.isInteger(valid) &&
+      valid > 0 &&
+      typeof measured === 'number'
     ) {
       try {
         const comparison = compareRatchet(
-          { value: row.measured, sampleSize: row.valid },
-          mutationScoreRatchet(file, {
-            floor: row.floor,
-            valid: row.valid,
-          })
+          { value: measured, sampleSize: valid },
+          mutationScoreRatchet(file, { floor, valid })
         );
         if (!comparison.ok) {
           errors.push(`${file}: measured score is below its floor`);
@@ -125,10 +124,22 @@ export function loadMutationScoreBaseline(path) {
 }
 
 /**
+ * @typedef {Object} MutationScoreVerdict
+ * @property {boolean} enforced
+ * @property {boolean} [ok]
+ * @property {string} file
+ * @property {number | null} score
+ * @property {number} valid
+ * @property {number} [floor]
+ * @property {string} [status]
+ */
+
+/**
  * @param {string} file apps/web-relative
  * @param {number | null} score
  * @param {number} valid
  * @param {{ files: Record<string, { floor: number, valid: number }> }} baseline
+ * @returns {MutationScoreVerdict}
  */
 export function evaluateMutationScore(file, score, valid, baseline) {
   const entry = baseline.files[file];

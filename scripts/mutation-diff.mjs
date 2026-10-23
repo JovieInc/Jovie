@@ -182,7 +182,7 @@ for (const source of toRun) {
   }
 }
 
-/** @type {ReturnType<typeof evaluateMutationScore>[]} */
+/** @type {{ file: string, score: number | null, floor: number }[]} */
 const floorFailures = [];
 if (!values['list-only']) {
   for (const result of results) {
@@ -193,7 +193,17 @@ if (!values['list-only']) {
       scored.valid,
       scoreBaseline
     );
-    if (verdict.enforced && !verdict.ok) floorFailures.push(verdict);
+    if (
+      verdict.enforced &&
+      verdict.ok === false &&
+      typeof verdict.floor === 'number'
+    ) {
+      floorFailures.push({
+        file: verdict.file,
+        score: verdict.score,
+        floor: verdict.floor,
+      });
+    }
   }
   const summary = renderSummary({
     sources,
