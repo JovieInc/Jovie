@@ -57,7 +57,7 @@ for (const viewport of [
 
     const screenshot = testInfo.outputPath(`download-${viewport.width}.png`);
     await page.screenshot({ path: screenshot, fullPage: true });
-    await testInfo.attach('download-page', {
+    await testInfo.attach('download-page.png', {
       path: screenshot,
       contentType: 'image/png',
     });
