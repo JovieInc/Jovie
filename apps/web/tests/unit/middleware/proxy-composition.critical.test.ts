@@ -331,5 +331,29 @@ describe('proxy composition (critical)', () => {
         : config.matcher;
       expect(matcherPattern).toContain('_next');
     });
+
+    it('skips the proxy for the same-origin alias decision endpoint (JOV-8338)', async () => {
+      // The proxy's alias fast path fetches /api/profile-alias-decision
+      // same-origin on every legacy alias hop. Running the proxy again on
+      // that fetch serializes a second Node proxy invocation inside the
+      // alias redirect whenever the CDN-cached decision is not served fresh.
+      const { config } = await import('@/proxy');
+      const patterns = (
+        Array.isArray(config.matcher) ? config.matcher : [config.matcher]
+      ).map(pattern => new RegExp(`^(?:${pattern})$`));
+      const proxyRuns = (pathname: string) =>
+        patterns.some(pattern => pattern.test(pathname));
+
+      expect(proxyRuns('/api/profile-alias-decision')).toBe(false);
+      expect(proxyRuns('/api/profile-alias-decision/')).toBe(false);
+      expect(proxyRuns('/api/profile-alias-decision/extra')).toBe(false);
+      expect(proxyRuns('/api/profile-alias-decisionx')).toBe(true);
+      expect(proxyRuns('/api/profile-alias-decisions')).toBe(true);
+      expect(proxyRuns('/api/auth/session')).toBe(true);
+      expect(proxyRuns('/api/health/build-info')).toBe(true);
+      expect(proxyRuns('/api/trpc/edge')).toBe(true);
+      expect(proxyRuns('/dualipa/listen')).toBe(true);
+      expect(proxyRuns('/dualipa')).toBe(true);
+    });
   });
 });
