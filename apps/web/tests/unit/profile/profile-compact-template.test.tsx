@@ -1465,23 +1465,22 @@ describe('ProfileCompactTemplate', () => {
     replaceStateSpy.mockRestore();
   });
 
-  describe('in-flight navigation guard (claim funnel and mode races)', () => {
-    // A failing assertion must not skip spy restoration: leaked history
-    // spies poison the case that runs after the failure. The outer
-    // beforeEach re-establishes every mock before each test.
-    afterEach(() => vi.restoreAllMocks());
+  it('does not push the profile URL over a claim-funnel navigation', async () => {
+    // Golden Path claim smoke regression: the claim CTA routes to
+    // /{handle}/claim?next=auth and on into /signup while this template is
+    // still mounted through the client transition. The history sync must
+    // not write the stale profile intent back over the router's new URL, or
+    // the click is swallowed and never reaches the auth funnel.
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    window.history.replaceState(null, '', '/test-artist?claim=1');
+    // The simulated router navigation below must go through the ORIGINAL
+    // pushState: a spied pushState would record the test's own navigation
+    // and the zero-write assertion would fail on its own setup call.
+    const originalPushState = window.history.pushState.bind(globalThis.history);
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
 
-    it('does not push the profile URL over a claim-funnel navigation', async () => {
-      // Golden Path claim smoke regression: the claim CTA routes to
-      // /{handle}/claim?next=auth and on into /signup while this template is
-      // still mounted through the client transition. The history sync must
-      // not write the stale profile intent back over the router's new URL, or
-      // the click is swallowed and never reaches the auth funnel.
-      mockCanonicalProfileDSPs.mockReturnValue([]);
-      window.history.replaceState(null, '', '/test-artist?claim=1');
-      const pushStateSpy = vi.spyOn(window.history, 'pushState');
-      const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
-
+    try {
       const view = render(
         <ProfileCompactTemplate
           mode='profile'
@@ -1500,14 +1499,12 @@ describe('ProfileCompactTemplate', () => {
       expect(pushStateSpy).not.toHaveBeenCalled();
       expect(replaceStateSpy).not.toHaveBeenCalled();
       const rendersAfterLanding = mockUseProfileShell.mock.calls.length;
-      pushStateSpy.mockClear();
-      replaceStateSpy.mockClear();
 
       // The router moves the URL to the auth funnel during the transition,
       // exactly as the Next history updater does once the claim route's
       // redirect has been followed. requestedMode is still 'profile'.
       act(() => {
-        window.history.pushState(
+        originalPushState(
           window.history.state,
           '',
           '/signup?handle=test-artist'
@@ -1533,41 +1530,40 @@ describe('ProfileCompactTemplate', () => {
           '/signup?handle=test-artist'
         );
       });
-      // Exactly one history write is known: the simulated router push above.
-      // A component push during or after the navigation would be a second
-      // recorded call; the strip restore would surface on replaceState.
-      expect(pushStateSpy).toHaveBeenCalledTimes(1);
-      expect(pushStateSpy.mock.calls[0]?.[2]).toBe(
-        '/signup?handle=test-artist'
-      );
+      expect(pushStateSpy).not.toHaveBeenCalled();
       expect(replaceStateSpy).not.toHaveBeenCalled();
-
+    } finally {
       pushStateSpy.mockRestore();
       replaceStateSpy.mockRestore();
-    });
+    }
+  });
 
-    it('does not revert a client Link navigation to a different mode', async () => {
-      // Reconciled from #22752 (same-path mode races in this effect): a
-      // client Link that moves the URL to another mode must not be written
-      // back over with the stale requestedMode.
-      mockCanonicalProfileDSPs.mockReturnValue([]);
-      mockUseProfileShell.mockImplementation(() => ({
-        locationMode: 'about',
-        notificationsContextValue: {
-          subscribedChannels: {},
-          subscriptionDetails: {},
-          setSubscribedChannels: vi.fn(),
-          setSubscriptionDetails: vi.fn(),
-          setState: vi.fn(),
-        },
-        notificationsController: {
-          contentPreferences: null,
-        },
-      }));
-      window.history.replaceState(null, '', '/test-artist?mode=about');
-      const pushStateSpy = vi.spyOn(window.history, 'pushState');
-      const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+  it('does not revert a client Link navigation to a different mode', async () => {
+    // Reconciled from #22752 (same-path mode races in this effect): a
+    // client Link that moves the URL to another mode must not be written
+    // back over with the stale requestedMode.
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseProfileShell.mockImplementation(() => ({
+      locationMode: 'about',
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    window.history.replaceState(null, '', '/test-artist?mode=about');
+    // Navigate through the ORIGINAL pushState so the spies record only
+    // writes made by the template itself, never the test's own navigation.
+    const originalPushState = window.history.pushState.bind(globalThis.history);
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
 
+    try {
       const view = render(
         <ProfileCompactTemplate
           mode='about'
@@ -1582,15 +1578,14 @@ describe('ProfileCompactTemplate', () => {
         );
       });
       expect(pushStateSpy).not.toHaveBeenCalled();
-      pushStateSpy.mockClear();
-      replaceStateSpy.mockClear();
+      expect(replaceStateSpy).not.toHaveBeenCalled();
 
       // A client Link (the about drawer's contact links) moves the URL to
       // contact mode; requestedMode is still 'about' until the shell's
-      // location store syncs it. The history effect must not write the stale
-      // intent back over the navigation.
+      // location store syncs it. The history effect must not write the
+      // stale intent back over the navigation.
       act(() => {
-        window.history.pushState(null, '', '/test-artist?mode=contact');
+        originalPushState(null, '', '/test-artist?mode=contact');
       });
       view.rerender(
         <ProfileCompactTemplate
@@ -1607,14 +1602,11 @@ describe('ProfileCompactTemplate', () => {
         );
       });
       expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(1);
-      // Exactly one known write: the simulated Link push above. The template
-      // must not add a push or a replaceState over the navigation.
-      expect(pushStateSpy).toHaveBeenCalledTimes(1);
-      expect(pushStateSpy.mock.calls[0]?.[2]).toBe('/test-artist?mode=contact');
+      expect(pushStateSpy).not.toHaveBeenCalled();
       expect(replaceStateSpy).not.toHaveBeenCalled();
 
-      // Once the location sync flips requestedMode, the URL already agrees, so
-      // the reconciliation still writes nothing.
+      // Once the location sync flips requestedMode, the URL already agrees,
+      // so the reconciliation still writes nothing.
       mockUseProfileShell.mockImplementation(() => ({
         locationMode: 'contact',
         notificationsContextValue: {
@@ -1641,34 +1633,39 @@ describe('ProfileCompactTemplate', () => {
           '/test-artist?mode=contact'
         );
       });
-      expect(pushStateSpy).toHaveBeenCalledTimes(1);
+      expect(pushStateSpy).not.toHaveBeenCalled();
       expect(replaceStateSpy).not.toHaveBeenCalled();
-
+    } finally {
       pushStateSpy.mockRestore();
       replaceStateSpy.mockRestore();
-    });
+    }
+  });
 
-    it('does not restore the landed mode over a Link that left it bare', async () => {
-      // Reconciled from #22752: the depth-0 landed-mode restore must not
-      // capture a client Link that pushed a new bare-profile entry.
-      mockCanonicalProfileDSPs.mockReturnValue([]);
-      mockUseProfileShell.mockImplementation(() => ({
-        locationMode: 'about',
-        notificationsContextValue: {
-          subscribedChannels: {},
-          subscriptionDetails: {},
-          setSubscribedChannels: vi.fn(),
-          setSubscriptionDetails: vi.fn(),
-          setState: vi.fn(),
-        },
-        notificationsController: {
-          contentPreferences: null,
-        },
-      }));
-      window.history.replaceState(null, '', '/test-artist?mode=about');
-      const pushStateSpy = vi.spyOn(window.history, 'pushState');
-      const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+  it('does not restore the landed mode over a Link that left it bare', async () => {
+    // Reconciled from #22752: the depth-0 landed-mode restore must not
+    // capture a client Link that pushed a new bare-profile entry.
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseProfileShell.mockImplementation(() => ({
+      locationMode: 'about',
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    window.history.replaceState(null, '', '/test-artist?mode=about');
+    // Navigate through the ORIGINAL pushState so the spies record only
+    // writes made by the template itself, never the test's own navigation.
+    const originalPushState = window.history.pushState.bind(globalThis.history);
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
 
+    try {
       const view = render(
         <ProfileCompactTemplate
           mode='about'
@@ -1683,14 +1680,14 @@ describe('ProfileCompactTemplate', () => {
         );
       });
       expect(pushStateSpy).not.toHaveBeenCalled();
-      pushStateSpy.mockClear();
-      replaceStateSpy.mockClear();
+      expect(replaceStateSpy).not.toHaveBeenCalled();
 
       // A client Link to the bare profile path pushes a new history entry,
       // where Next's landing strip replaces the landed entry in place. The
-      // landed-mode restore must not capture the Link and push the mode back.
+      // landed-mode restore must not capture the Link and push the mode
+      // back.
       act(() => {
-        window.history.pushState(null, '', '/test-artist');
+        originalPushState(null, '', '/test-artist');
       });
       view.rerender(
         <ProfileCompactTemplate
@@ -1707,15 +1704,12 @@ describe('ProfileCompactTemplate', () => {
         );
       });
       expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(1);
-      // Exactly one known write: the simulated bare-path Link push above. The
-      // landed-mode restore must not push the mode back or strip-replace it.
-      expect(pushStateSpy).toHaveBeenCalledTimes(1);
-      expect(pushStateSpy.mock.calls[0]?.[2]).toBe('/test-artist');
+      expect(pushStateSpy).not.toHaveBeenCalled();
       expect(replaceStateSpy).not.toHaveBeenCalled();
-
+    } finally {
       pushStateSpy.mockRestore();
       replaceStateSpy.mockRestore();
-    });
+    }
   });
 
   it('renders the alerts tab when ?mode=subscribe is in the URL', async () => {
