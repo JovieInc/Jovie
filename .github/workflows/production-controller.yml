@@ -111,7 +111,7 @@ jobs:
           set -euo pipefail
           {
             echo "is_current=false"
-            echo "decision=superseded"
+            echo "decision=error"
             echo "replacement_sha=none"
             echo "wait_seconds=0"
             echo "time_saved_seconds=0"
@@ -176,10 +176,9 @@ jobs:
             # a still-queued generation costs seconds to yield, so a stale
             # backlog drains to the newest queued generation (JOV-7149).
             # No production mutation has started. The gate still fails closed
-            # when ancestry stays unreadable (JOV-7674) so later in-flight
-            # boundaries cannot promote on a guess. Here that same
-            # decision=error yields with a receipt: an older generation must
-            # not turn the wave red when a newer one will run.
+            # when ancestry stays unreadable (JOV-7674), including at this
+            # pre-mutation boundary. Unknown lineage cannot prove that a
+            # replacement generation can supersede this one.
             gate_log="$RUNNER_TEMP/lineage-gate-before-evaluation.txt"
             set +e
             CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before evaluation" \
@@ -188,10 +187,6 @@ jobs:
             set -e
             gate_decision="$(tail -n 1 "$gate_log" 2>/dev/null || true)"
             if [ "$gate_status" -ne 0 ]; then
-              if [ "$gate_decision" = "decision=error" ]; then
-                record_receipt "superseded" "lineage unreadable before evaluation; yielding without mutation so a newer generation can run" "$current_main_sha" 0 "yield the production lease; no production mutation has started"
-                exit 0
-              fi
               echo "::error::Release lineage gate failed before evaluation (exit=${gate_status})."
               exit "$gate_status"
             fi
