@@ -597,6 +597,18 @@ describe('ShellReleasesView', () => {
     const list = screen.getByRole('list', { name: 'Releases' });
     expect(list.tagName).toBe('UL');
     expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
+    // axe `list` rule: a ul's direct children must be li (script/template).
+    // The context-menu wrapper is a presentation li, and each carries
+    // exactly one listitem row — the row inside, never a nested second
+    // listitem around the wrapper.
+    const directChildren = [...list.children];
+    expect(directChildren.length).toBeGreaterThanOrEqual(2);
+    for (const child of directChildren) {
+      expect(child.tagName).toBe('LI');
+      expect(child).toHaveAttribute('role', 'presentation');
+      expect(child).toHaveAttribute('data-shell-release-row-context-target');
+      expect(child.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+    }
   });
 
   it('shows the connect-Spotify empty state when not yet connected', () => {
