@@ -40,8 +40,10 @@ describe('documentTitle', () => {
       expect(resolved).not.toMatch(DOUBLED_SUFFIX);
     }
   });
+});
 
-  it('keeps the listed marketing document titles to a single brand suffix', () => {
+describe('marketing document titles', () => {
+  it('keeps the listed pages to a single brand suffix', () => {
     const resolved = [
       applyRootTitleTemplate(compareMetadata.title),
       applyRootTitleTemplate(alternativesMetadata.title),
