@@ -7503,3 +7503,52 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 /* SYSTEM B HOME RELEASE OPERATING SYSTEM SHOWCASE PRIMITIVES END */
+
+/* ── Shared marketing lit focal + entrance (MKT lit-focal-v1) ────────────
+ * One lit focal point on near-black: a quiet Ion wash behind a hero's
+ * focal column. Token-sourced (accent over transparent), never a raw
+ * hex, pointer-transparent, and out of the layout flow.
+ * ────────────────────────────────────────────────────────────────────── */
+.marketing-lit-focal {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 62% 46% at 62% 34%,
+      color-mix(in oklab, var(--color-accent) 12%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 38% 26% at 70% 22%,
+      color-mix(in oklab, var(--color-accent) 8%, transparent),
+      transparent 78%
+    );
+}
+
+/* One entrance moment per surface: the focal column rises in once, then
+ * is still. Reduced motion keeps the settled state with no animation. */
+.marketing-lit-enter {
+  animation: marketing-lit-rise 420ms var(--ease-out) both;
+}
+
+@keyframes marketing-lit-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-lit-enter {
+    animation: none;
+  }
+}
+
+/* SHARED MARKETING LIT FOCAL + ENTRANCE END */

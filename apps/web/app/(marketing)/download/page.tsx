@@ -189,8 +189,9 @@ export default function DownloadPage() {
                 </div>
 
                 <div className='relative min-h-96 lg:min-h-144'>
+                  <div className='marketing-lit-focal' aria-hidden='true' />
                   <div
-                    className='absolute inset-x-0 top-8 bottom-0 overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'
+                    className='marketing-lit-enter absolute inset-x-0 top-8 bottom-0 overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'
                     data-overlap='intentional'
                     data-testid='download-desktop-screenshot'
                   >
@@ -256,7 +257,7 @@ export default function DownloadPage() {
                     </div>
                     <h2
                       data-wrap='editorial-title'
-                      className='mt-5 text-pretty text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-4xl'
+                      className='mt-5 text-balance text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-4xl'
                     >
                       {platform.title}
                     </h2>
@@ -317,7 +318,7 @@ export default function DownloadPage() {
                 </p>
                 <h2
                   data-wrap='editorial-title'
-                  className='mt-4 text-pretty text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
+                  className='mt-4 text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
                 >
                   {DOWNLOAD_COPY.workflowTitle}
                 </h2>
@@ -328,7 +329,7 @@ export default function DownloadPage() {
                     <div className='mb-4 flex size-8 items-center justify-center rounded-full bg-surface-1/10 text-secondary-token'>
                       <Check className='size-4' aria-hidden='true' />
                     </div>
-                    <h3 className='text-pretty text-xl font-semibold tracking-normal text-(--system-b-text-primary)'>
+                    <h3 className='text-balance text-xl font-semibold tracking-normal text-(--system-b-text-primary)'>
                       {row.title}
                     </h3>
                     <p className={`mt-3 text-mid leading-relaxed ${muted}`}>
@@ -356,7 +357,7 @@ export default function DownloadPage() {
                 </p>
                 <h2
                   data-wrap='editorial-title'
-                  className='mt-4 text-pretty text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
+                  className='mt-4 text-balance text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
                 >
                   {DOWNLOAD_COPY.installTitle}
                 </h2>
