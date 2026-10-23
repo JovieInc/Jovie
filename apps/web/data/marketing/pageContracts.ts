@@ -180,6 +180,15 @@ export const MARKETING_PAGE_CONTRACTS = {
       label: PRODUCT_COPY.claimCard.cta,
     },
   },
+  '(marketing)/product/link-analytics/page.tsx': {
+    routeGlob: '(marketing)/product/link-analytics/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_LINK_ANALYTICS,
+    job: 'show click totals, the recent window, and the top provider for a smart link',
+    proof: 'live smart-link analytics panel with a fixed click count',
+    successEvent: 'visitor reads the click total and the top provider',
+    primaryCta: START_CTA,
+  },
   '(marketing)/card/page.tsx': {
     routeGlob: '(marketing)/card/page.tsx',
     copyScope: 'shared',

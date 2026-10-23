@@ -85,6 +85,7 @@ vi.mock('@/lib/analytics', async importOriginal => ({
 import { JovieCardLanding } from '@/app/(marketing)/card/JovieCardLanding';
 import DownloadPage from '@/app/(marketing)/download/page';
 import { InstantMerchLanding } from '@/app/(marketing)/instant-merch/InstantMerchLanding';
+import { LinkAnalyticsLanding } from '@/app/(marketing)/product/link-analytics/LinkAnalyticsLanding';
 import { ProductLanding } from '@/app/(marketing)/product/ProductLanding';
 import { SmartLinksLanding } from '@/app/(marketing)/smart-links/SmartLinksLanding';
 import { SolutionsRecordBody } from '@/app/(marketing)/solutions/[audience]/sections';
@@ -170,6 +171,7 @@ const RENDERERS: Readonly<Record<string, () => ReactElement>> = {
   '(marketing)/voice/page.tsx': () => <VoicePageContent />,
   '(marketing)/instant-merch/page.tsx': () => <InstantMerchLanding />,
   '(marketing)/youtube-thumbnails/page.tsx': () => <YoutubeThumbnailsLanding />,
+  '(marketing)/product/link-analytics/page.tsx': () => <LinkAnalyticsLanding />,
   '(marketing)/product/page.tsx': () => <ProductLanding />,
   '(marketing)/card/page.tsx': () => <JovieCardLanding />,
   '(marketing)/smart-links/page.tsx': () => <SmartLinksLanding />,

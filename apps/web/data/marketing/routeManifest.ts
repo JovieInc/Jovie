@@ -934,6 +934,37 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/product/link-analytics/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/link-analytics/LinkAnalyticsLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'Link analytics ships on /product/link-analytics',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live smart-link analytics panel. Each click is counted, with the provider that received it and the time of the last click. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/link-analytics',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/link-analytics/LinkAnalyticsPanel.tsx',
+      testId: 'release-smart-link-analytics',
+    },
+    healthCheck: {
+      path: '/product/link-analytics',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
     glob: '(marketing)/card/page.tsx',
     recipeId: 'feature',
     renderedSections: [
