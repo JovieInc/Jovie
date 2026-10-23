@@ -18,12 +18,11 @@ changes do not enter these lanes.
   `docs/VISUAL_TESTING_POLICY.md`.
 - Route surfaces (`page`, `layout`, `loading`, `error`, and `not-found` TSX
   files) require Storybook or Playwright visual evidence for the changed state.
-- Shared Storybook configuration, styles, design tokens, and the Chromatic
-  configuration are UI-relevant changes.
-- The merge-group Storybook build, Storybook a11y, Chromatic, and Playwright
-  visual lanes remain fail-closed when selected. Missing configuration,
-  skipped selected jobs, unreviewed Chromatic changes, HTTP 500s, and unsafe
-  Playwright artifacts are failures.
+- Shared Storybook configuration, styles, and design tokens are UI-relevant
+  changes.
+- The merge-group Storybook build, Storybook a11y, and Playwright visual
+  lanes remain fail-closed when selected. Missing configuration, skipped
+  selected jobs, HTTP 500s, and unsafe Playwright artifacts are failures.
 - DB-backed public redirects are marked `requiresDatabase`. DB-free smoke omits
   those routes explicitly; Neon-backed visual runs retain their coverage.
 
@@ -49,9 +48,8 @@ branches or production builds.
 The gate can graduate only when:
 
 1. five consecutive reports are clean;
-2. the root Chromatic config resolves from `apps/web`;
-3. Storybook build and a11y complete on representative component changes;
-4. DB-free and DB-required route inventories are explicit and both have a
+2. Storybook build and a11y complete on representative component changes;
+3. DB-free and DB-required route inventories are explicit and both have a
    proving lane;
-5. artifact scanning remains fail-closed; and
-6. Gem documents the activation run IDs and PR cutoff in the policy file.
+4. artifact scanning remains fail-closed; and
+5. Gem documents the activation run IDs and PR cutoff in the policy file.
