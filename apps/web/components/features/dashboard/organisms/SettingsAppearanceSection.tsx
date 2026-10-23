@@ -3,6 +3,7 @@
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Check, Laptop, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useSyncExternalStore } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
@@ -33,6 +34,18 @@ const THEME_OPTIONS = [
   },
 ] as const;
 
+function subscribeToNothing(): () => void {
+  return () => {};
+}
+
+function getHydratedSnapshot(): boolean {
+  return true;
+}
+
+function getServerSnapshot(): boolean {
+  return false;
+}
+
 export function SettingsAppearanceSection() {
   const { selectedProfile } = useDashboardData();
   const selectedProfileId = selectedProfile?.id;
@@ -59,10 +72,21 @@ export function SettingsAppearanceSection() {
     saveHighContrast(enabled, currentTheme);
   };
 
-  const selectedTheme = (theme ?? 'system') as ThemeValue;
+  // next-themes only knows the stored theme on the client. Rendering the
+  // selection during SSR/hydration made aria-pressed and the check icon
+  // disagree with the server HTML (React hydration error on /app/settings/
+  // account). Mark a theme selected only after hydration.
+  const hasHydrated = useSyncExternalStore(
+    subscribeToNothing,
+    getHydratedSnapshot,
+    getServerSnapshot
+  );
+  const selectedTheme = hasHydrated
+    ? ((theme ?? 'system') as ThemeValue)
+    : null;
   let resolvedThemeLabel = '';
-  if (resolvedTheme === 'light') resolvedThemeLabel = 'Light';
-  else if (resolvedTheme === 'dark') resolvedThemeLabel = 'Dark';
+  if (hasHydrated && resolvedTheme === 'light') resolvedThemeLabel = 'Light';
+  else if (hasHydrated && resolvedTheme === 'dark') resolvedThemeLabel = 'Dark';
 
   return (
     <SettingsPanel

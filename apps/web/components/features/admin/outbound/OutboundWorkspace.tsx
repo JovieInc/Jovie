@@ -22,6 +22,7 @@ import type {
   ContactEvidenceItem,
 } from '@/lib/contacts/certification';
 import {
+  OUTBOUND_FLAG_LABELS,
   OUTBOUND_NEXT_ACTION_LABELS,
   OUTBOUND_VIEW_LABELS,
   OUTBOUND_VIEWS,
@@ -67,32 +68,68 @@ const BAND_LABELS: Record<OutboundBand, string> = {
 
 const BAND_TITLES = {
   fit: 'Fit band from the qualification fit score',
+  presence:
+    'Score counts only link and tool presence (Spotify link, link-in-bio, tools), so it says nothing about fit',
   ability: 'Ability to pay is not measured yet (JOV-6650)',
   intent: 'Buying intent is not measured yet (JOV-6650)',
 } as const;
 
-function bandColumn(id: keyof typeof BAND_TITLES, header: string) {
+function BandCell({
+  row,
+  id,
+}: Readonly<{ row: OutboundRow; id: 'fit' | 'ability' | 'intent' }>) {
+  const band = row[id];
+  const presenceOnly = id === 'fit' && row.fitBasis === 'presence_only';
+  const label = presenceOnly ? 'Presence only' : BAND_LABELS[band];
+  return (
+    <span
+      title={presenceOnly ? BAND_TITLES.presence : BAND_TITLES[id]}
+      className={cn(
+        'whitespace-nowrap text-xs tabular-nums',
+        band === 'unknown' ? 'text-quaternary-token' : 'text-secondary-token'
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+/** Lower priority hides first when the detail panel narrows the table. */
+function bandColumn(
+  id: 'fit' | 'ability' | 'intent',
+  header: string,
+  priority: number
+) {
   return columnHelper.accessor(id, {
     header,
-    cell: ({ getValue }) => {
-      const band = getValue() as OutboundBand;
-      return (
-        <span
-          title={BAND_TITLES[id]}
-          className={cn(
-            'text-xs tabular-nums',
-            band === 'unknown'
-              ? 'text-quaternary-token'
-              : 'text-secondary-token'
-          )}
-        >
-          {BAND_LABELS[band]}
-        </span>
-      );
-    },
-    size: 60,
-    meta: id === 'fit' ? undefined : { priority: 2 },
+    cell: ({ row }) => <BandCell row={row.original} id={id} />,
+    size: id === 'fit' ? 84 : 60,
+    meta: { priority },
   });
+}
+
+function NameCell({ row }: Readonly<{ row: OutboundRow }>) {
+  const nonArtist = row.flags.includes('possible_non_artist');
+  return (
+    <span className='flex min-w-0 items-center gap-2'>
+      <Avatar src={row.avatarUrl} alt='' name={row.name} size='md' />
+      <span className='max-w-44 truncate text-app font-medium text-primary-token'>
+        {row.name}
+      </span>
+      <span className='max-w-28 truncate text-xs text-tertiary-token'>
+        @{row.handle}
+      </span>
+      {nonArtist ? (
+        <span
+          className='shrink-0 rounded-sm border border-subtle px-1 text-2xs text-secondary-token'
+          title={row.entityNote ?? undefined}
+          data-testid='outbound-flag-non-artist'
+        >
+          {OUTBOUND_FLAG_LABELS.possible_non_artist}
+        </span>
+      ) : null}
+    </span>
+  );
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
@@ -101,6 +138,8 @@ type OutboundColumn = ColumnDef<OutboundRow, any>;
 /** Actions Tim takes himself; the rest are waits shown as plain text. */
 const ACTIONABLE = new Set([
   'build_profile',
+  'gather_evidence',
+  'check_entity',
   'review_facts',
   'approve_message',
   'send',
@@ -129,37 +168,31 @@ function buildColumns(
     }),
     columnHelper.accessor('name', {
       header: 'Artist',
-      cell: ({ row }) => (
-        <span className='flex min-w-0 items-center gap-2'>
-          <Avatar
-            src={row.original.avatarUrl}
-            alt=''
-            name={row.original.name}
-            size='md'
-          />
-          <span className='max-w-44 truncate text-app font-medium text-primary-token'>
-            {row.original.name}
-          </span>
-          <span className='max-w-28 truncate text-xs text-tertiary-token'>
-            @{row.original.handle}
-          </span>
-        </span>
-      ),
+      cell: ({ row }) => <NameCell row={row.original} />,
       size: 260,
       meta: { primary: true },
     }),
     columnHelper.accessor('whyNow', {
       header: 'Why Now',
-      cell: ({ getValue }) => (
-        <span className='block max-w-56 truncate text-xs text-secondary-token'>
-          {getValue() as string}
-        </span>
-      ),
-      size: 200,
+      cell: ({ getValue }) => {
+        const trigger = getValue() as string | null;
+        return (
+          <span
+            className={cn(
+              'block max-w-56 truncate text-xs',
+              trigger ? 'text-secondary-token' : 'text-quaternary-token'
+            )}
+          >
+            {trigger ?? 'No trigger'}
+          </span>
+        );
+      },
+      size: 160,
+      meta: { priority: 4 },
     }),
-    bandColumn('fit', 'Fit'),
-    bandColumn('ability', 'Ability'),
-    bandColumn('intent', 'Intent'),
+    bandColumn('fit', 'Fit', 3),
+    bandColumn('ability', 'Ability', 1),
+    bandColumn('intent', 'Intent', 1),
     columnHelper.accessor('certified', {
       header: 'Certified',
       cell: ({ row }) => (
@@ -175,6 +208,7 @@ function buildColumns(
         </span>
       ),
       size: 68,
+      meta: { priority: 2 },
     }),
     columnHelper.accessor('nextAction', {
       header: 'Next',
@@ -497,7 +531,9 @@ export function OutboundWorkspace() {
       description={
         view === 'replied'
           ? 'Reply capture is not wired to a provider yet, so replies cannot land here.'
-          : 'People move here as you certify, approve, and send.'
+          : view === 'ready'
+            ? 'Nobody has every required piece of evidence yet. Check Needs evidence.'
+            : 'People move here as you certify, approve, and send.'
       }
     />
   );
@@ -611,7 +647,7 @@ export function OutboundWorkspace() {
               columns={columns}
               isLoading={query.isLoading}
               skeletonRows={10}
-              minWidth='760px'
+              minWidth='440px'
               getRowId={row => row.leadId}
               getRowClassName={getRowClassName}
               getRowTestId={row => `outbound-row-${row.leadId}`}

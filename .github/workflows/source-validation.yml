@@ -204,6 +204,27 @@ jobs:
           # The classifier only runs when invoked as its own entry point; a
           # missing receipt means it never ran, which must not read as a pass.
           test -s "$lane_dir/receipt.json"
+      # Read-only restore of the web tsc incremental state that
+      # tsc-cache-warm.yml writes on main. A pull_request can read that
+      # default-branch cache; merge_group already restores it in ci-fast.
+      # This job does not save: a PR-scoped entry is invisible to merge_group
+      # and competes for the 10 GB Actions cache cap. tsc re-hashes every
+      # input, so an older buildinfo cannot replay a passing typecheck.
+      # pnpm typecheck and the ci-fast --force gate are unchanged.
+      - name: Resolve tsc cache hour
+        id: tsc-cache-hour
+        if: steps.reuse.outputs.reuse != 'true'
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      - name: Restore web tsc incremental state
+        id: web-tsbuildinfo
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.cache/tsbuildinfo*
+          key: jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-h${{ steps.tsc-cache-hour.outputs.hour }}
+          restore-keys: |
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-
       - name: Run deterministic source contract
         if: steps.reuse.outputs.reuse != 'true'
         env:
@@ -214,6 +235,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           git fetch --no-tags origin "${{ github.base_ref }}"
           node scripts/verify-workflow-references.mjs
+          # A workflow GitHub cannot load runs zero jobs and stalls every queue
+          # group in AWAITING_CHECKS (2026-10-20). Check the head and the tree the
+          # queue builds by merging it into the current base.
+          node scripts/workflow-expression-budget.mjs --ref HEAD --merge-with "origin/${{ github.base_ref }}"
           node scripts/workflow-token-scope.mjs
           node --test scripts/workflow-token-scope.test.mjs
           node scripts/lockfile-specifier-preflight.mjs

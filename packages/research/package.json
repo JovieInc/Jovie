@@ -1,0 +1,24 @@
+{
+  "name": "@jovie/research",
+  "private": true,
+  "type": "module",
+  "description": "Tiered, cached, capped research router and decision log for Jovie agents.",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./sources.json": "./sources.json"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@jovie/api-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^6.0.3",
+    "vitest": "5.0.5"
+  }
+}

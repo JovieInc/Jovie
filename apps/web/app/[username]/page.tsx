@@ -9,6 +9,7 @@ import { isScreenCertSmartLinkProfileRequest } from '@/app/[username]/[slug]/_li
 // API (cookies(), headers()) in this RSC tree.
 
 import { AskJovieWidget } from '@/components/features/ask-jovie/AskJovieWidget';
+import { AliasCollisionRecovery } from '@/components/features/profile/AliasCollisionRecovery';
 import type { ProfileMode } from '@/components/features/profile/contracts';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfileClient';
@@ -470,6 +471,7 @@ async function ArtistPageContent({
 
   return (
     <>
+      <AliasCollisionRecovery username={username} />
       {/* JSON-LD Structured Data for SEO — single @graph for all schemas */}
       <script type='application/ld+json'>
         {safeJsonLdStringify(structuredData)}

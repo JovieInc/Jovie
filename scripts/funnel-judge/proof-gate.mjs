@@ -58,7 +58,7 @@ export function evaluateProofGate(report, { judgedStepIds, now = new Date() }) {
   const proofless = report.prooflessPaywallSteps.filter(isJudged);
   for (const step of proofless) {
     failures.push(
-      `${step} asks for $199 with no admissible outcome proof (computed, dogfood or pilot)`
+      `${step} asks for $12 with no admissible outcome proof (computed, dogfood or pilot)`
     );
   }
   const blockingIds = new Set([

@@ -294,6 +294,28 @@ async function assertUserButtonLoaded(
   return 'Dashboard shell chrome not visible after auth';
 }
 
+/**
+ * Resources that fail closed on purpose when this environment lacks an
+ * operator-only configuration. The URL comes from setupPageMonitoring.
+ * - /api/ovie/summer/history answers 503 "unconfigured" without
+ *   OVIE_SUMMER_FOUNDER_APP_USER_ID, which the E2E servers do not set.
+ */
+const ENVIRONMENT_UNCONFIGURED_RESOURCES = [
+  /status of 503 \(Service Unavailable\) \[[^\]]*\/api\/ovie\/summer\/history\]/,
+];
+
+function withoutEnvironmentGaps<
+  T extends { criticalErrors: string[]; uncaughtExceptions: string[] },
+>(context: T): T {
+  return {
+    ...context,
+    criticalErrors: context.criticalErrors.filter(
+      error =>
+        !ENVIRONMENT_UNCONFIGURED_RESOURCES.some(pattern => pattern.test(error))
+    ),
+  };
+}
+
 async function runRouteCheck(
   page: Page,
   route: DashboardRouteDescriptor,
@@ -358,7 +380,7 @@ async function runRouteCheck(
 
     const loadTimeMs = Date.now() - startTime;
     const currentUrl = page.url();
-    const monitorContext = getContext();
+    const monitorContext = withoutEnvironmentGaps(getContext());
 
     if (
       monitorContext.criticalErrors.length > 0 ||
@@ -479,7 +501,7 @@ async function runRouteCheck(
       await assertFastPageLoad(loadTimeMs, route.performanceBudgetMs, testInfo);
     }
 
-    const finalContext = getContext();
+    const finalContext = withoutEnvironmentGaps(getContext());
     if (
       finalContext.criticalErrors.length > 0 ||
       finalContext.uncaughtExceptions.length > 0

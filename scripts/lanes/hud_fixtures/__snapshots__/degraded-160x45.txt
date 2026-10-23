@@ -1,0 +1,45 @@
+● JOVIE · SYMPHONY · lanes fe27f07 on gem · ! hud≠release · ✕ tick 3m failing                         ! github stale · ✕ linear · feed 1m · prod 28s · 18:29:30Z
+ CONSTRAINT ✕ FAIL   delivery · qualified admitted work has no exact-head merge for 2h00m+ · doctor delivery-stalled
+ PRODUCTION  ! WARN    serves 060037d · ! Production Verified marker pending · main 661de44 · behind 18 commits · 7 undeployed · oldest 1h41m
+ FLOW 24h    draft ? → prepared ? → queued ? → merged 10 → deployed 3 → verified ? · merges 5/h · opened 11/h (1h) · claim→merge p50 24m · p95 codex 10h30m
+ WORKERS   ? UNKNOWN 1 running / unknown (codex 1/? · grok 0/?) · gate seats 2  │  SHIPPED   ! WARN    merged 10 in 24h · deployed 3 · verified ?
+● codex      PR21774   fix-red gate              3m  title not in current…      │   attribution verified 2/10 · inferred 8 · unknown 0
+○ codex      polling ×2 · eligible 1/27 · new issues 1                          │ #22307 merged        5m  fix(ci): set up Playwright when proof reuse still…
+○ grok       polling · eligible 0/27 · new issues 0                             │ #22304 merged        9m  fix(connectors): preserve Google OAuth ownership and…
+  codex      24h started 7 · productive 2 · PR 2 · first-pass 50% · landed 1    │ #22253 merged       24m  fix(lanes): keep the public status feed within its…
+  grok       24h started 0 · productive 0 · PR 0 · first-pass n/a · landed 0    │ #21869 merged       35m  feat(playbooks): bind growth preparation to launch…
+  24h verdicts: recovery-handoff 108 · revisit-failed 46 · failed 15            │ #22301 merged       47m  fix(lanes): stop Gem lane cleanup from leaking…
+                                                                                │ #21834 merged     1h05m  feat(observability): add revenue-spine failure…
+                                                                                │ #21956 merged     1h41m  feat(evals): add held-out revision quality replay…
+                                                                                │ #22166 deployed  21h48m  ci: catalog the workflow writes the enqueue check…
+                                                                                │ #22290 deployed  22h23m  fix(ovie): preserve Home snapshot freshness…
+ SUPPLY    ✓ OK      Todo 27 → eligible 1 → new issues 1                        │ #22292 deployed  22h27m  fix(ci): restore merge queue victim enrollment…
+  codex      new 1 · eligible 1/27 · PR ceiling none                            │
+  grok       new 0 · eligible 0/27 · PR ceiling none                            │
+    17 excluded  sensitive-text             all lanes                           │  QUEUE     ? UNKNOWN merge queue unknown · wait p50 11.4m · ejections 20%
+     7 excluded  hotspot-held               all lanes                           │   ? queue read: stale · last read 59m ago
+     2 excluded  route-held:standard        all lanes                           │   ? promotion: RuntimeError: gh: HTTP 502 retry later
+     1 excluded  in-flight-pr               all lanes                           │
+  ✕ Linear HTTPError: 429 rate limited retry-after 60                           │
+                                                                                │
+                                                                                │  ALERTS    ✕ FAIL    8 active · 3 critical/failing
+ REPAIR    ? UNKNOWN open lane PRs unknown · draft unknown · non-draft unknown  │ ✕ crit started-without-live-owner 48m · owner summer · summer requested
+  ? PR list: github-budget-floor: 529 (< 600) until reset                       │     3 In Progress issues have no live lane lease: JOV-8701, JOV-8702, JOV-8655
+  repo PRs open 36 · red 11 · dirty 2 · clean not queued 2 · exhausted 2        │ ! warn remediation-delivery 12d7h · owner symphony-lanes-doctor
+  ? hold records unknown · held.json unavailable or invalid                     │     remediation action lacks authoritative acknowledgement; failed=41, exhaus…
+  oldest #21725 142h · idle 9.2h · hold:fix-exhausted · fix-exhausted           │ ! warn escalation-needs-human 8d23h · owner symphony-lanes-doctor
+                                                                                │     needs a human decision: #20117 needs-human-decision, #20549 needs-human-d…
+                                                                                │ ! warn repairs-without-work 8d21h · owner symphony-lanes-doctor
+                                                                                │ ! warn failed-runs 1d6h · owner symphony-lanes-doctor · summer pending
+                                                                                │ ✕ held.json unavailable or invalid · owner lanes harness
+                                                                                │ ! cooldown grok 9m
+                                                                                │ ✕ dispatch tick: dispatch failed: OSError: [Errno 28] No space left on device…
+                                                                                │   +2 more
+                                                                                │  BUDGETS   ✕ FAIL    GitHub graphql 412/5000 · core 529 · resets in 46m
+                                                                                │   ! codex quota-blocked: usage-limit until 21:00Z
+                                                                                │   capacity horizon 2 leases · 0 reported incident(s) · show-only
+                                                                                │   ? lyb-pro ? · banked ? · natural reset ? · UNKNOWN · stale
+                                                                                │   ✓ current-login 99% · banked 1 · natural reset 6d14h · NORMAL · fresh
+                                                                                │   +2 more
+                                                                                │  HOST      ✕ FAIL    disk 8.2% free · mem 11% free · load 22.4 / 16 cores
+● running ○ idle ✓ ok ! warn ✕ fail ? unknown  │  draft→prepared→queued→merged→deployed→verified  │  ↑↓ PgUp/PgDn Home/End scroll workers
