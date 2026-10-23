@@ -1318,7 +1318,8 @@ def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict
 
     `terminal_ok` is only for deterministic main syncs of a terminal generation: a merge of
     main creates the new head that is that generation's material-change exit. Holds, active
-    repairs and diff-policy holds still refuse."""
+    repairs and diff-policy holds still refuse. Exhaustion evidence is the condition that
+    sync exists to clear. A secret-file or empty-diff line that remains still refuses."""
     labels = {label.lower() for label in label_names(pr)}
     if not isinstance(pr.get("headRefOid"), str) or not pr["headRefOid"].strip():
         return "head-unavailable"
@@ -1331,8 +1332,12 @@ def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict
     if now is not None and in_flight(record, {"headRefOid": record.get("sha")}, now):
         return "repair-active"
     entry = held or {}
-    if entry.get("sha") == pr.get("headRefOid") and not fixable_hold(entry, pr.get("headRefOid")):
-        return entry.get("reason") or held_reason(entry.get("evidence") or [])[0]
+    if entry.get("sha") == pr.get("headRefOid"):
+        evidence = list(entry.get("evidence") or [])
+        if terminal_ok:
+            evidence = [line for line in evidence if not str(line).startswith("fix-exhausted")]
+        if not fixable_hold({**entry, "evidence": evidence}, pr.get("headRefOid")):
+            return entry.get("reason") or held_reason(evidence)[0]
     return None
 
 
