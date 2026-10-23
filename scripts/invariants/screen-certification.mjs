@@ -51,6 +51,7 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.marketing-download': '/download',
   'web.marketing-pay': '/pay',
   'web.marketing-product': '/product',
+  'web.marketing-command-palette': '/product/command-palette',
   'web.marketing-release-scheduling': '/product/release-scheduling',
   'web.marketing-dsp-links': '/product/dsp-links',
   'web.marketing-isrc': '/product/isrc',
@@ -246,6 +247,7 @@ web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/
 web.investor-portal|web|investor-portal|apps/web/app/investor-portal/|desktop,mobile
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
 web.marketing-product|web|marketing-product|apps/web/app/(marketing)/product/page.tsx|desktop,mobile
+web.marketing-command-palette|web|marketing-command-palette|apps/web/app/(marketing)/product/command-palette/page.tsx|desktop,mobile
 web.marketing-release-scheduling|web|marketing-release-scheduling|apps/web/app/(marketing)/product/release-scheduling/page.tsx|desktop,mobile
 web.marketing-dsp-links|web|marketing-dsp-links|apps/web/app/(marketing)/product/dsp-links/page.tsx|desktop,mobile
 web.marketing-product-utm-links|web|marketing-product-utm-links|apps/web/app/(marketing)/product/utm-links/page.tsx|desktop,mobile

@@ -206,6 +206,8 @@ export const APP_ROUTES = {
   PAY: '/pay',
   /** Live DESIGN_READY marketing page — never 410 / reserved-gone. */
   PRODUCT: '/product',
+  /** Cmd+K command palette. Live feature page. */
+  PRODUCT_COMMAND_PALETTE: '/product/command-palette',
   /** Release date and reveal date fields. Nested under /product so it is not a profile handle. */
   PRODUCT_RELEASE_SCHEDULING: '/product/release-scheduling',
   /** Per-service DSP links. Nested under /product so it is not a profile handle. */
