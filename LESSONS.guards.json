@@ -225,7 +225,7 @@
         {
           "kind": "test",
           "path": "apps/web/tests/unit/home/tim-white-profile.test.ts",
-          "anchor": "keeps the homepage phone mock content aligned with the canonical profile",
+          "anchor": "keeps the new homepage story artist aligned with the canonical profile",
           "reason": "Checks a sibling homepage mock uses the same identity."
         }
       ]
@@ -551,6 +551,78 @@
           "path": "apps/web/tests/unit/marketing/correction-pyramid-guards.test.ts",
           "anchor": "locks the homepage H1 to the identity copy module",
           "reason": "Asserts the live homepage H1 stays sourced from the identity copy module."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Marketing plan prices come only from offer truth",
+      "lessonSha256": "e9aaf962362e35c24969a03f887e3c7080928ecb57be3316af597fa874fa6d28",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/offer-price-source-guard.test.ts",
+          "anchor": "keeps hand-typed plan prices out of marketing source",
+          "reason": "Fails when marketing source adds a recurring-price literal beyond the shrink-only baseline."
+        },
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/ui.md",
+          "anchor": "- Marketing plan prices render only through `MarketingOfferSummary` or",
+          "reason": "Directs marketing pages to render plan prices from offer truth only."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Marketing pages share one spine and one type ramp",
+      "lessonSha256": "0e38ad0821334c879586a0b896f243470f1fc3883411c1e7ddc98d25e4433fa1",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/marketing-route-source-invariants.test.ts",
+          "anchor": "never grows, and ratchets down, the violation baseline",
+          "reason": "Blocks new uses of the retired marketing-*-linear type classes in marketing source."
+        },
+        {
+          "kind": "scoped-rule",
+          "path": ".claude/rules/ui.md",
+          "anchor": "- Marketing pages share one spine and one type ramp: sections use",
+          "reason": "Names the shared section shell, hero container, and type classes."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Two-line display clamps must not crop descenders",
+      "lessonSha256": "5773d4fc7ec4316de74d0fe87c62966d1251807d21f1126fab591094cb4bd0cf",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/product-screenshots/route-dom-certification.spec.ts",
+          "anchor": "rejects a two-line heading whose cap crops descenders (/ hero)",
+          "reason": "Deliberate-red fixture proves the route DOM detector reports cropped descender ink."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/marketing-h1-two-line-contract.test.ts",
+          "anchor": "covers both public shells and every shared marketing hero owner",
+          "reason": "Pins the shared H1 clamp, including its descender allowance."
+        }
+      ]
+    },
+    {
+      "fingerprint": "A page change goes through one page contract, not a wall of locks",
+      "lessonSha256": "caa4b9516e3fd0ceb5bcdbd9ee713e8146b846793f00f7eca788b13b5765b7d5",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/home/homepage-contract.test.tsx",
+          "anchor": "mounts exactly the manifest sections, in recipe order",
+          "reason": "The one homepage contract derives order, owners, copy, prices, and media from the typed records."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/marketing/recipe-manifest.test.ts",
+          "anchor": "binds the homepage beats to the recipe and one source owner",
+          "reason": "Keeps the homepage manifest bound to its recipe and a single source owner."
         }
       ]
     }

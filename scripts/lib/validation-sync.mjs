@@ -917,7 +917,8 @@ export async function reconcileValidation(ctx) {
       issue.description,
       currentComments,
       issue.identifier,
-      issue.receiptNotBefore
+      issue.receiptNotBefore,
+      (ctx.now ?? (() => new Date()))().toISOString()
     ),
   ]) {
     if (receipt.status === 'invalid') {

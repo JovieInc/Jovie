@@ -445,6 +445,12 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("provider-down:devin", alerts)
         self.assertNotIn("provider-idle:devin", alerts)
 
+    def test_a_missing_linear_app_credential_fails_closed_with_its_own_condition(self):
+        alerts = doctor.judge(obs(linearAppCredential=False))
+        self.assertIn("no personal-key fallback", alerts["linear-app-credential-missing"])
+        for present in (True, None):  # installed, or a fixture/self-test with no host file
+            self.assertNotIn("linear-app-credential-missing", doctor.judge(obs(linearAppCredential=present)))
+
     def test_started_issues_without_a_live_owner_escalate_after_the_grace(self):
         quiet = doctor.judge(obs(ownership={"started": 536, "ownerless": 3, "overGrace": 0}))
         self.assertNotIn("started-without-owner", quiet)  # inside the grace period
@@ -480,6 +486,21 @@ class JudgeTest(unittest.TestCase):
             self.assertIn("60 min old", alerts["automation-silent:gem:stale"])
             self.assertIn("missing", alerts["automation-silent:gem:missing"])
             self.assertEqual(doctor.automation_watch(None, "gem", now), {"known": False, "silent": {}})
+            self.assertIn("automation-registry-unreadable",
+                          doctor.judge(obs(automation={"known": False, "silent": {}}, now=now)))
+            self.assertNotIn("automation-registry-unreadable",
+                             doctor.judge(obs(automation={"known": False, "silent": {}, "skipped": True}, now=now)))
+            self.assertNotIn("automation-registry-unreadable", doctor.judge(obs(now=now)))
+
+    def test_the_watched_registry_is_the_one_merged_on_main(self):
+        # The doctor must read the path the registry actually ships at (#22354: canon/).
+        repo = Path(__file__).resolve().parents[2]
+        if not (repo / "canon").is_dir():
+            self.skipTest("staged lanes release trees carry no canon/")
+        self.assertTrue((repo / doctor.AUTOMATION_REGISTRY).is_file(), doctor.AUTOMATION_REGISTRY)
+        rows = doctor.automation_registry(repo, run=lambda *_a, **_k: doctor.subprocess.CompletedProcess(
+            [], 0, (repo / doctor.AUTOMATION_REGISTRY).read_text(), ""))
+        self.assertTrue(rows and any(row["id"] == "gem:lanes-watchdog" for row in rows))
 
     def test_the_hosted_liveness_check_and_the_doctor_watch_each_other(self):
         now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
@@ -500,6 +521,20 @@ class JudgeTest(unittest.TestCase):
                          {"installed": True, "lastRunAt": "2026-10-20T21:30:00Z"})
         self.assertEqual(doctor.automation_liveness(fake(1, stderr="gh: Not Found (HTTP 404)"), 0), {"installed": False})
         self.assertEqual(doctor.automation_liveness(fake(1, stderr="timeout"), 0), {"installed": None})
+
+    def test_liveness_counts_only_successful_main_runs(self):
+        # Most runs are job-skipped (every 5th Production Continuity Guard run does work).
+        calls = []
+        lane = types.SimpleNamespace(REPO_SLUG="JovieInc/Jovie", shared=lambda key, ttl, fetch: fetch(),
+                                     sh=lambda args, **k: calls.append(args) or types.SimpleNamespace(
+                                         returncode=0, stdout='[""]', stderr=""))
+        self.assertEqual(doctor.automation_liveness(lane, 0), {"installed": True, "lastRunAt": None})
+        self.assertIn("status=success", calls[0][2])
+        self.assertIn("branch=main", calls[0][2])
+        # Installed but never succeeded reads as silent, not alive.
+        now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
+        self.assertIn("automation-liveness-silent", doctor.judge(obs(
+            automationLiveness={"installed": True, "lastRunAt": None}, now=now)))
 
     def test_a_failed_status_gist_publish_raises_status_feed_stale(self):
         failed = doctor.judge(obs(), {"statusFeedError": "RuntimeError: status-gist-publish-unconfirmed"})
@@ -1817,13 +1852,37 @@ class PublishTest(unittest.TestCase):
         self.assertEqual([(r["entityType"], r["entityId"], r["stage"], r["actor"], r["outcome"], r["sourceReceipt"]) for r in rows], [
             ("shipping", "JovieInc/Jovie#22315", "worker-start", "codex", "advanced", "lanes-ledger:r1"),
             ("shipping", "JOV-6", "worker-start", "grok", "failed", "lanes-ledger:r2"),
-            ("remediation", "JovieInc/Jovie#22301@0123456789ab", "repair-start", "codex", "failed", "lanes-ledger:r3")])
+            ("remediation", "JovieInc/Jovie#22301@0123456789ab", "repair-start", "codex", "failed", "lanes-ledger:r3"),
+            ("shipping", "JovieInc/Jovie#1", "gate-seat", "codex", "abandoned", "lanes-ledger:adopt")])
         self.assertTrue(all(r["schema"] == "jovie-stage-event/v1" and r["enteredAt"] < r["exitedAt"] for r in rows))
         writes = self.api.write_count
         doctor.publish_status(self.host, self.lane, self.feed(1))
         packet = json.loads((self.state / "lanes-status-publish.json").read_text())
         self.assertNotIn("stage-events.ndjson", packet["files"], "unchanged rows are not re-uploaded")
         self.assertEqual(self.api.write_count, writes + 1)
+
+    def test_gate_seat_wait_and_gate_run_are_tracked_stages(self):
+        events = doctor.stage_events.events
+        row = {"runId": "g1", "kind": "adopt", "pr": 22385, "provider": "grok", "gateWaitS": 120,
+               "startedAt": "2026-10-21T06:33:26Z", "endedAt": "2026-10-21T07:04:02Z", "verdict": "landing"}
+        seat, gate = events(row)
+        self.assertEqual((seat["stage"], seat["enteredAt"], seat["exitedAt"], seat["outcome"]),
+                         ("gate-seat", "2026-10-21T06:33:26Z", "2026-10-21T06:35:26Z", "advanced"))
+        self.assertEqual((gate["stage"], gate["enteredAt"], gate["exitedAt"], gate["outcome"], gate["entityId"]),
+                         ("gate", "2026-10-21T06:35:26Z", "2026-10-21T07:04:02Z", "advanced", "JovieInc/Jovie#22385"))
+        self.assertEqual(events({**row, "verdict": "held"})[1]["outcome"], "failed")
+        self.assertEqual(events({**row, "verdict": "gate-deferred"})[1]["outcome"], "abandoned")
+        [deferred] = events({**row, "gateWaitS": None, "verdict": "gate-deferred"})
+        self.assertEqual((deferred["stage"], deferred["exitedAt"], deferred["outcome"]),
+                         ("gate-seat", "2026-10-21T07:04:02Z", "abandoned"))
+        self.assertEqual(events({**row, "gateWaitS": 99999}), [events({**row, "gateWaitS": None})[0]])
+        self.assertEqual(events({**row, "pr": None}), [])
+
+    def test_a_held_sweep_snapshot_raises_an_alert_per_checkout(self):
+        alerts = doctor.judge(obs(sweepSecretHeld=[{"name": "94af-Jovie", "path": "/w/Jovie",
+                                                     "reason": "secret-finding:trufflehog"}]))
+        self.assertIn("secret-finding:trufflehog", alerts["sweep-snapshot-secret:94af-Jovie"])
+        self.assertFalse([key for key in doctor.judge(obs()) if key.startswith("sweep-snapshot-secret:")])
 
     def test_a_truncated_stage_file_is_read_back_by_its_size(self):
         now = time.time()

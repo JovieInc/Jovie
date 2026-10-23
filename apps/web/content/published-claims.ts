@@ -464,7 +464,7 @@ export const SCOPED_CLAIM_SURFACE_HASHES = {
   '/alternatives/link-in-bio':
     '67847983a3ac9762697e6b3d9f5a33733c2157e2799b17565f729fba41393e22',
   '/llms.txt':
-    '4e60c80e806700fba3ad55bf92c7390cb448d4ebe6457b88fd9b77e61c8f675e',
+    '42a226db249467579df5487aaa5b265d6c417bcef4dd5b0c5b82da89c003c2d0',
   '/llms-full.txt':
-    '66067a13cf6300a31447b5c80a598d790c401b79d7a8e70c5d83d91094352b42',
+    '9c2760ea00009e0e0fcae14e920e2fefb17dc027320da422bfd05c6eae4ce399',
 } as const;

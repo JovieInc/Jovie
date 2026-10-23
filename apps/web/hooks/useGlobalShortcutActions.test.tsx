@@ -128,7 +128,7 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
       shiftKey: true,
     });
 
-    expect(assign).toHaveBeenCalledWith('/app/ov/chat');
+    expect(assign).toHaveBeenCalledWith('/app/ov');
     expect(push).not.toHaveBeenCalled();
   });
 
@@ -161,7 +161,7 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
       shiftKey: true,
     });
 
-    expect(assign).toHaveBeenCalledWith('/app/ov/chat');
+    expect(assign).toHaveBeenCalledWith('/app/ov');
     expect(push).not.toHaveBeenCalled();
   });
 

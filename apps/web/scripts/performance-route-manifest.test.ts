@@ -109,9 +109,17 @@ describe('performance route manifest', () => {
       expect(route?.path).toBe(item.href);
       expect(route?.warmupStrategy).toBe('authenticated-shell');
       expect(route?.warmNavigationStartPath).not.toBe(item.href);
-      expect(route?.readySelectors.navTrigger).toContain(
-        `a[href="${item.href}"]`
-      );
+      if (item.id === 'home') {
+        // /app is shared with the header inbox bell. The warm probe must
+        // click the rail item, which carries navigation id `home`.
+        expect(route?.readySelectors.navTrigger).toEqual([
+          '[data-navigation-item-id="home"]',
+        ]);
+      } else {
+        expect(route?.readySelectors.navTrigger).toContain(
+          `a[href="${item.href}"]`
+        );
+      }
       expect(route?.readySelectors.content?.length ?? 0).toBeGreaterThan(0);
       expect(
         getRouteTimingBudgets(route!).some(
@@ -126,10 +134,6 @@ describe('performance route manifest', () => {
         `canonical nav path "${item.href}" must not also be modeled as a redirect`
       ).toBe(false);
     }
-
-    expect(
-      warmRoutesByNavigationItem.get('home')?.readySelectors.navTrigger?.[0]
-    ).toBe(`a[href="${APP_ROUTES.DASHBOARD}"]:has-text("Home")`);
   });
 
   it('uses Inbox readiness for /app and treats Releases as a Library redirect', () => {

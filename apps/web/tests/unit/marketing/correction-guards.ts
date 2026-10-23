@@ -23,7 +23,7 @@ export const JSX_ROOTS = [
   'apps/web/components/site',
 ] as const;
 
-export const LOCKED_HOMEPAGE_H1 = 'Be found. Be understood.';
+export const LOCKED_HOMEPAGE_H1 = 'One profile. For every fan.';
 
 const SOURCE_EXT = /\.(?:tsx?|mdx?)$/u;
 const SKIP_FILE = /\.(?:test|spec|stories)\./u;
