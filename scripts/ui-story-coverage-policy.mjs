@@ -27,6 +27,30 @@ function isoTimestamp(value) {
   return new Date(value).toISOString();
 }
 
+const LINEAR_ISSUE_RE = /^JOV-\d+$/u;
+const COMPONENT_ROOTS = ['apps/web/components', 'packages/ui'];
+
+function validateAllowlist(policy) {
+  if (policy.allowlist === undefined) return;
+  if (!Array.isArray(policy.allowlist)) {
+    throw new Error('Malformed UI story coverage allowlist');
+  }
+  const seen = new Set();
+  for (const entry of policy.allowlist) {
+    if (
+      !entry ||
+      typeof entry.path !== 'string' ||
+      entry.path !== entry.path.trim() ||
+      classifyUiPath(entry.path) !== 'component' ||
+      !LINEAR_ISSUE_RE.test(entry.linearIssue) ||
+      seen.has(entry.path)
+    ) {
+      throw new Error('Malformed UI story coverage allowlist');
+    }
+    seen.add(entry.path);
+  }
+}
+
 export function validateUiStoryCoveragePolicy(policy) {
   const ids = policy?.verifiedCleanRunIds;
   if (
@@ -40,11 +64,13 @@ export function validateUiStoryCoveragePolicy(policy) {
   ) {
     throw new Error('Malformed UI story coverage policy');
   }
+  validateAllowlist(policy);
 
   if (policy.mode === 'audit') {
     if (
       policy.blockingAfter !== null ||
-      policy.minimumPullRequestNumber !== null
+      policy.minimumPullRequestNumber !== null ||
+      (policy.allowlist?.length ?? 0) > 0
     ) {
       throw new Error('Audit policy cannot contain blocking activation');
     }
@@ -75,6 +101,50 @@ export function classifyUiPath(path) {
   if (COMPONENT_RE.test(path)) return 'component';
   if (UI_CONFIG_RE.test(path)) return 'ui-config';
   return null;
+}
+
+function walkComponentFiles(root, directory, found) {
+  const absolute = resolve(root, directory);
+  if (!existsSync(absolute)) return;
+  for (const entry of readdirSync(absolute, { withFileTypes: true })) {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) {
+      walkComponentFiles(root, path, found);
+      continue;
+    }
+    if (entry.isFile() && classifyUiPath(path) === 'component')
+      found.push(path);
+  }
+}
+
+/** Components the audit would fail if they changed, sorted. */
+export function listComponentsMissingAdjacentStories(root) {
+  const found = [];
+  for (const directory of COMPONENT_ROOTS)
+    walkComponentFiles(root, directory, found);
+  return found
+    .filter(path => !adjacentStoryExists(root, path))
+    .sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * The committed allowlist is the measured baseline. It can only shrink: a new
+ * uncovered component is absent from the list and fails the audit, and a story
+ * landing without removing its entry fails this check.
+ */
+export function assertBaselineAllowlist(root, policy) {
+  validateUiStoryCoveragePolicy(policy);
+  const measured = listComponentsMissingAdjacentStories(root);
+  const listed = (policy.allowlist ?? []).map(entry => entry.path);
+  if (
+    measured.length !== listed.length ||
+    measured.some((path, index) => path !== listed[index])
+  ) {
+    throw new Error(
+      'UI story coverage allowlist does not match components that lack an adjacent story'
+    );
+  }
+  return measured;
 }
 
 function adjacentStoryExists(root, sourcePath) {
@@ -130,16 +200,29 @@ function harnessIssues(root) {
   return missing;
 }
 
-export function auditUiStoryCoverage({ root, changedFiles }) {
+/**
+ * @param {{
+ *   root: string,
+ *   changedFiles: string[],
+ *   allowlist?: { path: string, linearIssue: string }[],
+ * }} input
+ */
+export function auditUiStoryCoverage({
+  root,
+  changedFiles,
+  allowlist = /** @type {{ path: string, linearIssue: string }[]} */ ([]),
+}) {
   const classified = changedFiles
     .map(path => ({ path, kind: classifyUiPath(path) }))
     .filter(entry => entry.kind !== null);
   const changedVisualEvidence = changedFiles.some(path =>
     VISUAL_EVIDENCE_RE.test(path)
   );
+  const allowlisted = new Set(allowlist.map(entry => entry.path));
   const issues = harnessIssues(root);
 
   for (const entry of classified) {
+    if (entry.kind === 'component' && allowlisted.has(entry.path)) continue;
     if (entry.kind === 'component' && !adjacentStoryExists(root, entry.path)) {
       issues.push({
         path: entry.path,
@@ -230,7 +313,11 @@ function main(argv = process.argv.slice(2)) {
     pullRequestNumber: args['pr-number'],
     openedAt: args['opened-at'],
   });
-  const audit = auditUiStoryCoverage({ root, changedFiles });
+  const audit = auditUiStoryCoverage({
+    root,
+    changedFiles,
+    allowlist: policy.allowlist ?? [],
+  });
   const report = {
     schemaVersion: 1,
     owner: policy.owner,

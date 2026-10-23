@@ -32,6 +32,7 @@ import {
   runWithRealGh,
   storedZip,
 } from '../real-gh-harness.mjs';
+import { assertReviewDeadline } from '../review-deadline.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   const actual = /** @type {typeof import('node:child_process')} */ (
@@ -137,7 +138,12 @@ describe('public-profile alias graduation policy', () => {
     const measuredAt = Date.parse(receipt.measuredAt);
     const nextReviewAt = Date.parse(policy.nextReviewAt);
     expect(nextReviewAt).toBeGreaterThan(measuredAt);
-    expect(nextReviewAt).toBeGreaterThan(Date.now());
+    // A missed review warns for 72h (naming JOV-8338), then fails merge groups.
+    assertReviewDeadline({
+      label: 'public-profile alias graduation',
+      deadline: policy.nextReviewAt,
+      trackingIssue: policy.trackingIssue,
+    });
     expect(nextReviewAt - measuredAt).toBeLessThanOrEqual(
       7 * 24 * 60 * 60 * 1000
     );

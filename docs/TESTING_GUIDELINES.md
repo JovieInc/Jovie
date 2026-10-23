@@ -82,7 +82,11 @@ Coverage shows which lines ran. Mutation testing shows whether a test would
 notice those lines changing. The `Mutation Diff` workflow runs Stryker after
 merge on changed high-risk `apps/web` source: billing, entitlements, auth,
 Stripe, webhooks, and claim. It posts per-file scores and surviving mutants to
-the job summary. It is advisory and fails only when Stryker itself breaks.
+the job summary. Files in `scripts/mutation-score-baseline.json` fail the
+job when they score under their floor. The floor is one point under the
+measured score and can only move up. Files without a floor stay advisory.
+The job also fails when Stryker itself breaks. It is not a merge-queue
+required check, because it runs after merge rather than on pull requests.
 
 Before landing a change to one of those files, run it locally:
 

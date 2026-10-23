@@ -1501,6 +1501,36 @@ describe('ci-fast bounded parallel workflow', () => {
     ].map(marker => warm.indexOf(marker));
     expect(order.every((at, i) => at > (order[i - 1] ?? 0))).toBe(true);
 
+    // Source Validation typechecks the same three web programs but previously
+    // started cold. It may only restore the main-scoped buildinfo (same
+    // fallbacks as tsc-cache-warm). It must not save: PR caches are invisible
+    // to merge_group and fill the Actions cache cap.
+    const sourceValidation = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
+      'utf8'
+    );
+    const svRestoreStart = sourceValidation.indexOf(
+      '- name: Restore web tsc incremental state'
+    );
+    const svContract = sourceValidation.indexOf(
+      '- name: Run deterministic source contract'
+    );
+    expect(svRestoreStart).toBeGreaterThan(-1);
+    expect(svRestoreStart).toBeLessThan(svContract);
+    const svRestore = sourceValidation.slice(svRestoreStart, svContract);
+    expect(svRestore).toContain(`uses: actions/cache/restore@${cacheSha}`);
+    expect(svRestore).toContain('path: apps/web/.cache/tsbuildinfo*\n');
+    expect(svRestore).toContain('id: web-tsbuildinfo');
+    expect(svRestore).not.toContain('actions/cache/save');
+    const [svKey, ...svFallbacks] = keys(svRestore).map(line => line.trim());
+    expect(svFallbacks).toEqual(warmFallbacks);
+    expect(
+      svKey.replace(/h\$\{\{ steps\.tsc-cache-hour\.outputs\.hour }}$/, '')
+    ).toBe(ciKey.replace('${{ github.sha }}', ''));
+    expect(
+      sourceValidation.match(/uses: actions\/cache\/save@/g) ?? []
+    ).toHaveLength(0);
+
     // The gate itself is unchanged: turbo never replays a cached verdict.
     expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');
   });
