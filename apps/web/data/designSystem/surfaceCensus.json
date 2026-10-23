@@ -291,6 +291,7 @@
         "apps/web/app/(marketing)/integrations/page.tsx",
         "apps/web/app/(marketing)/launch/page.tsx",
         "apps/web/app/(marketing)/pay/page.tsx",
+        "apps/web/app/(marketing)/product/dsp-links/page.tsx",
         "apps/web/app/(marketing)/product/page.tsx",
         "apps/web/app/(marketing)/smart-links/page.tsx",
         "apps/web/app/(marketing)/solutions/[audience]/page.tsx",
@@ -625,6 +626,13 @@
       "to": "holdout",
       "at": "2026-10-20T22:14:00Z",
       "evidence": "PR #22382 introduces the artist claim entry using StandaloneProductPage; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/dsp-links/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T11:10:00Z",
+      "evidence": "PR #22789 introduces the /product/dsp-links marketing page; source registration only, not rendered certification."
     }
   ]
 }

@@ -24,7 +24,7 @@ export function DspLinksLanding() {
         <div className='relative w-full max-w-3xl px-6 pt-16 sm:px-10 sm:pt-24'>
           <h1
             id='dsp-links-title'
-            className='font-display text-2xl font-medium tracking-tight text-primary-token'
+            className='font-display text-2xl font-medium tracking-tight text-primary-token line-clamp-2 text-balance'
           >
             {headline}
           </h1>
