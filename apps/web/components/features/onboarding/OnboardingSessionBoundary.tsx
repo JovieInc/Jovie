@@ -144,11 +144,11 @@ export function OnboardingSessionBoundary(props: OnboardingShellProps) {
         data-testid='onboarding-session-boundary'
         data-restore-state={failed ? 'failed' : 'restoring'}
       >
-        <p>
+        <h1 className='m-0 text-balance text-base font-normal leading-normal'>
           {failed
             ? 'Your conversation could not be restored.'
             : 'Restoring your conversation…'}
-        </p>
+        </h1>
         {failed ? (
           <>
             <Button onClick={() => setRevision(current => current + 1)}>

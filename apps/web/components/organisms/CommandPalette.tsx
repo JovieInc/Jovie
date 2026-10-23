@@ -155,10 +155,12 @@ function CommandPaletteController() {
       if (isCommandPaletteOpen) closeCommandPalette();
       else openCommandPalette();
     }
-    globalThis.addEventListener('keydown', onKeyDown);
+    // Capture so a focused drawer or menu cannot swallow Cmd/Ctrl+K.
+    // Editors still own the shortcut via the isFormElement guard above.
+    globalThis.addEventListener('keydown', onKeyDown, true);
     globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, openCommandPalette);
     return () => {
-      globalThis.removeEventListener('keydown', onKeyDown);
+      globalThis.removeEventListener('keydown', onKeyDown, true);
       globalThis.removeEventListener(
         OPEN_COMMAND_PALETTE_EVENT,
         openCommandPalette
