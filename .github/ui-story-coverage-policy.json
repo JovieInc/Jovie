@@ -4,7 +4,11 @@
   "mode": "blocking",
   "cleanBaselineRunsRequired": 5,
   "verifiedCleanRunIds": [
-    39795196291, 39796515081, 39868623309, 39873145141, 39884653800
+    39795196291,
+    39796515081,
+    39868623309,
+    39873145141,
+    39884653800
   ],
   "blockingAfter": "2026-10-23T02:55:00.000Z",
   "minimumPullRequestNumber": 22700,
