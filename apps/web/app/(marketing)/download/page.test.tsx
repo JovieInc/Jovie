@@ -33,9 +33,9 @@ describe('DownloadPage hero layout', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Mac desktop\u00a0workspace',
+        name: 'Mac workspace',
       })
     ).toBeInTheDocument();
-    expect(screen.getByText(/Open the Mac app today\./)).toBeInTheDocument();
+    expect(screen.getByText(/Download the Mac app\./)).toBeInTheDocument();
   });
 });
