@@ -78,6 +78,7 @@
     {"id": "workflow:pr-conflict-handler", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/pr-conflict-handler.yml"},
     {"id": "workflow:pr-preparation-canary", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-preparation-canary.yml"},
     {"id": "workflow:pr-review-learn", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-review-learn.yml", "note": "Workflow header names Tim as accountable writer; the routine owner is the agent role here."},
+    {"id": "workflow:pen-still-diff", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pen-still-diff.yml"},
     {"id": "workflow:pr-review", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-review.yml", "note": "Workflow header names Tim as accountable writer; the routine owner is the agent role here."},
     {"id": "workflow:pr-size-guard-label-override", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-size-guard-label-override.yml"},
     {"id": "workflow:pr-size-guard", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-size-guard.yml"},
