@@ -111,6 +111,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-failure-hold.mjs
+            scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/merge-group-admission.mjs
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
@@ -203,6 +204,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/merge-group-failure-hold.mjs
+            scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/merge-group-admission.mjs
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
