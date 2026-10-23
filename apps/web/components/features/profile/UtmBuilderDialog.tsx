@@ -1,6 +1,8 @@
 'use client';
 
-import { Button, Input, Label } from '@jovie/ui';
+import { Button } from '@jovie/ui/atoms/button';
+import { Input } from '@jovie/ui/atoms/input';
+import { Label } from '@jovie/ui/atoms/label';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -14,9 +16,13 @@ import { copyToClipboard } from '@/hooks/useClipboard';
 
 interface UtmBuilderDialogProps {
   readonly open: boolean;
-  readonly onClose: () => void;
+  /** Required for the modal. Omitted when `embedded` renders the fields inline. */
+  readonly onClose?: () => void;
   /** Profile URL the UTM params are appended to. */
   readonly baseUrl: string;
+  /** Inline fields for a page surface. Skips the dialog portal. */
+  readonly embedded?: boolean;
+  readonly initialValues?: Partial<Record<UtmField, string>>;
 }
 
 const UTM_FIELDS = [
@@ -49,6 +55,18 @@ const UTM_FIELDS = [
 
 type UtmField = (typeof UTM_FIELDS)[number]['key'];
 
+function withInitialValues(
+  initialValues: Partial<Record<UtmField, string>> | undefined
+): Record<UtmField, string> {
+  return {
+    utm_source: initialValues?.utm_source ?? '',
+    utm_medium: initialValues?.utm_medium ?? '',
+    utm_campaign: initialValues?.utm_campaign ?? '',
+    utm_term: initialValues?.utm_term ?? '',
+    utm_content: initialValues?.utm_content ?? '',
+  };
+}
+
 /**
  * Builds a profile URL with UTM tracking params.
  *
@@ -60,14 +78,12 @@ export function UtmBuilderDialog({
   open,
   onClose,
   baseUrl,
+  embedded = false,
+  initialValues,
 }: UtmBuilderDialogProps) {
-  const [values, setValues] = useState<Record<UtmField, string>>({
-    utm_source: '',
-    utm_medium: '',
-    utm_campaign: '',
-    utm_term: '',
-    utm_content: '',
-  });
+  const [values, setValues] = useState<Record<UtmField, string>>(() =>
+    withInitialValues(initialValues)
+  );
   const [copied, setCopied] = useState(false);
 
   const sourceMissing = values.utm_source.trim() === '';
@@ -94,67 +110,84 @@ export function UtmBuilderDialog({
     toast.error('Failed to copy');
   };
 
-  return (
-    <Dialog open={open} onClose={onClose} size='md'>
-      <DialogTitle>UTM Builder</DialogTitle>
-      <DialogBody className='space-y-3'>
-        {UTM_FIELDS.map(({ key, label, required, placeholder }) => (
-          <div key={key} className='grid gap-1.5'>
-            <Label htmlFor={`utm-${key}`} required={required}>
-              {label}
-            </Label>
-            <Input
-              id={`utm-${key}`}
-              type='text'
-              value={values[key]}
-              placeholder={placeholder}
-              onChange={event =>
-                setValues(prev => ({ ...prev, [key]: event.target.value }))
-              }
-            />
-          </div>
-        ))}
-
-        <div className='rounded-lg border border-(--app-shell-frame-seam) bg-surface-0 px-2.5 py-2'>
-          <p className='break-all font-mono text-2xs leading-5 text-secondary-token'>
-            {resultUrl}
-          </p>
+  const fields = (
+    <>
+      {UTM_FIELDS.map(({ key, label, required, placeholder }) => (
+        <div key={key} className='grid gap-1.5'>
+          <Label htmlFor={`utm-${key}`} required={required}>
+            {label}
+          </Label>
+          <Input
+            id={`utm-${key}`}
+            type='text'
+            value={values[key]}
+            placeholder={placeholder}
+            onChange={event =>
+              setValues(prev => ({ ...prev, [key]: event.target.value }))
+            }
+          />
         </div>
+      ))}
 
-        {/* Fixed-height slot so the rule appearing/clearing never reflows the dialog. */}
-        <p className='min-h-4 text-xs text-secondary-token' aria-live='polite'>
-          {sourceMissing
-            ? 'Add a source (like instagram) to create your tracking link.'
-            : null}
+      <div className='rounded-lg border border-(--app-shell-frame-seam) bg-surface-0 px-2.5 py-2'>
+        <p className='break-all font-mono text-2xs leading-5 text-secondary-token'>
+          {resultUrl}
         </p>
-      </DialogBody>
+      </div>
 
-      <DialogActions>
-        <Button
-          type='button'
-          variant='secondary'
-          disabled={sourceMissing}
-          onClick={() =>
-            globalThis.open(resultUrl, '_blank', 'noopener,noreferrer')
-          }
-        >
-          <ExternalLink className='mr-2 h-4 w-4' aria-hidden='true' />
-          Open
-        </Button>
-        <Button
-          type='button'
-          variant='primary'
-          disabled={sourceMissing}
-          onClick={handleCopy}
-        >
-          {copied ? (
-            <Check className='mr-2 h-4 w-4' aria-hidden='true' />
-          ) : (
-            <Copy className='mr-2 h-4 w-4' aria-hidden='true' />
-          )}
-          {copied ? 'Copied' : 'Copy link'}
-        </Button>
-      </DialogActions>
+      {/* Fixed-height slot so the rule appearing/clearing never reflows the dialog. */}
+      <p className='min-h-4 text-xs text-secondary-token' aria-live='polite'>
+        {sourceMissing
+          ? 'Add a source (like instagram) to create your tracking link.'
+          : null}
+      </p>
+    </>
+  );
+
+  const actions = (
+    <>
+      <Button
+        type='button'
+        variant='secondary'
+        disabled={sourceMissing}
+        onClick={() =>
+          globalThis.open(resultUrl, '_blank', 'noopener,noreferrer')
+        }
+      >
+        <ExternalLink className='mr-2 h-4 w-4' aria-hidden='true' />
+        Open
+      </Button>
+      <Button
+        type='button'
+        variant='primary'
+        disabled={sourceMissing}
+        onClick={handleCopy}
+      >
+        {copied ? (
+          <Check className='mr-2 h-4 w-4' aria-hidden='true' />
+        ) : (
+          <Copy className='mr-2 h-4 w-4' aria-hidden='true' />
+        )}
+        {copied ? 'Copied' : 'Copy link'}
+      </Button>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div data-testid='utm-builder' className='space-y-3'>
+        <p className='text-sm font-medium text-primary-token'>UTM Builder</p>
+        {fields}
+        <div className='flex flex-wrap justify-end gap-3'>{actions}</div>
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose ?? (() => undefined)} size='md'>
+      <DialogTitle>UTM Builder</DialogTitle>
+      <DialogBody className='space-y-3'>{fields}</DialogBody>
+      <DialogActions>{actions}</DialogActions>
     </Dialog>
   );
 }

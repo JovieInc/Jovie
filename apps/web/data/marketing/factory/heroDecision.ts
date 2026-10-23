@@ -260,6 +260,11 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     why: 'hero renders ProductClaimCard',
   },
   {
+    url: '/product/utm-links',
+    input: { useCase: 'aha-capture', captureId: 'utm-links-builder' },
+    why: 'hero mounts the live UTM builder as the aha capture',
+  },
+  {
     url: '/product/traffic-quality',
     input: { useCase: 'aha-capture', captureId: 'traffic-quality-filter' },
     why: 'hero mounts the live traffic quality filter as the aha capture',

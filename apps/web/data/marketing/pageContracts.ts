@@ -180,6 +180,15 @@ export const MARKETING_PAGE_CONTRACTS = {
       label: PRODUCT_COPY.claimCard.cta,
     },
   },
+  '(marketing)/product/utm-links/page.tsx': {
+    routeGlob: '(marketing)/product/utm-links/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_UTM_LINKS,
+    job: 'build a tracked link on an existing destination',
+    proof: 'live UTM builder with source, medium, campaign, and content filled',
+    successEvent: 'visitor copies a tracked link',
+    primaryCta: START_CTA,
+  },
   '(marketing)/product/traffic-quality/page.tsx': {
     routeGlob: '(marketing)/product/traffic-quality/page.tsx',
     copyScope: 'shared',
