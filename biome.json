@@ -146,6 +146,10 @@
   },
   "overrides": [
     {
+      "includes": ["scripts/invariants/copy-leak/config.json"],
+      "json": { "formatter": { "expand": "never", "lineWidth": 320 } }
+    },
+    {
       "includes": [
         "**/*.test.ts",
         "**/*.test.tsx",

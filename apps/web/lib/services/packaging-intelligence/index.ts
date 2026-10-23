@@ -1,3 +1,4 @@
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import 'server-only';
 
 import { serverFetch } from '@/lib/http/server-fetch';
@@ -145,7 +146,7 @@ export async function analyzeVideoPackaging(
   options: AnalyzeVideoPackagingOptions = {}
 ): Promise<PackagingIntelligence> {
   const videoContext = await fetchYouTubeVideoContext(input.videoId);
-  const title = input.title ?? videoContext?.title ?? 'Untitled video';
+  const title = input.title ?? videoContext?.title ?? COPY_FALLBACKS.video;
   const description = input.description ?? videoContext?.description ?? '';
   const thumbnailUrl = input.thumbnailUrl ?? videoContext?.thumbnailUrl;
   const { segments, source } = await resolveTranscript(
