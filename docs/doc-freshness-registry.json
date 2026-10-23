@@ -310,7 +310,7 @@
     ".claude/rules/ui.md": {
       "owner": "@itstimwhite",
       "claim": "Operational UI policy inherits the design authority chain. Canonical founder identity, Tailwind utility registration, signup intent and visible opening proof follow their lesson contracts.",
-      "documentSha256": "269feca43a3956c3a353ae21c7e3dcfe7b4867388de86960e86cdfa2ce7ac590",
+      "documentSha256": "a4cf01d634e41c4c6e4ebe40e34227bf4b29854eb50c6bb5ed20623fc1cb73f3",
       "sources": [
         {
           "path": "DESIGN.md",
