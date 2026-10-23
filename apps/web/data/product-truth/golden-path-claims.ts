@@ -111,7 +111,7 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'One profile. For every fan.',
+    copy: 'Be found. Be understood.',
     nature: 'capability',
     capabilityIds: ['artist-profiles', 'public-profile'],
   },

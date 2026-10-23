@@ -125,7 +125,7 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
   it('keeps the homepage hero H1 on the homepage, not /product', () => {
     render(<ProductLanding />);
 
-    expect(HOMEPAGE_COPY.hero.headline).toBe('One profile. For every fan.');
+    expect(HOMEPAGE_COPY.hero.headline).toBe('Be found. Be understood.');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Your living identity on the internet.'
     );

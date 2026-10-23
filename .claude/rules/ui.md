@@ -52,6 +52,10 @@ Do not hide a primary action behind hover, a gesture, a magic shortcut, or a
 second surface when a direct visible control fits. Touch and pointer controls
 remain available even when a keyboard accelerator is useful.
 
+Follow [tooltip eligibility and input](../../DESIGN.md#tooltip-eligibility-and-input):
+measure title clipping, preserve mouse/keyboard hints on hybrids, let touch
+activate immediately, and retain rail-owned interactive portals until dismissal.
+
 ### Input, Shortcuts, and Discoverability
 
 - Prefer semantic native controls. Use ARIA composite roles only when the
