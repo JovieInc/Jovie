@@ -20,6 +20,9 @@ const mockRelease: Release = {
   totalDiscs: 1,
 };
 
+/** Any formatTimeAgo output — relative labels must never reach server HTML. */
+const RELATIVE_TEXT = /(?:just now)|(?:\d+\s?(?:m|h|d|w|mo|y)\s?ago)/u;
+
 describe('ReleaseSmartLinkAnalytics', () => {
   it('renders the production profile host in the smart link, never a loopback URL', () => {
     const profileHost = new URL(BASE_URL).host;

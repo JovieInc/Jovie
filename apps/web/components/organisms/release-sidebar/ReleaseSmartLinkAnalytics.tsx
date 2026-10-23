@@ -21,10 +21,7 @@ import {
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import { env } from '@/lib/env-client';
 import { buildTrackedShareDropdownItems } from '@/lib/share/tracked-sources';
-import {
-  formatShortDateUTC,
-  formatTimeAgo,
-} from '@/lib/utils/date-formatting';
+import { formatShortDateUTC, formatTimeAgo } from '@/lib/utils/date-formatting';
 import { buildUTMContext } from '@/lib/utm';
 import type { Release, ReleaseSidebarAnalytics } from './types';
 
