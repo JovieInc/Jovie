@@ -38,7 +38,22 @@ const report = statuses => ({
     {
       specs: statuses.map(status => ({
         file: 'tests/e2e/golden-path.spec.ts',
-        tests: [{ status }],
+        tests: [
+          {
+            status,
+            expectedStatus: status === 'skipped' ? 'skipped' : 'passed',
+            results: [
+              {
+                status:
+                  status === 'expected'
+                    ? 'passed'
+                    : status === 'skipped'
+                      ? 'skipped'
+                      : 'failed',
+              },
+            ],
+          },
+        ],
       })),
     },
   ],
