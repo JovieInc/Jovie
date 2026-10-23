@@ -130,9 +130,11 @@ export function auditGateConfigs(root) {
     }
     const coverage = asMapping(codecov.coverage);
     const status = asMapping(coverage.status);
-    const patch = asMapping(status.patch);
-    const patchInformational = asMapping(patch.default).informational;
-    if (patchInformational !== true && !pullRequestUploadsCoverage) {
+    const patchEntries = Object.values(asMapping(status.patch));
+    const patchInformational =
+      patchEntries.length > 0 &&
+      patchEntries.every(entry => asMapping(entry).informational === true);
+    if (!patchInformational && !pullRequestUploadsCoverage) {
       findings.push(
         `${CODECOV_CONFIG} patch status is blocking, but no pull_request workflow uploads coverage. Exact-head Coverage in ci.yml is the pull-request line-coverage gate.`
       );

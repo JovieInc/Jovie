@@ -129,6 +129,29 @@ jobs:
     ]);
   });
 
+  it('rejects a named blocking patch status when default is informational', () => {
+    const root = mkdtempSync(join(tmpdir(), 'gate-config-'));
+    writeWorkflow(root, 'coverage.yml', NIGHTLY_COVERAGE);
+    writeFileSync(
+      join(root, 'codecov.yml'),
+      `coverage:
+  status:
+    patch:
+      default:
+        informational: true
+      app:
+        informational: false
+flags:
+  nightly-unittests:
+    paths:
+      - apps/web/
+`
+    );
+    expect(auditGateConfigs(root)).toEqual([
+      'codecov.yml patch status is blocking, but no pull_request workflow uploads coverage. Exact-head Coverage in ci.yml is the pull-request line-coverage gate.',
+    ]);
+  });
+
   it('rejects a blocking patch check and a coverage flag with no producer', () => {
     const root = mkdtempSync(join(tmpdir(), 'gate-config-'));
     writeWorkflow(root, 'coverage.yml', NIGHTLY_COVERAGE);
