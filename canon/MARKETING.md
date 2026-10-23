@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-08-03
+Last updated: 2026-10-23
 
 Marketing exists to create qualified demand that moves the current company bottleneck.
 
@@ -74,6 +74,71 @@ Unknown means measure first.
 
 ---
 
+## Art-directed marketing surfaces
+
+Public marketing routes (`app/(marketing)` and the homepage in `app/(home)`)
+are art-directed. This section is the explicit exception to "clarity beats
+novelty" and "smallest design change" in [`DESIGN.md`](./DESIGN.md). Product
+UI, the app shell, auth, and settings stay on that rule. Tokens, contrast,
+art-cropping, truth, motion, and accessibility gates still apply.
+
+The homepage is inbound for founders and investors, and it sells the artist
+profile (EVENT 2026-10-20). The headline stays **Be found. Be understood.**
+(`COMPANY_IDENTITY.homepageHeadline` in
+`apps/web/data/companyIdentity.ts`). The typed homepage recipe still owns
+section order. Those sections carry the arc below.
+
+### Mood
+
+Apple meets Rekordbox. Cinematic, quiet confidence. One idea per viewport.
+
+### Dark first
+
+Dark is the design and review mode. Use the Noir Ion dark tokens: canvas
+`#030406`, card `#131417`, hairline `--noir-ion-border-subtle`
+(`rgba(168, 176, 195, 0.1)`), and Ion `#11AFFF` as the only hero accent. Pulse
+and aqua (aqua aliases mint) stay tiny status accents. Light is a derived
+variant, reviewed second.
+
+### Expensive polish
+
+Expensive polish is restraint plus materiality. One hero artifact per section
+may carry subtle glass and edge-light. Keep generous negative space, one
+controlled glow, and an 8-pt rhythm on the 4px grid. Motion is one long ease
+with the existing reduced-motion fallback. Treat glass as a material on that
+artifact. ZiaWI stays at five elevations.
+
+### Product as hero
+
+Use real product mockups (profile, claim flow, release, analytics), cropped
+and framed at one consistent device scale. Callouts are thin leader lines and
+12–13px labels, at most 3 per mockup. Dense screenshot collages and
+label-connector diagrams stay rejected
+([MKT-D05](../docs/marketing/DESIGN_INVARIANTS.md#mkt-d05--choose-the-medium-before-the-component)).
+
+### Focus
+
+One primary CTA per viewport. At most two type sizes per section. No all-caps
+eyebrows. Social proof only when it is verified.
+
+### Narrative arc
+
+Claim your handle, then be found, then be understood, then proof, then the
+path for investors and founders, then the final CTA.
+
+### Hard negatives
+
+- Full-width sparse sections.
+- Repeating identical cards.
+- Gradient soup.
+- More than two accents per fold.
+- Document-like or flat screenshots.
+- A tall mockup in a wide section.
+- Payroll mentions.
+- Naming Daniel Kang or Haruki.
+
+---
+
 ## Anti-Goals
 
 Do not optimize for:
@@ -98,6 +163,7 @@ The executable landing-page copy workflow is in
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-23 | Added the art-directed marketing surface brief as the marketing-only exception to smallest-change design guidance. | Homepage art-direction brief; founder wording review |
 | 2026-10-02 | Added source-classified About/search guidance and distinct artist/ranking outcome boundaries. | Tim voice direction; JOV-7429; Google Search Central |
 | 2026-08-21 | Linked Jovie-owned generated campaign imagery to the scene-first design color contract. | Tim White approval |
 | 2026-08-04 | Added outcome-bound semantic guard against prompt/meta-copy leakage; shadow legacy, delta new/changed copy. | Tim White direction |

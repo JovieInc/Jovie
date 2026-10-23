@@ -15,6 +15,20 @@ Current direction: one System B token foundation, compact product and editorial
 marketing languages. Inter is the body/UI face; Satoshi is the approved display
 exception. Do not revive System A or DM Sans from historical examples.
 
+## Art-directed marketing surfaces
+
+Public marketing routes (`app/(marketing)` and `app/(home)`) follow the
+[art-directed marketing brief](canon/MARKETING.md#art-directed-marketing-surfaces).
+That brief is the explicit exception, for marketing surfaces only, to "clarity
+beats novelty" and "smallest design change" in
+[canon/DESIGN.md](canon/DESIGN.md). On those surfaces, composition, mockup
+proportion, material, and narrative lead.
+
+Product UI is unchanged. The app shell, auth, settings, and in-product screens
+still use the smallest design change that makes the next value moment obvious.
+Tokens, contrast, art-cropping, truth, motion, and accessibility gates still
+apply on marketing surfaces.
+
 Follow the founder-locked [settings decisions](docs/design-system/DETAILS.md#settings-decisions) (2026-10-02).
 
 ## Authority and precedence
