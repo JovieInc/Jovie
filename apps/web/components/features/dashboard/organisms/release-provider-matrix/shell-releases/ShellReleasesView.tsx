@@ -208,7 +208,7 @@ function ReleasesListContent({
           {/* Real heading: the e2e state resolution and axe gates resolve the
               disconnected state by its 'Connect Spotify' heading, matching
               the h3 the connected empty state already renders. */}
-          <h3 className='text-app font-caption text-primary-token'>
+          <h3 className='text-app font-caption text-primary-token text-balance'>
             Connect Spotify To Get Started
           </h3>
           <p className='mt-1 text-xs text-tertiary-token leading-normal'>
