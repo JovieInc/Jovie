@@ -268,6 +268,6 @@ export const config = {
     // alias redirect whenever the CDN-cached decision is not served fresh.
     // The endpoint is public, visitor-independent routing JSON that reads no
     // cookies, so it needs none of the proxy's gates (JOV-8338).
-    '/(?!api/profile-alias-decision(?:/|$))(api|trpc)(.*)',
+    '/((?!api/profile-alias-decision(?:/|$))(?:api|trpc).*)',
   ],
 };
