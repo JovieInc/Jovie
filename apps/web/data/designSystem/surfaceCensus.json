@@ -381,9 +381,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-23T05:55:00Z",
-        "ref": "PR 22726 title-metadata renewal; visual surface unchanged from JOV-8097 certification",
-        "sourceDigest": "54b25357a7c78748ebf22c8cfb2a1576de2638d76b9cb7c5ce5c8b79ba54ea5e"
+        "at": "2026-10-23T07:48:45.448Z",
+        "ref": "PR 22741 rounded-media renewal: exact-source 7db92251ffdeb0c448a3081d9f4e324d6cc72c2d production-build Playwright /pricing desktop 1440x900 and mobile 390x844 DOM/contrast receipts, zero findings; https://github.com/JovieInc/Jovie/actions/runs/39919560122/artifacts/12485938109; prior JOV-8097 interaction states unchanged",
+        "sourceDigest": "4a1953d5fed4f632e76e32041ddeec7d0c4fcd067cc84ab967608af30f71ae2c"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
