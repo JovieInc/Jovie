@@ -28,6 +28,7 @@ const THEME_SWITCHING_ROUTE_POLICY = {
     '/product/dsp-links',
     '/product/utm-links',
     '/product/isrc',
+    '/product/pre-save',
     '/product/link-analytics',
     '/smart-links',
     '/launch',

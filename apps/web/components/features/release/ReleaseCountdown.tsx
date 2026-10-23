@@ -143,10 +143,10 @@ export function ReleaseCountdown({
       <div className='flex items-baseline gap-2.5 tabular-nums'>
         {segments.map(segment => (
           <span key={segment.label}>
-            <span className='text-xl font-bold tracking-[-0.03em] text-(--color-text-tooltip)'>
+            <span className='text-xl font-bold tracking-tight text-(--color-text-tooltip)'>
               {segment.value}
             </span>
-            <span className='ml-0.5 text-3xs font-semibold uppercase tracking-[0.08em] text-white/35'>
+            <span className='ml-0.5 text-3xs font-semibold uppercase tracking-widest text-white/35'>
               {segment.label}
             </span>
           </span>

@@ -1088,6 +1088,37 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/product/pre-save/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/pre-save/PreSaveLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'Pre-save countdown ship on /product/pre-save',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live countdown for a dated release. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/pre-save',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/release/ReleaseCountdown.tsx',
+      testId: 'pre-save-countdown',
+    },
+    healthCheck: {
+      path: '/product/pre-save',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
     glob: '(marketing)/card/page.tsx',
     recipeId: 'feature',
     renderedSections: [
