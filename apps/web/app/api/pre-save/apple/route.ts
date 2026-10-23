@@ -17,9 +17,9 @@ const applePreSaveSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const { userId: clerkId } = await getCachedAuth();
+  const { userId: appUserId } = await getCachedAuth();
 
-  if (!clerkId) {
+  if (!appUserId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const [dbUser] = await db
     .select({ id: users.id, email: users.email })
     .from(users)
-    .where(eq(users.clerkId, clerkId))
+    .where(eq(users.id, appUserId))
     .limit(1);
 
   if (!dbUser) {

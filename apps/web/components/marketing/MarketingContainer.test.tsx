@@ -13,12 +13,8 @@ describe('MarketingContainer', () => {
 
     const wrapper = container.firstElementChild;
     expect(screen.getByText('page column')).toBeInTheDocument();
-    expect(wrapper).toHaveClass(
-      'mx-auto',
-      'w-full',
-      'max-w-public-content',
-      'py-16'
-    );
+    expect(wrapper).toHaveClass('public-container', 'py-16');
+    expect(wrapper).not.toHaveClass('public-container--bleed');
     expect(wrapper).toHaveAttribute(
       'data-pen-contract',
       MARKETING_CONTAINER_PEN_CONTRACT_BY_WIDTH.page
@@ -31,7 +27,7 @@ describe('MarketingContainer', () => {
     );
 
     const wrapper = container.firstElementChild;
-    expect(wrapper).toHaveClass('max-w-public-content');
+    expect(wrapper).toHaveClass('public-container');
     expect(wrapper).not.toHaveClass('max-w-prose-canonical');
     expect(wrapper).toHaveAttribute(
       'data-pen-contract',
@@ -46,10 +42,23 @@ describe('MarketingContainer', () => {
 
     const wrapper = container.firstElementChild;
     expect(wrapper).toHaveClass('max-w-prose-canonical');
-    expect(wrapper).not.toHaveClass('max-w-public-content');
+    expect(wrapper).not.toHaveClass('public-container');
     expect(wrapper).toHaveAttribute(
       'data-pen-contract',
       MARKETING_CONTAINER_PEN_CONTRACT_BY_WIDTH.prose
+    );
+  });
+
+  it('offers one full-bleed override and no other width', () => {
+    const { container } = render(
+      <MarketingContainer width='page' bleed>
+        bleed column
+      </MarketingContainer>
+    );
+
+    expect(container.firstElementChild).toHaveClass(
+      'public-container',
+      'public-container--bleed'
     );
   });
 });

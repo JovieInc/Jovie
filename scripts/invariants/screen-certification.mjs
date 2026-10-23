@@ -51,6 +51,12 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.marketing-download': '/download',
   'web.marketing-pay': '/pay',
   'web.marketing-product': '/product',
+  'web.marketing-command-palette': '/product/command-palette',
+  'web.marketing-release-scheduling': '/product/release-scheduling',
+  'web.marketing-dsp-links': '/product/dsp-links',
+  'web.marketing-isrc': '/product/isrc',
+  'web.marketing-pre-save': '/product/pre-save',
+  'web.marketing-link-analytics': '/product/link-analytics',
   'web.marketing-card': '/card',
   'web.marketing-smart-links': '/smart-links',
   'web.marketing-launch': '/launch',
@@ -236,11 +242,18 @@ web.blog|web|blog|apps/web/app/(marketing)/blog/|desktop,mobile
 web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile
 web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
 web.marketing-card|web|marketing-card|apps/web/app/(marketing)/card/page.tsx|desktop,mobile
-web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx|desktop,mobile
+web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx,apps/web/app/(marketing)/compare/[slug]/page.tsx|desktop,mobile
 web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/page.tsx|desktop,mobile
 web.investor-portal|web|investor-portal|apps/web/app/investor-portal/|desktop,mobile
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
 web.marketing-product|web|marketing-product|apps/web/app/(marketing)/product/page.tsx|desktop,mobile
+web.marketing-command-palette|web|marketing-command-palette|apps/web/app/(marketing)/product/command-palette/page.tsx|desktop,mobile
+web.marketing-release-scheduling|web|marketing-release-scheduling|apps/web/app/(marketing)/product/release-scheduling/page.tsx|desktop,mobile
+web.marketing-dsp-links|web|marketing-dsp-links|apps/web/app/(marketing)/product/dsp-links/page.tsx|desktop,mobile
+web.marketing-product-utm-links|web|marketing-product-utm-links|apps/web/app/(marketing)/product/utm-links/page.tsx|desktop,mobile
+web.marketing-isrc|web|marketing-isrc|apps/web/app/(marketing)/product/isrc/page.tsx|desktop,mobile
+web.marketing-pre-save|web|marketing-pre-save|apps/web/app/(marketing)/product/pre-save/page.tsx|desktop,mobile
+web.marketing-link-analytics|web|marketing-link-analytics|apps/web/app/(marketing)/product/link-analytics/page.tsx|desktop,mobile
 web.marketing-smart-links|web|marketing-smart-links|apps/web/app/(marketing)/smart-links/page.tsx|desktop,mobile
 web.marketing-pay|web|marketing-pay|apps/web/app/(marketing)/pay/page.tsx|desktop,mobile
 web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx,apps/web/app/(marketing)/pricing/layout.tsx|desktop,mobile
@@ -317,6 +330,7 @@ web.admin-growth|web|admin-growth|apps/web/app/app/(shell)/admin/growth/page.tsx
 web.admin-people|web|admin-people|apps/web/app/app/(shell)/admin/people/page.tsx|desktop,mobile
 web.admin-agent-runs|web|admin-agent-runs|apps/web/app/app/(shell)/admin/agent-runs/|desktop,mobile
 web.admin-ops-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/ops/page.tsx|desktop,mobile
+web.admin-yc-metrics-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/growth/yc-metrics/page.tsx|desktop,mobile
 web.ov-lists|web|ovie-lists|apps/web/app/app/(shell)/admin/lists/|desktop,mobile
 web.admin-screenshots|web|admin-screenshots|apps/web/app/app/(shell)/admin/screenshots/|desktop,mobile
 web.admin-share-studio|web|admin-share-studio|apps/web/app/app/(shell)/admin/share-studio/page.tsx|desktop,mobile
@@ -753,7 +767,10 @@ export function resolveTrustedProofForScreen(request) {
       proof: null,
       screen,
       findings: [
-        `${screen.id}: trusted producer artifact ${String(artifactId)} is not acceptable: ${(resolved.findings || []).join('; ')}`,
+        // Keep the screen id off the left of a colon. `web.legal-cookies: trusted`
+        // is credential-text to the Playwright artifact guard (COOKIES assignment)
+        // even though it is a screen id, and that blocked the receipt upload.
+        `trusted producer artifact ${String(artifactId)} is not acceptable for ${screen.id} (${(resolved.findings || []).join('; ')})`,
       ],
     };
   }
@@ -1220,7 +1237,7 @@ export function evaluateChangedScreens({
     );
     const commissioning = findings.length - blocking.length;
     if (blocking.length > 0)
-      issues.push(`${screen.id}: ${blocking.join('; ')}`);
+      issues.push(`screen ${screen.id} blocked (${blocking.join('; ')})`);
     changedScreens.push({
       id: screen.id,
       verdict: blocking.length === 0 ? 'pass' : 'block',

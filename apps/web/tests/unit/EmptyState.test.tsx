@@ -196,14 +196,49 @@ describe('EmptyState (canonical molecule API)', () => {
     expect(status.className).toContain('justify-center');
     expect(status.className).toContain('min-h-full');
     expect(status.querySelector('svg')).toBeNull();
-    expect(heading.className).toContain('text-2xl');
+    expect(heading.className).toContain('text-sm');
     expect(heading.className).toContain('font-semibold');
     expect(heading.className).toContain('tracking-tight');
     expect(heading.className).toContain('text-primary-token');
-    expect(description.className).toContain('text-base');
+    expect(description.className).toContain('text-xs');
+    // text-xs (same 0.75rem as --text-app) because tailwind-merge classifies
+    // unknown text-* names into the color group and drops them when
+    // text-secondary-token follows — text-xs is the known utility that
+    // survives the merge at the dense 12px body size.
+    expect(description.className).toContain('text-secondary-token');
     expect(description.className).toContain('max-w-md');
     expect(description.className).toContain('text-secondary-token');
     expect(description.className).toContain('mb-0');
+  });
+
+  it('frames the workspace presentation as one hairline focal card with left-aligned content', () => {
+    const { container } = render(
+      <EmptyState
+        heading='No Releases Yet'
+        description='Import your catalog to see it here.'
+        presentation='workspace'
+        action={{ label: 'Connect Spotify', onClick: () => undefined }}
+      />
+    );
+
+    const card = container.querySelector('[data-empty-state-card]');
+    expect(card).not.toBeNull();
+    expect(card).toHaveClass('rounded-md');
+    expect(card).toHaveClass('border-subtle');
+    expect(card).toHaveClass('bg-surface-0');
+    expect(card).toHaveClass('text-left');
+    // The single primary action row leads left inside the card.
+    const actionRow = card?.querySelector('div');
+    expect(actionRow).not.toBeNull();
+    expect(actionRow).toHaveClass('items-start');
+    // The non-workspace presentation stays centered with no card.
+    const bare = render(
+      <EmptyState
+        heading='No Matches'
+        action={{ label: 'Go', onClick: () => undefined }}
+      />
+    );
+    expect(bare.container.querySelector('[data-empty-state-card]')).toBeNull();
   });
 
   it('keeps action layout compact-first and inline at the small breakpoint', () => {

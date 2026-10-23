@@ -1,10 +1,10 @@
 {
   "name": "@jovie/web",
-  "version": "26.10.11",
+  "version": "26.10.14",
   "private": true,
   "sideEffects": false,
   "engines": {
-    "node": ">=24.21.0 <25"
+    "node": ">=24.22.1 <25"
   },
   "scripts": {
     "dev": "NODE_OPTIONS=--max-old-space-size=8192 doppler run -- node scripts/dev-fast.mjs",
@@ -212,6 +212,8 @@
     "perf:auth": "tsx scripts/performance-auth.ts",
     "perf:route-js": "node scripts/route-js-budget.mjs",
     "perf:interactions": "tsx scripts/performance-interaction-audit.ts",
+    "product-surface-counts": "tsx scripts/generate-product-surface-counts.ts",
+    "product-surface-counts:check": "tsx scripts/generate-product-surface-counts.ts --check",
     "perf:queue": "doppler run --project jovie-web --config dev -- tsx scripts/performance-batch-queue.ts",
     "qa:routes": "tsx scripts/route-qa.ts",
     "qa:marketing:route-health": "E2E_USE_TEST_AUTH_BYPASS=1 PUBLIC_NOAUTH_SMOKE=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_E2E_MODE=1 playwright test tests/e2e/marketing-route-health.spec.ts --project=marketing-route-health --reporter=line",
@@ -343,7 +345,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@biomejs/biome": "^2.5.14",
-    "@chromatic-com/storybook": "^5.5.1",
+    "@electric-sql/pglite": "^0.5.11",
     "@lhci/cli": "^0.15.1",
     "@next/bundle-analyzer": "^16.4.2",
     "@playwright/test": "1.64.1",

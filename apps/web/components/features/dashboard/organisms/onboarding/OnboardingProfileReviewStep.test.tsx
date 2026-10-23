@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
 import { OnboardingProfileReviewStep } from './OnboardingProfileReviewStep';
@@ -32,6 +33,20 @@ function renderStep() {
 }
 
 describe('OnboardingProfileReviewStep', () => {
+  it('keeps the display-name control focusable when opening the editor by keyboard', async () => {
+    renderStep();
+    const user = userEvent.setup();
+    const edit = screen.getByRole('button', { name: 'Edit Display Name' });
+    edit.focus();
+    expect(edit).toHaveFocus();
+    expect(edit).toHaveClass('focus-ring-themed');
+
+    await user.keyboard('{Enter}');
+    const input = screen.getByRole('textbox', { name: 'Edit Display Name' });
+    expect(input).toHaveValue(enrichedProfile.name);
+    expect(input).toHaveFocus();
+  });
+
   it('renders the name validation error with the error token, not raw red-* (JOV-6773)', () => {
     renderStep();
 

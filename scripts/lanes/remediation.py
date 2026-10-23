@@ -106,12 +106,21 @@ _NON_CREDENTIAL_STRATEGY = re.compile(
 )
 # Match only the stated assurance, capturing its credential mention. Never
 # erase another mention in the same sentence: it may request a real action.
+# JOV-8810: a model-route repair also says a check could not be verified,
+# that child-environment credentials were stripped, or names screenshot/credential
+# tests. Each alternative captures only that word. A rotate, a vault strip,
+# "credential for tests", and a credential path stay gated.
 _CREDENTIAL_ASSURANCE = re.compile(
     r"\b(?P<passive>credentials?)(?:,\s*(?:and\s+)?OTPs?)?\s+"
     r"(?:are|is|were|was)\s+(?:(?:excluded|omitted|redacted|hashed|stripped|dropped|withheld)"
     r"|not\s+(?:recorded|stored|logged|included|emitted|printed|persisted))\b"
     r"|\bcannot\s+(?:attest|isolate)(?:\s+or\s+(?:attest|isolate))?\s+"
-    r"(?:child\s+tools,\s*)?(?P<boundary>credentials?)\b",
+    r"(?:child\s+tools,\s*)?(?P<boundary>credentials?)\b"
+    r"|\bstrip(?:ped|ping)?\s+(?:(?:raw|metered)\s+)?(?:api\s+)?(?P<removed>credentials?)\s+"
+    r"(?:from|in)\s+(?:child\s+)?environments?\b"
+    r"|\b(?:could\s+not|cannot|can\s+not)\s+be\s+(?:verified|certified)\s+"
+    r"(?:with\s+the\s+available|without)\s+(?P<unavailable>credentials?)\b"
+    r"|\bscreenshot/(?P<testref>credentials?)\s+tests?\b",
     re.IGNORECASE,
 )
 ACTIONABLE_FIX = re.compile(

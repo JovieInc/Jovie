@@ -1682,7 +1682,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-pricing-page .marketing-pricing-plan-card) {
   min-height: calc(var(--space-20) + var(--space-16));
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-xl);
   background: var(--system-b-bg-surface-0);
   box-shadow: none;
   padding: var(--space-6);
@@ -2751,6 +2751,11 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
   gap: var(--space-3);
 }
 
+:where(.system-b-artist-notifications-card-position) {
+  width: 100%;
+  min-width: 0;
+}
+
 @media (min-width: 1024px) {
   :where(.system-b-artist-notifications-card-stage) {
     display: block;
@@ -2795,11 +2800,6 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
     width: 17rem;
     transform: rotate(2deg);
   }
-}
-
-:where(.system-b-artist-notifications-card-position) {
-  width: 100%;
-  min-width: 0;
 }
 
 /* ============================================

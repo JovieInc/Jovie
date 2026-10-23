@@ -1072,9 +1072,12 @@ async function materializeLifecycleIssue(fetchImpl, apiKey, raw) {
     ),
     hasChildren: childNodes.length > 0,
     openChildren: childNodes
+      // Linear's Duplicate state type is closed work, like canceled.
       .filter(
         child =>
-          !['completed', 'canceled'].includes(String(child?.state?.type ?? ''))
+          !['completed', 'canceled', 'duplicate'].includes(
+            String(child?.state?.type ?? '')
+          )
       )
       .map(child => String(child?.identifier ?? '').toUpperCase())
       .filter(Boolean),
@@ -1165,6 +1168,30 @@ function lifecyclePreimage(issue) {
  *   readonly log: (message: string) => void,
  * }} ctx
  */
+/**
+ * `remediation:pr-<n>-conflict` issues track one pull request that carried a
+ * lane-fix hold for over a day. Nothing posts their green marker, so they
+ * held Validating forever after the pull request closed or merged (11 of 12
+ * on 2026-10-21). The check is resolved when a complete open-PR scan no
+ * longer lists that pull request; an incomplete scan proves nothing (null).
+ *
+ * @param {{ labels?: readonly string[] }} issue
+ * @param {{ pulls: readonly object[], complete?: boolean }} openPulls
+ * @returns {boolean | null}
+ */
+export function conflictRemediationResolved(issue, openPulls) {
+  const numbers = (issue.labels ?? [])
+    .map(label => /^remediation:pr-(\d+)-conflict$/.exec(String(label))?.[1])
+    .filter(Boolean)
+    .map(Number);
+  if (numbers.length === 0) return null;
+  if (openPulls?.complete !== true) return null;
+  const open = new Set(
+    openPulls.pulls.map(pull => normalizePullRequest(pull).number)
+  );
+  return numbers.every(number => !open.has(number));
+}
+
 export async function reconcileIssueLifecycle(ctx) {
   const issue =
     ctx.issue !== undefined
@@ -1178,6 +1205,7 @@ export async function reconcileIssueLifecycle(ctx) {
   }
   const checkGreen =
     deprecationCheckGreen(issue) ??
+    conflictRemediationResolved(issue, ctx.openPulls) ??
     (issue.commentRecords ?? []).some(comment =>
       String(comment?.body ?? '').includes(GREEN_MARKER)
     );

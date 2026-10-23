@@ -3,6 +3,7 @@ import {
   clearRemediationLabelCache,
   closeLinearIssueByFingerprint,
   ensureLinearLabel,
+  LINEAR_LABEL_NAME_MAX,
   remediationKey,
   remediationTriggersEnabled,
   upsertLinearIssueByTitleFingerprint,
@@ -203,6 +204,24 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
       return new Response(JSON.stringify(hit.body));
     });
   }
+
+  it("fits long remediation labels into Linear's 80-character limit, stably", () => {
+    // JOV-8235: this 83-character label made every time-bomb filing run fail.
+    const fingerprint =
+      'time-bomb:apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts';
+    const label = remediationKey(fingerprint);
+    expect(label).toHaveLength(LINEAR_LABEL_NAME_MAX);
+    expect(label.startsWith('remediation:time-bomb:apps/web/tests/unit/')).toBe(
+      true
+    );
+    expect(label).toMatch(/~[0-9a-f]{8}$/);
+    expect(remediationKey(fingerprint)).toBe(label);
+    expect(remediationKey(label)).toBe(label);
+    expect(remediationKey(`remediation:${fingerprint}`)).toBe(label);
+    expect(remediationKey(`${fingerprint}x`)).not.toBe(label);
+    const exact = `remediation:${'a'.repeat(LINEAR_LABEL_NAME_MAX - 12)}`;
+    expect(remediationKey(exact)).toBe(exact);
+  });
 
   it('reopens after Done and re-files the same remediation label', async () => {
     const labelName = remediationKey(fingerprint);

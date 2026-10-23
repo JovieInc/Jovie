@@ -19,9 +19,9 @@ import {
   spendIntentRequestSchema,
   spendOutcomeRequestSchema,
 } from '@/lib/ovie/spend-preflight';
+import { summerCardId } from '@/lib/ovie/summer-card-digest';
 import {
   SUMMER_CARD_MAX_BODY_BYTES,
-  summerCardId,
   summerCardInputSchema,
   summerCardListQuerySchema,
 } from '@/lib/ovie/summer-cards';

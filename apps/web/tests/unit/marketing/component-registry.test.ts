@@ -47,7 +47,7 @@ it('renders a standalone artist section with the shared page spine', () => {
   expect(container.querySelectorAll('section')).toHaveLength(1);
   expect(heading.parentElement).toHaveClass(
     'ap-section-container',
-    'max-w-public-content'
+    'public-container'
   );
 });
 
@@ -1682,10 +1682,6 @@ describe('CTA source identity and Pen mapping', () => {
     expect(countReturnedRootBindings(parsed, '{...props}')).toBe(1);
     expect(owner).toContain('return <section {...props} />');
     for (const [file, binding] of [
-      [
-        'apps/web/components/homepage/HomepageClose.tsx',
-        "data-marketing-variant='editorial-search'",
-      ],
       [
         'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
         "data-marketing-variant='included-single'",

@@ -363,7 +363,9 @@ describe('ShippingMatrix rendering (JOV-6893)', () => {
     renderMatrix();
 
     expect(
-      await screen.findByText('Work matrix unavailable.')
+      await screen.findByText(
+        'Work matrix unavailable. In-flight work is unknown.'
+      )
     ).toBeInTheDocument();
     expect(
       screen.getByText('UNKNOWN — observation failed. Refresh to retry.')
@@ -375,13 +377,30 @@ describe('ShippingMatrix rendering (JOV-6893)', () => {
     ).toBeInTheDocument();
   });
 
+  it('never renders the empty state on a stale cache', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(projection([], { syncState: 'stale' }))
+    );
+
+    renderMatrix();
+
+    expect(
+      await screen.findByText(/In-flight work is unknown until the next sync/)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('No open lane pull requests.')
+    ).not.toBeInTheDocument();
+  });
+
   it('rejects an invalid shipping receipt', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ invalid: true }));
 
     renderMatrix();
 
     expect(
-      await screen.findByText('Work matrix unavailable.')
+      await screen.findByText(
+        'Work matrix unavailable. In-flight work is unknown.'
+      )
     ).toBeInTheDocument();
   });
 });

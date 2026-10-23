@@ -83,7 +83,7 @@ export const OPERATOR_NAV_ITEMS: readonly OperatorNavItem[] =
 
 /** Group label type for every block in the OV sidebar (sections and lists). */
 export const OPERATOR_NAV_GROUP_LABEL =
-  'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90';
+  'mb-1.5 block ps-(--app-shell-sidebar-label-inset) pe-(--app-shell-sidebar-inset) text-xs font-caption tracking-normal text-sidebar-muted';
 
 /**
  * Ovie is one Home plus a collapsed Tools group (Tim 2026-10-21). Home needs

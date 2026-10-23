@@ -7,6 +7,7 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import { env } from '@/lib/env-server';
 import { TABLE_NAMES } from '../config';
+import { withTimeout } from '../query-timeout';
 import {
   getDb,
   getInternalDb,
@@ -152,8 +153,9 @@ export function invalidateColumnExistenceCache(
 
 /**
  * Check if a column exists in a public table.
- * Uses the same TTL cache, retry, and timeout policy as doesTableExist so
- * public routes can avoid issuing schema-incompatible writes during rollout.
+ * Caches confirmed absence so public routes can avoid schema-incompatible
+ * writes during rollout. Failed probes return false without caching absence,
+ * allowing the next request to recover as soon as connectivity returns.
  */
 export async function doesColumnExist(
   tableName: string,
@@ -175,7 +177,7 @@ export async function doesColumnExist(
     const db = getDb();
     const result = await withRetry(
       () =>
-        Promise.race([
+        withTimeout(
           db.execute(
             drizzleSql<ColumnExistsRow>`
               SELECT EXISTS (
@@ -187,23 +189,15 @@ export async function doesColumnExist(
               ) AS column_exists
             `
           ),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () =>
-                reject(
-                  new Error(
-                    `columnExists timeout after ${TABLE_EXISTS_TIMEOUT_MS}ms`
-                  )
-                ),
-              TABLE_EXISTS_TIMEOUT_MS
-            )
-          ),
-        ]),
+          TABLE_EXISTS_TIMEOUT_MS,
+          'columnExists'
+        ),
       `columnExists(${cacheKey})`
     );
 
     const firstRow = result.rows[0];
-    const exists = isColumnExistsRow(firstRow) ? firstRow.column_exists : false;
+    if (!isColumnExistsRow(firstRow)) return false;
+    const exists = firstRow.column_exists;
 
     // Only cache negative results. A stale positive cache can survive schema
     // rollbacks/restores that share the same DATABASE_URL and cause public
@@ -217,12 +211,6 @@ export async function doesColumnExist(
     return exists;
   } catch (error) {
     logDbError('columnExists', error, { tableName, columnName });
-    if (!isRetryableError(error)) {
-      columnExistenceCache.set(cacheKey, {
-        exists: false,
-        timestamp: Date.now(),
-      });
-    }
     return false;
   }
 }

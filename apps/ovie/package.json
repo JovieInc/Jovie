@@ -2,7 +2,7 @@
   "name": "@jovie/ovie",
   "private": true,
   "engines": {
-    "node": ">=24.21.0 <25"
+    "node": ">=24.22.1 <25"
   },
   "scripts": {
     "dev": "node scripts/routes.mjs && next dev --port 3105",

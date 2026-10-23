@@ -56,7 +56,7 @@ inactiveWorkflows:
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
 generatedAt: deterministic
-normalPrCheckRecords: 24
+normalPrCheckRecords: 25
 nodes:
   - name: Workflow Lint
     path: .github/workflows/actionlint.yml
@@ -173,6 +173,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
     jobCount: 64
+  - name: Claim Checkout Dogfood
+    path: .github/workflows/claim-checkout-dogfood.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:dogfood
+    jobCount: 1
   - name: CLI Chaos Nightly
     path: .github/workflows/cli-chaos-nightly.yml
     active: true
@@ -429,6 +441,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Claim Checkout Dogfood
       - Lane Fix Relay
     triggeringStateTransition:
       - schedule
@@ -799,6 +812,31 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
     terminalReceipt: job:sync-issue
+    jobCount: 1
+  - name: Pen still diff (advisory)
+    path: .github/workflows/pen-still-diff.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - workflow_dispatch
+    terminalReceipt: job:comment
+    jobCount: 2
+  - name: Pen token parity
+    path: .github/workflows/pen-token-parity.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:parity
     jobCount: 1
   - name: Post-Deploy Probes
     path: .github/workflows/postdeploy-probes.yml
@@ -1213,7 +1251,7 @@ nodes:
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
-    jobCount: 6
+    jobCount: 7
   - name: Staging Controller
     path: .github/workflows/staging-controller.yml
     active: true
@@ -1221,6 +1259,7 @@ nodes:
     authoritativeProducer: Production Controller
     authoritativeFor: []
     allowedConsumers:
+      - Claim Checkout Dogfood
       - Controller Quota Replay
       - Production Controller
       - Production Release
@@ -1384,6 +1423,12 @@ edges:
   - from: CI
     to: Mac CI
     type: workflow_call
+  - from: Staging Controller
+    to: Claim Checkout Dogfood
+    type: workflow_run
+  - from: Golden Path Nightly
+    to: Claim Checkout Dogfood
+    type: workflow_run
   - from: CLI Chaos
     to: Mac Lane Route
     type: workflow_call

@@ -5,8 +5,10 @@ import {
   profilePrimaryPillClassName,
   profileSecondaryPillClassName,
   SubscriptionDesktopErrorIndicator,
+  SubscriptionFeedbackRail,
   SubscriptionFormSkeleton,
   SubscriptionPearlComposer,
+  subscriptionFeedbackCopyClassName,
 } from './shared';
 
 function expectCanonicalCtaGeometry(className: string) {
@@ -66,5 +68,25 @@ describe('shared public-profile CTA primitives', () => {
     expect(skeleton).not.toBeNull();
     expect(skeleton?.className).toContain('rounded-full');
     expect(skeleton?.className).not.toMatch(/rounded-\[/);
+  });
+});
+
+describe('subscription feedback a11y floors (WCAG 2.2 AA)', () => {
+  it('renders feedback copy at the 4.5:1 composite floor, not the retired /68 blend', () => {
+    // text-secondary-token/68 composited to ~#6f737a (4.02:1) on the dark
+    // storybook canvas at 12px. /80 clears 5:1 with margin.
+    expect(subscriptionFeedbackCopyClassName).toContain(
+      'text-secondary-token/80'
+    );
+    expect(subscriptionFeedbackCopyClassName).not.toContain(
+      'text-secondary-token/68'
+    );
+
+    render(
+      <SubscriptionFeedbackRail message='We sent a code to artist@example.com' />
+    );
+    expect(
+      screen.getByText('We sent a code to artist@example.com')
+    ).toHaveClass('text-secondary-token/80');
   });
 });

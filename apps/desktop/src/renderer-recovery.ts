@@ -390,49 +390,49 @@ export function describeDesktopLoadFailure(
     case 'offline':
       return {
         kind,
-        heading: 'Jovie couldn’t load',
+        heading: 'Jovie Couldn’t Load',
         body: 'Check your connection, then try again.',
       };
     case 'local-server-down':
       return {
         kind,
-        heading: 'Jovie couldn’t load',
+        heading: 'Jovie Couldn’t Load',
         body: `Local Jovie isn’t running at ${host}.`,
       };
     case 'host-unreachable':
       return {
         kind,
-        heading: 'Jovie couldn’t load',
+        heading: 'Jovie Couldn’t Load',
         body: `Couldn’t reach ${host}. Retry, or open Jovie in a browser.`,
       };
     case 'timed-out':
       return {
         kind,
-        heading: 'Jovie didn’t finish starting',
+        heading: 'Jovie Didn’t Finish Starting',
         body: 'The host is reachable, but this window didn’t finish loading.',
       };
     case 'crashed':
       return {
         kind,
-        heading: 'Jovie crashed',
+        heading: 'Jovie Crashed',
         body: 'The window closed unexpectedly. Try again.',
       };
     case 'unresponsive':
       return {
         kind,
-        heading: 'Jovie stopped responding',
+        heading: 'Jovie Stopped Responding',
         body: 'The window froze. Try again.',
       };
     case 'http-error':
       return {
         kind,
-        heading: 'Jovie couldn’t load',
+        heading: 'Jovie Couldn’t Load',
         body: 'The Jovie host returned an error. Try again.',
       };
     case 'unknown':
       return {
         kind,
-        heading: 'Jovie couldn’t load',
+        heading: 'Jovie Couldn’t Load',
         body: 'Something went wrong while loading. Try again.',
       };
   }

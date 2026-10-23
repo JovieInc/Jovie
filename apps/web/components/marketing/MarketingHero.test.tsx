@@ -16,7 +16,7 @@ vi.mock('@/components/features/home/HomeTrustSection', () => ({
 
 describe('MarketingHero source-backed default story', () => {
   it('puts an explicit delegated owner on the semantic root in both shell and content modes', () => {
-    const owner = 'apps/web/components/homepage/HomepageIdentityHero.tsx';
+    const owner = 'apps/web/components/homepage/HomepageArtistProfile.tsx';
     const shell = render(
       <MarketingHero
         variant='split'
@@ -283,6 +283,9 @@ describe('MarketingHero source-backed default story', () => {
     expect(shell).toHaveClass('relative', 'w-full');
     expect(shell).toHaveClass('pt-20', 'pb-16');
     expect(shell).toHaveClass('items-center', 'text-center');
+    // One boxed width: the hero never sets its own max-width or gutter.
+    expect(shell).toHaveClass('public-container');
+    expect(shell.className).not.toMatch(/\bmax-w-|\bpx-/);
   });
 
   it('paints the landing hero backdrop through the shared token class', () => {

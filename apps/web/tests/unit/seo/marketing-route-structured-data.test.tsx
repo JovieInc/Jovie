@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { PRODUCT_COPY } from '@/data/productCopy';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 
 vi.mock('@/app/(marketing)/product/ProductLanding', () => ({
   ProductLanding: () => <main data-testid='product-landing' />,
@@ -69,7 +70,9 @@ describe('seo:certify metadata fixes (JOV-7249)', () => {
     const { metadata } = await import('@/app/(marketing)/pricing/page');
     const image = `${BASE_URL}/og/default.png`;
 
-    expect(metadata.title).toBe(`Pricing | ${APP_NAME}`);
+    expect(applyRootTitleTemplate(metadata.title)).toBe(
+      `Pricing | ${APP_NAME}`
+    );
     expect(metadata.openGraph).toMatchObject({
       siteName: APP_NAME,
       images: [{ url: image, width: 1200, height: 630 }],

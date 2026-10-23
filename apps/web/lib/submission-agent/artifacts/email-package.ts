@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { escapeHtml } from '@/lib/email/utils';
 import type {
   CanonicalSubmissionContext,
@@ -28,7 +29,7 @@ export function buildSubmissionPackage(params: {
     monitoringBaseline,
   } = params;
   const artistName = canonical.artistName;
-  const releaseTitle = canonical.release?.title ?? 'Untitled release';
+  const releaseTitle = canonical.release?.title ?? COPY_FALLBACKS.release;
   const releaseDate = canonical.release?.releaseDate
     ? canonical.release.releaseDate.toISOString().slice(0, 10)
     : 'Unknown';
