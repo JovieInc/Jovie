@@ -141,8 +141,8 @@ export function DemoAuthShell({
   seedQueryClient,
   capturePlayer,
 }: DemoAuthShellProps) {
-  const captureActive =
-    capturePlayer ?? useSearchParams().get('capturePlayer') === '1';
+  const urlCapturePlayer = useSearchParams().get('capturePlayer') === '1';
+  const captureActive = capturePlayer ?? urlCapturePlayer;
   const data = captureActive
     ? FOUNDER_DEMO_DASHBOARD_DATA
     : (dashboardData ?? DEMO_DASHBOARD_DATA);

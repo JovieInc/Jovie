@@ -43,8 +43,8 @@ export function DemoReleasesExperience({
    * capturePlayer=1 URL (stories cannot rely on search params in vitest). */
   readonly capturePlayer?: boolean;
 } = {}) {
-  const captureActive =
-    capturePlayer ?? useSearchParams().get('capturePlayer') === '1';
+  const urlCapturePlayer = useSearchParams().get('capturePlayer') === '1';
+  const captureActive = capturePlayer ?? urlCapturePlayer;
   const useFounder = variant === 'founder' || captureActive;
   const persona = useFounder ? FOUNDER_DEMO_PERSONA : INTERNAL_DJ_DEMO_PERSONA;
   const releases = useFounder

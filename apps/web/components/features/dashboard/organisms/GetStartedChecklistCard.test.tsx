@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe('GetStartedChecklistCard dismissal target (WCAG 2.5.8)', () => {
-  it('renders the dismiss control with a >=24px hit area and dismisses for 24h', async () => {
+  it('renders the dismiss control on the canonical >=24px sm button and dismisses for 24h', async () => {
     render(
       <GetStartedChecklistCard
         userId='user-1'
@@ -17,9 +17,9 @@ describe('GetStartedChecklistCard dismissal target (WCAG 2.5.8)', () => {
       />
     );
     const dismiss = await screen.findByRole('button', { name: 'Dismiss' });
-    // py-1.5 lifts the 12px text button from ~21px to ~29px tall; the old
-    // py-0.5 pill measured below axe's 24x24 target-size minimum.
-    expect(dismiss).toHaveClass('py-1.5');
+    // Canonical sm text button: min-h-7 (28px) face plus the invisible 44px
+    // hit target — the old raw pill measured below axe's 24x24 minimum.
+    expect(dismiss).toHaveClass('min-h-7');
     expect(dismiss).not.toHaveClass('py-0.5');
     fireEvent.click(dismiss);
     expect(
