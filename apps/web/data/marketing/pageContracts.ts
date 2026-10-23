@@ -180,6 +180,15 @@ export const MARKETING_PAGE_CONTRACTS = {
       label: PRODUCT_COPY.claimCard.cta,
     },
   },
+  '(marketing)/product/release-scheduling/page.tsx': {
+    routeGlob: '(marketing)/product/release-scheduling/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_RELEASE_SCHEDULING,
+    job: 'store a future release date as scheduled and hold the public page until the reveal date',
+    proof: 'live release date and reveal date fields',
+    successEvent: 'visitor sets a release date and a reveal date',
+    primaryCta: START_CTA,
+  },
   '(marketing)/card/page.tsx': {
     routeGlob: '(marketing)/card/page.tsx',
     copyScope: 'shared',

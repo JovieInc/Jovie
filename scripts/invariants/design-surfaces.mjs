@@ -468,6 +468,7 @@ const TOOLING_ROUTES = new Set(['CLI', 'DEVELOPERS', 'DOCS']);
  */
 export const NAV_LABEL_DESTINATIONS = Object.freeze({
   Product: ['PRODUCT'],
+  'Release scheduling': ['PRODUCT_RELEASE_SCHEDULING'],
   Pricing: ['PRICING'],
   'Log in': ['SIGNIN'],
   'Find yourself': ['START'],

@@ -292,6 +292,7 @@
         "apps/web/app/(marketing)/launch/page.tsx",
         "apps/web/app/(marketing)/pay/page.tsx",
         "apps/web/app/(marketing)/product/page.tsx",
+        "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
         "apps/web/app/(marketing)/smart-links/page.tsx",
         "apps/web/app/(marketing)/solutions/[audience]/page.tsx",
         "apps/web/app/(marketing)/support/page.tsx",
@@ -625,6 +626,13 @@
       "to": "holdout",
       "at": "2026-10-20T22:14:00Z",
       "evidence": "PR #22382 introduces the artist claim entry using StandaloneProductPage; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T12:00:00Z",
+      "evidence": "Source registration for the release scheduling product page. Not rendered certification."
     }
   ]
 }
