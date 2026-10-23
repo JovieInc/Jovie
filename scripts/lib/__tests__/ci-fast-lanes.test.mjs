@@ -2177,6 +2177,7 @@ describe('source-read guard selection', () => {
         'artist-launch-contract',
         'merge-group-unit-guards',
         'static-revalidate-policy',
+        'art-direction',
         'marketing-rounded-media',
       ],
     ],
@@ -2321,6 +2322,27 @@ describe('source-read guard selection', () => {
         );
         continue;
       }
+
+      if (guard.id === 'art-direction') {
+        expect(guard.command).toContain(
+          'scripts/invariants/art-direction/run.mjs'
+        );
+        expect(guard.command).toContain(
+          'node --test scripts/invariants/art-direction/*.test.mjs'
+        );
+        expect(guard.prOnly).toBe(true);
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/art-direction/art-direction.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain('describe(');
+        continue;
+      }
+
       if (guard.id === 'marketing-rounded-media') {
         expect(guard.prOnly).toBe(true);
         expect(guard.command).toBe(
