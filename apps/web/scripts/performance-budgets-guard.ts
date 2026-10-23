@@ -2309,7 +2309,7 @@ async function measureRoutesAgainstBudgets(
             );
           });
         }
-        for (let index = 0; index < options.runs; index += 1) {
+        for (let index = 0; index < routeRuns; index += 1) {
           const sample = await measureRouteSample(
             browser,
             route,
@@ -2333,7 +2333,7 @@ async function measureRoutesAgainstBudgets(
               })
               .join('') ?? '';
           logInfo(
-            `  sample ${index + 1}/${options.runs}: ${formatMetric(sample.timingValues[getPrimaryTimingMetricName(route)], 'ms')}${aliasPhaseSummary}${aliasHopSummary}`,
+            `  sample ${index + 1}/${routeRuns}: ${formatMetric(sample.timingValues[getPrimaryTimingMetricName(route)], 'ms')}${aliasPhaseSummary}${aliasHopSummary}`,
             options
           );
         }
