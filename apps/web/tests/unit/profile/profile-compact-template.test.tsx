@@ -1658,6 +1658,38 @@ describe('ProfileCompactTemplate', () => {
     }
   });
 
+  it('renders the alerts tab when ?mode=subscribe is in the URL', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?mode=subscribe');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'subscribe',
+        })
+      );
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'subscribe'
+      );
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'false'
+      );
+    });
+
+    expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
+  });
+
   it('does not push the profile URL over a claim-funnel navigation', async () => {
     // Golden Path claim smoke regression: the claim CTA routes to
     // /{handle}/claim?next=auth and on into /signup while this template is
@@ -1807,38 +1839,6 @@ describe('ProfileCompactTemplate', () => {
       pushStateSpy.mockRestore();
       replaceStateSpy.mockRestore();
     }
-  });
-
-  it('renders the alerts tab when ?mode=subscribe is in the URL', async () => {
-    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
-    window.history.replaceState(null, '', '/test-artist?mode=subscribe');
-
-    render(
-      <ProfileCompactTemplate
-        mode='profile'
-        artist={mockArtist}
-        socialLinks={[]}
-        contacts={[]}
-      />
-    );
-
-    await waitFor(() => {
-      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          modeOverride: 'subscribe',
-        })
-      );
-      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
-        'data-mode',
-        'subscribe'
-      );
-      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-        'data-open',
-        'false'
-      );
-    });
-
-    expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
   });
 
   it('renders the Music tab when ?mode=listen is in the URL even when releases exist', async () => {
