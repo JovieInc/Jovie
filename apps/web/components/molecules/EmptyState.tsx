@@ -268,45 +268,61 @@ export function EmptyState({
         className
       )}
     >
-      {icon && (
-        <div className={cn('mb-3', styles.iconWrapper)} aria-hidden='true'>
-          {icon}
-        </div>
-      )}
-
-      <h3
-        id={headingId}
+      <div
+        data-empty-state-card
         className={cn(
-          'mb-1 text-app font-caption',
-          styles.heading,
           isWorkspacePresentation &&
-            'mb-2 text-sm font-semibold tracking-tight text-primary-token'
+            'w-full max-w-md rounded-md border border-subtle bg-surface-0 p-6 text-left'
         )}
       >
-        {heading}
-      </h3>
+        {icon && (
+          <div className={cn('mb-3', styles.iconWrapper)} aria-hidden='true'>
+            {icon}
+          </div>
+        )}
 
-      {description && (
-        <p
-          id={descriptionId}
+        <h3
+          id={headingId}
           className={cn(
-            'mb-5 max-w-sm text-app leading-[1.45]',
-            styles.descriptionClassName,
+            'mb-1 text-app font-caption',
+            styles.heading,
             isWorkspacePresentation &&
-              cn('max-w-md text-xs text-secondary-token', !hasActions && 'mb-0')
+              'mb-2 text-sm font-semibold tracking-tight text-primary-token'
           )}
         >
-          {description}
-        </p>
-      )}
+          {heading}
+        </h3>
 
-      {hasActions && (
-        <div className='flex max-w-full flex-col items-center gap-2 sm:flex-row sm:gap-3'>
-          {actionSlot}
-          {renderPrimaryAction()}
-          {renderSecondaryAction()}
-        </div>
-      )}
+        {description && (
+          <p
+            id={descriptionId}
+            className={cn(
+              'mb-5 max-w-sm text-app leading-[1.45]',
+              styles.descriptionClassName,
+              isWorkspacePresentation &&
+                cn(
+                  'max-w-md text-xs text-secondary-token',
+                  !hasActions && 'mb-0'
+                )
+            )}
+          >
+            {description}
+          </p>
+        )}
+
+        {hasActions && (
+          <div
+            className={cn(
+              'flex max-w-full flex-col gap-2 sm:flex-row sm:gap-3',
+              isWorkspacePresentation ? 'items-start' : 'items-center'
+            )}
+          >
+            {actionSlot}
+            {renderPrimaryAction()}
+            {renderSecondaryAction()}
+          </div>
+        )}
+      </div>
     </output>
   );
 }
