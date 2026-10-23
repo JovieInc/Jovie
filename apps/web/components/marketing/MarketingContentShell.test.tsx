@@ -18,7 +18,7 @@ describe('MarketingContentShell', () => {
     const body = screen.getByText('One adaptive profile for every drop.');
     expect(body.parentElement).toHaveClass(
       'marketing-body',
-      'text-(--linear-text-secondary)'
+      'text-secondary-token'
     );
   });
 
@@ -49,5 +49,16 @@ describe('MarketingContentShell', () => {
       'marketing-body',
       'legal-reading'
     );
+  });
+  it('keeps directory grids on the public width without creating duplicate page chrome', () => {
+    const { container } = render(
+      <MarketingContentShell width='page'>
+        <h1>Blog</h1>
+      </MarketingContentShell>
+    );
+    const shell = container.querySelector('[data-public-content-shell]');
+    expect(shell).toHaveAttribute('data-public-content-width', 'page');
+    expect(shell?.firstElementChild).toHaveClass('max-w-public-content');
+    expect(container.querySelector('main, header, footer')).toBeNull();
   });
 });

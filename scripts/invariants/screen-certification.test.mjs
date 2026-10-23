@@ -148,6 +148,24 @@ function findings(patch, screen = gated()[0]) {
 }
 
 describe('JOV-INV-018 screen-certification/v2', () => {
+  it('registers legal fallback states under the existing legal shell', () => {
+    for (const state of ['loading', 'error']) {
+      const result = classifyScreenPath(
+        `apps/web/app/(dynamic)/legal/${state}.tsx`
+      );
+      assert.equal(result.kind, 'registered');
+      assert.equal(result.entry.id, `web.legal-${state}`);
+      assert.equal(result.entry.owner, 'legal-shell');
+      assert.equal(SCREEN_PROOF_ROUTES[result.entry.id], undefined);
+      assert.equal(SCREEN_MARKETING_ROUTES[result.entry.id], undefined);
+      const proof = evaluateChangedScreens({
+        changedFiles: result.entry.sources,
+        headSha: HEAD,
+      });
+      assert.equal(proof.changedScreens[0].verdict, 'evidence-required');
+    }
+  });
+
   it('does not write a legal-cookies screen id as a credential assignment', () => {
     const guard = join(ROOT, '.github/scripts/guard-playwright-artifacts.mjs');
     const script = `

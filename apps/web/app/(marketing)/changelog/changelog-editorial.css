@@ -142,11 +142,6 @@
 /* Archive content — copy, sticky subscribe, and outcomes      */
 /* ---------------------------------------------------------- */
 
-.changelog-content {
-  padding-top: var(--space-16); /* 64px */
-  padding-bottom: var(--space-12); /* 48px */
-}
-
 .changelog-content__grid {
   display: grid;
   gap: var(--space-12);

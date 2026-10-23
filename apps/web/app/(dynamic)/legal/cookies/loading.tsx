@@ -1,1 +1,1 @@
-export { default } from '../loading';
+export { LegalLoadingContent as default } from '../loading';

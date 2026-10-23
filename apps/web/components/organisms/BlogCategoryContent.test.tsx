@@ -45,6 +45,11 @@ describe('BlogCategoryContent', () => {
       screen.getByRole('link', { name: /The Contact Problem/ })
     ).toHaveAttribute('href', '/blog/the-contact-problem');
     expect(container.querySelectorAll('article')).toHaveLength(1);
+    const shells = container.querySelectorAll('[data-public-content-shell]');
+    expect(shells).toHaveLength(1);
+    expect(shells[0]).toHaveAttribute('data-public-content-width', 'page');
+    expect(shells[0]).toContainElement(screen.getByRole('article'));
+
     expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
       'data-marketing-variant',
       'left-none'
@@ -60,7 +65,7 @@ describe('BlogCategoryContent', () => {
   });
 
   it('renders the existing empty state without inventing posts', () => {
-    render(
+    const { container } = render(
       <BlogCategoryContent
         category={BLOG_CATEGORY_STORY_CATEGORY}
         hasPosts={false}
@@ -68,6 +73,10 @@ describe('BlogCategoryContent', () => {
     );
 
     expect(screen.getByText('No posts in this category yet.')).toBeVisible();
+    expect(
+      container.querySelector('[data-public-content-shell]')
+    ).toContainElement(screen.getByText('No posts in this category yet.'));
+
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
   });
 

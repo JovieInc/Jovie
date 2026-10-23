@@ -7,14 +7,19 @@ async function loadPolicy() {
 }
 
 describe('theme route policy with THEME_SWITCHING off (default)', () => {
-  it.each(['/', '/pricing', '/app', '/app/settings', '/blog/entry', '/tim'])(
-    'forces dark on %s',
-    async pathname => {
-      const { isThemeRoute, THEME_ROUTE_POLICY } = await loadPolicy();
-      expect(THEME_ROUTE_POLICY).toEqual({ exact: [], prefixes: [] });
-      expect(isThemeRoute(pathname)).toBe(false);
-    }
-  );
+  it.each([
+    '/',
+    '/pricing',
+    '/app',
+    '/app/settings',
+    '/blog/entry',
+    '/legal/privacy',
+    '/tim',
+  ])('forces dark on %s', async pathname => {
+    const { isThemeRoute, THEME_ROUTE_POLICY } = await loadPolicy();
+    expect(THEME_ROUTE_POLICY).toEqual({ exact: [], prefixes: [] });
+    expect(isThemeRoute(pathname)).toBe(false);
+  });
 });
 
 describe('theme route policy with THEME_SWITCHING on', () => {
@@ -45,6 +50,10 @@ describe('theme route policy with THEME_SWITCHING on', () => {
     '/engineering/preview/story',
     '/compare/cursor',
     '/alternatives/linear',
+    '/legal/cookies',
+    '/legal/dmca',
+    '/legal/privacy',
+    '/legal/terms',
     '/renders/profile-admission',
   ])('accepts declared marketing path %s', pathname => {
     expect(isThemeRoute(pathname)).toBe(true);
@@ -63,6 +72,7 @@ describe('theme route policy with THEME_SWITCHING on', () => {
   it.each([
     '/pricing-extra',
     '/blogroll',
+    '/legalname',
     '/artistname',
     '/artistname/about',
     '/playlists',

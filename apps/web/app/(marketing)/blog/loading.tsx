@@ -1,4 +1,5 @@
 import { MarketingContainer } from '@/components/marketing';
+import { MarketingContentShell } from '@/components/marketing/MarketingContentShell';
 
 /**
  * Loading skeleton for the blog index page.
@@ -9,17 +10,17 @@ export default function BlogIndexLoading() {
     <div className='min-h-screen'>
       {/* Hero section */}
       <section className='relative overflow-hidden py-16 sm:py-20 lg:py-24'>
-        <div className='mx-auto max-w-7xl px-6 lg:px-8'>
+        <MarketingContainer width='page'>
           <div className='mx-auto max-w-2xl text-left'>
             <div className='h-4 w-12 skeleton motion-reduce:animate-none rounded mb-4' />
             <div className='h-12 w-24 skeleton motion-reduce:animate-none rounded-lg mt-6 mb-6' />
             <div className='h-5 w-80 max-w-full skeleton motion-reduce:animate-none rounded-lg' />
           </div>
-        </div>
+        </MarketingContainer>
       </section>
 
       {/* Posts grid */}
-      <MarketingContainer width='page' className='pb-20 sm:pb-28'>
+      <MarketingContentShell width='page'>
         <div className='marketing-divider mb-10' />
 
         {/* Featured post */}
@@ -49,7 +50,7 @@ export default function BlogIndexLoading() {
             )
           )}
         </div>
-      </MarketingContainer>
+      </MarketingContentShell>
     </div>
   );
 }
