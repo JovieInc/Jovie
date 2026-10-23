@@ -1,7 +1,7 @@
 {
   "schema": "jovie-copy-leak/v1",
   "roots": ["apps/web"],
-  "extensions": [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".json", ".txt", ".html", ".md", ".mdx"],
+  "extensions": [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".json", ".txt", ".html", ".md", ".mdx", ".css", ".svg"],
   "maxHeadlineCharacters": 120,
   "maxHeadlineWords": 20,
   "exclude": [
@@ -32,7 +32,8 @@
     { "id": "repeated-word", "source": "(?<![\\w-])([a-z]+)\\s+\\1(?![\\w-])" },
     { "id": "coming-soon", "source": "\\bcoming\\s+soon\\b" },
     { "id": "writer-imperative", "source": "^(?:Use|Keep|Avoid|Don't)\\b", "headlineOnly": true },
-    { "id": "trailing-instruction", "source": "\\((?:use|keep|avoid|don't|fits?|max|under|short|concise|write|make|tone|voice)\\b[^)]*\\)\\s*[.!]?$", "headlineOnly": true }
+    { "id": "trailing-instruction", "source": "\\((?:use|keep|avoid|don't|fits?|max|under|short|concise|write|make|tone|voice)\\b[^)]*\\)\\s*[.!]?$", "headlineOnly": true },
+    { "id": "unresolved-prompt", "raw": true, "source": "<(?:insert|your|headline|subhead|CTA|copy|replace|TODO|placeholder)\\b[^<>]*>|<(?:description|text)\\s+(?:here|goes\\b|insert\\b|your\\b|TODO\\b)[^<>]*>" }
   ],
   "allow": [
     { "path": "apps/web/app/(dynamic)/playlists/page.tsx", "rules": { "coming-soon": ["63a6373720bb487a"] }, "reason": "Truthful unreleased music or unavailable capability state; never claims that a shipped offer is available." },
@@ -367,7 +368,10 @@
     { "path": "apps/web/lib/admin/platform-stats.ts", "rules": { "punctuation": ["5aabfa2a1c8e9b7a", "dae399d3328a679a"] }, "reason": "Exact styling constant, registry action ID, or SQL schema/query syntax; not displayed prose." },
     { "path": "apps/web/lib/auth/constants.ts", "rules": { "unresolved-prompt": ["30170b20a7a2911e", "7f3d0da45ae025fc"], "headline-length": ["30170b20a7a2911e"] }, "reason": "Exact styling constant, registry action ID, or SQL schema/query syntax; not displayed prose." },
     { "path": "apps/web/lib/db/schema/dogfooders.ts", "rules": { "punctuation": ["d0693a6620fe4bc0", "a9454b0a77530d03"] }, "reason": "Exact styling constant, registry action ID, or SQL schema/query syntax; not displayed prose." },
-    { "path": "apps/web/lib/db/schema/investors.ts", "rules": { "punctuation": ["6c71c3cff0d4cead"] }, "reason": "Exact styling constant, registry action ID, or SQL schema/query syntax; not displayed prose." }
+    { "path": "apps/web/lib/db/schema/investors.ts", "rules": { "punctuation": ["6c71c3cff0d4cead"] }, "reason": "Exact styling constant, registry action ID, or SQL schema/query syntax; not displayed prose." },
+    { "path": "apps/web/data/marketing/factory/sectionRequest.ts", "rules": { "markdown": ["57f20db91c3f0dd4"] }, "reason": "Exact composed Markdown serialization or structured SEO diagnostic, not leaked formatting or an author prompt." },
+    { "path": "apps/web/lib/seo/metadata-ratchet.ts", "rules": { "unresolved-prompt": ["dc8389c992f3335c"] }, "reason": "Exact composed Markdown serialization or structured SEO diagnostic, not leaked formatting or an author prompt." },
+    { "path": "apps/web/lib/verification/notifications.ts", "rules": { "markdown": ["bf2906e234a69f21"] }, "reason": "Exact composed Markdown serialization or structured SEO diagnostic, not leaked formatting or an author prompt." }
   ],
   "nonCopyValues": [
     { "source": "^(?:https?://|@/|(?:GET|POST|PUT|PATCH|DELETE) /|/|apps/|app/|packages/)[^\\s]+$", "reason": "URLs, module imports, route templates and GraphQL documents are machine syntax." },
@@ -389,5 +393,9 @@
       "reason": "These sources deliberately serialize Markdown documents; all leak patterns still apply."
     },
     { "path": "\\.(?:md|mdx)$", "rules": ["markdown"], "reason": "Authored Markdown is rendered as Markdown; leak patterns still apply to each line." }
+  ],
+  "syntaxExclusions": [
+    { "kind": "comments", "reason": "Compiler AST excludes JS/TS/JSX comments; raw Markdown/HTML and CSS comment blocks are stripped." },
+    { "kind": "machine-syntax", "reason": "Imports, type nodes, property names, styling attributes, SQL tags and known diagnostic/selector calls never supply display copy; visible text and copy attributes remain scanned." }
   ]
 }
