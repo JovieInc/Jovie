@@ -189,8 +189,9 @@ export default function DownloadPage() {
                 </div>
 
                 <div className='relative min-h-96 lg:min-h-144'>
+                  <div className='marketing-lit-focal' aria-hidden='true' />
                   <div
-                    className='absolute inset-x-0 top-8 bottom-0 overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'
+                    className='marketing-lit-enter absolute inset-x-0 top-8 bottom-0 overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'
                     data-overlap='intentional'
                     data-testid='download-desktop-screenshot'
                   >
