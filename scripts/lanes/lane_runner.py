@@ -4142,8 +4142,7 @@ def terminal_prs(prs: list[dict], attempts: dict, held: dict) -> list[dict]:
         if hold and hold.get("sha") == head:
             # Exhaustion is the condition this exit repairs. Preserve the underlying
             # gate evidence so a secret-file or empty-diff hold still blocks a sync.
-            hold = {**hold, "evidence": [line for line in hold.get("evidence") or []
-                                        if not str(line).startswith("fix-exhausted")]}
+            hold = {**hold, "evidence": pr_events.without_exhaustion_evidence(hold.get("evidence"))}
         if not isinstance(head, str) or not head or not isinstance(record, dict) \
                 or labels & pr_events.HOLD_LABELS or pr.get("isInMergeQueue") is not False \
                 or pr.get("isCrossRepository") is not False \
@@ -5016,7 +5015,7 @@ def rung_blocker(pr: dict, record: dict, entry: dict) -> dict | None:
     if not isinstance(evidence, list) or (entry.get("reason") is not None
                                         and not isinstance(entry["reason"], str)):
         return None
-    evidence = [line for line in evidence if not str(line).startswith("fix-exhausted")]
+    evidence = pr_events.without_exhaustion_evidence(evidence)
     reason = entry.get("reason")
     if not reason or reason == "fix-exhausted":
         reason = pr_events.held_reason(evidence)[0]

@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 
 interface ProductScreenshotFrameProps {
   readonly alt: string;
@@ -54,7 +55,7 @@ function renderScreenshotContent({
             {title}
           </div>
           <p className='text-lg font-medium tracking-tight text-primary-token'>
-            Preview coming soon
+            {COPY_FALLBACKS.preview}
           </p>
           <p className='mt-2 text-sm leading-6 text-secondary-token'>
             See it live when you sign up.

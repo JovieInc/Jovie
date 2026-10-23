@@ -149,7 +149,6 @@ export function PreviewPanelProvider({
       setIsOpen(true);
       return;
     }
-    setPreviewData(null);
     // A default-open surface (profile settings) must come back open on a
     // large screen. Closing first and waiting for a later effect lets the
     // page opener's close() win the round trip.
@@ -157,6 +156,12 @@ export function PreviewPanelProvider({
       setIsOpen(true);
       return;
     }
+    // Only a surface that stays closed clears the rail data. This effect
+    // runs after the page hydrator's mount hydration, and the hydrator's
+    // empty-panel dependency never transitions when the hydration and this
+    // wipe land in one flush — a wipe here would leave the reopened rail
+    // stuck on its empty skeleton (Account → Back round trip).
+    setPreviewData(null);
     setIsOpen(false);
   }, [defaultOpen, isLargeScreen, scope]);
 

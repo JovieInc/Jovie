@@ -452,7 +452,7 @@ describe('CommandPalette', () => {
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByText('Recent Chats')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
-    expect(screen.getByText('Untitled chat')).toBeInTheDocument();
+    expect(screen.getByText('Conversation')).toBeInTheDocument();
     expect(screen.getByText('Active chat')).toBeVisible();
     expect(screen.getByText('Needs attention')).toBeVisible();
     expect(screen.queryByText('Hidden default chat')).toBeNull();

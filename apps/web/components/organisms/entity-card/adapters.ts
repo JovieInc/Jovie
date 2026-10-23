@@ -1,3 +1,4 @@
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import {
   buildAiVisibilityMeasurement,
   requireMeasuredAiVisibilityMetric,
@@ -347,7 +348,7 @@ export function chatEntityMentionToEntityCard(
 ): EntityCardModel {
   const kind = cardKindForMention(input.kind);
   const preset = KIND_PRESETS[kind];
-  const title = input.label.trim() || 'Untitled';
+  const title = input.label.trim() || COPY_FALLBACKS.item;
   const date = input.kind === 'event' ? toDate(input.eventDate ?? null) : null;
 
   return {

@@ -2198,43 +2198,85 @@ exit 9
     expect(run.result.stderr).not.toContain('unexpected merge-queue read');
   });
 
-  it('yields an unreadable pre-mutation generation instead of failing the wave', () => {
-    const fixture = makeFixture('coalesce-unreadable-');
-    stubCommand(
-      fixture.bin,
-      'bash',
-      `#!/bin/sh
+  it.each([
+    {
+      label: 'unknown lineage',
+      gateDecision: 'error',
+      gateStatus: 1,
+      expectedDecision: 'error',
+      expectedCurrent: 'false',
+    },
+    {
+      label: 'nonzero lineage error',
+      gateDecision: 'error',
+      gateStatus: 7,
+      expectedDecision: 'error',
+      expectedCurrent: 'false',
+    },
+    {
+      label: 'successful yield',
+      gateDecision: 'yield',
+      gateStatus: 0,
+      expectedDecision: 'superseded',
+      expectedCurrent: 'false',
+    },
+    {
+      label: 'successful proceed',
+      gateDecision: 'proceed',
+      gateStatus: 0,
+      expectedDecision: 'proceed',
+      expectedCurrent: 'true',
+    },
+  ])(
+    'handles lineage result before evaluation: $label',
+    ({ gateDecision, gateStatus, expectedDecision, expectedCurrent }) => {
+      const fixture = makeFixture('coalesce-unreadable-');
+      stubCommand(
+        fixture.bin,
+        'bash',
+        `#!/bin/sh
 case "$1" in
   *resolve-main-sha.sh) printf '%s\\n' '${NEWER_SHA}' ;;
-  *release-lineage-gate.sh) printf 'decision=error\\n'; exit 1 ;;
+  *release-lineage-gate.sh) printf 'decision=${gateDecision}\\n'; exit ${gateStatus} ;;
   -c) exec /bin/bash "$@" ;;
   *) echo "unexpected bash: $*" >&2; exit 2 ;;
 esac
 `
-    );
-    const script = getStepRunScript(
-      getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
-      'Evaluate event-driven supersession'
-    );
-    const result = runScript(script, fixture, {
-      EXPECTED_SHA,
-      FIXED_WINDOW_SECONDS_REPLACED: '60',
-      GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
-      PRODUCTION_STARVATION_SECONDS: '5400',
-      REPOSITORY: 'JovieInc/Jovie',
-      RESOLVE_MAIN_BUDGET_SECONDS: '5',
-      RESOLVE_MAIN_RETRY_SECONDS: '0',
-    });
-    expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout).toContain(
-      'lineage unreadable before evaluation; yielding without mutation'
-    );
-    expect(parseOutputs(fixture.output)).toMatchObject({
-      is_current: 'false',
-      decision: 'superseded',
-    });
-    expect(result.stdout).not.toContain('mutation-authorized');
-  });
+      );
+      const script = getStepRunScript(
+        getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
+        'Evaluate event-driven supersession'
+      );
+      const result = runScript(script, fixture, {
+        EXPECTED_SHA,
+        FIXED_WINDOW_SECONDS_REPLACED: '60',
+        GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
+        PRODUCTION_STARVATION_SECONDS: '5400',
+        REPOSITORY: 'JovieInc/Jovie',
+        RESOLVE_MAIN_BUDGET_SECONDS: '5',
+        RESOLVE_MAIN_RETRY_SECONDS: '0',
+      });
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(
+        gateStatus
+      );
+      const outputs = parseOutputs(fixture.output);
+      expect(outputs.is_current).toBe(expectedCurrent);
+      expect(outputs.decision ?? null).toBe(expectedDecision);
+      const receipt = join(fixture.root, 'release-lineage-receipt.json');
+      if (gateStatus !== 0) {
+        expect(result.stdout).toContain(
+          `Release lineage gate failed before evaluation (exit=${gateStatus}).`
+        );
+        expect(existsSync(receipt)).toBe(false);
+      } else {
+        expect(JSON.parse(readFileSync(receipt, 'utf8'))).toMatchObject({
+          decision: expectedDecision,
+          replacementSha: gateDecision === 'yield' ? NEWER_SHA : EXPECTED_SHA,
+        });
+      }
+      expect(result.stdout).not.toContain('mutation-authorized');
+    }
+  );
 
   it('still fails the wave when the pre-mutation gate crashes without a decision', () => {
     const fixture = makeFixture('coalesce-crash-');
