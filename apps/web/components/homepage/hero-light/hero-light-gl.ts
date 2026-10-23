@@ -3,7 +3,9 @@
  * allows it. The CSS poster is the look until the
  * first frame, and again if this declines to run or blows the frame budget.
  */
-
+// NIGHT_DJ_HARMONY_V1: scoped WebGL exception — this hero's decorative layer
+// only. See docs/design/night-dj-harmony-v1.md and the exception record in
+// docs/performance/performance-invariants-v1.md.
 import {
   HERO_CANVAS_FOCAL,
   HERO_LIGHT_PERF,

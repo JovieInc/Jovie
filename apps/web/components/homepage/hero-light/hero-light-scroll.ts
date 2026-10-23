@@ -6,7 +6,9 @@
  * animations own the CSS variable; everyone else gets this passive fallback.
  * Reduced motion stays at progress 0 (the full-bleed still).
  */
-
+// NIGHT_DJ_HARMONY_V1: scoped WebGL exception — this hero's decorative layer
+// only. See docs/design/night-dj-harmony-v1.md and the exception record in
+// docs/performance/performance-invariants-v1.md.
 /** Same interval as `animation-range: 0px 42svh` in HomepageHeroCanvas.css. */
 export const HERO_CANVAS_SCROLL_RANGE = 0.42;
 

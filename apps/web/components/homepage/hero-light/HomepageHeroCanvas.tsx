@@ -1,5 +1,8 @@
 'use client';
 
+// NIGHT_DJ_HARMONY_V1: scoped WebGL exception — this hero's decorative layer
+// only. See docs/design/night-dj-harmony-v1.md and the exception record in
+// docs/performance/performance-invariants-v1.md.
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import { ProductClaimHandleForm } from '@/app/(marketing)/product/ProductClaimHandleForm';

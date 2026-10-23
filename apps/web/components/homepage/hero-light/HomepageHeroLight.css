@@ -9,7 +9,9 @@
  * Scene palette v1: Ion #3FAFF3, Ultra #A789F0, Pulse #EB6AC6
  * on canvas #070B12.
  */
-
+/* NIGHT_DJ_HARMONY_V1: scoped WebGL exception — this hero's decorative
+   layer only. See docs/design/night-dj-harmony-v1.md and the exception
+   record in docs/performance/performance-invariants-v1.md. */
 .homepage-artist-hero--lit {
   position: relative;
   isolation: isolate;

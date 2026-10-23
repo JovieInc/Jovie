@@ -1,7 +1,7 @@
 /**
  * Homepage hero light gate.
  *
- * night-dj-harmony-v1 (`docs/design/night-dj-harmony-v1.md`) and
+ * NIGHT_DJ_HARMONY_V1 (`docs/design/night-dj-harmony-v1.md`) and
  * performance-invariants-v1 (`docs/performance/performance-invariants-v1.md`)
  * keep glow and glass on CSS tokens and disallow canvas, WebGL, and video on
  * a surface. The standing sentence is unchanged. The scoped exception below
