@@ -199,7 +199,11 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
       ref={setNodeRef}
       className={cn('relative')}
       style={cardStyle}
-      onPointerDown={listeners?.onPointerDown}
+      onPointerDown={
+        listeners?.onPointerDown as
+          | React.PointerEventHandler<HTMLDivElement>
+          | undefined
+      }
     >
       <SwipeToReveal
         itemId={id}
@@ -230,7 +234,11 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
           type='button'
           ref={setActivatorNodeRef}
           {...attributes}
-          onKeyDown={listeners?.onKeyDown}
+          onKeyDown={
+            listeners?.onKeyDown as
+              | React.KeyboardEventHandler<HTMLButtonElement>
+              | undefined
+          }
           className='sr-only focus:not-sr-only focus:absolute focus:top-0 focus:z-10 focus:rounded-md focus:bg-surface-1 focus:p-2'
         >
           Drag to reorder {primaryLabel}

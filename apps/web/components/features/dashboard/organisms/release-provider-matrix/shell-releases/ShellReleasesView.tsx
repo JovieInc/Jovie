@@ -178,7 +178,7 @@ interface ReleasesListContentProps {
   readonly onSelect: (release: ReleaseViewModel) => void;
   readonly onClearFilters: () => void;
   /** Ref forwarded to the listbox element for keyboard-nav focus scoping. */
-  readonly listboxRef?: RefObject<HTMLUListElement | null>;
+  readonly listboxRef?: RefObject<HTMLMenuElement | null>;
 }
 
 function ReleasesListContent({
@@ -308,7 +308,9 @@ function ReleasesListContent({
   }
 
   return (
-    <ul
+    // `menu` is HTML's list container (exposed as role=list) that, unlike
+    // `ul`, may keep the context-menu host wrappers around its listitem rows.
+    <menu
       ref={listboxRef}
       aria-label='Releases'
       className='py-1.5 space-y-px px-2'
@@ -320,7 +322,7 @@ function ReleasesListContent({
         >
           {/* Plain wrapper: Radix ContextMenu.Trigger asChild needs a host
               element that accepts the injected ref/onContextMenu props. */}
-          <li role='presentation' data-shell-release-row-context-target>
+          <div data-shell-release-row-context-target>
             <ShellReleaseRow
               release={r}
               isSelected={r.id === selectedReleaseId}
@@ -331,10 +333,10 @@ function ReleasesListContent({
               }
               syncStatus={getSyncStatus(r.id)}
             />
-          </li>
+          </div>
         </TableContextMenu>
       ))}
-    </ul>
+    </menu>
   );
 }
 
@@ -571,7 +573,7 @@ export function ShellReleasesView({
   );
 
   /** Ref for the listbox container — used to scope J/K nav to the releases list. */
-  const listboxRef = useRef<HTMLUListElement>(null);
+  const listboxRef = useRef<HTMLMenuElement>(null);
 
   useAmbientListSelection({
     enabled: visibleReleases.length > 0,
