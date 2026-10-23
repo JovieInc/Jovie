@@ -718,6 +718,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/product/command-palette/page.tsx",
+      "kind": "page",
+      "route": "/product/command-palette",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/product/page.tsx",
       "kind": "page",
       "route": "/product",
