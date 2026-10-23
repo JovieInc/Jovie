@@ -13,17 +13,17 @@ import { collectAccentSignals, collectHexes, normalizeHex } from './color.mjs';
 import {
   MARKETING_SOURCE_ROOTS,
   REPO_ROOT,
-  TOKEN_HEX_SOURCES,
   relPath,
   stripComments,
+  TOKEN_HEX_SOURCES,
   walkFiles,
 } from './paths.mjs';
 import { ancestorJson, evaluateRatchet } from './ratchet.mjs';
 
-export const ACCENT_BASELINE = 'scripts/invariants/art-direction/accent.baseline.json';
+export const ACCENT_BASELINE =
+  'scripts/invariants/art-direction/accent.baseline.json';
 
-const SECTION =
-  /<section\b|sectionId\s*=|MarketingSectionFrame\b/;
+const SECTION = /<section\b|sectionId\s*=|MarketingSectionFrame\b/;
 
 function tokenHexes(repoRoot) {
   const allowed = new Set();
@@ -56,7 +56,8 @@ export function accentViolations(source, file, allowed) {
   const seen = new Set();
   for (const hex of collectHexes(text)) {
     const normalized = normalizeHex(hex);
-    if (!normalized || allowed.has(normalized) || seen.has(normalized)) continue;
+    if (!normalized || allowed.has(normalized) || seen.has(normalized))
+      continue;
     seen.add(normalized);
     ids.push(`hardcoded-hex:${file}:${normalized}`);
   }

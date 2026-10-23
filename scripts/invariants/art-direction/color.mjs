@@ -18,10 +18,20 @@ export const ORANGE_HUE = Object.freeze({ min: 18, max: 48 });
 export const ORANGE_SAT_MIN = 0.45;
 export const ORANGE_LIGHTNESS = Object.freeze({ min: 0.15, max: 0.92 });
 
+/** @type {ReadonlyArray<readonly [string, RegExp]>} */
 const ROLE_SOURCE = [
-  ['ultra', /--noir-ion-ultra\b|--color-accent-purple\b|data-accent\s*=\s*['"](?:ultra|purple)['"]/],
-  ['pulse', /--noir-ion-pulse\b|--color-accent-pink\b|data-accent\s*=\s*['"](?:pulse|pink)['"]/],
-  ['ion', /--color-accent-blue\b|--system-b-accent-cyan\b|data-accent\s*=\s*['"](?:ion|blue)['"]/],
+  [
+    'ultra',
+    /--noir-ion-ultra\b|--color-accent-purple\b|data-accent\s*=\s*['"](?:ultra|purple)['"]/,
+  ],
+  [
+    'pulse',
+    /--noir-ion-pulse\b|--color-accent-pink\b|data-accent\s*=\s*['"](?:pulse|pink)['"]/,
+  ],
+  [
+    'ion',
+    /--color-accent-blue\b|--system-b-accent-cyan\b|data-accent\s*=\s*['"](?:ion|blue)['"]/,
+  ],
 ];
 
 const NAMED_ORANGE =
@@ -91,7 +101,9 @@ export function isOrangeHex(hex) {
 }
 
 export function collectHexes(source) {
-  return source.match(/#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g) ?? [];
+  return (
+    source.match(/#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g) ?? []
+  );
 }
 
 /** @returns {{ roles: string[], oranges: string[] }} */

@@ -200,11 +200,12 @@ export const SOURCE_GUARDS = Object.freeze([
     // Art-direction ratchets (one accent, hue, plates, surface media, hero
     // scroll, shadow vision judges). prOnly: merge groups run the same
     // checks via web unit tests. Path-filtered so product-only diffs skip it.
+    // The glob wires every art-direction unit test, including ones added later.
     id: 'art-direction',
     command:
-      'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/art-direction.test.mjs',
+      'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/*.test.mjs',
     inputs:
-      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|apps\/web\/lib\/marketing\/night-dj-harmony\.ts$|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|scripts\/invariants\/art-direction\/)/u,
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|scripts\/invariants\/art-direction\/)/u,
     prOnly: true,
   }),
   Object.freeze({

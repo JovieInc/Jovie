@@ -2326,7 +2326,7 @@ describe('source-read guard selection', () => {
           'scripts/invariants/art-direction/run.mjs'
         );
         expect(guard.command).toContain(
-          'scripts/invariants/art-direction/art-direction.test.mjs'
+          'node --test scripts/invariants/art-direction/*.test.mjs'
         );
         expect(guard.prOnly).toBe(true);
         expect(

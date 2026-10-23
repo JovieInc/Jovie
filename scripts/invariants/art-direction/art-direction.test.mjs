@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { accentViolations } from './accent.mjs';
+import { accentViolations, checkAccent } from './accent.mjs';
 import { evaluateRatchet } from './ratchet.mjs';
-import { judgeVision } from './vision.mjs';
-import { checkAccent } from './accent.mjs';
-import { checkVision } from './vision.mjs';
+import { checkVision, judgeVision } from './vision.mjs';
 
 const ALLOWED = new Set(['#11afff', '#030406']);
 

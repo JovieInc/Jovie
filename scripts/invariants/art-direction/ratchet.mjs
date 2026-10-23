@@ -58,7 +58,8 @@ export function ancestorJson(repoRoot, relPath) {
   if (rev.status !== 0) {
     return {
       ok: false,
-      error: 'origin/main is not available; the ratchet cannot prove it only shrinks',
+      error:
+        'origin/main is not available; the ratchet cannot prove it only shrinks',
     };
   }
   const spec = `origin/main:${relPath}`;

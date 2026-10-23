@@ -8,7 +8,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_ROOT } from './paths.mjs';
 
-export const VISION_CONFIG = 'scripts/invariants/art-direction/vision.config.json';
+export const VISION_CONFIG =
+  'scripts/invariants/art-direction/vision.config.json';
 
 export function readVisionConfig(repoRoot = REPO_ROOT) {
   return JSON.parse(readFileSync(join(repoRoot, VISION_CONFIG), 'utf8'));

@@ -3,22 +3,19 @@
  * vision.config.json sets promoteToBlocking.
  */
 import { readdirSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { REPO_ROOT } from './paths.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SKIP = new Set([
-  'color.mjs',
-  'paths.mjs',
-  'ratchet.mjs',
-  'run.mjs',
-]);
+const SKIP = new Set(['color.mjs', 'paths.mjs', 'ratchet.mjs', 'run.mjs']);
 
 export async function loadChecks(dir = HERE) {
   const files = readdirSync(dir)
-    .filter(name => name.endsWith('.mjs') && !name.endsWith('.test.mjs') && !SKIP.has(name))
+    .filter(
+      name =>
+        name.endsWith('.mjs') && !name.endsWith('.test.mjs') && !SKIP.has(name)
+    )
     .sort();
   const checks = [];
   for (const file of files) {
