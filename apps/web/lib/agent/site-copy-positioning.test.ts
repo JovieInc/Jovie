@@ -28,13 +28,13 @@ function expectCreatorPositioning(body: string): void {
 }
 
 describe('agent-facing site copy positioning (JOV-7638 follow-up)', () => {
-  it('keeps /llms.txt on the shared creator identity, with music as one workflow', async () => {
+  it('keeps /llms.txt on the shared creator identity', async () => {
     const body = await getLlmsTxt().text();
 
     expectCreatorPositioning(body);
     expect(body).toContain(COMPANY_IDENTITY.definition);
     expect(body).toContain('### Public Profile');
-    expect(body).toContain('### Music workflows');
+    expect(body).toContain('### Release workflows');
     expect(body).toContain(
       'Audience notifications, advanced analytics, and release planning require enrolled access'
     );

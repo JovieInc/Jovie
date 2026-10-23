@@ -1,0 +1,142 @@
+{
+  "schema": "jovie.icp-language/v1",
+  "rule": "Tim White, 2026-10-22 21:00 PT. No ICP-specific language on the homepage and general pages. Jovie is an identity product for any creator, so those surfaces stay generic. Dedicated audience routes may use segment language.",
+  "lockedHeadline": "Be found. Be understood.",
+  "termNotes": "Singular \"label\" is the UI word (aria-label, cta-label, form label, stat-label) and is not a term. The segment is \"labels\", \"record label\", and \"on a label\". suppressedPrefixes drops UI collocations such as \"access labels\" and \"nav labels\". Hyphenated tokens with no spaces are identifiers, not copy. \"creator\" is the generic word and is not a term.",
+  "suppressedPrefixes": {
+    "labels": [
+      "access",
+      "nav",
+      "form",
+      "field",
+      "aria",
+      "button",
+      "text",
+      "input",
+      "column"
+    ]
+  },
+  "terms": [
+    "music",
+    "artist",
+    "musician",
+    "dj",
+    "producer",
+    "labels",
+    "record label",
+    "on a label",
+    "founder",
+    "investor",
+    "fan",
+    "author",
+    "youtuber",
+    "podcaster",
+    "tiktoker",
+    "streamer",
+    "influencer",
+    "rapper",
+    "songwriter",
+    "filmmaker",
+    "photographer",
+    "beatmaker",
+    "vocalist",
+    "band"
+  ],
+  "pageRoots": [
+    "apps/web/app/(home)",
+    "apps/web/app/(marketing)",
+    "apps/web/app/brand"
+  ],
+  "seeds": [
+    "apps/web/app/layout.tsx",
+    "apps/web/app/manifest.ts",
+    "apps/web/app/llms.txt/route.ts",
+    "apps/web/app/llms-full.txt/route.ts",
+    "apps/web/data/companyIdentity.ts",
+    "apps/web/data/marketingNavigation.ts",
+    "apps/web/lib/billing/offer-truth.ts",
+    "apps/web/lib/config/plan-prices.ts"
+  ],
+  "followPrefixes": [
+    "apps/web/app/(home)/",
+    "apps/web/app/(marketing)/",
+    "apps/web/app/brand/",
+    "apps/web/app/layout.tsx",
+    "apps/web/app/manifest.ts",
+    "apps/web/app/llms.txt/",
+    "apps/web/app/llms-full.txt/",
+    "apps/web/components/homepage/",
+    "apps/web/components/marketing/",
+    "apps/web/components/site/",
+    "apps/web/components/organisms/",
+    "apps/web/components/features/home/",
+    "apps/web/data/",
+    "apps/web/content/",
+    "apps/web/lib/billing/offer-truth.ts",
+    "apps/web/lib/config/plan-prices.ts"
+  ],
+  "audienceAllowlist": [
+    {
+      "path": "apps/web/app/(marketing)/solutions/",
+      "reason": "solutions/[audience] audience landing pages"
+    },
+    {
+      "path": "apps/web/content/pages/solutions/",
+      "reason": "Factory records rendered only by solutions/[audience]"
+    },
+    {
+      "path": "apps/web/app/(marketing)/artist-profile/",
+      "reason": "Dedicated artist-profile audience route"
+    },
+    {
+      "path": "apps/web/app/(marketing)/artist-profiles/",
+      "reason": "Dedicated artist-profiles audience route"
+    },
+    {
+      "path": "apps/web/app/(marketing)/artist-notifications/",
+      "reason": "Dedicated artist-notifications audience route"
+    },
+    {
+      "path": "apps/web/app/(marketing)/youtube-thumbnails/",
+      "reason": "Dedicated YouTube-creator audience route"
+    },
+    {
+      "path": "apps/web/data/artistNotificationsCopy.ts",
+      "reason": "Copy rendered by the artist-notifications audience route"
+    },
+    {
+      "path": "apps/web/data/youtubeThumbnailsCopy.ts",
+      "reason": "Copy rendered by the YouTube-thumbnails audience route"
+    },
+    {
+      "path": "apps/web/app/investor-portal/",
+      "reason": "Dedicated investor audience portal"
+    },
+    {
+      "path": "apps/web/content/investors/",
+      "reason": "Investor-portal documents"
+    },
+    {
+      "path": "apps/web/data/investorAnswerReuseCopy.ts",
+      "reason": "Investor-audience answers"
+    }
+  ],
+  "editorialOutOfScope": [
+    {
+      "path": "apps/web/app/(marketing)/blog/",
+      "reason": "Editorial. The article subject chooses the nouns. Not a general product page."
+    },
+    {
+      "path": "apps/web/content/blog/",
+      "reason": "Editorial posts."
+    },
+    {
+      "path": "apps/web/app/(marketing)/engineering/",
+      "reason": "Engineering notes follow the subject of the note."
+    },
+    {
+      "path": "apps/web/content/engineering/",
+      "reason": "Engineering notes."
+    }
+  ]
+}

@@ -303,6 +303,14 @@ absent.
 
 ## Taste Rules (Hard Invariants)
 
+### No ICP-specific language on general pages
+
+- Homepage, pricing, about, brand, and other general marketing routes stay generic. Jovie is an identity product for any creator.
+- Do not write segment copy there: music, artist, musician, DJ, producer, label, founder, investor, fan, author, or a creator-type niche. “Creator” is the generic word.
+- Dedicated audience routes may use that language. The allowlist is `scripts/invariants/icp-language/config.json`.
+- The headline “Be found. Be understood.” is locked.
+- `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready check. Existing hits are a shrink-only baseline. See MKT-D16 in `docs/marketing/DESIGN_INVARIANTS.md`.
+
 ### No Emoji in UI — Use Icons
 
 - **NEVER** use emoji characters in component markup, mock data, or UI strings.
