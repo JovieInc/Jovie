@@ -12,12 +12,16 @@ import {
 import {
   aggregate,
   buildQuestions,
+  CAPTURE_COLOR_SCHEME_DEFAULT,
+  CAPTURE_VIEWPORTS,
   CONNECT_ATTEMPT_TIMEOUT_MS,
   callClef,
   ensureConnectAttemptBudget,
   evaluateScreenshots,
   MAX_REVISIONS,
   planRequests,
+  resolveCaptureColorScheme,
+  resolveCaptureViewport,
   resolveWorkersAiAuth,
   revisionNotes,
   rulesFor,
@@ -57,6 +61,15 @@ const stubCall =
     assert.ok(images.length >= 1 && images.length <= 4);
     return { answers: seq.shift() ?? answers(), usage: { input_tokens: 1000 } };
   };
+
+test('capture viewports stay 1440 and 390, and dark is the default scheme', () => {
+  assert.equal(CAPTURE_VIEWPORTS.desktop.width, 1440);
+  assert.equal(CAPTURE_VIEWPORTS.mobile.width, 390);
+  assert.equal(CAPTURE_VIEWPORTS.mobile.deviceScaleFactor, 2);
+  assert.equal(resolveCaptureViewport('unknown'), CAPTURE_VIEWPORTS.desktop);
+  assert.equal(CAPTURE_COLOR_SCHEME_DEFAULT, 'dark');
+  assert.equal(resolveCaptureColorScheme('light'), 'light');
+});
 
 test('profiles select rules; app drops marketing-only rules', () => {
   assert.ok(rulesFor('marketing').includes('dark_first'));
