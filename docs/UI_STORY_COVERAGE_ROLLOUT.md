@@ -18,12 +18,11 @@ changes do not enter these lanes.
   `docs/VISUAL_TESTING_POLICY.md`.
 - Route surfaces (`page`, `layout`, `loading`, `error`, and `not-found` TSX
   files) require Storybook or Playwright visual evidence for the changed state.
-- Shared Storybook configuration, styles, design tokens, and the Chromatic
-  configuration are UI-relevant changes.
-- The merge-group Storybook build, Storybook a11y, Chromatic, and Playwright
-  visual lanes remain fail-closed when selected. Missing configuration,
-  skipped selected jobs, unreviewed Chromatic changes, HTTP 500s, and unsafe
-  Playwright artifacts are failures.
+- Shared Storybook configuration, styles, and design tokens are UI-relevant
+  changes.
+- The merge-group Storybook build, Storybook a11y, and Playwright visual
+  lanes remain fail-closed when selected. Missing configuration, skipped
+  selected jobs, HTTP 500s, and unsafe Playwright artifacts are failures.
 - DB-backed public redirects are marked `requiresDatabase`. DB-free smoke omits
   those routes explicitly; Neon-backed visual runs retain their coverage.
 

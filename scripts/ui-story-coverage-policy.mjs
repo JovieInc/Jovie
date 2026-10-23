@@ -15,7 +15,7 @@ const COMPONENT_RE = /^(?:apps\/web\/components|packages\/ui)\/.*\.tsx$/;
 const VISUAL_EVIDENCE_RE =
   /^(?:apps\/web\/tests\/e2e\/.*(?:visual|a11y|axe|overflow).*\.spec\.ts|.*\.stories\.(?:[jt]sx?|mdx))$/i;
 const UI_CONFIG_RE =
-  /^(?:apps\/web\/\.storybook\/|apps\/web\/app\/globals\.css$|apps\/web\/styles\/|apps\/web\/design\/|packages\/ui\/|chromatic\.config\.json$)/;
+  /^(?:apps\/web\/\.storybook\/|apps\/web\/app\/globals\.css$|apps\/web\/styles\/|apps\/web\/design\/|packages\/ui\/)/;
 const LINEAR_ISSUE_RE = /^JOV-\d+$/u;
 const COMPONENT_ROOTS = ['apps/web/components', 'packages/ui'];
 
@@ -158,7 +158,6 @@ function adjacentStoryExists(root, sourcePath) {
 
 function harnessIssues(root) {
   const required = [
-    'chromatic.config.json',
     'apps/web/.storybook/main.ts',
     'apps/web/.storybook/preview.tsx',
     'scripts/story-coverage-baseline.json',

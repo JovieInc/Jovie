@@ -5,6 +5,7 @@ import { SCRIPT_CONTRACT_VITEST_TESTS } from '../../ci-fast-lanes.mjs';
 import {
   assertBaselineAllowlist,
   auditUiStoryCoverage,
+  classifyUiPath,
   validateUiStoryCoveragePolicy,
 } from '../../ui-story-coverage-policy.mjs';
 
@@ -53,6 +54,15 @@ describe('ui story coverage policy', () => {
         ],
       })
     ).toThrow('Malformed UI story coverage allowlist');
+  });
+
+  it('does not treat the removed Chromatic config as audit harness', () => {
+    const source = readFileSync(
+      resolve(REPO_ROOT, 'scripts/ui-story-coverage-policy.mjs'),
+      'utf8'
+    );
+    expect(source).not.toContain('chromatic.config.json');
+    expect(classifyUiPath('chromatic.config.json')).toBeNull();
   });
 
   it('does not let an allowlist entry hide a changed route surface', () => {
