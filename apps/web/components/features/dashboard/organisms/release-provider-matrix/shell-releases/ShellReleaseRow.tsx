@@ -375,6 +375,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   return (
     <ShellListRowFrame
       role='listitem'
+      aria-label={release.title}
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={handleKeyDown}

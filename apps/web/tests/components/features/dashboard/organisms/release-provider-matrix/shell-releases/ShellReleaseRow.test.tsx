@@ -72,6 +72,43 @@ function fakeRelease(
 }
 
 describe('ShellReleaseRow audio affordance', () => {
+  it('names the list item after the release and updates its name after edits', () => {
+    const release = fakeRelease({ id: 'r1', title: 'Lost in the Light' });
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <ShellReleaseRow
+        release={release}
+        isSelected={false}
+        onSelect={onSelect}
+      />
+    );
+
+    expect(
+      screen.getByRole('listitem', { name: release.title })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: `Open smart link for ${release.title}` })
+    ).toBeInTheDocument();
+
+    rerender(
+      <ShellReleaseRow
+        release={{ ...release, title: 'Edited release' }}
+        isSelected
+        onSelect={onSelect}
+      />
+    );
+
+    expect(
+      screen.getByRole('listitem', { name: 'Edited release' })
+    ).toHaveAttribute('data-selected', 'true');
+    expect(
+      screen.queryByRole('listitem', { name: release.title })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Open smart link for Edited release' })
+    ).toBeInTheDocument();
+  });
+
   it('opens the smart link without prefetching or selecting the row', async () => {
     const onSelect = vi.fn();
     render(
