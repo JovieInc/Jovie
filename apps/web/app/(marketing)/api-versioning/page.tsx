@@ -4,7 +4,7 @@ import Link from 'next/link';
 import '@/components/marketing/MarketingRouteHero.css';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { marketingOgImage } from '@/data/marketingOgCopy';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import {
   PUBLIC_ARTIST_API_OPENAPI_URL,
   PUBLIC_ARTIST_API_POLICY_URL,

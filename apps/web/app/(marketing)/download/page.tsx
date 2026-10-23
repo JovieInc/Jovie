@@ -19,7 +19,7 @@ import {
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { marketingOgImage } from '@/data/marketingOgCopy';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 import { MAC_APP_SUPPORT } from '@/lib/desktop/mac-compatibility';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { ComparisonPageContent } from '@/components/organisms/ComparisonPageContent';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getComparison, getComparisonSlugs } from '@/content/comparisons';
-import { comparisonOgImage } from '@/data/marketingOgCopy';
+import { comparisonOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 
 interface ComparePageProps {

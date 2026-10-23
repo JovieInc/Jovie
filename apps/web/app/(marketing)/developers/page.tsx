@@ -6,7 +6,7 @@ import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
-import { marketingOgImage } from '@/data/marketingOgCopy';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 
 export const revalidate = false;

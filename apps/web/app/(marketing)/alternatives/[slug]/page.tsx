@@ -10,7 +10,7 @@ import {
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getAlternative, getAlternativeSlugs } from '@/content/alternatives';
-import { alternativeOgImage } from '@/data/marketingOgCopy';
+import { alternativeOgImage } from '@/data/marketingOgCards';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 

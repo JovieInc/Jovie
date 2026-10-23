@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { SupportPageContent } from '@/components/organisms/SupportPageContent';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { marketingOgImage } from '@/data/marketingOgCopy';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { SUPPORT_SEO_COPY } from '@/data/supportCopy';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 

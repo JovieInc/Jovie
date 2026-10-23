@@ -7,7 +7,7 @@ import {
   MARKETING_OG_CARDS,
   MARKETING_OG_SIZE,
   marketingOgCard,
-} from '@/data/marketingOgCopy';
+} from '@/data/marketingOgCards';
 import { BRAND_ION_BLUE } from '@/lib/brand/tokens';
 import {
   marketingOgSvg,

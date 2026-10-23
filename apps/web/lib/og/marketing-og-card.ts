@@ -4,7 +4,7 @@ import {
   MARKETING_OG_CARDS,
   MARKETING_OG_SIZE,
   type MarketingOgCard,
-} from '@/data/marketingOgCopy';
+} from '@/data/marketingOgCards';
 import { BRAND_ION_BLUE } from '@/lib/brand/tokens';
 
 const fontDir = join(process.cwd(), 'public/fonts');

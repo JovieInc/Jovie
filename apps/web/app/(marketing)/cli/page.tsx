@@ -6,7 +6,7 @@ import {
 } from '@/components/marketing/CliLandingPage';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { marketingOgImage } from '@/data/marketingOgCopy';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 
 export const revalidate = false;

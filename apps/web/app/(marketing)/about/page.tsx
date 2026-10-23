@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { AboutPageContent } from '@/components/organisms/AboutPageContent';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { ABOUT_COPY, ABOUT_FAQ_ITEMS } from '@/data/aboutCopy';
-import { marketingOgImage } from '@/data/marketingOgCopy';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import {
   buildBreadcrumbSchema,
   buildFaqSchema,

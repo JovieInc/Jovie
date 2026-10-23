@@ -4,7 +4,7 @@ import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getComparison, getComparisonSlugs } from '@/content/comparisons';
-import { marketingOgImage } from '@/data/marketingOgCopy';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 
 export const revalidate = false;
