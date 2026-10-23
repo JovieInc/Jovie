@@ -108,6 +108,18 @@ controlled glow, and an 8-pt rhythm on the 4px grid. Motion is one long ease
 with the existing reduced-motion fallback. Treat glass as a material on that
 artifact. ZiaWI stays at five elevations.
 
+### Subtlety
+
+Technical, cyberpunk, and night cues are felt, not seen: grid lines, an
+iPhone focus-roll edge, scan, and grain.
+Those cues carry no explanatory text or UI. Take the literal version, abstract
+it, then light and focus it so only what matters is noticed.
+
+Scene color for the cues is Scene Palette v1
+(`apps/web/data/marketing/imageColorPolicy.ts`): Ion `#3FAFF3`, Ultra
+`#A789F0`, Pulse `#EB6AC6`. The dark-first UI anchors above stay the interface
+colors.
+
 ### Product as hero
 
 Use real product mockups (profile, claim flow, release, analytics), cropped
@@ -136,6 +148,10 @@ path for investors and founders, then the final CTA.
 - A tall mockup in a wide section.
 - Payroll mentions.
 - Naming Daniel Kang or Haruki.
+- Literal music signals: headphones on people, notes, or instruments as decoration.
+- Orange as a scene or cue color.
+- A literal triad.
+- Canvas, WebGL, or video on the surface (`night-dj-harmony-v1`). Shaders and light are baked images plus CSS motion.
 
 ---
 
@@ -163,6 +179,7 @@ The executable landing-page copy workflow is in
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-23 | Added the felt-not-seen subtlety rule, scene-palette cue colors, and night-surface hard negatives to the art-directed marketing brief. | Tim subtlety rule |
 | 2026-10-23 | Added the art-directed marketing surface brief as the marketing-only exception to smallest-change design guidance. | Homepage art-direction brief; founder wording review |
 | 2026-10-02 | Added source-classified About/search guidance and distinct artist/ranking outcome boundaries. | Tim voice direction; JOV-7429; Google Search Central |
 | 2026-08-21 | Linked Jovie-owned generated campaign imagery to the scene-first design color contract. | Tim White approval |
