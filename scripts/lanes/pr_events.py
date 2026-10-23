@@ -1322,9 +1322,10 @@ def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict
     """One guard for the existing claim, event and maintenance paths; no new retry authority.
 
     `terminal_ok` is only for deterministic main syncs of a terminal generation: a merge of
-    main creates the new head that is that generation's material-change exit. The
-    fix-exhausted marker is that exit's own condition and must not refuse the sync.
-    Secret-file, empty-diff, active repairs, and other non-fixable holds still refuse."""
+    main creates the new head that is that generation's material-change exit. Holds, active
+    repairs and diff-policy holds still refuse. Exhaustion evidence is the condition that
+    sync exists to clear, so the fix-exhausted marker must not refuse the sync or mask the
+    hold underneath it. A secret-file or empty-diff line that remains still refuses."""
     labels = {label.lower() for label in label_names(pr)}
     if not isinstance(pr.get("headRefOid"), str) or not pr["headRefOid"].strip():
         return "head-unavailable"

@@ -2,10 +2,10 @@
 
 The structural pytest lane runs wherever the pre-push gate runs, including the
 lanes host itself, whose shell exports live lane configuration (LANES_SLOTS_*,
-LANES_STATE, LANES_REPO, CODEX_LANE_*, ...). Those ambient values silently
-override the module constants the tests exercise, so the same suite passes in
-CI and fails on a configured host. CODEX_LANE_LOGIN_SLOTS above 1 makes
-CurrentLoginTest's metadata reap assertion retry forever inside
+LANES_STATE, LANES_REPO, CODEX_LANE_*, CODEX_LEDGER_*, ...). Those ambient
+values silently override the module constants the tests exercise, so the same
+suite passes in CI and fails on a configured host. CODEX_LANE_LOGIN_SLOTS
+above 1 makes CurrentLoginTest's metadata reap assertion retry forever inside
 reap_current_metadata. Scrub host-injected lane config once at collection so
 the suite is hermetic; tests that need a knob set it via patch.dict.
 """
@@ -25,7 +25,7 @@ import git_housekeeping  # noqa: E402
 git_housekeeping.install_process_fixture_env()
 git_housekeeping.install_isolated_tempdirs()
 
-_SCRUB_PREFIXES = ("LANES_", "SYMPHONY_", "CODEX_LANE_")
+_SCRUB_PREFIXES = ("LANES_", "SYMPHONY_", "CODEX_LANE_", "CODEX_LEDGER_")
 _SCRUB_EXACT = {
     "LINEAR_API_KEY",
     "LINEAR_API_URL",

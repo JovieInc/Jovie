@@ -238,9 +238,9 @@ jobs:
         if: ${{ always() && hashFiles('apps/web/test-results/*-results.json') != '' }}
         with:
           name: synthetic-test-results
-          path: |
-            apps/web/test-results/
-            !apps/web/test-results/public-profile-smoke-*.png
+          # Retry error-context.md is scanned by the producer, but this
+          # artifact deliberately publishes only structured JSON evidence.
+          path: apps/web/test-results/**/*.json
           retention-days: 30
 
       - name: Send Slack Alert on Failure
