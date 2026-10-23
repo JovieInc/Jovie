@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
 import ts from 'typescript';
 import { HERO_CANVAS_SCROLL_RANGE } from '@/components/homepage/hero-light/hero-light-scroll';
+import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { jovieMarkAtSize } from '@/lib/brand/tokens';
 
 const webRoot = join(__dirname, '../..');
@@ -34,6 +35,7 @@ function canvasHtml(fallback: boolean): string {
       }
       ${lightCss}
       ${canvasCss}
+      *, *::before, *::after { box-sizing: border-box; }
       html, body { margin: 0; background: #030406; color: #f5f7fb; }
       .homepage-hero-canvas__headline {
         font-family: Satoshi, sans-serif;
@@ -41,6 +43,22 @@ function canvasHtml(fallback: boolean): string {
         font-weight: 500;
         letter-spacing: -0.03em;
         line-height: 1.08;
+      }
+      .homepage-hero-canvas__subhead {
+        font-family: Satoshi, sans-serif;
+        font-size: 1.0625rem;
+        font-weight: 450;
+        line-height: 1.5;
+        letter-spacing: -0.006em;
+        max-width: 36rem;
+      }
+      .homepage-hero-canvas__support {
+        font-family: Satoshi, sans-serif;
+        font-size: 0.875rem;
+        font-weight: 450;
+        line-height: 1.45;
+        color: #a8b0c3;
+        max-width: 36rem;
       }
       .homepage-hero-canvas__claim-field {
         display: flex;
@@ -67,6 +85,34 @@ function canvasHtml(fallback: boolean): string {
         color: #030406;
         padding: 0.55rem 0.9rem;
         font: 500 0.95rem/1 Satoshi, sans-serif;
+      }
+      /* Quiet phone mock: bezel-free mobile web screen at the real 402/874
+         aspect (components/marketing/device/DeviceScreen.css). Skeleton
+         structure only — no invented profile content. */
+      .ap-phone-frame { width: 100%; }
+      .mobile-web-screen {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 402 / 874;
+        overflow: hidden;
+        border: 1px solid rgba(168, 176, 195, 0.16);
+        border-radius: 1.25rem;
+        background: #070b12;
+      }
+      .phone-skel { position: absolute; inset: 0; padding: 9% 8%; }
+      .phone-skel__bar {
+        height: 4.5%;
+        border-radius: 999px;
+        background: rgba(168, 176, 195, 0.14);
+        margin-bottom: 6%;
+      }
+      .phone-skel__bar--w60 { width: 60%; }
+      .phone-skel__bar--w80 { width: 80%; }
+      .phone-skel__cover {
+        aspect-ratio: 1;
+        border-radius: 0.75rem;
+        background: rgba(168, 176, 195, 0.1);
+        margin-bottom: 8%;
       }
       .spacer { height: 200vh; }
       ${fallback ? '.homepage-hero-canvas { animation: none !important; }' : ''}
@@ -99,7 +145,21 @@ function canvasHtml(fallback: boolean): string {
             <div class="homepage-hero-light__focus"><div class="homepage-hero-light__edge"></div></div>
           </div>
           <div class="homepage-hero-canvas__copy">
-            <h1 class="homepage-hero-canvas__headline">One profile. For every fan.</h1>
+            <h1 class="homepage-hero-canvas__headline">${HOMEPAGE_COPY.hero.headline}</h1>
+            <p class="homepage-hero-canvas__subhead">${HOMEPAGE_COPY.hero.subhead}</p>
+            <p class="homepage-hero-canvas__support">${HOMEPAGE_COPY.hero.supportNote}</p>
+          </div>
+          <div class="homepage-hero-canvas__proof">
+            <div class="ap-phone-frame homepage-artist-hero__phone">
+              <div class="mobile-web-screen">
+                <div class="phone-skel">
+                  <div class="phone-skel__bar phone-skel__bar--w60"></div>
+                  <div class="phone-skel__cover"></div>
+                  <div class="phone-skel__bar phone-skel__bar--w80"></div>
+                  <div class="phone-skel__bar phone-skel__bar--w60"></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="homepage-hero-canvas__logos homepage-hero-canvas__logos-rail"></div>
@@ -221,6 +281,72 @@ test.describe('homepage hero canvas scroll', () => {
     const back = await readScroll(page);
     expect(back.y).toBeLessThan(forward.y);
     expect(back.progress).toBeLessThan(forward.progress);
+  });
+
+  test('keeps the proof phone inside the field and off the headline at phone widths', async ({
+    page,
+  }) => {
+    await page.setContent(canvasHtml(true), { waitUntil: 'load' });
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 375, height: 667 },
+      { width: 360, height: 640 },
+      { width: 320, height: 568 },
+    ] as const) {
+      await page.setViewportSize({ ...viewport });
+      const boxes = await page.evaluate(() => {
+        const rect = (selector: string) => {
+          const el = document.querySelector(selector);
+          if (!(el instanceof HTMLElement)) {
+            throw new Error(`missing ${selector}`);
+          }
+          const box = el.getBoundingClientRect();
+          return {
+            top: box.top,
+            bottom: box.bottom,
+            left: box.left,
+            right: box.right,
+            height: box.height,
+          };
+        };
+        return {
+          field: rect('.homepage-hero-canvas__field'),
+          copy: rect('.homepage-hero-canvas__copy'),
+          headline: rect('.homepage-hero-canvas__headline'),
+          proof: rect('.homepage-hero-canvas__proof'),
+          screen: rect('.homepage-hero-canvas__proof .mobile-web-screen'),
+        };
+      });
+      const label = `${viewport.width}x${viewport.height}`;
+      // The phone sits fully inside the hero field.
+      expect(boxes.proof.top, `${label} phone above the field`).toBeGreaterThan(
+        boxes.field.top - 0.5
+      );
+      expect(
+        boxes.proof.bottom,
+        `${label} phone below the field`
+      ).toBeLessThanOrEqual(boxes.field.bottom + 0.5);
+      // The phone is in the field's flow under the copy, so it can never
+      // cover the headline — assert it, do not assume it.
+      expect(
+        boxes.proof.top,
+        `${label} phone overlaps the copy`
+      ).toBeGreaterThan(boxes.copy.bottom - 1);
+      expect(
+        boxes.headline.bottom,
+        `${label} headline runs under the phone`
+      ).toBeLessThanOrEqual(boxes.proof.top + 1);
+      // The headline itself stays fully inside the field.
+      expect(
+        boxes.headline.top,
+        `${label} headline clipped by the field top`
+      ).toBeGreaterThan(boxes.field.top - 1);
+      // The phone keeps the real screen aspect (402/874) at every width.
+      expect(boxes.screen.height / boxes.screen.width).toBeCloseTo(
+        874 / 402,
+        2
+      );
+    }
   });
 
   test('captures dark progress frames at 1440 and 390', async ({ page }) => {

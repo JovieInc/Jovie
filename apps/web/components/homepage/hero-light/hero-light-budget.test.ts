@@ -32,6 +32,22 @@ function cssBlock(source: string, selector: string): string {
   return source.slice(start, end);
 }
 
+/** Brace-balanced block for a selector or at-rule (media queries nest). */
+function balancedBlock(source: string, opener: string): string {
+  const start = source.indexOf(opener);
+  if (start < 0) throw new Error(`missing ${opener}`);
+  const openBrace = source.indexOf('{', start);
+  let depth = 0;
+  for (let i = openBrace; i < source.length; i += 1) {
+    if (source[i] === '{') depth += 1;
+    else if (source[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, i + 1);
+    }
+  }
+  throw new Error(`unbalanced braces for ${opener}`);
+}
+
 describe('homepage hero light budget', () => {
   it('keeps the WebGL chunk and the island inside their gzip budgets', () => {
     expect(transpiledGzipBytes('hero-light-gl.ts')).toBeLessThanOrEqual(
@@ -87,6 +103,33 @@ describe('homepage hero light budget', () => {
       '.homepage-hero-canvas__proof .homepage-artist-hero__phone'
     );
     expect(phone).toContain('width: 100%');
+  });
+
+  it('keeps the phone in the field flow under the copy on phone widths', () => {
+    const css = readFileSync(join(DIR, 'HomepageHeroCanvas.css'), 'utf8');
+    const narrow = balancedBlock(css, '@media (max-width: 63.99rem)');
+
+    const field = balancedBlock(narrow, '.homepage-hero-canvas__field');
+    expect(field).toContain('display: flex');
+    expect(field).toContain('flex-direction: column');
+
+    const copy = balancedBlock(narrow, '.homepage-hero-canvas__copy');
+    expect(copy).toContain('flex: 1 1 auto');
+    expect(copy).toContain('min-height: 0');
+    expect(copy).toContain('overflow: hidden');
+    // The phone is in flow, so the copy never reserves fixed space for it.
+    expect(copy).not.toMatch(/padding-bottom:\s*[\d.]+rem/);
+
+    const proof = balancedBlock(narrow, '.homepage-hero-canvas__proof');
+    // In flow under the copy — never layered over the headline.
+    expect(proof).toContain('position: relative');
+    expect(proof).not.toContain('position: absolute');
+    // Height-driven with the real screen aspect; on a short field it
+    // shrinks to its floor, then the copy clips inside itself bottom-up.
+    expect(proof).toContain('height: min(30svh, 15.75rem)');
+    expect(proof).toContain('aspect-ratio: 402 / 874');
+    expect(proof).toContain('flex: 0 1 auto');
+    expect(proof).toContain('min-height: 9rem');
   });
 
   it('records the scoped WebGL exception without rewriting the standing rule', () => {

@@ -7,7 +7,9 @@
  * --hero-canvas-progress is scroll-linked (42svh). It is not a timed tween
  * and it does not pin the page. Reduced motion leaves the variable at 0.
  */
-
+/* NIGHT_DJ_HARMONY_V1: scoped WebGL exception — this hero's decorative
+   layer only. See docs/design/night-dj-harmony-v1.md and the exception
+   record in docs/performance/performance-invariants-v1.md. */
 @property --hero-canvas-progress {
   syntax: "<number>";
   inherits: true;
@@ -186,17 +188,37 @@
   width: 100%;
 }
 
+/* Phone-width field: the proof phone joins the field's flow under the
+   copy, so it cannot cover the headline at any viewport height. The phone
+   is sized by height (the screen keeps its 402/874 aspect) and shrinks
+   first on a short field; once it hits its floor the copy clips inside
+   itself, bottom-up — the headline stays whole either way. */
 @media (max-width: 63.99rem) {
+  .homepage-hero-canvas__field {
+    display: flex;
+    flex-direction: column;
+  }
+
   .homepage-hero-canvas__copy {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    overflow: hidden;
     justify-content: flex-start;
-    padding-bottom: 16rem;
+    padding-bottom: var(--space-4, 1rem);
   }
 
   .homepage-hero-canvas__proof {
-    right: 0;
-    left: 0;
-    width: 7.25rem;
-    margin-inline: auto;
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: auto;
+    flex: 0 1 auto;
+    align-self: center;
+    height: min(30svh, 15.75rem);
+    min-height: 9rem;
+    aspect-ratio: 402 / 874;
+    margin: 0 0 var(--space-4, 1rem);
   }
 }
 
