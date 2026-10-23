@@ -11,6 +11,7 @@ import {
   isChangedMigrationSql,
   lintChangedMigrations,
   parseChangedMigrationSql,
+  readMigrationDiff,
   SQUAWK_SHA256,
   SQUAWK_VERSION,
 } from './lint-changed-migrations.mjs';
@@ -53,6 +54,34 @@ test('rejects an unrecognized diff status', () => {
       parseChangedMigrationSql('U\tapps/web/drizzle/migrations/0200_new.sql'),
     /Unrecognized migration diff status/
   );
+});
+
+test('reads UTF-8 migration diffs from the command runner', () => {
+  const diff = 'A\tapps/web/drizzle/migrations/0200_new.sql\n';
+  for (const stdout of [diff, Buffer.from(diff)]) {
+    assert.equal(
+      readMigrationDiff(REPO_ROOT, 'main', 'HEAD', (bin, args, options) => {
+        assert.equal(bin, 'git');
+        assert.ok(args.includes('main...HEAD'));
+        assert.equal(options.encoding, 'utf8');
+        return { status: 0, stdout };
+      }),
+      diff
+    );
+  }
+});
+
+test('fails closed when the migration diff command fails', () => {
+  for (const stderr of ['broken revision', Buffer.from('broken revision')]) {
+    assert.throws(
+      () =>
+        readMigrationDiff(REPO_ROOT, 'bad', 'HEAD', () => ({
+          status: 128,
+          stderr,
+        })),
+      /broken revision/
+    );
+  }
 });
 
 test('does not invoke squawk when the diff has no migration SQL', async () => {
@@ -153,10 +182,7 @@ test('rejects a squawk download that does not match the pinned sha256', async ()
       installSquawk({
         platform: 'linux',
         arch: 'x64',
-        fetchImpl: async () => ({
-          ok: true,
-          arrayBuffer: async () => Buffer.from('not-the-release'),
-        }),
+        fetchImpl: async () => new Response('not-the-release'),
       }),
     /Squawk checksum mismatch/
   );

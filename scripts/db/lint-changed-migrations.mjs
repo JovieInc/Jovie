@@ -24,6 +24,16 @@ export const SQUAWK_SHA256 = Object.freeze({
 const KNOWN_STATUS = new Set(['A', 'C', 'D', 'M', 'R', 'T']);
 
 /**
+ * The injected runner exposes the fields this linter consumes. Git requests
+ * UTF-8 output; Squawk only needs an exit status.
+ * @callback RunCommand
+ * @param {string} command
+ * @param {string[]} args
+ * @param {import('node:child_process').SpawnSyncOptions} options
+ * @returns {{ status: number | null, stdout?: string | Buffer, stderr?: string | Buffer }}
+ */
+
+/**
  * @param {string} nameStatus `git diff --name-status` text
  * @returns {string[]} repo-relative SQL paths to lint
  */
@@ -99,7 +109,7 @@ export async function installSquawk(options = {}) {
  * @param {string} repoRoot
  * @param {string} base
  * @param {string} head
- * @param {typeof spawnSync} run
+ * @param {RunCommand} run
  */
 export function readMigrationDiff(repoRoot, base, head, run = spawnSync) {
   const result = run(
@@ -117,10 +127,11 @@ export function readMigrationDiff(repoRoot, base, head, run = spawnSync) {
   );
   if (result.status !== 0) {
     throw new Error(
-      result.stderr?.trim() || `git diff failed for ${base}...${head}`
+      result.stderr?.toString().trim() ||
+        `git diff failed for ${base}...${head}`
     );
   }
-  return result.stdout ?? '';
+  return result.stdout?.toString() ?? '';
 }
 
 /**
@@ -130,7 +141,7 @@ export function readMigrationDiff(repoRoot, base, head, run = spawnSync) {
  *   head?: string,
  *   nameStatus?: string,
  *   squawkBin?: string,
- *   run?: typeof spawnSync,
+ *   run?: RunCommand,
  *   fetchImpl?: typeof fetch,
  *   platform?: string,
  *   arch?: string,
