@@ -88,6 +88,7 @@ import { InstantMerchLanding } from '@/app/(marketing)/instant-merch/InstantMerc
 import { DspLinksLanding } from '@/app/(marketing)/product/dsp-links/DspLinksLanding';
 import { IsrcLanding } from '@/app/(marketing)/product/isrc/IsrcLanding';
 import { ProductLanding } from '@/app/(marketing)/product/ProductLanding';
+import { UtmLinksLanding } from '@/app/(marketing)/product/utm-links/UtmLinksLanding';
 import { SmartLinksLanding } from '@/app/(marketing)/smart-links/SmartLinksLanding';
 import { SolutionsRecordBody } from '@/app/(marketing)/solutions/[audience]/sections';
 import { YoutubeThumbnailsLanding } from '@/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding';
@@ -174,6 +175,7 @@ const RENDERERS: Readonly<Record<string, () => ReactElement>> = {
   '(marketing)/youtube-thumbnails/page.tsx': () => <YoutubeThumbnailsLanding />,
   '(marketing)/product/page.tsx': () => <ProductLanding />,
   '(marketing)/product/dsp-links/page.tsx': () => <DspLinksLanding />,
+  '(marketing)/product/utm-links/page.tsx': () => <UtmLinksLanding />,
   '(marketing)/product/isrc/page.tsx': () => <IsrcLanding />,
   '(marketing)/card/page.tsx': () => <JovieCardLanding />,
   '(marketing)/smart-links/page.tsx': () => <SmartLinksLanding />,

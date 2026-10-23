@@ -237,6 +237,7 @@ describe('route hero audit', () => {
         "/product": "ok: split-link-claim",
         "/product/dsp-links": "ok: f-layout-desktop-screenshot",
         "/product/isrc": "ok: f-layout-desktop-screenshot",
+        "/product/utm-links": "ok: f-layout-desktop-screenshot",
         "/smart-links": "ok: f-layout-desktop-screenshot",
         "/solutions/*": "unlocked-code-variant: centered-phone -> split-link-claim",
         "/support": "ok: left-content",

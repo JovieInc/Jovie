@@ -208,6 +208,8 @@ export const APP_ROUTES = {
   PRODUCT: '/product',
   /** Per-service DSP links. Nested under /product so it is not a profile handle. */
   PRODUCT_DSP_LINKS: '/product/dsp-links',
+  /** Tracked-link builder. Nested under /product so it is not a profile handle. */
+  PRODUCT_UTM_LINKS: '/product/utm-links',
   /** ISRC field. Nested under /product so it is not a profile handle. */
   PRODUCT_ISRC: '/product/isrc',
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */

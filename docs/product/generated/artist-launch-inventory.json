@@ -742,6 +742,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/product/utm-links/page.tsx",
+      "kind": "page",
+      "route": "/product/utm-links",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/renders/[state]/page.tsx",
       "kind": "page",
       "route": "/renders/[state]",
