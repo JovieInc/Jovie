@@ -120,23 +120,24 @@ Imagery and color.
 
 ### Imagery and color
 
-One primary color per image. Each page section gets exactly one accent color,
-chosen from Scene Palette v1
+One primary color per image. Never mix colors in one image. Each page
+section gets exactly one accent color, chosen from Scene Palette v1
 (`apps/web/data/marketing/imageColorPolicy.ts`): Ion `#3FAFF3`, Ultra
 `#A789F0`, or Pulse `#EB6AC6`. One of those hues per section and per image.
 They are never blended in the same image. The dark-first UI anchors stay the
 interface colors. Real product captures are not recolored.
 
 When an image has a gradient, its key color is the hue of that section's
-accent. Other tones are only neutral black or near-black falloff.
+accent. Other tones are only neutral black falloff. Fades and light reveals
+are strongly asymmetric: a lit wedge, and the rest to black.
 
 Orange stays forbidden as a scene or cue color. A literal triad stays
-forbidden. Blending these scene hues in one image is the same failure.
+forbidden. Mixing colors, or blending these scene hues, is the same failure.
 Protected real-world color (skin, identity, safety) stays truthful and is not
 a second accent.
 
 Image-generation prompt templates name that single accent hue and forbid
-secondary hues.
+secondary hues. The same rule applies inside those prompts.
 
 ### Product as hero
 
@@ -210,7 +211,9 @@ Product UI rules are unchanged.
 - Orange as a scene or cue color.
 - A literal triad.
 - A second accent hue in one section or image.
-- A gradient falloff that is not neutral black or near-black.
+- Mixed colors in one image.
+- A gradient falloff that is not neutral black.
+- A symmetric fade or light reveal. Light is a lit wedge; the rest goes to black.
 - An image-generation prompt that omits its single accent hue or allows a secondary hue.
 - Canvas, WebGL, or video on the surface by default (`night-dj-harmony-v1`). Shaders and light are baked images plus CSS motion. WebGL only as a flagged, approved exception.
 - Heavy frosting, or glass that is not CSS token glass (low-opacity fill, a 1px edge highlight, soft blur).
@@ -243,6 +246,7 @@ The executable landing-page copy workflow is in
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-23 | Imagery never mixes colors in one image. Gradient falloff is neutral black. Fades and light reveals are a lit wedge, with the rest to black. | Tim color rule |
 | 2026-10-23 | Imagery uses one scene accent per section and image. Gradients fall off to neutral black. Prompt templates name that hue and forbid secondary hues. | Tim color rule |
 | 2026-10-23 | Added hero scroll behavior as design intent: full-bleed opening, native zoom into a cinematic card, token-glass header, felt theme. The current build is not claimed finished. | Tim hero-scroll intent |
 | 2026-10-23 | Marketing references: Raycast for dark glass and directed light at higher fidelity; Linear-style premium for true-scale proportions. | Tim reference rule |
