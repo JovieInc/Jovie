@@ -86,6 +86,7 @@ import { JovieCardLanding } from '@/app/(marketing)/card/JovieCardLanding';
 import DownloadPage from '@/app/(marketing)/download/page';
 import { InstantMerchLanding } from '@/app/(marketing)/instant-merch/InstantMerchLanding';
 import { CommandPaletteLanding } from '@/app/(marketing)/product/command-palette/CommandPaletteLanding';
+import { IsrcLanding } from '@/app/(marketing)/product/isrc/IsrcLanding';
 import { ProductLanding } from '@/app/(marketing)/product/ProductLanding';
 import { SmartLinksLanding } from '@/app/(marketing)/smart-links/SmartLinksLanding';
 import { SolutionsRecordBody } from '@/app/(marketing)/solutions/[audience]/sections';
@@ -175,6 +176,7 @@ const RENDERERS: Readonly<Record<string, () => ReactElement>> = {
   '(marketing)/product/command-palette/page.tsx': () => (
     <CommandPaletteLanding />
   ),
+  '(marketing)/product/isrc/page.tsx': () => <IsrcLanding />,
   '(marketing)/card/page.tsx': () => <JovieCardLanding />,
   '(marketing)/smart-links/page.tsx': () => <SmartLinksLanding />,
 };

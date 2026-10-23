@@ -23,7 +23,7 @@ export function CommandPaletteLanding() {
         />
         <div className='relative w-full max-w-3xl px-6 pt-16 sm:px-10 sm:pt-24'>
           <h1
-            className='command-palette-title font-display text-2xl font-medium tracking-tight text-primary-token'
+            className='text-balance font-display text-2xl font-medium tracking-tight text-primary-token'
             data-wrap='editorial-title'
             id='command-palette-title'
           >
