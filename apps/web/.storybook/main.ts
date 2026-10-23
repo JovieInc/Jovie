@@ -13,17 +13,12 @@ const LIVE_CERT_STORIES = [
   '../../../packages/ui/atoms/switch.stories.tsx',
 ] as const;
 
-const DECISION_PERFORMANCE_STORIES = [
-  '../components/features/admin/hud/OvieInbox.stories.tsx',
-  '../components/features/opportunity-inbox/OpportunityInboxPageClient.stories.tsx',
-] as const;
-
 const FULL_CATALOG_STORIES = [
   // Local story matrices (e.g. the surface-elevation visual-regression
   // matrix, JOV-2156) that are not tied to a single component directory.
   './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
   '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
-  // packages/ui atoms — highest-reuse surface; must enter Chromatic/Storybook
+  // packages/ui atoms — highest-reuse surface; must enter Storybook
   // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
   '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
 ] as const;
@@ -33,7 +28,7 @@ export function storybookAddonsForEnvironment(
   hasManualAxeSuite = process.env.JOVIE_STORYBOOK_MANUAL_AXE === '1'
 ) {
   // The live certificate reads the preview iframe directly and injects its
-  // own pinned Axe bundle. Loading docs, Vitest, Chromatic, and MCP here adds
+  // own pinned Axe bundle. Loading docs, Vitest, and MCP here adds
   // an unrelated production build graph that can exhaust the source-gate
   // runner before any canonical story is measured.
   if (isLiveStorybookCert) return [];
@@ -46,7 +41,6 @@ export function storybookAddonsForEnvironment(
     // two axe runs cannot race.
     ...(hasManualAxeSuite ? [] : ['@storybook/addon-a11y']),
     '@storybook/addon-vitest',
-    '@chromatic-com/storybook',
     '@storybook/addon-mcp',
   ];
 }
@@ -95,20 +89,17 @@ export function resolvePrivacyBoundaryShellAlias(
 
 const config: StorybookConfig = {
   stories:
-    process.env.JOVIE_DECISION_INBOX_PERF === '1'
-      ? [...DECISION_PERFORMANCE_STORIES]
+    // Deliberately invalid controls belong only to the explicit runner diagnostic.
+    process.env.JOVIE_STORYBOOK_A11Y_CONTROLS === '1'
+      ? ['../tests/fixtures/storybook-a11y-runner/controls.stories.tsx']
       : process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
         ? [...LIVE_CERT_STORIES]
         : [...FULL_CATALOG_STORIES],
-  addons:
-    process.env.JOVIE_DECISION_INBOX_PERF === '1'
-      ? []
-      : storybookAddonsForEnvironment(),
+  addons: storybookAddonsForEnvironment(),
   framework: storybookFrameworkForEnvironment(),
   docs: {},
   typescript:
-    process.env.JOVIE_LIVE_STORYBOOK_CERT === '1' ||
-    process.env.JOVIE_DECISION_INBOX_PERF === '1'
+    process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
       ? { check: false, reactDocgen: false }
       : {
           check: true,
