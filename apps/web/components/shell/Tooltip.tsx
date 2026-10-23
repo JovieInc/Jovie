@@ -19,6 +19,9 @@ import {
   type ReactNode,
   type Ref,
   useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
 } from 'react';
 import type { ShortcutHint } from '@/lib/shortcuts';
@@ -29,6 +32,8 @@ export interface TooltipProps {
   readonly label: string;
   readonly shortcut?: ShortcutHint;
   readonly side?: 'top' | 'bottom' | 'right' | 'left';
+  readonly align?: 'start' | 'center' | 'end';
+  readonly disabled?: boolean;
   readonly className?: string;
   // `block` for full-width triggers (sidebar nav rows). Default is
   // inline-flex which sizes to children — right for icon buttons.
@@ -138,11 +143,35 @@ export function Tooltip({
   label,
   shortcut,
   side = 'bottom',
+  align = 'center',
+  disabled = false,
   className,
   block,
   open,
   defaultOpen,
 }: TooltipProps) {
+  const [hintOpen, setHintOpen] = useState(defaultOpen ?? false);
+  const [touchActive, setTouchActive] = useState(false);
+  const touchInput = useRef(false);
+  // Keep the Radix root controlled even while eligibility changes. A fitting
+  // title closes its hint permanently until fresh pointer/keyboard intent.
+  useLayoutEffect(() => {
+    if (disabled || touchActive) setHintOpen(false);
+  }, [disabled, touchActive]);
+  const onPointerInput = useCallback((event: PointerEvent<HTMLElement>) => {
+    touchInput.current = event.pointerType === 'touch';
+    setTouchActive(touchInput.current);
+  }, []);
+  const onKeyboardInput = useCallback(() => {
+    touchInput.current = false;
+    setTouchActive(false);
+  }, []);
+  useEffect(() => {
+    if (!touchActive) return;
+    // Tab may originate outside this trigger on a hybrid device.
+    document.addEventListener('keydown', onKeyboardInput, true);
+    return () => document.removeEventListener('keydown', onKeyboardInput, true);
+  }, [touchActive, onKeyboardInput]);
   const [seamOffset, setSeamOffset] = useState<number | null>(null);
 
   // Measured on hover/focus of the interactive trigger (just before Radix
@@ -178,13 +207,26 @@ export function Tooltip({
 
   return (
     <TooltipProvider>
-      <TooltipRoot open={open} defaultOpen={defaultOpen}>
-        <TooltipTrigger asChild>{triggerChild}</TooltipTrigger>
+      <TooltipRoot
+        open={!disabled && !touchActive && (open ?? hintOpen)}
+        onOpenChange={value =>
+          setHintOpen(!disabled && !touchInput.current && value)
+        }
+      >
+        <TooltipTrigger
+          asChild
+          onPointerEnter={onPointerInput}
+          onPointerDown={onPointerInput}
+          onKeyDown={onKeyboardInput}
+        >
+          {triggerChild}
+        </TooltipTrigger>
         <TooltipContent
           data-slot='shell-tooltip-content'
           contentVariant='rich'
           style={{ zIndex: 'calc(var(--jovie-shell-overlay-z-index) + 1)' }}
           side={side}
+          align={align}
           sideOffset={sideOffset}
         >
           <span className='min-w-0 break-words'>{label}</span>
