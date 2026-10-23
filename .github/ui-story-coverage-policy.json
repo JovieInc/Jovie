@@ -1,9 +1,725 @@
 {
   "schemaVersion": 1,
   "owner": "Gem",
-  "mode": "audit",
+  "mode": "blocking",
   "cleanBaselineRunsRequired": 5,
-  "verifiedCleanRunIds": [],
-  "blockingAfter": null,
-  "minimumPullRequestNumber": null
+  "verifiedCleanRunIds": [
+    39795196291,
+    39796515081,
+    39868623309,
+    39873145141,
+    39884653800
+  ],
+  "blockingAfter": "2026-10-23T02:55:00.000Z",
+  "minimumPullRequestNumber": 22700,
+  "allowlist": [
+    {
+      "path": "apps/web/components/features/admin/admin-creator-profiles/hooks/useContextMenuItems.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/admin-creator-profiles/utils/column-definitions.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/admin-creator-profiles/utils/column-renderers.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/admin-users-table/admin-user-actions.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/admin-users-table/utils/column-renderers.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/agent-os/WorkflowRunRow.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/BatchIngestModal.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/BulkDeleteCreatorDialog.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/creator-actions-menu/CreatorActionsMenuContent.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/CreatorAvatarCell.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/CreatorProfileSocialLinks.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/DeleteCreatorDialog.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/feedback-table/feedback-actions.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/fixtures/static-click.a11y-red.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/hud/FounderConversionHud.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/hud/HudKpiSubgrid.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/leads/LeadPipelineKpis.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/OperationalControlPanel.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/outreach/DmQueueCard.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/outreach/OutreachStatusBadge.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/ScreenshotGallery.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/SendInviteDialog.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/table/organisms/fixtures/drop-zone.a11y-green.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/table/organisms/fixtures/static-click.a11y-red.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/waitlist-table/utils/column-renderers.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/waitlist-table/utils/context-menu-builders.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/waitlist-table/WaitlistKanbanCard.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/WeeklyTrendChart.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/wiki/WikiNamespaceSection.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/wiki/WikiSearchResults.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/admin/wiki/WikiUnavailableNotice.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/auth/ButtonSpinner.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/insights/InsightActions.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/insights/InsightCard.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/molecules/artist-search-mode/UniversalLinkInputArtistSearchMode.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/molecules/CelebrationCardPreview.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/molecules/ContactListRow.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/molecules/FirstFanCelebration.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/molecules/universal-link-input/MultiLinkPasteDialog.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/molecules/UniversalLinkInputPlatformSelector.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/molecules/useEmailSignatureMenuAction.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/account-settings/ConnectedAccountsCard.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/account-settings/EmailManagementCard.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/audience-member-sidebar/AudienceMemberDetails.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/audience-member-sidebar/AudienceMemberReferrers.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/contacts-table/columns.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/contacts-table/row-actions.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/ContactsManager.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/dashboard-audience-table/audience-actions.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/dashboard-audience-table/AudienceFilterDropdown.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/dashboard-audience-table/table-config.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/dashboard-audience-table/utils/column-renderers.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/DashboardFeedbackModal.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/dsp-matches/ConfirmMatchDialog.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceSummary.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceView.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/dsp-presence/MismatchCard.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/grouped-links/GroupedLinksManager.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/GroupedLinksManager.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/LazyDashboardAudienceClient.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/links/ChatStyleLinkList.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/links/QuickAddSuggestions.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/links/YouTubeCrossCategoryPrompt.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/onboarding/OnboardingCompleteStep.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileContactHeader.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileSmartLinkAnalytics.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/ProfileEditorSection.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/MobileReleaseListLazy.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/NewReleaseHeaderAction.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleasesExperience.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseStateBanners.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseTableExportButton.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseWorkflowOverlays.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/utils/release-context-actions.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/utils/release-table-renderers.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/releases/cells/AvailabilityCell.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/releases/cells/PopularityCell.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/releases/cells/ProviderCell.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/releases/components/NotFoundCopyButton.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/releases/components/ProviderCopyButton.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/settings-artist-profile-section/ConnectedDspList.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/settings-artist-profile-section/SettingsArtistProfileSection.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/SettingsAnalyticsSection.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/SettingsAudienceSection.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/SettingsContactsSection.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/SettingsNotificationsSection.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/SettingsPaySection.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/SettingsTouringSection.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/shopify/ShopifyStoreCard.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/socials-form/SocialLinkSuggestionRows.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/socials-form/VerificationModal.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/tour-dates/tour-date-actions.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/tour-dates/TourDatesManager.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/organisms/useSettingsContext.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/release-tasks/ReleaseTaskExplainerPopover.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/release-tasks/ReleaseTaskPastReleaseState.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/tasks/task-action-registry.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/tasks/TaskRowActionMenu.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dashboard/tasks/TaskWorkspaceLoadingRows.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/demo/DemoAudienceWorkspace.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/demo/DemoReleasePresaveSurface.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/demo/DemoReleaseTasksSurface.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/demo/DemoReleaseTrackedLinksSurface.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/demo/DemoVideoPlayer.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/demo/OnboardingDemoContent.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/demo/OnboardingDemoExperience.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/demo/ProductDemoCarousel.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/demo/SettingsDemoHarness.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/dev/DevToolbarGate.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/home/MarketingScrollUnlock.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/home/ProductScreenshotClient.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/home/ProfileMockup.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/library-asset-share/LibraryAssetShareUrlCell.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/library-share/LibraryShareDropHeader.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/library-share/LibrarySharePassphraseGate.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/onboarding/fixtures/onboarding-tool-field-raw-focus.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/opportunity-inbox/OpportunityInboxTourDateRow.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/opportunity-inbox/OpportunityInboxTourDateSections.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/opportunity-inbox/WorkflowCaptureInboxCard.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/pitch/PitchEngagement.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/profile/artist-contacts-button/ArtistContactsButton.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/profile/DesktopQrOverlayClient.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/profile/ProfileAboutShare.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/profile/ProfileFooter.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/profile/ProfileRedirectSurface.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/profile/ProfileWebVitalsReporter.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/profile/views/ListenView.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/features/release/ReleaseCreditsDialog.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/homepage/HomepageElectricSeam.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/artist-provider.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/AudioPreviewStrip.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/ChatAvatarUploadCard.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/ChatFeedbackControl.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/ChatPinnedOpportunityHeader.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/ChatPresenceArtifactCard.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/ChatProvidersRegistrar.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/ChatStepLimitAffordance.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/ChipTray.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/EntityMentionSpan.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/FileAttachmentChip.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/ImagePreviewStrip.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/SkillChip.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/components/TeleprompterNotchVisual.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/jovie/release-calendar/ReleaseMomentDrawer.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/media/trustLogoAssets.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/organisms/sidebar-identity-group/fixtures/split-layout.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/organisms/table/atoms/fixtures/button-click.a11y-green.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/organisms/table/atoms/fixtures/static-click.a11y-red.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/organisms/table/utils/createSelectionColumnFactory.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/providers/GoogleAnalytics.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/providers/JovieAnalytics.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/providers/ToastProvider.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/ArtworkPlayOverlay.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/DashboardSegmentSkeleton.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/EntityThreadGlyph.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/InlineEditRow.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/LoopBtn.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/PickerAction.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/PickerLink.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/PickerToggle.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/PlayingBars.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/PriorityGlyph.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/ScrubGradient.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/ShellLoader.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/SidebarSection.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/SmartLinkRow.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/TaskStatusIcon.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/ThreadCardIconBtn.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/ThreadComposer.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/shell/useChatThreadContextMenu.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/ui/contribution-graph.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "apps/web/components/ui/zoom-parallax.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "packages/ui/atoms/fixtures/badge-geometry-drift-fixtures.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "packages/ui/atoms/fixtures/cropped-artwork-avatar.tsx",
+      "linearIssue": "JOV-8847"
+    },
+    {
+      "path": "packages/ui/atoms/fixtures/non-circular-identity-avatar.tsx",
+      "linearIssue": "JOV-8847"
+    }
+  ]
 }
