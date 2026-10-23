@@ -382,8 +382,8 @@ another task supplies no design requirement or action authority here.
   PR Ready guard `marketing-container-width` fails a page-wide `max-w-*`
   (wider than 48rem), the `container` class, a second width token such as
   `--homepage-section-max`, a CSS `max-width` or `width` wider than 48rem, and
-  container padding set outside the token. Existing hits are a shrink-only
-  baseline (`container-width.baseline.json`) that only goes down.
+  container padding set outside the token. A hit that is not already on
+  `origin/main` fails. Fixing a hit shrinks the set. There is no exception file.
 - **Change/exception:** do not add a width. Use the box or `bleed`. A true
   non-container (a menu flyout, a phone frame) takes a
   `container-width-allow: <reason>` comment on the line or the line above.

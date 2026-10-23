@@ -3,11 +3,11 @@ import { describe, it } from 'node:test';
 import {
   checkContainerWidth,
   GUIDANCE,
+  idsBeyondAncestor,
   maxWidthProblem,
   scanSources,
   toRem,
 } from './container-width.mjs';
-import { evaluateRatchet } from './ratchet.mjs';
 
 const FILE = 'apps/web/components/marketing/Fixture.tsx';
 const scan = (source, path = FILE) => scanSources([{ path, source }]).ids;
@@ -141,18 +141,32 @@ describe('marketing container width', () => {
     );
   });
 
-  it('fails new violations and unresolved baseline entries, with guidance', () => {
-    const errors = evaluateRatchet({
-      current: ['a', 'new'],
-      recorded: ['a', 'gone'],
-      ancestor: ['a', 'gone'],
-    });
-    assert.equal(errors.length, 3);
+  it('allows a hit that origin/main already has and rejects a new one', () => {
+    assert.deepEqual(idsBeyondAncestor(['kept', 'new'], ['kept']), ['new']);
+    assert.deepEqual(idsBeyondAncestor(['kept'], ['kept', 'fixed']), []);
     assert.match(GUIDANCE, /MarketingContainer or Container/);
     assert.match(GUIDANCE, /only override is bleed/);
   });
 
-  it('passes in the repository, and the baseline only shrinks', () => {
+  it('reports live ids that the ancestor does not have', () => {
+    const { failures, ids } = checkContainerWidth(undefined, {
+      ancestorIds: [],
+    });
+    if (ids.length === 0) {
+      assert.deepEqual(failures, []);
+      return;
+    }
+    assert.match(failures.join('\n'), /new violations are not allowed/);
+  });
+
+  it('fails closed when the ancestor ref is missing', () => {
+    const { failures } = checkContainerWidth(undefined, {
+      ref: 'no-such-ref-container-width',
+    });
+    assert.match(failures.join('\n'), /not available/);
+  });
+
+  it('passes in the repository', () => {
     const { failures } = checkContainerWidth();
     assert.deepEqual(failures, [], failures.join('\n'));
   });
