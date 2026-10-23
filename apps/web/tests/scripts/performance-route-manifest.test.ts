@@ -56,7 +56,7 @@ const CREATOR_SHELL_SLICE_ROUTES = [
     measureMode: 'warm-navigation',
     warmupStrategy: 'authenticated-shell',
     primaryMetric: 'warm-shell-response',
-    navTrigger: `a[href="${APP_ROUTES.DASHBOARD}"][data-navigation-item-id="home"]`,
+    navTrigger: '[data-navigation-item-id="home"]',
   },
   {
     id: 'creator-library',

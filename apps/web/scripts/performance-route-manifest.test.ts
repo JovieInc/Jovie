@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   canonicalSidebarNavigation,
   chatNavItem,
-  homeNavItem,
-  inboxNavItem,
 } from '../components/features/dashboard/dashboard-nav/config';
 import { APP_ROUTES } from '../constants/routes';
 import {
@@ -20,23 +18,6 @@ import {
 } from './performance-route-manifest';
 
 describe('performance route manifest', () => {
-  it('selects the intended home identity when another Inbox link shares its href', () => {
-    const route = getEndUserPerfRouteManifest().find(
-      route => route.id === 'creator-inbox-nav'
-    );
-    expect(route).toBeDefined();
-    expect(route?.navigationItemId).toBe(homeNavItem.id);
-    expect(route?.path).toBe(homeNavItem.href);
-    expect(inboxNavItem.href).toBe(homeNavItem.href);
-    expect(inboxNavItem.id).not.toBe(homeNavItem.id);
-    expect(route?.readySelectors.navTrigger?.length).toBeGreaterThan(0);
-    for (const selector of route?.readySelectors.navTrigger ?? []) {
-      expect(selector).toContain(
-        `[data-navigation-item-id="${homeNavItem.id}"]`
-      );
-    }
-  });
-
   it('exports normalized route budgets for every end-user route', () => {
     const routes = getEndUserPerfRouteManifest();
 
@@ -128,11 +109,17 @@ describe('performance route manifest', () => {
       expect(route?.path).toBe(item.href);
       expect(route?.warmupStrategy).toBe('authenticated-shell');
       expect(route?.warmNavigationStartPath).not.toBe(item.href);
-      expect(route?.readySelectors.navTrigger).toContain(
-        item.id === 'home'
-          ? `a[href="${item.href}"][data-navigation-item-id="home"]`
-          : `a[href="${item.href}"]`
-      );
+      if (item.id === 'home') {
+        // /app is shared with the header inbox bell. The warm probe must
+        // click the rail item, which carries navigation id `home`.
+        expect(route?.readySelectors.navTrigger).toEqual([
+          '[data-navigation-item-id="home"]',
+        ]);
+      } else {
+        expect(route?.readySelectors.navTrigger).toContain(
+          `a[href="${item.href}"]`
+        );
+      }
       expect(route?.readySelectors.content?.length ?? 0).toBeGreaterThan(0);
       expect(
         getRouteTimingBudgets(route!).some(
@@ -147,10 +134,6 @@ describe('performance route manifest', () => {
         `canonical nav path "${item.href}" must not also be modeled as a redirect`
       ).toBe(false);
     }
-
-    expect(
-      warmRoutesByNavigationItem.get('home')?.readySelectors.navTrigger?.[0]
-    ).toBe(`a[href="${APP_ROUTES.DASHBOARD}"][data-navigation-item-id="home"]`);
   });
 
   it('uses Inbox readiness for /app and treats Releases as a Library redirect', () => {
