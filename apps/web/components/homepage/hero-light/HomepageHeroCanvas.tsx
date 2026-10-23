@@ -6,6 +6,7 @@
 import { useEffect, useRef } from 'react';
 import { ProductClaimHandleForm } from '@/app/(marketing)/product/ProductClaimHandleForm';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
+import '@/components/marketing/artist-profile/ArtistProfileSectionShell.css';
 import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
 import { type HomepageCopy } from '@/data/homepageCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
