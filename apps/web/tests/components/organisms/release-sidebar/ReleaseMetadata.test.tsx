@@ -107,7 +107,7 @@ describe('ReleaseMetadata editable fields', () => {
       </TooltipProvider>
     );
 
-    await user.click(screen.getByLabelText('Edit Label'));
+    await user.click(screen.getByRole('button', { name: /Edit Label/ }));
     const input = screen.getByLabelText('Edit Label');
     await user.type(input, 'New Label');
     await user.tab();
