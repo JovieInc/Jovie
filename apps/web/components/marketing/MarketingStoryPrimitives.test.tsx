@@ -17,7 +17,7 @@ describe('MarketingStoryPrimitives', () => {
 
       expect(container.firstElementChild).toHaveClass('rounded-xl');
       expect(screen.getByText(card.title)).toBeVisible();
-      if (card.detail) expect(screen.getByText(card.detail)).toBeVisible();
+      if ('detail' in card) expect(screen.getByText(card.detail)).toBeVisible();
     }
   );
 
