@@ -39,28 +39,31 @@ function renderJovieMark({ x, y, size, fill, opacity = 1 }) {
 }
 
 export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
-  // DESIGN.md (System B dark): #08090a base, #0f1011 / #17171a surfaces.
-  // Restrained premium dark, no sloppy green-blue gradients. Subtle purple-tinted
-  // low-opacity oversized Jovie mark in background per Wave 2 handoff + ui/ux feedback.
-  // Matches Jovie design system (dark-first, Apple-meets-Rekordbox restraint).
+  // System B dark stage. One asymmetric Ion wash (same #11AFFF as the Mac
+  // splash). No plus-grid: that texture read as grit on the installer.
   return `<svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <pattern id="jovie-grid" width="24" height="24" patternUnits="userSpaceOnUse">
-      <path d="M24 0H0V24" fill="none" stroke="#1A1F27" stroke-width="1"/>
-      <path d="M12 7V17M7 12H17" stroke="#2B323D" stroke-width="1" stroke-linecap="round" opacity="0.52"/>
-    </pattern>
     <linearGradient id="stage-glow" x1="68" y1="60" x2="692" y2="374" gradientUnits="userSpaceOnUse">
       <stop stop-color="#0f1011"/>
       <stop offset="0.5" stop-color="#11131a"/>
       <stop offset="1" stop-color="#12101b"/>
     </linearGradient>
+    <radialGradient id="ion-wash" cx="8%" cy="-12%" r="68%" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#11AFFF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#11AFFF" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="stage-clip">
+      <rect x="32" y="30" width="696" height="366" rx="22"/>
+    </clipPath>
     <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
       <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity="0.34"/>
     </filter>
   </defs>
   <rect width="${WIDTH}" height="${HEIGHT}" fill="#08090a"/>
   <rect x="32" y="30" width="696" height="366" rx="22" fill="url(#stage-glow)" stroke="#242A33"/>
-  <rect x="32" y="30" width="696" height="366" rx="22" fill="url(#jovie-grid)" opacity="0.66"/>
+  <g clip-path="url(#stage-clip)">
+    <rect x="32" y="30" width="696" height="366" fill="url(#ion-wash)"/>
+  </g>
   <rect x="68" y="66" width="624" height="294" rx="18" fill="#0f1011" opacity="0.42"/>
   ${renderJovieMark({ x: 460, y: 70, size: 260, fill: '#F7F8FA', opacity: 0.048 })}
   <text x="380" y="86" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="24" font-weight="700" letter-spacing="0" fill="#F5F7FA">Install Jovie</text>

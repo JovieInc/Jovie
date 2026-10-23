@@ -98,3 +98,14 @@ Route-response-latency budgets in this file are **not** a substitute for keeping
 path free of blocking I/O. The thread-blocking gate is `JOV-INV-031`
 ([latency-sensitive-execution-v1](./latency-sensitive-execution-v1.md)). That gate invents
 no numbers here and does not claim that async metadata changes crawler/bot wait.
+
+## Sibling check class: surface media
+
+Canvas, WebGL, and video on marketing pages are not a second Lighthouse budget
+and do not add a row here. `scripts/invariants/art-direction/surface-media.mjs`
+allows them only inside a named scope that keeps a non-WebGL fallback and
+`prefers-reduced-motion`. The homepage hero
+(`apps/web/components/homepage/hero-light/`) is that approved scope and ships
+with no feature flag. The ambient field stays in scope because it already
+keeps a CSS poster and declines WebGL under reduced motion. Every other hit
+is on that check's shrink-only baseline.

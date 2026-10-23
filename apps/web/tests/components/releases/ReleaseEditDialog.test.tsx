@@ -165,7 +165,7 @@ describe('ReleaseEditDialog', () => {
 
     render(
       <ReleaseEditDialog
-        release={createRelease()}
+        release={{ ...createRelease(), releaseDate: undefined }}
         providerList={[
           {
             key: 'spotify' as ProviderKey,
@@ -183,6 +183,7 @@ describe('ReleaseEditDialog', () => {
       />
     );
 
+    expect(screen.getByText('Date not set')).toBeInTheDocument();
     await user.click(screen.getByTestId('save-provider-release-1-spotify'));
     await user.click(screen.getByTestId('reset-provider-release-1-spotify'));
     await user.click(screen.getByRole('button', { name: 'Done' }));

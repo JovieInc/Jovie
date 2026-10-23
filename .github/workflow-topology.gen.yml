@@ -56,7 +56,7 @@ inactiveWorkflows:
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
 generatedAt: deterministic
-normalPrCheckRecords: 24
+normalPrCheckRecords: 25
 nodes:
   - name: Workflow Lint
     path: .github/workflows/actionlint.yml
@@ -838,6 +838,19 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:comment
     jobCount: 2
+  - name: Pen token parity
+    path: .github/workflows/pen-token-parity.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:parity
+    jobCount: 1
   - name: Post-Deploy Probes
     path: .github/workflows/postdeploy-probes.yml
     active: true
@@ -1251,7 +1264,7 @@ nodes:
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
-    jobCount: 6
+    jobCount: 7
   - name: Staging Controller
     path: .github/workflows/staging-controller.yml
     active: true

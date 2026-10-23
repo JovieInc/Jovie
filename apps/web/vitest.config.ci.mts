@@ -20,6 +20,7 @@ export default defineConfig({
       'tests/e2e/**',
       'tests/eval/**',
       'tests/performance/**',
+      'tests/a11y/**',
       'tests/docs-guides/**',
       'tests/product-screenshots/**',
       'tests/visual-qa/**',

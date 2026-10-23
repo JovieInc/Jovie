@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { classifyCiRisk, loadCiHarnessManifest } from '../ci-harness.mjs';
 import { planProductionLaneRange } from '../production-lane-range.mjs';
+import { journeysRequired } from '../promotion-journey-evidence.mjs';
 import { gradeReleaseRange } from '../release-range-risk.mjs';
 import { buildReleaseRiskReceipt } from '../release-risk-policy.mjs';
 
@@ -268,5 +269,173 @@ describe('release range risk fail-closed', () => {
     expect(ci).not.toMatch(/middleware\\?\.ts/);
     expect(ci).toMatch(/BUILD_PATTERN=.*apps\/web\/proxy\\\.ts/);
     expect(JSON.stringify(manifest)).not.toMatch(/middleware\\\\\.ts/);
+  });
+});
+
+describe('release range risk (2026-10-22 gate false-unknown)', () => {
+  /**
+   * The exact changed-path set of the 2026-10-22 promotion wave
+   * a718a69..afb27ba (Production Controller run 39905042790). The gate graded
+   * this range unknown because 13 path families matched no risk rule and no
+   * known-safe pattern, so a non-auth/billing range demanded journey evidence
+   * it had no way to obtain. Every family below must stay classified forever.
+   */
+  const INCIDENT_PATHS = [
+    '.claude/rules/ui.md',
+    '.github/ci-harness/manifest.json',
+    '.github/ci-harness/structural-control-paths.ere',
+    '.github/scripts/controller-quota-replay.mjs',
+    '.github/scripts/controller-quota-replay.test.mjs',
+    '.github/scripts/pen-still-diff-comment.mjs',
+    '.github/scripts/pen-still-diff-comment.test.mjs',
+    '.github/scripts/release-lineage-gate.sh',
+    '.github/ui-story-coverage-policy.json',
+    '.github/workflow-topology.gen.yml',
+    '.github/workflows/ci.yml',
+    '.github/workflows/pen-still-diff.yml',
+    '.github/workflows/production-controller.yml',
+    '.github/workflows/ui-story-coverage-audit.yml',
+    'DESIGN.md',
+    'apps/web/.storybook/main.ts',
+    'apps/web/.storybook/preview.tsx',
+    'apps/web/app/(marketing)/product/ProductLanding.test.tsx',
+    'apps/web/app/app/(shell)/dashboard/PreviewPanelContext.tsx',
+    'apps/web/app/app/(shell)/dashboard/profile/ProfilePreviewOpener.test.tsx',
+    'apps/web/app/app/(shell)/dashboard/profile/ProfilePreviewOpener.tsx',
+    'apps/web/components/features/dashboard/dashboard-nav/DashboardNav.test.tsx',
+    'apps/web/components/features/dashboard/dashboard-nav/DashboardNav.tsx',
+    'apps/web/components/features/dashboard/tasks/TasksPageClient.tsx',
+    'apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx',
+    'apps/web/components/jovie/JovieChatSections.test.tsx',
+    'apps/web/components/jovie/JovieChatSections.tsx',
+    'apps/web/components/organisms/UnifiedSidebar.stories.tsx',
+    'apps/web/components/shell/AppShellRightRail.stories.tsx',
+    'apps/web/components/shell/SidebarThreadsSection.test.tsx',
+    'apps/web/components/shell/SidebarThreadsSection.tsx',
+    'apps/web/components/shell/Tooltip.stories.tsx',
+    'apps/web/components/shell/Tooltip.test.tsx',
+    'apps/web/components/shell/Tooltip.tsx',
+    'apps/web/components/shell/useRailPreview.test.tsx',
+    'apps/web/components/shell/useRailPreview.ts',
+    'apps/web/data/homepageCopy.ts',
+    'apps/web/data/product-truth/golden-path-claims.ts',
+    'apps/web/data/product-truth/golden-path-proof.gen.json',
+    'apps/web/lib/ovie/generated/performance-invariants-v1.json',
+    'apps/web/package.json',
+    'apps/web/scripts/performance-route-manifest.ts',
+    'apps/web/tests/e2e/golden-path-waitlist-local.spec.ts',
+    'apps/web/tests/e2e/profile.spec.ts',
+    'apps/web/tests/e2e/start-onboarding-chat.spec.ts',
+    'apps/web/tests/e2e/storybook-chat-tooltip-rail.spec.ts',
+    'apps/web/tests/e2e/utils/public-surface-manifest.ts',
+    'apps/web/tests/unit/ci/visual-ci-harness.test.ts',
+    'apps/web/tests/unit/dashboard/PreviewPanelContext.scope.test.tsx',
+    'apps/web/tests/unit/dashboard/TasksPageClient.test.tsx',
+    'apps/web/tests/unit/e2e/noauth-playwright-config.test.ts',
+    'apps/web/tests/unit/marketing/correction-guards.ts',
+    'apps/web/tests/unit/marketing/correction-pyramid-guards.test.ts',
+    'apps/web/tests/unit/profile/profile-compact-template.test.tsx',
+    'canon/invariants.jsonl',
+    'canon/ownership.json',
+    'chromatic.config.json',
+    'codecov.yml',
+    'docs/UI_STORY_COVERAGE_ROLLOUT.md',
+    'docs/ci/lint-typecheck-audit-2026-10-23.md',
+    'docs/design-system/DETAILS.md',
+    'docs/llms-design-manifest.txt',
+    'docs/pen-stills/README.md',
+    'docs/pen-stills/homepage/manifest.json',
+    'docs/pen-stills/manifest.schema.json',
+    'packages/ui/atoms/tooltip.README.md',
+    'pnpm-lock.yaml',
+    'scripts/agent-context/rule-scopes.json',
+    'scripts/ci-fast-lanes.mjs',
+    'scripts/generate-llms-design-manifest.mjs',
+    'scripts/generate-llms-design-manifest.test.mjs',
+    'scripts/invariants/clef-screenshot-capture.mjs',
+    'scripts/invariants/clef-screenshot-evaluator.mjs',
+    'scripts/invariants/clef-screenshot-evaluator.test.mjs',
+    'scripts/invariants/pen-still-diff-lib.mjs',
+    'scripts/invariants/pen-still-diff.mjs',
+    'scripts/invariants/pen-still-diff.test.mjs',
+    'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+    'scripts/lib/__tests__/ci-harness.test.mjs',
+    'scripts/lib/__tests__/gate-config-consistency.test.mjs',
+    'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+    'scripts/lib/__tests__/production-release-supersession.test.mjs',
+    'scripts/lib/__tests__/release-lineage-gate.test.mjs',
+    'scripts/lib/__tests__/ui-story-coverage-policy.test.mjs',
+    'scripts/lib/gate-config-consistency.mjs',
+    'scripts/repo-root-allowlist.json',
+    'scripts/ui-story-coverage-policy.mjs',
+  ];
+  const BASE = 'a718a69d29ffdd1d74851511ecfe8aefe1e1a336';
+  const CANDIDATE = 'afb27ba5dc790557660cb787c72279df3b2eb24e';
+
+  it('the incident range grades known and does not require journeys', () => {
+    const artifact = gradeReleaseRange({
+      baseDeployedSha: BASE,
+      candidateSha: CANDIDATE,
+      paths: INCIDENT_PATHS,
+    });
+    expect(artifact.unknown).toBe(false);
+    expect(artifact.paths.filter(p => p.class === 'unknown')).toEqual([]);
+    expect(artifact.affects.auth).toBe(false);
+    expect(artifact.affects.billing).toBe(false);
+    expect(journeysRequired(artifact)).toBe(false);
+  });
+
+  it.each([
+    ['.github/ui-story-coverage-policy.json', 'ci-workflows'],
+    ['.github/workflow-topology.gen.yml', 'ci-workflows'],
+    ['.github/ci-harness/manifest.json', 'ci-workflows'],
+    ['canon/invariants.jsonl', 'ci-workflows'],
+    ['canon/ownership.json', 'ci-workflows'],
+    ['chromatic.config.json', 'ci-workflows'],
+    ['codecov.yml', 'ci-workflows'],
+    ['apps/web/data/homepageCopy.ts', 'public-ui'],
+    ['apps/web/data/product-truth/golden-path-claims.ts', 'public-ui'],
+    ['apps/web/styles/theme.css', 'public-ui'],
+    ['apps/web/screenshot-catalog/current/manifest.json', 'public-ui'],
+    ['apps/web/.storybook/main.ts', 'safe'],
+    ['apps/web/.storybook/preview.tsx', 'safe'],
+    ['apps/web/scripts/performance-route-manifest.ts', 'safe'],
+    ['apps/web/scripts/marketing-eyebrow-caps.ts', 'safe'],
+    ['apps/web/lib/a11y-gates/wcag-22-aa.ts', 'safe'],
+    ['apps/web/lib/a11y-gates/a11y-allowlist.json', 'safe'],
+    ['apps/web/lib/ovie/generated/performance-invariants-v1.json', 'safe'],
+  ])('%s classifies as %s (never unknown)', (path, cls) => {
+    const artifact = gradeReleaseRange({
+      baseDeployedSha: BASE,
+      candidateSha: CANDIDATE,
+      paths: [path],
+    });
+    expect(artifact.unknown).toBe(false);
+    expect(artifact.paths[0].class).toBe(cls);
+    expect(artifact.unknownReasons).toEqual([]);
+  });
+
+  it('rule classes still win over known-safe patterns', () => {
+    const artifact = gradeReleaseRange({
+      baseDeployedSha: BASE,
+      candidateSha: CANDIDATE,
+      paths: ['apps/web/scripts/check-agent-gate-evidence.ts'],
+    });
+    expect(artifact.paths[0].class).toBe('agent-control-plane');
+    expect(artifact.affects.agent).toBe(true);
+  });
+
+  it('a runtime-read sibling of the generated perf pack stays unknown', () => {
+    // preview-env-exceptions.json is imported by server code; only the exact
+    // generated performance pack is known-safe. Broadening that pattern would
+    // silently mark future runtime-generated files safe.
+    const artifact = gradeReleaseRange({
+      baseDeployedSha: BASE,
+      candidateSha: CANDIDATE,
+      paths: ['apps/web/lib/ovie/generated/preview-env-exceptions.json'],
+    });
+    expect(artifact.unknown).toBe(true);
+    expect(artifact.level).toBe('high');
+    expect(journeysRequired(artifact)).toBe(true);
   });
 });
