@@ -25,7 +25,7 @@ function createTxMock(userRows: Row[], entryRows: Row[]) {
     .mockImplementation(() => Promise.resolve(selectQueue.shift() ?? []));
   const forUpdate = vi.fn(() => ({ limit }));
   const orderBy = vi.fn(() => ({ for: forUpdate }));
-  const where = vi.fn(() => ({
+  const where = vi.fn((_predicate: unknown) => ({
     for: forUpdate,
     orderBy,
   }));
