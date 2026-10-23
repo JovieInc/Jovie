@@ -2084,6 +2084,11 @@ describe('failing test identities in lane excerpts', () => {
 describe('source-read guard selection', () => {
   const selected = (event, files) =>
     selectSourceGuards(event, files).map(guard => guard.id);
+  // external-api-guard scans every source, script and workflow file.
+  const apiGuard = path =>
+    /\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$/u.test(path)
+      ? ['external-api-guard']
+      : [];
 
   it.each(['pull_request', 'merge_group', 'push'])(
     'runs profile conformance for adapters on %s',
@@ -2095,20 +2100,30 @@ describe('source-read guard selection', () => {
   );
 
   it.each([
-    ['pull_request', ['web-source-read-tests', 'script-contracts']],
+    [
+      'pull_request',
+      ['web-source-read-tests', 'script-contracts', 'gate-weakening-detector'],
+    ],
     ['merge_group', []],
     ['push', []],
   ])(
-    'runs ci-schedule-inventory on %s when a workflow changes',
+    'runs ci-schedule-inventory and automation-registry on %s when a workflow changes',
     (event, pr) => {
       expect(
         selected(event, ['.github/workflows/upstash-quota-headroom.yml'])
-      ).toEqual(['ci-schedule-inventory', ...pr]);
+      ).toEqual([
+        'ci-schedule-inventory',
+        'automation-registry',
+        'external-api-guard',
+        ...pr,
+      ]);
     }
   );
 
   it.each([
     ['scripts/lib/ci-schedule-inventory.mjs', ['ci-schedule-inventory']],
+    ['canon/automation-registry.jsonl', ['automation-registry']],
+    ['scripts/lanes/continuity_clock.py', ['automation-registry']],
     [
       'scripts/lib/__tests__/ci-schedule-inventory.test.mjs',
       ['ci-schedule-inventory'],
@@ -2165,6 +2180,9 @@ describe('source-read guard selection', () => {
         'artist-launch-contract',
         'merge-group-unit-guards',
         'static-revalidate-policy',
+        'art-direction',
+        'icp-language',
+        'marketing-rounded-media',
       ],
     ],
     [
@@ -2187,8 +2205,11 @@ describe('source-read guard selection', () => {
     // PR-wide guards narrow inside their scripts.
     expect(selected('pull_request', [path])).toEqual([
       ...guards,
+      ...apiGuard(path),
       'web-source-read-tests',
       'script-contracts',
+      ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
+      'gate-weakening-detector',
     ]);
   });
 
@@ -2226,8 +2247,8 @@ describe('source-read guard selection', () => {
     ]) {
       expect(classifyProductLanes([path]).selectedLanes).toContain('web');
       const expected = path.startsWith('apps/web/lib/')
-        ? ['artist-profile-conformance']
-        : [];
+        ? ['artist-profile-conformance', ...apiGuard(path), 'copy-leak']
+        : ['copy-leak'];
       expect(selected('merge_group', [path])).toEqual(expected);
       expect(selected('push', [path])).toEqual(expected);
     }
@@ -2253,7 +2274,11 @@ describe('source-read guard selection', () => {
       'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
+      'automation-registry',
       'playbook-authoring',
+      'icp-language',
+      'external-api-guard',
+      'copy-leak',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
     expect(selected('pull_request', null)).toEqual(all);
@@ -2262,7 +2287,11 @@ describe('source-read guard selection', () => {
       'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
+      'automation-registry',
       'playbook-authoring',
+      'icp-language',
+      'external-api-guard',
+      'copy-leak',
     ]);
   });
 
@@ -2284,6 +2313,44 @@ describe('source-read guard selection', () => {
         ).toContain("from 'node:test'");
         continue;
       }
+      if (guard.id === 'icp-language') {
+        expect(guard.command).toContain(
+          'node scripts/invariants/icp-language/check.mjs'
+        );
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/icp-language/icp-language.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'copy-leak') {
+        expect(guard.prOnly).toBe(false);
+        expect(guard.command).toContain('copy-leak/check.mjs');
+        expect(guard.command).toContain('--test-coverage-lines=95');
+        expect(guard.command).toContain('copy-leak.test.mjs');
+        continue;
+      }
+      if (guard.id === 'oasdiff-breaking-change') {
+        expect(guard.command).toContain(
+          'node scripts/invariants/oasdiff-breaking-change.mjs'
+        );
+        expect(guard.prOnly).toBe(true);
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/oasdiff-breaking-change.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
       if (guard.id === 'codex-bootstrap') {
         expect(guard.command).toContain('--experimental-test-coverage');
         expect(guard.command).toContain('--test-coverage-lines=90');
@@ -2297,8 +2364,58 @@ describe('source-read guard selection', () => {
         ).toContain("from 'node:test'");
         continue;
       }
+      if (guard.id === 'external-api-guard') {
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/external-api-guard.mjs')
+        );
+        continue;
+      }
+
+      if (guard.id === 'art-direction') {
+        expect(guard.command).toContain(
+          'scripts/invariants/art-direction/run.mjs'
+        );
+        expect(guard.command).toContain(
+          'node --test scripts/invariants/art-direction/*.test.mjs'
+        );
+        expect(guard.prOnly).toBe(true);
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/art-direction/art-direction.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain('describe(');
+        continue;
+      }
+
+      if (guard.id === 'marketing-rounded-media') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toBe(
+          'node --test scripts/invariants/art-direction/rounded.test.mjs'
+        );
+        continue;
+      }
       if (guard.id === 'script-contracts') {
         expect(guard.command).toContain('/lib/script-contract-affected.mjs');
+        continue;
+      }
+      if (guard.id === 'gate-weakening-detector') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/invariants/gate-weakening-detector.mjs')
+        );
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/gate-weakening-detector.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
         continue;
       }
       if (guard.id === 'web-source-read-tests') {

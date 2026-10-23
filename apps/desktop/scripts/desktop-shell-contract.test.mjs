@@ -283,6 +283,10 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     mainSource,
     /<a class="secondary" href="\$\{appOrigin\}">Open Jovie<\/a>/
   );
+  assert.match(
+    mainSource,
+    /a:focus-visible \{ outline: 2px solid var\(--system-b-text-primary\); outline-offset: 3px; \}/
+  );
   assert.doesNotMatch(
     mainSource,
     /box-shadow: var\(--system-b-shadow-popover\)/
@@ -445,6 +449,12 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(tokenSource, /SYSTEM_B_DESKTOP_TOKENS/);
   assert.match(tokenSource, /backgroundColor: '#06070a'/);
   assert.match(tokenSource, /radiusPill: '999px'/);
+});
+
+test('application menu Preferences label uses one ellipsis', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  assert.match(mainSource, /label: 'Preferences…'/);
+  assert.doesNotMatch(mainSource, /label: 'Preferences\.\.\.'/);
 });
 
 test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark', async () => {
@@ -1505,7 +1515,13 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
   assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
   assert.match(globalsCss, /--electron-titlebar-height: 40px;/);
-  assert.match(globalsCss, /--electron-traffic-light-safe-width: 72px;/);
+  assert.match(globalsCss, /--electron-traffic-light-control-size: 14px;/);
+  assert.match(globalsCss, /--electron-traffic-light-clearance: 8px;/);
+  assert.match(globalsCss, /--electron-traffic-light-safe-width:\s*calc\(/);
+  assert.doesNotMatch(
+    globalsCss,
+    /--electron-traffic-light-safe-width:\s*\d+px;/
+  );
   assert.match(globalsCss, /--electron-traffic-light-x: 20px;/);
   assert.match(globalsCss, /--electron-traffic-light-y: 17px;/);
   assert.match(
@@ -1525,6 +1541,15 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     globalsCss,
     /grid-template-columns: var\(--linear-app-sidebar-width\)/
   );
+  // JOV-7740: the titlebar stays a flex row. A grid track must not return.
+  assert.match(
+    globalsCss,
+    /\[data-electron-titlebar="true"\] \{[^}]*display:\s*flex;/s
+  );
+  assert.match(
+    globalsCss,
+    /width:\s*calc\(var\(--app-shell-gap\)\s*\+\s*var\(--electron-sidebar-width\)\);/
+  );
   assert.match(
     titlebarSource,
     /data-testid='electron-traffic-light-safe-area'/
@@ -1538,6 +1563,10 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
   const webRoot = join(desktopRoot, '..', 'web');
   const globalsCss = await readFile(join(webRoot, 'app/globals.css'), 'utf8');
+  const designSystem = await readFile(
+    join(webRoot, 'styles/design-system.css'),
+    'utf8'
+  );
 
   // These values deliberately cross the native-window and hosted-renderer
   // boundary. The renderer must reserve enough room for the native controls;
@@ -1551,21 +1580,42 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
   const titlebarHeight = Number(
     globalsCss.match(/--electron-titlebar-height: (\d+)px;/)?.[1]
   );
-  const safeWidth = Number(
-    globalsCss.match(/--electron-traffic-light-safe-width: (\d+)px;/)?.[1]
+  const controlDiameter = Number(
+    globalsCss.match(/--electron-traffic-light-control-size: (\d+)px;/)?.[1]
   );
+  const trailingClearance = Number(
+    globalsCss.match(/--electron-traffic-light-clearance: (\d+)px;/)?.[1]
+  );
+  const shellGap = Number(
+    designSystem.match(/--app-shell-gap:\s*(\d+)px;/)?.[1]
+  );
+  const space2Rem = Number(
+    designSystem.match(/--space-2:\s*([\d.]+)rem;/)?.[1]
+  );
+  const iconGap = space2Rem * 16;
+  // Safe width is a calc of those tokens. The titlebar's padding-left is the
+  // shell gap, so the reserve is measured from the content origin:
+  // x - gap + 3 controls + 2 inter-light gaps + trailing clearance - icon gap.
+  const safeWidth =
+    x -
+    shellGap +
+    3 * controlDiameter +
+    2 * trailingClearance +
+    trailingClearance -
+    iconGap;
 
   assert.ok(Number.isFinite(x) && Number.isFinite(y));
   assert.ok(Number.isFinite(titlebarHeight) && Number.isFinite(safeWidth));
+  assert.equal(safeWidth, 70);
 
-  // macOS traffic-light controls are 14px wide. Keep an 8px trailing buffer
-  // so controls remain clear of interactive titlebar chrome at standard,
-  // minimum-width, resized, and full-screen window states.
-  const controlDiameter = 14;
-  const trailingClearance = 8;
+  // The first interactive control starts at window x = shell gap + reserve +
+  // the shared icon gap. That must clear the third traffic light plus the
+  // trailing buffer at every supported window size.
+  const lightsEnd = x + 3 * controlDiameter + 2 * trailingClearance;
+  const toggleStart = shellGap + safeWidth + iconGap;
   assert.ok(
-    safeWidth >= x + controlDiameter + trailingClearance,
-    `traffic-light reserve (${safeWidth}px) must contain x=${x}px + control + clearance`
+    toggleStart >= lightsEnd + trailingClearance,
+    `toggle window x (${toggleStart}px) must clear lights ending at ${lightsEnd}px plus ${trailingClearance}px`
   );
   assert.ok(
     titlebarHeight >= y + controlDiameter,

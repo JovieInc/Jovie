@@ -22,6 +22,11 @@ const approval: SummerCard = {
   comment: null,
   createdAt: '2026-10-10T12:00:00Z',
   decidedAt: null,
+  decideBy: '2026-10-12T12:00:00.000Z',
+  defaultDecision: 'reject',
+  resolution: null,
+  feedback: [],
+  feedbackAt: null,
 };
 const task: SummerKanbanCard = {
   workId: 'work_source-research',

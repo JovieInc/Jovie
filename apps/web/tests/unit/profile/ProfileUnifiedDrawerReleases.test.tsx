@@ -489,9 +489,11 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     const link = screen
       .getByTestId('profile-mode-drawer-releases')
       .querySelector('a');
-    expect(link?.getAttribute('aria-label')).toBe(
-      'View Aria Song by Collab Artist'
-    );
+    // Label-in-name (WCAG 2.5.3): the accessible name is the visible text,
+    // which already names the collaborator, so no overriding aria-label.
+    expect(link?.hasAttribute('aria-label')).toBe(false);
+    expect(link?.textContent).toContain('Aria Song');
+    expect(link?.textContent).toContain('Collab Artist');
   });
 
   it('omits the old catalog subtitle for the mock-faithful releases drawer', async () => {

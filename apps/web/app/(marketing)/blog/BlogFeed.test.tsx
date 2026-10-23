@@ -79,7 +79,7 @@ describe('BlogFeed', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Blog' })
     ).toBeVisible();
-    expect(screen.getByText('Posts coming soon.')).toBeVisible();
+    expect(screen.getByText('No posts published yet.')).toBeVisible();
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
   });
 

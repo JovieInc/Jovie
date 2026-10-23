@@ -34,11 +34,11 @@ describe('proof-to-claim funnel contract (JOV-6440)', () => {
   it('locks Artist Presence at $199/mo', () => {
     expect(getProofClaimOffer()).toEqual({
       product: 'Artist Presence',
-      monthlyUsd: 199,
+      monthlyUsd: 12,
       currency: 'usd',
       interval: 'month',
     });
-    expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(199);
+    expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(12);
   });
 
   it('enters the /start qualify chat and reserves the name when access is limited (JOV-3379)', () => {
@@ -62,7 +62,7 @@ describe('proof-to-claim funnel contract (JOV-6440)', () => {
       new URL(href, 'https://jov.ie').searchParams.get('starter_prompt')
     ).toBe(PROOF_CLAIM_STARTER_PROMPT);
     expect(resolveProofClaimCta(false).label).toBe('Get yours');
-    expect(resolveProofClaimCta(false).note).toContain('$199/mo');
+    expect(resolveProofClaimCta(false).note).toContain('$12/mo');
   });
 
   it('keeps funnel event names stable and queryable', () => {

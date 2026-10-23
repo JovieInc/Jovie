@@ -78,6 +78,7 @@ describe('ActionDial', () => {
     const dial = screen.getByRole('group', {
       name: 'Choose a streaming service',
     });
+    expect(dial.querySelector('div')).toHaveClass('h-53', 'min-h-53');
     dispatchTouchPointer(dial, 'pointerdown', 120);
     dispatchTouchPointer(dial, 'pointermove', 154);
     expect(screen.getByTestId('action-dial-icon-apple')).toHaveStyle({
@@ -406,7 +407,7 @@ describe('ActionDial', () => {
     expect(action).toBeDisabled();
     expect(action.className).toContain('top-3');
     expect(action.className).not.toContain('top-20');
-    expect(action.parentElement?.className).toContain('h-19');
+    expect(action.parentElement).toHaveClass('h-19', 'min-h-19');
     expect(action.parentElement?.className).not.toContain('h-53');
   });
 

@@ -1,0 +1,230 @@
+{
+  "schema": "jovie-api-providers/v1",
+  "priorities": {
+    "merge": { "class": "critical", "reserve": 0, "onLow": "wait" },
+    "deploy": { "class": "critical", "reserve": 0, "onLow": "wait" },
+    "repair": { "class": "critical", "reserve": 0, "onLow": "wait" },
+    "default": { "class": "normal", "reserve": 0.05, "onLow": "wait" },
+    "report": { "class": "background", "reserve": 0.15, "onLow": "shed" },
+    "poll": { "class": "background", "reserve": 0.25, "onLow": "shed" }
+  },
+  "defaults": {
+    "maxAttempts": 4,
+    "backoffBaseMs": 1000,
+    "backoffCapMs": 60000,
+    "timeoutMs": 20000,
+    "maxWaitMs": { "critical": 120000, "normal": 30000, "background": 0 },
+    "pace": { "burst": 10, "burstFraction": 0.1 },
+    "breaker": {
+      "failureThreshold": 5,
+      "failureWindowMs": 60000,
+      "cooldownBaseMs": 15000,
+      "cooldownMaxMs": 600000,
+      "probeLeaseMs": 30000,
+      "rateLimitCooldownMs": 60000
+    },
+    "staleCredentialMs": 7200000
+  },
+  "providers": {
+    "github": {
+      "hosts": ["api.github.com", "uploads.github.com"],
+      "defaultResource": "core",
+      "resourceRules": [
+        { "pathPrefix": "/graphql", "resource": "graphql" },
+        { "pathPrefix": "/search/", "resource": "search" }
+      ],
+      "budgetHeaders": [
+        {
+          "resourceHeader": "x-ratelimit-resource",
+          "limit": "x-ratelimit-limit",
+          "remaining": "x-ratelimit-remaining",
+          "reset": "x-ratelimit-reset",
+          "resetUnit": "epoch-s"
+        }
+      ],
+      "conditionalGet": true,
+      "minWriteIntervalMs": 1000,
+      "bodyRateLimitCodes": ["RATE_LIMITED"],
+      "primaryText": [
+        "API rate limit (already )?exceeded for",
+        "x-ratelimit-remaining: ?0\\b",
+        "github-quota-deferred"
+      ],
+      "secondaryText": [
+        "secondary rate limit",
+        "abuse (detection|rate limit)",
+        "HTTP 429",
+        "429 Too Many Requests"
+      ]
+    },
+    "linear": {
+      "hosts": ["api.linear.app"],
+      "defaultResource": "requests",
+      "costResources": ["complexity"],
+      "budgetHeaders": [
+        {
+          "resource": "requests",
+          "limit": "x-ratelimit-requests-limit",
+          "remaining": "x-ratelimit-requests-remaining",
+          "reset": "x-ratelimit-requests-reset",
+          "resetUnit": "epoch-ms"
+        },
+        {
+          "resource": "complexity",
+          "limit": "x-ratelimit-complexity-limit",
+          "remaining": "x-ratelimit-complexity-remaining",
+          "reset": "x-ratelimit-complexity-reset",
+          "resetUnit": "epoch-ms"
+        }
+      ],
+      "costHeader": "x-complexity",
+      "bodyRateLimitCodes": ["RATELIMITED"],
+      "primaryText": ["\\bRATELIMITED\\b"],
+      "secondaryText": []
+    },
+    "vercel": {
+      "hosts": ["api.vercel.com"],
+      "defaultResource": "requests",
+      "budgetHeaders": [
+        {
+          "resource": "requests",
+          "limit": "x-ratelimit-limit",
+          "remaining": "x-ratelimit-remaining",
+          "reset": "x-ratelimit-reset",
+          "resetUnit": "epoch-s"
+        }
+      ],
+      "primaryText": [],
+      "secondaryText": []
+    },
+    "sentry": {
+      "hosts": ["sentry.io"],
+      "pathPrefix": "/api/",
+      "defaultResource": "requests",
+      "budgetHeaders": [
+        {
+          "resource": "requests",
+          "limit": "x-sentry-rate-limit-limit",
+          "remaining": "x-sentry-rate-limit-remaining",
+          "reset": "x-sentry-rate-limit-reset",
+          "resetUnit": "epoch-s"
+        }
+      ],
+      "primaryText": [],
+      "secondaryText": []
+    },
+    "anthropic": {
+      "hosts": ["api.anthropic.com"],
+      "defaultResource": "requests",
+      "budgetHeaders": [
+        {
+          "resource": "requests",
+          "limit": "anthropic-ratelimit-requests-limit",
+          "remaining": "anthropic-ratelimit-requests-remaining",
+          "reset": "anthropic-ratelimit-requests-reset",
+          "resetUnit": "rfc3339"
+        }
+      ],
+      "primaryText": ["rate_limit_error"],
+      "secondaryText": ["overloaded_error"]
+    },
+    "openai": {
+      "hosts": ["api.openai.com"],
+      "defaultResource": "requests",
+      "budgetHeaders": [
+        {
+          "resource": "requests",
+          "limit": "x-ratelimit-limit-requests",
+          "remaining": "x-ratelimit-remaining-requests",
+          "reset": "x-ratelimit-reset-requests",
+          "resetUnit": "duration"
+        }
+      ],
+      "primaryText": ["rate_limit_exceeded"],
+      "secondaryText": []
+    },
+    "ai-gateway": {
+      "hosts": ["ai-gateway.vercel.sh"],
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": [],
+      "secondaryText": []
+    },
+    "apple-asc": {
+      "hosts": ["api.appstoreconnect.apple.com"],
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": [],
+      "secondaryText": []
+    },
+    "exa": {
+      "hosts": ["api.exa.ai"],
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": ["rate limit"],
+      "secondaryText": []
+    },
+    "firecrawl": {
+      "hosts": ["api.firecrawl.dev"],
+      "defaultResource": "requests",
+      "budgetHeaders": [
+        {
+          "resource": "requests",
+          "limit": "x-ratelimit-limit",
+          "remaining": "x-ratelimit-remaining",
+          "reset": "x-ratelimit-reset",
+          "resetUnit": "epoch-s"
+        }
+      ],
+      "primaryText": ["Rate limit exceeded"],
+      "secondaryText": []
+    },
+    "perplexity": {
+      "hosts": ["api.perplexity.ai"],
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": ["rate_limit"],
+      "secondaryText": []
+    },
+    "cloudflare": {
+      "hosts": ["api.cloudflare.com"],
+      "pathPrefix": "/client/v4/",
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": ["\\bRate limited\\b"],
+      "secondaryText": []
+    },
+    "hyperagent": {
+      "hosts": ["hyperagent.com"],
+      "pathPrefix": "/api/",
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": [],
+      "secondaryText": []
+    },
+    "xai-grok-cli": {
+      "hosts": [],
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": [
+        "rate.?limit(ed)? (exceeded|reached)",
+        "usage limit",
+        "quota (exceeded|exhausted)"
+      ],
+      "secondaryText": [
+        "HTTP 429",
+        "429 Too Many Requests",
+        "too many requests"
+      ]
+    },
+    "composio": {
+      "status": "blocked",
+      "blockedReason": "Composio Instant bills per call after the fact with no spend cap and keeps credentials outside config/registry (handoff composio-instant, 2026-10-21). Call paid APIs through their own provider entries.",
+      "hosts": ["backend.composio.dev"],
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": [],
+      "secondaryText": []
+    }
+  }
+}

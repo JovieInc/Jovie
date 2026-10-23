@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.art-direction-vision-judges/v1",
+  "mode": "shadow",
+  "promoteToBlocking": false,
+  "hamelFloors": {
+    "precisionMin": 0.9,
+    "recallMin": 0.8
+  },
+  "judges": ["polish", "hierarchy", "mockup-quality"]
+}

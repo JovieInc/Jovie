@@ -122,8 +122,12 @@ class CurrentLoginTest(Isolated):
         super().setUp()
         self.root = Path(self.tmp.name)
         self.cli = self.root / "codex"
+        # Pin one slot. An ambient CODEX_LANE_LOGIN_SLOTS above 1 makes
+        # test_real_metadata_child_retains_lease_until_delayed_reap loop in
+        # reap_current_metadata. Collection also scrubs the host value.
         self.env = patch.dict(os.environ, {
             "CODEX_LANE_AUTH_MODE": "current-login", "CODEX_LANE_CLI": str(self.cli),
+            "CODEX_LANE_LOGIN_SLOTS": "1",
             "CODEX_HOME": str(self.root / "existing-login"), "OPENAI_API_KEY": "must-not-reach-child",
             "OPENAI_BASE_URL": "https://unavailable.invalid", "CODEX_API_KEY": "must-not-reach-child",
         })
@@ -433,6 +437,10 @@ for line in sys.stdin:
 
     def test_real_metadata_child_retains_lease_until_delayed_reap(self):
         # The child needs no model calls: EOF ends the fake public protocol.
+        # Pin one slot. CODEX_LANE_LOGIN_SLOTS>1 lets lease() take a free slot,
+        # the assertion raises inside reap_current_metadata, and that helper
+        # retries the error until the runner times out. The release archive
+        # does not ship scripts/tests/conftest.py, so this pin is the contract.
         self.cli.write_text(f'''#!{sys.executable}
 import json, sys
 for line in sys.stdin:
@@ -456,17 +464,39 @@ for line in sys.stdin:
             proc.wait = delay_wait
             proc.kill = lambda: kill() if len(waits) >= 2 else None
             return proc
-        handle = codex.lease('current-login')
-        try:
-            with patch.object(codex.subprocess, 'Popen', side_effect=tracked):
-                codex.current_subscription_snapshot('current-login', lease_handle=handle)
-            self.assertEqual(len(waits), 3)
-            self.assertIsNone(codex.lease('current-login'))
-        finally:
-            handle.close()
-        again = codex.lease('current-login')
-        self.assertIsNotNone(again)
-        again.close()
+        with patch.dict(os.environ, {'CODEX_LANE_LOGIN_SLOTS': '1'}):
+            handle = codex.lease('current-login')
+            try:
+                with patch.object(codex.subprocess, 'Popen', side_effect=tracked):
+                    codex.current_subscription_snapshot('current-login', lease_handle=handle)
+                self.assertEqual(len(waits), 3)
+                self.assertIsNone(codex.lease('current-login'))
+            finally:
+                handle.close()
+            again = codex.lease('current-login')
+            self.assertIsNotNone(again)
+            again.close()
+
+    def test_widened_host_slots_still_leave_the_held_metadata_slot_exclusive_at_one(self):
+        # Same occupancy the delayed reap asserts, proved without spawning pytest.
+        # A release self-test tree has no conftest scrub; the pin above is what
+        # keeps reap from retrying a failed lease assertion.
+        with patch.dict(os.environ, {'CODEX_LANE_LOGIN_SLOTS': '5'}):
+            held = codex.lease('current-login')
+            extra = codex.lease('current-login')
+            try:
+                self.assertIsNotNone(held)
+                self.assertIsNotNone(extra)
+            finally:
+                held.close()
+                if extra is not None:
+                    extra.close()
+        with patch.dict(os.environ, {'CODEX_LANE_LOGIN_SLOTS': '1'}):
+            held = codex.lease('current-login')
+            try:
+                self.assertIsNone(codex.lease('current-login'))
+            finally:
+                held.close()
 
     def test_interruption_during_cleanup_reaps_before_propagating(self):
         proc = SimpleNamespace(poll=lambda: None, terminate=lambda: None, kill=lambda: None)

@@ -12,6 +12,8 @@
  * @see apps/web/proxy.ts
  * @see apps/web/tests/unit/middleware/proxy-behavioral.test.ts (callee behavior)
  */
+import 'next/dist/server/node-environment';
+import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
 import type { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
@@ -330,6 +332,33 @@ describe('proxy composition (critical)', () => {
         ? config.matcher[0]
         : config.matcher;
       expect(matcherPattern).toContain('_next');
+    });
+
+    it('skips the proxy for the same-origin alias decision endpoint (JOV-8338)', async () => {
+      // The proxy's alias fast path fetches /api/profile-alias-decision
+      // same-origin on every legacy alias hop. Running the proxy again on
+      // that fetch serializes a second Node proxy invocation inside the
+      // alias redirect whenever the CDN-cached decision is not served fresh.
+      const { config } = await import('@/proxy');
+      // Compile through Next's route parser, as the production build does.
+      const proxyRuns = (url: string) =>
+        unstable_doesMiddlewareMatch({ config, nextConfig: {}, url });
+
+      expect(proxyRuns('/api/profile-alias-decision')).toBe(false);
+      expect(proxyRuns('/api/profile-alias-decision/')).toBe(false);
+      expect(proxyRuns('/api/profile-alias-decision/extra')).toBe(false);
+      expect(
+        proxyRuns('/api/profile-alias-decision?username=dualipa&alias=listen')
+      ).toBe(false);
+      expect(proxyRuns('/api/profile-alias-decisionx')).toBe(true);
+      expect(proxyRuns('/api/profile-alias-decisions')).toBe(true);
+      expect(proxyRuns('/api/auth/session')).toBe(true);
+      expect(proxyRuns('/api/auth/session.json')).toBe(true);
+      expect(proxyRuns('/api/health/build-info')).toBe(true);
+      expect(proxyRuns('/api/trpc/edge')).toBe(true);
+      expect(proxyRuns('/trpc/profile.json')).toBe(true);
+      expect(proxyRuns('/dualipa/listen')).toBe(true);
+      expect(proxyRuns('/dualipa')).toBe(true);
     });
   });
 });

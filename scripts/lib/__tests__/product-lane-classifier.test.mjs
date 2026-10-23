@@ -202,6 +202,36 @@ describe('product lane classifier', () => {
     ).toBe(true);
   });
 
+  it('classifies the research router package as operations tooling', () => {
+    const receipt = classifyProductLanes([
+      'packages/research/router.ts',
+      'packages/research/package.json',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['operations']);
+    expect(
+      receipt.classifications.every(
+        item =>
+          item.rule === 'operations-research' &&
+          item.category === 'operations-tooling'
+      )
+    ).toBe(true);
+  });
+
+  it('classifies the shared API client package as operations tooling', () => {
+    const receipt = classifyProductLanes([
+      'packages/api-client/client.ts',
+      'packages/api-client/package.json',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['operations']);
+    expect(
+      receipt.classifications.every(
+        item =>
+          item.rule === 'operations-api-client' &&
+          item.category === 'operations-tooling'
+      )
+    ).toBe(true);
+  });
+
   it('keeps the allowlisted invariant addition operations-only', () => {
     const before = 'node scripts/invariants/validate.mjs';
     const receipt = pkg(

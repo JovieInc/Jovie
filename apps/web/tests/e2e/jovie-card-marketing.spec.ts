@@ -1,4 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { expect, test } from './setup';
 import { installPublicRouteMocks } from './utils/public-surface-helpers';
 
@@ -73,7 +74,13 @@ test.describe('Jovie Card marketing page', () => {
 
       const overflows = await page.evaluate(() =>
         Array.from(document.querySelectorAll<HTMLElement>('main *'))
-          .filter(element => element.scrollWidth > element.clientWidth + 1)
+          // clientWidth is always 0 for inline boxes; Firefox still reports
+          // their text scrollWidth, so only block-level boxes can overflow.
+          .filter(
+            element =>
+              getComputedStyle(element).display !== 'inline' &&
+              element.scrollWidth > element.clientWidth + 1
+          )
           .map(element => element.tagName)
           .slice(0, 5)
       );
@@ -100,7 +107,7 @@ test.describe('Jovie Card marketing page', () => {
       ).toBeVisible();
 
       const accessibility = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .options(wcag22AaAxeOptions())
         .analyze();
       expect(accessibility.violations).toEqual([]);
     });

@@ -43,12 +43,12 @@ describe('SidebarNavItem active chrome', () => {
       collapsed: true,
     });
 
-    expect(row).toContain('h-7');
+    expect(row).toContain('h-(--app-shell-sidebar-row-height)');
     expect(row).toContain('rounded-lg');
     expect(row).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
     expect(row).not.toContain('border-subtle');
     expect(icon).toContain('size-(--app-shell-sidebar-icon-size)');
-    expect(collapsedRow).toContain('h-7');
+    expect(collapsedRow).toContain('h-(--app-shell-sidebar-row-height)');
   });
 
   it('keeps long labels inside the grid and preserves keyboard focus chrome', () => {
@@ -103,6 +103,9 @@ describe('SidebarNavItem active chrome', () => {
 
     expect(row).toContain('w-fit');
     expect(row).not.toContain('w-full');
+    expect(row).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
+    expect(row).toContain('px-(--app-shell-sidebar-inset)');
+    expect(row).not.toContain('grid-cols-[18px');
   });
 
   // JOV-5537 consolidation: this row is a button, so it exposes the active

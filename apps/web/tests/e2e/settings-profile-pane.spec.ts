@@ -143,13 +143,48 @@ async function readPaneGeometry(page: Page) {
   });
 }
 
+/** Bounded idle-window sampler. `page.evaluate` has no deadline, so an
+ * unbounded rAF await here turns any renderer-side frame starvation into an
+ * opaque 180s test timeout at the test declaration; the in-page timer turns
+ * the same stall into a named 15s failure instead. */
+async function sampleIdleFrames(
+  page: Page,
+  frameBudget: number
+): Promise<void> {
+  await page.evaluate(
+    budget =>
+      Promise.race([
+        new Promise<void>(resolve => {
+          let frames = 0;
+          const sample = () => {
+            if (++frames >= budget) resolve();
+            else requestAnimationFrame(sample);
+          };
+          requestAnimationFrame(sample);
+        }),
+        new Promise((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  `renderer stopped servicing animation frames during the ${budget}-frame idle sample`
+                )
+              ),
+            15_000
+          )
+        ),
+      ]),
+    frameBudget
+  );
+}
+
 async function assertOpenPane(page: Page, testInfo: TestInfo, name: string) {
   // Observe a fixed window after the actual rail lifecycle settles. Never
   // poll until the centering assertion passes: a stable wrong layout is RED.
   const samples = [];
   for (let frame = 0; frame < 12; frame += 1) {
     samples.push(await readPaneGeometry(page));
-    await page.evaluate(() => new Promise(requestAnimationFrame));
+    await sampleIdleFrames(page, 1);
   }
   const result = samples.at(-1)!;
   const geometryPath = testInfo.outputPath(`${name}.json`);
@@ -272,17 +307,7 @@ async function assertReachable(page: Page) {
     scroll: element.closest('[data-testid="settings-shell-content"]')!
       .scrollTop,
   }));
-  await page.evaluate(
-    () =>
-      new Promise<void>(resolve => {
-        let frames = 0;
-        const sample = () => {
-          if (++frames >= 120) resolve();
-          else requestAnimationFrame(sample);
-        };
-        requestAnimationFrame(sample);
-      })
-  );
+  await sampleIdleFrames(page, 120);
   await expect(field).toBeFocused();
   expect(
     await field.evaluate((element: HTMLInputElement) => ({
@@ -343,17 +368,7 @@ async function assertMobileEditorAvailable(page: Page) {
   await expect(field).toBeFocused();
   // A ready document alone does not prove the opener's mount effect has run.
   // Keep the field focused through a bounded idle window and late renders.
-  await page.evaluate(
-    () =>
-      new Promise<void>(resolve => {
-        let frames = 0;
-        const sample = () => {
-          if (++frames >= 120) resolve();
-          else requestAnimationFrame(sample);
-        };
-        requestAnimationFrame(sample);
-      })
-  );
+  await sampleIdleFrames(page, 120);
   await expect(field).toBeFocused();
   await expect(
     page.getByRole('dialog', { name: 'Profile Preview' })
@@ -602,17 +617,7 @@ test('manual preview control keeps its pointer target and restores rail focus', 
     before.x + before.width / 2,
     before.y + before.height / 2
   );
-  await page.evaluate(
-    () =>
-      new Promise<void>(resolve => {
-        let frames = 0;
-        const sample = () => {
-          if (++frames >= 60) resolve();
-          else requestAnimationFrame(sample);
-        };
-        requestAnimationFrame(sample);
-      })
-  );
+  await sampleIdleFrames(page, 60);
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(toggle).toHaveAttribute('data-rail-pinned', 'false');
   const after = (await toggle.boundingBox())!;

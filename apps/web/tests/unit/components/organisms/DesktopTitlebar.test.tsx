@@ -75,6 +75,23 @@ describe('DesktopTitlebar', () => {
     document.documentElement.removeAttribute('data-desktop-built-at');
   });
 
+  it('keeps the sidebar toggle outside the window drag region', () => {
+    renderTitlebar();
+
+    const row = screen.getByTestId('electron-titlebar-row');
+    expect(row).not.toHaveAttribute('data-electron-drag-region');
+    expect(row).toHaveAttribute('data-electron-no-drag', 'true');
+    const toggle = screen.getByTestId('electron-sidebar-toggle');
+    expect(toggle.closest('[data-electron-drag-region="true"]')).toBeNull();
+    expect(screen.getByTestId('electron-titlebar-drag-strip')).toHaveAttribute(
+      'data-electron-drag-region',
+      'true'
+    );
+    expect(
+      screen.getByTestId('electron-traffic-light-safe-area')
+    ).toHaveAttribute('data-electron-drag-region', 'true');
+  });
+
   it('renders Electron titlebar navigation without duplicating sidebar notifications', () => {
     renderTitlebar();
 
@@ -87,6 +104,12 @@ describe('DesktopTitlebar', () => {
     expect(
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('electron-traffic-light-safe-area'));
+    expect(screen.getByTestId('electron-titlebar-sidebar-cell')).toHaveClass(
+      'gap-(--app-shell-sidebar-icon-gap)'
+    );
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).not.toHaveClass('px-2.5');
     expect(screen.getByTestId('electron-traffic-light-safe-area')).toHaveClass(
       'w-(--electron-traffic-light-safe-width)'
     );

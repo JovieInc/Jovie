@@ -166,6 +166,8 @@ export async function getOutboundReadiness(
     queue: queue
       ? {
           ready: queue.counts.ready,
+          needsEvidence: queue.counts.needs_evidence,
+          flagged: queue.counts.flagged,
           certified: queue.counts.certified,
           approved: queue.counts.approved,
           needsProfile: queue.rows.filter(

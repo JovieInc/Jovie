@@ -27,12 +27,15 @@ import {
   formatLaneDuration,
   LANE_COMMANDS,
   LANE_GROUPS,
+  LANES_PYTEST_FILES,
   LANES_PYTEST_SHARD_EXPRESSION,
+  LANES_PYTEST_SHARDS,
   listAllChangedFiles,
   MARKETING_CERTIFICATION_COMMAND,
   NODE_RUNTIME_CONTRACT_COMMAND,
   NODE_RUNTIME_CONTRACT_PATHS,
   OFFLINE_FAILURE_COVERAGE_COMMAND,
+  PEN_TOKEN_PARITY_COMMAND,
   runBiome,
   runCopyGate,
   runEslintServerBoundaries,
@@ -282,6 +285,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_brand_scrub.py',
       'scripts/tests/test_agent_workflow_hygiene.py',
       'scripts/tests/test_runner_routing.py',
+      'scripts/tests/test_signal_watch.py',
+      'scripts/tests/test_x_grok.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
@@ -315,15 +320,17 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
-  it('partitions the lanes coverage suite into complementary concurrent shards', () => {
-    // One coverage map used to come from one serial pytest (174.5s, the
-    // remaining job's long pole). Both shards must select the identical files
-    // with complementary -k expressions, both must pass, and their maps must
-    // be combined before any per-module threshold reads the data file.
+  it('partitions the lanes coverage suite into four balanced concurrent shards', () => {
+    // The lanes pytest is the remaining job's long pole (308.5s in merge group
+    // 39479966697). Every lanes test file must run exactly once across the
+    // shards: the two keyword shards split test_lane_runner.py with
+    // complementary -k expressions over that one file, and the other shards
+    // own disjoint whole files. All four maps are combined before any
+    // per-module threshold reads the data file.
     const [command] = STRUCTURAL_PYTHON_REGRESSION_COMMANDS;
     const shards = [
       ...command.matchAll(
-        /COVERAGE_FILE="([^"]+)" python3 -m coverage run --branch -m pytest ((?:scripts\/tests\/\S+\.py ?)+) -q -p no:cacheprovider --basetemp="([^"]+)" -k "([^"]+)"/gu
+        /COVERAGE_FILE="([^"]+)" python3 -m coverage run --branch -m pytest ((?:scripts\/tests\/\S+\.py ?)+) -q -p no:cacheprovider --basetemp="([^"]+)"(?: -k "([^"]+)")?/gu
       ),
     ].map(([, data, files, basetemp, keyword]) => ({
       data,
@@ -331,18 +338,27 @@ describe('ci-fast bounded parallel workflow', () => {
       basetemp,
       keyword,
     }));
-    expect(shards.map(shard => shard.keyword)).toEqual([
+    expect(shards).toHaveLength(LANES_PYTEST_SHARDS.length);
+    expect(shards).toHaveLength(4);
+    const keyed = shards.filter(shard => shard.keyword);
+    expect(keyed.map(shard => shard.keyword)).toEqual([
       LANES_PYTEST_SHARD_EXPRESSION,
       `not (${LANES_PYTEST_SHARD_EXPRESSION})`,
     ]);
-    expect(shards[1].files).toEqual(shards[0].files);
-    expect(shards[0].files).toContain('scripts/tests/test_lane_runner.py');
-    expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(2);
-    expect(command).toContain(
-      'lanes_b=$?; wait "$lanes_a" && test "$lanes_b" -eq 0; } && '
+    expect(keyed[1].files).toEqual(keyed[0].files);
+    expect(keyed[0].files).toEqual(['scripts/tests/test_lane_runner.py']);
+    // Whole-file shards plus the keyed file cover the suite exactly once.
+    const whole = shards.filter(shard => !shard.keyword).flatMap(s => s.files);
+    expect(new Set(whole).size).toBe(whole.length);
+    expect([...whole, ...keyed[0].files].sort()).toEqual(
+      [...LANES_PYTEST_FILES].sort()
     );
+    expect(LANES_PYTEST_FILES).toHaveLength(28);
+    expect(whole).toContain('scripts/tests/test_model_radar.py');
+    expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
+    expect(new Set(shards.map(shard => shard.data)).size).toBe(4);
     const combine = command.indexOf(
-      `python3 -m coverage combine "${shards[0].data}" "${shards[1].data}"`
+      `python3 -m coverage combine ${shards.map(shard => `"${shard.data}"`).join(' ')}`
     );
     expect(combine).toBeGreaterThan(-1);
     expect(command.indexOf('python3 -m coverage report')).toBeGreaterThan(
@@ -350,9 +366,9 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
-  it('fails the lanes coverage command when either shard fails', () => {
+  it('fails the lanes coverage command when any shard fails', () => {
     const [command] = STRUCTURAL_PYTHON_REGRESSION_COMMANDS;
-    for (const failing of ['a', 'b', '']) {
+    for (const failing of ['a', 'b', 'c', 'd', '']) {
       const root = mkdtempSync(join(tmpdir(), 'lanes-shards-'));
       try {
         const bin = join(root, 'bin');
@@ -371,8 +387,12 @@ describe('ci-fast bounded parallel workflow', () => {
           },
         });
         const calls = readFileSync(join(root, 'calls.log'), 'utf8');
+        // Every shard runs, even when an earlier one failed.
+        for (const id of ['a', 'b', 'c', 'd'])
+          expect(calls).toContain(`jovie-lanes-${id}.coverage -m coverage run`);
         if (failing) {
-          expect(result.status, failing).not.toBe(0);
+          // The failing shard's own exit status (9) is propagated.
+          expect(result.status, failing).toBe(9);
           expect(calls).not.toContain('-m coverage report');
         } else {
           expect(result.status, result.stderr).toBe(0);
@@ -905,6 +925,23 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(surfaces).toContain('--workers=2');
   });
 
+  it('runs destructive Button contrast proof through the guarded Storybook matrix', () => {
+    const surfaces = jobBlock(
+      'ci-storybook-surfaces',
+      'ci-cross-product-integration'
+    );
+    const invocation = surfaces.match(
+      /pnpm exec playwright test ([\s\S]*?)--config=playwright\.config\.storybook\.ts/
+    );
+    expect(invocation).not.toBeNull();
+    const selected =
+      invocation[1].match(/tests\/e2e\/storybook-[a-z0-9-]+\.spec\.ts/g) ?? [];
+    const contrast = 'tests/e2e/storybook-destructive-button.spec.ts';
+    expect(selected.filter(path => path === contrast)).toHaveLength(1);
+    expect(existsSync(resolve(REPO_ROOT, 'apps/web', contrast))).toBe(true);
+    expect(surfaces).toContain('guard-playwright-artifacts.mjs" --run --');
+  });
+
   it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
@@ -1025,6 +1062,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast',
       'merge-group-guards',
       'node-runtime-contracts',
+      'pen-token-parity',
       'profile-admission',
       'scripts-typecheck',
       'shadcn-lint-contracts',
@@ -1465,6 +1503,36 @@ describe('ci-fast bounded parallel workflow', () => {
     ].map(marker => warm.indexOf(marker));
     expect(order.every((at, i) => at > (order[i - 1] ?? 0))).toBe(true);
 
+    // Source Validation typechecks the same three web programs but previously
+    // started cold. It may only restore the main-scoped buildinfo (same
+    // fallbacks as tsc-cache-warm). It must not save: PR caches are invisible
+    // to merge_group and fill the Actions cache cap.
+    const sourceValidation = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
+      'utf8'
+    );
+    const svRestoreStart = sourceValidation.indexOf(
+      '- name: Restore web tsc incremental state'
+    );
+    const svContract = sourceValidation.indexOf(
+      '- name: Run deterministic source contract'
+    );
+    expect(svRestoreStart).toBeGreaterThan(-1);
+    expect(svRestoreStart).toBeLessThan(svContract);
+    const svRestore = sourceValidation.slice(svRestoreStart, svContract);
+    expect(svRestore).toContain(`uses: actions/cache/restore@${cacheSha}`);
+    expect(svRestore).toContain('path: apps/web/.cache/tsbuildinfo*\n');
+    expect(svRestore).toContain('id: web-tsbuildinfo');
+    expect(svRestore).not.toContain('actions/cache/save');
+    const [svKey, ...svFallbacks] = keys(svRestore).map(line => line.trim());
+    expect(svFallbacks).toEqual(warmFallbacks);
+    expect(
+      svKey.replace(/h\$\{\{ steps\.tsc-cache-hour\.outputs\.hour }}$/, '')
+    ).toBe(ciKey.replace('${{ github.sha }}', ''));
+    expect(
+      sourceValidation.match(/uses: actions\/cache\/save@/g) ?? []
+    ).toHaveLength(0);
+
     // The gate itself is unchanged: turbo never replays a cached verdict.
     expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');
   });
@@ -1559,6 +1627,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-system-source-ratchet',
       'design-exception-registry',
       'design-governance-enforcement',
+      'pen-token-parity',
       'design-conformance',
       'ios-fast',
       'profile-admission',
@@ -1607,6 +1676,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'copy-gate': COPY_GATE_COMMAND,
       'source-guards': SOURCE_GUARDS_COMMAND,
       'node-runtime-contracts': NODE_RUNTIME_CONTRACT_COMMAND,
+      'pen-token-parity': PEN_TOKEN_PARITY_COMMAND,
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
         ' && ' +
@@ -1827,7 +1897,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/tests/',
       'apps/web/styles/',
       'packages/ui/',
-      'chromatic\\.config\\.json$',
       'package\\.json$',
       'DESIGN\\.md$',
       'design\\.tokens\\.json$',
@@ -1953,7 +2022,10 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check'
+    );
+    expect(PACKAGE_JSON.scripts['ownership:check']).toBe(
+      'node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report'
     );
     const controlStages = buildControlTestCommands();
     expect(controlStages).toContainEqual([
@@ -2691,7 +2763,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/.storybook/main.ts',
       'apps/web/.storybook/preview.tsx',
       'apps/web/.storybook/stories/elevation-matrix.stories.tsx',
-      'chromatic.config.json',
     ]) {
       expect(selectsStructural.test(storybookHarnessPath)).toBe(true);
     }
@@ -2733,7 +2804,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
   });
 
-  it('runs hosted structural CI for Storybook, Chromatic, and token-guard inputs', () => {
+  it('runs hosted structural CI for Storybook and token-guard inputs', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -2765,7 +2836,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(
       uiRe.test('apps/web/.storybook/stories/elevation-matrix.stories.tsx')
     ).toBe(true);
-    expect(uiRe.test('chromatic.config.json')).toBe(true);
+    expect(uiRe.test('chromatic.config.json')).toBe(false);
     expect(uiRe.test('scripts/shared-ui-visual-arbitrary-audit.mjs')).toBe(
       true
     );

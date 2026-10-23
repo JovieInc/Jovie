@@ -130,7 +130,8 @@ const ZERO_BASELINE_SOURCE_CONTRACT = {
     'focus-visible:shadow-sm',
   ],
   'packages/ui/atoms/button.tsx': [
-    'text-error-foreground',
+    'bg-btn-destructive',
+    'text-btn-destructive-foreground',
     'active:scale-press',
   ],
   'packages/ui/atoms/progress.tsx': ['animate-progress-indeterminate'],
