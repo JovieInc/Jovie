@@ -197,6 +197,30 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
+    // Art-direction ratchets (one accent, hue, plates, surface media, hero
+    // scroll, shadow vision judges). prOnly: merge groups run the same
+    // checks via web unit tests. Path-filtered so product-only diffs skip it.
+    // The glob wires every art-direction unit test, including ones added later.
+    id: 'art-direction',
+    command:
+      'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/*.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|scripts\/invariants\/art-direction\/)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
+    // Tim 2026-10-22 21:00 PT: no ICP-specific language on the homepage and
+    // general pages. Audience routes are an explicit allowlist. The recorded
+    // violation set only shrinks. prOnly is false so merge groups fail closed
+    // on the same guard once this command is on the trusted base.
+    id: 'icp-language',
+    command:
+      'node scripts/invariants/icp-language/check.mjs && node --test --test-isolation=none scripts/invariants/icp-language/icp-language.test.mjs',
+    inputs:
+      /^(?:apps\/web\/(?:app\/(?:\(home\)|\(marketing\)|brand\/|layout\.tsx$|manifest\.ts$|llms(?:-full)?\.txt\/)|components\/(?:homepage|marketing|site|organisms|features\/home)\/|data\/|content\/|lib\/(?:config\/plan-prices\.ts$|billing\/offer-truth\.ts$))|scripts\/invariants\/icp-language\/|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // Third-party API calls go through packages/api-client / scripts/apiclient
     // (.claude/rules/external-apis.md). A new provider host, SDK client or gh
     // call in any scanned source fails here; grandfathered sites only shrink.
@@ -289,6 +313,8 @@ export const SOURCE_GUARDS_COMMAND = SOURCE_GUARDS.map(
 
 export const NODE_RUNTIME_CONTRACT_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/node-runtime-policy.test.ts tests/unit/ci/node-runtime-contract.test.ts tests/unit/ci/runner-setup-action.test.ts';
+export const PEN_TOKEN_PARITY_COMMAND =
+  'pnpm exec node --test scripts/invariants/pen-token-parity.test.mjs && pnpm exec node scripts/invariants/pen-token-parity.mjs';
 export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
   'apps/web/vitest.config.ci-contracts.mts',
   'apps/web/vitest.config.fast.mts',
@@ -629,8 +655,11 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/test-file-dependencies.test.mjs',
   'scripts/gate-ladder/gate-ladder.test.mjs',
   'scripts/homepage-screenshot-output.test.mjs',
+  'scripts/invariants/art-direction/hue.test.mjs',
   'scripts/hooks/pre-push-gate.test.mjs',
+  'scripts/invariants/art-direction/hero-scroll.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
+  'scripts/invariants/art-direction/images.test.mjs',
   'scripts/invariants/assurance-matrix.test.mjs',
   'scripts/invariants/browser-owned-input.test.mjs',
   'scripts/invariants/founder-calibration.test.mjs',
@@ -652,6 +681,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-victim-rearm.test.mjs',
   'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
   'scripts/hold-contract.test.mjs',
+  'scripts/invariants/art-direction/surface-media.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',
   'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',
@@ -708,6 +738,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/mesh-runtime-bundle.test.mjs',
   'scripts/lib/__tests__/mesh-current-wire.test.mjs',
   'scripts/lib/__tests__/summer-improvement-loop-config.test.mjs',
+  'scripts/lib/__tests__/merge-group-ahead-attribution.test.mjs',
   'scripts/lib/__tests__/review-deadline.test.mjs',
   'scripts/lib/__tests__/blog-content-ci.test.mjs',
   'scripts/lib/__tests__/api-quota-report.test.mjs',
@@ -730,6 +761,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/changelog-parser.test.mjs',
   'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/vitest-orphan-inventory.test.mjs',
+  'scripts/lib/__tests__/gate-config-consistency.test.mjs',
   'scripts/lib/__tests__/claim-dogfood-report.test.mjs',
   'scripts/lib/__tests__/claim-test-environment.test.mjs',
   'scripts/lib/__tests__/codeowners-drift.test.mjs',
@@ -924,6 +956,12 @@ const LANES = [
     run: runDesignGovernanceEnforcement,
   },
   {
+    id: 'pen-token-parity',
+    name: 'Pen token parity',
+    nextLocalCommand: PEN_TOKEN_PARITY_COMMAND,
+    run: runPenTokenParity,
+  },
+  {
     id: 'design-conformance',
     name: 'Design Conformance',
     nextLocalCommand: 'pnpm design:conformance:gate',
@@ -1013,6 +1051,7 @@ export const LANE_GROUPS = Object.freeze({
     'design-system-source-ratchet',
     'design-exception-registry',
     'design-governance-enforcement',
+    'pen-token-parity',
     'ios-fast',
     'billing-coverage',
     'copy-gate',
@@ -2000,6 +2039,18 @@ function runDesignGovernanceEnforcement() {
     };
   }
   return shell(LANE_COMMANDS['design-governance-enforcement']);
+}
+
+function runPenTokenParity() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Pen token parity skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
+  return shell(PEN_TOKEN_PARITY_COMMAND);
 }
 
 /**

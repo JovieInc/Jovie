@@ -2198,6 +2198,78 @@ exit 9
     expect(run.result.stderr).not.toContain('unexpected merge-queue read');
   });
 
+  it('yields an unreadable pre-mutation generation instead of failing the wave', () => {
+    const fixture = makeFixture('coalesce-unreadable-');
+    stubCommand(
+      fixture.bin,
+      'bash',
+      `#!/bin/sh
+case "$1" in
+  *resolve-main-sha.sh) printf '%s\\n' '${NEWER_SHA}' ;;
+  *release-lineage-gate.sh) printf 'decision=error\\n'; exit 1 ;;
+  -c) exec /bin/bash "$@" ;;
+  *) echo "unexpected bash: $*" >&2; exit 2 ;;
+esac
+`
+    );
+    const script = getStepRunScript(
+      getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
+      'Evaluate event-driven supersession'
+    );
+    const result = runScript(script, fixture, {
+      EXPECTED_SHA,
+      FIXED_WINDOW_SECONDS_REPLACED: '60',
+      GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
+      PRODUCTION_STARVATION_SECONDS: '5400',
+      REPOSITORY: 'JovieInc/Jovie',
+      RESOLVE_MAIN_BUDGET_SECONDS: '5',
+      RESOLVE_MAIN_RETRY_SECONDS: '0',
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain(
+      'lineage unreadable before evaluation; yielding without mutation'
+    );
+    expect(parseOutputs(fixture.output)).toMatchObject({
+      is_current: 'false',
+      decision: 'superseded',
+    });
+    expect(result.stdout).not.toContain('mutation-authorized');
+  });
+
+  it('still fails the wave when the pre-mutation gate crashes without a decision', () => {
+    const fixture = makeFixture('coalesce-crash-');
+    stubCommand(
+      fixture.bin,
+      'bash',
+      `#!/bin/sh
+case "$1" in
+  *resolve-main-sha.sh) printf '%s\\n' '${NEWER_SHA}' ;;
+  *release-lineage-gate.sh) echo 'boom' >&2; exit 1 ;;
+  -c) exec /bin/bash "$@" ;;
+  *) echo "unexpected bash: $*" >&2; exit 2 ;;
+esac
+`
+    );
+    const script = getStepRunScript(
+      getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
+      'Evaluate event-driven supersession'
+    );
+    const result = runScript(script, fixture, {
+      EXPECTED_SHA,
+      FIXED_WINDOW_SECONDS_REPLACED: '60',
+      GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
+      PRODUCTION_STARVATION_SECONDS: '5400',
+      REPOSITORY: 'JovieInc/Jovie',
+      RESOLVE_MAIN_BUDGET_SECONDS: '5',
+      RESOLVE_MAIN_RETRY_SECONDS: '0',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain(
+      'Release lineage gate failed before evaluation (exit=1).'
+    );
+    expect(result.stdout).not.toContain('yielding without mutation');
+  });
+
   it('still fails closed when main stays unreadable', () => {
     const run = runCoalesce(9);
     expect(run.result.status).toBe(1);

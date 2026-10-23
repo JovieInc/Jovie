@@ -1,3 +1,6 @@
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { performance } from 'node:perf_hooks';
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveProfileModeAliasAtEdge } from '@/lib/routing/profile-alias-edge';
@@ -164,6 +167,93 @@ describe('resolveProfileModeAliasAtEdge', () => {
     ).resolves.toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('keeps a cold decision fetch alive after the 250ms budget so the next hop is cached', async () => {
+    vi.unstubAllGlobals();
+    const coldOriginMs = 600;
+    const cachedOriginMs = 15;
+    let completedResponses = 0;
+    const server: Server = createServer((request, response) => {
+      const delay = completedResponses === 0 ? coldOriginMs : cachedOriginMs;
+      const timer = setTimeout(() => {
+        if (response.writableEnded || request.destroyed) return;
+        completedResponses += 1;
+        response.writeHead(200, {
+          'cache-control': 'public, s-maxage=15, stale-while-revalidate=285',
+          'content-type': 'application/json',
+        });
+        response.end(
+          JSON.stringify({ href: '/dualipa?mode=listen', kind: 'mode' })
+        );
+      }, delay);
+      // A client abort cancels the origin the way the old 250ms
+      // AbortSignal did, so the response is never stored.
+      request.on('close', () => {
+        if (!response.writableEnded) clearTimeout(timer);
+      });
+    });
+    await new Promise<void>(resolve => {
+      server.listen(0, '127.0.0.1', () => resolve());
+    });
+    const port = (server.address() as AddressInfo).port;
+    const origin = `http://127.0.0.1:${port}`;
+
+    try {
+      const aborted = new AbortController();
+      const abortTimer = setTimeout(() => aborted.abort(), 250);
+      const abortedRequest = fetch(
+        `${origin}/api/profile-alias-decision?username=dualipa&alias=listen`,
+        { signal: aborted.signal }
+      );
+      await expect(abortedRequest).rejects.toThrow();
+      clearTimeout(abortTimer);
+      expect(completedResponses).toBe(0);
+
+      const background: Promise<unknown>[] = [];
+      const startedAt = performance.now();
+      const first = await resolveProfileModeAliasAtEdge(
+        aliasRequest('/dualipa/listen', origin),
+        'dualipa',
+        'listen',
+        promise => {
+          background.push(promise);
+        }
+      );
+      const firstMs = performance.now() - startedAt;
+      expect(first).toBeNull();
+      expect(firstMs).toBeGreaterThan(200);
+      expect(firstMs).toBeLessThan(500);
+      expect(completedResponses).toBe(0);
+      await Promise.all(background);
+      expect(completedResponses).toBe(1);
+
+      const secondStartedAt = performance.now();
+      const second = await resolveProfileModeAliasAtEdge(
+        aliasRequest('/dualipa/listen', origin),
+        'dualipa',
+        'listen'
+      );
+      const secondMs = performance.now() - secondStartedAt;
+      expect(second?.status).toBe(307);
+      const location = new URL(second?.headers.get('location') ?? '');
+      expect(location.pathname).toBe('/dualipa');
+      expect(location.search).toBe('?mode=listen');
+      expect(secondMs).toBeLessThan(150);
+      expect(completedResponses).toBe(2);
+      console.info(
+        JSON.stringify({
+          abortedAt250MsStored: false,
+          coldOriginMs,
+          firstNavigationMs: Math.round(firstMs),
+          secondNavigationMs: Math.round(secondMs),
+        })
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close(error => (error ? reject(error) : resolve()));
+      });
+    }
+  }, 10_000);
 
   it('forwards the visitor cookie header for protected deployments', async () => {
     fetchMock.mockResolvedValue(
