@@ -198,6 +198,15 @@ export const MARKETING_PAGE_CONTRACTS = {
     successEvent: 'visitor sets a release date and a reveal date',
     primaryCta: START_CTA,
   },
+  '(marketing)/product/dsp-links/page.tsx': {
+    routeGlob: '(marketing)/product/dsp-links/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_DSP_LINKS,
+    job: 'store one outbound link per service',
+    proof: 'live service rows with saved links and a Find action',
+    successEvent: 'visitor opens a saved service link',
+    primaryCta: START_CTA,
+  },
   '(marketing)/product/isrc/page.tsx': {
     routeGlob: '(marketing)/product/isrc/page.tsx',
     copyScope: 'shared',
@@ -205,6 +214,15 @@ export const MARKETING_PAGE_CONTRACTS = {
     job: 'store one primary ISRC on a release and one code on each track',
     proof: 'live ISRC field with a release code and a track code',
     successEvent: 'visitor saves a valid ISRC',
+    primaryCta: START_CTA,
+  },
+  '(marketing)/product/link-analytics/page.tsx': {
+    routeGlob: '(marketing)/product/link-analytics/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_LINK_ANALYTICS,
+    job: 'show click totals, the recent window, and the top provider for a smart link',
+    proof: 'live smart-link analytics panel with a fixed click count',
+    successEvent: 'visitor reads the click total and the top provider',
     primaryCta: START_CTA,
   },
   '(marketing)/card/page.tsx': {

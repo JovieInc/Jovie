@@ -134,11 +134,15 @@ describe('HomepageArtistHero', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       HOMEPAGE_COPY.hero.headline
     );
-    expect(screen.getByRole('link', { name: 'Sign in' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Jovie' })).toBeTruthy();
-    expect(
-      document.querySelector('.homepage-hero-canvas__brand')
-    ).not.toBeNull();
+    // PublicPageShell owns navigation; the hero keeps one claim form.
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Jovie' })).toBeNull();
+    expect(screen.getAllByTestId('homepage-claim-form')).toHaveLength(1);
+    expect(screen.getByTestId('homepage-claim-form')).toHaveAttribute(
+      'action',
+      '/start'
+    );
     const light = screen.getByTestId('homepage-hero-light');
     expect(light).toHaveAttribute('data-renderer', 'css');
     expect(light.querySelector('canvas')).toBeNull();

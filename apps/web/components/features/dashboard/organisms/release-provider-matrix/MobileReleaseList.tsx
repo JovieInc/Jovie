@@ -264,7 +264,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
           <div className='flex items-center gap-1.5'>
             <TruncatedText
               lines={1}
-              className={shellReleaseRowTypography.title}
+              className={shellReleaseRowTypography.titleClassName}
             >
               {release.title}
             </TruncatedText>
@@ -274,7 +274,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
               className={mobileReleaseTokens.row.typeBadge}
             />
           </div>
-          <div className={shellReleaseRowTypography.subtitle}>
+          <div className={shellReleaseRowTypography.subtitleClassName}>
             {artistLine && <span>{artistLine}</span>}
             {artistLine && year && (
               <span className={mobileReleaseTokens.row.dot}>{' \u00B7 '}</span>

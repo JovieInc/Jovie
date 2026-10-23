@@ -1,0 +1,16 @@
+.link-analytics-stage {
+  min-height: 100svh;
+}
+
+.link-analytics-glow {
+  height: 28rem;
+}
+
+.link-analytics-card {
+  margin-bottom: -5.5rem;
+  padding-bottom: 7.5rem;
+}
+
+.link-analytics-title {
+  text-wrap: balance;
+}

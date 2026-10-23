@@ -85,7 +85,9 @@ vi.mock('@/lib/analytics', async importOriginal => ({
 import { JovieCardLanding } from '@/app/(marketing)/card/JovieCardLanding';
 import DownloadPage from '@/app/(marketing)/download/page';
 import { InstantMerchLanding } from '@/app/(marketing)/instant-merch/InstantMerchLanding';
+import { DspLinksLanding } from '@/app/(marketing)/product/dsp-links/DspLinksLanding';
 import { IsrcLanding } from '@/app/(marketing)/product/isrc/IsrcLanding';
+import { LinkAnalyticsLanding } from '@/app/(marketing)/product/link-analytics/LinkAnalyticsLanding';
 import { ProductLanding } from '@/app/(marketing)/product/ProductLanding';
 import { ReleaseSchedulingLanding } from '@/app/(marketing)/product/release-scheduling/ReleaseSchedulingLanding';
 import { UtmLinksLanding } from '@/app/(marketing)/product/utm-links/UtmLinksLanding';
@@ -173,10 +175,12 @@ const RENDERERS: Readonly<Record<string, () => ReactElement>> = {
   '(marketing)/voice/page.tsx': () => <VoicePageContent />,
   '(marketing)/instant-merch/page.tsx': () => <InstantMerchLanding />,
   '(marketing)/youtube-thumbnails/page.tsx': () => <YoutubeThumbnailsLanding />,
+  '(marketing)/product/link-analytics/page.tsx': () => <LinkAnalyticsLanding />,
   '(marketing)/product/page.tsx': () => <ProductLanding />,
   '(marketing)/product/release-scheduling/page.tsx': () => (
     <ReleaseSchedulingLanding />
   ),
+  '(marketing)/product/dsp-links/page.tsx': () => <DspLinksLanding />,
   '(marketing)/product/utm-links/page.tsx': () => <UtmLinksLanding />,
   '(marketing)/product/isrc/page.tsx': () => <IsrcLanding />,
   '(marketing)/card/page.tsx': () => <JovieCardLanding />,
