@@ -3250,8 +3250,7 @@ jobs:
           cp -r apps/web/public apps/web/.next/standalone/apps/web/public
       - name: Enforce authed route initial JS budgets
         # Deterministic gzip sizes from the build manifests; a few seconds.
-        # /app uses the client-reference ratchet. Other routes use first-load
-        # JS. Both ceilings live in apps/web/scripts/route-js-budgets.json.
+        # Ratchet lives in apps/web/scripts/route-js-budgets.json.
         run: node apps/web/scripts/route-js-budget.mjs --next-dir apps/web/.next
       - name: Certify marketing SEO against prerendered HTML
         # JOV-7277: reads .next/server/app/*.html from the build above (no

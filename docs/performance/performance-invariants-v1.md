@@ -19,26 +19,12 @@ Rows 1–4 define certified surfaces; row 5 numbers are citable targets only. Wh
 sources disagree, the stricter number governs and the file is named in the audit report.
 The only current row 1 advisory exceptions are bounded by the graduation policy below.
 
-Per-route first-load JS gzip is a separate blocking gate. After `next build`,
-`apps/web/scripts/route-js-budget.mjs` compares the build manifests with
-`apps/web/scripts/route-js-budgets.json`. `/app` keeps the client-reference
-ratchet. Other app routes use first-load JS gzip. Homepage, product, and
-feature pages use the tightest ceiling; unlisted routes use the default.
-Numbers only shrink. A higher number fails unless that key's `raises` entry
-passes the design-exception-registry gate-weakening override and is unexpired.
-Row 5 targets stay unwired.
-
-Routes measured over those ceilings on the 2026-10-23 head keep an explicit
-`firstLoad.baselines` ratchet. Each value is the measured gzip KB rounded up
-by at most 2% (`floor(measured * 1.02)`) and is the enforced ceiling. It can
-only go down. Raising `firstLoad.baselines.<route>` fails unless
-`raises["firstLoad.baselines.<route>"]` is an unexpired design-exception-registry
-gate-weakening override. A route that is not listed keeps its normal ceiling.
-Delete a baseline once a build is at or under its target.
-
-These baselines are the last CI measurements, taken before the deferred chunks
-below. The deferrals do not change the targets. The next measured build should
-lower a baseline when the route actually shrinks.
+`apps/web/scripts/route-js-budget.mjs` blocks finished builds on per-route gzip
+budgets. Marketing targets are tighter; unlisted routes use the default.
+Targets and measured baselines shrink; raises require an unexpired registry
+override for the exact key. Initial measurements (2026-10-23) allow at most 2%
+headroom. Lower baselines after reductions and delete them at the target.
+Profiles remain visible in server HTML before JavaScript. Row 5 stays unwired.
 
 | Route | Measured KB | Baseline KB | Target KB |
 | --- | ---: | ---: | ---: |
@@ -52,11 +38,6 @@ lower a baseline when the route actually shrinks.
 | `/demo/audience` | 847 | 863 | 800 |
 | `/demo` | 815 | 831 | 800 |
 | `/` | 650 | 663 | 640 |
-
-`/` defers the header user menu. `/[username]` and its profile-mode-render
-re-export defer `ProfileCompactTemplate`. `/start` defers `OnboardingShell`
-until conversation history has loaded. Demo and exp routes stay on the ratchet
-because they are intentionally heavy fixtures.
 
 ## Public-profile alias graduation
 

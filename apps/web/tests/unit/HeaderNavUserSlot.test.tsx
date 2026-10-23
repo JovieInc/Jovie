@@ -2,9 +2,10 @@ import { render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
+import { UserButton } from '@/components/organisms/user-button';
 import { APP_ROUTES } from '@/constants/routes';
 
-// Clerk hooks are pulled transitively by AuthActions; the signed-out
+// Clerk hooks are pulled transitively by UserButton/AuthActions; the signed-out
 // defaults are enough because MobileNav itself is mocked to capture the slot.
 vi.mock('@clerk/nextjs', () => ({
   useAuth: () => ({ isLoaded: true, isSignedIn: false, userId: null }),
@@ -41,8 +42,8 @@ describe('HeaderNav authenticated mobile user slot', () => {
       settingsHref?: string;
     }>;
     // JOV-5349: production must render the design-system showUserInfo variant,
-    // not the bare compact avatar default. The slot is the deferred UserButton,
-    // so the props are what the loader receives.
+    // not the bare compact avatar default.
+    expect(slot.type).toBe(UserButton);
     expect(slot.props.showUserInfo).toBe(true);
     expect(slot.props.settingsHref).toBe(APP_ROUTES.SETTINGS);
   });

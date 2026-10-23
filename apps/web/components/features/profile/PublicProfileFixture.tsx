@@ -1,6 +1,5 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { PublicClaimBanner } from '@/app/[username]/_components/PublicClaimBanner';
 import {
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
@@ -10,16 +9,8 @@ import {
   HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS,
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
 } from '@/components/features/home/homepage-profile-preview-fixture';
+import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
-
-// Same profile island as StaticArtistPage, deferred off the public first-load.
-const ProfileCompactTemplate = dynamic(
-  () =>
-    import('@/features/profile/templates/ProfileCompactTemplate').then(mod => ({
-      default: mod.ProfileCompactTemplate,
-    })),
-  { loading: () => null }
-);
 
 export interface PublicProfileFixtureProps {
   readonly longName?: boolean;

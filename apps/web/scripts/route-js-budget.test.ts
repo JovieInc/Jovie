@@ -10,8 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  baselineFromMeasurement,
-  ceilingFromMeasurement,
+  BASELINE_HEADROOM_RATIO,
   checkBudgets,
   checkFirstLoadBudgets,
   evaluateBudgets,
@@ -120,17 +119,7 @@ describe('route-js-budget', () => {
   it('ships budgets that name only real, stricter-than-default routes', () => {
     const budgets = JSON.parse(
       readFileSync(join(__dirname, 'route-js-budgets.json'), 'utf8')
-    ) as {
-      defaultMaxGzipKb: number;
-      routes: Record<string, number>;
-      firstLoad: {
-        marketingMaxGzipKb: number;
-        defaultMaxGzipKb: number;
-        headroomKb: number;
-        routes: Record<string, number>;
-        baselines: Record<string, number>;
-      };
-    };
+    ) as ReturnType<typeof firstLoadBudgets>;
 
     expect(budgets.defaultMaxGzipKb).toBeGreaterThan(0);
     for (const [route, kb] of Object.entries(budgets.routes)) {
@@ -149,19 +138,14 @@ describe('route-js-budget', () => {
     expect(budgets.firstLoad.defaultMaxGzipKb).toBe(800);
     expect(budgets.defaultMaxGzipKb).toBe(900);
     expect(budgets.firstLoad.routes['/']).toBe(640);
-    expect(budgets.firstLoad.baselines).toEqual({
-      '/demo/showcase/[surface]': baselineFromMeasurement(1284),
-      '/start': baselineFromMeasurement(1223),
-      '/demo/founder-video': baselineFromMeasurement(1157),
-      '/exp/shell-v1': baselineFromMeasurement(947),
-      '/[username]': baselineFromMeasurement(883),
-      '/[username]/profile-mode-render/[profileMode]/[marker]':
-        baselineFromMeasurement(883),
-      '/exp/page-builder': baselineFromMeasurement(881),
-      '/demo/audience': baselineFromMeasurement(847),
-      '/demo': baselineFromMeasurement(815),
-      '/': baselineFromMeasurement(650),
-    });
+    expect(budgets.firstLoad.baselines).toEqual(
+      Object.fromEntries(
+        Object.entries(MEASURED_BASELINES).map(([route, kb]) => [
+          route,
+          Math.floor(kb * (1 + BASELINE_HEADROOM_RATIO)),
+        ])
+      )
+    );
     expect(grownBudgetNumbers(budgets, budgets)).toEqual([]);
     const ancestor = readBudgetAncestor(join(__dirname, '../..'), {
       fetch: false,
@@ -192,6 +176,19 @@ describe('route-js-budget', () => {
   });
 });
 
+const MEASURED_BASELINES = {
+  '/demo/showcase/[surface]': 1284,
+  '/start': 1223,
+  '/demo/founder-video': 1157,
+  '/exp/shell-v1': 947,
+  '/[username]': 883,
+  '/[username]/profile-mode-render/[profileMode]/[marker]': 883,
+  '/exp/page-builder': 881,
+  '/demo/audience': 847,
+  '/demo': 815,
+  '/': 650,
+};
+
 const NOW = new Date('2026-10-22T00:00:00.000Z');
 
 function firstLoadBudgets() {
@@ -206,9 +203,7 @@ function firstLoadBudgets() {
       routes: { '/': 32, '/product': 32 } as Record<string, number>,
       baselines: {} as Record<string, number>,
     },
-    raises: undefined as
-      | Record<string, ReturnType<typeof validRaise>>
-      | undefined,
+    raises: {} as Record<string, ReturnType<typeof validRaise>>,
   };
 }
 
@@ -235,6 +230,10 @@ function judge(
     ancestor,
     now: NOW,
   });
+}
+
+function growth(next: object, previous: object) {
+  return grownBudgetNumbers(next, previous, NOW).join('\n');
 }
 
 function buildFirstLoadFixture() {
@@ -264,14 +263,18 @@ function buildFirstLoadFixture() {
 }
 
 describe('first-load JS budgets', () => {
-  it('adds a fixed headroom to a measured size', () => {
+  it('keeps fixed headroom and recorded baselines within two percent of measured sizes', () => {
     expect(HEADROOM_KB).toBe(16);
-    expect(ceilingFromMeasurement(100)).toBe(116);
-    expect(baselineFromMeasurement(1284)).toBe(1309);
-    expect(baselineFromMeasurement(650)).toBe(663);
-    expect(baselineFromMeasurement(650)).toBeLessThanOrEqual(
-      Math.floor(650 * 1.02)
+    expect(BASELINE_HEADROOM_RATIO).toBe(0.02);
+    const { firstLoad } = JSON.parse(
+      readFileSync(join(__dirname, 'route-js-budgets.json'), 'utf8')
     );
+    for (const [route, kb] of Object.entries(MEASURED_BASELINES)) {
+      expect(firstLoad.baselines[route]).toBeGreaterThanOrEqual(kb);
+      expect(firstLoad.baselines[route]).toBeLessThanOrEqual(
+        Math.floor(kb * 1.02)
+      );
+    }
     expect(isMarketingRoute('/solutions/artists', ['/solutions/*'])).toBe(true);
     expect(isMarketingRoute('/about', ['/', '/product'])).toBe(false);
   });
@@ -287,14 +290,14 @@ describe('first-load JS budgets', () => {
       budgets.firstLoad
     );
     expect(result.violations).toEqual([]);
-    expect(result.rows.find(row => row.route === '/')?.budgetKb).toBe(32);
-    expect(result.rows.find(row => row.route === '/product')?.budgetKb).toBe(
-      32
-    );
     expect(
-      result.rows.find(row => row.route === '/solutions/[audience]')?.budgetKb
-    ).toBe(32);
-    expect(result.rows.find(row => row.route === '/about')?.budgetKb).toBe(80);
+      Object.fromEntries(result.rows.map(row => [row.route, row.budgetKb]))
+    ).toEqual({
+      '/': 32,
+      '/product': 32,
+      '/solutions/[audience]': 32,
+      '/about': 80,
+    });
     expect(judge(budgets, rows).ok).toBe(true);
   });
 
@@ -350,15 +353,10 @@ describe('first-load JS budgets', () => {
       'firstLoad.routes./': validRaise(),
       'firstLoad.routes./product': validRaise(),
     };
-    expect(
-      gateWeakeningOverrideApplies(grown.raises['firstLoad.routes./'], NOW)
-    ).toBe(true);
-    expect(
-      gateWeakeningOverrideApplies(
-        grown.raises['firstLoad.marketingMaxGzipKb'],
-        NOW
-      )
-    ).toBe(false);
+    expect(gateWeakeningOverrideApplies(validRaise(), NOW)).toBe(true);
+    expect(gateWeakeningOverrideApplies(validRaise({ owner: '' }), NOW)).toBe(
+      false
+    );
     const incomplete = judge(grown, rows, budgets);
     expect(incomplete.ok).toBe(false);
     expect(incomplete.growth.join('\n')).toMatch(/marketingMaxGzipKb grew/);
@@ -385,17 +383,17 @@ describe('first-load JS budgets', () => {
 
     const raisedApp = structuredClone(budgets);
     raisedApp.routes['/app/chat'] += 1;
-    expect(grownBudgetNumbers(raisedApp, budgets, NOW).join('\n')).toMatch(
+    expect(growth(raisedApp, budgets)).toMatch(
       /routes\.\/app\/chat grew 1385 -> 1386/
     );
     const extraApp = structuredClone(budgets);
     extraApp.routes['/app/new'] = 901;
-    expect(grownBudgetNumbers(extraApp, budgets, NOW).join('\n')).toMatch(
+    expect(growth(extraApp, budgets)).toMatch(
       /routes\.\/app\/new grew 900 -> 901/
     );
     const extraPublic = structuredClone(budgets);
     extraPublic.firstLoad.routes['/about'] = 90;
-    expect(grownBudgetNumbers(extraPublic, budgets, NOW).join('\n')).toMatch(
+    expect(growth(extraPublic, budgets)).toMatch(
       /firstLoad\.routes\.\/about grew 80 -> 90/
     );
     expect(
@@ -419,13 +417,13 @@ describe('first-load JS budgets', () => {
       budgets.firstLoad
     );
     expect(result.violations).toEqual([]);
-    expect(result.rows.find(row => row.route === '/about')?.budgetKb).toBe(90);
-    expect(result.rows.find(row => row.route === '/about')?.targetKb).toBe(80);
-    expect(result.rows.find(row => row.route === '/')?.budgetKb).toBe(40);
-    expect(result.rows.find(row => row.route === '/')?.targetKb).toBe(32);
-    expect(result.rows.find(row => row.route === '/product')?.budgetKb).toBe(
-      32
-    );
+    expect(
+      Object.fromEntries(result.rows.map(row => [row.route, row]))
+    ).toMatchObject({
+      '/about': { budgetKb: 90, targetKb: 80 },
+      '/': { budgetKb: 40, targetKb: 32 },
+      '/product': { budgetKb: 32 },
+    });
     expect(judge(budgets, rows).ok).toBe(true);
 
     const overBaseline = rows.map(row =>
@@ -439,7 +437,7 @@ describe('first-load JS budgets', () => {
 
     const raised = structuredClone(budgets);
     raised.firstLoad.baselines['/about'] = 100;
-    expect(grownBudgetNumbers(raised, budgets, NOW).join('\n')).toMatch(
+    expect(growth(raised, budgets)).toMatch(
       /firstLoad\.baselines\.\/about grew 90 -> 100/
     );
     raised.raises = { 'firstLoad.baselines./about': validRaise() };
@@ -448,7 +446,7 @@ describe('first-load JS budgets', () => {
 
     const added = structuredClone(budgets);
     added.firstLoad.baselines['/extra'] = 200;
-    expect(grownBudgetNumbers(added, budgets, NOW).join('\n')).toMatch(
+    expect(growth(added, budgets)).toMatch(
       /firstLoad\.baselines\.\/extra grew 80 -> 200/
     );
 
@@ -458,11 +456,13 @@ describe('first-load JS budgets', () => {
 
     const { baselines: _baselines, ...firstLoadWithoutBaselines } =
       structuredClone(budgets.firstLoad);
-    const withoutBaselines = {
-      ...structuredClone(budgets),
-      firstLoad: firstLoadWithoutBaselines,
-    };
-    expect(grownBudgetNumbers(budgets, withoutBaselines, NOW)).toEqual([]);
+    expect(
+      grownBudgetNumbers(
+        budgets,
+        { ...budgets, firstLoad: firstLoadWithoutBaselines },
+        NOW
+      )
+    ).toEqual([]);
 
     const unmeasured = evaluateBudgets({
       appRows: [],

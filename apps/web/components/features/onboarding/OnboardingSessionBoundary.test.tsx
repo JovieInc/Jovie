@@ -97,7 +97,7 @@ describe('onboarding identity boundary', () => {
     );
     expect(mocks.shell).not.toHaveBeenCalled();
     await act(async () => resolve(snapshot()));
-    expect(await screen.findByTestId('history')).toHaveTextContent(
+    expect(screen.getByTestId('history')).toHaveTextContent(
       'Saved artist progress'
     );
     expect(mocks.shell.mock.lastCall?.[0]).toMatchObject({

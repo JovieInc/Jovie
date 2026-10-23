@@ -1,9 +1,9 @@
-import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import type { ProfileMode } from '@/features/profile/contracts';
 import { assertLiveProfileRoute } from '@/features/profile/live-profile-lock';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
@@ -16,15 +16,6 @@ import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
-
-// Profile shell is a client island. Keep it out of public-profile first-load JS.
-const ProfileCompactTemplate = dynamic(
-  () =>
-    import('@/features/profile/templates/ProfileCompactTemplate').then(mod => ({
-      default: mod.ProfileCompactTemplate,
-    })),
-  { loading: () => null }
-);
 
 export type StaticArtistPagePresentation = 'full-public' | 'compact-preview';
 

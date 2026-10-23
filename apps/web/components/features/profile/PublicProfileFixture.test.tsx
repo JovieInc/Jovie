@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES } from '@/components/features/home/homepage-profile-preview-fixture';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -49,10 +50,15 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
 }));
 
 describe('PublicProfileFixture', () => {
-  it('keeps the short unclaimed fixture source-backed', async () => {
+  it('paints the profile content in server HTML before JavaScript runs', () => {
+    const html = renderToString(<PublicProfileFixture state='claimed' />);
+    expect(html).toContain('data-testid="profile-template"');
+    expect(html).toContain('<h1>Unfazed</h1>');
+  });
+  it('keeps the short unclaimed fixture source-backed', () => {
     render(<PublicProfileFixture />);
 
-    expect(await screen.findByTestId('profile-template')).toHaveAttribute(
+    expect(screen.getByTestId('profile-template')).toHaveAttribute(
       'data-preview',
       'false'
     );
@@ -76,30 +82,30 @@ describe('PublicProfileFixture', () => {
     );
   });
 
-  it('exercises the maximum-name and claimed neighbors', async () => {
+  it('exercises the maximum-name and claimed neighbors', () => {
     render(<PublicProfileFixture longName state='claimed' />);
 
     expect(
-      await screen.findByRole('heading', {
+      screen.getByRole('heading', {
         name: 'The Extraordinary Midnight Radio Orchestra',
       })
     ).toBeInTheDocument();
   });
 
-  it('forwards the selected event dataset to the profile template', async () => {
+  it('forwards the selected event dataset to the profile template', () => {
     const populatedDates = HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES.slice(0, 1);
     const { rerender } = render(
       <PublicProfileFixture tourDates={populatedDates} />
     );
 
-    expect(await screen.findByTestId('profile-template')).toHaveAttribute(
+    expect(screen.getByTestId('profile-template')).toHaveAttribute(
       'data-tour-dates',
       '1'
     );
 
     rerender(<PublicProfileFixture tourDates={[]} />);
 
-    expect(await screen.findByTestId('profile-template')).toHaveAttribute(
+    expect(screen.getByTestId('profile-template')).toHaveAttribute(
       'data-tour-dates',
       '0'
     );
