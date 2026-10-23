@@ -47,7 +47,7 @@ it('renders a standalone artist section with the shared page spine', () => {
   expect(container.querySelectorAll('section')).toHaveLength(1);
   expect(heading.parentElement).toHaveClass(
     'ap-section-container',
-    'max-w-public-content'
+    'public-container'
   );
 });
 
