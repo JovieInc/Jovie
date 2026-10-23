@@ -200,7 +200,18 @@ function harnessIssues(root) {
   return missing;
 }
 
-export function auditUiStoryCoverage({ root, changedFiles, allowlist = [] }) {
+/**
+ * @param {{
+ *   root: string,
+ *   changedFiles: string[],
+ *   allowlist?: { path: string, linearIssue: string }[],
+ * }} input
+ */
+export function auditUiStoryCoverage({
+  root,
+  changedFiles,
+  allowlist = /** @type {{ path: string, linearIssue: string }[]} */ ([]),
+}) {
   const classified = changedFiles
     .map(path => ({ path, kind: classifyUiPath(path) }))
     .filter(entry => entry.kind !== null);
