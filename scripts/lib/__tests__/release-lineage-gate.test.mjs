@@ -33,6 +33,53 @@ function parseOutputs(path) {
   return values;
 }
 
+const COMPARE_FIXTURES = resolve(
+  import.meta.dirname,
+  'fixtures/release-lineage-compare'
+);
+
+function compareFixture(name) {
+  return readFileSync(join(COMPARE_FIXTURES, name), 'utf8');
+}
+
+/**
+ * The coalesce step records superseded only when the gate exits 0 and its
+ * last line is not decision=proceed. pipefail makes a gate exit 1 fail the
+ * step before any receipt (production-controller.yml, Evaluate event-driven
+ * supersession).
+ */
+function coalesceReceipt(gate) {
+  const root = mkdtempSync(join(tmpdir(), 'lineage-coalesce-'));
+  tempRoots.push(root);
+  const replay = join(root, 'replay.sh');
+  const out = join(root, 'gate.out');
+  writeFileSync(out, gate.stdout ?? '');
+  writeFileSync(replay, '#!/bin/sh\ncat "$1"\nexit "$2"\n');
+  chmodSync(replay, 0o755);
+  return spawnSync(
+    'bash',
+    [
+      '-c',
+      `set -euo pipefail
+gate_decision="$(bash "$REPLAY" "$OUT" "$STATUS" | tail -n 1)"
+if [ "$gate_decision" != "decision=proceed" ]; then
+  printf 'decision=superseded\\n'
+  exit 0
+fi
+printf 'decision=proceed\\n'`,
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        OUT: out,
+        REPLAY: replay,
+        STATUS: String(gate.status ?? 1),
+      },
+    }
+  );
+}
+
 /**
  * Stub gh/curl so the gate sees: main at `main`, compare(expected...main) =
  * `lineageStatus`, `pendingSuccessors` newer controller runs, live production
@@ -61,6 +108,7 @@ function runGate({
   gitMode = 'unproven',
   compareAttempts = 4,
   maxSleep = 15,
+  compareBody = /** @type {string | undefined} */ (undefined),
   // Queued successors with staging evidence: { sha, staging: 'deployed' |
   // 'superseded' | 'not_applicable' | 'failure' | 'missing' | 'no-artifact' }.
   successors = /** @type {{sha: string, staging: string}[]} */ ([]),
@@ -128,6 +176,8 @@ function runGate({
     'repos/JovieInc/Jovie/actions/workflows/staging-controller.yml/runs?branch=main&event=workflow_run&per_page=50'
   ] = JSON.stringify({ workflow_runs: stagingRuns });
   writeFileSync(join(root, 'routes.json'), JSON.stringify(extraRoutes));
+  const compareBodyFile = join(root, 'compare-body');
+  if (compareBody != null) writeFileSync(compareBodyFile, compareBody);
   const compare = compareFails
     ? ''
     : JSON.stringify({
@@ -167,6 +217,12 @@ case "$*" in
     if [ "${lineageExit}" -ne 0 ]; then
       printf 'HTTP/2.0 503 Service Unavailable\\r\\n\\r\\n{"message":"stub transport failure"}\\n'
       exit ${lineageExit}
+    fi
+    if [ -n "\${LINEAGE_COMPARE_BODY_FILE:-}" ]; then
+      printf 'HTTP/2.0 200 OK\\r\\n\\r\\n'
+      cat "\$LINEAGE_COMPARE_BODY_FILE"
+      printf '\\n'
+      exit 0
     fi
     printf 'HTTP/2.0 200 OK\\r\\n\\r\\n{"status":"%s"}\\n' "${lineageStatus}"
     exit 0
@@ -252,6 +308,7 @@ exit 0
       LINEAGE_REMAINING: remaining,
       LINEAGE_RESET: rateReset,
       LINEAGE_RETRY_AFTER: retryAfter,
+      LINEAGE_COMPARE_BODY_FILE: compareBody == null ? '' : compareBodyFile,
       PRODUCTION_STARVATION_SECONDS: String(starvationSeconds),
       REPOSITORY: 'JovieInc/Jovie',
       COMPARE_COUNT: compareCount,
@@ -661,5 +718,179 @@ describe('release lineage gate', () => {
   it('fails closed on malformed inputs', () => {
     const run = runGate({ main: 'not-a-sha' });
     expect(run.result.status).not.toBe(0);
+  });
+});
+
+describe('GitHub compare response fixtures', () => {
+  it('classifies the captured 467b195f...1b7e29b3 ahead body as an ancestor', () => {
+    const body = compareFixture('ahead.json');
+    expect(JSON.parse(body)).toMatchObject({
+      status: 'ahead',
+      ahead_by: 2,
+      behind_by: 0,
+      total_commits: 2,
+    });
+    expect(body).toContain('"status": "modified"');
+    const run = runGate({ main: NEWER_SHA, compareBody: body });
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.decision).toBe('decision=proceed');
+    expect(run.outputs).toMatchObject({
+      lineage: 'ancestor',
+      lineage_source: 'rest',
+      lineage_lookup_http: '200',
+    });
+    expect(run.result.stderr).not.toContain('Release ancestry is unknown');
+    expect(() => readFileSync(join(run.root, 'git.log'), 'utf8')).toThrow();
+  });
+
+  it('yields a stale ancestor to a queued successor as a superseded receipt', () => {
+    const run = runGate({
+      main: NEWER_SHA,
+      compareBody: compareFixture('ahead.json'),
+      pendingSuccessors: 2,
+      ageSeconds: 600,
+    });
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.decision).toBe('decision=yield');
+    expect(run.outputs).toMatchObject({
+      lineage: 'ancestor',
+      lineage_source: 'rest',
+      successor_pending: 'true',
+    });
+    expect(run.result.stderr).not.toContain('Release ancestry is unknown');
+    const receipt = coalesceReceipt(run.result);
+    expect(receipt.status, receipt.stderr).toBe(0);
+    expect(receipt.stdout.trim()).toBe('decision=superseded');
+  });
+
+  it.each([
+    ['behind.json', 'diverged'],
+    ['diverged.json', 'diverged'],
+  ])(
+    'classifies %s from the root status, not nested file statuses',
+    (name, lineage) => {
+      const run = runGate({
+        main: NEWER_SHA,
+        compareBody: compareFixture(name),
+      });
+      expect(run.result.status, run.result.stderr).toBe(0);
+      expect(run.decision).toBe('decision=yield');
+      expect(run.outputs).toMatchObject({
+        lineage,
+        lineage_source: 'rest',
+        lineage_lookup_http: '200',
+      });
+      expect(run.result.stderr).not.toContain('Release ancestry is unknown');
+      expect(() => readFileSync(join(run.root, 'git.log'), 'utf8')).toThrow();
+    }
+  );
+
+  it('fails closed on an identical compare when the SHAs still differ', () => {
+    const run = runGate({
+      main: NEWER_SHA,
+      compareBody: compareFixture('identical.json'),
+      gitMode: 'unproven',
+    });
+    expect(run.result.status).toBe(1);
+    expect(run.decision).toBe('decision=error');
+    expect(run.outputs).toMatchObject({
+      lineage: 'unknown',
+      gate_decision: 'error',
+      lineage_lookup_http: '200',
+    });
+    expect(run.outputs.lineage_source).toBeUndefined();
+    expect(run.result.stderr).toContain('Release ancestry is unknown');
+    expect(readFileSync(join(run.root, 'git.log'), 'utf8')).toContain('fetch');
+    const receipt = coalesceReceipt(run.result);
+    expect(receipt.status).not.toBe(0);
+    expect(receipt.stdout).not.toContain('superseded');
+    expect(receipt.stdout).not.toContain('decision=proceed');
+  });
+
+  it.each([
+    {
+      name: '403-rate-limit.json',
+      failHttp: '403 Forbidden',
+      retryAfter: '120',
+      remaining: '0',
+      http: '403',
+      calls: '1',
+    },
+    {
+      name: '403-scope.json',
+      failHttp: '403 Forbidden',
+      retryAfter: '',
+      remaining: '4800',
+      http: '403',
+      calls: '1',
+    },
+    {
+      name: '404.json',
+      failHttp: '404 Not Found',
+      retryAfter: '',
+      remaining: '4800',
+      http: '404',
+      calls: '1',
+    },
+    {
+      name: '503.json',
+      failHttp: '503 Service Unavailable',
+      retryAfter: '',
+      remaining: '4800',
+      http: '503',
+      calls: '4',
+    },
+  ])(
+    'fails closed on $name and does not record a superseded receipt',
+    overrides => {
+      const run = runGate({
+        main: NEWER_SHA,
+        failTimes: 6,
+        failHttp: overrides.failHttp,
+        failBody: compareFixture(overrides.name).trim(),
+        retryAfter: overrides.retryAfter,
+        remaining: overrides.remaining,
+        gitMode: 'unproven',
+      });
+      expect(run.result.status).toBe(1);
+      expect(run.decision).toBe('decision=error');
+      expect(run.outputs).toMatchObject({
+        lineage: 'unknown',
+        gate_decision: 'error',
+        gate_reason: 'lineage_lookup_unavailable',
+        lineage_lookup_http: overrides.http,
+      });
+      expect(run.result.stdout).not.toContain('decision=proceed');
+      expect(run.result.stdout).not.toContain('decision=yield');
+      expect(run.result.stderr).toContain('Release ancestry is unknown');
+      expect(run.result.stderr).not.toContain('left main');
+      expect(readFileSync(join(run.root, 'compare.count'), 'utf8').trim()).toBe(
+        overrides.calls
+      );
+      const receipt = coalesceReceipt(run.result);
+      expect(receipt.status).not.toBe(0);
+      expect(receipt.stdout).not.toContain('superseded');
+      expect(receipt.stdout).not.toContain('decision=proceed');
+    }
+  );
+
+  it('fails closed on a malformed compare body', () => {
+    const run = runGate({
+      main: NEWER_SHA,
+      compareBody: compareFixture('malformed.txt'),
+      gitMode: 'unproven',
+    });
+    expect(run.result.status).toBe(1);
+    expect(run.decision).toBe('decision=error');
+    expect(run.outputs).toMatchObject({
+      lineage: 'unknown',
+      gate_decision: 'error',
+      lineage_lookup_http: '200',
+    });
+    expect(run.result.stderr).toContain('Release ancestry is unknown');
+    expect(run.result.stdout).not.toContain('decision=yield');
+    const receipt = coalesceReceipt(run.result);
+    expect(receipt.status).not.toBe(0);
+    expect(receipt.stdout).not.toContain('superseded');
   });
 });
