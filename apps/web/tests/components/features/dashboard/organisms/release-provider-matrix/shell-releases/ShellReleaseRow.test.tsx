@@ -105,7 +105,11 @@ describe('ShellReleaseRow audio affordance', () => {
     );
 
     const row = container.querySelector('[data-shell-release-row]');
-    expect(row).toHaveAttribute('aria-selected', 'true');
+    // Rows are `listitem`s inside `role="list"` — an ARIA `option` cannot
+    // contain the row's real controls (axe nested-interactive), so selection
+    // stays visual (`data-selected` + selected tokens), not `aria-selected`.
+    expect(row).toHaveAttribute('role', 'listitem');
+    expect(row).not.toHaveAttribute('aria-selected');
     expect(row).toHaveAttribute('data-selected', 'true');
     expect(row?.className).toContain('system-b-table-row-selected');
     expect(row?.className).toContain('system-b-table-row-focus-visible');

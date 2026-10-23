@@ -173,6 +173,19 @@ describe('ProfileUnifiedDrawer', () => {
     );
   });
 
+  it('renders the unsubscribe control as a plain button, not a stray menuitem', () => {
+    render(
+      <ProfileUnifiedDrawer {...baseProps} view='notifications' />
+    );
+
+    // The notifications list is not an ARIA menu; a `role="menuitem"`
+    // without a `role="menu"` ancestor fails axe aria-required-parent.
+    const unsubscribe = screen.getByRole('button', {
+      name: /turn off notifications/i,
+    });
+    expect(unsubscribe).not.toHaveAttribute('role');
+  });
+
   it('omits credits and contacts from About when the profile has none', () => {
     render(<ProfileUnifiedDrawer {...baseProps} view='about' contacts={[]} />);
 

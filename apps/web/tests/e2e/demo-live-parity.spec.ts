@@ -102,7 +102,7 @@ async function collectReleasesShape(
 
   return {
     shellList: await matrix
-      .getByRole('listbox', { name: 'Releases' })
+      .getByRole('list', { name: 'Releases' })
       .isVisible(),
     drawerTabs: normalizeTexts(await drawer.getByRole('tab').allInnerTexts()),
     drawerCards: {

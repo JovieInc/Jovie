@@ -2183,7 +2183,9 @@
 
 :where(.system-b-shell-dropdown-filter-clear) {
   display: inline-flex;
-  height: var(--space-4);
+  /* WCAG 2.5.8 / axe `target-size`: the clear control needs a ≥24px hit
+     area (was --space-4 = 16px). */
+  height: var(--space-6);
   align-items: center;
   border: 0;
   border-radius: var(--radius-sm);

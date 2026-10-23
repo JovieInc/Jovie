@@ -293,9 +293,13 @@ const WeeklyStreamsCell = memo(function WeeklyStreamsCell({
  * + type badge + artists (+ inline sync status) + status + drop date +
  * DSP avatar stack + smart link + more menu.
  *
- * The outer `<div>` is the click + keyboard target (parent `<div role="listbox">`)
- * Inner interactive elements (smart link, more-menu) stop propagation so
- * they don't double-fire selection — the standard pattern across shell-v1.
+ * The outer row is a `role="listitem"` inside the parent `role="list"`
+ * (ShellReleasesView). It deliberately is NOT a `role="option"`: an
+ * option's children must be presentational (axe nested-interactive), but
+ * this row legitimately owns per-cell controls (play preview, title hover
+ * link, smart link, actions menu). The row stays the click + keyboard
+ * target; inner interactive elements stop propagation so they don't
+ * double-fire selection — the standard pattern across shell-v1.
  */
 export const ShellReleaseRow = memo(function ShellReleaseRow({
   release,
@@ -370,8 +374,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
 
   return (
     <ShellListRowFrame
-      role='option'
-      aria-selected={isSelected}
+      role='listitem'
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={handleKeyDown}

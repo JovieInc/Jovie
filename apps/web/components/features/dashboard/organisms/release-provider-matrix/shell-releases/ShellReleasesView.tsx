@@ -307,7 +307,10 @@ function ReleasesListContent({
   return (
     <div
       ref={listboxRef}
-      role='listbox'
+      // `role="list"` + `listitem` rows (not a listbox): each row owns real
+      // interactive controls, which an ARIA `option` cannot contain (axe
+      // nested-interactive).
+      role='list'
       aria-label='Releases'
       className='py-1.5 space-y-px px-2'
     >

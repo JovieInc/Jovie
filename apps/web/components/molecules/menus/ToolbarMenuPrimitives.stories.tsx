@@ -2,6 +2,7 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
@@ -17,7 +18,11 @@ const meta = {
   },
   decorators: [
     Story => (
-      <DropdownMenu defaultOpen>
+      // `modal={false}`: a modal Radix menu `hideOthers`-ARIA-hides the
+      // story canvas around the portaled content, which fails axe
+      // aria-hidden-focus on the focusable trigger. The non-modal menu is
+      // visually identical for this catalog demo.
+      <DropdownMenu defaultOpen modal={false}>
         <DropdownMenuTrigger asChild>
           <Button variant='outline' size='sm'>
             Open
@@ -61,9 +66,14 @@ export const WithLeadingIcon: Story = {
 
 export const RowOnly: Story = {
   render: () => (
-    <ToolbarMenuRow
-      label='Newest first'
-      leadingVisual={<Music className='h-3.5 w-3.5' />}
-    />
+    // Wrap the bare row in a real menuitem: a `role="menu"` requires a
+    // menuitem child (axe aria-required-children), and the row primitive on
+    // its own renders only presentational spans.
+    <DropdownMenuItem data-menu-row>
+      <ToolbarMenuRow
+        label='Newest first'
+        leadingVisual={<Music className='h-3.5 w-3.5' />}
+      />
+    </DropdownMenuItem>
   ),
 };
