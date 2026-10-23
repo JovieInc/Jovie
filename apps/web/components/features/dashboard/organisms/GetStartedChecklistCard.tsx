@@ -169,7 +169,7 @@ export function GetStartedChecklistCard({
   if (allDone || dismissed) return null;
 
   return (
-    <ContentSurfaceCard className='overflow-hidden p-0'>
+    <ContentSurfaceCard className='overflow-hidden'>
       <div className='flex items-center justify-between gap-3 border-b border-subtle px-3 py-2'>
         <div className='flex items-center gap-1.5'>
           <h3 className='text-xs font-caption tracking-tight text-primary-token'>

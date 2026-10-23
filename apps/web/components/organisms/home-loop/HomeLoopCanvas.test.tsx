@@ -596,8 +596,19 @@ describe('HomeLoopCanvas answered ask dim (a11y AA floor)', () => {
         })}
       />
     );
-    const card = screen.getByTestId('home-loop-ask');
+    const cards = screen.getAllByTestId('home-loop-ask');
+    expect(cards).toHaveLength(HOME_LOOP_FIXTURE_ASKS.length);
+    const card = cards.find(card =>
+      within(card).queryByRole('heading', {
+        name: HOME_LOOP_FIXTURE_ASKS[0]!.title,
+      })
+    );
     expect(card).toHaveClass('opacity-75');
     expect(card).not.toHaveClass('opacity-70');
+    for (const openCard of cards.filter(candidate => candidate !== card)) {
+      expect(openCard).toHaveAttribute('data-answer-state', 'open');
+      expect(openCard).not.toHaveClass('opacity-75');
+      expect(openCard).not.toHaveClass('opacity-70');
+    }
   });
 });
