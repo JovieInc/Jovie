@@ -47,6 +47,23 @@ async function interceptAnalytics(page: Page) {
   await page.route('**/api/track', (r: Route) =>
     r.fulfill({ status: 200, body: '{}' })
   );
+  // The claimed fixtures mount fan capture, whose admission GET draws on
+  // the shared per-IP capture-dismissal limiter (20/min) in this shard's
+  // single server process. Mocking keeps the fan-capture CTA mounted and
+  // asserted while unmocked admission specs (public-profile-smoke) keep
+  // their real budget. Same response shape as public-surface-helpers.
+  await page.route('**/api/profile/capture-dismissal**', (r: Route) =>
+    r.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        suppressed: r.request().method() === 'POST',
+        sessionCount: 0,
+        nextEligibleAt: null,
+      }),
+    })
+  );
 }
 
 function isUnavailablePage(text: string): boolean {
