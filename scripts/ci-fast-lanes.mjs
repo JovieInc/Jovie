@@ -268,6 +268,18 @@ export const SOURCE_GUARDS = Object.freeze([
     inputs: /./u,
     prOnly: true,
   }),
+  Object.freeze({
+    // JOV-INV-045. Trusted-base copy scans the pull request diff and fails
+    // when the diff loosens a blocking gate. Pull requests only.
+    id: 'gate-weakening-detector',
+    command: `node ${shellQuote(
+      fileURLToPath(
+        new URL('./invariants/gate-weakening-detector.mjs', import.meta.url)
+      )
+    )}`,
+    inputs: /./u,
+    prOnly: true,
+  }),
 ]);
 
 /**
