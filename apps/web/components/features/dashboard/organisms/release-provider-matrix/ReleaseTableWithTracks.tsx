@@ -1,5 +1,5 @@
 'use client';
-// @coverage-via apps/web/tests/components/release-provider-matrix/release-table-system-b-style-guard.test.ts
+// @coverage-via apps/web/tests/components/release-provider-matrix/ReleaseTable.test.tsx
 
 import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
