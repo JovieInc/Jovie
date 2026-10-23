@@ -496,6 +496,14 @@ work even when they are internal or generated.
    labels, and decorative elements before adding new visual treatment.
 8. Evidence closes the loop. Design work is not done without screenshots, mockups,
    component evidence, or an explicit non-UI rationale.
+9. General pages stay generic. Homepage, pricing, about, brand, and other
+   general marketing copy do not name a customer segment (music, artist,
+   musician, DJ, producer, label, founder, investor, fan, author, or a
+   creator-type niche). “Creator” is the generic word. Audience routes such as
+   `solutions/[audience]` may use segment language. The locked headline is
+   “Be found. Be understood.” MKT-D16 and
+   `scripts/invariants/icp-language/check.mjs` enforce this. The baseline only
+   shrinks.
 
 ### Logo asset normalization
 
