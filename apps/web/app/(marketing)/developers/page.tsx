@@ -7,11 +7,12 @@ import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `Developers - ${APP_NAME}`,
+  title: documentTitle(`Developers - ${APP_NAME}`),
   description:
     'Jovie’s public, anonymous, read-only profile API pairs with machine-readable site resources.',
   alternates: {

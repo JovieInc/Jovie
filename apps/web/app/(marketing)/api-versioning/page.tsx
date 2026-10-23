@@ -11,13 +11,14 @@ import {
   PUBLIC_ARTIST_API_VERSION,
 } from '@/lib/api/v1/contract';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
 const PAGE_URL = PUBLIC_ARTIST_API_POLICY_URL;
 
 export const metadata: Metadata = {
-  title: `API Versioning and Deprecation Policy - ${APP_NAME}`,
+  title: documentTitle(`API Versioning and Deprecation Policy - ${APP_NAME}`),
   description:
     // ui-casing-allow: metadata sentence with API lifecycle terms
     'The canonical lifecycle policy for Jovie’s public artist API: URL versioning, active v1 status, and future Deprecation or Sunset signals.',
