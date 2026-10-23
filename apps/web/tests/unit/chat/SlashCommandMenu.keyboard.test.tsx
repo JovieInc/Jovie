@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SlashCommandMenu } from '@/components/jovie/components/SlashCommandMenu';
@@ -63,21 +63,16 @@ function withProviders(ui: ReactNode) {
   return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
 }
 
-interface Handlers {
-  readonly onSelectSkill: ReturnType<typeof vi.fn>;
-  readonly onSelectEntity: ReturnType<typeof vi.fn>;
-  readonly onSetSelected: ReturnType<typeof vi.fn>;
-  readonly onMoveSelected: ReturnType<typeof vi.fn>;
-  readonly onClose: ReturnType<typeof vi.fn>;
-}
+type MenuProps = ComponentProps<typeof SlashCommandMenu>;
+type Handlers = ReturnType<typeof makeHandlers>;
 
-function makeHandlers(): Handlers {
+function makeHandlers() {
   return {
-    onSelectSkill: vi.fn(),
-    onSelectEntity: vi.fn(),
-    onSetSelected: vi.fn(),
-    onMoveSelected: vi.fn(),
-    onClose: vi.fn(),
+    onSelectSkill: vi.fn<MenuProps['onSelectSkill']>(),
+    onSelectEntity: vi.fn<MenuProps['onSelectEntity']>(),
+    onSetSelected: vi.fn<MenuProps['onSetSelected']>(),
+    onMoveSelected: vi.fn<MenuProps['onMoveSelected']>(),
+    onClose: vi.fn<MenuProps['onClose']>(),
   };
 }
 
