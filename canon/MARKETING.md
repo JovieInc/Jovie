@@ -142,6 +142,18 @@ secondary hues. The same rule applies inside those prompts.
 These rules are enforced as blocking checks by the companion PRs from agent
 bc-385e97f8. This section is the wording. Those checks are the gate.
 
+### Focal point
+
+Every section has one focal point. Generate each plate for a specific layout,
+with the overlaid content in mind. Name a quiet content zone: low luminance,
+no light and no detail, reserved for the headline and UI. Place light away
+from or behind that zone, and never blow the zone out. Prompts name the
+zone's position and size. The template is `marketingImagePrompt` in
+`apps/web/scripts/marketing-media/image-adapter.ts`.
+
+Review a plate only with the real content composited on top. Text contrast
+over the zone must meet WCAG 2.2 AA.
+
 ### Product as hero
 
 Use real product UI rendered from the app: Playwright captures at 2x or
@@ -218,6 +230,10 @@ Product UI rules are unchanged.
 - A gradient falloff that is not neutral black.
 - A symmetric fade or light reveal. Light is a lit wedge; the rest goes to black.
 - An image-generation prompt that omits its single accent hue or allows a secondary hue.
+- A section with more than one focal point.
+- Light or detail inside a quiet content zone.
+- A generated plate reviewed without the real content composited on top.
+- Text over a plate that misses WCAG 2.2 AA.
 - Canvas, WebGL, or video on the surface by default (`night-dj-harmony-v1`). Shaders and light are baked images plus CSS motion. WebGL only as a flagged, approved exception.
 - Heavy frosting, or glass that is not CSS token glass (low-opacity fill, a 1px edge highlight, soft blur).
 - AI-generated or hand-drawn illustrations of UI. AI images are lighting and mood plates only, with no UI, text, or logos; real UI is composited on top.
@@ -249,6 +265,7 @@ The executable landing-page copy workflow is in
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-23 | Each section has one focal point. Plates reserve a named quiet zone for the headline and UI, and text over that zone must meet WCAG 2.2 AA. | Tim focal-point rule |
 | 2026-10-23 | Imagery color rules are also in the UI contract and MKT-D16. Blocking checks are the companion PRs from agent bc-385e97f8. | Tim color rule |
 | 2026-10-23 | Imagery never mixes colors in one image. Gradient falloff is neutral black. Fades and light reveals are a lit wedge, with the rest to black. | Tim color rule |
 | 2026-10-23 | Imagery uses one scene accent per section and image. Gradients fall off to neutral black. Prompt templates name that hue and forbid secondary hues. | Tim color rule |
