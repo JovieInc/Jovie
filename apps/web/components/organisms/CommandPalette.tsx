@@ -46,7 +46,10 @@ import type { NavCommand } from '@/lib/commands/registry';
 import { WORKSPACE_SWITCH_SHORTCUT } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { isFormElement } from '@/lib/utils/keyboard';
-import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
+import {
+  OPEN_COMMAND_PALETTE_EVENT,
+  preloadCommandPaletteChunk,
+} from './command-palette-events';
 
 const RECENT_CHAT_QUERY_LIMIT = 50;
 
@@ -56,9 +59,6 @@ const CmdKPalette = dynamic(
   () => import('./CmdKPalette').then(module => module.CmdKPalette),
   { ssr: false }
 );
-
-/** Exposed for tests and idle-preload triggers. */
-export const CmdKPaletteDynamic = CmdKPalette;
 
 function getCurrentConversationId(pathname: string): string | null {
   const chatPrefix = `${APP_ROUTES.CHAT}/`;
@@ -79,14 +79,14 @@ export function CommandPalette() {
   useEffect(() => {
     if (typeof globalThis.requestIdleCallback === 'function') {
       const idleId = globalThis.requestIdleCallback(() => {
-        void CmdKPaletteDynamic.preload?.();
+        void preloadCommandPaletteChunk();
       });
       return () => {
         globalThis.cancelIdleCallback(idleId);
       };
     }
     const timer = globalThis.setTimeout(() => {
-      void CmdKPaletteDynamic.preload?.();
+      void preloadCommandPaletteChunk();
     }, 0);
     return () => {
       globalThis.clearTimeout(timer);
