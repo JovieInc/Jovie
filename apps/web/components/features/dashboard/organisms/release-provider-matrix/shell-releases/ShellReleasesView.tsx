@@ -312,12 +312,15 @@ function ReleasesListContent({
       ref={listboxRef}
       // Native `ul` (implicit role=list) + `listitem` rows: each row owns
       // real interactive controls, which an ARIA `option` cannot contain
-      // (axe nested-interactive). Every direct child is a plain li: axe's
-      // `list` rule requires ul children to carry listitem semantics, so a
-      // suppressed wrapper (role=presentation) is rejected exactly like a
-      // div, and the Radix context-menu trigger's global aria-haspopup is
-      // legal on an implicit listitem. The row inside keeps the named
-      // `listitem` semantics; axe does not police listitem-in-listitem.
+      // (axe nested-interactive). Every direct child is an li: axe's `list`
+      // rule requires ul children to carry listitem semantics — a suppressed
+      // wrapper (role=presentation) is rejected exactly like a div. The li
+      // carries a constant accessible name so name-based listitem queries
+      // keep resolving to exactly the named row inside (name-from-author
+      // overrides content naming), and the Radix context-menu trigger's
+      // global aria-haspopup is legal on an implicit listitem. The row
+      // inside keeps the named `listitem` semantics; axe does not police
+      // listitem-in-listitem.
       aria-label='Releases'
       className='py-1.5 space-y-px px-2'
     >
@@ -330,8 +333,9 @@ function ReleasesListContent({
               host element that accepts the injected ref/onContextMenu props,
               and axe's `list` rule only accepts ul children that carry
               listitem semantics — a suppressed wrapper is rejected like a
-              div, so the wrapper stays a plain li. */}
-          <li data-shell-release-row-context-target>
+              div. The constant aria-label keeps the wrapper's accessible
+              name distinct from the row's, so role queries stay singular. */}
+          <li aria-label='Release row' data-shell-release-row-context-target>
             <ShellReleaseRow
               release={r}
               isSelected={r.id === selectedReleaseId}
