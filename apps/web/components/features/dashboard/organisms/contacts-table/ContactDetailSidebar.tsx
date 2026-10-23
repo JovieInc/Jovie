@@ -25,6 +25,7 @@ import {
   type DrawerHeaderAction,
   DrawerHeaderActions,
 } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import {
   CONTACT_ROLE_OPTIONS,
@@ -272,7 +273,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   const contactDisplayName =
     contact?.personName?.trim() ||
     contact?.companyName?.trim() ||
-    'Untitled contact';
+    COPY_FALLBACKS.contact;
   const territorySummary = contact
     ? summarizeTerritories(contact.territories).summary
     : '';

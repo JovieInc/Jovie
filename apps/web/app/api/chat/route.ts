@@ -1,3 +1,4 @@
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 /**
  * AI Chat Route — POST /api/chat
  *
@@ -1127,7 +1128,7 @@ function createGenerateAlbumArtTool(params: {
             ? target.release
             : {
                 id: null,
-                title: releaseTitle?.trim() || 'Untitled Release',
+                title: releaseTitle?.trim() || COPY_FALLBACKS.release,
                 artworkUrl: null,
               };
         const providerPrompt = buildAlbumArtBackgroundPrompt({
