@@ -143,9 +143,9 @@ export function BlogPostPage({
       {/* Article Content + TOC Sidebar */}
       <MarketingContainer width='page' className='pb-16 sm:pb-24'>
         <div>
-          <div className='grid grid-cols-1 lg:grid-cols-[minmax(0,var(--ds-prose-max))_220px] gap-12'>
+          <div className='grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-12'>
             {/* Main content */}
-            <div className='min-w-0'>
+            <div className='min-w-0 max-w-prose-canonical'>
               <MarketingContentProse html={post.html} />
             </div>
 
