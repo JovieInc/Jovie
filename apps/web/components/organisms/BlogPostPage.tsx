@@ -11,6 +11,7 @@ import type { BlogPost, BlogPostSummary } from '@/lib/blog/getBlogPosts';
 import type { ResolvedAuthor } from '@/lib/blog/resolveAuthor';
 import { buildBlogShareContext } from '@/lib/share/context';
 import type { TocEntry } from '@/types/docs';
+import styles from './BlogPostPage.module.css';
 
 export interface BlogPostPageProps {
   readonly post: BlogPost;
@@ -143,7 +144,7 @@ export function BlogPostPage({
       {/* Article Content + TOC Sidebar */}
       <MarketingContainer width='page' className='pb-16 sm:pb-24'>
         <div>
-          <div className='grid grid-cols-1 lg:grid-cols-[minmax(0,var(--ds-prose-max))_220px] gap-12'>
+          <div className={`grid grid-cols-1 gap-12 ${styles.contentGrid}`}>
             {/* Main content */}
             <div className='min-w-0'>
               <MarketingContentProse html={post.html} />

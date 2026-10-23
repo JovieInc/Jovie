@@ -1,0 +1,6 @@
+/* Keep the reading measure beside the TOC without a second page container. */
+@media (min-width: 64rem) {
+  .contentGrid {
+    grid-template-columns: minmax(0, var(--ds-prose-max)) 220px;
+  }
+}
