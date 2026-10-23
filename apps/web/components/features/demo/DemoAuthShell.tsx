@@ -128,6 +128,10 @@ interface DemoAuthShellProps {
   readonly dashboardData?: DashboardData;
   readonly releasesForQuery?: readonly ReleaseViewModel[];
   readonly seedQueryClient?: DemoQuerySeeder;
+  /** Force the capture-player demo state. Stories use this because per-story
+   * search params do not reach useSearchParams in the vitest browser runner;
+   * production keeps using the capturePlayer=1 URL opt-in. */
+  readonly capturePlayer?: boolean;
 }
 
 export function DemoAuthShell({
@@ -135,12 +139,14 @@ export function DemoAuthShell({
   dashboardData,
   releasesForQuery,
   seedQueryClient,
+  capturePlayer,
 }: DemoAuthShellProps) {
-  const capturePlayer = useSearchParams().get('capturePlayer') === '1';
-  const data = capturePlayer
+  const urlCapturePlayer = useSearchParams().get('capturePlayer') === '1';
+  const captureActive = capturePlayer ?? urlCapturePlayer;
+  const data = captureActive
     ? FOUNDER_DEMO_DASHBOARD_DATA
     : (dashboardData ?? DEMO_DASHBOARD_DATA);
-  const queryReleases = capturePlayer
+  const queryReleases = captureActive
     ? FOUNDER_DEMO_RELEASE_VIEW_MODELS
     : (releasesForQuery ?? DEMO_RELEASE_VIEW_MODELS);
   const profileId = data.selectedProfile?.id ?? '';
@@ -168,7 +174,7 @@ export function DemoAuthShell({
         <NuqsProvider>
           <TooltipProvider>
             <DashboardDataProvider value={data}>
-              {capturePlayer ? <DemoPlayerCapture /> : null}
+              {captureActive ? <DemoPlayerCapture /> : null}
               <AuthShellWrapper
                 persistSidebarCollapsed={noopPersist}
                 sidebarDefaultOpen

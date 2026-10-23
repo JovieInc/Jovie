@@ -602,7 +602,17 @@ describe('ShellReleasesView', () => {
   it('shows the connect-Spotify empty state when not yet connected', () => {
     renderShell([]);
     expect(
-      screen.getByText(/Connect Spotify to get started/)
+      screen.getByText(/Connect Spotify To Get Started/)
+    ).toBeInTheDocument();
+  });
+
+  it('exposes the connect-Spotify empty state as a real heading', () => {
+    renderShell([]);
+    // The e2e releases health spec and the axe heading outline resolve the
+    // disconnected state by role=heading 'Connect Spotify' — the same shape
+    // the connected empty state already renders.
+    expect(
+      screen.getByRole('heading', { name: /Connect Spotify To Get Started/ })
     ).toBeInTheDocument();
   });
 

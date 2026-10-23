@@ -726,6 +726,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/product/dsp-links/page.tsx",
+      "kind": "page",
+      "route": "/product/dsp-links",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/product/isrc/page.tsx",
       "kind": "page",
       "route": "/product/isrc",
@@ -734,9 +742,25 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/product/link-analytics/page.tsx",
+      "kind": "page",
+      "route": "/product/link-analytics",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/product/page.tsx",
       "kind": "page",
       "route": "/product",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
+      "kind": "page",
+      "route": "/product/release-scheduling",
       "methods": [],
       "surface": "deferred",
       "classification": "C"

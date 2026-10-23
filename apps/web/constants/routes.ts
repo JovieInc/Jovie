@@ -208,10 +208,16 @@ export const APP_ROUTES = {
   PRODUCT: '/product',
   /** Cmd+K command palette. Live feature page. */
   PRODUCT_COMMAND_PALETTE: '/product/command-palette',
+  /** Release date and reveal date fields. Nested under /product so it is not a profile handle. */
+  PRODUCT_RELEASE_SCHEDULING: '/product/release-scheduling',
+  /** Per-service DSP links. Nested under /product so it is not a profile handle. */
+  PRODUCT_DSP_LINKS: '/product/dsp-links',
   /** Tracked-link builder. Nested under /product so it is not a profile handle. */
   PRODUCT_UTM_LINKS: '/product/utm-links',
   /** ISRC field. Nested under /product so it is not a profile handle. */
   PRODUCT_ISRC: '/product/isrc',
+  /** Smart-link click analytics. Live feature page. */
+  PRODUCT_LINK_ANALYTICS: '/product/link-analytics',
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */
   SOLUTIONS_ARTISTS: '/solutions/artists',
   INSTANT_MERCH: '/instant-merch',

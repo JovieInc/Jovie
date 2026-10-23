@@ -93,7 +93,7 @@ function AuthBrandFrame({
 
       {showText ? (
         <div className='relative z-10 px-8 pb-4 sm:px-10'>
-          <h2 className='text-balance text-[clamp(1.5rem,2.6vw,2rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)'>
+          <h2 className='text-balance text-2xl font-semibold leading-tight tracking-tight text-(--color-text-tooltip)'>
             {headline}
           </h2>
           {description ? (
