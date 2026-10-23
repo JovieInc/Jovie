@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ScrubGradient } from '../ScrubGradient';
@@ -54,5 +56,30 @@ describe('ScrubGradient', () => {
     );
     expect(grads.length).toBe(2);
     expect(grads[0].getAttribute('id')).not.toBe(grads[1].getAttribute('id'));
+  });
+});
+
+
+describe('Ion accent polish (glm/lyrics-player)', () => {
+  it('tints the loop-section band with the Ion accent, not raw cyan', () => {
+    const source = readFileSync(
+      resolve(__dirname, '../ScrubGradient.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/cyan-/);
+    expect(source).toContain("className='text-accent'");
+  });
+
+  it('renders the loop section band when a section loop is active', () => {
+    const { container } = render(
+      <ScrubGradient
+        currentTime={30}
+        duration={213}
+        loopMode='section'
+        loopSection={{ from: 6, to: 23 }}
+      />
+    );
+    const band = container.querySelector('rect.text-accent');
+    expect(band).not.toBeNull();
   });
 });

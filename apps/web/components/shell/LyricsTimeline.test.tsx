@@ -65,3 +65,36 @@ describe('JOV-5466 token retire', () => {
     expect(source).not.toMatch(/--linear-app-/);
   });
 });
+
+
+describe('Ion accent polish (glm/lyrics-player)', () => {
+  it('draws the progress rail and cue halos with the Ion accent, not raw cyan', () => {
+    const source = readFileSync(
+      resolve(__dirname, './LyricsTimeline.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/cyan-/);
+    expect(source).not.toMatch(/shadow-\[0_0_0/);
+    expect(source).toContain('bg-accent/80 transition-[width]');
+    expect(source).toContain('h-2 w-2 bg-accent ring-2 ring-accent/20');
+    expect(source).toContain('bg-accent ring-2 ring-accent/20');
+  });
+
+  it('renders the playhead with the accent halo ring', () => {
+    const { container } = render(
+      <LyricsTimeline
+        durationSec={213}
+        currentTimeSec={78}
+        lines={lines}
+        activeIndex={1}
+        onSeek={() => {}}
+      />
+    );
+    const playhead = container.querySelector(
+      'span.h-3.w-3.rounded-full'
+    ) as HTMLElement | null;
+    expect(playhead).not.toBeNull();
+    expect(playhead?.className).toContain('bg-accent');
+    expect(playhead?.className).toContain('ring-accent/20');
+  });
+});
