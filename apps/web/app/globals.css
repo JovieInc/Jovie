@@ -113,9 +113,21 @@ body {
 html[data-desktop-runtime="electron"] {
   --electron-titlebar-height: 40px;
   --electron-controls-width: 200px;
-  --electron-traffic-light-safe-width: 72px;
   --electron-traffic-light-x: 20px;
   --electron-traffic-light-y: 17px;
+  --electron-traffic-light-control-size: 14px;
+  --electron-traffic-light-clearance: 8px;
+  /* Content origin is the shell gap (titlebar padding-left). The reserve
+     places the first control at the native lights' trailing clearance.
+     20 - 8 + 42 + 16 + 8 - 8 = 70. Toggle window x = 8 + 70 + 8 = 86. */
+  --electron-traffic-light-safe-width: calc(
+    var(--electron-traffic-light-x) -
+    var(--app-shell-gap) +
+    (3 * var(--electron-traffic-light-control-size)) +
+    (2 * var(--electron-traffic-light-clearance)) +
+    var(--electron-traffic-light-clearance) -
+    var(--app-shell-sidebar-icon-gap)
+  );
   --electron-sidebar-width: var(--app-shell-sidebar-width);
   --electron-sidebar-collapsed-width: 52px;
 }
@@ -156,9 +168,12 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
      drag region. */
   -webkit-app-region: no-drag;
   z-index: 60;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  width: var(--electron-sidebar-width);
+  /* Padding-left is the shell gap, so the border box must include it or the
+     titlebar content ends 8px short of the rail. */
+  width: calc(var(--app-shell-gap) + var(--electron-sidebar-width));
   min-width: var(--electron-controls-width);
   height: var(--electron-titlebar-height);
   user-select: none;

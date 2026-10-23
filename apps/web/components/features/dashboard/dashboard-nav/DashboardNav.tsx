@@ -577,7 +577,7 @@ export function DashboardNav({
         )}
 
         {threadsVisible ? (
-          <div className='pt-5'>
+          <div className='pt-(--space-2)'>
             <SidebarThreadsSection
               threads={sidebarThreads}
               activeThreadId={activeThreadId}

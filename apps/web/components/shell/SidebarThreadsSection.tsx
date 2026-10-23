@@ -19,6 +19,10 @@ import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,
 } from './SidebarNavItem';
+import {
+  SIDEBAR_ENTRY_ICON_SLOT_CLASS,
+  SIDEBAR_ENTRY_LABEL_INSET_CLASS,
+} from './sidebar-optical';
 import { SEAM_BOUNDARY_SELECTOR, Tooltip } from './Tooltip';
 
 // Chat list types — co-located so consumers import from one place. Production
@@ -173,14 +177,12 @@ function SidebarThreadStatusRow({
   return (
     <div
       className={cn(
-        'grid grid-cols-[22px_minmax(0,1fr)] items-center gap-2 rounded-full px-2.5 text-tertiary-token',
-        tight ? 'h-6 text-xs' : 'h-7 text-xs'
+        getSidebarNavRowClassName({ tight }),
+        'text-tertiary-token'
       )}
     >
-      <span className='grid h-3.5 w-3.5 shrink-0 place-items-center justify-self-center text-quaternary-token'>
-        {icon}
-      </span>
-      <span className='min-w-0 flex-1 truncate'>{children}</span>
+      <span className={SIDEBAR_ENTRY_ICON_SLOT_CLASS}>{icon}</span>
+      <span className='min-w-0 truncate'>{children}</span>
     </div>
   );
 }
@@ -249,25 +251,27 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     'text-left',
     calm &&
       // Founder lock 2026-09-25 (Linear-scale density): 28px history rows.
-      'h-7 grid-cols-(--app-shell-sidebar-history-grid) gap-2 rounded-lg text-(length:--app-shell-sidebar-history-font-size)',
+      // The shared nav grid (aliased by the history token) keeps the title
+      // on the label column once the icon slot occupies track one.
+      'rounded-lg text-(length:--app-shell-sidebar-history-font-size)',
     active ? undefined : unread ? 'text-primary-token' : 'text-secondary-token'
   );
   const rowContent = (
     <>
-      <span
-        className={cn(
-          calm
-            ? 'sr-only'
-            : 'h-1.5 w-1.5 rounded-full shrink-0 justify-self-center',
-          thread.status === 'running'
-            ? 'bg-cyan-300/85 anim-calm-breath'
-            : thread.status === 'errored'
-              ? 'bg-rose-400/85'
-              : unread
-                ? 'bg-cyan-300/85'
-                : 'bg-white/25'
-        )}
-      />
+      <span className={SIDEBAR_ENTRY_ICON_SLOT_CLASS}>
+        <span
+          className={cn(
+            calm ? 'sr-only' : 'h-1.5 w-1.5 rounded-full',
+            thread.status === 'running'
+              ? 'bg-cyan-300/85 anim-calm-breath'
+              : thread.status === 'errored'
+                ? 'bg-rose-400/85'
+                : unread
+                  ? 'bg-cyan-300/85'
+                  : 'bg-white/25'
+          )}
+        />
+      </span>
       <span
         ref={titleRef}
         className={cn(
@@ -295,8 +299,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   return (
     <div
       className={cn(
-        'group/thread relative flex items-center',
-        calm ? 'h-7' : tight ? 'h-6' : 'h-7'
+        'group/thread relative flex items-center h-(--app-shell-sidebar-row-height)'
       )}
     >
       <Tooltip
@@ -339,7 +342,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             aria-label={`Chat Actions for ${thread.title}`}
             className={cn(
               // The reserved trailing track keeps this action off the title.
-              'absolute right-2.5 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-0 active:bg-surface-0 hover:text-primary-token focus-visible:bg-transparent focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
+              'absolute right-(--app-shell-sidebar-inset) top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-0 active:bg-surface-0 hover:text-primary-token focus-visible:bg-transparent focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
               '[@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
             )}
           >
@@ -419,10 +422,13 @@ export function SidebarThreadsSection({
   const hasThreads = sorted.length > 0;
 
   return (
-    <div className={calm ? 'space-y-2' : 'space-y-1.5'}>
+    <div className='space-y-1'>
       <div
         data-sidebar-history-header
-        className='flex min-h-6 items-center justify-between px-2.5 pb-0.5 pt-2'
+        className={cn(
+          'flex h-(--app-shell-sidebar-row-height) items-center justify-between',
+          SIDEBAR_ENTRY_LABEL_INSET_CLASS
+        )}
       >
         <span
           className={
@@ -484,13 +490,15 @@ export function SidebarThreadsSection({
         {state === 'error' && !hasThreads ? (
           <div
             className={cn(
-              'grid grid-cols-[minmax(0,1fr)_20px] items-center gap-2 rounded-full px-2.5 text-xs text-tertiary-token',
-              tight ? 'h-6' : 'h-7'
+              getSidebarNavRowClassName({ tight }),
+              'text-xs text-tertiary-token'
             )}
           >
-            <span className='min-w-0 flex-1 truncate'>
-              Conversations unavailable
-            </span>
+            <span
+              className={SIDEBAR_ENTRY_ICON_SLOT_CLASS}
+              aria-hidden='true'
+            />
+            <span className='min-w-0 truncate'>Conversations unavailable</span>
             {onRetry ? (
               <Button
                 type='button'
@@ -520,7 +528,12 @@ export function SidebarThreadsSection({
               new Date(t.updatedAt).toDateString() !== today &&
               new Date(visible[index - 1].updatedAt).toDateString() ===
                 today ? (
-                <div className='px-(--space-2-5) pb-2 pt-5 text-(length:--text-2xs) font-medium text-sidebar-muted'>
+                <div
+                  className={cn(
+                    'flex h-(--app-shell-sidebar-row-height) items-center text-(length:--text-2xs) font-medium text-sidebar-muted',
+                    SIDEBAR_ENTRY_LABEL_INSET_CLASS
+                  )}
+                >
                   Earlier
                 </div>
               ) : null}
@@ -546,17 +559,21 @@ export function SidebarThreadsSection({
                 active: allThreadsActive,
                 tight,
               }),
-              calm
-                ? 'mt-3 h-7 flex justify-between text-left text-(length:--app-shell-sidebar-history-font-size)'
-                : 'flex justify-between text-left'
+              'text-left',
+              calm &&
+                'mt-3 rounded-lg text-(length:--app-shell-sidebar-history-font-size)'
             )}
           >
-            <span className='min-w-0 truncate justify-self-start'>
+            <span
+              className={SIDEBAR_ENTRY_ICON_SLOT_CLASS}
+              aria-hidden='true'
+            />
+            <span className='min-w-0 truncate justify-self-stretch'>
               {calm ? 'All chats' : 'All Chats'}
             </span>
             <Icon
               name='ArrowRight'
-              className={getSidebarNavIconClassName({ tight })}
+              className={getSidebarNavIconClassName({})}
               aria-hidden='true'
               strokeWidth={2.25}
             />

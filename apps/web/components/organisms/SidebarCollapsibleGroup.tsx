@@ -91,7 +91,7 @@ export function SidebarCollapsibleGroup({
             tooltip={tooltip}
             className={cn(
               'justify-between',
-              'h-7 px-2.5 text-sidebar-muted hover:bg-transparent hover:text-sidebar-muted'
+              'h-(--app-shell-sidebar-row-height) px-(--app-shell-sidebar-inset) text-sidebar-muted hover:bg-transparent hover:text-sidebar-muted'
             )}
             aria-expanded={open}
           >
