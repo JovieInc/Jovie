@@ -38,6 +38,9 @@ export function deriveCodeRegisteredIdentities({ cwd = process.cwd() } = {}) {
     stdout = execFileSync('pnpm', ['exec', 'tsx', '-e', DERIVATION_SNIPPET], {
       cwd,
       encoding: 'utf8',
+      // The registry's copy modules use the web app's `@/` alias. The env
+      // form is used because `tsx --tsconfig` silently drops `-e` output.
+      env: { ...process.env, TSX_TSCONFIG_PATH: 'apps/web/tsconfig.json' },
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 120_000,
     });

@@ -21,12 +21,16 @@
  * --file applies the decisions through scripts/lib/remediation-signal.mjs
  * (needs LINEAR_API_KEY; REMEDIATION_INTAKE_DISABLED=1 skips).
  */
+import { execFile } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 import { createApiClient } from '../packages/api-client/client.ts';
 import { createLinearClient } from '../packages/api-client/linear.ts';
 import { hashCredential } from '../packages/api-client/store.ts';
+import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
 import {
   evaluateLiveness,
   livenessDecisions,
@@ -83,34 +87,41 @@ export async function observeGithubWorkflow(
   const branch = receipt.branch
     ? `&branch=${encodeURIComponent(receipt.branch)}`
     : '';
-  const base = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=30${branch}`;
+  const base = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs`;
   const events = receipt.events ?? null;
-  // Filter by event server-side: a busy push/PR workflow would otherwise
-  // push its scheduled runs out of the 30-run window (security.yml, 2026-10-21).
-  const urls = events
-    ? events.map(event => `${base}&event=${encodeURIComponent(event)}`)
-    : [base];
+  const acceptsRun = row =>
+    conclusions.includes(row?.conclusion) &&
+    (!events || events.includes(row?.event));
   const runs = [];
-  for (const url of urls) {
-    const read = await readJson(fetchImpl, url, githubHeaders(token));
-    if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
-    if (!Array.isArray(read.body?.workflow_runs))
-      return { ok: false, reason: 'github-runs-unreadable' };
-    runs.push(...read.body.workflow_runs);
+  // A single completed-run page can be empty transiently (JOV-8832), or
+  // crowded with skipped/cancelled runs. Before declaring silence, confirm
+  // with one bounded lookup per accepted conclusion. Healthy reads stay cheap.
+  for (const statuses of [['completed'], conclusions]) {
+    const urls = statuses.flatMap(status => {
+      const query = `${base}?status=${encodeURIComponent(status)}&per_page=30${branch}`;
+      // Keep trigger filtering server-side so pushes cannot hide scheduled runs.
+      return events
+        ? events.map(event => `${query}&event=${encodeURIComponent(event)}`)
+        : [query];
+    });
+    for (const url of urls) {
+      const read = await readJson(fetchImpl, url, githubHeaders(token));
+      if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
+      if (!Array.isArray(read.body?.workflow_runs))
+        return { ok: false, reason: 'github-runs-unreadable' };
+      runs.push(...read.body.workflow_runs);
+    }
+    if (runs.some(acceptsRun)) break;
   }
   runs.sort((a, b) =>
     String(b?.updated_at ?? '').localeCompare(String(a?.updated_at ?? ''))
   );
-  const run = runs.find(
-    row =>
-      conclusions.includes(row?.conclusion) &&
-      (!events || events.includes(row?.event))
-  );
+  const run = runs.find(acceptsRun);
   if (!run)
     return {
       ok: true,
       lastProofAt: null,
-      reason: `no-${conclusions.join('-or-')}${events ? `-${events.join('-or-')}` : ''}-run-in-last-30`,
+      reason: `no-${conclusions.join('-or-')}${events ? `-${events.join('-or-')}` : ''}-run-found`,
     };
   return {
     ok: true,
@@ -224,15 +235,107 @@ function mainRefFailure(error, status) {
   };
 }
 
+const execFileAsync = promisify(execFile);
+
+function gitProbeEnv(token) {
+  // Keep the probe independent of inherited credentials and Git settings.
+  /** @type {NodeJS.ProcessEnv} */
+  const env = {
+    PATH: process.env.PATH ?? '',
+    // A non-directory also prevents libcurl from loading inherited ~/.netrc.
+    HOME: '/dev/null',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_SYSTEM: '/dev/null',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_TERMINAL_PROMPT: '0',
+    GCM_INTERACTIVE: 'never',
+  };
+  const pairs = [['core.hooksPath', '/dev/null']];
+  if (token) {
+    const encoded = Buffer.from(`x-access-token:${token}`).toString('base64');
+    pairs.push(
+      ['credential.helper', ''],
+      [
+        'http.https://github.com/.extraheader',
+        `AUTHORIZATION: basic ${encoded}`,
+      ]
+    );
+  }
+  env.GIT_CONFIG_COUNT = String(pairs.length);
+  for (const [index, [key, value]] of pairs.entries()) {
+    env[`GIT_CONFIG_KEY_${index}`] = key;
+    env[`GIT_CONFIG_VALUE_${index}`] = value;
+  }
+  return env;
+}
+
+async function defaultGit(args, env) {
+  const { stdout } = await execFileAsync('git', args, {
+    cwd: tmpdir(),
+    timeout: TIMEOUT_MS,
+    maxBuffer: 8192,
+    env,
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  return stdout;
+}
+
+/**
+ * refs/heads/main over the git protocol. Try anonymously before retrying
+ * with the token in the child environment, never in argv. A failure returns
+ * null so the REST fallback can still run.
+ */
+export async function lsRemoteMain(repo, token, gitExec = defaultGit) {
+  if (!/^[^/\s]+\/[^/\s]+$/.test(String(repo ?? ''))) return null;
+  const args = [
+    'ls-remote',
+    '--refs',
+    `https://github.com/${repo}.git`,
+    'refs/heads/main',
+  ];
+  const read = async authToken => {
+    const stdout = await gitExec(args, gitProbeEnv(authToken));
+    const sha = String(stdout ?? '')
+      .trim()
+      .split(/\s+/)[0];
+    return SHA_RE.test(sha ?? '') ? sha : null;
+  };
+  try {
+    const anonymous = await read(undefined);
+    if (anonymous) return anonymous;
+  } catch {
+    // A failed anonymous read may still recover with the Actions token.
+  }
+  if (!token) return null;
+  try {
+    return await read(token);
+  } catch {
+    return null;
+  }
+}
+
+async function shaFromGit(readGitTip) {
+  if (typeof readGitTip !== 'function') return null;
+  try {
+    const sha = await readGitTip();
+    return SHA_RE.test(sha ?? '') ? sha : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Branch tip for the promotion probe.
  *
- * `git/ref` is the cheap read. The Actions token sometimes answers that one
- * route with HTTP 403 while the commit SHA media type still returns the tip
- * (run 39674054063). One alternate read keeps that blip from looking like a
- * stalled release. Any other failure stays unreadable.
+ * `git/ref` is the cheap read. The Actions token answers that route with
+ * HTTP 403 while production is inside the silence budget (runs 39674054063
+ * and 39682307911; the second ran after the commits/main fallback landed).
+ * `GET /commits/main` is the same 403 the production controller already left
+ * for `git ls-remote`. On a 403, ask git for refs/heads/main, then try one
+ * last commit-SHA read. Any other failure stays unreadable.
  */
-async function readMainSha(client, repo, headers, apiUrl) {
+async function readMainSha(client, repo, headers, apiUrl, readGitTip) {
   const request = (url, accept) =>
     client.request({
       url,
@@ -265,6 +368,8 @@ async function readMainSha(client, repo, headers, apiUrl) {
     failure = mainRefFailure(error);
     if (error?.status !== 403) return failure;
   }
+  const fromGit = await shaFromGit(readGitTip);
+  if (fromGit) return { ok: true, sha: fromGit };
   try {
     // application/vnd.github.sha is the raw tip. The default commit
     // document also builds the patch, which this probe does not need.
@@ -288,7 +393,7 @@ async function readMainSha(client, repo, headers, apiUrl) {
  */
 export async function observeProductionFreshness(
   receipt,
-  { fetchImpl, token, nowMs, githubClient, apiUrl = GITHUB_API }
+  { fetchImpl, token, nowMs, githubClient, apiUrl = GITHUB_API, lsRemote }
 ) {
   const build = await readJson(fetchImpl, receipt.buildInfoUrl);
   const live = build.ok ? build.body?.commitSha : null;
@@ -302,7 +407,13 @@ export async function observeProductionFreshness(
       credential: hashCredential('github', token ?? ''),
       fetch: fetchImpl,
     });
-  const mainRead = await readMainSha(client, receipt.repo, headers, apiUrl);
+  const mainRead = await readMainSha(
+    client,
+    receipt.repo,
+    headers,
+    apiUrl,
+    () => lsRemote?.(receipt.repo, token)
+  );
   if (!mainRead.ok) return mainRead;
   const main = mainRead.sha;
   const now = new Date(nowMs).toISOString();
@@ -461,6 +572,7 @@ export async function observeLinearTriageDwell(receipt, { linear, nowMs }) {
 }
 
 const MERGEABLE_GREEN = new Set(['CLEAN', 'UNSTABLE', 'HAS_HOOKS']);
+const ADMISSION_BLOCKING = new Set(ADMISSION_BLOCKING_LABELS);
 const GREEN_TIMING_MAX_PRS = 10;
 const FAILURE_HOLD_CONTEXT = 'jovie-queue-failure-hold/v1';
 const DEFECT_HOLD_CLASSES = new Set(['deterministic-source', 'unclassified']);
@@ -523,8 +635,10 @@ async function requiredGreenAt(
  * checks (CLEAN/UNSTABLE/HAS_HOOKS = required green and mergeable), so one
  * cheap list read finds candidates; only ready candidates (capped) pay for a
  * per-head timing read. Proof is "no ready, mergeable, required-green PR sits
- * outside the merge queue", else the earliest such green time. Green drafts
- * are counted in the reason; draft promotion is the writer's (JOV-INV-022).
+ * outside the merge queue", else the earliest such green time. Admission
+ * label holds are reported separately, using the writer's shared policy.
+ * Green drafts are counted in the reason; draft promotion is the writer's
+ * (JOV-INV-022).
  */
 export async function observeGreenToEnqueue(
   receipt,
@@ -534,7 +648,7 @@ export async function observeGreenToEnqueue(
   const [owner, name] = String(receipt.repo).split('/');
   const checks = receipt.requiredChecks ?? [];
   if (!checks.length) return { ok: false, reason: 'required-checks-missing' };
-  const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:40,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number isDraft isInMergeQueue mergeStateStatus baseRefName headRefOid}}}}`;
+  const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:40,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{number isDraft isInMergeQueue mergeStateStatus baseRefName headRefOid labels(first:100){nodes{name} pageInfo{hasNextPage}}}}}}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let body;
@@ -577,9 +691,24 @@ export async function observeGreenToEnqueue(
   const drafts = green.filter(pr => pr.isDraft).map(pr => pr.number);
   const waiting = [];
   const held = [];
-  for (const pr of green
-    .filter(row => !row.isDraft)
-    .slice(0, GREEN_TIMING_MAX_PRS)) {
+  const labelHeld = [];
+  const ready = [];
+  for (const pr of green.filter(row => !row.isDraft)) {
+    if (
+      !Array.isArray(pr.labels?.nodes) ||
+      pr.labels?.pageInfo?.hasNextPage !== false ||
+      pr.labels.nodes.some(label => typeof label?.name !== 'string')
+    )
+      return { ok: false, reason: 'green-enqueue-labels-unreadable' };
+    if (
+      pr.labels.nodes.some(label =>
+        ADMISSION_BLOCKING.has(label.name.toLowerCase())
+      )
+    )
+      labelHeld.push(pr.number);
+    else ready.push(pr);
+  }
+  for (const pr of ready.slice(0, GREEN_TIMING_MAX_PRS)) {
     const timing = await requiredGreenAt(receipt.repo, pr.headRefOid, checks, {
       fetchImpl,
       token,
@@ -601,7 +730,7 @@ export async function observeGreenToEnqueue(
     .map(n => `#${n}`)
     .join(
       ','
-    )}];defect-held=${held.length}[${held.map(n => `#${n}`).join(',')}]`;
+    )}];defect-held=${held.length}[${held.map(n => `#${n}`).join(',')}];label-held=${labelHeld.length}[${labelHeld.map(n => `#${n}`).join(',')}]`;
   if (!waiting.length)
     return { ok: true, lastProofAt: new Date(nowMs).toISOString(), reason };
   return {
@@ -638,6 +767,7 @@ export async function observeEntry(entry, context) {
  *   nowMs?: number,
  *   githubClient?: import('../packages/api-client/client.ts').ApiClient,
  *   linear?: { graphql: (query: string, variables?: Record<string, unknown>) => Promise<any> } | null,
+ *   lsRemote?: (repo: string, token?: string) => Promise<string | null>,
  * }} options
  */
 export async function runLiveness({
@@ -647,10 +777,11 @@ export async function runLiveness({
   nowMs = Date.now(),
   githubClient,
   linear = null,
+  lsRemote = lsRemoteMain,
 }) {
   const startedAt = new Date(nowMs).toISOString();
   const observations = new Map();
-  const context = { fetchImpl, token, nowMs, githubClient, linear };
+  const context = { fetchImpl, token, nowMs, githubClient, linear, lsRemote };
   for (const entry of registry.entries ?? []) {
     if (entry?.status !== 'live') continue;
     const observed = await observeEntry(entry, context);

@@ -86,7 +86,7 @@ async function createRefundOnce(
 
 export async function refundFirstMonthAndCancel(input: {
   readonly subscriptionId: string;
-  /** Stable per claim, e.g. `claim-verification-reject:<profileId>`. */
+  /** Stable per claim, e.g. `claim-verification-reject:<profileId>:<subscriptionId>`. */
   readonly idempotencyKey: string;
 }): Promise<ClaimRejectionRefundResult> {
   const invoice = await firstPaidInvoice(input.subscriptionId);

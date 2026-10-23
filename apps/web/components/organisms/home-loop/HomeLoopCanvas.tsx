@@ -37,6 +37,8 @@ export interface HomeLoopCanvasProps {
   readonly asksStatus: HomeLoopSectionStatus;
   /** Partial source failure while some or no asks are still shown. */
   readonly asksNotice?: string | null;
+  /** Full list behind a summarized asks notice. */
+  readonly asksNoticeHref?: string;
   readonly answers: Readonly<Record<string, HomeLoopAnswer>>;
   readonly onApprove: (ask: HomeLoopAsk, option?: string) => void;
   readonly onReply: (ask: HomeLoopAsk, text: string) => void;
@@ -78,6 +80,7 @@ export function HomeLoopCanvas({
   loopStatus,
   asksStatus,
   asksNotice,
+  asksNoticeHref,
   answers,
   onApprove,
   onReply,
@@ -128,6 +131,7 @@ export function HomeLoopCanvas({
           emptyLabel={copy.asksEmpty}
           errorLabel={copy.asksError}
           notice={asksNotice}
+          noticeHref={asksNoticeHref}
           onRetry={onRetryAsks}
           skeleton={<HomeLoopAsksSkeleton />}
           minBodyClassName='flex min-h-24 flex-1 flex-col lg:min-h-0'

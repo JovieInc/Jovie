@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
@@ -27,6 +28,16 @@ beforeEach(() => {
     playbackStatus: 'idle',
   };
 });
+
+// Expose the Next Link contract without starting a router in jsdom.
+vi.mock('next/link', () => ({
+  default: forwardRef<
+    HTMLAnchorElement,
+    ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+  >(function TestLink({ prefetch, ...props }, ref) {
+    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
+  }),
+}));
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
@@ -61,6 +72,25 @@ function fakeRelease(
 }
 
 describe('ShellReleaseRow audio affordance', () => {
+  it('opens the smart link without prefetching or selecting the row', async () => {
+    const onSelect = vi.fn();
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({ id: 'r1', title: 'Lost in the Light' })}
+        isSelected={false}
+        onSelect={onSelect}
+      />
+    );
+    const link = screen.getByRole('link', {
+      name: 'Open smart link for Lost in the Light',
+    });
+    expect(link).toHaveAttribute('href', '/lost-in-the-light');
+    expect(link).toHaveAttribute('data-prefetch', 'false');
+    expect(link).toHaveAttribute('target', '_blank');
+    await userEvent.click(link);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it('uses shared row state tokens for selected releases', () => {
     const { container } = render(
       <ShellReleaseRow

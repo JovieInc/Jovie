@@ -198,6 +198,9 @@ GENERATED_SIZE = re.compile(r"(^|/)generated/")
 # Test files: JS/TS conventions plus Python test_*.py and Xcode *Tests/ dirs.
 TEST_FILE = re.compile(r"(\.test\.|\.spec\.|/(?:tests?|__tests__|[^/]*Tests)/|(^|/)test_[^/]+\.py$)")
 DOC_FILE = re.compile(r"(\.mdx?c?$|^docs/|^canon/|\.txt$)")
+# Reviewed source-reference inventory for the nonblocking feedback-linkage audit.
+# Exempt only from the new-test requirement; canonical qualification still runs.
+REFERENCE_DATA_FILES = frozenset({"LESSONS.guards.json"})
 SECRET_FILE = re.compile(r"(^|/)\.env(\.|$)|\.pem$|credentials|id_rsa")
 MAX_REVIEWABLE_LINES = 1500
 PROVIDER_EVIDENCE_SCHEMA = "jovie-provider-lease/v1"
@@ -1338,7 +1341,8 @@ def gate_assessment(changes: list[Change], max_reviewable_lines: int = MAX_REVIE
     paths = [change.path for change in changes]
     if any(SECRET_FILE.search(path) for path in paths):
         failures.append("secret-like-file-changed")
-    code = [p for p in paths if not DOC_FILE.search(p) and not TEST_FILE.search(p) and not GENERATED.search(p)]
+    code = [p for p in paths if p not in REFERENCE_DATA_FILES
+            and not DOC_FILE.search(p) and not TEST_FILE.search(p) and not GENERATED.search(p)]
     if code and not any(TEST_FILE.search(p) for p in paths):
         versions = (dependency_diff.classify(worktree, pr.get("headRefOid"), paths, pr)
                     if worktree is not None and isinstance(pr, dict) else None)
@@ -2011,23 +2015,28 @@ class LinearRequestError(RuntimeError):
         super().__init__("linear: Entity not found: Comment" if missing else "linear: request rejected")
 
 
+class LinearAppCredentialMissing(RuntimeError):
+    """No Jovie Lanes app credential: lanes Linear access fails closed (doctor alert
+    `linear-app-credential-missing`). There is no personal-key fallback. A RuntimeError, so
+    every `except Exception` around Linear (the doctor's tracker, the watchdog) degrades
+    instead of exiting the process."""
+
+
 class Linear:
-    def __init__(self, env_file: Path, app_env: Path | None = None):
-        # The Jovie Lanes app (own quota) when its credentials are installed; Tim's personal
-        # key only when they are absent. `key` scopes cooldowns and caches: for the app it is
-        # the app identity, never the rotating token, so a re-mint keeps the same cooldown.
-        self.app = linear_app_token.credentials(app_env if app_env is not None else linear_app_token.default_path())
-        if self.app:
-            self.key = f"linear-app:{self.app[0]}"
-            return
-        key = linear_app_token.env_values(env_file).get("LINEAR_API_KEY", "")
-        if not key:
-            raise SystemExit(f"no LINEAR_API_KEY in {env_file}")
-        self.key = key
+    def __init__(self, env_file: Path | None = None, app_env: Path | None = None):
+        # Only the Jovie Lanes app credential (own quota, revocable on its own). Tim
+        # 2026-10-20: lanes never fall back to a personal LINEAR_API_KEY, so that key can be
+        # revoked without breaking lanes. `env_file` is accepted for call compatibility and
+        # never read. `key` scopes cooldowns and caches: the app identity, never the token.
+        path = app_env if app_env is not None else linear_app_token.default_path()
+        self.app = linear_app_token.credentials(path)
+        if not self.app:
+            raise LinearAppCredentialMissing(f"no Jovie Lanes Linear app credential at {path}")
+        self.key = f"linear-app:{self.app[0]}"
 
     def _authorization(self, rejected: str | None = None) -> tuple[str, str | None]:
         if not getattr(self, "app", None):
-            return self.key, None
+            raise LinearAppCredentialMissing("no Jovie Lanes Linear app credential")
         try:
             access = linear_app_token.token(*self.app, lane_state_dir(), rejected=rejected)
         except linear_app_token.TokenUnavailable as error:

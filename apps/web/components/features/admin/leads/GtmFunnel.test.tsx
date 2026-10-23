@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-import { getClampedPercent } from './percentages';
+import { formatSharePercent, getClampedPercent } from './percentages';
 
 describe('getClampedPercent', () => {
   it('returns the rounded percentage for normal funnel ratios', () => {
@@ -21,6 +21,22 @@ describe('getClampedPercent', () => {
   it('keeps impossible funnel rates inside the visible percentage range', () => {
     expect(getClampedPercent(125, 100)).toBe(100);
     expect(getClampedPercent(-5, 100)).toBe(0);
+  });
+});
+
+describe('formatSharePercent', () => {
+  it('never rounds a non-zero count to 0%', () => {
+    expect(formatSharePercent(1, 551)).toBe('<1%');
+    expect(formatSharePercent(0, 551)).toBe('0%');
+  });
+
+  it('never rounds a partial share up to 100%', () => {
+    expect(formatSharePercent(550, 551)).toBe('>99%');
+    expect(formatSharePercent(551, 551)).toBe('100%');
+  });
+
+  it('shows -- when there is no denominator', () => {
+    expect(formatSharePercent(3, 0)).toBe('--');
   });
 });
 
@@ -56,6 +72,9 @@ describe('GtmFunnel drop-off rates', () => {
     );
 
     expect(screen.getByText(/361 Disqualified \(66%\)/)).toBeInTheDocument();
-    expect(screen.getByText(/1 Rejected \(0%\)/)).toBeInTheDocument();
+    expect(screen.getByText(/1 Rejected \(<1%\)/)).toBeInTheDocument();
+    expect(screen.getByTestId('gtm-pipeline-scope')).toHaveTextContent(
+      'All time · outreach leads · 551 total leads'
+    );
   });
 });
