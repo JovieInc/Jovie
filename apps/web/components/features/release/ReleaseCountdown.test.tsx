@@ -92,4 +92,33 @@ describe('ReleaseCountdown', () => {
     expect(refresh).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it('colors compact unit labels with a token that clears 4.5:1 on the card', () => {
+    render(
+      <ReleaseCountdown
+        releaseDate={new Date('2031-04-18T19:04:00.000Z')}
+        compact
+      />
+    );
+
+    // text-white/35 computed to #666668 on the dark card (#131417) at
+    // ~3.2:1 and failed the /product/pre-save axe color-contrast capture;
+    // text-secondary-token clears 4.5:1 on the surface token in both modes.
+    const unitLabel = screen.getByText('H');
+    expect(unitLabel).toHaveClass('text-secondary-token');
+    expect(unitLabel.className).not.toMatch(/text-white\/\d+/u);
+  });
+
+  it('colors the non-compact labels and units with the same token', () => {
+    render(
+      <ReleaseCountdown releaseDate={new Date('2031-04-18T19:04:00.000Z')} />
+    );
+
+    expect(screen.getByText('Drops in')).toHaveClass('text-secondary-token');
+    for (const unit of ['days', 'hrs', 'min']) {
+      const label = screen.getByText(unit);
+      expect(label).toHaveClass('text-secondary-token');
+      expect(label.className).not.toMatch(/text-white\/\d+/u);
+    }
+  });
 });
