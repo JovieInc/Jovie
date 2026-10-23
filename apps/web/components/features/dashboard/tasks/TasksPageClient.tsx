@@ -1,4 +1,6 @@
 'use client';
+
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 // @coverage-via apps/web/tests/unit/dashboard/TasksPageClient.test.tsx
 
 import {
@@ -943,7 +945,7 @@ function TaskTitleEditor({
         rows={1}
         aria-label='Task Title'
         onChange={event => onChange(event.target.value)}
-        placeholder='Untitled Task' // ui-casing-allow: default task title placeholder
+        placeholder={COPY_FALLBACKS.task}
         className='w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-[1.75rem] font-semibold leading-[1.15] tracking-normal text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
         style={{
           height: measuredHeight,

@@ -52,7 +52,7 @@ describe('picker row style guard', () => {
       "import { ShellListRowFrame } from './table/atoms/ShellListRowFrame';"
     );
     expect(rowSource).toContain("chrome='shell'");
-    expect(rowSource).toContain("density='standard'");
+    expect(rowSource).toContain("density='dense'");
     expect(rowSource).not.toContain("className='system-b-table-row-shell");
     expect(rowSource).toContain("<RowVisual item={item} variant='dense' />");
     expect(rowSource).toContain("<RowBody item={item} variant='dense' />");

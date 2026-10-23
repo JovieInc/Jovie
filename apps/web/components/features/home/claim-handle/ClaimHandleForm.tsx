@@ -158,6 +158,7 @@ export function ClaimHandleForm({
         className={cn(
           'claim-input-row',
           'system-b-claim-handle-row',
+          'focus-field-inset',
           'relative flex w-full items-center gap-2',
           isAvailable && 'claim-input-row--available'
         )}
@@ -194,15 +195,9 @@ export function ClaimHandleForm({
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
             className={cn(
               'system-b-claim-handle-input',
-              // JOV-INV-019: tailwind-merge collapses focus-visible:outline
-              // and focus-visible:outline-2 into the same conflict group and
-              // keeps only the last one, so outline-style never actually
-              // turns on (outline-width without outline-style paints
-              // nothing) — and focus-visible:border-focus had no border
-              // width on this bare input to make a color change visible.
-              // focus-ring-themed is the shared box-shadow-based ring the
-              // rest of the app uses for exactly this reason.
-              'min-w-0 flex-1 bg-transparent focus-ring-themed',
+              // The field frame owns the single inset ring (.focus-field-inset).
+              // A ring on this input draws a second rectangle inside the row.
+              'min-w-0 flex-1 bg-transparent focus-visible:outline-none',
               isHeroLike
                 ? 'placeholder:text-quaternary-token'
                 : 'placeholder:text-tertiary-token'

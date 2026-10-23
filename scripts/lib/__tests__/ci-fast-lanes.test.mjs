@@ -2324,6 +2324,22 @@ describe('source-read guard selection', () => {
         ).toContain("from 'node:test'");
         continue;
       }
+      if (guard.id === 'oasdiff-breaking-change') {
+        expect(guard.command).toContain(
+          'node scripts/invariants/oasdiff-breaking-change.mjs'
+        );
+        expect(guard.prOnly).toBe(true);
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/oasdiff-breaking-change.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
       if (guard.id === 'codex-bootstrap') {
         expect(guard.command).toContain('--experimental-test-coverage');
         expect(guard.command).toContain('--test-coverage-lines=90');
