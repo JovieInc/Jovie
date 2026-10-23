@@ -78,6 +78,7 @@ describe('ProviderCell actions', () => {
     const sourceFiles = [
       'components/features/dashboard/organisms/releases/cells/ProviderCell.tsx',
       'components/features/dashboard/organisms/releases/components/ProviderCopyButton.tsx',
+      'components/features/dashboard/organisms/releases/components/NotFoundCopyButton.tsx',
     ];
 
     for (const sourceFile of sourceFiles) {
@@ -86,6 +87,30 @@ describe('ProviderCell actions', () => {
       expect(source).not.toMatch(/\btransition-all\b/);
       expect(source).not.toMatch(/\bscale-(?:50|95|100|105|110|125)\b/);
       expect(source).toContain('transition-opacity');
+      // Ion tokens only: the copied feedback wears the success token, never
+      // a raw emerald/amber palette color.
+      expect(source).not.toMatch(/emerald-|amber-|orange-|cyan-/);
     }
+
+    // Explicit per-file token reads for the coverage-via receipts on the two
+    // copy buttons (statically resolvable paths).
+    expect(
+      readFileSync(
+        resolve(
+          process.cwd(),
+          'components/features/dashboard/organisms/releases/components/ProviderCopyButton.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain("'border-success/15 bg-success/10 text-success'");
+    expect(
+      readFileSync(
+        resolve(
+          process.cwd(),
+          'components/features/dashboard/organisms/releases/components/NotFoundCopyButton.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain("'border-success/15 bg-success/10 text-success'");
   });
 });

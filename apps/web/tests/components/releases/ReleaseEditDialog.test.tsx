@@ -193,3 +193,31 @@ describe('ReleaseEditDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('ReleaseEditDialog token compliance', () => {
+  it('renders the Manual provider badge on neutral Badge tokens, never amber', () => {
+    render(
+      <ReleaseEditDialog
+        release={createRelease()}
+        providerList={[
+          {
+            key: 'spotify' as ProviderKey,
+            label: 'Spotify',
+            accent: '#1DB954',
+            isPrimary: true,
+          },
+        ]}
+        drafts={{}}
+        isSaving={false}
+        onDraftChange={vi.fn()}
+        onSave={vi.fn()}
+        onReset={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    const badge = screen.getByText('Manual');
+    expect(badge.className).not.toMatch(/amber|emerald|orange/);
+    expect(badge.className).toContain('rounded-md');
+  });
+});

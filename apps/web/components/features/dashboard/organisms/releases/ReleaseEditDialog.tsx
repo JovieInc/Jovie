@@ -1,6 +1,8 @@
 'use client';
 
 // @coverage-via apps/web/tests/components/releases/ReleaseEditDialog.test.tsx
+
+// @coverage-via apps/web/tests/components/releases/ReleaseEditDialog.test.tsx
 import { Badge, Input } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
@@ -141,7 +143,7 @@ export function ReleaseEditDialog({
                       {existing?.source === 'manual' ? (
                         <Badge
                           variant='secondary'
-                          className='rounded-md border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-3xs text-amber-700 dark:text-amber-300'
+                          className='rounded-md px-1.5 py-0.5 text-3xs'
                         >
                           Manual
                         </Badge>

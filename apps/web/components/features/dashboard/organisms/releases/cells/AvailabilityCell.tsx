@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/features/dashboard/organisms/releases/cells/AvailabilityCell.test.tsx
+
 import { Input, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import {
   type FormEvent,
@@ -282,7 +284,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                     <span
                       className={cn(
                         'relative h-2.5 w-2.5 rounded-full',
-                        status === 'manual' && 'ring-2 ring-amber-400/30'
+                        status === 'manual' && 'ring-2 ring-quaternary-token/40'
                       )}
                       style={{ backgroundColor: config.accent }}
                       aria-hidden='true'
@@ -335,7 +337,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                           onClick={createCopyHandler(providerKey, testId)}
                           className={cn(
                             'rounded-full p-1.5 text-tertiary-token transition-[background-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-ring',
-                            isCopied && 'text-emerald-600 dark:text-emerald-400'
+                            isCopied && 'text-success'
                           )}
                         >
                           <Icon

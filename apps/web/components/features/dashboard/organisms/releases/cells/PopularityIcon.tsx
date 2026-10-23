@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/features/dashboard/organisms/releases/cells/PopularityIcon.test.tsx
+
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { memo } from 'react';
 
@@ -13,9 +15,12 @@ interface PopularityIconProps {
  * Features:
  * - 3 vertical bars of increasing height (4px, 8px, 12px)
  * - Low (0-33): 1 bar filled, muted color
- * - Med (34-66): 2 bars filled, amber color
- * - High (67-100): 3 bars filled, green color
+ * - Med (34-66): 2 bars filled, Ion accent
+ * - High (67-100): 3 bars filled, Ion accent
  * - Tooltip showing exact score
+ *
+ * The tier reads from the bar COUNT; every lit bar wears the same Ion accent
+ * token (no raw amber/emerald palette colors).
  */
 export const PopularityIcon = memo(function PopularityIcon({
   popularity,
@@ -40,8 +45,8 @@ export const PopularityIcon = memo(function PopularityIcon({
   // Color mapping for each level
   const colors = {
     low: 'bg-tertiary-token',
-    med: 'bg-amber-400 dark:bg-amber-300',
-    high: 'bg-emerald-500 dark:bg-emerald-400',
+    med: 'bg-accent',
+    high: 'bg-accent',
   };
 
   const activeColor = colors[level];
