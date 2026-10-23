@@ -7,6 +7,7 @@ import {
   type TestInfo,
   test,
 } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 
 const STORY_ID = 'features-dashboard-releases-spotifyconnectdialog--default';
 const VIEWPORTS = [
@@ -30,7 +31,7 @@ async function attachEvidence(page: Page, testInfo: TestInfo, name: string) {
 async function assertAccessible(page: Page) {
   const results = await new AxeBuilder({ page })
     .include('[role="dialog"]')
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .options(wcag22AaAxeOptions())
     .analyze();
 
   expect(

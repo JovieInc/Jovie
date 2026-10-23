@@ -1897,7 +1897,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/tests/',
       'apps/web/styles/',
       'packages/ui/',
-      'chromatic\\.config\\.json$',
       'package\\.json$',
       'DESIGN\\.md$',
       'design\\.tokens\\.json$',
@@ -2764,7 +2763,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/.storybook/main.ts',
       'apps/web/.storybook/preview.tsx',
       'apps/web/.storybook/stories/elevation-matrix.stories.tsx',
-      'chromatic.config.json',
     ]) {
       expect(selectsStructural.test(storybookHarnessPath)).toBe(true);
     }
@@ -2806,7 +2804,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
   });
 
-  it('runs hosted structural CI for Storybook, Chromatic, and token-guard inputs', () => {
+  it('runs hosted structural CI for Storybook and token-guard inputs', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -2838,7 +2836,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(
       uiRe.test('apps/web/.storybook/stories/elevation-matrix.stories.tsx')
     ).toBe(true);
-    expect(uiRe.test('chromatic.config.json')).toBe(true);
+    expect(uiRe.test('chromatic.config.json')).toBe(false);
     expect(uiRe.test('scripts/shared-ui-visual-arbitrary-audit.mjs')).toBe(
       true
     );
