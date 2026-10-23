@@ -28,10 +28,11 @@ describe('desktop list density', () => {
       'components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.tsx'
     );
 
-    expect(row).toContain("density='dense'");
+    expect(row).toContain('getShellListRowFrameClassName');
+    expect(row).toContain("density: 'dense'");
     expect(row).toContain('h-8');
     expect(row).toContain('size={20}');
-    expect(row).not.toContain("density='spacious'");
+    expect(row).not.toContain("density: 'spacious'");
     expect(row).not.toContain('size={40}');
   });
 

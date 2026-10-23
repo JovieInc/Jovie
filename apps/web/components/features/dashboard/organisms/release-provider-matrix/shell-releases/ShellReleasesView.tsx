@@ -25,6 +25,7 @@ import {
   type ContextMenuItemType,
   convertContextMenuItems,
   TableContextMenu,
+  TableRoot,
   useAmbientListSelection,
 } from '@/components/organisms/table';
 import type {
@@ -305,7 +306,8 @@ function ReleasesListContent({
   }
 
   return (
-    <table
+    <TableRoot
+      rowMode='dense'
       ref={listboxRef}
       aria-label='Releases'
       className='block w-full py-1.5 space-y-px px-2'
@@ -331,7 +333,7 @@ function ReleasesListContent({
           </tbody>
         </TableContextMenu>
       ))}
-    </table>
+    </TableRoot>
   );
 }
 

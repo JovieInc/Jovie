@@ -1,12 +1,14 @@
 import { render, screen } from '@testing-library/react';
+import { createRef } from 'react';
 import { describe, expect, it } from 'vitest';
 import { TableCell } from '../atoms/TableCell';
 import { TableBody, TableRoot, TableRow } from './SemanticTable';
 
 describe('SemanticTable row geometry', () => {
   it('forwards the selected row mode to the semantic table containing investor cells', () => {
+    const tableRef = createRef<HTMLTableElement>();
     render(
-      <TableRoot rowMode='two-line'>
+      <TableRoot rowMode='two-line' aria-label='Investors' ref={tableRef}>
         <TableBody>
           <TableRow>
             <TableCell multiline>
@@ -17,7 +19,8 @@ describe('SemanticTable row geometry', () => {
         </TableBody>
       </TableRoot>
     );
-    const table = screen.getByRole('table');
+    const table = screen.getByRole('table', { name: 'Investors' });
+    expect(tableRef.current).toBe(table);
     expect(table).toHaveAttribute('data-table-row-mode', 'two-line');
     expect(table.style.getPropertyValue('--table-row-height')).toBe('56px');
     expect(table.style.getPropertyValue('--table-cell-content-height')).toBe(

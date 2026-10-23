@@ -48,7 +48,7 @@ for (const width of [390, 1440]) {
           `release-row-${state}-${theme}-${width}.png`
         );
         await page.screenshot({ path: screenshot });
-        await testInfo.attach(`release-row-${state}-${theme}-${width}`, {
+        await testInfo.attach(`release-row-${state}-${theme}-${width}.png`, {
           path: screenshot,
           contentType: 'image/png',
         });
