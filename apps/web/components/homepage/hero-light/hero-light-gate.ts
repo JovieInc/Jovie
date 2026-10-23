@@ -1,16 +1,15 @@
 /**
  * Homepage hero light gate.
  *
- * night-dj-harmony-v1 / performance-invariants-v1 (gbrain
- * `jovie/coordination/performance-invariants-v1`; repo contract
- * `docs/performance/performance-invariants-v1.md`) keep glow and glass on CSS
- * tokens and disallow canvas, WebGL, and video on a surface. This file does
- * not amend that invariant. The CSS renderer is the invariant-safe look.
- * `HERO_LIGHT_WEBGL_EXCEPTION` is a proposal for Tim, default off.
+ * night-dj-harmony-v1 (`docs/design/night-dj-harmony-v1.md`) and
+ * performance-invariants-v1 (`docs/performance/performance-invariants-v1.md`)
+ * keep glow and glass on CSS tokens and disallow canvas, WebGL, and video on
+ * a surface. The standing sentence is unchanged. The scoped exception below
+ * applies only when `SHOW_HOMEPAGE_HERO_LIGHT_WEBGL` is on, and only to this
+ * hero. Both flags stay default off.
  *
- * gbrain-unavailable: the CLI was not installed here, so the wording above is
- * the task's statement of that invariant plus the repo performance contract.
- * No Linear issue — ad-hoc.
+ * gbrain-unavailable: the CLI was not installed here. The repo contracts are
+ * the copies this check reads. No Linear issue — ad-hoc.
  */
 
 export const HERO_LIGHT_SCENE = {
@@ -76,18 +75,84 @@ export const HERO_CANVAS_FOCAL = {
 /** Design headline for the flagged canvas. The shipped hero copy is unchanged. */
 export const HERO_CANVAS_HEADLINE = 'Be found. Be understood.';
 
-/** Proposal only. Shipping this object does not approve a canvas on `/`. */
+export const HERO_CANVAS_BRAND_LABEL = 'Jovie';
+export const HERO_CANVAS_SIGN_IN = 'Sign in';
+
+/** Standing rule. The exception does not replace this sentence. */
+export const HERO_LIGHT_WEBGL_RULE =
+  'Glow and glass stay CSS tokens. No canvas, WebGL, or video on a surface.';
+
+/**
+ * Approved 2026-10-22 8:47 PM PT. The rule text stays. Canvas is allowed only
+ * while `SHOW_HOMEPAGE_HERO_LIGHT_WEBGL` is on, on this hero, and nowhere else.
+ * `amendsInvariant` stays false because the standing sentence is unchanged.
+ */
 export const HERO_LIGHT_WEBGL_EXCEPTION = {
-  status: 'proposed',
+  schema: 'hero-light-webgl-exception/v1',
+  status: 'approved',
+  approval: 'approved by Tim, scoped to the flagged hero prototype only',
+  approvedAt: '2026-10-22 8:47 PM PT',
   approver: 'Tim',
+  rule: HERO_LIGHT_WEBGL_RULE,
   invariant: 'night-dj-harmony-v1',
   sibling: 'performance-invariants-v1',
   amendsInvariant: false,
   surface: 'homepage hero decorative layer',
   cssFlag: 'SHOW_HOMEPAGE_HERO_LIGHT',
   webglFlag: 'SHOW_HOMEPAGE_HERO_LIGHT_WEBGL',
+  appliesOnlyWhen: 'SHOW_HOMEPAGE_HERO_LIGHT_WEBGL',
   defaultOff: true,
+  otherSurfaces: false,
+  module: 'apps/web/components/homepage/hero-light/hero-light-gl.ts',
 } as const;
+
+const EXCEPTION_RECORD_PATTERN =
+  /<!-- hero-light-webgl-exception\/v1\n([\s\S]*?)\n-->/u;
+
+/** Reads the checked-in exception. A missing or wider record is a violation. */
+export function heroLightWebGLExceptionViolations(document: string): string[] {
+  const errors: string[] = [];
+  const match = document.match(EXCEPTION_RECORD_PATTERN);
+  if (!match?.[1]) {
+    errors.push('exception record missing');
+    return errors;
+  }
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(match[1]) as Record<string, unknown>;
+  } catch {
+    errors.push('exception record is not JSON');
+    return errors;
+  }
+  const expectedKeys = Object.keys(HERO_LIGHT_WEBGL_EXCEPTION).sort();
+  const actualKeys = Object.keys(parsed).sort();
+  if (JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys)) {
+    errors.push('exception record fields changed');
+  }
+  for (const key of expectedKeys) {
+    const expected =
+      HERO_LIGHT_WEBGL_EXCEPTION[
+        key as keyof typeof HERO_LIGHT_WEBGL_EXCEPTION
+      ];
+    if (JSON.stringify(parsed[key]) !== JSON.stringify(expected)) {
+      errors.push(`${key} does not match the approved exception`);
+    }
+  }
+  if (parsed.appliesOnlyWhen !== HERO_LIGHT_WEBGL_EXCEPTION.webglFlag) {
+    errors.push('exception must apply only when the WebGL flag is on');
+  }
+  if (parsed.appliesOnlyWhen === HERO_LIGHT_WEBGL_EXCEPTION.cssFlag) {
+    errors.push('the CSS flag does not authorize a canvas');
+  }
+  if (parsed.otherSurfaces !== false) {
+    errors.push('exception must not cover any other surface');
+  }
+  const standingRule = document.replace(EXCEPTION_RECORD_PATTERN, '');
+  if (!standingRule.includes(HERO_LIGHT_WEBGL_RULE)) {
+    errors.push('standing rule removed outside the exception record');
+  }
+  return errors;
+}
 
 export function sceneUnitRgb(hex: string): [number, number, number] {
   const value = Number.parseInt(hex.slice(1), 16);

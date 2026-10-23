@@ -3,7 +3,12 @@ import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { HERO_LIGHT_PERF, HERO_LIGHT_SCENE } from './hero-light-gate';
+import {
+  HERO_LIGHT_PERF,
+  HERO_LIGHT_SCENE,
+  HERO_LIGHT_WEBGL_RULE,
+  heroLightWebGLExceptionViolations,
+} from './hero-light-gate';
 
 const DIR = join(__dirname);
 
@@ -67,15 +72,29 @@ describe('homepage hero light budget', () => {
     );
   });
 
-  it('does not amend the performance invariant contract', () => {
+  it('records the scoped WebGL exception without rewriting the standing rule', () => {
     const repo = join(DIR, '../../../../..');
     const canon = readFileSync(join(repo, 'canon/invariants.jsonl'), 'utf8');
     const perf = readFileSync(
       join(repo, 'docs/performance/performance-invariants-v1.md'),
       'utf8'
     );
+    const harmony = readFileSync(
+      join(repo, 'docs/design/night-dj-harmony-v1.md'),
+      'utf8'
+    );
     expect(canon).not.toContain('SHOW_HOMEPAGE_HERO_LIGHT');
-    expect(perf).not.toContain('HomepageHeroLight');
-    expect(perf).not.toContain('SHOW_HOMEPAGE_HERO_LIGHT');
+    expect(perf).toContain('Rules binding repo edits');
+    expect(perf).toContain(
+      'This contract file intentionally changes no product or CI behavior.'
+    );
+    expect(perf).toContain(HERO_LIGHT_WEBGL_RULE);
+    expect(harmony.startsWith('# night-dj-harmony-v1')).toBe(true);
+    expect(heroLightWebGLExceptionViolations(perf)).toEqual([]);
+    expect(heroLightWebGLExceptionViolations(harmony)).toEqual([]);
+    const withoutRule = harmony.replace(HERO_LIGHT_WEBGL_RULE, '');
+    expect(heroLightWebGLExceptionViolations(withoutRule)).toContain(
+      'standing rule removed outside the exception record'
+    );
   });
 });

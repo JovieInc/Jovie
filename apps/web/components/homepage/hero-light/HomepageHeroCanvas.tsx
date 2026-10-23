@@ -10,7 +10,9 @@ import { HOMEPAGE_COPY, type HomepageCopy } from '@/data/homepageCopy';
 import { HomepageHeroLight } from './HomepageHeroLight';
 import './HomepageHeroCanvas.css';
 import {
+  HERO_CANVAS_BRAND_LABEL,
   HERO_CANVAS_HEADLINE,
+  HERO_CANVAS_SIGN_IN,
   type HomepageHeroLightRenderer,
 } from './hero-light-gate';
 import { bindHeroCanvasScroll } from './hero-light-scroll';
@@ -51,7 +53,7 @@ export function HomepageHeroCanvas({
         <div className='homepage-hero-canvas__bar-plate'>
           <Link
             href={APP_ROUTES.HOME}
-            aria-label='Jovie'
+            aria-label={HERO_CANVAS_BRAND_LABEL}
             className='homepage-hero-canvas__brand'
           >
             <BrandLogo size='splash' tone='white' alt='' aria-hidden />
@@ -70,7 +72,7 @@ export function HomepageHeroCanvas({
             href={APP_ROUTES.SIGNIN}
             className='homepage-hero-canvas__sign-in'
           >
-            Sign in
+            {HERO_CANVAS_SIGN_IN}
           </Link>
         </div>
       </header>

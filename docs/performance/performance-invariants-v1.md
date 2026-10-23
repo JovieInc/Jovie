@@ -98,3 +98,41 @@ Route-response-latency budgets in this file are **not** a substitute for keeping
 path free of blocking I/O. The thread-blocking gate is `JOV-INV-031`
 ([latency-sensitive-execution-v1](./latency-sensitive-execution-v1.md)). That gate invents
 no numbers here and does not claim that async metadata changes crawler/bot wait.
+
+## Homepage hero WebGL exception
+
+The rules above are unchanged. This section does not add a row 1–3 budget and does not
+change product or CI behavior while both flags stay off.
+
+`night-dj-harmony-v1` still reads: Glow and glass stay CSS tokens. No canvas, WebGL, or video on a surface.
+
+approved by Tim, scoped to the flagged hero prototype only. Dated 2026-10-22 8:47 PM PT.
+
+The exception applies only when `SHOW_HOMEPAGE_HERO_LIGHT_WEBGL` is on, and only to the
+homepage hero decorative layer. It does not apply to any other surface.
+`SHOW_HOMEPAGE_HERO_LIGHT` stays inside the rule, including the glass bar
+(`backdrop-filter` via `--blur-header`). Both flags stay default off. There is no video.
+The canvas is `aria-hidden` and `pointer-events: none`, and it loads after idle.
+Reduced motion, save-data, and low-power never create a canvas. The CSS flag alone
+never authorizes a canvas.
+
+<!-- hero-light-webgl-exception/v1
+{
+  "schema": "hero-light-webgl-exception/v1",
+  "status": "approved",
+  "approval": "approved by Tim, scoped to the flagged hero prototype only",
+  "approvedAt": "2026-10-22 8:47 PM PT",
+  "approver": "Tim",
+  "rule": "Glow and glass stay CSS tokens. No canvas, WebGL, or video on a surface.",
+  "invariant": "night-dj-harmony-v1",
+  "sibling": "performance-invariants-v1",
+  "amendsInvariant": false,
+  "surface": "homepage hero decorative layer",
+  "cssFlag": "SHOW_HOMEPAGE_HERO_LIGHT",
+  "webglFlag": "SHOW_HOMEPAGE_HERO_LIGHT_WEBGL",
+  "appliesOnlyWhen": "SHOW_HOMEPAGE_HERO_LIGHT_WEBGL",
+  "defaultOff": true,
+  "otherSurfaces": false,
+  "module": "apps/web/components/homepage/hero-light/hero-light-gl.ts"
+}
+-->

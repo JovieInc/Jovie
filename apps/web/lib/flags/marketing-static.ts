@@ -52,8 +52,8 @@ export const FEATURE_FLAGS = {
   SHOW_PUBLIC_ABOUT_FOOTER_REFRESH: false,
   // Hero light prototype. Off keeps today's homepage pixel-identical.
   // CSS is the invariant-safe look (no canvas). WebGL is a second flag and
-  // does nothing unless the CSS flag is also on. Tim has not approved the
-  // night-dj-harmony-v1 canvas exception; do not flip either default.
+  // does nothing unless the CSS flag is also on. Tim approved the scoped
+  // canvas exception on 2026-10-22 8:47 PM PT; both defaults stay off.
   SHOW_HOMEPAGE_HERO_LIGHT: false,
   SHOW_HOMEPAGE_HERO_LIGHT_WEBGL: false,
 } as const;

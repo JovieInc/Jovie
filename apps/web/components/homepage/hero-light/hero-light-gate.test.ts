@@ -3,6 +3,8 @@ import {
   HERO_LIGHT_PERF,
   HERO_LIGHT_SCENE,
   HERO_LIGHT_WEBGL_EXCEPTION,
+  HERO_LIGHT_WEBGL_RULE,
+  heroLightWebGLExceptionViolations,
   isLowPowerBattery,
   nextLateFrameCount,
   resolveHomepageHeroLight,
@@ -147,11 +149,39 @@ describe('frame budget', () => {
       dprCap: 1,
     });
     expect(HERO_LIGHT_WEBGL_EXCEPTION).toMatchObject({
-      status: 'proposed',
+      status: 'approved',
+      approval: 'approved by Tim, scoped to the flagged hero prototype only',
+      approvedAt: '2026-10-22 8:47 PM PT',
       approver: 'Tim',
       amendsInvariant: false,
+      appliesOnlyWhen: 'SHOW_HOMEPAGE_HERO_LIGHT_WEBGL',
       defaultOff: true,
+      otherSurfaces: false,
     });
+    expect(heroLightWebGLExceptionViolations('')).toContain(
+      'exception record missing'
+    );
+    const widened = `<!-- hero-light-webgl-exception/v1
+${JSON.stringify({ ...HERO_LIGHT_WEBGL_EXCEPTION, otherSurfaces: true }, null, 2)}
+-->
+${HERO_LIGHT_WEBGL_RULE}`;
+    expect(heroLightWebGLExceptionViolations(widened).join('\n')).toMatch(
+      /other surface|does not match the approved exception/
+    );
+    const cssOnly = `<!-- hero-light-webgl-exception/v1
+${JSON.stringify(
+  {
+    ...HERO_LIGHT_WEBGL_EXCEPTION,
+    appliesOnlyWhen: HERO_LIGHT_WEBGL_EXCEPTION.cssFlag,
+  },
+  null,
+  2
+)}
+-->
+${HERO_LIGHT_WEBGL_RULE}`;
+    expect(heroLightWebGLExceptionViolations(cssOnly).join('\n')).toMatch(
+      /WebGL flag|CSS flag/
+    );
   });
 });
 
