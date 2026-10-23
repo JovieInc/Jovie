@@ -105,8 +105,10 @@ variant, reviewed second.
 Expensive polish is restraint plus materiality. One hero artifact per section
 may carry subtle glass and edge-light. Keep generous negative space, one
 controlled glow, and an 8-pt rhythm on the 4px grid. Motion is one long ease
-with the existing reduced-motion fallback. Treat glass as a material on that
-artifact. ZiaWI stays at five elevations.
+with the existing reduced-motion fallback. Glass on that artifact is CSS
+token glass only: a low-opacity fill, a 1px edge highlight, and a soft blur.
+No heavy frosting. ZiaWI stays at five elevations. Locked mixes stay in
+`apps/web/data/marketing/mediaRecipes.ts`.
 
 ### Subtlety
 
@@ -122,9 +124,10 @@ colors.
 
 ### Product as hero
 
-Use real product mockups (profile, claim flow, release, analytics), cropped
-and framed at one consistent device scale. Callouts are thin leader lines and
-12–13px labels, at most 3 per mockup. Dense screenshot collages and
+Use real product UI rendered from the app: Playwright captures at 2x or
+higher from seeded demo data (profile, claim flow, release, analytics). Crop
+and frame them at one consistent device scale. Callouts are thin leader lines
+and 12–13px labels, at most 3 per mockup. Dense screenshot collages and
 label-connector diagrams stay rejected
 ([MKT-D05](../docs/marketing/DESIGN_INVARIANTS.md#mkt-d05--choose-the-medium-before-the-component)).
 
@@ -152,6 +155,9 @@ path for investors and founders, then the final CTA.
 - Orange as a scene or cue color.
 - A literal triad.
 - Canvas, WebGL, or video on the surface by default (`night-dj-harmony-v1`). Shaders and light are baked images plus CSS motion. WebGL only as a flagged, approved exception.
+- Heavy frosting, or glass that is not CSS token glass (low-opacity fill, a 1px edge highlight, soft blur).
+- AI-generated or hand-drawn illustrations of UI. AI images are lighting and mood plates only, with no UI, text, or logos; real UI is composited on top.
+- Product mockups that are not Playwright captures of the app at 2x or higher from seeded demo data.
 
 ---
 
@@ -179,6 +185,7 @@ The executable landing-page copy workflow is in
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-23 | Marketing glass is CSS token glass only. Product UI is a Playwright capture at 2x or higher from seeded demo data. AI images are mood plates with no UI, text, or logos. | Tim glass and mockup rule |
 | 2026-10-23 | Night cues drop scan. Canvas, WebGL, and video stay off the surface by default; WebGL is a flagged, approved exception. | Tim subtlety rule |
 | 2026-10-23 | Added the felt-not-seen subtlety rule, scene-palette cue colors, and night-surface hard negatives to the art-directed marketing brief. | Tim subtlety rule |
 | 2026-10-23 | Added the art-directed marketing surface brief as the marketing-only exception to smallest-change design guidance. | Homepage art-direction brief; founder wording review |
