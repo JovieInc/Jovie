@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -117,6 +118,27 @@ describe('public CTA guard', () => {
     expect(
       screen.getAllByRole('link', { name: 'Request access' })
     ).toHaveLength(1);
+  });
+
+  it('keeps deferred user-menu copy reachable from the public header language audit', () => {
+    const files = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import { collectScanFiles } from './scripts/invariants/icp-language/scan.mjs';
+           import { loadConfig } from './scripts/invariants/icp-language/match.mjs';
+           const config = { ...loadConfig(), pageRoots: [], seeds: ['apps/web/components/organisms/HeaderNav.tsx'] };
+           console.log(JSON.stringify(collectScanFiles(undefined, config)));`,
+        ],
+        { cwd: join(ROOT, '..', '..'), encoding: 'utf8' }
+      )
+    ) as string[];
+
+    expect(files).toContain(
+      'apps/web/components/organisms/user-button/useUserButton.ts'
+    );
   });
 
   it('audits the exact public CTA owner modules', () => {
