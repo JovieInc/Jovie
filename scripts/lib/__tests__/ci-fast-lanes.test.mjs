@@ -2182,6 +2182,7 @@ describe('source-read guard selection', () => {
         'static-revalidate-policy',
         'art-direction',
         'icp-language',
+        'marketing-rounded-media',
       ],
     ],
     [
@@ -2369,6 +2370,7 @@ describe('source-read guard selection', () => {
         );
         continue;
       }
+
       if (guard.id === 'art-direction') {
         expect(guard.command).toContain(
           'scripts/invariants/art-direction/run.mjs'
@@ -2386,6 +2388,14 @@ describe('source-read guard selection', () => {
             'utf8'
           )
         ).toContain('describe(');
+        continue;
+      }
+
+      if (guard.id === 'marketing-rounded-media') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toBe(
+          'node --test scripts/invariants/art-direction/rounded.test.mjs'
+        );
         continue;
       }
       if (guard.id === 'script-contracts') {
