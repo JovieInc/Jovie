@@ -77,10 +77,14 @@ function DemoQueryProbe() {
     remaining: number;
     weeklyLimit: number;
   }>(queryKeys.chat.usage());
+  const crawlers = queryClient.getQueryData<{ totalRequests: number }>(
+    queryKeys.dashboard.aiCrawlers()
+  );
 
   return (
     <div>
       <span data-testid='demo-billing-plan'>{billing?.plan}</span>
+      <span data-testid='demo-crawler-reads'>{crawlers?.totalRequests}</span>
       <span data-testid='demo-usage-snapshot'>
         {usage?.remaining}/{usage?.weeklyLimit}
       </span>
@@ -146,6 +150,7 @@ describe('DemoAuthShell', () => {
     );
     expect(screen.getByTestId('demo-auth-shell-wrapper')).toBeInTheDocument();
     expect(screen.getByTestId('demo-billing-plan')).toHaveTextContent('max');
+    expect(screen.getByTestId('demo-crawler-reads')).toHaveTextContent('216');
     expect(screen.getByTestId('demo-usage-snapshot')).toHaveTextContent(
       '122/250'
     );

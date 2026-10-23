@@ -452,7 +452,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       title: 'Releases With Sidebar',
       route: '/demo',
       waitFor: '[data-testid="release-sidebar"]',
-      interaction: 'open-first-release',
+      interaction: 'open-first-release-dsps',
       publicExportPath: 'releases-dashboard-sidebar.png',
       playerTimestamp: '1:42',
       fixedNow: '2026-06-12T16:00:00.000Z',

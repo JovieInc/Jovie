@@ -34,6 +34,7 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 import { queryKeys } from '@/lib/queries';
 import type { BillingStatusData } from '@/lib/queries/useBillingStatusQuery';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
+import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 import { DemoPlayerCapture } from './DemoPlayerCapture';
 import {
   DEMO_DASHBOARD_DATA,
@@ -94,6 +95,25 @@ function createDemoQueryClient(
     warningThreshold: 50,
     isNearLimit: false,
   });
+  client.setQueryData<AiCrawlerAnalyticsResponse>(
+    queryKeys.dashboard.aiCrawlers(),
+    {
+      totalRequests: 216,
+      weeklyRequests: 64,
+      crawlers: [
+        {
+          id: 'gptbot',
+          name: 'GPTBot',
+          requests: 216,
+          previousPeriodRequests: 152,
+        },
+      ],
+      dailyTrend: [{ date: '2026-04-15', requests: 18 }],
+      syncedAt: '2026-04-15T16:00:00.000Z',
+      isPro: true,
+      isTeaser: false,
+    }
+  );
   seedQueryClient?.(client, dashboardData);
 
   return client;
