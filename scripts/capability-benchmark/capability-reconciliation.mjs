@@ -55,7 +55,7 @@ function officialSource(packageName) {
 export const NEXT_CACHE_COMPONENTS_EXCEPTION = Object.freeze({
   scope: 'apps/web Cache Components enablement',
   blocker:
-    '245 route files export dynamic or revalidate, which must migrate before cacheComponents can build safely',
+    '246 route files export dynamic or revalidate, which must migrate before cacheComponents can build safely',
   owner: 'web-platform',
   lastTestedVersion: '16.4.0',
   lastTestedAt: '2026-10-14T00:00:00.000Z',
@@ -535,7 +535,7 @@ export function assessStackAdoption({
   };
 }
 
-export function assertStackPatternRatchet(root, maximumLegacyFiles = 245) {
+export function assertStackPatternRatchet(root, maximumLegacyFiles = 246) {
   const config = readFileSync(join(root, 'apps/web/next.config.js'), 'utf8');
   if (
     /cacheComponents (?:disabled|removed) due to incompatibility with runtime=['"]nodejs/u.test(

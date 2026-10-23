@@ -726,6 +726,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/product/traffic-quality/page.tsx",
+      "kind": "page",
+      "route": "/product/traffic-quality",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/renders/[state]/page.tsx",
       "kind": "page",
       "route": "/renders/[state]",
