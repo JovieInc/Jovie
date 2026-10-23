@@ -21,7 +21,7 @@ describe('DataPrivacySection', () => {
     const row = title.closest('[data-tone="destructive"]');
 
     expect(row).toHaveAttribute('data-state', 'idle');
-    expect(title).toHaveClass('text-error');
+    expect(title).toHaveClass('text-error-text');
     expect(
       screen.getByText(
         'Permanently remove your account, profile, contacts, and all associated data. This action cannot be undone.'

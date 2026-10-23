@@ -146,7 +146,10 @@ describe('QuickAddSuggestions', () => {
       // Get all button elements (pills are interactive)
       const buttons = screen.getAllByRole('button');
       const labels = buttons.map(btn =>
-        btn.textContent?.replace('+', '').trim()
+        btn.textContent
+          ?.replace(/^Select [^:]+: /, '')
+          .replace('+', '')
+          .trim()
       );
 
       // First platforms should be from SOCIAL_FIRST_ORDER
@@ -174,7 +177,10 @@ describe('QuickAddSuggestions', () => {
       // Get all button elements
       const buttons = screen.getAllByRole('button');
       const labels = buttons.map(btn =>
-        btn.textContent?.replace('+', '').trim()
+        btn.textContent
+          ?.replace(/^Select [^:]+: /, '')
+          .replace('+', '')
+          .trim()
       );
 
       // Music order starts with: spotify-artist, spotify, apple-music, youtube, youtube-music
@@ -203,7 +209,10 @@ describe('QuickAddSuggestions', () => {
 
       const buttons = screen.getAllByRole('button');
       const labels = buttons.map(btn =>
-        btn.textContent?.replace('+', '').trim()
+        btn.textContent
+          ?.replace(/^Select [^:]+: /, '')
+          .replace('+', '')
+          .trim()
       );
 
       // With instagram and tiktok filtered, youtube should be first (social order)
@@ -336,7 +345,10 @@ describe('QuickAddSuggestions', () => {
 
       const buttons = screen.getAllByRole('button');
       const labels = buttons.map(btn =>
-        btn.textContent?.replace('+', '').trim()
+        btn.textContent
+          ?.replace(/^Select [^:]+: /, '')
+          .replace('+', '')
+          .trim()
       );
 
       // Should use social order (Instagram first)

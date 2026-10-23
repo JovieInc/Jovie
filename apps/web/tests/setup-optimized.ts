@@ -210,6 +210,7 @@ vi.mock('motion/react', async () => {
     children ?? null;
   const tableComponents = new Map<string, typeof passthrough>();
   return {
+    MotionGlobalConfig: { skipAnimations: false },
     AnimatePresence: ({ children }: { children: unknown }) => children,
     LazyMotion: ({ children }: { children: unknown }) => children,
     motion: new Proxy(
