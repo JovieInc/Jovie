@@ -1,5 +1,4 @@
-import { MarketingContainer } from '@/components/marketing';
-import { PublicPageShell } from '@/components/site/PublicPageShell';
+import { MarketingContentShell } from '@/components/marketing/MarketingContentShell';
 
 export const revalidate = false;
 
@@ -9,17 +8,8 @@ export default function DmcaLegalLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <PublicPageShell
-      className='public-legal-shell bg-base text-primary-token'
-      headerVariant='minimal'
-      logoSize='sm'
-    >
-      <MarketingContainer
-        className='public-legal-content py-16 sm:py-20'
-        width='page'
-      >
-        {children}
-      </MarketingContainer>
-    </PublicPageShell>
+    <MarketingContentShell className='public-legal-content'>
+      {children}
+    </MarketingContentShell>
   );
 }

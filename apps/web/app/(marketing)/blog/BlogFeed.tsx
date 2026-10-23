@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import {
-  MarketingContainer,
   MarketingEditorialHeroPhoto,
   MarketingHero,
 } from '@/components/marketing';
+import { MarketingContentShell } from '@/components/marketing/MarketingContentShell';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import type {
   BlogPostSummary,
@@ -54,10 +54,10 @@ export function BlogFeed({ entries }: Readonly<BlogFeedProps>) {
           <h1 className='system-b-marketing-route-title mb-6 mt-6 max-w-2xl text-primary-token line-clamp-2'>
             Blog
           </h1>
-          <p className='max-w-xl text-lg leading-relaxed text-secondary-token'>
-            {COPY_FALLBACKS.posts}
-          </p>
         </BlogHeroFrame>
+        <MarketingContentShell width='page'>
+          <p className='text-secondary-token'>{COPY_FALLBACKS.posts}</p>
+        </MarketingContentShell>
       </div>
     );
   }
@@ -75,13 +75,13 @@ export function BlogFeed({ entries }: Readonly<BlogFeedProps>) {
         </p>
       </BlogHeroFrame>
 
-      <section
-        aria-label='Blog Posts'
-        data-testid='marketing-section-blog-feed'
-        data-marketing-variant='featured-grid'
-        data-marketing-owner='apps/web/app/(marketing)/blog/BlogFeed.tsx'
-      >
-        <MarketingContainer width='page' className='pb-20 sm:pb-28'>
+      <MarketingContentShell width='page'>
+        <section
+          aria-label='Blog Posts'
+          data-testid='marketing-section-blog-feed'
+          data-marketing-variant='featured-grid'
+          data-marketing-owner='apps/web/app/(marketing)/blog/BlogFeed.tsx'
+        >
           <div className='marketing-divider mb-10' />
 
           <div className='mb-10'>
@@ -99,8 +99,8 @@ export function BlogFeed({ entries }: Readonly<BlogFeedProps>) {
               ))}
             </div>
           )}
-        </MarketingContainer>
-      </section>
+        </section>
+      </MarketingContentShell>
     </div>
   );
 }

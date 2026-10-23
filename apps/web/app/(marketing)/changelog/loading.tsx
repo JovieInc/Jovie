@@ -1,4 +1,5 @@
 import { MarketingContainer } from '@/components/marketing';
+import { MarketingContentShell } from '@/components/marketing/MarketingContentShell';
 import './changelog-editorial.css';
 
 /**
@@ -34,7 +35,7 @@ export default function ChangelogLoading() {
       </section>
 
       {/* Archive content skeleton: copy, sticky subscribe, and outcomes */}
-      <MarketingContainer width='page' className='changelog-content'>
+      <MarketingContentShell width='page' className='changelog-content'>
         <div className='changelog-content__grid'>
           <div className='changelog-lead__copy'>
             <div className='h-5 w-full max-w-lg skeleton rounded' />
@@ -65,7 +66,7 @@ export default function ChangelogLoading() {
             ))}
           </div>
         </div>
-      </MarketingContainer>
+      </MarketingContentShell>
     </div>
   );
 }

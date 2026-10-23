@@ -8,7 +8,7 @@ export interface BlogMarkdownReaderProps {
 // Extracted markdown styling classes for reusability
 const MARKDOWN_STYLES = cn(
   // Base text styles using design tokens
-  'max-w-none text-lg leading-relaxed text-secondary-token text-linear',
+  'min-w-0 max-w-none break-words text-lg leading-relaxed text-secondary-token text-linear',
 
   // First paragraph styling (drop cap effect area)
   '[&>p:first-of-type]:text-xl [&>p:first-of-type]:leading-relaxed [&>p:first-of-type]:text-primary-token',
@@ -63,7 +63,7 @@ const MARKDOWN_STYLES = cn(
   '[&_img]:my-10 [&_img]:rounded-xl [&_img]:w-full',
 
   // Tables
-  '[&_table]:my-8 [&_table]:w-full [&_table]:text-left [&_table]:border-collapse',
+  '[&_table]:my-8 [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_table]:w-full [&_table]:text-left [&_table]:border-collapse',
   '[&_th]:pb-3 [&_th]:text-sm [&_th]:font-semibold [&_th]:text-tertiary-token [&_th]:border-b [&_th]:border-border-default',
   '[&_td]:py-3 [&_td]:text-secondary-token [&_td]:border-b [&_td]:border-border-subtle'
 );

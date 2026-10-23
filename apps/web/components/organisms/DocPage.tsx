@@ -21,7 +21,7 @@ export function DocPage({ doc, aside, pdfTitle }: DocPageProps) {
   return (
     <div className='space-y-10'>
       <DocPrintScope />
-      <div className='flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between'>
+      <div className='flex flex-col gap-6'>
         <LegalHero
           title={doc.title}
           lastUpdated={doc.lastUpdated}
@@ -31,18 +31,12 @@ export function DocPage({ doc, aside, pdfTitle }: DocPageProps) {
           <DocToolbar pdfTitle={pdfTitle} />
         </div>
       </div>
-      <div className='border-y border-neutral-200 py-5 dark:border-white/10 lg:hidden'>
-        <LegalSidebar toc={doc.toc} />
-      </div>
-      <div className='grid min-w-0 gap-12 lg:grid-cols-[220px_minmax(0,760px)] xl:grid-cols-[240px_minmax(0,800px)]'>
-        <aside
-          data-doc-sidebar
-          className='max-lg:hidden lg:sticky lg:top-24 lg:self-start'
-        >
+      <div className='space-y-8'>
+        <div data-doc-sidebar className='border-y border-subtle py-5'>
           <LegalSidebar toc={doc.toc} />
-          {aside}
-        </aside>
-        <LegalMarkdownReader html={doc.html} className='min-w-0' />
+        </div>
+        <LegalMarkdownReader html={doc.html} />
+        {aside}
       </div>
     </div>
   );

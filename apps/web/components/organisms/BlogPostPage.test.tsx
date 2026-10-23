@@ -1,7 +1,25 @@
 import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { BlogPost } from '@/lib/blog/getBlogPosts';
 import type { ResolvedAuthor } from '@/lib/blog/resolveAuthor';
+
+vi.mock('next/link', () => ({
+  default: ({
+    href,
+    prefetch,
+    children,
+    ...props
+  }: {
+    readonly href: string;
+    readonly prefetch?: boolean;
+    readonly children?: ReactNode;
+  }) => (
+    <a href={href} data-prefetch={String(prefetch)} {...props}>
+      {children}
+    </a>
+  ),
+}));
 
 vi.mock('@/components/features/share/PublicShareMenu', () => ({
   PublicShareMenu: () => <button type='button'>Share</button>,
@@ -38,7 +56,7 @@ const author: ResolvedAuthor = {
 
 describe('BlogPostPage', () => {
   it('composes the canonical content-prose body', () => {
-    render(
+    const { container } = render(
       <BlogPostPage
         post={post}
         author={author}
@@ -49,6 +67,15 @@ describe('BlogPostPage', () => {
     );
 
     expect(
+      container.querySelector('[data-public-content-shell]')
+    ).toHaveAttribute('data-public-content-width', 'prose');
+    expect(
+      screen.getByRole('navigation', { name: 'Table of contents' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Ship with context' })
+    ).toBeVisible();
+    expect(
       screen.getByRole('heading', { level: 1, name: 'Release rhythm' })
     ).toBeInTheDocument();
     expect(
@@ -57,5 +84,29 @@ describe('BlogPostPage', () => {
     expect(
       screen.getByRole('heading', { level: 2, name: 'Ship with context' })
     ).toBeInTheDocument();
+  });
+
+  it('does not prefetch a creator profile that the static build may not contain', () => {
+    render(
+      <BlogPostPage
+        post={post}
+        author={{ ...author, profileUrl: '/tim' }}
+        toc={post.toc}
+        relatedPosts={[]}
+        relatedAuthors={new Map()}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'Jovie' })).toHaveAttribute(
+      'data-prefetch',
+      'false'
+    );
+    expect(
+      screen.getByRole('link', { name: 'View profile →' })
+    ).toHaveAttribute('data-prefetch', 'false');
+    expect(screen.getByRole('link', { name: 'Blog' })).toHaveAttribute(
+      'data-prefetch',
+      'undefined'
+    );
   });
 });

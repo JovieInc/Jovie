@@ -6,6 +6,7 @@ import {
 } from '@/components/marketing';
 import { ChangelogSubscribeColumn } from '@/components/marketing/changelog/ChangelogSubscribeColumn';
 import { CustomerChangelogArchive } from '@/components/marketing/changelog/CustomerChangelogArchive';
+import { MarketingContentShell } from '@/components/marketing/MarketingContentShell';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -148,7 +149,7 @@ export default async function ChangelogPage() {
     <div className='min-h-screen bg-page text-primary-token'>
       <ReleaseJournalHero latest={latest} />
 
-      <MarketingContainer width='page' className='changelog-content'>
+      <MarketingContentShell width='page' className='changelog-content'>
         <div className='changelog-content__grid'>
           <div className='changelog-lead__copy'>
             <p id='changelog-lead-intro' className='changelog-lead__intro'>
@@ -182,7 +183,7 @@ export default async function ChangelogPage() {
             />
           </div>
         </div>
-      </MarketingContainer>
+      </MarketingContentShell>
 
       <MarketingFooterCta
         title='Take control of your presence.'
