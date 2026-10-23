@@ -17,7 +17,7 @@ const FEATURE_SKELETON_KEYS = Array.from(
 export default function PricingLoading() {
   return (
     <div className='min-h-screen bg-page'>
-      <div className='mx-auto max-w-7xl px-4 py-20 sm:py-28 sm:px-6 lg:px-8'>
+      <div className='public-container py-20 sm:py-28'>
         {/* Header skeleton */}
         <div className='text-center mb-20'>
           <div className='mx-auto h-12 w-96 max-w-full skeleton rounded-lg mb-6' />
@@ -25,7 +25,7 @@ export default function PricingLoading() {
         </div>
 
         {/* Three-tier pricing grid skeleton */}
-        <div className='max-w-6xl mx-auto'>
+        <div>
           <div className='grid md:grid-cols-3 gap-6'>
             {TIER_SKELETON_KEYS.map(key => (
               <div

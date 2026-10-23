@@ -4007,6 +4007,7 @@ if (p.endsWith('/zip')) {
   it('registers the marketing pricing page for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/pricing/page.tsx';
     const layoutSource = 'apps/web/app/(marketing)/pricing/layout.tsx';
+    const loadingSource = 'apps/web/app/(marketing)/pricing/loading.tsx';
     const screen = SCREEN_REGISTRY.find(
       entry => entry.id === 'web.marketing-pricing'
     );
@@ -4015,9 +4016,15 @@ if (p.endsWith('/zip')) {
       id: 'web.marketing-pricing',
       platform: 'web',
       owner: 'marketing-pricing',
-      sources: [source, layoutSource],
+      sources: [source, layoutSource, loadingSource],
       viewports: ['desktop', 'mobile'],
     });
+
+    const loadingResult = evaluateChangedScreens({
+      changedFiles: [{ path: loadingSource, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(loadingResult.issues, []);
 
     const result = evaluateChangedScreens({
       changedFiles: [{ path: source, status: 'M' }],
