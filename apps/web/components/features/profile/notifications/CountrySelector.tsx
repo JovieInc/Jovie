@@ -136,20 +136,18 @@ export function CountrySelector({
           <ChevronDown className='w-3.5 h-3.5 text-tertiary-token' />
         </button>
       </PopoverTrigger>
-      <PopoverContent
-        align='start'
-        sideOffset={6}
-        className='w-64 rounded-(--radius-3xl) border border-[color:var(--profile-panel-border)] bg-(--profile-drawer-bg) p-2 shadow-(--profile-panel-shadow) backdrop-blur-2xl'
-      >
-        <div className='max-h-64 overflow-y-auto'>
-          {COUNTRY_OPTIONS.map(option => (
-            <CountryOptionButton
-              key={option.code}
-              option={option}
-              isSelected={country.code === option.code}
-              onSelect={handleSelect}
-            />
-          ))}
+      <PopoverContent align='start' sideOffset={6} size='bare' className='w-64'>
+        <div className='bg-(--profile-drawer-bg) p-2 backdrop-blur-2xl'>
+          <div className='max-h-64 overflow-y-auto'>
+            {COUNTRY_OPTIONS.map(option => (
+              <CountryOptionButton
+                key={option.code}
+                option={option}
+                isSelected={country.code === option.code}
+                onSelect={handleSelect}
+              />
+            ))}
+          </div>
         </div>
       </PopoverContent>
     </Popover>

@@ -46,20 +46,23 @@ function TerritoryPills({
         <PopoverContent
           side='top'
           align='start'
-          className='w-auto min-w-45 rounded-2xl border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] p-3 text-white dark:text-white shadow-[0_20px_48px_rgba(0,0,0,0.4)]'
+          size='bare'
+          className='w-auto min-w-45'
         >
-          <p className='text-2xs font-semibold tracking-[0.08em] text-white/42'>
-            Territories
-          </p>
-          <div className='mt-2 flex flex-wrap gap-1.5'>
-            {territories.map(territory => (
-              <span
-                key={territory}
-                className='inline-flex rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-2xs font-caption text-white/72'
-              >
-                {territory}
-              </span>
-            ))}
+          <div className='bg-[color:var(--profile-drawer-bg)] p-3 text-white dark:text-white'>
+            <p className='text-2xs font-semibold tracking-[0.08em] text-white/42'>
+              Territories
+            </p>
+            <div className='mt-2 flex flex-wrap gap-1.5'>
+              {territories.map(territory => (
+                <span
+                  key={territory}
+                  className='inline-flex rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-2xs font-caption text-white/72'
+                >
+                  {territory}
+                </span>
+              ))}
+            </div>
           </div>
         </PopoverContent>
       </Popover>

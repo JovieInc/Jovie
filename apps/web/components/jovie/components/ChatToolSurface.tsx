@@ -10,7 +10,12 @@ import { cn } from '@/lib/utils';
  */
 export const CHAT_TOOL_CANCELLED_LABEL = 'Cancelled' as const;
 
-export type ChatToolSurfaceTone = 'default' | 'success' | 'cancelled' | 'flat';
+export type ChatToolSurfaceTone =
+  | 'default'
+  | 'success'
+  | 'cancelled'
+  | 'destructive'
+  | 'flat';
 
 interface ChatToolSurfaceProps {
   readonly children: ReactNode;
@@ -50,6 +55,8 @@ export function ChatToolSurface({
         'system-b-chat-tool-surface',
         tone === 'success' && 'system-b-chat-tool-surface-success',
         tone === 'cancelled' && 'system-b-chat-tool-surface-cancelled',
+        tone === 'destructive' &&
+          'system-b-chat-link-card system-b-chat-link-card-remove',
         className
       )}
     >

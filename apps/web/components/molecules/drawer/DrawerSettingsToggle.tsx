@@ -44,7 +44,7 @@ export function DrawerSettingsToggle({
     <div
       data-testid={testId}
       className={cn(
-        'flex items-center justify-between gap-3 rounded-lg border py-px transition-[background-color,border-color] duration-subtle',
+        'flex items-center justify-between gap-3 rounded-lg border py-1 transition-[background-color,border-color] duration-subtle',
         density === 'compact'
           ? 'border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'
           : 'border-(--app-shell-frame-seam) bg-surface-0',
@@ -67,9 +67,6 @@ export function DrawerSettingsToggle({
         {label}
       </label>
       <Switch
-        stateStyling='owner'
-        className='h-6 bg-transparent before:h-4 before:w-7 before:rounded-full before:border before:border-subtle before:bg-surface-2 data-[state=checked]:before:border-transparent data-[state=checked]:before:bg-btn-primary'
-        thumbClassName='relative'
         id={id}
         checked={checked}
         onCheckedChange={onCheckedChange}
