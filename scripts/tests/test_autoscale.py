@@ -403,7 +403,11 @@ class AutoscaleTest(unittest.TestCase):
                               feed["autoscale"]["lanes"]["devin"]["base"], len(feed["autoscale"]["history"])), ("apply", 6, 4, 10))
         spec = importlib.util.spec_from_file_location("hud_fixture", ROOT / "scripts/tests/test_hud.py"); fixture = importlib.util.module_from_spec(spec); spec.loader.exec_module(fixture)
         def text(value):
-            return "\n".join(fixture.plain(line) for line in fixture.hud.render(value, 160, 45))
+            # Use the widest two-column geometry so the optional autoscale mode fits
+            # beside the effective/base slot counts in the WORKERS panel heading.
+            frame = fixture.hud.render(value, 199, 45)
+            # Scaling arrows belong to the worker summary; the footer also has scroll arrows.
+            return next(cell for cell in fixture.cells(frame) if cell.startswith(" WORKERS "))
         self.assertIn("1 running / 3 (devin 1/2 · codex 0/1)", text(fixture.model())); self.assertNotIn("auto:", text(fixture.model())); shown = fixture.model(); shown["local"].update(autoscaleMode="apply", baseSlots={"devin": 2, "codex": 2}, slots={"devin": 3, "codex": 1}); rendered = text(shown); self.assertIn("devin 1/3↑2", rendered); self.assertIn("codex 0/1↓2", rendered); self.assertIn("auto:apply", rendered); level = fixture.model()
         level["local"].update(autoscaleMode="observe", baseSlots={"devin": 2, "codex": 1}); rendered = text(level); self.assertIn("1 running / 3 (devin 1/2 · codex 0/1)", rendered); self.assertIn("auto:observe", rendered); self.assertNotIn("↑", rendered)
         with tempfile.TemporaryDirectory() as tmp:
