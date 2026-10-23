@@ -16,6 +16,7 @@ import {
   type SurfaceBaselineTrust,
   type SurfaceProfile,
   surfaceEvidenceDigest,
+  type TrustedSurfaceBaseline,
 } from './performance-surface-comparator';
 import { runSurfaceComparison } from './performance-surface-compare';
 
@@ -94,6 +95,56 @@ const candidate = (
     run(p, `${prefix}-${p.platform}`, head, minute, feedback, usable)
   );
 
+function compare(
+  baseline: TrustedSurfaceBaseline,
+  runs = candidate(),
+  head = candidateHead,
+  checkedAt = now
+) {
+  return compareSurfaceMeasurements(baseline, runs, head, checkedAt);
+}
+
+function controlCohort(head: string, minutes: number[], lastFeedback = 40) {
+  return profiles.flatMap(p =>
+    minutes.map((minute, index) =>
+      run(
+        p,
+        `control-${head}-${p.platform}-${minute}`,
+        head,
+        minute,
+        index === minutes.length - 1 ? lastFeedback : 40
+      )
+    )
+  );
+}
+
+function withFeedbackNoise(
+  bundle: SurfaceBaselineBundle,
+  allowance = 2
+): SurfaceBaselineBundle {
+  return {
+    ...bundle,
+    policy: {
+      ...bundle.policy,
+      surfaces: bundle.policy.surfaces.map(surface => ({
+        ...surface,
+        noiseAllowance: {
+          ...surface.noiseAllowance,
+          p50FirstFeedbackMs: allowance,
+          p95FirstFeedbackMs: allowance,
+        },
+      })),
+    },
+    controls: bundle.controls.map((control, index) => ({
+      ...control,
+      samples: control.samples.map(sample => ({
+        ...sample,
+        firstFeedbackMs: index % 3 === 2 ? 42 : 40,
+      })),
+    })),
+  };
+}
+
 function fixture(
   change?: (bundle: SurfaceBaselineBundle) => SurfaceBaselineBundle
 ) {
@@ -122,25 +173,15 @@ function fixture(
       sampleCount: 5,
       surfaces: profiles.map(p => ({
         profile: p,
-        ceilings: {
-          p50FirstFeedbackMs: 100,
-          p95FirstFeedbackMs: 100,
-          p95UsableStateMs: 300,
-          p95RenderToInteractiveMs: 50,
-          maxDroppedFrameCount: 0,
-        },
+        ceilings: { ...values(100, 300), p95RenderToInteractiveMs: 50 },
         noiseAllowance: { ...values(0, 0), p95RenderToInteractiveMs: 0 },
       })),
     },
-    controls: profiles.flatMap(p =>
-      [1, 2, 3].map(index =>
-        run(p, `control-${p.platform}-${index}`, head, index, 40, 140)
-      )
-    ),
+    controls: controlCohort(head, [1, 2, 3]),
     history: [
       {
         parentDigest: null,
-        runs: profiles.map(p => run(p, `baseline-${p.platform}`, head, 10)),
+        runs: candidate(head, 40, 140, 'baseline', 10),
       },
     ],
   };
@@ -180,9 +221,7 @@ describe('trusted surface regression comparator', () => {
     expect(
       buildInteractionLatencyReport({ samples: runs[0]!.samples }).status
     ).toBe('pass');
-    expect(
-      compareSurfaceMeasurements(f.load(), runs, candidateHead, now)
-    ).toMatchObject({
+    expect(compare(f.load(), runs)).toMatchObject({
       status: 'fail',
       reasons: [expect.stringContaining('regression:')],
     });
@@ -190,79 +229,48 @@ describe('trusted surface regression comparator', () => {
 
   it('accepts legitimate improvement independently on desktop, phone, and native', () => {
     const f = fixture();
-    expect(
-      compareSurfaceMeasurements(
-        f.load(),
-        candidate(candidateHead, 35, 120),
-        candidateHead,
-        now
-      ).status
-    ).toBe('pass');
+    expect(compare(f.load(), candidate(candidateHead, 35, 120)).status).toBe(
+      'pass'
+    );
   });
 
   it.each([
-    'platform',
-    'browser',
-    'measurementVersion',
-    'fixtureVersion',
-  ] as const)(
-    'rejects an incompatible %s rather than pooling profiles',
-    field => {
-      const f = fixture();
-      const runs = candidate();
-      runs[0] = {
-        ...runs[0]!,
-        profile: { ...runs[0]!.profile, [field]: 'changed' },
-      };
-      expect(
-        compareSurfaceMeasurements(f.load(), runs, candidateHead, now).status
-      ).toBe('fail');
-    }
-  );
-
-  it.each([
-    'authPersona',
-    'buildMode',
-    'cacheState',
-    'cpuProfile',
-    'datasetSize',
-    'networkProfile',
-    'viewport',
-    'workers',
-  ] as const)('rejects changed workload %s', field => {
+    ['platform', false],
+    ['browser', false],
+    ['measurementVersion', false],
+    ['fixtureVersion', false],
+    ['authPersona', true],
+    ['buildMode', true],
+    ['cacheState', true],
+    ['cpuProfile', true],
+    ['datasetSize', true],
+    ['networkProfile', true],
+    ['viewport', true],
+    ['workers', true],
+  ] as const)('rejects incompatible %s (workload %s)', (field, workload) => {
     const f = fixture();
     const runs = candidate();
+    const original = runs[0]!;
+    const changed = { [field]: field === 'workers' ? 1 : 'changed' };
     runs[0] = {
-      ...runs[0]!,
-      profile: {
-        ...runs[0]!.profile,
-        workload: {
-          ...runs[0]!.profile.workload,
-          [field]: field === 'workers' ? 1 : 'changed',
-        },
-      },
+      ...original,
+      profile: workload
+        ? {
+            ...original.profile,
+            workload: { ...original.profile.workload, ...changed },
+          }
+        : { ...original.profile, ...changed },
     };
-    expect(
-      compareSurfaceMeasurements(f.load(), runs, candidateHead, now).status
-    ).toBe('fail');
+    expect(compare(f.load(), runs).status).toBe('fail');
   });
 
   it('does not let a missing slower phone surface disappear', () => {
     const f = fixture();
-    expect(
-      compareSurfaceMeasurements(
-        f.load(),
-        candidate().slice(0, 1),
-        candidateHead,
-        now
-      )
-    ).toMatchObject({
+    expect(compare(f.load(), candidate().slice(0, 1))).toMatchObject({
       status: 'fail',
       reasons: [expect.stringContaining('missing required surfaces')],
     });
-    expect(
-      compareSurfaceMeasurements(f.load(), [], candidateHead, now).status
-    ).toBe('fail');
+    expect(compare(f.load(), []).status).toBe('fail');
   });
 
   it('keeps a failed first attempt failed when its retry passes', () => {
@@ -270,26 +278,12 @@ describe('trusted surface regression comparator', () => {
     const runs = candidate();
     const first = { ...runs[0]!, status: 'fail' as const };
     const retry = { ...runs[0]!, id: 'retry', attempt: 2 };
-    expect(
-      compareSurfaceMeasurements(
-        f.load(),
-        [first, ...runs.slice(1), retry],
-        candidateHead,
-        now
-      )
-    ).toMatchObject({
+    expect(compare(f.load(), [first, ...runs.slice(1), retry])).toMatchObject({
       status: 'fail',
       diagnosticRetries: 1,
       reasons: ['failed or missing first attempt'],
     });
-    expect(
-      compareSurfaceMeasurements(
-        f.load(),
-        [...runs.slice(1), retry],
-        candidateHead,
-        now
-      ).status
-    ).toBe('fail');
+    expect(compare(f.load(), [...runs.slice(1), retry]).status).toBe('fail');
   });
 
   it('never scores diagnostic retries even if their metrics fail', () => {
@@ -302,9 +296,10 @@ describe('trusted surface regression comparator', () => {
       status: 'fail' as const,
       samples: [],
     };
-    expect(
-      compareSurfaceMeasurements(f.load(), [...runs, retry], candidateHead, now)
-    ).toMatchObject({ status: 'pass', diagnosticRetries: 1 });
+    expect(compare(f.load(), [...runs, retry])).toMatchObject({
+      status: 'pass',
+      diagnosticRetries: 1,
+    });
   });
 
   it('rejects incomplete, nonfinite, duplicate, or truncated samples', () => {
@@ -322,12 +317,10 @@ describe('trusted surface regression comparator', () => {
       samples.map(sample => ({ ...sample, droppedFrameCount: 0.5 })),
     ]) {
       expect(
-        compareSurfaceMeasurements(
-          baseline,
-          [{ ...candidate()[0]!, samples: invalid }, ...candidate().slice(1)],
-          candidateHead,
-          now
-        ).status
+        compare(baseline, [
+          { ...candidate()[0]!, samples: invalid },
+          ...candidate().slice(1),
+        ]).status
       ).toBe('fail');
     }
   });
@@ -336,12 +329,7 @@ describe('trusted surface regression comparator', () => {
     const f = fixture();
     const baseline = f.load();
     expect(
-      compareSurfaceMeasurements(
-        baseline,
-        candidate(),
-        candidateHead,
-        epoch + 120 * 60_000
-      ).status
+      compare(baseline, candidate(), candidateHead, epoch + 120 * 60_000).status
     ).toBe('fail');
     const runs = candidate();
     for (const override of [
@@ -352,17 +340,11 @@ describe('trusted surface regression comparator', () => {
       { attempt: 0 },
     ]) {
       expect(
-        compareSurfaceMeasurements(
-          baseline,
-          [{ ...runs[0]!, ...override }, ...runs.slice(1)],
-          candidateHead,
-          now
-        ).status
+        compare(baseline, [{ ...runs[0]!, ...override }, ...runs.slice(1)])
+          .status
       ).toBe('fail');
     }
-    expect(compareSurfaceMeasurements(baseline, runs, '', now).status).toBe(
-      'fail'
-    );
+    expect(compare(baseline, runs, '').status).toBe('fail');
   });
 
   it.each([20, 40])(
@@ -373,16 +355,7 @@ describe('trusted surface regression comparator', () => {
         policy: { ...bundle.policy, maxAgeMs: maxAgeMinutes * 60_000 },
         controls: [
           ...bundle.controls,
-          ...profiles.flatMap(p =>
-            [40, 41, 42].map(minute =>
-              run(
-                p,
-                `fresh-control-${p.platform}-${minute}`,
-                bundle.controls[0]!.head,
-                minute
-              )
-            )
-          ),
+          ...controlCohort(bundle.controls[0]!.head, [40, 41, 42]),
         ],
         history: bundle.history.map(entry => ({
           ...entry,
@@ -398,7 +371,7 @@ describe('trusted surface regression comparator', () => {
       } else {
         const baseline = f.load();
         expect(
-          compareSurfaceMeasurements(
+          compare(
             baseline,
             candidate(candidateHead, 40, 140, 'fresh', 48),
             candidateHead,
@@ -414,14 +387,7 @@ describe('trusted surface regression comparator', () => {
 
   it('rejects candidate-created baseline handles', () => {
     const f = fixture();
-    expect(
-      compareSurfaceMeasurements(
-        { provenance: f.trust },
-        candidate(),
-        candidateHead,
-        now
-      ).status
-    ).toBe('fail');
+    expect(compare({ provenance: f.trust }).status).toBe('fail');
   });
 
   it('ignores checkout policy edits and candidate-supplied ceilings or history', () => {
@@ -430,10 +396,7 @@ describe('trusted surface regression comparator', () => {
       join(f.root, 'baseline.json'),
       '{"policy":"replaced by candidate"}'
     );
-    expect(
-      compareSurfaceMeasurements(f.load(), candidate(), candidateHead, now)
-        .status
-    ).toBe('pass');
+    expect(compare(f.load()).status).toBe('pass');
     const trustFile = join(f.root, 'host-trust.json');
     const candidateFile = join(f.root, 'candidate.json');
     writeFileSync(trustFile, JSON.stringify(f.trust));
@@ -489,53 +452,14 @@ describe('trusted surface regression comparator', () => {
   });
 
   it('qualifies declared noise with repeated identical-head controls', () => {
-    const f = fixture(bundle => ({
-      ...bundle,
-      policy: {
-        ...bundle.policy,
-        surfaces: bundle.policy.surfaces.map(surface => ({
-          ...surface,
-          noiseAllowance: {
-            ...surface.noiseAllowance,
-            p50FirstFeedbackMs: 50,
-            p95FirstFeedbackMs: 50,
-          },
-        })),
-      },
-      controls: bundle.controls.map((control, index) => ({
-        ...control,
-        samples: control.samples.map(sample => ({
-          ...sample,
-          firstFeedbackMs: index % 3 === 2 ? 42 : 40,
-        })),
-      })),
-    }));
+    const f = fixture(bundle => withFeedbackNoise(bundle, 50));
     const baseline = f.load();
-    expect(
-      compareSurfaceMeasurements(
-        baseline,
-        candidate(candidateHead, 42),
-        candidateHead,
-        now
-      ).status
-    ).toBe('pass');
+    expect(compare(baseline, candidate(candidateHead, 42)).status).toBe('pass');
     // Declared 50ms cannot hide 3ms: controls demonstrated only 2ms.
-    expect(
-      compareSurfaceMeasurements(
-        baseline,
-        candidate(candidateHead, 43),
-        candidateHead,
-        now
-      ).status
-    ).toBe('fail');
-    expect(
-      compareSurfaceMeasurements(
-        baseline,
-        candidate(candidateHead, 100),
-        candidateHead,
-        now
-      ).status
-    ).toBe('fail');
+    expect(compare(baseline, candidate(candidateHead, 43)).status).toBe('fail');
+    expect(compare(baseline, candidate(candidateHead, 100)).status).toBe(
+      'fail'
+    );
   });
 
   it('preserves old controls while qualifying a newer identical-head cohort', () => {
@@ -544,27 +468,12 @@ describe('trusted surface regression comparator', () => {
       ...f.bundle,
       controls: [
         ...f.bundle.controls,
-        ...profiles.flatMap(p =>
-          [20, 21, 22].map(minute =>
-            run(
-              p,
-              `new-control-${p.platform}-${minute}`,
-              f.trust.commit,
-              minute
-            )
-          )
-        ),
+        ...controlCohort(f.trust.commit, [20, 21, 22]),
       ],
     };
     const trust = f.store(refreshed);
     const baseline = loadTrustedSurfaceBaseline(f.root, trust, now);
-    expect(
-      compareSurfaceMeasurements(baseline, candidate(), candidateHead, now)
-        .status
-    ).toBe('pass');
-    expect(refreshed.controls.slice(0, f.bundle.controls.length)).toEqual(
-      f.bundle.controls
-    );
+    expect(compare(baseline).status).toBe('pass');
     const proposal = promoteSurfaceBaseline(
       baseline,
       candidate(trust.commit),
@@ -574,112 +483,31 @@ describe('trusted surface regression comparator', () => {
     expect(proposal.history[0]).toEqual(f.bundle.history[0]);
   });
 
-  it.each([false, true])(
-    'uses the newest complete cohort without pooling noise (reversed %s)',
-    reverse => {
-      const f = fixture(bundle => ({
-        ...bundle,
-        policy: {
-          ...bundle.policy,
-          surfaces: bundle.policy.surfaces.map(surface => ({
-            ...surface,
-            noiseAllowance: {
-              ...surface.noiseAllowance,
-              p50FirstFeedbackMs: 2,
-              p95FirstFeedbackMs: 2,
-            },
-          })),
-        },
-        controls: bundle.controls.map((control, index) => ({
-          ...control,
-          samples: control.samples.map(sample => ({
-            ...sample,
-            firstFeedbackMs: index % 3 === 2 ? 42 : 40,
-          })),
-        })),
-      }));
+  it.each([
+    { tied: false, reverse: false },
+    { tied: false, reverse: true },
+    { tied: true, reverse: false },
+    { tied: true, reverse: true },
+  ])(
+    'selects the newest cohort with SHA ties, without pooling noise ($tied/$reverse)',
+    ({ tied, reverse }) => {
+      const f = fixture(withFeedbackNoise);
       const controls = [
         ...f.bundle.controls,
-        ...profiles.flatMap(p =>
-          [20, 21, 22].map(minute =>
-            run(
-              p,
-              `new-control-${p.platform}-${minute}`,
-              f.trust.commit,
-              minute
-            )
-          )
-        ),
+        ...controlCohort(f.trust.commit, tied ? [1, 2, 3] : [20, 21, 22]),
       ];
       const trust = f.store({
         ...f.bundle,
         controls: reverse ? controls.reverse() : controls,
       });
       const baseline = loadTrustedSurfaceBaseline(f.root, trust, now);
-      expect(
-        compareSurfaceMeasurements(
-          baseline,
-          candidate(candidateHead, 41),
-          candidateHead,
-          now
-        )
-      ).toMatchObject({
-        status: 'fail',
-        reasons: [expect.stringContaining('regression:')],
-      });
-    }
-  );
-
-  it.each([false, true])(
-    'breaks equal-time cohort ties by head SHA (reversed %s)',
-    reverse => {
-      const f = fixture(bundle => ({
-        ...bundle,
-        policy: {
-          ...bundle.policy,
-          surfaces: bundle.policy.surfaces.map(surface => ({
-            ...surface,
-            noiseAllowance: {
-              ...surface.noiseAllowance,
-              p50FirstFeedbackMs: 2,
-              p95FirstFeedbackMs: 2,
-            },
-          })),
-        },
-        controls: bundle.controls.map((control, index) => ({
-          ...control,
-          samples: control.samples.map(sample => ({
-            ...sample,
-            firstFeedbackMs: index % 3 === 2 ? 42 : 40,
-          })),
-        })),
-      }));
-      const controls = [
-        ...f.bundle.controls,
-        ...profiles.flatMap(p =>
-          [1, 2, 3].map(minute =>
-            run(
-              p,
-              `tied-control-${p.platform}-${minute}`,
-              f.trust.commit,
-              minute
-            )
-          )
-        ),
-      ];
-      const trust = f.store({
-        ...f.bundle,
-        controls: reverse ? controls.reverse() : controls,
-      });
-      const baseline = loadTrustedSurfaceBaseline(f.root, trust, now);
-      expect(
-        compareSurfaceMeasurements(
-          baseline,
-          candidate(candidateHead, 41),
-          candidateHead,
-          now
-        ).status
-      ).toBe(f.head < f.trust.commit ? 'pass' : 'fail');
+      const result = compare(baseline, candidate(candidateHead, 41));
+      const expected = tied && f.head < f.trust.commit ? 'pass' : 'fail';
+      expect(result.status).toBe(expected);
+      if (expected === 'fail')
+        expect(result.reasons).toEqual([
+          expect.stringContaining('regression:'),
+        ]);
     }
   );
 
@@ -691,25 +519,16 @@ describe('trusted surface regression comparator', () => {
         ...f.bundle,
         controls: [
           ...f.bundle.controls,
-          ...profiles.flatMap(p =>
-            Array.from({ length: count }, (_, index) =>
-              run(
-                p,
-                `new-control-${p.platform}-${index}`,
-                f.trust.commit,
-                20 + index,
-                index === count - 1 ? 41 : 40
-              )
-            )
+          ...controlCohort(
+            f.trust.commit,
+            Array.from({ length: count }, (_, index) => 20 + index),
+            41
           ),
         ],
       });
       const load = () => loadTrustedSurfaceBaseline(f.root, trust, now);
       if (count < 3) {
-        expect(
-          compareSurfaceMeasurements(load(), candidate(), candidateHead, now)
-            .status
-        ).toBe('pass');
+        expect(compare(load()).status).toBe('pass');
       } else {
         expect(load).toThrow('unqualified control noise:');
       }
@@ -744,69 +563,48 @@ describe('trusted surface regression comparator', () => {
         })),
       })),
     }));
-    expect(
-      compareSurfaceMeasurements(
-        f.load(),
-        candidate(candidateHead, 40, 300),
-        candidateHead,
-        now
-      )
-    ).toMatchObject({
+    expect(compare(f.load(), candidate(candidateHead, 40, 300))).toMatchObject({
       status: 'fail',
       reasons: ['absolute ceiling exceeded: p95UsableStateMs'],
     });
   });
 
   it('rejects undeclared, unqualified, insufficient, or nonidentical controls', () => {
+    const f = fixture();
+    const { controls, policy } = f.bundle;
+    const first = controls[0]!;
+    const rest = controls.slice(1);
     const cases = [
-      (bundle: SurfaceBaselineBundle) => ({
-        ...bundle,
-        controls: bundle.controls.slice(1),
-      }),
-      (bundle: SurfaceBaselineBundle) => ({
-        ...bundle,
-        controls: bundle.controls.map((control, index) =>
-          index === 0 ? { ...control, head: candidateHead } : control
-        ),
-      }),
-      (bundle: SurfaceBaselineBundle) => ({
-        ...bundle,
-        policy: { ...bundle.policy, declaredAt: at(5) },
-      }),
-      (bundle: SurfaceBaselineBundle) => ({
-        ...bundle,
-        controls: bundle.controls.map((control, index) =>
-          index === 0
-            ? { ...control, samples: control.samples.slice(1) }
-            : control
-        ),
-      }),
-      (bundle: SurfaceBaselineBundle) => ({
-        ...bundle,
-        controls: bundle.controls.map((control, index) =>
-          index === 0
-            ? {
-                ...control,
-                samples: control.samples.map(sample => ({
-                  ...sample,
-                  firstFeedbackMs: 41,
-                })),
-              }
-            : control
-        ),
-      }),
-      (bundle: SurfaceBaselineBundle) => ({
-        ...bundle,
+      { controls: rest },
+      { controls: [{ ...first, head: candidateHead }, ...rest] },
+      { policy: { ...policy, declaredAt: at(5) } },
+      { controls: [{ ...first, samples: first.samples.slice(1) }, ...rest] },
+      {
+        controls: [
+          {
+            ...first,
+            samples: first.samples.map(sample => ({
+              ...sample,
+              firstFeedbackMs: 41,
+            })),
+          },
+          ...rest,
+        ],
+      },
+      {
         policy: {
-          ...bundle.policy,
-          surfaces: bundle.policy.surfaces.map(surface => ({
+          ...policy,
+          surfaces: policy.surfaces.map(surface => ({
             ...surface,
             ceilings: { ...surface.ceilings, p95UsableStateMs: 301 },
           })),
         },
-      }),
+      },
     ];
-    for (const change of cases) expect(fixture(change).load).toThrow();
+    for (const patch of cases) {
+      const trust = f.store({ ...f.bundle, ...patch });
+      expect(() => loadTrustedSurfaceBaseline(f.root, trust, now)).toThrow();
+    }
   });
 
   it('promotes trusted improvements by appending and keeps prior measurements immutable', () => {
@@ -823,83 +621,62 @@ describe('trusted surface regression comparator', () => {
     const trust = f.store(proposal);
     const improved = loadTrustedSurfaceBaseline(f.root, trust, now);
     expect(
-      compareSurfaceMeasurements(
-        improved,
-        candidate(candidateHead, 40, 140, 'next', 40),
-        candidateHead,
-        now
-      )
+      compare(improved, candidate(candidateHead, 40, 140, 'next', 40))
     ).toMatchObject({
       status: 'fail',
       reasons: [expect.stringContaining('regression:')],
     });
-    expect(
-      compareSurfaceMeasurements(
-        improved,
-        candidate(candidateHead, 35, 120, 'next', 40),
-        candidateHead,
-        now
-      ).status
-    ).toBe('pass');
-    expect(() =>
-      promoteSurfaceBaseline(
-        improved,
-        candidate(candidateHead, 35, 120, 'next', 40),
-        now
-      )
-    ).toThrow('candidate head mismatch');
+    const nextRuns = candidate(candidateHead, 35, 120, 'next', 40);
+    expect(compare(improved, nextRuns).status).toBe('pass');
+    expect(() => promoteSurfaceBaseline(improved, nextRuns, now)).toThrow(
+      'candidate head mismatch'
+    );
     expect(readFileSync(join(f.root, 'baseline.json'), 'utf8')).toContain(
       'baseline-desktop'
     );
   });
 
   it('rejects history rewriting, missing history surfaces, and failed historical first attempts', () => {
+    const f = fixture();
+    const entry = f.bundle.history[0]!;
     const cases = [
-      (bundle: SurfaceBaselineBundle) => ({
-        ...bundle,
-        history: [{ ...bundle.history[0]!, parentDigest: '0'.repeat(64) }],
-      }),
-      (bundle: SurfaceBaselineBundle) => ({
-        ...bundle,
-        history: [
-          { ...bundle.history[0]!, runs: bundle.history[0]!.runs.slice(1) },
-        ],
-      }),
-      (bundle: SurfaceBaselineBundle) => ({
-        ...bundle,
-        history: [
-          {
-            ...bundle.history[0]!,
-            runs: bundle.history[0]!.runs.map((control, index) =>
-              index === 0 ? { ...control, status: 'fail' as const } : control
-            ),
-          },
-        ],
-      }),
-      (bundle: SurfaceBaselineBundle) => ({ ...bundle, history: [] }),
+      [{ ...entry, parentDigest: '0'.repeat(64) }],
+      [{ ...entry, runs: entry.runs.slice(1) }],
+      [
+        {
+          ...entry,
+          runs: [
+            { ...entry.runs[0]!, status: 'fail' as const },
+            ...entry.runs.slice(1),
+          ],
+        },
+      ],
+      [],
     ];
-    for (const change of cases) expect(fixture(change).load).toThrow();
+    for (const history of cases) {
+      const trust = f.store({ ...f.bundle, history });
+      expect(() => loadTrustedSurfaceBaseline(f.root, trust, now)).toThrow();
+    }
   });
 
   it('fails missing and malformed file evidence through the report entry point', () => {
     const f = fixture();
     const trustFile = join(f.root, 'host-trust.json');
     const candidateFile = join(f.root, 'candidate.json');
-    expect(
-      runSurfaceComparison(f.root, trustFile, candidateFile, candidateHead, now)
-        .status
-    ).toBe('fail');
+    const report = () =>
+      runSurfaceComparison(
+        f.root,
+        trustFile,
+        candidateFile,
+        candidateHead,
+        now
+      );
+    expect(report().status).toBe('fail');
     writeFileSync(trustFile, JSON.stringify(f.trust));
     writeFileSync(candidateFile, JSON.stringify({ runs: candidate() }));
-    expect(
-      runSurfaceComparison(f.root, trustFile, candidateFile, candidateHead, now)
-        .status
-    ).toBe('pass');
+    expect(report().status).toBe('pass');
     writeFileSync(candidateFile, '{}');
-    expect(
-      runSurfaceComparison(f.root, trustFile, candidateFile, candidateHead, now)
-        .status
-    ).toBe('fail');
+    expect(report().status).toBe('fail');
   });
 
   it('returns real CLI exit codes for passing, regressing, and missing evidence', () => {

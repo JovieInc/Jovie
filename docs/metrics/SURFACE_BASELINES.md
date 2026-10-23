@@ -15,13 +15,11 @@ authenticated `JovieInc/Jovie` remote and supplies a host-owned trust JSON file:
 full current SHA, `path` selects the baseline bundle in that commit, and `digest`
 is the SHA-256 of the exact file bytes, including any trailing newline.
 
-Trust inputs and the expected candidate SHA must come from outside candidate
-artifacts and PR-controlled configuration. A remote URL is an identity check,
-not authentication by itself. The trusted controller owns fetching and pinning;
-the comparator does no network access and cannot establish trust for its caller.
-It checks the remote identity, exact ref/commit/digest, and ancestry of every
-historical/control head. Uncommitted baseline files are ignored. No bootstrap
-from candidate measurements, caller-created handles, or missing baselines exists.
+Trust inputs and the expected candidate SHA come from outside candidate artifacts
+and PR configuration. The controller owns authenticated fetches and pins; remote
+URLs check identity only. The offline comparator verifies identity, exact pins and
+history/control ancestry. It ignores uncommitted files and rejects candidate
+bootstrap, caller-created handles, and missing baselines.
 
 From the repository root:
 
