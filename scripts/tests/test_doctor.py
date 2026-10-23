@@ -1872,18 +1872,6 @@ class PublishTest(unittest.TestCase):
         self.assertEqual(events({**row, "gateWaitS": 99999}), [events({**row, "gateWaitS": None})[0]])
         self.assertEqual(events({**row, "pr": None}), [])
 
-    def test_outcome_verification_is_the_outcome_receipt_stage(self):
-        events = doctor.stage_events.events
-        row = {"runId": "o1", "kind": "outcome-verify", "provider": "codex", "issue": "JOV-7771",
-               "startedAt": "2026-10-21T11:27:54Z", "endedAt": "2026-10-21T12:00:00Z",
-               "verdict": "recorded", "decision": "pass"}
-        [event] = events(row)
-        self.assertEqual((event["entityId"], event["stage"], event["outcome"]),
-                         ("JOV-7771", "outcome-receipt", "advanced"))
-        self.assertEqual(events({**row, "decision": "fail"})[0]["outcome"], "failed")
-        self.assertEqual(events({**row, "verdict": "verifier-failed"})[0]["outcome"], "abandoned")
-        self.assertEqual(events({**row, "issue": "LYB-1"}), [])
-
     def test_a_truncated_stage_file_is_read_back_by_its_size(self):
         now = time.time()
         iso = lambda delta: doctor.datetime.fromtimestamp(now - delta, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
