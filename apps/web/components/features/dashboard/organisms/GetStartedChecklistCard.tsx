@@ -192,7 +192,7 @@ export function GetStartedChecklistCard({
           <button
             type='button'
             onClick={handleDismiss}
-            className='rounded-full border border-transparent px-2 py-0.5 text-2xs text-tertiary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-secondary-token'
+            className='rounded-full border border-transparent px-2 py-1.5 text-2xs text-tertiary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-secondary-token'
           >
             Dismiss
           </button>

@@ -585,3 +585,19 @@ describe('useUndoableAnswers', () => {
     expect(toastMock.success).not.toHaveBeenCalled();
   });
 });
+
+describe('HomeLoopCanvas answered ask dim (a11y AA floor)', () => {
+  it('dims an answered ask card at opacity-75, never 0.70', () => {
+    const askId = HOME_LOOP_FIXTURE_ASKS[0]!.id;
+    render(
+      <HomeLoopCanvas
+        {...props({
+          answers: { [askId]: { label: 'Approved', state: 'sent' } },
+        })}
+      />
+    );
+    const card = screen.getByTestId('home-loop-ask');
+    expect(card).toHaveClass('opacity-75');
+    expect(card).not.toHaveClass('opacity-70');
+  });
+});
