@@ -1,0 +1,16 @@
+.release-scheduling-stage {
+  min-height: 100svh;
+}
+
+.release-scheduling-glow {
+  height: 28rem;
+}
+
+.release-scheduling-card {
+  margin-bottom: -5.5rem;
+  padding-bottom: 7.5rem;
+}
+
+.release-scheduling-title {
+  text-wrap: balance;
+}

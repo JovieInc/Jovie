@@ -934,6 +934,129 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/product/link-analytics/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/link-analytics/LinkAnalyticsLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'Link analytics ships on /product/link-analytics',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live smart-link analytics panel. Each click is counted, with the provider that received it and the time of the last click. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/link-analytics',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/link-analytics/LinkAnalyticsPanel.tsx',
+      testId: 'release-smart-link-analytics',
+    },
+    healthCheck: {
+      path: '/product/link-analytics',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/utm-links/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/utm-links/UtmLinksLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'UTM builder ship on /product/utm-links',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live UTM builder with a filled tracking link. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/utm-links',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/profile/UtmBuilderDialog.tsx',
+      testId: 'utm-builder',
+    },
+    healthCheck: {
+      path: '/product/utm-links',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/release-scheduling/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/release-scheduling/ReleaseSchedulingLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source:
+        'Release date and reveal date fields ship on /product/release-scheduling',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live release date and reveal date fields. A future release date is stored as scheduled. A blank reveal date keeps the page off the public profile until release day. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/release-scheduling',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/components/molecules/DatePicker.tsx',
+      testId: 'release-schedule-fields',
+    },
+    healthCheck: {
+      path: '/product/release-scheduling',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/dsp-links/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/dsp-links/DspLinksLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'DSP link rows ship on /product/dsp-links',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live DSP rows: a saved URL opens that service, and a missing service stays on Find. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/dsp-links',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/components/molecules/inspector/DspQuietRow.tsx',
+      testId: 'dsp-links',
+    },
+    healthCheck: {
+      path: '/product/dsp-links',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
     glob: '(marketing)/product/isrc/page.tsx',
     recipeId: 'feature',
     renderedSections: [

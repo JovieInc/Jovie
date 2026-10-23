@@ -98,11 +98,14 @@ describe('homepage hero light budget', () => {
     );
   });
 
-  it('stacks the hero copy and keeps the proof phone inside the field', () => {
+  it('stacks the hero copy on the shared spine and keeps the proof phone inside the field', () => {
     const css = readFileSync(join(DIR, 'HomepageHeroCanvas.css'), 'utf8');
     const copy = cssBlock(css, '.homepage-hero-canvas__copy');
     expect(copy).toContain('flex-direction: column');
-    expect(copy).toContain('align-items: center');
+    // The copy column is the shared ap-section-container spine, so its
+    // children align to the spine's left edge, not the field center.
+    expect(copy).toContain('align-items: flex-start');
+    expect(copy).toContain('margin-inline: auto');
     const phone = cssBlock(
       css,
       '.homepage-hero-canvas__proof .homepage-artist-hero__phone'
@@ -119,7 +122,7 @@ describe('homepage hero light budget', () => {
     expect(field).toContain('flex-direction: column');
 
     const copy = balancedBlock(narrow, '.homepage-hero-canvas__copy');
-    expect(copy).toContain('flex: 1 1 auto');
+    expect(copy).toContain('flex: 1 0 auto');
     expect(copy).toContain('min-height: 0');
     expect(copy).toContain('overflow: hidden');
     // The phone is in flow, so the copy never reserves fixed space for it.
@@ -129,10 +132,8 @@ describe('homepage hero light budget', () => {
     // In flow under the copy — never layered over the headline.
     expect(proof).toContain('position: relative');
     expect(proof).not.toContain('position: absolute');
-    // Height-driven with the real screen aspect; the ceiling reserves the
-    // bar plus a 20rem copy budget so the phone yields before the copy
-    // clips, then the floor binds, then the copy clips inside itself
-    // bottom-up.
+    // Height-driven with the real screen aspect. The copy cannot shrink;
+    // the field grows when the phone and conversion form need more space.
     expect(proof).toContain(
       'height: min(30svh, 15.75rem, calc(100svh - var(--hero-canvas-bar) - 20rem))'
     );

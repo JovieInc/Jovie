@@ -38,7 +38,7 @@ for (const viewport of [
 
     const platformHeading = surface.getByRole('heading', {
       level: 2,
-      name: /^Mac workspace$/,
+      name: /^Mac Workspace$/,
     });
     await platformHeading.scrollIntoViewIfNeeded();
     await expect(platformHeading).toBeVisible();
