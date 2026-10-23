@@ -1,20 +1,14 @@
-import HudPage, { metadata } from '@/app/hud/page';
+import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 
-export { metadata };
-
-// Next.js route-segment config must be a local literal. Re-exporting
-// `dynamic`/`runtime` fails Turbopack: "mustn't be reexported".
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
-
-export default async function AdminHudPage({
-  searchParams,
-}: Readonly<{
-  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
-}>) {
+/**
+ * Default `/hud` (including the packaged Mac `?ovie=mac` door) rewrites here
+ * and lands on Ovie Home (founder decision 2026-10-20). Kiosk tokens and
+ * `?fs=1` bypass this rewrite and keep the isolated Ops presentation; the
+ * full dashboard lives at /app/ov/ops.
+ */
+export default async function AdminHudRedirectPage() {
   await requireCurrentAdminPageAccess();
-  // The packaged Mac compatibility query resolves to this same shell route.
-  const { ovie: _macDoor, ...params } = await searchParams;
-  return HudPage({ searchParams: Promise.resolve(params) });
+  redirect(APP_ROUTES.OV);
 }

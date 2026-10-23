@@ -7,6 +7,14 @@ import {
   getContactLifecycleStageLabel,
 } from '@/lib/contacts/lifecycle';
 
+/**
+ * Window and population for every lifecycle count. These are deduped contacts
+ * (leads, waitlist, profiles, users) counted once at their current stage, so
+ * they intentionally differ from windowed funnel counts and People tab totals.
+ */
+export const CANONICAL_LIFECYCLE_SCOPE =
+  'All time · deduped contacts, each counted once at current stage (not cumulative)';
+
 interface CanonicalLifecycleFunnelProps {
   readonly metrics: CanonicalContactMetrics;
 }
@@ -20,10 +28,18 @@ export function CanonicalLifecycleFunnel({
 }: Readonly<CanonicalLifecycleFunnelProps>) {
   return (
     <ContentSurfaceCard data-testid='canonical-lifecycle-funnel'>
-      <div className='mb-3 flex items-baseline justify-between'>
-        <h2 className='text-sm font-semibold tracking-tight text-primary-token'>
-          Customer Lifecycle
-        </h2>
+      <div className='mb-3 flex items-baseline justify-between gap-3'>
+        <div>
+          <h2 className='text-balance text-sm font-semibold tracking-tight text-primary-token'>
+            Customer Lifecycle
+          </h2>
+          <p
+            className='mt-0.5 text-2xs text-tertiary-token'
+            data-testid='canonical-lifecycle-scope'
+          >
+            {CANONICAL_LIFECYCLE_SCOPE}
+          </p>
+        </div>
         <a
           href={buildAdminPeopleHref('contacts')}
           className='text-xs text-secondary-token underline-offset-2 hover:text-primary-token hover:underline'

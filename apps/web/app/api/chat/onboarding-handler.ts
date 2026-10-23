@@ -9,6 +9,7 @@ import {
 import { and, asc, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { isAiGatewayAvailable } from '@/lib/ai/gateway-availability';
 import {
   classifyGatewayAlert,
   isGatewayBudgetExceededError,
@@ -848,6 +849,18 @@ export async function tryHandleAnonymousOnboardingChat(
   try {
     if (forcedFallbackReason) {
       return await serveScriptedFallback(forcedFallbackReason);
+    }
+
+    // Matrix and other keyless runtimes have no Gateway credential and no
+    // Vercel OIDC. `executeChatTurn` hangs there instead of throwing, so the
+    // catch below never serves the script. Answer from the script first.
+    if (
+      !isAiGatewayAvailable({
+        apiKey: env.AI_GATEWAY_API_KEY,
+        vercel: process.env.VERCEL,
+      })
+    ) {
+      return await serveScriptedFallback('llm_error');
     }
 
     let streamFailed = false;

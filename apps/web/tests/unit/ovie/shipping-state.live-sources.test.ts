@@ -15,6 +15,8 @@ import {
   type LiveIo,
   NAMED_AUTHORITY_URLS,
   pacificMidnightIso,
+  parseLaneFlow,
+  parseStageSummary,
   readLanePullRequests,
   readLanesStatus,
   readLiveBuild,
@@ -160,6 +162,177 @@ describe('lanes-status (symphony-lanes-status/v1 gist)', () => {
       state: 'measured-nonzero',
       value: 2,
     });
+  });
+
+  it('reads the stage summary from slo.stages and drops malformed rows', async () => {
+    const read = await readLanesStatus(
+      io(async () =>
+        json({
+          ...LANES_FEED,
+          slo: {
+            stages: {
+              schema: 'jovie-stage-summary/v1',
+              at: '2026-09-27T01:58:00Z',
+              coverage: { stagesTotal: 31, stagesWithData: 14, events: 25262 },
+              regressions: ['remediation:classified.p95', 42],
+              slowestP95_7d: [
+                {
+                  stage: 'remediation:classified',
+                  p50: 3219,
+                  p95: 201933,
+                  n: 126,
+                },
+                { stage: 'shipping:ready', p50: null, p95: 23458, n: 571 },
+                { stage: '', p50: 1, p95: 2, n: 3 },
+                { stage: 'bad-n', p50: 1, p95: 2, n: -1 },
+              ],
+              endToEnd7d: {},
+            },
+          },
+        })
+      )
+    );
+    expect(read).toMatchObject({
+      status: 'ok',
+      delivery: {
+        lanes: {
+          stageSummary: {
+            at: '2026-09-27T01:58:00.000Z',
+            stagesTotal: 31,
+            stagesWithData: 14,
+            regressions: ['remediation:classified.p95'],
+            slowestP95: [
+              {
+                stage: 'remediation:classified',
+                p50: 3219,
+                p95: 201933,
+                n: 126,
+              },
+              { stage: 'shipping:ready', p50: null, p95: 23458, n: 571 },
+            ],
+          },
+        },
+      },
+    });
+  });
+
+  it('reports no stage summary when the feed omits or mislabels it', async () => {
+    const read = await readLanesStatus(io(async () => json(LANES_FEED)));
+    expect(read).toMatchObject({ delivery: { lanes: { stageSummary: null } } });
+    expect(
+      parseStageSummary({ schema: 'other/v1', at: '2026-09-27T01:58:00Z' })
+    ).toBeNull();
+    expect(
+      parseStageSummary({ schema: 'jovie-stage-summary/v1', at: 'soon' })
+    ).toBeNull();
+    expect(
+      parseStageSummary({
+        schema: 'jovie-stage-summary/v1',
+        at: '2026-09-27T01:58:00Z',
+      })
+    ).toEqual({
+      at: '2026-09-27T01:58:00.000Z',
+      stagesTotal: null,
+      stagesWithData: null,
+      regressions: [],
+      slowestP95: [],
+      endToEnd7d: [],
+    });
+  });
+
+  it('parses end-to-end spans and marks regressed ones', () => {
+    const summary = parseStageSummary({
+      schema: 'jovie-stage-summary/v1',
+      at: '2026-09-27T01:58:00Z',
+      regressions: ['remediation:red->green.p95'],
+      endToEnd7d: {
+        'shipping:pr-open->merged': { n: 571, p50: 2280, p95: 102600 },
+        'remediation:red->green': { n: 156, p50: 3420, p95: 259560 },
+        'release:staging->verified': { n: -1, p50: 1, p95: 2 },
+      },
+    });
+    expect(summary?.endToEnd7d).toEqual([
+      {
+        pipeline: 'shipping:pr-open->merged',
+        p50: 2280,
+        p95: 102600,
+        n: 571,
+        regressed: false,
+      },
+      {
+        pipeline: 'remediation:red->green',
+        p50: 3420,
+        p95: 259560,
+        n: 156,
+        regressed: true,
+      },
+    ]);
+  });
+
+  it.each([
+    ['shipping:pr-open->merged', true],
+    ['A1:stage_one.v2->done', true],
+    ['a', true],
+    ['a'.repeat(96), true],
+    ['a'.repeat(97), false],
+    ['', false],
+    ['-shipping:pr-open->merged', false],
+    ['shipping:pr open->merged', false],
+    ['shipping:pr-open->merged/extra', false],
+    ['shipping:pr-open->merged[extra]', false],
+  ])('validates end-to-end pipeline key %j (accepted: %s)', (key, accepted) => {
+    const summary = parseStageSummary({
+      schema: 'jovie-stage-summary/v1',
+      at: '2026-09-27T01:58:00Z',
+      endToEnd7d: { [key]: { n: 1, p50: 1, p95: 2 } },
+    });
+    expect(summary?.endToEnd7d?.map(row => row.pipeline)).toEqual(
+      accepted ? [key] : []
+    );
+  });
+
+  it('reads flow health from prs, slo, admission and ownership', () => {
+    expect(
+      parseLaneFlow({
+        prs: { open: 94, red: 20, dirty: 7, cleanNotQueued: 6, exhausted: 11 },
+        slo: {
+          at: '2026-09-27T01:50:00Z',
+          queueEjectionRate: 0.72,
+          queueWaitP95Seconds: 10471,
+          productionLagP95Seconds: 527997,
+          throughput: { mergesPerDay: 87.4 },
+          regressions: ['merge_queue.ejection_rate'],
+        },
+        admission: { eligiblePool: 0, candidatePool: 28 },
+        ownership: { ownerless: 2 },
+      })
+    ).toEqual({
+      openPrs: 94,
+      redPrs: 20,
+      dirtyPrs: 7,
+      cleanNotQueued: 6,
+      exhaustedPrs: 11,
+      mergesPerHour: 3.6,
+      queueEjectionRate: 0.72,
+      queueWaitP95Seconds: 10471,
+      productionLagP95Seconds: 527997,
+      eligiblePool: 0,
+      candidatePool: 28,
+      ownerless: 2,
+      regressions: ['merge_queue.ejection_rate'],
+      at: '2026-09-27T01:50:00.000Z',
+    });
+  });
+
+  it('keeps unpublished flow fields unknown rather than zero', () => {
+    expect(parseLaneFlow({})).toBeNull();
+    const flow = parseLaneFlow({
+      prs: { open: 'many' },
+      slo: { queueEjectionRate: 4 },
+    });
+    expect(flow?.openPrs).toBeNull();
+    expect(flow?.queueEjectionRate).toBeNull();
+    expect(flow?.mergesPerHour).toBeNull();
   });
 
   it('marks the lanes block stale when `at` is older than ten minutes', async () => {
@@ -394,6 +567,53 @@ describe('github-merges (search issueCount)', () => {
         },
       },
     });
+  });
+
+  it("lists today's merged PRs newest first and drops malformed nodes", async () => {
+    const pr = (number: number, mergedAt: string, extra = {}) => ({
+      number,
+      title: `PR ${number}`,
+      url: `https://github.com/JovieInc/Jovie/pull/${number}`,
+      mergedAt,
+      repository: { name: 'Jovie' },
+      ...extra,
+    });
+    const read = await readMerges(
+      io(async () =>
+        json({
+          data: {
+            ...counts,
+            org: {
+              issueCount: 292,
+              nodes: [
+                pr(1, '2026-09-26T08:00:00Z'),
+                pr(2, '2026-09-26T09:00:00Z'),
+                pr(3, 'later'),
+                pr(4, '2026-09-26T10:00:00Z', { url: 'https://evil.test/4' }),
+                {},
+              ],
+            },
+          },
+        })
+      )
+    );
+    expect(read).toMatchObject({
+      delivery: {
+        merges: {
+          recent: [
+            {
+              repo: 'Jovie',
+              number: 2,
+              title: 'PR 2',
+              url: 'https://github.com/JovieInc/Jovie/pull/2',
+              mergedAt: '2026-09-26T09:00:00.000Z',
+            },
+            { number: 1 },
+          ],
+        },
+      },
+    });
+    expect(read.delivery?.merges?.recent).toHaveLength(2);
   });
 
   it('keeps a zero-merge day as measured zero', async () => {

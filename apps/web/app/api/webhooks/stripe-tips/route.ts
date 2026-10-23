@@ -6,8 +6,8 @@
  *
  * Auth: signature verified via STRIPE_WEBHOOK_SECRET_TIPS using
  * `stripe.webhooks.constructEvent`. Missing/invalid signature → 400.
- * Unset STRIPE_WEBHOOK_SECRET_TIPS → 200 with a clear log so Stripe does
- * not retry a configuration gap.
+ * Unset STRIPE_WEBHOOK_SECRET_TIPS → 500 so Stripe keeps retrying until the
+ * secret is configured; acknowledging would drop paid tips.
  *
  * Events handled:
  * - `checkout.session.completed` → create a tips row, fire post-processing
@@ -19,9 +19,10 @@
  * `paymentIntentId`, so duplicate Stripe deliveries are no-ops. Post-processing
  * only runs when a row is actually inserted.
  *
- * Failure mode: handler returns 200 even when metadata is missing or no
- * matching profile is found — these are logged via captureCriticalError so the
- * team can manually reconcile, but Stripe is not asked to retry.
+ * Failure mode: a paid tip with no creator metadata or no matching profile is
+ * acknowledged only after it is stored as a needs_reconciliation row in
+ * stripe_webhook_events (and alerted). If that write fails → 500, Stripe
+ * retries.
  */
 
 import { eq } from 'drizzle-orm';
@@ -35,6 +36,11 @@ import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { processTipCompleted } from '@/lib/services/tips/process-tip-completed';
 import { stripe } from '@/lib/stripe/client';
+import {
+  captureStripeEventForReconciliation,
+  isStripeReconciliationRequiredError,
+  StripeReconciliationRequiredError,
+} from '@/lib/stripe/webhooks/reconciliation';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -45,12 +51,14 @@ export async function POST(req: NextRequest) {
   try {
     const webhookSecret = env.STRIPE_WEBHOOK_SECRET_TIPS;
     if (!webhookSecret) {
-      logger.error(
-        'STRIPE_WEBHOOK_SECRET_TIPS is not configured; acknowledging tip webhook without processing'
+      await captureCriticalError(
+        'STRIPE_WEBHOOK_SECRET_TIPS is not configured',
+        new Error('Missing STRIPE_WEBHOOK_SECRET_TIPS environment variable'),
+        { route: '/api/webhooks/stripe-tips' }
       );
       return NextResponse.json(
-        { received: false, reason: 'not_configured' },
-        { status: 200, headers: NO_STORE_HEADERS }
+        { error: 'Webhook not configured' },
+        { status: 500, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -78,9 +86,23 @@ export async function POST(req: NextRequest) {
 
     switch (event.type) {
       case 'checkout.session.completed': {
-        await handleCheckoutCompleted(
-          event.data.object as Stripe.Checkout.Session
-        );
+        try {
+          await handleCheckoutCompleted(
+            event.data.object as Stripe.Checkout.Session
+          );
+        } catch (error) {
+          if (!isStripeReconciliationRequiredError(error)) throw error;
+          // Throws on failure → outer catch → 500 → Stripe retries.
+          await captureStripeEventForReconciliation({
+            event,
+            route: '/api/webhooks/stripe-tips',
+            error,
+          });
+          return NextResponse.json(
+            { received: true, reconciliation: 'needs_reconciliation' },
+            { headers: NO_STORE_HEADERS }
+          );
+        }
         break;
       }
       case 'charge.refunded': {
@@ -113,23 +135,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     : null;
 
   if (!handle && !profileId) {
-    // No creator identifier in metadata — tip cannot be attributed.
-    // Log as critical error (not just warn) so the team can investigate and
-    // manually reconcile. Still return (200) to stop Stripe retries since
-    // retrying won't produce a handle that was never set.
-    // Fire-and-forget — don't let telemetry failure bubble into a 500
+    // No creator identifier in metadata, so the tip cannot be attributed and a
+    // retry will not change that. Capture it durably for reconciliation.
     const rawEmail = session.customer_details?.email ?? session.customer_email;
-    void captureCriticalError(
+    throw new StripeReconciliationRequiredError(
+      'tip_unattributed',
       'Tip checkout completed without handle or profile_id metadata',
-      new Error('Missing creator metadata on tip checkout session'),
       {
-        route: '/api/webhooks/stripe-tips',
-        session_id: session.id,
-        amount: session.amount_total,
-        customer_email_domain: rawEmail?.split('@')[1] ?? null,
+        checkoutSessionId: session.id,
+        amountTotal: session.amount_total ?? null,
+        customerEmailDomain: rawEmail?.split('@')[1] ?? null,
       }
-    ).catch(() => {});
-    return;
+    );
   }
 
   // Resolve creator profile
@@ -146,17 +163,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   if (!creatorProfileId) {
-    await captureCriticalError(
+    throw new StripeReconciliationRequiredError(
+      'tip_unattributed',
       'Tip checkout completed but no creator profile found',
-      new Error('Creator profile not found for tip checkout'),
       {
-        route: '/api/webhooks/stripe-tips',
-        handle,
-        session_id: session.id,
-        amount: session.amount_total,
+        handle: handle ?? null,
+        checkoutSessionId: session.id,
+        amountTotal: session.amount_total ?? null,
       }
     );
-    return;
   }
 
   // Get payment intent ID from the session

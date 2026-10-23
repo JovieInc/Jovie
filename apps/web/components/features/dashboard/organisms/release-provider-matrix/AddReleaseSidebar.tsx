@@ -348,6 +348,7 @@ export function AddReleaseSidebar({
               id='release-date'
               value={releaseDate}
               onChange={setReleaseDate}
+              disablePortal
             />
           </DrawerFormField>
 

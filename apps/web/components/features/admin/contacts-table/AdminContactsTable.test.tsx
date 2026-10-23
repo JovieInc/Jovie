@@ -277,6 +277,49 @@ describe('AdminContactsTable', () => {
     expect(screen.getByRole('button', { name: 'No' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it.each([
+    {
+      freshness: 'stale' as const,
+      confidence: 0.85,
+      label: 'Stale, recheck (was 85%)',
+    },
+    { freshness: 'stale' as const, confidence: null, label: 'Stale, recheck' },
+    {
+      freshness: 'unknown' as const,
+      confidence: 0.85,
+      label: '85% confidence · age unknown',
+    },
+  ])(
+    'qualifies $freshness evidence confidence ($confidence) without blocking review',
+    ({ freshness, confidence, label }) => {
+      const onDecision = vi.fn(async () => {});
+      const item = { ...certification.items[0]!, freshness, confidence };
+      render(
+        <EvidenceItemCard item={item} pending={false} onDecision={onDecision} />
+      );
+
+      expect(
+        screen.getByText(
+          (_, element) =>
+            element?.tagName === 'P' &&
+            element.textContent?.endsWith(label) === true
+        )
+      ).toBeVisible();
+      if (freshness === 'stale')
+        expect(screen.queryByText(/85% confidence/)).not.toBeInTheDocument();
+      for (const name of ['Yes', 'No', 'Unsure'])
+        expect(screen.getByRole('button', { name })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: 'Unsure' }));
+      expect(onDecision).toHaveBeenCalledWith(item, 'unsure');
+      fireEvent.change(
+        screen.getByRole('textbox', { name: 'Correct Display name' }),
+        { target: { value: 'Ari Corrected' } }
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      expect(onDecision).toHaveBeenLastCalledWith(item, 'no', 'Ari Corrected');
+    }
+  );
+
   it('marks the keyboard-active evidence card for reuse in Ovie Outbound', () => {
     const onDecision = vi.fn(async () => {});
     const item = certification.items[0]!;

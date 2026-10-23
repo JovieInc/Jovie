@@ -1,5 +1,9 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { writePendingClaimContext } from '@/lib/claim/context';
+import {
+  applyPendingClaimCookie,
+  writePendingClaimContext,
+} from '@/lib/claim/context';
+import { buildClaimRedirectUrl } from '@/lib/claim/redirect-origin';
 import {
   clearLeadAttributionCookie,
   lookupLeadByClaimToken,
@@ -25,7 +29,7 @@ interface ClaimTokenRouteContext {
 }
 
 function buildAbsoluteUrl(request: NextRequest, pathname: string): URL {
-  return new URL(pathname, request.url);
+  return buildClaimRedirectUrl(request, pathname);
 }
 
 export async function GET(
@@ -79,7 +83,7 @@ export async function GET(
 
   await setLeadAttributionCookieFromToken(token);
   await markLeadClaimPageViewedFromToken(token);
-  await writePendingClaimContext({
+  const context = await writePendingClaimContext({
     mode: 'token_backed',
     creatorProfileId: profile.id,
     username: profile.usernameNormalized,
@@ -88,10 +92,13 @@ export async function GET(
     expectedSpotifyArtistId: profile.spotifyId ?? null,
   });
 
-  return NextResponse.redirect(
-    buildAbsoluteUrl(
-      request,
-      `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
-    )
+  return applyPendingClaimCookie(
+    NextResponse.redirect(
+      buildAbsoluteUrl(
+        request,
+        `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
+      )
+    ),
+    context
   );
 }

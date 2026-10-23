@@ -130,7 +130,7 @@ jobs:
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
         if: steps.lineage.outputs.outcome == 'not_applicable'
-        with: {node-version: 24.21.0}
+        with: {node-version: 24.22.1}
       - id: routing
         env: {INITIAL_OUTCOME: "${{ steps.lineage.outputs.outcome }}", EXPECTED_SHA: "${{ github.event.workflow_run.head_sha }}", SOURCE_CI_RUN_ID: "${{ github.event.workflow_run.id }}", REPOSITORY: "${{ github.repository }}", GH_TOKEN: "${{ github.token }}"}
         run: |

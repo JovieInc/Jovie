@@ -1,0 +1,45 @@
+● JOVIE · SYMPHONY · lanes fe27f07 on gem · ✓ hud=release · tick 3m                                                                                             github 27s · linear 2m · feed 1m · prod 28s · 18:29:30Z
+ CONSTRAINT ! WARN   deploy · 7 merged PR(s) not in production · oldest 1h41m · prod 060037d is 18 commits behind main 661de44
+ PRODUCTION  ! WARN    serves 060037d · ✓ verified 5h13m ago · main 661de44 · behind 18 commits · 7 undeployed · oldest 1h41m
+ FLOW 24h    draft 6 → prepared 2 → queued 3 → merged 10 → deployed 3 → verified 3 · merges 5/h · opened 11/h (1h) · claim→merge p50 24m · p95 codex 10h30m · eligible→verified ? (no producer)
+ WORKERS   ✓ OK      1 running / 4 (codex 1/3 · grok 0/1)              │  REPAIR    ! WARN    open lane PRs 8 · draft 6 · non-draft 2           │  SHIPPED   ! WARN    merged 10 in 24h · deployed 3 · verified 3
+● codex      PR21774   fix-red agent             3m  feat(marketing):… │   repo PRs open 36 · red 11 · dirty 2 · clean not queued 2             │   attribution verified 2/10 · inferred 8 · unknown 0
+○ codex      polling ×2 · eligible 1/27 · new issues 1                 │   hold records 3 · fix-exhausted 3 · gate-check-failed 2               │ #22307 merged        5m  fix(ci): set up Playwright when proof reuse…
+○ grok       polling · eligible 0/27 · new issues 0                    │   oldest #21725 142h · idle 9.2h · hold:fix-exhausted · fix-exhausted  │ #22304 merged        9m  fix(connectors): preserve Google OAuth…
+  codex      24h started 7 · productive 2 · PR 2 · landed 1            │ #21748 JOV-6226  DRAFT merge conflict  codex · fix(auth): honor…       │ #22253 merged       24m  fix(lanes): keep the public status feed…
+  grok       24h started 0 · productive 0 · PR 0 · landed 0            │ #21774 JOV-5763  DRAFT merge conflict · held: fix-exhausted  codex · … │ #21869 merged       35m  feat(playbooks): bind growth preparation to…
+  24h verdicts: recovery-handoff 108 · revisit-failed 46 · failed 15   │ #21826 JOV-8237  OPEN  merge conflict  codex · fix(ci): preserve…      │ #22301 merged       47m  fix(lanes): stop Gem lane cleanup from…
+                                                                       │ #21903 JOV-8119  DRAFT held: fix-exhausted  codex · feat(agents):…     │ #21834 merged     1h05m  feat(observability): add revenue-spine…
+                                                                       │ #22138 JOV-8535  DRAFT held: gate-check-failed  grok · fix(onboarding… │ #21956 merged     1h41m  feat(evals): add held-out revision quality…
+                                                                       │ #21824 JOV-5885  DRAFT draft · awaiting gate  codex · feat(marketing)… │ #22166 verified  21h48m  ci: catalog the workflow writes the enqueue…
+                                                                       │ #22011 JOV-6246  DRAFT draft · awaiting gate  codex · feat(marketing)… │ #22290 verified  22h23m  fix(ovie): preserve Home snapshot freshness…
+                                                                       │ #21946 JOV-8384  OPEN  prepared · clean  codex · fix(ui): restore aa…  │ #22292 verified  22h27m  fix(ci): restore merge queue victim…
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+ SUPPLY    ✓ OK      Todo 26 → eligible 1 → new issues 1               │                                                                        │
+  codex      new 1 · eligible 1/27 · PR ceiling none                   │                                                                        │
+  grok       new 0 · eligible 0/27 · PR ceiling none                   │                                                                        │
+    17 excluded  sensitive-text             all lanes                  │                                                                        │
+     7 excluded  hotspot-held               all lanes                  │                                                                        │
+     2 excluded  route-held:standard        all lanes                  │                                                                        │
+     1 excluded  in-flight-pr               all lanes                  │                                                                        │
+  Linear mirror 2m ago · in progress 0                                 │                                                                        │
+                                                                       │                                                                        │
+                                                                       │                                                                        │
+ ALERTS    ! WARN    4 active · 0 critical/failing                     │                                                                        │
+! warn remediation-delivery 12d7h · owner symphony-lanes-doctor        │                                                                        │
+    remediation action lacks authoritative acknowledgement; failed=41… │                                                                        │
+! warn escalation-needs-human 8d23h · owner symphony-lanes-doctor      │                                                                        │
+    needs a human decision: #20117 needs-human-decision, #20549 needs… │                                                                        │
+! warn repairs-without-work 8d21h · owner symphony-lanes-doctor        │                                                                        │
+    109 PR repairs in 24h spent a fix attempt before any agent work (… │                                                                        │
+! warn failed-runs 1d6h · owner symphony-lanes-doctor · summer pending │                                                                        │  BUDGETS   ✓ OK      GitHub graphql 4526/5000 · core 4773 · resets i…
+    15 harness-failed runs in 24h; read runs/ledger.jsonl reasons      │                                                                        │   Linear outbox 1 · dead 0 · oldest 0s
+                                                                       │                                                                        │   capacity horizon 2 leases · 0 reported incident(s) · show-only
+                                                                       │  QUEUE     ✓ OK      merge queue 3 · wait p50 11.4m · ejections 20%    │   ✓ lyb-pro 98% · banked 1 · natural reset 6d12h · NORMAL · fresh
+                                                                       │   first-pass 65% · ejected→back p75 0.7m (2 waiting)                   │   ✓ current-login 99% · banked 1 · NORMAL · fresh
+                                                                       │   open→enqueue p75 54.3m · CLEAN not queued 2                          │   top blocker: drain evidence stale or missing
+                                                                       │   #22306 awaiting_checks     13m                                       │
+                                                                       │   #22309 awaiting_checks     13m                                       │
+                                                                       │   #22305 awaiting_checks      7m                                       │  HOST      ! WARN    disk 19.9% free · mem 90% free · load 1.1 / 16 …
+● running ○ idle ✓ ok ! warn ✕ fail ? unknown  │  draft→prepared→queued→merged→deployed→verified  │  ↑↓ PgUp/PgDn Home/End scroll workers
