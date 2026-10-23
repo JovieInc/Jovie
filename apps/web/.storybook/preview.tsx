@@ -9,16 +9,15 @@ import '../app/globals.css';
 
 /**
  * Deterministic Storybook fixtures (Phase 2 visual-testing policy).
- * Fixed clock, stable IDs, disabled animations, seeded data — prevent
- * Chromatic false positives that burn the free-tier snapshot budget.
- * @see https://www.chromatic.com/docs/snapshots/
+ * Fixed clock, stable IDs, disabled animations, seeded data — keep Storybook
+ * and Playwright visual evidence stable.
  * @see docs/VISUAL_TESTING_POLICY.md
  */
 const FIXED_NOW = new Date('2026-01-15T12:00:00.000Z');
 const STABLE_ID_PREFIX = 'sb-stable';
 
 function installProcessPolyfill(): void {
-  // Chromatic story extraction runs in a browser. Vite `define` rewrites most
+  // Storybook runs in a browser. Vite `define` rewrites most
   // process.env.* references, but a global fallback prevents hard crashes if
   // any residual bare `process` access remains in the story graph.
   const g = globalThis as unknown as {
@@ -198,13 +197,6 @@ if (typeof window !== 'undefined') {
 
 const preview: Preview = {
   parameters: {
-    // Chromatic: pause animations (defense in depth vs CSS above)
-    chromatic: {
-      pauseAnimationAtEnd: true,
-      delay: 0,
-      // One Chrome viewport by free-tier policy unless layout truly changes.
-      modes: undefined,
-    },
     controls: {
       matchers: {
         color: /(background|color)$/i,
