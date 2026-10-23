@@ -290,7 +290,24 @@ const SECTION_RESOLUTIONS = {
       {
         variantId: 'split-claim-card',
         componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        rootBinding: "sectionVariant='split-claim-card'",
+        rootBinding: 'headingId={headingId}',
+        delegatedProofs: [
+          {
+            source:
+              'apps/web/components/homepage/hero-light/HomepageHeroCanvas.tsx',
+            binding: "data-marketing-variant='split-claim-card'",
+            occurrences: 1,
+            kind: 'jsx-root',
+          },
+          {
+            source:
+              'apps/web/components/homepage/hero-light/HomepageHeroCanvas.tsx',
+            binding:
+              'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}',
+            occurrences: 1,
+            kind: 'jsx-root',
+          },
+        ],
       },
       {
         variantId: 'left-none',

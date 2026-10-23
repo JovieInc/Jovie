@@ -305,6 +305,7 @@ test.describe('homepage hero canvas scroll', () => {
             bottom: box.bottom,
             left: box.left,
             right: box.right,
+            width: box.width,
             height: box.height,
           };
         };
