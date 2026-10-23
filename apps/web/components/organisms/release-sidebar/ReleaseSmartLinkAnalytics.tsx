@@ -21,7 +21,10 @@ import {
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import { env } from '@/lib/env-client';
 import { buildTrackedShareDropdownItems } from '@/lib/share/tracked-sources';
-import { formatTimeAgo } from '@/lib/utils/date-formatting';
+import {
+  formatShortDateUTC,
+  formatTimeAgo,
+} from '@/lib/utils/date-formatting';
 import { buildUTMContext } from '@/lib/utm';
 import type { Release, ReleaseSidebarAnalytics } from './types';
 
@@ -218,9 +221,20 @@ export function ReleaseSmartLinkAnalytics({
   const [data, setData] = useState<ReleaseSidebarAnalytics | null>(
     analyticsOverride ?? null
   );
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [hasError, setHasError] = useState(false);
+
+  // formatTimeAgo depends on the wall clock, so it can only run after
+  // hydration: prerendered pages bake server HTML at build time, and the
+  // first client render must match it byte for byte or React fails
+  // hydration (#418) whenever the server and client clocks disagree
+  // (pinned-clock screenshot captures, cached static HTML). Render the
+  // timezone-pinned absolute date until mount, then upgrade to relative.
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (analyticsOverride) {
@@ -278,7 +292,11 @@ export function ReleaseSmartLinkAnalytics({
         {
           id: 'last-click',
           label: 'Last Click',
-          value: lastClickAt ? formatTimeAgo(lastClickAt) : '—',
+          value: lastClickAt
+            ? hasHydrated
+              ? formatTimeAgo(lastClickAt)
+              : formatShortDateUTC(lastClickAt)
+            : '—',
           hint: `${numberFormatter.format(last7DaysClicks)} in last 7 days`,
         },
       ]

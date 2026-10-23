@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { BASE_URL } from '@/constants/domains';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
@@ -54,5 +55,42 @@ describe('ReleaseSmartLinkAnalytics', () => {
     expect(
       within(control).getByRole('button', { name: 'Copy smart link' })
     ).toHaveAttribute('title', 'Copy smart link');
+  });
+
+  it('server-renders a wall-clock-independent last-click value so hydration cannot mismatch', () => {
+    const html = renderToString(
+      <ReleaseSmartLinkAnalytics
+        release={mockRelease}
+        artistName='Calvin Harris'
+        analyticsOverride={{
+          totalClicks: 12,
+          last7DaysClicks: 3,
+          lastClickAt: '2026-08-20T15:04:00.000Z',
+          providerClicks: [{ provider: 'spotify', clicks: 8 }],
+        }}
+      />
+    );
+
+    expect(html).toContain('Aug 20, 2026');
+    expect(html).not.toMatch(RELATIVE_TEXT);
+  });
+
+  it('upgrades the last-click value to relative time once hydrated', () => {
+    render(
+      <ReleaseSmartLinkAnalytics
+        release={mockRelease}
+        artistName='Calvin Harris'
+        analyticsOverride={{
+          totalClicks: 12,
+          last7DaysClicks: 3,
+          lastClickAt: '2026-08-20T15:04:00.000Z',
+          providerClicks: [{ provider: 'spotify', clicks: 8 }],
+        }}
+      />
+    );
+
+    expect(
+      screen.getByTestId('drawer-analytics-metric-value-last-click')
+    ).toHaveTextContent(RELATIVE_TEXT);
   });
 });
