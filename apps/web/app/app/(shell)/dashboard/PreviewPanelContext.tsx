@@ -139,15 +139,6 @@ export function PreviewPanelProvider({
   });
   const [previewData, setPreviewData] = useState<PreviewPanelData | null>(null);
 
-  // Why the rail is open. An explicitly requested rail (rail toggle, `]`
-  // shortcut, or the ?panel=profile deep link) survives the lg breakpoint
-  // crossing: below lg the drawer re-presents the same open rail as a modal
-  // sheet instead of silently discarding the user's open panel. A
-  // default-open (unsolicited) rail still closes before it could become an
-  // unsolicited modal (JOV-7150) — only an explicit action may raise the
-  // sheet, and dismissing it (Escape or the toggle) is that same contract.
-  const openedByUserRef = useRef(false);
-
   // Surface change (dashboard ↔ chat ↔ artist-profile settings) resets the
   // rail to closed — it only opens from an explicit user action afterward.
   // `?panel=profile` is that explicit action: the scope reset used to close
@@ -158,7 +149,6 @@ export function PreviewPanelProvider({
     previousScopeRef.current = scope;
     const panel = new URLSearchParams(globalThis.location.search).get('panel');
     if (scope === 'chat' && panel === 'profile') {
-      openedByUserRef.current = true;
       setIsOpen(true);
       return;
     }
@@ -166,7 +156,6 @@ export function PreviewPanelProvider({
     // large screen. Closing first and waiting for a later effect lets the
     // page opener's close() win the round trip.
     if (defaultOpen && isLargeScreen) {
-      openedByUserRef.current = false;
       setIsOpen(true);
       return;
     }
@@ -180,14 +169,11 @@ export function PreviewPanelProvider({
   }, [defaultOpen, isLargeScreen, scope]);
 
   // Open panel after mount on large screens when defaultOpen is requested.
-  // Also close when switching to a small screen — but only a rail the surface
-  // opened by default: an explicitly opened rail keeps its open state across
-  // the crossing and the drawer re-presents it as the mobile modal sheet.
+  // Also close when switching to a small screen.
   useEffect(() => {
     if (defaultOpen && isLargeScreen) {
-      openedByUserRef.current = false;
       setIsOpen(true);
-    } else if (!isLargeScreen && isOpen && !openedByUserRef.current) {
+    } else if (!isLargeScreen && isOpen) {
       setIsOpen(false);
     }
     // Intentionally omit isOpen to avoid re-triggering when user manually closes.
@@ -198,14 +184,12 @@ export function PreviewPanelProvider({
 
   const open = useCallback(() => {
     if (!enabled) return;
-    openedByUserRef.current = true;
     dismissPreview();
     setIsOpen(true);
   }, [enabled, dismissPreview]);
 
   const close = useCallback(() => {
     if (!enabled) return;
-    openedByUserRef.current = false;
     dismissPreview();
     setIsOpen(false);
   }, [enabled, dismissPreview]);
@@ -213,12 +197,7 @@ export function PreviewPanelProvider({
   const toggle = useCallback(() => {
     if (!enabled) return;
     dismissPreview();
-    setIsOpen(prev => {
-      // Idempotent under double-invoked updaters: `!prev` is stable for the
-      // same prev, so the provenance write cannot drift.
-      openedByUserRef.current = !prev;
-      return !prev;
-    });
+    setIsOpen(prev => !prev);
   }, [enabled, dismissPreview]);
 
   const effectiveIsOpen = enabled ? isOpen || isPreview : false;

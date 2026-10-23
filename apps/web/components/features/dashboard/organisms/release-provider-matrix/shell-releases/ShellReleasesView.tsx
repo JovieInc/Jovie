@@ -312,9 +312,7 @@ function ReleasesListContent({
       ref={listboxRef}
       // Native `ul` (implicit role=list) + `listitem` rows: each row owns
       // real interactive controls, which an ARIA `option` cannot contain
-      // (axe nested-interactive). Every direct child is an li so the list
-      // stays axe `list`-clean; the li is role=presentation and the row
-      // inside it keeps the listitem semantics.
+      // (axe nested-interactive).
       aria-label='Releases'
       className='py-1.5 space-y-px px-2'
     >
@@ -323,13 +321,9 @@ function ReleasesListContent({
           key={r.id}
           items={contextMenuItemsByReleaseId.get(r.id)}
         >
-          {/* List-legal wrapper: Radix ContextMenu.Trigger asChild needs a host
-              element that accepts the injected ref/onContextMenu props, and
-              axe's `list` rule only allows li/script/template as direct ul
-              children. role=presentation keeps the wrapper out of the a11y
-              tree so the row's own listitem semantics stay singular (a bare
-              li would nest a second, unnamed listitem around every row). */}
-          <li role='presentation' data-shell-release-row-context-target>
+          {/* Plain wrapper: Radix ContextMenu.Trigger asChild needs a host
+              element that accepts the injected ref/onContextMenu props. */}
+          <div data-shell-release-row-context-target>
             <ShellReleaseRow
               release={r}
               isSelected={r.id === selectedReleaseId}
@@ -340,7 +334,7 @@ function ReleasesListContent({
               }
               syncStatus={getSyncStatus(r.id)}
             />
-          </li>
+          </div>
         </TableContextMenu>
       ))}
     </ul>
