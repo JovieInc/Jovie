@@ -6,6 +6,7 @@ import { PreviewDataHydrator } from './PreviewDataHydrator';
 const register = vi.hoisted(() => vi.fn());
 const hydration = vi.hoisted(() => ({
   setPreviewData: vi.fn(),
+  previewData: null as { username: string } | null,
   selectedProfile: { username: 'alex', isVerified: true, settings: {} },
 }));
 vi.mock('@sentry/nextjs', () => ({ addBreadcrumb: vi.fn() }));
@@ -13,7 +14,10 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({ selectedProfile: hydration.selectedProfile }),
 }));
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
-  usePreviewPanelData: () => ({ setPreviewData: hydration.setPreviewData }),
+  usePreviewPanelData: () => ({
+    previewData: hydration.previewData,
+    setPreviewData: hydration.setPreviewData,
+  }),
 }));
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: register,
@@ -31,6 +35,20 @@ it('registers profile-only content so the shared rail uses profile intent', () =
   expect(
     screen.getByRole('complementary', { name: 'Artist profile' }).parentElement
   ).toHaveAttribute('data-shell-profile-only', 'true');
+});
+
+it('hydrates again after a scope change clears the rail', () => {
+  hydration.previewData = { username: 'alex' };
+  const view = render(
+    <PreviewDataHydrator initialLinks={[]} connectedDSPs={[]} />
+  );
+  const callsAfterPaint = hydration.setPreviewData.mock.calls.length;
+  hydration.previewData = null;
+  view.rerender(<PreviewDataHydrator initialLinks={[]} connectedDSPs={[]} />);
+  expect(hydration.setPreviewData.mock.calls.length).toBeGreaterThan(
+    callsAfterPaint
+  );
+  hydration.previewData = null;
 });
 
 it('hydrates the profile verification flag rather than inferring it from DSP connections', () => {

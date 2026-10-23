@@ -163,6 +163,9 @@ const markdownAllowedJobs = new Set([
   'postdeploy-probes.yml:auth-smoke',
   'production-controller.yml:ci-post-deploy-auth-smoke',
   'visual-regression.yml:visual-regression',
+  // Failure-only claim dogfood evidence includes Playwright error-context.md.
+  // The guard redacts known secrets before that page snapshot is uploaded.
+  'claim-checkout-dogfood.yml:dogfood',
 ]);
 // Workflow-level secrets a Playwright child may inherit (remote build cache).
 const inheritedSecretAllowlist = new Set(['TURBO_TOKEN', 'TURBO_TEAM']);
@@ -1378,6 +1381,99 @@ ${fixtureCheckout}
     );
     expect(upload?.with?.path).toBe('${{ steps.guard.outputs.path }}');
     expect(upload?.with?.['include-hidden-files']).toBe(true);
+  });
+
+  it('uploads synthetic JSON failure evidence after exhausted retries without Markdown', () => {
+    const job = policyWorkflow('synthetic-monitoring.yml').jobs![
+      'synthetic-test'
+    ]!;
+    const upload = job.steps!.find(
+      step => step.name === 'Upload test results'
+    )!;
+    const actionPath = join(
+      githubRoot,
+      'actions/upload-safe-playwright-artifact'
+    );
+    const action = parseYaml(
+      readFileSync(join(actionPath, 'action.yml'), 'utf8')
+    ) as {
+      inputs: Record<string, { default?: string }>;
+      runs: { steps: PolicyStep[] };
+    };
+    const uploadGuard = action.runs.steps.find(step => step.id === 'guard')!;
+    const workspace = fixture();
+    const runner = fixture();
+    const jobEnv = Object.fromEntries(
+      Object.entries(job.env ?? {}).map(([name, value]) => [
+        name,
+        String(value),
+      ])
+    );
+    const report = {
+      status: 'failed',
+      error: 'Required canary config missing',
+    };
+    const resultPath =
+      'apps/web/test-results/synthetic-production-waitlist-results.json';
+    const packetPath =
+      'apps/web/test-results/journey-failure-packets/waitlist.json';
+    write(join(workspace, resultPath), JSON.stringify(report));
+    write(join(workspace, packetPath), JSON.stringify(report));
+    for (let retry = 0; retry < 3; retry++) {
+      write(
+        join(
+          workspace,
+          `apps/web/test-results/waitlist-retry${retry}/error-context.md`
+        ),
+        '# Page snapshot\n- heading: Required canary config missing\n'
+      );
+    }
+
+    const producer = runChild(workspace, runner, 'process.exit(1)', {
+      ...jobEnv,
+      PLAYWRIGHT_ARTIFACT_PATHS: 'apps/web/test-results',
+    });
+    expect(producer.status, producer.stderr).toBe(1);
+    expect(producer.stdout + producer.stderr).toContain('secret guard passed');
+    expect(
+      globSync('**/error-context.md', { cwd: currentStage(runner).stage })
+    ).toHaveLength(3);
+
+    const uploadEnv = Object.fromEntries(
+      Object.entries(uploadGuard.env ?? {}).map(([name, expression]) => {
+        const input = String(expression).match(/inputs\.([\w-]+)/)![1]!;
+        return [
+          name,
+          String(upload.with?.[input] ?? action.inputs[input]?.default ?? ''),
+        ];
+      })
+    );
+    const output = join(runner, 'upload-output');
+    const uploaded = spawnSync(
+      'bash',
+      ['--noprofile', '--norc', '-euo', 'pipefail', '-c', uploadGuard.run!],
+      {
+        cwd: workspace,
+        encoding: 'utf8',
+        env: baseEnv(workspace, runner, {
+          ...jobEnv,
+          ...uploadEnv,
+          GITHUB_ACTION_PATH: actionPath,
+          GITHUB_OUTPUT: output,
+        }),
+      }
+    );
+    expect(uploaded.status, uploaded.stdout + uploaded.stderr).toBe(0);
+    const artifactStage = readFileSync(output, 'utf8').split('\n')[1]!;
+    expect(globSync('**/*.md', { cwd: artifactStage })).toEqual([]);
+    for (const path of [
+      'synthetic-production-waitlist-results.json',
+      'journey-failure-packets/waitlist.json',
+    ]) {
+      expect(
+        JSON.parse(readFileSync(join(artifactStage, path), 'utf8'))
+      ).toEqual(report);
+    }
   });
 
   it('scopes release auth probes to their step and orders the OAuth gate after the alias', () => {

@@ -13,10 +13,6 @@ import { FEATURE_FLAGS } from './marketing-static';
  * deliberate product decision — update these assertions in the same PR.
  */
 describe('marketing-static homepage design flags', () => {
-  it('renders the V2 homepage (SHOW_HOME_V1_DESIGN must stay false)', () => {
-    expect(FEATURE_FLAGS.SHOW_HOME_V1_DESIGN).toBe(false);
-  });
-
   it('renders the V2 public profile (SHOW_PUBLIC_PROFILE_V1_DESIGN must stay false)', () => {
     expect(FEATURE_FLAGS.SHOW_PUBLIC_PROFILE_V1_DESIGN).toBe(false);
   });

@@ -49,7 +49,7 @@ export async function getLinksByProfileId(
  */
 export async function getLinksByProfileIdForUser(
   profileId: string,
-  clerkUserId: string
+  appUserId: string
 ): Promise<DashboardSocialLink[]> {
   const rows = await db
     .select({
@@ -71,9 +71,7 @@ export async function getLinksByProfileIdForUser(
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
     .leftJoin(socialLinks, eq(socialLinks.creatorProfileId, creatorProfiles.id))
-    .where(
-      and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
-    )
+    .where(and(eq(creatorProfiles.id, profileId), eq(users.id, appUserId)))
     .orderBy(socialLinks.sortOrder)
     .limit(MAX_LINKS);
 

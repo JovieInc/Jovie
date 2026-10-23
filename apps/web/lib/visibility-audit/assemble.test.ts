@@ -52,7 +52,8 @@ describe('visibility audit', () => {
   it('builds the Tim /tim sample from verified profile evidence only', () => {
     const report = assembleVisibilityAudit(TIM_WHITE_VISIBILITY_AUDIT_INPUT);
     expect(report.profilePath).toBe('/tim');
-    expect(report.priceUsd).toBe(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd);
+    expect(report.priceUsd).toBe(199);
+    expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(12);
     expect(report.creditNote).toContain(`$${report.priceUsd}`);
     expect(report.identity.mbid).toBeNull();
     expect(report.identity.wikidataQid).toBeNull();

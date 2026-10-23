@@ -36,7 +36,7 @@ export interface PixelSettingsResponse {
  * @throws Error if user is not authenticated or profile not found
  */
 export async function getPixelSettingsForCurrentUser(): Promise<PixelSettingsResponse> {
-  return withDbSessionTx(async (tx, clerkUserId) => {
+  return withDbSessionTx(async (tx, appUserId) => {
     // Get user's profile
     const [userProfile] = await tx
       .select({
@@ -44,7 +44,7 @@ export async function getPixelSettingsForCurrentUser(): Promise<PixelSettingsRes
       })
       .from(creatorProfiles)
       .innerJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(users.clerkId, clerkUserId))
+      .where(eq(users.id, appUserId))
       .limit(1);
 
     if (!userProfile) {

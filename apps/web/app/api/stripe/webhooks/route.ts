@@ -38,6 +38,12 @@ import {
   stripeTimestampToDate,
 } from '@/lib/stripe/webhooks';
 import { processStripeWebhookEvent } from '@/lib/stripe/webhooks/process-event';
+import {
+  isStripeReconciliationRequiredError,
+  markStripeEventNeedsReconciliation,
+  reconciledAtOnSuccess,
+  reconciledStatusOnSuccess,
+} from '@/lib/stripe/webhooks/reconciliation';
 import { logger } from '@/lib/utils/logger';
 
 // Force Node.js runtime for Stripe SDK compatibility
@@ -268,11 +274,17 @@ export async function POST(request: NextRequest) {
       // Process the event (handlers throw on failure)
       await processStripeWebhookEvent(event, stripeCreatedAt);
 
-      // Mark event as processed
+      // Mark event as processed (and reconciled, if it was flagged earlier)
+      const processedAt = new Date();
       const [processedRecord] = await withSystemIngestionSession(tx =>
         tx
           .update(stripeWebhookEvents)
-          .set({ processedAt: new Date(), processingStartedAt: null })
+          .set({
+            processedAt,
+            processingStartedAt: null,
+            reconciliationStatus: reconciledStatusOnSuccess,
+            reconciledAt: reconciledAtOnSuccess(processedAt),
+          })
           .where(
             and(
               eq(stripeWebhookEvents.id, claimedWebhookRecordId),
@@ -292,6 +304,35 @@ export async function POST(request: NextRequest) {
         );
       }
     } catch (processingError) {
+      // A verified event that cannot be applied yet (unmapped price) may be
+      // acknowledged only once it is durably marked for reconciliation. If
+      // that write fails, fall through to the 5xx path so Stripe retries.
+      if (
+        isStripeReconciliationRequiredError(processingError) &&
+        leaseClaimed &&
+        leaseStartedAt &&
+        webhookRecordId
+      ) {
+        try {
+          await markStripeEventNeedsReconciliation({
+            webhookRecordId,
+            stripeEventId: event.id,
+            eventType: event.type,
+            route: '/api/stripe/webhooks',
+            error: processingError,
+            leaseStartedAt,
+          });
+          return NextResponse.json(
+            { received: true, reconciliation: 'needs_reconciliation' },
+            { headers: NO_STORE_HEADERS }
+          );
+        } catch (captureError) {
+          logger.warn('Stripe webhook reconciliation capture failed', {
+            eventId: event.id,
+            error: captureError,
+          });
+        }
+      }
       captureRevenueSpineFailure({
         stage: 'webhook',
         severity: 'blocked',

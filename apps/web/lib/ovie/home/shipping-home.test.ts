@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import type { OvieInbox, OvieInboxCase } from '@/lib/ovie/inbox';
 import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
@@ -223,7 +224,19 @@ describe('buildDoneToday', () => {
 describe('buildPulse', () => {
   it('shows Not measured, neutral tone, and no was for an empty summary', () => {
     const pulse = buildPulse(delivery());
-    expect(pulse).toHaveLength(7);
+    expect(pulse.map(tile => tile.key)).toEqual([
+      'prod',
+      'merges-hour',
+      'queue',
+      'red-prs',
+      'lanes',
+      'eligible',
+      'held',
+      'ownerless',
+      'merges-today',
+      'merges-7d',
+      'gem-disk',
+    ]);
     for (const tile of pulse) {
       expect(tile.value).toBe(OVIE_NOT_MEASURED);
       expect(tile.measured).toBe(false);
@@ -327,7 +340,33 @@ describe('buildConstraint', () => {
         rows([task(1, 'blocked')]),
         'fresh'
       )
-    ).toEqual({ tone: 'bad', text: '0 of 28 Todo issues eligible' });
+    ).toEqual({
+      tone: 'bad',
+      text: '0 of 28 Todo issues eligible',
+      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+    });
+  });
+
+  it('names a raw doctor diagnostic in operator copy, never the raw string', () => {
+    const base = measuredDelivery();
+    const constraint = buildConstraint(
+      delivery({
+        ...base,
+        lanes: {
+          ...base.lanes,
+          alerts: [
+            'remediation action lacks authoritative acknowledgement; failed=45, exhausted=0, next retry=None; inspect event-delivery.json',
+          ],
+        },
+      }),
+      [],
+      'fresh'
+    );
+    expect(constraint).toEqual({
+      tone: 'bad',
+      text: 'Remediation alerts are not being acknowledged (45 failed delivery records)',
+      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+    });
   });
 
   it('names blocked, failing, behind-main, and stale conditions in order', () => {
@@ -427,6 +466,29 @@ describe('buildOvieAsks', () => {
     };
   }
 
+  it('badges escalated no-default cases and ignores anything else', () => {
+    const cases: readonly OvieInboxCase[] = [
+      {
+        ...inboxCase('late', 'needs_you'),
+        escalation: { level: 2, waitingHours: 52.7 },
+      },
+      {
+        ...inboxCase('fresh', 'needs_you'),
+        escalation: { level: 0, waitingHours: 3 },
+      },
+      {
+        ...inboxCase('odd', 'needs_you'),
+        escalation: { level: 'high' },
+      } as unknown as OvieInboxCase,
+    ];
+    const asks = buildOvieAsks({ issues: [], cases });
+    expect(asks.map(ask => ask.escalation)).toEqual([
+      { level: 2, waitingHours: 52 },
+      null,
+      null,
+    ]);
+  });
+
   it('keeps only founder decisions, in inbox order', () => {
     const inbox: OvieInbox = {
       cases: [
@@ -447,8 +509,12 @@ describe('buildOvieAsks', () => {
         recommendation: 'Approve',
         why: 'Why this matters',
         decidable: true,
+        actionLabel: 'Approve',
         canReply: true,
         evidence: ['https://example.com/receipt'],
+        decisionDefault: null,
+        canFeedback: true,
+        escalation: null,
       },
       {
         id: 'c',
@@ -456,8 +522,12 @@ describe('buildOvieAsks', () => {
         recommendation: 'Approve',
         why: 'Why this matters',
         decidable: false,
+        actionLabel: 'Approve',
         canReply: false,
         evidence: ['https://example.com/receipt'],
+        decisionDefault: null,
+        canFeedback: false,
+        escalation: null,
       },
       {
         id: 'd',
@@ -465,10 +535,60 @@ describe('buildOvieAsks', () => {
         recommendation: 'Approve',
         why: 'Why this matters',
         decidable: true,
-        canReply: false,
+        actionLabel: 'Mark done',
+        // Linear replies are posted back to the issue as the answer.
+        canReply: true,
         evidence: ['https://example.com/receipt'],
+        decisionDefault: null,
+        canFeedback: false,
+        escalation: null,
       },
     ]);
+  });
+
+  it('names certification as certify rather than approve', () => {
+    const inbox: OvieInbox = {
+      cases: [
+        {
+          ...inboxCase('cert', 'needs_you'),
+          decisionTarget: {
+            kind: 'certification',
+            id: 'cert',
+            evidenceDigest: 'digest',
+          },
+        },
+      ],
+      issues: [],
+    };
+    expect(buildOvieAsks(inbox)[0]?.actionLabel).toBe('Certify');
+  });
+
+  it('maps the decision default contract and ignores malformed defaults', () => {
+    const withDefault = {
+      ...inboxCase('a', 'needs_you'),
+      decisionDefault: {
+        contract: 'jovie.decision-default/v1',
+        decision: 'reject',
+        summary: 'Keep the current copy',
+        deadline: '2026-10-22T12:00:00.000Z',
+        declared: true,
+      },
+    } as OvieInboxCase;
+    const malformed = {
+      ...inboxCase('b', 'needs_you'),
+      decisionDefault: { contract: 'other/v1', decision: 'approve' },
+    } as unknown as OvieInboxCase;
+    const [first, second] = buildOvieAsks({
+      cases: [withDefault, malformed],
+      issues: [],
+    });
+    expect(first?.decisionDefault).toEqual({
+      decision: 'reject',
+      summary: 'Keep the current copy',
+      deadline: '2026-10-22T12:00:00.000Z',
+      declared: true,
+    });
+    expect(second?.decisionDefault).toBeNull();
   });
 });
 

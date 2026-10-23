@@ -13,7 +13,9 @@ Read in this order:
 7. [`POSITIONING.md`](./POSITIONING.md) — founder-locked customer positioning and
    message roles; read for product, marketing, partnership, and brand work.
 8. [`VOICE.md`](./VOICE.md) — messaging, tone, and agent communication.
-9. [`RELEASE_CHANNELS.md`](./RELEASE_CHANNELS.md) — canonical release-channel
+9. [`OWNERSHIP.md`](./OWNERSHIP.md) — owner registry, agent identity registry,
+   and the CI check that fails on anything unowned.
+10. [`RELEASE_CHANNELS.md`](./RELEASE_CHANNELS.md) — canonical release-channel
    vocabulary (Stable / Beta / Nightly), platform mappings, and Settings IA;
    machine-readable contract in `packages/release-channel-contracts`.
 
