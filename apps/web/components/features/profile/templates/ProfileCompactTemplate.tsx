@@ -364,6 +364,16 @@ export function ProfileCompactTemplate({
   const suppressNextHistorySyncRef = useRef(true);
   const arrivalHistoryLengthRef = useRef<number | null>(null);
   const profileHistoryDepthRef = useRef(0);
+  // The mode this document landed with. Next's history updater can replace
+  // the landing entry with the bare profile path after the first effects;
+  // restoring that mode must not push a second entry on top of the strip.
+  const landedHistoryModeRef = useRef<ProfileMode | null>(null);
+  if (
+    landedHistoryModeRef.current === null &&
+    globalThis.window !== undefined
+  ) {
+    landedHistoryModeRef.current = getModeFromUrl();
+  }
 
   const clearCloseResetTimer = useCallback(() => {
     if (closeResetTimerRef.current !== null) {
@@ -726,6 +736,11 @@ export function ProfileCompactTemplate({
     return () => globalThis.removeEventListener('popstate', handlePopState);
   }, [syncRequestedModeFromLocation]);
 
+  const browserHref =
+    globalThis.window === undefined
+      ? ''
+      : `${globalThis.location.pathname}${globalThis.location.search}`;
+
   useEffect(() => {
     if (!initialLocationModeAlignedRef.current) {
       return;
@@ -770,6 +785,21 @@ export function ProfileCompactTemplate({
       return;
     }
 
+    const landedMode = landedHistoryModeRef.current;
+    const correctingStrippedLanding =
+      profileHistoryDepthRef.current === 0 &&
+      landedMode !== null &&
+      landedMode !== 'profile' &&
+      activeMode === landedMode;
+    if (correctingStrippedLanding) {
+      globalThis.history.replaceState(
+        withPublicProfileHistoryDepth(globalThis.history.state, 0),
+        '',
+        href
+      );
+      return;
+    }
+
     const nextDepth = profileHistoryDepthRef.current + 1;
     profileHistoryDepthRef.current = nextDepth;
     globalThis.history.pushState(
@@ -778,6 +808,7 @@ export function ProfileCompactTemplate({
       href
     );
   }, [
+    browserHref,
     drawerOpen,
     drawerView,
     requestedMode,
