@@ -6,6 +6,7 @@ import {
 } from '@/components/marketing/CliLandingPage';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 import { documentTitle } from '@/lib/seo/document-title';
 
@@ -22,6 +23,11 @@ export const metadata: Metadata = {
     description: CLI_SUBTITLE,
     url: `${BASE_URL}${APP_ROUTES.CLI}`,
     type: 'website',
+    images: [marketingOgImage('cli')],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: [marketingOgImage('cli').url],
   },
 };
 
