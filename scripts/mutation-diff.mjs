@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// Advisory mutation testing on changed high-risk apps/web source.
+// Diff-scoped mutation testing on changed high-risk apps/web source.
 //
 //   node scripts/mutation-diff.mjs --base <sha> --head <sha>
 //   node scripts/mutation-diff.mjs --files apps/web/lib/cron/auth.ts
 //
 // Exits non-zero when selection or execution fails (a broken harness must not
-// look like a clean run). Scores below --low are flagged, never enforced.
+// look like a clean run), and when a baselined file scores under its floor.
+// Scores below --low are flagged. Files with no committed floor stay advisory.
 
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, rmSync } from 'node:fs';
@@ -24,9 +25,16 @@ import {
   selectHighRiskSources,
   WEB_ROOT,
 } from './lib/mutation-diff.mjs';
+import {
+  evaluateMutationScore,
+  loadMutationScoreBaseline,
+} from './lib/mutation-score-floor.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const webRoot = join(repoRoot, WEB_ROOT);
+const scoreBaseline = loadMutationScoreBaseline(
+  join(repoRoot, 'scripts/mutation-score-baseline.json')
+);
 
 const { values } = parseArgs({
   options: {
@@ -174,7 +182,19 @@ for (const source of toRun) {
   }
 }
 
+/** @type {ReturnType<typeof evaluateMutationScore>[]} */
+const floorFailures = [];
 if (!values['list-only']) {
+  for (const result of results) {
+    const scored = scoreMutants(result.mutants);
+    const verdict = evaluateMutationScore(
+      result.file,
+      scored.score,
+      scored.valid,
+      scoreBaseline
+    );
+    if (verdict.enforced && !verdict.ok) floorFailures.push(verdict);
+  }
   const summary = renderSummary({
     sources,
     results,
@@ -182,6 +202,8 @@ if (!values['list-only']) {
     skipped,
     lowScore: Number(values.low),
     errors: harnessErrors,
+    floors: scoreBaseline.files,
+    floorFailures,
   });
   console.log(`\n${summary}`);
   if (values.summary) appendFileSync(values.summary, summary);
@@ -195,4 +217,7 @@ if (values['list-only']) {
   for (const error of harnessErrors)
     console.error(`${error.file}: ${error.reason}`);
 }
-process.exitCode = harnessErrors.length > 0 || untested.length > 0 ? 1 : 0;
+process.exitCode =
+  harnessErrors.length > 0 || untested.length > 0 || floorFailures.length > 0
+    ? 1
+    : 0;
