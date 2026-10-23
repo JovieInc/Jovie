@@ -211,8 +211,8 @@ function defaultFetchTarball(url) {
 
 /**
  * oasdiff breaking base revision, githubactions format, fail on ERR.
- * v1.34.1 rejects `--color` unless the format is `text` or `singleline`
- * (exit 100), so the annotation format is left uncolored.
+ * v1.34.1 rejects `--color` unless the format is text or singleline
+ * (exit 100), so this invocation does not pass it.
  */
 export function runOasdiff(binary, basePath, revisionPath) {
   const result = spawnSync(

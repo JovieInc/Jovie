@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
@@ -289,6 +296,36 @@ test('guard-file changes trigger the HEAD self-check path', () => {
   assert.match(emitted.join('\n'), /self-check/);
 });
 
+test('githubactions breaking invocation does not pass --color', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'jovie-oasdiff-args-'));
+  const bin = join(dir, 'oasdiff');
+  const argsFile = join(dir, 'args');
+  writeFileSync(
+    bin,
+    `#!/usr/bin/env node
+import { writeFileSync } from 'node:fs';
+writeFileSync(${JSON.stringify(argsFile)}, process.argv.slice(2).join('\\n'));
+`
+  );
+  chmodSync(bin, 0o755);
+  try {
+    const result = runOasdiff(bin, 'base.json', 'revision.json');
+    assert.equal(result.code, 0);
+    assert.equal(result.stderr, '');
+    assert.deepEqual(readFileSync(argsFile, 'utf8').split('\n'), [
+      'breaking',
+      'base.json',
+      'revision.json',
+      '-f',
+      'githubactions',
+      '--fail-on',
+      'ERR',
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('the pinned oasdiff release is exact and sha-verified', () => {
   assert.equal(OASDIFF_VERSION, 'v1.34.1');
   assert.match(OASDIFF_TARBALL_SHA256, /^[0-9a-f]{64}$/);
@@ -309,28 +346,6 @@ test('the base worktree render produces the same document as the head render', {
   assert.equal(head.code, 0, head.error);
   assert.equal(base.code, 0, base.error);
   assert.equal(base.document, head.document);
-});
-
-test('pinned oasdiff accepts githubactions format without --color', () => {
-  const binary = ensureOasdiffBinary();
-  assert.equal(binary.code, 0, binary.error);
-  const directory = mkdtempSync(join(tmpdir(), 'jovie-oasdiff-format-'));
-  try {
-    const spec = `${JSON.stringify({
-      openapi: '3.0.3',
-      info: { title: 'probe', version: '1' },
-      paths: {},
-    })}\n`;
-    const base = join(directory, 'base.json');
-    const revision = join(directory, 'revision.json');
-    writeFileSync(base, spec);
-    writeFileSync(revision, spec);
-    const result = runOasdiff(binary.binary, base, revision);
-    assert.equal(result.code, 0, result.stderr);
-    assert.doesNotMatch(result.stderr, /--color flag is only relevant/);
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
 });
 
 test('the renderer produces stable, schema-bearing JSON from the real tree', {

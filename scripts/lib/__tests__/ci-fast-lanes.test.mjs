@@ -2100,7 +2100,10 @@ describe('source-read guard selection', () => {
   );
 
   it.each([
-    ['pull_request', ['web-source-read-tests', 'script-contracts']],
+    [
+      'pull_request',
+      ['web-source-read-tests', 'script-contracts', 'gate-weakening-detector'],
+    ],
     ['merge_group', []],
     ['push', []],
   ])(
@@ -2204,6 +2207,7 @@ describe('source-read guard selection', () => {
       ...apiGuard(path),
       'web-source-read-tests',
       'script-contracts',
+      'gate-weakening-detector',
     ]);
   });
 
@@ -2376,6 +2380,22 @@ describe('source-read guard selection', () => {
       }
       if (guard.id === 'script-contracts') {
         expect(guard.command).toContain('/lib/script-contract-affected.mjs');
+        continue;
+      }
+      if (guard.id === 'gate-weakening-detector') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/invariants/gate-weakening-detector.mjs')
+        );
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/gate-weakening-detector.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
         continue;
       }
       if (guard.id === 'web-source-read-tests') {
