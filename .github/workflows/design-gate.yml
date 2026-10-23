@@ -1,7 +1,7 @@
-# controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Cursor
-# necessary-trust-boundary: Read-only pull_request listing of changed files via the ephemeral github.token (`gh api .../pulls/<n>/files`); permissions are contents:read + pull-requests:read only, so the hop can observe but cannot write labels, checks, code, or comments. No merge, deploy, or release authority is added.
-# revisit-trigger: Remove this workflow (and the exception) once the design gate is enforced by an existing controller or required check rather than a standalone pull_request hop; otherwise revisit if DESIGN_GATE_ENFORCE graduates to a merge-queue required check.
+# Changed paths come from the pull_request merge commit: HEAD^1 is the base
+# tip, so the diff is this PR. The pulls files endpoint returns HTTP 403 once
+# the Actions installation REST budget is exhausted, which failed this check
+# before the brief ran. This job reads the checkout instead.
 name: Design gate
 
 # Warns when a PR touches a marketing or landing surface without a completed
@@ -31,7 +31,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
   group: design-gate-${{ github.event.pull_request.number }}
@@ -46,14 +45,16 @@ jobs:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Default pull_request ref is the synthetic merge. Depth 2 includes
+          # that commit and its first parent (the base tip).
+          fetch-depth: 2
           persist-credentials: false
 
       - name: Changed files
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename' > "$RUNNER_TEMP/design-gate-files.txt"
+          git rev-parse --verify HEAD^1 >/dev/null
+          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/design-gate-files.txt"
 
       - name: Check the design brief
         env:
