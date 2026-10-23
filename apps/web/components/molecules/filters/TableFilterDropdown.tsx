@@ -30,7 +30,7 @@ import {
   PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
-} from '@/components/organisms/table';
+} from '@/components/molecules/page-toolbar-classes';
 import { cn } from '@/lib/utils';
 import { FilterCheckboxItem } from './FilterCheckboxItem';
 import { FilterSearchInput } from './FilterSearchInput';

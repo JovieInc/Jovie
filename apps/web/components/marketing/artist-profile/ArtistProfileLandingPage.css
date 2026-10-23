@@ -391,23 +391,14 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 }
 
 .system-b-launch-hero-title {
-  /* JOV-8167: wide enough for balanced lines, never clamped. Plain class
-     (not :where) so it beats the zero-specificity h1 two-line fallback. */
-  display: block;
-  max-block-size: none;
-  overflow: visible;
-  -webkit-line-clamp: unset;
-  max-width: 24ch;
+  /* Fit the full headline in two lines, including the narrower split column. */
+  max-width: 100%;
   text-wrap: balance;
   margin: var(--space-5) 0 0;
   color: var(--system-b-text-primary);
-  font-size: clamp(
-    var(--text-5xl),
-    13cqi,
-    calc(var(--text-5xl) + var(--space-8))
-  );
+  font-size: clamp(var(--text-3xl), 8cqi, var(--text-5xl));
   font-weight: var(--font-weight-bold);
-  letter-spacing: 0;
+  letter-spacing: var(--ds-marketing-display-tracking);
   line-height: 0.94;
 }
 
@@ -526,7 +517,8 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-launch-final h2) {
   margin: 0;
   color: var(--system-b-text-primary);
-  font-size: clamp(var(--text-3xl), 5vw, var(--text-5xl));
+  /* Stay below the hero even when its desktop column narrows. */
+  font-size: var(--text-3xl);
   font-weight: var(--font-weight-bold);
   letter-spacing: 0;
   line-height: 1.02;
@@ -1238,10 +1230,6 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 
   :where(.system-b-launch-hero-grid) {
     gap: var(--space-6);
-  }
-
-  .system-b-launch-hero-title {
-    max-width: 13ch;
   }
 
   :where(.system-b-launch-profile-stage) {

@@ -552,7 +552,7 @@ module.exports = [
     files: [
       'lib/chat/system-prompt.ts',
       'components/organisms/billing/PlanComparisonSection.tsx',
-      'components/molecules/PaySelector.tsx',
+      'components/features/pay/PaySelector.tsx',
       'app/investor-portal/_components/FundraiseProgress.tsx',
       'app/onboarding/checkout/OnboardingCheckoutClient.tsx',
     ],
