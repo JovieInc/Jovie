@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
@@ -11,6 +12,13 @@ import {
 } from '@/lib/seo/sitemap-publication';
 
 describe('/product/traffic-quality marketing route', () => {
+  it('inherits static defaults without legacy route-segment cache exports', () => {
+    const source = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8');
+    expect(source).not.toMatch(
+      /\bexport\s+const\s+(?:dynamic|fetchCache|revalidate)\s*=/
+    );
+  });
+
   it('ships as a published commercial sitemap hub', () => {
     expect(APP_ROUTES.PRODUCT_TRAFFIC_QUALITY).toBe('/product/traffic-quality');
     expect(getExactPublishedMarketingPaths()).toContain(

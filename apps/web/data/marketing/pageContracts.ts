@@ -189,6 +189,15 @@ export const MARKETING_PAGE_CONTRACTS = {
     successEvent: 'visitor toggles the traffic quality filter',
     primaryCta: START_CTA,
   },
+  '(marketing)/product/isrc/page.tsx': {
+    routeGlob: '(marketing)/product/isrc/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_ISRC,
+    job: 'store one primary ISRC on a release and one code on each track',
+    proof: 'live ISRC field with a release code and a track code',
+    successEvent: 'visitor saves a valid ISRC',
+    primaryCta: START_CTA,
+  },
   '(marketing)/card/page.tsx': {
     routeGlob: '(marketing)/card/page.tsx',
     copyScope: 'shared',

@@ -52,6 +52,7 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.marketing-pay': '/pay',
   'web.marketing-product': '/product',
   'web.marketing-traffic-quality': '/product/traffic-quality',
+  'web.marketing-isrc': '/product/isrc',
   'web.marketing-card': '/card',
   'web.marketing-smart-links': '/smart-links',
   'web.marketing-launch': '/launch',
@@ -243,6 +244,7 @@ web.investor-portal|web|investor-portal|apps/web/app/investor-portal/|desktop,mo
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
 web.marketing-product|web|marketing-product|apps/web/app/(marketing)/product/page.tsx|desktop,mobile
 web.marketing-traffic-quality|web|marketing-traffic-quality|apps/web/app/(marketing)/product/traffic-quality/page.tsx|desktop,mobile
+web.marketing-isrc|web|marketing-isrc|apps/web/app/(marketing)/product/isrc/page.tsx|desktop,mobile
 web.marketing-smart-links|web|marketing-smart-links|apps/web/app/(marketing)/smart-links/page.tsx|desktop,mobile
 web.marketing-pay|web|marketing-pay|apps/web/app/(marketing)/pay/page.tsx|desktop,mobile
 web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx,apps/web/app/(marketing)/pricing/layout.tsx|desktop,mobile
