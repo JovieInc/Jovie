@@ -3,7 +3,10 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const webRoot = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../../../..'
+);
 
 /**
  * Token-compliance contract (Ion tokens only, no raw palette colors):
