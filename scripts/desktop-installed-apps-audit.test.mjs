@@ -148,6 +148,8 @@ async function observePublication(
   feedResponse = () => new Response(fixture.feed)
 ) {
   return fetchShippedDesktopVersions(async (url, options) => {
+    if (String(url).includes('/commits/tags/'))
+      return Response.json({ sha: SOURCE_REVISION });
     if (String(url).includes('/releases/assets/')) {
       assert.equal(
         new Headers(options.headers).get('Accept'),
@@ -171,6 +173,10 @@ test('publication identity binds exact assets and feed bytes, without claiming a
       });
     }
     const observed = await fetchShippedDesktopVersions(async url => {
+      if (String(url).includes('/commits/tags/')) {
+        assert.ok(String(url).endsWith(`/tags/${fixture.release.tag_name}`));
+        return Response.json({ sha: SOURCE_REVISION });
+      }
       if (String(url).includes('/releases/assets/'))
         return new Response(fixture.feed);
       return Response.json(fixture.release);
@@ -257,9 +263,11 @@ test('unpublished, missing, duplicate, empty or undigested assets cannot verify 
       const fixture = publishedFixture(channel);
       mutate(fixture);
       const observed = await fetchShippedDesktopVersions(async url =>
-        String(url).includes('/releases/assets/')
-          ? new Response(fixture.feed)
-          : Response.json(fixture.release)
+        String(url).includes('/commits/tags/')
+          ? Response.json({ sha: SOURCE_REVISION })
+          : String(url).includes('/releases/assets/')
+            ? new Response(fixture.feed)
+            : Response.json(fixture.release)
       );
       assert.equal(observed[channel].publicationIdentityVerified, false);
       assert.ok(observed[channel].publicationError);
@@ -277,9 +285,11 @@ test('staging requires a valid timestamp for the current rolling publication', a
     const fixture = publishedFixture('staging');
     fixture.release.updated_at = updatedAt;
     const observed = await fetchShippedDesktopVersions(async url =>
-      String(url).includes('/releases/assets/')
-        ? new Response(fixture.feed)
-        : Response.json(fixture.release)
+      String(url).includes('/commits/tags/')
+        ? Response.json({ sha: SOURCE_REVISION })
+        : String(url).includes('/releases/assets/')
+          ? new Response(fixture.feed)
+          : Response.json(fixture.release)
     );
     assert.equal(observed.staging.publicationIdentityVerified, false);
   }
@@ -316,6 +326,56 @@ test('wrong feed bytes, unavailable feed, and wrong feed target cannot verify pu
         .publicationIdentityVerified,
       false
     );
+  }
+});
+
+test('malformed channel feeds cannot verify publication even with matching digests', async () => {
+  for (const channel of ['production', 'staging']) {
+    for (const transform of [
+      feed => `${feed}${feed.split('\n')[0]}\n`,
+      feed => feed.replace('    size: 100', '   size: 100'),
+      feed => feed.replace('    size: 100', '    size: 100\n    size: 100'),
+      feed => feed.replace('files:', 'files: |'),
+      feed => feed.replace('files:', 'files: >'),
+    ]) {
+      const fixture = publishedFixture(channel);
+      fixture.feed = transform(fixture.feed);
+      const asset = fixture.release.assets[4];
+      asset.size = Buffer.byteLength(fixture.feed);
+      asset.digest = `sha256:${createHash('sha256').update(fixture.feed).digest('hex')}`;
+      const observed = await fetchShippedDesktopVersions(async url =>
+        String(url).includes('/commits/tags/')
+          ? Response.json({ sha: SOURCE_REVISION })
+          : String(url).includes('/releases/assets/')
+            ? new Response(fixture.feed)
+            : Response.json(fixture.release)
+      );
+      assert.equal(observed[channel].publicationIdentityVerified, false);
+      assert.ok(observed[channel].publicationError);
+    }
+  }
+});
+
+test('release metadata cannot hide a mismatched or unavailable published tag', async () => {
+  for (const channel of ['production', 'staging']) {
+    const fixture = publishedFixture(channel);
+    for (const tagResponse of [
+      () => Response.json({ sha: 'b'.repeat(40) }),
+      () => Response.json({}),
+      () => new Response('missing tag', { status: 404 }),
+      () => {
+        throw new Error('tag lookup unavailable');
+      },
+    ]) {
+      const observed = await fetchShippedDesktopVersions(async url => {
+        if (String(url).includes('/commits/tags/')) return tagResponse();
+        if (String(url).includes('/releases/assets/'))
+          return new Response(fixture.feed);
+        return Response.json(fixture.release);
+      });
+      assert.equal(observed[channel].publicationIdentityVerified, false);
+      assert.ok(observed[channel].publicationError);
+    }
   }
 });
 

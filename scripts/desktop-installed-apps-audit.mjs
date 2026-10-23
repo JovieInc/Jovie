@@ -16,10 +16,10 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
+import { load as loadYaml } from 'js-yaml';
 import {
   expectedDesktopAssetNames,
   isStagingAssetName,
-  parseLatestMacYaml,
   validateReleaseEnvelope,
 } from './desktop-release-assets.mjs';
 
@@ -425,6 +425,18 @@ async function shippedVersion(release, channel, fetchImpl) {
       version,
       draft: false,
     });
+    const tagCommit = await githubJson(
+      `${GITHUB_API}/repos/${GITHUB_REPO}/commits/tags/${encodeURIComponent(release.tag_name)}`,
+      fetchImpl
+    );
+    if (
+      !tagCommit ||
+      typeof tagCommit !== 'object' ||
+      !('sha' in tagCommit) ||
+      tagCommit.sha !== result.sourceRevision
+    ) {
+      throw new Error('Published release tag and source revision differ.');
+    }
     const names = expectedDesktopAssetNames(version, channel);
     if (channel === 'production' && release.assets.length !== names.length) {
       throw new Error(
@@ -476,23 +488,32 @@ async function shippedVersion(release, channel, fetchImpl) {
         'Published feed digest or size differs from release metadata.'
       );
     }
-    const metadata = parseLatestMacYaml(bytes.toString('utf8'));
+    // Validate the same YAML values the installed updater consumes.
+    const metadata = /** @type {Record<string, unknown> | null} */ (
+      loadYaml(bytes.toString('utf8'))
+    );
+    const files = metadata?.files;
     const zip = assets.find(asset => asset.name.endsWith('.zip'));
     if (
+      !metadata ||
+      typeof metadata !== 'object' ||
       metadata.version !== version ||
       metadata.path !== zip.name ||
-      metadata.files.length !== 2 ||
+      !Array.isArray(files) ||
+      files.length !== 2 ||
+      files.some(file => !file || typeof file !== 'object') ||
+      typeof metadata.sha512 !== 'string' ||
       !/^[A-Za-z0-9+/]{86}==$/.test(metadata.sha512 ?? '') ||
-      metadata.files.filter(
+      files.filter(
         file => file.url === zip.name && file.sha512 === metadata.sha512
       ).length !== 1 ||
       ['.zip', '.dmg'].some(extension => {
         const asset = assets.find(item => item.name.endsWith(extension));
-        const files = metadata.files.filter(file => file.url === asset.name);
+        const matches = files.filter(file => file.url === asset.name);
         return (
-          files.length !== 1 ||
-          Number(files[0].size) !== asset.size ||
-          !/^[A-Za-z0-9+/]{86}==$/.test(files[0].sha512 ?? '')
+          matches.length !== 1 ||
+          Number(matches[0].size) !== asset.size ||
+          !/^[A-Za-z0-9+/]{86}==$/.test(matches[0].sha512 ?? '')
         );
       })
     ) {
