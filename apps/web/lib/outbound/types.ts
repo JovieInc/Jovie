@@ -49,8 +49,16 @@ export type OutboundTargetState =
 
 export type OutboundCopyState = 'draft' | 'approved' | 'rejected' | 'stale';
 
+/**
+ * Views in pipeline order. "ready" means every required evidence class is on
+ * file, so Tim can review facts and certify. Missing evidence is its own view,
+ * and possible non-artists or unscored leads sit under "flagged" (warn-only:
+ * nothing is disqualified automatically).
+ */
 export const OUTBOUND_VIEWS = [
   'ready',
+  'needs_evidence',
+  'flagged',
   'certified',
   'approved',
   'sent',
@@ -64,6 +72,8 @@ export type OutboundView = (typeof OUTBOUND_VIEWS)[number];
 
 export const OUTBOUND_VIEW_LABELS: Record<OutboundView, string> = {
   ready: 'Ready to certify',
+  needs_evidence: 'Needs evidence',
+  flagged: 'Flagged',
   certified: 'Certified',
   approved: 'Approved',
   sent: 'Sent',
@@ -78,6 +88,8 @@ export type OutboundBand = 'high' | 'medium' | 'low' | 'unknown';
 
 export type OutboundNextAction =
   | 'build_profile'
+  | 'gather_evidence'
+  | 'check_entity'
   | 'review_facts'
   | 'approve_message'
   | 'send'
@@ -88,6 +100,8 @@ export type OutboundNextAction =
 
 export const OUTBOUND_NEXT_ACTION_LABELS: Record<OutboundNextAction, string> = {
   build_profile: 'Build profile',
+  gather_evidence: 'Gather evidence',
+  check_entity: 'Check entity',
   review_facts: 'Review facts',
   approve_message: 'Approve message',
   send: 'Ready to send',
@@ -96,6 +110,21 @@ export const OUTBOUND_NEXT_ACTION_LABELS: Record<OutboundNextAction, string> = {
   await_payment: 'Awaiting payment',
   none: '—',
 };
+
+/** Warn-only flags. They label a row and keep it out of "ready"; they never reject. */
+export type OutboundFlag =
+  | 'possible_non_artist'
+  | 'unscored'
+  | 'presence_only_fit';
+
+export const OUTBOUND_FLAG_LABELS: Record<OutboundFlag, string> = {
+  possible_non_artist: 'Possible non-artist',
+  unscored: 'Unscored',
+  presence_only_fit: 'Presence-only fit',
+};
+
+/** What the fit score is based on, so a thin score is not read as a judgment. */
+export type OutboundFitBasis = 'scored' | 'presence_only' | 'unscored';
 
 export interface OutboundRow {
   readonly leadId: string;
@@ -106,13 +135,21 @@ export interface OutboundRow {
   readonly profilePath: string | null;
   readonly sourceUrl: string;
   readonly view: OutboundView;
-  readonly whyNow: string;
+  /** A dated trigger event ("Released 3 days ago"), else null for no trigger. */
+  readonly whyNow: string | null;
   readonly fit: OutboundBand;
   readonly fitScore: number | null;
+  readonly fitBasis: OutboundFitBasis;
+  readonly flags: readonly OutboundFlag[];
+  /** Why the row is flagged as a possible non-artist, in Tim's words. */
+  readonly entityNote: string | null;
+  /** Required evidence classes not yet on file; empty when complete. */
+  readonly missingEvidence: readonly string[];
   /** JOV-6650 owns ability and intent; unknown until it ships. */
   readonly ability: OutboundBand;
   readonly intent: OutboundBand;
   readonly certified: boolean;
+  /** Only a channel with a sendable recipient on file; null when unreachable. */
   readonly channel: OutboundChannel | null;
   readonly nextAction: OutboundNextAction;
   readonly approval: {

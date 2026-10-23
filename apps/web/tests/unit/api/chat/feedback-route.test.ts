@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { drizzleColumns } from '@/tests/unit/auth/drizzle-predicate';
+
+const APP_USER_ID = '33333333-3333-4333-8333-333333333333';
 
 // ---- hoisted mocks ----
 const mockGetCachedAuth = vi.hoisted(() => vi.fn());
@@ -67,7 +70,7 @@ describe('POST /api/chat/feedback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLimit.mockResolvedValue({ success: true });
-    mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
+    mockGetCachedAuth.mockResolvedValue({ userId: APP_USER_ID });
     mockUsersFindFirst.mockResolvedValue({ id: 'user-uuid-1' });
     mockGetCurrentUserEntitlements.mockResolvedValue({ plan: 'pro' });
     mockUpsertChatMessageVote.mockResolvedValue({ id: 'feedback-1' });
@@ -112,6 +115,9 @@ describe('POST /api/chat/feedback', () => {
     );
 
     expect(response.status).toBe(200);
+    expect(drizzleColumns(mockUsersFindFirst.mock.calls[0]?.[0].where)).toEqual(
+      ['users.id']
+    );
     expect(mockUpsertChatMessageVote).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'user-uuid-1',

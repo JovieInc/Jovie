@@ -1,5 +1,8 @@
 import * as Sentry from '@sentry/nextjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
+
+const missingPriceIssue = `No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the ${ARTIST_VISIBILITY_OFFER.pro.displayName} $${ARTIST_VISIBILITY_OFFER.pro.monthlyUsd}/month USD recurring price ID.`;
 
 describe('Artist Visibility billing startup contract', () => {
   beforeEach(() => {
@@ -39,7 +42,7 @@ describe('Artist Visibility billing startup contract', () => {
     expect(getActivePriceIds()).toEqual(['price_visibility']);
     expect(getPriceMappingDetails('price_visibility')).toMatchObject({
       plan: 'pro',
-      amount: 19900,
+      amount: 1200,
       currency: 'usd',
       interval: 'month',
     });
@@ -88,9 +91,13 @@ describe('Artist Visibility billing startup contract', () => {
       const result = validateStripeBillingConfig();
       expect(result.healthy).toBe(false);
       expect(getActivePriceIds()).toEqual([]);
+      expect(missingPriceIssue).toContain(
+        `${ARTIST_VISIBILITY_OFFER.pro.displayName} $${ARTIST_VISIBILITY_OFFER.pro.monthlyUsd}/month`
+      );
+      expect(missingPriceIssue).not.toContain('$199');
       expect(result.issues).toEqual([
         'Missing Stripe env vars: STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY',
-        'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Presence $199/month USD recurring price ID.',
+        missingPriceIssue,
       ]);
       expect(Sentry.captureMessage).toHaveBeenCalledTimes(
         deployment === 'development' ? 0 : 1
@@ -133,7 +140,7 @@ describe('Artist Visibility billing startup contract', () => {
       expect(result.healthy).toBe(false);
       expect(result.issues).toEqual([
         'Missing Stripe env vars: STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY',
-        'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Presence $199/month USD recurring price ID.',
+        missingPriceIssue,
       ]);
     }
 
@@ -162,7 +169,7 @@ describe('Artist Visibility billing startup contract', () => {
 
     expect(Sentry.captureMessage).toHaveBeenCalledTimes(2);
     expect(Sentry.captureMessage).toHaveBeenLastCalledWith(
-      'Stripe billing misconfigured at startup: Missing Stripe env vars: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY; No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Presence $199/month USD recurring price ID.',
+      `Stripe billing misconfigured at startup: Missing Stripe env vars: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY; ${missingPriceIssue}`,
       expect.objectContaining({ level: 'fatal' })
     );
   });

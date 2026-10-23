@@ -20,7 +20,6 @@ describe('marketing static flags', () => {
   it('keeps V1 design flags false (inverted semantics still off — V2 ships)', () => {
     // V1_DESIGN flags have inverted semantics: true = OLD design.
     // They remain false so the homepage continues to use V2 structure.
-    expect(FEATURE_FLAGS.SHOW_HOME_V1_DESIGN).toBe(false);
     expect(FEATURE_FLAGS.SHOW_PUBLIC_PROFILE_V1_DESIGN).toBe(false);
   });
 

@@ -177,6 +177,27 @@ function aggregateActiveCausalLift(rows: readonly ArtistCohortRevenueRow[]): {
   return { cents: null, status: 'unmeasured' };
 }
 
+/** An IRPAA window is measured only when automation outcomes landed in it. */
+export function irpaaHasData(result: IrpaaResult | null): boolean {
+  return result != null && (result.activeArtists > 0 || result.runCount > 0);
+}
+
+/**
+ * "Measured" requires data and a delta requires a baseline. A window with no
+ * automation outcomes is No data (null), never a measured $0.00, and the prior
+ * window is dropped unless it is itself measured.
+ */
+export function measuredIrpaaWindows(
+  current: IrpaaResult | null,
+  prior: IrpaaResult | null
+): { irpaa: IrpaaResult | null; irpaaPrior: IrpaaResult | null } {
+  const irpaa = irpaaHasData(current) ? current : null;
+  return {
+    irpaa,
+    irpaaPrior: irpaa && irpaaHasData(prior) ? prior : null,
+  };
+}
+
 function formatMs(ms: number | null): string {
   if (ms == null) return '—';
   if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
@@ -207,15 +228,16 @@ export async function loadRevenueLiftDashboard(
   let irpaaSource: MetricSourceMeta;
 
   try {
-    [irpaa, irpaaPrior] = await Promise.all([
+    const [current, priorWindow] = await Promise.all([
       getRolling30DayIRPAA(now),
       getIRPAA(windowPrior),
     ]);
+    ({ irpaa, irpaaPrior } = measuredIrpaaWindows(current, priorWindow));
     irpaaSource = sourceOk(
       'IRPAA',
       'getRolling30DayIRPAA → workflow_run_outcomes + revenue-lift-weights',
       fetchedAtIso,
-      irpaa.activeArtists > 0 || irpaa.runCount > 0
+      irpaa != null
     );
   } catch (error) {
     logger.error('[revenue-lift-dashboard] IRPAA load failed', error);

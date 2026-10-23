@@ -1,0 +1,8 @@
+# Persistent run memory: one receipt line per run plus the open fix to verify.
+# Never store credentials here.
+name: summer-improvement-loop
+description: >-
+  Receipts from prior Summer improvement loop runs. runs.jsonl has one JSON line
+  per run (signals, decision, PR, before values, verification probe);
+  open-fix.json names the last shipped fix to verify; needs-tim.md lists asks
+  already raised to Tim so they are not raised twice.

@@ -39,8 +39,9 @@ const FORBIDDEN_PRICING_PAGE_MARKERS = Object.freeze([
 ]);
 const REQUIRED_PRICING_PAGE_MARKERS = Object.freeze([
   ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
-  '$199',
-  'Request access',
+  // EVENT: Tim, 2026-10-20 — Pro is $12/month self-serve via /claim.
+  '$12',
+  'Claim your profile',
 ]);
 const FORBIDDEN_DIRECTORY_IDENTITIES = Object.freeze([
   'e2e+jordan@example.com',

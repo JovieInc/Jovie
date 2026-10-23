@@ -18,6 +18,8 @@ export function HomeLoopSection({
   isEmpty,
   emptyLabel,
   errorLabel,
+  notice,
+  noticeHref,
   onRetry,
   skeleton,
   minBodyClassName,
@@ -31,6 +33,10 @@ export function HomeLoopSection({
   readonly isEmpty: boolean;
   readonly emptyLabel: string;
   readonly errorLabel: string;
+  /** Ready-state source warning. Replaces the empty line when the section is empty. */
+  readonly notice?: string | null;
+  /** Where the full warning lives (e.g. every unavailable source). */
+  readonly noticeHref?: string;
   readonly onRetry?: () => void;
   readonly skeleton: ReactNode;
   /** Reserved minimum body height, so state changes stay local. */
@@ -86,13 +92,56 @@ export function HomeLoopSection({
             ) : null}
           </div>
         ) : isEmpty ? (
-          <p className='rounded-lg border border-dashed border-subtle px-3 py-2 text-xs text-tertiary-token'>
-            {emptyLabel}
+          <p
+            role={notice ? 'status' : undefined}
+            data-testid={notice ? `${testId}-notice` : undefined}
+            className={cn(
+              'rounded-lg border border-dashed border-subtle px-3 py-2 text-xs',
+              notice ? 'text-secondary-token' : 'text-tertiary-token'
+            )}
+          >
+            {notice ?? emptyLabel}
+            {notice && noticeHref ? (
+              <NoticeLink href={noticeHref} testId={testId} />
+            ) : null}
           </p>
         ) : (
-          children
+          <>
+            {notice ? (
+              <p
+                role='status'
+                data-testid={`${testId}-notice`}
+                className='line-clamp-1 shrink-0 pb-2 text-xs text-secondary-token'
+                title={notice}
+              >
+                {notice}
+                {noticeHref ? (
+                  <NoticeLink href={noticeHref} testId={testId} />
+                ) : null}
+              </p>
+            ) : null}
+            {children}
+          </>
         )}
       </div>
     </section>
+  );
+}
+
+function NoticeLink({
+  href,
+  testId,
+}: Readonly<{ readonly href: string; readonly testId: string }>) {
+  return (
+    <>
+      {' '}
+      <a
+        href={href}
+        className='text-secondary-token underline underline-offset-2 hover:text-primary-token'
+        data-testid={`${testId}-notice-link`}
+      >
+        View
+      </a>
+    </>
   );
 }

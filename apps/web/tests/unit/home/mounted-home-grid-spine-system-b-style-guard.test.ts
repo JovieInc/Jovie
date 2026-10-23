@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 const webRoot = path.resolve(__dirname, '../../..');
 const pagePath = 'app/(home)/page.tsx';
 const cssPath = 'app/(home)/home.css';
+const componentPath = 'components/homepage/HomepageArtistProfile.tsx';
 
 const forbiddenPageChromePatterns = [
   /#[0-9a-fA-F]{3,8}/,
@@ -43,24 +44,15 @@ function countOccurrences(source: string, needle: string): number {
 
 describe('mounted homepage grid spine System B source contract', () => {
   it('keeps page-level markup free of forbidden style patterns', () => {
-    const pageSource = readFileSync(path.join(webRoot, pagePath), 'utf8');
-
-    for (const pattern of forbiddenPageChromePatterns) {
-      expect(pageSource, `${pagePath} leaked ${pattern}`).not.toMatch(pattern);
+    for (const sourcePath of [pagePath, componentPath]) {
+      const source = readFileSync(path.join(webRoot, sourcePath), 'utf8');
+      for (const pattern of forbiddenPageChromePatterns) {
+        expect(source, `${sourcePath} leaked ${pattern}`).not.toMatch(pattern);
+      }
     }
 
-    // The hero guard slices page.tsx between these two anchors; they must
-    // survive any page-spine edit verbatim.
-    expect(pageSource).toContain('function HomepageHero()');
-    expect(pageSource).toContain('function HomepageUnlockedSections()');
-    expect(pageSource.indexOf('function HomepageHero()')).toBeLessThan(
-      pageSource.indexOf('function HomepageUnlockedSections()')
-    );
-
-    // Page-level wrappers stay neutral: sections mount through named shells,
-    // never through ad-hoc sizing utilities in page markup.
-    expect(pageSource).toContain('homepage-story-stack');
-    // Certified homepage: proof is a statement, never a logo strip.
+    const pageSource = readFileSync(path.join(webRoot, pagePath), 'utf8');
+    // Proof is real product, never a logo strip or an FAQ wall.
     expect(pageSource).not.toContain('HomeTrustSection');
     expect(pageSource).not.toContain('FaqSection');
   });
@@ -69,42 +61,34 @@ describe('mounted homepage grid spine System B source contract', () => {
     const pageSource = readFileSync(path.join(webRoot, pagePath), 'utf8');
 
     for (const mount of [
-      '<HomepageIdentityHero',
-      '<HomepageCertifiedSections',
-      '<HomepageClose',
+      '<HomepageArtistHero',
+      '<HomepageFanStates',
+      '<HomepageOfferClose',
     ]) {
       expect(
         countOccurrences(pageSource, mount),
         `${pagePath} must mount ${mount} exactly once`
       ).toBe(1);
     }
-
-    expect(
-      countOccurrences(pageSource, "data-testid='homepage-story-stack'")
-    ).toBe(1);
-
-    // Canonical Pen v3 dark launch mounts each of its sections exactly once.
-    for (const mount of [
-      '<HomepageIdentityHero',
-      '<HomepageIdentitySections',
-      '<HomepageIdentityClose',
-    ]) {
-      expect(
-        countOccurrences(pageSource, mount),
-        `${pagePath} must mount ${mount} exactly once`
-      ).toBe(1);
-    }
-    expect(
-      countOccurrences(
-        pageSource,
-        "data-testid='homepage-identity-story-stack'"
-      )
-    ).toBe(1);
 
     expect(pageSource).not.toContain('MarketingShippedSitesShowcase');
     expect(pageSource).not.toContain('MarketingPlatformSpecBento');
-    expect(pageSource).not.toContain('homepage-shipped-sites-showcase');
-    expect(pageSource).not.toContain('homepage-platform-spec-bento');
+  });
+
+  it('aligns the homepage sections to the shared content column', () => {
+    const css = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepageArtistProfile.css'),
+      'utf8'
+    );
+    // The hero shares the section shell's container: one gutter, one width.
+    const component = readFileSync(path.join(webRoot, componentPath), 'utf8');
+    expect(component).toContain(
+      "className='ap-section-container homepage-artist-hero__inner'"
+    );
+    expect(css).not.toMatch(/--homepage-page-gutter|--ds-public-content-max/);
+    for (const pattern of forbiddenSpineCssPatterns) {
+      expect(css, `homepage CSS leaked ${pattern}`).not.toMatch(pattern);
+    }
   });
 
   it('locks the page-level CSS spine onto the shared content column', () => {

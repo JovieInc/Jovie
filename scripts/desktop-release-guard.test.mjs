@@ -1569,7 +1569,10 @@ globalThis.setTimeout = (callback, ms) => {
   await published();
   assert.equal((await readFile(join(root, 'attempts'), 'utf8')).trim(), '2');
   const wait = Number((await readFile(join(root, 'sleeps'), 'utf8')).trim());
-  assert.ok(wait >= 90_000 && wait <= 91_000, `Unexpected wait: ${wait}`);
+  // The mock stamps the reset with `date +%s` (whole seconds) and the
+  // publisher waits reset + 1s from a later Date.now(), so a slow runner
+  // that crosses a second boundary lands just under 90s (seen: 89_999).
+  assert.ok(wait >= 85_000 && wait <= 91_000, `Unexpected wait: ${wait}`);
   for (const overrides of [
     { MOCK_FAIL_ENDPOINT: 'compare/', MOCK_RESET_SECONDS: '3600' },
     { MOCK_FAIL_ENDPOINT: 'compare/', MOCK_FAILURES: '4' },
@@ -1759,7 +1762,7 @@ test('desktop authorizer accepts an exact successful recovered production marker
   ]);
 });
 
-test('scheduled staging defers while exact push CI is still running', async t => {
+test('staging authorization defers scheduled reconciliation until exact push CI exists', async t => {
   const root = await mkdtemp(join(tmpdir(), 'jovie-staging-ci-defer-'));
   t.after(() => rm(root, { force: true, recursive: true }));
   const repository = 'JovieInc/Jovie';
@@ -1803,12 +1806,15 @@ esac
     path: '.github/workflows/ci.yml',
     ...overrides,
   });
-  const run = runsJson =>
-    spawnSync('bash', ['-c', stagingGate], {
+  let runCount = 0;
+  const run = (runsJson, overrides = {}) => {
+    const outputPath = join(root, `output-${runCount++}.txt`);
+    const result = spawnSync('bash', ['-c', stagingGate], {
       encoding: 'utf8',
       env: {
         ...process.env,
-        GITHUB_OUTPUT: join(root, 'output.txt'),
+        EVENT_NAME: 'schedule',
+        GITHUB_OUTPUT: outputPath,
         MOCK_CI_RUNS_JSON: JSON.stringify({ workflow_runs: runsJson }),
         MOCK_CI_WORKFLOW_JSON: JSON.stringify({
           id: workflowId,
@@ -1819,25 +1825,71 @@ esac
         REPOSITORY: repository,
         environment: 'staging',
         release_sha: releaseSha,
+        ...overrides,
       },
     });
+    return { ...result, outputPath };
+  };
+  const assertUnauthorized = async result => {
+    const output = await readFile(result.outputPath, 'utf8').catch(() => '');
+    assert.doesNotMatch(
+      output,
+      /^authorized=true$|^release_sha=[0-9a-f]{40}$/m
+    );
+    assert.doesNotMatch(result.stdout, /fell-through/);
+  };
+
+  const missing = run([]);
+  assert.equal(missing.status, 0, missing.stderr || missing.stdout);
+  assert.match(missing.stdout, /No exact push CI run exists yet/);
+  assert.match(missing.stdout, /deferring staging publication/);
+  await assertUnauthorized(missing);
+
+  for (const mismatch of [
+    { head_sha: 'b'.repeat(40) },
+    { head_branch: 'feature' },
+    { head_repository: { full_name: 'other/repository' } },
+    { event: 'workflow_dispatch' },
+    { path: '.github/workflows/other.yml' },
+  ]) {
+    const unrelated = run([
+      ciRun({ status: 'completed', conclusion: 'success', ...mismatch }),
+    ]);
+    assert.equal(unrelated.status, 0, unrelated.stderr || unrelated.stdout);
+    assert.match(unrelated.stdout, /No exact push CI run exists yet/);
+    await assertUnauthorized(unrelated);
+  }
+
+  const manualMissing = run([], { EVENT_NAME: 'workflow_dispatch' });
+  assert.equal(manualMissing.status, 1);
+  await assertUnauthorized(manualMissing);
+
+  for (const malformed of ['{}', 'null', '{"workflow_runs":null}', 'invalid']) {
+    const rejected = run([], { MOCK_CI_RUNS_JSON: malformed });
+    assert.equal(rejected.status, 1, rejected.stderr || rejected.stdout);
+    await assertUnauthorized(rejected);
+  }
 
   const inFlight = run([ciRun({ status: 'in_progress' })]);
   assert.equal(inFlight.status, 0, inFlight.stderr);
+  await assertUnauthorized(inFlight);
   assert.match(inFlight.stdout, /still running; deferring staging publication/);
   assert.doesNotMatch(inFlight.stdout, /fell-through/);
 
   const queued = run([ciRun({ status: 'queued' })]);
   assert.equal(queued.status, 0, queued.stderr);
+  await assertUnauthorized(queued);
   assert.match(queued.stdout, /still running; deferring staging publication/);
 
   const green = run([ciRun({ status: 'completed', conclusion: 'success' })]);
   assert.equal(green.status, 0, green.stderr);
-  const authorized = await readFile(join(root, 'output.txt'), 'utf8');
+  const authorized = await readFile(green.outputPath, 'utf8');
   assert.match(authorized, /^authorized=true$/m);
+  assert.match(authorized, new RegExp(`^release_sha=${releaseSha}$`, 'm'));
 
   const failed = run([ciRun({ status: 'completed', conclusion: 'failure' })]);
   assert.equal(failed.status, 1);
+  await assertUnauthorized(failed);
   assert.match(
     failed.stdout,
     /lacks an exact successful CI run for staging publication/

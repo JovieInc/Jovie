@@ -23,7 +23,7 @@ for (const width of [320, 375, 390, 430, 720, 768, 1440]) {
       await page.evaluate(() => document.fonts.ready);
       const headings = page.locator(
         route === '/'
-          ? '#homepage-section-presence-heading'
+          ? '#home-hero-heading, #homepage-fan-states-heading, #homepage-offer-heading'
           : 'main h2.ap-shell-h2, main [data-testid="final-cta-headline"]'
       );
       expect(await headings.count()).toBeGreaterThan(0);

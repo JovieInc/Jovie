@@ -6,6 +6,11 @@ import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { invalidateReleaseCaches } from '@/lib/cache/releases';
+import { claimVerificationPendingMessage } from '@/lib/claim/claim-verification';
+import {
+  getClaimVerificationReach,
+  requestClaimVerification,
+} from '@/lib/claim/claim-verification.server';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { hasReleaseClickAnalytics } from '@/lib/db/queries/analytics';
@@ -1325,7 +1330,10 @@ export async function connectSpotifyArtist(params: {
 
   // Get current settings to merge with new data
   const [currentProfile] = await db
-    .select({ settings: creatorProfiles.settings })
+    .select({
+      settings: creatorProfiles.settings,
+      spotifyId: creatorProfiles.spotifyId,
+    })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, profile.id))
     .limit(1);
@@ -1334,6 +1342,31 @@ export async function connectSpotifyArtist(params: {
     string,
     unknown
   >;
+
+  // Claim integrity: a high-reach artist is never linked self-serve. Store a
+  // verification request instead (lib/claim/claim-verification.ts).
+  if (currentProfile?.spotifyId !== params.spotifyArtistId) {
+    const reach = await getClaimVerificationReach(params.spotifyArtistId);
+    if (reach !== null) {
+      const entitlements = await getCurrentUserEntitlements();
+      await requestClaimVerification({
+        profileId: profile.id,
+        spotifyArtistId: params.spotifyArtistId,
+        artistName: params.artistName || null,
+        reach,
+        paid: entitlements.isPro && !entitlements.isTrialing,
+      });
+      return {
+        success: false,
+        importing: false,
+        message: claimVerificationPendingMessage(params.artistName),
+        imported: 0,
+        releases: [],
+        artistName: params.artistName,
+      };
+    }
+  }
+
   const shouldRunInlineImport =
     Boolean(params.forceInlineImport) || isE2EFastOnboardingEnabled();
 

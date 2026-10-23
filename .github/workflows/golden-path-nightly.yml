@@ -19,6 +19,10 @@ on:
     - cron: '23 9 * * *'
   workflow_dispatch:
 
+# A green run of THIS workflow is a dispatch receipt only. It is never
+# promotion evidence: scripts/lib/promotion-journey-evidence.mjs rejects it
+# (JOV-5937, release-integrity repair 2).
+
 permissions: {}
 
 concurrency:

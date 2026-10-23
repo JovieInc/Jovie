@@ -19,7 +19,7 @@ const proPlan = getVisibleMarketingPricingPlans().find(
 const expectedRequestAccessCopy = PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY;
 
 describe('PricingRecipeBody', () => {
-  it('renders the production pricing route with limited-access JSON-LD', () => {
+  it('renders the production pricing route with self-serve JSON-LD', () => {
     const { container } = render(<PricingPage />);
 
     expect(
@@ -35,11 +35,11 @@ describe('PricingRecipeBody', () => {
     expect(screen.queryByText('Max')).toBeNull();
     expect(screen.queryByText('$149')).toBeNull();
     expect(screen.getByTestId('marketing-pricing-plan-pro')).toHaveTextContent(
-      '$199'
+      '$12'
     );
     expect(
-      screen.getAllByRole('link', { name: 'Request access' })[0]
-    ).toHaveAttribute('href', '/waitlist');
+      screen.getAllByRole('link', { name: 'Claim your profile' })[0]
+    ).toHaveAttribute('href', '/claim?plan=pro');
     expect(
       container.querySelector(
         `[data-offer-contract="${ARTIST_VISIBILITY_OFFER_CONTRACT_ID}"]`
@@ -70,7 +70,7 @@ describe('PricingRecipeBody', () => {
       'Jovie Enterprise',
     ]);
     expect(items[1]?.item?.offers?.availability).toBe(
-      'https://schema.org/LimitedAvailability'
+      'https://schema.org/InStock'
     );
   });
 
@@ -110,8 +110,8 @@ describe('PricingRecipeBody', () => {
       screen.getAllByRole('link', { name: 'Claim my free profile' })[1]
     ).toBeVisible();
     expect(
-      screen.getByRole('link', { name: 'Request access' })
-    ).toHaveAttribute('href', '/waitlist');
+      screen.getByRole('link', { name: 'Claim your profile' })
+    ).toHaveAttribute('href', '/claim?plan=pro');
     expect(screen.getByRole('link', { name: 'Contact sales' })).toHaveAttribute(
       'href',
       'mailto:support@jov.ie'
@@ -163,7 +163,9 @@ describe('PricingRecipeBody', () => {
     expect(proCard?.textContent).toContain(proPlan?.price ?? '');
     expect(proCard?.textContent).toContain('/mo');
     expect(proCard?.textContent).toContain(proPlan?.ctaLabel ?? '');
-    expect(proCard?.querySelector('a')?.getAttribute('href')).toBe('/waitlist');
+    expect(proCard?.querySelector('a')?.getAttribute('href')).toBe(
+      '/claim?plan=pro'
+    );
   });
 
   it('shares one route/story body and records shipped zero-proof omissions', () => {

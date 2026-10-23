@@ -79,6 +79,27 @@ jobs:
             scripts/lib/linear-cooldown.mjs
             scripts/invariants/assurance-matrix.mjs
             scripts/invariants/assurance-matrix.json
+            scripts/lib/screen-audit-receipts.mjs
+            scripts/invariants/screen-audit.mjs
+            scripts/invariants/screen-certification.mjs
+            scripts/invariants/screen-decision-routing.mjs
+            scripts/invariants/browser-owned-input.mjs
+            scripts/invariants/browser-owned-input-matrix.json
+            scripts/invariants/product-reference-coherence.mjs
+            scripts/invariants/screen-proof-resolver.mjs
+            scripts/lib/playwright-png.mjs
+            packages/api-client/cache.ts
+            packages/api-client/cli.ts
+            packages/api-client/client.ts
+            packages/api-client/contract.ts
+            packages/api-client/gh.ts
+            packages/api-client/github.ts
+            packages/api-client/headers.ts
+            packages/api-client/legacy.ts
+            packages/api-client/linear.ts
+            packages/api-client/policy.ts
+            packages/api-client/providers.json
+            packages/api-client/store.ts
           sparse-checkout-cone-mode: false
 
       - name: Set up pinned Node.js
@@ -107,6 +128,39 @@ jobs:
           path: .linear-sync-cursor
           key: linear-sync-cursor-v1-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: linear-sync-cursor-v1-
+
+      # Machine screen-audit receipts (JOV-7713) for the verified production
+      # build, written before this run's sweep reads them, so the 98 issues
+      # that owed one have an exit without a clock (2026-10-21). The producer
+      # proves the screenshots render that exact build; otherwise it skips.
+      # A failure here never blocks the lifecycle evaluation below.
+      - name: Record screen-audit receipts for the production build
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Production Controller')
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          sha="$(curl -fsS --max-time 10 https://jov.ie/api/health/build-info | jq -r '.commitSha // empty')"
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::warning::production build sha unreadable; no screen-audit receipts"
+            exit 0
+          fi
+          run="$(node packages/api-client/cli.ts gh --priority default -- run list -R "$REPO" --workflow screenshots.yml --branch main --event push --status success --limit 1 --json databaseId,headSha --jq '.[0] | "\(.databaseId) \(.headSha)"')"
+          read -r run_id screens_sha <<<"$run"
+          if [ -z "${run_id:-}" ]; then
+            echo "::warning::no successful Product Screenshots run on main"
+            exit 0
+          fi
+          dir="$RUNNER_TEMP/screen-evidence"
+          node packages/api-client/cli.ts gh --priority default -- run download "$run_id" -R "$REPO" -D "$dir" \
+            -p 'route-dom-certification-*' -p 'screen-browser-proof*'
+          node scripts/lib/screen-audit-receipts.mjs --artifacts "$dir" --sha "$sha" \
+            --screens-sha "$screens_sha" \
+            --run-url "https://github.com/$REPO/actions/runs/$run_id" \
+            --out "$RUNNER_TEMP/screen-audit-receipts.json"
 
       - name: Evaluate the validation lifecycle
         id: evaluate
