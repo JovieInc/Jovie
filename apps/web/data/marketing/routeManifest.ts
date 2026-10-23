@@ -964,6 +964,37 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/product/isrc/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/isrc/IsrcLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'ISRC field ship on /product/isrc',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live ISRC field with a release code and a track code. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/isrc',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/molecules/drawer/DrawerEditableTextField.tsx',
+      testId: 'isrc-editor',
+    },
+    healthCheck: {
+      path: '/product/isrc',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
     glob: '(marketing)/card/page.tsx',
     recipeId: 'feature',
     renderedSections: [
