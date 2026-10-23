@@ -726,6 +726,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
+      "kind": "page",
+      "route": "/product/release-scheduling",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/renders/[state]/page.tsx",
       "kind": "page",
       "route": "/renders/[state]",
