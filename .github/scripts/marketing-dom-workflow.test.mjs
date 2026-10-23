@@ -167,7 +167,7 @@ test('PR visual review lane runs the same exact marketing route spec on PRs, uns
   }
   assert.match(capture.run, /--retries=0/);
   // Artifact secret boundary: same guard as every other Playwright producer
-  // (playwright-artifact-secrets.test.ts); never an exemption.
+  // (artifact boundary policy test); never an exemption.
   assert.match(
     capture.run,
     /guard-playwright-artifacts\.mjs" --run --\s*\\?\s+pnpm exec playwright test/

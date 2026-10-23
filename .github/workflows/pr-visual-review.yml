@@ -244,8 +244,8 @@ jobs:
             exit 1
           fi
           cd apps/web
-          # Same artifact secret boundary as every other Playwright producer
-          # (playwright-artifact-secrets.test.ts): no exemption is needed.
+          # Same Playwright artifact guard as every other producer step, so
+          # no reviewed exemption is needed for this step.
           node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
             pnpm exec playwright test \
               tests/product-screenshots/marketing-routes.spec.ts \
