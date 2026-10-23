@@ -1,4 +1,4 @@
-/** Marketing images and cards use a radius token. See MKT-D16. */
+/** Marketing images and cards use a radius token. See MKT-D17. */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

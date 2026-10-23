@@ -193,18 +193,7 @@ function hasTextContent(text: string) {
 }
 
 async function openReleasesMatrix() {
-  const releasesNavLabel = screen
-    .getAllByText('Releases')
-    .find(node => node.closest('button'));
-  expect(releasesNavLabel).toBeTruthy();
-  fireEvent.click(releasesNavLabel?.closest('button') as HTMLButtonElement);
-
-  const releasesMatrix = await screen.findByTestId('releases-matrix');
-  fireEvent.click(
-    within(releasesMatrix).getByRole('tab', { name: 'Releases' })
-  );
-
-  return releasesMatrix;
+  return screen.findByTestId('releases-matrix');
 }
 
 // Full-shell renders with drawer interactions can legitimately exceed Vitest's
@@ -216,11 +205,11 @@ async function openReleaseDrawer(
   options?: { readonly requireSidebar?: boolean }
 ) {
   const releasesMatrix = await openReleasesMatrix();
-  const openButton = within(releasesMatrix).getByRole('button', {
-    name: `Open ${title}`,
+  const releaseRow = within(releasesMatrix).getByRole('option', {
+    name: new RegExp(title),
   });
 
-  fireEvent.click(openButton);
+  fireEvent.click(releaseRow);
 
   if (options?.requireSidebar) {
     await waitFor(
@@ -264,7 +253,7 @@ describe('DemoReleasesExperience', () => {
     FULL_SHELL_TIMEOUT_MS
   );
 
-  it('renders release data in the table', async () => {
+  it('renders release data in the shell list', async () => {
     renderDemo();
 
     const releasesMatrix = await openReleasesMatrix();
@@ -289,7 +278,7 @@ describe('DemoReleasesExperience', () => {
 
       const tracklist = await screen.findByTestId('tracklist');
       const trackButtons = within(tracklist)
-        .getAllByRole('button')
+        .getAllByTestId(/release-track-control-/)
         .map(button => button.textContent?.trim());
 
       expect(trackButtons).toEqual(['1', '2', '3', '4', '5', '6']);

@@ -134,7 +134,8 @@ describe('correction pyramid guards', () => {
 
   it('locks the homepage H1 to the homepage copy module', () => {
     expect(HOMEPAGE_COPY.hero.headline).toBe(LOCKED_HOMEPAGE_H1);
-    expect(LOCKED_HOMEPAGE_H1).toBe('One profile. For every fan.');
+    expect(LOCKED_HOMEPAGE_H1).toBe('Be found. Be understood.');
+    expect(HOMEPAGE_COPY.seo.title).toBe('Jovie | Be found. Be understood.');
     const hero = readFileSync(
       path.join(webRoot, 'components/homepage/HomepageArtistProfile.tsx'),
       'utf8'

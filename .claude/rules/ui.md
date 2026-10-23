@@ -285,7 +285,7 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
 - Marketing images and cards use a radius token. The wide cinematic corner
   is `.marketing-rounded-frame` (`--system-b-radius-panel` / `--radius-3xl`).
   Exempt only the full-bleed hero start (it rounds as it zooms out), logos,
-  icons, SVG marks, and already-round avatars. See MKT-D16.
+  icons, SVG marks, and already-round avatars. See MKT-D17.
 
 ### No Duplicate Page Titles (Breadcrumb + Toolbar)
 
@@ -310,6 +310,14 @@ the primary content column must return to the shared seam when that track is
 absent.
 
 ## Taste Rules (Hard Invariants)
+
+### No ICP-specific language on general pages
+
+- Homepage, pricing, about, brand, and other general marketing routes stay generic. Jovie is an identity product for any creator.
+- Do not write segment copy there: music, artist, musician, DJ, producer, label, founder, investor, fan, author, or a creator-type niche. “Creator” is the generic word.
+- Dedicated audience routes may use that language. The allowlist is `scripts/invariants/icp-language/config.json`.
+- The headline “Be found. Be understood.” is locked.
+- `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready check. Existing hits are a shrink-only baseline. See MKT-D16 in `docs/marketing/DESIGN_INVARIANTS.md`.
 
 ### No Emoji in UI — Use Icons
 

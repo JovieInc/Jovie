@@ -2,6 +2,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { waitForHydration } from '../e2e/utils/smoke-test-utils';
 import { collectBrowserErrors } from '../visual-qa/route-quality';
 
@@ -110,7 +111,7 @@ test('emits exact-head artists directory desktop and mobile evidence', async ({
 
     const accessibility = await new AxeBuilder({ page })
       .include('[data-testid="artists-directory"]')
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .options(wcag22AaAxeOptions())
       .analyze();
     expect(accessibility.violations).toEqual([]);
 
