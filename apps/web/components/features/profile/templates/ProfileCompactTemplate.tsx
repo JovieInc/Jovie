@@ -807,15 +807,19 @@ export function ProfileCompactTemplate({
     const landedMode = landedHistoryModeRef.current;
     // Next's own entry updater strips the landed ?mode=… entry back to the
     // bare profile path at depth 0; restoring the landed mode must replace
-    // that stripped entry, not push a second one on top of it. The bare-URL
-    // requirement keeps this from capturing a client Link navigation to a
-    // different mode, whose URL also disagrees with the (stale) intent.
+    // that stripped entry, not push a second one on top of it. Two things
+    // keep this restore from capturing a client Link navigation instead:
+    // the mode param is gone (a Link to another mode keeps a mode param) and
+    // no new history entry was pushed since arrival — the strip replaces the
+    // landed entry in place, while a Link to the bare path pushes one.
     const correctingStrippedLanding =
       profileHistoryDepthRef.current === 0 &&
       landedMode !== null &&
       landedMode !== 'profile' &&
       activeMode === landedMode &&
-      getModeFromUrl() === null;
+      new URLSearchParams(globalThis.location.search).get('mode') === null &&
+      globalThis.history.length ===
+        (arrivalHistoryLengthRef.current ?? globalThis.history.length);
     if (correctingStrippedLanding) {
       globalThis.history.replaceState(
         withPublicProfileHistoryDepth(globalThis.history.state, 0),
