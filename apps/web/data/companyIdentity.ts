@@ -8,14 +8,15 @@
  * The homepage page body sells the artist profile (EVENT 2026-10-20) from
  * `homepageCopy.ts`; its metadata description and structured data still read
  * this general identity. `homepageHeadline` is the auth brand-panel line.
+ * General copy stays generic (Tim, 2026-10-22): do not put a segment list back
+ * into support, definition, audiences, or knowsAbout.
  */
 export const COMPANY_IDENTITY = {
   productName: 'Jovie',
   headline: 'Presence, relationships, and growth.',
-  support:
-    'One product for artists, founders, authors, creators, and independent experts.',
+  support: 'One product for any creator.',
   definition:
-    'Jovie is one product for presence, relationships, and growth. It helps artists, founders, authors, creators, and independent experts control how they are found and turn attention into relationships.',
+    'Jovie is one product for presence, relationships, and growth. It helps any creator control how they are found and turn attention into relationships.',
   seoTitle: 'Jovie | Be found. Be understood.',
   seoDescription:
     'Claim your name. Jovie makes you easy to reach, for people and for agents.',
@@ -24,13 +25,7 @@ export const COMPANY_IDENTITY = {
   xHandle: '@meetjovie',
   /** Homepage WebSite schema names. Do not add a product-category alias. */
   schemaAlternateNames: ['Jovie', 'jov.ie'],
-  audiences: [
-    'artists',
-    'founders',
-    'authors',
-    'creators',
-    'independent experts',
-  ] as const,
+  audiences: ['creators'] as const,
   outcomes: ['presence', 'relationships', 'growth'] as const,
   knowsAbout: [
     'Public Profiles',
@@ -38,7 +33,7 @@ export const COMPANY_IDENTITY = {
     'Audience Relationships',
     'Independent Creators',
     'Smart Links',
-    'Music Marketing',
+    'Public Identity',
   ] as const,
   signupDescription:
     'Create your Jovie account to claim a living profile and turn attention into relationships.',

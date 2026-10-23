@@ -284,9 +284,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PRODUCER_JOB_ID="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
-            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          PRODUCER_JOB_ID="$(node scripts/invariants/resolve-screenshot-producer-job.mjs)"
           if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::Could not resolve the current producer job ID."
             exit 1
@@ -337,9 +335,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PRODUCER_JOB_ID="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
-            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          PRODUCER_JOB_ID="$(node scripts/invariants/resolve-screenshot-producer-job.mjs)"
           if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::Could not resolve the current producer job ID."
             exit 1
@@ -411,9 +407,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PRODUCER_JOB_ID="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
-            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          PRODUCER_JOB_ID="$(node scripts/invariants/resolve-screenshot-producer-job.mjs)"
           if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::Could not resolve the current producer job ID."
             exit 1
@@ -464,9 +458,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PRODUCER_JOB_ID="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
-            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          PRODUCER_JOB_ID="$(node scripts/invariants/resolve-screenshot-producer-job.mjs)"
           if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::Could not resolve the current producer job ID."
             exit 1
@@ -516,9 +508,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PRODUCER_JOB_ID="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
-            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          PRODUCER_JOB_ID="$(node scripts/invariants/resolve-screenshot-producer-job.mjs)"
           if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::Could not resolve the current producer job ID."
             exit 1
@@ -574,9 +564,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PRODUCER_JOB_ID="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
-            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          PRODUCER_JOB_ID="$(node scripts/invariants/resolve-screenshot-producer-job.mjs)"
           if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::Could not resolve the current producer job ID."
             exit 1
@@ -627,9 +615,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PRODUCER_JOB_ID="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
-            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          PRODUCER_JOB_ID="$(node scripts/invariants/resolve-screenshot-producer-job.mjs)"
           if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::Could not resolve the current producer job ID."
             exit 1
@@ -684,9 +670,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PRODUCER_JOB_ID="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
-            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          PRODUCER_JOB_ID="$(node scripts/invariants/resolve-screenshot-producer-job.mjs)"
           if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::Could not resolve the current producer job ID."
             exit 1
@@ -940,9 +924,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PRODUCER_JOB_ID="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
-            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          PRODUCER_JOB_ID="$(node scripts/invariants/resolve-screenshot-producer-job.mjs)"
           if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
             echo "::error::Could not resolve the current producer job ID."
             exit 1
