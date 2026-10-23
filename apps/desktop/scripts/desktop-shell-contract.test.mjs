@@ -263,11 +263,11 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /beginRecoveryUnlatch/);
   assert.match(mainSource, /decideRecoveryUnlatch/);
   assert.match(recoverySource, /hostedUrlCandidates/);
-  assert.match(recoverySource, /Jovie couldn’t load/);
+  assert.match(recoverySource, /Jovie Couldn’t Load/);
   assert.match(recoverySource, /Check your connection, then try again\./);
   assert.match(recoverySource, /Local Jovie isn’t running at/);
-  assert.match(recoverySource, /Jovie didn’t finish starting/);
-  assert.match(recoverySource, /Jovie crashed/);
+  assert.match(recoverySource, /Jovie Didn’t Finish Starting/);
+  assert.match(recoverySource, /Jovie Crashed/);
   assert.doesNotMatch(mainSource, /Desktop shell runtime:/);
   assert.doesNotMatch(mainSource, /Built for artists/);
   assert.match(mainSource, /data:text\/html;charset=utf-8/);
@@ -447,7 +447,9 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.doesNotMatch(mainSource, /const APP_BACKGROUND_COLOR = '#08090a';/);
   assert.doesNotMatch(mainSource, /background: #08090a/);
   assert.match(tokenSource, /SYSTEM_B_DESKTOP_TOKENS/);
-  assert.match(tokenSource, /backgroundColor: '#06070a'/);
+  assert.match(tokenSource, /backgroundColor: '#06080d'/);
+  assert.match(tokenSource, /surfaceColor: '#0f1420'/);
+  assert.doesNotMatch(tokenSource, /#06070a|#101216|#0a0b0e|#161a20/);
   assert.match(tokenSource, /radiusPill: '999px'/);
 });
 
