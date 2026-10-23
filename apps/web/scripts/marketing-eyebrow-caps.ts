@@ -3,9 +3,9 @@
  *
  * Flags tracked-caps and named eyebrow/kicker/overline rules under the
  * homepage and `(marketing)` routes, plus the marketing components those
- * routes render. Product UI is outside the scan. `armed` stays false: growth
- * warns and does not fail CI, and this file does not change Clef or any
- * other blocking gate.
+ * routes render. Product UI is outside the scan. `armed: true` fails when
+ * the live count moves. Lower the baseline count in the same change that
+ * removes hits. Growth fails. This file does not change Clef.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
