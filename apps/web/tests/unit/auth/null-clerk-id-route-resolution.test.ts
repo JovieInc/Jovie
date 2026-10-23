@@ -325,7 +325,9 @@ describe('NULL clerk_id Better Auth route resolution (JOV-8790)', () => {
         id, profile_id, session_id, event_type, forwarding_status, created_at
       ) VALUES (
         '${PIXEL_ID}', '${PROFILE_ID}', 'sess_pixel', 'page_view',
-        '{"facebook":{"status":"sent","sentAt":"2026-10-23T00:00:00.000Z"}}'::jsonb,
+        jsonb_build_object(
+          'facebook', jsonb_build_object('status', 'sent', 'sentAt', NOW())
+        ),
         NOW()
       );
 
@@ -611,6 +613,27 @@ describe('NULL clerk_id Better Auth route resolution (JOV-8790)', () => {
       status: redeemed.outcome === 'approved' ? 200 : 404,
       resolved: redeemed.outcome === 'approved' && redeemed.clerkId === USER_ID,
       detail: redeemed.outcome,
+    });
+    expect(
+      await rows(
+        'SELECT id, clerk_id, waitlist_entry_id FROM users WHERE email = $1',
+        [EMAIL]
+      )
+    ).toEqual([{ id: USER_ID, clerk_id: null, waitlist_entry_id: ENTRY_ID }]);
+
+    const replayed = await redeemWaitlistInviteToken({
+      token,
+      clerkUserId: USER_ID,
+      verifiedEmail: EMAIL,
+    });
+    record({
+      route: 'waitlist redeem replay for the same user',
+      status: replayed.outcome === 'approved' ? 200 : 404,
+      resolved:
+        replayed.outcome === 'approved' &&
+        replayed.entryId === ENTRY_ID &&
+        replayed.clerkId === USER_ID,
+      detail: replayed.outcome,
     });
 
     const failed = probes.filter(probe => !probe.resolved);

@@ -511,6 +511,7 @@ vi.mock('@/components/features/dashboard/tasks/TaskBoard', () => ({
     board,
     onOpenTask,
     onMoveTask,
+    showAssigneeChip = true,
   }: {
     readonly board?: TaskBoardResult;
     readonly onOpenTask: (task: TaskView) => void;
@@ -518,8 +519,12 @@ vi.mock('@/components/features/dashboard/tasks/TaskBoard', () => ({
       readonly taskId: string;
       readonly toStatus: TaskStatus;
     }) => void;
+    readonly showAssigneeChip?: boolean;
   }) => (
-    <div data-testid='tasks-board'>
+    <div
+      data-testid='tasks-board'
+      data-show-assignee-chip={String(showAssigneeChip)}
+    >
       {board?.columns.flatMap(column =>
         column.tasks.map(task => (
           <button
@@ -953,6 +958,24 @@ describe('TasksPageClient', () => {
     expect(screen.getByTestId('task-document-pane')).toHaveClass('lg:flex');
     expect(screen.getByTestId('task-list-pane').parentElement).toHaveClass(
       'lg:grid-cols-[minmax(0,1fr)_minmax(18rem,20rem)]'
+    );
+  });
+
+  it('keeps the assignee chip on a board filtered to Jovie', () => {
+    mockViewMode = 'board';
+    mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
+
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole('tab', {
+        name: segmentedAccessibleName('Assigned To Jovie', '1'),
+      })
+    );
+
+    expect(screen.getByTestId('tasks-board')).toHaveAttribute(
+      'data-show-assignee-chip',
+      'true'
     );
   });
 

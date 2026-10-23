@@ -1,4 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { isThemeRoute } from '@/lib/theme/route-policy';
 import { setTestAuthBypassSession } from '../helpers/auth';
 import { expect, test } from './setup';
@@ -152,7 +153,7 @@ const {
   error: surfaceManifestLoadError,
 } = loadSurfaceManifests();
 
-test.describe('Axe WCAG 2.1 Compliance', () => {
+test.describe('Axe WCAG 2.2 AA Compliance', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
   test.setTimeout(120_000);
 
@@ -200,7 +201,7 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
         }
 
         const results = await new AxeBuilder({ page })
-          .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+          .options(wcag22AaAxeOptions())
           .analyze();
 
         expect(
