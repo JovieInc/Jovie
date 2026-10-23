@@ -38,9 +38,14 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='w-full max-w-4xl bg-surface-0 p-3 text-primary-token'>
-        <Story />
-      </div>
+      <table
+        aria-label='Releases'
+        className='block w-full max-w-4xl bg-surface-0 p-3 text-primary-token'
+      >
+        <tbody className='block'>
+          <Story />
+        </tbody>
+      </table>
     ),
   ],
   args: {

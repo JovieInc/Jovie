@@ -44,12 +44,13 @@ describe('JOV-5466 token retire', () => {
 });
 
 describe('JOV-6773 red drift', () => {
-  it('renders the danger tone with the error token, not raw red-*', () => {
+  it('keeps danger chrome and readable text without raw red-*', () => {
     const { container } = render(
       <ShellMetadataChip tone='danger'>Overdue</ShellMetadataChip>
     );
     const chip = container.firstElementChild as HTMLElement;
-    expect(chip.className).toContain('text-error');
+    expect(chip.className).toContain('border-error');
+    expect(chip.className).toContain('text-primary-token');
     expect(chip.className).not.toMatch(/\bred-\d/);
   });
 

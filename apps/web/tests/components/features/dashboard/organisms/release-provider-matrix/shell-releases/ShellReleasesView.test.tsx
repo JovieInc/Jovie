@@ -8,6 +8,7 @@ import {
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { createPortal } from 'react-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TableActionMenuProps } from '@/components/atoms/table-action-menu/types';
 import { useImportPolling } from '@/components/features/dashboard/organisms/release-provider-matrix/hooks/useImportPolling';
@@ -258,27 +259,30 @@ vi.mock(
 
 function MockActionMenu({ children, items }: TableActionMenuProps) {
   return (
-    <div>
+    <>
       {children}
-      <div data-testid='mock-release-actions'>
-        {items
-          .flatMap(item =>
-            item.children && item.children.length > 0 ? item.children : [item]
-          )
-          .map(item => (
-            <button
-              key={item.id}
-              type='button'
-              onClick={event => {
-                event.stopPropagation();
-                item.onClick?.();
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-      </div>
-    </div>
+      {createPortal(
+        <div data-testid='mock-release-actions'>
+          {items
+            .flatMap(item =>
+              item.children && item.children.length > 0 ? item.children : [item]
+            )
+            .map(item => (
+              <button
+                key={item.id}
+                type='button'
+                onClick={event => {
+                  event.stopPropagation();
+                  item.onClick?.();
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 
@@ -443,7 +447,7 @@ describe('ShellReleasesView', () => {
       initialImporting: true,
     });
     expect(screen.getByTestId('releases-matrix')).toBeInTheDocument();
-    const row = screen.getByRole('option', { name: /Lost in the Light/ });
+    const row = screen.getByRole('row', { name: /Lost in the Light/ });
     const progress = screen.getByTestId('spotify-import-progress-banner');
     const progressSlot = screen.getByTestId('release-import-progress-slot');
     expect(progress).toHaveAttribute('aria-hidden', 'false');
@@ -490,7 +494,7 @@ describe('ShellReleasesView', () => {
       spotifyConnected: true,
       initialImporting: true,
     });
-    await user.click(screen.getByRole('option', { name: /Lost in the Light/ }));
+    await user.click(screen.getByRole('row', { name: /Lost in the Light/ }));
     const drawer = await screen.findByTestId('release-sidebar');
     const input = within(drawer).getByRole('textbox', {
       name: 'Release title draft',
@@ -513,7 +517,7 @@ describe('ShellReleasesView', () => {
     expect(input).toHaveFocus();
     expect([input.selectionStart, input.selectionEnd]).toEqual([2, 7]);
     expect(
-      screen.getByRole('option', { name: /Updated from Spotify/ })
+      screen.getByRole('row', { name: /Updated from Spotify/ })
     ).toHaveAttribute('aria-selected', 'true');
   });
 
@@ -525,7 +529,7 @@ describe('ShellReleasesView', () => {
     );
 
     expect(
-      screen.queryByRole('option', { name: /Wait for eligibility/ })
+      screen.queryByRole('row', { name: /Wait for eligibility/ })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('apple-music-sync-banner')
@@ -553,7 +557,7 @@ describe('ShellReleasesView', () => {
     );
 
     expect(
-      screen.getByRole('option', { name: /Wait for eligibility/ })
+      screen.getByRole('row', { name: /Wait for eligibility/ })
     ).toBeInTheDocument();
     expect(screen.getByTestId('apple-music-sync-banner')).toBeInTheDocument();
   });
@@ -569,7 +573,7 @@ describe('ShellReleasesView', () => {
     });
 
     expect(
-      screen.getByRole('option', { name: /Already linked/ })
+      screen.getByRole('row', { name: /Already linked/ })
     ).toBeInTheDocument();
     expect(
       screen.queryByTestId('apple-music-sync-banner')
@@ -625,7 +629,7 @@ describe('ShellReleasesView', () => {
   it('opens and dismisses the production release drawer from a row', async () => {
     renderShell([fakeRelease({ id: 'r1', title: 'Lost in the Light' })]);
 
-    const row = screen.getByRole('option', { name: /Lost in the Light/ });
+    const row = screen.getByRole('row', { name: /Lost in the Light/ });
     expect(row).toHaveAttribute('aria-selected', 'false');
 
     fireEvent.click(row);
@@ -646,7 +650,7 @@ describe('ShellReleasesView', () => {
   it('passes the same lifecycle and eligibility capabilities to the detail rail', async () => {
     renderShell([fakeRelease({ id: 'r1', title: 'Lost in the Light' })]);
 
-    fireEvent.click(screen.getByRole('option', { name: /Lost in the Light/ }));
+    fireEvent.click(screen.getByRole('row', { name: /Lost in the Light/ }));
     const rail = await screen.findByTestId('release-sidebar');
 
     expect(rail).toHaveAttribute('data-has-delete', 'true');
@@ -658,10 +662,10 @@ describe('ShellReleasesView', () => {
   it('keeps selected row in sync when the drawer edits a release', async () => {
     renderShell([fakeRelease({ id: 'r1', title: 'Lost in the Light' })]);
 
-    fireEvent.click(screen.getByRole('option', { name: /Lost in the Light/ }));
+    fireEvent.click(screen.getByRole('row', { name: /Lost in the Light/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'Save Edit' }));
 
-    expect(screen.getByRole('option', { name: /Edited/ })).toHaveAttribute(
+    expect(screen.getByRole('row', { name: /Edited/ })).toHaveAttribute(
       'aria-selected',
       'true'
     );
@@ -1027,7 +1031,7 @@ describe('ShellReleasesView', () => {
         fakeRelease({ id: 'r2', title: 'Beta' }),
       ]);
 
-      const rows = screen.getAllByRole('option');
+      const rows = screen.getAllByRole('row');
       expect(rows[0]).toHaveAttribute('aria-selected', 'false');
 
       fireEvent.keyDown(document, { key: 'j' });
@@ -1044,7 +1048,7 @@ describe('ShellReleasesView', () => {
         fakeRelease({ id: 'r3', title: 'Gamma' }),
       ]);
 
-      const rows = screen.getAllByRole('option');
+      const rows = screen.getAllByRole('row');
 
       // J selects first
       fireEvent.keyDown(document, { key: 'j' });
@@ -1076,7 +1080,7 @@ describe('ShellReleasesView', () => {
       // Navigate to first release with J
       fireEvent.keyDown(document, { key: 'j' });
       await waitFor(() => {
-        expect(screen.getAllByRole('option')[0]).toHaveAttribute(
+        expect(screen.getAllByRole('row')[0]).toHaveAttribute(
           'aria-selected',
           'true'
         );
@@ -1096,7 +1100,7 @@ describe('ShellReleasesView', () => {
         fakeRelease({ id: 'r2', title: 'Beta' }),
       ]);
 
-      const rows = screen.getAllByRole('option');
+      const rows = screen.getAllByRole('row');
       const input = document.createElement('input');
       document.body.appendChild(input);
       input.focus();
@@ -1111,7 +1115,7 @@ describe('ShellReleasesView', () => {
     it('does not fire J/K when a modifier key is held', () => {
       renderShell([fakeRelease({ id: 'r1', title: 'Alpha' })]);
 
-      const rows = screen.getAllByRole('option');
+      const rows = screen.getAllByRole('row');
 
       fireEvent.keyDown(document, { key: 'j', metaKey: true });
 
@@ -1154,7 +1158,7 @@ describe('ShellReleasesView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'New release' }));
     expect(onCreateRelease).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('option', { name: /Demo Single/ }));
+    fireEvent.click(screen.getByRole('row', { name: /Demo Single/ }));
     const sidebar = screen.getByTestId('release-sidebar');
     expect(sidebar).toHaveAttribute('data-analytics', 'override');
     expect(sidebar).toHaveAttribute('data-has-tracks', 'true');

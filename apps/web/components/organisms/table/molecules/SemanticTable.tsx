@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ComponentPropsWithRef, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { type TableRowMode, tableRowModeStyle } from '../table.styles';
 
@@ -6,13 +6,16 @@ export function TableRoot({
   children,
   className,
   rowMode,
-}: Readonly<{
-  children: ReactNode;
-  className?: string;
-  rowMode?: TableRowMode;
-}>) {
+  ...props
+}: Readonly<
+  Omit<ComponentPropsWithRef<'table'>, 'style'> & {
+    children: ReactNode;
+    rowMode?: TableRowMode;
+  }
+>) {
   return (
     <table
+      {...props}
       className={className}
       data-table-row-mode={rowMode}
       style={tableRowModeStyle(rowMode)}

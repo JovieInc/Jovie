@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, userEvent, within } from 'storybook/test';
 import {
   DashboardStoryProviders,
   DEFAULT_DASHBOARD_DATA,
@@ -46,5 +47,22 @@ export const ConnectedProfile: Story = {
         state: 'active',
       },
     ],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const edit = await canvas.findByRole('button', {
+      name: 'Edit display name: Sasha Waves',
+    });
+    await expect(edit).not.toHaveAttribute('aria-controls');
+    await expect(
+      canvas.getByRole('button', { name: 'Upload profile photo: SW' })
+    ).toBeVisible();
+    const row = edit.parentElement;
+    const before = row?.getBoundingClientRect().toJSON();
+    await userEvent.click(edit);
+    await expect(
+      await canvas.findByRole('textbox', { name: 'Display Name' })
+    ).toBeVisible();
+    await expect(row?.getBoundingClientRect().toJSON()).toEqual(before);
   },
 };

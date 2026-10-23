@@ -27,7 +27,7 @@ import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   contextualAction,
-  ShellListRowFrame,
+  getShellListRowFrameClassName,
 } from '@/components/organisms/table';
 import { AgentPulse } from '@/components/shell/AgentPulse';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
@@ -293,9 +293,8 @@ const WeeklyStreamsCell = memo(function WeeklyStreamsCell({
  * + type badge + artists (+ inline sync status) + status + drop date +
  * DSP avatar stack + smart link + more menu.
  *
- * The outer `<div>` is the click + keyboard target (parent `<div role="listbox">`)
- * Inner interactive elements (smart link, more-menu) stop propagation so
- * they don't double-fire selection — the standard pattern across shell-v1.
+ * Each selectable table row owns a cell containing independent controls.
+ * Inner actions stop propagation so they do not double-fire row selection.
  */
 export const ShellReleaseRow = memo(function ShellReleaseRow({
   release,
@@ -361,7 +360,8 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
     status: release.status,
   };
 
-  function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+  function handleKeyDown(e: KeyboardEvent<HTMLTableRowElement>) {
+    if (e.target !== e.currentTarget) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onSelect();
@@ -369,8 +369,9 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   }
 
   return (
-    <ShellListRowFrame
-      role='option'
+    <tr
+      data-shell-list-row='true'
+      data-selected={isSelected ? 'true' : undefined}
       aria-selected={isSelected}
       tabIndex={0}
       onClick={onSelect}
@@ -380,101 +381,105 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       data-shell-release-row
       data-release-id={release.id}
       data-release-active={isActiveTrack ? 'true' : undefined}
-      chrome='shell'
-      density='dense'
-      isSelected={isSelected}
-      interactive
-      className='group/row flex h-8 items-center gap-2 overflow-hidden px-3'
+      className={getShellListRowFrameClassName({
+        chrome: 'shell',
+        density: 'dense',
+        isSelected,
+        interactive: true,
+        className: 'group/row flex h-8 items-center gap-2 overflow-hidden px-3',
+      })}
     >
-      <ArtworkCell release={release} isSyncing={syncLabel !== null} />
+      <td className='contents'>
+        <ArtworkCell release={release} isSyncing={syncLabel !== null} />
 
-      <div className='min-w-0 flex-1'>
-        <div className='flex min-w-0 items-center gap-1.5'>
-          <EntityHoverLink
-            entity={releaseEntity}
-            className={cn(
-              shellReleaseRowTypography.title,
-              'inline-flex min-w-0 hover:no-underline'
-            )}
-          >
-            {release.title}
-          </EntityHoverLink>
-          <TypeBadge label={typeLabel} />
-          {artistLabel ? (
-            <>
-              <span
-                aria-hidden='true'
-                className='shrink-0 text-2xs text-quaternary-token'
-              >
-                ·
-              </span>
-              <span
-                className={cn(shellReleaseRowTypography.subtitle, 'min-w-0')}
-              >
-                {artistLabel}
-              </span>
-            </>
-          ) : null}
-          {syncLabel ? (
-            <span className='inline-flex shrink-0 items-center text-2xs text-accent-blue'>
-              <span aria-hidden='true' className='mr-1 text-quaternary-token'>
-                ·
-              </span>
-              <span className='whitespace-nowrap'>{syncLabel}</span>
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      <div className='hidden w-24 shrink-0 justify-start md:inline-flex'>
-        <StatusBadge status={status} />
-      </div>
-
-      {dropMeta ? (
-        <div className='hidden w-28 shrink-0 justify-start lg:inline-flex'>
-          <DropDateChip tone={dropMeta.tone} label={dropMeta.label} />
-        </div>
-      ) : (
-        <span className='hidden w-28 shrink-0 lg:block' aria-hidden='true' />
-      )}
-
-      <WeeklyStreamsCell weeklyStreams={release.weeklyStreams} />
-
-      <div className='hidden w-24 shrink-0 justify-start md:inline-flex'>
-        <DspAvatarStack dsps={dspItems} maxVisible={3} />
-      </div>
-
-      <SmartLinkCell
-        release={release}
-        smartLinkLockReason={smartLinkLockReason}
-        smartLinkPath={smartLinkPath}
-      />
-
-      {actionMenuItems && actionMenuItems.length > 0 ? (
-        <div
-          className={cn('h-7 w-7 shrink-0', contextualAction.slot)}
-          data-menu-open={actionsOpen || undefined}
-          data-testid='shell-release-row-actions'
-        >
-          <TableActionMenu
-            items={actionMenuItems}
-            trigger='custom'
-            align='end'
-            open={actionsOpen}
-            onOpenChange={setActionsOpen}
-          >
-            <button
-              type='button'
-              onClick={e => e.stopPropagation()}
-              onKeyDown={e => e.stopPropagation()}
-              aria-label={`Release actions for ${release.title}`}
-              className='grid h-7 w-7 shrink-0 place-items-center rounded-md text-quaternary-token transition-[opacity,color,background-color] duration-subtle ease-subtle hover:bg-surface-2/70 hover:text-primary-token'
+        <div className='min-w-0 flex-1'>
+          <div className='flex min-w-0 items-center gap-1.5'>
+            <EntityHoverLink
+              entity={releaseEntity}
+              className={cn(
+                shellReleaseRowTypography.title,
+                'inline-flex min-h-6 min-w-0 items-center hover:no-underline'
+              )}
             >
-              <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
-            </button>
-          </TableActionMenu>
+              {release.title}
+            </EntityHoverLink>
+            <TypeBadge label={typeLabel} />
+            {artistLabel ? (
+              <>
+                <span
+                  aria-hidden='true'
+                  className='shrink-0 text-2xs text-quaternary-token'
+                >
+                  ·
+                </span>
+                <span
+                  className={cn(shellReleaseRowTypography.subtitle, 'min-w-0')}
+                >
+                  {artistLabel}
+                </span>
+              </>
+            ) : null}
+            {syncLabel ? (
+              <span className='inline-flex shrink-0 items-center text-2xs text-accent-blue'>
+                <span aria-hidden='true' className='mr-1 text-quaternary-token'>
+                  ·
+                </span>
+                <span className='whitespace-nowrap'>{syncLabel}</span>
+              </span>
+            ) : null}
+          </div>
         </div>
-      ) : null}
-    </ShellListRowFrame>
+
+        <div className='hidden w-24 shrink-0 justify-start md:inline-flex'>
+          <StatusBadge status={status} />
+        </div>
+
+        {dropMeta ? (
+          <div className='hidden w-28 shrink-0 justify-start lg:inline-flex'>
+            <DropDateChip tone={dropMeta.tone} label={dropMeta.label} />
+          </div>
+        ) : (
+          <span className='hidden w-28 shrink-0 lg:block' aria-hidden='true' />
+        )}
+
+        <WeeklyStreamsCell weeklyStreams={release.weeklyStreams} />
+
+        <div className='hidden w-24 shrink-0 justify-start md:inline-flex'>
+          <DspAvatarStack dsps={dspItems} maxVisible={3} />
+        </div>
+
+        <SmartLinkCell
+          release={release}
+          smartLinkLockReason={smartLinkLockReason}
+          smartLinkPath={smartLinkPath}
+        />
+
+        {actionMenuItems && actionMenuItems.length > 0 ? (
+          <div
+            className={cn('h-7 w-7 shrink-0', contextualAction.slot)}
+            data-menu-open={actionsOpen || undefined}
+            data-testid='shell-release-row-actions'
+          >
+            <TableActionMenu
+              items={actionMenuItems}
+              trigger='custom'
+              align='end'
+              open={actionsOpen}
+              onOpenChange={setActionsOpen}
+            >
+              <button
+                type='button'
+                onClick={e => e.stopPropagation()}
+                onKeyDown={e => e.stopPropagation()}
+                aria-label={`Release actions for ${release.title}`}
+                className='grid h-7 w-7 shrink-0 place-items-center rounded-md text-quaternary-token transition-[opacity,color,background-color] duration-subtle ease-subtle hover:bg-surface-2/70 hover:text-primary-token'
+              >
+                <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
+              </button>
+            </TableActionMenu>
+          </div>
+        ) : null}
+      </td>
+    </tr>
   );
 });

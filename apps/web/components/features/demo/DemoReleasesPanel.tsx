@@ -38,7 +38,7 @@ export function DemoReleasesPanel({
     () => new Set()
   );
   const [focusIndex, setFocusIndex] = useState(-1);
-  const listRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLElement>(null);
 
   // Build flat list of IDs for keyboard navigation
   const flatIds = groups.flatMap(g =>
@@ -69,12 +69,6 @@ export function DemoReleasesPanel({
       } else if (e.key === 'ArrowUp' || e.key === 'k') {
         e.preventDefault();
         nextIndex = Math.max(focusIndex - 1, 0);
-      } else if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        if (focusIndex >= 0 && focusIndex < flatIds.length) {
-          onSelect(flatIds[focusIndex]);
-        }
-        return;
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onSelect('');
@@ -88,18 +82,18 @@ export function DemoReleasesPanel({
       const row = listRef.current?.querySelector(
         `[data-release-id="${flatIds[nextIndex]}"]`
       );
-      row?.scrollIntoView({ block: 'nearest' });
+      if (row instanceof HTMLElement) {
+        row.focus();
+        row.scrollIntoView({ block: 'nearest' });
+      }
     },
     [flatIds, focusIndex, onSelect]
   );
 
   return (
-    <div // NOSONAR - custom listbox pattern with keyboard navigation, native <select> not suitable for this UI
+    <section
       ref={listRef}
       className='h-full overflow-y-auto overflow-x-hidden outline-none scrollbar-hide'
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-      role='listbox'
       aria-label='Releases'
     >
       {groups.map(group => {
@@ -111,10 +105,12 @@ export function DemoReleasesPanel({
             <div className='sticky top-0 z-10 flex h-8 items-center gap-1 border-b border-(--app-shell-frame-seam) bg-surface-0 px-4'>
               <button
                 type='button'
+                onKeyDown={handleKeyDown}
                 onClick={() => toggleGroup(group.status)}
-                className='flex min-w-0 flex-1 items-center gap-2 text-xs text-tertiary-token [font-weight:var(--font-weight-medium)]'
-                aria-label={`Toggle ${STATUS_LABEL[group.status]} releases section`}
+                className='flex min-h-6 min-w-0 flex-1 items-center gap-2 text-xs text-tertiary-token [font-weight:var(--font-weight-medium)]'
+                aria-expanded={!isCollapsed}
               >
+                <span className='sr-only'>Toggle </span>
                 <ChevronRight
                   className={cn(
                     'size-3.5 shrink-0 text-tertiary-token transition-transform duration-fast',
@@ -133,6 +129,7 @@ export function DemoReleasesPanel({
               </button>
               <button
                 type='button'
+                onKeyDown={handleKeyDown}
                 className='flex size-6 items-center justify-center rounded-full text-tertiary-token'
                 aria-label={`Add ${STATUS_LABEL[group.status]} release`}
               >
@@ -148,25 +145,19 @@ export function DemoReleasesPanel({
                 const isSelected = release.id === selectedId;
 
                 return (
-                  <div // NOSONAR - custom listbox option with keyboard support
+                  <button
+                    type='button'
+                    onFocus={() => setFocusIndex(globalIndex)}
+                    onKeyDown={handleKeyDown}
                     key={release.id}
                     data-release-id={release.id}
-                    role='option'
-                    tabIndex={0}
-                    aria-selected={isSelected}
+                    aria-pressed={isSelected}
                     onClick={() => {
                       onSelect(release.id);
                       setFocusIndex(globalIndex);
                     }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        onSelect(release.id);
-                        setFocusIndex(globalIndex);
-                      }
-                    }}
                     className={cn(
-                      'flex h-8 cursor-pointer items-center gap-3 border-b border-(--app-shell-frame-seam) px-4 text-app',
+                      'flex h-8 w-full text-left cursor-pointer items-center gap-3 border-b border-(--app-shell-frame-seam) px-4 text-app',
                       isSelected &&
                         'bg-[color-mix(in_oklab,var(--linear-row-selected)_20%,transparent)] shadow-[inset_2px_0_0_var(--color-accent)]',
                       isFocused && !isSelected && 'bg-surface-2',
@@ -226,12 +217,12 @@ export function DemoReleasesPanel({
                     <span className='max-xl:hidden w-16 shrink-0 text-right text-xs text-quaternary-token'>
                       {release.releaseDate}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
           </div>
         );
       })}
-    </div>
+    </section>
   );
 }

@@ -1,6 +1,10 @@
 'use client';
 
-import { getAvatarShapeClassName, getAvatarSizePx } from '@jovie/ui';
+import {
+  getAvatarShapeClassName,
+  getAvatarSizePx,
+  getInitials,
+} from '@jovie/ui';
 import React, {
   forwardRef,
   useCallback,
@@ -194,7 +198,11 @@ export const AvatarUploadable = React.memo(
             onDragOver={canUpload ? handleDragOver : undefined}
             onDrop={canUpload ? handleDrop : undefined}
             onClick={handleClick}
-            aria-label={isInteractive ? uploadButtonLabel : undefined}
+            aria-label={
+              isInteractive
+                ? `${uploadButtonLabel}${avatarShape === 'person' && avatarProps.name ? `: ${getInitials(avatarProps.name)}` : ''}`
+                : undefined
+            }
             aria-busy={isUploading || undefined}
             disabled={!isInteractive}
           >

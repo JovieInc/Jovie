@@ -480,7 +480,8 @@ async function waitForReleaseSidebar(
 }
 
 async function getReleaseRowTrigger(row: Locator) {
-  const openButton = row.locator('button[aria-label^="Open "]').first();
+  if ((await row.getAttribute('data-shell-release-row')) !== null) return row;
+  const openButton = row.getByRole('button', { name: /^Open / }).first();
   if ((await openButton.count()) > 0) {
     return openButton;
   }
@@ -496,7 +497,7 @@ async function getReleaseRowTrigger(row: Locator) {
 async function getSeededReleaseRow(page: Page, releaseTitle: string) {
   const escapedTitle = escapeRegExp(releaseTitle);
   const shellRow = page
-    .getByRole('option', { name: new RegExp(escapedTitle) })
+    .getByRole('row', { name: new RegExp(escapedTitle) })
     .first();
 
   if ((await shellRow.count()) > 0) {
@@ -507,7 +508,7 @@ async function getSeededReleaseRow(page: Page, releaseTitle: string) {
     .locator('tbody tr')
     .filter({
       has: page.getByRole('button', {
-        name: new RegExp(`^Open\\s+${escapedTitle}$`),
+        name: new RegExp(`^Open\\s+${escapedTitle}`),
       }),
     })
     .first();

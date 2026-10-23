@@ -118,8 +118,8 @@ export function ProfileEditPreviewCard({
   // Show completed state
   if (applied) {
     return (
-      <ContentSurfaceCard className='p-3'>
-        <div className='flex items-center justify-between gap-2'>
+      <ContentSurfaceCard>
+        <div className='flex items-center justify-between gap-2 p-3'>
           <div className='min-w-0 space-y-0.5'>
             <p className='truncate text-app font-semibold tracking-tight text-primary-token'>
               {preview.fieldLabel}
@@ -138,8 +138,8 @@ export function ProfileEditPreviewCard({
   // Show cancelled state — single "Cancelled" verb (JOV-3551); keep field label + badge only
   if (cancelled) {
     return (
-      <ContentSurfaceCard className='p-3 opacity-70'>
-        <div className='flex items-center justify-between gap-2'>
+      <ContentSurfaceCard>
+        <div className='flex items-center justify-between gap-2 p-3'>
           <div className='min-w-0 space-y-0.5'>
             <p className='truncate text-app font-semibold tracking-tight text-primary-token'>
               {preview.fieldLabel}
@@ -204,7 +204,7 @@ export function ProfileEditPreviewCard({
           </div>
         </div>
         <div className='rounded-lg border border-accent/20 bg-accent/5 px-2.5 py-2'>
-          <div className='mb-0.5 text-app font-caption tracking-normal text-(--linear-accent)'>
+          <div className='mb-0.5 text-app font-caption tracking-normal text-primary-token'>
             New
           </div>
           <div className='text-app tracking-tight text-primary-token'>
@@ -219,7 +219,7 @@ export function ProfileEditPreviewCard({
           tone='primary'
           onClick={handleApply}
           disabled={confirmEdit.isPending}
-          className='flex-1 justify-center gap-1.5'
+          className='flex-1 justify-center'
         >
           {confirmEdit.isPending ? (
             <>
@@ -238,7 +238,7 @@ export function ProfileEditPreviewCard({
           tone='secondary'
           onClick={handleCancel}
           disabled={confirmEdit.isPending}
-          className='justify-center gap-1.5'
+          className='justify-center'
         >
           <X className='h-3.5 w-3.5' />
           Cancel

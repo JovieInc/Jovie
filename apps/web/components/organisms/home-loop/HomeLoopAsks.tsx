@@ -219,7 +219,7 @@ function AskCard({
   const card = (
     <li
       ref={cardRef}
-      className={cn(CARD_FRAME, 'shrink-0', answered && 'opacity-70')}
+      className={cn(CARD_FRAME, 'shrink-0')}
       data-answer-state={answer?.state ?? 'open'}
       data-fit-item
       data-testid='home-loop-ask'

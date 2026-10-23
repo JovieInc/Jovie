@@ -1,9 +1,29 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import {
+  screen,
+  render as testingRender,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { type ComponentPropsWithoutRef, forwardRef } from 'react';
+import {
+  type ComponentPropsWithoutRef,
+  forwardRef,
+  type ReactNode,
+} from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+
+function ReleaseGrid({ children }: { readonly children: ReactNode }) {
+  return (
+    <table>
+      <tbody>{children}</tbody>
+    </table>
+  );
+}
+
+function render(ui: ReactNode) {
+  return testingRender(ui, { wrapper: ReleaseGrid });
+}
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
 const fetchMock = vi.fn();
@@ -105,6 +125,12 @@ describe('ShellReleaseRow audio affordance', () => {
     );
 
     const row = container.querySelector('[data-shell-release-row]');
+    expect(screen.getByRole('row')).toBe(row);
+    expect(screen.getByRole('cell')).toContainElement(
+      screen.getByRole('link', {
+        name: 'Open smart link for Lost in the Light',
+      })
+    );
     expect(row).toHaveAttribute('aria-selected', 'true');
     expect(row).toHaveAttribute('data-selected', 'true');
     expect(row?.className).toContain('system-b-table-row-selected');

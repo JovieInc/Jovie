@@ -77,11 +77,17 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
   onAnyMenuOpen,
   isLastAdded,
 }: ChatStyleLinkItemProps<T>) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({
-      id,
-      disabled: !draggable,
-    });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+  } = useSortable({
+    id,
+    disabled: !draggable,
+  });
 
   const firstItemRef = useRef<HTMLButtonElement | null>(null);
   const isMenuOpen = openMenuId === id;
@@ -177,7 +183,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
   );
 
   return (
-    <div ref={setNodeRef} {...attributes} style={cardStyle}>
+    <div ref={setNodeRef} style={cardStyle}>
       <SwipeToReveal
         itemId={id}
         actions={swipeActions}
@@ -203,6 +209,8 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
               )}
               aria-label='Drag To Reorder'
+              ref={setActivatorNodeRef}
+              {...attributes}
               {...listeners}
             >
               <GripVertical className='h-5 w-5 sm:h-4 sm:w-4' />

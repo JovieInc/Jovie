@@ -145,9 +145,6 @@ describe('QuickAddSuggestions', () => {
 
       // Get all button elements (pills are interactive)
       const buttons = screen.getAllByRole('button');
-      const labels = buttons.map(btn =>
-        btn.textContent?.replace('+', '').trim()
-      );
 
       // First platforms should be from SOCIAL_FIRST_ORDER
       // Social order: instagram, tiktok, youtube, twitter, spotify, apple-music, youtube-music, venmo, website
@@ -158,7 +155,9 @@ describe('QuickAddSuggestions', () => {
 
       // The first few pills should match social order
       for (let i = 0; i < Math.min(3, socialOrderLabels.length); i++) {
-        expect(labels[i]).toBe(socialOrderLabels[i]);
+        expect(buttons[i]).toHaveAccessibleName(
+          `Select ${socialOrderLabels[i]}: ${socialOrderLabels[i]}`
+        );
       }
     });
 
@@ -173,9 +172,6 @@ describe('QuickAddSuggestions', () => {
 
       // Get all button elements
       const buttons = screen.getAllByRole('button');
-      const labels = buttons.map(btn =>
-        btn.textContent?.replace('+', '').trim()
-      );
 
       // Music order starts with: spotify-artist, spotify, apple-music, youtube, youtube-music
       const musicOrderLabels = MUSIC_FIRST_ORDER.map(id => {
@@ -185,7 +181,9 @@ describe('QuickAddSuggestions', () => {
 
       // The first few pills should match music order
       for (let i = 0; i < Math.min(3, musicOrderLabels.length); i++) {
-        expect(labels[i]).toBe(musicOrderLabels[i]);
+        expect(buttons[i]).toHaveAccessibleName(
+          `Select ${musicOrderLabels[i]}: ${musicOrderLabels[i]}`
+        );
       }
     });
 
@@ -202,12 +200,9 @@ describe('QuickAddSuggestions', () => {
       );
 
       const buttons = screen.getAllByRole('button');
-      const labels = buttons.map(btn =>
-        btn.textContent?.replace('+', '').trim()
-      );
 
       // With instagram and tiktok filtered, youtube should be first (social order)
-      expect(labels[0]).toBe('YouTube');
+      expect(buttons[0]).toHaveAccessibleName('Select YouTube: YouTube');
     });
   });
 
@@ -335,12 +330,9 @@ describe('QuickAddSuggestions', () => {
       );
 
       const buttons = screen.getAllByRole('button');
-      const labels = buttons.map(btn =>
-        btn.textContent?.replace('+', '').trim()
-      );
 
       // Should use social order (Instagram first)
-      expect(labels[0]).toBe('Instagram');
+      expect(buttons[0]).toHaveAccessibleName('Select Instagram: Instagram');
     });
   });
 });

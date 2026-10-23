@@ -113,7 +113,7 @@ describe('AvatarUploadable - Upload Mode', () => {
 
     const container = screen.getByRole('button');
     expect(container).toBeInTheDocument();
-    expect(container).toHaveAttribute('aria-label', 'Upload profile photo');
+    expect(container).toHaveAccessibleName('Upload profile photo: JD');
     expect(container).toHaveAttribute('tabIndex', '0');
   });
 
