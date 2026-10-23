@@ -196,6 +196,7 @@ behavior, not agent compliance, hosted CI, shadow qualification or product runti
 - Merged is not done until production outcome is verified.
 - A green local check is evidence, not completion.
 - CI, migration guards, security gates, and production verification are not optional.
+- Two pull-request checks inside Source Validation fail `PR Ready` with no feature flag. Security Evidence runs `actions/dependency-review-action` (pinned by commit SHA, `.github/dependency-review-config.yml`) and fails an added or upgraded dependency with a high or critical vulnerability or a GPL/AGPL-family license. Migration Guard runs Squawk 2.70.0 (pinned by version and sha256, `.squawk.toml`) on Postgres migration SQL the pull request adds or changes. Unchanged migrations are not linted. Do not lower either check to advisory. Scheduled osv-scanner and Trivy scans stay beside dependency review, and `validate-migrations.sh` stays beside Squawk. These two checks are blocking because this change required a hard fail. Apply the shadow-first rule below to every other new gate.
 
 ---
 
@@ -252,4 +253,5 @@ Concrete implementation lives in `../CLAUDE.md`, `../CODEX.md`, `.claude/rules/*
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-23 | Blocking pull-request dependency review and Squawk on changed migration SQL. | grok/extra-guards |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |

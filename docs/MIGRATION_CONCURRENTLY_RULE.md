@@ -4,7 +4,9 @@
 
 **Never use `CREATE INDEX CONCURRENTLY` in Drizzle migration files.** Use the
 certified online-index artifact path in `docs/DB_MIGRATIONS.md` when JOV-6273
-workload evidence requires a nontransactional build.
+workload evidence requires a nontransactional build. Squawk also fails a
+non-concurrent `CREATE INDEX` on a table that already exists. An index on a
+table created in the same migration file can stay in that file.
 
 - ❌ `CREATE INDEX CONCURRENTLY` → **BREAKS** migrations
 - ✅ `CREATE INDEX IF NOT EXISTS` → valid only for the transactional path; it

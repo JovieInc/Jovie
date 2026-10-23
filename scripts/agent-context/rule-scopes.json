@@ -16,8 +16,14 @@
   },
   {
     "file": ".claude/rules/db.md",
-    "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
-    "bodySha256": "dd8a0de6daeb7b37b8507fd9c2f6ea6e19ada223aad91f1adf9ea7c612e0b8a1"
+    "paths": [
+      "**/db/**",
+      "**/drizzle/**",
+      "**/migrations/**",
+      "**/queries/**",
+      ".squawk.toml"
+    ],
+    "bodySha256": "bd7172e60252dd5e919b66adfb6275c5b690ff8c33eb6d630c12b8a416083a6d"
   },
   {
     "file": ".claude/rules/environment.md",
@@ -146,7 +152,7 @@
       ".github/**",
       "scripts/**"
     ],
-    "bodySha256": "fde7b500d8f9bc41f224183ffd4ccbeb7d357bb3bf324a753384e3565580fc37"
+    "bodySha256": "2f5b5b01bd34142deb0a9a71784152ebe60d1be2c18e56bb7cd6aaa44a68d3fa"
   },
   {
     "file": ".claude/rules/swarm.md",
