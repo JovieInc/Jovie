@@ -212,14 +212,15 @@ describe('HomeLoopCanvas', () => {
     const toggle = within(first as HTMLElement).getByRole('button', {
       name: 'Why',
     });
-    const why = document.getElementById(
-      toggle.getAttribute('aria-controls') ?? ''
-    );
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(why).not.toBeVisible();
+    expect(
+      document.getElementById(toggle.getAttribute('aria-controls') ?? '')
+    ).toBeNull();
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(why).toBeVisible();
+    expect(
+      document.getElementById(toggle.getAttribute('aria-controls') ?? '')
+    ).toBeVisible();
   });
 
   it('replaces controls with the answer and restores them on failure', () => {
@@ -260,6 +261,31 @@ describe('HomeLoopCanvas', () => {
     expect(
       within(failed as HTMLElement).getByTestId('home-loop-ask-approve')
     ).toBeVisible();
+  });
+});
+
+describe('HomeLoopCanvas notices and details', () => {
+  it('links a summarized asks notice and the constraint details', () => {
+    render(
+      <HomeLoopCanvas
+        {...props({
+          constraint: {
+            tone: 'bad',
+            text: 'Remediation alerts are not being acknowledged',
+            detailsHref: '/app/ov/product',
+          },
+          asksNotice: '27 sources are unavailable or missing evidence.',
+          asksNoticeHref: '/app/ov/inbox',
+        })}
+      />
+    );
+    expect(screen.getByTestId('home-loop-constraint-details')).toHaveAttribute(
+      'href',
+      '/app/ov/product'
+    );
+    expect(
+      screen.getByTestId('home-loop-asks-section-notice-link')
+    ).toHaveAttribute('href', '/app/ov/inbox');
   });
 });
 

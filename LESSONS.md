@@ -114,8 +114,13 @@ policy-only fingerprints are listed explicitly and do not prove executable preve
 
 ## Marketing Pages
 
+### A page change goes through one page contract, not a wall of locks
+**Mistake:** Replacing the homepage meant editing about 25 test files: per-component source-string locks, a role-invariant fixture, a stale redesign contract, grammar locks pinned to a retired "Find me" action, and section inventories that each re-declared the same page. The YouTube-MVP draft touched 50 files for a three-section page. Several of these locks asserted off-flag code that no visitor ever saw.
+
+**Rule:** Bind a marketing page through its typed records (recipe, route manifest, copy modules, offer truth). Test it with one rendered contract that reads those records, like `homepage-contract.test.tsx`: manifest order, one h1, one primary action, offer-truth prices, registry media and tokenized CSS. Do not add per-component source-string locks or literals that duplicate the records.
+
 ### Marketing plan prices come only from offer truth
-**Mistake:** The artist-profile homepage brief asked for the $12 offer before it existed in `lib/billing/offer-truth.ts`. Typing "$12/mo" into page copy would have sold a price that billing did not charge. The offer is now published in offer truth; marketing reads it from that owner.
+**Mistake:** The artist-profile homepage brief asked for the $12 offer before it existed in `lib/billing/offer-truth.ts`. Typing "$12/mo" into page copy would have sold a price that billing does not charge. The offer is now published in offer truth; marketing reads it from that owner.
 
 **Rule:** Render plan prices through `MarketingOfferSummary` or `getPublicPriceClaim`, never as literals. Publish a new offer in offer truth first; marketing pages pick it up from there. `offer-price-source-guard` blocks recurring-price literals in marketing source.
 

@@ -2,24 +2,14 @@
   "schema": "jovie.seo-certify-baseline/v1",
   "failures": {
     "/": ["geo:geo-sibling-links"],
-    "/about": ["technical:open-graph"],
     "/ai": ["agentic:structured-data"],
     "/alternatives": [
       "copy:copy-lint",
       "geo:geo-jsonld-type",
-      "geo:geo-sibling-links",
-      "technical:open-graph"
+      "geo:geo-sibling-links"
     ],
-    "/alternatives/linktree": [
-      "geo:geo-last-updated",
-      "geo:geo-sibling-links",
-      "technical:open-graph"
-    ],
-    "/api-versioning": [
-      "geo:geo-jsonld-type",
-      "geo:geo-sibling-links",
-      "technical:open-graph"
-    ],
+    "/alternatives/linktree": ["geo:geo-last-updated", "geo:geo-sibling-links"],
+    "/api-versioning": ["geo:geo-jsonld-type", "geo:geo-sibling-links"],
     "/artist-notifications": [
       "agentic:structured-data",
       "geo:geo-jsonld-type",
@@ -50,18 +40,13 @@
       "geo:geo-last-updated"
     ],
     "/changelog/26.8.1": ["geo:geo-last-updated"],
-    "/cli": ["copy:copy-lint", "geo:geo-sibling-links", "technical:open-graph"],
+    "/cli": ["copy:copy-lint", "geo:geo-sibling-links"],
     "/compare": [
       "copy:copy-lint",
       "geo:geo-jsonld-type",
-      "geo:geo-sibling-links",
-      "technical:open-graph"
+      "geo:geo-sibling-links"
     ],
-    "/compare/linktree": [
-      "geo:geo-last-updated",
-      "geo:geo-sibling-links",
-      "technical:open-graph"
-    ],
+    "/compare/linktree": ["geo:geo-last-updated", "geo:geo-sibling-links"],
     "/demo/video": [
       "agentic:server-rendered-content",
       "agentic:structured-data"
@@ -70,12 +55,11 @@
       "agentic:server-rendered-content",
       "agentic:structured-data"
     ],
-    "/developers": ["geo:geo-jsonld-type", "technical:open-graph"],
+    "/developers": ["geo:geo-jsonld-type"],
     "/download": [
       "geo:geo-jsonld-type",
       "geo:geo-orphan",
-      "geo:geo-sibling-links",
-      "technical:open-graph"
+      "geo:geo-sibling-links"
     ],
     "/engineering": [
       "agentic:structured-data",
@@ -106,11 +90,7 @@
       "geo:geo-sibling-links"
     ],
     "/solutions/artists": ["geo:geo-sibling-links"],
-    "/support": [
-      "geo:geo-jsonld-type",
-      "geo:geo-sibling-links",
-      "technical:open-graph"
-    ],
+    "/support": ["geo:geo-jsonld-type", "geo:geo-sibling-links"],
     "/voice": ["agentic:structured-data", "copy:copy-lint"],
     "/waitlist": ["technical:html-source"],
     "/waitlist/invite": ["technical:html-source"],

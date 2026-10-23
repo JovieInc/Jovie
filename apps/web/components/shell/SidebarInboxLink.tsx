@@ -27,6 +27,7 @@ export function SidebarInboxLink({
     <Tooltip label={accessibleLabel} side='bottom'>
       <Link
         href={APP_ROUTES.DASHBOARD}
+        prefetch={false}
         aria-label={accessibleLabel}
         data-inbox-attention={
           pending ? 'available' : (availability?.state ?? 'unknown')

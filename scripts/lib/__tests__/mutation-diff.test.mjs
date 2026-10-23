@@ -544,8 +544,27 @@ describe('mutation CLI result semantics', () => {
       for (const path of [
         'scripts/mutation-diff.mjs',
         'scripts/lib/mutation-diff.mjs',
+        'scripts/lib/mutation-score-floor.mjs',
+        'scripts/lib/ratchet-core.mjs',
+        'scripts/mutation-score-baseline.json',
       ]) {
         put(path, readFileSync(join(repoRoot, path), 'utf8'));
+      }
+      if (mode === 'below-floor' || mode === 'at-floor') {
+        const baseline = JSON.parse(
+          readFileSync(
+            join(root, 'scripts/mutation-score-baseline.json'),
+            'utf8'
+          )
+        );
+        baseline.files['lib/auth/policy.ts'] = {
+          measured: 100,
+          floor: mode === 'at-floor' ? 100 : 1,
+          valid: 1,
+          runId: 1,
+          sha: 'a'.repeat(40),
+        };
+        put('scripts/mutation-score-baseline.json', JSON.stringify(baseline));
       }
       symlinkSync(
         join(repoRoot, 'node_modules'),
@@ -607,7 +626,7 @@ describe('mutation CLI result semantics', () => {
         if (process.env.FIXTURE_MODE === 'failed') process.exit(1);
         if (process.env.FIXTURE_MODE === 'missing-report') process.exit(0);
         const mutants = process.env.FIXTURE_MODE === 'zero-mutants' ? [] : [{
-          status: process.env.FIXTURE_MODE === 'invalid-mutants' ? 'CompileError' : 'Survived',
+          status: process.env.FIXTURE_MODE === 'invalid-mutants' ? 'CompileError' : process.env.FIXTURE_MODE === 'at-floor' ? 'Killed' : 'Survived',
           mutatorName: 'BooleanLiteral', replacement: 'false', location: { start: { line: 1 } }
         }];
         fs.writeFileSync(process.env.STRYKER_REPORT_FILE, JSON.stringify({ files: {
@@ -672,12 +691,26 @@ describe('mutation CLI result semantics', () => {
     expect(run.stdout).not.toContain('no applicable');
   });
 
-  it('keeps a completed 0% score advisory and includes actual passed-test count', () => {
+  it('keeps an unbaselined 0% score advisory and includes actual passed-test count', () => {
     const run = runFixture('survived');
     expect(run.status, run.stderr).toBe(0);
     expect(run.stdout).toContain(
-      '| `lib/auth/policy.ts` | 0% (low) | 0 | 1 | 1 | 1 | 1/1 / 1/1 |'
+      '| `lib/auth/policy.ts` | 0% (low) | 0 | 1 | 1 | 1 | 1/1 / 1/1 | n/a |'
     );
+  });
+
+  it('fails a baselined file that scores under its floor', () => {
+    const run = runFixture('below-floor');
+    expect(run.status, run.stderr).toBe(1);
+    expect(run.stdout).toContain('`lib/auth/policy.ts`: 0% is below floor 1%');
+  });
+
+  it('passes a baselined file that meets its floor', () => {
+    const run = runFixture('at-floor');
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.stdout).toContain('| `lib/auth/policy.ts` | 100% | 1 | 0 | 1 |');
+    expect(run.stdout).toContain('| 1/1 / 1/1 | 100% |');
+    expect(run.stdout).not.toContain('Score floor regressions');
   });
 
   it('keeps the nearest meaningful transitive suite ahead of broad auth routes under a cap', () => {

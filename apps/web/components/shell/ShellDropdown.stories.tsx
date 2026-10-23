@@ -31,6 +31,10 @@ export const Default: Story = {
       </Button>
     ),
     defaultOpen: true,
+    // `modal={false}`: a modal Radix menu `hideOthers`-ARIA-hides the story
+    // canvas around the portaled content, which fails axe aria-hidden-focus
+    // on the focusable trigger. Non-modal is visually identical for demos.
+    modal: false,
     children: (
       <>
         <ShellDropdown.Item label='Copy link' icon={Copy} onSelect={fn()} />
@@ -54,6 +58,7 @@ export const Searchable: Story = {
       </Button>
     ),
     defaultOpen: true,
+    modal: false,
     searchable: true,
     searchPlaceholder: 'Search platforms…',
     children: (
@@ -76,6 +81,7 @@ function RadioGroupDemo() {
         </Button>
       }
       defaultOpen
+      modal={false}
     >
       <ShellDropdown.RadioGroup value={value} onValueChange={setValue}>
         <ShellDropdown.RadioItem value='newest' label='Newest first' />

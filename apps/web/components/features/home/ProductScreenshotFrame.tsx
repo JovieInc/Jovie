@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 
 interface ProductScreenshotFrameProps {
   readonly alt: string;
@@ -54,7 +55,7 @@ function renderScreenshotContent({
             {title}
           </div>
           <p className='text-lg font-medium tracking-tight text-primary-token'>
-            Preview coming soon
+            {COPY_FALLBACKS.preview}
           </p>
           <p className='mt-2 text-sm leading-6 text-secondary-token'>
             See it live when you sign up.
@@ -73,7 +74,7 @@ function renderScreenshotContent({
       priority={priority}
       quality={quality}
       sizes={sizes}
-      className='w-full'
+      className='marketing-rounded-frame w-full'
       onError={onImageError}
     />
   );
@@ -100,7 +101,7 @@ export function ProductScreenshotFrame({
       aria-label={isAvailable === true ? undefined : alt}
       data-testid={testId}
       className={[
-        'relative overflow-hidden rounded-[0.95rem] border border-subtle bg-surface-0 shadow-card-elevated md:rounded-xl',
+        'marketing-rounded-frame relative border border-subtle bg-surface-0 shadow-card-elevated',
         className,
       ]
         .filter(Boolean)

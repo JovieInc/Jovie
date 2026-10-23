@@ -2363,8 +2363,8 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
       transientFailure: 'bounded-retry',
       liveRulesetCutover: 'applied',
     });
-    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(6);
-    expect(NATIVE_QUEUE_POLICY.max_entries_to_merge).toBe(5);
+    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(10);
+    expect(NATIVE_QUEUE_POLICY.max_entries_to_merge).toBe(10);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(1);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(0);
     expect(
@@ -2402,7 +2402,7 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
     );
 
     expect(result.errors).toContain(
-      'live native merge_queue max_entries_to_merge must be 5 (observed 3)'
+      'live native merge_queue max_entries_to_merge must be 10 (observed 3)'
     );
   });
 
@@ -2510,12 +2510,12 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
         { ...NATIVE_QUEUE_POLICY },
         { checkResponseTimeout: null }
       )
-    ).toMatchObject({ check_response_timeout_minutes: 60 });
+    ).toMatchObject({ check_response_timeout_minutes: 20 });
     const secondsReadback = buildNativeQueuePolicyReadback({
       ...NATIVE_QUEUE_POLICY,
-      checkResponseTimeout: 1200,
+      checkResponseTimeout: 3600,
     });
-    expect(secondsReadback.observed.check_response_timeout_minutes).toBe(20);
+    expect(secondsReadback.observed.check_response_timeout_minutes).toBe(60);
     expect(secondsReadback.drift).toContain(
       'check_response_timeout_minutes'
     );
@@ -2548,9 +2548,9 @@ describe('native merge-queue singleton groups (JOV-8112)', () => {
       {
         backend: 'native',
         liveQueueConfiguration: {
-          checkResponseTimeout: 1200,
+          checkResponseTimeout: 3600,
           maximumEntriesToBuild: 1,
-          maximumEntriesToMerge: 5,
+          maximumEntriesToMerge: 10,
           mergeMethod: 'SQUASH',
           minimumEntriesToMerge: 1,
           minimumEntriesToMergeWaitTime: 0,

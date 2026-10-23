@@ -202,9 +202,20 @@
   transition-property: background-color, border-color;
 }
 
+/* Card border and shadow ease. Background snaps so a theme-class change
+   cannot be sampled mid-blend. */
+@utility transition-card-chrome {
+  transition-property: border-color, box-shadow;
+}
+
 /* Canonical allocation transition shared by sidebar, inspector, and drawers. */
 @utility transition-shell-rail-allocation {
   transition-property: flex-basis, width, border-width, opacity, transform;
+}
+
+/* Keep scrollports from shifting when a descendant receives focus. */
+@utility overflow-anchor-none {
+  overflow-anchor: none;
 }
 
 @utility scale-press {

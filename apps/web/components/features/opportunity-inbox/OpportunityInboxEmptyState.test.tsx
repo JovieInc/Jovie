@@ -25,7 +25,7 @@ describe('OpportunityInboxEmptyState', () => {
     const emptyState = screen.getByTestId('opportunity-inbox-empty-state');
     expect(emptyState).toHaveClass('flex-1', 'items-center', 'justify-center');
     expect(screen.getByText('Your Inbox Is Clear')).toHaveClass(
-      'text-2xl',
+      'text-sm',
       'font-semibold',
       'tracking-tight'
     );

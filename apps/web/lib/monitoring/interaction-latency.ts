@@ -16,6 +16,7 @@ export const UX_LATENCY_METRICS = [
   { name: 'speech_to_text', label: 'Speech To Text' },
   { name: 'page_to_interactive', label: 'Page Interactive' },
   { name: 'gbrain_query', label: 'Gbrain Query' },
+  { name: 'ovie_home_ready', label: 'Ovie Home Ready' },
 ] as const;
 
 export type UxLatencyMetric = (typeof UX_LATENCY_METRICS)[number]['name'];

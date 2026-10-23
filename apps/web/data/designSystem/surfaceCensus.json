@@ -381,9 +381,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-21T05:44:03.216Z",
-        "ref": "docs/screenshots/jov-8097/README.md",
-        "sourceDigest": "2757fea8de89291f29de54ed1439db8db1529c9d0ff511222f81d0d13da8a8ec"
+        "at": "2026-10-23T08:14:57.640Z",
+        "ref": "PR 22741 rounded-media renewal after the main merge (footer #22727): exact-source fdef998ff6270246923cc01af76e87a7af8139fe PR Visual Review production-build capture (desktop + mobile) on the changed marketing surfaces; fail-closed evidence gate completed success, zero findings; https://github.com/JovieInc/Jovie/actions/runs/39921828523/artifacts/12488081620; prior JOV-8097 interaction states unchanged",
+        "sourceDigest": "e66fa65ce71b5fe1d9989871ab8984c1038733ccc04c09ce9098b50d78bdbbd5"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
