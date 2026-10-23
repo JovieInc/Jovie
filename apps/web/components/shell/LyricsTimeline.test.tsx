@@ -66,7 +66,6 @@ describe('JOV-5466 token retire', () => {
   });
 });
 
-
 describe('Ion accent polish (glm/lyrics-player)', () => {
   it('draws the progress rail and cue halos with the Ion accent, not raw cyan', () => {
     const source = readFileSync(
