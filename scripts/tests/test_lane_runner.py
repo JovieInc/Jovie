@@ -5658,6 +5658,36 @@ class PreservedRecoveryTest(unittest.TestCase):
             claim.assert_not_called()
             agent.assert_not_called()
 
+    def test_recovery_marker_digest_and_failed_archive_preserve_exact_crlf_bytes(self):
+        self.supersede_cancelled_recovery_fixture()
+        marker = self.path / lane.disk_guard.PRESERVED_REPAIR
+        data = json.loads(marker.read_bytes())
+        raw = json.dumps(data, indent=2).replace("\n", "\r\n").encode() + b"\r\n"
+        marker.write_bytes(raw)
+        digest = hashlib.sha256(raw).hexdigest()
+        before = self.recovery_source_snapshot()
+        observations = []
+        self.assertEqual(lane.retire_published_preserved(
+            self.host, self.pr["number"], observations=observations), [])
+        self.assertEqual(observations[-1]["markerPreimageSha256"], digest)
+        self.assertEqual(self.recovery_source_snapshot(), before)
+        real = lane.sh
+        def shell(args, **kwargs):
+            if args[:3] == ["git", "worktree", "remove"]:
+                return SimpleNamespace(returncode=1, stdout="", stderr="")
+            return real(args, **kwargs)
+        with patch.object(lane, "sh", side_effect=shell):
+            self.assertIsNone(lane.archive_unresumable_preserved(
+                self.host, self.path, "preserved-head-superseded", observations=observations))
+        self.assertEqual(observations[-1]["reason"], "archive-worktree-retained")
+        self.assertEqual(observations[-1]["markerPreimageSha256"], digest)
+        self.assertEqual(marker.read_bytes(), raw)
+        after = self.recovery_source_snapshot()
+        ref = lane.PRESERVED_ARCHIVE_REF + self.path.name
+        self.assertEqual(self.git(self.host.repo, "show", f"{ref}:repair.txt"), "unpublished fix")
+        after["refs"] = before["refs"]  # Retaining the source ref does not release the checkout.
+        self.assertEqual(after, before)
+
     def test_recovery_diagnostics_exclude_untrusted_fields_and_unreadable_source(self):
         observations = []
         lane.note_preserved_recovery(observations, "archive", "worktree-not-idle",

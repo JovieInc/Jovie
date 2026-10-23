@@ -6067,7 +6067,7 @@ def retire_published_preserved(host: Host, number: int, *, observations=None) ->
     for marker_path in sorted((host.state / "worktrees").glob(f"*/{disk_guard.PRESERVED_REPAIR}")):
         path = marker_path.parent
         try:
-            marker_text = marker_path.read_text()
+            marker_text = marker_path.read_bytes().decode()  # Preserve line endings for the preimage digest.
             marker = json.loads(marker_text)
         except (OSError, ValueError):
             continue
@@ -6162,7 +6162,7 @@ def archive_unresumable_preserved(host: Host, path: Path, reason: str, *, observ
         return None
     marker = None
     try:
-        marker = marker_path.read_text()
+        marker = marker_path.read_bytes().decode()  # Digest and restore the exact marker bytes.
         try:
             stamp = datetime.fromisoformat(str(json.loads(marker).get("at")).replace("Z", "+00:00")).timestamp()
         except (ValueError, TypeError, AttributeError):
@@ -6205,7 +6205,7 @@ def archive_unresumable_preserved(host: Host, path: Path, reason: str, *, observ
         marker_path.unlink()
         sh(["git", "worktree", "remove", "--force", str(path)], cwd=host.repo, timeout=600)
         if path.exists():
-            marker_path.write_text(marker)  # Not removed: keep it protected; the ref also holds it.
+            marker_path.write_bytes(marker.encode())  # Not removed: keep it protected; the ref also holds it.
             note_preserved_recovery(observations, "archive", "archive-worktree-retained", marker=marker)
             return None
     except (OSError, subprocess.SubprocessError):
