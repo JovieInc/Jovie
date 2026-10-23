@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
+// Screenshot and e2e configs have separate testDirs; retain the H1 checks in both.
+import '../e2e/marketing-headings-visual.spec';
 import { MARKETING_EXACT_PUBLIC_ROUTE_TARGETS } from '@/data/marketing';
 import { SCREENSHOT_VIEWPORTS } from '@/lib/screenshots/registry';
 import {
@@ -663,82 +665,6 @@ test('deliberate-red: a wedged receipt fails with its stalled phase instead of h
   );
   expect(Date.now() - started).toBeLessThan(10_000);
 });
-
-// JOV-7772: baseline allowances cannot certify the hero contract. Check both
-// complete text and two natural lines so removing a clamp cannot hide a failure.
-for (const route of [
-  '/about',
-  '/ai',
-  '/artist-notifications',
-  '/download',
-  '/launch',
-  '/voice',
-  '/youtube-thumbnails',
-]) {
-  const viewports = [
-    { name: 'desktop', size: SCREENSHOT_VIEWPORTS.desktop },
-    { name: 'mobile', size: SCREENSHOT_VIEWPORTS.mobile },
-    // At lg the download hero splits into columns before the xl type fits.
-    ...(route === '/download'
-      ? [{ name: 'split-desktop', size: { width: 1024, height: 900 } }]
-      : []),
-  ];
-  for (const viewport of viewports) {
-    test(`marketing H1 contract: ${route} ${viewport.name}`, async ({
-      page,
-    }, testInfo) => {
-      await page.setViewportSize(viewport.size);
-      await page.emulateMedia({ reducedMotion: 'reduce' });
-      const response = await page.goto(route, {
-        waitUntil: 'domcontentloaded',
-      });
-      expect(response?.status()).toBe(200);
-      const heading = page.getByRole('heading', { level: 1 });
-      await expect(heading).toHaveCount(1);
-      await expect(heading).toBeVisible();
-      await page.evaluate(() => document.fonts.ready);
-
-      const geometry = await heading.evaluate(element => {
-        const style = getComputedStyle(element);
-        const lineHeight = Number.parseFloat(style.lineHeight);
-        const paintedHeight = element.getBoundingClientRect().height;
-        const previousStyle = element.getAttribute('style');
-        let fullHeight: number;
-        try {
-          for (const [property, value] of [
-            ['-webkit-line-clamp', 'unset'],
-            ['max-block-size', 'none'],
-            ['max-height', 'none'],
-          ] as const) {
-            element.style.setProperty(property, value, 'important');
-          }
-          fullHeight = element.getBoundingClientRect().height;
-        } finally {
-          if (previousStyle === null) element.removeAttribute('style');
-          else element.setAttribute('style', previousStyle);
-        }
-        return { fullHeight, lineHeight, paintedHeight };
-      });
-      expect(geometry.lineHeight).toBeGreaterThan(0);
-      expect(
-        geometry.fullHeight,
-        'Complete authored H1 must fit in two natural lines'
-      ).toBeLessThanOrEqual(geometry.lineHeight * 2 + 1);
-      expect(
-        geometry.fullHeight - geometry.paintedHeight,
-        'H1 must not hide any authored lines'
-      ).toBeLessThanOrEqual(1);
-      const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
-      expect(
-        snapshot.findings.filter(finding => finding.kind === 'clipped-heading')
-      ).toEqual([]);
-      await testInfo.attach('hero', {
-        body: await page.screenshot(),
-        contentType: 'image/png',
-      });
-    });
-  }
-}
 
 test('certifies every marketing route and public-profile open state', async ({
   context,
