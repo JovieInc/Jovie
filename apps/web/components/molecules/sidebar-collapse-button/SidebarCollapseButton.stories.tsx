@@ -1,6 +1,30 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button';
-import { SidebarProvider } from '@/components/organisms/sidebar';
+import { type ReactNode, useState } from 'react';
+import { SidebarContext } from '@/components/shell/SidebarContext';
+import { SidebarCollapseButton } from '.';
+
+/** Story-local sidebar state so this molecule story never imports organisms. */
+function SidebarProvider({ children }: { readonly children: ReactNode }) {
+  const [open, setOpen] = useState(true);
+  const [openMobile, setOpenMobile] = useState(false);
+  return (
+    <SidebarContext.Provider
+      value={{
+        state: open ? 'open' : 'closed',
+        open,
+        isPreview: false,
+        isFloating: false,
+        setOpen,
+        openMobile,
+        setOpenMobile,
+        isMobile: false,
+        toggleSidebar: () => setOpen(value => !value),
+      }}
+    >
+      {children}
+    </SidebarContext.Provider>
+  );
+}
 
 const meta: Meta<typeof SidebarCollapseButton> = {
   title: 'Molecules/SidebarCollapseButton',
