@@ -8,18 +8,14 @@
  * rgba under the forced-dark marketing theme.
  *
  * The carousel gutter previously referenced --linear-content-max (1200px =
- * 75rem). The value is kept EXACTLY as 75rem so scroll padding and control
- * positions do not shift; it is no longer read from the retired System A var.
+ * 75rem). It now follows the single public container (--ds-public-content-max)
+ * so the rail edge matches the header, hero and footer.
  */
 
 /* ---------- Content-aligned header + carousel gutter ---------- */
 
-.ap-monetization__header {
-  max-width: 75rem;
-}
-
 .ap-monetization__scroller {
-  --ap-monetization-content-max: 75rem;
+  --ap-monetization-content-max: var(--ds-public-content-max);
 }
 
 @media (min-width: 640px) {
@@ -55,7 +51,14 @@
 .ap-monetization__skip:focus {
   left: max(
     1.25rem,
-    calc((100vw - var(--ap-monetization-content-max, 75rem)) / 2 + 1.25rem)
+    calc(
+      (
+        100vw -
+        var(--ap-monetization-content-max, var(--ds-public-content-max))
+      ) /
+      2 +
+      1.25rem
+    )
   );
   border: 1px solid
     color-mix(in oklab, var(--system-b-cinematic-black) 12%, transparent);
@@ -82,7 +85,14 @@
 .ap-monetization__nav {
   right: max(
     1.25rem,
-    calc((100vw - var(--ap-monetization-content-max, 75rem)) / 2 + 1.25rem)
+    calc(
+      (
+        100vw -
+        var(--ap-monetization-content-max, var(--ds-public-content-max))
+      ) /
+      2 +
+      1.25rem
+    )
   );
 }
 

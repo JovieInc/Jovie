@@ -46,7 +46,7 @@ export function BlogPostPage({
     <article className='min-h-screen'>
       {/* Header Section */}
       <MarketingContainer width='page' className='pb-12 pt-16 sm:pt-24'>
-        <div className='mx-auto max-w-4xl'>
+        <div className='max-w-prose-canonical'>
           {/* Back link */}
           <Link
             href='/blog'
@@ -142,8 +142,8 @@ export function BlogPostPage({
 
       {/* Article Content + TOC Sidebar */}
       <MarketingContainer width='page' className='pb-16 sm:pb-24'>
-        <div className='mx-auto max-w-4xl'>
-          <div className='grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-12'>
+        <div>
+          <div className='grid grid-cols-1 lg:grid-cols-[minmax(0,var(--ds-prose-max))_220px] gap-12'>
             {/* Main content */}
             <div className='min-w-0'>
               <MarketingContentProse html={post.html} />

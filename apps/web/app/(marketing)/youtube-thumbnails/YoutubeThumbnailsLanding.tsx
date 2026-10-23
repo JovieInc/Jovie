@@ -75,7 +75,7 @@ export function YoutubeThumbnailsLanding() {
                 {copy.workflow.body}
               </p>
             </div>
-            <div className='mx-auto mt-12 grid max-w-5xl gap-8 md:grid-cols-3'>
+            <div className='mt-12 grid gap-8 md:grid-cols-3'>
               {copy.workflow.steps.map((step, index) => (
                 <article
                   key={step.title}

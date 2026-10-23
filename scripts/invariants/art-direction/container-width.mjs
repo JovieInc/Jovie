@@ -227,6 +227,8 @@ function scanCss(path, source) {
   let match = decl.exec(text);
   while (match) {
     const [, prop, value] = match;
+    // Report the declaration's own line so a reasoned allow comment above it counts.
+    const at = match.index + match[0].lastIndexOf(prop);
     const lengths = [...value.matchAll(/(\d*\.?\d+)(rem|em|px)\b/g)].map(m =>
       toRem(m[0])
     );
@@ -234,16 +236,16 @@ function scanCss(path, source) {
     const token = value.replace(/\s+/g, ' ');
     if (prop.startsWith('--')) {
       if (WIDTH_VAR.test(prop) && !/--ds-public-content-max/.test(value)) {
-        found.push(['second-token', `${prop}: ${token}`, match.index]);
+        found.push(['second-token', `${prop}: ${token}`, at]);
       }
     } else if (/--ds-public-content-max/.test(value)) {
       // The token itself. Fine.
     } else if (
       /var\(\s*--[\w-]*(?:section|grid|content|page|container)-max/.test(value)
     ) {
-      found.push(['second-token', `${prop}: ${token}`, match.index]);
+      found.push(['second-token', `${prop}: ${token}`, at]);
     } else if (wide) {
-      found.push(['page-width', `${prop}: ${token}`, match.index]);
+      found.push(['page-width', `${prop}: ${token}`, at]);
     }
     match = decl.exec(text);
   }
