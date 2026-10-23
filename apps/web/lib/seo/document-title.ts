@@ -1,12 +1,17 @@
 import type { Metadata } from 'next';
 import { APP_NAME } from '@/constants/app';
 
-const BRAND_WORD = new RegExp(`\\b${APP_NAME}\\b`, 'i');
-
 /**
  * Root layout titles use `%s | Jovie`. A title that already names the brand
  * must opt out, or the tab reads `Compare — Jovie | Jovie`.
+ *
+ * The check is a literal, not `APP_NAME` at module init. Route tests often
+ * stub `@/constants/app` with only `BASE_URL`, and a missing export throws
+ * while the page module is still loading. `applyRootTitleTemplate` still
+ * appends `APP_NAME`, and the unit test locks that constant to this word.
  */
+const BRAND_WORD = /\bJovie\b/i;
+
 export function documentTitle(title: string): string | { absolute: string } {
   const trimmed = title.trim();
   if (BRAND_WORD.test(trimmed)) return { absolute: trimmed };
