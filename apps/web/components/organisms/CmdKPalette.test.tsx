@@ -173,7 +173,8 @@ describe('CmdKPalette', () => {
 
     const plane = screen.getByTestId('cmdk-main-plane');
     expect(plane).toHaveClass('w-full');
-    expect(plane).not.toHaveClass('max-w-2xl', 'max-w-3xl');
+    expect(plane).not.toHaveClass('max-w-2xl');
+    expect(plane).not.toHaveClass('max-w-3xl');
     expect(screen.queryByTestId('shared-command-palette')).toBeNull();
     expect(plane).toContainElement(
       screen.getByRole('listbox', { name: 'Command Palette Results' })
