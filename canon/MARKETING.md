@@ -110,10 +110,10 @@ artifact. ZiaWI stays at five elevations.
 
 ### Subtlety
 
-Technical, cyberpunk, and night cues are felt, not seen: grid lines, an
-iPhone focus-roll edge, scan, and grain.
-Those cues carry no explanatory text or UI. Take the literal version, abstract
-it, then light and focus it so only what matters is noticed.
+Technical, cyberpunk, and night cues are felt, not seen, with no explanatory
+text or UI: grid lines, edge-light lines like an iPhone focus-roll edge, and
+grain. Take the literal version, abstract it, then light and focus it so only
+what matters is noticed.
 
 Scene color for the cues is Scene Palette v1
 (`apps/web/data/marketing/imageColorPolicy.ts`): Ion `#3FAFF3`, Ultra
@@ -151,7 +151,7 @@ path for investors and founders, then the final CTA.
 - Literal music signals: headphones on people, notes, or instruments as decoration.
 - Orange as a scene or cue color.
 - A literal triad.
-- Canvas, WebGL, or video on the surface (`night-dj-harmony-v1`). Shaders and light are baked images plus CSS motion.
+- Canvas, WebGL, or video on the surface by default (`night-dj-harmony-v1`). Shaders and light are baked images plus CSS motion. WebGL only as a flagged, approved exception.
 
 ---
 
@@ -179,6 +179,7 @@ The executable landing-page copy workflow is in
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-23 | Night cues drop scan. Canvas, WebGL, and video stay off the surface by default; WebGL is a flagged, approved exception. | Tim subtlety rule |
 | 2026-10-23 | Added the felt-not-seen subtlety rule, scene-palette cue colors, and night-surface hard negatives to the art-directed marketing brief. | Tim subtlety rule |
 | 2026-10-23 | Added the art-directed marketing surface brief as the marketing-only exception to smallest-change design guidance. | Homepage art-direction brief; founder wording review |
 | 2026-10-02 | Added source-classified About/search guidance and distinct artist/ranking outcome boundaries. | Tim voice direction; JOV-7429; Google Search Central |
