@@ -934,6 +934,37 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/product/utm-links/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/utm-links/UtmLinksLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'UTM builder ship on /product/utm-links',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live UTM builder with a filled tracking link. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/utm-links',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/profile/UtmBuilderDialog.tsx',
+      testId: 'utm-builder',
+    },
+    healthCheck: {
+      path: '/product/utm-links',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
     glob: '(marketing)/card/page.tsx',
     recipeId: 'feature',
     renderedSections: [
