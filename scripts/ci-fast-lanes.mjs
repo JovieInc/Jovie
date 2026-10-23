@@ -290,7 +290,7 @@ export const SOURCE_GUARDS_COMMAND = SOURCE_GUARDS.map(
 export const NODE_RUNTIME_CONTRACT_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/node-runtime-policy.test.ts tests/unit/ci/node-runtime-contract.test.ts tests/unit/ci/runner-setup-action.test.ts';
 export const PEN_TOKEN_PARITY_COMMAND =
-  'node --test scripts/invariants/pen-token-parity.test.mjs && node scripts/invariants/pen-token-parity.mjs';
+  'pnpm exec node --test scripts/invariants/pen-token-parity.test.mjs && pnpm exec node scripts/invariants/pen-token-parity.mjs';
 export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
   'apps/web/vitest.config.ci-contracts.mts',
   'apps/web/vitest.config.fast.mts',
