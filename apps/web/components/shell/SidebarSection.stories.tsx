@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { House, Users } from 'lucide-react';
-import { useArgs } from 'storybook/preview-api';
+import { useState } from 'react';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { SidebarNavItem } from './SidebarNavItem';
 import { SidebarSection } from './SidebarSection';
@@ -24,14 +24,18 @@ const meta = {
     collapsed: false,
     children: null,
   },
+  // Local state instead of useArgs/updateArgs: the vitest browser runner does
+  // not round-trip story args, so the Expanded play assertion (aria-expanded
+  // flips on click) failed deterministically in the Storybook A11y shards.
   render: function Render(args) {
-    const [, updateArgs] = useArgs();
+    const [open, setOpen] = useState(args.open);
     return (
       <SidebarSection
         {...args}
+        open={open}
         onToggle={() => {
           args.onToggle();
-          updateArgs({ open: !args.open });
+          setOpen(current => !current);
         }}
       >
         <SidebarNavItem

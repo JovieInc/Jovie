@@ -772,7 +772,7 @@ test('load failures are classified honestly instead of as generic offline', () =
   ).toBe('Local Jovie isn’t running at localhost:3112.');
   expect(
     describeDesktopLoadFailure('timed-out', 'http://localhost:3112').heading
-  ).toBe('Jovie didn’t finish starting');
+  ).toBe('Jovie Didn’t Finish Starting');
 
   expect(
     decideHostedLoadRetry({

@@ -154,6 +154,23 @@ describe('MobileReleaseList', () => {
     expect(badge.className).toContain('leading-none');
   });
 
+  it('scans titles through the shared titleClassName token with the target-size floor', () => {
+    render(
+      <MobileReleaseList
+        releases={[createRelease()]}
+        artistName='Jovie Artist'
+        onEdit={vi.fn()}
+      />
+    );
+
+    // The shared row-typography keys are className tokens, not copy: the
+    // dense-row 24px WCAG 2.5.8 target floor rides on the shared constant.
+    expect(screen.getByText('Summer Lights').className).toContain('min-h-6');
+    const source = readWebSource(mobileReleaseListSourcePath);
+    expect(source).toContain('shellReleaseRowTypography.titleClassName');
+    expect(source).toContain('shellReleaseRowTypography.subtitleClassName');
+  });
+
   it('imports mobile tokens from the direct module instead of the barrel', () => {
     const source = readWebSource(mobileReleaseListSourcePath);
     expect(source).toContain('@/features/dashboard/tokens/mobile-tokens');

@@ -934,6 +934,129 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/product/link-analytics/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/link-analytics/LinkAnalyticsLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'Link analytics ships on /product/link-analytics',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live smart-link analytics panel. Each click is counted, with the provider that received it and the time of the last click. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/link-analytics',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/link-analytics/LinkAnalyticsPanel.tsx',
+      testId: 'release-smart-link-analytics',
+    },
+    healthCheck: {
+      path: '/product/link-analytics',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/utm-links/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/utm-links/UtmLinksLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'UTM builder ship on /product/utm-links',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live UTM builder with a filled tracking link. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/utm-links',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/profile/UtmBuilderDialog.tsx',
+      testId: 'utm-builder',
+    },
+    healthCheck: {
+      path: '/product/utm-links',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/dsp-links/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/dsp-links/DspLinksLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'DSP link rows ship on /product/dsp-links',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live DSP rows: a saved URL opens that service, and a missing service stays on Find. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/dsp-links',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/components/molecules/inspector/DspQuietRow.tsx',
+      testId: 'dsp-links',
+    },
+    healthCheck: {
+      path: '/product/dsp-links',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/isrc/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/isrc/IsrcLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'ISRC field ship on /product/isrc',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live ISRC field with a release code and a track code. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/isrc',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/molecules/drawer/DrawerEditableTextField.tsx',
+      testId: 'isrc-editor',
+    },
+    healthCheck: {
+      path: '/product/isrc',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
     glob: '(marketing)/card/page.tsx',
     recipeId: 'feature',
     renderedSections: [

@@ -216,10 +216,16 @@ describe('the hero ships ungated and the viewport ships with it', () => {
 
   it('pairs the hero-canvas viewport class with the mounted hero', () => {
     const layout = readFileSync(join(webRoot, 'app/(home)/layout.tsx'), 'utf8');
-    // The hero replaces the docked marketing header with its own bar, so
-    // the layout carries the hero-canvas viewport and skips the shell
-    // offset in the same breath as the hero mount — they cannot diverge.
+    const canvas = readFileSync(
+      join(webRoot, 'components/homepage/hero-light/HomepageHeroCanvas.tsx'),
+      'utf8'
+    );
+    // The canonical docked marketing header stays mounted on the homepage:
+    // the hero-canvas viewport class travels with the hero mount, and the
+    // hero bleeds under the docked header via marketing-hero-dock instead
+    // of hiding the shell header — they cannot diverge.
     expect(layout).toContain('home-viewport--hero-canvas');
-    expect(layout).toContain('mainOffset={false}');
+    expect(layout).not.toContain('mainOffset={false}');
+    expect(canvas).toContain('marketing-hero-dock');
   });
 });

@@ -1,4 +1,14 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -63,6 +73,26 @@ function listRouteFiles(directory: string): string[] {
 
 function isStaticEntrypoint(path: string): boolean {
   return STATIC_ENTRYPOINT_FILENAMES.has(path.split(/[\\/]/).at(-1) ?? '');
+}
+
+function hasStaticRevalidationPolicy(repoRoot: string, path: string): boolean {
+  const staticExport = /export\s+const\s+revalidate\s*=\s*false\b/;
+  if (staticExport.test(readFileSync(path, 'utf8'))) return true;
+
+  let directory = dirname(path);
+  while (directory.startsWith(`${repoRoot}/`)) {
+    for (const filename of ['layout.ts', 'layout.tsx']) {
+      const layout = join(directory, filename);
+      if (
+        existsSync(layout) &&
+        staticExport.test(readFileSync(layout, 'utf8'))
+      ) {
+        return true;
+      }
+    }
+    directory = dirname(directory);
+  }
+  return false;
 }
 
 function isClientBoundary(source: string): boolean {
@@ -145,6 +175,31 @@ function listServerGraphViolations(
 }
 
 describe('static marketing route policy', () => {
+  it('inherits static policy from a parent layout without a page export', () => {
+    const root = mkdtempSync(join(tmpdir(), 'static-route-policy-'));
+    try {
+      const directory = join(root, 'app', '(marketing)', 'product', 'feature');
+      mkdirSync(directory, { recursive: true });
+      const page = join(directory, 'page.tsx');
+      writeFileSync(page, 'export default function Page() { return null; }');
+      expect(hasStaticRevalidationPolicy(root, page)).toBe(false);
+      writeFileSync(
+        join(root, 'app', '(marketing)', 'layout.tsx'),
+        'export const revalidate = false;'
+      );
+      expect(hasStaticRevalidationPolicy(root, page)).toBe(true);
+      writeFileSync(
+        join(root, 'app', '(marketing)', 'layout.tsx'),
+        'export const revalidate = 60;'
+      );
+      expect(hasStaticRevalidationPolicy(root, page)).toBe(false);
+      writeFileSync(page, 'export const revalidate = false;');
+      expect(hasStaticRevalidationPolicy(root, page)).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('keeps marketing and legal route entrypoints fully static', () => {
     const repoRoot = process.cwd();
     const routeFiles = STATIC_ROUTE_ROOTS.flatMap(root =>
@@ -157,11 +212,10 @@ describe('static marketing route policy', () => {
     }));
     const staticEntrypointViolations = routeSources
       .filter(({ path }) => isStaticEntrypoint(path))
-      .filter(
-        ({ source }) =>
-          !/export\s+const\s+revalidate\s*=\s*false\b/.test(source)
-      )
-      .map(({ relativePath }) => `${relativePath}: missing revalidate=false`);
+      .filter(({ path }) => !hasStaticRevalidationPolicy(repoRoot, path))
+      .map(
+        ({ relativePath }) => `${relativePath}: missing static route policy`
+      );
     const requestTimeApiViolations = routeSources.flatMap(
       ({ relativePath, source }) =>
         FORBIDDEN_REQUEST_TIME_PATTERNS.filter(pattern =>
