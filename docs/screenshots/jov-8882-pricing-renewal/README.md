@@ -1,8 +1,17 @@
 # Pricing certification renewal for PR #22838
 
+Merged owner fingerprint at 2026-10-23T22:18:41.922Z, after `origin/main`
+including PR #22849: `8e04962d231d816b3936aaef2002e05d3d28994daa8a970035b91ce66eca8536`.
+PR #22849 moved home, section, blog, and artist-profile widths onto one
+`.public-container` token, dropped the pricing section and chart `64rem` cap,
+and re-measured `/pricing` at the same edges recorded below (x 71-1369 at 1440,
+x 24-366 at 390, no horizontal overflow). The JOV-8882 launch-hero selectors
+in the shared stylesheet match no elements on `/pricing`.
+
 Observed 2026-10-23T20:44:07.579Z against this worktree's local public route,
 `http://localhost:33138/pricing`, with Node 24.22.1, Next 16.4.1 and Chromium.
-Pricing owner source digest: `127c0cfad9c8c1c69b3335dcf21c043db9c3f4fc93967f9d073ee2f948fac7ad`.
+Capture-time pricing owner source digest:
+`127c0cfad9c8c1c69b3335dcf21c043db9c3f4fc93967f9d073ee2f948fac7ad`.
 The checked-out application source was commit
 `ccd1dafc54551d3268eac5659c4db826100dd9c2`; this repair changes certification
 metadata and the DESIGN section checksum, with no production component changes.

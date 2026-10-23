@@ -1,7 +1,5 @@
 .artist-profiles-home-system {
   --homepage-page-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
-  --homepage-grid-max: var(--ds-public-content-max);
-  --homepage-grid-gutter: var(--homepage-page-gutter);
   --homepage-section-title-size: clamp(
     var(--text-3xl),
     3.6vw,
@@ -1763,7 +1761,6 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-pricing-section-inner) {
-  max-width: 64rem;
   margin-inline: auto;
 }
 
@@ -1803,7 +1800,6 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-pricing-chart) {
-  max-width: 64rem;
   margin-inline: auto;
 }
 
@@ -2200,7 +2196,7 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
 
 :where(.system-b-brand-hero-grid) {
   display: grid;
-  width: min(100%, var(--public-content-max-page));
+  width: min(100%, var(--ds-public-content-max));
   align-items: center;
   gap: var(--space-12);
   margin-inline: auto;
@@ -2408,7 +2404,7 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-brand-section),
 :where(.system-b-brand-final) {
   display: grid;
-  width: min(100%, var(--public-content-max-page));
+  width: min(100%, var(--ds-public-content-max));
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-12);
   margin-inline: auto;

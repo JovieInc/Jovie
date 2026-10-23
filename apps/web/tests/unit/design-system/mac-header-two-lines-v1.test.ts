@@ -58,27 +58,16 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // /product's closing CTA headline is the same terminal value proposition —
   // the two-line clamp truncated it at 390px, so it renders editorial-title.
   'apps/web/app/(marketing)/product/ProductLanding.tsx',
+  // The /product/* feature pages (release-scheduling, dsp-links, utm-links,
+  // isrc, link-analytics) share one hero. Its title stays complete; balance
+  // comes from text-balance, so the heading does not use line-clamp.
+  'apps/web/app/(marketing)/product/ProductFeatureLanding.tsx',
   // /product/command-palette keeps the full headline with text-balance;
   // the heading does not use line-clamp.
   'apps/web/app/(marketing)/product/command-palette/CommandPaletteLanding.tsx',
-  // /product/release-scheduling keeps the full headline. Balance lives in
-  // the page CSS class, so the heading does not use line-clamp.
-  'apps/web/app/(marketing)/product/release-scheduling/ReleaseSchedulingLanding.tsx',
-  // /product/dsp-links is a new marketing h1. The shrink-only headline
-  // ratchet rejects a new line-clamp token, so the title stays complete.
-  'apps/web/app/(marketing)/product/dsp-links/DspLinksLanding.tsx',
-  // /product/utm-links is a new marketing h1. The shrink-only headline
-  // ratchet rejects a new line-clamp token, so the title stays complete.
-  'apps/web/app/(marketing)/product/utm-links/UtmLinksLanding.tsx',
-  // /product/isrc is a new marketing h1. The shrink-only headline ratchet
-  // rejects a new line-clamp token, so the title stays complete.
-  'apps/web/app/(marketing)/product/isrc/IsrcLanding.tsx',
   // /product/pre-save is a new marketing h1. The shrink-only headline ratchet
   // rejects a new line-clamp token, so the title stays complete.
   'apps/web/app/(marketing)/product/pre-save/PreSaveLanding.tsx',
-  // /product/link-analytics keeps the full headline. Balance lives in
-  // .link-analytics-title; the heading does not use line-clamp.
-  'apps/web/app/(marketing)/product/link-analytics/LinkAnalyticsLanding.tsx',
   // /card section titles wrap to three lines at 390px; the clamp cut
   // "An introduction. Not a list of usernames" mid-sentence.
   'apps/web/app/(marketing)/card/JovieCardLanding.tsx',

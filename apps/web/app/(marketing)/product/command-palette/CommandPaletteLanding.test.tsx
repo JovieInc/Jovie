@@ -42,7 +42,7 @@ describe('CommandPaletteLanding', () => {
       'data-marketing-owner',
       'apps/web/app/(marketing)/product/command-palette/CommandPaletteLanding.tsx'
     );
-    expect(hero).toHaveAttribute('data-accent', 'ion');
+    expect(hero.closest('[data-accent="ion"]')).not.toBeNull();
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveTextContent(COMMAND_PALETTE_COPY.headline);
@@ -54,12 +54,7 @@ describe('CommandPaletteLanding', () => {
     const palette = screen.getByTestId('shared-command-palette');
     expect(palette).toBeVisible();
     const panel = screen.getByTestId('command-palette-panel');
-    expect(panel).toHaveClass(
-      'rounded-3xl',
-      'border',
-      'border-subtle',
-      'bg-surface-1'
-    );
+    expect(panel).toHaveClass('marketing-rounded-frame', 'border');
     expect(panel).toContainElement(palette);
 
     await user.type(

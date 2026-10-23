@@ -9,7 +9,7 @@ export default function BlogIndexLoading() {
     <div className='min-h-screen'>
       {/* Hero section */}
       <section className='relative overflow-hidden py-16 sm:py-20 lg:py-24'>
-        <div className='mx-auto max-w-7xl px-6 lg:px-8'>
+        <div className='public-container'>
           <div className='mx-auto max-w-2xl text-left'>
             <div className='h-4 w-12 skeleton motion-reduce:animate-none rounded mb-4' />
             <div className='h-12 w-24 skeleton motion-reduce:animate-none rounded-lg mt-6 mb-6' />
