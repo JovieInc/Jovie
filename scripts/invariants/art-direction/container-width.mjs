@@ -324,7 +324,10 @@ function gitText(repoRoot, args) {
   });
 }
 
-/** Blob bytes for `ref:path` specs, in order. One missing object fails closed. */
+/**
+ * Blob bytes for `ref:path` specs, in order. One missing object fails closed.
+ * @returns {{ ok: true, sources: string[] } | { ok: false, error: string }}
+ */
 function readRefBlobs(repoRoot, ref, paths) {
   if (paths.length === 0) return { ok: true, sources: [] };
   const result = spawnSync('git', ['cat-file', '--batch'], {
@@ -377,7 +380,7 @@ export function ancestorContainerIds(repoRoot = REPO_ROOT, ref = ANCESTOR_REF) {
   }
   const paths = listed.stdout.split('\n').filter(isContainerSource);
   const blobs = readRefBlobs(repoRoot, ref, paths);
-  if (!blobs.ok) return blobs;
+  if (blobs.ok === false) return blobs;
   return {
     ok: true,
     ids: scanSources(
@@ -403,12 +406,13 @@ export function scanContainerWidth(repoRoot = REPO_ROOT) {
 
 export function checkContainerWidth(repoRoot = REPO_ROOT, options = {}) {
   const { ids } = scanContainerWidth(repoRoot);
+  /** @type {ReturnType<typeof ancestorContainerIds>} */
   const ancestor =
     options.ancestorIds != null
       ? { ok: true, ids: options.ancestorIds }
       : ancestorContainerIds(repoRoot, options.ref ?? ANCESTOR_REF);
   const failures = [];
-  if (!ancestor.ok) failures.push(ancestor.error);
+  if (ancestor.ok === false) failures.push(ancestor.error);
   else {
     const grown = idsBeyondAncestor(ids, ancestor.ids);
     if (grown.length > 0) {
