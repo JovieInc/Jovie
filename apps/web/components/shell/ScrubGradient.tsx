@@ -1,3 +1,4 @@
+// @coverage-via apps/web/components/shell/__tests__/ScrubGradient.test.tsx
 'use client';
 
 import { useId } from 'react';
@@ -200,7 +201,7 @@ export function ScrubGradient({
               width={sectionToX - sectionFromX}
               height={WAVE_H}
               fill='currentColor'
-              className='text-cyan-300'
+              className='text-accent'
               opacity={0.12}
             />
           )}
