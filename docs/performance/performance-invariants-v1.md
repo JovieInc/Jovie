@@ -101,9 +101,11 @@ no numbers here and does not claim that async metadata changes crawler/bot wait.
 
 ## Sibling check class: surface media
 
-Canvas, WebGL, and video on marketing surfaces are not a second Lighthouse and
-do not add a budget number. `scripts/invariants/art-direction/surface-media.mjs`
-rejects them unless the file names `NIGHT_DJ_HARMONY_V1` and
-`apps/web/lib/marketing/night-dj-harmony.ts` keeps
-`NIGHT_DJ_HARMONY_V1_ENABLED = false`. Pre-existing `<video>` mounts stay on
-that check's shrink-only baseline. Shaders stay baked images plus CSS motion.
+Canvas, WebGL, and video on marketing pages are not a second Lighthouse budget
+and do not add a row here. `scripts/invariants/art-direction/surface-media.mjs`
+allows them only inside a named scope that keeps a non-WebGL fallback and
+`prefers-reduced-motion`. The homepage hero
+(`apps/web/components/homepage/hero-light/`) is that approved scope and ships
+with no feature flag. The ambient field stays in scope because it already
+keeps a CSS poster and declines WebGL under reduced motion. Every other hit
+is on that check's shrink-only baseline.

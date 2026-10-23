@@ -4,20 +4,19 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../../../../../');
+const REPO_ROOT = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../../../../'
+);
 
 describe('marketing surface media', () => {
-  it('keeps canvas and WebGL behind night-dj-harmony-v1', () => {
-    const flag = readFileSync(
-      join(REPO_ROOT, 'apps/web/lib/marketing/night-dj-harmony.ts'),
+  it('scopes canvas, WebGL, and video and allows the homepage hero', () => {
+    const check = readFileSync(
+      join(REPO_ROOT, 'scripts/invariants/art-direction/surface-media.mjs'),
       'utf8'
     );
-    expect(flag).toContain('NIGHT_DJ_HARMONY_V1_ENABLED = false');
-    expect([
-      'apps/web/components/marketing',
-      'apps/web/app/(marketing)',
-      'apps/web/lib/marketing/night-dj-harmony.ts',
-    ]).toContain('apps/web/components/marketing');
+    expect(check).toContain('apps/web/components/homepage/hero-light/');
+    expect(check).not.toContain('NIGHT_DJ_HARMONY_V1_ENABLED');
     const result = spawnSync(
       'node',
       ['--test', 'scripts/invariants/art-direction/surface-media.test.mjs'],

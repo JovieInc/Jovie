@@ -1,6 +1,5 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isNightDjHarmonyEnabled } from '@/lib/marketing/night-dj-harmony';
 import { startAmbientField } from './ambient-field-gl';
 import {
   MarketingAmbientField,
@@ -8,10 +7,6 @@ import {
 } from './MarketingAmbientField';
 
 vi.mock('./ambient-field-gl', () => ({ startAmbientField: vi.fn() }));
-vi.mock('@/lib/marketing/night-dj-harmony', () => ({
-  NIGHT_DJ_HARMONY_V1_ENABLED: false,
-  isNightDjHarmonyEnabled: vi.fn(() => false),
-}));
 
 interface FakeWindowOptions {
   readonly reducedMotion?: boolean;
@@ -42,9 +37,8 @@ function fakeWindow({
 }
 
 describe('shouldRunAmbientField', () => {
-  it('stays off until night-dj-harmony-v1 is enabled', () => {
-    expect(shouldRunAmbientField(fakeWindow())).toBe(false);
-    expect(shouldRunAmbientField(fakeWindow(), true)).toBe(true);
+  it('runs on a capable device with motion allowed', () => {
+    expect(shouldRunAmbientField(fakeWindow())).toBe(true);
   });
 
   it.each([
@@ -54,7 +48,7 @@ describe('shouldRunAmbientField', () => {
     ['few cores', { hardwareConcurrency: 2 }],
     ['no WebGL2', { webgl2: false }],
   ] as const)('keeps the static poster under %s', (_label, options) => {
-    expect(shouldRunAmbientField(fakeWindow(options), true)).toBe(false);
+    expect(shouldRunAmbientField(fakeWindow(options))).toBe(false);
   });
 });
 
@@ -106,7 +100,6 @@ describe('MarketingAmbientField', () => {
       motionListeners = new Set();
       idleCallback = undefined;
       stop.mockReset();
-      vi.mocked(isNightDjHarmonyEnabled).mockReturnValue(true);
       vi.stubGlobal('WebGL2RenderingContext', function WebGL2() {});
       vi.stubGlobal('matchMedia', () => ({
         matches: false,
