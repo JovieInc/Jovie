@@ -393,6 +393,11 @@ describe('UnifiedSidebar library route', () => {
         .find(node => node.className.includes('font-caption'));
       expect(group?.className).toContain('text-sidebar-muted');
       expect(group?.className).not.toMatch(/text-sidebar-muted\/\d+/);
+      expect(group).toHaveClass(
+        'ps-(--app-shell-sidebar-label-inset)',
+        'pe-(--app-shell-sidebar-inset)'
+      );
+      expect(group).not.toHaveClass('px-2.5');
     }
   });
 
