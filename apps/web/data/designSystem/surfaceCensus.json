@@ -646,13 +646,6 @@
       "evidence": "PR #22777 introduces the /product/utm-links marketing page; source registration only, not rendered certification."
     },
     {
-      "source": "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
-      "from": null,
-      "to": "holdout",
-      "at": "2026-10-23T12:00:00Z",
-      "evidence": "Source registration for the release scheduling product page. Not rendered certification."
-    },
-    {
       "source": "apps/web/app/(marketing)/product/dsp-links/page.tsx",
       "from": null,
       "to": "holdout",
@@ -665,6 +658,13 @@
       "to": "holdout",
       "at": "2026-10-23T13:20:00Z",
       "evidence": "Source registration for the link analytics product page. Not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T16:05:01Z",
+      "evidence": "PR #22801 re-registers the release scheduling product page after merging main. Original branch observation: 2026-10-23T12:00:00Z. Source registration only, not rendered certification."
     }
   ]
 }
