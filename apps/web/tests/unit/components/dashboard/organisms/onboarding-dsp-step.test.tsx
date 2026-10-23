@@ -9,6 +9,7 @@ import type { SpotifyArtistResult } from '@/lib/queries';
 const mockSearch = vi.fn();
 const mockSearchImmediate = vi.fn();
 const mockClear = vi.fn();
+const mockHandleArtistSelect = vi.fn();
 const mockHookReturn = {
   results: [] as SpotifyArtistResult[],
   state: 'idle' as 'idle' | 'loading' | 'empty' | 'error' | 'success',
@@ -34,7 +35,7 @@ vi.mock(
     useSpotifyConnect: () => ({
       connectFromUrl: vi.fn(),
       extractSpotifyArtistId: vi.fn(() => null),
-      handleArtistSelect: vi.fn(),
+      handleArtistSelect: mockHandleArtistSelect,
     }),
   })
 );
@@ -92,6 +93,28 @@ afterEach(() => {
 // JOV-6553: claimed ≠ membership. Expected copy authored from the approved
 // contract, not from the component implementation.
 describe('OnboardingDspStep truthful artist status', () => {
+  it('keeps artist results focusable and selectable by keyboard', async () => {
+    mockHookReturn.results = ARTISTS;
+    mockHookReturn.state = 'success';
+    renderComponent();
+    const user = userEvent.setup();
+    await user.type(
+      screen.getByPlaceholderText(/Search for your artist/i),
+      'Nova'
+    );
+    await user.tab();
+
+    const result = screen.getByRole('button', { name: /Nova Crown/i });
+    expect(result).toHaveFocus();
+    expect(result).toHaveClass('focus-ring-themed');
+    await user.keyboard('{Enter}');
+    expect(mockHandleArtistSelect).toHaveBeenCalledWith({
+      id: ARTISTS[0].id,
+      name: ARTISTS[0].name,
+      url: ARTISTS[0].url,
+    });
+  });
+
   it('shows results when a query is typed', async () => {
     mockHookReturn.results = ARTISTS;
     mockHookReturn.state = 'success';

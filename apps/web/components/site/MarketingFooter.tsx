@@ -206,18 +206,25 @@ export function MarketingFooter({
               )}
               aria-label='Footer'
             >
-              {footerColumns.map(column => (
-                <section key={column.title}>
-                  <h2 className='mf-eyebrow line-clamp-2'>{column.title}</h2>
-                  <ul className='flex list-none flex-col gap-3 p-0'>
-                    {column.links.map(link => (
-                      <li key={`${link.href}-${link.label}`}>
-                        <FooterLink link={link} />
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
+              {footerColumns.map(column => {
+                const columnLabelId = `footer-column-${column.title
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '-')}`;
+                return (
+                  <section key={column.title} aria-labelledby={columnLabelId}>
+                    <p id={columnLabelId} className='mf-eyebrow line-clamp-2'>
+                      {column.title}
+                    </p>
+                    <ul className='flex list-none flex-col gap-3 p-0'>
+                      {column.links.map(link => (
+                        <li key={`${link.href}-${link.label}`}>
+                          <FooterLink link={link} />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
             </nav>
           </div>
         )}

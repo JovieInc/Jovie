@@ -33,6 +33,7 @@ import {
   buildBreadcrumbSchema,
 } from '@/lib/constants/schemas';
 import { resolveCustomerChangelogHero } from '@/lib/customer-changelog';
+import { documentTitle } from '@/lib/seo/document-title';
 import '../changelog-editorial.css';
 
 export const revalidate = false;
@@ -69,7 +70,7 @@ export async function generateMetadata({
   const label = changelogVersionLabel(version);
   const description = releaseDescription(label, release.summary);
   return {
-    title: `${APP_NAME} ${label}`,
+    title: documentTitle(`${APP_NAME} ${label}`),
     description,
     alternates: { canonical },
     openGraph: {

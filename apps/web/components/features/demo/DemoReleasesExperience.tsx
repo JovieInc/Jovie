@@ -5,7 +5,7 @@ import {
   primaryProviderKeys,
   providerConfig,
 } from '@/app/app/(shell)/dashboard/releases/config';
-import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix';
+import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import {
   FOUNDER_DEMO_PERSONA,
   INTERNAL_DJ_DEMO_PERSONA,
@@ -25,8 +25,8 @@ type DemoReleasesExperienceVariant = 'internal-dj' | 'founder';
  * DemoReleasesExperience — the full demo page content wrapped in the real
  * authenticated app shell (sidebar, header, nav) fed by mock data.
  *
- * Accepts optional dashboardData from a server component that fetches
- * a featured creator from the DB via getDemoCreator().
+ * Prospects and screenshots use the same shell release list as `/app/releases`.
+ * The demo adapter supplies deterministic fixtures and disables live mutations.
  */
 export function DemoReleasesExperience({
   dashboardData,
@@ -48,15 +48,14 @@ export function DemoReleasesExperience({
 
   return (
     <DemoAuthShell dashboardData={dashboardData} releasesForQuery={releases}>
-      <ReleasesExperience
+      <ShellReleasesView
         releases={releases}
         providerConfig={providerConfig}
         primaryProviders={primaryProviderKeys}
-        spotifyConnected
-        spotifyArtistName={persona.profile.displayName}
-        appleMusicConnected
-        appleMusicArtistName={persona.profile.displayName}
+        artistName={persona.profile.displayName}
         allowArtworkDownloads
+        spotifyConnected
+        appleMusicConnected
         experienceAdapter={createDemoReleaseExperienceAdapter({
           releases,
           sidebarDataByReleaseId,

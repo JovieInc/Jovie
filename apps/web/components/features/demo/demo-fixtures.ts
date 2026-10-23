@@ -1,3 +1,4 @@
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import type { DemoAssignee, DemoRelease, ReleaseLabel } from './demo-types';
 
@@ -218,7 +219,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
     title: 'Manual Sunset',
     artist: PRIMARY_ARTIST,
     type: 'EP',
-    releaseDate: 'TBD',
+    releaseDate: COPY_FALLBACKS.date,
     status: 'draft',
     priority: 'medium',
     labels: L(0, 3),
@@ -240,7 +241,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
     title: 'Echoes',
     artist: PRIMARY_ARTIST,
     type: 'Album',
-    releaseDate: 'TBD',
+    releaseDate: COPY_FALLBACKS.date,
     status: 'draft',
     priority: 'low',
     labels: L(0),
@@ -258,7 +259,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
     title: 'Somewhere Between',
     artist: `${PRIMARY_ARTIST} & Mira Chen`,
     type: 'Single',
-    releaseDate: 'TBD',
+    releaseDate: COPY_FALLBACKS.date,
     status: 'draft',
     priority: 'none',
     labels: L(5),

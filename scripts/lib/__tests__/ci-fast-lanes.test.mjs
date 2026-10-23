@@ -2177,6 +2177,8 @@ describe('source-read guard selection', () => {
         'artist-launch-contract',
         'merge-group-unit-guards',
         'static-revalidate-policy',
+        'art-direction',
+        'icp-language',
       ],
     ],
     [
@@ -2268,6 +2270,7 @@ describe('source-read guard selection', () => {
       'ci-schedule-inventory',
       'automation-registry',
       'playbook-authoring',
+      'icp-language',
       'external-api-guard',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
@@ -2279,6 +2282,7 @@ describe('source-read guard selection', () => {
       'ci-schedule-inventory',
       'automation-registry',
       'playbook-authoring',
+      'icp-language',
       'external-api-guard',
     ]);
   });
@@ -2301,6 +2305,37 @@ describe('source-read guard selection', () => {
         ).toContain("from 'node:test'");
         continue;
       }
+      if (guard.id === 'icp-language') {
+        expect(guard.command).toContain(
+          'node scripts/invariants/icp-language/check.mjs'
+        );
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/icp-language/icp-language.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'oasdiff-breaking-change') {
+        expect(guard.command).toContain(
+          'node scripts/invariants/oasdiff-breaking-change.mjs'
+        );
+        expect(guard.prOnly).toBe(true);
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/oasdiff-breaking-change.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
       if (guard.id === 'codex-bootstrap') {
         expect(guard.command).toContain('--experimental-test-coverage');
         expect(guard.command).toContain('--test-coverage-lines=90');
@@ -2318,6 +2353,25 @@ describe('source-read guard selection', () => {
         expect(guard.command).toContain(
           join(REPO_ROOT, 'scripts/external-api-guard.mjs')
         );
+        continue;
+      }
+      if (guard.id === 'art-direction') {
+        expect(guard.command).toContain(
+          'scripts/invariants/art-direction/run.mjs'
+        );
+        expect(guard.command).toContain(
+          'node --test scripts/invariants/art-direction/*.test.mjs'
+        );
+        expect(guard.prOnly).toBe(true);
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/art-direction/art-direction.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain('describe(');
         continue;
       }
       if (guard.id === 'script-contracts') {

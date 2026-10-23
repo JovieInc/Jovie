@@ -1400,6 +1400,249 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
+  it('replaces a stripped deep-link landing instead of pushing a second profile entry', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseProfileShell.mockImplementation(() => ({
+      locationMode: 'listen',
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    window.history.replaceState(null, '', '/artist-profiles');
+    window.history.pushState(null, '', '/test-artist?mode=listen&source=qr');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+
+    const view = render(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          modeOverride: 'listen',
+          sourceOverride: 'qr',
+        })
+      );
+    });
+
+    const historyLengthAfterLanding = window.history.length;
+    act(() => {
+      window.history.replaceState(window.history.state, '', '/test-artist');
+    });
+    pushStateSpy.mockClear();
+    replaceStateSpy.mockClear();
+    view.rerender(
+      <ProfileCompactTemplate
+        mode='listen'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(`${window.location.pathname}${window.location.search}`).toBe(
+        '/test-artist?mode=listen&source=qr'
+      );
+    });
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(window.history.length).toBe(historyLengthAfterLanding);
+
+    pushStateSpy.mockRestore();
+    replaceStateSpy.mockRestore();
+  });
+
+  it('does not revert a client Link navigation to a different mode', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseProfileShell.mockImplementation(() => ({
+      locationMode: 'about',
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    window.history.replaceState(null, '', '/test-artist?mode=about');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+
+    const view = render(
+      <ProfileCompactTemplate
+        mode='about'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+    await waitFor(() => {
+      expect(`${window.location.pathname}${window.location.search}`).toBe(
+        '/test-artist?mode=about'
+      );
+    });
+    expect(pushStateSpy).not.toHaveBeenCalled();
+
+    // A client Link (the about drawer's contact links) moves the URL to
+    // contact mode; requestedMode is still 'about' until the shell's
+    // location store syncs it. The history effect must not write the stale
+    // intent back over the navigation. The Link's own pushState is the
+    // navigation under test, so only writes after it count.
+    act(() => {
+      window.history.pushState(null, '', '/test-artist?mode=contact');
+    });
+    pushStateSpy.mockClear();
+    replaceStateSpy.mockClear();
+    view.rerender(
+      <ProfileCompactTemplate
+        mode='about'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(`${window.location.pathname}${window.location.search}`).toBe(
+        '/test-artist?mode=contact'
+      );
+    });
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+
+    // Once the location sync flips requestedMode, the URL already agrees, so
+    // the reconciliation still writes nothing.
+    mockUseProfileShell.mockImplementation(() => ({
+      locationMode: 'contact',
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    view.rerender(
+      <ProfileCompactTemplate
+        mode='contact'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+    await waitFor(() => {
+      expect(`${window.location.pathname}${window.location.search}`).toBe(
+        '/test-artist?mode=contact'
+      );
+    });
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+
+    pushStateSpy.mockRestore();
+    replaceStateSpy.mockRestore();
+  });
+
+  it('does not restore the landed mode over a Link that left it bare', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    mockUseProfileShell.mockImplementation(() => ({
+      locationMode: 'about',
+      notificationsContextValue: {
+        subscribedChannels: {},
+        subscriptionDetails: {},
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+    window.history.replaceState(null, '', '/test-artist?mode=about');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+
+    const view = render(
+      <ProfileCompactTemplate
+        mode='about'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+    await waitFor(() => {
+      expect(`${window.location.pathname}${window.location.search}`).toBe(
+        '/test-artist?mode=about'
+      );
+    });
+    expect(pushStateSpy).not.toHaveBeenCalled();
+
+    // A client Link to the bare profile path pushes a new history entry.
+    // Next's landing strip replaces the landed entry in place and leaves
+    // history.length unchanged. Earlier cases in this file replace
+    // history.length with a constant, and jsdom does not grow that constant,
+    // so model the browser entry the guard actually reads. The landed-mode
+    // restore must not capture the Link.
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(
+      window.history,
+      'length'
+    );
+    const arrivalLength = window.history.length;
+    act(() => {
+      window.history.pushState(null, '', '/test-artist');
+    });
+    Object.defineProperty(window.history, 'length', {
+      configurable: true,
+      value: arrivalLength + 1,
+    });
+    pushStateSpy.mockClear();
+    replaceStateSpy.mockClear();
+    try {
+      view.rerender(
+        <ProfileCompactTemplate
+          mode='about'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      await waitFor(() => {
+        expect(`${window.location.pathname}${window.location.search}`).toBe(
+          '/test-artist'
+        );
+      });
+      expect(pushStateSpy).not.toHaveBeenCalled();
+      expect(replaceStateSpy).not.toHaveBeenCalled();
+    } finally {
+      if (lengthDescriptor) {
+        Object.defineProperty(window.history, 'length', lengthDescriptor);
+      } else {
+        Reflect.deleteProperty(window.history, 'length');
+      }
+      pushStateSpy.mockRestore();
+      replaceStateSpy.mockRestore();
+    }
+  });
+
   it('renders the alerts tab when ?mode=subscribe is in the URL', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=subscribe');

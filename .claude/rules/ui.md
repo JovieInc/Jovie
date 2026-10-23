@@ -52,6 +52,10 @@ Do not hide a primary action behind hover, a gesture, a magic shortcut, or a
 second surface when a direct visible control fits. Touch and pointer controls
 remain available even when a keyboard accelerator is useful.
 
+Follow [tooltip eligibility and input](../../DESIGN.md#tooltip-eligibility-and-input):
+measure title clipping, preserve mouse/keyboard hints on hybrids, let touch
+activate immediately, and retain rail-owned interactive portals until dismissal.
+
 ### Input, Shortcuts, and Discoverability
 
 - Prefer semantic native controls. Use ARIA composite roles only when the
@@ -316,6 +320,14 @@ the primary content column must return to the shared seam when that track is
 absent.
 
 ## Taste Rules (Hard Invariants)
+
+### No ICP-specific language on general pages
+
+- Homepage, pricing, about, brand, and other general marketing routes stay generic. Jovie is an identity product for any creator.
+- Do not write segment copy there: music, artist, musician, DJ, producer, label, founder, investor, fan, author, or a creator-type niche. “Creator” is the generic word.
+- Dedicated audience routes may use that language. The allowlist is `scripts/invariants/icp-language/config.json`.
+- The headline “Be found. Be understood.” is locked.
+- `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready check. Existing hits are a shrink-only baseline. See MKT-D16 in `docs/marketing/DESIGN_INVARIANTS.md`.
 
 ### No Emoji in UI — Use Icons
 
