@@ -45,7 +45,7 @@ Once a migration is merged to `main`, treat it as immutable.
 
 - Never use `CREATE INDEX CONCURRENTLY` in a Drizzle migration. Hot-table
   exceptions use the separately reviewed online-index artifact runner.
-- Squawk (`.squawk.toml`) lints SQL a pull request adds or changes. `CREATE INDEX`
+- Squawk (`scripts/db/squawk.toml`) lints SQL a pull request adds or changes. `CREATE INDEX`
   on a table created in the same file is allowed. `CREATE INDEX` on a table that
   already exists fails; use the online-index artifact instead.
 - Use idempotent patterns for:

@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -12,6 +18,7 @@ import {
   lintChangedMigrations,
   parseChangedMigrationSql,
   readMigrationDiff,
+  SQUAWK_CONFIG,
   SQUAWK_SHA256,
   SQUAWK_VERSION,
 } from './lint-changed-migrations.mjs';
@@ -112,7 +119,7 @@ test('fails closed when squawk reports an unsafe changed migration', async () =>
       assert.equal(bin, 'squawk');
       assert.deepEqual(args.slice(0, 2), [
         '--config',
-        join(REPO_ROOT, '.squawk.toml'),
+        join(REPO_ROOT, 'scripts/db/squawk.toml'),
       ]);
       assert.deepEqual(args.slice(2), [
         'apps/web/drizzle/migrations/0200_bad.sql',
@@ -196,7 +203,7 @@ test('rejects a squawk download that does not match the pinned sha256', async ()
 test('source validation blocks dependency and migration diffs', () => {
   const workflow = read('.github/workflows/source-validation.yml');
   const config = read('.github/dependency-review-config.yml');
-  const squawk = read('.squawk.toml');
+  const squawk = read('scripts/db/squawk.toml');
   assert.match(workflow, /^on:\n {2}pull_request:/m);
   assert.match(
     workflow,
@@ -255,12 +262,53 @@ test('source validation blocks dependency and migration diffs', () => {
   }
 });
 
+test('migration runner loads its config beside the script in a separate checkout', {
+  skip: process.env.SQUAWK_BIN ? false : 'SQUAWK_BIN is not set',
+}, async t => {
+  const root = mkdtempSync(join(tmpdir(), 'squawk-config-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'scripts/db'), { recursive: true });
+  writeFileSync(join(root, 'scripts/db/squawk.toml'), read(SQUAWK_CONFIG));
+  const file = 'apps/web/drizzle/migrations/0200_changed.sql';
+  mkdirSync(dirname(join(root, file)), { recursive: true });
+  for (const { sql, status, diagnostic } of [
+    {
+      sql: 'ALTER TABLE "users" ADD COLUMN "handle" text NOT NULL;',
+      status: 1,
+      diagnostic: /adding-required-field/,
+    },
+    {
+      sql: 'ALTER TABLE "users" ADD COLUMN "nickname" text;',
+      status: 0,
+      diagnostic: /Found 0 issues/,
+    },
+  ]) {
+    writeFileSync(join(root, file), `${sql}\n`);
+    let output = '';
+    const result = await lintChangedMigrations({
+      repoRoot: root,
+      base: 'unused',
+      nameStatus: `A\t${file}\n`,
+      squawkBin: process.env.SQUAWK_BIN,
+      stdio: 'pipe',
+      run: (bin, args, options) => {
+        const child = spawnSync(bin, args, { ...options, encoding: 'utf8' });
+        output = child.stdout + child.stderr;
+        return child;
+      },
+    });
+    assert.equal(result.invoked, true);
+    assert.equal(result.status, status, output);
+    assert.match(output, diagnostic);
+  }
+});
+
 test('pinned squawk fails the unsafe operations and accepts a new table', {
   skip: process.env.SQUAWK_BIN ? false : 'SQUAWK_BIN is not set',
 }, () => {
   const squawk = process.env.SQUAWK_BIN ?? '';
   const root = mkdtempSync(join(tmpdir(), 'squawk-rules-'));
-  const config = join(REPO_ROOT, '.squawk.toml');
+  const config = join(REPO_ROOT, 'scripts/db/squawk.toml');
   const run = sql => {
     const file = join(root, 'migration.sql');
     writeFileSync(file, sql);

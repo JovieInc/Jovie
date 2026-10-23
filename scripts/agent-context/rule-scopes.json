@@ -16,14 +16,8 @@
   },
   {
     "file": ".claude/rules/db.md",
-    "paths": [
-      "**/db/**",
-      "**/drizzle/**",
-      "**/migrations/**",
-      "**/queries/**",
-      ".squawk.toml"
-    ],
-    "bodySha256": "bd7172e60252dd5e919b66adfb6275c5b690ff8c33eb6d630c12b8a416083a6d"
+    "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
+    "bodySha256": "827454729d91ae084f5accd102eda950842fccfeb8094182866d04e0c323df32"
   },
   {
     "file": ".claude/rules/environment.md",

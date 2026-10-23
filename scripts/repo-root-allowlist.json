@@ -34,7 +34,6 @@
     ".orchestrator",
     ".sonarcloud.properties",
     ".sonarlint",
-    ".squawk.toml",
     ".trivyignore",
     ".trufflehog-exclude.txt",
     ".vercelignore",

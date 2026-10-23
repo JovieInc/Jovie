@@ -1,5 +1,5 @@
 ---
-paths: ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**", ".squawk.toml"]
+paths: ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"]
 ---
 
 # Database
@@ -16,11 +16,11 @@ The `file-protection-check.sh` hook blocks edits to existing migration files.
 
 ## Squawk Lints Added or Changed Migration SQL
 
-Source Validation's Migration Guard job runs Squawk 2.70.0 on `pull_request`. The binary is pinned by version and sha256 in `scripts/db/lint-changed-migrations.mjs`. The config is `.squawk.toml`.
+Source Validation's Migration Guard job runs Squawk 2.70.0 on `pull_request`. The binary is pinned by version and sha256 in `scripts/db/lint-changed-migrations.mjs`. The config is `scripts/db/squawk.toml`.
 
 - Squawk receives only `apps/web/drizzle/migrations/**/*.sql` files the pull request adds or changes. Unchanged migrations are not linted. Snapshots and `meta/` are not SQL migrations.
 - With `assume_in_transaction` (Drizzle wraps each file), an index on a table created in that same file is allowed. `CREATE INDEX` on a table that already exists fails `require-concurrent-index-creation`. Put that index in `drizzle/online-indexes/`. `CREATE INDEX CONCURRENTLY` inside a Drizzle file remains forbidden by `validate-migrations.sh`.
-- Adding `NOT NULL` without a default and changing a column type fail. Excluded rules are style or session-timeout rules that Drizzle SQL does not own. Each exclusion in `.squawk.toml` has a reason. Do not exclude a lock-safety rule to land a migration.
+- Adding `NOT NULL` without a default and changing a column type fail. Excluded rules are style or session-timeout rules that Drizzle SQL does not own. Each exclusion in `scripts/db/squawk.toml` has a reason. Do not exclude a lock-safety rule to land a migration.
 
 `pnpm db:migrate` trusts the `drizzle.__drizzle_migrations` ledger and can report "up to date" on a drifted database; run `pnpm --filter @jovie/web run db:verify` (also wired into `scripts/setup.sh`) to compare the ledger against the journal and get repair steps.
 

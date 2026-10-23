@@ -13,7 +13,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const SQUAWK_VERSION = '2.70.0';
-export const SQUAWK_CONFIG = '.squawk.toml';
+export const SQUAWK_CONFIG = 'scripts/db/squawk.toml';
 export const MIGRATION_PREFIX = 'apps/web/drizzle/migrations/';
 /** sha256 of the official v2.70.0 release binaries. */
 export const SQUAWK_SHA256 = Object.freeze({

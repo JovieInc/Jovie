@@ -18,7 +18,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `d9f318747a126ce2247661af67852b185def7789492eabfad7bba322be087c33`)
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `a44a810c60e53213e6d3720322c545cb93c523a5ed8b68e27bdf031c66fc87b9`)
 - `canon/OPERATING_SYSTEM.md` — Company canon; review portable repository contract after changes (SHA-256 `b14b7076c927dc556a7d7bc71271595b9996040cd6e5262b5fb468b40956bbf7`)
-- `canon/ENGINEERING.md` — Company engineering canon; review portable repository contract after changes (SHA-256 `2a69d3f20699bc3b9da89769343a05f5963b93236aa9479e16935d6d2bc35f3a`)
+- `canon/ENGINEERING.md` — Company engineering canon; review portable repository contract after changes (SHA-256 `0d08b2e18374c5a26ab2afc23beeef3580893530b26bf20de2b5e6576c1d3b2f`)
 - `canon/FLEET.md` — Company fleet canon; review portable repository contract after changes (SHA-256 `3c2c00af57bad96eb27a90d2f0b42a879ec99aa14325bd57d521eeab3500a1e2`)
 - `docs/company/REPOSITORY_SOURCE_CONTRACT.md` — Portable shared source; independently update pinned consumers after review (SHA-256 `f6bb8cdfdc317ed4ac3b99f8d2fc18a9647124c4fb807b1eef274892447b184f`)
 
