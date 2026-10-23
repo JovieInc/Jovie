@@ -205,7 +205,7 @@ async function openReleaseDrawer(
   options?: { readonly requireSidebar?: boolean }
 ) {
   const releasesMatrix = await openReleasesMatrix();
-  const releaseRow = within(releasesMatrix).getByRole('option', {
+  const releaseRow = within(releasesMatrix).getByRole('listitem', {
     name: new RegExp(title),
   });
 
