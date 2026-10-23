@@ -14,8 +14,29 @@ export function ProfilePreviewOpener() {
   const isDesktop = useBreakpoint('lg');
 
   useEffect(() => {
-    if (isDesktop) open();
+    const queryList =
+      typeof globalThis.matchMedia === 'function'
+        ? globalThis.matchMedia('(min-width: 1024px)')
+        : null;
+    // The breakpoint hook's server snapshot is false through hydration.
+    // Reading the live viewport here keeps a desktop history return from
+    // closing the rail after the provider has opened it.
+    const desktop = queryList ? queryList.matches : isDesktop;
+    if (desktop) open();
     else close();
+
+    if (
+      queryList === null ||
+      typeof queryList.addEventListener !== 'function'
+    ) {
+      return;
+    }
+    const onChange = (event: MediaQueryListEvent) => {
+      if (event.matches) open();
+      else close();
+    };
+    queryList.addEventListener('change', onChange);
+    return () => queryList.removeEventListener('change', onChange);
   }, [isDesktop, open, close]);
 
   return null;

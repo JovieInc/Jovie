@@ -8,6 +8,7 @@ import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { ProfilePreviewOpener } from '@/app/app/(shell)/dashboard/profile/ProfilePreviewOpener';
 import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
@@ -119,6 +120,37 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
         <RailProbe />
       </PreviewPanelProvider>
     );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+  });
+
+  it('keeps the profile rail open when the page opener remounts on the way back', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('768') || query.includes('1024'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+
+    const roundTrip = (scope: string, defaultOpen = false) => (
+      <PreviewPanelProvider defaultOpen={defaultOpen} scope={scope}>
+        <RailProbe />
+        {scope === 'artist-profile-settings' ? <ProfilePreviewOpener /> : null}
+      </PreviewPanelProvider>
+    );
+
+    const { rerender } = render(roundTrip('artist-profile-settings', true));
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+
+    rerender(roundTrip('app-shell'));
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('false');
+    });
+
+    rerender(roundTrip('artist-profile-settings', true));
     await waitFor(() => {
       expect(screen.getByTestId('rail-open').textContent).toBe('true');
     });

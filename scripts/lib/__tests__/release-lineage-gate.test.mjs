@@ -584,8 +584,9 @@ describe('release lineage gate', () => {
     expect(readFileSync(join(run.root, 'sleep.log'), 'utf8').trim()).toBe('2');
     expect(run.result.stderr).toContain('HTTP 403');
     expect(run.result.stderr).toContain(
-      'API rate limit exceeded for installation ID 1.'
+      'API rate limit exceeded for installation.'
     );
+    expect(run.result.stderr).not.toContain('installation ID');
   });
 
   it('does not retry before a Retry-After that exceeds the bound, and uses git', () => {

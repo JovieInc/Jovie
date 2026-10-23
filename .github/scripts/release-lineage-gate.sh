@@ -169,6 +169,8 @@ read_compare_once() {
   else
     compare_detail="$(one_line "$compare_detail")"
   fi
+  # A rate-limit body names the installation. Keep the class, drop the id.
+  compare_detail="$(printf '%s\n' "$compare_detail" | sed -E 's/installation ID [0-9]+/installation/g')"
   rm -f "$raw" "$compare_err"
 }
 
@@ -395,7 +397,26 @@ elif [ "$lineage" = ancestor ]; then
   # Unknown visibility must not become an empty-queue decision, including
   # under starvation. Emit bounded diagnostics without raw API response text.
   lookup_status=0
-  runs_json="$("$gh_cli" api "repos/$repository/actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&per_page=30" 2>/dev/null)" || lookup_status=$?
+  runs_attempt=1
+  runs_backoff="${LINEAGE_COMPARE_BACKOFF_SECONDS:-2}"
+  [[ "$runs_backoff" =~ ^[0-9]+$ ]] || runs_backoff=2
+  runs_json=""
+  while [ "$runs_attempt" -le 3 ]; do
+    lookup_status=0
+    runs_json="$("$gh_cli" api "repos/$repository/actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&per_page=30" 2>/dev/null)" || lookup_status=$?
+    if [ "$lookup_status" -eq 0 ]; then
+      break
+    fi
+    if [ "$runs_attempt" -ge 3 ]; then
+      break
+    fi
+    echo "::warning::Release successor lookup attempt ${runs_attempt}/3 failed (exit=${lookup_status}); retrying." >&2
+    if [ "$runs_backoff" -gt 0 ]; then
+      sleep "$runs_backoff"
+      runs_backoff=$((runs_backoff * 2))
+    fi
+    runs_attempt=$((runs_attempt + 1))
+  done
   if [ "$lookup_status" -ne 0 ] || ! pending="$(jq -er --argjson run "$run_id" '
     if (.workflow_runs | type) != "array" or
       any(.workflow_runs[]; (.id | type) != "number" or .id <= 0 or
