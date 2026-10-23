@@ -312,13 +312,13 @@ function ReleasesListContent({
       ref={listboxRef}
       // Native `ul` (implicit role=list) + `listitem` rows: each row owns
       // real interactive controls, which an ARIA `option` cannot contain
-      // (axe nested-interactive). Every direct child is a plain li so the
-      // list stays axe `list`-clean. The li carries the Radix context-menu
-      // trigger's global aria (aria-haspopup etc.); adding
-      // role='presentation' here tripped axe's presentation-role-conflict
-      // (global aria on a suppressed role), so the wrapper stays an
-      // ordinary list item and the row inside it keeps the named
-      // `listitem` semantics.
+      // (axe nested-interactive). Every direct child is an li so the list
+      // stays axe `list`-clean. The li is role=presentation so it never
+      // nests a second, unnamed listitem around the named row inside — and
+      // the Radix context-menu trigger's global aria-haspopup is suppressed
+      // (child props win Radix's asChild merge; null omits the attribute),
+      // because global aria on a suppressed role is exactly axe's
+      // presentation-role-conflict.
       aria-label='Releases'
       className='py-1.5 space-y-px px-2'
     >
@@ -330,11 +330,22 @@ function ReleasesListContent({
           {/* List-legal wrapper: Radix ContextMenu.Trigger asChild needs a
               host element that accepts the injected ref/onContextMenu props,
               and axe's `list` rule only allows li/script/template as direct
-              ul children. A plain li (implicit listitem) keeps the Radix
-              trigger's global aria legal; the row inside keeps the named
-              listitem, and axe's nested-interactive does not police
-              listitem-in-listitem, so the nesting stays clean. */}
-          <li data-shell-release-row-context-target>
+              ul children. role=presentation keeps the wrapper out of the
+              a11y tree so the row inside stays the single named listitem;
+              aria-haspopup={null} suppresses the Radix trigger's global aria
+              so the suppressed role carries no conflicting global attribute
+              (axe presentation-role-conflict). */}
+          <li
+            role='presentation'
+            // null intentionally suppresses the Radix context-menu
+            // trigger's injected global aria-haspopup — a global aria
+            // attribute on the suppressed presentation role is axe's
+            // presentation-role-conflict, and React omits the attribute
+            // entirely for null.
+            // biome-ignore lint/a11y/useValidAriaValues: null suppresses the injected trigger aria
+            aria-haspopup={null}
+            data-shell-release-row-context-target
+          >
             <ShellReleaseRow
               release={r}
               isSelected={r.id === selectedReleaseId}

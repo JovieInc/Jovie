@@ -609,25 +609,24 @@ describe('ShellReleasesView', () => {
       fakeRelease({ id: '2', title: 'Take Me Over' }),
     ]);
 
-    // axe `list` rule: a ul's direct children must be li (script/template),
-    // and the wrapper must stay a plain li: the Radix context-menu trigger
-    // injects global aria (aria-haspopup) onto it, which a presentation role
-    // would turn into an axe presentation-role-conflict.
+    // axe `list` rule: a ul's direct children must be li (script/template).
+    // The wrapper li is role=presentation so the row inside stays the single
+    // named listitem, and it must not carry the Radix context-menu trigger's
+    // global aria-haspopup — global aria on a suppressed role is axe's
+    // presentation-role-conflict. The row keeps exactly one listitem per
+    // wrapper.
     const list = screen.getByRole('list', { name: 'Releases' });
     const directChildren = [...list.children];
     expect(directChildren.length).toBeGreaterThanOrEqual(2);
     for (const child of directChildren) {
       expect(child.tagName).toBe('LI');
-      expect(child).not.toHaveAttribute('role', 'presentation');
+      expect(child).toHaveAttribute('role', 'presentation');
+      expect(child).not.toHaveAttribute('aria-haspopup');
       expect(child).toHaveAttribute('data-shell-release-row-context-target');
-      // The row inside keeps the named listitem semantics, exactly one per
-      // wrapper li.
       expect(child.querySelectorAll('[role="listitem"]')).toHaveLength(1);
     }
-    // The listbox contract still resolves every row by role.
-    expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(
-      directChildren.length
-    );
+    // The listbox contract still resolves exactly one listitem per row.
+    expect(screen.getAllByRole('listitem')).toHaveLength(directChildren.length);
   });
 
   it('shows the connect-Spotify empty state when not yet connected', () => {
