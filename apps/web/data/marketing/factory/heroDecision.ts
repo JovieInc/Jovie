@@ -265,6 +265,14 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     why: 'hero mounts the live UTM builder as the aha capture',
   },
   {
+    url: '/product/release-scheduling',
+    input: {
+      useCase: 'aha-capture',
+      captureId: 'release-schedule-fields',
+    },
+    why: 'hero mounts the live release date and reveal date fields as the aha capture',
+  },
+  {
     url: '/product/dsp-links',
     input: { useCase: 'aha-capture', captureId: 'dsp-links' },
     why: 'hero mounts the live DSP rows as the aha capture',

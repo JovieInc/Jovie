@@ -119,6 +119,10 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     title: 'Product',
     links: [
       { href: APP_ROUTES.PRODUCT, label: 'Product' },
+      {
+        href: APP_ROUTES.PRODUCT_RELEASE_SCHEDULING,
+        label: 'Release scheduling',
+      },
       { href: APP_ROUTES.PRODUCT_DSP_LINKS, label: 'DSP Links' },
       { href: APP_ROUTES.PRODUCT_UTM_LINKS, label: 'UTM Links' },
       { href: APP_ROUTES.PRODUCT_ISRC, label: 'ISRC' },
