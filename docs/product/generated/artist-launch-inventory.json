@@ -718,6 +718,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/product/dsp-links/page.tsx",
+      "kind": "page",
+      "route": "/product/dsp-links",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/product/page.tsx",
       "kind": "page",
       "route": "/product",
