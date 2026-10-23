@@ -52,6 +52,10 @@ Do not hide a primary action behind hover, a gesture, a magic shortcut, or a
 second surface when a direct visible control fits. Touch and pointer controls
 remain available even when a keyboard accelerator is useful.
 
+Follow [tooltip eligibility and input](../../DESIGN.md#tooltip-eligibility-and-input):
+measure title clipping, preserve mouse/keyboard hints on hybrids, let touch
+activate immediately, and retain rail-owned interactive portals until dismissal.
+
 ### Input, Shortcuts, and Discoverability
 
 - Prefer semantic native controls. Use ARIA composite roles only when the
@@ -273,6 +277,15 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
   receipts, duplicates, mappings, and process copy in operator artifacts.
 - Pen is proposal/review evidence until source identity, save/readback, and
   persistence contracts pass. Visual similarity is not source backing.
+- Marketing pages share one spine and one type ramp: sections use
+  `ArtistProfileSectionShell`, heroes use `.ap-section-container`, and type
+  uses `.marketing-type-display` / `-section` / `-lede`.
+- Marketing plan prices render only through `MarketingOfferSummary` or
+  `getPublicPriceClaim` from offer truth; never type a price into copy.
+- Marketing images and cards use a radius token. The wide cinematic corner
+  is `.marketing-rounded-frame` (`--system-b-radius-panel` / `--radius-3xl`).
+  Exempt only the full-bleed hero start (it rounds as it zooms out), logos,
+  icons, SVG marks, and already-round avatars. See MKT-D17.
 
 ### No Duplicate Page Titles (Breadcrumb + Toolbar)
 
@@ -297,6 +310,20 @@ the primary content column must return to the shared seam when that track is
 absent.
 
 ## Taste Rules (Hard Invariants)
+
+### No ICP-specific language on general pages
+
+- Homepage, pricing, about, brand, and other general marketing routes stay generic. Jovie is an identity product for any creator.
+- Do not write segment copy there: music, artist, musician, DJ, producer, label, founder, investor, fan, author, or a creator-type niche. “Creator” is the generic word.
+- Dedicated audience routes may use that language. The allowlist is `scripts/invariants/icp-language/config.json`.
+- The headline “Be found. Be understood.” is locked.
+- `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready check. Existing hits are a shrink-only baseline. See MKT-D16 in `docs/marketing/DESIGN_INVARIANTS.md`.
+
+### Copy Is the Message, Never the Brief
+
+Reject AI instructions, editing rules, and unfinished text in every user-visible string, including metadata, accessibility labels, emails, errors, empty states, and demos. Use the copy system.
+Run `node scripts/invariants/copy-leak/check.mjs` before review: it blocks PR Ready and merge groups. Fix real leaks; its baseline only shrinks.
+Exact exceptions in `scripts/invariants/copy-leak/config.json` require reasons.
 
 ### No Emoji in UI — Use Icons
 
@@ -492,6 +519,8 @@ When building or iterating on the Artist Profiles landing page:
   `globals.css`; a CSS variable declared only in `:root` does not emit utilities.
 - Marketing signup CTAs use `/signup`. Do not send them to `/claim`, `/register`
   or `/waitlist`; the artist profile claim flow has a different intent.
+  Exception: the paid Pro CTA is that claim intent and routes to `/claim`
+  (EVENT: Tim, 2026-10-20, $12/month self-serve artist profile).
 - Honor the marketing registry's above-the-fold hero contract: do not use a
   full-height hero shell that pushes the first proof element below the fold.
   Keep the opening proof in the composition without decorative inset cards.

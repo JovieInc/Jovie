@@ -35,6 +35,10 @@ const {
   mockAdmitPaidUser: vi.fn(),
 }));
 
+vi.mock('@/lib/claim/claim-verification.server', () => ({
+  markClaimVerificationsPaid: vi.fn().mockResolvedValue(0),
+}));
+
 vi.mock('@/lib/waitlist/paid-admission', () => ({
   admitPaidUser: mockAdmitPaidUser,
 }));
@@ -385,7 +389,7 @@ describe('@critical CheckoutSessionHandler', () => {
       expect(mockGetUserIdFromStripeCustomer).not.toHaveBeenCalled();
     });
 
-    it('throws error when subscription price ID is unknown', async () => {
+    it('requires reconciliation (never a silent skip) when the subscription price ID is unknown', async () => {
       const mockSubscription = {
         id: 'sub_unknown_price',
         status: 'active',
@@ -414,20 +418,12 @@ describe('@critical CheckoutSessionHandler', () => {
         stripeEventTimestamp: new Date(),
       };
 
-      await expect(handler.handle(context)).resolves.toMatchObject({
-        success: true,
-        skipped: true,
+      await expect(handler.handle(context)).rejects.toMatchObject({
+        name: 'StripeReconciliationRequiredError',
         reason: 'unknown_price_id',
+        context: expect.objectContaining({ priceIds: ['price_unknown'] }),
       });
-
-      expect(mockCaptureCriticalError).toHaveBeenCalledWith(
-        'Unknown price ID in subscription',
-        expect.any(Error),
-        expect.objectContaining({
-          route: '/api/stripe/webhooks',
-          priceId: 'price_unknown',
-        })
-      );
+      expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
     });
 
     it('throws error when subscription has no price ID', async () => {

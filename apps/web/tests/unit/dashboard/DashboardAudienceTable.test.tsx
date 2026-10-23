@@ -116,6 +116,13 @@ let resizeObserverTarget: Element | null = null;
 
 vi.mock('@/components/organisms/table', () => ({
   AudienceMobileCard: () => null,
+  TableEmptyState: ({
+    heading,
+    testId,
+  }: {
+    heading?: string;
+    testId?: string;
+  }) => <div data-testid={testId}>{heading}</div>,
   UnifiedTable: ({
     data,
     columnVisibility,
@@ -301,7 +308,9 @@ describe('DashboardAudienceTable', () => {
     expect(
       screen.getByTestId('dashboard-audience-empty-state')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('unified-table')).toBeInTheDocument();
     expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
+    expect(capturedTableData).toEqual([]);
   });
 
   it('shows unified empty state with correct testId in subscribers mode', () => {

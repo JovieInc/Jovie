@@ -113,9 +113,21 @@ body {
 html[data-desktop-runtime="electron"] {
   --electron-titlebar-height: 40px;
   --electron-controls-width: 200px;
-  --electron-traffic-light-safe-width: 72px;
   --electron-traffic-light-x: 20px;
   --electron-traffic-light-y: 17px;
+  --electron-traffic-light-control-size: 14px;
+  --electron-traffic-light-clearance: 8px;
+  /* Content origin is the shell gap (titlebar padding-left). The reserve
+     places the first control at the native lights' trailing clearance.
+     20 - 8 + 42 + 16 + 8 - 8 = 70. Toggle window x = 8 + 70 + 8 = 86. */
+  --electron-traffic-light-safe-width: calc(
+    var(--electron-traffic-light-x) -
+    var(--app-shell-gap) +
+    (3 * var(--electron-traffic-light-control-size)) +
+    (2 * var(--electron-traffic-light-clearance)) +
+    var(--electron-traffic-light-clearance) -
+    var(--app-shell-sidebar-icon-gap)
+  );
   --electron-sidebar-width: var(--app-shell-sidebar-width);
   --electron-sidebar-collapsed-width: 52px;
 }
@@ -151,11 +163,17 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   position: absolute;
   top: 0;
   left: 0;
-  -webkit-app-region: drag;
+  /* Drag lives on sibling strips, not this ancestor. Chromium reports
+     focus as inactive at 200% zoom when a no-drag control sits inside a
+     drag region. */
+  -webkit-app-region: no-drag;
   z-index: 60;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  width: var(--electron-sidebar-width);
+  /* Padding-left is the shell gap, so the border box must include it or the
+     titlebar content ends 8px short of the rail. */
+  width: calc(var(--app-shell-gap) + var(--electron-sidebar-width));
   min-width: var(--electron-controls-width);
   height: var(--electron-titlebar-height);
   user-select: none;
@@ -936,10 +954,19 @@ body {
   .marketing-h1-max-two-lines,
   :where(.home-viewport, .system-b-marketing) :where(h1:not(.sr-only)) {
     display: -webkit-box;
-    max-block-size: calc(2 * 1lh);
+    /* 2026-10-20: tight display leading (1.06) puts descenders below the
+       second line box; the em allowance keeps "y", "g", and "p" whole. The
+       line clamp still hides any third line. */
+    max-block-size: calc(2 * 1lh + 0.16em);
+    padding-block-end: 0.16em;
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+  }
+  /* The same ink allowance is needed by clamped section/CTA headings.
+     Their tight Satoshi leading can crop descenders even with no hidden line. */
+  :where(.home-viewport, .system-b-marketing) :where(h2, h3).line-clamp-2 {
+    padding-block-end: 0.16em;
   }
   @media (min-width: 768px) {
     .marketing-h1-linear {
@@ -1035,6 +1062,33 @@ body {
     .marketing-hero-photo {
       display: none;
     }
+  }
+  /* System B marketing type (2026-10-20). One class per role, bound to the
+     --ds-marketing-* ramp in design-system.css. New marketing pages use these
+     instead of the retired marketing-*-linear classes or page-local clamps:
+     display = the page h1, section = h2 chapter titles, lede = supporting
+     copy. Color stays on token utilities in markup. */
+  .marketing-type-display {
+    font-family: var(--font-display);
+    font-size: var(--ds-marketing-title-size);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: -0.03em;
+    line-height: var(--ds-marketing-title-leading);
+    text-wrap: balance;
+  }
+  .marketing-type-section {
+    font-family: var(--font-display);
+    font-size: clamp(var(--text-3xl), 3vw, var(--text-4xl));
+    font-weight: var(--font-weight-medium);
+    letter-spacing: -0.025em;
+    line-height: 1.12;
+    text-wrap: balance;
+  }
+  .marketing-type-lede {
+    font-size: var(--ds-marketing-lede-size);
+    letter-spacing: var(--ds-marketing-lede-tracking);
+    line-height: var(--ds-marketing-lede-leading);
+    text-wrap: pretty;
   }
   .marketing-lead-linear {
     /* Exact Linear.app: 15px, 400wt, -0.165px tracking, 24px line-height */

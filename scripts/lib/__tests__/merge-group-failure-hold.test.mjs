@@ -30,7 +30,9 @@ import {
   failureReceiptStatus,
   humanFailureReleaseIntent,
   humanReleaseDisposition,
+  isHeldWorkflowFailure,
   ownerHoldReleaseIntent,
+  PR_SIZE_GUARD_WORKFLOW_ID,
   parseMergeQueueBranch,
   REVISION_FAILED_AT_HEAD,
   reenrollmentDisposition,
@@ -39,6 +41,7 @@ import {
   revisionFailureDisposition,
   sourceHeadForRun,
   supersededByLiveEntry,
+  WORKFLOW_LOAD_STEP,
 } from '../../merge-group-failure-hold.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
@@ -697,6 +700,99 @@ process.stdout.write(JSON.stringify(result));
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it.each([
+  ['proven', 'ahead-22328-lanes-flake.txt', false],
+  ['unproven', 'poison-22331-api-guard.txt', true],
+])(
+  'CLI attributes against a completed failed ahead run from its job logs (%s)',
+  (_label, aheadLogName, waits) => {
+    const dir = mkdtempSync(join(tmpdir(), 'failure-hold-attribution-'));
+    try {
+      const logs = resolve(import.meta.dirname, 'fixtures/ahead-attribution');
+      const fixturePath = join(dir, 'fixture.json');
+      writeFileSync(
+        fixturePath,
+        JSON.stringify({
+          run,
+          timeline,
+          source: SOURCE,
+          currentLog: join(logs, 'poison-22331-api-guard.txt'),
+          // The unproven case feeds the poison log as the ahead evidence too:
+          // its own failing commands never passed there.
+          aheadLog: join(logs, aheadLogName),
+        })
+      );
+      writeFileSync(
+        join(dir, 'gh'),
+        `#!${process.execPath}
+const fs = require('node:fs');
+const fixture = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
+const args = process.argv.slice(2);
+const failed = id => [
+  { id, name: 'ci-fast (remaining)', conclusion: 'failure',
+    steps: [{ name: 'Run structural ci-fast lane', conclusion: 'failure' }] },
+  { id: id + 1, name: 'PR Ready', conclusion: 'failure',
+    steps: [{ name: 'Evaluate combined-head checks', conclusion: 'failure' }] },
+];
+let result;
+if (args[1] === 'graphql') {
+  const query = args.find(arg => arg.startsWith('query='));
+  const pr = query.includes('timelineItems')
+    ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
+    : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
+        isInMergeQueue: false, mergeQueueEntry: null, autoMergeRequest: null };
+  result = { data: { repository: { pullRequest: pr } } };
+} else if (args.includes('POST')) result = {};
+else if (args[1].endsWith('/actions/jobs/11/logs')) { process.stdout.write(fs.readFileSync(fixture.currentLog, 'utf8')); process.exit(0); }
+else if (args[1].endsWith('/actions/jobs/21/logs')) { process.stdout.write(fs.readFileSync(fixture.aheadLog, 'utf8')); process.exit(0); }
+else if (args[1].includes('/compare/')) result = { status: 'behind' };
+else if (args[1].includes('/actions/runs?head_sha=')) result = { workflow_runs: [
+  { id: 900, workflow_id: 178737329, created_at: '2026-10-12T08:43:05Z', conclusion: 'failure' },
+] };
+else if (args[1].includes('/runs/900/jobs?')) result = { jobs: args[1].includes('page=1') ? failed(21) : [] };
+else if (args[1].includes('/jobs?')) result = { jobs: args[1].includes('page=1') ? failed(11) : [] };
+else if (args[1].includes('/statuses')) result = [];
+else result = fixture.run;
+process.stdout.write(JSON.stringify(result));
+`,
+        { mode: 0o755 }
+      );
+      const eventPath = join(dir, 'event.json');
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          repository: { full_name: REPOSITORY },
+          workflow_run: { id: run.id },
+        })
+      );
+      const execution = spawnSync(
+        process.execPath,
+        [
+          resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
+          '--event-path',
+          eventPath,
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            HOLD_TEST_FIXTURE: fixturePath,
+            GITHUB_OUTPUT: join(dir, 'output'),
+          },
+        }
+      );
+      expect(execution.status, execution.stderr).toBe(0);
+      const receipt = JSON.parse(execution.stdout);
+      expect(Boolean(receipt.aheadEntryUnproven)).toBe(waits);
+      expect(receipt.statusWritten).toBe(!waits);
+      expect(receipt.aheadAttribution?.attributable).toBe(!waits);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);
 
 it.each([
   ['behind', 'in_progress', true],
@@ -1713,6 +1809,65 @@ describe('terminal failure hold application', () => {
     }
   });
 
+  it('holds when the completed ahead run proves the failure is this entry own (#22331)', async () => {
+    const writeStatus = vi.fn();
+    const signatureAttribution = {
+      attributable: true,
+      reason: 'failing-signals-passed-on-ahead-run',
+    };
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        aheadGroup: {
+          baseOnMain: false,
+          aheadConclusion: 'failure',
+          aheadRunId: 39536019717,
+          signatureAttribution,
+        },
+      },
+      {
+        writeStatus,
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: false,
+          mergeQueueEntry: null,
+          autoMergeRequest: null,
+        })),
+        dequeuePullRequest: vi.fn(),
+        disableAutoMerge: vi.fn(),
+      }
+    );
+    expect(result).not.toHaveProperty('skipped');
+    expect(result).not.toHaveProperty('aheadEntryUnproven');
+    expect(result).toMatchObject({
+      statusWritten: true,
+      aheadAttribution: signatureAttribution,
+    });
+    expect(writeStatus).toHaveBeenCalled();
+  });
+
+  it('keeps waiting when ahead attribution is unproven', () => {
+    expect(
+      aheadEntryUnproven({
+        baseOnMain: false,
+        aheadConclusion: 'failure',
+        signatureAttribution: {
+          attributable: false,
+          reason: 'ci-fast-log-missing',
+        },
+      })
+    ).toBe(true);
+    expect(
+      aheadEntryUnproven({
+        baseOnMain: false,
+        aheadConclusion: 'failure',
+        signatureAttribution: { attributable: true, reason: 'x' },
+      })
+    ).toBe(false);
+  });
+
   it('holds when the base is main, the group ahead passed, or the base is unreadable', () => {
     expect(aheadEntryUnproven({ baseOnMain: true })).toBe(false);
     expect(
@@ -2011,5 +2166,139 @@ describe('poison re-enqueue loop (JOV-7708, #20354)', () => {
       )
     ).toBe(true);
     expect(autoMergeWasNotArmed(new Error('Bad credentials'))).toBe(false);
+  });
+});
+
+// 2026-10-20 21:13–21:52Z: #21826 grew ci.yml's path-detect run script past
+// GitHub's 21,000-character expression limit. Every group containing it got a
+// zero-job CI run attributed to push, no merge_group check ever reported, and
+// ten entries sat in AWAITING_CHECKS. PR Size Guard's load step now fails the
+// group that introduced it; the hold must keep that exact head out.
+describe('workflow-load guard failures (2026-10-20 queue stall, #21826)', () => {
+  const sizeGuardRun = {
+    ...run,
+    workflow_id: PR_SIZE_GUARD_WORKFLOW_ID,
+    path: '.github/workflows/pr-size-guard.yml',
+  };
+  const queuedPr = () => ({
+    id: 'PR_42',
+    state: 'OPEN',
+    headRefOid: SOURCE,
+    isInMergeQueue: true,
+    mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+    autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+  });
+
+  it('classifies the load step as a source failure', () => {
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: [WORKFLOW_LOAD_STEP],
+      })
+    ).toBe('deterministic-source');
+  });
+
+  it('holds only the PR Size Guard load step, never other size failures', () => {
+    expect(isHeldWorkflowFailure(run, [])).toBe(true);
+    expect(isHeldWorkflowFailure(sizeGuardRun, [WORKFLOW_LOAD_STEP])).toBe(
+      true
+    );
+    expect(
+      isHeldWorkflowFailure(sizeGuardRun, [
+        'Enforce combined-tree payload and member size policy',
+      ])
+    ).toBe(false);
+    expect(
+      isHeldWorkflowFailure({ ...sizeGuardRun, workflow_id: 1 }, [
+        WORKFLOW_LOAD_STEP,
+      ])
+    ).toBe(false);
+  });
+
+  it('holds the exact head even while the group ahead is unproven', async () => {
+    // The guard fails only when the group's base loads, so the failure is
+    // this group's own diff whatever the group ahead is doing.
+    let state = queuedPr();
+    const writeStatus = vi.fn(async (/** @type {any} */ _receipt) => {});
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        run: sizeGuardRun,
+        failedSteps: [WORKFLOW_LOAD_STEP],
+        aheadGroup: { baseOnMain: false, aheadConclusion: null },
+      },
+      {
+        writeStatus,
+        readPullRequest: vi.fn(async () => structuredClone(state)),
+        dequeuePullRequest: vi.fn(async () => {
+          state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+        }),
+        disableAutoMerge: vi.fn(async () => {
+          state = { ...state, autoMergeRequest: null };
+        }),
+      }
+    );
+    // First the exact-head hold receipt, then the required context failed on
+    // the synthetic group head so the queue ejects it now.
+    expect(writeStatus.mock.calls.map(([receipt]) => receipt)).toEqual([
+      expect.objectContaining({
+        sha: SOURCE,
+        context: FAILURE_HOLD_CONTEXT,
+        state: 'success',
+        description: expect.stringContaining('class=deterministic-source'),
+      }),
+      expect.objectContaining({
+        sha: GROUP,
+        context: 'PR Ready',
+        state: 'failure',
+      }),
+    ]);
+    expect(result).toMatchObject({
+      prNumber: 42,
+      classification: 'deterministic-source',
+      retryDisposition: 'blocked-until-new-source-head',
+      autoMergeDisabled: true,
+      groupEjected: true,
+    });
+    expect(result.skipped).toBeUndefined();
+  });
+
+  it('never reports PR Ready failed for an ordinary CI failure', async () => {
+    let state = queuedPr();
+    const writeStatus = vi.fn(async (/** @type {any} */ _receipt) => {});
+    const result = await applyMergeGroupFailure(failureInput, {
+      writeStatus,
+      readPullRequest: vi.fn(async () => structuredClone(state)),
+      dequeuePullRequest: vi.fn(async () => {
+        state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+      }),
+      disableAutoMerge: vi.fn(async () => {
+        state = { ...state, autoMergeRequest: null };
+      }),
+    });
+    expect(
+      writeStatus.mock.calls.some(
+        ([receipt]) => receipt?.context === 'PR Ready'
+      )
+    ).toBe(false);
+    expect(result).not.toHaveProperty('groupEjected');
+  });
+
+  it('rejects a PR Size Guard run from any other workflow path', async () => {
+    await expect(
+      applyMergeGroupFailure(
+        {
+          ...failureInput,
+          run: { ...sizeGuardRun, path: '.github/workflows/ci.yml' },
+          failedSteps: [WORKFLOW_LOAD_STEP],
+        },
+        {
+          writeStatus: vi.fn(),
+          readPullRequest: vi.fn(),
+          dequeuePullRequest: vi.fn(),
+          disableAutoMerge: vi.fn(),
+        }
+      )
+    ).rejects.toThrow(/terminal merge-group CI failure/);
   });
 });

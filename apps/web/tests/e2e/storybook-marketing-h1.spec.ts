@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Locator, test } from '@playwright/test';
 
 const LONG_HEADING =
   'A deliberately long marketing headline that must keep every word available to assistive technology while never painting more than two visual lines at any supported viewport';
@@ -20,6 +20,28 @@ async function settleLayout(page: import('@playwright/test').Page) {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
       })
   );
+}
+
+async function measureHeading(heading: Locator) {
+  return heading.evaluate(element => {
+    const style = getComputedStyle(element);
+    const lineHeight = Number.parseFloat(style.lineHeight);
+    // Line boxes occupy the content box. The shared clamp also reserves
+    // padding for descenders; counting that as text invents a third line.
+    const contentHeight =
+      element.getBoundingClientRect().height -
+      Number.parseFloat(style.paddingTop) -
+      Number.parseFloat(style.paddingBottom) -
+      Number.parseFloat(style.borderTopWidth) -
+      Number.parseFloat(style.borderBottomWidth);
+    return {
+      clientHeight: element.clientHeight,
+      contentHeight,
+      fullText: element.textContent,
+      lines: Math.ceil(contentHeight / lineHeight - 0.05),
+      scrollHeight: element.scrollHeight,
+    };
+  });
 }
 
 test.describe('shared marketing H1 visual-line contract', () => {
@@ -45,18 +67,7 @@ test.describe('shared marketing H1 visual-line contract', () => {
       await settleLayout(page);
       expect(await heading.boundingBox()).toEqual(firstBox);
 
-      const metrics = await heading.evaluate(element => {
-        const style = getComputedStyle(element);
-        const lineHeight = Number.parseFloat(style.lineHeight);
-        return {
-          clientHeight: element.clientHeight,
-          fullText: element.textContent,
-          lines: Math.ceil(
-            element.getBoundingClientRect().height / lineHeight - 0.05
-          ),
-          scrollHeight: element.scrollHeight,
-        };
-      });
+      const metrics = await measureHeading(heading);
 
       expect(metrics.fullText).toBe(LONG_HEADING);
       expect(
@@ -75,6 +86,15 @@ test.describe('shared marketing H1 visual-line contract', () => {
         path: testInfo.outputPath(`marketing-h1-${viewport.label}.png`),
         fullPage: true,
       });
+
+      // Deliberately break the visual contract: the same measurement must
+      // detect a real third line even with the descender allowance present.
+      await heading.evaluate(element => {
+        element.style.setProperty('-webkit-line-clamp', '3', 'important');
+        element.style.setProperty('max-block-size', 'none', 'important');
+      });
+      await settleLayout(page);
+      expect((await measureHeading(heading)).lines).toBe(3);
     });
   }
 });

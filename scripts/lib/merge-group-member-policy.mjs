@@ -61,6 +61,22 @@ export class MergeGroupPolicyRateLimitError extends MergeGroupPolicyEvidenceErro
   }
 }
 
+/**
+ * The exemption evidence (labels, author, body) could not be read while the
+ * locally measured diff is over the standard cap, so a size exemption cannot
+ * be confirmed. Deferred with a distinct budget-unavailable label, never a
+ * size-cap verdict (run 39927237081 ejected big-pr #22711 on an exhausted
+ * installation budget). The cap itself never moves and no oversize PR passes:
+ * the required check stays red until the quota resets and the read succeeds.
+ */
+export class MergeGroupPolicyBudgetUnavailableError extends MergeGroupPolicyRateLimitError {
+  constructor(message) {
+    super(message);
+    this.name = 'MergeGroupPolicyBudgetUnavailableError';
+    this.budgetUnavailable = true;
+  }
+}
+
 function fail(message) {
   throw new MergeGroupPolicyEvidenceError(message);
 }
@@ -911,6 +927,8 @@ function trackedFromEvidence(tracked) {
 
 function syntheticRateLimitedPull(member, headSha) {
   // No labels, so big-pr / codemod / integration-train cannot bypass the cap.
+  // Only reached when the locally measured diff fits the standard cap; the
+  // over-cap case defers as budget-unavailable instead (runPolicy above).
   return {
     number: member.number,
     state: 'open',
@@ -1008,6 +1026,13 @@ function parsePolicy(argv) {
   return { policy, also };
 }
 
+function standardSizeCaps(env) {
+  return {
+    maxLines: Number(env.MAX_LINES ?? '800'),
+    maxFiles: Number(env.MAX_FILES ?? '40'),
+  };
+}
+
 async function evaluateMembers({
   deadlineMs,
   env,
@@ -1035,8 +1060,7 @@ async function evaluateMembers({
       evaluateForkMemberPolicy({ pr, reviews: reviews[index] })
     );
   } else {
-    const maxLines = Number(env.MAX_LINES ?? '800');
-    const maxFiles = Number(env.MAX_FILES ?? '40');
+    const { maxLines, maxFiles } = standardSizeCaps(env);
     const files = await Promise.all(
       pullRequests.map(pr => {
         const labels = labelsFor(pr);
@@ -1163,6 +1187,29 @@ export async function runPolicy({
         `::notice::PR Size Guard refused a GitHub rate limit with no local diff: ${error.message}`
       );
       throw error;
+    }
+    // A substituted pull carries no labels, author, or body, so every size
+    // exemption (big-pr, codemod, integration-train, dependabot) is
+    // unreadable. While the measured diff still fits the standard cap the
+    // verdict is identical whatever that evidence says, so the cap is kept.
+    // Over the cap, a size-cap FAIL would eject an exempted PR on missing
+    // evidence (run 39927237081 ejected big-pr #22711 on an exhausted
+    // installation budget) — fail as a distinct budget-unavailable deferral
+    // instead. No cap moves and no oversize PR passes: the required check
+    // stays red until the quota resets and the pull read succeeds. Note the
+    // hold labels on a synthetic pull are equally unreadable in this
+    // fallback; that gap predates this change and is unchanged here.
+    if (members.length !== 1) {
+      throw new MergeGroupPolicyBudgetUnavailableError(
+        `PR Size Guard budget-unavailable: the pull read was rate-limited (${error.message}) and the local range diff cannot be attributed to ${members.length} members, so size exemptions cannot be confirmed — deferring instead of a size-cap verdict`
+      );
+    }
+    const measured = countSizeGuardFiles(local.files);
+    const { maxLines, maxFiles } = standardSizeCaps(env);
+    if (measured.lines > maxLines || measured.files > maxFiles) {
+      throw new MergeGroupPolicyBudgetUnavailableError(
+        `PR Size Guard budget-unavailable: the pull read was rate-limited (${error.message}) while the locally measured diff is ${measured.lines}/${maxLines} lines and ${measured.files}/${maxFiles} files over the standard cap, so a size exemption cannot be confirmed — deferring instead of a size-cap verdict`
+      );
     }
     log(
       `::notice::PR Size Guard kept the size cap on the local diff after a GitHub rate limit: ${error.message}`

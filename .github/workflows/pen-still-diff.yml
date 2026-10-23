@@ -1,0 +1,96 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Symphony
+# capability-gap: The diff job is read-only. Posting the Pen | render | diff triptych on the pull request needs pull-requests write, which is the narrowest token that can attach the image.
+# removal-trigger: Remove the comment job when canonical stills are enforced by a required check that already publishes the triptych.
+
+name: Pen still diff (advisory)
+
+# Not a required check. No canonical stills exist yet, so the job exits 0
+# and posts a triptych. It does not change PR Ready, Migration Guard, Fork
+# PR Gate, or PR Size Guard.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - 'scripts/invariants/pen-still-diff.mjs'
+      - 'scripts/invariants/pen-still-diff-lib.mjs'
+      - 'scripts/invariants/pen-still-diff.test.mjs'
+      - 'scripts/invariants/clef-screenshot-capture.mjs'
+      - 'scripts/invariants/clef-screenshot-evaluator.mjs'
+      - 'scripts/invariants/clef-screenshot-evaluator.test.mjs'
+      - 'docs/pen-stills/**'
+      - '.github/scripts/pen-still-diff-comment.mjs'
+      - '.github/scripts/pen-still-diff-comment.test.mjs'
+      - '.github/workflows/pen-still-diff.yml'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: pen-still-diff-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diff:
+    name: Pen still diff (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Unit tests
+        run: node --test scripts/invariants/pen-still-diff.test.mjs scripts/invariants/clef-screenshot-evaluator.test.mjs .github/scripts/pen-still-diff-comment.test.mjs
+
+      - name: Advisory diff
+        run: node scripts/invariants/pen-still-diff.mjs --manifest docs/pen-stills/homepage/manifest.json --out pen-still-out
+
+      - name: Upload triptych
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pen-still-triptych
+          path: pen-still-out/
+          if-no-files-found: error
+
+  comment:
+    name: Post triptych
+    needs: diff
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout comment script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Download triptych
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pen-still-triptych
+          path: pen-still-out
+
+      - name: Post advisory comment
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PEN_STILL_OUT: pen-still-out
+        run: node .github/scripts/pen-still-diff-comment.mjs

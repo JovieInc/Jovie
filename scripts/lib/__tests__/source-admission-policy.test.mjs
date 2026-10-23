@@ -37,18 +37,6 @@ test('trusted source-read guards reject a deleted test on an old head and execut
   const git = (...args) =>
     execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
   try {
-    const archive = execFileSync(
-      '/usr/bin/git',
-      ['archive', 'HEAD', 'scripts'],
-      { maxBuffer: 20 * 1024 * 1024 }
-    );
-    execFileSync('tar', ['-x', '-C', repo], { input: archive });
-    // This synthetic base isolates the web manifest guard and predates the
-    // Codex bootstrap contract. Do not turn deletion of its checker scripts
-    // into an unrelated deletion of the Codex source/test surface.
-    for (const name of readdirSync(join(repo, 'scripts'))) {
-      if (name.startsWith('codex-')) rmSync(join(repo, 'scripts', name));
-    }
     const retired = join(repo, 'apps/web/lib/merch/qa-gate.test.ts');
     mkdirSync(join(repo, 'apps/web/lib/merch'), { recursive: true });
     mkdirSync(join(repo, 'apps/web/tests'), { recursive: true });
@@ -60,13 +48,16 @@ test('trusted source-read guards reject a deleted test on an old head and execut
       '#!/bin/sh\n[ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9\ncase "$*" in *node-environment-files.test.ts*) case "$(cat apps/web/tests/node-environment-files.json)" in *qa-gate.test.ts*) test -f apps/web/lib/merch/qa-gate.test.ts ;; *) exit 0 ;; esac ;; *) exit 0 ;; esac\n',
       { mode: 0o755 }
     );
-    // This fixture has no launch or profile inventory. Isolate those unrelated
-    // checker, as pnpm above isolates the other guards, while checking its cwd.
+    // This fixture has no launch, profile, art-direction, ICP-language, copy, or
+    // oasdiff inventory. Isolate those unrelated checkers, as pnpm above
+    // isolates the other guards, while checking its cwd. The older head
+    // deletes scripts/, so the real art-direction, ICP-language, and oasdiff
+    // runners are not on that checkout.
     writeFileSync(
       join(bin, 'node'),
       `#!/bin/sh
 case "$*" in
-  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs)
+  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs|*scripts/invariants/art-direction/*|*scripts/invariants/icp-language/*|*scripts/invariants/copy-leak/*|*scripts/invariants/oasdiff-breaking-change.mjs*|*scripts/invariants/oasdiff-breaking-change.test.mjs*)
     [ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9
     exit 0 ;;
 esac
@@ -78,11 +69,30 @@ exec "$SOURCE_FIXTURE_NODE" "$@"
     git('config', 'user.name', 'Source guard test');
     git('config', 'user.email', 'source-guard@example.invalid');
     git('add', '.');
+    git('commit', '--quiet', '-m', 'fork point before trusted source guards');
+    const fork = git('rev-parse', 'HEAD');
+    const archive = execFileSync(
+      '/usr/bin/git',
+      ['archive', 'HEAD', 'scripts'],
+      // scripts/ reached 20.0 MB on 2026-10-21 (ENOBUFS at a 20 MiB cap).
+      { maxBuffer: 128 * 1024 * 1024 }
+    );
+    execFileSync('tar', ['-x', '-C', repo], { input: archive });
+    // This synthetic base isolates the web manifest guard and predates the
+    // Codex bootstrap contract. Do not turn deletion of its checker scripts
+    // into an unrelated deletion of the Codex source/test surface.
+    for (const name of readdirSync(join(repo, 'scripts'))) {
+      if (name.startsWith('codex-')) rmSync(join(repo, 'scripts', name));
+    }
+    git('add', '.');
     git('commit', '--quiet', '-m', 'trusted source-read guards');
     git('branch', 'main');
     git('remote', 'add', 'origin', repo);
     git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
-    rmSync(join(repo, 'scripts'), { recursive: true });
+    // Checking the fork back out drops scripts/ that main added after the
+    // branch. Removing them from the trusted parent would be a pull-request
+    // deletion of the invariant suite and the gate detector.
+    git('checkout', '--detach', fork);
     rmSync(retired);
     git('add', '--all');
     git('commit', '--quiet', '-m', 'older head deletes a manifest-listed test');
@@ -104,12 +114,22 @@ exec "$SOURCE_FIXTURE_NODE" "$@"
     const rejected = invoke();
     assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr);
     assert.match(rejected.stdout, /node-environment-files: exit 1/);
+    // The merge base is the fork, which has no scripts/. Files main added
+    // after that fork are absent from this head and are not deletions.
+    // Clearing the merch manifest removes the node-environment failure.
+    // The retired merch test is not an invariant test, so the detector passes.
+    // A deletion of a gate that existed at the fork is covered by
+    // gate-weakening-detector.test.mjs, not by restoring post-fork scripts.
     writeFileSync(manifest, '[]\n');
     git('add', '.');
     git('commit', '--quiet', '-m', 'remove the retired manifest entry');
-    const accepted = invoke();
-    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
-    assert.match(accepted.stdout, /node-environment-files: exit 0/);
+    const cleared = invoke();
+    assert.equal(cleared.status, 0, cleared.stdout + cleared.stderr);
+    assert.match(cleared.stdout, /node-environment-files: exit 0/);
+    assert.match(cleared.stdout, /gate-weakening-detector: PASS/);
+    assert.doesNotMatch(cleared.stdout, /gate-weakening-detector: FAIL/);
+    assert.doesNotMatch(cleared.stdout, /detector-deleted /);
+    assert.doesNotMatch(cleared.stdout, /invariant-test-deleted /);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -1154,16 +1174,18 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     reuseStep.if,
     "${{ github.event.action == 'edited' && !github.event.changes.base }}"
   );
-  for (const job of ['security', 'migration', 'coverage']) {
+  for (const job of ['security', 'migration', 'coverage', 'unit']) {
     const [first, ...rest] = workflow.jobs[job].steps;
     assert.equal(first.id, 'reuse', job);
     assert.ok(workflow.jobs[job].permissions.actions === 'read', job);
-    // Coverage's route-budget build narrows further to build-affecting diffs.
+    // Coverage's route-budget build and the unit lanes narrow further to the
+    // diff they can affect; none may run on a reused metadata-only edit.
     for (const step of rest)
       assert.ok(
         step.if === gate ||
           (job === 'coverage' &&
-            step.if === `${gate} && steps.scope.outputs.build == 'true'`),
+            step.if === `${gate} && steps.scope.outputs.build == 'true'`) ||
+          (job === 'unit' && step.if?.startsWith(`${gate} && `)),
         `${job}: ${step.name ?? step.uses}`
       );
   }
@@ -1210,7 +1232,7 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
   }
   assert.equal(
     workflow.jobs.ready.steps[0].run,
-    'test "$RESULTS" = \'success,success,success,success\''
+    'test "$RESULTS" = \'success,success,success,success,success,success\''
   );
 });
 
@@ -1288,6 +1310,215 @@ test('route budgets build only when the diff can change build output', () => {
         'apps/ios/Jovie/App.swift',
       ]),
       'build=false'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('affected unit tests gate PR Ready and select only unit-affecting diffs (JOV-6834)', () => {
+  const workflow = sourceValidationWorkflow();
+  const job = workflow.jobs.unit;
+  // A required source proof: PR Ready aggregates it, so a red shard blocks
+  // enqueue instead of ejecting the PR from the merge queue.
+  assert.ok(workflow.jobs.ready.needs.includes('unit'));
+  assert.equal(workflow.on.pull_request.types.includes('synchronize'), true);
+  assert.deepEqual(job.strategy.matrix.shard, ['1/4', '2/4', '3/4', '4/4']);
+  const names = job.steps.map(step => step.name);
+  for (const name of [
+    'Run web unit tests related to the exact PR diff',
+    'Run CI contract tests read from disk',
+    'Run packages/ui unit tests',
+    'Run Ovie route and private-boundary coverage',
+  ])
+    assert.ok(names.includes(name), name);
+  // Whole-suite extras run on exactly one shard each.
+  const shardOf = name =>
+    /matrix\.shard == '(\d\/4)'/.exec(
+      job.steps.find(step => step.name === name).if
+    )?.[1];
+  assert.equal(shardOf('Run packages/ui unit tests'), '1/4');
+  assert.equal(shardOf('Run Ovie route and private-boundary coverage'), '2/4');
+  assert.equal(shardOf('Run CI contract tests read from disk'), '3/4');
+  const web = job.steps.find(
+    step => step.name === 'Run web unit tests related to the exact PR diff'
+  ).run;
+  // Same fast config and quarantine as the merge-group shards, narrowed to
+  // the module graph the exact diff reaches.
+  assert.match(web, /pnpm --filter @jovie\/web test:fast --/);
+  assert.match(web, /--changed "\$BASE_SHA"/);
+  assert.match(web, /--shard=\$\{\{ matrix\.shard \}\}/);
+  assert.match(web, /unit_excludes/);
+  // The merge-group Unit Tests job is unchanged: the combined head still owns
+  // exact integration evidence.
+  const ci = load(readFileSync('.github/workflows/ci.yml', 'utf8'));
+  assert.ok(ci.jobs['ci-unit-tests']);
+  assert.match(ci.jobs['ci-unit-tests'].if, /merge_group/);
+
+  const script = job.steps
+    .find(step => step.id === 'scope')
+    .run.replace(/\$\{\{\s*github.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-unit-scope-'));
+  const repo = join(root, 'repo');
+  mkdirSync(repo, { recursive: true });
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  const write = path => {
+    mkdirSync(join(repo, path, '..'), { recursive: true });
+    writeFileSync(join(repo, path), `${path}\n`);
+  };
+  try {
+    git('init', '--quiet', '--initial-branch=main');
+    git('config', 'user.name', 'Unit scope test');
+    git('config', 'user.email', 'unit-scope@example.invalid');
+    write('README.md');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'base');
+    git('remote', 'add', 'origin', repo);
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    const scope = paths => {
+      git('checkout', '--quiet', '-B', 'head', 'origin/main');
+      for (const path of paths) write(path);
+      git('add', '.');
+      git('commit', '--quiet', '--allow-empty', '-m', 'head');
+      const output = join(root, `output-${Math.random()}`);
+      const result = spawnSync('/bin/bash', ['-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          GITHUB_OUTPUT: output,
+        },
+      });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      return Object.fromEntries(
+        readFileSync(output, 'utf8')
+          .trim()
+          .split('\n')
+          .map(line => line.split('='))
+          .filter(([key]) => key !== 'base')
+      );
+    };
+    // Test-only edits are exactly the diffs the coverage ratchet skips, so
+    // they must still select their related tests.
+    const expectScope = (paths, web, ui, ovie, ci) =>
+      assert.deepEqual(scope(paths), { web, ui, ovie, ci }, paths.join(','));
+    expectScope(
+      ['apps/web/tests/unit/a/b.test.ts'],
+      'true',
+      'false',
+      'false',
+      'false'
+    );
+    expectScope(
+      ['packages/ui/src/button.tsx'],
+      'true',
+      'true',
+      'false',
+      'false'
+    );
+    expectScope(['apps/ovie/app/page.tsx'], 'false', 'false', 'true', 'false');
+    expectScope(['pnpm-lock.yaml'], 'true', 'false', 'false', 'false');
+    // Web tests import scripts/ and .github/ modules, and tests/unit/ci read
+    // workflow YAML from disk: both select tests (review finding on #22360).
+    expectScope(
+      ['scripts/ci-fast-lanes.mjs'],
+      'true',
+      'false',
+      'false',
+      'true'
+    );
+    expectScope(['.github/workflows/ci.yml'], 'true', 'false', 'false', 'true');
+    // Nothing unit-affecting: a non-applicable receipt, no tests run.
+    expectScope(
+      ['docs/PR_FLOW.md', 'apps/ios/A.swift'],
+      'false',
+      'false',
+      'false',
+      'false'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('UI-path axe gate blocks PR Ready and stays quiet for non-UI diffs', () => {
+  const workflow = sourceValidationWorkflow();
+  const job = workflow.jobs.a11y;
+  assert.equal(job.name, 'A11y (UI paths)');
+  assert.equal(job['continue-on-error'], undefined);
+  assert.equal(job.if, undefined);
+  assert.deepEqual(workflow.jobs.ready.needs, [
+    'deterministic',
+    'security',
+    'migration',
+    'coverage',
+    'unit',
+    'a11y',
+  ]);
+  const run = job.steps.find(
+    step => step.name === 'Run rendered WCAG 2.2 AA gate'
+  );
+  assert.match(run.run, /playwright\.a11y-gate\.config\.ts/);
+  assert.match(run.if, /steps\.scope\.outputs\.ui == 'true'/);
+  assert.equal(run['continue-on-error'], undefined);
+  assert.match(
+    workflow.jobs.deterministic.steps.find(
+      step => step.name === 'Run deterministic source contract'
+    ).run,
+    /node apps\/web\/scripts\/a11y-wcag-standard-check\.cjs/
+  );
+  const script = job.steps
+    .find(step => step.id === 'scope')
+    .run.replace(/\$\{\{\s*github\.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-a11y-scope-'));
+  const repo = join(root, 'repo');
+  mkdirSync(repo, { recursive: true });
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  const write = path => {
+    mkdirSync(join(repo, path, '..'), { recursive: true });
+    writeFileSync(join(repo, path), `${path}\n`);
+  };
+  try {
+    git('init', '--quiet', '--initial-branch=main');
+    git('config', 'user.name', 'A11y scope test');
+    git('config', 'user.email', 'a11y-scope@example.invalid');
+    write('README.md');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'base');
+    git('remote', 'add', 'origin', repo);
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    const scope = paths => {
+      git('checkout', '--quiet', '-B', 'head', 'origin/main');
+      for (const path of paths) write(path);
+      git('add', '.');
+      git('commit', '--quiet', '--allow-empty', '-m', 'head');
+      const output = join(root, `output-${Math.random()}`);
+      const result = spawnSync('/bin/bash', ['-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          GITHUB_OUTPUT: output,
+        },
+      });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      return readFileSync(output, 'utf8');
+    };
+    assert.match(scope(['README.md']), /ui=false/);
+    assert.match(scope(['apps/web/lib/billing/plan.ts']), /ui=false/);
+    assert.match(scope(['apps/web/components/Button.tsx']), /ui=true/);
+    assert.match(scope(['docs/ACCESSIBILITY.md']), /ui=true/);
+    assert.match(
+      scope(['apps/web/lib/a11y-gates/wcag-standard.cjs']),
+      /ui=true/
+    );
+    assert.match(
+      scope(['apps/web/scripts/a11y-wcag-standard-check.cjs']),
+      /ui=true/
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

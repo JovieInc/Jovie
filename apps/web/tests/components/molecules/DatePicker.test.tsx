@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/components/atoms/Calendar', () => ({
@@ -14,28 +13,6 @@ vi.mock('@/components/atoms/Calendar', () => ({
     >
       Select May 20 2030
     </button>
-  ),
-}));
-
-vi.mock('@jovie/ui/atoms/popover', () => ({
-  Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
-  PopoverContent: ({
-    children,
-    className,
-    size,
-  }: {
-    children: ReactNode;
-    className?: string;
-    size?: string;
-  }) => (
-    <div
-      data-testid='date-picker-popover-content'
-      data-size={size}
-      className={className}
-    >
-      {children}
-    </div>
   ),
 }));
 
@@ -80,7 +57,34 @@ describe('formatDatePickerValue', () => {
 });
 
 describe('DatePicker', () => {
-  it('renders the placeholder on the canonical compact trigger', () => {
+  it.each([false, true])(
+    'keeps date selection usable with disablePortal=%s',
+    async disablePortal => {
+      const onChange = vi.fn();
+      render(
+        <aside aria-label='Release details'>
+          <DatePicker
+            id='date'
+            value=''
+            onChange={onChange}
+            disablePortal={disablePortal}
+          />
+        </aside>
+      );
+      const drawer = screen.getByRole('complementary', {
+        name: 'Release details',
+      });
+      await userEvent.click(
+        within(drawer).getByRole('button', { name: 'Pick a date' })
+      );
+      const day = screen.getByTestId('calendar-select-date');
+      expect(drawer.contains(day)).toBe(disablePortal);
+      await userEvent.click(day);
+      expect(onChange).toHaveBeenCalledExactlyOnceWith('2030-05-20');
+    }
+  );
+
+  it('renders the placeholder on the canonical compact trigger', async () => {
     render(<DatePicker id='date' value='' onChange={vi.fn()} />);
 
     const trigger = screen.getByRole('button', { name: /Pick a date/ });
@@ -89,13 +93,9 @@ describe('DatePicker', () => {
     expect(trigger.className).toContain('before:h-11');
     expect(trigger.className).toContain('rounded-lg');
     expect(trigger.className).toContain('text-tertiary-token');
-    expect(screen.getByTestId('date-picker-popover-content')).toHaveClass(
-      'w-auto'
-    );
-    expect(screen.getByTestId('date-picker-popover-content')).toHaveAttribute(
-      'data-size',
-      'bare'
-    );
+    await userEvent.click(trigger);
+    expect(screen.getByTestId('popover-content')).toHaveClass('w-auto');
+    expect(screen.getByTestId('popover-content')).toHaveClass('p-0');
   });
 
   it('renders the formatted selected date', () => {
@@ -116,6 +116,7 @@ describe('DatePicker', () => {
     const onChange = vi.fn();
     render(<DatePicker id='date' value='' onChange={onChange} />);
 
+    await user.click(screen.getByRole('button', { name: 'Pick a date' }));
     await user.click(screen.getByTestId('calendar-select-date'));
 
     expect(onChange).toHaveBeenCalledWith('2030-05-20');

@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { SIDEBAR_ENTRY_ROW_CLASS } from './sidebar-optical';
 import { Tooltip } from './Tooltip';
 
 // SidebarNavItem — single nav row in the shell sidebar. Icon + label with
@@ -41,11 +42,11 @@ interface SidebarNavChromeOptions {
 // Create actions stay compact. New Chat uses the primary tone so an enabled
 // create control cannot inherit muted/disabled icon chrome.
 const SIDEBAR_SECONDARY_CHROME =
-  'w-fit grid-cols-[18px_auto] gap-x-1.5 px-2.5 text-sidebar-item-foreground font-medium hover:bg-sidebar-accent';
+  'w-fit text-sidebar-item-foreground font-medium hover:bg-sidebar-accent';
 
 // Elevated create treatment for the New Chat primary action.
 const SIDEBAR_PRIMARY_CHROME =
-  'w-fit grid-cols-[18px_auto] gap-x-1.5 bg-sidebar-accent/40 px-2.5 text-sidebar-item-foreground font-medium shadow-none hover:bg-sidebar-accent/70';
+  'w-fit bg-sidebar-accent/40 text-sidebar-item-foreground font-medium shadow-none hover:bg-sidebar-accent/70';
 
 // Active state uses a quiet neutral fill with primary-token type and a Jovie teal icon.
 // Avoid a left rail or guide decoration so every shared sidebar consumer keeps
@@ -79,26 +80,17 @@ export function getSidebarNavRowClassName({
   active,
   collapsed,
   nested,
-  tight,
-  trailingOverlay,
   calm,
   tone = 'default',
   className,
 }: SidebarNavChromeOptions) {
-  const nonCollapsedSize = tight ? 'h-6 px-2.5' : 'h-7 px-2.5';
-
   return cn(
     'relative grid items-center rounded-full transition-[background-color,box-shadow,color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
-    tone === 'primary' || tone === 'secondary' ? undefined : 'w-full',
-    'font-normal',
-    tight ? 'gap-x-2 text-xs' : 'gap-x-2.5 text-xs',
+    'font-normal text-xs',
     collapsed
-      ? 'h-7 w-10 mx-auto grid-cols-1 place-items-center'
+      ? 'h-(--app-shell-sidebar-row-height) w-10 mx-auto grid-cols-1 place-items-center'
       : cn(
-          trailingOverlay
-            ? 'grid-cols-[18px_minmax(0,1fr)]'
-            : 'grid-cols-[18px_minmax(0,1fr)_minmax(34px,auto)]',
-          nonCollapsedSize,
+          SIDEBAR_ENTRY_ROW_CLASS,
           'group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center'
         ),
     getToneClassName({ active, nested, tone }),
@@ -107,7 +99,7 @@ export function getSidebarNavRowClassName({
     // border, so resting and active rows share the same row geometry.
     calm &&
       !collapsed &&
-      'h-7 rounded-lg grid-cols-(--app-shell-sidebar-nav-grid) gap-x-(--space-2-5) text-(length:--text-app) after:absolute after:inset-x-0 after:-inset-y-1 after:lg:hidden',
+      'rounded-lg text-(length:--text-app) after:absolute after:inset-x-0 after:-inset-y-1 after:lg:hidden',
     className
   );
 }
@@ -115,9 +107,7 @@ export function getSidebarNavRowClassName({
 export function getSidebarNavIconClassName({
   active,
   nested,
-  tight,
   tone,
-  calm,
   className,
 }: SidebarNavChromeOptions) {
   const inactiveIconColor = nested
@@ -125,8 +115,7 @@ export function getSidebarNavIconClassName({
     : 'text-sidebar-muted/70';
 
   return cn(
-    'shrink-0 justify-self-center',
-    tight ? 'h-3 w-3' : 'h-3.5 w-3.5',
+    'size-(--app-shell-sidebar-icon-size) shrink-0 justify-self-center',
     // The selected row deliberately owns white label text. Keep its icon on
     // the canonical Jovie teal token so the active signal remains quiet.
     tone === 'primary'
@@ -134,7 +123,6 @@ export function getSidebarNavIconClassName({
       : active && tone !== 'secondary'
         ? 'text-accent-teal!'
         : inactiveIconColor,
-    calm && 'size-(--app-shell-sidebar-icon-size)',
     className
   );
 }

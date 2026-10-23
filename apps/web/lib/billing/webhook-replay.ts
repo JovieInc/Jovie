@@ -18,6 +18,12 @@ import {
   handleMerchCheckoutCompleted,
 } from '@/lib/merch/orders';
 import { processStripeWebhookEvent } from '@/lib/stripe/webhooks/process-event';
+import {
+  isStripeReconciliationRequiredError,
+  markStripeEventNeedsReconciliation,
+  reconciledAtOnSuccess,
+  reconciledStatusOnSuccess,
+} from '@/lib/stripe/webhooks/reconciliation';
 import { logger } from '@/lib/utils/logger';
 
 const WEBHOOK_REDRIVE_AFTER_MS = 2 * 60 * 60 * 1000;
@@ -42,6 +48,8 @@ export interface WebhookReplaySummary {
   processed: number;
   blocked: ReplayIssue[];
   failed: ReplayIssue[];
+  /** Still cannot be applied (e.g. price not mapped yet); stays queued. */
+  needsReconciliation: ReplayIssue[];
 }
 
 class ManualStripeReplayRequiredError extends Error {
@@ -89,6 +97,7 @@ export async function replayUnprocessedStripeWebhooks(
     processed: 0,
     blocked: [],
     failed: [],
+    needsReconciliation: [],
   };
 
   for (const candidate of candidates) {
@@ -130,7 +139,12 @@ async function replayOne(
     const [marked] = await withSystemIngestionSession(tx =>
       tx
         .update(stripeWebhookEvents)
-        .set({ processedAt: now, processingStartedAt: null })
+        .set({
+          processedAt: now,
+          processingStartedAt: null,
+          reconciliationStatus: reconciledStatusOnSuccess,
+          reconciledAt: reconciledAtOnSuccess(now),
+        })
         .where(owned(candidate.id, now))
         .returning({ id: stripeWebhookEvents.id })
     );
@@ -154,6 +168,29 @@ async function replayOne(
     if (error instanceof ManualStripeReplayRequiredError) {
       summary.blocked.push(issue);
       return;
+    }
+
+    if (isStripeReconciliationRequiredError(error)) {
+      // Keep the lease (see above) and refresh the durable marker. A failed
+      // write is reported as a replay failure, never as processed.
+      try {
+        await markStripeEventNeedsReconciliation({
+          webhookRecordId: candidate.id,
+          stripeEventId: candidate.stripeEventId,
+          eventType: candidate.type,
+          route: '/api/cron/billing-reconciliation',
+          error,
+          leaseStartedAt: now,
+          keepLease: true,
+          now,
+        });
+        summary.needsReconciliation.push(issue);
+        return;
+      } catch (markError) {
+        issue.reason = `${reason}; reconciliation marker failed: ${
+          markError instanceof Error ? markError.message : String(markError)
+        }`;
+      }
     }
 
     logger.warn('[billing-webhook-replay] stored event failed', issue);

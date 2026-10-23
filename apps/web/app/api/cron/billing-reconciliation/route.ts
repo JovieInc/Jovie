@@ -77,6 +77,7 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
     processed: 0,
     blocked: [],
     failed: [],
+    needsReconciliation: [],
   };
   let result: ReconciliationResult | undefined;
   let failure: unknown;
@@ -89,6 +90,10 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
       ),
       ...webhookReplay.failed.map(
         issue => `Webhook ${issue.stripeEventId} failed: ${issue.reason}`
+      ),
+      ...webhookReplay.needsReconciliation.map(
+        issue =>
+          `Webhook ${issue.stripeEventId} needs reconciliation: ${issue.reason}`
       )
     );
 
@@ -101,7 +106,8 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
       success:
         stats.errors === 0 &&
         webhookReplay.blocked.length === 0 &&
-        webhookReplay.failed.length === 0,
+        webhookReplay.failed.length === 0 &&
+        webhookReplay.needsReconciliation.length === 0,
       stats,
       errors,
       duration,

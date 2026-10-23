@@ -35,6 +35,7 @@ import {
   NODE_RUNTIME_CONTRACT_COMMAND,
   NODE_RUNTIME_CONTRACT_PATHS,
   OFFLINE_FAILURE_COVERAGE_COMMAND,
+  PEN_TOKEN_PARITY_COMMAND,
   runBiome,
   runCopyGate,
   runEslintServerBoundaries,
@@ -284,6 +285,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_brand_scrub.py',
       'scripts/tests/test_agent_workflow_hygiene.py',
       'scripts/tests/test_runner_routing.py',
+      'scripts/tests/test_signal_watch.py',
+      'scripts/tests/test_x_grok.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
@@ -350,7 +353,8 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(27);
+    expect(LANES_PYTEST_FILES).toHaveLength(28);
+    expect(whole).toContain('scripts/tests/test_model_radar.py');
     expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
     expect(new Set(shards.map(shard => shard.data)).size).toBe(4);
     const combine = command.indexOf(
@@ -1058,6 +1062,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast',
       'merge-group-guards',
       'node-runtime-contracts',
+      'pen-token-parity',
       'profile-admission',
       'scripts-typecheck',
       'shadcn-lint-contracts',
@@ -1498,6 +1503,36 @@ describe('ci-fast bounded parallel workflow', () => {
     ].map(marker => warm.indexOf(marker));
     expect(order.every((at, i) => at > (order[i - 1] ?? 0))).toBe(true);
 
+    // Source Validation typechecks the same three web programs but previously
+    // started cold. It may only restore the main-scoped buildinfo (same
+    // fallbacks as tsc-cache-warm). It must not save: PR caches are invisible
+    // to merge_group and fill the Actions cache cap.
+    const sourceValidation = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
+      'utf8'
+    );
+    const svRestoreStart = sourceValidation.indexOf(
+      '- name: Restore web tsc incremental state'
+    );
+    const svContract = sourceValidation.indexOf(
+      '- name: Run deterministic source contract'
+    );
+    expect(svRestoreStart).toBeGreaterThan(-1);
+    expect(svRestoreStart).toBeLessThan(svContract);
+    const svRestore = sourceValidation.slice(svRestoreStart, svContract);
+    expect(svRestore).toContain(`uses: actions/cache/restore@${cacheSha}`);
+    expect(svRestore).toContain('path: apps/web/.cache/tsbuildinfo*\n');
+    expect(svRestore).toContain('id: web-tsbuildinfo');
+    expect(svRestore).not.toContain('actions/cache/save');
+    const [svKey, ...svFallbacks] = keys(svRestore).map(line => line.trim());
+    expect(svFallbacks).toEqual(warmFallbacks);
+    expect(
+      svKey.replace(/h\$\{\{ steps\.tsc-cache-hour\.outputs\.hour }}$/, '')
+    ).toBe(ciKey.replace('${{ github.sha }}', ''));
+    expect(
+      sourceValidation.match(/uses: actions\/cache\/save@/g) ?? []
+    ).toHaveLength(0);
+
     // The gate itself is unchanged: turbo never replays a cached verdict.
     expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');
   });
@@ -1592,6 +1627,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-system-source-ratchet',
       'design-exception-registry',
       'design-governance-enforcement',
+      'pen-token-parity',
       'design-conformance',
       'ios-fast',
       'profile-admission',
@@ -1640,6 +1676,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'copy-gate': COPY_GATE_COMMAND,
       'source-guards': SOURCE_GUARDS_COMMAND,
       'node-runtime-contracts': NODE_RUNTIME_CONTRACT_COMMAND,
+      'pen-token-parity': PEN_TOKEN_PARITY_COMMAND,
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
         ' && ' +
@@ -1860,7 +1897,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/tests/',
       'apps/web/styles/',
       'packages/ui/',
-      'chromatic\\.config\\.json$',
       'package\\.json$',
       'DESIGN\\.md$',
       'design\\.tokens\\.json$',
@@ -1986,7 +2022,10 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check'
+    );
+    expect(PACKAGE_JSON.scripts['ownership:check']).toBe(
+      'node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report'
     );
     const controlStages = buildControlTestCommands();
     expect(controlStages).toContainEqual([
@@ -2724,7 +2763,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/.storybook/main.ts',
       'apps/web/.storybook/preview.tsx',
       'apps/web/.storybook/stories/elevation-matrix.stories.tsx',
-      'chromatic.config.json',
     ]) {
       expect(selectsStructural.test(storybookHarnessPath)).toBe(true);
     }
@@ -2766,7 +2804,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
   });
 
-  it('runs hosted structural CI for Storybook, Chromatic, and token-guard inputs', () => {
+  it('runs hosted structural CI for Storybook and token-guard inputs', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -2798,7 +2836,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(
       uiRe.test('apps/web/.storybook/stories/elevation-matrix.stories.tsx')
     ).toBe(true);
-    expect(uiRe.test('chromatic.config.json')).toBe(true);
+    expect(uiRe.test('chromatic.config.json')).toBe(false);
     expect(uiRe.test('scripts/shared-ui-visual-arbitrary-audit.mjs')).toBe(
       true
     );

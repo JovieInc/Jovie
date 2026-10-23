@@ -4,6 +4,7 @@ import {
   MarketingEditorialHeroPhoto,
   MarketingHero,
 } from '@/components/marketing';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import type {
   BlogPostSummary,
   ResolvedAuthor,
@@ -54,7 +55,7 @@ export function BlogFeed({ entries }: Readonly<BlogFeedProps>) {
             Blog
           </h1>
           <p className='max-w-xl text-lg leading-relaxed text-secondary-token'>
-            Posts coming soon.
+            {COPY_FALLBACKS.posts}
           </p>
         </BlogHeroFrame>
       </div>

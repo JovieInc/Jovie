@@ -1,0 +1,119 @@
+{
+  "schema": "jovie-research-sources/v1",
+  "reviewed": "2026-10-20",
+  "freshnessTtlMs": {
+    "live": 900000,
+    "day": 21600000,
+    "week": 259200000,
+    "month": 1209600000,
+    "evergreen": 7776000000
+  },
+  "judge": {
+    "order": ["clef-flash", "jev"],
+    "keepScore": 1.5,
+    "goodScore": 2,
+    "enoughGood": { "quick": 2, "standard": 3, "deep": 5 }
+  },
+  "sources": {
+    "gbrain": {
+      "tier": 0,
+      "kind": "search",
+      "billing": "free",
+      "note": "Local shared brain via the loopback MCP daemon (127.0.0.1:7801). Not a third-party API."
+    },
+    "repo": {
+      "tier": 0,
+      "kind": "search",
+      "billing": "free",
+      "note": "ripgrep over canon/, docs/, .claude/rules/, CLAUDE.md and AGENTS.md in the current checkout."
+    },
+    "cloudflare-fetch": {
+      "tier": 1,
+      "kind": "fetch",
+      "billing": "credits",
+      "apiProvider": "cloudflare",
+      "usdPerCall": 0.0005,
+      "caps": { "dailyCalls": 300, "monthlyCalls": 6000 },
+      "note": "Browser Rendering /markdown. Cloudflare credits; replaces Firecrawl scrape for single URLs."
+    },
+    "firecrawl": {
+      "tier": 1,
+      "kind": "search",
+      "billing": "plan-credits",
+      "apiProvider": "firecrawl",
+      "usdPerCall": 0,
+      "creditsPerCall": 2,
+      "caps": { "dailyCalls": 40, "monthlyCalls": 400 },
+      "note": "Existing plan: 1000 credits per billing month; search costs 2 credits per 5 results. Cap keeps 20% for crawl jobs."
+    },
+    "last30days": {
+      "tier": 1,
+      "kind": "social",
+      "billing": "free",
+      "usdPerCall": 0,
+      "caps": { "dailyCalls": 20, "monthlyCalls": 300 },
+      "note": "~/.claude/skills/last30days engine (Reddit, HN, X, YouTube, GitHub). ScrapeCreators free calls."
+    },
+    "hyperagent": {
+      "tier": 1,
+      "kind": "deep",
+      "billing": "credits",
+      "apiProvider": "hyperagent",
+      "usdPerCall": 0.05,
+      "caps": {
+        "dailyCalls": 12,
+        "monthlyCalls": 200,
+        "dailyUsd": 1,
+        "monthlyUsd": 15
+      },
+      "agentId": "cmtkwfvld033b06adh0pqnx6a",
+      "note": "Thread on the GLM 5.3 Flash agent (auto mode, Exa web search inside the thread). Deep mode only: minutes, not seconds."
+    },
+    "exa": {
+      "tier": 2,
+      "kind": "search",
+      "billing": "paid",
+      "apiProvider": "exa",
+      "usdPerCall": 0.007,
+      "caps": {
+        "dailyCalls": 150,
+        "monthlyCalls": 2000,
+        "dailyUsd": 1,
+        "monthlyUsd": 15
+      },
+      "note": "Existing EXA_API_KEY. Measured $0.007 per auto search with highlights (2026-10-20)."
+    },
+    "perplexity": {
+      "tier": 2,
+      "kind": "answer",
+      "billing": "paid",
+      "apiProvider": "perplexity",
+      "usdPerCall": 0.006,
+      "caps": { "dailyCalls": 0, "monthlyCalls": 0 },
+      "note": "Disabled: no credential on this machine. Enabling is new spend and needs Tim."
+    },
+    "clef-flash": {
+      "tier": -1,
+      "kind": "judge",
+      "billing": "credits",
+      "apiProvider": "cloudflare",
+      "usdPerCall": 0.00002,
+      "caps": { "dailyCalls": 5000, "monthlyCalls": 60000 },
+      "note": "Cloudflare Workers AI decision model (@cf/cloudflare/clef-flash, $0.038/M input) on Cloudflare credits."
+    },
+    "jev": {
+      "tier": -1,
+      "kind": "judge",
+      "billing": "paid",
+      "apiProvider": "ai-gateway",
+      "usdPerCall": 0.00003,
+      "caps": {
+        "dailyCalls": 3000,
+        "monthlyCalls": 40000,
+        "dailyUsd": 0.25,
+        "monthlyUsd": 3
+      },
+      "note": "typesafe-ai/jev evaluation model on the Vercel AI Gateway. Measured $0.000022 per 3-result call."
+    }
+  }
+}

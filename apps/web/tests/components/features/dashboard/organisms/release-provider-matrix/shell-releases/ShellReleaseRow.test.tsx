@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
@@ -27,6 +28,16 @@ beforeEach(() => {
     playbackStatus: 'idle',
   };
 });
+
+// Expose the Next Link contract without starting a router in jsdom.
+vi.mock('next/link', () => ({
+  default: forwardRef<
+    HTMLAnchorElement,
+    ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+  >(function TestLink({ prefetch, ...props }, ref) {
+    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
+  }),
+}));
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
@@ -61,6 +72,25 @@ function fakeRelease(
 }
 
 describe('ShellReleaseRow audio affordance', () => {
+  it('opens the smart link without prefetching or selecting the row', async () => {
+    const onSelect = vi.fn();
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({ id: 'r1', title: 'Lost in the Light' })}
+        isSelected={false}
+        onSelect={onSelect}
+      />
+    );
+    const link = screen.getByRole('link', {
+      name: 'Open smart link for Lost in the Light',
+    });
+    expect(link).toHaveAttribute('href', '/lost-in-the-light');
+    expect(link).toHaveAttribute('data-prefetch', 'false');
+    expect(link).toHaveAttribute('target', '_blank');
+    await userEvent.click(link);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it('uses shared row state tokens for selected releases', () => {
     const { container } = render(
       <ShellReleaseRow
@@ -75,7 +105,13 @@ describe('ShellReleaseRow audio affordance', () => {
     );
 
     const row = container.querySelector('[data-shell-release-row]');
-    expect(row).toHaveAttribute('aria-selected', 'true');
+    // Rows are `listitem`s inside `role="list"` — an ARIA `option` cannot
+    // contain the row's real controls (axe nested-interactive), so selection
+    // stays visual (`data-selected` + selected tokens), not `aria-selected`.
+    expect(row).toHaveAttribute('role', 'listitem');
+    // name-from-author: the row announces its release title.
+    expect(row).toHaveAttribute('aria-label', 'Lost in the Light');
+    expect(row).not.toHaveAttribute('aria-selected');
     expect(row).toHaveAttribute('data-selected', 'true');
     expect(row?.className).toContain('system-b-table-row-selected');
     expect(row?.className).toContain('system-b-table-row-focus-visible');
@@ -102,7 +138,7 @@ describe('ShellReleaseRow audio affordance', () => {
     });
 
     expect(row?.className).toContain('system-b-table-row-shell');
-    expect(row?.className).toContain('h-14');
+    expect(row?.className).toContain('h-8');
     expect(slot).toHaveClass('system-b-table-contextual-action');
     expect(slot.className).not.toContain('group-hover/row');
     expect(trigger.className).not.toContain('group-hover/row');
@@ -406,7 +442,7 @@ describe('ShellReleaseRow enrichment', () => {
       />
     );
     const idleRow = idle.container.querySelector('[data-shell-release-row]');
-    expect(idleRow?.className).toContain('h-14');
+    expect(idleRow?.className).toContain('h-8');
     idle.unmount();
 
     const syncing = render(
@@ -423,7 +459,7 @@ describe('ShellReleaseRow enrichment', () => {
     // Same fixed row height token in both states — the sync chrome lives
     // inside the existing single-line subtitle and an absolutely-positioned
     // pulse, so adding it cannot reflow the row.
-    expect(syncingRow?.className).toContain('h-14');
+    expect(syncingRow?.className).toContain('h-8');
   });
 });
 

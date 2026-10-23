@@ -5,9 +5,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import { cockpitMetrics } from '@/tests/fixtures/hud-cockpit';
 
 beforeEach(() => {
-  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-28T12:00:00.000Z'));
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-09-28T12:00:00.000Z'));
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => vi.useRealTimers());
 
 describe('HudDrilldownSearch', () => {
   it('clears the previous scope query so switching cannot hide active exceptions', () => {

@@ -115,7 +115,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(
       screen.getByText('Start 14-day Artist Presence trial')
     ).toBeInTheDocument();
-    expect(screen.getByText(/199\/month/)).toBeInTheDocument();
+    expect(screen.getByText(/\$12\/month/)).toBeInTheDocument();
     expect(screen.getByText(/No credit card/)).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')
@@ -200,7 +200,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     searchParamsState.value = 'plan=pro&interval=annual';
     const { rerender } = render(<AuthShell mode='sign-up' />);
     expect(screen.getByText('Choose an available plan')).toBeInTheDocument();
-    expect(screen.queryByText(/199\/month/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\$12\/month/)).not.toBeInTheDocument();
     searchParamsState.value = 'plan=max';
     rerender(<AuthShell mode='sign-up' />);
     expect(screen.getByText('Contact sales')).toBeInTheDocument();
@@ -214,6 +214,31 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(
       container.querySelector('[data-auth-shell-ready="true"]')
     ).not.toBeNull();
+  });
+
+  it('renders the full-page shell as one hairline focal card with left-aligned identity', () => {
+    const { container } = render(<AuthShell mode='sign-in' />);
+    const card = container.querySelector('[data-auth-surface-card]');
+    expect(card).not.toBeNull();
+    expect(card).toHaveClass('rounded-lg');
+    expect(card).toHaveClass('border-subtle');
+    expect(card).toHaveClass('bg-surface-1');
+    const identity = container.querySelector('[data-auth-shell-identity]');
+    expect(identity).toHaveClass('items-start');
+    expect(identity).toHaveClass('text-left');
+    const divider = container.querySelector('[data-auth-method-divider]');
+    expect(divider?.textContent).toContain('or use email');
+    expect(divider?.textContent).toBe('or use email');
+  });
+
+  it('keeps intercepted modal and marketing captures centered without the card', () => {
+    const { container } = render(<AuthShell mode='sign-in' compact />);
+    const modalCard = container.querySelector('[data-auth-surface-card]');
+    expect(modalCard).not.toBeNull();
+    expect(modalCard).not.toHaveClass('bg-surface-1');
+    expect(container.querySelector('[data-auth-shell-identity]')).toHaveClass(
+      'items-center'
+    );
   });
 
   it('keeps OAuth buttons disabled until client hydration attaches handlers', async () => {
