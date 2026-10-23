@@ -589,6 +589,12 @@ describe('ShellReleasesView', () => {
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
     expect(screen.getByText('Other')).toBeInTheDocument();
+    // The catalog is a native list (not an ARIA listbox): rows own real
+    // per-cell controls, which an ARIA `option` cannot contain (axe
+    // nested-interactive).
+    const list = screen.getByRole('list', { name: 'Releases' });
+    expect(list.tagName).toBe('UL');
+    expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
   });
 
   it('shows the connect-Spotify empty state when not yet connected', () => {
