@@ -60,6 +60,9 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // /product/command-palette keeps the full headline with text-balance;
   // the heading does not use line-clamp.
   'apps/web/app/(marketing)/product/command-palette/CommandPaletteLanding.tsx',
+  // /product/utm-links is a new marketing h1. The shrink-only headline
+  // ratchet rejects a new line-clamp token, so the title stays complete.
+  'apps/web/app/(marketing)/product/utm-links/UtmLinksLanding.tsx',
   // /product/isrc is a new marketing h1. The shrink-only headline ratchet
   // rejects a new line-clamp token, so the title stays complete.
   'apps/web/app/(marketing)/product/isrc/IsrcLanding.tsx',
