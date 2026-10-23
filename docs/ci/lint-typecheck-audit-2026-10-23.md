@@ -162,6 +162,24 @@ spent 92s on disk-read contracts and 320s on the deterministic contract.
 [39895447664](https://github.com/JovieInc/Jovie/actions/runs/39895447664)
 hit the cache and skipped typecheck. Job wall 40s, mostly setup-node.
 
+This pull request's Source Validation
+([39896793480](https://github.com/JovieInc/Jovie/actions/runs/39896793480))
+restored `jovie-web-tsbuildinfo-v2-Linux-…-h2026102303` in about 1s (cache
+hit). The deterministic step was 81s and the job was 264s. That is not a
+336s → 81s typecheck win: turbo `--affected` ran 0 typecheck tasks (189ms)
+because the diff does not touch a package program. What did run with the
+restored incremental state:
+
+| Program | This run | Prior cold note in the workflow |
+| --- | ---: | --- |
+| Web tests (`tsc --noEmit --incremental` via the baseline runner) | 13.7s | comment cites 100s |
+| Web stories | 6.6s | comment cites 66s |
+| Scripts baseline | 15.5s | merge-group lane 19.0s |
+| Full-tree Biome | 9s | local 11.6s |
+
+The app program's cold-to-warm gap remains the local measurement (104s → 12s).
+It shows up on pull requests that actually typecheck `@jovie/web`.
+
 Lint is not the merge-queue bottleneck. The pull-request bottleneck is the
 deterministic contract (typecheck with a cold buildinfo, full-tree Biome,
 changed-file ESLint, and the harness scripts) plus disk-read contracts and
@@ -214,16 +232,20 @@ CI cache:
 ### tsgo / TypeScript 7
 
 npm on this date: `typescript` 7.0.2 and `@typescript/native-preview`
-7.0.0-dev.20260707.2. Both install and print a version from `/tmp/tsgo-audit`
-(not the repo, lockfile untouched). A side-by-side check of
-`apps/web/tsconfig.typecheck.json` was not used as a gate. Web sets
-`ignoreDeprecations: "6.0"`, which TypeScript 7 can reject, and
-`apps/web/tsconfig.json` loads the Next type plugin. Tools that import the
-`typescript` package (ESLint, Next) still need the 6.x API. Shipping a
-compiler major in this audit would not be a low-risk speedup. The local
-6.0.3 cold check is 89s of the 104s wall; a native compiler is the large
-remaining typecheck win after the buildinfo restore, and it needs a
-diagnostic diff against 6.0.3 first.
+7.0.0-dev.20260707.2 (`tsgo`). Both install from `/tmp/tsgo-audit` (lockfile
+untouched). Neither can check this repo yet:
+
+| Command | Exit | Diagnostic |
+| --- | ---: | --- |
+| `tsgo -p apps/web/tsconfig.typecheck.json --noEmit --incremental false` | 1 | TS5102: `baseUrl` has been removed |
+| `tsc` 7.0.2, same arguments | 1 | TS5102, same message |
+| `tsgo -p packages/ui/tsconfig.json --noEmit --incremental false` | 1 | TS6379 composite projects may not disable incremental compilation; TS5102 `baseUrl` |
+
+No speedup number. A diagnostic diff needs a tsconfig migration first
+(`baseUrl` removal, and ui `composite` kept incremental). Web also sets
+`ignoreDeprecations: "6.0"` and the Next type plugin, which this probe did
+not reach. ESLint and Next still import the TypeScript 6 API. Not a safe
+change in this audit.
 
 ## 3. Lint migration
 
@@ -301,8 +323,8 @@ audit.
 
 | Priority | Change | Expected save | Risk | Effort | State |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Restore main's web `tsbuildinfo` in Source Validation, read-only | Local app program 92s cold to warm (104s → 12s). The deterministic step is 320–336s and also runs tests then stories, full-tree Biome, and changed ESLint. Expect on the order of 30–90s off that step when the PR is near main; less when a signature fans out. Merge-group lanes with a warm cache already finish in 67s wall. | Low. `tsc` re-hashes. No save. `--force` unchanged. | Contract test added | Shipped in [#22713](https://github.com/JovieInc/Jovie/pull/22713) |
-| 2 | TypeScript 7 / `tsgo` beside 6.0.3, then adopt only after diagnostics match | The 89s check phase is the piece a native compiler targets. Not measured on this repo's config. | High until `ignoreDeprecations`, the Next plugin, and diagnostic parity are clean. ESLint and Next keep importing TypeScript 6. | Separate project | Not shipped. Needs Tim's call after a parity diff |
+| 1 | Restore main's web `tsbuildinfo` in Source Validation, read-only | Local app program 92s cold to warm (104s → 12s). On [#22713](https://github.com/JovieInc/Jovie/pull/22713) the restore was a cache hit in ~1s; tests 13.7s and stories 6.6s (workflow comment: 100s + 66s cold). The app program did not run (`--affected`, 0 tasks). Do not read the 81s deterministic step as the app-program save. | Low. `tsc` re-hashes. No save. `--force` unchanged. | Contract test added | Shipped in [#22713](https://github.com/JovieInc/Jovie/pull/22713). This doc revision may follow if the merge queue releases the branch |
+| 2 | TypeScript 7 / `tsgo` after `baseUrl` is removed and diagnostics match 6.0.3 | Not measurable yet. Both binaries exit 1 on TS5102 before checking files. The 89s check phase is what a native compiler would target. | High. Config migration plus the Next plugin and TypeScript 6 imports in ESLint and Next. | Separate project | Not shipped. Needs Tim's call |
 | 3 | Close H-06 (fingerprint → guard or cannot-recur) | None. Stops repeated review comments from staying prose | Product. Exception expires 2026-10-31 | Summer | Not shipped. Needs Linear |
 | 4 | Full-tree ESLint `TIMING=1`, then delete only rules whose time is real and whose Biome equivalent matches on a violation diff | Unknown. Boundaries rules are 55ms of a 22s cold run, so do not expect a large win | Medium if a Next rule is dropped early | After the profile | Not shipped |
 | 5 | oxlint pre-pass | Likely none while custom rules stay in ESLint | Extra tool, duplicate findings | Only if priority 4 shows a replaceable family | Not shipped |
