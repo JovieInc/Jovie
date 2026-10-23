@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/dashboard/ContactDetailSidebar.test.tsx
 'use client';
 
 import {
