@@ -426,10 +426,24 @@ describe('EVENT routing qualification in the screen gate (JOV-7350)', () => {
       writeFileSync(
         input,
         JSON.stringify(
-          declaration([decision({ paths })], {
-            headSha: head,
-            changedPaths: paths,
-          })
+          declaration(
+            [
+              decision({ paths: paths.slice(0, 1) }),
+              ...(paths.length > 1
+                ? [
+                    {
+                      id: 'remaining-changes',
+                      kind: 'machine-correctness',
+                      paths: paths.slice(1),
+                      proposedEffect:
+                        'Verify remaining changes through existing CI.',
+                      evidence: ['docs/PR_FLOW.md'],
+                    },
+                  ]
+                : []),
+            ],
+            { headSha: head, changedPaths: paths }
+          )
         )
       );
       // Test-only producer boundary; no live card or authority receipt is filed.
@@ -478,6 +492,16 @@ describe('EVENT routing qualification in the screen gate (JOV-7350)', () => {
       assert.equal(receipt.certified, before.certified);
       assert.deepEqual(receipt.issues, before.issues);
       assert.equal(receipt.decisionRouting.status, 'founder-routed');
+      assert.deepEqual(receipt.decisionRouting.changedPaths, [...paths].sort());
+      assert.deepEqual(
+        receipt.decisionRouting.eventDelivery.receipts[0].changedPaths,
+        [...paths].sort()
+      );
+      assert.deepEqual(
+        receipt.decisionRouting.founderReviewCandidates[0].paths,
+        paths.slice(0, 1)
+      );
+
       assert.equal(receipt.decisionRouting.deliveryVerified, true);
       assert.equal(receipt.decisionRouting.approvalVerified, false);
       assert.equal(receipt.decisionRouting.runtimeProofAuthority, 'Gem');
