@@ -5,7 +5,10 @@ import {
   type ReversibleActivation,
 } from '../utils/reversible-control-detector';
 import { inspectShellMaterial } from './utils/shell-material-detector';
-import { waitForHydration } from './utils/smoke-test-utils';
+import {
+  gotoAuthenticatedChatRoute,
+  waitForHydration,
+} from './utils/smoke-test-utils';
 
 test.use({
   storageState: { cookies: [], origins: [] },
@@ -223,8 +226,25 @@ for (const side of ['left', 'right'] as const) {
         ? '#shell-left-rail [data-sidebar="sidebar"]'
         : '#shell-artist-profile-rail'
     );
+    // Since #22207 the left navigation opens only on explicit activation:
+    // a hover preview moved the toggle before the pointer could click it.
+    // The right inspector keeps its hover/focus preview.
+    const previewsOnHover = side === 'right';
     for (let cycle = 0; cycle < 10; cycle++) {
       await controls(page, side).hover();
+      if (!previewsOnHover) {
+        await expect(controls(page, side)).toHaveAttribute(
+          'aria-expanded',
+          'false'
+        );
+        await expect(controls(page, side)).toHaveAccessibleName(
+          'Expand sidebar'
+        );
+        await expect(notes).toBeFocused();
+        await expect.poll(async () => plane.boundingBox()).toEqual(initial);
+        await page.mouse.move(700, 450);
+        continue;
+      }
       await expect(controls(page, side)).toHaveAttribute(
         'aria-expanded',
         'true'
@@ -247,9 +267,12 @@ for (const side of ['left', 'right'] as const) {
     expect(
       (await page.context().cookies()).filter(c => c.name === 'sidebar:state')
     ).toEqual(cookies);
-    // Focus is equivalent access; explicit toggle pins the preview.
+    // Focus is equivalent access; explicit toggle pins the preview (right)
+    // or opens the navigation (left, which has no preview).
     await controls(page, side).focus();
-    await expect(controls(page, side)).toHaveAccessibleName(/Pin /);
+    await expect(controls(page, side)).toHaveAccessibleName(
+      previewsOnHover ? /Pin / : 'Expand sidebar'
+    );
     await controls(page, side).press('Enter');
     await expect(controls(page, side)).toHaveAccessibleName(
       side === 'left' ? 'Collapse sidebar' : /Hide .* profile/
@@ -298,16 +321,19 @@ test('route navigation keeps the shell attached and inspects rendered materials 
         document.documentElement.classList.toggle('dark', value === 'dark'),
       theme
     );
-    for (const [name, pathname] of [
-      ['New Chat', '/app/chat'],
-      ['Identity', '/app/presence'],
-      ['Work', '/app/library'],
-      ['Home', '/app'],
+    // [sidebar link, page heading, pathname]. The root link is `Inbox` since
+    // #20840 (header still titles `/app` as Home via breadcrumb-labels), and
+    // the Identity destination is titled `Profiles` since #20953.
+    for (const [linkName, heading, pathname] of [
+      ['New Chat', 'New Chat', '/app/chat'],
+      ['Identity', 'Profiles', '/app/presence'],
+      ['Work', 'Work', '/app/library'],
+      ['Inbox', 'Home', '/app'],
     ] as const) {
-      await page.getByRole('link', { name, exact: true }).click();
+      await page.getByRole('link', { name: linkName, exact: true }).click();
       await page.waitForURL(url => url.pathname === pathname);
       await expect(
-        page.getByRole('heading', { name, exact: true }).first()
+        page.getByRole('heading', { name: heading, exact: true }).first()
       ).toBeVisible();
       await expect(page.locator('[data-app-shell-frame]')).toHaveAttribute(
         'data-quality-probe',
@@ -333,7 +359,9 @@ test('chat profile stays mounted through closed, opening and interrupted exits',
   await page.getByRole('link', { name: 'New Chat', exact: true }).click();
   // E2E chat intentionally disables this surface unless its existing
   // profile fixture parameter is set; production enables it by default.
-  await page.goto('/app/chat?panel=profile');
+  await gotoAuthenticatedChatRoute(page, {
+    path: '/app/chat?panel=profile',
+  });
   await expect(
     page.getByRole('heading', { name: 'New Chat', exact: true })
   ).toBeVisible();

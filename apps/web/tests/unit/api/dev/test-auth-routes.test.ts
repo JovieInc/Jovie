@@ -8,6 +8,7 @@ const {
   mockCreateStoredNativeExchangeCode,
   mockEnsureDevTestAuthActor,
   mockEnsureExistingDevTestAuthActor,
+  mockProvisionDeterministicFreshDevTestActor,
   mockEnsureLiveDevTestAuthActor,
   mockGetSyntheticDevTestAuthActor,
   mockGetCachedDevTestAuthSession,
@@ -24,6 +25,7 @@ const {
   mockCreateStoredNativeExchangeCode: vi.fn(),
   mockEnsureDevTestAuthActor: vi.fn(),
   mockEnsureExistingDevTestAuthActor: vi.fn(),
+  mockProvisionDeterministicFreshDevTestActor: vi.fn(),
   mockEnsureLiveDevTestAuthActor: vi.fn(),
   mockGetSyntheticDevTestAuthActor: vi.fn(),
   mockGetCachedDevTestAuthSession: vi.fn(),
@@ -52,6 +54,8 @@ vi.mock('@/lib/auth/dev-test-auth.server', () => ({
   ],
   ensureDevTestAuthActor: mockEnsureDevTestAuthActor,
   ensureExistingDevTestAuthActor: mockEnsureExistingDevTestAuthActor,
+  provisionDeterministicFreshDevTestActor:
+    mockProvisionDeterministicFreshDevTestActor,
   ensureLiveDevTestAuthActor: mockEnsureLiveDevTestAuthActor,
   getSyntheticDevTestAuthActor: mockGetSyntheticDevTestAuthActor,
   getCachedDevTestAuthSession: mockGetCachedDevTestAuthSession,
@@ -295,6 +299,43 @@ describe('dev test-auth routes', () => {
       success: false,
       error: 'Unknown Better Auth test user',
     });
+    expect(mockProvisionDeterministicFreshDevTestActor).not.toHaveBeenCalled();
+  });
+
+  it('provisions a deterministic golden-path user when the persisted actor is missing', async () => {
+    mockEnsureExistingDevTestAuthActor
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        persona: 'creator',
+        clerkUserId: 'ba_golden',
+        email: 'gp-seed+clerk_test@test.jovie.com',
+        username: null,
+        fullName: 'Golden Path',
+        isAdmin: false,
+        profilePath: null,
+      });
+    mockProvisionDeterministicFreshDevTestActor.mockResolvedValueOnce(true);
+    mockBuildDevTestAuthCookieDescriptors.mockReturnValueOnce([]);
+
+    const { POST } = await import('@/app/api/dev/test-auth/session/route');
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/dev/test-auth/session', {
+        method: 'POST',
+        body: JSON.stringify({
+          persona: 'creator',
+          existingUserId: 'user_dev_gp_seed',
+          email: 'gp-seed+clerk_test@test.jovie.com',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockProvisionDeterministicFreshDevTestActor).toHaveBeenCalledWith({
+      existingUserId: 'user_dev_gp_seed',
+      email: 'gp-seed+clerk_test@test.jovie.com',
+    });
+    expect(mockEnsureExistingDevTestAuthActor).toHaveBeenCalledTimes(2);
   });
 
   it('accepts POST /session when the URL host is the server bind address but the request host is loopback', async () => {

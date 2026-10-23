@@ -5,8 +5,8 @@
 // recedes substantially rather than competing at nearly equal weight."
 //
 // Representative surface: the canonical homepage hero
-// (apps/web/components/homepage/HomepageIdentityHero.tsx), the flagship
-// marketing surface named in that component's own doc comment. This renders
+// (apps/web/components/homepage/HomepageArtistProfile.tsx), the flagship
+// marketing surface. This renders
 // the real component tree (not a source-text scan) and reads the actual
 // declared type-scale and ink tokens from its stylesheet, so a refactor that
 // makes the headline and support copy compete at nearly equal weight fails
@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { HomepageIdentityHero } from '@/components/homepage/HomepageIdentityHero';
+import { HomepageArtistHero } from '@/components/homepage/HomepageArtistProfile';
 import { contrastRatio } from '@/lib/utils/color';
 
 vi.mock('@/components/homepage/homepage-analytics', () => ({
@@ -45,8 +45,8 @@ vi.mock('next/image', () => ({
   },
 }));
 
-const HEADLINE_SELECTOR = '.marketing-h1-linear';
-const SUPPORT_SELECTOR = '.marketing-lead-linear';
+const HEADLINE_SELECTOR = '.marketing-type-display';
+const SUPPORT_SELECTOR = '.marketing-type-lede';
 // A minimum ratio, not the exact locked value (currently ~2.25x-3.2x): tight
 // enough that "nearly equal weight" fails closed, loose enough that routine
 // type-scale tuning does not make this brittle.
@@ -55,62 +55,104 @@ const read = (path: string) =>
   readFileSync(resolve(process.cwd(), path), 'utf8');
 
 function css(): string {
-  return `${read('app/globals.css')}\n${read('styles/linear-tokens.css')}`;
+  return read('app/globals.css');
+}
+
+/** First declaration of each custom property in the System B token sheet. */
+function tokenTable(): ReadonlyMap<string, string> {
+  const table = new Map<string, string>();
+  for (const match of read('styles/design-system.css').matchAll(
+    /(--[\w-]+):\s*([^;{}]+);/g
+  )) {
+    if (!table.has(match[1])) table.set(match[1], match[2].trim());
+  }
+  return table;
 }
 
 function cssBlock(source: string, selector: string): string {
   const start = source.indexOf(`${selector} {`);
   if (start === -1) {
-    throw new Error(`selector not found in HomepageIdentity.css: ${selector}`);
+    throw new Error(`selector not found in stylesheet: ${selector}`);
   }
   const end = source.indexOf('}', start);
   if (end === -1) {
-    throw new Error(
-      `unterminated rule for ${selector} in HomepageIdentity.css`
-    );
+    throw new Error(`unterminated rule for ${selector} in stylesheet`);
   }
   return source.slice(start, end);
 }
 
-function toPx(bound: string): number {
-  const trimmed = bound.trim();
-  const rem = /^([\d.]+)rem$/.exec(trimmed);
-  if (rem) return Number.parseFloat(rem[1]) * 16;
-  const px = /^([\d.]+)px$/.exec(trimmed);
-  if (px) return Number.parseFloat(px[1]);
-  throw new Error(`unsupported clamp() bound unit: ${trimmed}`);
+/** Splits top-level commas (not those nested inside var()/calc()). */
+function splitArgs(args: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const char of args) {
+    if (char === '(') depth += 1;
+    if (char === ')') depth -= 1;
+    if (char === ',' && depth === 0) {
+      parts.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  parts.push(current.trim());
+  return parts;
 }
 
-/** Reads the min/max px of a `property: clamp(min, preferred, max);` declaration. */
+/** Resolves a token-built length (rem, px, var(), calc(a + b)) to px. */
+function toPx(expr: string, tokens: ReadonlyMap<string, string>): number {
+  const value = expr.trim();
+  const rem = /^([\d.]+)rem$/.exec(value);
+  if (rem) return Number.parseFloat(rem[1]) * 16;
+  const px = /^([\d.]+)px$/.exec(value);
+  if (px) return Number.parseFloat(px[1]);
+  const variable = /^var\((--[\w-]+)\)$/.exec(value);
+  if (variable) {
+    const resolved = tokens.get(variable[1]);
+    if (!resolved) throw new Error(`unknown token ${variable[1]}`);
+    return toPx(resolved, tokens);
+  }
+  const calc = /^calc\((.+)\)$/.exec(value);
+  if (calc) {
+    const [left, right] = calc[1].split(/\s\+\s/);
+    if (!right) throw new Error(`unsupported calc(): ${value}`);
+    return toPx(left, tokens) + toPx(right, tokens);
+  }
+  throw new Error(`unsupported length: ${value}`);
+}
+
+/** Min/max px of a font-size declared as a length, clamp(), or ramp token. */
 function clampRangePx(
   block: string,
   property: string
 ): { min: number; max: number } {
-  const fixed = new RegExp(`${property}:\\s*([\\d.]+px)`).exec(block)?.[1];
-  if (fixed) return { min: toPx(fixed), max: toPx(fixed) };
-  if (block.includes('var(--linear-h1-size-sm)')) {
-    return { min: 38, max: 64 };
+  const tokens = tokenTable();
+  let declared = new RegExp(`${property}:\\s*([^;]+);`).exec(block)?.[1];
+  if (!declared) throw new Error(`no ${property} in: ${block}`);
+  declared = declared.trim();
+  const variable = /^var\((--[\w-]+)\)$/.exec(declared);
+  if (variable) declared = tokens.get(variable[1]) ?? declared;
+  const clamp = /^clamp\((.+)\)$/.exec(declared.replace(/\s+/g, ' '));
+  if (!clamp) {
+    const fixed = toPx(declared, tokens);
+    return { min: fixed, max: fixed };
   }
-  const match = new RegExp(
-    `${property}:\\s*clamp\\(([^,]+),[^,]+,([^)]+)\\)`
-  ).exec(block);
-  if (!match) {
-    throw new Error(`no clamp() found for ${property} in: ${block}`);
-  }
-  return { min: toPx(match[1]), max: toPx(match[2]) };
+  const [min, , max] = splitArgs(clamp[1]);
+  return { min: toPx(min, tokens), max: toPx(max, tokens) };
 }
 
 describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () => {
   it('renders exactly one dominant heading and a structurally secondary support line', () => {
-    render(<HomepageIdentityHero />);
+    render(<HomepageArtistHero />);
 
     const hero = screen.getByTestId('marketing-section-hero');
     const headings = within(hero).getAllByRole('heading');
     expect(headings).toHaveLength(1);
-    expect(headings[0]).toHaveClass('marketing-h1-linear');
+    expect(headings[0]).toHaveClass('marketing-type-display');
     expect(headings[0]).toHaveClass('text-primary-token');
 
-    const support = hero.querySelector('.marketing-lead-linear');
+    const support = hero.querySelector('.marketing-type-lede');
     expect(support).not.toBeNull();
     expect(support).toHaveClass('text-secondary-token');
     // Support copy must not itself be a heading — it recedes structurally,
@@ -138,47 +180,22 @@ describe('JOV-INV-038 dominant-first-hierarchy evaluator (homepage hero)', () =>
       MIN_DOMINANCE_RATIO
     );
 
-    expect(source).toMatch(
-      /@media \(min-width: 768px\)\s*\{\s*\.marketing-h1-linear\s*\{[^}]*font-size:\s*var\(--linear-h1-size-md\)/
+    // Both roles read the one --ds-marketing-* ramp, never page clamps.
+    expect(cssBlock(source, HEADLINE_SELECTOR)).toContain(
+      'var(--ds-marketing-title-size)'
     );
-    expect(source).toMatch(
-      /@media \(min-width: 1280px\)\s*\{\s*\.marketing-h1-linear\s*\{[^}]*font-size:\s*var\(--linear-h1-size\)/
-    );
-    expect(source).toMatch(
-      /--linear-h1-size:\s*64px;[\s\S]*--linear-h1-size-sm:\s*38px;[\s\S]*--linear-h1-size-md:\s*56px;/
+    expect(cssBlock(source, SUPPORT_SELECTOR)).toContain(
+      'var(--ds-marketing-lede-size)'
     );
   });
 
   it('keeps the headline at full ink weight while the support line recedes via a lighter ink token', () => {
-    const source = read('components/homepage/HomepageIdentity.css');
-    // The light-theme override is the one block that gives each ink token a
-    // literal value (the dark default aliases straight to --color-text-*);
-    // it is where "recedes" is either honored or silently dropped.
-    const lightThemeBlock = cssBlock(
-      source,
-      ':root:not(.dark) .homepage-identity-hero'
-    );
-
-    const primaryInk = /--homepage-identity-hero-ink:\s*([^;]+);/.exec(
-      lightThemeBlock
-    )?.[1];
-    const secondaryInk = /--homepage-identity-hero-ink-2:\s*([^;]+);/.exec(
-      lightThemeBlock
-    )?.[1];
-    expect(primaryInk, 'primary ink token declared').toBeTruthy();
-    expect(secondaryInk, 'secondary ink token declared').toBeTruthy();
-
-    // The dominant headline keeps full opacity — no color-mix fade.
-    expect(primaryInk).not.toContain('color-mix');
-
-    // The receding support line is mixed toward transparent at some opacity
-    // below 100% — "recedes substantially", not simultaneous full weight.
-    const secondaryOpacity = Number.parseFloat(
-      /(\d+(?:\.\d+)?)%/.exec(secondaryInk ?? '')?.[1] ?? 'NaN'
-    );
-    expect(Number.isNaN(secondaryOpacity)).toBe(false);
-    expect(secondaryOpacity).toBeLessThan(100);
-    expect(secondaryOpacity).toBeGreaterThan(0);
+    // The hero paints ink through the semantic token utilities only; the
+    // homepage stylesheet must not re-mix or fade either ink.
+    const source = read('components/homepage/HomepageArtistProfile.css');
+    expect(source).not.toMatch(/--color-text-(?:primary|secondary)-token\s*:/);
+    const support = cssBlock(source, '.homepage-artist-hero__subhead');
+    expect(support).not.toContain('color-mix');
 
     const theme = read('styles/design-system.css');
     const tailwind = read('styles/tailwind-foundation.css');

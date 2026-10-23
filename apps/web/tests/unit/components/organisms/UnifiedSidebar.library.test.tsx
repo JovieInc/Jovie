@@ -9,7 +9,11 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import {
+  type ComponentPropsWithoutRef,
+  forwardRef,
+  type ReactNode,
+} from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -27,6 +31,16 @@ import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { resetDashboardNavTestMocks } from '@/tests/utils/dashboard-nav-test-support';
 
 const unifiedPathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
+
+// Expose the Next Link contract without starting a router in jsdom.
+vi.mock('next/link', () => ({
+  default: forwardRef<
+    HTMLAnchorElement,
+    ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+  >(function TestLink({ prefetch, ...props }, ref) {
+    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
+  }),
+}));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => unifiedPathnameMock(),
@@ -214,6 +228,21 @@ function renderUnifiedSidebar({
 }
 
 describe('UnifiedSidebar library route', () => {
+  it('keeps the route back link available without idle prefetch', () => {
+    renderUnifiedSidebar({ overrideContent: <span>Releases</span> });
+    const link = screen.getByRole('link', { name: 'Back to App' });
+    expect(link).toHaveAttribute('href', APP_ROUTES.CHAT);
+    expect(link).toHaveAttribute('data-prefetch', 'false');
+  });
+
+  it('pins the sidebar content scrollport so focusing New Chat does not shift the shell', () => {
+    renderUnifiedSidebar();
+
+    expect(document.querySelector('[data-sidebar="content"]')).toHaveClass(
+      'overflow-anchor-none'
+    );
+  });
+
   afterEach(() => {
     document.cookie = 'sidebar:state=; path=/; max-age=0';
     electronRuntimeMock.isElectronRuntime = true;
@@ -355,6 +384,21 @@ describe('UnifiedSidebar library route', () => {
     expect(
       within(panel).getByRole('link', { name: /Public Profile/i })
     ).toHaveAttribute('href', '/timwhite');
+    const settingsNav = screen.getByRole('navigation', {
+      name: 'settings navigation',
+    });
+    for (const label of ['Account', 'Artist']) {
+      const group = within(settingsNav)
+        .getAllByText(label)
+        .find(node => node.className.includes('font-caption'));
+      expect(group?.className).toContain('text-sidebar-muted');
+      expect(group?.className).not.toMatch(/text-sidebar-muted\/\d+/);
+      expect(group).toHaveClass(
+        'ps-(--app-shell-sidebar-label-inset)',
+        'pe-(--app-shell-sidebar-inset)'
+      );
+      expect(group).not.toHaveClass('px-2.5');
+    }
   });
 
   it('keeps the unified user panel when a route-owned sidebar override replaces nav', () => {

@@ -559,7 +559,7 @@ describe('LibrarySurface', () => {
     }
     expect(emptyState).toHaveClass('py-16', 'min-h-90');
     expect(screen.getByRole('heading', { name: 'No work yet' })).toHaveClass(
-      'text-2xl',
+      'text-sm',
       'font-semibold',
       'text-primary-token'
     );

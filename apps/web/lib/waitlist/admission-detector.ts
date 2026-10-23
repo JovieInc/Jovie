@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray, isNull, lt } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
@@ -11,55 +11,69 @@ import { buildSignupWaitlistEntryValues } from '@/lib/waitlist/signup-entry';
 export const PENDING_REVIEW_SLA_DAYS = 3;
 
 export interface WaitlistAdmissionReport {
-  /** Pending users found without a waitlist entry; each now has one. */
+  /** Missing pending/approved entries actually inserted by this run. */
   readonly healedMissingEntries: number;
   /** External pending users waiting longer than the review SLA. */
   readonly stalePending: number;
 }
 
-const hasNoCanonicalEntry = drizzleSql`not exists (
+const hasNoEntry = drizzleSql`not exists (
   select 1 from ${waitlistEntries}
-  where ${waitlistEntries.canonical} = true
-    and ${waitlistEntries.emailNormalized} = lower(trim(${users.email}))
+  where ${waitlistEntries.id} = ${users.waitlistEntryId}
+    or (${waitlistEntries.canonical} = true and (
+      ${waitlistEntries.emailNormalized} = lower(trim(${users.email}))
+      or lower(trim(${waitlistEntries.email})) = lower(trim(${users.email}))
+    ))
 )`;
 
 /**
  * Admission detector (EVENT 2026-10-03, JOV-7701). Two invariants:
- * 1. Every `waitlist_pending` user has a waitlist entry. Provisioning creates
- *    it; a miss means that path regressed. The detector heals the miss and
- *    reports it, so the account reaches review instead of being stranded.
+ * 1. Pending and approved users have a waitlist entry. Heal legacy ingestion
+ *    and gate-bypass misses while preserving the user's admission state.
  * 2. No external customer waits in `waitlist_pending` beyond the review SLA.
  */
 export async function reconcileWaitlistAdmission(
   now = new Date()
 ): Promise<WaitlistAdmissionReport> {
   const missing = await db
-    .select({ email: users.email })
+    .select({ email: users.email, userStatus: users.userStatus })
     .from(users)
     .where(
       and(
-        eq(users.userStatus, 'waitlist_pending'),
+        inArray(users.userStatus, ['waitlist_pending', 'waitlist_approved']),
         isNull(users.deletedAt),
-        drizzleSql`${users.email} is not null`,
-        hasNoCanonicalEntry
+        drizzleSql`nullif(trim(${users.email}), '') is not null`,
+        hasNoEntry
       )
     );
 
-  const emails = [
-    ...new Set(
-      missing
-        .map(row => row.email?.trim().toLowerCase())
-        .filter((email): email is string => Boolean(email))
-    ),
-  ];
-  if (emails.length > 0) {
-    await db
+  const entries = new Map<string, typeof waitlistEntries.$inferInsert>();
+  for (const row of missing) {
+    const email = row.email?.trim().toLowerCase();
+    if (!email || entries.get(email)?.status === 'approved') continue;
+    entries.set(email, {
+      ...buildSignupWaitlistEntryValues(email, now),
+      ...(row.userStatus === 'waitlist_approved'
+        ? {
+            status: 'approved',
+            statusReason: 'legacy_user_approved',
+            approvedAt: now,
+            waitlistedAt: null,
+          }
+        : {}),
+    });
+  }
+  let healedMissingEntries = 0;
+  if (entries.size > 0) {
+    const inserted = await db
       .insert(waitlistEntries)
-      .values(emails.map(email => buildSignupWaitlistEntryValues(email, now)))
+      .values([...entries.values()])
       .onConflictDoNothing({
         target: waitlistEntries.emailNormalized,
         where: drizzleSql`${waitlistEntries.canonical} = true`,
-      });
+      })
+      .returning({ id: waitlistEntries.id });
+    healedMissingEntries = inserted.length;
   }
 
   const cutoff = new Date(
@@ -72,13 +86,13 @@ export async function reconcileWaitlistAdmission(
       and(
         eq(users.userStatus, 'waitlist_pending'),
         isNull(users.deletedAt),
-        drizzleSql`${users.createdAt} < ${cutoff}`,
+        lt(users.createdAt, cutoff),
         drizzleSql`lower(coalesce(${users.email}, '')) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN}`
       )
     );
 
   return {
-    healedMissingEntries: emails.length,
+    healedMissingEntries,
     stalePending: Number(stale?.count ?? 0),
   };
 }
@@ -90,7 +104,7 @@ export function assertWaitlistAdmissionHealthy(
   const problems: string[] = [];
   if (report.healedMissingEntries > 0) {
     problems.push(
-      `${report.healedMissingEntries} waitlist_pending user(s) had no waitlist entry (healed; provisioning regressed)`
+      `${report.healedMissingEntries} pending/approved waitlist entry(s) were missing (healed; inspect ingestion or gate bypass)`
     );
   }
   if (report.stalePending > 0) {

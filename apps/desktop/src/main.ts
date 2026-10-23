@@ -1507,6 +1507,7 @@ function buildDesktopShellHtml(input: {
       a { display: inline-flex; height: 34px; align-items: center; justify-content: center; border-radius: var(--system-b-radius-pill); padding: 0 13px; color: var(--system-b-text-primary); font-size: 12px; font-weight: 590; text-decoration: none; }
       .primary { background: var(--system-b-primary-bg); color: var(--system-b-primary-fg); }
       .secondary { color: var(--system-b-text-secondary); }
+      a:focus-visible { outline: 2px solid var(--system-b-text-primary); outline-offset: 3px; }
       ${DESKTOP_BUILD_IDENTITY_SHELL_CSS}
     </style>
   </head>
@@ -2988,7 +2989,7 @@ function buildApplicationMenu(): Menu {
           buildUpdateMenuItem(),
           { type: 'separator' },
           {
-            label: 'Preferences...',
+            label: 'Preferences…',
             accelerator: 'Command+,',
             click: openPreferences,
           },
@@ -3028,7 +3029,7 @@ function buildApplicationMenu(): Menu {
           },
         },
         {
-          label: 'Preferences...',
+          label: 'Preferences…',
           accelerator: 'Ctrl+,',
           click: openPreferences,
         },

@@ -37,6 +37,40 @@ test('trusted source-read guards reject a deleted test on an old head and execut
   const git = (...args) =>
     execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
   try {
+    const retired = join(repo, 'apps/web/lib/merch/qa-gate.test.ts');
+    mkdirSync(join(repo, 'apps/web/lib/merch'), { recursive: true });
+    mkdirSync(join(repo, 'apps/web/tests'), { recursive: true });
+    const manifest = join(repo, 'apps/web/tests/node-environment-files.json');
+    writeFileSync(manifest, '["lib/merch/qa-gate.test.ts"]\n');
+    writeFileSync(retired, 'test fixture\n');
+    writeFileSync(
+      join(bin, 'pnpm'),
+      '#!/bin/sh\n[ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9\ncase "$*" in *node-environment-files.test.ts*) case "$(cat apps/web/tests/node-environment-files.json)" in *qa-gate.test.ts*) test -f apps/web/lib/merch/qa-gate.test.ts ;; *) exit 0 ;; esac ;; *) exit 0 ;; esac\n',
+      { mode: 0o755 }
+    );
+    // This fixture has no launch, profile, art-direction, ICP-language, or
+    // oasdiff inventory. Isolate those unrelated checkers, as pnpm above
+    // isolates the other guards, while checking its cwd. The older head
+    // deletes scripts/, so the real art-direction, ICP-language, and oasdiff
+    // runners are not on that checkout.
+    writeFileSync(
+      join(bin, 'node'),
+      `#!/bin/sh
+case "$*" in
+  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs|*scripts/invariants/art-direction/*|*scripts/invariants/icp-language/*|*scripts/invariants/oasdiff-breaking-change.mjs*|*scripts/invariants/oasdiff-breaking-change.test.mjs*)
+    [ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9
+    exit 0 ;;
+esac
+exec "$SOURCE_FIXTURE_NODE" "$@"
+`,
+      { mode: 0o755 }
+    );
+    git('init', '--quiet', '--initial-branch=source-head');
+    git('config', 'user.name', 'Source guard test');
+    git('config', 'user.email', 'source-guard@example.invalid');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'fork point before trusted source guards');
+    const fork = git('rev-parse', 'HEAD');
     const archive = execFileSync(
       '/usr/bin/git',
       ['archive', 'HEAD', 'scripts'],
@@ -50,40 +84,15 @@ test('trusted source-read guards reject a deleted test on an old head and execut
     for (const name of readdirSync(join(repo, 'scripts'))) {
       if (name.startsWith('codex-')) rmSync(join(repo, 'scripts', name));
     }
-    const retired = join(repo, 'apps/web/lib/merch/qa-gate.test.ts');
-    mkdirSync(join(repo, 'apps/web/lib/merch'), { recursive: true });
-    mkdirSync(join(repo, 'apps/web/tests'), { recursive: true });
-    const manifest = join(repo, 'apps/web/tests/node-environment-files.json');
-    writeFileSync(manifest, '["lib/merch/qa-gate.test.ts"]\n');
-    writeFileSync(retired, 'test fixture\n');
-    writeFileSync(
-      join(bin, 'pnpm'),
-      '#!/bin/sh\n[ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9\ncase "$*" in *node-environment-files.test.ts*) case "$(cat apps/web/tests/node-environment-files.json)" in *qa-gate.test.ts*) test -f apps/web/lib/merch/qa-gate.test.ts ;; *) exit 0 ;; esac ;; *) exit 0 ;; esac\n',
-      { mode: 0o755 }
-    );
-    // This fixture has no launch or profile inventory. Isolate those unrelated
-    // checker, as pnpm above isolates the other guards, while checking its cwd.
-    writeFileSync(
-      join(bin, 'node'),
-      `#!/bin/sh
-case "$*" in
-  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs)
-    [ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9
-    exit 0 ;;
-esac
-exec "$SOURCE_FIXTURE_NODE" "$@"
-`,
-      { mode: 0o755 }
-    );
-    git('init', '--quiet', '--initial-branch=source-head');
-    git('config', 'user.name', 'Source guard test');
-    git('config', 'user.email', 'source-guard@example.invalid');
     git('add', '.');
     git('commit', '--quiet', '-m', 'trusted source-read guards');
     git('branch', 'main');
     git('remote', 'add', 'origin', repo);
     git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
-    rmSync(join(repo, 'scripts'), { recursive: true });
+    // Checking the fork back out drops scripts/ that main added after the
+    // branch. Removing them from the trusted parent would be a pull-request
+    // deletion of the invariant suite and the gate detector.
+    git('checkout', '--detach', fork);
     rmSync(retired);
     git('add', '--all');
     git('commit', '--quiet', '-m', 'older head deletes a manifest-listed test');
@@ -105,12 +114,22 @@ exec "$SOURCE_FIXTURE_NODE" "$@"
     const rejected = invoke();
     assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr);
     assert.match(rejected.stdout, /node-environment-files: exit 1/);
+    // The merge base is the fork, which has no scripts/. Files main added
+    // after that fork are absent from this head and are not deletions.
+    // Clearing the merch manifest removes the node-environment failure.
+    // The retired merch test is not an invariant test, so the detector passes.
+    // A deletion of a gate that existed at the fork is covered by
+    // gate-weakening-detector.test.mjs, not by restoring post-fork scripts.
     writeFileSync(manifest, '[]\n');
     git('add', '.');
     git('commit', '--quiet', '-m', 'remove the retired manifest entry');
-    const accepted = invoke();
-    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
-    assert.match(accepted.stdout, /node-environment-files: exit 0/);
+    const cleared = invoke();
+    assert.equal(cleared.status, 0, cleared.stdout + cleared.stderr);
+    assert.match(cleared.stdout, /node-environment-files: exit 0/);
+    assert.match(cleared.stdout, /gate-weakening-detector: PASS/);
+    assert.doesNotMatch(cleared.stdout, /gate-weakening-detector: FAIL/);
+    assert.doesNotMatch(cleared.stdout, /detector-deleted /);
+    assert.doesNotMatch(cleared.stdout, /invariant-test-deleted /);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -1213,7 +1232,7 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
   }
   assert.equal(
     workflow.jobs.ready.steps[0].run,
-    'test "$RESULTS" = \'success,success,success,success,success\''
+    'test "$RESULTS" = \'success,success,success,success,success,success\''
   );
 });
 
@@ -1418,6 +1437,88 @@ test('affected unit tests gate PR Ready and select only unit-affecting diffs (JO
       'false',
       'false',
       'false'
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('UI-path axe gate blocks PR Ready and stays quiet for non-UI diffs', () => {
+  const workflow = sourceValidationWorkflow();
+  const job = workflow.jobs.a11y;
+  assert.equal(job.name, 'A11y (UI paths)');
+  assert.equal(job['continue-on-error'], undefined);
+  assert.equal(job.if, undefined);
+  assert.deepEqual(workflow.jobs.ready.needs, [
+    'deterministic',
+    'security',
+    'migration',
+    'coverage',
+    'unit',
+    'a11y',
+  ]);
+  const run = job.steps.find(
+    step => step.name === 'Run rendered WCAG 2.2 AA gate'
+  );
+  assert.match(run.run, /playwright\.a11y-gate\.config\.ts/);
+  assert.match(run.if, /steps\.scope\.outputs\.ui == 'true'/);
+  assert.equal(run['continue-on-error'], undefined);
+  assert.match(
+    workflow.jobs.deterministic.steps.find(
+      step => step.name === 'Run deterministic source contract'
+    ).run,
+    /node apps\/web\/scripts\/a11y-wcag-standard-check\.cjs/
+  );
+  const script = job.steps
+    .find(step => step.id === 'scope')
+    .run.replace(/\$\{\{\s*github\.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-a11y-scope-'));
+  const repo = join(root, 'repo');
+  mkdirSync(repo, { recursive: true });
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  const write = path => {
+    mkdirSync(join(repo, path, '..'), { recursive: true });
+    writeFileSync(join(repo, path), `${path}\n`);
+  };
+  try {
+    git('init', '--quiet', '--initial-branch=main');
+    git('config', 'user.name', 'A11y scope test');
+    git('config', 'user.email', 'a11y-scope@example.invalid');
+    write('README.md');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'base');
+    git('remote', 'add', 'origin', repo);
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    const scope = paths => {
+      git('checkout', '--quiet', '-B', 'head', 'origin/main');
+      for (const path of paths) write(path);
+      git('add', '.');
+      git('commit', '--quiet', '--allow-empty', '-m', 'head');
+      const output = join(root, `output-${Math.random()}`);
+      const result = spawnSync('/bin/bash', ['-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          GITHUB_OUTPUT: output,
+        },
+      });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      return readFileSync(output, 'utf8');
+    };
+    assert.match(scope(['README.md']), /ui=false/);
+    assert.match(scope(['apps/web/lib/billing/plan.ts']), /ui=false/);
+    assert.match(scope(['apps/web/components/Button.tsx']), /ui=true/);
+    assert.match(scope(['docs/ACCESSIBILITY.md']), /ui=true/);
+    assert.match(
+      scope(['apps/web/lib/a11y-gates/wcag-standard.cjs']),
+      /ui=true/
+    );
+    assert.match(
+      scope(['apps/web/scripts/a11y-wcag-standard-check.cjs']),
+      /ui=true/
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

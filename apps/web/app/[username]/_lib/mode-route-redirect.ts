@@ -45,6 +45,9 @@ export const LEGACY_PROFILE_MODE_BY_SLUG: Readonly<
   // paths must resolve to tour mode.
   shows: 'tour',
   events: 'tour',
+  // /contact is a legacy deep link. The dedicated page stays for the
+  // alias-content hold; the public URL redirects to contact mode.
+  contact: 'contact',
 };
 
 export function isLegacyProfileModeAlias(slug: string): boolean {
@@ -54,9 +57,9 @@ export function isLegacyProfileModeAlias(slug: string): boolean {
 /**
  * Resolves a legacy profile-mode alias after the smart-link route has proved
  * that the slug does not belong to published, renamed, or unpublished music.
- * Alias requests are routed after filesystem matches into the catch-all
- * resolver, so static application routes retain priority and real releases
- * called `music` or `tour` keep their public URLs.
+ * The public URL itself is an edge redirect. This resolver still owns the
+ * collision hold (`jovie_alias_content` or `?alias-content=1`), so real
+ * releases called `music` or `tour` keep their public URLs.
  */
 export function getLegacyProfileModeRedirectHref(
   username: string,
