@@ -9,6 +9,7 @@ import {
   getRoutePaths,
 } from './utils/dashboard-route-matrix';
 import {
+  isDestroyedExecutionContext,
   isTransientNavigationError,
   setupPageMonitoring,
   smokeNavigateWithRetry,
@@ -79,6 +80,21 @@ function isReactError(text: string): boolean {
  * Returns unique selectors that can be used to locate and click elements
  */
 async function findClickableElements(page: Page): Promise<string[]> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await collectClickableElements(page);
+    } catch (error) {
+      if (attempt < 2 && isDestroyedExecutionContext(error)) {
+        await page.waitForLoadState('domcontentloaded').catch(() => undefined);
+        continue;
+      }
+      throw error;
+    }
+  }
+  return [];
+}
+
+async function collectClickableElements(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const selectors = [
       'button:not([disabled])',

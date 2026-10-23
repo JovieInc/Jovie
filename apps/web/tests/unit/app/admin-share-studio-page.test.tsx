@@ -18,7 +18,9 @@ vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   AdminPage: ({ children }: { children: ReactNode }) => <main>{children}</main>,
 }));
 vi.mock('next/image', () => ({
-  default: ({ alt }: { alt: string }) => <span role='img' aria-label={alt} />,
+  default: ({ alt, src }: { alt: string; src: string }) => (
+    <span role='img' aria-label={alt} data-src={src} />
+  ),
 }));
 vi.mock('@/components/features/feedback/PageErrorState', () => ({
   PageErrorState: ({
@@ -104,7 +106,10 @@ describe('Share preview page composition', () => {
     expect(screen.getByText('Release Share Payload')).toBeInTheDocument();
     expect(
       screen.getByRole('img', { name: 'Song story preview' })
-    ).toBeInTheDocument();
+    ).toHaveAttribute(
+      'data-src',
+      expect.stringMatching(/^\/api\/share\/story\/release\?/)
+    );
     expect(
       screen.getByRole('link', { name: 'Open selected release' })
     ).toHaveAttribute('href', releaseContext.canonicalUrl);

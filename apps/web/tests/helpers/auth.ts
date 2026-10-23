@@ -274,7 +274,8 @@ async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
 export async function setTestAuthBypassSession(
   page: Page,
   persona: DevTestAuthPersona | null,
-  overrideUserId?: string | null
+  overrideUserId?: string | null,
+  options?: { readonly email?: string }
 ): Promise<void> {
   const configuredBaseUrl = process.env.BASE_URL?.trim();
   const baseUrl =
@@ -294,6 +295,7 @@ export async function setTestAuthBypassSession(
       data: {
         persona: provisionedPersona,
         ...(existingUserId ? { existingUserId } : {}),
+        ...(options?.email ? { email: options.email } : {}),
       },
     }
   );

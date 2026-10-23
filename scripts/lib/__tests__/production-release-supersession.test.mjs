@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
+import { load } from 'js-yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   STRUCTURAL_DEFAULT_CONCURRENCY,
@@ -393,6 +394,48 @@ describe('public-profile alias graduation policy', () => {
         for (const route of ALIAS_ROUTES)
           expect(args).toContain(`--route-id\n${route}`);
       }
+    }
+  );
+});
+
+describe('production lane evidence across failed-job retries', () => {
+  it.each([
+    [1, 1],
+    [1, 2],
+    [2, 3],
+  ])(
+    'downloads the artifact produced in attempt %s from consumer attempt %s',
+    (producerAttempt, consumerAttempt) => {
+      const workflow =
+        /** @type {{ jobs: Record<string, { outputs: Record<string, string>, steps: { name?: string, uses?: string, with?: Record<string, string> }[] }> }} */ (
+          load(CONTROLLER_WORKFLOW)
+        );
+      const producer = workflow.jobs['authorize-production'];
+      const upload = producer.steps.find(
+        step =>
+          step.uses?.startsWith('actions/upload-artifact@') &&
+          step.name === 'Preserve cumulative production lane evidence'
+      );
+      const producerValues = {
+        'steps.authorize.outputs.expected_sha': EXPECTED_SHA,
+        'github.run_attempt': String(producerAttempt),
+      };
+      const uploaded = materialize(upload.with.name, producerValues);
+      const output = producer.outputs.lane_range_artifact_name;
+      expect(
+        output,
+        'authorization must retain the producer artifact name'
+      ).toBeTypeOf('string');
+      const retained = materialize(output, producerValues);
+      const download = workflow.jobs['production-verified'].steps.find(step =>
+        step.uses?.startsWith('actions/download-artifact@')
+      );
+      const requested = materialize(download.with.name, {
+        'needs.authorize-production.outputs.lane_range_artifact_name': retained,
+        'needs.authorize-production.outputs.expected_sha': EXPECTED_SHA,
+        'github.run_attempt': String(consumerAttempt),
+      });
+      expect(requested).toBe(uploaded);
     }
   );
 });

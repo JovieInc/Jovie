@@ -48,6 +48,11 @@ describe('AdminVerificationRequired', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'Admin verification required to load this data.'
     );
+    // E2E (admin-step-up.spec.ts) drives the inline state by this testid.
+    expect(screen.getByRole('status')).toHaveAttribute(
+      'data-testid',
+      'admin-verification-required'
+    );
     expect(screen.getByRole('button', { name: 'Unlock' })).toBeInTheDocument();
   });
 

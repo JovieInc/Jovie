@@ -5,16 +5,23 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { planProductionLaneRange } from '../production-lane-range.mjs';
+import { gradeReleaseRange } from '../release-range-risk.mjs';
 import {
   buildReleaseRiskReceipt,
   measureReleaseRiskReceipt,
 } from '../release-risk-policy.mjs';
 
 const sha = 'a'.repeat(40);
+const safeRange = gradeReleaseRange({
+  baseDeployedSha: 'b'.repeat(40),
+  candidateSha: sha,
+  paths: ['README.md'],
+});
 const base = {
+  rangeRisk: safeRange,
   lineageSha: sha,
   deployableWeb: true,
-  mergeAt: '2026-10-03T12:00:00.000Z',
+  mergeAt: '2026-10-21.12:00:00.000Z',
 };
 const risk = (risk_level, flags = {}) => ({
   sha,
@@ -41,7 +48,7 @@ describe('release risk policy', () => {
   ])('maps the existing %s receipt', (_name, level, flags, lane, target) => {
     const receipt = plan(risk(level, flags));
     expect(receipt).toMatchObject({
-      policyVersion: 'jovie.release-risk-policy/2026-10-03.1',
+      policyVersion: 'jovie.release-risk-policy/2026-10-21.1',
       selectedLane: lane,
       latency: { targetP95Seconds: target },
       promotion: { unattendedAllowed: true },
@@ -84,7 +91,7 @@ describe('release risk policy', () => {
     const planned = plan(risk('medium'));
     const measured = measureReleaseRiskReceipt(
       planned,
-      '2026-10-03T12:14:00.000Z'
+      '2026-10-21.12:14:00.000Z'
     );
     expect(measured.latency).toMatchObject({
       measuredSeconds: 840,

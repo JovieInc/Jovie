@@ -317,6 +317,7 @@ web.admin-growth|web|admin-growth|apps/web/app/app/(shell)/admin/growth/page.tsx
 web.admin-people|web|admin-people|apps/web/app/app/(shell)/admin/people/page.tsx|desktop,mobile
 web.admin-agent-runs|web|admin-agent-runs|apps/web/app/app/(shell)/admin/agent-runs/|desktop,mobile
 web.admin-ops-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/ops/page.tsx|desktop,mobile
+web.admin-yc-metrics-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/growth/yc-metrics/page.tsx|desktop,mobile
 web.ov-lists|web|ovie-lists|apps/web/app/app/(shell)/admin/lists/|desktop,mobile
 web.admin-screenshots|web|admin-screenshots|apps/web/app/app/(shell)/admin/screenshots/|desktop,mobile
 web.admin-share-studio|web|admin-share-studio|apps/web/app/app/(shell)/admin/share-studio/page.tsx|desktop,mobile
@@ -753,7 +754,10 @@ export function resolveTrustedProofForScreen(request) {
       proof: null,
       screen,
       findings: [
-        `${screen.id}: trusted producer artifact ${String(artifactId)} is not acceptable: ${(resolved.findings || []).join('; ')}`,
+        // Keep the screen id off the left of a colon. `web.legal-cookies: trusted`
+        // is credential-text to the Playwright artifact guard (COOKIES assignment)
+        // even though it is a screen id, and that blocked the receipt upload.
+        `trusted producer artifact ${String(artifactId)} is not acceptable for ${screen.id} (${(resolved.findings || []).join('; ')})`,
       ],
     };
   }
@@ -1220,7 +1224,7 @@ export function evaluateChangedScreens({
     );
     const commissioning = findings.length - blocking.length;
     if (blocking.length > 0)
-      issues.push(`${screen.id}: ${blocking.join('; ')}`);
+      issues.push(`screen ${screen.id} blocked (${blocking.join('; ')})`);
     changedScreens.push({
       id: screen.id,
       verdict: blocking.length === 0 ? 'pass' : 'block',

@@ -30,6 +30,7 @@ import {
   getStripeConnectReadiness,
   isStripeConnectChargesReady,
 } from '@/lib/stripe/connect-readiness';
+import { StripeReconciliationRequiredError } from '@/lib/stripe/webhooks/reconciliation';
 import { logger } from '@/lib/utils/logger';
 import {
   isPriorMerchSaleStatus,
@@ -387,6 +388,23 @@ export async function handleMerchCheckoutCompleted(
 
   const existing = await getOrderWithCard(orderId);
   if (!existing) {
+    if (session.payment_status === 'paid') {
+      // A buyer paid for an order we cannot find. Never ack and forget it:
+      // the webhook route durably marks the event needs_reconciliation first.
+      throw new StripeReconciliationRequiredError(
+        'merch_order_not_found',
+        `Paid merch checkout for unknown order ${orderId}`,
+        {
+          merchOrderId: orderId,
+          checkoutSessionId: session.id,
+          customerId:
+            typeof session.customer === 'string'
+              ? session.customer
+              : (session.customer?.id ?? null),
+          amountTotal: session.amount_total ?? null,
+        }
+      );
+    }
     logger.warn('[merch] Stripe checkout completed for unknown order', {
       orderId,
       sessionId: session.id,

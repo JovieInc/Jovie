@@ -22,6 +22,7 @@ import { env, isTestEnv } from '@/lib/env-server';
 import { assertGlobalDbAllowed } from '../atomic-context';
 import * as schema from '../schema';
 import { logDbError, logDbInfo } from './logging';
+import { preserveTransactionErrors } from './transaction-errors';
 import type { DbType, PoolMetrics } from './types';
 
 // Configure Neon to use the ws library for WebSocket connections in Node.js
@@ -311,9 +312,11 @@ export function initializeDb(): DbType {
   // Drizzle's pooled transaction awaits BEGIN before entering its own
   // release finally. Own the checkout here so even a failed BEGIN releases
   // capacity. A client-bound Drizzle session never acquires/releases again.
-  dbInstance.transaction = async (operation, config) => {
+  dbInstance.transaction = async (callback, config) => {
     const client = await pool.connect();
     let releaseError: Error | undefined;
+    const operation: typeof callback = tx =>
+      preserveTransactionErrors(tx, callback);
     try {
       return await createDbInstance(client).transaction(operation, config);
     } catch (error) {

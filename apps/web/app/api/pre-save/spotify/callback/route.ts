@@ -22,14 +22,14 @@ export async function GET(request: Request) {
     const redirectUri = `${origin}/api/pre-save/spotify/callback`;
     const tokenResponse = await exchangeSpotifyCode({ code, redirectUri });
     const me = await fetchSpotifyMe(tokenResponse.access_token);
-    const { userId: clerkId } = await getCachedAuth();
+    const { userId: appUserId } = await getCachedAuth();
 
     let dbUserId: string | null = null;
-    if (clerkId) {
+    if (appUserId) {
       const [dbUser] = await db
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.clerkId, clerkId))
+        .where(eq(users.id, appUserId))
         .limit(1);
       dbUserId = dbUser?.id ?? null;
     }

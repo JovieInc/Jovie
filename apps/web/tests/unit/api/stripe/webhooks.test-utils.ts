@@ -18,6 +18,7 @@ export let simulateUnprocessedRetry = false;
 export let simulateActiveLease = false;
 export let simulateLeaseClaimFailure = false;
 export let simulateLeaseLossBeforeFinalize = false;
+export let simulateReconciliationCaptureFailure = false;
 
 export function setSimulateRaceDisappear(value: boolean) {
   simulateRaceDisappear = value;
@@ -37,6 +38,10 @@ export function setSimulateLeaseClaimFailure(value: boolean) {
 
 export function setSimulateLeaseLossBeforeFinalize(value: boolean) {
   simulateLeaseLossBeforeFinalize = value;
+}
+
+export function setSimulateReconciliationCaptureFailure(value: boolean) {
+  simulateReconciliationCaptureFailure = value;
 }
 
 export async function getPost() {
@@ -95,7 +100,14 @@ const hoisted = vi.hoisted(() => {
             simulateActiveLease: activeLease,
             simulateLeaseClaimFailure: claimFailure,
             simulateLeaseLossBeforeFinalize: leaseLoss,
+            simulateReconciliationCaptureFailure: captureFailure,
           } = await import('./webhooks.test-utils');
+          if (
+            captureFailure &&
+            values.reconciliationStatus === 'needs_reconciliation'
+          ) {
+            return [];
+          }
           if (claimFailure && dbUpdate.mock.calls.length === 1) {
             throw new Error('lease claim failed');
           }
@@ -195,6 +207,8 @@ vi.mock('@/lib/db/schema', () => ({
     stripeEventId: 'stripe_event_id',
     processedAt: 'processed_at',
     processingStartedAt: 'processing_started_at',
+    reconciliationStatus: 'reconciliation_status',
+    reconciledAt: 'reconciled_at',
   },
 }));
 

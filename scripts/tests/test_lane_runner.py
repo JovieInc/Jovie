@@ -1623,12 +1623,14 @@ class LinearClientTest(unittest.TestCase):
         self.assertEqual(str(missing), "linear: Entity not found: Comment")
 
     def test_graphql_error_diagnostics_retain_only_allowlisted_metadata(self):
-        client = lane.Linear.__new__(lane.Linear); client.key = "test-only-no-live-credential"
+        client = lane.Linear.__new__(lane.Linear); client.key = "linear-app:test"; client.app = ("test", "fixture")
         class Response:
             def __enter__(self): return self
             def __exit__(self, *args): return False
             def read(self): return json.dumps({"errors": [{"message": "private payload secret-token", "extensions": {"code": "FORBIDDEN", "statusCode": 403, "payload": "secret-token"}}]}).encode()
-        with patch.object(lane, "linear_cooldown_until", return_value=None), patch.object(lane, "record_linear_budget"), patch.object(lane.urllib.request, "urlopen", return_value=Response()):
+        with patch.object(lane, "linear_cooldown_until", return_value=None), patch.object(lane, "record_linear_budget"), \
+                patch.object(lane.linear_app_token, "token", return_value="fixture-token"), \
+                patch.object(lane.urllib.request, "urlopen", return_value=Response()):
             with self.assertRaises(lane.LinearRequestError) as caught:
                 client.gql("mutation", {"body": "private payload"})
         self.assertEqual(caught.exception.diagnostic, {"class": "linear-graphql", "code": "FORBIDDEN", "httpStatus": 403})
@@ -1654,10 +1656,10 @@ class LinearClientTest(unittest.TestCase):
 
     def test_reads_key_and_maps_lane_issues_from_the_local_mirror(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"LANES_STATE": tmp}):
-            env = Path(tmp) / "linear.env"
-            env.write_text('export LINEAR_API_KEY="lin_api_x"\n')
-            client = lane.Linear(env)
-            self.assertEqual(client.key, "lin_api_x")
+            app_env = Path(tmp) / "linear-app.env"
+            app_env.write_text('LINEAR_CLIENT_ID=cid\nLINEAR_CLIENT_SECRET=sec\n')
+            client = lane.Linear(app_env=app_env)
+            self.assertEqual(client.key, "linear-app:cid")
             lane.linear_sync.apply(Path(tmp), "JOV", [{
                 "id": "i1", "identifier": "JOV-5", "title": "t", "description": None, "priority": 2,
                 "createdAt": "2026-09-01T00:00:00Z", "updatedAt": "2026-10-11T00:00:00.000Z",
@@ -1672,7 +1674,8 @@ class LinearClientTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             env = Path(tmp) / "linear.env"
             env.write_text("OTHER=1\n")
-            with self.assertRaises(SystemExit):
+            # #22378: no personal-key fallback; a RuntimeError the doctor and watchdog degrade on.
+            with self.assertRaises(lane.LinearAppCredentialMissing):
                 lane.Linear(env)
 
 
@@ -1781,9 +1784,13 @@ class LinearRateLimitTest(unittest.TestCase):
             else:
                 os.environ["LANES_STATE"] = previous
         self.addCleanup(restore_state)
-        self.env = self.state / "linear.env"
-        self.env.write_text('export LINEAR_API_KEY="lin_api_test_secret"\n')
-        self.client = lane.Linear(self.env)
+        self.env = self.state / "linear-app.env"
+        self.env.write_text('LINEAR_CLIENT_ID=cid\nLINEAR_CLIENT_SECRET=lin_api_test_secret\n')
+        for patcher in (patch.object(lane.linear_app_token, "token", return_value="lin_api_test_secret"),
+                        patch.object(lane.linear_app_token, "default_path", return_value=self.env)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.client = lane.Linear(app_env=self.env)
         self.real_open = lane.urllib.request.urlopen
         self.addCleanup(lambda: setattr(lane.urllib.request, "urlopen", self.real_open))
 
@@ -4969,6 +4976,24 @@ class TerminalRevisitTest(unittest.TestCase):
                 self.assertEqual(json.loads((self.host.state / "held.json").read_text()), held)
                 self.main = "m2"
 
+    def test_mergeable_exhaustion_hold_syncs_main_and_lifts_the_label(self):
+        # JOV-8810: #22473 was MERGEABLE with a fix-exhausted hold. The conflict
+        # path (JOV-8533) reached partial sync; a non-DIRTY head never called
+        # update-branch, so lane-fix-exhausted stayed past 24h.
+        attempts = {"22473": {"sha": "h22473", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}}
+        held = {"22473": lane.pr_events.held_record("h22473", ["fix-exhausted"])}
+        self.write("fix-attempts.json", attempts)
+        self.write("held.json", held)
+        pr = self.pr(22473, isDraft=True, mergeStateStatus="UNSTABLE",
+                     labels=[{"name": "lane-fix-exhausted"}, {"name": "lane-fix-green"}])
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [pr], now=TERMINAL_NOW), [22473])
+        self.assertEqual([args[4] for args in self.updates()],
+                         [f"repos/{lane.REPO_SLUG}/pulls/22473/update-branch"])
+        lifts = [args[4] for args in self.calls if args[:4] == ["gh", "api", "-X", "DELETE"]]
+        self.assertEqual(lifts, [f"repos/{lane.REPO_SLUG}/issues/22473/labels/lane-fix-exhausted"])
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text()), attempts)
+        self.assertEqual(json.loads((self.host.state / "held.json").read_text()), held)
+
     def test_exhaustion_does_not_mask_nonfixable_policy_holds(self):
         for evidence in ("secret-like-file-changed", "empty-diff"):
             with self.subTest(evidence=evidence):
@@ -7959,11 +7984,17 @@ class GateSingleflightTest(unittest.TestCase):
         with open(self.host.state / "worker.log", "w") as log:
             worker = subprocess.Popen([sys.executable, "-u", "-c", worker_code], stdout=log, stderr=log)
             try:
-                for _ in range(200):
-                    if pidfile.exists():
+                # Startup only. The lock checks below are the contract.
+                deadline = time.monotonic() + 15
+                while time.monotonic() < deadline:
+                    if pidfile.exists() or worker.poll() is not None:
                         break
                     time.sleep(.01)
-                self.assertTrue(pidfile.exists())
+                if not pidfile.exists():
+                    detail = (self.host.state / "worker.log").read_text(errors="replace")[-2000:]
+                    self.fail(
+                        f"detached child did not start (worker exit {worker.poll()})\n{detail}"
+                    )
                 time.sleep(.2)  # allow the existing process observer to see the detached child
                 worker.kill()
                 worker.wait(timeout=3)
