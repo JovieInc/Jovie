@@ -12,7 +12,7 @@
  */
 
 import 'server-only';
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -49,7 +49,7 @@ function getEmailProvider(): ResendEmailProvider {
  * Information about a failed payment
  */
 export interface PaymentFailureInfo {
-  /** Clerk user ID */
+  /** App `users.id`, or a legacy Clerk id from Stripe metadata. */
   userId: string;
   /** Amount due in cents */
   amountDue: number;
@@ -69,7 +69,7 @@ export interface PaymentFailureInfo {
  * Information about a recovered payment
  */
 export interface PaymentRecoveryInfo {
-  /** Clerk user ID */
+  /** App `users.id`, or a legacy Clerk id from Stripe metadata. */
   userId: string;
   /** Amount paid in cents */
   amountPaid: number;
@@ -80,7 +80,8 @@ export interface PaymentRecoveryInfo {
 }
 
 /**
- * Get user email from Clerk user ID
+ * Resolve the recipient. Payment-failure mail passes `result.appUserId`.
+ * Recovery mail may still pass a legacy Clerk id from Stripe metadata.
  */
 async function getUserEmail(userId: string): Promise<{
   email: string | null;
@@ -93,7 +94,7 @@ async function getUserEmail(userId: string): Promise<{
         name: users.name,
       })
       .from(users)
-      .where(eq(users.clerkId, userId))
+      .where(or(eq(users.id, userId), eq(users.clerkId, userId)))
       .limit(1);
 
     return {
