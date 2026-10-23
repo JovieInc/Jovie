@@ -620,7 +620,9 @@ jobs:
         uses: ./.github/actions/setup-playwright
       - name: Run rendered WCAG 2.2 AA gate
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true'
-        run: pnpm --filter @jovie/web exec playwright test --config=playwright.a11y-gate.config.ts
+        run: >-
+          node .github/scripts/guard-playwright-artifacts.mjs --run --
+          pnpm --filter @jovie/web exec playwright test --config=playwright.a11y-gate.config.ts
   ready:
     name: PR Ready
     if: ${{ always() }}
