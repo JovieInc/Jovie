@@ -442,7 +442,7 @@ describe('SidebarThreadsSection', () => {
       })
     ).toMatchObject({
       href: `${APP_ROUTES.CHAT}/thread%20%2F%20one`,
-      title: 'Untitled chat',
+      title: 'Conversation',
       status: 'running',
       unread: true,
     });

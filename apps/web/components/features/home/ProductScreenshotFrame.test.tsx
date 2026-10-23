@@ -2,49 +2,43 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProductScreenshotFrame } from './ProductScreenshotFrame';
 
-const screenshot = {
-  alt: 'Profile editor preview',
+const props = {
+  alt: 'Release dashboard preview',
   aspectRatio: '16 / 9',
   chrome: 'window',
   height: 900,
   isAvailable: true,
   priority: false,
-  src: '/preview.png',
-  testId: 'screenshot',
-  title: 'Profile editor',
+  src: '/images/dashboard.png',
+  title: 'Dashboard',
   width: 1600,
 } as const;
 
 describe('ProductScreenshotFrame', () => {
-  it('rounds the image and its frame while preserving image error recovery', () => {
-    const onImageError = vi.fn();
+  it('shows an accessible unavailable preview instead of a broken screenshot', () => {
     render(
-      <ProductScreenshotFrame {...screenshot} onImageError={onImageError} />
+      <ProductScreenshotFrame {...props} chrome='minimal' isAvailable={false} />
     );
-
-    const image = screen.getByRole('img', { name: screenshot.alt });
-    expect(image).toHaveClass('marketing-rounded-frame');
-    expect(screen.getByTestId('screenshot')).toHaveClass(
+    expect(screen.getByRole('figure', { name: props.alt })).toBeVisible();
+    expect(screen.getByRole('figure', { name: props.alt })).toHaveClass(
       'marketing-rounded-frame'
     );
-    expect(screen.getByText(screenshot.title)).toBeVisible();
-    fireEvent.error(image);
-    expect(onImageError).toHaveBeenCalledOnce();
+    expect(screen.getByText('Preview unavailable')).toBeVisible();
+    expect(screen.getByText(props.title)).toBeVisible();
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 
-  it('keeps an unavailable preview labeled and rounded without loading an image', () => {
-    render(
-      <ProductScreenshotFrame
-        {...screenshot}
-        chrome='minimal'
-        isAvailable={false}
-      />
-    );
-
-    expect(screen.queryByRole('img')).not.toBeInTheDocument();
-    expect(screen.getByRole('figure', { name: screenshot.alt })).toHaveClass(
-      'marketing-rounded-frame'
-    );
-    expect(screen.getByText('Preview coming soon')).toBeVisible();
+  it('renders available media and forwards image errors to the caller', () => {
+    const onImageError = vi.fn();
+    render(<ProductScreenshotFrame {...props} onImageError={onImageError} />);
+    const image = screen.getByRole('img', { name: props.alt });
+    expect(image).toBeVisible();
+    expect(image).toHaveClass('marketing-rounded-frame');
+    expect(image.closest('figure')).toHaveClass('marketing-rounded-frame');
+    expect(image).toHaveAttribute('width', '1600');
+    expect(screen.queryByText('Preview unavailable')).toBeNull();
+    fireEvent.error(image);
+    expect(onImageError).toHaveBeenCalledOnce();
   });
 });

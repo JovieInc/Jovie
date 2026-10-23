@@ -5061,6 +5061,41 @@ class TerminalRevisitTest(unittest.TestCase):
                 self.assertEqual(lane.terminal_prs([{**pr, "headRefOid": "new-head"}], {}, held),
                                  [{**pr, "headRefOid": "new-head"}])
 
+    def test_mergeable_exhaustion_hold_syncs_and_lifts_the_label(self):
+        # JOV-8812: #22265 stayed MERGEABLE/BLOCKED because held.json named
+        # fix-exhausted. terminal_prs admits that marker, then the non-DIRTY
+        # revisit refused the same record and never called update-branch.
+        attempts = {"22265": {"sha": "h22265", "count": 2, "escalated": True}}
+        held = {"22265": lane.pr_events.held_record("h22265", ["fix-exhausted"])}
+        self.write("fix-attempts.json", attempts)
+        self.write("held.json", held)
+        pr = self.pr(22265, isDraft=True, mergeStateStatus="BLOCKED",
+                     labels=[{"name": "lane-fix-exhausted"}, {"name": "lane-fix-green"}])
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [pr], now=TERMINAL_NOW), [22265])
+        self.assertEqual([args[4] for args in self.updates()],
+                         [f"repos/{lane.REPO_SLUG}/pulls/22265/update-branch"])
+        lifts = [args[4] for args in self.calls if args[:4] == ["gh", "api", "-X", "DELETE"]]
+        self.assertEqual(lifts, [f"repos/{lane.REPO_SLUG}/issues/22265/labels/lane-fix-exhausted"])
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text()), attempts)
+        self.assertEqual(json.loads((self.host.state / "held.json").read_text()), held)
+
+    def test_terminal_sync_reports_the_policy_hold_under_exhaustion(self):
+        attempts = {"1": {"sha": "h1", "count": 2, "escalated": True}}
+        self.write("fix-attempts.json", attempts)
+        self.write("held.json", {"1": lane.pr_events.held_record("h1", ["fix-exhausted", "empty-diff"])})
+        pr = self.pr(1, labels=[{"name": "lane-fix-exhausted"}])
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [pr], now=TERMINAL_NOW), [])
+        self.assertEqual(
+            lane.pr_events.sync_main(self.host, lane, pr, TERMINAL_NOW, terminal_ok=True),
+            "held:empty-diff")
+        secret = self.pr(2, labels=[{"name": "lane-fix-exhausted"}])
+        self.write("fix-attempts.json", {"2": {"sha": "h2", "count": 2, "escalated": True}})
+        self.write("held.json", {"2": lane.pr_events.held_record(
+            "h2", ["secret-like-file-changed", "fix-exhausted"])})
+        self.assertEqual(
+            lane.pr_events.sync_main(self.host, lane, secret, TERMINAL_NOW, terminal_ok=True),
+            "held:secret-file")
+
     def test_partial_main_sync_merges_the_newest_conflict_free_main_commit(self):
         repo = Path(self.temp.name) / "repo"
         repo.mkdir()
