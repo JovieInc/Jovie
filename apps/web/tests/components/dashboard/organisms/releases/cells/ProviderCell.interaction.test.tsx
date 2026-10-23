@@ -122,7 +122,13 @@ describe('Ion-token feedback on availability surfaces', () => {
   it('renders the manual-status ring and copied feedback on tokens inside the availability popover', async () => {
     const onCopy = vi.fn().mockResolvedValue('copied');
     const manualRelease: ReleaseViewModel = {
-      ...release,
+      profileId: 'profile-1',
+      id: 'release-1',
+      title: 'Midnight Signal',
+      releaseDate: '2026-01-01',
+      artworkUrl: 'https://example.com/art.jpg',
+      slug: 'midnight-signal',
+      smartLinkPath: '/r/midnight-signal',
       providers: [
         {
           key: 'spotify' as ProviderKey,
@@ -134,6 +140,9 @@ describe('Ion-token feedback on availability surfaces', () => {
           updatedAt: '2026-01-01T00:00:00.000Z',
         },
       ],
+      releaseType: 'single',
+      isExplicit: false,
+      totalTracks: 1,
     };
 
     render(
