@@ -110,9 +110,41 @@ exec "$SOURCE_FIXTURE_NODE" "$@"
     writeFileSync(manifest, '[]\n');
     git('add', '.');
     git('commit', '--quiet', '-m', 'remove the retired manifest entry');
+    const stillRejected = invoke();
+    assert.equal(
+      stillRejected.status,
+      1,
+      stillRejected.stdout + stillRejected.stderr
+    );
+    assert.match(stillRejected.stdout, /node-environment-files: exit 0/);
+    assert.match(stillRejected.stdout, /gate-weakening-detector: FAIL/);
+    assert.match(
+      stillRejected.stdout,
+      /detector-deleted scripts\/invariants\/gate-weakening-detector\.mjs/
+    );
+    assert.match(
+      stillRejected.stdout,
+      /invariant-test-deleted scripts\/invariants\//
+    );
+    // Clearing the manifest cannot authorize deleting the gates. Restore the
+    // synthetic base's scripts before expecting the source checkout to pass.
+    execFileSync('tar', ['-x', '-C', repo], {
+      input: execFileSync('/usr/bin/git', ['archive', 'main', 'scripts'], {
+        cwd: repo,
+        maxBuffer: 128 * 1024 * 1024,
+      }),
+    });
+    git('add', '.');
+    git(
+      'commit',
+      '--quiet',
+      '-m',
+      'restore the source guards and invariant tests'
+    );
     const accepted = invoke();
     assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
     assert.match(accepted.stdout, /node-environment-files: exit 0/);
+    assert.match(accepted.stdout, /gate-weakening-detector: PASS/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
