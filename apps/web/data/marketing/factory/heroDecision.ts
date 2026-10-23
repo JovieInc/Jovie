@@ -260,6 +260,14 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     why: 'hero renders ProductClaimCard',
   },
   {
+    url: '/product/command-palette',
+    input: {
+      useCase: 'aha-capture',
+      captureId: 'shared-command-palette',
+    },
+    why: 'hero mounts the live command palette as the aha capture',
+  },
+  {
     url: '/card',
     input: { useCase: 'informational' },
     why: 'planned Card announcement uses text until an approved Wallet capture exists',

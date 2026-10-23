@@ -180,6 +180,15 @@ export const MARKETING_PAGE_CONTRACTS = {
       label: PRODUCT_COPY.claimCard.cta,
     },
   },
+  '(marketing)/product/command-palette/page.tsx': {
+    routeGlob: '(marketing)/product/command-palette/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_COMMAND_PALETTE,
+    job: 'filter workspace routes and skills from one search field',
+    proof: 'live command palette with registry routes and skills',
+    successEvent: 'visitor filters the command palette and commits a command',
+    primaryCta: START_CTA,
+  },
   '(marketing)/card/page.tsx': {
     routeGlob: '(marketing)/card/page.tsx',
     copyScope: 'shared',
