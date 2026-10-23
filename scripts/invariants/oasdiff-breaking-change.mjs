@@ -209,7 +209,11 @@ function defaultFetchTarball(url) {
   return { ok: true, bytes: result.stdout };
 }
 
-/** oasdiff breaking base revision, githubactions format, fail on ERR. */
+/**
+ * oasdiff breaking base revision, githubactions format, fail on ERR.
+ * v1.34.1 rejects `--color` unless the format is `text` or `singleline`
+ * (exit 100), so the annotation format is left uncolored.
+ */
 export function runOasdiff(binary, basePath, revisionPath) {
   const result = spawnSync(
     binary,
@@ -221,8 +225,6 @@ export function runOasdiff(binary, basePath, revisionPath) {
       'githubactions',
       '--fail-on',
       'ERR',
-      '--color',
-      'never',
     ],
     { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }
   );

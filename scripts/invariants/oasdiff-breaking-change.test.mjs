@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +15,7 @@ import {
   readApiBreakingMarker,
   renderBaseSpec,
   renderSpecAt,
+  runOasdiff,
   SPEC_SOURCE_RE,
   specSourcesChanged,
 } from './oasdiff-breaking-change.mjs';
@@ -307,6 +309,28 @@ test('the base worktree render produces the same document as the head render', {
   assert.equal(head.code, 0, head.error);
   assert.equal(base.code, 0, base.error);
   assert.equal(base.document, head.document);
+});
+
+test('pinned oasdiff accepts githubactions format without --color', () => {
+  const binary = ensureOasdiffBinary();
+  assert.equal(binary.code, 0, binary.error);
+  const directory = mkdtempSync(join(tmpdir(), 'jovie-oasdiff-format-'));
+  try {
+    const spec = `${JSON.stringify({
+      openapi: '3.0.3',
+      info: { title: 'probe', version: '1' },
+      paths: {},
+    })}\n`;
+    const base = join(directory, 'base.json');
+    const revision = join(directory, 'revision.json');
+    writeFileSync(base, spec);
+    writeFileSync(revision, spec);
+    const result = runOasdiff(binary.binary, base, revision);
+    assert.equal(result.code, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /--color flag is only relevant/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('the renderer produces stable, schema-bearing JSON from the real tree', {
