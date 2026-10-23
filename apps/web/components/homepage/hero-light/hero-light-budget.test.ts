@@ -67,10 +67,15 @@ describe('homepage hero light budget', () => {
     expect(island).toContain("import('./hero-light-gl')");
   });
 
-  it('paints only the scene palette, with Ultra and Pulse on the edge', () => {
+  it('uses the cinematic canvas and scene accent tokens, with Ultra and Pulse on the edge', () => {
     const css = readFileSync(join(DIR, 'HomepageHeroLight.css'), 'utf8');
-    for (const hex of Object.values(HERO_LIGHT_SCENE)) {
-      expect(css).toContain(hex);
+    expect(css).toContain(
+      '--hero-light-canvas: var(--system-b-cinematic-black, #06070a);'
+    );
+    for (const role of ['ion', 'ultra', 'pulse'] as const) {
+      expect(css).toContain(
+        `--hero-light-${role}: var(--noir-ion-${role}, ${HERO_LIGHT_SCENE[role].toLowerCase()});`
+      );
     }
     expect(css.toLowerCase()).not.toMatch(/#ff7800|#ffa500|orange/);
     expect(css).not.toMatch(/\bblur\(|box-shadow:/);
