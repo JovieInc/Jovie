@@ -1,0 +1,12 @@
+.isrc-stage {
+  min-height: 100svh;
+}
+
+.isrc-glow {
+  height: 28rem;
+}
+
+.isrc-card {
+  margin-bottom: -5.5rem;
+  padding-bottom: 7.5rem;
+}
