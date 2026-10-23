@@ -62,7 +62,7 @@ function ShortcutItem({ shortcut }: { shortcut: KeyboardShortcut }) {
   const Icon = shortcut.icon;
 
   return (
-    <div className='group flex items-center justify-between rounded-md px-2 py-1 transition-colors hover:bg-surface-1'>
+    <div className='group flex h-8 items-center justify-between rounded-md px-2 transition-colors hover:bg-surface-1'>
       <div className='flex items-center gap-3 min-w-0'>
         {Icon && (
           <Icon className='h-4 w-4 shrink-0 text-tertiary-token' aria-hidden />
@@ -181,11 +181,11 @@ export function KeyboardShortcutsSheet() {
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetContent
         side='right'
-        className='top-2 right-2 bottom-2 flex h-auto w-full flex-col gap-0 rounded-lg bg-surface-0 p-0 sm:max-w-[26rem]'
+        className='top-2 right-2 bottom-2 flex h-auto w-full flex-col gap-0 rounded-lg bg-surface-0 p-0 sm:max-w-104'
         hideClose
         onAnimationEnd={handleAnimationEnd}
       >
-        <div className='sticky top-0 z-10 shrink-0 bg-surface-0/95 backdrop-blur-md'>
+        <div className='sticky top-0 z-10 shrink-0 bg-surface-0'>
           <SheetHeader className='flex flex-row items-center gap-2 space-y-0 px-3 py-2'>
             <Button
               variant='ghost'
@@ -251,10 +251,21 @@ export function KeyboardShortcutsSheet() {
             </div>
           ) : (
             <div className='flex flex-col items-center justify-center py-12 text-center'>
-              <Search className='h-8 w-8 text-tertiary-token mb-3' />
-              <p className='text-sm text-tertiary-token'>
+              <Search
+                className='mb-3 h-8 w-8 text-tertiary-token'
+                aria-hidden
+              />
+              <p className='mb-3 text-sm text-tertiary-token'>
                 No shortcuts found for &quot;{searchQuery}&quot;
               </p>
+              <Button
+                type='button'
+                variant='secondary'
+                size='sm'
+                onClick={() => setSearchQuery('')}
+              >
+                Clear Search
+              </Button>
             </div>
           )}
         </div>
