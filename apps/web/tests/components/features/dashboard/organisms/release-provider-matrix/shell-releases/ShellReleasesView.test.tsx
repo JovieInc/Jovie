@@ -602,6 +602,32 @@ describe('ShellReleasesView', () => {
     expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
   });
 
+  it('keeps the release list axe list-clean through the real context-menu path', () => {
+    // The default suite mock wraps rows in a div; the production
+    // ContextMenuPrimitive.Trigger asChild renders the row host directly, so
+    // the ul's children contract is only observable with the real menu.
+    testState.realActionMenu = true;
+    renderShell([
+      fakeRelease({ id: '1', title: 'Lost in the Light' }),
+      fakeRelease({ id: '2', title: 'Take Me Over' }),
+    ]);
+
+    // axe `list` rule: a ul's direct children must be li (script/template).
+    // The context-menu wrapper is a presentation li, and each carries exactly
+    // one listitem row — the row inside, never a nested second listitem.
+    const list = screen.getByRole('list', { name: 'Releases' });
+    const directChildren = [...list.children];
+    expect(directChildren.length).toBeGreaterThanOrEqual(2);
+    for (const child of directChildren) {
+      expect(child.tagName).toBe('LI');
+      expect(child).toHaveAttribute('role', 'presentation');
+      expect(child).toHaveAttribute('data-shell-release-row-context-target');
+      expect(child.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+    }
+    // The listbox contract still resolves exactly one listitem per row.
+    expect(screen.getAllByRole('listitem')).toHaveLength(directChildren.length);
+  });
+
   it('shows the connect-Spotify empty state when not yet connected', () => {
     renderShell([]);
     expect(
