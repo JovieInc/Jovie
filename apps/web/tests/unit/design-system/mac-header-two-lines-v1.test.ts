@@ -57,6 +57,9 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // /product's closing CTA headline is the same terminal value proposition —
   // the two-line clamp truncated it at 390px, so it renders editorial-title.
   'apps/web/app/(marketing)/product/ProductLanding.tsx',
+  // /product/command-palette keeps the full headline with text-balance;
+  // the heading does not use line-clamp.
+  'apps/web/app/(marketing)/product/command-palette/CommandPaletteLanding.tsx',
   // /product/release-scheduling keeps the full headline. Balance lives in
   // the page CSS class, so the heading does not use line-clamp.
   'apps/web/app/(marketing)/product/release-scheduling/ReleaseSchedulingLanding.tsx',

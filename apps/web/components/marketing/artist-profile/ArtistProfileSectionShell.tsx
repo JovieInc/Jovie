@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { MarketingContainer } from '../MarketingContainer';
 import './ArtistProfileSectionShell.css';
 
-const PAGE_CHROME_ALIGNED_CONTAINER_CLASS = 'ap-section-container !px-0';
+const PAGE_CHROME_ALIGNED_CONTAINER_CLASS = 'ap-section-container';
 
 interface ArtistProfileSectionShellProps {
   readonly id?: string;

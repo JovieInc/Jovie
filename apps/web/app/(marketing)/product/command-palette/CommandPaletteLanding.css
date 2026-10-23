@@ -1,0 +1,12 @@
+.command-palette-stage {
+  min-height: 100svh;
+}
+
+.command-palette-glow {
+  height: 28rem;
+}
+
+.command-palette-card {
+  margin-bottom: -5.5rem;
+  padding-bottom: 7.5rem;
+}

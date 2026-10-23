@@ -60,6 +60,11 @@
   /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
   --ds-public-content-max: 1298px; /* canonical public/marketing width */
   --ds-prose-max: 680px; /* prose exception */
+  /* One boxed public width. Header, hero, sections and footer all use it, so
+     their content edges line up. The only exception is the full-bleed
+     override (.public-container--bleed). Enforced by
+     scripts/invariants/art-direction/container-width.mjs. */
+  --ds-public-gutter: 1.5rem;
 
   /* Marketing display type scale (System B public surfaces). One canonical
      ramp for hero display, section titles, and ledes so marketing pages share
@@ -3578,4 +3583,36 @@ html:not(.dark) .smart-link-powered-by {
   .icon-glyph:hover {
     background-color: var(--icon-glyph-hover-surface, var(--color-surface-1));
   }
+}
+
+/* Public boxed container: the single marketing and public content width.
+   The box IS the content edge (no inner padding), so header, hero, sections
+   and footer content all start at the same x. Gutter steps 24 / 32 / 40px
+   and applies as the viewport margin below the box width. Do not set
+   max-width or horizontal padding on a marketing container any other way. */
+@media (min-width: 640px) {
+  :root {
+    --ds-public-gutter: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --ds-public-gutter: 2.5rem;
+  }
+}
+
+.public-container {
+  width: min(
+    100% -
+    (var(--ds-public-gutter) * 2),
+    var(--ds-public-content-max)
+  );
+  margin-inline: auto;
+}
+
+/* The one full-bleed override: edge to edge with no box and no gutter. */
+.public-container--bleed {
+  width: 100%;
+  max-width: none;
 }

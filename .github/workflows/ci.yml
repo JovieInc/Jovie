@@ -1795,6 +1795,62 @@ jobs:
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
+      # The exact-route capture (console errors, axe quality checks, HTTP
+      # failures per registered marketing route) used to run only on main push
+      # in screenshots.yml, so a route that failed it merged untested and
+      # re-reddened main. Run the same spec, config and flags here, on the
+      # build above, for every PR and merge-group head that selects marketing
+      # inputs. No route or axe check is skipped; the spec is unchanged.
+      - name: Capture exact marketing routes (marketing-routes.spec.ts)
+        if: needs.ci-path-changes.outputs.run_marketing_dom == 'true'
+        run: |
+          set -euo pipefail
+          # Exact-head provenance (screenshots.yml, JOV-4731) refuses a dirty
+          # tree, and the build can dirty tracked files. Restore source
+          # cleanliness without touching ignored build output or test results.
+          git checkout -- .
+          git clean -fd -e apps/web/test-results
+          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+            echo "::error::Source tree is dirty after restore; exact-route capture requires a clean checkout."
+            git status --porcelain --untracked-files=all
+            exit 1
+          fi
+          cd apps/web
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "::error::Standalone server not found; exact marketing route capture cannot start."
+            exit 1
+          fi
+          export HOSTNAME=localhost
+          PORT=3230 node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/marketing-routes-server.log" 2>&1 &
+          SERVER_PID=$!
+          for _attempt in $(seq 1 30); do
+            curl -sf http://localhost:3230 > /dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -sf http://localhost:3230 > /dev/null || { cat "$RUNNER_TEMP/marketing-routes-server.log"; exit 1; }
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm exec playwright test tests/product-screenshots/marketing-routes.spec.ts \
+              --config=playwright.config.screenshots.ts --project=screenshots \
+              --workers=4 --retries=0 --reporter=line
+        env:
+          BASE_URL: http://localhost:3230
+          CI: 'true'
+          SCREENSHOT_BUILD_MODE: pr-premerge
+          DATABASE_URL: postgresql://localhost/noop
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
+          CLERK_SECRET_KEY: sk_test_mock
+          NEXT_DISABLE_TOOLBAR: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          E2E_USE_TEST_AUTH_BYPASS: '1'
       - name: Upload homepage visual failure evidence
         if: ${{ failure() && (needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true') && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact

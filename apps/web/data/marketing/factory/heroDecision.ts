@@ -265,6 +265,14 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     why: 'hero mounts the live UTM builder as the aha capture',
   },
   {
+    url: '/product/command-palette',
+    input: {
+      useCase: 'aha-capture',
+      captureId: 'shared-command-palette',
+    },
+    why: 'hero mounts the live command palette as the aha capture',
+  },
+  {
     url: '/product/release-scheduling',
     input: {
       useCase: 'aha-capture',
