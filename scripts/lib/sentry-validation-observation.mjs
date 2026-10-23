@@ -32,7 +32,7 @@ const SENTRY_API = 'https://sentry.io/api/0';
  * | { status: 'fail', reason: string, source: string, release: string, evidence: string }} ObservationResult */
 /** @typedef {{sha: string, evidence: string, recordedAt: string, bindingSha: string,
  * window: {start: string, end: string}, previous?: PredecessorFailure}} PredecessorFailure */
-/** @typedef {{ servedGeneration: () => Promise<{status: string, sha?: string}>,
+/** @typedef {{ servedGeneration: () => Promise<{status: string, sha?: string, detail?: string}>,
  * contains: (base: string, head: string) => Promise<boolean> }} ObservationFacts */
 
 /** @param {string} reason @returns {UnknownObservation} */
