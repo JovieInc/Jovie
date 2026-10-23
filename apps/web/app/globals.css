@@ -2101,6 +2101,12 @@ body {
     --tw-ring-color: var(--color-focus-ring);
     --tw-ring-offset-color: var(--color-bg-page);
   }
+
+  /* One ring on the field frame. An inner input ring nests a second rectangle
+     inside the pill, and outline utilities lose to the global input reset. */
+  .focus-field-inset:has(input:focus-visible) {
+    box-shadow: inset 0 0 0 2px var(--color-focus);
+  }
 }
 
 /* Menu animations */

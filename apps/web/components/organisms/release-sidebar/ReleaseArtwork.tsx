@@ -10,9 +10,9 @@
 
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-
 import { DrawerMediaThumb, EntityHeader } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
@@ -107,7 +107,7 @@ export function ReleaseArtwork({
   return (
     <EntityHeader
       thumbnail={artworkImage}
-      title={title || 'Untitled'}
+      title={title || COPY_FALLBACKS.release}
       subtitle={artistName}
       data-testid='release-artwork'
     />

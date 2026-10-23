@@ -1,5 +1,7 @@
 'use client';
 
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
+
 /**
  * CommandPalette — global Cmd+K shell.
  *
@@ -231,7 +233,7 @@ function CommandPaletteInner({
           const entity: EntityRef = {
             kind: 'track', // Reuses the generic Music2 fallback art.
             id: `thread:${convo.id}`,
-            label: convo.title || 'Untitled chat',
+            label: convo.title || COPY_FALLBACKS.conversation,
             meta: {
               kind: 'track',
               subtitle: getPaletteConversationSubtitle(
