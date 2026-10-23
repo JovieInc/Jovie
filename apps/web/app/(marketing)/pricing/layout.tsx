@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `${APP_NAME} Pricing`,
+  title: documentTitle(`${APP_NAME} Pricing`),
   description:
     'Jovie pricing for your artist profile, smart links, and audience capture.',
   alternates: {

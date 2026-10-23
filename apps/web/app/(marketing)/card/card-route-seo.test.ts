@@ -6,6 +6,7 @@ import {
   isDedicatedRootSegment,
   isPublicProfileAudienceBlockCandidate,
 } from '@/lib/routing/proxy-routing';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 import {
   getExactPublishedMarketingPaths,
   getPublishedCommercialHubPaths,
@@ -43,7 +44,9 @@ describe('/card marketing route', () => {
 
   it('keeps canonical, social, and coming-soon metadata on the same route', () => {
     expect(metadata.alternates?.canonical).toBe('https://jov.ie/card');
-    expect(metadata.title).toMatch(/planned.*Apple Wallet/i);
+    expect(applyRootTitleTemplate(metadata.title)).toMatch(
+      /planned.*Apple Wallet/i
+    );
     expect(metadata.description).toContain('planned Apple Wallet');
     expect(metadata.description).toContain('Passes are not available yet.');
     expect(metadata.openGraph).toMatchObject({
