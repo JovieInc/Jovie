@@ -1,3 +1,13 @@
+/* The marketing shell clamps every h1 to two painted lines at zero
+   specificity. This class keeps the page title complete. */
+.dsp-links-title {
+  display: block;
+  max-block-size: none;
+  overflow: visible;
+  -webkit-box-orient: initial;
+  -webkit-line-clamp: unset;
+}
+
 .dsp-links-stage {
   min-height: 100svh;
 }
