@@ -221,6 +221,14 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Marketing images and cards use a radius token. Zero exceptions.
+    id: 'marketing-rounded-media',
+    command: 'node --test scripts/invariants/art-direction/rounded.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage|features\/(?:home|pricing|visibility-audit))\/|apps\/web\/components\/organisms\/(?:AboutPage|Blog|ComparisonPage|PricingRecipe|SupportPage|VoicePage)|apps\/web\/components\/site\/Marketing|apps\/web\/tests\/unit\/marketing\/art-direction\/rounded|scripts\/invariants\/art-direction\/rounded)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
     // Breaking changes to the public OpenAPI contract (ARTIST_OPENAPI_DOCUMENT,
     // served at /api/v1/openapi.json and /openapi.json) fail closed unless the
     // PR body carries an auditable `api-breaking: <reason>` marker line. The
