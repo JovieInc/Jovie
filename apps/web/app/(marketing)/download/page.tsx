@@ -23,6 +23,7 @@ import { DOWNLOAD_COPY } from '@/data/downloadCopy';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 import { MAC_APP_SUPPORT } from '@/lib/desktop/mac-compatibility';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
@@ -74,7 +75,7 @@ const REQUIREMENTS = [
 ] as const;
 
 export const metadata: Metadata = {
-  title: DOWNLOAD_COPY.metadata.title,
+  title: documentTitle(DOWNLOAD_COPY.metadata.title),
   description: DOWNLOAD_COPY.metadata.description,
   alternates: {
     canonical: `${BASE_URL}/download`,
@@ -92,7 +93,7 @@ export const metadata: Metadata = {
   },
 };
 
-const FAQ_SCHEMA = buildFaqSchema(DOWNLOAD_COPY.faq);
+const FAQ_SCHEMA = buildFaqSchema([...DOWNLOAD_COPY.faq]);
 const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
   { name: APP_NAME, url: BASE_URL },
   { name: 'Download', url: `${BASE_URL}/download` },
