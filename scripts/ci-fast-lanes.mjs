@@ -221,6 +221,21 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Breaking changes to the public OpenAPI contract (ARTIST_OPENAPI_DOCUMENT,
+    // served at /api/v1/openapi.json and /openapi.json) fail closed unless the
+    // PR body carries an auditable `api-breaking: <reason>` marker line. The
+    // spec is rendered from source at the head and the merge base and diffed
+    // with a pinned, sha-verified oasdiff binary the guard downloads itself.
+    // prOnly: the marker lives in the pull_request body, which merge-group
+    // and main events cannot present, so those events skip this guard.
+    id: 'oasdiff-breaking-change',
+    command:
+      'node scripts/invariants/oasdiff-breaking-change.mjs && node --test --test-isolation=none scripts/invariants/oasdiff-breaking-change.test.mjs',
+    inputs:
+      /^(?:apps\/web\/(?:lib\/api\/(?:v1\/|public-agent-openapi\.ts$)|lib\/music-resolver\/public-schemas\.ts$|app\/api\/v1\/openapi\.json\/route\.ts$|app\/openapi\.json\/route\.ts$|scripts\/render-public-openapi\.ts$)|scripts\/invariants\/oasdiff-breaking-change(?:\.test)?\.mjs$|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
     // Third-party API calls go through packages/api-client / scripts/apiclient
     // (.claude/rules/external-apis.md). A new provider host, SDK client or gh
     // call in any scanned source fails here; grandfathered sites only shrink.
@@ -670,6 +685,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
   'scripts/invariants/quality-saturation.test.mjs',
   'scripts/invariants/screen-audit.test.mjs',
+  'scripts/invariants/oasdiff-breaking-change.test.mjs',
   'scripts/invariants/ui-escape-holdout.test.mjs',
   'scripts/invariants/virtual-models.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
