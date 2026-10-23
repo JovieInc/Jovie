@@ -113,26 +113,157 @@ iso_to_epoch() {
   date -u -d "$1" +%s 2>/dev/null || date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s
 }
 
+# Bounded REST retry. Stderr is classified and discarded: a rate-limit body
+# can carry an installation id, and a raw body must not become a log line.
+# gh_retry_status / gh_retry_class survive for the caller. A completed HTTP
+# success (including an empty or unexpected status) returns 0 and is not retried.
+gh_retry_status=0
+gh_retry_class=""
+gh_retry() {
+  local label="$1"
+  shift
+  local attempt=1 max backoff err text http
+  max="${LINEAGE_COMPARE_ATTEMPTS:-3}"
+  backoff="${LINEAGE_COMPARE_BACKOFF_SECONDS:-2}"
+  [[ "$max" =~ ^[1-9][0-9]*$ ]] || max=3
+  [[ "$backoff" =~ ^[0-9]+$ ]] || backoff=2
+  while [ "$attempt" -le "$max" ]; do
+    err="$(mktemp)"
+    gh_retry_status=0
+    gh_retry_class=""
+    text="$("$gh_cli" "$@" 2>"$err")" || gh_retry_status=$?
+    if [ "$gh_retry_status" -eq 0 ]; then
+      rm -f "$err"
+      printf '%s\n' "$text"
+      return 0
+    fi
+    text="$(cat "$err" 2>/dev/null || true)"
+    rm -f "$err"
+    gh_retry_class=transport
+    http=""
+    if printf '%s\n' "$text" | grep -qiE 'secondary rate limit|API rate limit|rate limit exceeded'; then
+      gh_retry_class=rate_limit
+    fi
+    if [[ "$text" =~ HTTP[^0-9]*([0-9]{3}) ]]; then
+      http="${BASH_REMATCH[1]}"
+    fi
+    if [ "$gh_retry_class" != rate_limit ] && [ "$http" = 429 ]; then
+      gh_retry_class=rate_limit
+    elif [ -n "$http" ] && [ "$gh_retry_class" = transport ]; then
+      gh_retry_class="http_${http}"
+    fi
+    echo "::warning::${label} attempt ${attempt}/${max} class=${gh_retry_class} http=${http:-none} exit=${gh_retry_status}." >&2
+    if [ "$attempt" -ge "$max" ]; then
+      return 1
+    fi
+    if [ "$backoff" -gt 0 ]; then
+      sleep "$backoff"
+      backoff=$((backoff * 2))
+    fi
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+# Git does not spend the shared installation REST quota. Used only after the
+# compare command itself failed. A 200 with an empty or unexpected status is
+# not overridden: that completed read stays unknown (JOV-7674). A missing
+# object stays unknown rather than diverged.
+prove_git_lineage() {
+  [ "${LINEAGE_PROVE_WITH_GIT:-1}" = 1 ] || return 1
+  local work tip token header url
+  work="$(mktemp -d)"
+  url="https://github.com/${repository}.git"
+  git_auth() {
+    if [ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
+      token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+      header="$(printf 'x-access-token:%s' "$token" | base64 | tr -d '\n')"
+      printf '::add-mask::%s\n' "$header" >&2
+      GIT_CONFIG_COUNT=2 \
+        GIT_CONFIG_KEY_0="http.https://github.com/.extraheader" \
+        GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${header}" \
+        GIT_CONFIG_KEY_1=core.hooksPath \
+        GIT_CONFIG_VALUE_1=/dev/null \
+        GIT_TERMINAL_PROMPT=0 \
+        git "$@"
+      return
+    fi
+    GIT_TERMINAL_PROMPT=0 git "$@"
+  }
+  git_auth init -q "$work" || {
+    rm -rf "$work"
+    return 1
+  }
+  for depth in 128 2048; do
+    if ! git_auth -C "$work" fetch --no-tags --filter=blob:none --depth="$depth" \
+      "$url" 'refs/heads/main:refs/heads/main'; then
+      rm -rf "$work"
+      return 1
+    fi
+    tip="$(git -C "$work" rev-parse refs/heads/main 2>/dev/null || true)"
+    if [ "$tip" != "$current" ]; then
+      echo "::warning::git main tip does not match the resolved main SHA; refusing the git lineage proof." >&2
+      rm -rf "$work"
+      return 1
+    fi
+    if git -C "$work" cat-file -e "${expected}^{commit}" 2>/dev/null; then
+      if git -C "$work" merge-base --is-ancestor "$expected" "$tip"; then
+        rm -rf "$work"
+        printf 'ahead\n'
+        return 0
+      fi
+      rm -rf "$work"
+      printf 'diverged\n'
+      return 0
+    fi
+  done
+  rm -rf "$work"
+  return 1
+}
+
 lineage=exact
+compare_error_class=""
 if [ "$current" != "$expected" ]; then
   lookup_status=0
-  status="$("$gh_cli" api "repos/$repository/compare/${expected}...${current}" --jq '.status // empty' 2>/dev/null)" || lookup_status=$?
   lineage=unknown
-  if [ "$lookup_status" -eq 0 ]; then
+  # Redirect instead of $(...): a command substitution runs the function in a
+  # subshell and would drop gh_retry_status.
+  compare_out="$(mktemp)"
+  if gh_retry "Release compare" api "repos/$repository/compare/${expected}...${current}" --jq '.status // empty' >"$compare_out"; then
+    status="$(cat "$compare_out")"
     case "$status" in
       ahead) lineage=ancestor ;;
       behind|diverged) lineage=diverged ;;
     esac
+  else
+    lookup_status="$gh_retry_status"
+    compare_error_class="${gh_retry_class:-transport}"
+    # 2026-10-23 03:52Z: installation REST quota was exhausted. The compare
+    # exited 1 while both SHAs were ancestors of main. Git still proved the
+    # tip (resolve-main-sha uses ls-remote). A failed command may be proven
+    # that way. An unproven read still fails closed.
+    if git_status="$(prove_git_lineage)"; then
+      case "$git_status" in
+        ahead) lineage=ancestor ;;
+        behind|diverged) lineage=diverged ;;
+      esac
+      if [ "$lineage" != unknown ]; then
+        echo "::warning::REST compare unavailable class=${compare_error_class} exit=${lookup_status}; git proved lineage=${lineage}." >&2
+      fi
+    fi
   fi
-  # A failed/empty compare proves no rewrite. In particular, installation
-  # quota exhaustion must fail the controller so its existing recovery path
-  # can run, rather than recording a successful supersession (JOV-7674).
+  rm -f "$compare_out"
+  # A failed or unexpected compare proves no rewrite. Installation quota
+  # exhaustion must still fail a mutating promotion (JOV-7674). The coalesce
+  # caller, which has not mutated, turns this decision=error into a yield
+  # receipt so an older generation does not fail the wave.
   if [ "$lineage" = unknown ]; then
     emit lineage unknown
     emit lineage_lookup_exit "$lookup_status"
+    emit lineage_lookup_class "${compare_error_class:-none}"
     emit gate_decision error
     emit gate_reason lineage_lookup_unavailable
-    echo "::error::Release ancestry is unknown (exit=$lookup_status); inspect GitHub compare access/response before superseding $expected." >&2
+    echo "::error::Release ancestry is unknown (exit=${lookup_status} class=${compare_error_class:-none}); inspect GitHub compare access/response before superseding $expected." >&2
     printf 'decision=error\n'
     exit 1
   fi
@@ -153,7 +284,14 @@ elif [ "$lineage" = ancestor ]; then
   # Unknown visibility must not become an empty-queue decision, including
   # under starvation. Emit bounded diagnostics without raw API response text.
   lookup_status=0
-  runs_json="$("$gh_cli" api "repos/$repository/actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&per_page=30" 2>/dev/null)" || lookup_status=$?
+  runs_out="$(mktemp)"
+  if gh_retry "Release successor lookup" api "repos/$repository/actions/workflows/production-controller.yml/runs?branch=main&event=workflow_run&per_page=30" >"$runs_out"; then
+    runs_json="$(cat "$runs_out")"
+  else
+    lookup_status="$gh_retry_status"
+    runs_json=""
+  fi
+  rm -f "$runs_out"
   if [ "$lookup_status" -ne 0 ] || ! pending="$(jq -er --argjson run "$run_id" '
     if (.workflow_runs | type) != "array" or
       any(.workflow_runs[]; (.id | type) != "number" or .id <= 0 or
