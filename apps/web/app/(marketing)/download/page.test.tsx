@@ -25,4 +25,17 @@ describe('DownloadPage hero layout', () => {
     expect(copy?.parentElement).toHaveClass('items-start', 'lg:items-center');
     expect(copy?.parentElement).not.toHaveClass('items-center');
   });
+
+  it('does not call the shipped Mac app native', () => {
+    render(<DownloadPage />);
+
+    expect(document.body.textContent).not.toMatch(/\bnative\b/i);
+    expect(
+      screen.getByRole('heading', {
+        level: 2,
+        name: 'Mac desktop\u00a0workspace',
+      })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Open the Mac app today\./)).toBeInTheDocument();
+  });
 });
