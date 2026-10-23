@@ -265,6 +265,11 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     why: 'hero mounts the live UTM builder as the aha capture',
   },
   {
+    url: '/product/dsp-links',
+    input: { useCase: 'aha-capture', captureId: 'dsp-links' },
+    why: 'hero mounts the live DSP rows as the aha capture',
+  },
+  {
     url: '/product/isrc',
     input: { useCase: 'aha-capture', captureId: 'isrc-editor' },
     why: 'hero mounts the live ISRC field as the aha capture',
