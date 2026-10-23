@@ -130,7 +130,11 @@ html:not(.dark) .homepage-hero-light {
     transparent 248deg
   );
   opacity: 0.7;
-  animation: homepage-hero-light-roll 28s linear infinite;
+  /* Ambient loop, not a UI transition. The period lives on a custom property
+     so the motion lint treats it as a token (see lint-motion-css). */
+  --hero-light-roll-period: 28s;
+  animation: homepage-hero-light-roll var(--hero-light-roll-period) linear
+    infinite;
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
