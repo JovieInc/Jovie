@@ -1,7 +1,7 @@
 name: Controller Quota Replay
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Shipping-Control
-# necessary-trust-boundary: GitHub Actions cannot retry a workflow_run-triggered controller after a transient failure; this hop reruns only the failed jobs of the newest failed Staging/Production Controller run, so the controllers' own lineage, lease and authorization gates decide again against current main.
+# necessary-trust-boundary: GitHub Actions cannot retry a workflow_run-triggered controller after a transient failure, and a controller rerun is refused at authorization; this hop reruns the exact source CI run of the newest failed generation at current main, so fresh controller attempts pass every lineage, lease and authorization gate.
 # removal-trigger: Remove when the controllers retry their own GitHub reads across a quota reset, or GitHub offers native retry for workflow_run consumers.
 
 # 2026-10-21 08:05-09:23Z: GitHub App installation quota ran out. A Production
@@ -10,10 +10,11 @@ name: Controller Quota Replay
 # installation"). Nothing replayed either run (production-controller-health
 # only runs daily), so jov.ie stayed on 51dad18 until the next merge.
 #
-# This reacts to the controller's completion event, no clock. It reruns only
-# a transient failure (quota, GitHub 5xx, network, runner loss) of the newest
-# run of that controller, while production lags main, at most until the
-# controller reaches attempt 3. It waits once for the token's quota reset (or
+# This reacts to the controller's completion event, no clock. For a transient
+# failure (quota, GitHub 5xx, network, runner loss) of controller attempt 1 at
+# current main, before any Production Release job started, it reruns the
+# exact source CI run (as production-controller-health does), at most until
+# CI attempt 3. It waits once for the token's quota reset (or
 # 2^(attempt-1) x 120s backoff, whichever is longer), the same bounded hold
 # as .github/scripts/gh-api-hold.sh, and never polls. Each decision is a
 # jovie-stage-event/v1 row (entity release-replay) in the run's artifact.
@@ -28,10 +29,10 @@ permissions:
 jobs:
   replay:
     name: Replay transient controller failure
-    # Cheap filter before a runner is used: failures on main below the cap.
+    # Cheap filter before a runner is used: attempt-1 failures on main.
     if: >-
       github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.run_attempt < 3 &&
+      github.event.workflow_run.run_attempt == 1 &&
       (github.event.workflow_run.conclusion == 'failure' ||
        github.event.workflow_run.conclusion == 'timed_out')
     concurrency:
