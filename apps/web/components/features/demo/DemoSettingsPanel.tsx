@@ -65,11 +65,12 @@ export function DemoSettingsPanel() {
               >
                 <div className='flex min-w-0 items-center gap-2'>
                   <span
-                    className={cn(
-                      'size-2 shrink-0 rounded-full',
-                      platform.connected ? 'bg-success' : 'bg-quaternary-token'
-                    )}
-                    aria-hidden='true'
+                    className='size-2 shrink-0 rounded-full'
+                    style={{
+                      backgroundColor: platform.connected
+                        ? 'var(--color-success)'
+                        : 'var(--linear-text-quaternary)',
+                    }}
                   />
                   <span className='truncate text-app font-caption text-primary-token'>
                     {platform.name}
