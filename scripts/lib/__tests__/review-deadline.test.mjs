@@ -57,9 +57,56 @@ describe('review deadlines (warn for 72h, then fail)', () => {
       /(nextReview|reviewAt|reviewBy|review_?deadline)[A-Za-z]*\)?\)?\.toBeGreaterThan(OrEqual)?\(\s*Date\.now\(\)/i.test(
         text
       );
-    expect(bare('expect(nextReviewAt).toBeGreaterThan(Date.now());')).toBe(
-      true
+    // The positive sample has to live in this scanned file so the regex is
+    // tested against committed text. That makes git grep flag this file.
+    // Allow only the exact fixture line in this file. A bare comparison
+    // anywhere else, including later in this file, still fails. Do not
+    // exclude the whole path: the alias-graduation test on main compares
+    // nextReviewAt to Date.now(), and that hit must keep failing.
+    const fixtureFile = 'scripts/lib/__tests__/review-deadline.test.mjs';
+    const fixtureSource =
+      "bare('expect(nextReviewAt).toBeGreaterThan(Date.now());')";
+    expect(bare(fixtureSource.slice("bare('".length, -"')".length))).toBe(true);
+    expect(bare('expect(nextReviewAt).toBeGreaterThan(measuredAt);')).toBe(
+      false
     );
+    expect(bare('expect(expiresAt).toBeGreaterThan(Date.now());')).toBe(false);
+    const orEqual = [
+      'expect(reviewBy).toBeGreaterThanOrEqual(',
+      'Date.now())',
+    ].join('');
+    expect(bare(orEqual)).toBe(true);
+    const reviewDeadline = [
+      'expect(Date.parse(policy.review_deadline)).toBeGreaterThan(',
+      'Date.now())',
+    ].join('');
+    expect(bare(reviewDeadline)).toBe(true);
+
+    const unexpected = hits =>
+      hits
+        .split('\n')
+        .filter(Boolean)
+        .filter(hit => {
+          const match = /^([^:]+):\d+:(.*)$/.exec(hit);
+          if (!match) return true;
+          const [, file, line] = match;
+          return !(file === fixtureFile && line.includes(fixtureSource));
+        });
+    expect(
+      unexpected(`${fixtureFile}:1:    expect(${fixtureSource}).toBe(`)
+    ).toEqual([]);
+    const otherFile = `apps/web/tests/review.test.ts:3:    expect(${fixtureSource}).toBe(`;
+    expect(unexpected(otherFile)).toEqual([otherFile]);
+    // Split so this negative case is not itself a committed scan hit.
+    const comparison = [
+      'expect(nextReviewAt).toBeGreaterThan(',
+      'Date.now());',
+    ].join('');
+    const guarded = `scripts/lib/__tests__/production-release-supersession.test.mjs:140:    ${comparison}`;
+    expect(unexpected(guarded)).toEqual([guarded]);
+    const sameFile = `${fixtureFile}:99:    ${comparison}`;
+    expect(unexpected(sameFile)).toEqual([sameFile]);
+
     let hits = '';
     try {
       hits = execFileSync(
@@ -82,6 +129,7 @@ describe('review deadlines (warn for 72h, then fail)', () => {
       // git grep exits 1 when nothing matches.
       if (/** @type {{ status?: number }} */ (error).status !== 1) throw error;
     }
-    expect(hits).toBe('');
+    expect(hits).toContain(fixtureSource);
+    expect(unexpected(hits)).toEqual([]);
   });
 });
