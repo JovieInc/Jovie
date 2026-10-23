@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   HERO_LIGHT_PERF,
@@ -177,5 +179,47 @@ describe('scene palette', () => {
     expect(sceneUnitRgb(HERO_LIGHT_SCENE.canvas)[2]).toBeGreaterThan(
       sceneUnitRgb(HERO_LIGHT_SCENE.canvas)[0]
     );
+  });
+});
+
+describe('the hero ships ungated and the viewport ships with it', () => {
+  const webRoot = join(__dirname, '../../..');
+
+  it('mounts the hero light with no feature flag and no conditional gate', () => {
+    const component = readFileSync(
+      join(webRoot, 'components/homepage/HomepageArtistProfile.tsx'),
+      'utf8'
+    );
+    const canvas = readFileSync(
+      join(webRoot, 'components/homepage/hero-light/HomepageHeroCanvas.tsx'),
+      'utf8'
+    );
+    const flags = readFileSync(
+      join(webRoot, 'lib/flags/marketing-static.ts'),
+      'utf8'
+    );
+
+    expect(component).toContain('<HomepageHeroCanvas');
+    expect(component).not.toContain('FEATURE_FLAGS');
+    // The light mounts unconditionally inside the field. The device gate is
+    // the only gate, and it runs in the browser, never at build time.
+    expect(canvas).toContain('<HomepageHeroLight');
+    expect(canvas).not.toContain('FEATURE_FLAGS');
+    expect(canvas).not.toMatch(/\bif\s*\(.*(?:flag|Flag)/);
+    for (const flag of [
+      'SHOW_HOMEPAGE_HERO_LIGHT',
+      'SHOW_HOMEPAGE_HERO_LIGHT_WEBGL',
+    ]) {
+      expect(flags).not.toContain(flag);
+    }
+  });
+
+  it('pairs the hero-canvas viewport class with the mounted hero', () => {
+    const layout = readFileSync(join(webRoot, 'app/(home)/layout.tsx'), 'utf8');
+    // The hero replaces the docked marketing header with its own bar, so
+    // the layout carries the hero-canvas viewport and skips the shell
+    // offset in the same breath as the hero mount — they cannot diverge.
+    expect(layout).toContain('home-viewport--hero-canvas');
+    expect(layout).toContain('mainOffset={false}');
   });
 });
