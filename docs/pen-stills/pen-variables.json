@@ -1,0 +1,27 @@
+{
+  "schema": "pen-variables-export/v1",
+  "coverage": "seed",
+  "primaryMode": "dark",
+  "source": {
+    "name": "Jovie Homepage Profiles Claim — review copy 2026-10-01.pen",
+    "inRepo": false,
+    "sha256": null
+  },
+  "variables": [
+    {
+      "name": "atom-surface-canvas",
+      "type": "color",
+      "modes": { "dark": "#030406" }
+    },
+    {
+      "name": "atom-surface-card",
+      "type": "color",
+      "modes": { "dark": "#131417" }
+    },
+    {
+      "name": "atom-border-subtle",
+      "type": "color",
+      "modes": { "dark": "#A8B0C31A" }
+    }
+  ]
+}

@@ -151,7 +151,7 @@ function FunnelCard({
 
   return (
     <DrawerSurfaceCard
-      variant='flat'
+      variant='card'
       data-right-rail-section='status'
       className='divide-y divide-subtle overflow-hidden py-1'
     >
@@ -307,6 +307,7 @@ export function AnalyticsSidebarView({
       tabsAriaLabel='Analytics data tabs'
       tabDistribution='fill'
       tabbedCardTestId={tabbedCardTestId}
+      tabbedSurfaceVariant='card'
       sectionKind='details'
       contentClassName='pt-2'
       entityHeader={

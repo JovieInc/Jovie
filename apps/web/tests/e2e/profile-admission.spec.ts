@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES } from '../../components/features/home/homepage-profile-preview-fixture';
 import {
   startOfProfileSurfaceLocalDay,
@@ -1074,7 +1075,7 @@ test.describe('public profile browser admission', () => {
     await captureStill(page, testInfo, 'profile-admission-mobile.png', true);
     const accessibility = await new AxeBuilder({ page })
       .include('[data-testid="marketing-render-surface"]')
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .options(wcag22AaAxeOptions())
       .analyze();
     expect(accessibility.violations).toEqual([]);
 
