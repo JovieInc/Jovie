@@ -1202,6 +1202,63 @@ class GateTest(unittest.TestCase):
         self.assertEqual(lane.gate_rules([self.change("docs/agents.md")]), [])
         self.assertEqual(lane.gate_rules([self.change(".cursor/rules/general.mdc")]), [])
 
+    def test_committed_feedback_reference_repair_needs_no_new_test(self):
+        # PR #22434 repairs a stale test reference, not the test it names.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            def git(*args):
+                return subprocess.run(
+                    ["git", "-c", "core.hooksPath=" + os.devnull,
+                     "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                     "-c", "commit.gpgSign=false", *args], cwd=root, check=True,
+                    capture_output=True, text=True,
+                    env=git_housekeeping.apply_fixture_env(os.environ)).stdout.strip()
+            git("init", "-q")
+            inventory = {"schema": "jovie.feedback-guards/v1", "reviewedOn": "2026-10-17",
+                         "lessons": [{"fingerprint": "Protected deployment evidence must be one fail-closed boundary",
+                                      "lessonSha256": "9be675f44c4d687b00743acd245f48d1aaba53e5aad3960d1f4a75da95429411",
+                                      "guards": [{
+                             "kind": "test", "path": "apps/web/tests/unit/ci/deploy-workflow.test.ts",
+                             "anchor": "binds the exact project deployment before cookie-only canary and auth smoke",
+                             "reason": "Checks exact deployment binding and canonical protected probe ownership."
+                         }]}]}
+            reference = root / "LESSONS.guards.json"
+            reference.write_text(json.dumps(inventory, indent=2) + "\n")
+            (root / "LESSONS.md").write_text("# Lessons\n")
+            git("add", ".")
+            git("commit", "-qm", "docs: original feedback reference")
+            base = git("rev-parse", "HEAD")
+            inventory["reviewedOn"] = "2026-10-21"
+            inventory["lessons"][0]["guards"][0].update(
+                path="apps/web/tests/unit/ci/canary-health-gate.test.ts",
+                anchor="binds the exact deployment, then probes it cookie-only without redirects",
+                reason="Executes the shipped canary shell against a modeled preview and checks the exact deployment URL, bounded cookie-only requests and no redirects.")
+            reference.write_text(json.dumps(inventory, indent=2) + "\n")
+            (root / "LESSONS.md").write_text("# Lessons\n\nReviewed the repaired canary reference.\n")
+            git("add", ".")
+            git("commit", "-qm", "docs: repair feedback reference")
+            changes = lane.parse_numstat(git("diff", "--numstat", base + "...HEAD"))
+            self.assertEqual([c.path for c in changes], ["LESSONS.guards.json", "LESSONS.md"])
+            self.assertEqual((changes[0].added, changes[0].deleted), (4, 4))
+            self.assertEqual(lane.gate_assessment(changes), ([], None))
+            # Classification must not skip the existing canonical qualification commands.
+            self.assertEqual(lane.check_commands([c.path for c in changes]), [lane.CANONICAL_GATE])
+
+    def test_feedback_inventory_is_not_a_test_or_a_general_json_exemption(self):
+        inventory = self.change("LESSONS.guards.json")
+        for path in ["apps/web/lib/a.ts", "scripts/invariants/feedback-linkage.mjs",
+                     "package.json", "other.json", "nested/LESSONS.guards.json",
+                     "LESSONS.guards.json.mjs", "lessons.guards.json"]:
+            with self.subTest(path=path):
+                self.assertEqual(lane.gate_rules([inventory, self.change(path)]),
+                                 ["code-change-without-test"])
+        self.assertIn("secret-like-file-changed", lane.gate_rules([
+            inventory, self.change(".env.local")]))
+        self.assertIn("lockfile-without-manifest", lane.gate_rules([
+            inventory, self.change("pnpm-lock.yaml")]))
+        self.assertEqual(lane.gate_rules([self.change("LESSONS.guards.json", 1501)]),
+                         ["diff-too-large:1501"])
+
     def test_xcode_tests_directory_counts_as_test(self):
         changes = [self.change("apps/ios/Jovie/Core/ChatRepository.swift"),
                    self.change("apps/ios/JovieTests/ChatRepositoryTests.swift")]
