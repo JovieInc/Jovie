@@ -174,9 +174,7 @@ describe('ProfileUnifiedDrawer', () => {
   });
 
   it('renders the unsubscribe control as a plain button, not a stray menuitem', () => {
-    render(
-      <ProfileUnifiedDrawer {...baseProps} view='notifications' />
-    );
+    render(<ProfileUnifiedDrawer {...baseProps} view='notifications' />);
 
     // The notifications list is not an ARIA menu; a `role="menuitem"`
     // without a `role="menu"` ancestor fails axe aria-required-parent.
