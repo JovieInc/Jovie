@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useEffect } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -228,6 +229,69 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
       </PreviewPanelProvider>
     );
     expect(screen.getByTestId('rail-data').textContent).toBe('none');
+  });
+
+  it('keeps the reopened default-open rail hydrated after a scope round trip', async () => {
+    function MountOnlyHydrator() {
+      const { setPreviewData } = usePreviewPanelData();
+      useEffect(() => {
+        setPreviewData(current =>
+          current
+            ? current
+            : {
+                username: 'alex',
+                displayName: 'Alex',
+                avatarUrl: null,
+                bio: null,
+                genres: null,
+                location: null,
+                hometown: null,
+                activeSinceYear: null,
+                links: [],
+                profilePath: '/alex',
+                dspConnections: {
+                  spotify: { connected: false, artistName: null },
+                  appleMusic: { connected: false, artistName: null },
+                },
+              }
+        );
+        // Mount-only on purpose: the real page hydrator re-runs on its own
+        // dependencies and never re-runs after a provider-side wipe.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return null;
+    }
+
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('768'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+
+    const { rerender } = render(
+      <PreviewPanelProvider scope='app-shell'>
+        <MountOnlyHydrator />
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-data').textContent).toBe('alex');
+    });
+
+    rerender(
+      <PreviewPanelProvider defaultOpen scope='artist-profile-settings'>
+        <MountOnlyHydrator />
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+    // The scope reset reopens the rail; the wipe must not swallow the data
+    // the page hydrator already mounted, or the rail sticks on its empty
+    // skeleton (Account → Back round trip).
+    expect(screen.getByTestId('rail-data').textContent).toBe('alex');
   });
 
   it('certifies repeated cycles on the composed right rail and drawer', async () => {
