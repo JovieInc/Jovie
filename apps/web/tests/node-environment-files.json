@@ -289,6 +289,7 @@
   "scripts/eval-lanes.test.mjs",
   "scripts/fetch-sonar-issues.test.mjs",
   "scripts/fix-standalone-loopback-hostname.test.mjs",
+  "scripts/generate-product-surface-counts.test.ts",
   "scripts/lighthouse-exact-target-guard.test.ts",
   "scripts/linear-compare/owned-output-directory.test.ts",
   "scripts/lint-motion-css.test.mjs",
