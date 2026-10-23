@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -28,75 +29,10 @@ const clean = { schema: config.schema, entries: {} };
 const bad = 'concise headline. fits 1-2 lines.';
 
 test('each configured leak family is case insensitive and blocks real copy', () => {
-  const cases = {
-    instruction: [
-      bad,
-      'fits one or two lines',
-      'max 12 characters',
-      'under 5 words',
-      'short headline',
-      'punchy',
-      'catchy',
-      'compelling',
-      'engaging',
-      'write a bio',
-      'rewrite this',
-      'make it better',
-      'Tone: friendly',
-      'Tone:friendly',
-      'Voice: warm',
-      'CTA here',
-      'headline here',
-      'subhead here',
-      'copy goes here',
-      'replace this',
-      'your text',
-      'description here',
-    ],
-    placeholder: [
-      'lorem ipsum',
-      'todo',
-      'TBD',
-      'FIXME',
-      'XXX',
-      'placeholder',
-      'sample text',
-      'example text',
-      'Untitled',
-    ],
-    'unresolved-prompt': [
-      '{{company}}',
-      '[insert artist]',
-      '[something]',
-      '<your headline>',
-      '<artist name>',
-      '<NAME>',
-      '<...>',
-    ],
-    assistant: [
-      'As an AI',
-      'Here is your copy',
-      "Here's a headline",
-      'Sure, go ahead',
-      'Sure,here you go',
-      'Certainly',
-      'I hope this helps',
-      'Option 1: listen',
-      'Option 1:listen',
-    ],
-    markdown: ['**Listen**', '**Listen', '```code```', '- Listen'],
-    punctuation: ['Listen!!', 'What??', 'Hello,,', 'Hello..', 'Title::'],
-    'repeated-word': ['Your your music'],
-    'coming-soon': ['Coming soon'],
-    'writer-imperative': [
-      'Use a short title',
-      'Keep it short',
-      'Avoid jargon',
-      "Don't use a long headline",
-    ],
-    'trailing-instruction': ['Listen now (keep it short)'],
-    'headline-length': ['Music '.repeat(25)],
-  };
+  const cases = JSON.parse(
+    readFileSync(new URL('positive-fixtures.json', import.meta.url), 'utf8')
+  );
+  assert.equal(Object.keys(cases).length, 11);
   for (const [rule, texts] of Object.entries(cases))
     for (const text of texts) {
       assert.ok(
@@ -110,10 +46,10 @@ test('each configured leak family is case insensitive and blocks real copy', () 
     'A certain light',
     'Todoist',
     'Your music. One link.',
-    'Loading...',
+    'Loading... a < b > c <=>',
     'Catchyfish',
     '<header><article name="bio">Ready</article></header>',
-    '<name>Jovie</name>',
+    '<name>Jovie</name><entry><content>Ready</content></entry>',
   ])
     assert.deepEqual(detect(text, 'headline'), []);
 });
@@ -122,6 +58,7 @@ test('all visible source forms are scanned, including nested expressions and spl
   const sources = [
     `export const copy = {name: '${bad}'};`,
     `<h1>${bad} text-[12px]</h1>`,
+    `<h1>{['${bad}'.trim()].map(text => text)}</h1>`,
     `<p>https://jov.ie — ${bad}</p>`,
     '<h1>TODO-release</h1>',
     '<h1>concise <span>{`headline`}</span></h1>',
@@ -212,6 +149,7 @@ test('HTML/email headings and attributes, CSS content and SVG labels carry real 
   ])
     assert.ok(scan(path, source).length, path);
   assert.ok(detect('<description here>').includes('unresolved-prompt'));
+  assert.deepEqual(scan(fixture, 'const html = `<td${style}>Ready</td>`;'), []);
 });
 
 test('narrow exclusions preserve fixtures and do not hide leaked adjacent copy', () => {

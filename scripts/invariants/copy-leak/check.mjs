@@ -168,7 +168,7 @@ export function extract(path, source) {
       return;
     if (
       ts.isTaggedTemplateExpression(node) &&
-      /^(?:sql|css)(?:\b|<)/u.test(node.tag.getText(tree))
+      /^(?:sql|drizzleSql|css)(?:\b|<)/u.test(node.tag.getText(tree))
     )
       return;
     if (
@@ -177,9 +177,8 @@ export function extract(path, source) {
     )
       return;
     if (
-      parent &&
-      ((ts.isPropertyAssignment(parent) && parent.name === node) ||
-        ts.isPropertyAccessExpression(parent))
+      parent?.name === node &&
+      (ts.isPropertyAssignment(parent) || ts.isPropertyAccessExpression(parent))
     )
       return;
     if (
