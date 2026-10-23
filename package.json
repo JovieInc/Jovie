@@ -86,7 +86,9 @@
       "promptfoo>js-yaml": "^5.2.2",
       "@peculiar/asn1-schema": "2.9.5",
       "zod@4.1.11": "4.6.7",
-      "zod@4.3.6": "4.6.7"
+      "zod@4.3.6": "4.6.7",
+      "zod@3.22.4": "4.6.7",
+      "@lhci/utils>lighthouse": "13.4.1"
     },
     "patchedDependencies": {
       "@better-auth/oauth-provider@1.7.6": "patches/@better-auth__oauth-provider@1.7.6.patch",
