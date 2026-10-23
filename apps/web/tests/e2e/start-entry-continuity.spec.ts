@@ -321,11 +321,9 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     });
     const beforeReply = await input.boundingBox();
     await expectEssentials(page);
-    // The starter handoff has settled. Open the zero-CLS window here so
-    // navigation and handoff entries stay outside it, including entries the
-    // observer delivers late. Shifts from this moment through the reply still
-    // have to total 0.
-    await page.evaluate(() => window.__armClaimLayout?.());
+    // Score every un-input shift from navigation through the settled handoff.
+    // The probe ignores hadRecentInput and keeps this window open from
+    // navigation, so a handoff shift stays inside the total.
     await page.evaluate(
       () =>
         new Promise<void>(resolve =>
