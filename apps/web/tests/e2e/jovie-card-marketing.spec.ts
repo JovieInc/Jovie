@@ -1,4 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { expect, test } from './setup';
 import { installPublicRouteMocks } from './utils/public-surface-helpers';
 
@@ -106,7 +107,7 @@ test.describe('Jovie Card marketing page', () => {
       ).toBeVisible();
 
       const accessibility = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .options(wcag22AaAxeOptions())
         .analyze();
       expect(accessibility.violations).toEqual([]);
     });
