@@ -120,6 +120,7 @@ describe('ProviderCell actions', () => {
 
 describe('Ion-token feedback on availability surfaces', () => {
   it('renders the manual-status ring and copied feedback on tokens inside the availability popover', async () => {
+    const user = userEvent.setup();
     const onCopy = vi.fn().mockResolvedValue('copied');
     const manualRelease: ReleaseViewModel = {
       profileId: 'profile-1',
