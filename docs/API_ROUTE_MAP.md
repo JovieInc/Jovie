@@ -118,15 +118,13 @@ sibling deployments, machine publishers, or source-repository automation.
 | `/api/v1/openapi.json` | GET | `public` | Canonical OpenAPI 3.1 contract for the public artist API |
 | `/openapi.json` | GET | `public` | Conventional discovery surface; identical contract to `/api/v1/openapi.json` |
 
-**Breaking-change enforcement.** The canonical contract above is generated
-from source (`ARTIST_OPENAPI_DOCUMENT` in `apps/web/lib/api/v1/openapi.ts`).
+**Breaking-change enforcement.** The contract above is generated from source
+(`ARTIST_OPENAPI_DOCUMENT` in `apps/web/lib/api/v1/openapi.ts`).
 `scripts/invariants/oasdiff-breaking-change.mjs` is a blocking Source
-Validation guard: on pull requests that touch the contract sources it renders
-the document at the head and the merge base, diffs them with a pinned,
-sha-verified oasdiff release, and fails on breaking changes (removals, type
-changes, new required fields). Additions pass. An intentional break needs an
-auditable PR-body marker line — `api-breaking: <reason>` — which keeps the
-changes visible as warnings while naming the migration.
+Validation guard: on PRs touching the contract sources it renders the document
+at the head and the merge base, diffs them with a pinned, sha-verified oasdiff
+release, and fails on breaking changes. Additions pass; an intentional break
+needs an auditable PR-body marker line — `api-breaking: <reason>`.
 
 ### Audience
 

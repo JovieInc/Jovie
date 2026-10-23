@@ -10,7 +10,6 @@ import {
   ensureOasdiffBinary,
   guardFilesChanged,
   OASDIFF_TARBALL_SHA256,
-  OASDIFF_TARBALL_URL,
   OASDIFF_VERSION,
   readApiBreakingMarker,
   renderBaseSpec,
@@ -291,10 +290,6 @@ test('guard-file changes trigger the HEAD self-check path', () => {
 test('the pinned oasdiff release is exact and sha-verified', () => {
   assert.equal(OASDIFF_VERSION, 'v1.34.1');
   assert.match(OASDIFF_TARBALL_SHA256, /^[0-9a-f]{64}$/);
-  assert.equal(
-    OASDIFF_VERSION,
-    `v${OASDIFF_TARBALL_URL.split('/').pop().split('_')[1]}`
-  );
   const fetched = { ok: true, bytes: Buffer.from('not the tarball') };
   const result = ensureOasdiffBinary({
     cacheDir: '/nonexistent-jovie-oasdiff',

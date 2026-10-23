@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { ARTIST_OPENAPI_DOCUMENT } from '@/lib/api/v1/openapi';
 
 /**
@@ -6,4 +8,14 @@ import { ARTIST_OPENAPI_DOCUMENT } from '@/lib/api/v1/openapi';
  * Used by the oasdiff breaking-change guard to diff the PR head against the
  * merge base.
  */
-process.stdout.write(`${JSON.stringify(ARTIST_OPENAPI_DOCUMENT, null, 2)}\n`);
+export function renderPublicOpenApiDocument(): string {
+  return `${JSON.stringify(ARTIST_OPENAPI_DOCUMENT, null, 2)}\n`;
+}
+
+const invokedAsScript =
+  process.argv[1] !== undefined &&
+  pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
+
+if (invokedAsScript) {
+  process.stdout.write(renderPublicOpenApiDocument());
+}

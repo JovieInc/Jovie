@@ -1,25 +1,13 @@
 #!/usr/bin/env node
 /**
- * Blocking gate: breaking changes to the public OpenAPI contract.
- *
- * The public artist API is generated from source (`ARTIST_OPENAPI_DOCUMENT`)
- * and served at `/api/v1/openapi.json` and `/openapi.json`. This guard
- * renders the document at the PR head and at the merge base, diffs them with
- * a pinned oasdiff binary, and fails on breaking changes unless the PR body
- * carries an explicit, auditable marker line:
- *
- *   api-breaking: <reason>
- *
- * Additions to the contract pass. The marker is case-sensitive and requires a
- * non-empty reason on the same line. The breaking changes are still printed
- * as warnings when the marker is present, so an approved break stays visible.
- *
- * Source Validation selects this guard from the trusted base once it merges
- * (scripts/ci-fast-lanes.mjs SOURCE_GUARDS, prOnly so merge groups and main
- * pushes are not double-checked against a body they cannot see). When the
- * guard's own files change, it runs a self-check instead: the full pipeline
- * with the base at HEAD must produce a clean diff, so a guard-editing PR
- * proves the machinery (worktree render, pinned binary) still works.
+ * Blocking gate: breaking changes to the public OpenAPI contract. The public
+ * artist API (`ARTIST_OPENAPI_DOCUMENT`, served at /api/v1/openapi.json and
+ * /openapi.json) is rendered at the PR head and the merge base, diffed with a
+ * pinned oasdiff binary, and breaking changes fail closed unless the PR body
+ * carries an auditable marker line: `api-breaking: <reason>`. Additions pass;
+ * approved breaks stay visible as warnings. Selected via SOURCE_GUARDS once
+ * on the trusted base (prOnly: the marker lives in the pull_request body).
+ * Guard-file edits trigger a HEAD self-check of the full pipeline.
  */
 
 import { spawnSync } from 'node:child_process';
