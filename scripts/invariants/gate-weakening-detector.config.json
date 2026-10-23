@@ -1,0 +1,54 @@
+{
+  "schema": "jovie-gate-weakening-detector/v1",
+  "invariantId": "JOV-INV-045",
+  "override": {
+    "bodyLine": "^gate-change:\\s+(\\S.*)$",
+    "label": "codeowners-approved"
+  },
+  "scanExclusions": [],
+  "selfPaths": [
+    "scripts/invariants/gate-weakening-detector.mjs",
+    "scripts/invariants/gate-weakening-detector.config.json",
+    "scripts/invariants/gate-weakening-detector.test.mjs"
+  ],
+  "requiredKinds": [
+    "required-check-removed",
+    "ruleset-enforcement-loosened",
+    "branch-strict-loosened",
+    "required-reviews-loosened",
+    "pr-ready-check-removed",
+    "source-validation-check-removed",
+    "source-guard-removed",
+    "continue-on-error",
+    "if-false",
+    "advisory",
+    "shrink-only-growth",
+    "threshold-loosened",
+    "test-skip",
+    "test-only",
+    "xit",
+    "eslint-disable",
+    "ts-ignore",
+    "ts-expect-error",
+    "biome-ignore",
+    "ignore-list-entry",
+    "invariant-test-deleted",
+    "invariant-test-emptied",
+    "timeout-raised",
+    "retries-raised"
+  ],
+  "lowerIsLooser": [
+    "coverage",
+    "lines",
+    "branches",
+    "functions",
+    "statements",
+    "score",
+    "target"
+  ],
+  "higherIsLooser": ["threshold", "violations", "cls", "latency", "bundle"],
+  "prReadyJob": "ci-pr-ready",
+  "prReadyPath": ".github/workflows/ci.yml",
+  "sourceValidationPath": ".github/workflows/source-validation.yml",
+  "sourceGuardPath": "scripts/ci-fast-lanes.mjs"
+}

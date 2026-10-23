@@ -99,7 +99,7 @@ export function OnboardingHandleStep({
           {/* Inline input with claim button */}
           <div
             className={cn(
-              'focus-field-inset flex items-center gap-2 rounded-full border px-2 py-1.5 transition-[background-color,border-color,box-shadow] duration-subtle',
+              'flex items-center gap-2 rounded-full border px-2 py-1.5 transition-[background-color,border-color,box-shadow] duration-subtle',
               'border-subtle bg-[color-mix(in_oklab,var(--app-shell-content-surface)_94%,var(--linear-bg-surface-0))]',
               'hover:border-default hover:bg-surface-0',
               hasError && 'border-destructive/60'
@@ -129,7 +129,7 @@ export function OnboardingHandleStep({
               autoCorrect='off'
               spellCheck={false}
               aria-invalid={hasError ? 'true' : undefined}
-              className='min-w-0 flex-1 bg-transparent text-mid font-semibold tracking-tighter text-primary-token placeholder:text-tertiary-token placeholder:opacity-60 focus-visible:outline-none'
+              className='min-w-0 flex-1 bg-transparent text-mid font-semibold tracking-tighter text-primary-token placeholder:text-tertiary-token placeholder:opacity-60 focus-ring-themed'
             />
             <button
               data-testid='onboarding-handle-submit'
