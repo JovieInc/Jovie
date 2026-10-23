@@ -1318,7 +1318,8 @@ def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict
 
     `terminal_ok` is only for deterministic main syncs of a terminal generation: a merge of
     main creates the new head that is that generation's material-change exit. Holds, active
-    repairs and diff-policy holds still refuse."""
+    repairs and diff-policy holds still refuse. Exhaustion evidence is the condition that
+    sync exists to clear. A secret-file or empty-diff line that remains still refuses."""
     labels = {label.lower() for label in label_names(pr)}
     if not isinstance(pr.get("headRefOid"), str) or not pr["headRefOid"].strip():
         return "head-unavailable"
@@ -1331,8 +1332,12 @@ def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict
     if now is not None and in_flight(record, {"headRefOid": record.get("sha")}, now):
         return "repair-active"
     entry = held or {}
-    if entry.get("sha") == pr.get("headRefOid") and not fixable_hold(entry, pr.get("headRefOid")):
-        return entry.get("reason") or held_reason(entry.get("evidence") or [])[0]
+    if entry.get("sha") == pr.get("headRefOid"):
+        evidence = list(entry.get("evidence") or [])
+        if terminal_ok:
+            evidence = [line for line in evidence if not str(line).startswith("fix-exhausted")]
+        if not fixable_hold({**entry, "evidence": evidence}, pr.get("headRefOid")):
+            return entry.get("reason") or held_reason(evidence)[0]
     return None
 
 
@@ -1864,11 +1869,22 @@ def sync_main(host, lane, pr: dict, now: float, *, terminal_ok: bool = False) ->
     ok = result.returncode == 0
     lane.update_json(host.state / "synced.json",
                      lambda synced: synced.update({str(pr["number"]): {"from": pr["headRefOid"], "at": now, "ok": ok}}))
-    ledger(host, {"schema": "jovie-lane-run/v1", "kind": "sync-main", "origin": "autonomous-lane",
-                  "attribution": {"category": "finalizer-only", "provider": "lane-event"},
-                  "pr": pr["number"], "headBefore": pr["headRefOid"],
-                  "verdict": "synced" if ok else "sync-failed", "endedAt": lane.now_iso()})
+    receipt = {"schema": "jovie-lane-run/v1", "kind": "sync-main", "origin": "autonomous-lane",
+               "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+               "pr": pr["number"], "headBefore": pr["headRefOid"],
+               "verdict": "synced" if ok else "sync-failed", "endedAt": lane.now_iso()}
+    if not ok:
+        # 71 sync-failed rows/24h on 2026-10-21 carried no reason; keep GitHub's own answer.
+        receipt["reasons"] = [sync_failure_reason(result)]
+    ledger(host, receipt)
     return "synced" if ok else "sync-failed"
+
+
+def sync_failure_reason(result) -> str:
+    """GitHub's update-branch refusal, short and secret-free (the API message, not the token)."""
+    text = f"{getattr(result, 'stdout', '') or ''} {getattr(result, 'stderr', '') or ''}"
+    found = re.search(r'"message"\s*:\s*"([^"]{1,160})"', text) or re.search(r"(HTTP \d{3}[^\n]{0,120})", text)
+    return "update-branch:" + (found.group(1) if found else f"exit-{getattr(result, 'returncode', '?')}")
 
 
 def ledger(host, receipt: dict) -> None:

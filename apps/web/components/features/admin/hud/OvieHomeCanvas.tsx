@@ -18,6 +18,7 @@ import {
   buildCanvasTurns,
   partitionCanvasCards,
 } from '@/lib/ovie/home/canvas-turns';
+import { buildStageStrip } from '@/lib/ovie/home/flow-home';
 import {
   buildOvieAsks,
   buildOvieHomeShipping,
@@ -25,11 +26,13 @@ import {
   type OviePulseMemory,
   ovieAskAction,
   rememberPulse,
+  summarizeSourceIssues,
 } from '@/lib/ovie/home/shipping-home';
 import { inboxDecisionRequest, type OvieInbox } from '@/lib/ovie/inbox';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
+import { useOvieHomeReadyTiming } from './useOvieHomeReadyTiming';
 
 const OVIE_HOME_COPY: HomeLoopCopy = {
   constraintClear: 'Nothing is blocking shipping',
@@ -41,6 +44,8 @@ const OVIE_HOME_COPY: HomeLoopCopy = {
   inFlightError: 'Shipping data could not load.',
   doneTitle: 'Done Today',
   doneEmpty: 'Nothing has landed yet today.',
+  latencyTitle: 'Stage Time 7d (P50 / P95)',
+  latencyEmpty: 'Not measured',
 };
 
 const INBOX_QUERY_KEY = ['ovie', 'inbox'] as const;
@@ -100,6 +105,10 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     useState<OviePulseMemory>(readPulseMemory);
 
   const snapshot = shipping.isPending ? null : shipping;
+  const strip = useMemo(
+    () => (snapshot ? buildStageStrip(snapshot.view.delivery) : null),
+    [snapshot]
+  );
   const home = useMemo(
     () =>
       snapshot
@@ -151,7 +160,9 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
         id: ask.id,
         label:
           decision === 'approve'
-            ? ovieAskAction(target?.kind).committedLabel
+            ? notes
+              ? `Answered: ${notes}`
+              : ovieAskAction(target?.kind).committedLabel
             : `Replied: ${notes}`,
         commit: async () => {
           if (!target) throw new Error('This decision is no longer open.');
@@ -209,10 +220,11 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
   );
 
   const loopStatus: HomeLoopSectionStatus =
-    !snapshot || awaitingFirstTasks
-      ? 'loading'
-      : connection === 'unauthorized'
-        ? 'error'
+    connection === 'unauthorized' ||
+    (awaitingFirstTasks && snapshot?.operationalRequestState === 'error')
+      ? 'error'
+      : !snapshot || awaitingFirstTasks
+        ? 'loading'
         : 'ready';
   // A disconnected feed keeps the last values but must say so in text.
   const constraint =
@@ -227,10 +239,12 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       : 'loading';
   // Mirror the inbox: a successful read can still omit a source. Showing the
   // loaded asks alone would claim the section is complete.
-  const asksNotice =
-    inbox.data && inbox.data.issues.length > 0
-      ? `Some sources are unavailable. ${inbox.data.issues.join(' ')}`
-      : null;
+  // First meaningful paint: both sections past their skeletons.
+  useOvieHomeReadyTiming(loopStatus !== 'loading' && asksStatus !== 'loading');
+  // Many issues collapse to a count; the inbox lists every one.
+  const asksNotice = inbox.data
+    ? summarizeSourceIssues(inbox.data.issues)
+    : null;
 
   const turns = useMemo(
     () => buildCanvasTurns(chat?.messages ?? [], chat?.isStreaming ?? false),
@@ -295,13 +309,17 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       loopStatus={loopStatus}
       asksStatus={asksStatus}
       asksNotice={asksNotice}
+      asksNoticeHref={APP_ROUTES.ADMIN_INBOX}
       answers={answers}
-      onApprove={ask => decide(ask, 'approve', '')}
+      onApprove={(ask, option) => decide(ask, 'approve', option ?? '')}
       onReply={(ask, text) => decide(ask, 'reject', text)}
       onFeedback={sendFeedback}
       onRetryLoop={() => void shipping.refetch()}
       onRetryAsks={() => void inbox.refetch()}
       asksMoreHref={APP_ROUTES.ADMIN_INBOX}
+      inFlightMoreHref={APP_ROUTES.ADMIN_SHIPPING}
+      strip={strip?.items ?? []}
+      stripCoverage={strip?.coverage ?? null}
     />
   );
 }

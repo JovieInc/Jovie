@@ -85,6 +85,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
       processed: 0,
       blocked: [],
       failed: [],
+      needsReconciliation: [],
     });
   });
 
@@ -163,6 +164,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
             processed: 0,
             blocked: [],
             failed: [],
+            needsReconciliation: [],
           },
         }),
       })

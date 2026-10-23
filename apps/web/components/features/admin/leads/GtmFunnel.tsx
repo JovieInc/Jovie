@@ -2,7 +2,7 @@ import { ChevronRight } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { getLeadFunnelReport } from '@/lib/leads/reporting';
 import type { LeadFunnelCounts } from './LeadPipelineKpis';
-import { getClampedPercent } from './percentages';
+import { formatSharePercent } from './percentages';
 
 export type { LeadFunnelCounts } from './LeadPipelineKpis';
 
@@ -41,18 +41,16 @@ function DropOff({
   total,
 }: Readonly<{ label: string; count: number; total: number }>) {
   if (count === 0) return null;
-  const pct = getClampedPercent(count, total);
   return (
     <span className='text-2xs font-book text-destructive/70'>
-      {count.toLocaleString()} {label} ({pct}%)
+      {count.toLocaleString()} {label} ({formatSharePercent(count, total)})
     </span>
   );
 }
 
-function formatRate(numerator: number, denominator: number): string {
-  if (denominator === 0) return '--';
-  return `${getClampedPercent(numerator, denominator)}%`;
-}
+/** Window/scope labels so lead counts never read as customer-lifecycle counts. */
+export const GTM_PIPELINE_SCOPE = 'All time · outreach leads';
+export const GTM_CONVERSION_SCOPE = 'Leads created in last 30d';
 
 function EmptyFunnel() {
   return (
@@ -117,11 +115,15 @@ export async function GtmFunnel({ counts }: GtmFunnelProps) {
               Pipeline Scan
             </p>
             <p className='mt-0.5 text-xs text-secondary-token'>
-              All-time lead status flow from discovery through ingestion.
+              Lead status flow from discovery through ingestion.
             </p>
           </div>
-          <span className='text-2xs text-tertiary-token'>
-            {total.toLocaleString()} total lead{total === 1 ? '' : 's'}
+          <span
+            className='text-2xs text-tertiary-token'
+            data-testid='gtm-pipeline-scope'
+          >
+            {GTM_PIPELINE_SCOPE} · {total.toLocaleString()} total lead
+            {total === 1 ? '' : 's'}
           </span>
         </div>
         <div className='flex flex-wrap items-stretch gap-2'>
@@ -130,7 +132,9 @@ export async function GtmFunnel({ counts }: GtmFunnelProps) {
             label='Qualified'
             count={qualified}
             rate={
-              discovered > 0 ? formatRate(qualified, discovered) : undefined
+              discovered > 0
+                ? formatSharePercent(qualified, discovered)
+                : undefined
             }
           />
           <FunnelStage label='Approved' count={approved} />
@@ -145,13 +149,14 @@ export async function GtmFunnel({ counts }: GtmFunnelProps) {
         {summary.contacted > 0 && (
           <div className='mt-4 border-t border-subtle pt-3'>
             <p className='mb-1 text-2xs font-medium text-tertiary-token'>
-              Conversion (last 30 days)
+              Outreach conversion · {GTM_CONVERSION_SCOPE}
             </p>
             <p className='text-app font-book text-secondary-token'>
               Contacted: {summary.contacted}
               {' · '}
-              Claimed: {summary.claimClicks} (
-              {formatRate(summary.claimClicks, summary.contacted)}){' · '}
+              Claim clicks: {summary.claimClicks} (
+              {formatSharePercent(summary.claimClicks, summary.contacted)})
+              {' · '}
               Signed up: {summary.signups}
               {summary.paidConversions > 0 && (
                 <>

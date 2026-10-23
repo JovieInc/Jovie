@@ -285,6 +285,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_agent_workflow_hygiene.py',
       'scripts/tests/test_runner_routing.py',
       'scripts/tests/test_signal_watch.py',
+      'scripts/tests/test_x_grok.py',
     ]);
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];

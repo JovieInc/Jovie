@@ -43,6 +43,7 @@ import {
   ensureSocialLinkRecord,
   ensureUserProfileClaim,
   ensureUserRecord,
+  getDeterministicTestClerkId,
   invalidateTestUserCaches,
   setActiveProfileForUser,
 } from '@/lib/testing/test-user-provision.server';
@@ -345,6 +346,49 @@ async function findDevTestAuthSession(
     isAdmin: matchedUser.isAdmin,
     profilePath: username ? `/${username}` : null,
   };
+}
+
+/**
+ * Fresh golden-path users are addressed by `user_dev_*`, derived from a
+ * `+clerk_test@test.jovie.com` mailbox. `ensureClerkTestUser` no longer
+ * inserts that row, so the session route must provision it before it can
+ * mint a Better Auth session. Arbitrary ids stay fail-closed.
+ */
+export function isDeterministicFreshDevTestUser(input: {
+  readonly existingUserId: string;
+  readonly email: string;
+}): boolean {
+  const email = normalizeEmail(input.email) ?? '';
+  if (!input.existingUserId.startsWith('user_dev_')) return false;
+  if (
+    !email.endsWith('+clerk_test@test.jovie.com') &&
+    !email.endsWith('@test.jovie.com')
+  ) {
+    return false;
+  }
+  return getDeterministicTestClerkId(email) === input.existingUserId;
+}
+
+export async function provisionDeterministicFreshDevTestActor(input: {
+  readonly existingUserId: string;
+  readonly email: string;
+  readonly fullName?: string;
+}): Promise<boolean> {
+  if (!isDeterministicFreshDevTestUser(input)) return false;
+  const fullName = input.fullName?.trim() || 'Golden Path';
+  const betterAuthUserId = await ensureBetterAuthTestUser({
+    email: input.email,
+    fullName,
+  });
+  await ensureUserRecord(db, {
+    clerkId: input.existingUserId,
+    betterAuthUserId,
+    email: input.email,
+    name: fullName,
+    userStatus: 'active',
+    isAdmin: false,
+  });
+  return true;
 }
 
 export async function ensureExistingDevTestAuthActor(

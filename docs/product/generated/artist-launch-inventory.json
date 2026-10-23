@@ -1129,6 +1129,22 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/admin/claim-verifications/[profileId]/decision/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/claim-verifications/[profileId]/decision",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/claim-verifications/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/claim-verifications",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/admin/contacts/route.ts",
       "kind": "handler",
       "route": "/api/admin/contacts",
@@ -3921,6 +3937,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/ovie/summer-cards/[id]/feedback/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/summer-cards/[id]/feedback",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/ovie/summer-cards/route.ts",
       "kind": "handler",
       "route": "/api/ovie/summer-cards",
@@ -3972,6 +3996,22 @@
       "source": "apps/web/app/api/preview-url/refresh/route.ts",
       "kind": "handler",
       "route": "/api/preview-url/refresh",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/profile-alias-decision/[username]/[slug]/route.ts",
+      "kind": "handler",
+      "route": "/api/profile-alias-decision/[username]/[slug]",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/profile-alias-decision/route.ts",
+      "kind": "handler",
+      "route": "/api/profile-alias-decision",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
@@ -5081,14 +5121,6 @@
       "source": "apps/web/app/app/(shell)/admin/lists/views/[viewId]/page.tsx",
       "kind": "page",
       "route": "/app/admin/lists/views/[viewId]",
-      "methods": [],
-      "surface": "deferred",
-      "classification": "C"
-    },
-    {
-      "source": "apps/web/app/app/(shell)/admin/needs-you/page.tsx",
-      "kind": "page",
-      "route": "/app/admin/needs-you",
       "methods": [],
       "surface": "deferred",
       "classification": "C"

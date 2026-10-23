@@ -94,8 +94,8 @@ describe('marketing certification producer', () => {
   ];
 
   it.each([
-    'apps/web/data/homepageIdentityCopy.ts',
-    'apps/web/components/homepage/HomepageIdentity.css',
+    'apps/web/data/homepageCopy.ts',
+    'apps/web/components/homepage/HomepageArtistProfile.css',
     'apps/web/data/marketing/componentRegistry.ts',
     'apps/web/data/marketing/landingPageGrammar.ts',
     'apps/web/app/(home)/page.tsx',
@@ -133,7 +133,7 @@ describe('marketing certification producer', () => {
 
   it('does not let a direct test hit hide another shared input in the same push', () => {
     const direct = 'apps/web/tests/unit/home/Hero.test.tsx';
-    const shared = 'apps/web/data/homepageIdentityCopy.ts';
+    const shared = 'apps/web/data/homepageCopy.ts';
     for (const changed of [
       [direct, shared],
       [shared, direct],

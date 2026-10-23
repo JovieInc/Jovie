@@ -60,6 +60,7 @@ describe('OnboardingProfileRail', () => {
     // tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts.
     expect(rail).toContainElement(strip);
     expect(phonePreview).not.toContainElement(strip);
+    expect(screen.getByText(/12\.3K Spotify followers/)).toBeVisible();
   });
 
   it('renders the inline rail variant at mobile widths', () => {

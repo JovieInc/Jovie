@@ -6,6 +6,7 @@ import { checkStageManifest } from '../../stage-manifest-check.mjs';
 import {
   buildStageSummary,
   chainStages,
+  compactStageTimings,
   computeStageTimings,
   parseStageEventFeed,
   regressionFlag,
@@ -140,6 +141,13 @@ describe('stage event contract', () => {
       MANIFEST
     );
     expect(open[0]).toMatchObject({ outcome: 'open', exitedAt: null });
+    const bogus = chainStages(
+      'shipping',
+      'y',
+      [{ stage: 'ready', at: ago(3), sourceReceipt: 'r', outcome: 'shipped' }],
+      MANIFEST
+    );
+    expect(bogus[0].outcome).toBe('open');
   });
 });
 
@@ -157,6 +165,8 @@ describe('stage timings', () => {
       dwell('queued', 60, 100, 'a'),
       dwell('queued', 3 * 1440, 300, 'b'),
       dwell('queued', 20 * 1440, 900, 'c'),
+      dwell('gate-seat', 60, 120, 'a'),
+      dwell('gate', 60, 1716, 'a'),
       event({
         stage: 'verified',
         entityId: 'a',
@@ -175,10 +185,21 @@ describe('stage timings', () => {
       '24h': { n: 1, p50: null, p95: null, failed: 0, failRate: 0 },
       regression: null,
     });
+    expect(t.entities.shipping.stages['gate-seat']['24h']).toEqual({
+      n: 1,
+      p50: 120,
+      p95: 120,
+    });
+    expect(t.entities.shipping.stages.gate['24h']).toEqual({
+      n: 1,
+      p50: 1716,
+      p95: 1716,
+    });
     expect(t.coverage).toEqual({
-      stagesTotal: 33,
-      stagesWithData: 2,
-      events: 4,
+      stagesTotal: Object.values(MANIFEST.entities).flatMap(e => e.stages)
+        .length,
+      stagesWithData: 4,
+      events: 6,
     });
   });
 
@@ -202,6 +223,9 @@ describe('stage timings', () => {
       MANIFEST,
       { now: NOW }
     );
+    expect(
+      compactStageTimings(t).entities['summer-turn'].stages.outcome['24h']
+    ).toEqual([4, null, null, 3, 0.75]);
     expect(t.entities['summer-turn'].stages.outcome['24h']).toEqual({
       n: 4,
       p50: null,

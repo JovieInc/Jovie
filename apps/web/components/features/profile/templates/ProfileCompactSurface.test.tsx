@@ -331,6 +331,21 @@ describe('ProfileCompactSurface', () => {
     renderSurface({ renderMode: 'preview', presentation: 'embedded' });
 
     expect(screen.queryByTestId('profile-bottom-nav')).toBeNull();
+    expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+      'data-render-mode',
+      'preview'
+    );
+  });
+
+  it('exposes the interactive render mode so md+ embedded chrome still reserves the dock', () => {
+    // From md up the live profile passes presentation="embedded" and still
+    // renders the dock; the dock-reservation CSS keys off data-render-mode.
+    renderSurface({ presentation: 'embedded' });
+
+    const surface = screen.getByTestId('profile-compact-surface');
+    expect(surface).toHaveAttribute('data-presentation', 'embedded');
+    expect(surface).toHaveAttribute('data-render-mode', 'interactive');
+    expect(screen.getByTestId('profile-bottom-nav')).toBeTruthy();
   });
 
   it('uses pearlQuiet top chrome without IconButton restyle classes', () => {
