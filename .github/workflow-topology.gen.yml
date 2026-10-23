@@ -813,6 +813,19 @@ nodes:
       - repository_dispatch
     terminalReceipt: job:sync-issue
     jobCount: 1
+  - name: Pen token parity
+    path: .github/workflows/pen-token-parity.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:parity
+    jobCount: 1
   - name: Post-Deploy Probes
     path: .github/workflows/postdeploy-probes.yml
     active: true
