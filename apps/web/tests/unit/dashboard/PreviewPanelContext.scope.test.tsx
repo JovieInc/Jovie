@@ -29,7 +29,7 @@ import { detectReversibleControl } from '@/tests/utils/reversible-control-detect
  * survived the route change.
  */
 function RailProbe() {
-  const { isOpen, open } = usePreviewPanelState();
+  const { isOpen, open, close } = usePreviewPanelState();
   const { previewData } = usePreviewPanelData();
 
   return (
@@ -40,6 +40,9 @@ function RailProbe() {
       </div>
       <button data-testid='open-rail' onClick={open} type='button'>
         open rail
+      </button>
+      <button data-testid='close-rail' onClick={close} type='button'>
+        close rail
       </button>
     </div>
   );
@@ -400,7 +403,7 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
     expect(screen.getByTestId('rail-open').textContent).toBe('true');
 
     // Dismissing the sheet is still the same explicit close contract.
-    fireEvent.click(screen.getByTestId('open-rail'));
+    fireEvent.click(screen.getByTestId('close-rail'));
     expect(screen.getByTestId('rail-open').textContent).toBe('false');
   });
 
