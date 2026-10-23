@@ -5,33 +5,43 @@ import { useEffect, useRef } from 'react';
 import { ProductClaimHandleForm } from '@/app/(marketing)/product/ProductClaimHandleForm';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
+import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
+import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
 import { APP_ROUTES } from '@/constants/routes';
-import { HOMEPAGE_COPY, type HomepageCopy } from '@/data/homepageCopy';
+import { type HomepageCopy } from '@/data/homepageCopy';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { HomepageHeroLight } from './HomepageHeroLight';
 import './HomepageHeroCanvas.css';
 import {
   HERO_CANVAS_BRAND_LABEL,
-  HERO_CANVAS_HEADLINE,
   HERO_CANVAS_SIGN_IN,
-  type HomepageHeroLightRenderer,
 } from './hero-light-gate';
 import { bindHeroCanvasScroll } from './hero-light-scroll';
 
 const HOMEPAGE_LOGO_PLACEMENT = { page: '/' } as const;
 
 /**
- * Flagged hero. Full-bleed at rest, then a cinematic card whose inset,
- * radius, and header glass follow scroll position. The shipped hero does
- * not render this.
+ * Shipped homepage hero. Full-bleed at rest, then a cinematic card whose
+ * inset, radius, and header glass follow scroll position. The decorative
+ * light paints the CSS poster first and upgrades to WebGL only when the
+ * device can run it.
  */
 export function HomepageHeroCanvas({
-  renderer,
   headingId,
-  copy = HOMEPAGE_COPY.hero,
+  headline,
+  subhead,
+  claim,
+  supportNote,
+  profile,
+  sectionOwner,
 }: Readonly<{
-  renderer: HomepageHeroLightRenderer;
   headingId: string;
-  copy?: HomepageCopy['hero'];
+  headline: HomepageCopy['hero']['headline'];
+  subhead: HomepageCopy['hero']['subhead'];
+  claim: HomepageCopy['hero']['claim'];
+  supportNote: HomepageCopy['hero']['supportNote'];
+  profile: HomepageCopy['hero']['profile'];
+  sectionOwner: string;
 }>) {
   const rootRef = useRef<HTMLElement>(null);
 
@@ -45,9 +55,13 @@ export function HomepageHeroCanvas({
     <section
       ref={rootRef}
       className='homepage-hero-canvas'
+      aria-labelledby={headingId}
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}
       data-testid='marketing-section-hero'
-      data-hero-canvas=''
+      data-marketing-owner={sectionOwner}
+      data-marketing-variant='split-claim-card'
       data-marketing-section='hero'
+      data-hero-canvas=''
     >
       <header className='homepage-hero-canvas__bar'>
         <div className='homepage-hero-canvas__bar-plate'>
@@ -60,9 +74,9 @@ export function HomepageHeroCanvas({
           </Link>
           <div className='homepage-hero-canvas__claim'>
             <ProductClaimHandleForm
-              domain={copy.claim.domain}
-              placeholder={copy.claim.placeholder}
-              submitLabel={copy.claim.action}
+              domain={claim.domain}
+              placeholder={claim.placeholder}
+              submitLabel={claim.action}
               inputId='homepage-claim-handle'
               testIdPrefix='homepage'
               submitTestId='homepage-primary-cta'
@@ -78,14 +92,30 @@ export function HomepageHeroCanvas({
       </header>
       <div className='homepage-hero-canvas__stage'>
         <div className='homepage-hero-canvas__field'>
-          <HomepageHeroLight renderer={renderer} />
+          <HomepageHeroLight />
           <div className='homepage-hero-canvas__copy'>
             <h1
               id={headingId}
-              className='marketing-type-display text-balance homepage-hero-canvas__headline'
+              className='marketing-type-display text-balance text-primary-token homepage-hero-canvas__headline'
             >
-              {HERO_CANVAS_HEADLINE}
+              {headline}
             </h1>
+            <p className='marketing-type-lede text-secondary-token homepage-hero-canvas__subhead'>
+              {subhead}
+            </p>
+            <p className='homepage-hero-canvas__support'>{supportNote}</p>
+          </div>
+          <div className='homepage-hero-canvas__proof'>
+            <ArtistProfilePhoneFrame className='homepage-artist-hero__phone'>
+              <MarketingPhoneImage
+                scenarioId={profile.scenarioId}
+                altOverride={profile.alt}
+                fill
+                priority
+                sizes='(min-width: 1024px) 21.25rem, (min-width: 768px) 18rem, 72vw'
+                className='object-cover object-top'
+              />
+            </ArtistProfilePhoneFrame>
           </div>
         </div>
         <div className='homepage-hero-canvas__logos homepage-hero-canvas__logos-rail'>

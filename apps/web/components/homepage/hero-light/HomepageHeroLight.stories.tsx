@@ -10,7 +10,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Flag-gated homepage hero light. Production defaults are off. CssBaseline is the invariant-safe poster. WebGl upgrades it after idle on a capable device.',
+          'Homepage hero light. The CSS poster is always there. WebGL upgrades it after idle when the device can run it, and drops back to the poster on reduced motion or context loss.',
       },
     },
   },
@@ -35,10 +35,4 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const CssBaseline: Story = {
-  args: { renderer: 'css' },
-};
-
-export const WebGl: Story = {
-  args: { renderer: 'webgl' },
-};
+export const Poster: Story = {};

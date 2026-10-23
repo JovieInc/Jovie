@@ -118,13 +118,12 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     );
   });
 
-  it('does not mount the hero light while its flags stay off', async () => {
+  it('mounts the hero light and keeps the canvas off until WebGL can run', async () => {
     const { container } = await renderHomePage();
     expect(
       container.querySelector('[data-testid="homepage-hero-light"]')
-    ).toBeNull();
-    expect(container.querySelector('.homepage-artist-hero--lit')).toBeNull();
-    expect(container.querySelector('.homepage-hero-canvas')).toBeNull();
+    ).not.toBeNull();
+    expect(container.querySelector('.homepage-hero-canvas')).not.toBeNull();
     expect(container.querySelector('canvas')).toBeNull();
   });
 

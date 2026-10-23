@@ -1,6 +1,6 @@
 /**
- * WebGL2 hero light. Loaded only after idle, and only when the WebGL flag
- * and the device gate both allow it. The CSS poster is the look until the
+ * WebGL2 hero light. Loaded only after idle, and only when the device gate
+ * allows it. The CSS poster is the look until the
  * first frame, and again if this declines to run or blows the frame budget.
  */
 

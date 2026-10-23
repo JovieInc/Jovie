@@ -1,5 +1,5 @@
 /**
- * Scroll progress for the flagged hero canvas.
+ * Scroll progress for the homepage hero canvas.
  *
  * The document scroll position is the only input. Nothing listens for wheel
  * or touch, and nothing calls preventDefault. Browsers with scroll-driven

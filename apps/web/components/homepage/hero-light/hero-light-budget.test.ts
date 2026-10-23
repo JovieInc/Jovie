@@ -77,6 +77,18 @@ describe('homepage hero light budget', () => {
     );
   });
 
+  it('stacks the hero copy and keeps the proof phone inside the field', () => {
+    const css = readFileSync(join(DIR, 'HomepageHeroCanvas.css'), 'utf8');
+    const copy = cssBlock(css, '.homepage-hero-canvas__copy');
+    expect(copy).toContain('flex-direction: column');
+    expect(copy).toContain('align-items: center');
+    const phone = cssBlock(
+      css,
+      '.homepage-hero-canvas__proof .homepage-artist-hero__phone'
+    );
+    expect(phone).toContain('width: 100%');
+  });
+
   it('records the scoped WebGL exception without rewriting the standing rule', () => {
     const repo = join(DIR, '../../../../..');
     const canon = readFileSync(join(repo, 'canon/invariants.jsonl'), 'utf8');
@@ -89,6 +101,11 @@ describe('homepage hero light budget', () => {
       'utf8'
     );
     expect(canon).not.toContain('SHOW_HOMEPAGE_HERO_LIGHT');
+    const flags = readFileSync(
+      join(repo, 'apps/web/lib/flags/marketing-static.ts'),
+      'utf8'
+    );
+    expect(flags).not.toContain('SHOW_HOMEPAGE_HERO_LIGHT');
     expect(perf).toContain('Rules binding repo edits');
     expect(perf).toContain(
       'This contract file intentionally changes no product or CI behavior.'

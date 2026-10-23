@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageArtistHero } from '@/components/homepage/HomepageArtistProfile';
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { HomepageHeroLight } from './HomepageHeroLight';
-import { HERO_CANVAS_HEADLINE } from './hero-light-gate';
 import { startHeroLight } from './hero-light-gl';
 
 vi.mock('./hero-light-gl', () => ({ startHeroLight: vi.fn() }));
@@ -41,7 +40,7 @@ describe('HomepageHeroLight', () => {
   });
 
   it('renders a decorative CSS poster with no canvas and no copy', () => {
-    render(<HomepageHeroLight renderer='css' />);
+    render(<HomepageHeroLight />);
     const light = screen.getByTestId('homepage-hero-light');
 
     expect(light).toHaveAttribute('aria-hidden', 'true');
@@ -59,7 +58,7 @@ describe('HomepageHeroLight', () => {
     stubMotion(true);
     vi.stubGlobal('WebGL2RenderingContext', function WebGL2() {});
 
-    render(<HomepageHeroLight renderer='webgl' />);
+    render(<HomepageHeroLight />);
 
     expect(
       screen.getByTestId('homepage-hero-light').querySelector('canvas')
@@ -86,7 +85,7 @@ describe('HomepageHeroLight', () => {
     });
     vi.stubGlobal('cancelIdleCallback', vi.fn());
 
-    render(<HomepageHeroLight renderer='webgl' />);
+    render(<HomepageHeroLight />);
     expect(startHeroLight).not.toHaveBeenCalled();
     expect(
       screen.getByTestId('homepage-hero-light').querySelector('canvas')
@@ -94,8 +93,8 @@ describe('HomepageHeroLight', () => {
 
     idleCallback?.();
     await waitFor(() => expect(startHeroLight).toHaveBeenCalledTimes(1));
-    const [canvas, onFirstFrame] = vi.mocked(startHeroLight).mock.calls[0];
-    expect(canvas).toBeInstanceOf(HTMLCanvasElement);
+    const [glCanvas, onFirstFrame] = vi.mocked(startHeroLight).mock.calls[0];
+    expect(glCanvas).toBeInstanceOf(HTMLCanvasElement);
     act(() => {
       onFirstFrame();
     });
@@ -103,27 +102,37 @@ describe('HomepageHeroLight', () => {
       'data-live',
       'true'
     );
+    expect(screen.getByTestId('homepage-hero-light')).toHaveAttribute(
+      'data-renderer',
+      'webgl'
+    );
+
+    act(() => {
+      glCanvas.dispatchEvent(
+        new Event('webglcontextlost', { cancelable: true })
+      );
+    });
+    expect(screen.getByTestId('homepage-hero-light')).toHaveAttribute(
+      'data-live',
+      'false'
+    );
+    expect(screen.getByTestId('homepage-hero-light')).toHaveAttribute(
+      'data-renderer',
+      'css'
+    );
+    expect(glCanvas.isConnected).toBe(true);
   });
 });
 
-describe('HomepageArtistHero light flag', () => {
+describe('HomepageArtistHero', () => {
   afterEach(() => {
     cleanup();
   });
 
-  it('leaves the shipped hero unchanged when the override is omitted', () => {
+  it('ships the cinematic hero and the CSS poster', () => {
     render(<HomepageArtistHero />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       HOMEPAGE_COPY.hero.headline
-    );
-    expect(screen.queryByTestId('homepage-hero-light')).toBeNull();
-    expect(document.querySelector('.homepage-artist-hero--lit')).toBeNull();
-  });
-
-  it('mounts the cinematic canvas and the design headline when forced on', () => {
-    render(<HomepageArtistHero heroLight='css' />);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      HERO_CANVAS_HEADLINE
     );
     expect(screen.getByRole('link', { name: 'Sign in' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Jovie' })).toBeTruthy();
@@ -133,7 +142,8 @@ describe('HomepageArtistHero light flag', () => {
     const light = screen.getByTestId('homepage-hero-light');
     expect(light).toHaveAttribute('data-renderer', 'css');
     expect(light.querySelector('canvas')).toBeNull();
-    expect(document.querySelector('.homepage-artist-hero__phone')).toBeNull();
-    expect(document.querySelector('.homepage-artist-hero--lit')).toBeNull();
+    expect(
+      document.querySelector('.homepage-artist-hero__phone')
+    ).not.toBeNull();
   });
 });

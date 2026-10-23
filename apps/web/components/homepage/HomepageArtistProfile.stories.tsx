@@ -13,7 +13,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'The artist-profile homepage (EVENT 2026-10-20): the claim with the live profile, three real profile states, then the free offer from offer truth and the same claim.',
+          'The artist-profile homepage. The hero is the cinematic canvas with the claim, three real profile states, then the free offer from offer truth and the same claim.',
       },
     },
   },
@@ -23,15 +23,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Hero: Story = {};
-
-/** Flags-on preview. Production flags stay off; this story forces the full-bleed canvas. */
-export const HeroWithCssLight: Story = {
-  args: { heroLight: 'css' },
-};
-
-export const HeroWithWebGlLight: Story = {
-  args: { heroLight: 'webgl' },
-};
 
 export const FanStates: Story = {
   render: () => <HomepageFanStates />,

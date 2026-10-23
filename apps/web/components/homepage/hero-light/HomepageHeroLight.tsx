@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   HERO_LIGHT_PERF,
-  type HomepageHeroLightRenderer,
   isLowPowerBattery,
   shouldRunHeroLightWebGL,
 } from './hero-light-gate';
@@ -13,26 +12,22 @@ interface HeroLightHandle {
   stop(): void;
 }
 
-export interface HomepageHeroLightProps {
-  /** `css` is the invariant-safe poster. `webgl` may upgrade it after idle. */
-  readonly renderer: HomepageHeroLightRenderer;
-}
-
 /**
  * Decorative hero light. No text, no controls. Pointer events stay on the
- * hero. The WebGL canvas is mounted only after a client capability check, so
- * reduced-motion, save-data, and low-power sessions keep the CSS poster and
- * never create a canvas.
+ * hero. The CSS poster is always the layout. A canvas is created only after
+ * a client capability check, and it crossfades in. Reduced motion, save-data,
+ * low-power, missing WebGL, a refused context, and context loss leave the
+ * poster in place.
  */
-export function HomepageHeroLight({ renderer }: HomepageHeroLightProps) {
+export function HomepageHeroLight() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mountCanvas, setMountCanvas] = useState(false);
   const [live, setLive] = useState(false);
 
   useEffect(() => {
-    if (renderer !== 'webgl' || !shouldRunHeroLightWebGL()) return;
+    if (!shouldRunHeroLightWebGL()) return;
     setMountCanvas(true);
-  }, [renderer]);
+  }, []);
 
   useEffect(() => {
     if (!mountCanvas) return;
@@ -81,13 +76,19 @@ export function HomepageHeroLight({ renderer }: HomepageHeroLightProps) {
     const onMotion = () => {
       if (reducedMotion.matches) stop();
     };
+    const onContextLost = (event: Event) => {
+      event.preventDefault();
+      stop();
+    };
     reducedMotion.addEventListener('change', onMotion);
+    canvas.addEventListener('webglcontextlost', onContextLost);
 
     return () => {
       cancelled = true;
       if (usesIdleCallback) globalThis.cancelIdleCallback(idleId);
       if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
       reducedMotion.removeEventListener('change', onMotion);
+      canvas.removeEventListener('webglcontextlost', onContextLost);
       handle?.stop();
     };
   }, [mountCanvas]);
@@ -97,7 +98,7 @@ export function HomepageHeroLight({ renderer }: HomepageHeroLightProps) {
       aria-hidden='true'
       className='homepage-hero-light'
       data-live={live ? 'true' : 'false'}
-      data-renderer={renderer}
+      data-renderer={live ? 'webgl' : 'css'}
       data-testid='homepage-hero-light'
     >
       <div className='homepage-hero-light__wash' />

@@ -5,8 +5,8 @@
  * performance-invariants-v1 (`docs/performance/performance-invariants-v1.md`)
  * keep glow and glass on CSS tokens and disallow canvas, WebGL, and video on
  * a surface. The standing sentence is unchanged. The scoped exception below
- * applies only when `SHOW_HOMEPAGE_HERO_LIGHT_WEBGL` is on, and only to this
- * hero. Both flags stay default off.
+ * applies only to this hero's decorative layer. The hero ships enabled.
+ * There is no feature flag.
  *
  * gbrain-unavailable: the CLI was not installed here. The repo contracts are
  * the copies this check reads. No Linear issue — ad-hoc.
@@ -37,7 +37,7 @@ export type HomepageHeroLightRenderer = 'css' | 'webgl';
  *   so a retina hero does not fill a 4k framebuffer.
  * - Bytes: `hero-light-gl.ts` is a dynamic import, gzip -9 ≤ 4KB on
  *   comment-free transpile. It is fetched only after idle, and only when the
- *   WebGL flag is on and the device gate passes.
+ *   device gate passes.
  * - Idle: `requestIdleCallback` timeout 2000ms, after first paint (the start
  *   runs in an effect). Browsers without idle callback wait 600ms.
  * - Power: off when `prefers-reduced-motion`, `saveData`, `effectiveType` of
@@ -72,9 +72,6 @@ export const HERO_CANVAS_FOCAL = {
   narrow: { x: 0.5, y: 0.74 },
 } as const;
 
-/** Design headline for the flagged canvas. The shipped hero copy is unchanged. */
-export const HERO_CANVAS_HEADLINE = 'Be found. Be understood.';
-
 export const HERO_CANVAS_BRAND_LABEL = 'Jovie';
 export const HERO_CANVAS_SIGN_IN = 'Sign in';
 
@@ -84,7 +81,7 @@ export const HERO_LIGHT_WEBGL_RULE =
 
 /**
  * Approved 2026-10-22 8:47 PM PT. The rule text stays. Canvas is allowed only
- * while `SHOW_HOMEPAGE_HERO_LIGHT_WEBGL` is on, on this hero, and nowhere else.
+ * on this hero's decorative layer, and nowhere else. The hero ships enabled.
  * `amendsInvariant` stays false because the standing sentence is unchanged.
  */
 export const HERO_LIGHT_WEBGL_EXCEPTION = {
@@ -98,10 +95,6 @@ export const HERO_LIGHT_WEBGL_EXCEPTION = {
   sibling: 'performance-invariants-v1',
   amendsInvariant: false,
   surface: 'homepage hero decorative layer',
-  cssFlag: 'SHOW_HOMEPAGE_HERO_LIGHT',
-  webglFlag: 'SHOW_HOMEPAGE_HERO_LIGHT_WEBGL',
-  appliesOnlyWhen: 'SHOW_HOMEPAGE_HERO_LIGHT_WEBGL',
-  defaultOff: true,
   otherSurfaces: false,
   module: 'apps/web/components/homepage/hero-light/hero-light-gl.ts',
 } as const;
@@ -138,14 +131,17 @@ export function heroLightWebGLExceptionViolations(document: string): string[] {
       errors.push(`${key} does not match the approved exception`);
     }
   }
-  if (parsed.appliesOnlyWhen !== HERO_LIGHT_WEBGL_EXCEPTION.webglFlag) {
-    errors.push('exception must apply only when the WebGL flag is on');
-  }
-  if (parsed.appliesOnlyWhen === HERO_LIGHT_WEBGL_EXCEPTION.cssFlag) {
-    errors.push('the CSS flag does not authorize a canvas');
-  }
   if (parsed.otherSurfaces !== false) {
     errors.push('exception must not cover any other surface');
+  }
+  if (parsed.surface !== HERO_LIGHT_WEBGL_EXCEPTION.surface) {
+    errors.push('exception must stay on the homepage hero decorative layer');
+  }
+  if (
+    JSON.stringify(parsed).includes('SHOW_HOMEPAGE_HERO') ||
+    Object.keys(parsed).some(key => /flag/i.test(key))
+  ) {
+    errors.push('exception must not use a feature flag');
   }
   const standingRule = document.replace(EXCEPTION_RECORD_PATTERN, '');
   if (!standingRule.includes(HERO_LIGHT_WEBGL_RULE)) {
@@ -161,15 +157,6 @@ export function sceneUnitRgb(hex: string): [number, number, number] {
     ((value >> 8) & 255) / 255,
     (value & 255) / 255,
   ];
-}
-
-export function resolveHomepageHeroLight(
-  override: HomepageHeroLightRenderer | 'off' | undefined,
-  flags: { readonly css: boolean; readonly webgl: boolean }
-): HomepageHeroLightRenderer | 'off' {
-  if (override) return override;
-  if (!flags.css) return 'off';
-  return flags.webgl ? 'webgl' : 'css';
 }
 
 export function nextLateFrameCount(previous: number, frameMs: number): number {

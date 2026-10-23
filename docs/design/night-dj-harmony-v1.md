@@ -13,12 +13,12 @@ Sibling performance contract: [`performance-invariants-v1`](../performance/perfo
 
 approved by Tim, scoped to the flagged hero prototype only. Dated 2026-10-22 8:47 PM PT.
 
-The exception applies only when `SHOW_HOMEPAGE_HERO_LIGHT_WEBGL` is on, and only to the
-homepage hero decorative layer. `SHOW_HOMEPAGE_HERO_LIGHT` obeys the invariant, including
-the glass bar (`backdrop-filter` via `--blur-header`). Both flags stay default off.
-There is no video. The canvas is `aria-hidden` and `pointer-events: none`, and it loads
-after idle. Reduced motion, save-data, and low-power never create a canvas. The CSS
-flag alone never authorizes a canvas.
+The exception applies only to the homepage hero decorative layer. It does not apply
+to any other surface. The hero ships enabled. There is no feature flag. There is no
+video. The canvas is `aria-hidden` and `pointer-events: none`, and it loads after
+idle. No WebGL support, reduced motion, save-data, low-power, and context loss keep
+the CSS poster, with no layout shift. The glass bar stays on CSS tokens
+(`backdrop-filter` via `--blur-header`).
 
 <!-- hero-light-webgl-exception/v1
 {
@@ -32,10 +32,6 @@ flag alone never authorizes a canvas.
   "sibling": "performance-invariants-v1",
   "amendsInvariant": false,
   "surface": "homepage hero decorative layer",
-  "cssFlag": "SHOW_HOMEPAGE_HERO_LIGHT",
-  "webglFlag": "SHOW_HOMEPAGE_HERO_LIGHT_WEBGL",
-  "appliesOnlyWhen": "SHOW_HOMEPAGE_HERO_LIGHT_WEBGL",
-  "defaultOff": true,
   "otherSurfaces": false,
   "module": "apps/web/components/homepage/hero-light/hero-light-gl.ts"
 }

@@ -3,9 +3,11 @@
  *
  * Felt, not seen: one Ion wash, a hairline grid that fades from the focal
  * point, and a 1px edge-light whose highlight rolls through that focus.
- * Ultra and Pulse exist only on that traveling edge. No blur, no shadow,
- * no canvas. Scene palette v1: Ion #3FAFF3, Ultra #A789F0, Pulse #EB6AC6
- * on canvas #070B12. Dark mode only.
+ * Ultra and Pulse exist only on that traveling edge. No blur, no shadow.
+ * The canvas, when the device can run it, is absolute and starts at
+ * opacity 0 so a refusal or context loss does not move layout.
+ * Scene palette v1: Ion #3FAFF3, Ultra #A789F0, Pulse #EB6AC6
+ * on canvas #070B12.
  */
 
 .homepage-artist-hero--lit {
@@ -39,10 +41,6 @@
   .homepage-hero-light {
     --hero-light-focal-y: 74%;
   }
-}
-
-html:not(.dark) .homepage-hero-light {
-  display: none;
 }
 
 .homepage-hero-light__wash,

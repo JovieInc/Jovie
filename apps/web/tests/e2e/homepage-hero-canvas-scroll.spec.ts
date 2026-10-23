@@ -99,7 +99,7 @@ function canvasHtml(fallback: boolean): string {
             <div class="homepage-hero-light__focus"><div class="homepage-hero-light__edge"></div></div>
           </div>
           <div class="homepage-hero-canvas__copy">
-            <h1 class="homepage-hero-canvas__headline">Be found. Be understood.</h1>
+            <h1 class="homepage-hero-canvas__headline">One profile. For every fan.</h1>
           </div>
         </div>
         <div class="homepage-hero-canvas__logos homepage-hero-canvas__logos-rail"></div>
@@ -202,7 +202,11 @@ test.describe('homepage hero canvas scroll', () => {
         })
     );
     const forward = await readScroll(page);
-    const expected = Math.min(1, forward.y / (900 * HERO_CANVAS_SCROLL_RANGE));
+    const viewportHeight = page.viewportSize()?.height ?? 0;
+    const expected = Math.min(
+      1,
+      forward.y / (viewportHeight * HERO_CANVAS_SCROLL_RANGE)
+    );
     expect(forward.y).toBeGreaterThanOrEqual(190);
     expect(forward.y).toBeLessThanOrEqual(210);
     expect(forward.progress).toBeCloseTo(expected, 2);

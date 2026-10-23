@@ -7,7 +7,6 @@ import {
   heroLightWebGLExceptionViolations,
   isLowPowerBattery,
   nextLateFrameCount,
-  resolveHomepageHeroLight,
   sceneUnitRgb,
   shouldAbortForLateFrames,
   shouldRunHeroLightWebGL,
@@ -42,35 +41,6 @@ function fakeWindow({
     WebGL2RenderingContext: webgl2 ? function WebGL2() {} : undefined,
   } as unknown as Window;
 }
-
-describe('resolveHomepageHeroLight', () => {
-  it('stays off when the CSS flag is off, even if WebGL is on', () => {
-    expect(
-      resolveHomepageHeroLight(undefined, { css: false, webgl: true })
-    ).toBe('off');
-  });
-
-  it('uses the CSS poster when only the first flag is on', () => {
-    expect(
-      resolveHomepageHeroLight(undefined, { css: true, webgl: false })
-    ).toBe('css');
-  });
-
-  it('upgrades to WebGL only when both flags are on', () => {
-    expect(
-      resolveHomepageHeroLight(undefined, { css: true, webgl: true })
-    ).toBe('webgl');
-  });
-
-  it('lets a story force a renderer without flipping the flags', () => {
-    expect(resolveHomepageHeroLight('css', { css: false, webgl: false })).toBe(
-      'css'
-    );
-    expect(resolveHomepageHeroLight('off', { css: true, webgl: true })).toBe(
-      'off'
-    );
-  });
-});
 
 describe('shouldRunHeroLightWebGL', () => {
   it('runs on a capable device with motion allowed', () => {
@@ -154,8 +124,7 @@ describe('frame budget', () => {
       approvedAt: '2026-10-22 8:47 PM PT',
       approver: 'Tim',
       amendsInvariant: false,
-      appliesOnlyWhen: 'SHOW_HOMEPAGE_HERO_LIGHT_WEBGL',
-      defaultOff: true,
+      surface: 'homepage hero decorative layer',
       otherSurfaces: false,
     });
     expect(heroLightWebGLExceptionViolations('')).toContain(
@@ -168,19 +137,33 @@ ${HERO_LIGHT_WEBGL_RULE}`;
     expect(heroLightWebGLExceptionViolations(widened).join('\n')).toMatch(
       /other surface|does not match the approved exception/
     );
-    const cssOnly = `<!-- hero-light-webgl-exception/v1
+    const otherSurface = `<!-- hero-light-webgl-exception/v1
 ${JSON.stringify(
   {
     ...HERO_LIGHT_WEBGL_EXCEPTION,
-    appliesOnlyWhen: HERO_LIGHT_WEBGL_EXCEPTION.cssFlag,
+    surface: 'marketing ambient field',
   },
   null,
   2
 )}
 -->
 ${HERO_LIGHT_WEBGL_RULE}`;
-    expect(heroLightWebGLExceptionViolations(cssOnly).join('\n')).toMatch(
-      /WebGL flag|CSS flag/
+    expect(heroLightWebGLExceptionViolations(otherSurface).join('\n')).toMatch(
+      /homepage hero|does not match the approved exception/
+    );
+    const flagged = `<!-- hero-light-webgl-exception/v1
+${JSON.stringify(
+  {
+    ...HERO_LIGHT_WEBGL_EXCEPTION,
+    webglFlag: 'SHOW_HOMEPAGE_HERO_LIGHT_WEBGL',
+  },
+  null,
+  2
+)}
+-->
+${HERO_LIGHT_WEBGL_RULE}`;
+    expect(heroLightWebGLExceptionViolations(flagged).join('\n')).toMatch(
+      /feature flag|fields changed/
     );
   });
 });

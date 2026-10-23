@@ -1,5 +1,5 @@
 /*
- * Flagged homepage hero canvas. Off-flag pages never carry these classes.
+ * Homepage hero canvas. The homepage always carries these classes.
  *
  * Progress 0 is a full-bleed 100svh field, header included, square corners.
  * Progress 1 insets that field and the header by the same gutter, rounds
@@ -149,6 +149,7 @@
   position: relative;
   z-index: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
@@ -162,6 +163,41 @@
 .homepage-hero-canvas__headline {
   max-width: 16ch;
   margin: 0;
+}
+
+.homepage-hero-canvas__subhead,
+.homepage-hero-canvas__support {
+  max-width: 36rem;
+  margin: var(--space-3, 0.75rem) 0 0;
+}
+
+.homepage-hero-canvas__proof {
+  position: absolute;
+  z-index: 1;
+  right: var(--hero-canvas-chrome);
+  bottom: var(--space-4, 1rem);
+  width: 13rem;
+  pointer-events: none;
+}
+
+/* The shared phone class is 21.25rem in the old two-column hero. Inside this
+   field it has to follow the proof box, or it covers the headline. */
+.homepage-hero-canvas__proof .homepage-artist-hero__phone {
+  width: 100%;
+}
+
+@media (max-width: 63.99rem) {
+  .homepage-hero-canvas__copy {
+    justify-content: flex-start;
+    padding-bottom: 16rem;
+  }
+
+  .homepage-hero-canvas__proof {
+    right: 0;
+    left: 0;
+    width: 7.25rem;
+    margin-inline: auto;
+  }
 }
 
 .homepage-hero-canvas__logos {

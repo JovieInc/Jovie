@@ -2,7 +2,6 @@ import './home.css';
 import '../../components/marketing/MarketingSnapRail.css';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export const revalidate = false;
 
@@ -11,19 +10,16 @@ export default function HomeLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // The homepage uses the one canonical marketing shell: the docked landing
-  // header (with the Customers flyout) and the full footer. The hero opts in
-  // to `.marketing-hero-dock`, so its texture bleeds under the header to y=0.
+  // The hero canvas replaces the docked marketing header with its own
+  // bar and hides that header. Skip the shell's header offset so the
+  // 100svh field starts at the top of the viewport.
   return (
     <ClientProviders forceSignedOutDefaults>
       <PublicPageShell
-        className={
-          FEATURE_FLAGS.SHOW_HOMEPAGE_HERO_LIGHT
-            ? 'home-viewport home-viewport--hero-canvas min-h-svh overflow-x-clip bg-base text-primary-token'
-            : 'home-viewport min-h-svh overflow-x-clip bg-base text-primary-token'
-        }
+        className='home-viewport home-viewport--hero-canvas min-h-svh overflow-x-clip bg-base text-primary-token'
         footerVariant='expanded'
         logoSize='sm'
+        mainOffset={false}
       >
         {children}
       </PublicPageShell>
