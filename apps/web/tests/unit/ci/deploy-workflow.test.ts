@@ -831,7 +831,7 @@ describe('deploy workflow Vercel env resolution', () => {
     }
   });
 
-  it('keeps exact-build performance proof deployable without optional auth credentials', () => {
+  it('enforces qualified exact-build budgets while allowing optional auth credentials to be unconfigured', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const promotionJob = getJobBlock(workflow, 'promote-production');
     const setupStep = getStepBlock(
@@ -879,12 +879,17 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(performanceStep).toContain('--auth-path "$auth_state"');
     expect(performanceStep).toContain('--runs 3');
-    expect(performanceStep).toContain(
+    expect(performanceStep).not.toContain(
       'echo "::warning::Canonical six-route browser budgets failed on the exact staged build."'
     );
-    expect(performanceStep).toContain('performance_status=warn');
     expect(performanceStep).not.toContain(
-      'fail_performance_gate "Canonical six-route browser budgets failed on the exact staged build."'
+      'authenticated_performance_status=warn'
+    );
+    expect(performanceStep).toContain(
+      'fail_performance_gate "Canonical six-route browser budgets failed on the exact staged build (JOV-8557)."'
+    );
+    expect(performanceStep).toContain(
+      'authenticated_performance_status=passed'
     );
     for (const routeId of [
       'creator-inbox-nav',
