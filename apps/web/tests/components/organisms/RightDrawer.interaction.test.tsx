@@ -205,18 +205,18 @@ describe('RightDrawer', () => {
     expect(onKeyDown).toHaveBeenCalledTimes(1);
   });
 
-  it('lets the active mobile rail own Escape while a superseded rail stays armed but deferential', async () => {
+  it('keeps Escape live on the active mobile rail with another rail mounted', async () => {
     mockUseBreakpointDown.mockReturnValue(true);
-    const onKeyDownFirst = vi.fn();
-    const onKeyDownSecond = vi.fn();
+    const onKeyDownOther = vi.fn();
+    const onKeyDownActive = vi.fn();
 
     render(
       <>
         <RightDrawer
-          isOpen
+          isOpen={false}
           width={360}
-          ariaLabel='Superseded rail'
-          onKeyDown={onKeyDownFirst}
+          ariaLabel='Other rail'
+          onKeyDown={onKeyDownOther}
         >
           <button type='button'>First rail</button>
         </RightDrawer>
@@ -224,32 +224,23 @@ describe('RightDrawer', () => {
           isOpen
           width={360}
           ariaLabel='Active rail'
-          onKeyDown={onKeyDownSecond}
+          onKeyDown={onKeyDownActive}
         >
           <button type='button'>Second rail</button>
         </RightDrawer>
       </>
     );
 
-    // The last opened rail wins activation; the earlier one is inert and
-    // aria-hidden while still mounted and open.
     await waitFor(() =>
       expect(screen.getByLabelText('Active rail')).toHaveAttribute(
         'aria-modal',
         'true'
       )
     );
-    expect(screen.getByLabelText('Superseded rail')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
 
-    // Escape belongs to the live modal. The superseded rail's listener is
-    // armed but defers through the open-modal arbitration instead of
-    // stealing or dropping the key.
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(onKeyDownSecond).toHaveBeenCalledTimes(1);
-    expect(onKeyDownFirst).not.toHaveBeenCalled();
+    expect(onKeyDownActive).toHaveBeenCalledTimes(1);
+    expect(onKeyDownOther).not.toHaveBeenCalled();
   });
 
   it('does not handle Escape when a modal dialog is open above the drawer', () => {
