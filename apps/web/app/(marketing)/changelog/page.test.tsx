@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChangelogParseResult } from '@/lib/changelog-parser';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 
 const SNAPSHOT: ChangelogParseResult = {
   releases: [
@@ -164,7 +165,7 @@ describe('public changelog page', () => {
   });
 
   it('uses a descriptive product-update title for search and sharing', () => {
-    expect(metadata.title).toBe(
+    expect(applyRootTitleTemplate(metadata.title)).toBe(
       'Jovie Changelog: Product Updates & New Features'
     );
   });

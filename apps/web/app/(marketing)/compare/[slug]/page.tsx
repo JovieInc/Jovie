@@ -4,6 +4,7 @@ import { ComparisonPageContent } from '@/components/organisms/ComparisonPageCont
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getComparison, getComparisonSlugs } from '@/content/comparisons';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
+import { documentTitle } from '@/lib/seo/document-title';
 
 interface ComparePageProps {
   readonly params: Promise<{ slug: string }>;
@@ -23,7 +24,7 @@ export async function generateMetadata({
   if (!data) return { title: 'Comparison' };
 
   return {
-    title: data.title,
+    title: documentTitle(data.title),
     description: data.metaDescription,
     alternates: {
       canonical: `${BASE_URL}/compare/${data.slug}`,

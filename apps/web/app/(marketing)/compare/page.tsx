@@ -5,11 +5,12 @@ import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getComparison, getComparisonSlugs } from '@/content/comparisons';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `Compare — ${APP_NAME}`,
+  title: documentTitle(`Compare — ${APP_NAME}`),
   description:
     'See how Jovie compares with the tools musicians already use to share music.',
   alternates: {

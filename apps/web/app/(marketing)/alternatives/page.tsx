@@ -5,11 +5,12 @@ import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternative, getAlternativeSlugs } from '@/content/alternatives';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `Alternatives — ${APP_NAME}`,
+  title: documentTitle(`Alternatives — ${APP_NAME}`),
   description:
     'Find a musician-first alternative to generic link-in-bio tools, with smart links and release workflows instead of a list of links.',
   alternates: {
