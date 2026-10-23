@@ -24,6 +24,7 @@ const SampleForm = () => (
     <input
       type='email'
       placeholder='you@example.com'
+      aria-label='Email address'
       className='w-full rounded-xl border border-subtle bg-surface-0 px-3 py-2 text-primary-token placeholder:text-tertiary-token'
     />
     <button
