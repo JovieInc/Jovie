@@ -5,8 +5,6 @@ import { ISRC_COPY } from '@/data/isrcCopy';
 import { buildSoftwareSchema } from '@/lib/constants/schemas';
 import { IsrcLanding } from './IsrcLanding';
 
-export const revalidate = false;
-
 const PAGE_URL = `${BASE_URL}${APP_ROUTES.PRODUCT_ISRC}`;
 const PAGE_TITLE = `${ISRC_COPY.seo.title} | ${APP_NAME}`;
 
