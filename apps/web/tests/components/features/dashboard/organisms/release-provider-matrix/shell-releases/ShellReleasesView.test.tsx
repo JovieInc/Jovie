@@ -595,9 +595,7 @@ describe('ShellReleasesView', () => {
     // through the context-menu host wrappers.
     const list = screen.getByRole('list', { name: 'Releases' });
     expect(
-      screen
-        .getByRole('listitem', { name: 'Lost in the Light' })
-        .closest('[role="list"]')
+      screen.getByRole('listitem', { name: 'Lost in the Light' }).closest('ul')
     ).toBe(list);
     expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
   });

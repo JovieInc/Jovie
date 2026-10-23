@@ -4,6 +4,15 @@ import { ThreadView } from './ThreadView';
 const meta = {
   title: 'Shell/ThreadView',
   component: ThreadView,
+  decorators: [
+    Story => (
+      // Give the thread a real viewport so its scroll region does not overflow
+      // (an overflowing scroller needs a keyboard entry point).
+      <div className='h-96 w-[44rem] max-w-full'>
+        <Story />
+      </div>
+    ),
+  ],
   parameters: {
     layout: 'centered',
     jovie: {
