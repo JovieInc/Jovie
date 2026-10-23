@@ -5,12 +5,14 @@
  * A literal triad is one CSS rule body that names Ion, Ultra, and Pulse.
  * imageColorPolicy.ts documents the ban and is not scanned.
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+
 import { spawnSync } from 'node:child_process';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const HUE_BASELINE = 'scripts/invariants/art-direction/hue.baseline.json';
+export const HUE_BASELINE =
+  'scripts/invariants/art-direction/hue.baseline.json';
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const ROOTS = [
   'apps/web/app/(marketing)',
@@ -21,32 +23,57 @@ const ROOTS = [
 const EXTRA = ['design.tokens.json'];
 const POLICY = 'apps/web/data/marketing/imageColorPolicy.ts';
 const SKIP_DIRS = new Set([
-  'node_modules', '.next', 'dist', 'coverage', 'storybook-static', 'generated',
+  'node_modules',
+  '.next',
+  'dist',
+  'coverage',
+  'storybook-static',
+  'generated',
 ]);
 const SKIP_FILE = /\.(?:test|spec|stories)\.[cm]?[jt]sx?$/;
+/** @type {ReadonlyArray<readonly [string, RegExp]>} */
 const ROLE_SOURCE = [
-  ['ultra', /--noir-ion-ultra\b|--color-accent-purple\b|data-accent\s*=\s*['"](?:ultra|purple)['"]/],
-  ['pulse', /--noir-ion-pulse\b|--color-accent-pink\b|data-accent\s*=\s*['"](?:pulse|pink)['"]/],
-  ['ion', /--color-accent-blue\b|--system-b-accent-cyan\b|data-accent\s*=\s*['"](?:ion|blue)['"]/],
+  [
+    'ultra',
+    /--noir-ion-ultra\b|--color-accent-purple\b|data-accent\s*=\s*['"](?:ultra|purple)['"]/,
+  ],
+  [
+    'pulse',
+    /--noir-ion-pulse\b|--color-accent-pink\b|data-accent\s*=\s*['"](?:pulse|pink)['"]/,
+  ],
+  [
+    'ion',
+    /--color-accent-blue\b|--system-b-accent-cyan\b|data-accent\s*=\s*['"](?:ion|blue)['"]/,
+  ],
 ];
 const NAMED_ORANGE =
   /--color-accent-orange\b|--noir-ion-orange\b|--noir-ion-gold\b|data-accent\s*=\s*['"]orange['"]|\baccent:\s*['"]orange['"]/;
 const ACCENT_HEX = {
-  '#3faff3': 'ion', '#11afff': 'ion', '#a789f0': 'ultra',
-  '#8e56f5': 'ultra', '#eb6ac6': 'pulse', '#f52bb5': 'pulse',
+  '#3faff3': 'ion',
+  '#11afff': 'ion',
+  '#a789f0': 'ultra',
+  '#8e56f5': 'ultra',
+  '#eb6ac6': 'pulse',
+  '#f52bb5': 'pulse',
 };
 
 function normalizeHex(hex) {
   let body = String(hex).replace('#', '').trim();
   if (body.length === 3 || body.length === 4) {
-    body = body.slice(0, 3).split('').map(char => char + char).join('');
+    body = body
+      .slice(0, 3)
+      .split('')
+      .map(char => char + char)
+      .join('');
   } else if (body.length === 8) body = body.slice(0, 6);
   if (body.length !== 6 || /[^0-9a-f]/i.test(body)) return null;
   return `#${body.toLowerCase()}`;
 }
 
 function rgbToHsl(r, g, b) {
-  const red = r / 255, green = g / 255, blue = b / 255;
+  const red = r / 255,
+    green = g / 255,
+    blue = b / 255;
   const max = Math.max(red, green, blue);
   const min = Math.min(red, green, blue);
   const lightness = (max + min) / 2;
@@ -66,14 +93,20 @@ export function isOrangeHex(hex) {
   const normalized = normalizeHex(hex);
   if (!normalized) return false;
   const value = Number.parseInt(normalized.slice(1), 16);
-  const { h, s, l } = rgbToHsl((value >> 16) & 255, (value >> 8) & 255, value & 255);
+  const { h, s, l } = rgbToHsl(
+    (value >> 16) & 255,
+    (value >> 8) & 255,
+    value & 255
+  );
   return h >= 18 && h <= 48 && s >= 0.45 && l >= 0.15 && l <= 0.92;
 }
 
 function signals(source) {
   const roles = new Set();
   const oranges = [];
-  for (const hex of source.match(/#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g) ?? []) {
+  for (const hex of source.match(
+    /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g
+  ) ?? []) {
     const normalized = normalizeHex(hex);
     if (!normalized) continue;
     if (ACCENT_HEX[normalized]) roles.add(ACCENT_HEX[normalized]);
@@ -96,8 +129,15 @@ function walk(repoRoot) {
   const files = [];
   const visit = absolute => {
     let stats;
-    try { stats = statSync(absolute); } catch { return; }
-    if (stats.isFile()) { files.push(absolute); return; }
+    try {
+      stats = statSync(absolute);
+    } catch {
+      return;
+    }
+    if (stats.isFile()) {
+      files.push(absolute);
+      return;
+    }
     if (!stats.isDirectory()) return;
     for (const entry of readdirSync(absolute)) {
       if (entry.startsWith('.') || SKIP_DIRS.has(entry)) continue;
@@ -140,14 +180,25 @@ export function scanHue(repoRoot = REPO_ROOT) {
 
 function ancestorIds(repoRoot, relPath) {
   const rev = spawnSync('git', ['rev-parse', '--verify', 'origin/main'], {
-    cwd: repoRoot, encoding: 'utf8',
+    cwd: repoRoot,
+    encoding: 'utf8',
   });
-  if (rev.status !== 0) return { ok: false, error: 'origin/main is not available; the ratchet cannot prove it only shrinks' };
+  if (rev.status !== 0)
+    return {
+      ok: false,
+      error:
+        'origin/main is not available; the ratchet cannot prove it only shrinks',
+    };
   const spec = `origin/main:${relPath}`;
-  if (spawnSync('git', ['cat-file', '-e', spec], { cwd: repoRoot }).status !== 0) {
+  if (
+    spawnSync('git', ['cat-file', '-e', spec], { cwd: repoRoot }).status !== 0
+  ) {
     return { ok: true, ancestor: null };
   }
-  const show = spawnSync('git', ['show', spec], { cwd: repoRoot, encoding: 'utf8' });
+  const show = spawnSync('git', ['show', spec], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
   if (show.status !== 0) return { ok: false, error: `unable to read ${spec}` };
   return { ok: true, ancestor: JSON.parse(show.stdout).ids };
 }
@@ -158,11 +209,20 @@ function ratchet(current, recorded, ancestor) {
   const live = new Set(current);
   const added = current.filter(id => !known.has(id));
   const removed = recorded.filter(id => !live.has(id));
-  if (added.length) errors.push(`baseline is missing ${added.length} live id(s); do not add ids:\n${added.map(id => `  + ${id}`).join('\n')}`);
-  if (removed.length) errors.push(`baseline can only shrink; delete ${removed.length} resolved id(s):\n${removed.map(id => `  - ${id}`).join('\n')}`);
+  if (added.length)
+    errors.push(
+      `baseline is missing ${added.length} live id(s); do not add ids:\n${added.map(id => `  + ${id}`).join('\n')}`
+    );
+  if (removed.length)
+    errors.push(
+      `baseline can only shrink; delete ${removed.length} resolved id(s):\n${removed.map(id => `  - ${id}`).join('\n')}`
+    );
   if (ancestor) {
     const grown = current.filter(id => !new Set(ancestor).has(id));
-    if (grown.length) errors.push(`new violations are not allowed (${grown.length}):\n${grown.map(id => `  + ${id}`).join('\n')}`);
+    if (grown.length)
+      errors.push(
+        `new violations are not allowed (${grown.length}):\n${grown.map(id => `  + ${id}`).join('\n')}`
+      );
   }
   return errors;
 }
@@ -171,8 +231,13 @@ export const check = checkHue;
 
 export function checkHue(repoRoot = REPO_ROOT, recordedIds) {
   const current = scanHue(repoRoot);
-  const recorded = recordedIds ?? JSON.parse(readFileSync(join(repoRoot, HUE_BASELINE), 'utf8')).ids;
+  const recorded =
+    recordedIds ??
+    JSON.parse(readFileSync(join(repoRoot, HUE_BASELINE), 'utf8')).ids;
   const ancestor = ancestorIds(repoRoot, HUE_BASELINE);
   if (!ancestor.ok) return { failures: [ancestor.error], ids: current };
-  return { failures: ratchet(current, recorded, ancestor.ancestor), ids: current };
+  return {
+    failures: ratchet(current, recorded, ancestor.ancestor),
+    ids: current,
+  };
 }

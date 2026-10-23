@@ -10,10 +10,13 @@ describe('marketing hue', () => {
   });
 
   it('flags a literal triad in one rule and an orange hex', () => {
-    const css = '.all { color: #3faff3; background: #a789f0; border-color: #eb6ac6; } .sun { color: #ff7800; }';
+    const css =
+      '.all { color: #3faff3; background: #a789f0; border-color: #eb6ac6; } .sun { color: #ff7800; }';
     const ids = hueViolations(css, 'apps/web/components/marketing/sample.css');
     assert.ok(ids.some(id => id.startsWith('triad:')));
-    assert.ok(ids.includes('orange:apps/web/components/marketing/sample.css:#ff7800'));
+    assert.ok(
+      ids.includes('orange:apps/web/components/marketing/sample.css:#ff7800')
+    );
   });
 
   it('matches the shrink-only baseline', () => {
