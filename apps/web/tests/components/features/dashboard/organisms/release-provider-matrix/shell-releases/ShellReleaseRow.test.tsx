@@ -109,6 +109,8 @@ describe('ShellReleaseRow audio affordance', () => {
     // contain the row's real controls (axe nested-interactive), so selection
     // stays visual (`data-selected` + selected tokens), not `aria-selected`.
     expect(row).toHaveAttribute('role', 'listitem');
+    // name-from-author: the row announces its release title.
+    expect(row).toHaveAttribute('aria-label', 'Lost in the Light');
     expect(row).not.toHaveAttribute('aria-selected');
     expect(row).toHaveAttribute('data-selected', 'true');
     expect(row?.className).toContain('system-b-table-row-selected');

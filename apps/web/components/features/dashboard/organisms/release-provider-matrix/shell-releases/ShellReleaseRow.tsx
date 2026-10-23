@@ -375,6 +375,11 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   return (
     <ShellListRowFrame
       role='listitem'
+      // `listitem` is name-from-author (unlike the old `option`, which was
+      // name-from-content): give the row an explicit accessible name so
+      // role-based queries and screen-reader item navigation announce the
+      // release title.
+      aria-label={release.title}
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
