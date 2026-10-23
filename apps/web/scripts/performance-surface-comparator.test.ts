@@ -365,6 +365,53 @@ describe('trusted surface regression comparator', () => {
     );
   });
 
+  it.each([20, 40])(
+    'checks each baseline profile at load and comparison (max age %i minutes)',
+    maxAgeMinutes => {
+      const f = fixture(bundle => ({
+        ...bundle,
+        policy: { ...bundle.policy, maxAgeMs: maxAgeMinutes * 60_000 },
+        controls: [
+          ...bundle.controls,
+          ...profiles.flatMap(p =>
+            [40, 41, 42].map(minute =>
+              run(
+                p,
+                `fresh-control-${p.platform}-${minute}`,
+                bundle.controls[0]!.head,
+                minute
+              )
+            )
+          ),
+        ],
+        history: bundle.history.map(entry => ({
+          ...entry,
+          runs: entry.runs.map(baseline =>
+            baseline.profile.platform === 'phone'
+              ? baseline
+              : { ...baseline, startedAt: at(45), completedAt: at(45.1) }
+          ),
+        })),
+      }));
+      if (maxAgeMinutes === 20) {
+        expect(f.load).toThrow('stale baseline evidence');
+      } else {
+        const baseline = f.load();
+        expect(
+          compareSurfaceMeasurements(
+            baseline,
+            candidate(candidateHead, 40, 140, 'fresh', 48),
+            candidateHead,
+            epoch + 51 * 60_000
+          )
+        ).toMatchObject({
+          status: 'fail',
+          reasons: ['stale baseline evidence'],
+        });
+      }
+    }
+  );
+
   it('rejects candidate-created baseline handles', () => {
     const f = fixture();
     expect(
@@ -490,6 +537,184 @@ describe('trusted surface regression comparator', () => {
       ).status
     ).toBe('fail');
   });
+
+  it('preserves old controls while qualifying a newer identical-head cohort', () => {
+    const f = fixture();
+    const refreshed = {
+      ...f.bundle,
+      controls: [
+        ...f.bundle.controls,
+        ...profiles.flatMap(p =>
+          [20, 21, 22].map(minute =>
+            run(
+              p,
+              `new-control-${p.platform}-${minute}`,
+              f.trust.commit,
+              minute
+            )
+          )
+        ),
+      ],
+    };
+    const trust = f.store(refreshed);
+    const baseline = loadTrustedSurfaceBaseline(f.root, trust, now);
+    expect(
+      compareSurfaceMeasurements(baseline, candidate(), candidateHead, now)
+        .status
+    ).toBe('pass');
+    expect(refreshed.controls.slice(0, f.bundle.controls.length)).toEqual(
+      f.bundle.controls
+    );
+    const proposal = promoteSurfaceBaseline(
+      baseline,
+      candidate(trust.commit),
+      now
+    );
+    expect(proposal.controls).toEqual(refreshed.controls);
+    expect(proposal.history[0]).toEqual(f.bundle.history[0]);
+  });
+
+  it.each([false, true])(
+    'uses the newest complete cohort without pooling noise (reversed %s)',
+    reverse => {
+      const f = fixture(bundle => ({
+        ...bundle,
+        policy: {
+          ...bundle.policy,
+          surfaces: bundle.policy.surfaces.map(surface => ({
+            ...surface,
+            noiseAllowance: {
+              ...surface.noiseAllowance,
+              p50FirstFeedbackMs: 2,
+              p95FirstFeedbackMs: 2,
+            },
+          })),
+        },
+        controls: bundle.controls.map((control, index) => ({
+          ...control,
+          samples: control.samples.map(sample => ({
+            ...sample,
+            firstFeedbackMs: index % 3 === 2 ? 42 : 40,
+          })),
+        })),
+      }));
+      const controls = [
+        ...f.bundle.controls,
+        ...profiles.flatMap(p =>
+          [20, 21, 22].map(minute =>
+            run(
+              p,
+              `new-control-${p.platform}-${minute}`,
+              f.trust.commit,
+              minute
+            )
+          )
+        ),
+      ];
+      const trust = f.store({
+        ...f.bundle,
+        controls: reverse ? controls.reverse() : controls,
+      });
+      const baseline = loadTrustedSurfaceBaseline(f.root, trust, now);
+      expect(
+        compareSurfaceMeasurements(
+          baseline,
+          candidate(candidateHead, 41),
+          candidateHead,
+          now
+        )
+      ).toMatchObject({
+        status: 'fail',
+        reasons: [expect.stringContaining('regression:')],
+      });
+    }
+  );
+
+  it.each([false, true])(
+    'breaks equal-time cohort ties by head SHA (reversed %s)',
+    reverse => {
+      const f = fixture(bundle => ({
+        ...bundle,
+        policy: {
+          ...bundle.policy,
+          surfaces: bundle.policy.surfaces.map(surface => ({
+            ...surface,
+            noiseAllowance: {
+              ...surface.noiseAllowance,
+              p50FirstFeedbackMs: 2,
+              p95FirstFeedbackMs: 2,
+            },
+          })),
+        },
+        controls: bundle.controls.map((control, index) => ({
+          ...control,
+          samples: control.samples.map(sample => ({
+            ...sample,
+            firstFeedbackMs: index % 3 === 2 ? 42 : 40,
+          })),
+        })),
+      }));
+      const controls = [
+        ...f.bundle.controls,
+        ...profiles.flatMap(p =>
+          [1, 2, 3].map(minute =>
+            run(
+              p,
+              `tied-control-${p.platform}-${minute}`,
+              f.trust.commit,
+              minute
+            )
+          )
+        ),
+      ];
+      const trust = f.store({
+        ...f.bundle,
+        controls: reverse ? controls.reverse() : controls,
+      });
+      const baseline = loadTrustedSurfaceBaseline(f.root, trust, now);
+      expect(
+        compareSurfaceMeasurements(
+          baseline,
+          candidate(candidateHead, 41),
+          candidateHead,
+          now
+        ).status
+      ).toBe(f.head < f.trust.commit ? 'pass' : 'fail');
+    }
+  );
+
+  it.each([2, 3, 4])(
+    'does not bypass noise qualification with %i newer controls',
+    count => {
+      const f = fixture();
+      const trust = f.store({
+        ...f.bundle,
+        controls: [
+          ...f.bundle.controls,
+          ...profiles.flatMap(p =>
+            Array.from({ length: count }, (_, index) =>
+              run(
+                p,
+                `new-control-${p.platform}-${index}`,
+                f.trust.commit,
+                20 + index,
+                index === count - 1 ? 41 : 40
+              )
+            )
+          ),
+        ],
+      });
+      const load = () => loadTrustedSurfaceBaseline(f.root, trust, now);
+      if (count < 3) {
+        expect(
+          compareSurfaceMeasurements(load(), candidate(), candidateHead, now)
+            .status
+        ).toBe('pass');
+      } else {
+        expect(load).toThrow('unqualified control noise:');
+      }
+    }
+  );
 
   it('never relaxes absolute ceilings with noise', () => {
     const f = fixture(bundle => ({

@@ -300,21 +300,33 @@ function qualifyControls(bundle: SurfaceBaselineBundle, cutoff: number) {
   let controlsEnd = time(policy.declaredAt);
   for (const surface of policy.surfaces) {
     const key = profileKey(surface.profile);
-    const controls = bundle.controls.filter(
+    const available = bundle.controls.filter(
       run =>
         profileKey(run.profile) === key &&
         time(run.completedAt) <= cutoff &&
         cutoff - time(run.completedAt) <= policy.maxAgeMs
     );
+    const cohorts = new Map<string, SurfaceAttempt[]>();
+    for (const run of available) {
+      const cohort = cohorts.get(run.head) ?? [];
+      cohort.push(run);
+      cohorts.set(run.head, cohort);
+    }
+    // Use the newest complete same-head cohort, never a favorable subset or
+    // fallback to older controls when that cohort exceeds declared noise.
+    const controls = [...cohorts.entries()]
+      .filter(([, runs]) => runs.length >= 3)
+      .map(([head, runs]) => ({
+        head,
+        runs,
+        latest: Math.max(...runs.map(run => time(run.completedAt))),
+      }))
+      .sort(
+        (a, b) => b.latest - a.latest || a.head.localeCompare(b.head)
+      )[0]?.runs;
     requireEvidence(
-      controls.length >= 3,
+      controls,
       'at least three fresh identical-head controls required'
-    );
-    const heads = new Set(controls.map(run => run.head));
-    const counts = new Set(controls.map(run => run.samples.length));
-    requireEvidence(
-      heads.size === 1 && counts.size === 1,
-      'controls must use identical head and sample count'
     );
     const values = controls.map(run => {
       const measured = checkRun(run, cutoff, policy.sampleCount);
@@ -397,6 +409,7 @@ function validateBundle(
     );
   }
   const best = new Map<string, Values>();
+  let oldestBaselineCompletion = declared;
   let state: BaselineState = {
     bundle,
     best,
@@ -442,18 +455,18 @@ function validateBundle(
         )
       );
     }
+    const completions = [...firstAttempts(entry.runs, policy).values()].map(
+      run => time(run.completedAt)
+    );
+    oldestBaselineCompletion = Math.min(...completions);
     state = {
       ...state,
-      latest: Math.max(
-        ...[...firstAttempts(entry.runs, policy).values()].map(run =>
-          time(run.completedAt)
-        )
-      ),
+      latest: Math.max(...completions),
     };
     previous = entry;
   }
   requireEvidence(
-    now - state.latest <= policy.maxAgeMs,
+    now - oldestBaselineCompletion <= policy.maxAgeMs,
     'stale baseline evidence'
   );
   const qualified = qualifyControls(bundle, now);

@@ -65,6 +65,10 @@ spread must fit the declaration; effective allowance is capped at that spread.
 Absolute ceilings still apply independently. Historical entries use only controls
 available before those entries; later experiments cannot repair past failures.
 Fresh controls can be appended without deleting older qualification evidence.
+For each profile and cutoff, qualify all fresh controls from the newest head
+with at least three controls (head SHA breaks completion-time ties). Incomplete
+newer cohorts cannot displace a complete cohort; a complete newer cohort with
+excess noise fails instead of falling back to older controls.
 
 ## Monotonic promotion
 
@@ -77,5 +81,7 @@ raises a baseline and a later regression can fail below an absolute ceiling.
 Fixture/measurement changes require explicit trusted profile/policy review and
 new qualification while retaining old evidence; promotion cannot reset them.
 Expired baseline/control evidence fails until valid trusted evidence is supplied.
+Every required profile's latest baseline must independently be fresh; a newer
+measurement on one platform cannot refresh another platform's evidence.
 The regression suite uses temporary Git repositories and synthetic samples; it
 proves comparator behavior, not browser performance or hosted provenance custody.
