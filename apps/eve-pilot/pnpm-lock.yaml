@@ -1702,6 +1702,7 @@ packages:
 
   content-type@2.1.0:
     resolution: {integrity: sha512-mj7UPXE0jaqaOsukNZRUEfEi2AcL7C/vwmwcHV0O97eO1E1pxBZuyjlZrx5seTaNBg1U6+o35wpa35Qfcc+7ag==}
+    engines: {node: '>=18'}
 
   convert-hrtime@3.0.0:
     resolution: {integrity: sha512-7V+KqSvMiHp8yWDuwfww06XleMWVVB9b9tURBx+G7UTADuo5hYPuowKloz4OzOqbPezxgo+fdQ1522WzPG4OeA==}
@@ -4488,6 +4489,8 @@ snapshots:
     optional: true
 
   body-parser@2.4.0:
+    transitivePeerDependencies:
+      - supports-color
     dependencies:
       bytes: 3.1.2
       content-type: 2.1.0
