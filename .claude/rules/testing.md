@@ -163,3 +163,9 @@ Never mark a task complete without confirming the fix works:
 
 - Full E2E details: `apps/web/tests/TESTING.md`
 - Testing philosophy: `docs/TESTING_GUIDELINES.md`
+
+## Gate weakening (JOV-INV-045)
+
+Do not land `test.skip`, `it.skip`, `describe.skip`, `.only`, or `xit` to get a
+change through CI. The gate-weakening detector fails that pull request. Deleting
+or emptying a `scripts/invariants/*.test.*` file fails the same check.

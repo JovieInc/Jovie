@@ -132,7 +132,7 @@ describe('ShellReleaseRow audio affordance', () => {
     });
 
     expect(row?.className).toContain('system-b-table-row-shell');
-    expect(row?.className).toContain('h-14');
+    expect(row?.className).toContain('h-8');
     expect(slot).toHaveClass('system-b-table-contextual-action');
     expect(slot.className).not.toContain('group-hover/row');
     expect(trigger.className).not.toContain('group-hover/row');
@@ -436,7 +436,7 @@ describe('ShellReleaseRow enrichment', () => {
       />
     );
     const idleRow = idle.container.querySelector('[data-shell-release-row]');
-    expect(idleRow?.className).toContain('h-14');
+    expect(idleRow?.className).toContain('h-8');
     idle.unmount();
 
     const syncing = render(
@@ -453,7 +453,7 @@ describe('ShellReleaseRow enrichment', () => {
     // Same fixed row height token in both states — the sync chrome lives
     // inside the existing single-line subtitle and an absolutely-positioned
     // pulse, so adding it cannot reflow the row.
-    expect(syncingRow?.className).toContain('h-14');
+    expect(syncingRow?.className).toContain('h-8');
   });
 });
 
