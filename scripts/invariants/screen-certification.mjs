@@ -256,7 +256,7 @@ web.marketing-pre-save|web|marketing-pre-save|apps/web/app/(marketing)/product/p
 web.marketing-link-analytics|web|marketing-link-analytics|apps/web/app/(marketing)/product/link-analytics/page.tsx|desktop,mobile
 web.marketing-smart-links|web|marketing-smart-links|apps/web/app/(marketing)/smart-links/page.tsx|desktop,mobile
 web.marketing-pay|web|marketing-pay|apps/web/app/(marketing)/pay/page.tsx|desktop,mobile
-web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx,apps/web/app/(marketing)/pricing/layout.tsx|desktop,mobile
+web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx,apps/web/app/(marketing)/pricing/layout.tsx,apps/web/app/(marketing)/pricing/loading.tsx|desktop,mobile
 web.marketing-new|web|marketing-new|apps/web/app/(marketing)/new/page.tsx|desktop,mobile
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
 web.root-not-found|web|root-not-found|apps/web/app/not-found.tsx|desktop,mobile
