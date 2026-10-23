@@ -1,11 +1,8 @@
 // @coverage-via apps/web/tests/unit/home/homepage-contract.test.tsx
 import Link from 'next/link';
 import { ProductClaimHandleForm } from '@/app/(marketing)/product/ProductClaimHandleForm';
-import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
-import { MarketingHero } from '@/components/marketing/MarketingHero';
 import { MarketingOfferSummary } from '@/components/marketing/MarketingOfferSummary';
-import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
 import { MarketingPhoneStateGallery } from '@/components/marketing/MarketingPhoneStateGallery';
 import { HOMEPAGE_COPY, type HomepageCopy } from '@/data/homepageCopy';
 import {
@@ -13,67 +10,33 @@ import {
   type HomepageFanStatesCopy,
 } from '@/data/homepageFanStatesCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { HomepageHeroCanvas } from './hero-light/HomepageHeroCanvas';
 import './HomepageArtistProfile.css';
 
 const OWNER = 'apps/web/components/homepage/HomepageArtistProfile.tsx';
 
 /**
- * Hero: the claim action and the product itself. The live profile capture is
- * the page's one hero-weight proof element and its LCP image.
+ * Hero: the claim and the headline share one cinematic field. The decorative
+ * light is a CSS poster that may upgrade to WebGL. It takes no flow space.
  */
 export function HomepageArtistHero({
   copy = HOMEPAGE_COPY.hero,
   headingId = 'homepage-hero-heading',
-}: Readonly<{ copy?: HomepageCopy['hero']; headingId?: string }>) {
+}: Readonly<{
+  copy?: HomepageCopy['hero'];
+  headingId?: string;
+}>) {
   return (
-    <MarketingHero
-      variant='unstyled'
-      className='homepage-artist-hero'
+    <HomepageHeroCanvas
       headingId={headingId}
-      testId='marketing-section-hero'
-      sectionVariant='split-claim-card'
+      headline={copy.headline}
+      subhead={copy.subhead}
+      claim={copy.claim}
+      supportNote={copy.supportNote}
+      profile={copy.profile}
       sectionOwner={OWNER}
-    >
-      <div className='ap-section-container homepage-artist-hero__inner'>
-        <div className='homepage-artist-hero__copy'>
-          <h1
-            id={headingId}
-            className='marketing-type-display text-balance text-primary-token homepage-artist-hero__headline'
-          >
-            {copy.headline}
-          </h1>
-          <p className='marketing-type-lede text-secondary-token homepage-artist-hero__subhead'>
-            {copy.subhead}
-          </p>
-          <div
-            className='homepage-artist-hero__claim'
-            data-testid='homepage-hero-claim'
-          >
-            <ProductClaimHandleForm
-              domain={copy.claim.domain}
-              placeholder={copy.claim.placeholder}
-              submitLabel={copy.claim.action}
-              inputId='homepage-claim-handle'
-              testIdPrefix='homepage'
-              submitTestId='homepage-primary-cta'
-            />
-            <p className='homepage-artist-hero__support'>{copy.supportNote}</p>
-          </div>
-        </div>
-        <div className='homepage-artist-hero__media'>
-          <ArtistProfilePhoneFrame className='homepage-artist-hero__phone'>
-            <MarketingPhoneImage
-              scenarioId={copy.profile.scenarioId}
-              altOverride={copy.profile.alt}
-              fill
-              priority
-              sizes='(min-width: 1024px) 21.25rem, (min-width: 768px) 18rem, 72vw'
-              className='object-cover object-top'
-            />
-          </ArtistProfilePhoneFrame>
-        </div>
-      </div>
-    </MarketingHero>
+      sectionVariant='split-claim-card'
+    />
   );
 }
 
