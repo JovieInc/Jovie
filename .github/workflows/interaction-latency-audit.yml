@@ -1,0 +1,51 @@
+name: Interaction latency audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/web/scripts/run-interaction-latency-audit.ts'
+      - 'apps/web/scripts/performance-interaction-manifest.ts'
+      - 'apps/web/scripts/performance-interaction-report.ts'
+      - 'apps/web/tests/e2e/utils/interaction-latency-utils.ts'
+      - 'docs/performance/receipts/interaction-latency-*'
+      - 'docs/performance/generated/interaction-latency-*'
+      - '.github/workflows/interaction-latency-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/scripts/run-interaction-latency-audit.ts'
+      - 'apps/web/scripts/performance-interaction-manifest.ts'
+      - 'apps/web/scripts/performance-interaction-report.ts'
+      - 'apps/web/tests/e2e/utils/interaction-latency-utils.ts'
+      - 'docs/performance/receipts/interaction-latency-*'
+      - 'docs/performance/generated/interaction-latency-*'
+      - '.github/workflows/interaction-latency-audit.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interaction-latency-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: Interaction latency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-playwright
+      - name: Measure declared interaction budgets
+        run: pnpm --filter @jovie/web exec tsx scripts/run-interaction-latency-audit.ts --check
+      - name: Upload receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: interaction-latency-receipt
+          path: apps/web/test-results/interaction-latency-receipt/
+          if-no-files-found: ignore
