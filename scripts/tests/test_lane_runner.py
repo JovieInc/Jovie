@@ -7966,11 +7966,17 @@ class GateSingleflightTest(unittest.TestCase):
         with open(self.host.state / "worker.log", "w") as log:
             worker = subprocess.Popen([sys.executable, "-u", "-c", worker_code], stdout=log, stderr=log)
             try:
-                for _ in range(200):
-                    if pidfile.exists():
+                # Startup only. The lock checks below are the contract.
+                deadline = time.monotonic() + 15
+                while time.monotonic() < deadline:
+                    if pidfile.exists() or worker.poll() is not None:
                         break
                     time.sleep(.01)
-                self.assertTrue(pidfile.exists())
+                if not pidfile.exists():
+                    detail = (self.host.state / "worker.log").read_text(errors="replace")[-2000:]
+                    self.fail(
+                        f"detached child did not start (worker exit {worker.poll()})\n{detail}"
+                    )
                 time.sleep(.2)  # allow the existing process observer to see the detached child
                 worker.kill()
                 worker.wait(timeout=3)
