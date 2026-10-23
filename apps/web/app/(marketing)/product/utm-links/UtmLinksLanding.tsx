@@ -24,7 +24,7 @@ export function UtmLinksLanding() {
         <div className='relative w-full max-w-3xl px-6 pt-16 sm:px-10 sm:pt-24'>
           <h1
             id='utm-links-title'
-            className='font-display text-2xl font-medium tracking-tight text-primary-token'
+            className='line-clamp-2 text-balance font-display text-2xl font-medium tracking-tight text-primary-token'
           >
             {headline}
           </h1>
