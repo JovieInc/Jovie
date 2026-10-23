@@ -4,21 +4,41 @@
  *   jovie-research ask "<question>" [--fresh week] [--mode quick|standard|deep] [--social] [--local] [--json]
  *   jovie-research stats [--days 7] [--json]
  *   jovie-research sources
+ *   jovie-research decision find "<topic>"
+ *   jovie-research decision record --file decision.json
+ *   jovie-research decision trigger --kind model --trigger "<what changed>" [--topic ..] [--evidence url]... [--dry-run]
+ *   jovie-research decision resolve <review-slug> --kept|--superseded [--evidence ref]
+ *   jovie-research decision check <slug>
+ *   jovie-research mcp
  */
+import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
 import { createProviderClients } from './credentials.ts';
+import {
+  checkDecision,
+  type DecisionInput,
+  findDecisions,
+  proposeReviews,
+  recordDecision,
+  resolveReview,
+  type TriggerKind,
+} from './decisions.ts';
+import { serveMcp } from './mcp.ts';
 import { renderResult, sourcesTable } from './report.ts';
 import { last30daysScript } from './sources-web.ts';
 import { summarize } from './state.ts';
 import type { Freshness, Mode } from './types.ts';
 import { createDefaultWiring } from './wiring.ts';
 
-export const USAGE = `usage: jovie-research <ask|stats|sources> ...
+export const USAGE = `usage: jovie-research <ask|stats|sources|decision|mcp> ...
   ask "<question>" [--fresh live|day|week|month|evergreen] [--mode quick|standard|deep]
                    [--social] [--local] [--max-tier 0|1|2] [--refresh] [--no-persist] [--json] [--caller name]
   stats [--days N] [--json]
-  sources`;
+  sources
+  decision find "<topic>" | record --file <json> | trigger --kind <k> --trigger "<t>" [--topic t] [--evidence r]... [--dry-run]
+           | resolve <review-slug> --kept|--superseded [--evidence r] | check <slug>
+  mcp`;
 
 const FRESH = new Set(['live', 'day', 'week', 'month', 'evergreen']);
 const MODES = new Set(['quick', 'standard', 'deep']);
@@ -43,6 +63,14 @@ export async function main(
       json: { type: 'boolean' },
       caller: { type: 'string' },
       days: { type: 'string' },
+      file: { type: 'string' },
+      kind: { type: 'string' },
+      trigger: { type: 'string' },
+      topic: { type: 'string' },
+      evidence: { type: 'string', multiple: true },
+      'dry-run': { type: 'boolean' },
+      kept: { type: 'boolean' },
+      superseded: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -77,6 +105,7 @@ export async function main(
       caller: values.caller ?? process.env.JOVIE_AGENT_PROFILE ?? 'cli',
     });
     print(values.json ? result : renderResult(result));
+    await wiring.router.flush();
     return 0;
   }
   if (command === 'stats') {
@@ -109,6 +138,64 @@ export async function main(
         jev: clients.gateway() !== null,
       })
     );
+    return 0;
+  }
+  if (command === 'decision') {
+    const [sub, arg] = rest;
+    if (sub === 'find' && arg) {
+      const rows = await findDecisions(wiring.gbrain, rest.slice(1).join(' '));
+      print(
+        rows
+          .map(r => `${r.slug} (${r.status ?? '?'}) ${r.title ?? ''}`)
+          .join('\n') || 'No decisions found.'
+      );
+      return 0;
+    }
+    if (sub === 'record' && values.file) {
+      const input = JSON.parse(
+        readFileSync(values.file, 'utf8')
+      ) as DecisionInput;
+      print(await recordDecision(wiring.gbrain, input));
+      return 0;
+    }
+    if (sub === 'trigger' && values.trigger && values.kind) {
+      const rows = await proposeReviews(wiring.gbrain, {
+        trigger: values.trigger,
+        kind: values.kind as TriggerKind,
+        topic: values.topic,
+        evidence: values.evidence ?? [],
+        dryRun: values['dry-run'],
+      });
+      print(
+        values.json
+          ? rows
+          : rows
+              .map(
+                r =>
+                  `${r.decision} -> ${r.review ?? '(dry run)'} (${r.score.toFixed(2)})`
+              )
+              .join('\n') || 'No decisions matched.'
+      );
+      return 0;
+    }
+    if (sub === 'resolve' && arg && (values.kept || values.superseded)) {
+      await resolveReview(
+        wiring.gbrain,
+        arg,
+        values.kept ? 'kept' : 'superseded',
+        values.evidence ?? []
+      );
+      print(`resolved ${arg}`);
+      return 0;
+    }
+    if (sub === 'check' && arg) {
+      print(await checkDecision(wiring.gbrain, arg));
+      return 0;
+    }
+    throw new UsageError(`bad decision command: ${rest.join(' ')}`);
+  }
+  if (command === 'mcp') {
+    await serveMcp(wiring);
     return 0;
   }
   throw new UsageError(`unknown command ${command}`);

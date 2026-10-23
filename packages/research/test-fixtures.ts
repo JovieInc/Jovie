@@ -73,3 +73,41 @@ export const client = (provider: string, fetch: typeof globalThis.fetch) =>
     log: () => undefined,
     sleep: async () => undefined,
   });
+
+export function fakeGbrain(pages: Record<string, string> = {}) {
+  const calls: { tool: string; args: Record<string, unknown> }[] = [];
+  const gbrain = {
+    calls,
+    async call<T>(tool: string, args: Record<string, unknown>): Promise<T> {
+      calls.push({ tool, args });
+      if (tool === 'get_page') {
+        const content = pages[String(args.slug)];
+        return (content ? { slug: args.slug, content } : null) as T;
+      }
+      if (tool === 'put_page') pages[String(args.slug)] = String(args.content);
+      if (tool === 'search')
+        return [
+          {
+            slug: 'decisions/research/old',
+            title: 'Old',
+            type: 'decision',
+            score: 0.9,
+          },
+          {
+            slug: 'decisions/research/weak',
+            title: 'Weak',
+            type: 'decision',
+            score: 0.2,
+          },
+          {
+            slug: 'decisions/reviews/x',
+            title: 'R',
+            type: 'decision-review',
+            score: 0.9,
+          },
+        ] as T;
+      return {} as T;
+    },
+  };
+  return { gbrain, pages };
+}

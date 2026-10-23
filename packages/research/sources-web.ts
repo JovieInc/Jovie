@@ -80,6 +80,7 @@ export async function exaSearch(
       contents: { highlights: { numSentences: 3, highlightsPerUrl: 2 } },
       ...(since ? { startPublishedDate: since } : {}),
     },
+    timeoutMs: 30_000,
     ...READ,
   });
   if (response.status >= 400) throw new Error(`exa HTTP ${response.status}`);
