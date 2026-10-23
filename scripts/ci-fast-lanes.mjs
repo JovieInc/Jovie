@@ -209,6 +209,18 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
+    // Tim 2026-10-22 21:00 PT: no ICP-specific language on the homepage and
+    // general pages. Audience routes are an explicit allowlist. The recorded
+    // violation set only shrinks. prOnly is false so merge groups fail closed
+    // on the same guard once this command is on the trusted base.
+    id: 'icp-language',
+    command:
+      'node scripts/invariants/icp-language/check.mjs && node --test --test-isolation=none scripts/invariants/icp-language/icp-language.test.mjs',
+    inputs:
+      /^(?:apps\/web\/(?:app\/(?:\(home\)|\(marketing\)|brand\/|layout\.tsx$|manifest\.ts$|llms(?:-full)?\.txt\/)|components\/(?:homepage|marketing|site|organisms|features\/home)\/|data\/|content\/|lib\/(?:config\/plan-prices\.ts$|billing\/offer-truth\.ts$))|scripts\/invariants\/icp-language\/|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // Third-party API calls go through packages/api-client / scripts/apiclient
     // (.claude/rules/external-apis.md). A new provider host, SDK client or gh
     // call in any scanned source fails here; grandfathered sites only shrink.
@@ -751,6 +763,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/vitest-orphan-inventory.test.mjs',
   'scripts/lib/__tests__/gate-config-consistency.test.mjs',
   'scripts/lib/__tests__/claim-dogfood-report.test.mjs',
+  'scripts/lib/__tests__/claim-test-environment.test.mjs',
   'scripts/lib/__tests__/codeowners-drift.test.mjs',
   'scripts/lib/__tests__/component-comparative-quality-bar.test.mjs',
   'scripts/lib/__tests__/component-rendered-certification.test.mjs',

@@ -82,13 +82,16 @@ for (const route of ROUTES) {
     ).not.toBeNull();
     if (!input) return;
 
-    const focused = await captureFocusStyle(input);
+    const field = (await input.evaluateHandle(
+      element => element.closest('.focus-field-inset') ?? element
+    )) as ElementHandle<HTMLElement>;
+    const focused = await captureFocusStyle(field);
     await input.evaluate(element => element.blur());
-    const blurred = await captureFocusStyle(input);
+    const blurred = await captureFocusStyle(field);
 
     expect(
       hasVisibleFocusStyleChange(focused, blurred),
-      `${route} claim-handle input focus indicator ${JSON.stringify({ focused, blurred })}`
+      `${route} claim-handle field focus indicator ${JSON.stringify({ focused, blurred })}`
     ).toBe(true);
   });
 }

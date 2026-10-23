@@ -19,9 +19,11 @@ import {
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 import { MAC_APP_SUPPORT } from '@/lib/desktop/mac-compatibility';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
@@ -116,7 +118,7 @@ const REQUIREMENTS = [
 ] as const;
 
 export const metadata: Metadata = {
-  title: 'Download Jovie',
+  title: documentTitle('Download Jovie'),
   description: `Download the ${APP_NAME} desktop app for macOS. Code-signed, notarized by Apple, and updates itself in the background.`,
   alternates: {
     canonical: `${BASE_URL}/download`,
@@ -126,11 +128,13 @@ export const metadata: Metadata = {
     description: `${APP_NAME} for Mac, with iPhone in internal TestFlight alpha.`,
     url: `${BASE_URL}/download`,
     type: 'website',
+    images: [marketingOgImage('download')],
   },
   twitter: {
     card: 'summary_large_image',
     title: `Download ${APP_NAME}`,
     description: `${APP_NAME} for Mac, with iPhone in internal TestFlight alpha.`,
+    images: [marketingOgImage('download').url],
   },
 };
 

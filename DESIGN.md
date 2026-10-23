@@ -158,7 +158,7 @@ unless linked below.
 | `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
 | `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
 | `deprecated-button-alias` | `error` | G | Yes | 91 |
-| `linear-namespace` | `error` | G + I | Yes | 701 |
+| `linear-namespace` | `error` | G + I | Yes | 700 |
 | `shadcn/no-restyle` | `error` | L + G | Yes | 217 files; 3105 messages (grandfathered) |
 | `source-identity` | `error` | I | Yes | 2057 |
 | `spacing-scale (conservative)` | `error` | S + G | Yes | 614; armed=true; marketing=46; packages/ui=11; web-other=304; web-shell=253 |

@@ -286,10 +286,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleasesExperience.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -423,10 +419,6 @@
     },
     {
       "path": "apps/web/components/features/demo/DemoReleaseTrackedLinksSurface.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
       "linearIssue": "JOV-8847"
     },
     {

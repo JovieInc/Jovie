@@ -2178,6 +2178,7 @@ describe('source-read guard selection', () => {
         'merge-group-unit-guards',
         'static-revalidate-policy',
         'art-direction',
+        'icp-language',
       ],
     ],
     [
@@ -2269,6 +2270,7 @@ describe('source-read guard selection', () => {
       'ci-schedule-inventory',
       'automation-registry',
       'playbook-authoring',
+      'icp-language',
       'external-api-guard',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
@@ -2280,6 +2282,7 @@ describe('source-read guard selection', () => {
       'ci-schedule-inventory',
       'automation-registry',
       'playbook-authoring',
+      'icp-language',
       'external-api-guard',
     ]);
   });
@@ -2299,6 +2302,21 @@ describe('source-read guard selection', () => {
         expect(guard.command).toContain('node scripts/artist-');
         expect(
           readFileSync(join(REPO_ROOT, `scripts/${guard.id}.test.mjs`), 'utf8')
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'icp-language') {
+        expect(guard.command).toContain(
+          'node scripts/invariants/icp-language/check.mjs'
+        );
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/icp-language/icp-language.test.mjs'
+            ),
+            'utf8'
+          )
         ).toContain("from 'node:test'");
         continue;
       }

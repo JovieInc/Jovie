@@ -43,7 +43,7 @@ function SubmitButtonIcon({
   autoSubmitClaimed: boolean;
 }>) {
   if (isLoading || checking) {
-    return <LoadingSpinner size='sm' className='text-current' />;
+    return <LoadingSpinner size='sm' tone='inverse' />;
   }
   if (autoSubmitClaimed) {
     return (
@@ -99,10 +99,9 @@ export function OnboardingHandleStep({
           {/* Inline input with claim button */}
           <div
             className={cn(
-              'flex items-center gap-2 rounded-full border px-2 py-1.5 transition-[background-color,border-color,box-shadow] duration-subtle',
+              'focus-field-inset flex items-center gap-2 rounded-full border px-2 py-1.5 transition-[background-color,border-color,box-shadow] duration-subtle',
               'border-subtle bg-[color-mix(in_oklab,var(--app-shell-content-surface)_94%,var(--linear-bg-surface-0))]',
               'hover:border-default hover:bg-surface-0',
-              'focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-ring/16',
               hasError && 'border-destructive/60'
             )}
           >
@@ -140,7 +139,7 @@ export function OnboardingHandleStep({
                 ctaDisabledReason ? disabledReasonId : undefined
               }
               className={cn(
-                'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-[background-color,opacity] duration-subtle',
+                'focus-ring-themed inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-[background-color,opacity] duration-subtle',
                 'border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
                 'disabled:cursor-not-allowed disabled:opacity-40'
               )}

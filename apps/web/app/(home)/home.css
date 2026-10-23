@@ -6529,7 +6529,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .system-b-claim-handle-row {
   min-height: 52px;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 70%, transparent);
   border-radius: var(--radius-xl);
