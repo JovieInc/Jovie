@@ -21,7 +21,7 @@ import {
   fuzzyMatch,
   PaletteList,
 } from '@/components/organisms/SharedCommandPalette';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 import {
   commandsForSurface,
@@ -475,7 +475,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       );
     expect(releasesNav).toBeDefined();
     fireEvent.mouseDown(releasesNav!);
-    expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.RELEASES);
+    expect(pushMock).toHaveBeenCalledWith(buildLibraryViewRoute('releases'));
   });
 
   it.each(['pointer', 'keyboard'] as const)(

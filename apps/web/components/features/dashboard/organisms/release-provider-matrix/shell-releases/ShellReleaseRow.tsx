@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.test.tsx
+
 import { QueryClientContext } from '@tanstack/react-query';
 import {
   Clock,
@@ -235,6 +237,7 @@ const SmartLinkCell = memo(function SmartLinkCell({
   return (
     <Link
       href={smartLinkPath}
+      prefetch={false}
       target='_blank'
       rel='noreferrer'
       onClick={e => e.stopPropagation()}

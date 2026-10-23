@@ -12,6 +12,7 @@ export type { UpdateProfileRecordsParams } from './db-operations';
 export {
   getProfileByClerkId,
   getProfileUpdatePreflight,
+  readWritableProfileUsername,
   updateProfileRecords,
 } from './db-operations';
 export type { FinalizeProfileResponseParams } from './response';

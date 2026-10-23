@@ -23,6 +23,7 @@
  */
 import { execFile } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -86,34 +87,41 @@ export async function observeGithubWorkflow(
   const branch = receipt.branch
     ? `&branch=${encodeURIComponent(receipt.branch)}`
     : '';
-  const base = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=30${branch}`;
+  const base = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs`;
   const events = receipt.events ?? null;
-  // Filter by event server-side: a busy push/PR workflow would otherwise
-  // push its scheduled runs out of the 30-run window (security.yml, 2026-10-21).
-  const urls = events
-    ? events.map(event => `${base}&event=${encodeURIComponent(event)}`)
-    : [base];
+  const acceptsRun = row =>
+    conclusions.includes(row?.conclusion) &&
+    (!events || events.includes(row?.event));
   const runs = [];
-  for (const url of urls) {
-    const read = await readJson(fetchImpl, url, githubHeaders(token));
-    if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
-    if (!Array.isArray(read.body?.workflow_runs))
-      return { ok: false, reason: 'github-runs-unreadable' };
-    runs.push(...read.body.workflow_runs);
+  // A single completed-run page can be empty transiently (JOV-8832), or
+  // crowded with skipped/cancelled runs. Before declaring silence, confirm
+  // with one bounded lookup per accepted conclusion. Healthy reads stay cheap.
+  for (const statuses of [['completed'], conclusions]) {
+    const urls = statuses.flatMap(status => {
+      const query = `${base}?status=${encodeURIComponent(status)}&per_page=30${branch}`;
+      // Keep trigger filtering server-side so pushes cannot hide scheduled runs.
+      return events
+        ? events.map(event => `${query}&event=${encodeURIComponent(event)}`)
+        : [query];
+    });
+    for (const url of urls) {
+      const read = await readJson(fetchImpl, url, githubHeaders(token));
+      if (!read.ok) return { ok: false, reason: `github-${read.reason}` };
+      if (!Array.isArray(read.body?.workflow_runs))
+        return { ok: false, reason: 'github-runs-unreadable' };
+      runs.push(...read.body.workflow_runs);
+    }
+    if (runs.some(acceptsRun)) break;
   }
   runs.sort((a, b) =>
     String(b?.updated_at ?? '').localeCompare(String(a?.updated_at ?? ''))
   );
-  const run = runs.find(
-    row =>
-      conclusions.includes(row?.conclusion) &&
-      (!events || events.includes(row?.event))
-  );
+  const run = runs.find(acceptsRun);
   if (!run)
     return {
       ok: true,
       lastProofAt: null,
-      reason: `no-${conclusions.join('-or-')}${events ? `-${events.join('-or-')}` : ''}-run-in-last-30`,
+      reason: `no-${conclusions.join('-or-')}${events ? `-${events.join('-or-')}` : ''}-run-found`,
     };
   return {
     ok: true,
@@ -230,11 +238,15 @@ function mainRefFailure(error, status) {
 const execFileAsync = promisify(execFile);
 
 function gitProbeEnv(token) {
-  // Spreading process.env drops its index signature, so later GIT_CONFIG_*
-  // writes are not assignable unless the bag is typed as the real env.
+  // Keep the probe independent of inherited credentials and Git settings.
   /** @type {NodeJS.ProcessEnv} */
   const env = {
-    ...process.env,
+    PATH: process.env.PATH ?? '',
+    // A non-directory also prevents libcurl from loading inherited ~/.netrc.
+    HOME: '/dev/null',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_SYSTEM: '/dev/null',
+    GIT_CONFIG_NOSYSTEM: '1',
     GIT_TERMINAL_PROMPT: '0',
     GCM_INTERACTIVE: 'never',
   };
@@ -259,7 +271,9 @@ function gitProbeEnv(token) {
 
 async function defaultGit(args, env) {
   const { stdout } = await execFileAsync('git', args, {
+    cwd: tmpdir(),
     timeout: TIMEOUT_MS,
+    maxBuffer: 8192,
     env,
     encoding: 'utf8',
     windowsHide: true,
@@ -268,26 +282,34 @@ async function defaultGit(args, env) {
 }
 
 /**
- * refs/heads/main over the git protocol. The token stays in the child
- * environment, never in argv. A failure returns null so the REST fallback
- * can still run.
+ * refs/heads/main over the git protocol. Try anonymously before retrying
+ * with the token in the child environment, never in argv. A failure returns
+ * null so the REST fallback can still run.
  */
 export async function lsRemoteMain(repo, token, gitExec = defaultGit) {
   if (!/^[^/\s]+\/[^/\s]+$/.test(String(repo ?? ''))) return null;
-  try {
-    const stdout = await gitExec(
-      [
-        'ls-remote',
-        '--refs',
-        `https://github.com/${repo}.git`,
-        'refs/heads/main',
-      ],
-      gitProbeEnv(token)
-    );
+  const args = [
+    'ls-remote',
+    '--refs',
+    `https://github.com/${repo}.git`,
+    'refs/heads/main',
+  ];
+  const read = async authToken => {
+    const stdout = await gitExec(args, gitProbeEnv(authToken));
     const sha = String(stdout ?? '')
       .trim()
       .split(/\s+/)[0];
     return SHA_RE.test(sha ?? '') ? sha : null;
+  };
+  try {
+    const anonymous = await read(undefined);
+    if (anonymous) return anonymous;
+  } catch {
+    // A failed anonymous read may still recover with the Actions token.
+  }
+  if (!token) return null;
+  try {
+    return await read(token);
   } catch {
     return null;
   }

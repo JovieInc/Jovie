@@ -283,14 +283,6 @@ vi.mock('@jovie/ui', () => ({
   Spinner: () => <span data-testid='loading-spinner' />,
 }));
 
-vi.mock('@jovie/ui/atoms/popover', () => ({
-  Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
-  PopoverContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-}));
-
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   createRelease: mockCreateRelease,
 }));
@@ -361,6 +353,18 @@ describe('AddReleaseSidebar', () => {
     ).toBeDisabled();
   });
 
+  it('keeps calendar selection inside the release drawer without closing it', async () => {
+    render(<AddReleaseSidebar {...defaultProps} />);
+    const sidebar = screen.getByTestId('add-release-sidebar');
+    await userEvent.click(within(sidebar).getByLabelText('Release Date'));
+    await userEvent.click(within(sidebar).getByTestId('calendar-select-date'));
+    expect(within(sidebar).getByLabelText('Release Date')).toHaveTextContent(
+      'May 20, 2030'
+    );
+    expect(defaultProps.onClose).not.toHaveBeenCalled();
+    expect(mockCreateRelease).not.toHaveBeenCalled();
+  });
+
   it('updates the header preview title and release fields as form values change', async () => {
     const user = userEvent.setup();
     render(<AddReleaseSidebar {...defaultProps} />);
@@ -410,7 +414,9 @@ describe('AddReleaseSidebar', () => {
     expect(revealDatePicker).toHaveAttribute('type', 'button');
     expect(revealDatePicker).toHaveTextContent('Pick a date');
 
-    await user.click(screen.getAllByTestId('calendar-select-date')[1]!);
+    await user.keyboard('{Escape}');
+    await user.click(revealDatePicker);
+    await user.click(screen.getByTestId('calendar-select-date'));
 
     expect(revealDatePicker).toHaveTextContent(/\w{3} \d{1,2}, \d{4}/);
   });

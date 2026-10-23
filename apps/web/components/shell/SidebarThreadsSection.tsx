@@ -263,6 +263,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         {thread.href ? (
           <Link
             href={thread.href}
+            prefetch={false}
             aria-current={active ? 'page' : undefined}
             className={rowClasses}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
@@ -492,6 +493,7 @@ export function SidebarThreadsSection({
         {hasThreads ? (
           <Link
             href={APP_ROUTES.CHATS}
+            prefetch={false}
             aria-current={allThreadsActive ? 'page' : undefined}
             className={cn(
               getSidebarNavRowClassName({

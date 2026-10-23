@@ -8,6 +8,7 @@
  * missing ("Not measured"), never zero, healthy, or "now".
  */
 
+import { APP_ROUTES } from '@/constants/routes';
 import {
   formatDurationSeconds,
   HOME_LOOP_NOT_MEASURED,
@@ -23,6 +24,7 @@ import {
   rememberTiles,
   withTileHistory,
 } from '@/lib/home-loop/contract';
+import { OVIE_CERTIFICATION_TIER_LABELS } from '@/lib/ovie/certifications/types';
 import type {
   InboxDecisionTarget,
   OvieInbox,
@@ -35,6 +37,9 @@ import type {
   DeliverySummary,
   StageSummary,
 } from '@/lib/ovie/shipping-state/contract';
+import { operatorAlertCopy } from './operator-copy';
+
+export { summarizeSourceIssues } from './operator-copy';
 
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
 type OperationalTask = OperationalTaskFeed['tasks'][number];
@@ -442,7 +447,14 @@ export function buildConstraint(
   tasksSyncState: OperationalTaskFeed['syncState']
 ): OvieConstraint | null {
   const alert = delivery.lanes.alerts.find(text => text.trim().length > 0);
-  if (alert) return { tone: 'bad', text: alert.trim() };
+  // Lanes alerts are doctor diagnostics; Home names them in operator copy and
+  // links the Product view, which carries the full (path-redacted) text.
+  if (alert)
+    return {
+      tone: 'bad',
+      text: operatorAlertCopy(alert),
+      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+    };
 
   const blocked = rows.filter(row => row.attention === 'blocked').length;
   if (blocked > 0)
@@ -587,6 +599,35 @@ function escalationOf(item: OvieInboxCase): OvieAsk['escalation'] {
   return { level: wire.level, waitingHours: Math.floor(wire.waitingHours) };
 }
 
+/**
+ * Review asks (certify, accept a visual change) may only offer their action
+ * with evidence attached. Certification rows carry tier receipts; they become
+ * the inline summary even when no receipt has a navigable link.
+ */
+function reviewEvidence(
+  item: OvieInboxCase
+): Pick<OvieAsk, 'requiresEvidence' | 'evidenceSummary'> {
+  const kind = item.decisionTarget?.kind;
+  if (
+    item.kind !== 'certification' &&
+    kind !== 'certification' &&
+    kind !== 'visual'
+  )
+    return {};
+  const receipts = item.certification?.row.evidence ?? [];
+  const summary = receipts.length
+    ? receipts
+        .slice(0, 3)
+        .map(
+          receipt =>
+            `${OVIE_CERTIFICATION_TIER_LABELS[receipt.tier]} ${receipt.status}`
+        )
+        .join(' · ') +
+      (receipts.length > 3 ? ` · +${receipts.length - 3} more` : '')
+    : null;
+  return { requiresEvidence: true, evidenceSummary: summary };
+}
+
 function askFromCase(item: OvieInboxCase): OvieAsk {
   return {
     id: item.id,
@@ -599,6 +640,7 @@ function askFromCase(item: OvieInboxCase): OvieAsk {
     // Linear replies are posted back to the issue as the answer.
     canReply: item.decisionTarget !== null,
     evidence: item.evidence,
+    ...reviewEvidence(item),
     decisionDefault: decisionDefaultOf(item),
     // Summer cards accept post-ship feedback once decided.
     canFeedback: item.decisionTarget?.kind === 'summer',

@@ -90,9 +90,12 @@ export function resolvePrivacyBoundaryShellAlias(
 
 const config: StorybookConfig = {
   stories:
-    process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
-      ? [...LIVE_CERT_STORIES]
-      : [...FULL_CATALOG_STORIES],
+    // Deliberately invalid controls belong only to the explicit runner diagnostic.
+    process.env.JOVIE_STORYBOOK_A11Y_CONTROLS === '1'
+      ? ['../tests/fixtures/storybook-a11y-runner/controls.stories.tsx']
+      : process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+        ? [...LIVE_CERT_STORIES]
+        : [...FULL_CATALOG_STORIES],
   addons: storybookAddonsForEnvironment(),
   framework: storybookFrameworkForEnvironment(),
   docs: {},
