@@ -726,6 +726,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/product/link-analytics/page.tsx",
+      "kind": "page",
+      "route": "/product/link-analytics",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/product/page.tsx",
       "kind": "page",
       "route": "/product",
