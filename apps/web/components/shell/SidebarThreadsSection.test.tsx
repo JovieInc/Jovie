@@ -65,8 +65,14 @@ describe('SidebarThreadsSection', () => {
       .getByRole('link', { name: 'All Chats' })
       .querySelector('svg');
 
-    expect(chatActionIcon).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
-    expect(allChatsIcon).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
+    expect(chatActionIcon).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)',
+      'text-sidebar-muted/70'
+    );
+    expect(allChatsIcon).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)',
+      'text-sidebar-muted/70'
+    );
     const recent = screen.getByText('Recent');
     expect(recent.className).toContain('text-sidebar-muted');
     expect(recent.className).not.toMatch(/text-sidebar-muted\/\d+/);
@@ -84,7 +90,10 @@ describe('SidebarThreadsSection', () => {
 
     expect(
       screen.getByRole('button', { name: 'Retry Chats' }).querySelector('svg')
-    ).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
+    ).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)',
+      'text-sidebar-muted/70'
+    );
 
     rerender(
       <SidebarThreadsSection
@@ -137,9 +146,9 @@ describe('SidebarThreadsSection', () => {
       name: `Chat Actions for ${title}`,
     });
 
-    expect(row).toHaveClass('grid-cols-[18px_minmax(0,1fr)_minmax(34px,auto)]');
+    expect(row).toHaveClass('grid-cols-(--app-shell-sidebar-nav-grid)');
     expect(action).toHaveClass(
-      'right-2.5',
+      'right-(--app-shell-sidebar-inset)',
       'hover:bg-surface-0',
       'active:bg-surface-0'
     );
@@ -170,7 +179,7 @@ describe('SidebarThreadsSection', () => {
 
     expect(activeThread).toHaveAttribute('href', '/app/chat/thread-newer');
     expect(activeThread).toHaveAttribute('aria-current', 'page');
-    expect(activeThread).toHaveClass('h-6');
+    expect(activeThread).toHaveClass('h-(--app-shell-sidebar-row-height)');
     expect(activeThread).toHaveClass('bg-sidebar-accent-active');
     expect(activeThread).toHaveClass('text-primary-token');
     expect(activeThread).not.toHaveClass(
@@ -292,7 +301,12 @@ describe('SidebarThreadsSection', () => {
 
     const sectionHeader = screen.getByText('Recent').parentElement;
 
-    expect(sectionHeader).toHaveClass('px-2.5', 'pb-0.5', 'pt-2');
+    expect(sectionHeader).toHaveClass(
+      'h-(--app-shell-sidebar-row-height)',
+      'ps-(--app-shell-sidebar-label-inset)',
+      'pe-(--app-shell-sidebar-inset)'
+    );
+    expect(sectionHeader).not.toHaveClass('px-2.5', 'pb-0.5', 'pt-2');
     expect(sectionHeader).not.toHaveClass('border-t');
     expect(sectionHeader?.className).not.toContain(
       'border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)]'
@@ -322,7 +336,10 @@ describe('SidebarThreadsSection', () => {
     const threadButton = screen.getByRole('button', { name: 'Draft thread' });
 
     expect(threadButton).toHaveAttribute('aria-pressed', 'true');
-    expect(threadButton).toHaveClass('h-6', 'bg-sidebar-accent-active');
+    expect(threadButton).toHaveClass(
+      'h-(--app-shell-sidebar-row-height)',
+      'bg-sidebar-accent-active'
+    );
     expect(threadButton).not.toHaveClass('h-auto', 'hover:bg-transparent');
     fireEvent.click(threadButton);
     expect(onSelect).toHaveBeenCalledWith('draft-thread');
@@ -402,7 +419,7 @@ describe('SidebarThreadsSection', () => {
 
     const loadingRow =
       container.querySelector('.skeleton')?.parentElement?.parentElement;
-    expect(loadingRow).toHaveClass('h-7');
+    expect(loadingRow).toHaveClass('h-(--app-shell-sidebar-row-height)');
 
     rerender(
       <SidebarThreadsSection
@@ -417,7 +434,7 @@ describe('SidebarThreadsSection', () => {
     const errorRow = screen.getByText(
       'Conversations unavailable'
     ).parentElement;
-    expect(errorRow).toHaveClass('h-7');
+    expect(errorRow).toHaveClass('h-(--app-shell-sidebar-row-height)');
     fireEvent.click(screen.getByRole('button', { name: 'Retry Chats' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });

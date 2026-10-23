@@ -9,6 +9,8 @@ const earliest = list =>
 const latest = list =>
   list.filter(Boolean).sort((a, b) => ms(b) - ms(a))[0] ?? null;
 const stamp = (stage, at, sourceReceipt) => ({ stage, at, sourceReceipt });
+const isOutcomeReceipt = event =>
+  event.entityType === 'shipping' && event.stage === 'outcome-receipt';
 /** JOV-123 from the branch first (lanes branches carry it), then the title. */
 export function linearIdFor(pr) {
   const match =
@@ -60,6 +62,9 @@ function feedStampsFor(feedStamps, keys) {
 export function indexFeedEvents(events) {
   const out = new Map();
   for (const event of events ?? []) {
+    // Outcome receipts retain their issue ID, duration and verdict independently
+    // of PR timelines, including later PRs for a reworked issue.
+    if (isOutcomeReceipt(event)) continue;
     const key = `${event.entityType}\u0000${event.entityId}`;
     if (!out.has(key)) out.set(key, []);
     out.get(key).push({
@@ -289,6 +294,8 @@ export function deriveStageEvents(raw, manifest) {
     ...deriveRemediationEvents({ prs: raw?.prs, feed }, manifest),
     ...deriveReleaseEvents({ controllers: raw?.controllers }, manifest),
     ...deriveIosReleaseEvents({ lyb: raw?.lyb, feed }, manifest),
-    ...feedEvents.filter(event => !derived.has(event.entityType)),
+    ...feedEvents.filter(
+      event => !derived.has(event.entityType) || isOutcomeReceipt(event)
+    ),
   ];
 }

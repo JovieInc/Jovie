@@ -666,10 +666,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/shell/SidebarSection.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/shell/SmartLinkRow.tsx",
       "linearIssue": "JOV-8847"
     },

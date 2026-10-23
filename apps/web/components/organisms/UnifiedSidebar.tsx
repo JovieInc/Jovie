@@ -30,6 +30,7 @@ import {
   SHELL_RAIL_LABEL,
 } from '@/components/shell/rail-motion';
 import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
+import { SIDEBAR_ENTRY_LABEL_INSET_CLASS } from '@/components/shell/sidebar-optical';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
@@ -248,7 +249,8 @@ function SettingsNavigation({
       <div>
         <span
           className={cn(
-            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted',
+            'mb-1.5 block text-xs font-caption tracking-normal text-sidebar-muted',
+            SIDEBAR_ENTRY_LABEL_INSET_CLASS,
             SHELL_RAIL_LABEL
           )}
         >
@@ -259,7 +261,8 @@ function SettingsNavigation({
       <div>
         <span
           className={cn(
-            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted',
+            'mb-1.5 block text-xs font-caption tracking-normal text-sidebar-muted',
+            SIDEBAR_ENTRY_LABEL_INSET_CLASS,
             SHELL_RAIL_LABEL
           )}
         >
@@ -331,7 +334,7 @@ function SidebarHeaderNav({
             return (
               <div
                 className={cn(
-                  'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
+                  'flex h-7 w-full items-center gap-(--app-shell-sidebar-icon-gap) rounded-full',
                   'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
                 )}
               >
@@ -369,7 +372,7 @@ function SidebarHeaderNav({
           return (
             <div
               className={cn(
-                'flex h-7 w-full items-center gap-1.5',
+                'flex h-7 w-full items-center gap-(--app-shell-sidebar-icon-gap)',
                 'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
               )}
             >
@@ -460,10 +463,10 @@ export function UnifiedSidebar({
       <SidebarHeader
         data-electron-drag-region='true'
         className={cn(
-          'relative justify-center gap-0 px-(--space-2-5) group-data-[collapsible=icon]:px-0',
+          'relative justify-center gap-0 px-(--app-shell-sidebar-inset) group-data-[collapsible=icon]:px-0',
           isRouteSidebar || isOperatorSection
             ? 'h-(--app-shell-header-height) py-0.5'
-            : 'h-16 pl-4 pr-3 pt-5 pb-4'
+            : 'h-16 pt-5 pb-4'
         )}
       >
         <SidebarHeaderNav
@@ -479,7 +482,7 @@ export function UnifiedSidebar({
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 overflow-anchor-none px-2 pb-(--space-2-5) pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+      <SidebarContent className='min-h-0 flex-1 overflow-anchor-none px-0 pb-(--space-2-5) pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex min-h-0 flex-1 flex-col'>
             {section === 'ov' ? (
