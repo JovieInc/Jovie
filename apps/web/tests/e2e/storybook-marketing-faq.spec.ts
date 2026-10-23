@@ -394,10 +394,13 @@ test.describe('artist FAQ mount visibility', () => {
         expect(fitsViewport, 'FAQ does not cause horizontal overflow').toBe(
           true
         );
-        await testInfo.attach('artist-faq', {
-          body: await section.screenshot(),
-          contentType: 'image/png',
-        });
+        await testInfo.attach(
+          `artist-faq-${viewport.label}-${reducedMotion}.png`,
+          {
+            body: await section.screenshot(),
+            contentType: 'image/png',
+          }
+        );
       });
     }
   }
