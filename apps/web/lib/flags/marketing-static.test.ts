@@ -20,4 +20,9 @@ describe('marketing-static homepage design flags', () => {
   it('keeps the public about and footer refresh off by default', () => {
     expect(FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH).toBe(false);
   });
+
+  it('keeps the homepage hero light and its WebGL upgrade off by default', () => {
+    expect(FEATURE_FLAGS.SHOW_HOMEPAGE_HERO_LIGHT).toBe(false);
+    expect(FEATURE_FLAGS.SHOW_HOMEPAGE_HERO_LIGHT_WEBGL).toBe(false);
+  });
 });

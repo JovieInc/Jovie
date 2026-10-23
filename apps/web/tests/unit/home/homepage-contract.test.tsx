@@ -118,6 +118,15 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     );
   });
 
+  it('does not mount the hero light while its flags stay off', async () => {
+    const { container } = await renderHomePage();
+    expect(
+      container.querySelector('[data-testid="homepage-hero-light"]')
+    ).toBeNull();
+    expect(container.querySelector('.homepage-artist-hero--lit')).toBeNull();
+    expect(container.querySelector('canvas')).toBeNull();
+  });
+
   it('renders one h1 from the copy module and no stray headings', async () => {
     const { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY } = await loadCopy();
     await renderHomePage();

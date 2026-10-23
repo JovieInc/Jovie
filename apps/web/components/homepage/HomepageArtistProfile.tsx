@@ -13,6 +13,12 @@ import {
   type HomepageFanStatesCopy,
 } from '@/data/homepageFanStatesCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+import { HomepageHeroLight } from './hero-light/HomepageHeroLight';
+import {
+  type HomepageHeroLightRenderer,
+  resolveHomepageHeroLight,
+} from './hero-light/hero-light-gate';
 import './HomepageArtistProfile.css';
 
 const OWNER = 'apps/web/components/homepage/HomepageArtistProfile.tsx';
@@ -24,16 +30,33 @@ const OWNER = 'apps/web/components/homepage/HomepageArtistProfile.tsx';
 export function HomepageArtistHero({
   copy = HOMEPAGE_COPY.hero,
   headingId = 'homepage-hero-heading',
-}: Readonly<{ copy?: HomepageCopy['hero']; headingId?: string }>) {
+  heroLight,
+}: Readonly<{
+  copy?: HomepageCopy['hero'];
+  headingId?: string;
+  /** Story/test override. Omitted uses the default-off marketing flags. */
+  heroLight?: HomepageHeroLightRenderer | 'off';
+}>) {
+  const heroLightMode = resolveHomepageHeroLight(heroLight, {
+    css: FEATURE_FLAGS.SHOW_HOMEPAGE_HERO_LIGHT,
+    webgl: FEATURE_FLAGS.SHOW_HOMEPAGE_HERO_LIGHT_WEBGL,
+  });
   return (
     <MarketingHero
       variant='unstyled'
-      className='homepage-artist-hero'
+      className={
+        heroLightMode === 'off'
+          ? 'homepage-artist-hero'
+          : 'homepage-artist-hero homepage-artist-hero--lit'
+      }
       headingId={headingId}
       testId='marketing-section-hero'
       sectionVariant='split-claim-card'
       sectionOwner={OWNER}
     >
+      {heroLightMode === 'off' ? null : (
+        <HomepageHeroLight renderer={heroLightMode} />
+      )}
       <div className='ap-section-container homepage-artist-hero__inner'>
         <div className='homepage-artist-hero__copy'>
           <h1

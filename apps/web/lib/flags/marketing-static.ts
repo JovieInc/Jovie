@@ -50,6 +50,12 @@ export const FEATURE_FLAGS = {
   // Public About body and commercial footer links. Stays off so production
   // keeps the current page until this refresh is explicitly flipped.
   SHOW_PUBLIC_ABOUT_FOOTER_REFRESH: false,
+  // Hero light prototype. Off keeps today's homepage pixel-identical.
+  // CSS is the invariant-safe look (no canvas). WebGL is a second flag and
+  // does nothing unless the CSS flag is also on. Tim has not approved the
+  // night-dj-harmony-v1 canvas exception; do not flip either default.
+  SHOW_HOMEPAGE_HERO_LIGHT: false,
+  SHOW_HOMEPAGE_HERO_LIGHT_WEBGL: false,
 } as const;
 
 export type MarketingStaticFlagName = keyof typeof FEATURE_FLAGS;

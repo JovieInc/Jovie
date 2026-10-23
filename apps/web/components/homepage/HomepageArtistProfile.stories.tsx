@@ -24,6 +24,15 @@ type Story = StoryObj<typeof meta>;
 
 export const Hero: Story = {};
 
+/** Flags-on preview. Production flags stay off; this story forces the CSS layer. */
+export const HeroWithCssLight: Story = {
+  args: { heroLight: 'css' },
+};
+
+export const HeroWithWebGlLight: Story = {
+  args: { heroLight: 'webgl' },
+};
+
 export const FanStates: Story = {
   render: () => <HomepageFanStates />,
 };

@@ -1,0 +1,171 @@
+/*
+ * Homepage hero light (CSS baseline).
+ *
+ * Felt, not seen: one Ion wash, a hairline grid that fades from the focal
+ * point, and a 1px edge-light whose highlight rolls through that focus.
+ * Ultra and Pulse exist only on that traveling edge. No blur, no shadow,
+ * no canvas. Scene palette v1: Ion #3FAFF3, Ultra #A789F0, Pulse #EB6AC6
+ * on canvas #070B12. Dark mode only.
+ */
+
+.homepage-artist-hero--lit {
+  position: relative;
+  isolation: isolate;
+}
+
+.homepage-artist-hero--lit .homepage-artist-hero__inner,
+.homepage-hero-light-stage__copy {
+  position: relative;
+  z-index: 1;
+}
+
+.homepage-hero-light {
+  --hero-light-canvas: #070b12;
+  --hero-light-ion: #3faff3;
+  --hero-light-ultra: #a789f0;
+  --hero-light-pulse: #eb6ac6;
+  --hero-light-focal-x: 34%;
+  --hero-light-focal-y: 64%;
+
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: transparent;
+}
+
+@media (max-width: 63.99rem) {
+  .homepage-hero-light {
+    --hero-light-focal-x: 50%;
+    --hero-light-focal-y: 78%;
+  }
+}
+
+html:not(.dark) .homepage-hero-light {
+  display: none;
+}
+
+.homepage-hero-light__wash,
+.homepage-hero-light__grid,
+.homepage-hero-light__focus,
+.homepage-hero-light__edge,
+.homepage-hero-light__canvas {
+  position: absolute;
+  pointer-events: none;
+}
+
+.homepage-hero-light__wash {
+  inset: 0;
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--hero-light-canvas) 70%, transparent) 0%,
+      color-mix(in oklab, var(--hero-light-canvas) 28%, transparent) 48%,
+      transparent 76%
+    ),
+    radial-gradient(
+      ellipse 44% 36% at var(--hero-light-focal-x) var(--hero-light-focal-y),
+      color-mix(in oklab, var(--hero-light-ion) 16%, transparent),
+      transparent 72%
+    );
+}
+
+.homepage-hero-light__grid {
+  inset: 0;
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklab, var(--hero-light-ion) 42%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--hero-light-ion) 26%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: var(--space-16, 4rem) var(--space-16, 4rem);
+  opacity: 0.5;
+  -webkit-mask-image: radial-gradient(
+    ellipse 50% 42% at var(--hero-light-focal-x) var(--hero-light-focal-y),
+    #000 0%,
+    transparent 74%
+  );
+  mask-image: radial-gradient(
+    ellipse 50% 42% at var(--hero-light-focal-x) var(--hero-light-focal-y),
+    #000 0%,
+    transparent 74%
+  );
+}
+
+.homepage-hero-light__focus {
+  inset: 0;
+  -webkit-mask-image: radial-gradient(
+    ellipse 34% 24% at var(--hero-light-focal-x) var(--hero-light-focal-y),
+    #000 0%,
+    transparent 72%
+  );
+  mask-image: radial-gradient(
+    ellipse 34% 24% at var(--hero-light-focal-x) var(--hero-light-focal-y),
+    #000 0%,
+    transparent 72%
+  );
+}
+
+.homepage-hero-light__edge {
+  left: var(--hero-light-focal-x);
+  top: var(--hero-light-focal-y);
+  width: min(42rem, 88%);
+  aspect-ratio: 1.7;
+  translate: -50% -50%;
+  border-radius: 50%;
+  padding: 1px;
+  background: conic-gradient(
+    from 210deg,
+    transparent 0deg,
+    var(--hero-light-ion) 12deg,
+    var(--hero-light-ultra) 26deg,
+    transparent 48deg,
+    transparent 206deg,
+    var(--hero-light-pulse) 222deg,
+    transparent 248deg
+  );
+  opacity: 0.7;
+  animation: homepage-hero-light-roll 28s linear infinite;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.homepage-hero-light__canvas {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity var(--duration-cinematic) var(--ease-out);
+}
+
+.homepage-hero-light[data-live="true"] .homepage-hero-light__canvas {
+  opacity: 1;
+}
+
+@keyframes homepage-hero-light-roll {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .homepage-hero-light__edge {
+    animation: none;
+  }
+
+  .homepage-hero-light__canvas {
+    transition: none;
+  }
+}

@@ -31,6 +31,11 @@ describe('marketing static flags', () => {
     expect(FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH).toBe(false);
   });
 
+  it('keeps the homepage hero light off so production does not change', () => {
+    expect(FEATURE_FLAGS.SHOW_HOMEPAGE_HERO_LIGHT).toBe(false);
+    expect(FEATURE_FLAGS.SHOW_HOMEPAGE_HERO_LIGHT_WEBGL).toBe(false);
+  });
+
   it('is pure constants (no runtime env toggles)', () => {
     // Guards against reintroducing NEXT_PUBLIC_* env reads that would break
     // static marketing rendering. FEATURE_FLAGS must stay build-time constants.
