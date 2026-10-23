@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.4.0
+spec-version: 1.5.0
 doc-freshness: docs/marketing/DESIGN_INVARIANTS.md
 -->
 # Marketing design invariants
@@ -55,6 +55,11 @@ JOV-5885 [YouTube artist MVP](YOUTUBE_ARTIST_MVP.md) draft: `/` sells the artist
 profile and its offer through the [homepage recipe](RECIPE_CATALOG.md#recipe-homepage).
 Metadata and structured data stay general. Atoms stay. No waitlist-first
 homepage or “Drop more music”. Historical record follows.
+
+MKT-D16 blocks new ICP-specific terms on `/` and other general pages. The
+2026-10-20 artist-profile sales copy already on `/` is baselined debt in the
+ICP-language ratchet. Do not add more. The locked line “Be found. Be understood.”
+stays as written.
 
 - **Scope:** homepage narrative and audience brief, not every product surface.
 - **Requirement:** primarily address founders/investors discovering Tim through
@@ -321,24 +326,10 @@ another task supplies no design requirement or action authority here.
   navigation behavior consistently; do not impose a new-context destination
   merely to justify an icon. Re-evaluate scoped label size after rendered comparison.
 
-## MKT-D16 — One accent per marketing image and section
+## MKT-D16 — No ICP-specific language on general pages
 
-- **Scope:** marketing page sections, generated and art-directed imagery, and
-  image-generation prompt templates. Real product captures stay unrecolored.
-- **Requirement:** one primary color per image, never mixed. Each page section
-  gets exactly one accent, chosen per section and image from Scene Palette v1:
-  Ion `#3FAFF3`, Ultra `#A789F0`, or Pulse `#EB6AC6`. Never blend those hues in
-  the same image. A gradient's key color is that section's accent hue; other
-  tones are only neutral black falloff. Fades and light reveals are strongly
-  asymmetric: a lit wedge, and the rest to black. Prompt templates name the
-  single hue and forbid secondary hues. The same rule applies inside those
-  prompts. Orange as a scene or cue color, and a literal triad, stay forbidden.
-  Canonical wording is [Imagery and color](../../canon/MARKETING.md#imagery-and-color).
-- **Founder evidence/status:** requirement, 2026-10-23.
-- **Enforcement:** blocking checks in the companion PRs from agent
-  bc-385e97f8. Recording the rule here does not create that gate. The in-repo
-  frontend contract is [`.claude/rules/ui.md`](../../.claude/rules/ui.md); the
-  prose skill `~/.codex/skills/frontend-skill` is not in this repository.
-- **Change/exception:** truthful skin, identity, and safety color is not a
-  second accent. Real product captures are not recolored. Product UI accent
-  rotation does not license a second hue in a marketing image.
+- **Scope:** homepage, pricing, about, brand, and other general marketing routes, including metadata and the copy-system strings they render. Dedicated audience routes are exempt. Editorial blog and engineering notes follow the subject of the piece and are out of scope.
+- **Requirement:** general copy stays generic. Jovie is an identity product for any creator. Do not target a customer segment on these surfaces: music, artist, musician, DJ, producer, label, founder, investor, fan, author, and creator-type niches. “Creator” is the generic word. The headline “Be found. Be understood.” is locked.
+- **Founder evidence/status:** requirement; Tim White, 2026-10-22 21:00 PT.
+- **Enforcement:** `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready guard. Terms and the audience allowlist live in `scripts/invariants/icp-language/config.json`. Word boundaries ignore identifiers such as `artist-profile`. Existing hits are a shrink-only baseline. The count can only go down.
+- **Change/exception:** the audience allowlist in that config (`solutions/[audience]`, artist-profile, artist-profiles, artist-notifications, youtube-thumbnails, and the investor portal). Adding an exemption is a config change with a reason, not a silent skip. MKT-D02 does not license new ICP terms on general pages.
