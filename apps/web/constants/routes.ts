@@ -208,6 +208,8 @@ export const APP_ROUTES = {
   PRODUCT: '/product',
   /** ISRC field. Nested under /product so it is not a profile handle. */
   PRODUCT_ISRC: '/product/isrc',
+  /** Pre-save countdown. Nested under /product so it is not a profile handle. */
+  PRODUCT_PRE_SAVE: '/product/pre-save',
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */
   SOLUTIONS_ARTISTS: '/solutions/artists',
   INSTANT_MERCH: '/instant-merch',

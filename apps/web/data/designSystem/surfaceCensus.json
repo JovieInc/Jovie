@@ -293,6 +293,7 @@
         "apps/web/app/(marketing)/pay/page.tsx",
         "apps/web/app/(marketing)/product/isrc/page.tsx",
         "apps/web/app/(marketing)/product/page.tsx",
+        "apps/web/app/(marketing)/product/pre-save/page.tsx",
         "apps/web/app/(marketing)/smart-links/page.tsx",
         "apps/web/app/(marketing)/solutions/[audience]/page.tsx",
         "apps/web/app/(marketing)/support/page.tsx",
@@ -633,6 +634,13 @@
       "to": "holdout",
       "at": "2026-10-23T10:00:00Z",
       "evidence": "PR #22783 introduces the /product/isrc marketing page; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/pre-save/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T14:00:00Z",
+      "evidence": "Introduces the /product/pre-save marketing page; source registration only, not rendered certification."
     }
   ]
 }
