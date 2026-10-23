@@ -115,10 +115,32 @@ iso_to_epoch() {
 
 # Bounded REST retry. Stderr is classified and discarded: a rate-limit body
 # can carry an installation id, and a raw body must not become a log line.
-# gh_retry_status / gh_retry_class survive for the caller. A completed HTTP
-# success (including an empty or unexpected status) returns 0 and is not retried.
+# gh_retry_status / gh_retry_class / gh_retry_http / gh_retry_message survive
+# for the caller. A completed HTTP success (including an empty or unexpected
+# status) returns 0 and is not retried.
 gh_retry_status=0
 gh_retry_class=""
+gh_retry_http=""
+gh_retry_message=""
+
+# Single bounded log-safe line for annotations: collapse whitespace, redact
+# credential-shaped text (token prefixes, bearer/token values, app
+# installation ids, long opaque strings) and cap the length. The raw response
+# body still never becomes a log line; only this classified excerpt does.
+sanitize_log_text() {
+  printf '%s' "$1" |
+    tr '\t\r\n' '   ' |
+    sed -e 's/[][`"\\|;$&<>]//g' \
+      -e 's/gh[pousr]_[A-Za-z0-9][A-Za-z0-9_]*/[redacted]/g' \
+      -e 's/github_pat_[A-Za-z0-9_][A-Za-z0-9_]*/[redacted]/g' \
+      -e 's/[Bb]earer[[:space:]][A-Za-z0-9._~+/=-]\{8,\}/[redacted]/g' \
+      -e 's/[Tt]oken[[:space:]][A-Za-z0-9._~+/=-]\{8,\}/[redacted]/g' \
+      -e 's/installation ID [0-9][0-9]*/installation [redacted]/g' \
+      -e 's/[A-Za-z0-9+/=]\{64,\}/[redacted]/g' \
+      -e 's/[[:space:]]\{2,\}/ /g' |
+    cut -c1-160
+}
+
 gh_retry() {
   local label="$1"
   shift
@@ -131,6 +153,8 @@ gh_retry() {
     err="$(mktemp)"
     gh_retry_status=0
     gh_retry_class=""
+    gh_retry_http=""
+    gh_retry_message=""
     text="$("$gh_cli" "$@" 2>"$err")" || gh_retry_status=$?
     if [ "$gh_retry_status" -eq 0 ]; then
       rm -f "$err"
@@ -146,12 +170,18 @@ gh_retry() {
     fi
     if [[ "$text" =~ HTTP[^0-9]*([0-9]{3}) ]]; then
       http="${BASH_REMATCH[1]}"
+    elif [[ "$text" =~ HTTP/[0-9.]+[[:space:]]+([0-9]{3}) ]]; then
+      # curl-style status lines ("HTTP/1.1 403 ...") never match the first
+      # pattern: the minor-version digits interrupt it.
+      http="${BASH_REMATCH[1]}"
     fi
     if [ "$gh_retry_class" != rate_limit ] && [ "$http" = 429 ]; then
       gh_retry_class=rate_limit
     elif [ -n "$http" ] && [ "$gh_retry_class" = transport ]; then
       gh_retry_class="http_${http}"
     fi
+    gh_retry_http="$http"
+    gh_retry_message="$(sanitize_log_text "$text")"
     echo "::warning::${label} attempt ${attempt}/${max} class=${gh_retry_class} http=${http:-none} exit=${gh_retry_status}." >&2
     if [ "$attempt" -ge "$max" ]; then
       return 1
@@ -263,7 +293,7 @@ if [ "$current" != "$expected" ]; then
     emit lineage_lookup_class "${compare_error_class:-none}"
     emit gate_decision error
     emit gate_reason lineage_lookup_unavailable
-    echo "::error::Release ancestry is unknown (exit=${lookup_status} class=${compare_error_class:-none}); inspect GitHub compare access/response before superseding $expected." >&2
+    echo "::error::Release ancestry is unknown (exit=${lookup_status} class=${compare_error_class:-none} http=${gh_retry_http:-none} msg=\"${gh_retry_message:-}\"); inspect GitHub compare access/response before superseding $expected." >&2
     printf 'decision=error\n'
     exit 1
   fi
