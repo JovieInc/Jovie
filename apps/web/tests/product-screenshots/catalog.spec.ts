@@ -27,9 +27,10 @@ import {
   PUBLIC_EXPORT_DIR,
   SCREENSHOT_CLOCK_ISO,
   TIMEOUTS,
-  waitForImages,
+  prepareImagesForScreenshot,
   waitForSettle,
 } from './helpers';
+import { captureOnlyWhenImagesReady } from './image-prep-policy';
 import {
   resolveScreenshotEvidence,
   resolveScreenshotSourceGitSha,
@@ -217,9 +218,9 @@ async function prepareScenario(
   await expect(initialWait).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
 
   if (isOpenFirstRelease) {
-    await waitForImages(page, 'table').catch(() => {});
+    await prepareImagesForScreenshot(page);
     await waitForSettle(page, 2000);
-    await page.locator('[data-testid="release-row"]').first().click();
+    await page.locator('[data-shell-release-row]').first().click();
     await expect(page.locator(scenario.waitFor).first()).toBeVisible({
       timeout: TIMEOUTS.SIDEBAR_VISIBLE,
     });
@@ -249,7 +250,7 @@ async function prepareScenario(
     ).toHaveCount(0);
   }
 
-  await waitForImages(page).catch(() => {});
+  await prepareImagesForScreenshot(page);
   await waitForSettle(page);
   await hideTransientUI(page);
   await assertNoDevOverlays(page);
@@ -303,10 +304,9 @@ test.describe('Screenshot Catalog', () => {
       const previousEntry = manifestEntriesById.get(scenario.id) ?? null;
       const preparedScenario = await prepareScenario(page, scenario.id);
       const catalogPath = join(CATALOG_OUTPUT_DIR, `${scenario.id}.png`);
-      const imageChanged = await captureCatalogImage(
-        page,
-        preparedScenario,
-        catalogPath
+      const imageChanged = await captureOnlyWhenImagesReady(
+        () => prepareImagesForScreenshot(page),
+        () => captureCatalogImage(page, preparedScenario, catalogPath)
       );
 
       if (preparedScenario.publicExportPath) {
