@@ -496,7 +496,7 @@ export function UnifiedSidebar({
                 headerOwnsInbox={!isDemoRoute && !isOperatorSection}
               >
                 {isDemoRoute ? (
-                  <HeaderSearchSurfaceFromContext className='w-full max-w-none gap-x-1.5 px-1.5 sm:w-full lg:w-full' />
+                  <HeaderSearchSurfaceFromContext className='w-full max-w-none sm:w-full lg:w-full' />
                 ) : null}
               </DashboardNav>
             )}
