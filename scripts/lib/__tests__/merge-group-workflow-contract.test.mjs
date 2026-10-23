@@ -583,7 +583,7 @@ describe('merge_group workflow contract', () => {
     expect(remaining).toContain('apps/web/\\.storybook/');
     expect(remaining).toContain('apps/web/package\\.json$');
     expect(remaining).toContain('apps/web/scripts/');
-    expect(remaining).toContain('chromatic\\.config\\.json$');
+    expect(remaining).not.toContain('chromatic\\.config\\.json$');
     expect(remaining).toContain('package\\.json$');
     expect(remaining).toContain('shared-ui-visual-arbitrary');
     // Control-lane paths moved to data (JOV-6837).

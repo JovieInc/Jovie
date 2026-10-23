@@ -345,7 +345,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@biomejs/biome": "^2.5.14",
-    "@chromatic-com/storybook": "^5.5.1",
+    "@electric-sql/pglite": "^0.5.11",
     "@lhci/cli": "^0.15.1",
     "@next/bundle-analyzer": "^16.4.2",
     "@playwright/test": "1.64.1",

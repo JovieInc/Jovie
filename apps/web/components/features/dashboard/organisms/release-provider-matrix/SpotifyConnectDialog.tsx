@@ -511,7 +511,7 @@ export function SpotifyConnectDialog({
                 autoCorrect='off'
                 autoComplete='off'
                 disabled={isPending}
-                className='min-w-0 flex-1 bg-transparent text-app text-primary-token focus-visible:outline-none'
+                className='min-h-6 min-w-0 flex-1 bg-transparent text-app text-primary-token focus-visible:outline-none'
                 role='combobox'
                 aria-expanded={shouldShowDropdown}
                 aria-controls='spotify-connect-results'

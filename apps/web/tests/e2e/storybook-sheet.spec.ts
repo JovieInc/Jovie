@@ -8,6 +8,7 @@ import {
   type TestInfo,
   test,
 } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 
 const SHEET_MATRIX_STORY_ID = 'ui-atoms-sheet--conformance-matrix';
 const STORYBOOK_THEME_STORAGE_KEY = 'jovie-theme-storybook';
@@ -60,7 +61,7 @@ async function attachScreenshot(testInfo: TestInfo, name: string, page: Page) {
 async function attachA11yResult(page: Page, testInfo: TestInfo, name: string) {
   const results = await new AxeBuilder({ page })
     .include('body')
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .options(wcag22AaAxeOptions())
     .analyze();
   const evidence = JSON.stringify(
     {

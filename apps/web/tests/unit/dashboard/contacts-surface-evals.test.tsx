@@ -53,7 +53,10 @@ describe('Contacts authenticated-surface evals', () => {
     );
     expect(rail).not.toContain('drawerClassName=');
     expect(rail).toContain("workspaceSurface='flat'");
-    expect(rail).toContain("surfaceVariant='flat'");
+    expect(rail).toContain("tabbedSurfaceVariant = 'flat'");
+    expect(rail).toContain('surfaceVariant={tabbedSurfaceVariant}');
+    expect(details).not.toContain('tabbedSurfaceVariant');
+    expect(audience).not.toContain('tabbedSurfaceVariant');
     expect(details).toContain('<EntityTabbedRail');
     expect(audience).toContain('<EntityTabbedRail');
     expect(details).toContain("layout='grid'");
