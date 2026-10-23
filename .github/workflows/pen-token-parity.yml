@@ -1,0 +1,57 @@
+name: Pen token parity
+
+# Cheap check. Not a new required status. PR Ready runs the same command in
+# the pen-token-parity ci-fast lane, which is what blocks merge. This workflow
+# makes the failure visible on the paths below. It does not change PR Ready,
+# Migration Guard, Fork PR Gate, or PR Size Guard.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - 'design.tokens.json'
+      - 'docs/pen-stills/PEN_VARIABLES.md'
+      - 'docs/pen-stills/pen-variables.json'
+      - 'docs/pen-stills/pen-variable-aliases.json'
+      - 'docs/pen-stills/pen-variable-baseline.json'
+      - 'scripts/invariants/pen-token-parity.mjs'
+      - 'scripts/invariants/pen-token-parity.test.mjs'
+      - 'scripts/ci-fast-lanes.mjs'
+      - '.github/workflows/pen-token-parity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'design.tokens.json'
+      - 'docs/pen-stills/pen-variables.json'
+      - 'docs/pen-stills/pen-variable-aliases.json'
+      - 'docs/pen-stills/pen-variable-baseline.json'
+      - 'scripts/invariants/pen-token-parity.mjs'
+      - 'scripts/invariants/pen-token-parity.test.mjs'
+      - '.github/workflows/pen-token-parity.yml'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: pen-token-parity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  parity:
+    name: Pen token parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Unit tests and ratchet
+        run: node --test scripts/invariants/pen-token-parity.test.mjs && node scripts/invariants/pen-token-parity.mjs
