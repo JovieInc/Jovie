@@ -208,6 +208,8 @@ export const APP_ROUTES = {
   PRODUCT: '/product',
   /** Release date and reveal date fields. Nested under /product so it is not a profile handle. */
   PRODUCT_RELEASE_SCHEDULING: '/product/release-scheduling',
+  /** Tracked-link builder. Nested under /product so it is not a profile handle. */
+  PRODUCT_UTM_LINKS: '/product/utm-links',
   /** ISRC field. Nested under /product so it is not a profile handle. */
   PRODUCT_ISRC: '/product/isrc',
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */
