@@ -22,11 +22,11 @@
   "patterns": [
     {
       "id": "instruction",
-      "source": "\\b(?:fits?\\s+(?:1\\s*[-\u2013]\\s*2|one\\s+or\\s+two)\\s+lines?|max(?:imum)?\\s+\\d+\\s+(?:characters?|words?)|under\\s+\\d+\\s+words?|concise\\s+headline|short\\s+headline|punchy|catchy|compelling|engaging|write\\s+a|rewrite|make\\s+it|tone\\s*:|voice\\s*:|(?:CTA|headline|subhead|description)\\s+here|copy\\s+goes\\s+here|replace\\s+this|your\\s+text)(?=\\W|$)"
+      "source": "\\b(?:fits?\\s+(?:1\\s*[-\u2013]\\s*2|one\\s+or\\s+two)\\s+lines?|max(?:imum)?\\s+\\d+\\s+(?:characters?|words?)|under\\s+\\d+\\s+words?|concise\\s+headline|short\\s+headline|punchy|catchy|compelling|engaging|write\\s+a|rewrite|make\\s+it|tone\\s*:|voice\\s*:|(?:CTA|headline|subhead|description)\\s+here|copy\\s+goes\\s+here|replace\\s+this|your\\s+text)(?:(?=\\W|$)|(?<=[,:]))"
     },
     { "id": "placeholder", "source": "\\b(?:lorem\\s+ipsum|TODO|TBD|FIXME|XXX|placeholder|sample\\s+text|example\\s+text|Untitled)\\b" },
     { "id": "unresolved-prompt", "source": "\\{\\{[^{}]+\\}\\}|\\[[^\\]\\n]+\\](?![(:])|<(?:insert|your|headline|subhead|description|CTA|text|copy|replace|TODO|placeholder)(?:\\s[^<>]*)?>" },
-    { "id": "assistant", "source": "\\b(?:As\\s+an\\s+AI|Here\\s+is|Here's\\s+a|Sure,|Certainly|I\\s+hope\\s+this\\s+helps|Option\\s+1\\s*:)(?=\\W|$)" },
+    { "id": "assistant", "source": "\\b(?:As\\s+an\\s+AI|Here\\s+is|Here's\\s+a|Sure,|Certainly|I\\s+hope\\s+this\\s+helps|Option\\s+1\\s*:)(?:(?=\\W|$)|(?<=[,:]))" },
     { "id": "markdown", "source": "(?<!\\*)\\*\\*(?!\\*)|```|(?:^|\\n)\\s*-\\s+\\S" },
     { "id": "punctuation", "source": "([!?;,:])\\1+|(?<!\\.)\\.{2}(?![./])" },
     { "id": "repeated-word", "source": "(?<![\\w-])([a-z]+)\\s+\\1(?![\\w-])" },

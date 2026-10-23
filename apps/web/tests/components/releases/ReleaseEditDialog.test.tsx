@@ -165,7 +165,7 @@ describe('ReleaseEditDialog', () => {
 
     render(
       <ReleaseEditDialog
-        release={{ ...createRelease(), releaseDate: null }}
+        release={{ ...createRelease(), releaseDate: undefined }}
         providerList={[
           {
             key: 'spotify' as ProviderKey,
