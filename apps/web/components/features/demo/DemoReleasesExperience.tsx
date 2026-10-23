@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/demo/demo-releases-experience.test.tsx
+
 import { useSearchParams } from 'next/navigation';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import {
