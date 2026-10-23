@@ -9,8 +9,6 @@ import importlib.util
 import io
 import json
 import os
-import signal
-import subprocess
 import sys
 import tempfile
 import threading
@@ -435,6 +433,10 @@ for line in sys.stdin:
 
     def test_real_metadata_child_retains_lease_until_delayed_reap(self):
         # The child needs no model calls: EOF ends the fake public protocol.
+        # Pin one slot. CODEX_LANE_LOGIN_SLOTS>1 lets lease() take a free slot,
+        # the assertion raises inside reap_current_metadata, and that helper
+        # retries the error until the runner times out. The release archive
+        # does not ship scripts/tests/conftest.py, so this pin is the contract.
         self.cli.write_text(f'''#!{sys.executable}
 import json, sys
 for line in sys.stdin:
@@ -458,50 +460,39 @@ for line in sys.stdin:
             proc.wait = delay_wait
             proc.kill = lambda: kill() if len(waits) >= 2 else None
             return proc
-        handle = codex.lease('current-login')
-        try:
-            with patch.object(codex.subprocess, 'Popen', side_effect=tracked):
-                codex.current_subscription_snapshot('current-login', lease_handle=handle)
-            self.assertEqual(len(waits), 3)
-            self.assertIsNone(codex.lease('current-login'))
-        finally:
-            handle.close()
-        again = codex.lease('current-login')
-        self.assertIsNotNone(again)
-        again.close()
-
-    def test_collection_scrubs_host_login_slots_before_the_delayed_reap(self):
-        # The lanes host exports CODEX_LANE_LOGIN_SLOTS=5. Without the conftest
-        # scrub, the test above takes a free slot, the assertion raises inside
-        # reap_current_metadata, and cleanup retries until the shard hits 30 min.
-        if os.environ.get('JOVIE_NESTED_CODEX_HERMETIC') == '1':
-            self.skipTest('nested probe')
-        env = os.environ.copy()
-        env.update({
-            'JOVIE_NESTED_CODEX_HERMETIC': '1',
-            'CODEX_LANE_LOGIN_SLOTS': '5',
-            'CODEX_LANE_AUTH_MODE': 'subscription-pool',
-            'CODEX_LANE_CLI': '/does/not/exist',
-            'CODEX_LANE_SUBSCRIPTION_PROFILES': '{}',
-            'CODEX_LEDGER_CADENCE_S': '1',
-        })
-        node = (
-            'scripts/tests/test_codex_lane.py::CurrentLoginTest::'
-            'test_real_metadata_child_retains_lease_until_delayed_reap'
-        )
-        with tempfile.TemporaryDirectory(prefix='jovie-codex-hermetic-') as base:
-            proc = subprocess.Popen(
-                [sys.executable, '-m', 'pytest', node, '-q', '-p', 'no:cacheprovider',
-                 '--basetemp', base],
-                cwd=ROOT, env=env, start_new_session=True,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        with patch.dict(os.environ, {'CODEX_LANE_LOGIN_SLOTS': '1'}):
+            handle = codex.lease('current-login')
             try:
-                stdout, stderr = proc.communicate(timeout=60)
-            except subprocess.TimeoutExpired:
-                os.killpg(proc.pid, signal.SIGKILL)
-                proc.communicate()
-                self.fail('delayed reap hung while host login slots were widened')
-        self.assertEqual(proc.returncode, 0, (stdout + stderr)[-4000:])
+                with patch.object(codex.subprocess, 'Popen', side_effect=tracked):
+                    codex.current_subscription_snapshot('current-login', lease_handle=handle)
+                self.assertEqual(len(waits), 3)
+                self.assertIsNone(codex.lease('current-login'))
+            finally:
+                handle.close()
+            again = codex.lease('current-login')
+            self.assertIsNotNone(again)
+            again.close()
+
+    def test_widened_host_slots_still_leave_the_held_metadata_slot_exclusive_at_one(self):
+        # Same occupancy the delayed reap asserts, proved without spawning pytest.
+        # A release self-test tree has no conftest scrub; the pin above is what
+        # keeps reap from retrying a failed lease assertion.
+        with patch.dict(os.environ, {'CODEX_LANE_LOGIN_SLOTS': '5'}):
+            held = codex.lease('current-login')
+            extra = codex.lease('current-login')
+            try:
+                self.assertIsNotNone(held)
+                self.assertIsNotNone(extra)
+            finally:
+                held.close()
+                if extra is not None:
+                    extra.close()
+        with patch.dict(os.environ, {'CODEX_LANE_LOGIN_SLOTS': '1'}):
+            held = codex.lease('current-login')
+            try:
+                self.assertIsNone(codex.lease('current-login'))
+            finally:
+                held.close()
 
     def test_interruption_during_cleanup_reaps_before_propagating(self):
         proc = SimpleNamespace(poll=lambda: None, terminate=lambda: None, kill=lambda: None)
