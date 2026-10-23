@@ -154,6 +154,32 @@ function MainPlaneReopenHarness() {
 }
 
 describe('CmdKPalette', () => {
+  it('constrains dialog search to the compact presentation column', () => {
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+
+    const column = screen.getByTestId('shared-command-palette');
+    expect(column).toHaveClass('w-full', 'max-w-2xl');
+    expect(column).not.toHaveClass('max-w-3xl');
+    expect(column).toContainElement(
+      screen.getByRole('combobox', { name: 'Command Palette Search' })
+    );
+    expect(column).toContainElement(
+      screen.getByRole('listbox', { name: 'Command Palette Results' })
+    );
+  });
+
+  it('keeps main-plane results full width without a dialog column', () => {
+    render(<MainPlaneHarness />);
+
+    const plane = screen.getByTestId('cmdk-main-plane');
+    expect(plane).toHaveClass('w-full');
+    expect(plane).not.toHaveClass('max-w-2xl', 'max-w-3xl');
+    expect(screen.queryByTestId('shared-command-palette')).toBeNull();
+    expect(plane).toContainElement(
+      screen.getByRole('listbox', { name: 'Command Palette Results' })
+    );
+  });
+
   it('opens Contacts exactly once when its result is clicked', async () => {
     const onOpenChange = vi.fn();
     pushMock.mockClear();
