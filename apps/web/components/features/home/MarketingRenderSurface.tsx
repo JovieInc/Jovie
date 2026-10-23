@@ -65,7 +65,7 @@ function RenderShell({
 }>) {
   return (
     <div
-      className={`relative flex min-h-[13.25rem] items-center justify-center overflow-hidden rounded-[1.4rem] ${
+      className={`marketing-rounded-frame relative flex min-h-[13.25rem] items-center justify-center ${
         emphasize
           ? 'bg-[radial-gradient(circle_at_top,rgba(138,180,255,0.14),transparent_50%),linear-gradient(180deg,rgba(13,15,20,0.96),rgba(8,10,14,0.98))]'
           : 'bg-[linear-gradient(180deg,rgba(13,15,20,0.98),rgba(8,10,14,1))]'
@@ -154,7 +154,7 @@ export function MarketingRenderSurface({
     case 'fans':
       return (
         <RenderShell>
-          <div className='w-full max-w-96 rounded-[1.25rem] bg-white/[0.03] p-3'>
+          <div className='w-full max-w-96 rounded-2xl bg-white/[0.03] p-3'>
             <HomeRelationshipPanel />
           </div>
         </RenderShell>

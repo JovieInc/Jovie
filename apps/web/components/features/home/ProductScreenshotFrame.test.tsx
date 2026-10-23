@@ -20,6 +20,9 @@ describe('ProductScreenshotFrame', () => {
       <ProductScreenshotFrame {...props} chrome='minimal' isAvailable={false} />
     );
     expect(screen.getByRole('figure', { name: props.alt })).toBeVisible();
+    expect(screen.getByRole('figure', { name: props.alt })).toHaveClass(
+      'marketing-rounded-frame'
+    );
     expect(screen.getByText('Preview unavailable')).toBeVisible();
     expect(screen.getByText(props.title)).toBeVisible();
     expect(screen.queryByRole('img')).toBeNull();
@@ -31,6 +34,8 @@ describe('ProductScreenshotFrame', () => {
     render(<ProductScreenshotFrame {...props} onImageError={onImageError} />);
     const image = screen.getByRole('img', { name: props.alt });
     expect(image).toBeVisible();
+    expect(image).toHaveClass('marketing-rounded-frame');
+    expect(image.closest('figure')).toHaveClass('marketing-rounded-frame');
     expect(image).toHaveAttribute('width', '1600');
     expect(screen.queryByText('Preview unavailable')).toBeNull();
     fireEvent.error(image);

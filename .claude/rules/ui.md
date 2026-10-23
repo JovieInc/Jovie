@@ -282,6 +282,10 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
   uses `.marketing-type-display` / `-section` / `-lede`.
 - Marketing plan prices render only through `MarketingOfferSummary` or
   `getPublicPriceClaim` from offer truth; never type a price into copy.
+- Marketing images and cards use a radius token. The wide cinematic corner
+  is `.marketing-rounded-frame` (`--system-b-radius-panel` / `--radius-3xl`).
+  Exempt only the full-bleed hero start (it rounds as it zooms out), logos,
+  icons, SVG marks, and already-round avatars. See MKT-D17.
 
 ### No Duplicate Page Titles (Breadcrumb + Toolbar)
 

@@ -35,6 +35,7 @@
     width: 89.3333%;
     height: 95%;
     overflow: hidden;
+    border-radius: var(--radius-3xl);
     background: var(--color-bg-surface-0);
   }
 
