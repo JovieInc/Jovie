@@ -120,7 +120,7 @@ export function ChatLinkRemovalCard({
 
   return (
     <ChatToolSurface>
-      <div className='system-b-chat-link-card system-b-chat-link-card-remove -m-(--space-4) flex items-center gap-3 rounded-[inherit]'>
+      <div className='system-b-chat-link-card system-b-chat-link-card-remove -m-(--space-4) flex items-center gap-3 rounded-xl'>
         <span className='system-b-chat-link-card-icon system-b-chat-link-card-icon-remove'>
           <SocialIcon
             platform={normalizeSocialPlatform(platform)}
