@@ -92,7 +92,10 @@ test('a new unmapped color fails and a baselined id does not', () => {
   );
   const judged = ratchet(findings, { allowed: ['incomplete-export'] });
   assert.equal(judged.ok, false);
-  assert.equal(judged.fresh.length, 2);
+  assert.deepEqual(
+    judged.fresh.map(finding => finding.detail),
+    findings.map(finding => finding.detail)
+  );
   assert.deepEqual(judged.stale, ['incomplete-export']);
   const held = ratchet([{ id: 'incomplete-export', detail: 'seed' }], {
     allowed: ['incomplete-export'],

@@ -193,7 +193,7 @@ export function comparePenTokens({ doc, tokens, aliases }) {
 }
 
 /**
- * @param {Array<{id: string}>} findings
+ * @param {Array<{id: string, detail: string}>} findings
  * @param {{allowed?: string[]}} baseline
  */
 export function ratchet(findings, baseline) {
