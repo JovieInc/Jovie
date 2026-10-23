@@ -113,26 +113,268 @@ iso_to_epoch() {
   date -u -d "$1" +%s 2>/dev/null || date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s
 }
 
-lineage=exact
-if [ "$current" != "$expected" ]; then
-  lookup_status=0
-  status="$("$gh_cli" api "repos/$repository/compare/${expected}...${current}" --jq '.status // empty' 2>/dev/null)" || lookup_status=$?
-  lineage=unknown
-  if [ "$lookup_status" -eq 0 ]; then
-    case "$status" in
-      ahead) lineage=ancestor ;;
-      behind|diverged) lineage=diverged ;;
-    esac
+# One log line. Workflow commands treat % as an escape, so drop it.
+one_line() {
+  local text
+  text="$(printf '%s' "$1" | tr '\r\n%' '   ')"
+  printf '%s' "${text:0:240}"
+}
+
+# Git protocol does not spend the Actions installation REST budget. Same
+# auth shape as resolve-main-sha.sh. An empty token fetches anonymously.
+git_authenticated() {
+  if [ -n "${GH_TOKEN:-}" ]; then
+    local basic
+    basic="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+    printf '::add-mask::%s\n' "$basic" >&2
+    GIT_CONFIG_COUNT=2 \
+      GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+      GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${basic}" \
+      GIT_CONFIG_KEY_1=core.hooksPath \
+      GIT_CONFIG_VALUE_1=/dev/null \
+      GIT_TERMINAL_PROMPT=0 \
+      GCM_INTERACTIVE=never \
+      git "$@"
+    return
   fi
-  # A failed/empty compare proves no rewrite. In particular, installation
-  # quota exhaustion must fail the controller so its existing recovery path
-  # can run, rather than recording a successful supersession (JOV-7674).
+  GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never git "$@"
+}
+
+# Read one compare response. Sets compare_exit, compare_http,
+# compare_retry_after, compare_remaining, compare_reset, compare_detail.
+# Does not treat an error body's "status" field as ancestry: a 403 payload
+# can contain "status":"404" or any other word (JOV-7674).
+read_compare_once() {
+  local raw
+  raw="$(mktemp)"
+  compare_err="$(mktemp)"
+  set +e
+  "$gh_cli" api -i "repos/$repository/compare/${expected}...${current}" >"$raw" 2>"$compare_err"
+  compare_exit=$?
+  set -e
+  compare_http="$(awk 'toupper($1) ~ /^HTTP/ { gsub(/\r/,"",$2); print $2; exit }' "$raw")"
+  compare_retry_after="$(awk 'tolower($1)=="retry-after:" { gsub(/\r/,"",$2); print $2; exit }' "$raw")"
+  compare_remaining="$(awk 'tolower($1)=="x-ratelimit-remaining:" { gsub(/\r/,"",$2); print $2; exit }' "$raw")"
+  compare_reset="$(awk 'tolower($1)=="x-ratelimit-reset:" { gsub(/\r/,"",$2); print $2; exit }' "$raw")"
+  compare_body="$(awk 'BEGIN{p=0} { sub(/\r/,"") } NF==0 { p=1; next } p { print }' "$raw")"
+  if [ -z "${compare_http:-}" ]; then
+    compare_http="$(awk 'match($0, /HTTP [0-9][0-9][0-9]/) { print substr($0, RSTART+5, 3); exit }' "$compare_err")"
+  fi
+  compare_detail="$(jq -r '.message // empty' <<<"${compare_body:-{\}}" 2>/dev/null || true)"
+  if [ -z "$compare_detail" ]; then
+    compare_detail="$(one_line "${compare_body:-}")"
+  fi
+  if [ -z "$compare_detail" ]; then
+    compare_detail="$(one_line "$(cat "$compare_err" 2>/dev/null || true)")"
+  else
+    compare_detail="$(one_line "$compare_detail")"
+  fi
+  rm -f "$raw" "$compare_err"
+}
+
+compare_retryable() {
+  case "${compare_http:-}" in
+    429|502|503|504) return 0 ;;
+    "")
+      if [ "${compare_exit:-1}" -ne 0 ]; then
+        return 0
+      fi
+      return 1
+      ;;
+    403)
+      if [ "${compare_remaining:-}" = "0" ]; then
+        return 0
+      fi
+      if [[ "${compare_retry_after:-}" =~ ^[0-9]+$ ]]; then
+        return 0
+      fi
+      if printf '%s\n' "$compare_detail" | grep -qiE 'rate limit|secondary rate|abuse detection'; then
+        return 0
+      fi
+      return 1
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+# Seconds to wait before another REST attempt. Retry-After and a primary
+# reset beat the exponential backoff. The caller refuses a wait past the cap
+# instead of retrying early: an early retry makes a secondary limit worse.
+compare_wait_seconds() {
+  local wait_s="$compare_backoff" i=1 reset_wait now
+  while [ "$i" -lt "$attempt" ]; do
+    wait_s=$((wait_s * 2))
+    i=$((i + 1))
+  done
+  if [[ "${compare_retry_after:-}" =~ ^[0-9]+$ ]]; then
+    wait_s="$compare_retry_after"
+  fi
+  if [ "${compare_remaining:-}" = "0" ] && [[ "${compare_reset:-}" =~ ^[0-9]+$ ]]; then
+    now="$(date +%s)"
+    reset_wait=$((compare_reset - now + 1))
+    if [ "$reset_wait" -lt 0 ]; then
+      reset_wait=0
+    fi
+    if [ "$reset_wait" -gt "$wait_s" ]; then
+      wait_s="$reset_wait"
+    fi
+  fi
+  printf '%s\n' "$wait_s"
+}
+
+# Sets compare_status to ahead|behind|diverged on a classified HTTP 200.
+# Retries only a transient failure whose wait fits in the cap. Returns 1
+# when ancestry is still unproven; the caller may then use git.
+rest_lineage_status() {
+  local attempt=1 wait_s
+  compare_attempts="${LINEAGE_COMPARE_ATTEMPTS:-4}"
+  compare_backoff="${LINEAGE_COMPARE_BACKOFF_SECONDS:-2}"
+  compare_max_sleep="${LINEAGE_COMPARE_MAX_SLEEP_SECONDS:-15}"
+  [[ "$compare_attempts" =~ ^[1-9][0-9]*$ ]] || compare_attempts=4
+  [[ "$compare_backoff" =~ ^[0-9]+$ ]] || compare_backoff=2
+  [[ "$compare_max_sleep" =~ ^[0-9]+$ ]] || compare_max_sleep=15
+  if [ "$compare_attempts" -gt 6 ]; then
+    compare_attempts=6
+  fi
+  compare_status=""
+  while [ "$attempt" -le "$compare_attempts" ]; do
+    read_compare_once
+    if [ "$compare_exit" -eq 0 ] && [ "$compare_http" = "200" ]; then
+      compare_status="$(jq -r '.status // empty' <<<"${compare_body:-{\}}" 2>/dev/null || true)"
+      case "$compare_status" in
+        ahead|behind|diverged) return 0 ;;
+      esac
+      # A 200 that is not ahead/behind/diverged is not a transport error.
+      # Retrying it cannot classify the pair. Git may still prove it.
+      return 1
+    fi
+    if ! compare_retryable || [ "$attempt" -ge "$compare_attempts" ]; then
+      return 1
+    fi
+    wait_s="$(compare_wait_seconds)"
+    if [ "$wait_s" -gt "$compare_max_sleep" ]; then
+      echo "::warning::GitHub compare HTTP ${compare_http:-none} requires ${wait_s}s, past the ${compare_max_sleep}s bound (response: ${compare_detail:-none}); proving ancestry with git." >&2
+      return 1
+    fi
+    echo "::warning::GitHub compare attempt ${attempt} failed (exit=${compare_exit}, HTTP ${compare_http:-none}, response: ${compare_detail:-none}); retrying in ${wait_s}s." >&2
+    sleep "$wait_s"
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+# Echo ahead or diverged. Return 1 when git cannot prove the relationship.
+# A shallow fetch that does not contain EXPECTED_SHA is unproven, not a
+# rewrite: merge-base exit 1 counts as diverged only on a full history.
+prove_lineage_with_git() {
+  local current="$1" work depth tip ancestor_status shallow git_err_file fetch_err
+  git_reason=""
+  if ! command -v git >/dev/null 2>&1; then
+    git_reason="git is not installed"
+    return 1
+  fi
+  work="$(mktemp -d 2>/dev/null || true)"
+  git_err_file="$(mktemp)"
+  if [ -z "$work" ] || [ ! -d "$work" ]; then
+    git_reason="git init failed"
+    rm -f "$git_err_file"
+    return 1
+  fi
+  if ! git init -q "$work" >/dev/null 2>&1; then
+    git_reason="git init failed"
+    rm -rf "$work"
+    rm -f "$git_err_file"
+    return 1
+  fi
+  for depth in 300 4000; do
+    if ! git_authenticated -C "$work" fetch --no-tags --filter=blob:none --depth="$depth" \
+      "https://github.com/${repository}.git" \
+      'refs/heads/main:refs/remotes/origin/main' >/dev/null 2>"$git_err_file"; then
+      fetch_err="$(one_line "$(cat "$git_err_file" 2>/dev/null || true)")"
+      if [ -n "$fetch_err" ]; then
+        git_reason="git fetch of main failed (${fetch_err})"
+      else
+        git_reason="git fetch of main failed"
+      fi
+      rm -rf "$work"
+      rm -f "$git_err_file"
+      return 1
+    fi
+    tip="$(git_authenticated -C "$work" rev-parse refs/remotes/origin/main 2>/dev/null || true)"
+    if [ "$tip" != "$current" ]; then
+      git_reason="main moved from ${current} to ${tip:-missing} while proving lineage"
+      rm -rf "$work"
+      rm -f "$git_err_file"
+      return 1
+    fi
+    set +e
+    git_authenticated -C "$work" merge-base --is-ancestor "$expected" "$tip" >/dev/null 2>&1
+    ancestor_status=$?
+    set -e
+    if [ "$ancestor_status" -eq 0 ]; then
+      printf 'ahead\n'
+      rm -rf "$work"
+      rm -f "$git_err_file"
+      return 0
+    fi
+    shallow="$(git_authenticated -C "$work" rev-parse --is-shallow-repository 2>/dev/null || printf 'true\n')"
+    if [ "$shallow" != "true" ] && [ "$ancestor_status" -eq 1 ]; then
+      printf 'diverged\n'
+      rm -rf "$work"
+      rm -f "$git_err_file"
+      return 0
+    fi
+    if [ "$ancestor_status" -ne 1 ] && [ "$ancestor_status" -ne 128 ]; then
+      git_reason="git merge-base failed (exit ${ancestor_status})"
+      rm -rf "$work"
+      rm -f "$git_err_file"
+      return 1
+    fi
+  done
+  git_reason="git history is still too shallow to prove whether ${expected} is on main"
+  rm -rf "$work"
+  rm -f "$git_err_file"
+  return 1
+}
+
+lineage=exact
+lineage_source=""
+compare_http=""
+compare_exit=0
+compare_detail=""
+compare_status=""
+git_reason=""
+if [ "$current" != "$expected" ]; then
+  lineage=unknown
+  # 2026-10-23 runs 39896469044 and 39897429704: one compare failure
+  # (gh exit 1, response discarded) failed the coalesce job closed and
+  # skipped promotion. Retry a short transient failure. When the wait
+  # cannot be honored, or the response is still unclassified, prove the
+  # pair with git merge-base. Unknown after both still exits 1. A transport
+  # error is never divergence and never a successful supersession (JOV-7674).
+  if rest_lineage_status; then
+    lineage_source=rest
+  else
+    # Redirect, don't capture: a command substitution would drop git_reason.
+    git_status_file="$(mktemp)"
+    if prove_lineage_with_git "$current" >"$git_status_file"; then
+      compare_status="$(tr -d '\r\n' <"$git_status_file")"
+      lineage_source=git
+      echo "::warning::REST compare unavailable (exit=${compare_exit}, HTTP ${compare_http:-none}, response: ${compare_detail:-none}); proved lineage with git (${compare_status})." >&2
+    fi
+    rm -f "$git_status_file"
+  fi
+  case "${compare_status:-}" in
+    ahead) lineage=ancestor ;;
+    behind|diverged) lineage=diverged ;;
+  esac
   if [ "$lineage" = unknown ]; then
     emit lineage unknown
-    emit lineage_lookup_exit "$lookup_status"
+    emit lineage_lookup_exit "$compare_exit"
+    emit lineage_lookup_http "${compare_http:-none}"
     emit gate_decision error
     emit gate_reason lineage_lookup_unavailable
-    echo "::error::Release ancestry is unknown (exit=$lookup_status); inspect GitHub compare access/response before superseding $expected." >&2
+    echo "::error::Release ancestry is unknown (exit=${compare_exit}, HTTP ${compare_http:-none}); compare response: ${compare_detail:-none}; git: ${git_reason:-unproven}. Inspect GitHub compare access/response before superseding ${expected}." >&2
     printf 'decision=error\n'
     exit 1
   fi
@@ -250,5 +492,11 @@ emit unshipped_commits "$unshipped_commits"
 emit unshipped_age_seconds "$unshipped_age_seconds"
 emit gate_decision "$decision"
 emit gate_reason "$reason"
-echo "::notice::Release lineage gate $boundary: decision=$decision lineage=$lineage successor_pending=$successor_pending starving=$starving unshipped=$unshipped_commits age=${unshipped_age_seconds}s reason=\"$reason\"" >&2
+if [ -n "$lineage_source" ]; then
+  emit lineage_source "$lineage_source"
+fi
+if [ -n "$compare_http" ]; then
+  emit lineage_lookup_http "$compare_http"
+fi
+echo "::notice::Release lineage gate $boundary: decision=$decision lineage=$lineage source=${lineage_source:-exact} successor_pending=$successor_pending starving=$starving unshipped=$unshipped_commits age=${unshipped_age_seconds}s reason=\"$reason\"" >&2
 printf 'decision=%s\n' "$decision"
