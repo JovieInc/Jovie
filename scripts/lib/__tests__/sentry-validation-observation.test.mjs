@@ -951,10 +951,13 @@ function harness({
   let reads = 0;
   let recordedBody;
   const facts = {
-    servedGeneration: vi.fn(async () => ({
-      status: 'verified',
-      sha: ARTIFACT,
-    })),
+    servedGeneration: vi.fn(
+      /** @returns {ReturnType<import('../sentry-validation-observation.mjs').ObservationFacts['servedGeneration']>} */
+      async () => ({
+        status: 'verified',
+        sha: ARTIFACT,
+      })
+    ),
     contains: vi.fn(async () => true),
   };
   const sentry = sentryPort(
