@@ -38,24 +38,20 @@ function TerritoryPills({
           <button
             type='button'
             className='inline-flex h-6 items-center rounded-full border border-white/[0.08] bg-white/[0.04] px-2 text-2xs font-semibold text-white/58 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-            aria-label={`Show all territories for ${contact.roleLabel}`}
+            aria-label={`+${territories.length - 1} more territories for ${contact.roleLabel}`}
           >
             +{territories.length - 1}
           </button>
         </PopoverTrigger>
-        <PopoverContent
-          side='top'
-          align='start'
-          className='w-auto min-w-45 rounded-2xl border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] p-3 text-white dark:text-white shadow-[0_20px_48px_rgba(0,0,0,0.4)]'
-        >
-          <p className='text-2xs font-semibold tracking-[0.08em] text-white/42'>
+        <PopoverContent side='top' align='start' className='w-auto min-w-45'>
+          <p className='text-2xs font-semibold tracking-[0.08em] text-secondary-token'>
             Territories
           </p>
           <div className='mt-2 flex flex-wrap gap-1.5'>
             {territories.map(territory => (
               <span
                 key={territory}
-                className='inline-flex rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-2xs font-caption text-white/72'
+                className='inline-flex rounded-full border border-subtle bg-surface-1 px-2 py-1 text-2xs font-caption text-primary-token'
               >
                 {territory}
               </span>

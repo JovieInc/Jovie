@@ -165,7 +165,7 @@ export function OpportunityCardStack({
             }}
             initial={
               reducedMotion
-                ? { opacity: 0 }
+                ? false
                 : { opacity: 0, transform: 'translateY(8px) scale(0.98)' }
             }
             animate={{ opacity: 1, transform: 'translateY(0) scale(1)' }}
@@ -175,7 +175,7 @@ export function OpportunityCardStack({
                 : { opacity: 0, transform: 'translateX(0) scale(0.96)' }
             }
             transition={{
-              duration: reducedMotion ? 0.15 : 0.22,
+              duration: reducedMotion ? 0 : 0.22,
               ease: 'easeOut',
             }}
             style={{ touchAction: 'pan-y' }}

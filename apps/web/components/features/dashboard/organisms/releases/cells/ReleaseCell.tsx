@@ -124,9 +124,9 @@ export const ReleaseCell = memo(function ReleaseCell({
           type='button'
           onClick={handleSelect}
           className='min-w-0 flex-1 text-left focus-visible:outline-none'
-          aria-label={`Open ${release.title}`}
           data-testid={`release-open-${release.id}`}
         >
+          <span className='sr-only'>Open </span>
           <div className='flex min-w-0 items-center gap-1.5 leading-none'>
             <TruncatedText
               lines={1}

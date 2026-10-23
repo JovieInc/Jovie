@@ -117,6 +117,28 @@ beforeEach(() => {
 });
 
 describe('SlashCommandMenu keyboard + IME + ARIA', () => {
+  it('connects its filter to the suggestions and active option without a caller id', () => {
+    render(
+      withProviders(
+        <SlashCommandMenu
+          state={rootState(0)}
+          profileId='profile-test'
+          {...makeHandlers()}
+          onQueryChange={vi.fn()}
+        />
+      )
+    );
+
+    const filter = screen.getByRole('combobox');
+    const suggestions = screen.getByRole('listbox');
+    expect(suggestions.id).not.toBe('');
+    expect(filter).toHaveAttribute('aria-controls', suggestions.id);
+    expect(filter).toHaveAttribute(
+      'aria-activedescendant',
+      screen.getAllByRole('option')[0].id
+    );
+  });
+
   it('renders a listbox with role=option rows for each skill', () => {
     const handlers = makeHandlers();
     renderMenu(rootState(0), handlers);
