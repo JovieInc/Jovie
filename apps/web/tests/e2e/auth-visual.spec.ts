@@ -234,6 +234,9 @@ test.describe('/signin page visual regression', () => {
         .isVisible({ timeout: SNAPSHOT_TIMEOUT })
         .catch(() => false);
 
+      // glm/auth-focal-polish: the tab title is the heading copy verbatim.
+      await expect(page).toHaveTitle('Log in to Jovie');
+
       await neutralizeAuthScreenshotPointer(page);
       await expect(page).toHaveScreenshot(`signin-page-${bp.name}.png`, {
         fullPage: false,
@@ -274,6 +277,9 @@ test.describe('/signup page visual regression', () => {
         .first()
         .isVisible({ timeout: SNAPSHOT_TIMEOUT })
         .catch(() => false);
+
+      // glm/auth-focal-polish: the tab title is the heading copy verbatim.
+      await expect(page).toHaveTitle('Continue to Jovie');
 
       await neutralizeAuthScreenshotPointer(page);
       await expect(page).toHaveScreenshot(`signup-page-${bp.name}.png`, {
