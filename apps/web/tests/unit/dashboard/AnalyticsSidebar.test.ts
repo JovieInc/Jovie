@@ -1,11 +1,32 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { calculateConversionRate } from '@/features/dashboard/organisms/AnalyticsSidebar';
+import { calculateConversionRate } from '@/components/features/dashboard/organisms/AnalyticsSidebar';
+
+const appRoot = resolve(__dirname, '../../..');
+
+function readSource(relativePath: string): string {
+  return readFileSync(resolve(appRoot, relativePath), 'utf8');
+}
 
 // calculateConversionRate now delegates to formatAnalyticsStageRate, which
 // SUPPRESSES vanity percents on small bases (base < MIN_SAMPLE_FOR_PERCENT_DELTA,
 // currently 30). A small denominator turns conversion into noise like "1200%",
 // so we hide the percent entirely (return null) until the base is large enough
 // to be meaningful. These tests assert that suppression behavior.
+describe('AnalyticsSidebar ranked-list density', () => {
+  it('keeps the desktop ranked rows and their loading shell on the 32px scale', () => {
+    const source = readSource(
+      'components/features/dashboard/organisms/AnalyticsSidebar.tsx'
+    );
+
+    expect(source).not.toContain('flex h-9 items-center justify-between');
+    expect(source).toContain(
+      'flex h-8 items-center justify-between rounded-lg px-2.5'
+    );
+  });
+});
+
 describe('calculateConversionRate', () => {
   it('suppresses the percent when the base is below the sample threshold', () => {
     // base < 30 → vanity noise, hide it

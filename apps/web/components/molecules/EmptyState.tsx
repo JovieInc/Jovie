@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/EmptyState.test.tsx
+
 import { Button, type ButtonProps, Kbd } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
@@ -278,7 +280,7 @@ export function EmptyState({
           'mb-1 text-app font-caption',
           styles.heading,
           isWorkspacePresentation &&
-            'mb-2 text-2xl font-semibold tracking-tight text-primary-token'
+            'mb-2 text-sm font-semibold tracking-tight text-primary-token'
         )}
       >
         {heading}
@@ -292,7 +294,7 @@ export function EmptyState({
             styles.descriptionClassName,
             isWorkspacePresentation &&
               cn(
-                'max-w-md text-base leading-6 text-secondary-token',
+                'max-w-md text-app text-secondary-token',
                 !hasActions && 'mb-0'
               )
           )}

@@ -10,12 +10,12 @@ import { cn } from '@/lib/utils';
 import { runDemoAction } from './demo-actions';
 
 const PLATFORM_CONNECTIONS = [
-  { name: 'Spotify', connected: true, color: '#1DB954' },
-  { name: 'Apple Music', connected: true, color: '#FA2D48' },
-  { name: 'YouTube Music', connected: true, color: '#FF0000' },
-  { name: 'Amazon Music', connected: false, color: '#00A8E1' },
-  { name: 'SoundCloud', connected: false, color: '#FF5500' },
-  { name: 'Tidal', connected: false, color: '#000000' },
+  { name: 'Spotify', connected: true },
+  { name: 'Apple Music', connected: true },
+  { name: 'YouTube Music', connected: true },
+  { name: 'Amazon Music', connected: false },
+  { name: 'SoundCloud', connected: false },
+  { name: 'Tidal', connected: false },
 ] as const;
 
 type DemoSettingsCaptureMode = 'quality' | 'sync' | null;
@@ -65,17 +65,13 @@ export function DemoSettingsPanel() {
               >
                 <div className='flex min-w-0 items-center gap-2'>
                   <span
-                    className='size-2 shrink-0 rounded-full'
-                    style={{
-                      backgroundColor: platform.connected
-                        ? 'var(--color-success)'
-                        : 'var(--linear-text-quaternary)',
-                    }}
+                    className={cn(
+                      'size-2 shrink-0 rounded-full',
+                      platform.connected ? 'bg-success' : 'bg-quaternary-token'
+                    )}
+                    aria-hidden='true'
                   />
-                  <span
-                    className='truncate text-app font-caption'
-                    style={{ color: platform.color }}
-                  >
+                  <span className='truncate text-app font-caption text-primary-token'>
                     {platform.name}
                   </span>
                 </div>
@@ -130,9 +126,7 @@ function AudienceQualityCaptureCard() {
         data-testid='demo-settings-audience-quality-capture'
       >
         <div className='border-b border-subtle px-5 py-4'>
-          <p className='text-2xs font-semibold tracking-[0.12em] text-tertiary-token uppercase'>
-            Settings
-          </p>
+          <p className='text-2xs font-medium text-tertiary-token'>Settings</p>
           <div className='mt-2 flex items-end justify-between gap-4'>
             <div>
               <h2 className='text-xl font-semibold tracking-[-0.03em] text-primary-token'>
@@ -212,9 +206,7 @@ function SyncSettingsCaptureCard() {
         data-testid='demo-settings-sync-capture'
       >
         <div className='border-b border-subtle px-5 py-4'>
-          <p className='text-2xs font-semibold tracking-[0.12em] text-tertiary-token uppercase'>
-            Settings
-          </p>
+          <p className='text-2xs font-medium text-tertiary-token'>Settings</p>
           <h2 className='mt-2 text-xl font-semibold tracking-[-0.03em] text-primary-token'>
             Always In Sync
           </h2>
