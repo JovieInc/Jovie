@@ -82,7 +82,7 @@ export function HomepageHeroCanvas({
           <div className='homepage-hero-canvas__copy'>
             <h1
               id={headingId}
-              className='marketing-type-display homepage-hero-canvas__headline'
+              className='marketing-type-display text-balance homepage-hero-canvas__headline'
             >
               {HERO_CANVAS_HEADLINE}
             </h1>
