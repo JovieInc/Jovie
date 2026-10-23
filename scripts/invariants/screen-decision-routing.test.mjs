@@ -397,6 +397,14 @@ describe('EVENT routing qualification in the screen gate (JOV-7350)', () => {
     const input = join(temp, 'declarations.json');
     const output = join(temp, 'receipt.json');
     const transport = join(temp, 'fixture-transport.mjs');
+    const committedAt = spawnSync(
+      'git',
+      ['show', '-s', '--format=%cI', 'HEAD'],
+      {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }
+    ).stdout.trim();
     const head = spawnSync('git', ['rev-parse', 'HEAD'], {
       cwd: ROOT,
       encoding: 'utf8',
@@ -428,6 +436,9 @@ describe('EVENT routing qualification in the screen gate (JOV-7350)', () => {
         transport,
         `
         import { createHash } from 'node:crypto';
+        import { mock } from 'node:test';
+        // Bind the fixture clock to HEAD so old checkouts remain reproducible.
+        mock.timers.enable({ apis: ['Date'], now: ${Date.parse(committedAt)} });
         globalThis.fetch = async (url, init) => {
           if (url !== 'https://jov.ie/api/internal/ovie/summer-cards' ||
               init.headers.authorization !== 'Bearer fixture-only-oidc-token') throw Error('unexpected transport');
