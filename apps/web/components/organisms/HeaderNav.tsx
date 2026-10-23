@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 // User menu is client-only. Keep it out of marketing first-load JS.
 const UserButton = dynamic(
   () =>
-    import('@/components/organisms/user-button').then(mod => ({
+    import('@/components/organisms/user-button/UserButton').then(mod => ({
       default: mod.UserButton,
     })),
   { loading: () => null }
