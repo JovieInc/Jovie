@@ -186,8 +186,8 @@ export default function DownloadPage() {
                   <p
                     className={`mt-6 max-w-xl text-balance text-lg leading-relaxed tracking-normal ${muted}`}
                   >
-                    Open the Mac app today. Keep the iPhone build internal
-                    while we harden auth, Profile QR, and TestFlight.
+                    Open the Mac app today. Keep the iPhone build internal while
+                    we harden auth, Profile QR, and TestFlight.
                   </p>
                   <div className='mt-8 flex flex-wrap items-center gap-3'>
                     <Button
