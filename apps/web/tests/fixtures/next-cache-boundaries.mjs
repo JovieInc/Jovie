@@ -31,9 +31,6 @@ export default async function Page({searchParams}:any){const p=await searchParam
   'src/lib/admin/impersonation.ts': String.raw`
 export async function getImpersonationState(){return null;}
 `,
-  'src/lib/auth/app-user-id.ts': String.raw`
-import {eq} from 'drizzle-orm'; export const appUserIdFilter=(table:any,id:string)=>eq(table.id,id);
-`,
   'src/lib/auth/app-user.ts': String.raw`
 export async function getAppUserByBetterAuthId(id:string){return {id,userStatus:'active',deletedAt:null};} export const getAppUserById=getAppUserByBetterAuthId;
 `,

@@ -1,6 +1,7 @@
 /**
  * Explicit integration selector (not added to the fast source CI path):
- * node --test apps/web/tests/integration/next-cache-boundaries.test.mjs
+ * node --test apps/web/tests/integration/next-cache-boundaries.node-test.mjs
+ * The node-test suffix keeps this explicit Node runner out of Vitest discovery.
  *
  * Real Next Server Actions, React memoization, headers and persistent cache;
  * synthetic session/DB leaves. No application server or secrets are required.
@@ -37,6 +38,7 @@ const sourceFiles = [
   'lib/auth/cached.ts',
   'lib/auth/session.ts',
   'lib/auth/request-session.ts',
+  'lib/auth/app-user-id.ts',
 ];
 
 async function freePort() {
@@ -53,17 +55,18 @@ test('persistent caches preserve request auth boundaries in Next Server Actions'
 }, async t => {
   const directory = await mkdtemp(path.join(tmpdir(), 'jovie-next-cache-'));
   let server;
+  let serverStopped;
   let logs = '';
   t.after(async () => {
-    if (server && server.exitCode === null) {
+    if (server && server.exitCode === null && server.signalCode === null) {
       server.kill('SIGTERM');
       await Promise.race([
-        once(server, 'exit'),
+        serverStopped,
         delay(5_000, undefined, { ref: false }),
       ]);
-      if (server.exitCode === null) {
+      if (server.exitCode === null && server.signalCode === null) {
         server.kill('SIGKILL');
-        await once(server, 'exit');
+        await serverStopped;
       }
     }
     await rm(directory, { recursive: true, force: true });
@@ -151,6 +154,13 @@ test('persistent caches preserve request auth boundaries in Next Server Actions'
       stdio: ['ignore', 'pipe', 'pipe'],
     }
   );
+  serverStopped = new Promise(resolve => {
+    server.once('exit', resolve);
+    server.once('error', error => {
+      logs += error.message;
+      resolve();
+    });
+  });
   server.stdout.on('data', data => {
     logs += data;
   });
@@ -161,6 +171,7 @@ test('persistent caches preserve request auth boundaries in Next Server Actions'
   let document;
   while (Date.now() < deadline) {
     assert.equal(server.exitCode, null, logs);
+    assert.equal(server.signalCode, null, logs);
     try {
       const response = await fetch(base, {
         signal: AbortSignal.timeout(3_000),
