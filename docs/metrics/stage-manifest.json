@@ -102,6 +102,14 @@
           "source": "github-controller"
         },
         {
+          "id": "outcome-receipt",
+          "meaning": "independent issue span: outcome receipt owed (lifecycle comment) to receipt recorded by the outcome lane; entityId is the JOV issue",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
           "id": "verified",
           "meaning": "first Production Verified job completed at or after deploy",
           "producer": "production-controller.yml",
