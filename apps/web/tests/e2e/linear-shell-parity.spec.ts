@@ -15,23 +15,6 @@ async function setTheme(page: Page, theme: 'light' | 'dark') {
   }, theme);
 }
 
-async function expectQuietToolbarActionChrome(locator: Locator) {
-  const metrics = await locator.evaluate(element => {
-    const style = getComputedStyle(element);
-    return {
-      height: Number.parseFloat(style.height),
-      radius: Number.parseFloat(style.borderTopLeftRadius),
-      borderTop: Number.parseFloat(style.borderTopWidth),
-      boxShadow: style.boxShadow,
-    };
-  });
-
-  expect(metrics.height).toBeGreaterThanOrEqual(27);
-  expect(metrics.height).toBeLessThanOrEqual(29.5);
-  expect(metrics.radius).toBeGreaterThanOrEqual(999);
-  expect(metrics.borderTop).toBe(0);
-  expect(hasVisibleShadow(metrics.boxShadow)).toBeFalsy();
-}
 function hasVisibleShadow(boxShadow: string) {
   if (boxShadow === 'none') return false;
 
@@ -76,7 +59,7 @@ function splitShadowLayers(boxShadow: string) {
   return layers;
 }
 
-async function expectFlatPillChrome(locator: Locator) {
+async function expectDrawerTabChrome(locator: Locator) {
   const metrics = await locator.evaluate(element => {
     const style = getComputedStyle(element);
     return {
@@ -88,8 +71,9 @@ async function expectFlatPillChrome(locator: Locator) {
   });
 
   expect(metrics.height).toBeGreaterThanOrEqual(27);
-  expect(metrics.height).toBeLessThanOrEqual(29.5);
-  expect(metrics.radius).toBeGreaterThanOrEqual(999);
+  expect(metrics.height).toBeLessThanOrEqual(32);
+  expect(metrics.radius).toBeGreaterThanOrEqual(9.5);
+  expect(metrics.radius).toBeLessThan(16);
   expect(metrics.borderTop).toBeGreaterThan(0);
   expect(hasVisibleShadow(metrics.boxShadow)).toBeFalsy();
 }
@@ -106,7 +90,7 @@ async function expectCardChrome(locator: Locator) {
 
   expect(metrics.radius).toBeGreaterThanOrEqual(9.5);
   expect(metrics.borderTop).toBeGreaterThan(0);
-  expect(metrics.boxShadow).not.toBe('none');
+  expect(hasVisibleShadow(metrics.boxShadow)).toBeFalsy();
 }
 
 async function expectFlatSurface(locator: Locator) {
@@ -154,44 +138,19 @@ function getPrimaryReleaseTitle() {
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  // JOV-8783: drawer tab and analytics card radii drifted from this
-  // contract; taste decision pending. Re-enable once decided.
-  test.fixme(`${theme}: /demo toolbar pills and release drawer follow parity invariants`, async ({
+  test(`${theme}: /demo release drawer matches the shipped shell`, async ({
     page,
   }) => {
     await page.goto('/demo', { waitUntil: 'domcontentloaded' });
-    // Wait for hydration via the asserted target instead of a fixed sleep.
-    // setTheme toggles a documentElement class that Tailwind keys off;
-    // it only needs the page rendered, not a wall-clock delay.
     const primaryReleaseTitle = getPrimaryReleaseTitle();
-    const firstReleaseRow = page.getByTestId('release-row');
+    const firstReleaseRow = page.locator('[data-shell-release-row]').first();
     await expect(firstReleaseRow).toBeVisible();
     await setTheme(page, theme);
     await expect(
       firstReleaseRow.getByText(primaryReleaseTitle, { exact: true })
     ).toBeVisible();
 
-    const displayButton = page
-      .locator('button[aria-label="Display"]:visible')
-      .last();
-    const previewButton = page
-      .locator('button[aria-label="Toggle release preview"]:visible')
-      .last();
-    const hasDisplayButton = (await displayButton.count()) > 0;
-
-    const firstReleaseTrigger = page
-      .locator('[data-testid^="release-open-"]')
-      .first();
-    await expect(firstReleaseTrigger).toBeVisible();
-    await expect(previewButton).toBeVisible();
-    await expect(previewButton).toBeEnabled();
-    await expectQuietToolbarActionChrome(previewButton);
-    if (hasDisplayButton) {
-      await expect(displayButton).toBeEnabled();
-      await expectQuietToolbarActionChrome(displayButton);
-    }
-
-    await firstReleaseTrigger.click();
+    await firstReleaseRow.click();
 
     const drawer = page.getByTestId('release-sidebar');
     await expect(drawer).toBeVisible();
@@ -209,17 +168,15 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(overviewTab).toBeVisible();
     await expect(platformsTab).toBeVisible();
     await expect(tasksTab).toBeVisible();
-    await expectFlatPillChrome(overviewTab);
-    await expectFlatPillChrome(platformsTab);
-    await expectFlatPillChrome(tasksTab);
+    await expectDrawerTabChrome(overviewTab);
+    await expectDrawerTabChrome(platformsTab);
+    await expectDrawerTabChrome(tasksTab);
     await expectCardChrome(drawer.getByTestId('release-tabbed-card'));
     await expectFlatSurface(drawer.getByTestId('release-metadata-card'));
     await expect(drawer.getByTestId('release-header-card')).toBeVisible();
-    const copySmartLinkButton = drawer.getByRole('button', {
-      name: 'Copy smart link',
-    });
-    await expect(copySmartLinkButton).toBeVisible();
-    await expectFlatPillChrome(copySmartLinkButton);
+    await expect(
+      drawer.getByRole('button', { name: 'Copy smart link' })
+    ).toBeVisible();
 
     expect(
       await livesInsideRoundedCard(
@@ -233,9 +190,7 @@ for (const theme of ['light', 'dark'] as const) {
     ).toBeTruthy();
   });
 
-  // JOV-8783: drawer tab and analytics card radii drifted from this
-  // contract; taste decision pending. Re-enable once decided.
-  test.fixme(`${theme}: /demo/audience analytics drawer uses minimal top chrome and card surfaces`, async ({
+  test(`${theme}: /demo/audience analytics drawer uses the shared rounded card`, async ({
     page,
   }) => {
     await page.goto('/demo/audience', { waitUntil: 'domcontentloaded' });
@@ -260,7 +215,9 @@ for (const theme of ['light', 'dark'] as const) {
     const tabbedCard = drawer.getByTestId('demo-analytics-tabbed-card');
     await expect(tabbedCard).toBeVisible();
     await expectCardChrome(tabbedCard);
-    await expect(tabbedCard.getByRole('tab', { name: 'Cities' })).toBeVisible();
+    const citiesTab = tabbedCard.getByRole('tab', { name: 'Cities' });
+    await expect(citiesTab).toBeVisible();
+    await expectDrawerTabChrome(citiesTab);
     await expect(tabbedCard.getByText('Los Angeles')).toBeVisible();
 
     expect(

@@ -202,7 +202,7 @@
       "gh-shell": 4
     },
     ".github/workflows/screenshots.yml": {
-      "gh-shell": 13
+      "gh-shell": 4
     },
     ".github/workflows/security-suppression-audit.yml": {
       "gh-shell": 1
