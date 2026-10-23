@@ -492,7 +492,9 @@ export function scoreMutants(mutants) {
 /**
  * Markdown summary: one row per file, then the first survivors per file.
  * @param {{ sources: string[], results: FileResult[], untested: string[], skipped: string[],
- *   errors?: { file: string, reason: string }[], lowScore: number, survivorsPerFile?: number }} input
+ *   errors?: { file: string, reason: string }[], lowScore: number, survivorsPerFile?: number,
+ *   floors?: Record<string, { floor?: number }>,
+ *   floorFailures?: { file: string, score: number | null, floor: number }[] }} input
  */
 export function renderSummary({
   sources,
@@ -502,8 +504,10 @@ export function renderSummary({
   lowScore,
   errors = [],
   survivorsPerFile = 10,
+  floors = {},
+  floorFailures = [],
 }) {
-  const lines = ['## Mutation diff (advisory)', ''];
+  const lines = ['## Mutation diff', ''];
   if (sources.length === 0) {
     lines.push('Skipped: no applicable changed high-risk source files.');
     return `${lines.join('\n')}\n`;
@@ -514,9 +518,9 @@ export function renderSummary({
   );
   if (results.length > 0) {
     lines.push(
-      '| File | Score | Detected | Survived | Test files | Passed tests | Target statements / functions |'
+      '| File | Score | Detected | Survived | Test files | Passed tests | Target statements / functions | Floor |'
     );
-    lines.push('|---|---:|---:|---:|---:|---:|---:|');
+    lines.push('|---|---:|---:|---:|---:|---:|---:|---:|');
     for (const result of results) {
       const { detected, undetected, score } = scoreMutants(result.mutants);
       const flag = score !== null && score < lowScore ? ' (low)' : '';
@@ -525,8 +529,19 @@ export function renderSummary({
       const executed = target
         ? `${target.executedStatements}/${target.totalStatements} / ${target.executedFunctions}/${target.totalFunctions}`
         : 'n/a';
+      const floor = floors[result.file]?.floor;
+      const floorCell = typeof floor === 'number' ? `${floor}%` : 'n/a';
       lines.push(
-        `| \`${result.file}\` | ${shown} | ${detected} | ${undetected} | ${result.tests.length} | ${result.executedTests ?? 'n/a'} | ${executed} |`
+        `| \`${result.file}\` | ${shown} | ${detected} | ${undetected} | ${result.tests.length} | ${result.executedTests ?? 'n/a'} | ${executed} | ${floorCell} |`
+      );
+    }
+  }
+  if (floorFailures.length > 0) {
+    lines.push('', '### Score floor regressions', '');
+    for (const failure of floorFailures) {
+      const shown = failure.score === null ? 'n/a' : `${failure.score}%`;
+      lines.push(
+        `- \`${failure.file}\`: ${shown} is below floor ${failure.floor}%`
       );
     }
   }

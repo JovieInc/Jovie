@@ -106,12 +106,21 @@ _NON_CREDENTIAL_STRATEGY = re.compile(
 )
 # Match only the stated assurance, capturing its credential mention. Never
 # erase another mention in the same sentence: it may request a real action.
+# JOV-8810: a model-route repair also says a check could not be verified,
+# that child-environment credentials were stripped, or names screenshot/credential
+# tests. Each alternative captures only that word. A rotate, a vault strip,
+# "credential for tests", and a credential path stay gated.
 _CREDENTIAL_ASSURANCE = re.compile(
     r"\b(?P<passive>credentials?)(?:,\s*(?:and\s+)?OTPs?)?\s+"
     r"(?:are|is|were|was)\s+(?:(?:excluded|omitted|redacted|hashed|stripped|dropped|withheld)"
     r"|not\s+(?:recorded|stored|logged|included|emitted|printed|persisted))\b"
     r"|\bcannot\s+(?:attest|isolate)(?:\s+or\s+(?:attest|isolate))?\s+"
-    r"(?:child\s+tools,\s*)?(?P<boundary>credentials?)\b",
+    r"(?:child\s+tools,\s*)?(?P<boundary>credentials?)\b"
+    r"|\bstrip(?:ped|ping)?\s+(?:(?:raw|metered)\s+)?(?:api\s+)?(?P<removed>credentials?)\s+"
+    r"(?:from|in)\s+(?:child\s+)?environments?\b"
+    r"|\b(?:could\s+not|cannot|can\s+not)\s+be\s+(?:verified|certified)\s+"
+    r"(?:with\s+the\s+available|without)\s+(?P<unavailable>credentials?)\b"
+    r"|\bscreenshot/(?P<testref>credentials?)\s+tests?\b",
     re.IGNORECASE,
 )
 ACTIONABLE_FIX = re.compile(
@@ -941,12 +950,16 @@ def remediation_summary(snapshot: dict | None, receipts: list[dict] | None, now:
     return report
 
 
-def alert_reason(report: dict) -> str | None:
-    surfaced = report.get("surfaced") or []
+def alert_reason(report: dict, open_prs: set[int] | None = None) -> str | None:
+    """Surfaced PRs that are still open, for the lanes repair owner (Tim's rule: never a
+    human by default). `surfaced` is append-only, so on Gem 2026-10-20 the alert listed 12
+    PRs that had all merged or closed by 10-13; with the open set known, those drop out."""
+    surfaced = [row for row in report.get("surfaced") or []
+                if open_prs is None or row.get("pr") in open_prs]
     if not surfaced:
         return None
     listed = ", ".join(f"#{row.get('pr')} {row.get('cls')}" for row in surfaced[:12])
-    return f"needs a human decision: {listed}"
+    return f"surfaced PRs need a repair-owner decision: {listed}"
 
 
 def intake_labels(ws: str) -> list[str]:

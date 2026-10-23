@@ -20,6 +20,7 @@ export const WEB_UNIT_EXCLUDE_PREFIXES = Object.freeze([
   'apps/web/tests/audit/',
   'apps/web/tests/performance/',
   'apps/web/tests/integration/',
+  'apps/web/tests/a11y/',
   'apps/web/tests/product-screenshots/',
   'apps/web/tests/visual-qa/',
 ]);
@@ -30,6 +31,7 @@ export const WEB_UNIT_EXCLUDE_GLOBS = Object.freeze([
   'tests/audit/**',
   'tests/performance/**',
   'tests/integration/**',
+  'tests/a11y/**',
   'tests/product-screenshots/**',
   'tests/visual-qa/**',
   'tests/**/*.nightly.test.ts',

@@ -63,7 +63,7 @@ These are Electron/hosted-load problems. A Swift rewrite does not remove them, a
 5. **merged ≠ live for Ovie.** #16414 changed hosted `/hud?ovie=mac`. Packaged `Jovie.app` pointed at production does not show it until that web SHA is deployed **and** the app reloads. Summer already named this `ops/reviewed-invariants/mac-ovie-empty-hud-is-red-v1`.
 6. **Two menu-bar owners.** Electron tray (product) and MenuMonitor (ops). Do not add a third Swift menu as a HUD.
 
-Electron startup/memory evidence is still “required” in `PERFORMANCE.md` (JOV-2712). Target on paper: start < 3s, stable RSS, no renderer crashes.
+Electron startup/memory evidence is still “required” in `docs/hardening/PERFORMANCE.md` (JOV-2712). Target on paper: start < 3s, stable RSS, no renderer crashes.
 
 ---
 

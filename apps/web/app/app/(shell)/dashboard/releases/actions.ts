@@ -6,6 +6,11 @@ import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { invalidateReleaseCaches } from '@/lib/cache/releases';
+import { claimVerificationPendingMessage } from '@/lib/claim/claim-verification';
+import {
+  getClaimVerificationReach,
+  requestClaimVerification,
+} from '@/lib/claim/claim-verification.server';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { hasReleaseClickAnalytics } from '@/lib/db/queries/analytics';
@@ -17,6 +22,7 @@ import {
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
+import { normalizeEditableIsrc } from '@/lib/discography/editable-isrc';
 import { validateProviderUrl } from '@/lib/discography/provider-domains';
 import {
   getProviderLink,
@@ -88,7 +94,6 @@ export type { ReleaseProfileContext } from '@/lib/releases/release-types';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
-const EDITABLE_ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 
 function isSpotifyIdUniqueViolation(error: unknown): boolean {
   return isUniqueViolation(error, 'creator_profiles_spotify_id_unique');
@@ -107,20 +112,6 @@ function normalizeEditableUpc(value: string | null | undefined): string | null {
   if (!/^\d+$/u.test(normalized)) {
     throw new Error('UPC must contain only digits');
   }
-  return normalized;
-}
-
-function normalizeEditableIsrc(
-  value: string | null | undefined
-): string | null {
-  const trimmed = value?.trim() ?? '';
-  if (!trimmed) return null;
-
-  const normalized = trimmed.replaceAll(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  if (!EDITABLE_ISRC_REGEX.test(normalized)) {
-    throw new Error('ISRC must be 12 letters and digits');
-  }
-
   return normalized;
 }
 
@@ -1325,7 +1316,10 @@ export async function connectSpotifyArtist(params: {
 
   // Get current settings to merge with new data
   const [currentProfile] = await db
-    .select({ settings: creatorProfiles.settings })
+    .select({
+      settings: creatorProfiles.settings,
+      spotifyId: creatorProfiles.spotifyId,
+    })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, profile.id))
     .limit(1);
@@ -1334,6 +1328,31 @@ export async function connectSpotifyArtist(params: {
     string,
     unknown
   >;
+
+  // Claim integrity: a high-reach artist is never linked self-serve. Store a
+  // verification request instead (lib/claim/claim-verification.ts).
+  if (currentProfile?.spotifyId !== params.spotifyArtistId) {
+    const reach = await getClaimVerificationReach(params.spotifyArtistId);
+    if (reach !== null) {
+      const entitlements = await getCurrentUserEntitlements();
+      await requestClaimVerification({
+        profileId: profile.id,
+        spotifyArtistId: params.spotifyArtistId,
+        artistName: params.artistName || null,
+        reach,
+        paid: entitlements.isPro && !entitlements.isTrialing,
+      });
+      return {
+        success: false,
+        importing: false,
+        message: claimVerificationPendingMessage(params.artistName),
+        imported: 0,
+        releases: [],
+        artistName: params.artistName,
+      };
+    }
+  }
+
   const shouldRunInlineImport =
     Boolean(params.forceInlineImport) || isE2EFastOnboardingEnabled();
 

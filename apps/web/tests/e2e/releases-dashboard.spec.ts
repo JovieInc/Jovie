@@ -290,7 +290,6 @@ test.describe('Releases dashboard', () => {
 
     await sidebar.getByTestId('drawer-tab-tasks').click();
     await expect(sidebar.getByTestId('release-tasks-card')).toBeVisible();
-    await sidebar.getByTestId('release-tasks-toggle').click();
     await expect(
       sidebar.locator(
         '[data-testid="release-task-checklist-scroll-region"], [data-testid="release-task-empty-state-compact"]'
@@ -300,7 +299,10 @@ test.describe('Releases dashboard', () => {
 
     const smartLinkPage = await page.context().newPage();
     try {
-      const response = await smartLinkPage.goto(copiedUrl!, {
+      // The copied URL always carries the canonical public host (never a
+      // loopback), so follow its path on the server under test.
+      const smartLinkPath = new URL(copiedUrl!).pathname;
+      const response = await smartLinkPage.goto(smartLinkPath, {
         waitUntil: 'domcontentloaded',
         timeout: 180_000,
       });
@@ -338,8 +340,8 @@ test.describe('Releases dashboard', () => {
         }
       );
       // /app/releases aliases the shell catalog. Tracks/Releases tabs belong
-      // to the retired matrix switcher; the canonical surface is this listbox.
-      const releaseList = page.getByRole('listbox', { name: 'Releases' });
+      // to the retired matrix switcher; the canonical surface is this list.
+      const releaseList = page.getByRole('list', { name: 'Releases' });
       await expect(releaseList).toBeVisible({
         timeout: TIMEOUTS.ELEMENT_CHECK,
       });
@@ -386,7 +388,6 @@ test.describe('Releases dashboard', () => {
     await expect(sidebar.getByTitle('Copy smart link')).toBeVisible();
     await sidebar.getByTestId('drawer-tab-tasks').click();
     await expect(sidebar.getByTestId('release-tasks-card')).toBeVisible();
-    await sidebar.getByTestId('release-tasks-toggle').click();
     await expect(
       sidebar.locator(
         '[data-testid="release-task-checklist-scroll-region"], [data-testid="release-task-empty-state-compact"]'
@@ -431,47 +432,7 @@ test.describe('Releases dashboard', () => {
     }
   });
 
-  test('shows release toolbar controls when releases exist @nightly', async ({
-    page,
-  }) => {
-    test.setTimeout(TIMEOUTS.TEST_OVERALL);
-    await page.route('**/api/profile/view', route =>
-      route.fulfill({ status: 200, body: '{}' })
-    );
-    await page.route('**/api/audience/visit', route =>
-      route.fulfill({ status: 200, body: '{}' })
-    );
-    await page.route('**/api/track', route =>
-      route.fulfill({ status: 200, body: '{}' })
-    );
-    await page.goto(RELEASES_ROUTE, {
-      waitUntil: 'domcontentloaded',
-      timeout: TIMEOUTS.NAVIGATION,
-    });
-
-    const { surface } = await ensureReleasesVisible(page);
-
-    const releaseRows =
-      surface === 'mobile'
-        ? page.locator('[data-testid^="mobile-release-row-"]')
-        : page.locator('tbody tr');
-    expect(await releaseRows.count()).toBeGreaterThan(0);
-
-    await expect(
-      page.getByRole('button', { name: 'Search releases' })
-    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
-    await expect(page.getByRole('button', { name: 'Filter' })).toBeVisible({
-      timeout: TIMEOUTS.ELEMENT_CHECK,
-    });
-    await expect(
-      page.getByRole('button', { name: 'Export data to CSV file' })
-    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
-    await expect(
-      page.getByRole('button', { name: 'Toggle release preview' })
-    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
-  });
-
-  test('opens the add-release calendar and keeps expanded tracks bounded between release rows @nightly', async ({
+  test('shows release list controls when releases exist @nightly', async ({
     page,
   }) => {
     test.setTimeout(TIMEOUTS.TEST_OVERALL);
@@ -492,32 +453,48 @@ test.describe('Releases dashboard', () => {
     const { surface } = await ensureReleasesVisible(page);
     expect(surface).toBe('desktop');
 
-    const expandButton = page
-      .getByRole('button', { name: 'Expand tracks' })
-      .first();
-    await expect(expandButton).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
-    await expandButton.click();
-
-    const trackStack = page
-      .locator('[data-testid^="release-track-stack-"]')
-      .first();
-    await expect(trackStack).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
-
-    const releaseOpenButtons = page.locator('[data-testid^="release-open-"]');
+    // /app/releases renders the shell release list (ShellReleasesView, via
+    // the library alias since #22071). Each row owns its smart link and
+    // action menu; the table-era toolbar (export, preview toggle) is gone.
+    const releaseList = page.getByRole('list', { name: 'Releases' });
+    await expect(releaseList).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+    const rows = releaseList.getByRole('listitem');
     await expect
-      .poll(() => releaseOpenButtons.count(), {
-        timeout: TIMEOUTS.ELEMENT_CHECK,
-      })
-      .toBeGreaterThan(1);
+      .poll(() => rows.count(), { timeout: TIMEOUTS.ELEMENT_CHECK })
+      .toBeGreaterThan(0);
 
-    const trackStackBox = await trackStack.boundingBox();
-    const secondReleaseBox = await releaseOpenButtons.nth(1).boundingBox();
+    const firstRow = rows.first();
+    await expect(
+      firstRow.getByRole('link', { name: /^Open smart link for / })
+    ).toHaveAttribute('href', /^\/[^/]+\/[^/]+/);
+    await expect(
+      firstRow.getByRole('button', { name: /^Release actions for / })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Create a new release' })
+    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
+  });
 
-    expect(trackStackBox).not.toBeNull();
-    expect(secondReleaseBox).not.toBeNull();
-    expect(secondReleaseBox!.y).toBeGreaterThan(
-      trackStackBox!.y + trackStackBox!.height - 2
+  test('opens the add-release calendar from the release list @nightly', async ({
+    page,
+  }) => {
+    test.setTimeout(TIMEOUTS.TEST_OVERALL);
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
     );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.goto(RELEASES_ROUTE, {
+      waitUntil: 'domcontentloaded',
+      timeout: TIMEOUTS.NAVIGATION,
+    });
+
+    const { surface } = await ensureReleasesVisible(page);
+    expect(surface).toBe('desktop');
 
     const addReleaseButton = page.getByRole('button', {
       name: 'Create a new release',
@@ -526,6 +503,9 @@ test.describe('Releases dashboard', () => {
       timeout: TIMEOUTS.ELEMENT_CHECK,
     });
     await addReleaseButton.click();
+    // With Spotify connected, New release offers "Sync from Spotify" or
+    // "Add manually"; the calendar lives in the manual form.
+    await page.getByRole('menuitem', { name: 'Add manually' }).click();
 
     const addReleaseSidebar = page.getByTestId('add-release-sidebar');
     await expect(addReleaseSidebar).toBeVisible({
@@ -536,8 +516,7 @@ test.describe('Releases dashboard', () => {
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
 
     await addReleaseSidebar
-      .getByRole('button', { name: /Pick a date/i })
-      .first()
+      .getByRole('button', { name: 'Release Date', exact: true })
       .click();
     await expect(
       addReleaseSidebar.locator('[role="grid"]').first()

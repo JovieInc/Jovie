@@ -65,6 +65,10 @@ class SweepTest(unittest.TestCase):
         git(self.repo, "push", "-q", "origin", "HEAD:main")
         self.roots = [self.base / "wts"]
         self.now = time.time() + 2 * DAY  # every reflog entry reads two days idle
+        # Hermetic: the real scanners are exercised by SnapshotScanTest; here every snapshot is clean.
+        self.scan = patch.object(sweeper, "scan_snapshot", return_value=None)
+        self.scan.start()
+        self.addCleanup(self.scan.stop)
 
     def worktree(self, name, *, root=None):
         path = (root or self.roots[0]) / name
@@ -77,7 +81,11 @@ class SweepTest(unittest.TestCase):
         return sweeper.sweep([self.repo], self.roots, [self.base / "never"], date="20261003", **kw)
 
     def remote_branches(self):
-        return git(self.remote, "for-each-ref", "--format=%(refname:short)", "refs/heads/backup").split()
+        """Sweep snapshots on the remote; a sweep never creates a branch (refs/heads/*), since
+        branch pushes started Actions and Vercel builds (77 queued on 2026-10-20)."""
+        heads = git(self.remote, "for-each-ref", "--format=%(refname)", "refs/heads/").split()
+        self.assertEqual([ref for ref in heads if ref != "refs/heads/main"], [], "sweep created a branch")
+        return git(self.remote, "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/").split()
 
     def test_existing_drain_starts_no_cleanup_commands(self):
         state = self.base / "state"
@@ -114,7 +122,7 @@ class SweepTest(unittest.TestCase):
         self.assertTrue(report["drained"])
         self.assertFalse(first.exists())
         self.assertTrue(second.exists())
-        self.assertEqual(git(self.remote, "show", "backup/mac/first-20261003:a.txt"),
+        self.assertEqual(git(self.remote, "show", "refs/jovie-preserved/sweep/mac/first-20261003:a.txt"),
                          "keep this edit")
         self.assertEqual(len(report["removed"]), 1)
         self.assertFalse(any("prune" in args for args in commands))
@@ -159,11 +167,12 @@ class SweepTest(unittest.TestCase):
         provenance.write_text("retain provenance\n")
         report = self.sweep(now=time.time() + 2 * DAY)
         self.assertFalse(path.exists())
-        self.assertEqual(report["backups"], ["backup/mac/dirty-20261003"])
-        files = git(self.remote, "ls-tree", "-r", "--name-only", "backup/mac/dirty-20261003").split()
+        self.assertEqual(report["backups"], ["refs/jovie-preserved/sweep/mac/dirty-20261003"])
+        self.assertEqual(self.remote_branches(), report["backups"])
+        files = git(self.remote, "ls-tree", "-r", "--name-only", report["backups"][0]).split()
         self.assertEqual(sorted(files), [".symphony/package-cache/network-trace", "a.txt", "b.txt", "new.txt"],
                          "private cache bytes never reach the backup; source and provenance do")
-        self.assertEqual(git(self.remote, "show", "backup/mac/dirty-20261003:a.txt"), "edited")
+        self.assertEqual(git(self.remote, "show", "refs/jovie-preserved/sweep/mac/dirty-20261003:a.txt"), "edited")
 
     def test_failed_backup_keeps_checkout_and_strips_build_output(self):
         path = self.worktree("unsaved")
@@ -284,8 +293,10 @@ class SweepTest(unittest.TestCase):
         self.assertFalse(expired.exists())
         self.assertEqual(sorted(r["reason"] for r in report["removed"]), ["preserved-expired", "preserved-pr-closed"])
         self.assertEqual(sorted(self.remote_branches()),
-                         ["backup/mac/closed-repair-20261003", "backup/mac/expired-repair-20261003"])
-        files = git(self.remote, "ls-tree", "-r", "--name-only", "backup/mac/closed-repair-20261003").split()
+                         ["refs/jovie-preserved/sweep/mac/closed-repair-20261003",
+                          "refs/jovie-preserved/sweep/mac/expired-repair-20261003"])
+        files = git(self.remote, "ls-tree", "-r", "--name-only",
+                    "refs/jovie-preserved/sweep/mac/closed-repair-20261003").split()
         self.assertNotIn(sweeper.PRESERVED_REPAIR, files)
 
 
@@ -306,6 +317,88 @@ class SweepTest(unittest.TestCase):
         self.assertTrue(work.exists(), "real uncommitted work stays preserved until its TTL")
         self.assertTrue(repair.exists(), "a cancelled repair's marker is not a cleanup marker")
         self.assertEqual(self.remote_branches(), [], "a clean checkout needs no backup branch")
+
+class SnapshotScanTest(unittest.TestCase):
+    """refs/jovie-preserved/* is public: a snapshot pushes only when both scanners prove it clean."""
+
+    def fake_run(self, *, truffle=0, leaks=0, base="b" * 40, raise_on=None):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(list(args))
+            if raise_on and raise_on in args[0]:
+                raise subprocess.TimeoutExpired(args, 1)
+            if args[0] == "git" and "merge-base" in args:
+                return subprocess.CompletedProcess(args, 0 if base else 1, stdout=(base or "") + "\n", stderr="")
+            if args[0] == "git":
+                return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+            code = truffle if "trufflehog" in args[0] else leaks
+            return subprocess.CompletedProcess(args, code, stdout="", stderr="")
+        return run, calls
+
+    def scan(self, **kw):
+        run, calls = self.fake_run(**kw)
+        with patch.object(sweeper, "scanner", side_effect=lambda name: f"/opt/{name}"):
+            return sweeper.scan_snapshot(Path("/w"), run, "origin", "a" * 40), calls
+
+    def test_clean_findings_errors_and_unknown_base(self):
+        self.assertEqual(self.scan()[0], None)
+        self.assertEqual(self.scan(truffle=sweeper.TRUFFLEHOG_FINDINGS)[0], "secret-finding:trufflehog")
+        self.assertEqual(self.scan(leaks=1)[0], "secret-finding:gitleaks")
+        self.assertTrue(self.scan(truffle=2)[0].startswith("scan-failed"))
+        self.assertEqual(self.scan(raise_on="gitleaks")[0], "scan-failed:TimeoutExpired")
+        self.assertEqual(self.scan(base=None)[0], "scan-base-unknown")
+        self.assertEqual(self.scan(base="a" * 40)[0], None)  # nothing new beyond the remote
+
+    def test_scan_covers_base_to_snapshot_by_commit_sha(self):
+        _, calls = self.scan(truffle=sweeper.TRUFFLEHOG_FINDINGS)
+        truffle = next(call for call in calls if "trufflehog" in call[0])
+        self.assertIn("--fail", truffle)
+        self.assertEqual(truffle[truffle.index("--since-commit") + 1], "b" * 40)
+        # A full ref path makes trufflehog scan nothing and exit 0; the SHA is scanned.
+        self.assertEqual(truffle[truffle.index("--branch") + 1], "a" * 40)
+        leaks = next(call for call in calls if "gitleaks" in call[0])
+        self.assertIn(f"{'b' * 40}..{'a' * 40}", leaks)
+        self.assertFalse(any("update-ref" in call for call in calls))
+
+    def test_missing_scanner_holds(self):
+        run, calls = self.fake_run()
+        with patch.object(sweeper, "scanner", return_value=None):
+            self.assertEqual(sweeper.scan_snapshot(Path("/w"), run, "origin", "a" * 40), "scan-unavailable")
+        self.assertEqual(calls, [])
+
+
+class SnapshotHoldTest(SweepTest):
+    """A held snapshot never pushes and keeps the checkout exactly as it is."""
+
+    def test_secret_finding_keeps_checkout_unstripped_and_unpushed(self):
+        path = self.worktree("leaky")
+        (path / "a.txt").write_text("edit with a secret\n")
+        (path / "node_modules").mkdir()
+        self.scan.stop()
+        with patch.object(sweeper, "scan_snapshot", return_value="secret-finding:trufflehog"):
+            report = self.sweep()
+        self.scan.start()
+        self.assertTrue((path / "a.txt").exists() and (path / "node_modules").exists())
+        self.assertEqual(report["secretHeld"], [{"name": "leaky", "path": str(path),
+                                                 "reason": "secret-finding:trufflehog"}])
+        self.assertEqual(self.remote_branches(), [])
+        self.assertEqual(report["removed"], [])
+
+    def test_outputs_and_archives_never_enter_a_snapshot(self):
+        path = self.worktree("bulky")
+        (path / "a.txt").write_text("real edit\n")
+        (path / "outputs/sidebar-review").mkdir(parents=True)
+        (path / "outputs/sidebar-review/build.bin").write_text("x")
+        (path / "src.tar.gz").write_bytes(b"\x1f\x8b")
+        (path / "nested").mkdir()
+        (path / "nested/bundle.zip").write_bytes(b"PK")
+        self.sweep()
+        [ref] = self.remote_branches()
+        files = git(self.remote, "ls-tree", "-r", "--name-only", ref).split()
+        self.assertIn("a.txt", files)
+        self.assertFalse([name for name in files if name.startswith("outputs/") or name.endswith((".tar.gz", ".zip"))])
+
 
 class ScopeTest(unittest.TestCase):
     def test_glob_roots_match_only_direct_children(self):

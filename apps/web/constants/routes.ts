@@ -99,11 +99,12 @@ export const APP_ROUTES = {
   /** Internal visual catalog for canonical chat lifecycle and artifact states. */
   ADMIN_CHAT_PLAYGROUND: '/app/ov/chat-playground',
   /** Founder home: business and production reality in one scan. */
-  ADMIN_NOW: '/hud',
-  ADMIN_OPS: '/hud',
+  ADMIN_NOW: '/app/ov',
+  ADMIN_OPS: '/app/ov/ops',
   ADMIN_PRODUCT: '/app/ov/product',
   ADMIN_OPERATIONS: '/app/ov/operations',
   ADMIN_NEEDS_YOU: '/app/ov/needs-you',
+  ADMIN_INBOX: '/app/ov/inbox',
   ADMIN_SHIPPING: '/app/ov/shipping',
   ADMIN_PEOPLE: '/app/ov/people',
   ADMIN_GROWTH: '/app/ov/growth',
@@ -205,6 +206,18 @@ export const APP_ROUTES = {
   PAY: '/pay',
   /** Live DESIGN_READY marketing page — never 410 / reserved-gone. */
   PRODUCT: '/product',
+  /** Release date and reveal date fields. Nested under /product so it is not a profile handle. */
+  PRODUCT_RELEASE_SCHEDULING: '/product/release-scheduling',
+  /** Per-service DSP links. Nested under /product so it is not a profile handle. */
+  PRODUCT_DSP_LINKS: '/product/dsp-links',
+  /** Tracked-link builder. Nested under /product so it is not a profile handle. */
+  PRODUCT_UTM_LINKS: '/product/utm-links',
+  /** ISRC field. Nested under /product so it is not a profile handle. */
+  PRODUCT_ISRC: '/product/isrc',
+  /** Pre-save countdown. Nested under /product so it is not a profile handle. */
+  PRODUCT_PRE_SAVE: '/product/pre-save',
+  /** Smart-link click analytics. Live feature page. */
+  PRODUCT_LINK_ANALYTICS: '/product/link-analytics',
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */
   SOLUTIONS_ARTISTS: '/solutions/artists',
   INSTANT_MERCH: '/instant-merch',
@@ -248,6 +261,9 @@ export const APP_ROUTES = {
   WAITLIST_INVITE: '/waitlist/invite',
   /** Anonymous onboarding chat (JOV-2132). Replaces /waitlist as the front door. */
   START: '/start',
+  /** Self-serve $12/month artist profile: find or create, then checkout. */
+  CLAIM: '/claim',
+  CLAIM_START: '/claim/start',
 
   // Billing
   BILLING: '/billing',

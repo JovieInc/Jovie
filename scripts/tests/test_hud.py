@@ -1596,3 +1596,13 @@ class ConsoleTextTest(unittest.TestCase):
                         self.assertEqual(sum(alloc.values()), rows)
                         self.assertEqual(alloc, hud.allocate(names, rows))
         self.assertEqual(hud.allocate(["workers", "supply"], 4), {"workers": 4}, "a panel that cannot fit is hidden whole")
+
+    def test_once_draws_the_panel_layout_by_default(self):
+        value, now = fixture("live")
+        output = io.StringIO()
+        with mock.patch.object(hud.lane, "Host"), mock.patch.object(hud.lane, "load_github_env"), \
+                mock.patch.object(hud, "build_model", return_value=value), \
+                mock.patch.object(hud, "utcnow", return_value=now), mock.patch.object(hud.sys, "stdout", output):
+            self.assertEqual(hud.main(["--once", "--width", "160", "--height", "45"]), 0)
+        self.assertIn(" WORKERS ", output.getvalue())
+        self.assertNotIn("ACTIVE SLOTS", output.getvalue())

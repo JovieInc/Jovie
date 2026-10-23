@@ -363,7 +363,24 @@ export function ProfileCompactTemplate({
   const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
   const arrivalHistoryLengthRef = useRef<number | null>(null);
+  // The pathname this document mounted on. Render fixtures mount this
+  // template on their own pathname; user-initiated mode activation from
+  // there stays sanctioned.
+  const mountedPathnameRef = useRef<string | null>(null);
   const profileHistoryDepthRef = useRef(0);
+  // The mode this document landed with. Filled in by the effect below, before
+  // the history effect, while the landing URL is still intact. Next's history
+  // updater can replace that entry with the bare profile path after child
+  // effects; restoring the mode must not push a second entry on top of the strip.
+  const landedHistoryModeRef = useRef<ProfileMode | null>(null);
+  // The URL/intent pair the history effect last observed. When a later run
+  // sees the URL move while the intent is unchanged, a client Link navigation
+  // (or Next's own entry updater) is mid-flight and requestedMode has not
+  // synced yet; writing the stale intent back would revert the navigation.
+  const lastHistorySyncRef = useRef<{
+    href: string;
+    mode: ProfileMode | null;
+  } | null>(null);
 
   const clearCloseResetTimer = useCallback(() => {
     if (closeResetTimerRef.current !== null) {
@@ -378,6 +395,7 @@ export function ProfileCompactTemplate({
 
   useEffect(() => {
     arrivalHistoryLengthRef.current = globalThis.history.length;
+    mountedPathnameRef.current = globalThis.location.pathname;
     profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
       globalThis.history.state
     );
@@ -726,7 +744,34 @@ export function ProfileCompactTemplate({
     return () => globalThis.removeEventListener('popstate', handlePopState);
   }, [syncRequestedModeFromLocation]);
 
+  const browserHref =
+    globalThis.window === undefined
+      ? ''
+      : `${globalThis.location.pathname}${globalThis.location.search}`;
+
   useEffect(() => {
+    if (
+      landedHistoryModeRef.current !== null ||
+      globalThis.window === undefined
+    ) {
+      return;
+    }
+    landedHistoryModeRef.current = getModeFromUrl();
+  }, []);
+
+  useEffect(() => {
+    // Record the URL/intent pair this run observes first — the guards below
+    // return early, and the in-flight-navigation check after them must still
+    // see what the last run saw, including on suppressed or unsettled runs.
+    const activeMode = resolveHistoryMode({
+      drawerOpen,
+      drawerView,
+      requestedMode,
+    });
+    const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
+    const previousSync = lastHistorySyncRef.current;
+    lastHistorySyncRef.current = { href: currentHref, mode: activeMode };
+
     if (!initialLocationModeAlignedRef.current) {
       return;
     }
@@ -747,11 +792,6 @@ export function ProfileCompactTemplate({
       return;
     }
 
-    const activeMode = resolveHistoryMode({
-      drawerOpen,
-      drawerView,
-      requestedMode,
-    });
     const isHistoryModeSettled =
       requestedMode === 'profile'
         ? activeMode === null
@@ -765,8 +805,62 @@ export function ProfileCompactTemplate({
       activeMode === null
         ? getProfileModeHref(artist.handle, 'profile', searchSuffix)
         : getProfileModeHref(artist.handle, activeMode, searchSuffix);
-    const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
     if (currentHref === href) {
+      return;
+    }
+
+    // Durable ownership: once the document's pathname has left both this
+    // profile's root path and the pathname this template mounted on, the
+    // URL belongs to a navigation away from the surface. The in-flight
+    // guard below only defers the first run after such a move; later
+    // mode/drawer settling would still write the profile URL back over the
+    // navigation target (the open-drawer claim funnel case). The profile's
+    // own root path and the mount pathname (render fixtures) stay ours.
+    if (
+      globalThis.location.pathname !== `/${artist.handle}` &&
+      globalThis.location.pathname !== mountedPathnameRef.current
+    ) {
+      return;
+    }
+
+    const landedMode = landedHistoryModeRef.current;
+    // Next's own entry updater strips the landed ?mode=… entry back to the
+    // bare profile path at depth 0; restoring the landed mode must replace
+    // that stripped entry, not push a second one on top of it. Two things
+    // keep this restore from capturing a client Link navigation instead:
+    // the mode param is gone (a Link to another mode keeps a mode param) and
+    // no new history entry was pushed since arrival — the strip replaces the
+    // landed entry in place, while a Link to the bare path pushes one.
+    const correctingStrippedLanding =
+      profileHistoryDepthRef.current === 0 &&
+      landedMode !== null &&
+      landedMode !== 'profile' &&
+      activeMode === landedMode &&
+      new URLSearchParams(globalThis.location.search).get('mode') === null &&
+      globalThis.history.length ===
+        (arrivalHistoryLengthRef.current ?? globalThis.history.length);
+    if (correctingStrippedLanding) {
+      globalThis.history.replaceState(
+        withPublicProfileHistoryDepth(globalThis.history.state, 0),
+        '',
+        href
+      );
+      return;
+    }
+
+    // A client Link navigation to a different mode (or to the bare profile)
+    // updates the URL before requestedMode syncs through the shell's
+    // location store. browserHref wakes this effect with the stale intent;
+    // writing that intent back would revert the visitor's navigation (the
+    // contact drawer link regression). Wait for the location sync — the next
+    // run sees the updated requestedMode and reconciles without a push. The
+    // depth-0 strip correction above stays the only sanctioned external URL
+    // move.
+    if (
+      previousSync &&
+      previousSync.href !== currentHref &&
+      previousSync.mode === activeMode
+    ) {
       return;
     }
 
@@ -778,6 +872,7 @@ export function ProfileCompactTemplate({
       href
     );
   }, [
+    browserHref,
     drawerOpen,
     drawerView,
     requestedMode,

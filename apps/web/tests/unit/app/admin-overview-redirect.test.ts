@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import AdminOverviewRedirectPage from '@/app/app/(shell)/admin/page';
+import AdminHudRedirectPage from '@/app/app/(shell)/admin/hud/page';
 import { APP_ROUTES } from '@/constants/routes';
 
 const redirectMock = vi.hoisted(() =>
@@ -7,20 +7,24 @@ const redirectMock = vi.hoisted(() =>
     throw new Error(`NEXT_REDIRECT:${url}`);
   })
 );
+const accessMock = vi.hoisted(() => vi.fn(async () => undefined));
 
-vi.mock('next/navigation', () => ({
-  redirect: redirectMock,
+vi.mock('next/navigation', () => ({ redirect: redirectMock }));
+vi.mock('@/lib/admin/page-access', () => ({
+  requireCurrentAdminPageAccess: accessMock,
 }));
 
-describe('/app/ov compatibility alias', () => {
+describe('/hud default door', () => {
   beforeEach(() => {
     redirectMock.mockClear();
+    accessMock.mockClear();
   });
 
-  it('redirects Overview to canonical Ops', () => {
-    expect(() => AdminOverviewRedirectPage()).toThrow(
-      `NEXT_REDIRECT:${APP_ROUTES.HUD}`
+  it('checks admin access, then lands on Ovie Home', async () => {
+    await expect(AdminHudRedirectPage()).rejects.toThrow(
+      `NEXT_REDIRECT:${APP_ROUTES.OV}`
     );
-    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.HUD);
+    expect(accessMock).toHaveBeenCalledOnce();
+    expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.OV);
   });
 });

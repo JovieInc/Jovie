@@ -218,20 +218,63 @@ describe('synthetic monitoring workflow parser', () => {
     }
   });
 
-  it('skips the production onboarding robot with a logged warning and no auth bypass', () => {
+  it('warns for the deferred production onboarding robot without an auth bypass', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const step = getStepBlock(
       workflow,
       'Run Onboarding Robot Full Synthetic (JOV-2681)'
     );
 
-    expect(step).toContain(
-      'synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot.'
+    const failureStep = getStepBlock(
+      workflow,
+      'Warn while the onboarding robot is deferred'
     );
-    expect(step).toContain(
-      '::warning title=Onboarding robot skipped::${reason}'
-    );
-    expect(step).toContain('robot_skip_reason=${reason}');
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-onboarding-robot-'));
+    const output = join(directory, 'output');
+    const summary = join(directory, 'summary');
+    const runStep = (block: string) =>
+      spawnSync('bash', ['-e', '-c', block.split('        run: |\n')[1]!], {
+        env: {
+          ...process.env,
+          GITHUB_OUTPUT: output,
+          GITHUB_STEP_SUMMARY: summary,
+        },
+        encoding: 'utf8',
+      });
+
+    try {
+      const result = runStep(step);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain(
+        '::warning title=Onboarding robot skipped::'
+      );
+      expect(result.stdout).toContain('synthetic-robot-auth-unavailable');
+      expect(result.stdout).toContain('JOV-8809');
+      expect(readFileSync(output, 'utf8')).toContain(
+        'robot_skip_reason=synthetic-robot-auth-unavailable:'
+      );
+      expect(readFileSync(output, 'utf8')).toContain('JOV-8809');
+      expect(readFileSync(output, 'utf8')).toContain(
+        'robot_status=not_implemented\n'
+      );
+      expect(readFileSync(summary, 'utf8')).toContain(
+        'synthetic-robot-auth-unavailable'
+      );
+      expect(failureStep).toContain(
+        "if: ${{ always() && steps.onboarding-robot.outputs.robot_status == 'not_implemented' }}"
+      );
+      expect(failureStep).toContain('JOV-8809');
+      expect(failureStep).not.toContain('continue-on-error:');
+      expect(failureStep).not.toContain('::error::');
+      const failure = runStep(failureStep);
+      expect(failure.status).toBe(0);
+      expect(failure.stdout).toContain(
+        '::warning title=Onboarding robot skipped::synthetic-robot-auth-unavailable: deferred while JOV-8809 is open.'
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+
     expect(step).not.toContain('onboarding-robot.full.spec.ts');
     expect(step).not.toContain('/api/dev/test-auth/session');
     expect(step).not.toContain('DOPPLER_TOKEN');

@@ -152,7 +152,9 @@
       "entity": "profile-claim",
       "routes": [
         "/[username]/claim",
+        "/claim",
         "/claim/[token]",
+        "/claim/start",
         "/onboarding",
         "/api/onboarding/claim"
       ],
@@ -716,9 +718,57 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/product/dsp-links/page.tsx",
+      "kind": "page",
+      "route": "/product/dsp-links",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/isrc/page.tsx",
+      "kind": "page",
+      "route": "/product/isrc",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/link-analytics/page.tsx",
+      "kind": "page",
+      "route": "/product/link-analytics",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/product/page.tsx",
       "kind": "page",
       "route": "/product",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/pre-save/page.tsx",
+      "kind": "page",
+      "route": "/product/pre-save",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
+      "kind": "page",
+      "route": "/product/release-scheduling",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/utm-links/page.tsx",
+      "kind": "page",
+      "route": "/product/utm-links",
       "methods": [],
       "surface": "deferred",
       "classification": "C"
@@ -1055,6 +1105,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/admin/acquisition/artist-offer-funnel/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/acquisition/artist-offer-funnel",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/admin/acquisition/proof-claim-funnel/route.ts",
       "kind": "handler",
       "route": "/api/admin/acquisition/proof-claim-funnel",
@@ -1114,6 +1172,22 @@
       "source": "apps/web/app/api/admin/campaigns/stats/route.ts",
       "kind": "handler",
       "route": "/api/admin/campaigns/stats",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/claim-verifications/[profileId]/decision/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/claim-verifications/[profileId]/decision",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/claim-verifications/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/claim-verifications",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
@@ -3911,6 +3985,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/ovie/summer-cards/[id]/feedback/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/summer-cards/[id]/feedback",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/ovie/summer-cards/route.ts",
       "kind": "handler",
       "route": "/api/ovie/summer-cards",
@@ -3962,6 +4044,22 @@
       "source": "apps/web/app/api/preview-url/refresh/route.ts",
       "kind": "handler",
       "route": "/api/preview-url/refresh",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/profile-alias-decision/[username]/[slug]/route.ts",
+      "kind": "handler",
+      "route": "/api/profile-alias-decision/[username]/[slug]",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/profile-alias-decision/route.ts",
+      "kind": "handler",
+      "route": "/api/profile-alias-decision",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
@@ -5071,14 +5169,6 @@
       "source": "apps/web/app/app/(shell)/admin/lists/views/[viewId]/page.tsx",
       "kind": "page",
       "route": "/app/admin/lists/views/[viewId]",
-      "methods": [],
-      "surface": "deferred",
-      "classification": "C"
-    },
-    {
-      "source": "apps/web/app/app/(shell)/admin/needs-you/page.tsx",
-      "kind": "page",
-      "route": "/app/admin/needs-you",
       "methods": [],
       "surface": "deferred",
       "classification": "C"
@@ -6686,6 +6776,22 @@
       "source": "apps/web/app/claim/[token]/route.ts",
       "kind": "handler",
       "route": "/claim/[token]",
+      "methods": ["GET"],
+      "surface": "claim",
+      "classification": "B"
+    },
+    {
+      "source": "apps/web/app/claim/page.tsx",
+      "kind": "page",
+      "route": "/claim",
+      "methods": [],
+      "surface": "claim",
+      "classification": "B"
+    },
+    {
+      "source": "apps/web/app/claim/start/route.ts",
+      "kind": "handler",
+      "route": "/claim/start",
       "methods": ["GET"],
       "surface": "claim",
       "classification": "B"

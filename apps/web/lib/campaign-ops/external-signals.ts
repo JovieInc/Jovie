@@ -1,3 +1,4 @@
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 /**
  * External opportunity detector (JOV-2205).
  *
@@ -111,7 +112,7 @@ function kindForSource(sourceKind: SignalSourceKind): OpportunityKind {
 
 function buildTitle(signals: readonly NormalizedExternalSignal[]): string {
   const primary = signals[0];
-  if (!primary) return 'Untitled opportunity';
+  if (!primary) return COPY_FALLBACKS.opportunity;
 
   if (primary.collaboratorName && primary.eventName) {
     return `${primary.collaboratorName} at ${primary.eventName}`;

@@ -1,9 +1,9 @@
 import 'server-only';
 
 import { eq } from 'drizzle-orm';
-import { getAppUrl } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
+import { getOutboundClaimUrl } from '@/lib/outbound/claim-url';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { DEFAULT_DM_TEMPLATE } from './constants';
 import { filterEmail } from './email-filter';
@@ -73,7 +73,7 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
   const tokenPair = isTokenValid
     ? { token, tokenHash, expiresAt }
     : await generateClaimTokenPair();
-  const claimUrl = getAppUrl(`/claim/${tokenPair.token}`);
+  const claimUrl = getOutboundClaimUrl(tokenPair.token);
 
   // 7. Build DM copy if needed
   let dmCopy: string | null = null;
