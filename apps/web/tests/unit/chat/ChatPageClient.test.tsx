@@ -537,6 +537,13 @@ describe('ChatPageClient', () => {
   it('preserves profile panel deep-link hydration and opens the panel from the query param', () => {
     mockSearchParams = new URLSearchParams('panel=profile');
     mockPreviewPanelState.isOpen = false;
+    // Desktop viewport: the deep link opens the overlay rail.
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('1024'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
 
     const { rerender } = renderChatPage();
 
@@ -550,6 +557,23 @@ describe('ChatPageClient', () => {
     );
 
     expect(hasRegisteredRightPanel()).toBe(true);
+  });
+
+  it('keeps the chat rail closed for a mobile deep link until its next explicit action', () => {
+    mockSearchParams = new URLSearchParams('panel=profile');
+    mockPreviewPanelState.isOpen = false;
+    // Below lg the rail presents as a full-screen modal sheet, so the
+    // deep link must not auto-open it (JOV-7150).
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+
+    renderChatPage();
+
+    expect(mockOpenPreviewPanel).not.toHaveBeenCalled();
   });
 
   it('cleans up header actions on unmount', () => {

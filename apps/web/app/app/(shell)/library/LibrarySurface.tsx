@@ -141,6 +141,7 @@ import type { FilterPill } from '@/components/shell/pill-search.types';
 import { RowWaveform } from '@/components/shell/RowWaveform';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
@@ -844,7 +845,7 @@ function LibrarySavedViewRow({
     >
       <button type='button' onClick={onClick} aria-pressed={active}>
         <span className='min-w-0 flex-1 truncate text-left'>
-          {label || 'Untitled'}
+          {label || COPY_FALLBACKS.item}
         </span>
         <span className='system-b-library-rail-count tabular-nums'>
           {count}
@@ -2000,7 +2001,11 @@ function YouTubeLedgerLink() {
       size='sm'
       className={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
     >
-      <Link href={APP_ROUTES.YOUTUBE_REVIVAL}>YouTube Ledger</Link>
+      {/* Viewport prefetch of this dynamic route is two RSC requests on every
+          Work visit and pushes the shell persistence budget over its cap. */}
+      <Link href={APP_ROUTES.YOUTUBE_REVIVAL} prefetch={false}>
+        YouTube Ledger
+      </Link>
     </Button>
   );
 }

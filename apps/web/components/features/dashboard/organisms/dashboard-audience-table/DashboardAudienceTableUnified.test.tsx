@@ -99,10 +99,24 @@ describe('DashboardAudienceTableUnified', () => {
     expect(
       screen.getByRole('heading', { name: 'Audience', hidden: true })
     ).toBeInTheDocument();
-    expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
+    expect(screen.getAllByText('Grow Your Audience').length).toBeGreaterThan(0);
     expect(
-      screen.getByRole('link', { name: 'Open Profile Settings' })
+      screen.getAllByRole('link', { name: 'Open Profile Settings' })[0]
     ).toHaveAttribute('href', '/app/settings/profile');
+    const headerLabels = screen
+      .getAllByRole('columnheader')
+      .map(header => header.textContent?.replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
+    expect(headerLabels).toEqual(
+      expect.arrayContaining([
+        'Fan',
+        'State',
+        'Alerts',
+        'Engagement',
+        'Last Seen',
+        'Action',
+      ])
+    );
   });
 
   it('renders members on the 32px dense people row with a face', () => {

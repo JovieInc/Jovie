@@ -1202,6 +1202,63 @@ class GateTest(unittest.TestCase):
         self.assertEqual(lane.gate_rules([self.change("docs/agents.md")]), [])
         self.assertEqual(lane.gate_rules([self.change(".cursor/rules/general.mdc")]), [])
 
+    def test_committed_feedback_reference_repair_needs_no_new_test(self):
+        # PR #22434 repairs a stale test reference, not the test it names.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            def git(*args):
+                return subprocess.run(
+                    ["git", "-c", "core.hooksPath=" + os.devnull,
+                     "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                     "-c", "commit.gpgSign=false", *args], cwd=root, check=True,
+                    capture_output=True, text=True,
+                    env=git_housekeeping.apply_fixture_env(os.environ)).stdout.strip()
+            git("init", "-q")
+            inventory = {"schema": "jovie.feedback-guards/v1", "reviewedOn": "2026-10-17",
+                         "lessons": [{"fingerprint": "Protected deployment evidence must be one fail-closed boundary",
+                                      "lessonSha256": "9be675f44c4d687b00743acd245f48d1aaba53e5aad3960d1f4a75da95429411",
+                                      "guards": [{
+                             "kind": "test", "path": "apps/web/tests/unit/ci/deploy-workflow.test.ts",
+                             "anchor": "binds the exact project deployment before cookie-only canary and auth smoke",
+                             "reason": "Checks exact deployment binding and canonical protected probe ownership."
+                         }]}]}
+            reference = root / "LESSONS.guards.json"
+            reference.write_text(json.dumps(inventory, indent=2) + "\n")
+            (root / "LESSONS.md").write_text("# Lessons\n")
+            git("add", ".")
+            git("commit", "-qm", "docs: original feedback reference")
+            base = git("rev-parse", "HEAD")
+            inventory["reviewedOn"] = "2026-10-21"
+            inventory["lessons"][0]["guards"][0].update(
+                path="apps/web/tests/unit/ci/canary-health-gate.test.ts",
+                anchor="binds the exact deployment, then probes it cookie-only without redirects",
+                reason="Executes the shipped canary shell against a modeled preview and checks the exact deployment URL, bounded cookie-only requests and no redirects.")
+            reference.write_text(json.dumps(inventory, indent=2) + "\n")
+            (root / "LESSONS.md").write_text("# Lessons\n\nReviewed the repaired canary reference.\n")
+            git("add", ".")
+            git("commit", "-qm", "docs: repair feedback reference")
+            changes = lane.parse_numstat(git("diff", "--numstat", base + "...HEAD"))
+            self.assertEqual([c.path for c in changes], ["LESSONS.guards.json", "LESSONS.md"])
+            self.assertEqual((changes[0].added, changes[0].deleted), (4, 4))
+            self.assertEqual(lane.gate_assessment(changes), ([], None))
+            # Classification must not skip the existing canonical qualification commands.
+            self.assertEqual(lane.check_commands([c.path for c in changes]), [lane.CANONICAL_GATE])
+
+    def test_feedback_inventory_is_not_a_test_or_a_general_json_exemption(self):
+        inventory = self.change("LESSONS.guards.json")
+        for path in ["apps/web/lib/a.ts", "scripts/invariants/feedback-linkage.mjs",
+                     "package.json", "other.json", "nested/LESSONS.guards.json",
+                     "LESSONS.guards.json.mjs", "lessons.guards.json"]:
+            with self.subTest(path=path):
+                self.assertEqual(lane.gate_rules([inventory, self.change(path)]),
+                                 ["code-change-without-test"])
+        self.assertIn("secret-like-file-changed", lane.gate_rules([
+            inventory, self.change(".env.local")]))
+        self.assertIn("lockfile-without-manifest", lane.gate_rules([
+            inventory, self.change("pnpm-lock.yaml")]))
+        self.assertEqual(lane.gate_rules([self.change("LESSONS.guards.json", 1501)]),
+                         ["diff-too-large:1501"])
+
     def test_xcode_tests_directory_counts_as_test(self):
         changes = [self.change("apps/ios/Jovie/Core/ChatRepository.swift"),
                    self.change("apps/ios/JovieTests/ChatRepositoryTests.swift")]
@@ -4976,6 +5033,24 @@ class TerminalRevisitTest(unittest.TestCase):
                 self.assertEqual(json.loads((self.host.state / "held.json").read_text()), held)
                 self.main = "m2"
 
+    def test_mergeable_exhaustion_hold_syncs_main_and_lifts_the_label(self):
+        # JOV-8810: #22473 was MERGEABLE with a fix-exhausted hold. The conflict
+        # path (JOV-8533) reached partial sync; a non-DIRTY head never called
+        # update-branch, so lane-fix-exhausted stayed past 24h.
+        attempts = {"22473": {"sha": "h22473", "count": lane.MAX_FIX_ATTEMPTS, "escalated": True}}
+        held = {"22473": lane.pr_events.held_record("h22473", ["fix-exhausted"])}
+        self.write("fix-attempts.json", attempts)
+        self.write("held.json", held)
+        pr = self.pr(22473, isDraft=True, mergeStateStatus="UNSTABLE",
+                     labels=[{"name": "lane-fix-exhausted"}, {"name": "lane-fix-green"}])
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [pr], now=TERMINAL_NOW), [22473])
+        self.assertEqual([args[4] for args in self.updates()],
+                         [f"repos/{lane.REPO_SLUG}/pulls/22473/update-branch"])
+        lifts = [args[4] for args in self.calls if args[:4] == ["gh", "api", "-X", "DELETE"]]
+        self.assertEqual(lifts, [f"repos/{lane.REPO_SLUG}/issues/22473/labels/lane-fix-exhausted"])
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text()), attempts)
+        self.assertEqual(json.loads((self.host.state / "held.json").read_text()), held)
+
     def test_exhaustion_does_not_mask_nonfixable_policy_holds(self):
         for evidence in ("secret-like-file-changed", "empty-diff"):
             with self.subTest(evidence=evidence):
@@ -4985,6 +5060,41 @@ class TerminalRevisitTest(unittest.TestCase):
                 # A hold on an older generation cannot block the current head.
                 self.assertEqual(lane.terminal_prs([{**pr, "headRefOid": "new-head"}], {}, held),
                                  [{**pr, "headRefOid": "new-head"}])
+
+    def test_mergeable_exhaustion_hold_syncs_and_lifts_the_label(self):
+        # JOV-8812: #22265 stayed MERGEABLE/BLOCKED because held.json named
+        # fix-exhausted. terminal_prs admits that marker, then the non-DIRTY
+        # revisit refused the same record and never called update-branch.
+        attempts = {"22265": {"sha": "h22265", "count": 2, "escalated": True}}
+        held = {"22265": lane.pr_events.held_record("h22265", ["fix-exhausted"])}
+        self.write("fix-attempts.json", attempts)
+        self.write("held.json", held)
+        pr = self.pr(22265, isDraft=True, mergeStateStatus="BLOCKED",
+                     labels=[{"name": "lane-fix-exhausted"}, {"name": "lane-fix-green"}])
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [pr], now=TERMINAL_NOW), [22265])
+        self.assertEqual([args[4] for args in self.updates()],
+                         [f"repos/{lane.REPO_SLUG}/pulls/22265/update-branch"])
+        lifts = [args[4] for args in self.calls if args[:4] == ["gh", "api", "-X", "DELETE"]]
+        self.assertEqual(lifts, [f"repos/{lane.REPO_SLUG}/issues/22265/labels/lane-fix-exhausted"])
+        self.assertEqual(json.loads((self.host.state / "fix-attempts.json").read_text()), attempts)
+        self.assertEqual(json.loads((self.host.state / "held.json").read_text()), held)
+
+    def test_terminal_sync_reports_the_policy_hold_under_exhaustion(self):
+        attempts = {"1": {"sha": "h1", "count": 2, "escalated": True}}
+        self.write("fix-attempts.json", attempts)
+        self.write("held.json", {"1": lane.pr_events.held_record("h1", ["fix-exhausted", "empty-diff"])})
+        pr = self.pr(1, labels=[{"name": "lane-fix-exhausted"}])
+        self.assertEqual(lane.revisit_terminal_prs(self.host, [pr], now=TERMINAL_NOW), [])
+        self.assertEqual(
+            lane.pr_events.sync_main(self.host, lane, pr, TERMINAL_NOW, terminal_ok=True),
+            "held:empty-diff")
+        secret = self.pr(2, labels=[{"name": "lane-fix-exhausted"}])
+        self.write("fix-attempts.json", {"2": {"sha": "h2", "count": 2, "escalated": True}})
+        self.write("held.json", {"2": lane.pr_events.held_record(
+            "h2", ["secret-like-file-changed", "fix-exhausted"])})
+        self.assertEqual(
+            lane.pr_events.sync_main(self.host, lane, secret, TERMINAL_NOW, terminal_ok=True),
+            "held:secret-file")
 
     def test_partial_main_sync_merges_the_newest_conflict_free_main_commit(self):
         repo = Path(self.temp.name) / "repo"
@@ -7966,11 +8076,17 @@ class GateSingleflightTest(unittest.TestCase):
         with open(self.host.state / "worker.log", "w") as log:
             worker = subprocess.Popen([sys.executable, "-u", "-c", worker_code], stdout=log, stderr=log)
             try:
-                for _ in range(200):
-                    if pidfile.exists():
+                # Startup only. The lock checks below are the contract.
+                deadline = time.monotonic() + 15
+                while time.monotonic() < deadline:
+                    if pidfile.exists() or worker.poll() is not None:
                         break
                     time.sleep(.01)
-                self.assertTrue(pidfile.exists())
+                if not pidfile.exists():
+                    detail = (self.host.state / "worker.log").read_text(errors="replace")[-2000:]
+                    self.fail(
+                        f"detached child did not start (worker exit {worker.poll()})\n{detail}"
+                    )
                 time.sleep(.2)  # allow the existing process observer to see the detached child
                 worker.kill()
                 worker.wait(timeout=3)

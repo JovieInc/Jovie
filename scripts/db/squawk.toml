@@ -1,0 +1,30 @@
+# Squawk 2.70.0. Source Validation passes only SQL files a pull request adds
+# or changes under apps/web/drizzle/migrations. Unchanged migrations are not
+# linted. pg_version retires rules that do not apply since Postgres 11 (a
+# constant column default is metadata-only). It does not turn off lock-safety
+# rules. assume_in_transaction matches Drizzle, which wraps each file in one
+# transaction, so an index on a table created in that same file is not treated
+# as a build on a populated table.
+pg_version = "16.0"
+assume_in_transaction = true
+
+excluded_rules = [
+  # require-lock-timeout: Squawk 2.70 flags this on every ALTER and on CREATE
+  # INDEX, including an index for a table created in the same file. Drizzle does
+  # not emit SET lock_timeout. Hot index builds set a 5s lock_timeout in
+  # apps/web/scripts/online-index-migrate.ts.
+  "require-lock-timeout",
+  # require-statement-timeout: same generator boundary. The online-index runner
+  # sets a 10 minute statement_timeout. Requiring it in generated SQL would
+  # reject ordinary migrations, including a nullable ADD COLUMN.
+  "require-statement-timeout",
+  # prefer-text-field: style. The schema uses varchar(n). A type change,
+  # including a varchar width change, still fails changing-column-type.
+  "prefer-text-field",
+  # prefer-bigint-over-int: style. integer columns match the existing Drizzle
+  # schema. This is not a lock hazard.
+  "prefer-bigint-over-int",
+  # prefer-timestamp-tz: style. The schema uses both timestamp and timestamptz.
+  # A new column that matches an existing column type is not a migration lock.
+  "prefer-timestamp-tz",
+]

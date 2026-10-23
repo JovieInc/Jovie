@@ -401,3 +401,41 @@ describe('EmailCodeAuthForm pre-hydration guard', () => {
     );
   });
 });
+
+describe('EmailCodeAuthForm page alignment', () => {
+  async function reachCodeStepWithAlign(align: 'left' | 'center') {
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: { success: true },
+      error: null,
+    });
+    render(
+      <EmailCodeAuthForm mode='sign-in' redirectUrl='/app' align={align} />
+    );
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'artist@example.com' },
+    });
+    fireEvent.submit(
+      screen.getByLabelText(/email/i).closest('form') as HTMLFormElement
+    );
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-auth-email-code-step="code"]')
+      ).toBeTruthy()
+    );
+    return document.querySelector('[data-auth-email-code-step="code"]');
+  }
+
+  it('left-aligns the code step on full-page shells', async () => {
+    const step = await reachCodeStepWithAlign('left');
+    const intro = step?.querySelector('p');
+    expect(intro?.className).toContain('text-left');
+    expect(intro?.className).not.toContain('text-center');
+  });
+
+  it('keeps overlay captures centered by default', async () => {
+    const step = await reachCodeStepWithAlign('center');
+    const intro = step?.querySelector('p');
+    expect(intro?.className).toContain('text-center');
+    expect(intro?.className).not.toContain('text-left');
+  });
+});

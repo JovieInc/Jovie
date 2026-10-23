@@ -48,6 +48,27 @@ mockTableViewport();
 
 describe('AdminWaitlistTableWithViews', () => {
   beforeEach(() => localStorage.clear());
+  it('shows a healthy disposition when every integrity count is zero', () => {
+    render(
+      <TooltipProvider>
+        <AdminWaitlistTableWithViews
+          entries={entries}
+          page={1}
+          pageSize={25}
+          total={1}
+          integrity={{
+            totalIssues: 0,
+            usersMissingWaitlistEntry: 0,
+            entriesMissingUser: 0,
+            signedUpEntriesMissingUser: 0,
+          }}
+        />
+      </TooltipProvider>
+    );
+    expect(screen.getByText('Waitlist links look healthy')).toBeVisible();
+    expect(screen.queryByText(/waitlist integrity issues/)).toBeNull();
+  });
+
   it('keeps integrity visible and excludes covered actions until selection is cleared', async () => {
     const user = userEvent.setup();
     render(

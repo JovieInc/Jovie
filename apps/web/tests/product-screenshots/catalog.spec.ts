@@ -5,6 +5,7 @@ import {
   APP_FLAG_OVERRIDES_COOKIE,
   FF_OVERRIDES_KEY,
 } from '@/lib/flags/overrides';
+import { parseWhatsNewFeed, WHATS_NEW_PATH } from '@/lib/whats-new';
 import {
   getScreenshotScenario,
   SCREENSHOT_MOBILE_SAFE_AREA,
@@ -25,11 +26,12 @@ import {
   CATALOG_OUTPUT_DIR,
   hideTransientUI,
   PUBLIC_EXPORT_DIR,
+  prepareImagesForScreenshot,
   SCREENSHOT_CLOCK_ISO,
   TIMEOUTS,
-  waitForImages,
   waitForSettle,
 } from './helpers';
+import { captureOnlyWhenImagesReady } from './image-prep-policy';
 import {
   resolveScreenshotEvidence,
   resolveScreenshotSourceGitSha,
@@ -202,7 +204,26 @@ async function prepareScenario(
       value: SCREENSHOT_FLAG_OVERRIDES,
     }
   );
-  await page.goto(scenario.route, {
+  const route = new URL(scenario.route, 'http://localhost');
+  const captureShellPlayer =
+    scenario.group === 'dashboard' &&
+    scenario.captureTarget !== 'locator' &&
+    scenario.playerTimestamp !== undefined;
+  if (captureShellPlayer) {
+    route.searchParams.set('capturePlayer', '1');
+    route.searchParams.set('playerTimestamp', scenario.playerTimestamp!);
+    // The capture starts with the current notice already read, just as a
+    // returning signed-in creator. No product chrome is painted over/hidden.
+    const response = await page.request.get(WHATS_NEW_PATH);
+    expect(response.ok()).toBe(true);
+    const release = parseWhatsNewFeed(await response.json())?.entries[0];
+    if (release) {
+      await page.addInitScript(id => {
+        localStorage.setItem('jovie.sidebarDock.demo-user-001.seenRelease', id);
+      }, release.id);
+    }
+  }
+  await page.goto(`${route.pathname}${route.search}`, {
     waitUntil: 'domcontentloaded',
     timeout: TIMEOUTS.NAVIGATION,
   });
@@ -217,9 +238,9 @@ async function prepareScenario(
   await expect(initialWait).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
 
   if (isOpenFirstRelease) {
-    await waitForImages(page, 'table').catch(() => {});
+    await prepareImagesForScreenshot(page);
     await waitForSettle(page, 2000);
-    await page.locator('[data-testid="release-row"]').first().click();
+    await page.locator('[data-shell-release-row]').first().click();
     await expect(page.locator(scenario.waitFor).first()).toBeVisible({
       timeout: TIMEOUTS.SIDEBAR_VISIBLE,
     });
@@ -249,7 +270,55 @@ async function prepareScenario(
     ).toHaveCount(0);
   }
 
-  await waitForImages(page).catch(() => {});
+  await prepareImagesForScreenshot(page);
+  if (captureShellPlayer) {
+    const player = page.getByTestId('audio-surface-expanded-shell');
+    await expect(page.getByTestId('shell-audio-dock')).toHaveAttribute(
+      'data-state',
+      'open'
+    );
+    await expect(player.getByTestId('desktop-player-track')).toContainText(
+      'The Deep End'
+    );
+    await expect(
+      player.getByRole('button', { name: 'Pause (space)', exact: true })
+    ).toBeVisible();
+    await player
+      .getByRole('button', { name: 'Show waveform', exact: true })
+      .click();
+    await expect(
+      player.getByText(scenario.playerTimestamp!, { exact: true })
+    ).toBeVisible();
+    await expect(page.getByTestId('user-button-loaded')).toBeVisible();
+    await expect(page.getByTestId('user-button-loading')).toHaveCount(0);
+    await expect(page.getByTestId('ai-crawler-card-error')).toHaveCount(0);
+    await expect(page.getByTestId('ai-crawler-card-skeleton')).toHaveCount(0);
+    await expect(page.getByText('High Priority', { exact: true })).toHaveCount(
+      0
+    );
+    await expect(page.getByText('Jovie Demo', { exact: true })).toHaveCount(0);
+    await expect(page.getByText(/@example\.com/)).toHaveCount(0);
+    if (scenario.id === 'dashboard-audience-desktop') {
+      await expect(
+        page.getByTestId('ai-crawler-intelligence-card')
+      ).toBeVisible();
+    }
+    if (scenario.id === 'dashboard-earnings-desktop') {
+      await expect(page.getByText('248', { exact: true })).toBeVisible();
+      await expect(page.getByText('376', { exact: true })).toBeVisible();
+      await expect(page.getByText('624', { exact: true })).toBeVisible();
+    }
+    await expect(page.locator('[data-user-button-display-name]')).toHaveText(
+      'Tim White'
+    );
+    const searchLabel = page.locator('[data-app-search-trigger] span').first();
+    expect(
+      await searchLabel.evaluate(
+        element => element.scrollWidth <= element.clientWidth
+      )
+    ).toBe(true);
+    await page.mouse.move(0, 0);
+  }
   await waitForSettle(page);
   await hideTransientUI(page);
   await assertNoDevOverlays(page);
@@ -303,10 +372,9 @@ test.describe('Screenshot Catalog', () => {
       const previousEntry = manifestEntriesById.get(scenario.id) ?? null;
       const preparedScenario = await prepareScenario(page, scenario.id);
       const catalogPath = join(CATALOG_OUTPUT_DIR, `${scenario.id}.png`);
-      const imageChanged = await captureCatalogImage(
-        page,
-        preparedScenario,
-        catalogPath
+      const imageChanged = await captureOnlyWhenImagesReady(
+        () => prepareImagesForScreenshot(page),
+        () => captureCatalogImage(page, preparedScenario, catalogPath)
       );
 
       if (preparedScenario.publicExportPath) {

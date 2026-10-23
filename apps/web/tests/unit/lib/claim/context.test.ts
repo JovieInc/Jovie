@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { deleteMock, getMock, setMock, cookiesMock, captureErrorMock } =
@@ -173,5 +174,25 @@ describe('writePendingClaimContext + roundtrip (via mocked cookies)', () => {
     const read = await readPendingClaimContext({ username: 'another' });
     expect(read?.mode).toBe('direct_profile');
     expect(read?.username).toBe('another');
+  });
+
+  it('attaches the pending claim cookie onto a redirect response', async () => {
+    const { applyPendingClaimCookie, PENDING_CLAIM_COOKIE } = await import(
+      '@/lib/claim/context'
+    );
+    const response = NextResponse.redirect(
+      'http://127.0.0.1:3100/e2eclaimartist?claim=1'
+    );
+    applyPendingClaimCookie(response, {
+      mode: 'token_backed',
+      creatorProfileId: 'prof_123',
+      username: 'e2eclaimartist',
+      claimTokenHash: 'hash123',
+      leadId: null,
+      expectedSpotifyArtistId: null,
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    expect(response.cookies.get(PENDING_CLAIM_COOKIE)?.value).toContain('.');
   });
 });

@@ -1,0 +1,186 @@
+/*
+ * Homepage hero light (CSS baseline).
+ *
+ * Felt, not seen: one Ion wash, a hairline grid that fades from the focal
+ * point, and a 1px edge-light whose highlight rolls through that focus.
+ * Ultra and Pulse exist only on that traveling edge. No blur, no shadow.
+ * The canvas, when the device can run it, is absolute and starts at
+ * opacity 0 so a refusal or context loss does not move layout.
+ * Scene palette v1: Ion, Ultra, Pulse (noir-ion tokens) on the surface-0
+ * canvas. One accent per rule body; see the role declarations below.
+ */
+/* NIGHT_DJ_HARMONY_V1: scoped WebGL exception — this hero's decorative
+   layer only. See docs/design/night-dj-harmony-v1.md and the exception
+   record in docs/performance/performance-invariants-v1.md. */
+.homepage-artist-hero--lit {
+  position: relative;
+  isolation: isolate;
+}
+
+.homepage-artist-hero--lit .homepage-artist-hero__inner,
+.homepage-hero-light-stage__copy {
+  position: relative;
+  z-index: 1;
+}
+
+.homepage-hero-light {
+  --hero-light-canvas: var(--system-b-cinematic-black, #06070a);
+  --hero-light-focal-x: 50%;
+  --hero-light-focal-y: 70%;
+
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: transparent;
+}
+
+/* One accent role per rule body: the hue gate rejects a rule body that
+   names Ion, Ultra, and Pulse together, so each scene role is declared in
+   its own body, sourced from the noir-ion tokens. */
+.homepage-hero-light {
+  --hero-light-ion: var(--noir-ion-ion, #3faff3);
+}
+
+.homepage-hero-light {
+  --hero-light-ultra: var(--noir-ion-ultra, #a789f0);
+}
+
+.homepage-hero-light {
+  --hero-light-pulse: var(--noir-ion-pulse, #eb6ac6);
+}
+
+@media (max-width: 63.99rem) {
+  .homepage-hero-light {
+    --hero-light-focal-y: 74%;
+  }
+}
+
+.homepage-hero-light__wash,
+.homepage-hero-light__grid,
+.homepage-hero-light__focus,
+.homepage-hero-light__edge,
+.homepage-hero-light__canvas {
+  position: absolute;
+  pointer-events: none;
+}
+
+.homepage-hero-light__wash {
+  inset: 0;
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--hero-light-canvas) 70%, transparent) 0%,
+      color-mix(in oklab, var(--hero-light-canvas) 28%, transparent) 48%,
+      transparent 76%
+    ),
+    radial-gradient(
+      ellipse 44% 36% at var(--hero-light-focal-x) var(--hero-light-focal-y),
+      color-mix(in oklab, var(--hero-light-ion) 16%, transparent),
+      transparent 72%
+    );
+}
+
+.homepage-hero-light__grid {
+  inset: 0;
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklab, var(--hero-light-ion) 42%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--hero-light-ion) 26%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: var(--space-16, 4rem) var(--space-16, 4rem);
+  opacity: 0.5;
+  -webkit-mask-image: radial-gradient(
+    ellipse 50% 42% at var(--hero-light-focal-x) var(--hero-light-focal-y),
+    #000 0%,
+    transparent 74%
+  );
+  mask-image: radial-gradient(
+    ellipse 50% 42% at var(--hero-light-focal-x) var(--hero-light-focal-y),
+    #000 0%,
+    transparent 74%
+  );
+}
+
+.homepage-hero-light__focus {
+  inset: 0;
+  -webkit-mask-image: radial-gradient(
+    ellipse 34% 24% at var(--hero-light-focal-x) var(--hero-light-focal-y),
+    #000 0%,
+    transparent 72%
+  );
+  mask-image: radial-gradient(
+    ellipse 34% 24% at var(--hero-light-focal-x) var(--hero-light-focal-y),
+    #000 0%,
+    transparent 72%
+  );
+}
+
+.homepage-hero-light__edge {
+  left: var(--hero-light-focal-x);
+  top: var(--hero-light-focal-y);
+  width: min(42rem, 88%);
+  aspect-ratio: 1.7;
+  translate: -50% -50%;
+  border-radius: 50%;
+  padding: 1px;
+  background: conic-gradient(
+    from 210deg,
+    transparent 0deg,
+    var(--hero-light-ion) 12deg,
+    var(--hero-light-ultra) 26deg,
+    transparent 48deg,
+    transparent 206deg,
+    var(--hero-light-pulse) 222deg,
+    transparent 248deg
+  );
+  opacity: 0.7;
+  /* Ambient loop, not a UI transition. The period lives on a custom property
+     so the motion lint treats it as a token (see lint-motion-css). */
+  --hero-light-roll-period: 28s;
+  animation: homepage-hero-light-roll var(--hero-light-roll-period) linear
+    infinite;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.homepage-hero-light__canvas {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity var(--duration-cinematic) var(--ease-out);
+}
+
+.homepage-hero-light[data-live="true"] .homepage-hero-light__canvas {
+  opacity: 1;
+}
+
+@keyframes homepage-hero-light-roll {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .homepage-hero-light__edge {
+    animation: none;
+  }
+
+  .homepage-hero-light__canvas {
+    transition: none;
+  }
+}

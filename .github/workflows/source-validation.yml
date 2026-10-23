@@ -204,6 +204,27 @@ jobs:
           # The classifier only runs when invoked as its own entry point; a
           # missing receipt means it never ran, which must not read as a pass.
           test -s "$lane_dir/receipt.json"
+      # Read-only restore of the web tsc incremental state that
+      # tsc-cache-warm.yml writes on main. A pull_request can read that
+      # default-branch cache; merge_group already restores it in ci-fast.
+      # This job does not save: a PR-scoped entry is invisible to merge_group
+      # and competes for the 10 GB Actions cache cap. tsc re-hashes every
+      # input, so an older buildinfo cannot replay a passing typecheck.
+      # pnpm typecheck and the ci-fast --force gate are unchanged.
+      - name: Resolve tsc cache hour
+        id: tsc-cache-hour
+        if: steps.reuse.outputs.reuse != 'true'
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      - name: Restore web tsc incremental state
+        id: web-tsbuildinfo
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.cache/tsbuildinfo*
+          key: jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-h${{ steps.tsc-cache-hour.outputs.hour }}
+          restore-keys: |
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-
       - name: Run deterministic source contract
         if: steps.reuse.outputs.reuse != 'true'
         env:
@@ -222,6 +243,7 @@ jobs:
           node --test scripts/workflow-token-scope.test.mjs
           node scripts/lockfile-specifier-preflight.mjs
           node scripts/ci-release-incident-contract.mjs
+          node apps/web/scripts/a11y-wcag-standard-check.cjs
           pnpm ci:harness:check
           # The web test and story tsc programs (100s + 66s) ran after the
           # workspace typecheck (112s), serially, in this step (PR p50 7.6m).
@@ -326,6 +348,24 @@ jobs:
           node scripts/golden-path-lock.mjs merge-gate
           git diff --name-only "$base_sha" HEAD > "$RUNNER_TEMP/security-gate-files.txt"
           node scripts/security/security-gate.mjs --changed-files "$RUNNER_TEMP/security-gate-files.txt"
+      # Hosted GITHUB_TOKEN compare returns 403 on this public repository.
+      # A contents:read Jovie Bot installation token returns 200. Severity
+      # and the GPL/AGPL denylist stay blocking. The minted token is
+      # contents:read only; an empty key fails the mint closed.
+      - name: Mint dependency review read token
+        id: dependency-review-token
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
+      - name: Review added and upgraded dependencies
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          repo-token: ${{ steps.dependency-review-token.outputs.token }}
+          config-file: ./.github/dependency-review-config.yml
   migration:
     name: Migration Guard
     runs-on: ubuntu-latest
@@ -362,6 +402,13 @@ jobs:
           ./scripts/check-migrations.sh
           ./scripts/validate-migrations.sh
           pnpm exec tsx scripts/online-index-migrate.ts --validate-only
+      - name: Lint added or changed migration SQL
+        if: steps.reuse.outputs.reuse != 'true'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          node scripts/db/lint-changed-migrations.mjs --base "$base_sha"
   coverage:
     name: Exact-head Coverage
     runs-on: ubuntu-latest
@@ -548,13 +595,66 @@ jobs:
       - name: Run Ovie route and private-boundary coverage
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ovie == 'true' && matrix.shard == '2/4'
         run: pnpm --filter @jovie/ovie test
+  a11y:
+    name: A11y (UI paths)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - *proof-reuse
+      - *reused-checkout
+      - name: Select UI accessibility diff
+        id: scope
+        if: steps.reuse.outputs.reuse != 'true'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          if git diff --quiet "$base_sha" HEAD -- \
+            apps/web/app \
+            apps/web/components \
+            apps/web/styles \
+            apps/web/.storybook \
+            apps/web/lib/a11y-gates \
+            apps/web/tests/a11y \
+            apps/web/tests/e2e \
+            apps/web/tests/product-screenshots \
+            apps/web/tests/visual-qa \
+            apps/web/playwright.a11y-gate.config.ts \
+            apps/web/scripts/lint-touch-target.ts \
+            apps/web/scripts/a11y-wcag-standard-check.cjs \
+            packages/ui \
+            scripts/component-rendered-evaluator.mjs \
+            .github/workflows/source-validation.yml \
+            docs/ACCESSIBILITY.md; then
+            echo 'No UI paths changed; non-applicable receipt recorded.'
+            echo 'ui=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ui=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Setup Node.js and pnpm
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Playwright (Chromium)
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true'
+        uses: ./.github/actions/setup-playwright
+      - name: Run rendered WCAG 2.2 AA gate
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true'
+        run: >-
+          node .github/scripts/guard-playwright-artifacts.mjs --run --
+          pnpm --filter @jovie/web exec playwright test --config=playwright.a11y-gate.config.ts
   ready:
     name: PR Ready
     if: ${{ always() }}
-    needs: [deterministic, security, migration, coverage, unit]
+    needs: [deterministic, security, migration, coverage, unit, a11y]
     runs-on: ubuntu-latest
     steps:
       - name: Require every source proof
         env:
           RESULTS: ${{ join(needs.*.result, ',') }}
-        run: test "$RESULTS" = 'success,success,success,success,success'
+        run: test "$RESULTS" = 'success,success,success,success,success,success'

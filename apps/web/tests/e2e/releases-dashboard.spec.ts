@@ -516,8 +516,7 @@ test.describe('Releases dashboard', () => {
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
 
     await addReleaseSidebar
-      .getByRole('button', { name: /Pick a date/i })
-      .first()
+      .getByRole('button', { name: 'Release Date', exact: true })
       .click();
     await expect(
       addReleaseSidebar.locator('[role="grid"]').first()

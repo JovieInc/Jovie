@@ -666,6 +666,9 @@ test.describe('Tasks layout', () => {
       timeout: 30_000,
     });
     await ensureBoardViewMode(page);
+    // The board defaults to Assigned To Me. The persisted card is assigned to
+    // Jovie, so the same visibility checks run after that filter is selected.
+    await page.getByRole('tab', { name: /Assigned To Jovie/ }).click();
 
     const movedCard = page
       .getByTestId('tasks-board-column-in_progress')

@@ -2,7 +2,10 @@ import type { Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { setTestAuthBypassSession } from '../helpers/auth';
 import { expect, test } from './setup';
-import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
+import {
+  isDestroyedExecutionContext,
+  smokeNavigateWithRetry,
+} from './utils/smoke-test-utils';
 
 const USE_TEST_AUTH_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
@@ -21,20 +24,56 @@ function normalizeTexts(values: string[]) {
   return values.map(value => value.replace(/\s+/g, ' ').trim()).filter(Boolean);
 }
 
-async function collectAudienceContentSurface(page: Page) {
-  const audienceTable = page
-    .locator('table, [role="grid"], [data-testid="unified-table"]')
-    .first();
-  const emptyState = page.getByTestId('dashboard-audience-empty-state');
+const AUDIENCE_COLUMN_HEADERS = [
+  'Fan',
+  'State',
+  'Alerts',
+  'Engagement',
+  'Last Seen',
+  'Action',
+] as const;
 
-  return Promise.any([
-    audienceTable
-      .waitFor({ state: 'visible', timeout: 60_000 })
-      .then(() => 'table' as const),
-    emptyState
-      .waitFor({ state: 'visible', timeout: 60_000 })
-      .then(() => 'empty' as const),
-  ]);
+async function classifyAudienceSurface(
+  page: Page
+): Promise<'table' | 'empty' | 'pending'> {
+  try {
+    if ((await page.getByTestId('dashboard-audience-loading').count()) > 0) {
+      return 'pending';
+    }
+
+    const headers = normalizeTexts(
+      await page.getByRole('columnheader').allInnerTexts()
+    );
+    if (AUDIENCE_COLUMN_HEADERS.every(header => headers.includes(header))) {
+      return 'table';
+    }
+
+    const visibleEmptyStates = await page
+      .locator('[data-testid="dashboard-audience-empty-state"]:visible')
+      .count();
+    return visibleEmptyStates > 0 ? 'empty' : 'pending';
+  } catch (error) {
+    // A navigation during the poll destroys the execution context. The poll
+    // retries until the audience surface settles; the final not-pending
+    // assertion is unchanged.
+    if (isDestroyedExecutionContext(error)) return 'pending';
+    throw error;
+  }
+}
+
+async function collectAudienceContentSurface(page: Page) {
+  let settled: 'table' | 'empty' = 'table';
+  await expect
+    .poll(
+      async () => {
+        const next = await classifyAudienceSurface(page);
+        if (next !== 'pending') settled = next;
+        return next;
+      },
+      { timeout: 60_000 }
+    )
+    .not.toBe('pending');
+  return settled;
 }
 
 async function collectReleasesShape(
@@ -54,33 +93,24 @@ async function collectReleasesShape(
   const matrix = page.getByTestId('releases-matrix');
   await expect(matrix).toBeVisible({ timeout: 60_000 });
 
-  const previewToggle = page.getByRole('button', {
-    name: 'Toggle release preview',
-  });
-  await expect(previewToggle).toBeVisible({ timeout: 30_000 });
-  await previewToggle.click();
+  const firstRow = matrix.locator('[data-shell-release-row]').first();
+  await expect(firstRow).toBeVisible({ timeout: 30_000 });
+  await firstRow.click();
 
   const drawer = page.getByTestId('release-sidebar');
   await expect(drawer).toBeVisible({ timeout: 30_000 });
 
   return {
-    toolbarButtons: {
-      display: await page
-        .getByRole('button', { name: 'Display' })
-        .first()
-        .isVisible(),
-      preview: await page
-        .getByRole('button', { name: 'Toggle release preview' })
-        .first()
-        .isVisible(),
-    },
-    matrixTabs: normalizeTexts(await matrix.getByRole('tab').allInnerTexts()),
+    shellList: await matrix
+      .getByRole('listbox', { name: 'Releases' })
+      .isVisible(),
     drawerTabs: normalizeTexts(await drawer.getByRole('tab').allInnerTexts()),
     drawerCards: {
       analytics: await drawer
         .getByTestId('release-smart-link-analytics')
         .isVisible(),
       metadata: await drawer.getByTestId('release-metadata-card').isVisible(),
+      tabbed: await drawer.getByTestId('release-tabbed-card').isVisible(),
     },
   };
 }
@@ -105,6 +135,10 @@ async function collectAudienceShape(
     name: /analytics panel/i,
   });
   await expect(toggleAnalytics).toBeVisible({ timeout: 30_000 });
+  // The funnel lives in the analytics panel, which starts closed.
+  if ((await page.getByText('Audience funnel').count()) === 0) {
+    await toggleAnalytics.click();
+  }
 
   await expect(page.getByText('Audience funnel')).toBeVisible({
     timeout: 30_000,
@@ -173,9 +207,7 @@ test.describe
   .serial('Demo/live route parity', () => {
     test.skip(!USE_TEST_AUTH_BYPASS, 'Requires E2E_USE_TEST_AUTH_BYPASS=1');
 
-    // JOV-8782: live /app/releases is the shell release list, /demo still
-    // renders the table-era matrix. Re-enable when /demo moves to the shell.
-    test.fixme('releases demo mirrors the live releases workspace structure', async ({
+    test('releases demo mirrors the live releases workspace structure', async ({
       page,
     }) => {
       const liveShape = await collectReleasesShape(

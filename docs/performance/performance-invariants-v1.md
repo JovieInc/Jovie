@@ -98,3 +98,47 @@ Route-response-latency budgets in this file are **not** a substitute for keeping
 path free of blocking I/O. The thread-blocking gate is `JOV-INV-031`
 ([latency-sensitive-execution-v1](./latency-sensitive-execution-v1.md)). That gate invents
 no numbers here and does not claim that async metadata changes crawler/bot wait.
+
+## Sibling check class: surface media
+
+Canvas, WebGL, and video on marketing pages are not a second Lighthouse budget
+and do not add a row here. `scripts/invariants/art-direction/surface-media.mjs`
+allows them only inside a named scope that keeps a non-WebGL fallback and
+`prefers-reduced-motion`. The homepage hero
+(`apps/web/components/homepage/hero-light/`) is that approved scope and ships
+with no feature flag. The ambient field stays in scope because it already
+keeps a CSS poster and declines WebGL under reduced motion. Every other hit
+is on that check's shrink-only baseline.
+
+
+## Homepage hero WebGL exception
+
+The rules above are unchanged. This section does not add a row 1–3 budget.
+
+`night-dj-harmony-v1` still reads: Glow and glass stay CSS tokens. No canvas, WebGL, or video on a surface.
+
+approved by Tim, scoped to the flagged hero prototype only. Dated 2026-10-22 8:47 PM PT.
+
+The exception applies only to the homepage hero decorative layer. It does not apply
+to any other surface. The hero ships enabled. There is no feature flag. There is no
+video. The canvas is `aria-hidden` and `pointer-events: none`, and it loads after
+idle. No WebGL support, reduced motion, save-data, low-power, and context loss keep
+the CSS poster, with no layout shift. The glass bar stays on CSS tokens
+(`backdrop-filter` via `--blur-header`).
+
+<!-- hero-light-webgl-exception/v1
+{
+  "schema": "hero-light-webgl-exception/v1",
+  "status": "approved",
+  "approval": "approved by Tim, scoped to the flagged hero prototype only",
+  "approvedAt": "2026-10-22 8:47 PM PT",
+  "approver": "Tim",
+  "rule": "Glow and glass stay CSS tokens. No canvas, WebGL, or video on a surface.",
+  "invariant": "night-dj-harmony-v1",
+  "sibling": "performance-invariants-v1",
+  "amendsInvariant": false,
+  "surface": "homepage hero decorative layer",
+  "otherSurfaces": false,
+  "module": "apps/web/components/homepage/hero-light/hero-light-gl.ts"
+}
+-->

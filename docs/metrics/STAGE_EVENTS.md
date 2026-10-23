@@ -107,6 +107,7 @@ PATCH as `lanes-status.json`). Keep 28 days, drop older rows, cap at 8 MB.
 | `shipping:worker-start` | `shipping` / `JovieInc/Jovie#<pr>` once the run has a PR, else `JOV-<n>` | ledger receipt `startedAt` | receipt `endedAt` | `runs/ledger.jsonl` issue receipt (`kind` issue) |
 | `shipping:gate-seat` | `shipping` / `JovieInc/Jovie#<pr>` | adopt receipt `startedAt` | `startedAt + gateWaitS` (no seat: `endedAt`, outcome `abandoned`) | `runs/ledger.jsonl` (`kind` adopt) |
 | `shipping:gate` | `shipping` / `JovieInc/Jovie#<pr>` | `startedAt + gateWaitS` | receipt `endedAt` (`advanced` landing/verified, `failed` held/timeout) | `runs/ledger.jsonl` (`kind` adopt) |
+| `shipping:outcome-receipt` | `shipping` / `JOV-<n>` | lifecycle comment that owes `outcome` | outcome lane records the receipt (`advanced` pass, `failed` fail, `abandoned` no receipt) | `runs/ledger.jsonl` (`kind` outcome-verify) |
 | `remediation:repair-start` | `remediation` / `JovieInc/Jovie#<pr>@<first 12 chars of the red head sha>` | fix-red receipt `startedAt` | receipt `endedAt` | `runs/ledger.jsonl` (`kind` fix-red) |
 
 `actor` = provider (`codex`, `claude`, ...). `outcome`: `advanced` when the run
@@ -151,6 +152,23 @@ controller attempt 3, after waiting for the token's quota reset or
 
 `entityId` = `<workflow file>#<run id>@<attempt>`. The source is an artifact
 (see "Where events live").
+
+### Claim checkout dogfood (`claim-dogfood`)
+
+Live emitter: `scripts/claim-dogfood-report.mjs stage-events` (workflow
+`claim-checkout-dogfood.yml`, after every successful Staging Controller and
+after Golden Path Nightly). Rows go to the artifact
+`claim-dogfood-receipts/stage-events.ndjson`.
+
+| Stage | Timestamp |
+| --- | --- |
+| `claim-dogfood:wait` | triggering run's `updated_at` (staging deploy done) to job start; omitted for manual dispatch |
+| `claim-dogfood:setup` | job start to app server ready (Neon branch, migrations, build); `failed` when the journey never starts |
+| `claim-dogfood:journey` | browser journey start to finish; `completed` (green) or `failed` (red) |
+
+`entityId` = `claim-checkout-dogfood#<run id>@<attempt>`. Like `release-replay`,
+the source is an artifact, so it reaches stage timings once the collector reads
+artifact sources.
 
 ### Automation liveness (`automation-run`)
 

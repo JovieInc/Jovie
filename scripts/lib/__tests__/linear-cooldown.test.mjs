@@ -141,6 +141,22 @@ describe('shared linear cooldown', () => {
     }
   });
 
+  it('keeps a private scope when concurrent publishers mkdir it together', async () => {
+    const key = 'concurrent-mkdir-secret';
+    const now = 1_700_000_000_000;
+    for (let round = 0; round < 4; round += 1) {
+      fs.rmSync(root, { recursive: true, force: true });
+      fs.mkdirSync(root, { mode: 0o700 });
+      const store = credentialBackoff(key, root);
+      await Promise.all(
+        Array.from({ length: 16 }, (_, index) =>
+          store.publish(now + 60_000 + index)
+        )
+      );
+      assert.equal(await store.read(now), now + 60_000 + 15);
+    }
+  });
+
   it('a failed publish never throws', async () => {
     const key = 'unwritable-secret';
     const blocker = join(root, 'blocked');
