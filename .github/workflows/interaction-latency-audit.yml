@@ -34,6 +34,8 @@ jobs:
     name: Interaction latency audit
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -41,11 +43,15 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - uses: ./.github/actions/setup-playwright
       - name: Measure declared interaction budgets
-        run: pnpm --filter @jovie/web exec tsx scripts/run-interaction-latency-audit.ts --check
+        env:
+          PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results/interaction-latency-receipt/*.json
+        run: >-
+          node .github/scripts/guard-playwright-artifacts.mjs --run --
+          pnpm --filter @jovie/web exec tsx scripts/run-interaction-latency-audit.ts --check
       - name: Upload receipt
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ always() && hashFiles('apps/web/test-results/interaction-latency-receipt/*.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: interaction-latency-receipt
-          path: apps/web/test-results/interaction-latency-receipt/
-          if-no-files-found: ignore
+          path: apps/web/test-results/interaction-latency-receipt/*.json
+          if-no-files-found: error

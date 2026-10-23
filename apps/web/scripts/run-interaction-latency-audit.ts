@@ -46,7 +46,7 @@ interface HarnessWindow extends Window {
   __jovieHarness?: Harness;
 }
 
-function harnessHtml(scenarioId: string) {
+export function harnessHtml(scenarioId: string) {
   return `<!doctype html><meta charset="utf-8"><title>${scenarioId}</title><body><div id="app"></div><script>
 (() => {
 const scenarioId = ${JSON.stringify(scenarioId)};
@@ -271,7 +271,7 @@ function receiptDate(generatedAt: string) {
   return generatedAt.slice(0, 10);
 }
 
-function renderMarkdown(receipt: ReturnType<typeof buildReceipt>) {
+export function renderMarkdown(receipt: ReturnType<typeof buildReceipt>) {
   const ms = (value: number | null) =>
     value === null ? 'n/a' : `${value.toFixed(1)}ms`;
   const rows = receipt.scenarios.map(
@@ -315,7 +315,7 @@ function renderMarkdown(receipt: ReturnType<typeof buildReceipt>) {
   ].join('\n');
 }
 
-async function measureAll() {
+export async function measureAll() {
   const scenarios = getInteractionHotPathManifest();
   const missing = scenarios.filter(scenario => !actions[scenario.id]);
   if (missing.length > 0) {
@@ -406,7 +406,7 @@ async function measureAll() {
   }
 }
 
-function buildReceipt(
+export function buildReceipt(
   generatedAt: string,
   browserVersion: string,
   samples: readonly InteractionLatencySample[]
