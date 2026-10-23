@@ -90,6 +90,25 @@ class ExecutionAttemptTest(unittest.TestCase):
             self.assertIsNone(seen["env"], "the lanes' gh shim supplies the token")
         finally:
             attempt.subprocess.run = real[0]; attempt.os.environ.clear(); attempt.os.environ.update(real[1])
+    def test_a_slow_paginated_read_gets_one_retry_and_writes_never_replay(self):
+        # 2026-10-21: 14 claims/24h failed on a 30 s status-history read before any work.
+        calls = []
+        def fake_run(args, **kwargs):
+            calls.append((args[3], kwargs.get("timeout")))
+            if len(calls) == 1 or args[3] == "POST":
+                raise subprocess.TimeoutExpired(args, kwargs.get("timeout"))
+            return subprocess.CompletedProcess(args, 0, "[[]]", "")
+        real = attempt.subprocess.run
+        attempt.subprocess.run = fake_run
+        try:
+            self.assertEqual(attempt._gh({}, "GET", "repos/x/y/statuses"), [[]])
+            self.assertEqual(calls, [("GET", attempt.GET_TIMEOUT_S), ("GET", attempt.GET_TIMEOUT_S)])
+            calls.clear()
+            with self.assertRaises(subprocess.TimeoutExpired):
+                attempt._gh({}, "POST", "repos/x/y/statuses/s", {"state": "pending"})
+            self.assertEqual(calls, [("POST", 30)], "a write is never replayed")
+        finally:
+            attempt.subprocess.run = real
     def test_crash_restart_and_redelivery_stay_terminal(self):
         first = self.claim()
         self.assertEqual(self.claim(now=101)["reason"], "duplicate_active")

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, globSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -157,12 +158,65 @@ export function capabilityEventFromEvidence(evidence, change) {
 /** @typedef {Record<string, Record<string, LockSpec> | undefined>} DepBlock */
 /** @typedef {{ importers: Record<string, DepBlock> }} PnpmLock */
 
+const SOURCE_FILE = /\.(?:cjs|js|json|mjs|ts|tsx)$/u;
+const GENERATED_PATH =
+  /(?:^|\/)(?:\.next|node_modules|coverage|\.turbo|test-results|playwright-report)\//u;
+
+/** Tracked files only when `root` is a git checkout: CI lanes write untracked outputs (coverage,
+ * reports, caches) under apps/ while this scan runs, which flipped a same-source reuse to
+ * 'refreshed' and ejected merge groups (JOV-8749). Outside a checkout, fall back to the glob. */
+function trackedFilesUnder(root, directory) {
+  try {
+    const listed = execFileSync(
+      'git',
+      ['-C', root, 'ls-files', '-z', '--', directory],
+      {
+        encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }
+    );
+    return (
+      listed
+        .split('\0')
+        // Same scope as the glob fallback: no dot-directories or dotfiles (glob default dot: false).
+        .filter(
+          path =>
+            path &&
+            SOURCE_FILE.test(path) &&
+            !GENERATED_PATH.test(path) &&
+            !relative(directory, path)
+              .split('/')
+              .some(segment => segment.startsWith('.'))
+        )
+        .map(path => join(root, path))
+        .filter(path => existsSync(path) && statSync(path).isFile())
+        .sort()
+    );
+  } catch {
+    return null;
+  }
+}
+
 function filesUnder(root, directory) {
   const start = join(root, directory);
   if (!existsSync(start)) return [];
+  const tracked = existsSync(join(root, '.git'))
+    ? trackedFilesUnder(root, directory)
+    : null;
+  if (tracked) return tracked;
   return globSync('**/*.{cjs,js,json,mjs,ts,tsx}', {
     cwd: start,
-    exclude: ['**/.next/**', '**/node_modules/**'],
+    // Generated outputs are not source. CI writes coverage JSON under apps/
+    // while this scan runs, which flipped a same-source reuse to 'refreshed'.
+    exclude: [
+      '**/.next/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      '**/.turbo/**',
+      '**/test-results/**',
+      '**/playwright-report/**',
+    ],
   })
     .map(path => join(start, path))
     .filter(path => statSync(path).isFile());

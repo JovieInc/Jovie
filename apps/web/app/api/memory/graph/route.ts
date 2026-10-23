@@ -12,8 +12,8 @@ export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
   try {
-    const { userId: clerkUserId } = await getCachedAuth();
-    if (!clerkUserId) {
+    const { userId: appUserId } = await getCachedAuth();
+    if (!appUserId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
         activeProfileId: users.activeProfileId,
       })
       .from(users)
-      .where(and(eq(users.clerkId, clerkUserId), isNull(users.deletedAt)))
+      .where(and(eq(users.id, appUserId), isNull(users.deletedAt)))
       .limit(1);
 
     if (!user?.activeProfileId) {

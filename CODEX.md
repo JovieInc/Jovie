@@ -4,7 +4,7 @@ Read `canon/OPERATING_SYSTEM.md` and `AGENTS.md` first. Codex uses the same
 canonical local bootstrap as humans and Claude: `bash scripts/codex-setup.sh`
 delegates to `scripts/setup.sh`. The wrapper selects the source-pinned Node
 runtime from nvm when already installed, including in non-interactive desktop
-hook shells. Current pins are Node 24.21.0 and pnpm 9.15.9.
+hook shells. Current pins are Node 24.22.1 and pnpm 9.15.9.
 
 ## Desktop worktrees and hooks
 

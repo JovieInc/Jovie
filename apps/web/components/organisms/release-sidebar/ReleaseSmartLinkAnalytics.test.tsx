@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { BASE_URL } from '@/constants/domains';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
@@ -40,5 +40,19 @@ describe('ReleaseSmartLinkAnalytics', () => {
     expect(control).toHaveTextContent(profileHost);
     expect(control).toHaveTextContent('calvinharris/im-not-alone-remixes');
     expect(control.textContent ?? '').not.toMatch(/localhost|127\.0\.0\.1/u);
+  });
+
+  it('names the copy control as the smart link, matching every other release surface', () => {
+    render(
+      <ReleaseSmartLinkAnalytics
+        release={mockRelease}
+        artistName='Calvin Harris'
+      />
+    );
+
+    const control = screen.getByTestId('release-smart-link-control');
+    expect(
+      within(control).getByRole('button', { name: 'Copy smart link' })
+    ).toHaveAttribute('title', 'Copy smart link');
   });
 });

@@ -57,6 +57,7 @@ import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
+import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
 import {
   probeRedisOperability,
   RedisOperabilityError,
@@ -185,6 +186,14 @@ export async function GET(request: Request) {
       investigations: snapshot.investigations.length,
     };
   });
+
+  // Default-plus-deadline contract: an overdue founder ask records its
+  // declared default (approve or reject) so nothing waits on Tim forever.
+  // One indexed KV read per run; at most 100 compare-and-set writes.
+  results.summerCardDefaults = await runSubJob(
+    'summerCardDefaults',
+    async () => ({ ...(await applySummerCardDefaults(new Date())) })
+  );
 
   // 2. Process campaigns — every invocation (15 min)
   results.campaigns = await runSubJob('campaigns', async () => {

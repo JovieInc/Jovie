@@ -115,11 +115,27 @@ iso_to_epoch() {
 
 lineage=exact
 if [ "$current" != "$expected" ]; then
-  status="$("$gh_cli" api "repos/$repository/compare/${expected}...${current}" --jq '.status // empty' 2>/dev/null || true)"
-  case "$status" in
-    ahead) lineage=ancestor ;;
-    *) lineage=diverged ;;
-  esac
+  lookup_status=0
+  status="$("$gh_cli" api "repos/$repository/compare/${expected}...${current}" --jq '.status // empty' 2>/dev/null)" || lookup_status=$?
+  lineage=unknown
+  if [ "$lookup_status" -eq 0 ]; then
+    case "$status" in
+      ahead) lineage=ancestor ;;
+      behind|diverged) lineage=diverged ;;
+    esac
+  fi
+  # A failed/empty compare proves no rewrite. In particular, installation
+  # quota exhaustion must fail the controller so its existing recovery path
+  # can run, rather than recording a successful supersession (JOV-7674).
+  if [ "$lineage" = unknown ]; then
+    emit lineage unknown
+    emit lineage_lookup_exit "$lookup_status"
+    emit gate_decision error
+    emit gate_reason lineage_lookup_unavailable
+    echo "::error::Release ancestry is unknown (exit=$lookup_status); inspect GitHub compare access/response before superseding $expected." >&2
+    printf 'decision=error\n'
+    exit 1
+  fi
 fi
 
 successor_pending=false
