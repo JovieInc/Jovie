@@ -1,7 +1,7 @@
 // biome-ignore-all format: keep the gate detector within the diff budget
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -175,6 +175,44 @@ describe('JOV-INV-045 gate-weakening detector', () => {
       const failed = run(['--check'], { GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: 'main' }, dir);
       assert.equal(failed.code, 1);
       assert.match(failed.out, /test-skip/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('diffs the merge base, so an older head does not look like it deleted files main added later', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gate-weakening-old-head-'));
+    const git = args => {
+      const result = spawnSync('git', ['-c', 'commit.gpgsign=false', '-c', 'user.email=dev@example.com', '-c', 'user.name=Dev', ...args], { cwd: dir, encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+    };
+    try {
+      git(['init', '-b', 'main']);
+      mkdirSync(join(dir, 'scripts/invariants'), { recursive: true });
+      mkdirSync(join(dir, '.github/workflows'), { recursive: true });
+      writeFileSync(join(dir, 'scripts/invariants/keep.test.mjs'), "it('keeps', () => {});\n");
+      writeFileSync(join(dir, 'scripts/invariants/gate-weakening-detector.mjs'), 'keep\n');
+      writeFileSync(join(dir, '.github/workflows/ci.yml'), 'timeout-minutes: 30\nname: old\n');
+      git(['add', '.']);
+      git(['commit', '-m', 'fork']);
+      const fork = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
+      writeFileSync(join(dir, 'scripts/invariants/added-on-main.test.mjs'), "it('later', () => {});\n");
+      writeFileSync(join(dir, '.github/workflows/ci.yml'), 'timeout-minutes: 10\nname: old\n');
+      git(['add', '.']);
+      git(['commit', '-m', 'main adds a test and tightens the timeout']);
+      git(['checkout', '-B', 'pr', fork]);
+      writeFileSync(join(dir, 'note.txt'), 'pull request edit\n');
+      writeFileSync(join(dir, '.github/workflows/ci.yml'), 'timeout-minutes: 30\nname: new\n');
+      git(['add', '.']);
+      git(['commit', '-m', 'edit a file that already existed at the fork']);
+      const older = loadDiffFiles(dir, 'main');
+      assert.deepEqual(older.map(file => file.path).sort(), ['.github/workflows/ci.yml', 'note.txt']);
+      assert.deepEqual(evaluateGateWeakening(older, config), []);
+      git(['rm', 'scripts/invariants/keep.test.mjs', 'scripts/invariants/gate-weakening-detector.mjs']);
+      git(['commit', '-m', 'delete a real invariant test and the detector']);
+      const kinds = evaluateGateWeakening(loadDiffFiles(dir, 'main'), config).map(item => item.kind);
+      assert.ok(kinds.includes('invariant-test-deleted'));
+      assert.ok(kinds.includes('detector-deleted'));
+      assert.equal(kinds.includes('timeout-raised'), false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

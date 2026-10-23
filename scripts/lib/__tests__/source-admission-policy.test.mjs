@@ -37,19 +37,6 @@ test('trusted source-read guards reject a deleted test on an old head and execut
   const git = (...args) =>
     execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
   try {
-    const archive = execFileSync(
-      '/usr/bin/git',
-      ['archive', 'HEAD', 'scripts'],
-      // scripts/ reached 20.0 MB on 2026-10-21 (ENOBUFS at a 20 MiB cap).
-      { maxBuffer: 128 * 1024 * 1024 }
-    );
-    execFileSync('tar', ['-x', '-C', repo], { input: archive });
-    // This synthetic base isolates the web manifest guard and predates the
-    // Codex bootstrap contract. Do not turn deletion of its checker scripts
-    // into an unrelated deletion of the Codex source/test surface.
-    for (const name of readdirSync(join(repo, 'scripts'))) {
-      if (name.startsWith('codex-')) rmSync(join(repo, 'scripts', name));
-    }
     const retired = join(repo, 'apps/web/lib/merch/qa-gate.test.ts');
     mkdirSync(join(repo, 'apps/web/lib/merch'), { recursive: true });
     mkdirSync(join(repo, 'apps/web/tests'), { recursive: true });
@@ -63,8 +50,8 @@ test('trusted source-read guards reject a deleted test on an old head and execut
     );
     // This fixture has no launch, profile, art-direction, or ICP-language
     // inventory. Isolate those unrelated checkers, as pnpm above isolates the
-    // other guards, while checking its cwd. The older head deletes scripts/,
-    // so the real art-direction and ICP-language runners are not on that checkout.
+    // other guards, while checking its cwd. The older head branched before
+    // scripts/ existed, so those runners are not on that checkout.
     writeFileSync(
       join(bin, 'node'),
       `#!/bin/sh
@@ -81,11 +68,30 @@ exec "$SOURCE_FIXTURE_NODE" "$@"
     git('config', 'user.name', 'Source guard test');
     git('config', 'user.email', 'source-guard@example.invalid');
     git('add', '.');
+    git('commit', '--quiet', '-m', 'fork point before trusted source guards');
+    const fork = git('rev-parse', 'HEAD');
+    const archive = execFileSync(
+      '/usr/bin/git',
+      ['archive', 'HEAD', 'scripts'],
+      // scripts/ reached 20.0 MB on 2026-10-21 (ENOBUFS at a 20 MiB cap).
+      { maxBuffer: 128 * 1024 * 1024 }
+    );
+    execFileSync('tar', ['-x', '-C', repo], { input: archive });
+    // This synthetic base isolates the web manifest guard and predates the
+    // Codex bootstrap contract. Do not turn deletion of its checker scripts
+    // into an unrelated deletion of the Codex source/test surface.
+    for (const name of readdirSync(join(repo, 'scripts'))) {
+      if (name.startsWith('codex-')) rmSync(join(repo, 'scripts', name));
+    }
+    git('add', '.');
     git('commit', '--quiet', '-m', 'trusted source-read guards');
     git('branch', 'main');
     git('remote', 'add', 'origin', repo);
     git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
-    rmSync(join(repo, 'scripts'), { recursive: true });
+    // Checking the fork back out drops scripts/ that main added after the
+    // branch. Removing them from the trusted parent would be a pull-request
+    // deletion of the invariant suite and the gate detector.
+    git('checkout', '--detach', fork);
     rmSync(retired);
     git('add', '--all');
     git('commit', '--quiet', '-m', 'older head deletes a manifest-listed test');

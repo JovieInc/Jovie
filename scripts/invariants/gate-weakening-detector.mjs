@@ -126,7 +126,14 @@ export function resolveBaseRef(cwd, env) {
   throw new Error(`base ref origin/${base} is not available`);
 }
 export function loadDiffFiles(cwd, baseRef) {
-  const listed = git(cwd, ['diff', '--name-status', '--find-renames', `${baseRef}...HEAD`]);
+  // The base tip includes commits that landed after this pull request branched.
+  // Those files are absent from an older head; they are not deletions. The
+  // pre-image is that same merge base, so a later tightening on main is not
+  // judged as this pull request loosening the gate.
+  const merged = git(cwd, ['merge-base', baseRef, 'HEAD']);
+  if (merged.code !== 0) throw new Error(merged.stderr.trim() || 'git merge-base failed');
+  const mergeBase = merged.stdout.trim();
+  const listed = git(cwd, ['diff', '--name-status', '--find-renames', mergeBase, 'HEAD']);
   if (listed.code !== 0) throw new Error(listed.stderr.trim() || 'git diff failed');
   const files = [];
   for (const line of listed.stdout.split('\n')) {
@@ -137,7 +144,7 @@ export function loadDiffFiles(cwd, baseRef) {
     const renamed = flag.startsWith('R') || flag.startsWith('C');
     files.push({
       path,
-      before: flag.startsWith('A') ? null : showFile(cwd, baseRef, renamed ? parts[1] : path),
+      before: flag.startsWith('A') ? null : showFile(cwd, mergeBase, renamed ? parts[1] : path),
       after: flag.startsWith('D') ? null : showFile(cwd, 'HEAD', path),
     });
   }
