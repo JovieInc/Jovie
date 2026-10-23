@@ -1,24 +1,8 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import {
-  MARKETING_OG_CARDS,
   MARKETING_OG_SIZE,
   type MarketingOgCard,
 } from '@/data/marketingOgCards';
 import { BRAND_ION_BLUE } from '@/lib/brand/tokens';
-
-const fontDir = join(process.cwd(), 'public/fonts');
-const fontConfigPath = join('/tmp', 'jovie-marketing-og-fonts.conf');
-writeFileSync(
-  fontConfigPath,
-  `<?xml version="1.0"?>
-<fontconfig>
-  <dir>${fontDir}</dir>
-  <cachedir>/tmp/jovie-marketing-og-fontconfig</cachedir>
-</fontconfig>
-`
-);
-process.env.FONTCONFIG_FILE ??= fontConfigPath;
 
 const SURFACE = '#08090a';
 const CREAM = '#F5F4F0';
@@ -80,12 +64,4 @@ export async function renderMarketingOgPng(
   return sharp(Buffer.from(marketingOgSvg(card)))
     .png()
     .toBuffer();
-}
-
-export async function writeMarketingOgCards(outputDir: string): Promise<void> {
-  mkdirSync(outputDir, { recursive: true });
-  for (const card of MARKETING_OG_CARDS) {
-    const png = await renderMarketingOgPng(card);
-    writeFileSync(join(outputDir, card.file), png);
-  }
 }
