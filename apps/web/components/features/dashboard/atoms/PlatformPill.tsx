@@ -137,11 +137,14 @@ export const PlatformPill = React.forwardRef<HTMLElement, PlatformPillProps>(
       className,
     });
 
-    // Extract aria label logic to avoid nested ternary
+    // Extract aria label logic to avoid nested ternary.
+    // Expanded pills name themselves from their visible content (prefixed by
+    // the sr-only "Select {platform}: " inside the button) so the accessible
+    // name always contains the visible text (label-content-name-mismatch).
     const getAriaLabel = (): string | undefined => {
       if (!isInteractive) return undefined;
       if (collapsed) return `${platformName}: ${primaryText}`;
-      return `Select ${platformName}`;
+      return undefined;
     };
     const ariaLabel = getAriaLabel();
 
@@ -180,6 +183,9 @@ export const PlatformPill = React.forwardRef<HTMLElement, PlatformPillProps>(
           data-testid={testId}
           aria-label={ariaLabel}
         >
+          {!collapsed && (
+            <span className='sr-only'>Select {platformName}: </span>
+          )}
           {pillContent}
         </button>
       );

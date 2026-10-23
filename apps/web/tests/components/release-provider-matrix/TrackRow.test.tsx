@@ -173,9 +173,14 @@ describe('TrackRow', () => {
 
     renderTrackRow({ onClick, renderMode: 'stack' });
 
-    await user.click(
-      screen.getByRole('button', { name: 'Open details for Open Skies' })
-    );
+    // Accessible name is computed from the visible content with an sr-only
+    // prefix, so the name always contains the visible text (WCAG 2.5.3).
+    const detailsButton = screen.getByRole('button', {
+      name: 'Open details for 1. Open Skies',
+    });
+    expect(detailsButton).toHaveTextContent('1.');
+    expect(detailsButton).toHaveTextContent('Open Skies');
+    await user.click(detailsButton);
     expect(onClick).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: 'Play Open Skies' }));

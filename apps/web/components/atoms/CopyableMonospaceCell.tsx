@@ -70,8 +70,8 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
         className
       )}
       title={`Copy ${label}`}
-      aria-label={`Copy ${label}`}
     >
+      <span className='sr-only'>Copy {label}: </span>
       <span
         className='truncate'
         style={{ maxWidth: `${maxWidth}px` }}
