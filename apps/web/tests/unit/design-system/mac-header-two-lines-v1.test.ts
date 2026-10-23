@@ -57,6 +57,9 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // /product's closing CTA headline is the same terminal value proposition —
   // the two-line clamp truncated it at 390px, so it renders editorial-title.
   'apps/web/app/(marketing)/product/ProductLanding.tsx',
+  // /product/release-scheduling keeps the full headline. Balance lives in
+  // the page CSS class, so the heading does not use line-clamp.
+  'apps/web/app/(marketing)/product/release-scheduling/ReleaseSchedulingLanding.tsx',
   // /product/dsp-links is a new marketing h1. The shrink-only headline
   // ratchet rejects a new line-clamp token, so the title stays complete.
   'apps/web/app/(marketing)/product/dsp-links/DspLinksLanding.tsx',
