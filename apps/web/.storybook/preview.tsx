@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import React from 'react';
 import { ToastProvider } from '../components/providers/ToastProvider';
+import { STORYBOOK_A11Y_PARAMETERS } from '../lib/a11y-gates/wcag-22-aa.ts';
 import { ThemeProvider } from './next-themes-mock';
 import '../app/globals.css';
 
@@ -229,19 +230,7 @@ const preview: Preview = {
         { name: 'gray', value: '#f3f4f6' },
       ],
     },
-    a11y: {
-      config: {
-        rules: [
-          {
-            id: 'color-contrast',
-            enabled: true,
-          },
-        ],
-      },
-      options: {
-        runOnly: ['wcag2a', 'wcag2aa'],
-      },
-    },
+    a11y: STORYBOOK_A11Y_PARAMETERS,
   },
   tags: ['autodocs'],
   decorators: [

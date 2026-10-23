@@ -222,6 +222,7 @@ jobs:
           node --test scripts/workflow-token-scope.test.mjs
           node scripts/lockfile-specifier-preflight.mjs
           node scripts/ci-release-incident-contract.mjs
+          node apps/web/scripts/a11y-wcag-standard-check.cjs
           pnpm ci:harness:check
           # The web test and story tsc programs (100s + 66s) ran after the
           # workspace typecheck (112s), serially, in this step (PR p50 7.6m).
@@ -548,13 +549,64 @@ jobs:
       - name: Run Ovie route and private-boundary coverage
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ovie == 'true' && matrix.shard == '2/4'
         run: pnpm --filter @jovie/ovie test
+  a11y:
+    name: A11y (UI paths)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - *proof-reuse
+      - *reused-checkout
+      - name: Select UI accessibility diff
+        id: scope
+        if: steps.reuse.outputs.reuse != 'true'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          if git diff --quiet "$base_sha" HEAD -- \
+            apps/web/app \
+            apps/web/components \
+            apps/web/styles \
+            apps/web/.storybook \
+            apps/web/lib/a11y-gates \
+            apps/web/tests/a11y \
+            apps/web/tests/e2e \
+            apps/web/tests/product-screenshots \
+            apps/web/tests/visual-qa \
+            apps/web/playwright.a11y-gate.config.ts \
+            apps/web/scripts/lint-touch-target.ts \
+            apps/web/scripts/a11y-wcag-standard-check.cjs \
+            packages/ui \
+            scripts/component-rendered-evaluator.mjs \
+            .github/workflows/source-validation.yml \
+            docs/ACCESSIBILITY.md; then
+            echo 'No UI paths changed; non-applicable receipt recorded.'
+            echo 'ui=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ui=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Setup Node.js and pnpm
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Playwright (Chromium)
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true'
+        uses: ./.github/actions/setup-playwright
+      - name: Run rendered WCAG 2.2 AA gate
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true'
+        run: pnpm --filter @jovie/web exec playwright test --config=playwright.a11y-gate.config.ts
   ready:
     name: PR Ready
     if: ${{ always() }}
-    needs: [deterministic, security, migration, coverage, unit]
+    needs: [deterministic, security, migration, coverage, unit, a11y]
     runs-on: ubuntu-latest
     steps:
       - name: Require every source proof
         env:
           RESULTS: ${{ join(needs.*.result, ',') }}
-        run: test "$RESULTS" = 'success,success,success,success,success'
+        run: test "$RESULTS" = 'success,success,success,success,success,success'
