@@ -20,6 +20,7 @@ import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { DOWNLOAD_COPY } from '@/data/downloadCopy';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 import { MAC_APP_SUPPORT } from '@/lib/desktop/mac-compatibility';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
@@ -85,11 +86,13 @@ export const metadata: Metadata = {
     description: DOWNLOAD_COPY.metadata.socialDescription,
     url: `${BASE_URL}/download`,
     type: 'website',
+    images: [marketingOgImage('download')],
   },
   twitter: {
     card: 'summary_large_image',
     title: `Download ${APP_NAME}`,
     description: DOWNLOAD_COPY.metadata.socialDescription,
+    images: [marketingOgImage('download').url],
   },
 };
 

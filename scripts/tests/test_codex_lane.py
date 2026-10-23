@@ -122,8 +122,12 @@ class CurrentLoginTest(Isolated):
         super().setUp()
         self.root = Path(self.tmp.name)
         self.cli = self.root / "codex"
+        # Pin one slot. An ambient CODEX_LANE_LOGIN_SLOTS above 1 makes
+        # test_real_metadata_child_retains_lease_until_delayed_reap loop in
+        # reap_current_metadata. Collection also scrubs the host value.
         self.env = patch.dict(os.environ, {
             "CODEX_LANE_AUTH_MODE": "current-login", "CODEX_LANE_CLI": str(self.cli),
+            "CODEX_LANE_LOGIN_SLOTS": "1",
             "CODEX_HOME": str(self.root / "existing-login"), "OPENAI_API_KEY": "must-not-reach-child",
             "OPENAI_BASE_URL": "https://unavailable.invalid", "CODEX_API_KEY": "must-not-reach-child",
         })
