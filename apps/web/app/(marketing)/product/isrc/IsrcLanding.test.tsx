@@ -47,7 +47,7 @@ describe('IsrcLanding', () => {
     const editor = within(hero).getByTestId('isrc-editor');
     expect(editor).toBeVisible();
     expect(within(editor).getByText(ISRC_FIXTURE.releaseTitle)).toBeVisible();
-    const primary = within(editor).getByRole('button', { name: 'Edit ISRC' });
+    const primary = within(editor).getByRole('button', { name: /Edit ISRC/ });
     expect(primary).toHaveTextContent(ISRC_FIXTURE.primaryIsrc);
     expect(
       within(editor).getByRole('button', { name: 'Copy ISRC' })
@@ -71,18 +71,18 @@ describe('IsrcLanding', () => {
 
     await waitFor(() => {
       expect(
-        within(editor).getByRole('button', { name: 'Edit ISRC' })
+        within(editor).getByRole('button', { name: /Edit ISRC/ })
       ).toHaveTextContent(ISRC_FIXTURE.primaryIsrc);
     });
 
-    fireEvent.click(within(editor).getByRole('button', { name: 'Edit ISRC' }));
+    fireEvent.click(within(editor).getByRole('button', { name: /Edit ISRC/ }));
     const next = within(editor).getByRole('textbox', { name: 'Edit ISRC' });
     fireEvent.change(next, { target: { value: 'us-rc1-7607840' } });
     fireEvent.blur(next);
 
     await waitFor(() => {
       expect(
-        within(editor).getByRole('button', { name: 'Edit ISRC' })
+        within(editor).getByRole('button', { name: /Edit ISRC/ })
       ).toHaveTextContent('USRC17607840');
     });
   });
