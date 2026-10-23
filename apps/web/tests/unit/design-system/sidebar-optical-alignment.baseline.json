@@ -1,0 +1,5 @@
+{
+  "$comment": "One-off sidebar offsets (px-2.5, 18px grids, h-6.5, and the rest of the banned set) on the shared shell owners. Armed. The count may only go down. Zero means the shared optical column owns alignment.",
+  "armed": true,
+  "count": 0
+}

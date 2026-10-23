@@ -282,6 +282,10 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
   uses `.marketing-type-display` / `-section` / `-lede`.
 - Marketing plan prices render only through `MarketingOfferSummary` or
   `getPublicPriceClaim` from offer truth; never type a price into copy.
+- Marketing images and cards use a radius token. The wide cinematic corner
+  is `.marketing-rounded-frame` (`--system-b-radius-panel` / `--radius-3xl`).
+  Exempt only the full-bleed hero start (it rounds as it zooms out), logos,
+  icons, SVG marks, and already-round avatars. See MKT-D17.
 
 ### No Duplicate Page Titles (Breadcrumb + Toolbar)
 
@@ -314,6 +318,12 @@ absent.
 - Dedicated audience routes may use that language. The allowlist is `scripts/invariants/icp-language/config.json`.
 - The headline “Be found. Be understood.” is locked.
 - `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready check. Existing hits are a shrink-only baseline. See MKT-D16 in `docs/marketing/DESIGN_INVARIANTS.md`.
+
+### Copy Is the Message, Never the Brief
+
+Reject AI instructions, editing rules, and unfinished text in every user-visible string, including metadata, accessibility labels, emails, errors, empty states, and demos. Use the copy system.
+Run `node scripts/invariants/copy-leak/check.mjs` before review: it blocks PR Ready and merge groups. Fix real leaks; its baseline only shrinks.
+Exact exceptions in `scripts/invariants/copy-leak/config.json` require reasons.
 
 ### No Emoji in UI — Use Icons
 

@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { cn } from '@/lib/utils';
 
 const DEFAULT_MARKETING_QUALITY = 85;
 
@@ -36,7 +37,7 @@ export function MarketingPhoneImage({
         sizes={sizes}
         priority={priority}
         quality={quality ?? DEFAULT_MARKETING_QUALITY}
-        className={className}
+        className={cn('marketing-rounded-frame', className)}
       />
     );
   }
@@ -49,7 +50,7 @@ export function MarketingPhoneImage({
       sizes={sizes}
       priority={priority}
       quality={quality ?? DEFAULT_MARKETING_QUALITY}
-      className={className}
+      className={cn('marketing-rounded-frame', className)}
     />
   );
 }

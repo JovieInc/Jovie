@@ -90,8 +90,8 @@ export const DEMO_EARNINGS_RESPONSE: EarningsResponse = {
   tippers: [
     createDemoTipper({
       id: 'tipper-1',
-      tipperName: 'Sam K.',
-      contactEmail: 'sam@example.com',
+      tipperName: 'Alex R.',
+      contactEmail: 'alex.rivera@gmail.com',
       amountCents: 500,
       createdAt: '2026-04-12T18:30:00.000Z',
     }),
@@ -104,8 +104,8 @@ export const DEMO_EARNINGS_RESPONSE: EarningsResponse = {
     }),
     createDemoTipper({
       id: 'tipper-3',
-      tipperName: 'Jordan B.',
-      contactEmail: 'jordan@example.com',
+      tipperName: 'Maya C.',
+      contactEmail: 'maya.chen@outlook.com',
       amountCents: 300,
       createdAt: '2026-04-10T12:00:00.000Z',
     }),
@@ -138,10 +138,10 @@ export const DEMO_INSIGHTS: InsightResponse[] = [
     id: 'demo-insight-city-growth',
     insightType: 'city_growth',
     category: 'geographic',
-    priority: 'high',
+    priority: 'medium',
     title: 'Toronto is heating up',
     description:
-      'Audience activity in Toronto is up 38% over the last 30 days, outpacing every other top market.',
+      'Audience activity is up 38% over the last 30 days, outpacing every other top market.',
     actionSuggestion:
       'Prioritize Toronto in your next run of paid traffic and shortlist it for tour routing.',
     confidence: '0.91',

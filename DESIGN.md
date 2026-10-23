@@ -152,7 +152,7 @@ unless linked below.
 | --- | --- | --- | --- | --- |
 | `@jovie/no-hardcoded-theme-colors` | `error` | L | Yes | None (no grandfathered count) |
 | `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
-| `arbitrary-radius` | `error` | S + G | Yes | 27 occurrences; 12 files |
+| `arbitrary-radius` | `error` | S + G | Yes | 14 occurrences; 8 files |
 | `arbitrary-values` | `error` | G + I | Yes | 2169 |
 | `component-family` | `error` | G | Yes | button=37; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
 | `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
@@ -161,8 +161,8 @@ unless linked below.
 | `linear-namespace` | `error` | G + I | Yes | 700 |
 | `shadcn/no-restyle` | `error` | L + G | Yes | 217 files; 3105 messages (grandfathered) |
 | `source-identity` | `error` | I | Yes | 2057 |
-| `spacing-scale (conservative)` | `error` | S + G | Yes | 614; armed=true; marketing=46; packages/ui=11; web-other=304; web-shell=253 |
-| `spacing-scale (strict)` | `warn` | S + G | No | 2202; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=851 |
+| `spacing-scale (conservative)` | `error` | S + G | Yes | 590; armed=true; marketing=46; packages/ui=11; web-other=290; web-shell=243 |
+| `spacing-scale (strict)` | `warn` | S + G | No | 2190; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=837 |
 | `touch-target` | `error` | D | Yes | 153 |
 | `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=267; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
 

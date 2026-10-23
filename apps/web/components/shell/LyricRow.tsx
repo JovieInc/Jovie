@@ -6,16 +6,16 @@ import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
 import type { LyricLine } from './LyricsView.types';
 
-// Cyan pill-chip + tinted bg used for selected/focused rows in edit mode.
+// Ion-accent pill-chip + tinted bg used for selected/focused rows in edit mode.
 // Mirrors the shell-v1 SELECTED_ROW_CLASSES vocabulary so the row treatment
 // reads consistently across views.
 const SELECTED_ROW_CLASSES = [
-  'data-[selected]:bg-cyan-300/[0.06]',
-  'data-[focused]:bg-cyan-300/[0.04]',
+  'data-[selected]:bg-accent/[0.06]',
+  'data-[focused]:bg-accent/[0.04]',
   'before:absolute before:left-0.5 before:top-1/2 before:-translate-y-1/2',
-  'before:h-3.5 before:w-1 before:rounded-full before:bg-cyan-300/0',
-  'data-[focused]:before:bg-cyan-300/85',
-  'data-[selected]:before:bg-cyan-300/85',
+  'before:h-3.5 before:w-1 before:rounded-full before:bg-accent/0',
+  'data-[focused]:before:bg-accent/85',
+  'data-[selected]:before:bg-accent/85',
   'before:transition-colors before:duration-subtle before:ease-subtle',
 ].join(' ');
 
@@ -60,7 +60,7 @@ export const LyricRow = React.memo(function LyricRow({
   if (!editing) {
     if (!interactive) {
       return (
-        <li className='text-center text-xl leading-[1.35] font-display text-secondary-token'>
+        <li className='text-center text-xl leading-snug font-display text-secondary-token'>
           {line.text}
         </li>
       );
@@ -78,8 +78,8 @@ export const LyricRow = React.memo(function LyricRow({
             'group/lyric block w-full text-center cursor-pointer select-none bg-transparent border-0 p-0',
             'transition-[color,opacity,transform] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
             isActive
-              ? 'text-primary-token text-3xl leading-[1.25] font-display opacity-100'
-              : 'text-tertiary-token text-xl leading-[1.35] font-display opacity-60 hover:opacity-90 hover:text-secondary-token'
+              ? 'text-primary-token text-3xl leading-tight font-display opacity-100'
+              : 'text-tertiary-token text-xl leading-snug font-display opacity-60 hover:opacity-90 hover:text-secondary-token'
           )}
         >
           {line.text}
@@ -113,8 +113,8 @@ export const LyricRow = React.memo(function LyricRow({
         className={cn(
           'shrink-0 h-6 px-1.5 rounded text-3xs tabular-nums font-caption transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
           isActive
-            ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
-            : 'text-tertiary-token bg-surface-1 border border-(--app-shell-border) hover:text-primary-token hover:border-cyan-500/40'
+            ? 'bg-accent/15 text-accent border border-accent/30'
+            : 'text-tertiary-token bg-surface-1 border border-(--app-shell-border) hover:text-primary-token hover:border-accent/40'
         )}
         title='Stamp this line to the current playhead (Enter)'
       >
