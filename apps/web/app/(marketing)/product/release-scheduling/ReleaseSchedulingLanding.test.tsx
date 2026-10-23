@@ -49,7 +49,7 @@ describe('ReleaseSchedulingLanding', () => {
       'data-marketing-owner',
       'apps/web/app/(marketing)/product/release-scheduling/ReleaseSchedulingLanding.tsx'
     );
-    expect(hero).toHaveAttribute('data-accent', 'ion');
+    expect(hero.closest('[data-accent="ion"]')).not.toBeNull();
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveTextContent(RELEASE_SCHEDULING_COPY.headline);
@@ -61,12 +61,7 @@ describe('ReleaseSchedulingLanding', () => {
     const fields = screen.getByTestId('release-schedule-fields');
     expect(fields).toBeVisible();
     const panel = screen.getByTestId('release-scheduling-panel');
-    expect(panel).toHaveClass(
-      'rounded-3xl',
-      'border',
-      'border-subtle',
-      'bg-surface-1'
-    );
+    expect(panel).toHaveClass('marketing-rounded-frame', 'border');
     expect(panel).toContainElement(fields);
 
     const releaseDate = formatDatePickerValue(

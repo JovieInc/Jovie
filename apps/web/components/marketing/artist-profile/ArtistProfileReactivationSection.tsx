@@ -30,7 +30,7 @@ export function ArtistProfileReactivationSection({
       sectionVariant={sectionVariant}
       sectionOwner={sectionOwner}
     >
-      <div className='mx-auto max-w-280'>
+      <div>
         <ArtistProfileSectionHeader
           align='center'
           headline={reactivation.headline}

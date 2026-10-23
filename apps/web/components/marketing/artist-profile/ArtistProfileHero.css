@@ -3,8 +3,6 @@
 
 .ap-hero {
   --homepage-header-height: 56px;
-  --homepage-grid-max: var(--ds-public-content-max);
-  --homepage-grid-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
   --homepage-page-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
   margin-top: calc(-1 * var(--public-shell-header-offset));
 }

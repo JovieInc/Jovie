@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { BlogPost } from '@/lib/blog/getBlogPosts';
@@ -58,4 +60,17 @@ describe('BlogPostPage', () => {
       screen.getByRole('heading', { level: 2, name: 'Ship with context' })
     ).toBeInTheDocument();
   });
+});
+
+const OWN_WIDTH_CAP =
+  /max-w-(?:300|315|280|4xl|6xl|linear-content)|--homepage-section-max/;
+
+describe('single container width', () => {
+  it.each(['components/organisms/BlogPostPage.tsx'])(
+    '%s takes its width from the shared container, not its own cap',
+    file => {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).not.toMatch(OWN_WIDTH_CAP);
+    }
+  );
 });

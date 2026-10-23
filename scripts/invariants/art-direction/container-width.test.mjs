@@ -121,6 +121,17 @@ describe('marketing container width', () => {
     );
     assert.deepEqual(
       scan(
+        '.a { margin: 0; }\n.glow {\n  top: 0;\n  /* container-width-allow: decorative glow */\n  width: min(80rem, 120vw);\n}',
+        path
+      ),
+      []
+    );
+    assert.equal(
+      scan('.glow {\n  top: 0;\n  width: min(80rem, 120vw);\n}', path).length,
+      1
+    );
+    assert.deepEqual(
+      scan(
         "// container-width-allow: demo frame\n<div className='max-w-5xl' />"
       ),
       []
