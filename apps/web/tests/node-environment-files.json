@@ -44,6 +44,7 @@
   "components/shell/",
   "constants/platforms/utils.fuzz.test.ts",
   "data/canonicalPublicShellOptimization.test.ts",
+  "data/downloadCopy.test.ts",
   "data/marketing/pageContracts.test.ts",
   "data/supportCopy.test.ts",
   "eslint-rules/",
