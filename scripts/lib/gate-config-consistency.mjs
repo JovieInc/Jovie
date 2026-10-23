@@ -27,6 +27,14 @@ const WORKFLOW_DIR = '.github/workflows';
 const CHROMATIC_RUN =
   /(?:chromatic-com\/action@|uses:\s*['"]?chromatic\/|npx\s+chromatic\b|\bpnpm\s+(?:exec\s+)?chromatic\b)/u;
 
+/** @param {unknown} value @returns {Record<string, unknown>} */
+function asMapping(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return /** @type {Record<string, unknown>} */ (value);
+}
+
 /** @param {string} workflowText */
 export function onBlock(workflowText) {
   const start = workflowText.search(/^on:\s*/m);
@@ -104,8 +112,8 @@ export function auditGateConfigs(root) {
   if (!existsSync(codecovPath)) {
     findings.push(`${CODECOV_CONFIG} is missing`);
   } else {
-    const codecov = loadYaml(readFileSync(codecovPath, 'utf8'));
-    const declared = new Set(Object.keys(codecov?.flags ?? {}));
+    const codecov = asMapping(loadYaml(readFileSync(codecovPath, 'utf8')));
+    const declared = new Set(Object.keys(asMapping(codecov.flags)));
     for (const flag of declared) {
       if (!coverageFlags.has(flag)) {
         findings.push(
@@ -120,8 +128,10 @@ export function auditGateConfigs(root) {
         );
       }
     }
-    const patchInformational =
-      codecov?.coverage?.status?.patch?.default?.informational;
+    const coverage = asMapping(codecov.coverage);
+    const status = asMapping(coverage.status);
+    const patch = asMapping(status.patch);
+    const patchInformational = asMapping(patch.default).informational;
     if (patchInformational !== true && !pullRequestUploadsCoverage) {
       findings.push(
         `${CODECOV_CONFIG} patch status is blocking, but no pull_request workflow uploads coverage. Exact-head Coverage in ci.yml is the pull-request line-coverage gate.`
