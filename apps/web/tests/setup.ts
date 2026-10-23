@@ -2,6 +2,7 @@
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { cleanup } from '@testing-library/react';
 import { afterEach, expect, vi } from 'vitest';
+import { releaseIdleAuthClient } from '../lib/auth/auth-client-test-hooks';
 
 expect.extend(matchers);
 
@@ -70,6 +71,8 @@ vi.mock('@sentry/nextjs', () => ({
 // Ensure the DOM is cleaned up between tests to avoid cross-test interference
 afterEach(() => {
   cleanup();
+  // Run after Testing Library unmounts, while jsdom's `window` still exists.
+  releaseIdleAuthClient();
 });
 
 // Suppress noisy runtime warnings that depend on optional integrations in tests.

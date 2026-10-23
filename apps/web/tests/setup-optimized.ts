@@ -15,6 +15,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, vi } from 'vitest';
+import { releaseIdleAuthClient } from '../lib/auth/auth-client-test-hooks';
 
 const appRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -39,6 +40,8 @@ if (typeof window !== 'undefined') {
   // Ensure the DOM is cleaned up between tests to avoid cross-test interference
   afterEach(() => {
     cleanup();
+    // Run after Testing Library unmounts, while jsdom's `window` still exists.
+    releaseIdleAuthClient();
   });
 }
 

@@ -2,6 +2,7 @@ import { oauthProviderClient } from '@better-auth/oauth-provider/client';
 import { passkeyClient } from '@better-auth/passkey/client';
 import { emailOTPClient, oneTapClient } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
+import { rememberAuthClientForTests } from '@/lib/auth/auth-client-test-hooks';
 import { absolutePublicUrl } from '@/lib/env-public';
 
 /**
@@ -79,5 +80,7 @@ export const authClient = createAuthClient({
       : []),
   ],
 });
+
+rememberAuthClientForTests(authClient);
 
 export type AuthClient = typeof authClient;
