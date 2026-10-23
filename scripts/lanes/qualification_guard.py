@@ -113,10 +113,11 @@ HERE = Path(__file__).resolve().parent
 # silently deferred every lane draft's gate after #22301 changed the fixture (2026-10-20
 # 17:26Z to 2026-10-21): 45 jovie-bot drafts were never qualified or promoted.
 REVIEWED_FIXTURE_SHA256 = (
-    "be680e72198db2174f6c0ac5fe05157a4a03f7bd791941c9254f13b21d0686fb",  # 5db1a60 (#22010)
+    "53d4b1b3b46143fec03da0f02788a8409778d06ff59aadec14e8002c70d77304",  # JOV-8517 (owned home and fail-closed probe)
     "aa24ace3f9cf6fc485806d2c8395c9344e7680cc4e8b7fd5c126d777515e4f0c",  # 0fa7c7a (#22301)
-    "e533ec43dfa16b7d869712515bcf724e671a4fa438d3ba11608f9747e70d12aa",  # 2f3af5b (#22373)
+    "be680e72198db2174f6c0ac5fe05157a4a03f7bd791941c9254f13b21d0686fb",  # 5db1a60 (#22010)
     "cea3f65dc681620b08138f4c1f35a6695083196c60e79e6a021da02b0a05851b",  # #22495 (scan stub in setUp)
+    "e533ec43dfa16b7d869712515bcf724e671a4fa438d3ba11608f9747e70d12aa",  # 2f3af5b (#22373)
 )
 DEFAULT_POLICY = SafetyPolicy(
     "5db1a60487c0a29dda45315d9aa5da14493d9409",

@@ -232,6 +232,7 @@ class CheckTest(unittest.TestCase):
         scratch = Path(self.cleanup.name)
         derived = guard.sweep_derived_data
         isolated = [
+            patch.object(Path, "home", return_value=scratch),
             patch.object(guard, "runner_roots", return_value=[]),
             patch.object(guard, "retired_workspace_roots", return_value=[]),
             patch.object(guard, "log_dirs", side_effect=lambda host: [host.state / "runs"]),
@@ -475,6 +476,103 @@ class CheckTest(unittest.TestCase):
             first.assert_called_once()
             second.assert_not_called()
             self.assertFalse(report["admitted"])
+
+
+
+def probe_check_fixture():
+    """Audit only cleanup execution; import source before denying host access."""
+    import worktree_sweep  # noqa: F401 (load lazy dependencies before the audit)
+    case = CheckTest("test_healthy_disk_sweeps_nothing")
+    case.setUp()
+    root = Path(case.cleanup.name)
+    violations = []
+    active = True
+
+    def inside(path, dir_fd=None):
+        if isinstance(path, int) or path is None:
+            return
+        path = os.fsdecode(path)
+        if not os.path.isabs(path) and dir_fd is not None and dir_fd != -1:
+            path = os.path.join(os.readlink(f"/proc/self/fd/{dir_fd}"), path)
+        absolute = Path(os.path.realpath(path))
+        if not absolute.is_relative_to(root):
+            violations.append(f"outside fixture: {absolute}")
+            raise PermissionError(violations[-1])
+
+    def audit(event, args):
+        if not active:
+            return
+        if event.startswith(("subprocess.", "socket.")) or event in ("os.system", "os.posix_spawn", "os.exec"):
+            violations.append(f"forbidden launch/network: {event}")
+            raise PermissionError(violations[-1])
+        if event in ("open", "os.listdir", "os.scandir", "os.chdir", "os.remove",
+                     "os.rmdir", "os.mkdir", "shutil.rmtree", "pathlib.Path.glob", "pathlib.Path.rglob"):
+            dir_fd = args[1] if event in ("os.remove", "os.rmdir", "shutil.rmtree") else None
+            if event == "os.mkdir":
+                dir_fd = args[2]
+            inside(args[0], dir_fd)
+        if event in ("os.rename", "os.link", "os.symlink"):
+            inside(args[0])
+            inside(args[1])
+
+    # stat/lstat do not emit Python audit events. Observe those paths too.
+    stat, lstat = Path.stat, Path.lstat
+    def checked_stat(path, *args, **kwargs):
+        inside(path)
+        return stat(path, *args, **kwargs)
+    def checked_lstat(path, *args, **kwargs):
+        inside(path)
+        return lstat(path, *args, **kwargs)
+
+    commands = []
+    def run(args, **kwargs):
+        case.assertIsNotNone(kwargs.get("cwd"))
+        inside(kwargs["cwd"])
+        if args not in (["git", "worktree", "list", "--porcelain"],
+                        ["xcrun", "simctl", "delete", "unavailable"]):
+            violations.append(f"unexpected command: {args}")
+            raise PermissionError(violations[-1])
+        commands.append(args)
+        return ok(args)
+
+    sys.addaudithook(audit)
+    try:
+        with patch.object(Path, "stat", checked_stat), patch.object(Path, "lstat", checked_lstat), \
+                patch.object(guard, "free_pct", return_value=10.0):
+            derived = make_tree(root / "DerivedData/old", ["build.log"], age_s=6 * 3600)
+            logs = make_tree(root / "runs", ["old.log"], age_s=15 * 86400)
+            report = guard.check(case.host(root), run=run, now=NOW, sweep=True)
+            case.assertEqual(report["errors"], [])
+            case.assertFalse(derived.exists())
+            case.assertFalse((logs / "old.log").exists())
+            case.assertEqual(guard.runner_roots(), [])
+            case.assertEqual(guard.retired_workspace_roots(), [])
+            # Deliberate tool coverage still uses the fixture's own home.
+            with patch.object(guard.shutil, "which", return_value="/fixture/xcrun"):
+                guard.sweep_host_tools(run, report)
+            case.assertIn(["xcrun", "simctl", "delete", "unavailable"], commands)
+            case.assertEqual(violations, [], "caught sweep errors must also fail the probe")
+            # Prove launch/path refusal before any effect; these two are deliberate reds.
+            with case.assertRaises(PermissionError):
+                subprocess.run(["git", "push", "https://invalid.example/fixture"], cwd=root)
+            with case.assertRaises(PermissionError):
+                (root.parent / "outside-fixture").read_text()
+            case.assertEqual(len(violations), 2)
+    finally:
+        active = False
+        case.doCleanups()
+
+
+class FixtureIsolationTest(unittest.TestCase):
+    def test_check_fixture_paths_and_subprocesses_fail_closed(self):
+        # Audit hooks are irreversible: contain them in a fresh interpreter.
+        code = ("import importlib.util,sys; "
+                "s=importlib.util.spec_from_file_location('disk_fixture_probe', sys.argv[1]); "
+                "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); "
+                "m.probe_check_fixture()")
+        result = subprocess.run([sys.executable, "-I", "-B", "-c", code, str(Path(__file__).resolve())],
+                                capture_output=True, text=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 
