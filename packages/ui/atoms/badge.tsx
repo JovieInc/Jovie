@@ -13,26 +13,26 @@ const badgeVariants = cva(BADGE_SHARED_GEOMETRY_CLASS, {
         'border-(--color-border-strong) bg-(--color-bg-primary) text-(--linear-text-primary)',
       secondary:
         'border-(--color-border-strong) bg-(--color-bg-primary) text-(--linear-text-tertiary)',
-      destructive: 'border-error/20 bg-(--color-error-subtle) text-error',
+      destructive: 'border-error/20 bg-(--color-error-subtle) text-error-text',
       outline:
         'border-(--color-border-default) bg-transparent text-(--linear-text-secondary)',
-      success: 'border-success/20 bg-(--color-success-subtle) text-success',
-      warning: 'border-warning/20 bg-(--color-warning-subtle) text-warning',
+      success: 'border-success/20 bg-(--color-success-subtle) text-success-text',
+      warning: 'border-warning/20 bg-(--color-warning-subtle) text-warning-text',
       'permission-restricted':
         'border-(--state-permission-border) bg-(--state-permission-bg) text-(--state-permission-fg)',
       // Backwards-compat aliases
       primary:
         'border-(--color-border-strong) bg-(--color-bg-primary) text-(--linear-text-primary)',
-      error: 'border-error/20 bg-(--color-error-subtle) text-error',
+      error: 'border-error/20 bg-(--color-error-subtle) text-error-text',
     },
     size: BADGE_SIZE_GEOMETRY,
     tone: {
       neutral: 'border-subtle bg-surface-1 text-tertiary-token',
       info: 'border-info/20 bg-surface-1 text-info',
-      success: 'border-success/20 bg-surface-1 text-success',
+      success: 'border-success/20 bg-surface-1 text-success-text',
       accent: 'border-accent/20 bg-surface-1 text-accent',
-      warning: 'border-warning/20 bg-surface-1 text-warning',
-      error: 'border-error/20 bg-surface-1 text-error',
+      warning: 'border-warning/20 bg-surface-1 text-warning-text',
+      error: 'border-error/20 bg-surface-1 text-error-text',
     },
   },
   defaultVariants: {

@@ -214,7 +214,7 @@ export function ConnectorCard({
           <p
             className={cn(
               'min-h-4 text-xs',
-              needsAttention || !available ? 'text-error' : 'text-tertiary'
+              needsAttention || !available ? 'text-error-text' : 'text-tertiary'
             )}
             data-testid={`connector-detail-${provider}`}
           >
@@ -256,7 +256,7 @@ export function ConnectorCard({
             </details>
           )}
           {missingCapabilities && (
-            <p className='text-xs text-warning'>
+            <p className='text-xs text-warning-text'>
               Reconnect to enable missing permissions.
             </p>
           )}

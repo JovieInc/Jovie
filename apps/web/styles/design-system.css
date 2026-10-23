@@ -1266,26 +1266,26 @@
 
   --color-accent-gray: #7f7f85;
   --color-accent-gray-subtle: #efeff2;
-  --color-accent-blue: #0a6fa8;
-  --color-accent-blue-subtle: rgba(10, 111, 168, 0.1);
+  --color-accent-blue: #11afff;
+  --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
   --color-accent-purple: #8e56f5;
   --color-accent-purple-subtle: rgba(142, 86, 245, 0.12);
   /* Purple as TEXT on white (7:1); fills keep --color-accent-purple. */
   --color-accent-purple-text: #6d28d9;
   --color-accent-pink: #f52bb5;
   --color-accent-pink-subtle: rgba(245, 43, 181, 0.12);
-  --color-accent-red: #d0212c;
-  --color-accent-red-subtle: rgba(208, 33, 44, 0.1);
-  --color-accent-orange: #b34700;
-  --color-accent-orange-subtle: rgba(179, 71, 0, 0.1);
-  --color-accent-green: #0b7a3b;
-  --color-accent-green-subtle: rgba(11, 122, 59, 0.1);
+  --color-accent-red: #f72a36;
+  --color-accent-red-subtle: rgba(247, 42, 54, 0.12);
+  --color-accent-orange: #ff7800;
+  --color-accent-orange-subtle: rgba(255, 120, 0, 0.12);
+  --color-accent-green: #3ffa8b;
+  --color-accent-green-subtle: rgba(63, 250, 139, 0.12);
   --color-accent-teal: #3ffa8b;
   --color-accent-teal-subtle: rgba(63, 250, 139, 0.12);
 
-  --color-accent: #0a6fa8;
-  --color-accent-hover: #0a6fa8;
-  --color-accent-active: #0a6fa8;
+  --color-accent: #11afff;
+  --color-accent-hover: #11afff;
+  --color-accent-active: #11afff;
   --color-accent-subtle: var(--noir-ion-ion-soft);
   --color-accent-foreground: oklch(100% 0 0);
 
@@ -1450,7 +1450,7 @@
   );
   --color-link-visited: var(--color-accent-purple);
   --state-disabled-opacity: 0.5;
-  --state-partial-opacity: 0.62;
+  --state-partial-opacity: 0.8;
   --state-offline-bg: var(--color-warning-subtle);
   --state-offline-border: color-mix(
     in oklab,
@@ -1780,7 +1780,7 @@
   --color-link-visited: var(--noir-ion-ultra);
   --color-focus-ring: var(--color-border-focus);
   --state-disabled-opacity: 0.5;
-  --state-partial-opacity: 0.62;
+  --state-partial-opacity: 0.8;
   --state-offline-bg: var(--color-warning-subtle);
   --state-offline-border: color-mix(
     in oklab,
@@ -2606,7 +2606,7 @@
   /* Warning */
   --color-warning: var(--color-accent-orange);
   --color-warning-subtle: var(--color-accent-orange-subtle);
-  --color-warning-foreground: oklch(100% 0 0);
+  --color-warning-foreground: oklch(20% 0 0);
 
   /* Error/Destructive */
   --color-error: var(--color-accent-red);
@@ -2629,12 +2629,9 @@
   /* Warning — Orange */
   --color-warning: var(--color-accent-orange);
   --color-warning-subtle: var(--color-accent-orange-subtle);
-  --color-warning-foreground: oklch(20% 0 0);
 
-  /* Error — Red (danger). Text red is lifted slightly above the brand fill red
-     so error copy clears 4.5:1 on the error-subtle tint and on elevated
-     surfaces; fills keep --color-accent-red. */
-  --color-error: #ff4a55;
+  /* Error — Red (danger) */
+  --color-error: var(--color-accent-red);
   --color-error-subtle: var(--color-accent-red-subtle);
   --color-danger: var(--color-error);
   --color-danger-subtle: var(--color-error-subtle);
@@ -2642,6 +2639,24 @@
   /* Info — Aqua/system signal (not Ion blue; Ion is action/focus) */
   --color-info: var(--color-accent-teal);
   --color-info-subtle: var(--color-accent-teal-subtle);
+}
+
+/* Status colors as TEXT. The status tokens above are fills/accents (neon mint,
+   orange, red) that stay locked to the Noir Ion palette; these derived tokens
+   keep status copy at WCAG AA (4.5:1) on white (light) and on the error-tinted
+   and elevated dark surfaces, without redefining the palette. */
+:root {
+  --color-success-text: color-mix(in srgb, var(--color-success) 48%, black);
+  --color-warning-text: color-mix(in srgb, var(--color-warning) 70%, black);
+  --color-error-text: color-mix(in srgb, var(--color-error) 85%, black);
+  --color-accent-text: color-mix(in srgb, var(--color-accent) 65%, black);
+}
+
+:root.dark {
+  --color-success-text: var(--color-success);
+  --color-warning-text: var(--color-warning);
+  --color-error-text: color-mix(in srgb, var(--color-error) 75%, white);
+  --color-accent-text: var(--color-accent);
 }
 
 /* ============================================

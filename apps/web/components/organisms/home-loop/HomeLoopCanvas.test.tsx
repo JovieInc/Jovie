@@ -331,8 +331,8 @@ describe('HomeLoopAsks escalation', () => {
       'Waiting 52h',
       'Waiting 26h',
     ]);
-    expect(badges[0]).toHaveClass('text-error');
-    expect(badges[1]).toHaveClass('text-warning');
+    expect(badges[0]).toHaveClass('text-error-text');
+    expect(badges[1]).toHaveClass('text-warning-text');
   });
 });
 

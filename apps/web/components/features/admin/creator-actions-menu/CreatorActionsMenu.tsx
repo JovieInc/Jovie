@@ -131,8 +131,7 @@ function MenuItems({
             onClick={onDelete}
             variant='destructive'
             style={{
-              color:
-                'light-dark(var(--color-error), color-mix(in oklab, var(--color-error) 85%, var(--color-error-foreground)))',
+              color: 'var(--color-error-text)',
             }}
           >
             <Trash2 className='h-3.5 w-3.5' />

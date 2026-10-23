@@ -55,7 +55,7 @@ describe('MetadataAgentPanel status callouts', () => {
     const error = await screen.findByText(
       'Unable to load metadata agent state.'
     );
-    expect(error).toHaveClass('bg-error-subtle', 'text-error');
+    expect(error).toHaveClass('bg-error-subtle', 'text-error-text');
     expect(error.className).not.toMatch(PALETTE);
   });
 
@@ -66,7 +66,7 @@ describe('MetadataAgentPanel status callouts', () => {
     const warning = await screen.findByText(
       'Metadata submission storage is not available in this environment.'
     );
-    expect(warning).toHaveClass('bg-warning-subtle', 'text-warning');
+    expect(warning).toHaveClass('bg-warning-subtle', 'text-warning-text');
     expect(warning.className).not.toMatch(PALETTE);
   });
 
@@ -81,7 +81,7 @@ describe('MetadataAgentPanel status callouts', () => {
     renderPanel();
 
     const heading = await screen.findByText('Missing Fields');
-    expect(heading).toHaveClass('text-warning');
+    expect(heading).toHaveClass('text-warning-text');
     expect(heading.parentElement).toHaveClass('bg-warning-subtle');
     expect(heading.parentElement?.className).not.toMatch(PALETTE);
   });
@@ -94,7 +94,7 @@ describe('MetadataAgentPanel status callouts', () => {
 
     expect(
       await screen.findByText('No open drift issues on the latest snapshot.')
-    ).toHaveClass('text-success');
-    expect(screen.getByText('Bounce once')).toHaveClass('text-error');
+    ).toHaveClass('text-success-text');
+    expect(screen.getByText('Bounce once')).toHaveClass('text-error-text');
   });
 });

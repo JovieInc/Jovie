@@ -381,7 +381,7 @@ describe('Card composition', () => {
     const card = screen.getByTestId('card');
     expect(card).toHaveAttribute('data-content-state', 'partial');
     expect(card).toHaveAttribute('aria-busy', 'true');
-    expect(card.className).not.toContain('opacity-');
+    expect(card.className).toContain('opacity-[var(--state-partial-opacity)]');
   });
 
   it('preserves explicit busy semantics outside the partial state', () => {

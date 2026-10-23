@@ -155,9 +155,9 @@ function draftForItem(
 }
 
 const MARK_TOKENS = {
-  certified: ['size-3', Check, 'Certified', 'text-success'],
-  'needs-work': ['size-3', XCircle, 'Needs Work', 'text-warning'],
-  ready: ['size-3', CheckCircle2, 'Ready', 'text-success'],
+  certified: ['size-3', Check, 'Certified', 'text-success-text'],
+  'needs-work': ['size-3', XCircle, 'Needs Work', 'text-warning-text'],
+  ready: ['size-3', CheckCircle2, 'Ready', 'text-success-text'],
   collecting: ['size-3', CircleDashed, 'Collecting', 'text-secondary-token'],
 } as const;
 

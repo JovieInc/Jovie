@@ -78,7 +78,7 @@ function EvidenceLine({ ask }: Readonly<{ readonly ask: HomeLoopAsk }>) {
   if (isAskEvidenceMissing(ask))
     return (
       <p
-        className='text-xs text-warning'
+        className='text-xs text-warning-text'
         data-testid='home-loop-ask-evidence-missing'
       >
         Evidence missing
@@ -232,8 +232,8 @@ function AskCard({
                 className={cn(
                   'mr-1.5 inline-flex rounded-full px-1.5 align-middle text-2xs font-semibold tabular-nums',
                   ask.escalation.level === 2
-                    ? 'bg-error-subtle text-error'
-                    : 'bg-warning-subtle text-warning'
+                    ? 'bg-error-subtle text-error-text'
+                    : 'bg-warning-subtle text-warning-text'
                 )}
                 data-testid='home-loop-ask-escalation'
               >
@@ -288,7 +288,7 @@ function AskCard({
           className={cn(ACTION_SLOT, 'text-xs text-secondary-token')}
           role='status'
         >
-          <Check aria-hidden='true' className='size-3.5 text-success' />
+          <Check aria-hidden='true' className='size-3.5 text-success-text' />
           <span className='truncate'>{answer.label}</span>
           {answer.state === 'pending' ? (
             <span className='text-tertiary-token'>Sending</span>
@@ -357,7 +357,7 @@ function AskCard({
             </form>
           ) : null}
           {answer?.state === 'failed' ? (
-            <span className='text-xs text-error' role='alert'>
+            <span className='text-xs text-error-text' role='alert'>
               {answer.label}
             </span>
           ) : null}

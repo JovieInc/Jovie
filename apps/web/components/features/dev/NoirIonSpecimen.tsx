@@ -70,7 +70,7 @@ const ACCENTS: ReadonlyArray<{
     name: 'Red',
     role: 'Danger / error (flare aliases red)',
     color: 'var(--noir-ion-red)',
-    textColor: 'var(--color-error)',
+    textColor: 'var(--color-error-text)',
     soft: 'var(--noir-ion-flare-soft)',
   },
 ];

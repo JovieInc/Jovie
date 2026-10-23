@@ -204,6 +204,15 @@ if (typeof window !== 'undefined') {
 }
 
 const preview: Preview = {
+  // Theme toggles persist to localStorage; clear it so one story's light/dark
+  // choice never leaks into the next story's axe run in the same browser.
+  beforeEach: () => {
+    try {
+      globalThis.localStorage?.removeItem('jovie-theme-storybook');
+    } catch {
+      // Storage is optional in isolated browser tests.
+    }
+  },
   parameters: {
     controls: {
       matchers: {

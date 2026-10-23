@@ -303,6 +303,11 @@
   --color-accent-blue: var(--color-accent-blue);
   --color-error-subtle: var(--color-error-subtle);
   --color-error-foreground: var(--color-error-foreground);
+  --color-success-text: var(--color-success-text);
+  --color-warning-text: var(--color-warning-text);
+  --color-error-text: var(--color-error-text);
+  --color-accent-text: var(--color-accent-text);
+  --color-accent-purple-text: var(--color-accent-purple-text);
   /* Accent token — enables bg-accent-subtle, text-accent, border-accent */
   --color-accent: var(--color-accent);
   --color-accent-subtle: var(--color-accent-subtle);
