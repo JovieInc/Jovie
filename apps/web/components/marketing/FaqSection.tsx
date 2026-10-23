@@ -62,3 +62,5 @@ export function FaqSection({
     </section>
   );
 }
+
+// proof: exercises PR-time marketing route capture; do not merge
