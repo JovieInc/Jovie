@@ -66,6 +66,7 @@ test('FS-009 requires a marketing radius token and leaves parent clipping to the
   const file = 'apps/web/components/marketing/MarketingSurfaceCard.tsx';
   const hit = (text, nearby = '') =>
     checkLine(file, 1, text, nearby).some(item => item.id === 'FS-009');
+  /** @type {Array<[string, boolean]>} */
   const cases = [
     ["className='rounded-[1.1rem]'", true],
     ['border-radius: 1.45rem;', true],
