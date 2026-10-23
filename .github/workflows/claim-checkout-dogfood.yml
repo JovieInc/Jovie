@@ -94,12 +94,14 @@ jobs:
           fallback_json_key: db_url
 
       - name: Export DATABASE_URL
+        env:
+          RESOLVED_DATABASE_URL: ${{ steps.resolve-db.outputs.database_url }}
         run: |
-          if [ -z "${{ steps.resolve-db.outputs.database_url }}" ]; then
+          if [ -z "$RESOLVED_DATABASE_URL" ]; then
             echo "::error::No ephemeral Neon DATABASE_URL. Refusing to run the dogfood against a shared database."
             exit 1
           fi
-          echo "DATABASE_URL=${{ steps.resolve-db.outputs.database_url }}" >> "$GITHUB_ENV"
+          printf 'DATABASE_URL=%s\n' "$RESOLVED_DATABASE_URL" >> "$GITHUB_ENV"
 
       - name: Emit isolated claim-test admission
         env:

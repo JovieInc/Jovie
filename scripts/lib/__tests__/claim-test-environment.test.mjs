@@ -306,6 +306,57 @@ describe('runner preflight and workflow boundary', () => {
       }).blockers
     ).toContain('database_url_invalid');
   });
+  it.each([true, false])(
+    'preserves shell-sensitive resolved URI data; present=%s',
+    present => {
+      const dir = mkdtempSync(join(tmpdir(), 'jovie-isolation-test-'));
+      dirs.push(dir);
+      const envFile = join(dir, 'github-env');
+      const workflow = readFileSync(
+        resolve(
+          import.meta.dirname,
+          '../../../.github/workflows/claim-checkout-dogfood.yml'
+        ),
+        'utf8'
+      );
+      const step = workflow
+        .split('- name: Export DATABASE_URL\n')[1]
+        .split('\n      - name:')[0];
+      const script = step
+        .split('        run: |\n')[1]
+        .split('\n')
+        .map(line => line.replace(/^          /, ''))
+        .join('\n');
+      const value = present
+        ? url('ep-synthetic').replace(
+            'not-a-real-secret',
+            'synthetic$(printf)$CLAIM_EXPORT_TEST_MARKER'
+          )
+        : '';
+      const result = spawnSync(
+        '/bin/bash',
+        ['--noprofile', '--norc', '-e', '-c', script],
+        {
+          env: {
+            PATH: process.env.PATH,
+            GITHUB_ENV: envFile,
+            RESOLVED_DATABASE_URL: value,
+            CLAIM_EXPORT_TEST_MARKER: 'expanded',
+          },
+          encoding: 'utf8',
+          timeout: 5000,
+        }
+      );
+      expect(result.status).toBe(present ? 0 : 1);
+      if (present) {
+        expect(readFileSync(envFile, 'utf8')).toBe(`DATABASE_URL=${value}\n`);
+        expect(result.stdout + result.stderr).toBe('');
+      } else {
+        expect(result.stdout).toContain('Refusing to run');
+        expect(() => readFileSync(envFile)).toThrow();
+      }
+    }
+  );
   it('keeps target preflight before all migrations and publishes its failure receipt', () => {
     const workflow = readFileSync(
       resolve(

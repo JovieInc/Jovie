@@ -731,6 +731,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
   'scripts/lib/__tests__/vitest-orphan-inventory.test.mjs',
   'scripts/lib/__tests__/claim-dogfood-report.test.mjs',
+  'scripts/lib/__tests__/claim-test-environment.test.mjs',
   'scripts/lib/__tests__/codeowners-drift.test.mjs',
   'scripts/lib/__tests__/component-comparative-quality-bar.test.mjs',
   'scripts/lib/__tests__/component-rendered-certification.test.mjs',
