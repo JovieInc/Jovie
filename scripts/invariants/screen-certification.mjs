@@ -1470,7 +1470,7 @@ export function runScreenCertificationFromArtifact({
 const isMain =
   process.argv[1] &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isMain) {
+async function main() {
   const diffBase = process.argv
     .find(arg => arg.startsWith('--diff-base='))
     ?.slice(12);
@@ -1593,4 +1593,11 @@ if (isMain) {
     );
   }
   process.exit(result.ok ? 0 : 1);
+}
+
+if (isMain) {
+  main().catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+  });
 }

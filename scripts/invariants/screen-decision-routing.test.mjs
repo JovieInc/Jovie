@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { summerCardId } from '../../apps/web/lib/ovie/summer-card-digest.ts';
 import {
-  summerCardId,
+  summerCardDecisionContract,
   summerCardInputSchema,
 } from '../../apps/web/lib/ovie/summer-cards.ts';
 import {
@@ -446,6 +447,7 @@ describe('EVENT routing qualification in the screen gate (JOV-7350)', () => {
           const digest = createHash('sha256').update('summer-card:' + input.idempotencyKey).digest('hex');
           return new Response(JSON.stringify({card: {...input,
             defaultIfSilent: null, recipient: null, amountUsd: null,
+            defaultDecision: 'reject',
             id: 'sc_' + digest.slice(0, 32), status: 'approved',
             createdAt: new Date().toISOString()
           }}), {status: 201});
@@ -525,6 +527,10 @@ describe('EVENT producer delivery in the screen gate', () => {
   };
   const storedCard = input => ({
     ...summerCardInputSchema.parse(input),
+    ...summerCardDecisionContract(
+      summerCardInputSchema.parse(input),
+      new Date(T0)
+    ),
     id: summerCardId(input.idempotencyKey),
     status: 'pending',
     createdAt: T0,
@@ -732,6 +738,8 @@ describe('EVENT producer delivery in the screen gate', () => {
       card => ({ ...card, id: 'sc_forged' }),
       card => ({ ...card, body: 'different effect' }),
       card => ({ ...card, evidence: [] }),
+      card => ({ ...card, defaultDecision: 'approve' }),
+      card => ({ ...card, defaultDecision: null }),
       card => ({ ...card, status: 'unknown' }),
       card => ({ ...card, status: null }),
       card => ({ ...card, createdAt: 'invalid' }),

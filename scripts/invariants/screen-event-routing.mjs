@@ -117,6 +117,8 @@ function matchesCard(card, input, nowMs, committedAt) {
     recipient: null,
     amountUsd: null,
     preflightReceiptId: null,
+    // Summer records an undeclared deadline default as rejection.
+    defaultDecision: input.defaultDecision ?? 'reject',
   };
   return (
     isObject(card) &&
