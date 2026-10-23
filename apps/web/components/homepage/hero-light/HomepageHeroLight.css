@@ -24,8 +24,8 @@
   --hero-light-ion: #3faff3;
   --hero-light-ultra: #a789f0;
   --hero-light-pulse: #eb6ac6;
-  --hero-light-focal-x: 34%;
-  --hero-light-focal-y: 64%;
+  --hero-light-focal-x: 50%;
+  --hero-light-focal-y: 70%;
 
   position: absolute;
   inset: 0;
@@ -37,8 +37,7 @@
 
 @media (max-width: 63.99rem) {
   .homepage-hero-light {
-    --hero-light-focal-x: 50%;
-    --hero-light-focal-y: 78%;
+    --hero-light-focal-y: 74%;
   }
 }
 

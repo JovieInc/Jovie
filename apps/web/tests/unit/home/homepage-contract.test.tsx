@@ -124,6 +124,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       container.querySelector('[data-testid="homepage-hero-light"]')
     ).toBeNull();
     expect(container.querySelector('.homepage-artist-hero--lit')).toBeNull();
+    expect(container.querySelector('.homepage-hero-canvas')).toBeNull();
     expect(container.querySelector('canvas')).toBeNull();
   });
 

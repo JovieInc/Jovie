@@ -64,6 +64,18 @@ export const HERO_LIGHT_PERF = {
   rollPeriodMs: 28_000,
 } as const;
 
+/**
+ * Atmosphere sits in the open field under the headline and the handle
+ * input, so the light does not sit on the type.
+ */
+export const HERO_CANVAS_FOCAL = {
+  wide: { x: 0.5, y: 0.7 },
+  narrow: { x: 0.5, y: 0.74 },
+} as const;
+
+/** Design headline for the flagged canvas. The shipped hero copy is unchanged. */
+export const HERO_CANVAS_HEADLINE = 'Be found. Be understood.';
+
 /** Proposal only. Shipping this object does not approve a canvas on `/`. */
 export const HERO_LIGHT_WEBGL_EXCEPTION = {
   status: 'proposed',

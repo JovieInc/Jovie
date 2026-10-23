@@ -24,7 +24,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Hero: Story = {};
 
-/** Flags-on preview. Production flags stay off; this story forces the CSS layer. */
+/** Flags-on preview. Production flags stay off; this story forces the full-bleed canvas. */
 export const HeroWithCssLight: Story = {
   args: { heroLight: 'css' },
 };

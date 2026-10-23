@@ -1,0 +1,220 @@
+/*
+ * Flagged homepage hero canvas. Off-flag pages never carry these classes.
+ *
+ * Progress 0 is a full-bleed 100svh field, header included, square corners.
+ * Progress 1 insets that field and the header by the same gutter, rounds
+ * the card, and turns the header from solid black into quiet glass.
+ * --hero-canvas-progress is scroll-linked (42svh). It is not a timed tween
+ * and it does not pin the page. Reduced motion leaves the variable at 0.
+ */
+
+@property --hero-canvas-progress {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.homepage-hero-canvas {
+  --hero-canvas-progress: 0;
+  --hero-canvas-gutter: var(--space-4, 1rem);
+  --hero-canvas-chrome: var(--space-4, 1rem);
+  --hero-canvas-bar: 8.25rem;
+  --hero-canvas-radius: var(--system-b-radius-panel, 1.5rem);
+
+  position: relative;
+  height: 100svh;
+  background: var(--system-b-cinematic-black, #030406);
+  color: var(--color-text-primary-token, #f5f7fb);
+}
+
+@media (min-width: 64rem) {
+  .homepage-hero-canvas {
+    --hero-canvas-bar: 4.75rem;
+  }
+}
+
+.home-viewport--hero-canvas {
+  background: var(--system-b-cinematic-black, #030406);
+}
+
+.home-viewport--hero-canvas [data-testid="header-nav"],
+.home-viewport--hero-canvas .marketing-header-growth-space {
+  display: none;
+}
+
+.homepage-hero-canvas__bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.home-viewport--hero-canvas .homepage-hero-canvas__bar {
+  position: fixed;
+}
+
+.homepage-hero-canvas__bar-plate {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  box-sizing: border-box;
+  min-height: var(--hero-canvas-bar);
+  margin-inline: calc(var(--hero-canvas-progress) * var(--hero-canvas-gutter));
+  padding: var(--space-3, 0.75rem) var(--hero-canvas-chrome);
+  pointer-events: auto;
+  background: color-mix(
+    in oklab,
+    var(--system-b-cinematic-black, #030406)
+      calc((1 - var(--hero-canvas-progress)) * 100%),
+    transparent
+  );
+  border-radius: calc(var(--hero-canvas-progress) * var(--hero-canvas-radius))
+    calc(var(--hero-canvas-progress) * var(--hero-canvas-radius)) 0 0;
+  -webkit-backdrop-filter: blur(
+    calc(var(--hero-canvas-progress) * var(--blur-header, 20px))
+  );
+  backdrop-filter: blur(
+    calc(var(--hero-canvas-progress) * var(--blur-header, 20px))
+  );
+  box-shadow: inset 0 -1px 0
+    color-mix(
+      in oklab,
+      var(--hero-light-ion, #3faff3) calc(var(--hero-canvas-progress) * 22%),
+      transparent
+    );
+}
+
+.homepage-hero-canvas__brand {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--color-text-primary-token, #f5f7fb);
+}
+
+.homepage-hero-canvas__brand svg {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.homepage-hero-canvas__claim {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: min(32rem, 100%);
+  justify-self: center;
+}
+
+.homepage-hero-canvas__sign-in {
+  justify-self: end;
+  color: var(--color-text-primary-token, #f5f7fb);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+}
+
+@media (min-width: 64rem) {
+  .homepage-hero-canvas__bar-plate {
+    grid-template-columns: 1.75rem minmax(0, 32rem) auto;
+    justify-content: space-between;
+  }
+
+  .homepage-hero-canvas__claim {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
+.homepage-hero-canvas__stage {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+  padding-top: var(--hero-canvas-bar);
+  padding-inline: calc(var(--hero-canvas-progress) * var(--hero-canvas-gutter));
+  padding-bottom: calc(var(--hero-canvas-progress) * var(--space-4, 1rem));
+}
+
+.homepage-hero-canvas__field {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: calc(var(--hero-canvas-progress) * var(--hero-canvas-radius))
+    calc(var(--hero-canvas-progress) * var(--hero-canvas-radius)) 0 0;
+}
+
+.homepage-hero-canvas__copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 100%;
+  margin: 0;
+  padding: var(--space-6, 1.5rem) var(--hero-canvas-chrome);
+  opacity: clamp(0, calc(1 - (var(--hero-canvas-progress) - 0.45) / 0.4), 1);
+  text-align: center;
+}
+
+.homepage-hero-canvas__headline {
+  max-width: 16ch;
+  margin: 0;
+}
+
+.homepage-hero-canvas__logos {
+  border-radius: 0 0
+    calc(var(--hero-canvas-progress) * var(--hero-canvas-radius))
+    calc(var(--hero-canvas-progress) * var(--hero-canvas-radius));
+  background: color-mix(
+    in oklab,
+    var(--system-b-cinematic-black, #030406) 72%,
+    transparent
+  );
+  -webkit-backdrop-filter: blur(
+    calc(var(--hero-canvas-progress) * var(--blur-header, 20px))
+  );
+  backdrop-filter: blur(
+    calc(var(--hero-canvas-progress) * var(--blur-header, 20px))
+  );
+}
+
+.homepage-hero-canvas__logos-rail {
+  min-height: 2.75rem;
+  border-top: 1px solid
+    color-mix(in oklab, var(--hero-light-ion, #3faff3) 18%, transparent);
+}
+
+@keyframes homepage-hero-canvas-progress {
+  from {
+    --hero-canvas-progress: 0;
+  }
+
+  to {
+    --hero-canvas-progress: 1;
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .homepage-hero-canvas {
+      animation: homepage-hero-canvas-progress linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0px 42svh;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .homepage-hero-canvas__bar-plate,
+  .homepage-hero-canvas__logos {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .homepage-hero-canvas__copy {
+    opacity: 1;
+  }
+}

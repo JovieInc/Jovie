@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomepageArtistHero } from '@/components/homepage/HomepageArtistProfile';
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { HomepageHeroLight } from './HomepageHeroLight';
+import { HERO_CANVAS_HEADLINE } from './hero-light-gate';
 import { startHeroLight } from './hero-light-gl';
 
 vi.mock('./hero-light-gl', () => ({ startHeroLight: vi.fn() }));
@@ -119,17 +120,20 @@ describe('HomepageArtistHero light flag', () => {
     expect(document.querySelector('.homepage-artist-hero--lit')).toBeNull();
   });
 
-  it('mounts the CSS layer behind the same headline when forced on', () => {
+  it('mounts the cinematic canvas and the design headline when forced on', () => {
     render(<HomepageArtistHero heroLight='css' />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      HOMEPAGE_COPY.hero.headline
+      HERO_CANVAS_HEADLINE
     );
+    expect(screen.getByRole('link', { name: 'Sign in' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Jovie' })).toBeTruthy();
+    expect(
+      document.querySelector('.homepage-hero-canvas__brand')
+    ).not.toBeNull();
     const light = screen.getByTestId('homepage-hero-light');
     expect(light).toHaveAttribute('data-renderer', 'css');
-    expect(
-      light.compareDocumentPosition(screen.getByRole('heading', { level: 1 })) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
-    expect(document.querySelector('.homepage-artist-hero--lit')).not.toBeNull();
+    expect(light.querySelector('canvas')).toBeNull();
+    expect(document.querySelector('.homepage-artist-hero__phone')).toBeNull();
+    expect(document.querySelector('.homepage-artist-hero--lit')).toBeNull();
   });
 });

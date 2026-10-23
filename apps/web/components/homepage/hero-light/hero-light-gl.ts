@@ -5,6 +5,7 @@
  */
 
 import {
+  HERO_CANVAS_FOCAL,
   HERO_LIGHT_PERF,
   HERO_LIGHT_SCENE,
   nextLateFrameCount,
@@ -169,7 +170,8 @@ export function startHeroLight(
     gl.viewport(0, 0, width, height);
     gl.uniform2f(uRes, width, height);
     const narrow = rect.width < 1024;
-    gl.uniform2f(uFocal, narrow ? 0.5 : 0.36, narrow ? 0.28 : 0.42);
+    const focal = narrow ? HERO_CANVAS_FOCAL.narrow : HERO_CANVAS_FOCAL.wide;
+    gl.uniform2f(uFocal, focal.x, focal.y);
   };
 
   let frame = 0;

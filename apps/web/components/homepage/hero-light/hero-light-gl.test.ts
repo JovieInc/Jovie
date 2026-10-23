@@ -135,7 +135,7 @@ describe('startHeroLight', () => {
     startHeroLight(canvas, vi.fn(), vi.fn());
 
     expect([canvas.width, canvas.height]).toEqual([1440, 800]);
-    expect(gl.uniform2f).toHaveBeenCalledWith('focal', 0.36, 0.42);
+    expect(gl.uniform2f).toHaveBeenCalledWith('focal', 0.5, 0.7);
 
     const huge = canvasWith(fakeGl(), { width: 4000, height: 2000 });
     startHeroLight(huge, vi.fn(), vi.fn());
@@ -151,7 +151,7 @@ describe('startHeroLight', () => {
       vi.fn(),
       vi.fn()
     );
-    expect(gl.uniform2f).toHaveBeenCalledWith('focal', 0.5, 0.28);
+    expect(gl.uniform2f).toHaveBeenCalledWith('focal', 0.5, 0.74);
   });
 
   it('drops WebGL after eight late frames and keeps earlier frames', () => {

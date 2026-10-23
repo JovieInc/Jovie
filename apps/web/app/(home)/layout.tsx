@@ -2,6 +2,7 @@ import './home.css';
 import '../../components/marketing/MarketingSnapRail.css';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export const revalidate = false;
 
@@ -16,7 +17,11 @@ export default function HomeLayout({
   return (
     <ClientProviders forceSignedOutDefaults>
       <PublicPageShell
-        className='home-viewport min-h-svh overflow-x-clip bg-base text-primary-token'
+        className={
+          FEATURE_FLAGS.SHOW_HOMEPAGE_HERO_LIGHT
+            ? 'home-viewport home-viewport--hero-canvas min-h-svh overflow-x-clip bg-base text-primary-token'
+            : 'home-viewport min-h-svh overflow-x-clip bg-base text-primary-token'
+        }
         footerVariant='expanded'
         logoSize='sm'
       >

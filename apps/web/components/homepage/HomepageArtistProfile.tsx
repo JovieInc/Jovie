@@ -14,7 +14,7 @@ import {
 } from '@/data/homepageFanStatesCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
-import { HomepageHeroLight } from './hero-light/HomepageHeroLight';
+import { HomepageHeroCanvas } from './hero-light/HomepageHeroCanvas';
 import {
   type HomepageHeroLightRenderer,
   resolveHomepageHeroLight,
@@ -41,22 +41,24 @@ export function HomepageArtistHero({
     css: FEATURE_FLAGS.SHOW_HOMEPAGE_HERO_LIGHT,
     webgl: FEATURE_FLAGS.SHOW_HOMEPAGE_HERO_LIGHT_WEBGL,
   });
+  if (heroLightMode !== 'off') {
+    return (
+      <HomepageHeroCanvas
+        renderer={heroLightMode}
+        headingId={headingId}
+        copy={copy}
+      />
+    );
+  }
   return (
     <MarketingHero
       variant='unstyled'
-      className={
-        heroLightMode === 'off'
-          ? 'homepage-artist-hero'
-          : 'homepage-artist-hero homepage-artist-hero--lit'
-      }
+      className='homepage-artist-hero'
       headingId={headingId}
       testId='marketing-section-hero'
       sectionVariant='split-claim-card'
       sectionOwner={OWNER}
     >
-      {heroLightMode === 'off' ? null : (
-        <HomepageHeroLight renderer={heroLightMode} />
-      )}
       <div className='ap-section-container homepage-artist-hero__inner'>
         <div className='homepage-artist-hero__copy'>
           <h1
