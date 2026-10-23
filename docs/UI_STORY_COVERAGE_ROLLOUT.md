@@ -28,28 +28,37 @@ changes do not enter these lanes.
 
 ## Forward-only rollout
 
-The `UI Story Coverage Audit` workflow is shadow evidence. It runs for current
-main and UI PR changes, uploads a JSON report, and annotates missing coverage or
-harness defects without participating in production authorization or merge
-readiness.
+The `UI Story Coverage Audit` workflow is blocking for UI pull requests opened
+on or after `2026-10-23T02:55:00.000Z` with number `22700` or higher. Earlier
+pull requests stay grandfathered. The activation evidence is five clean
+applicable reports:
 
-Gem owns graduation. Change `.github/ui-story-coverage-policy.json` to
-`blocking` only after five consecutive clean audit artifacts from authoritative
-GitHub runs on the current baseline and representative UI PRs. Record those run
-IDs, the activation timestamp, and the first PR number opened after activation.
-Validation rejects a blocking policy without all three fields.
+- [39795196291](https://github.com/JovieInc/Jovie/actions/runs/39795196291)
+- [39796515081](https://github.com/JovieInc/Jovie/actions/runs/39796515081)
+- [39868623309](https://github.com/JovieInc/Jovie/actions/runs/39868623309)
+- [39873145141](https://github.com/JovieInc/Jovie/actions/runs/39873145141)
+- [39884653800](https://github.com/JovieInc/Jovie/actions/runs/39884653800)
 
-PRs opened before activation remain grandfathered. Backend-only PRs are never
-selected. Newly opened UI PRs after activation fail on missing evidence.
-Material UI additions to an older PR should opt into the new contract during
-rebase; the owner records that remediation rather than surprising historical
-branches or production builds.
+Workflow success alone is not a clean report. Audit mode used to exit 0 with
+findings. These five artifacts have `clean: true` and at least one applicable
+UI path.
 
-The gate can graduate only when:
+Components that already have no adjacent story are the baseline allowlist in
+`.github/ui-story-coverage-policy.json`. Every entry maps to
+[JOV-8847](https://linear.app/jovie/issue/JOV-8847). Do not add paths. Remove
+an entry in the same change that adds its story.
+`assertBaselineAllowlist` fails when the list and the tree disagree. A changed
+component that is not on the list fails the audit. Route surfaces are not
+allowlisted.
 
-1. five consecutive reports are clean;
-2. Storybook build and a11y complete on representative component changes;
-3. DB-free and DB-required route inventories are explicit and both have a
-   proving lane;
-4. artifact scanning remains fail-closed; and
-5. Gem documents the activation run IDs and PR cutoff in the policy file.
+The check is not a merge-queue required status. It is path-filtered, so
+requiring it would stall pull requests that do not run it. Revisit on
+2026-11-06, after the workflow reports a passing status on every pull request.
+
+Backend-only PRs are never selected. Newly opened UI PRs after activation fail
+on missing evidence.
+
+Activation used the five clean reports above and the recorded cutoff in
+`.github/ui-story-coverage-policy.json`. Storybook build, Storybook a11y,
+Playwright visual lanes, and artifact scanning stay fail-closed on their own
+jobs. This audit does not depend on Chromatic.
