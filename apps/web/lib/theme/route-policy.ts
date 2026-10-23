@@ -25,6 +25,7 @@ const THEME_SWITCHING_ROUTE_POLICY = {
     '/youtube-thumbnails',
     '/product',
     '/product/command-palette',
+    '/product/isrc',
     '/smart-links',
     '/launch',
     '/about',

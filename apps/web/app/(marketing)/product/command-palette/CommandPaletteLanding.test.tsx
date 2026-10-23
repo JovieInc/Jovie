@@ -47,6 +47,7 @@ describe('CommandPaletteLanding', () => {
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveTextContent(COMMAND_PALETTE_COPY.headline);
     expect(heading).toHaveAttribute('data-wrap', 'editorial-title');
+    expect(heading).toHaveClass('text-balance');
     expect(heading.className).not.toMatch(/line-clamp/);
     expect(screen.getByText(COMMAND_PALETTE_COPY.support)).toBeVisible();
 
