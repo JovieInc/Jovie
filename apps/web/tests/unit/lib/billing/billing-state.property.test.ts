@@ -127,15 +127,15 @@ describe('detectStatusMismatch (property)', () => {
 describe('customer-id extraction (property)', () => {
   it('agrees across modules and fails closed', () => {
     fc.assert(
-      fc.property(customerIdArb, customer => {
+      fc.property(customerIdArb, raw => {
+        const customer = raw as unknown as Parameters<typeof getCustomerId>[0];
         expect(getCustomerId(customer)).toBe(extractCustomerId(customer));
-        const extracted = extractCustomerId(customer);
         if (typeof customer === 'string') {
-          expect(extracted).toBe(customer);
+          expect(extractCustomerId(customer)).toBe(customer);
         } else if (customer && typeof customer === 'object') {
-          expect(extracted).toBe(customer.id);
+          expect(extractCustomerId(customer)).toBe(customer.id);
         } else {
-          expect(extracted).toBeNull();
+          expect(extractCustomerId(customer)).toBeNull();
         }
       })
     );
