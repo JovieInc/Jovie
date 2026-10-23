@@ -1,6 +1,6 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
@@ -444,8 +444,210 @@ describe('dead-man liveness', () => {
     });
   });
 
+  describe('unshipped range recovery', () => {
+    beforeEach(() => vi.stubEnv('JOVIE_API_STATE', 'memory'));
+    afterEach(() => vi.unstubAllEnvs());
+
+    it.each([500, 502, 503, 504, { name: 'AbortError' }, new Error('reset')])(
+      'recovers a transient unshipped-range read with a bounded retry (%j)',
+      async failure => {
+        let attempts = 0;
+        const { report } = await runLiveness({
+          registry: only('derived:jovie:production-promotion'),
+          nowMs: NOW,
+          fetchImpl: fakeFetch({
+            'jov.ie/api/health/build-info': { commitSha: LIVE },
+            '/git/ref/heads/main': mainRef(MAIN),
+            [`/compare/${LIVE}...${MAIN}`]: () => {
+              attempts += 1;
+              if (attempts > 1)
+                return {
+                  ahead_by: 2,
+                  commits: [{ commit: { committer: { date: iso(30) } } }],
+                };
+              if (typeof failure === 'number') return failure;
+              throw failure;
+            },
+          }),
+        });
+        expect(
+          rowFor(report, 'derived:jovie:production-promotion')
+        ).toMatchObject({
+          status: 'fresh',
+          reason: '2-commits-unshipped',
+          ageMinutes: 30,
+        });
+        expect(attempts).toBe(2);
+        expect(livenessDecisions(report)).toEqual([]);
+      }
+    );
+
+    it.each([30, 180])(
+      'recovers an authenticated range 403 without hiding %i minutes of lag',
+      async ageMinutes => {
+        const requests = [];
+        const network = fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: LIVE },
+          '/git/ref/heads/main': 403,
+          [`/compare/${LIVE}...${MAIN}`]: () =>
+            requests.length === 1
+              ? 403
+              : {
+                  ahead_by: 2,
+                  commits: [
+                    { commit: { committer: { date: iso(ageMinutes) } } },
+                  ],
+                },
+        });
+        const { report } = await runLiveness({
+          registry: only('derived:jovie:production-promotion'),
+          nowMs: NOW,
+          token: 'test-token',
+          lsRemote: async () => MAIN,
+          fetchImpl: async (url, init) => {
+            if (String(url).includes('/compare/'))
+              requests.push({
+                url: String(url),
+                headers: new Headers(init.headers),
+              });
+            return network(url);
+          },
+        });
+        expect(
+          rowFor(report, 'derived:jovie:production-promotion')
+        ).toMatchObject({
+          status: ageMinutes > 120 ? 'stale' : 'fresh',
+          reason:
+            ageMinutes > 120
+              ? 'silent-for-180m-over-120m'
+              : '2-commits-unshipped',
+          ageMinutes,
+        });
+        expect(requests).toHaveLength(2);
+        expect(requests[0].headers.get('authorization')).toBe(
+          'Bearer test-token'
+        );
+        expect(requests[1].headers.get('authorization')).toBeNull();
+        expect(requests.every(r => r.url.endsWith('?per_page=1'))).toBe(true);
+        expect(livenessDecisions(report).length).toBe(ageMinutes > 120 ? 1 : 0);
+      }
+    );
+    it('uses the public credential budget when main recovery exhausted the Actions budget', async () => {
+      const rangeHeaders = [];
+      const network = fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': new Response(
+          '{"message":"API rate limit exceeded"}',
+          {
+            status: 403,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': String(NOW / 1000 + 3600),
+              'X-RateLimit-Resource': 'core',
+            },
+          }
+        ),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [{ commit: { committer: { date: iso(30) } } }],
+        },
+      });
+      const { report } = await runLiveness({
+        registry: only('derived:jovie:production-promotion'),
+        nowMs: NOW,
+        token: 'test-token',
+        lsRemote: async () => MAIN,
+        fetchImpl: async (url, init) => {
+          if (String(url).includes('/compare/'))
+            rangeHeaders.push(new Headers(init.headers));
+          return network(url);
+        },
+      });
+      expect(
+        rowFor(report, 'derived:jovie:production-promotion')
+      ).toMatchObject({
+        status: 'fresh',
+        reason: '1-commits-unshipped',
+        ageMinutes: 30,
+      });
+      expect(rangeHeaders).toHaveLength(1);
+      expect(rangeHeaders[0].get('authorization')).toBeNull();
+    });
+
+    it.each([
+      [403, 'http-403'],
+      [429, 'http-429'],
+      [503, 'http-503'],
+      [new Error('reset'), 'transient'],
+      [new Response('not json', { status: 200 }), 'unreadable'],
+    ])(
+      'keeps a failed public recovery red with its diagnostic (%j)',
+      async (failure, reason) => {
+        let attempts = 0;
+        const { report } = await runLiveness({
+          registry: only('derived:jovie:production-promotion'),
+          nowMs: NOW,
+          token: 'test-token',
+          fetchImpl: fakeFetch({
+            'jov.ie/api/health/build-info': { commitSha: LIVE },
+            '/git/ref/heads/main': mainRef(MAIN),
+            [`/compare/${LIVE}...${MAIN}`]: () => {
+              attempts += 1;
+              if (attempts === 1) return 403;
+              if (failure instanceof Error) throw failure;
+              return failure;
+            },
+          }),
+        });
+        expect(
+          rowFor(report, 'derived:jovie:production-promotion')
+        ).toMatchObject({
+          status: 'unknown',
+          reason: `unshipped-range-${reason}`,
+          url: `https://api.github.com/repos/JovieInc/Jovie/compare/${LIVE}...${MAIN}?per_page=1`,
+        });
+        expect(attempts).toBe(2);
+        expect(livenessDecisions(report)[0].action).toBe('red');
+      }
+    );
+
+    it.each([401, 404, 503])(
+      'keeps other authenticated failures red (%i)',
+      async status => {
+        const authorizations = [];
+        const network = fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: LIVE },
+          '/git/ref/heads/main': mainRef(MAIN),
+          [`/compare/${LIVE}...${MAIN}`]: status,
+        });
+        const { report } = await runLiveness({
+          registry: only('derived:jovie:production-promotion'),
+          nowMs: NOW,
+          token: 'test-token',
+          fetchImpl: async (url, init) => {
+            if (String(url).includes('/compare/'))
+              authorizations.push(
+                new Headers(init.headers).get('authorization')
+              );
+            return network(url);
+          },
+        });
+        expect(
+          rowFor(report, 'derived:jovie:production-promotion')
+        ).toMatchObject({
+          status: 'unknown',
+          reason: `unshipped-range-http-${status}`,
+        });
+        expect(authorizations).toEqual(
+          Array(status === 503 ? 2 : 1).fill('Bearer test-token')
+        );
+      }
+    );
+  });
+
   it.each([
-    [503, 'unknown', 'unshipped-range-unreadable'],
+    [503, 'unknown', 'unshipped-range-http-503'],
     [{ ahead_by: 1, commits: [] }, 'unknown', 'unshipped-age-unreadable'],
     [{ ahead_by: 0 }, 'fresh', 'production-current'],
   ])(

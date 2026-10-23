@@ -46,3 +46,14 @@ To use a screenshot on a marketing page:
    - `<MarketingPhoneImage scenarioId="..." />` ([apps/web/components/marketing/MarketingPhoneImage.tsx](../apps/web/components/marketing/MarketingPhoneImage.tsx)) — for plain `<Image>` renders inside a `<PhoneFrame>` (or anywhere `<ProductScreenshot>` is the wrong shape).
 
 Do not write `<Image src="/product-screenshots/..." />` in marketing pages. The wrappers resolve URL + retina dimensions from the registry so renames are caught by typescript and so a renamed PNG never silently breaks a marketing page.
+
+Dashboard page captures that declare `playerTimestamp` opt into
+`/demo?capturePlayer=1&playerTimestamp=M:SS`. The demo harness uses the
+canonical Tim White profile and release fixtures, including real artwork,
+and freezes the shared player's playing state without autoplay or network
+audio. The production `PersistentAudioBar` renders the player; Playwright
+opens its waveform and checks identity, progress and loaded account chrome.
+Capture cleanup releases only its own playback frame. This URL state exists
+only in demo components and grants no authenticated session or API access.
+The workflow captures demo fixtures without a database; `seed.ts` is the
+legacy database-backed seed, not the catalog job's data source.

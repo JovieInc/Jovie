@@ -255,19 +255,8 @@ export function EmptyState({
     );
   };
 
-  return (
-    <output
-      aria-labelledby={headingId}
-      aria-describedby={description ? descriptionId : undefined}
-      data-content-state={variant === 'error' ? 'error' : 'empty'}
-      data-empty-state-presentation={presentation}
-      data-testid={testId}
-      className={cn(
-        'flex flex-1 flex-col items-center justify-center px-3 py-10 text-center',
-        isWorkspacePresentation && 'px-6 py-16',
-        className
-      )}
-    >
+  const content = (
+    <>
       {icon && (
         <div className={cn('mb-3', styles.iconWrapper)} aria-hidden='true'>
           {icon}
@@ -301,11 +290,42 @@ export function EmptyState({
       )}
 
       {hasActions && (
-        <div className='flex max-w-full flex-col items-center gap-2 sm:flex-row sm:gap-3'>
+        <div
+          className={cn(
+            'flex max-w-full flex-col gap-2 sm:flex-row sm:gap-3',
+            isWorkspacePresentation ? 'items-start' : 'items-center'
+          )}
+        >
           {actionSlot}
           {renderPrimaryAction()}
           {renderSecondaryAction()}
         </div>
+      )}
+    </>
+  );
+
+  return (
+    <output
+      aria-labelledby={headingId}
+      aria-describedby={description ? descriptionId : undefined}
+      data-content-state={variant === 'error' ? 'error' : 'empty'}
+      data-empty-state-presentation={presentation}
+      data-testid={testId}
+      className={cn(
+        'flex flex-1 flex-col items-center justify-center px-3 py-10 text-center',
+        isWorkspacePresentation && 'px-6 py-16',
+        className
+      )}
+    >
+      {isWorkspacePresentation ? (
+        <div
+          data-empty-state-card=''
+          className='w-full max-w-md rounded-md border border-subtle bg-surface-0 p-6 text-left'
+        >
+          {content}
+        </div>
+      ) : (
+        content
       )}
     </output>
   );

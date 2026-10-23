@@ -658,15 +658,7 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/shell/ScrubGradient.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/shell/ShellLoader.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/SidebarSection.tsx",
       "linearIssue": "JOV-8847"
     },
     {

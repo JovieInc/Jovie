@@ -62,7 +62,7 @@ export function LyricsTimeline({
         >
           <span className='pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-(--app-shell-border)' />
           <span
-            className='pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-px bg-cyan-400/80 transition-[width] duration-subtle ease-subtle'
+            className='pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-px bg-accent/80 transition-[width] duration-subtle ease-subtle'
             style={{ width: `${pct}%` }}
           />
           {lines.map((line, i) => {
@@ -82,7 +82,7 @@ export function LyricsTimeline({
                 className={cn(
                   'pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full transition-colors duration-subtle ease-subtle',
                   isActive
-                    ? 'h-2 w-2 bg-cyan-300 shadow-[0_0_0_2px_rgb(34_211_238/0.18)]'
+                    ? 'h-2 w-2 bg-accent ring-2 ring-accent/20'
                     : 'h-1 w-1 bg-quaternary-token/80'
                 )}
                 style={{ left: `${left}%` }}
@@ -91,7 +91,7 @@ export function LyricsTimeline({
           })}
           <span
             aria-hidden='true'
-            className='pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_0_3px_rgb(34_211_238/0.18)] transition-[left] duration-subtle ease-subtle'
+            className='pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3 w-3 rounded-full bg-accent ring-2 ring-accent/20 transition-[left] duration-subtle ease-subtle'
             style={{ left: `${pct}%` }}
           />
         </button>

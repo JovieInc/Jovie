@@ -5,8 +5,6 @@ import { COMMAND_PALETTE_COPY } from '@/data/commandPaletteCopy';
 import { buildSoftwareSchema } from '@/lib/constants/schemas';
 import { CommandPaletteLanding } from './CommandPaletteLanding';
 
-export const revalidate = false;
-
 const PAGE_URL = `${BASE_URL}${APP_ROUTES.PRODUCT_COMMAND_PALETTE}`;
 const PAGE_TITLE = `${COMMAND_PALETTE_COPY.seo.title} | ${APP_NAME}`;
 

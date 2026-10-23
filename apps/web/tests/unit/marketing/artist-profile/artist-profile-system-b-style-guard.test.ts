@@ -134,7 +134,7 @@ describe('artist profile landing family System B source contract', () => {
       "data-testid='artist-profile-opinionated-profile'"
     );
     expect(opinionated).toContain(
-      "className='ap-opinionated__visual relative'"
+      "className='ap-opinionated__visual marketing-rounded-frame relative'"
     );
     expect(opinionated).not.toContain('MarketingSnapRail');
 
