@@ -212,6 +212,7 @@
     "perf:auth": "tsx scripts/performance-auth.ts",
     "perf:route-js": "node scripts/route-js-budget.mjs",
     "perf:interactions": "tsx scripts/performance-interaction-audit.ts",
+    "perf:interactions:measure": "tsx scripts/run-interaction-latency-audit.ts",
     "product-surface-counts": "tsx scripts/generate-product-surface-counts.ts",
     "product-surface-counts:check": "tsx scripts/generate-product-surface-counts.ts --check",
     "perf:queue": "doppler run --project jovie-web --config dev -- tsx scripts/performance-batch-queue.ts",
