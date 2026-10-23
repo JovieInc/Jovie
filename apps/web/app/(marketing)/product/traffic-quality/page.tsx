@@ -5,8 +5,6 @@ import { TRAFFIC_QUALITY_COPY } from '@/data/trafficQualityCopy';
 import { buildSoftwareSchema } from '@/lib/constants/schemas';
 import { TrafficQualityLanding } from './TrafficQualityLanding';
 
-export const revalidate = false;
-
 const PAGE_URL = `${BASE_URL}${APP_ROUTES.PRODUCT_TRAFFIC_QUALITY}`;
 const PAGE_TITLE = `${TRAFFIC_QUALITY_COPY.seo.title} | ${APP_NAME}`;
 

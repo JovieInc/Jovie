@@ -263,7 +263,7 @@ test('commissions Next and TanStack deltas through one commit-bound Summer path'
   // biome-ignore format: failed-source bounded staleness proof
   assert.deepEqual(Object.entries(reconciliation.adaptStackDelta(makeDelta('next'), { status: 'failed', attempts: 2, error: 'timeout' }, [], nowUtc)).filter(([key]) => ['status', 'freshness', 'retryAt'].includes(key)).map(([, value]) => value), ['stale', 'unknown', '2026-10-14T04:00:00.000Z']);
   // biome-ignore format: exact ratchet receipt
-  assert.deepEqual(reconciliation.assertStackPatternRatchet(root), { legacyFiles: 246 });
+  assert.deepEqual(reconciliation.assertStackPatternRatchet(root), { legacyFiles: 245 });
 });
 
 const hash = value => createHash('sha256').update(value).digest('hex');
