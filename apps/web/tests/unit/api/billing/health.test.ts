@@ -149,6 +149,34 @@ describe('GET /api/billing/health', () => {
     );
   });
 
+  it('goes critical while any paid Stripe event waits for reconciliation', async () => {
+    const now = new Date().toISOString();
+    mockHealthQueries([
+      [{ count: 1 }],
+      [{ count: 0 }],
+      [{ createdAt: now, metadata: { success: true } }],
+      [{ count: 1 }],
+      [{ lastBillingEventAt: now }],
+      [{ count: 2 }],
+    ]);
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [{ id: 'sub_1' }],
+      has_more: false,
+    });
+
+    const { GET } = await import('@/app/api/billing/health/route');
+    const response = await GET(cronRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.healthy).toBe(false);
+    expect(data.checks.noEventsNeedReconciliation).toMatchObject({
+      status: 'critical',
+      details: { needsReconciliationCount: 2 },
+    });
+    expect(data.metrics.needsReconciliationCount).toBe(2);
+  });
+
   it('reports a fresh failed reconciliation instead of healthy sync', async () => {
     const createdAt = new Date().toISOString();
     mockHealthQueries([

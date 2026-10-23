@@ -162,7 +162,7 @@ jobs:
             --volume "$PWD:/repo:ro" \
             "$IMAGE_TAG" -lc '
               set -euo pipefail
-              test "$(node --version)" = v24.21.0
+              test "$(node --version)" = v24.22.1
               test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.9
 
               dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
@@ -291,7 +291,7 @@ jobs:
           assert_line 'pnpm store path' 'pnpm_store_path=/opt/jovie-pnpm-store' "$dependency_status"
           assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
           assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
-          assert_equal 'Node version' v24.21.0 "$(node --version)"
+          assert_equal 'Node version' v24.22.1 "$(node --version)"
           assert_equal 'pnpm version' 9.15.9 "$(pnpm --version)"
           assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
           assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
@@ -631,6 +631,19 @@ jobs:
       - name: Detect path changes for all job types
         id: detect
         shell: bash
+        # Event values come in through env so the run script contains no
+        # ${{ }} interpolation. GitHub evaluates an interpolated run script as
+        # one format() expression capped at ~21,000 chars; exceeding it fails
+        # the whole workflow with zero jobs (JOV-8706). Keep this script
+        # expression-free; add new event inputs here.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          IS_FORK_PULL_REQUEST: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+          EVENT_MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          EVENT_MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          EVENT_PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
           emit_ci_lanes() {
@@ -647,14 +660,14 @@ jobs:
               printf '%s\n' "${CHANGED_FILES:-}" | node "$TRUSTED_CI_REPO_LANES" --emit-github-output
             fi
           }
-          IS_FORK="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}"
+          IS_FORK="${IS_FORK_PULL_REQUEST}"
           # Determine changed files
-          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+          if [[ "${EVENT_NAME}" == "merge_group" ]]; then
             # JOV-4446: never fall through to github.base_ref / event.before —
             # those push/PR-only fields are empty on merge_group and produce
             # "Could not resolve origin/" + false docs-only classification.
-            MERGE_GROUP_BASE_SHA="${{ github.event.merge_group.base_sha }}"
-            MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"
+            MERGE_GROUP_BASE_SHA="${EVENT_MERGE_GROUP_BASE_SHA}"
+            MERGE_GROUP_HEAD_SHA="${EVENT_MERGE_GROUP_HEAD_SHA}"
             if [[ ! "$MERGE_GROUP_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
               [[ ! "$MERGE_GROUP_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] ||
               [[ "$MERGE_GROUP_BASE_SHA" == "0000000000000000000000000000000000000000" ]] ||
@@ -662,11 +675,8 @@ jobs:
               echo "::error::merge_group base_sha/head_sha are not usable exact SHAs"
               exit 1
             fi
-            # JOV-4905: a coalesced/re-resolved head can make the event
-            # base...head range empty even when the combined tree still
-            # differs from live main. The helper retries against the live
-            # refs/heads/main merge-base and only then emits a typed no-op.
-            # A valid head never hard-fails on an empty event-base diff.
+            # Re-resolved heads can hide changes in an empty event range.
+            # Retry against live main before requiring exact no-op trees.
             PATH_DIFF_DIR="$RUNNER_TEMP/merge-group-path-diff"
             mkdir -p "$PATH_DIFF_DIR"
             TRUSTED_PATH_DIFF_RESOLVER="$PATH_DIFF_DIR/resolve-merge-group-path-diff.mjs"
@@ -696,9 +706,17 @@ jobs:
             if [[ "${IS_NOOP:-}" == "true" ]]; then
               # Typed no-op: Path Changes passes with all optional lanes off;
               # merge-group gates still validate the exact combined head.
+              NOOP_BASE_TREE=$(git rev-parse --verify "${MERGE_GROUP_BASE_SHA}^{tree}")
+              NOOP_HEAD_TREE=$(git rev-parse --verify "${MERGE_GROUP_HEAD_SHA}^{tree}")
+              if [[ "$NOOP_BASE_TREE" != "$NOOP_HEAD_TREE" ]]; then
+                echo "::error::Typed no-op requires equal exact event-base and head trees."
+                exit 1
+              fi
               PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
               mkdir -p "$PRODUCT_LANE_DIR"
               : > "$PRODUCT_LANE_DIR/changed-paths.txt"
+              echo "path_diff_base_sha=$MERGE_GROUP_BASE_SHA" >> "$GITHUB_OUTPUT"
+              echo "path_diff_head_sha=$MERGE_GROUP_HEAD_SHA" >> "$GITHUB_OUTPUT"
               echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"
               for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos run_web run_operations run_cross_product has_code_changes; do
                 echo "$output=false" >> "$GITHUB_OUTPUT"
@@ -731,34 +749,34 @@ jobs:
             CLASSIFICATION_BASE_REF="$PATH_DIFF_BASE_SHA"
             CLASSIFICATION_HEAD_REF="$PATH_DIFF_HEAD_SHA"
             CLASSIFICATION_POLICY_REF="$CLASSIFICATION_BASE_REF"
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          elif [[ "${EVENT_NAME}" == "pull_request" ]]; then
             # Fail closed on base resolution: an empty CHANGED_FILES list must
             # not look docs-only and skip-cascade required lanes.
-            git fetch --no-tags origin "${{ github.base_ref }}"
-            if ! git rev-parse --verify "origin/${{ github.base_ref }}" >/dev/null 2>&1; then
-              echo "::error::Could not resolve origin/${{ github.base_ref }} after fetch"
+            git fetch --no-tags origin "${BASE_REF}"
+            if ! git rev-parse --verify "origin/${BASE_REF}" >/dev/null 2>&1; then
+              echo "::error::Could not resolve origin/${BASE_REF} after fetch"
               exit 1
             fi
-            CLASSIFICATION_BASE_REF="origin/${{ github.base_ref }}"
+            CLASSIFICATION_BASE_REF="origin/${BASE_REF}"
             CLASSIFICATION_HEAD_REF="HEAD"
             CLASSIFICATION_POLICY_REF="$CLASSIFICATION_BASE_REF"
             TRUSTED_CI_REPO_LANES="$RUNNER_TEMP/ci-repo-lanes.mjs"
             git show "${CLASSIFICATION_BASE_REF}:scripts/lib/ci-repo-lanes.mjs" \
               > "$TRUSTED_CI_REPO_LANES"
-            CHANGED_FILES=$(git diff --no-renames --name-only "origin/${{ github.base_ref }}" HEAD)
+            CHANGED_FILES=$(git diff --no-renames --name-only "origin/${BASE_REF}" HEAD)
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
               # Merge tree-identical to base; classify merge-base..head (JOV-6820).
-              PULL_REQUEST_HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+              PULL_REQUEST_HEAD_SHA="${EVENT_PULL_REQUEST_HEAD_SHA}"
               git fetch --no-tags origin "$PULL_REQUEST_HEAD_SHA"
-              CLASSIFICATION_BASE_REF=$(git merge-base "origin/${{ github.base_ref }}" "$PULL_REQUEST_HEAD_SHA")
+              CLASSIFICATION_BASE_REF=$(git merge-base "origin/${BASE_REF}" "$PULL_REQUEST_HEAD_SHA")
               CLASSIFICATION_HEAD_REF="$PULL_REQUEST_HEAD_SHA"
               CHANGED_FILES=$(git diff --no-renames --name-only "$CLASSIFICATION_BASE_REF" "$CLASSIFICATION_HEAD_REF")
             fi
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
-              echo "::error::Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification."
+              echo "::error::Empty changed-file list vs origin/${BASE_REF}; refusing a false docs-only classification."
               exit 1
             fi
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          elif [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
             printf '### Qualification classification\n\nManual dispatch requires full qualification across all product lanes.\n' >> "$GITHUB_STEP_SUMMARY"
@@ -773,8 +791,8 @@ jobs:
             echo "shared_contract_impact=ios,mac,web" >> "$GITHUB_OUTPUT"
             emit_ci_lanes all
             exit 0
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
-            PUSH_BASE_SHA="${{ github.event.before }}"
+          elif [[ "${EVENT_NAME}" == "push" ]]; then
+            PUSH_BASE_SHA="${EVENT_PUSH_BEFORE_SHA}"
             if [[ ! "$PUSH_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
               [[ "$PUSH_BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
               echo "::error::push.before is not a usable exact main base SHA"
@@ -789,7 +807,7 @@ jobs:
               > "$TRUSTED_CI_REPO_LANES"
             CHANGED_FILES=$(git diff --no-renames --name-only "$PUSH_BASE_SHA" HEAD)
           else
-            echo "::error::Unsupported event for path change detection: ${{ github.event_name }}"
+            echo "::error::Unsupported event for path change detection: ${EVENT_NAME}"
             exit 1
           fi
 
@@ -823,7 +841,7 @@ jobs:
 
           PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/)'
           PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/tests/eval/golden/.*|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
-          if [[ "${{ github.event_name }}" == "pull_request" ]] &&
+          if [[ "${EVENT_NAME}" == "pull_request" ]] &&
             echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_INFRA_TRIGGER_PATTERN" &&
             ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_INFRA_ALLOWED_PATTERN" | grep -q .; then
             echo "Promptfoo eval-infrastructure-only source PR: deferring semantic evidence to the merge-group head."
@@ -851,7 +869,7 @@ jobs:
           echo "has_code_changes=true" >> "$GITHUB_OUTPUT"
 
           # Build paths
-          BUILD_PATTERN='^(CHANGELOG\.md$|apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/middleware\.ts|package.*\.json|turbo\.json)'
+          BUILD_PATTERN='^(CHANGELOG\.md$|apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.(js|mjs|ts)|vercel\.json|packages/|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|apps/web/instrumentation.*\.ts|apps/web/sentry\..*\.config\.ts|apps/web/proxy\.ts|package.*\.json|turbo\.json)'
           if echo "$CHANGED_FILES" | grep -q -E "$BUILD_PATTERN"; then
             RUN_BUILD=true
             echo "run_build=true" >> "$GITHUB_OUTPUT"
@@ -975,7 +993,7 @@ jobs:
 
       - name: Classify blog qualification and seal intake receipts
         id: blog-detect
-        if: ${{ github.event_name != 'workflow_dispatch' && steps.detect.outputs.is_noop_merge_group != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         shell: bash
         env:
           BASE_SHA: ${{ steps.detect.outputs.path_diff_base_sha }}
@@ -1069,7 +1087,7 @@ jobs:
           fi
 
       - name: Preserve intake product-lane receipt
-        if: ${{ github.event_name != 'workflow_dispatch' && steps.detect.outputs.is_noop_merge_group != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: product-lane-intake-${{ github.sha }}-${{ github.run_attempt }}
@@ -1118,17 +1136,50 @@ jobs:
             scripts/lib/merge-group-admission.mjs
             scripts/lib/github-rate-limit.mjs
           sparse-checkout-cone-mode: false
+      # JOV-8754: admission is the queue's highest-priority REST caller. The
+      # repo GITHUB_TOKEN bucket (5,000/h, shared by every workflow) ran dry
+      # hourly on 2026-10-21 (07:41-07:52Z, 08:23-08:52Z) and every merge
+      # group waited out the reset here. Read on the Jovie Bot installation's
+      # own bucket (used 397/5,000 that hour), read-only scopes, as
+      # ci-merge-group-supersede already does. A failed mint or any failed
+      # app-token attempt falls back to GITHUB_TOKEN, so admission stays
+      # fail-closed and never gets weaker than before.
+      - name: Generate Jovie Bot admission read token
+        id: admission-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-checks: read
+          permission-contents: read
+          permission-pull-requests: read
       - name: Require live queue membership and external admission checks
         id: admission
         env:
           GH_TOKEN: ${{ github.token }}
+          ADMISSION_APP_TOKEN: ${{ steps.admission-token.outputs.token }}
         run: |
           set -euo pipefail
           policy='scripts/lib/merge-group-admission.mjs'
           policy_contract="$(node "$policy" --print-contract-version)"
           if [[ "$policy_contract" == 'jovie-merge-group-live-admission/v2' \
             || "$policy_contract" == 'jovie-merge-group-live-admission/v1' ]]; then
-            node "$policy"
+            # Each attempt writes its own outputs; only the deciding attempt's
+            # are published, so a failed app-token attempt leaves no trace.
+            attempt_output="$RUNNER_TEMP/admission-output"
+            : > "$attempt_output"
+            if [[ -n "${ADMISSION_APP_TOKEN:-}" ]] &&
+              GH_TOKEN="$ADMISSION_APP_TOKEN" GITHUB_OUTPUT="$attempt_output" node "$policy"; then
+              echo 'Admission read on the Jovie Bot installation bucket.'
+            else
+              [[ -n "${ADMISSION_APP_TOKEN:-}" ]] &&
+                echo '::notice::Admission app-token attempt did not decide; retrying on GITHUB_TOKEN.'
+              : > "$attempt_output"
+              GITHUB_OUTPUT="$attempt_output" node "$policy"
+            fi
+            cat "$attempt_output" >> "$GITHUB_OUTPUT"
             admitted_value="$(sed -n 's/^admitted=//p' "$GITHUB_OUTPUT")"
             if [[ "$admitted_value" != 'true' && "$admitted_value" != 'false' ]]; then
               echo '::error::Live queue admission policy emitted an invalid admitted value'
@@ -2078,9 +2129,9 @@ jobs:
           # invariants' own scan roots; a node failure fails this step closed.
           STRUCTURAL_CONTROL_PATTERN+="|$(node scripts/invariants/scanned-paths.mjs --ere)"
 
-          # Component receipts are executable test evidence; Storybook/Chromatic
-          # config and the shared-UI token audit feed structural component proof.
-          STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-motion-css|lint-no-native-dialogs|lint-ui-feel|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|chromatic\.config\.json$|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
+          # Component receipts are executable test evidence; Storybook config and
+          # the shared-UI token audit feed structural component proof.
+          STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-motion-css|lint-no-native-dialogs|lint-ui-feel|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
           STRUCTURAL_DESKTOP_PATTERN='^scripts/desktop-release-(assets|guard|publisher)(\.test)?\.mjs$|^apps/desktop/electron-builder(\.staging)?\.yml$|^apps/desktop/scripts/notarize-release-dmg\.cjs$'
           # A new scripts test must prove it is wired into a lane (inventory guard)
           # before the queue; #18714 was ejected for an unwired one.
@@ -3678,7 +3729,6 @@ jobs:
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
-      needs.ci-path-changes.outputs.is_noop_merge_group != 'true' &&
       (github.event_name != 'merge_group' || needs.ci-merge-group-admission.result == 'success') &&
       (github.event_name != 'merge_group' || needs.ci-merge-group-admission.outputs.admitted == 'true') &&
       (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
@@ -5709,7 +5759,7 @@ jobs:
     # requires every shard to pass, merges their coverage maps, and runs the
     # changed-line ratchet on the exact diff.
     # Job timeout must fail before GitHub merge-queue
-    # check_response_timeout_minutes=60 after source-first ruleset cutover.
+    # check_response_timeout_minutes (20 since 2026-10-21; see MERGE_QUEUE.md).
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -6341,7 +6391,12 @@ jobs:
           fi
 
           cd "$GITHUB_WORKSPACE"
-          CI=true BASE_URL=http://localhost:3240 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --reporter=line
+          # The round-trip ratchet's p95 is the slowest of five samples. Score
+          # it after the rest of the lane, on one worker, so a sibling
+          # Chromium's CPU spike is not recorded as chat latency. Budgets are
+          # unchanged. The test is not skipped.
+          CI=true BASE_URL=http://localhost:3240 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --grep-invert "deploy-gating responsiveness budget" --reporter=line
+          CI=true PLAYWRIGHT_WORKERS=1 BASE_URL=http://localhost:3240 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/chat-performance-ratchet.spec.ts --config=playwright.config.smoke.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           BETTER_AUTH_URL: http://localhost:3240
@@ -6374,16 +6429,28 @@ jobs:
     # branch so certification writes a certificate (JOV-8614).
     # Unlike ci-e2e-smoke this must NOT set NEXT_PUBLIC_CLERK_MOCK or
     # E2E_USE_TEST_AUTH_BYPASS — required mode fails closed if either is present.
-    # Path-triggered (not always-on): the spec has a 900s timeout, so always-on would
-    # blow the CI budget and churn the external Spotify/Stripe fixtures.
+    # PRs and the merge queue stay off this lane: the spec has a 900s timeout.
+    # Main pushes run this same job, including queue-proven pushes that skip
+    # ci-path-changes. That skip is the promotion SHA: staging follows this
+    # push, and the journey gate accepts evidence only for its exact SHA.
+    # A workflow_dispatch can produce the artifact, but it cannot start staging.
+    # Push leaves neon-db skipped; this job opens its own ephemeral branch.
+    # A red push run does not fail CI. The gate still blocks when the range
+    # requires a green journey.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
-    if: ${{ always() && !cancelled() && needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure') }}
+    if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_dispatch' && needs.ci-path-changes.result == 'success' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    continue-on-error: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     outputs:
       journey_outcome: ${{ steps.canonical_journey.outcome }}
       certification_outcome: ${{ steps.canonical_certification.outcome }}
-    env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      # Preview – jovie secret STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY is
+      # the active test-mode USD 1200/month price. The assertion stays
+      # fail-closed; true reports a contract breach instead of a missing secret.
+      FEATURE_STRIPE_TEST_PRICE_CONFIGURED: 'true'
     # Scope pending replacement to one PR. GitHub replaces the older pending job in
     # a constant concurrency group even when cancel-in-progress is false, which can
     # cancel a required check before it obtains a runner. Golden-path cleanup only
@@ -6493,10 +6560,11 @@ jobs:
         id: canonical_journey
         continue-on-error: true
         run: |
+          mkdir -p "${{ runner.temp }}/journey-evidence"
           cd apps/web
 
           if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
-            echo "::error::Standalone server not found — ci-build-public artifact is required for the golden path"
+            echo "::error::Standalone server not found — the golden-path build did not produce the standalone server."
             exit 1
           fi
 
@@ -6590,6 +6658,7 @@ jobs:
           # the artifact secret guard) and a reviewer-only gateway key
           # (AI Gateway key jovie-golden-path-review, $10 monthly budget).
           GOLDEN_PATH_KEYFRAME_DIR: ${{ github.workspace }}/apps/web/test-results/golden-path-keyframes/first
+          JOURNEY_EVIDENCE_REPORT: ${{ runner.temp }}/journey-evidence/playwright-report.json
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
           VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
@@ -6611,6 +6680,33 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY }}
           STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv
+
+      # Evidence for the pre-promotion gate (promotion-journey-gate.mjs). Built
+      # from the Playwright report of THIS run, so a skipped, mocked or red
+      # journey is recorded as such. Named by exact SHA so the production
+      # workflow can fetch it for the candidate.
+      - name: Emit journey evidence (jovie.journey-evidence/v1)
+        if: ${{ always() }}
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          JOURNEY_OUTCOME: ${{ steps.canonical_journey.outcome || 'skipped' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node scripts/emit-journey-evidence.mjs \
+            --report "${{ runner.temp }}/journey-evidence/playwright-report.json" \
+            --out-dir "${{ runner.temp }}/journey-evidence" \
+            --sha "${{ github.sha }}" --run-id "${{ github.run_id }}" \
+            --run-url "$RUN_URL" --outcome "$JOURNEY_OUTCOME"
+
+      - name: Upload journey evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: journey-evidence-${{ github.sha }}
+          overwrite: true
+          path: ${{ runner.temp }}/journey-evidence/journey-evidence-*.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Probe live $199 revenue path
         id: canonical_revenue
@@ -6743,7 +6839,8 @@ jobs:
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
-          GOLDEN_PATH_RESULT: ${{ needs.ci-golden-path.outputs.certification_outcome == 'failure' && needs.ci-golden-path.outputs.journey_outcome == 'success' && 'success' || needs.ci-golden-path.result }}
+          # A certification failure is a failure; never remap it to success.
+          GOLDEN_PATH_RESULT: ${{ needs.ci-golden-path.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           MAIN_SHA: ${{ github.sha }}
         run: node scripts/golden-path-nightly-intake.mjs
@@ -7555,9 +7652,7 @@ jobs:
             fi
           done
 
-          if [[ "$NOOP_GROUP" == "true" ]]; then
-            [ "$LANE_RECEIPT_RESULT" = skipped ] || { echo "::error::No-op receipt must skip."; exit 1; }
-          elif [[ "$LANE_RECEIPT_RESULT" != success ]]; then
+          if [[ "$LANE_RECEIPT_RESULT" != success ]]; then
             echo "::error::Final product-lane receipt did not pass ($LANE_RECEIPT_RESULT)."
             exit 1
           fi
@@ -8219,13 +8314,19 @@ jobs:
             exit 1
           fi
 
-          # Run smoke tests with BASE_URL set (skips Playwright webServer config)
+          # Run smoke tests with BASE_URL set (skips Playwright webServer config).
+          # The ratchet follows on one worker. See the E2E Smoke step.
           cd "$GITHUB_WORKSPACE"
           set +e
-          CI=true BASE_URL=http://localhost:3260 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --reporter=line
-          EXIT_CODE=$?
+          CI=true BASE_URL=http://localhost:3260 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --grep-invert "deploy-gating responsiveness budget" --reporter=line
+          SUITE_EXIT=$?
+          CI=true PLAYWRIGHT_WORKERS=1 BASE_URL=http://localhost:3260 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/chat-performance-ratchet.spec.ts --config=playwright.config.smoke.ts --reporter=line
+          RATCHET_EXIT=$?
           set -e
-          exit $EXIT_CODE
+          if [ "$SUITE_EXIT" -ne 0 ]; then
+            exit "$SUITE_EXIT"
+          fi
+          exit "$RATCHET_EXIT"
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           BETTER_AUTH_URL: http://localhost:3260

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
+  ARTIST_VISIBILITY_PRICE_METADATA,
   type ArtistVisibilityStripePrice,
   assertArtistVisibilityStripeTestPrice,
   assertStripeTestAccount,
@@ -18,11 +19,11 @@ const validPrice: ArtistVisibilityStripePrice = {
   billing_scheme: 'per_unit',
   currency: 'usd',
   livemode: false,
-  metadata: { issue: 'JOV-6218', offer: 'artist_visibility_pro' },
+  metadata: { ...ARTIST_VISIBILITY_PRICE_METADATA },
   recurring: validRecurring,
   transform_quantity: null,
   type: 'recurring',
-  unit_amount: 19_900,
+  unit_amount: 1_200,
 };
 
 const validConfig = {
@@ -33,6 +34,10 @@ const validConfig = {
 } as const;
 
 describe('Artist Visibility Stripe test price contract', () => {
+  afterEach(() => {
+    delete process.env.FEATURE_STRIPE_TEST_PRICE_CONFIGURED;
+  });
+
   it('requires the dedicated test-mode price and rejects legacy-only configuration', () => {
     expect(() =>
       getRequiredStripeTestConfig({
@@ -101,10 +106,50 @@ describe('Artist Visibility Stripe test price contract', () => {
     ).not.toThrow();
   });
 
-  it('accepts the active test-mode USD 199 monthly offer', () => {
+  it('accepts the active test-mode USD 1200 monthly offer while the config flag is off', () => {
+    delete process.env.FEATURE_STRIPE_TEST_PRICE_CONFIGURED;
     expect(() =>
       assertArtistVisibilityStripeTestPrice(validPrice)
     ).not.toThrow();
+  });
+
+  it('names the GitHub secret when the config flag is off and the price misses the contract', () => {
+    delete process.env.FEATURE_STRIPE_TEST_PRICE_CONFIGURED;
+    const assertMismatch = () =>
+      assertArtistVisibilityStripeTestPrice({
+        ...validPrice,
+        unit_amount: 19_900,
+        metadata: { issue: 'JOV-6218', offer: 'artist_visibility_pro' },
+      });
+
+    expect(assertMismatch).toThrow(/Stripe test price config is missing/);
+    expect(assertMismatch).toThrow(
+      /GitHub Actions secret STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY/
+    );
+    expect(assertMismatch).toThrow(
+      /FEATURE_STRIPE_TEST_PRICE_CONFIGURED is off/
+    );
+    expect(assertMismatch).toThrow(
+      /Configured Stripe test price must be active, test-mode USD 1200\/month/
+    );
+    expect(assertMismatch).toThrow(
+      /Mismatched fields: unit_amount, metadata\.decision/
+    );
+    expect(assertMismatch).not.toThrow(/price_/);
+  });
+
+  it('keeps the contract failure when the config flag says the secret is set', () => {
+    process.env.FEATURE_STRIPE_TEST_PRICE_CONFIGURED = 'true';
+    const assertMismatch = () =>
+      assertArtistVisibilityStripeTestPrice({
+        ...validPrice,
+        metadata: { offer: 'artist_visibility_pro' },
+      });
+
+    expect(assertMismatch).toThrow(
+      'Configured Stripe test price must be active, test-mode USD 1200/month. Mismatched fields: metadata.decision.'
+    );
+    expect(assertMismatch).not.toThrow(/config is missing/);
   });
 
   it.each([
@@ -128,6 +173,13 @@ describe('Artist Visibility Stripe test price contract', () => {
       { transform_quantity: { divide_by: 10, round: 'up' } },
     ],
     ['wrong offer metadata', { metadata: { issue: 'JOV-17747' } }],
+    [
+      'the retired $199 fixture',
+      {
+        metadata: { issue: 'JOV-6218', offer: 'artist_visibility_pro' },
+        unit_amount: 19_900,
+      },
+    ],
     ['one-time price', { recurring: null }],
   ])(
     'rejects %s before using it for the money-path test',

@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import {
   type CorrectionHit,
   findBannedNames,
@@ -66,7 +66,7 @@ describe('correction pyramid guards', () => {
     expect(repoRootFromModule()).toBe(repoRoot);
     const files = listCorrectionFiles(repoRoot, PHRASE_AND_NAME_ROOTS);
     expect(files).toContain('apps/web/app/(home)/page.tsx');
-    expect(files).toContain('apps/web/data/homepageIdentityCopy.ts');
+    expect(files).toContain('apps/web/data/homepageCopy.ts');
     expect(files).toContain('apps/web/lib/constants/schemas.ts');
     expect(
       files.some(
@@ -132,11 +132,12 @@ describe('correction pyramid guards', () => {
     expectWarnRatchet(scanRawJsx(repoRoot), jsxBaselinePath);
   });
 
-  it('locks the homepage H1 to the identity copy module', () => {
-    expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(LOCKED_HOMEPAGE_H1);
+  it('locks the homepage H1 to the homepage copy module', () => {
+    expect(HOMEPAGE_COPY.hero.headline).toBe(LOCKED_HOMEPAGE_H1);
     expect(LOCKED_HOMEPAGE_H1).toBe('Be found. Be understood.');
+    expect(HOMEPAGE_COPY.seo.title).toBe('Jovie | Be found. Be understood.');
     const hero = readFileSync(
-      path.join(webRoot, 'components/homepage/HomepageIdentityHero.tsx'),
+      path.join(webRoot, 'components/homepage/HomepageArtistProfile.tsx'),
       'utf8'
     );
     const page = readFileSync(
@@ -144,9 +145,9 @@ describe('correction pyramid guards', () => {
       'utf8'
     );
     expect(hero).toContain('copy.headline');
-    expect(hero).toContain('HOMEPAGE_IDENTITY_COPY');
-    expect(hero).not.toContain('>Be found. Be understood.<');
-    expect(page).toContain('HomepageIdentityHero');
+    expect(hero).toContain('HOMEPAGE_COPY');
+    expect(hero).not.toContain(`>${LOCKED_HOMEPAGE_H1}<`);
+    expect(page).toContain('HomepageArtistHero');
   });
 
   it('tightens a warn baseline only when every live key is already known', () => {

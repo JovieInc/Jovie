@@ -243,7 +243,7 @@
     },
     {
       "id": "ui-story-coverage-audit",
-      "name": "UI Story Coverage Audit (shadow)",
+      "name": "UI Story Coverage Audit",
       "tier": "risk-triggered-smoke",
       "mergeGate": false,
       "nextLocalCommand": "pnpm story-coverage:check && pnpm storybook:quality && pnpm component-ship-gate",
@@ -466,6 +466,8 @@
       "level": "high",
       "patterns": [
         "^apps/web/lib/auth/",
+        "^apps/web/lib/claim/",
+        "^apps/web/app/(claim|api/claim)/",
         "^apps/web/app/\\(auth\\)/",
         "^apps/web/app/(signin|signup)/",
         "^apps/web/app/api/auth/",
@@ -499,8 +501,9 @@
       "title": "Billing and money movement",
       "level": "high",
       "patterns": [
-        "^apps/web/app/api/(stripe|billing)/",
-        "^apps/web/lib/(stripe|billing|entitlements)/",
+        "^apps/web/app/api/(stripe|stripe-connect|billing|merch)/",
+        "^apps/web/app/api/webhooks/stripe",
+        "^apps/web/lib/(stripe|billing|entitlements|merch)/",
         "^apps/web/components/.*/billing",
         "^apps/web/tests/.*/(stripe|billing|entitlements)"
       ],
@@ -529,11 +532,7 @@
       "id": "proxy-middleware",
       "title": "Proxy and middleware",
       "level": "high",
-      "patterns": [
-        "^apps/web/proxy\\.ts$",
-        "^apps/web/middleware\\.ts$",
-        "^proxy\\.ts$"
-      ],
+      "patterns": ["^apps/web/proxy\\.ts$", "^proxy\\.ts$"],
       "requiresSmoke": true,
       "requiresPreview": true,
       "blocksUnattendedAutoMerge": false,
@@ -546,7 +545,12 @@
       "patterns": [
         "^\\.env",
         "^apps/web/lib/env",
-        "^apps/web/next\\.config\\.js$",
+        "^apps/web/lib/flags/",
+        "^apps/web/next\\.config\\.[cm]?[jt]s$",
+        "^(apps/web/)?vercel\\.json$",
+        "^packages/(?!ui/)",
+        "^pnpm-workspace\\.yaml$",
+        "^\\.npmrc$",
         "^turbo\\.json$",
         "^package\\.json$",
         "^apps/web/package\\.json$",
@@ -566,6 +570,7 @@
         "^apps/web/app/\\(marketing\\)/",
         "^apps/web/app/\\[username\\]/",
         "^apps/web/components/features/profile/",
+        "^apps/web/lib/images/",
         "^packages/ui/"
       ],
       "requiresSmoke": false,

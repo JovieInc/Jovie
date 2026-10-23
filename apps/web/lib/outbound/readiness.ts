@@ -54,7 +54,10 @@ export interface ReadinessInputs {
   } | null;
   readonly funnel: FunnelJudgeReceipt | null;
   readonly queue: {
+    /** Evidence complete: Tim can review facts and certify. */
     readonly ready: number;
+    readonly needsEvidence: number;
+    readonly flagged: number;
     readonly certified: number;
     readonly approved: number;
     readonly needsProfile: number;
@@ -190,7 +193,7 @@ export function buildOutboundReadiness(
         : 'red',
     detail: !queue
       ? 'Outbound queue could not be read.'
-      : `${queue.ready - queue.needsProfile} built profiles to review · ${queue.needsProfile} waiting on a profile build · ${queue.certified} certified · ${queue.approved} approved`,
+      : `${queue.ready} ready to certify · ${queue.needsEvidence} need evidence (${queue.needsProfile} waiting on a profile build) · ${queue.flagged} flagged · ${queue.certified} certified · ${queue.approved} approved`,
     owner: 'Tim',
     href: '/app/ov/outbound',
   });

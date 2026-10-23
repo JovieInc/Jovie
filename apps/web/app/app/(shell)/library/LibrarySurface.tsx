@@ -2000,7 +2000,11 @@ function YouTubeLedgerLink() {
       size='sm'
       className={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
     >
-      <Link href={APP_ROUTES.YOUTUBE_REVIVAL}>YouTube Ledger</Link>
+      {/* Viewport prefetch of this dynamic route is two RSC requests on every
+          Work visit and pushes the shell persistence budget over its cap. */}
+      <Link href={APP_ROUTES.YOUTUBE_REVIVAL} prefetch={false}>
+        YouTube Ledger
+      </Link>
     </Button>
   );
 }

@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import {
   chmodSync,
@@ -11,17 +12,27 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
+import { load } from 'js-yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   STRUCTURAL_DEFAULT_CONCURRENCY,
   selectLanes,
 } from '../../ci-fast-lanes.mjs';
 import {
+  ALIAS_ROUTES,
+  aliasDecision,
+  collectAliasGraduation,
+  completeList,
+  parseAliasSamples,
+  selectAliasWindow,
+} from '../public-profile-alias-graduation.mjs';
+import {
   realGhVersion,
   resolveRealGh,
   runWithRealGh,
   storedZip,
 } from '../real-gh-harness.mjs';
+import { assertReviewDeadline } from '../review-deadline.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   const actual = /** @type {typeof import('node:child_process')} */ (
@@ -56,54 +67,83 @@ const DEPLOYMENT_URL = 'https://jovie-exact-generation-jovie.vercel.app';
 const tempRoots = [];
 
 describe('public-profile alias graduation policy', () => {
-  it('proves the bounded production decision from exactly 14 controller jobs', () => {
+  it('reproduces each independent window from the complete controller inventory', () => {
     const receipt = PUBLIC_PROFILE_ALIAS_GRADUATION;
-    const { policy, result, runs, selection } = receipt;
-
-    expect(receipt.schema).toBe('jovie-public-profile-alias-graduation/v1');
-    expect(receipt.surface).toBe('production-canonical-alias');
-    expect(selection.windowSize).toBe(policy.requiredConsecutiveRuns);
-    expect(runs).toHaveLength(selection.windowSize);
-    expect(new Set(runs.map(run => run.controllerRunId)).size).toBe(
-      selection.windowSize
+    const { policy, selection, evidence, windows } = receipt;
+    const readRows = path =>
+      readFileSync(resolve(REPO_ROOT, 'docs/performance', path), 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line));
+    const inventory = readRows(evidence.inventory);
+    const measurements = readRows(evidence.measurements);
+    for (const key of ['inventory', 'measurements']) {
+      expect(
+        createHash('sha256')
+          .update(
+            readFileSync(resolve(REPO_ROOT, 'docs/performance', evidence[key]))
+          )
+          .digest('hex')
+      ).toBe(evidence[`${key}Sha256`]);
+    }
+    expect(receipt.schema).toBe('jovie-public-profile-alias-graduation/v2');
+    expect(inventory).toHaveLength(selection.enumeratedControllers);
+    const originalWindow = selectAliasWindow(
+      inventory,
+      'production',
+      '2026-10-14T15:21:25Z'
     );
-    expect(new Set(runs.map(run => run.jobId)).size).toBe(selection.windowSize);
+    expect(originalWindow.map(row => row.production.jobId)).toEqual(
+      expect.arrayContaining([115872079856, 115852914061, 115804204403])
+    );
+    expect(selection.windowSize).toBe(policy.requiredConsecutiveRuns);
     expect(policy.samplesPerRoute).toBe(5);
     expect(policy.p95Estimator).toBe('nearest-rank');
-    expect(policy.trackingIssue).toBe('JOV-8338');
-    expect(receipt.measuredAt).toBe(runs[0].completedAt);
-
-    for (const [index, run] of runs.entries()) {
-      const observedP95Ms = Math.max(...Object.values(run.routeP95Ms));
-      expect(run.observedP95Ms).toBe(observedP95Ms);
-      expect(run.qualifies).toBe(observedP95Ms <= policy.thresholdMs);
-      expect(run.headSha).toMatch(/^[0-9a-f]{40}$/);
-      expect(run.jobUrl).toBe(
-        `https://github.com/JovieInc/Jovie/actions/runs/${run.controllerRunId}/job/${run.jobId}`
+    for (const [surface, window] of Object.entries(windows)) {
+      const selected = selectAliasWindow(inventory, surface, selection.cutoff);
+      expect(window.selectedJobIds).toEqual(
+        selected.map(row => row[surface].jobId)
       );
-      if (index > 0) {
-        expect(Date.parse(runs[index - 1].completedAt)).toBeGreaterThan(
-          Date.parse(run.completedAt)
+      const rows = measurements.filter(row => row.surface === window.surface);
+      expect(rows.map(row => row.jobId)).toEqual(window.selectedJobIds);
+      expect(rows).toHaveLength(14);
+      expect(new Set(rows.map(row => row.controllerRunId)).size).toBe(14);
+      for (const row of rows) {
+        expect(row.valid).toBe(true);
+        expect(row.headSha).toMatch(/^[0-9a-f]{40}$/);
+        expect(row.testedSha).toMatch(/^[0-9a-f]{40}$/);
+        if (surface === 'staging') {
+          expect(row.stagedDeployment.expectedSha).toBe(row.testedSha);
+          expect(row.stagedDeployment.url).toMatch(
+            /^https:\/\/jovie-[a-z0-9-]+-jovie\.vercel\.app$/
+          );
+        }
+        expect(row.logSha256).toMatch(/^[0-9a-f]{64}$/);
+        expect(row.jobUrl).toBe(
+          `https://github.com/JovieInc/Jovie/actions/runs/${row.controllerRunId}/job/${row.jobId}`
         );
+        for (const route of ALIAS_ROUTES) {
+          expect(row.routeSamplesMs[route]).toHaveLength(5);
+          expect(row.routeP95Ms[route]).toBe(
+            Math.max(...row.routeSamplesMs[route])
+          );
+        }
+        expect(row.observedP95Ms).toBe(
+          Math.max(...Object.values(row.routeP95Ms))
+        );
+        expect(row.qualifies).toBe(row.observedP95Ms <= policy.thresholdMs);
       }
+      expect(window).toMatchObject(aliasDecision(rows));
     }
-
-    const qualifyingRuns = runs.filter(run => run.qualifies).length;
-    const firstMiss = runs.findIndex(run => !run.qualifies);
-    const consecutiveQualifyingRuns =
-      firstMiss === -1 ? runs.length : firstMiss;
-    expect(result.qualifyingRunsInWindow).toBe(qualifyingRuns);
-    expect(result.consecutiveQualifyingRuns).toBe(consecutiveQualifyingRuns);
-    expect(result.graduated).toBe(
-      consecutiveQualifyingRuns >= policy.requiredConsecutiveRuns
-    );
-    expect(result.decision).toBe(result.graduated ? 'block' : 'warn');
-    expect(policy.currentEnforcement).toBe(result.decision);
-
     const measuredAt = Date.parse(receipt.measuredAt);
     const nextReviewAt = Date.parse(policy.nextReviewAt);
     expect(nextReviewAt).toBeGreaterThan(measuredAt);
-    expect(nextReviewAt).toBeGreaterThan(Date.now());
+    // A missed review warns for 72h (naming JOV-8338), then fails merge groups.
+    assertReviewDeadline({
+      label: 'public-profile alias graduation',
+      deadline: policy.nextReviewAt,
+      trackingIssue: policy.trackingIssue,
+    });
     expect(nextReviewAt - measuredAt).toBeLessThanOrEqual(
       7 * 24 * 60 * 60 * 1000
     );
@@ -117,15 +157,287 @@ describe('public-profile alias graduation policy', () => {
     );
 
     expect(staging).toContain('Staging policy is independent');
-    expect(staging).toContain('Recheck by 2026-10-21 under JOV-8338');
+    const { policy, windows } = PUBLIC_PROFILE_ALIAS_GRADUATION;
+    const review = policy.nextReviewAt.slice(0, 10);
+    expect(staging).toContain(
+      `Recheck by ${review} under ${policy.trackingIssue}`
+    );
     expect(production).toContain(
       'docs/performance/public-profile-alias-graduation.json'
     );
-    expect(production).toContain('current streak of 1/14');
-    expect(production).toContain('no later than 2026-10-21 (JOV-8338)');
-    expect(production).toContain('performance_status=warn');
+    expect(production).toContain(
+      `current streak of ${windows.production.consecutiveQualifyingRuns}/14`
+    );
+    expect(production).toContain(
+      `no later than ${review} (${policy.trackingIssue})`
+    );
+    expect(production.includes('performance_status=warn')).toBe(
+      !windows.production.graduated
+    );
     expect(production).not.toContain('JOV-4854');
   });
+
+  it('retains intervening failed controllers and partial measurements, skipping only unexecuted work', () => {
+    const job = {
+      status: 'completed',
+      completedAt: '2026-10-20T01:00:00Z',
+      stepStatus: 'completed',
+      stepConclusion: 'success',
+    };
+    const inventory = Array.from({ length: 17 }, (_, index) => ({
+      controllerRunId: index + 1,
+      status: 'completed',
+      conclusion: index % 2 ? 'failure' : 'success',
+      updatedAt: job.completedAt,
+      production: { ...job, jobId: index + 1 },
+    }));
+    inventory[16].production.stepConclusion = 'skipped';
+    inventory[15].status = 'in_progress';
+    inventory[14].production.stepConclusion = 'cancelled';
+    const selected = selectAliasWindow(
+      inventory,
+      'production',
+      '2026-10-21T01:00:00Z'
+    );
+    expect(selected.map(row => row.controllerRunId)).toEqual(
+      Array.from({ length: 14 }, (_, index) => 15 - index)
+    );
+    expect(
+      aliasDecision(
+        selected.map(row => ({ qualifies: row.controllerRunId !== 15 }))
+      )
+    ).toMatchObject({ decision: 'warn', consecutiveQualifyingRuns: 0 });
+    expect(
+      selectAliasWindow(inventory, 'staging', '2026-10-21T01:00:00Z')
+    ).toEqual([]);
+    expect(
+      selectAliasWindow(inventory, 'production', '2026-10-19T01:00:00Z')
+    ).toEqual([]);
+    expect(() =>
+      completeList([{ total_count: 18, jobs: inventory }], 'jobs')
+    ).toThrow('Incomplete');
+    expect(() =>
+      completeList([{ total_count: 2, jobs: [{ id: 1 }, { id: 1 }] }], 'jobs')
+    ).toThrow('duplicate');
+  });
+
+  it('requires all 30 numbered samples and matching native maxima; 13 good runs cannot graduate', () => {
+    const log = ALIAS_ROUTES.map(
+      route =>
+        `Checking ${route} -> /test\n${[1, 2, 3, 4, 5].map(index => `  sample ${index}/5: ${index === 5 ? 1500 : 700}ms`).join('\n')}\n${route} (/test) primary=usable-alias-result=700ms\n  PASS usable-alias-result-max: 1500.0ms / 1500.0ms`
+    ).join('\n');
+    const parsed = parseAliasSamples(log);
+    expect(parsed).toMatchObject({
+      valid: true,
+      qualifies: true,
+      observedP95Ms: 1500,
+    });
+    for (const broken of [
+      log.replace('sample 3/5', 'sample 2/5'),
+      log.replace('sample 5/5: 1500ms', 'sample 5/5: 1501ms'),
+      log.replace('  sample 1/5: 700ms', ''),
+      `${log}\n${log}`,
+    ]) {
+      expect(parseAliasSamples(broken)).toMatchObject({
+        valid: false,
+        qualifies: false,
+      });
+    }
+    const miss = parseAliasSamples(
+      log.replaceAll('1500ms', '1501ms').replaceAll('1500.0ms /', '1501.0ms /')
+    );
+    expect(miss).toMatchObject({
+      valid: true,
+      qualifies: false,
+      observedP95Ms: 1501,
+    });
+    expect(aliasDecision(Array(13).fill(parsed)).graduated).toBe(false);
+    expect(aliasDecision(Array(14).fill(parsed)).graduated).toBe(true);
+  });
+
+  it('collects paginated exact-attempt jobs without filtering failed controllers or borrowing staging samples', async () => {
+    const at = '2026-10-20T01:00:00Z';
+    const runs = Array.from({ length: 17 }, (_, index) => ({
+      id: index + 1,
+      run_attempt: 2,
+      head_sha: EXPECTED_SHA,
+      created_at: at,
+      updated_at: at,
+      status: 'completed',
+      conclusion: 'failure',
+      path: '.github/workflows/production-controller.yml',
+    }));
+    const request = vi.fn((path, json) => {
+      if (path.includes('/workflows/'))
+        return [runs.slice(0, 8), runs.slice(8)].map(workflow_runs => ({
+          total_count: 17,
+          workflow_runs,
+        }));
+      if (json === false)
+        return [
+          `${at} [command]/usr/bin/git log -1 --format=%H\n${at} ${EXPECTED_SHA}`,
+          ...ALIAS_ROUTES.flatMap(route => [
+            `${at} Checking ${route} -> /test`,
+            ...[1, 2, 3, 4, 5].map(index => `${at}   sample ${index}/5: 700ms`),
+            `${at} ${route} (/test) primary=usable-alias-result=700ms`,
+            `${at}   PASS usable-alias-result-max: 700.0ms / 1500.0ms`,
+          ]),
+        ].join('\n');
+      const id = +path.match(/runs\/(\d+)\/attempts\/2/)[1];
+      return [
+        {
+          total_count: 1,
+          jobs: [
+            {
+              id: id * 10,
+              name: 'Production Release / Production public-profile alias usable-result gate',
+              status: 'completed',
+              conclusion: 'success',
+              completed_at: at,
+              steps: [
+                {
+                  name: 'Gate canonical public-profile aliases on usable results',
+                  number: 5,
+                  status: 'completed',
+                  conclusion: 'success',
+                  started_at: at,
+                  completed_at: at,
+                },
+              ],
+            },
+          ],
+        },
+      ];
+    });
+    const options = {
+      since: '2026-10-19T00:00:00Z',
+      cutoff: '2026-10-21T00:00:00Z',
+      nextReviewAt: '2026-10-28T00:00:00Z',
+      trackingIssue: 'JOV-8338',
+      request,
+    };
+    const { receipt, measurementsText } = await collectAliasGraduation(options);
+    expect(receipt.windows.production).toMatchObject({
+      graduated: true,
+      consecutiveQualifyingRuns: 14,
+      selectedJobIds: Array.from(
+        { length: 14 },
+        (_, index) => (17 - index) * 10
+      ),
+    });
+    expect(receipt.windows.staging).toMatchObject({
+      graduated: false,
+      consecutiveQualifyingRuns: 0,
+      selectedJobIds: [],
+    });
+    expect(measurementsText.trim().split('\n')).toHaveLength(14);
+    expect(request.mock.calls[0][0]).not.toContain('status=success');
+    await expect(
+      collectAliasGraduation({ ...options, nextReviewAt: at })
+    ).rejects.toThrow('bounded');
+    await expect(
+      collectAliasGraduation({ ...options, cutoff: 'invalid' })
+    ).rejects.toThrow('UTC');
+    await expect(
+      collectAliasGraduation({
+        ...options,
+        request: () => [{ total_count: 18, workflow_runs: runs }],
+      })
+    ).rejects.toThrow('Incomplete');
+  });
+
+  it.each(['production', 'staging'])(
+    'executes the %s guard with the measured enforcement decision',
+    surface => {
+      const staging = surface === 'staging';
+      const job = getJobBlock(
+        RELEASE_WORKFLOW,
+        staging ? 'promote-production' : 'production-public-profile-alias-gate'
+      );
+      const script = getStepRunScript(
+        job,
+        staging
+          ? 'Prove canonical navigation budgets on exact staged build'
+          : 'Gate canonical public-profile aliases on usable results'
+      );
+      for (const exit of [0, 17]) {
+        const fixture = makeFixture('alias-policy-');
+        mkdirSync(join(fixture.root, 'apps/web'), { recursive: true });
+        stubCommand(
+          fixture.bin,
+          'pnpm',
+          '#!/bin/sh\nprintf "%s\\n" "$@" > "$ALIAS_GUARD_ARGUMENTS"\nexit "$ALIAS_GUARD_EXIT"\n'
+        );
+        const result = runScript(script, fixture, {
+          ALIAS_GUARD_ARGUMENTS: join(fixture.root, 'arguments'),
+          ALIAS_GUARD_EXIT: String(exit),
+          DOPPLER_TOKEN: '',
+          PLAYWRIGHT_VERCEL_BYPASS_SECRET: 'fixture-bypass',
+          PRODUCTION_DEPLOYMENT_URL_B64:
+            Buffer.from(DEPLOYMENT_URL).toString('base64'),
+        });
+        const decision =
+          PUBLIC_PROFILE_ALIAS_GRADUATION.windows[surface].decision;
+        expect(result.status).toBe(exit && decision === 'block' ? 1 : 0);
+        const outputs = parseOutputs(fixture.output);
+        if (!exit) expect(outputs.performance_status).toBe('passed');
+        else if (staging)
+          expect(outputs).toMatchObject({
+            failure_subtype: 'exact_build_performance_failed',
+          });
+        else expect(outputs.performance_status).toBe('warn');
+        const args = readFileSync(join(fixture.root, 'arguments'), 'utf8');
+        expect(args).toContain(
+          `--base-url\n${staging ? DEPLOYMENT_URL : 'https://jov.ie'}`
+        );
+        expect(args).toContain('--runs\n5');
+        for (const route of ALIAS_ROUTES)
+          expect(args).toContain(`--route-id\n${route}`);
+      }
+    }
+  );
+});
+
+describe('production lane evidence across failed-job retries', () => {
+  it.each([
+    [1, 1],
+    [1, 2],
+    [2, 3],
+  ])(
+    'downloads the artifact produced in attempt %s from consumer attempt %s',
+    (producerAttempt, consumerAttempt) => {
+      const workflow =
+        /** @type {{ jobs: Record<string, { outputs: Record<string, string>, steps: { name?: string, uses?: string, with?: Record<string, string> }[] }> }} */ (
+          load(CONTROLLER_WORKFLOW)
+        );
+      const producer = workflow.jobs['authorize-production'];
+      const upload = producer.steps.find(
+        step =>
+          step.uses?.startsWith('actions/upload-artifact@') &&
+          step.name === 'Preserve cumulative production lane evidence'
+      );
+      const producerValues = {
+        'steps.authorize.outputs.expected_sha': EXPECTED_SHA,
+        'github.run_attempt': String(producerAttempt),
+      };
+      const uploaded = materialize(upload.with.name, producerValues);
+      const output = producer.outputs.lane_range_artifact_name;
+      expect(
+        output,
+        'authorization must retain the producer artifact name'
+      ).toBeTypeOf('string');
+      const retained = materialize(output, producerValues);
+      const download = workflow.jobs['production-verified'].steps.find(step =>
+        step.uses?.startsWith('actions/download-artifact@')
+      );
+      const requested = materialize(download.with.name, {
+        'needs.authorize-production.outputs.lane_range_artifact_name': retained,
+        'needs.authorize-production.outputs.expected_sha': EXPECTED_SHA,
+        'github.run_attempt': String(consumerAttempt),
+      });
+      expect(requested).toBe(uploaded);
+    }
+  );
 });
 
 describe('production verification admission', () => {
@@ -1886,6 +2198,78 @@ exit 9
     expect(run.result.stderr).not.toContain('unexpected merge-queue read');
   });
 
+  it('yields an unreadable pre-mutation generation instead of failing the wave', () => {
+    const fixture = makeFixture('coalesce-unreadable-');
+    stubCommand(
+      fixture.bin,
+      'bash',
+      `#!/bin/sh
+case "$1" in
+  *resolve-main-sha.sh) printf '%s\\n' '${NEWER_SHA}' ;;
+  *release-lineage-gate.sh) printf 'decision=error\\n'; exit 1 ;;
+  -c) exec /bin/bash "$@" ;;
+  *) echo "unexpected bash: $*" >&2; exit 2 ;;
+esac
+`
+    );
+    const script = getStepRunScript(
+      getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
+      'Evaluate event-driven supersession'
+    );
+    const result = runScript(script, fixture, {
+      EXPECTED_SHA,
+      FIXED_WINDOW_SECONDS_REPLACED: '60',
+      GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
+      PRODUCTION_STARVATION_SECONDS: '5400',
+      REPOSITORY: 'JovieInc/Jovie',
+      RESOLVE_MAIN_BUDGET_SECONDS: '5',
+      RESOLVE_MAIN_RETRY_SECONDS: '0',
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain(
+      'lineage unreadable before evaluation; yielding without mutation'
+    );
+    expect(parseOutputs(fixture.output)).toMatchObject({
+      is_current: 'false',
+      decision: 'superseded',
+    });
+    expect(result.stdout).not.toContain('mutation-authorized');
+  });
+
+  it('still fails the wave when the pre-mutation gate crashes without a decision', () => {
+    const fixture = makeFixture('coalesce-crash-');
+    stubCommand(
+      fixture.bin,
+      'bash',
+      `#!/bin/sh
+case "$1" in
+  *resolve-main-sha.sh) printf '%s\\n' '${NEWER_SHA}' ;;
+  *release-lineage-gate.sh) echo 'boom' >&2; exit 1 ;;
+  -c) exec /bin/bash "$@" ;;
+  *) echo "unexpected bash: $*" >&2; exit 2 ;;
+esac
+`
+    );
+    const script = getStepRunScript(
+      getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
+      'Evaluate event-driven supersession'
+    );
+    const result = runScript(script, fixture, {
+      EXPECTED_SHA,
+      FIXED_WINDOW_SECONDS_REPLACED: '60',
+      GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
+      PRODUCTION_STARVATION_SECONDS: '5400',
+      REPOSITORY: 'JovieInc/Jovie',
+      RESOLVE_MAIN_BUDGET_SECONDS: '5',
+      RESOLVE_MAIN_RETRY_SECONDS: '0',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain(
+      'Release lineage gate failed before evaluation (exit=1).'
+    );
+    expect(result.stdout).not.toContain('yielding without mutation');
+  });
+
   it('still fails closed when main stays unreadable', () => {
     const run = runCoalesce(9);
     expect(run.result.status).toBe(1);
@@ -1946,6 +2330,47 @@ printf 'HTTP/2 200\\r\\n\\r\\n{"sha":"%s"}\\n' "$STUB_MAIN_SHA"
 });
 
 describe('controller starvation bound', () => {
+  it.each([
+    ['current_main_sha', 'echo "is_current=true"'],
+    ['final_main_sha', '  {\n    echo "source_ci_run_id='],
+  ])('fails authorization when %s ancestry cannot be read', (variable, end) => {
+    const authorization = getStepRunScript(
+      getJobBlock(CONTROLLER_WORKFLOW, 'authorize-production'),
+      'Cross-prove exact successful push CI'
+    );
+    const start = authorization.indexOf(`${variable}="$(bash `);
+    const finish = authorization.indexOf(end, start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(finish).toBeGreaterThan(start);
+    const fixture = makeFixture('authorization-lineage-');
+    stubCommand(
+      fixture.bin,
+      'bash',
+      `#!/bin/sh
+case "$1" in
+  *resolve-main-sha.sh) printf '%s\\n' '${NEWER_SHA}' ;;
+  *release-lineage-gate.sh) printf 'decision=error\\n'; exit 1 ;;
+  -c) exec /bin/bash \"$@\" ;;
+  *) exit 2 ;;
+esac
+`
+    );
+    // Execute the actual workflow boundary, including its shell conditionals.
+    // A failed child inside [ "$(...)" ... ] must not become a green yield.
+    const result = runScript(
+      `set -euo pipefail\n${authorization.slice(start, finish)}\necho mutation-authorized`,
+      fixture,
+      { EXPECTED_SHA, REPOSITORY: 'JovieInc/Jovie' }
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).not.toContain('yielded');
+    expect(result.stdout).not.toContain('mutation-authorized');
+    expect(parseOutputs(fixture.output)).not.toHaveProperty(
+      'is_current',
+      'false'
+    );
+  });
+
   it('routes every post-coalesce main recheck through the lineage gate', () => {
     const coalesce = getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production');
     const authorize = getJobBlock(CONTROLLER_WORKFLOW, 'authorize-production');

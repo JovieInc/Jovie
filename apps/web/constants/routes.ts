@@ -249,6 +249,9 @@ export const APP_ROUTES = {
   WAITLIST_INVITE: '/waitlist/invite',
   /** Anonymous onboarding chat (JOV-2132). Replaces /waitlist as the front door. */
   START: '/start',
+  /** Self-serve $12/month artist profile: find or create, then checkout. */
+  CLAIM: '/claim',
+  CLAIM_START: '/claim/start',
 
   // Billing
   BILLING: '/billing',

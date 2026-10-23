@@ -41,7 +41,7 @@ const {
   buildHumanServiceOutcomeReceipt,
   evaluateHumanServiceRequest,
 } = await import('@/lib/ovie/human-service-pilot');
-const { summerCardId } = await import('@/lib/ovie/summer-cards');
+const { summerCardId } = await import('@/lib/ovie/summer-card-digest');
 
 const URL_BASE = 'https://jov.ie/api/internal/ovie/summer-cards';
 
@@ -343,6 +343,22 @@ describe('GET /api/internal/ovie/summer-cards', () => {
       since: '2026-09-01T00:00:00.000Z',
       limit: 10,
     });
+  });
+
+  it('lets Summer poll post-ship feedback on decided cards', async () => {
+    hoisted.list.mockResolvedValue([]);
+    await GET(
+      new Request(
+        `${URL_BASE}?status=decided&feedbackSince=2026-10-22T00:00:00.000Z`
+      )
+    );
+    expect(hoisted.list).toHaveBeenCalledWith({
+      status: 'decided',
+      feedbackSince: '2026-10-22T00:00:00.000Z',
+      limit: 50,
+    });
+    const bad = await GET(new Request(`${URL_BASE}?feedbackSince=soon`));
+    expect(bad.status).toBe(400);
   });
 
   it('defaults to pending cards', async () => {

@@ -40,7 +40,8 @@ test('trusted source-read guards reject a deleted test on an old head and execut
     const archive = execFileSync(
       '/usr/bin/git',
       ['archive', 'HEAD', 'scripts'],
-      { maxBuffer: 20 * 1024 * 1024 }
+      // scripts/ reached 20.0 MB on 2026-10-21 (ENOBUFS at a 20 MiB cap).
+      { maxBuffer: 128 * 1024 * 1024 }
     );
     execFileSync('tar', ['-x', '-C', repo], { input: archive });
     // This synthetic base isolates the web manifest guard and predates the
@@ -60,13 +61,15 @@ test('trusted source-read guards reject a deleted test on an old head and execut
       '#!/bin/sh\n[ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9\ncase "$*" in *node-environment-files.test.ts*) case "$(cat apps/web/tests/node-environment-files.json)" in *qa-gate.test.ts*) test -f apps/web/lib/merch/qa-gate.test.ts ;; *) exit 0 ;; esac ;; *) exit 0 ;; esac\n',
       { mode: 0o755 }
     );
-    // This fixture has no launch or profile inventory. Isolate those unrelated
-    // checker, as pnpm above isolates the other guards, while checking its cwd.
+    // This fixture has no launch, profile, or art-direction inventory. Isolate
+    // those unrelated checkers, as pnpm above isolates the other guards, while
+    // checking its cwd. The older head deletes scripts/, so the real
+    // art-direction runner is not on that checkout.
     writeFileSync(
       join(bin, 'node'),
       `#!/bin/sh
 case "$*" in
-  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs)
+  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs|*scripts/invariants/art-direction/*)
     [ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9
     exit 0 ;;
 esac

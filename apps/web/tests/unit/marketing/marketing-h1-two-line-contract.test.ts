@@ -33,7 +33,7 @@ describe('marketing H1 two-visual-line contract', () => {
     );
 
     expect(globals).toMatch(
-      /\.marketing-h1-max-two-lines,[\s\S]*?:where\(\.home-viewport, \.system-b-marketing\) :where\(h1:not\(\.sr-only\)\)[\s\S]*?max-block-size: calc\(2 \* 1lh\);[\s\S]*?overflow: hidden;[\s\S]*?-webkit-line-clamp: 2;/
+      /\.marketing-h1-max-two-lines,[\s\S]*?:where\(\.home-viewport, \.system-b-marketing\) :where\(h1:not\(\.sr-only\)\)[\s\S]*?max-block-size: calc\(2 \* 1lh \+ 0\.16em\);[\s\S]*?overflow: hidden;[\s\S]*?-webkit-line-clamp: 2;/
     );
     expect(globals).not.toContain(
       ':where(.home-viewport, .system-b-marketing) h1:not(.sr-only)'

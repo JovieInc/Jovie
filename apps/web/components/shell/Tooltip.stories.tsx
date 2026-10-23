@@ -1,5 +1,6 @@
 import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { RenderedFamily } from '@/.storybook/rendered-family';
 import { Tooltip } from './Tooltip';
 
 const meta = {
@@ -16,6 +17,15 @@ const meta = {
     defaultOpen: true,
   },
   tags: ['autodocs'],
+  decorators: [
+    Story => (
+      <RenderedFamily name='Tooltip' owner='Tooltip' interactive>
+        <div className='p-4'>
+          <Story />
+        </div>
+      </RenderedFamily>
+    ),
+  ],
 } satisfies Meta<typeof Tooltip>;
 
 export default meta;
@@ -33,4 +43,10 @@ export const LongLabel: Story = {
   args: {
     label: 'Ask Jovie about audience engagement over the last quarter',
   },
+};
+
+export const InputSwitching: Story = { args: { defaultOpen: false } };
+export const Ineligible: Story = { args: { disabled: true } };
+export const ListPlacement: Story = {
+  args: { side: 'bottom', align: 'start' },
 };

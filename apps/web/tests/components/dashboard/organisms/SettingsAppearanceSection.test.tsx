@@ -1,5 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsAppearanceSection } from '@/features/dashboard/organisms/SettingsAppearanceSection';
 
@@ -101,5 +102,23 @@ describe('SettingsAppearanceSection', () => {
     expect(updateThemeMock).not.toHaveBeenCalled();
     expect(setHighContrastMock).not.toHaveBeenCalled();
     expect(saveHighContrastMock).not.toHaveBeenCalled();
+  });
+
+  it('server-renders no theme selection so hydration matches the client', () => {
+    themeState.theme = 'dark';
+
+    const html = renderToString(
+      <TooltipProvider>
+        <SettingsAppearanceSection />
+      </TooltipProvider>
+    );
+
+    expect(html).not.toContain('aria-pressed="true"');
+
+    renderSection();
+    expect(screen.getByTestId('theme-option-dark')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 });

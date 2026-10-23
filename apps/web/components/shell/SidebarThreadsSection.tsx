@@ -3,7 +3,13 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import React, { useMemo } from 'react';
+import React, {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { NavBadge } from '@/components/atoms/NavBadge';
 import { APP_ROUTES } from '@/constants/routes';
@@ -13,7 +19,7 @@ import {
   getSidebarNavIconClassName,
   getSidebarNavRowClassName,
 } from './SidebarNavItem';
-import { Tooltip } from './Tooltip';
+import { SEAM_BOUNDARY_SELECTOR, Tooltip } from './Tooltip';
 
 // Chat list types — co-located so consumers import from one place. Production
 // adapters should map real conversation records into this flat shell contract.
@@ -202,6 +208,39 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     thread: SidebarThread
   ) => void;
 }) {
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const [titleClipped, setTitleClipped] = useState(false);
+  const [tooltipSide, setTooltipSide] = useState<'bottom' | 'right'>('bottom');
+  const measureTitle = useCallback(() => {
+    const title = titleRef.current;
+    if (!title) return;
+    setTitleClipped(
+      title.clientWidth > 0 && title.scrollWidth > title.clientWidth
+    );
+    setTooltipSide(title.closest(SEAM_BOUNDARY_SELECTOR) ? 'right' : 'bottom');
+  }, []);
+
+  // The same string can change width when unread/active typography changes.
+  // Font loading and container resizing can also change clipping without a render.
+  useLayoutEffect(() => {
+    measureTitle();
+    const observer = new ResizeObserver(measureTitle);
+    if (titleRef.current) observer.observe(titleRef.current);
+    globalThis.addEventListener('resize', measureTitle);
+    const fonts = document.fonts;
+    let mounted = true;
+    void fonts?.ready.then(() => {
+      if (mounted) measureTitle();
+    });
+    fonts?.addEventListener('loadingdone', measureTitle);
+    return () => {
+      mounted = false;
+      observer.disconnect();
+      globalThis.removeEventListener('resize', measureTitle);
+      fonts?.removeEventListener('loadingdone', measureTitle);
+    };
+  }, [measureTitle, thread.title, unread, active, calm, tight]);
+
   const rowClasses = cn(
     getSidebarNavRowClassName({
       active,
@@ -230,6 +269,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         )}
       />
       <span
+        ref={titleRef}
         className={cn(
           // Reserve date/actions tracks; truncation never paints beneath them.
           'min-w-0 w-full justify-self-stretch overflow-hidden whitespace-nowrap text-ellipsis text-left',
@@ -259,10 +299,17 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         calm ? 'h-7' : tight ? 'h-6' : 'h-7'
       )}
     >
-      <Tooltip label={thread.title} side='right' block>
+      <Tooltip
+        label={thread.title}
+        disabled={!titleClipped}
+        side={tooltipSide}
+        align={tooltipSide === 'right' ? 'center' : 'start'}
+        block
+      >
         {thread.href ? (
           <Link
             href={thread.href}
+            prefetch={false}
             aria-current={active ? 'page' : undefined}
             className={rowClasses}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
@@ -293,7 +340,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             className={cn(
               // The reserved trailing track keeps this action off the title.
               'absolute right-2.5 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-0 active:bg-surface-0 hover:text-primary-token focus-visible:bg-transparent focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
-              'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
+              '[@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
             )}
           >
             <Icon
@@ -383,7 +430,7 @@ export function SidebarThreadsSection({
               ? // Founder lock 2026-09-25: sentence case, no letterspacing,
                 // 11px medium, quiet color.
                 'text-(length:--text-2xs) font-medium text-sidebar-muted'
-              : 'text-xs font-caption tracking-normal text-sidebar-muted/90'
+              : 'text-xs font-caption tracking-normal text-sidebar-muted'
           }
         >
           {calm
@@ -492,6 +539,7 @@ export function SidebarThreadsSection({
         {hasThreads ? (
           <Link
             href={APP_ROUTES.CHATS}
+            prefetch={false}
             aria-current={allThreadsActive ? 'page' : undefined}
             className={cn(
               getSidebarNavRowClassName({

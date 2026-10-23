@@ -364,6 +364,11 @@ export function ProfileCompactTemplate({
   const suppressNextHistorySyncRef = useRef(true);
   const arrivalHistoryLengthRef = useRef<number | null>(null);
   const profileHistoryDepthRef = useRef(0);
+  // The mode this document landed with. Filled in by the effect below, before
+  // the history effect, while the landing URL is still intact. Next's history
+  // updater can replace that entry with the bare profile path after child
+  // effects; restoring the mode must not push a second entry on top of the strip.
+  const landedHistoryModeRef = useRef<ProfileMode | null>(null);
 
   const clearCloseResetTimer = useCallback(() => {
     if (closeResetTimerRef.current !== null) {
@@ -726,6 +731,21 @@ export function ProfileCompactTemplate({
     return () => globalThis.removeEventListener('popstate', handlePopState);
   }, [syncRequestedModeFromLocation]);
 
+  const browserHref =
+    globalThis.window === undefined
+      ? ''
+      : `${globalThis.location.pathname}${globalThis.location.search}`;
+
+  useEffect(() => {
+    if (
+      landedHistoryModeRef.current !== null ||
+      globalThis.window === undefined
+    ) {
+      return;
+    }
+    landedHistoryModeRef.current = getModeFromUrl();
+  }, []);
+
   useEffect(() => {
     if (!initialLocationModeAlignedRef.current) {
       return;
@@ -770,6 +790,21 @@ export function ProfileCompactTemplate({
       return;
     }
 
+    const landedMode = landedHistoryModeRef.current;
+    const correctingStrippedLanding =
+      profileHistoryDepthRef.current === 0 &&
+      landedMode !== null &&
+      landedMode !== 'profile' &&
+      activeMode === landedMode;
+    if (correctingStrippedLanding) {
+      globalThis.history.replaceState(
+        withPublicProfileHistoryDepth(globalThis.history.state, 0),
+        '',
+        href
+      );
+      return;
+    }
+
     const nextDepth = profileHistoryDepthRef.current + 1;
     profileHistoryDepthRef.current = nextDepth;
     globalThis.history.pushState(
@@ -778,6 +813,7 @@ export function ProfileCompactTemplate({
       href
     );
   }, [
+    browserHref,
     drawerOpen,
     drawerView,
     requestedMode,
