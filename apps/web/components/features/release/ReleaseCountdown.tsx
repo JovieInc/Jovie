@@ -146,7 +146,7 @@ export function ReleaseCountdown({
             <span className='text-xl font-bold tracking-tight text-(--color-text-tooltip)'>
               {segment.value}
             </span>
-            <span className='ml-0.5 text-3xs font-semibold uppercase tracking-widest text-white/35'>
+            <span className='ml-0.5 text-3xs font-semibold uppercase tracking-widest text-secondary-token'>
               {segment.label}
             </span>
           </span>
