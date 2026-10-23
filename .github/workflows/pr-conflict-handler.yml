@@ -534,7 +534,7 @@ jobs:
         env:
           FX_AUTO_UPGRADE: '0'
           FX_PERMISSION_MODE: ask
-          FX_MODEL: openai/gpt-5.6-sol
+          FX_MODEL: zai/glm-5.3
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ matrix.prNumber }}
           SOURCE_HEAD: ${{ matrix.headRefOid }}
@@ -728,7 +728,7 @@ jobs:
           FX_AUTO_UPGRADE: '0'
           FX_DISABLE_KEYCHAIN: '1'
           FX_MAX_AGENT_STEPS: '12'
-          FX_MODEL: openai/gpt-5.6-sol
+          FX_MODEL: zai/glm-5.3
           FX_PERMISSION_MODE: ask
           HOME: ${{ runner.temp }}/fx-home
         run: |
@@ -773,7 +773,7 @@ jobs:
           LIVE_GUARD_ELIGIBLE: ${{ steps.pre_spend_guard.outputs.eligible }}
           LIVE_GUARD_OUTCOME: ${{ steps.pre_spend_guard.outputs.outcome }}
           LIVE_GUARD_DETAIL: ${{ steps.pre_spend_guard.outputs.detail }}
-          FX_MODEL: openai/gpt-5.6-sol
+          FX_MODEL: zai/glm-5.3
           SOURCE_HEAD: ${{ matrix.headRefOid }}
         run: |
           set -euo pipefail
@@ -914,7 +914,7 @@ jobs:
           HEAD_REF: ${{ matrix.headRefName }}
           ATTEMPT: ${{ matrix.attempt }}
           MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
-          EXPECTED_MODEL: openai/gpt-5.6-sol
+          EXPECTED_MODEL: zai/glm-5.3
         run: |
           set -euo pipefail
           candidate_dir="$RUNNER_TEMP/conflict-fx-verified"
@@ -1022,7 +1022,7 @@ jobs:
             --volume "$RUNNER_TEMP/trusted-run-affected-tests.mjs:/workspace/scripts/run-affected-tests.mjs:ro" \
             --volume "$RUNNER_TEMP/trusted-blog-content-ci.mjs:/workspace/scripts/lib/blog-content-ci.mjs:ro" \
             --workdir /workspace \
-            'node:24.21.0-bookworm@sha256:6dac556d980b7f0e5498d08f08cee0ca67798b4ad6c23964a9214920e67758d0' \
+            'node:24.22.1-bookworm@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a' \
             bash -lc 'corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --frozen-lockfile && node scripts/run-affected-tests.mjs --base "$SOURCE_HEAD" --max-workers 2'
           verify_rc=$?
           set -e
@@ -1103,7 +1103,7 @@ jobs:
           HEAD_REF: ${{ matrix.headRefName }}
           ATTEMPT: ${{ matrix.attempt }}
           MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
-          EXPECTED_MODEL: openai/gpt-5.6-sol
+          EXPECTED_MODEL: zai/glm-5.3
           FX_HOSTED_REMEDIATION_ENABLED: ${{ vars.FX_HOSTED_REMEDIATION_ENABLED }}
           FX_HOSTED_REMEDIATION_CANARY_PR: ${{ vars.FX_HOSTED_REMEDIATION_CANARY_PR }}
           CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
@@ -1177,7 +1177,7 @@ jobs:
           ATTEMPT: ${{ matrix.attempt }}
           MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
           COHORT_ID: ${{ needs.plan.outputs.cohort_id }}
-          EXPECTED_MODEL: openai/gpt-5.6-sol
+          EXPECTED_MODEL: zai/glm-5.3
           CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
           DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
           DELIVERABLE: ${{ steps.prevalidate.outputs.deliverable }}

@@ -1,12 +1,15 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { mockFitLayout } from './fit-layout.test-utils';
 import {
+  HOME_LOOP_FIXTURE_BUSY_DONE,
   HOME_LOOP_FIXTURE_DONE,
   HOME_LOOP_FIXTURE_PULSE,
   HOME_LOOP_FIXTURE_ROWS,
   HOME_LOOP_FIXTURE_STAGES,
   HOME_LOOP_FIXTURE_UNMEASURED_PULSE,
 } from './fixtures';
+import { HomeLoopLatency } from './HomeLoopLatency';
 import { HomeLoopConstraintBanner, HomeLoopPulse } from './HomeLoopPulse';
 import { HomeLoopSection } from './HomeLoopSection';
 import { HomeLoopDoneChips, HomeLoopStageRows } from './HomeLoopStageRows';
@@ -36,6 +39,33 @@ describe('HomeLoopConstraintBanner', () => {
       />
     );
     expect(banner).toHaveAttribute('data-tone', 'loading');
+  });
+});
+
+describe('HomeLoopConstraintBanner details', () => {
+  it('links the full diagnostic only when the constraint names a details view', () => {
+    const { rerender } = render(
+      <HomeLoopConstraintBanner
+        constraint={{
+          tone: 'bad',
+          text: 'Remediation alerts are not being acknowledged',
+          detailsHref: '/app/ov/product',
+        }}
+        emptyLabel='All clear'
+      />
+    );
+    expect(screen.getByRole('link', { name: 'Details' })).toHaveAttribute(
+      'href',
+      '/app/ov/product'
+    );
+
+    rerender(
+      <HomeLoopConstraintBanner
+        constraint={{ tone: 'warn', text: 'Lanes feed is stale' }}
+        emptyLabel='All clear'
+      />
+    );
+    expect(screen.queryByTestId('home-loop-constraint-details')).toBeNull();
   });
 });
 
@@ -108,6 +138,33 @@ describe('HomeLoopStageRows', () => {
   });
 });
 
+describe('Home loop fit', () => {
+  it('hides pulse tiles that do not fit one row, keeping priority order', () => {
+    const restore = mockFitLayout('home-loop-pulse', 250);
+    try {
+      render(<HomeLoopPulse tiles={HOME_LOOP_FIXTURE_PULSE} />);
+      const tiles = screen.getAllByTestId(/^home-loop-tile-/);
+      expect(
+        tiles.filter(tile => tile.getAttribute('aria-hidden') !== 'true')
+      ).toEqual(tiles.slice(0, 2));
+    } finally {
+      restore();
+    }
+  });
+
+  it('collapses done chips that do not fit into +N more', () => {
+    const restore = mockFitLayout('home-loop-done', 250);
+    try {
+      render(<HomeLoopDoneChips items={HOME_LOOP_FIXTURE_BUSY_DONE} fit />);
+      expect(screen.getByTestId('home-loop-done-more')).toHaveTextContent(
+        `+${HOME_LOOP_FIXTURE_BUSY_DONE.length - 2} more`
+      );
+    } finally {
+      restore();
+    }
+  });
+});
+
 describe('HomeLoopSection', () => {
   function section(
     status: 'loading' | 'error' | 'ready',
@@ -163,5 +220,164 @@ describe('HomeLoopSection', () => {
     rerender(section('ready', false));
     expect(screen.getByText('Body')).toBeVisible();
     expect(screen.getByTestId('section-count')).toHaveTextContent('3');
+  });
+
+  it('replaces a clear empty line when a source warning is present', () => {
+    render(
+      <HomeLoopSection
+        title='Blocked On You'
+        status='ready'
+        isEmpty
+        emptyLabel='Nothing here'
+        errorLabel='Could not load'
+        notice='Some sources are unavailable.'
+        skeleton={<p>Skeleton</p>}
+        testId='section'
+      >
+        <p>Body</p>
+      </HomeLoopSection>
+    );
+    expect(screen.getByTestId('section-notice')).toHaveTextContent(
+      'Some sources are unavailable.'
+    );
+    expect(screen.queryByText('Nothing here')).not.toBeInTheDocument();
+    expect(screen.queryByText('Body')).not.toBeInTheDocument();
+  });
+});
+
+describe('HomeLoopSection notice link', () => {
+  it('links a summarized warning to its full list in both empty and populated states', () => {
+    const section = (isEmpty: boolean) => (
+      <HomeLoopSection
+        title='Blocked On You'
+        status='ready'
+        isEmpty={isEmpty}
+        emptyLabel='Nothing here'
+        errorLabel='Could not load'
+        notice='27 sources are unavailable or missing evidence.'
+        noticeHref='/app/ov/inbox'
+        skeleton={<p>Skeleton</p>}
+        testId='section'
+      >
+        <p>Body</p>
+      </HomeLoopSection>
+    );
+    const { rerender } = render(section(true));
+    expect(screen.getByTestId('section-notice-link')).toHaveAttribute(
+      'href',
+      '/app/ov/inbox'
+    );
+    rerender(section(false));
+    expect(screen.getByTestId('section-notice-link')).toHaveAttribute(
+      'href',
+      '/app/ov/inbox'
+    );
+    expect(screen.getByText('Body')).toBeVisible();
+  });
+});
+
+describe('HomeLoopLatency', () => {
+  it('lists slowest stages with regressions named in text', () => {
+    render(
+      <HomeLoopLatency
+        rows={[
+          {
+            id: 'a',
+            label: 'Remediation · Classified',
+            p50: '54m',
+            p95: '2.3d',
+            samples: 126,
+            regressed: true,
+          },
+          {
+            id: 'b',
+            label: 'Shipping · PR Open',
+            p50: '8m',
+            p95: '4.2h',
+            samples: 570,
+            regressed: false,
+          },
+        ]}
+        otherRegressions={['Release · Staging → Verified']}
+        coverage='14 of 31 stages measured'
+      />
+    );
+    const rows = screen.getAllByTestId('home-loop-latency-row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('Regressed');
+    expect(rows[0]).toHaveTextContent('2.3d');
+    expect(rows[1]).not.toHaveTextContent('Regressed');
+    expect(
+      screen.getByRole('table', { name: 'Slowest stages by 7-day p95' })
+    ).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(
+      screen.getAllByRole('columnheader').map(header => header.textContent)
+    ).toEqual(['Stage', 'P50', 'P95', 'Runs']);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('home-loop-latency')).toHaveTextContent(
+      'Also regressed: Release · Staging → Verified · 14 of 31 stages measured'
+    );
+  });
+
+  it('preserves unknown durations and zero runs on refresh without changing table density', () => {
+    const row = {
+      id: 'shipping:ready',
+      label: 'Shipping · Ready',
+      p50: 'Not measured',
+      p95: 'Not measured',
+      samples: 0,
+      regressed: false,
+    };
+    const { rerender } = render(<HomeLoopLatency rows={[row]} />);
+    const table = screen.getByRole('table', {
+      name: 'Slowest stages by 7-day p95',
+    });
+    const stage = screen.getByTestId('home-loop-latency-row');
+    expect(within(stage).getAllByText('Not measured')).toHaveLength(2);
+    expect(within(stage).getByText('0')).toBeVisible();
+    expect(stage).not.toHaveAttribute('tabindex');
+    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+
+    rerender(
+      <HomeLoopLatency
+        rows={[
+          { ...row, p50: '3m', p95: '6.5h', samples: 571, regressed: true },
+        ]}
+      />
+    );
+    expect(screen.getByRole('table')).toBe(table);
+    expect(stage).toHaveTextContent('Regressed');
+    expect(stage).toHaveTextContent('6.5h');
+    expect(stage).not.toHaveTextContent('Not measured');
+    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+  });
+
+  it('keeps the named table and headers when empty, with optional footer details', () => {
+    const { rerender } = render(<HomeLoopLatency rows={[]} />);
+    const table = screen.getByRole('table', {
+      name: 'Slowest stages by 7-day p95',
+    });
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(4);
+    expect(
+      screen.queryByTestId('home-loop-latency-row')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('home-loop-latency').querySelector('p')
+    ).toBeNull();
+
+    rerender(<HomeLoopLatency rows={[]} coverage='0 of 31 stages measured' />);
+    expect(screen.getByText('0 of 31 stages measured')).toBeVisible();
+    expect(screen.queryByText(/Also regressed/)).not.toBeInTheDocument();
+
+    rerender(
+      <HomeLoopLatency
+        rows={[]}
+        otherRegressions={['Release · Staging → Verified']}
+      />
+    );
+    expect(
+      screen.getByText('Also regressed: Release · Staging → Verified')
+    ).toBeVisible();
+    expect(screen.getByRole('table')).toBe(table);
   });
 });

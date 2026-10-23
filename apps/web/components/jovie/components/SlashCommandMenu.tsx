@@ -29,10 +29,7 @@ import {
   flattenSections,
   InlinePalette,
 } from '@/components/organisms/SharedCommandPalette';
-import {
-  filterSkillsHidingBrokenAlbumArt,
-  shouldHideAlbumArtChatSuggestion,
-} from '@/lib/chat/album-art-capability';
+import { shouldHideAlbumArtChatSuggestion } from '@/lib/chat/album-art-capability';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
 import { commandsForSurface, type SkillCommand } from '@/lib/commands/registry';
@@ -165,11 +162,6 @@ export function useSlashItems(
     artistSearchSearch(artistQueryString);
   }, [artistQueryString, artistSearchSearch]);
 
-  const { data: chatCapabilities } = useChatCapabilitiesQuery({
-    profileId,
-    enabled: Boolean(profileId) && isRoot,
-  });
-
   // Own-graph tier: recently-referenced entities, synced instantly across
   // picker instances. Ranked above the per-kind source results so the menu
   // opens populated with the creator's world even before Spotify responds.
@@ -266,18 +258,17 @@ export function useSlashItems(
     }
 
     // root: skills + entity suggestions per kind
-    // A release-dependent skill immediately opens the release picker. Do not
-    // offer it when the creator has no release context: anonymous /start users
-    // would otherwise enter an empty picker with no forward action.
-    const skills = filterSkillsHidingBrokenAlbumArt(
-      commandsForSurface('chat-slash').filter(
-        (c): c is SkillCommand => c.kind === 'skill'
-      ),
-      chatCapabilities?.tools.albumArt
-    )
+    // A release-dependent skill opens the release picker. Anonymous /start
+    // (no profile) must not enter an empty picker. Signed-in composers keep
+    // the skill, including when album art is provider-down: selecting it
+    // still reaches the unavailable-assistant reply, and an empty catalog
+    // renders the entity rail with no rows.
+    const skills = commandsForSurface('chat-slash')
+      .filter((c): c is SkillCommand => c.kind === 'skill')
       .filter(
         skill =>
           hasReleaseContext ||
+          profileId.length > 0 ||
           !skill.entitySlots.some(
             slot => slot.kind === 'release' && slot.required
           )
@@ -337,7 +328,7 @@ export function useSlashItems(
     eventLoading,
     artistSearch.results,
     artistSearch.state,
-    chatCapabilities?.tools,
+    profileId,
   ]);
 }
 
@@ -517,7 +508,18 @@ export function SlashCommandMenu({
       // IME composition (Japanese, Chinese, Korean): the user is mid-glyph
       // and Enter is "commit composition," not "submit." Bail before any
       // navigation key handling so we never swallow the composition.
-      if (e.isComposing || e.keyCode === 229) return;
+      // keyCode 229 is the IME composition signal. Firefox reports it for
+      // ArrowDown as well, while `key` stays ArrowDown. Only bail when the
+      // key itself is the composition commit.
+      if (
+        e.isComposing ||
+        (e.keyCode === 229 &&
+          e.key !== 'ArrowDown' &&
+          e.key !== 'ArrowUp' &&
+          e.key !== 'Escape')
+      ) {
+        return;
+      }
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         onMoveSelected(1, flatItems.length);

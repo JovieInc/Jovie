@@ -26,6 +26,7 @@ const {
   mockGetAuthSignupOnboardingCanaryStatus,
   mockGetPublicProfileCanaryStatus,
   mockRefreshCompanyStateCache,
+  mockApplySummerCardDefaults,
 } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),
   mockDbSelect: vi.fn(),
@@ -52,6 +53,7 @@ const {
   mockGetAuthSignupOnboardingCanaryStatus: vi.fn(),
   mockGetPublicProfileCanaryStatus: vi.fn(),
   mockRefreshCompanyStateCache: vi.fn(),
+  mockApplySummerCardDefaults: vi.fn(),
 }));
 
 vi.mock('@/lib/admin/ops-queries', () => ({
@@ -65,6 +67,10 @@ vi.mock('@/lib/acquisition/eligibility.server', () => ({
 
 vi.mock('@/lib/ovie/company-state.server', () => ({
   refreshCompanyStateCache: mockRefreshCompanyStateCache,
+}));
+
+vi.mock('@/lib/ovie/summer-cards.server', () => ({
+  applySummerCardDefaults: mockApplySummerCardDefaults,
 }));
 
 vi.mock(
@@ -253,6 +259,14 @@ describe('GET /api/cron/frequent', () => {
     mockGetPublicProfileCanaryStatus.mockImplementation(async () => ({
       runAt: new Date().toISOString(),
     }));
+    mockApplySummerCardDefaults.mockResolvedValue({
+      checked: 2,
+      defaulted: 1,
+      approvedByDefault: 1,
+      rejectedByDefault: 0,
+      raced: 0,
+      cardIds: ['sc_0123456789abcdef0123456789abcdef'],
+    });
     mockRefreshCompanyStateCache.mockResolvedValue({
       revision: 'company-state-revision',
       activeConstraint: 'certification:public_profile',
@@ -293,6 +307,37 @@ describe('GET /api/cron/frequent', () => {
     );
     expect(mockProcessCampaigns).toHaveBeenCalledOnce();
     expect(mockRefreshCompanyStateCache).toHaveBeenCalledOnce();
+  });
+
+  it('applies overdue founder-ask defaults every run without blocking siblings', async () => {
+    const { GET } = await import('@/app/api/cron/frequent/route');
+    let body = await (
+      await GET(
+        new Request('http://localhost/api/cron/frequent', {
+          headers: { authorization: 'Bearer test-secret' },
+        })
+      )
+    ).json();
+    expect(mockApplySummerCardDefaults).toHaveBeenCalledWith(expect.any(Date));
+    expect(body.results.summerCardDefaults).toMatchObject({
+      success: true,
+      data: { defaulted: 1, approvedByDefault: 1 },
+    });
+
+    mockApplySummerCardDefaults.mockRejectedValueOnce(new Error('kv down'));
+    const campaignsBefore = mockProcessCampaigns.mock.calls.length;
+    body = await (
+      await GET(
+        new Request('http://localhost/api/cron/frequent', {
+          headers: { authorization: 'Bearer test-secret' },
+        })
+      )
+    ).json();
+    expect(body.results.summerCardDefaults).toEqual({
+      success: false,
+      error: 'kv down',
+    });
+    expect(mockProcessCampaigns.mock.calls.length).toBe(campaignsBefore + 1);
   });
 
   it('alarms on an expired Redis key even when no acquisition runs', async () => {

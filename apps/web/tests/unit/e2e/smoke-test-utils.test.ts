@@ -2,9 +2,11 @@ import type { Page } from '@playwright/test';
 import { describe, expect, it } from 'vitest';
 import {
   filterCriticalErrors,
+  isDestroyedExecutionContext,
   isExpectedError,
   isExpectedWarning,
   isTransientNavigationError,
+  setupPageMonitoring,
   waitForAnyVisible,
 } from '@/tests/e2e/utils/smoke-test-utils';
 
@@ -41,6 +43,18 @@ describe('smoke-test-utils', () => {
         isExpectedError(
           'Blocked by CORS policy: No Access-Control-Allow-Origin header is present.'
         )
+      ).toBe(false);
+    });
+
+    it('treats Firefox fetch aborts like Chrome net::ERR_* noise', () => {
+      expect(
+        isExpectedError('NetworkError when attempting to fetch resource.')
+      ).toBe(true);
+      expect(isTransientNavigationError(new Error('NS_BINDING_ABORTED'))).toBe(
+        true
+      );
+      expect(
+        isExpectedError('TypeError: Failed to parse the profile payload')
       ).toBe(false);
     });
   });
@@ -121,6 +135,14 @@ describe('smoke-test-utils', () => {
         )
       ).toBe(false);
     });
+
+    it('does not treat a destroyed execution context as a page-health redirect', () => {
+      const error = new Error(
+        'page.evaluate: Execution context was destroyed, most likely because of a navigation'
+      );
+      expect(isDestroyedExecutionContext(error)).toBe(true);
+      expect(isTransientNavigationError(error)).toBe(false);
+    });
   });
 
   describe('filterCriticalErrors', () => {
@@ -176,6 +198,43 @@ describe('smoke-test-utils', () => {
           { timeout: 1 }
         )
       ).rejects.toThrow(/testids=\[.*profile-compact-shell.*profile-header/);
+    });
+  });
+  describe('setupPageMonitoring', () => {
+    function monitoredPage() {
+      const handlers: Record<string, (arg: unknown) => void> = {};
+      const page = {
+        on: (event: string, handler: (arg: unknown) => void) => {
+          handlers[event] = handler;
+        },
+        off: () => {},
+        url: () => 'http://127.0.0.1:3100/app/ov',
+      } as unknown as Page;
+      const emitConsole = (text: string, url: string) =>
+        handlers.console?.({
+          type: () => 'error',
+          text: () => text,
+          location: () => ({ url }),
+        });
+      return { page, emitConsole };
+    }
+
+    it('drops fail-closed 401/403 resources and names other failed resources', () => {
+      const { page, emitConsole } = monitoredPage();
+      const { getContext } = setupPageMonitoring(page);
+
+      emitConsole(
+        'Failed to load resource: the server responded with a status of 403 (Forbidden)',
+        'http://127.0.0.1:3100/api/admin/leads'
+      );
+      emitConsole(
+        'Failed to load resource: the server responded with a status of 404 (Not Found)',
+        'http://127.0.0.1:3100/api/missing'
+      );
+
+      expect(getContext().criticalErrors).toEqual([
+        'Failed to load resource: the server responded with a status of 404 (Not Found) [http://127.0.0.1:3100/api/missing]',
+      ]);
     });
   });
 });

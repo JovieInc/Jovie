@@ -46,26 +46,27 @@ Context guidance: [agent context](docs/agent-context/README.md).
 
 | Task | Read |
 |---|---|
-| Environment/tooling | [environment.md](.claude/rules/environment.md) |
-| TypeScript, React, boundaries, prior art | [code-style.md](.claude/rules/code-style.md) |
-| DB/migrations | [db.md](.claude/rules/db.md) |
-| Auth/Better Auth | [auth.md](.claude/rules/auth.md) |
-| Security, billing, entitlements | [security.md](.claude/rules/security.md) |
-| UI/design | [DESIGN.md](DESIGN.md), [ui.md](.claude/rules/ui.md) |
+| Environment/tooling | [environment](.claude/rules/environment.md) |
+| TypeScript, React, boundaries, prior art | [code-style](.claude/rules/code-style.md) |
+| DB/migrations | [db](.claude/rules/db.md) |
+| Auth/Better Auth | [auth](.claude/rules/auth.md) |
+| Security, billing, entitlements | [security](.claude/rules/security.md) |
+| External APIs | [external-apis](.claude/rules/external-apis.md) |
+| UI/design | [DESIGN](DESIGN.md), [ui](.claude/rules/ui.md) |
 | Marketing pages (fully static) | [marketing guide](docs/marketing/AGENT_GUIDE.md) |
 | Writing/copy | [writing contract](docs/writing/SURFACE_COVERAGE.md) |
 | Strategy (pricing, free tier, business model, delegation, substrate) | [strategy canon](canon/strategy/README.md) |
-| Tests/coverage | [testing.md](.claude/rules/testing.md) |
+| Tests/coverage | [testing](.claude/rules/testing.md) |
 | PR, CI, merge, deploy | [flow](docs/PR_FLOW.md), [queue](.github/MERGE_QUEUE.md), [protection](.github/BRANCH_PROTECTION.md), [release](.claude/rules/release.md) |
-| iOS / macOS | [ios.md](.claude/rules/ios.md) / [macos.md](.claude/rules/macos.md) |
-| Pen canvas/registry | [pen.md](.claude/rules/pen.md) |
-| Skills | [gstack.md](.claude/rules/gstack.md) |
+| iOS/macOS | [ios](.claude/rules/ios.md) / [macos](.claude/rules/macos.md) |
+| Pen canvas/registry | [pen](.claude/rules/pen.md) |
+| Skills | [gstack](.claude/rules/gstack.md) |
 
-Other scoped rules: ci-branching, infra, linear, motion, pr-stacking, swarm,
-hermes-air.
-Company domain canon: [index](canon/README.md). API/cron/webhook inventories:
-[AI_AGENT_GUIDE.md](docs/AI_AGENT_GUIDE.md). Codex setup: [CODEX.md](CODEX.md).
-<!-- doc-freshness:scoped-rules-count:19 -->
+Other scoped rules: ci-branching, event-driven, infra, linear, motion,
+pr-stacking, swarm, hermes-air.
+Company domain canon: [index](canon/README.md). API/cron/webhook maps:
+[AI_AGENT_GUIDE](docs/AI_AGENT_GUIDE.md). Codex: [CODEX](CODEX.md).
+<!-- doc-freshness:scoped-rules-count:21 -->
 
 ## Tools and workflow
 
