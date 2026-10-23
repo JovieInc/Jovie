@@ -44,8 +44,14 @@ a usefulness trial, not enough samples for a latency or loss-rate claim.
 ## Source audit and ownership
 
 Inspected repository base: `3813f4d514d`. Links below are local source evidence,
-not hosted CI, deployed UI or device observations. GBrain lookup failed with a
-connection refusal (`gbrain-unavailable`); no prior memory was treated as proof.
+not hosted CI, deployed UI or device observations. On 2026-10-23 those cited
+paths were rechecked against `76bf0a17f95`: they still resolve, Tiptap remains
+3.32.0 without UniqueID, voice capture still returns a transcript without an
+original file, vlog storage remains `local_only_no_upload` with a fresh script
+UUID, and the launch registry is still in memory. That recheck is source
+evidence only. The 2026-10-21 GBrain lookup failed with a connection refusal.
+A 2026-10-23 keyword search for JOV-8648 returned no page. No prior memory
+was treated as proof.
 Linear issue/project descriptions and related ownership were refreshed on
 2026-10-21. Status badges do not certify the end-to-end workflow.
 
