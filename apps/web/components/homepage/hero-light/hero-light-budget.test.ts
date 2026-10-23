@@ -124,12 +124,16 @@ describe('homepage hero light budget', () => {
     // In flow under the copy — never layered over the headline.
     expect(proof).toContain('position: relative');
     expect(proof).not.toContain('position: absolute');
-    // Height-driven with the real screen aspect; on a short field it
-    // shrinks to its floor, then the copy clips inside itself bottom-up.
-    expect(proof).toContain('height: min(30svh, 15.75rem)');
+    // Height-driven with the real screen aspect; the ceiling reserves the
+    // bar plus a 20rem copy budget so the phone yields before the copy
+    // clips, then the floor binds, then the copy clips inside itself
+    // bottom-up.
+    expect(proof).toContain(
+      'height: min(30svh, 15.75rem, calc(100svh - var(--hero-canvas-bar) - 20rem))'
+    );
     expect(proof).toContain('aspect-ratio: 402 / 874');
     expect(proof).toContain('flex: 0 1 auto');
-    expect(proof).toContain('min-height: 9rem');
+    expect(proof).toContain('min-height: 7rem');
   });
 
   it('records the scoped WebGL exception without rewriting the standing rule', () => {
