@@ -348,10 +348,23 @@ jobs:
           node scripts/golden-path-lock.mjs merge-gate
           git diff --name-only "$base_sha" HEAD > "$RUNNER_TEMP/security-gate-files.txt"
           node scripts/security/security-gate.mjs --changed-files "$RUNNER_TEMP/security-gate-files.txt"
+      # Hosted GITHUB_TOKEN compare returns 403 on this public repository.
+      # A contents:read Jovie Bot installation token returns 200. Severity
+      # and the GPL/AGPL denylist stay blocking. The minted token is
+      # contents:read only; an empty key fails the mint closed.
+      - name: Mint dependency review read token
+        id: dependency-review-token
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
       - name: Review added and upgraded dependencies
         if: steps.reuse.outputs.reuse != 'true'
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
+          repo-token: ${{ steps.dependency-review-token.outputs.token }}
           config-file: ./.github/dependency-review-config.yml
   migration:
     name: Migration Guard

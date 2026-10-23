@@ -217,6 +217,24 @@ test('source validation blocks dependency and migration diffs', () => {
     workflow,
     /config-file: \.\/\.github\/dependency-review-config\.yml/
   );
+  const securityJob = workflow.slice(
+    workflow.indexOf('  security:'),
+    workflow.indexOf('  migration:')
+  );
+  assert.match(
+    securityJob,
+    /uses: actions\/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3\.3\.0/
+  );
+  assert.match(securityJob, /id: dependency-review-token/);
+  assert.match(securityJob, /permission-contents: read/);
+  assert.match(
+    securityJob,
+    /repo-token: \$\{\{ steps\.dependency-review-token\.outputs\.token \}\}/
+  );
+  assert.match(securityJob, /contents: read/);
+  assert.doesNotMatch(securityJob, /contents: write/);
+  assert.doesNotMatch(securityJob, /continue-on-error:/);
+  assert.doesNotMatch(securityJob, /pull_request_target/);
   assert.match(
     workflow,
     /node scripts\/db\/lint-changed-migrations\.mjs --base "\$base_sha"/
