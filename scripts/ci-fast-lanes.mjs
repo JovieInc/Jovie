@@ -301,6 +301,8 @@ export const SOURCE_GUARDS_COMMAND = SOURCE_GUARDS.map(
 
 export const NODE_RUNTIME_CONTRACT_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/node-runtime-policy.test.ts tests/unit/ci/node-runtime-contract.test.ts tests/unit/ci/runner-setup-action.test.ts';
+export const PEN_TOKEN_PARITY_COMMAND =
+  'pnpm exec node --test scripts/invariants/pen-token-parity.test.mjs && pnpm exec node scripts/invariants/pen-token-parity.mjs';
 export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
   'apps/web/vitest.config.ci-contracts.mts',
   'apps/web/vitest.config.fast.mts',
@@ -938,6 +940,12 @@ const LANES = [
     run: runDesignGovernanceEnforcement,
   },
   {
+    id: 'pen-token-parity',
+    name: 'Pen token parity',
+    nextLocalCommand: PEN_TOKEN_PARITY_COMMAND,
+    run: runPenTokenParity,
+  },
+  {
     id: 'design-conformance',
     name: 'Design Conformance',
     nextLocalCommand: 'pnpm design:conformance:gate',
@@ -1027,6 +1035,7 @@ export const LANE_GROUPS = Object.freeze({
     'design-system-source-ratchet',
     'design-exception-registry',
     'design-governance-enforcement',
+    'pen-token-parity',
     'ios-fast',
     'billing-coverage',
     'copy-gate',
@@ -2014,6 +2023,18 @@ function runDesignGovernanceEnforcement() {
     };
   }
   return shell(LANE_COMMANDS['design-governance-enforcement']);
+}
+
+function runPenTokenParity() {
+  const event = process.env.GITHUB_EVENT_NAME || '';
+  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+    return {
+      code: 0,
+      output: 'Pen token parity skipped (no Jovie product files changed)\n',
+      skipped: true,
+    };
+  }
+  return shell(PEN_TOKEN_PARITY_COMMAND);
 }
 
 /**
