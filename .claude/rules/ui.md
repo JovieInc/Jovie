@@ -315,6 +315,12 @@ absent.
 - The headline “Be found. Be understood.” is locked.
 - `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready check. Existing hits are a shrink-only baseline. See MKT-D16 in `docs/marketing/DESIGN_INVARIANTS.md`.
 
+### Copy Is the Message, Never the Brief
+
+Reject AI instructions, editing rules, and unfinished text in every user-visible string, including metadata, accessibility labels, emails, errors, empty states, and demos. Use the copy system.
+Run `node scripts/invariants/copy-leak/check.mjs` before review: it blocks PR Ready and merge groups. Fix real leaks; its baseline only shrinks.
+Exact exceptions in `scripts/invariants/copy-leak/config.json` require reasons.
+
 ### No Emoji in UI — Use Icons
 
 - **NEVER** use emoji characters in component markup, mock data, or UI strings.

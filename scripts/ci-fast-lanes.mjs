@@ -284,6 +284,15 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
+    id: 'copy-leak',
+    // Trusted-base scanner/policy, checked against the PR checkout. PR Ready
+    // inherits Source Validation failures; merge groups and main also run it.
+    command: `node ${shellQuote(fileURLToPath(new URL('./invariants/copy-leak/check.mjs', import.meta.url)))} && node --test --test-isolation=none --experimental-test-coverage ${shellQuote(`--test-coverage-include=${fileURLToPath(new URL('./invariants/copy-leak/check.mjs', import.meta.url))}`)} --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=85 ${shellQuote(fileURLToPath(new URL('./invariants/copy-leak/copy-leak.test.mjs', import.meta.url)))}`,
+    inputs:
+      /^(?:apps\/web\/|scripts\/invariants\/copy-leak\/|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // JOV-INV-045. Trusted-base copy scans the pull request diff and fails
     // when the diff loosens a blocking gate. Pull requests only.
     id: 'gate-weakening-detector',
@@ -637,6 +646,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.claude/hooks/post-task-validate.test.mjs',
