@@ -265,6 +265,14 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     why: 'hero mounts the live UTM builder as the aha capture',
   },
   {
+    url: '/product/command-palette',
+    input: {
+      useCase: 'aha-capture',
+      captureId: 'shared-command-palette',
+    },
+    why: 'hero mounts the live command palette as the aha capture',
+  },
+  {
     url: '/product/release-scheduling',
     input: {
       useCase: 'aha-capture',
@@ -289,6 +297,11 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
       captureId: 'release-smart-link-analytics',
     },
     why: 'hero mounts the live smart-link analytics panel as the aha capture',
+  },
+  {
+    url: '/product/pre-save',
+    input: { useCase: 'aha-capture', captureId: 'pre-save-countdown' },
+    why: 'hero mounts the live countdown as the aha capture',
   },
   {
     url: '/card',
