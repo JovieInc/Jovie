@@ -275,6 +275,14 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     why: 'hero mounts the live ISRC field as the aha capture',
   },
   {
+    url: '/product/link-analytics',
+    input: {
+      useCase: 'aha-capture',
+      captureId: 'release-smart-link-analytics',
+    },
+    why: 'hero mounts the live smart-link analytics panel as the aha capture',
+  },
+  {
     url: '/card',
     input: { useCase: 'informational' },
     why: 'planned Card announcement uses text until an approved Wallet capture exists',
