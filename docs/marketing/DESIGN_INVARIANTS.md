@@ -328,23 +328,8 @@ another task supplies no design requirement or action authority here.
 
 ## MKT-D16 — No ICP-specific language on general pages
 
-- **Scope:** homepage, pricing, about, brand, and other general marketing
-  routes, including their metadata and the copy-system strings they render.
-  Dedicated audience routes are exempt. Editorial blog and engineering notes
-  follow the subject of the piece and are out of scope.
-- **Requirement:** general copy stays generic. Jovie is an identity product for
-  any creator. Do not target a customer segment on these surfaces: music,
-  artist, musician, DJ, producer, label, founder, investor, fan, author, and
-  creator-type niches. “Creator” is the generic word. The headline “Be found.
-  Be understood.” is locked.
+- **Scope:** homepage, pricing, about, brand, and other general marketing routes, including metadata and the copy-system strings they render. Dedicated audience routes are exempt. Editorial blog and engineering notes follow the subject of the piece and are out of scope.
+- **Requirement:** general copy stays generic. Jovie is an identity product for any creator. Do not target a customer segment on these surfaces: music, artist, musician, DJ, producer, label, founder, investor, fan, author, and creator-type niches. “Creator” is the generic word. The headline “Be found. Be understood.” is locked.
 - **Founder evidence/status:** requirement; Tim White, 2026-10-22 21:00 PT.
-- **Enforcement:** `scripts/invariants/icp-language/check.mjs` is a blocking PR
-  Ready guard. Terms and the audience allowlist live in
-  `scripts/invariants/icp-language/config.json`. Word boundaries ignore
-  identifiers such as `artist-profile`. Existing hits are a shrink-only
-  baseline. The count can only go down.
-- **Change/exception:** the audience allowlist in that config (for example
-  `solutions/[audience]`, artist-profile, artist-profiles, artist-notifications,
-  youtube-thumbnails, and the investor portal). Adding an exemption is a
-  config change with a reason, not a silent skip. MKT-D02 does not license new
-  ICP terms on general pages.
+- **Enforcement:** `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready guard. Terms and the audience allowlist live in `scripts/invariants/icp-language/config.json`. Word boundaries ignore identifiers such as `artist-profile`. Existing hits are a shrink-only baseline. The count can only go down.
+- **Change/exception:** the audience allowlist in that config (`solutions/[audience]`, artist-profile, artist-profiles, artist-notifications, youtube-thumbnails, and the investor portal). Adding an exemption is a config change with a reason, not a silent skip. MKT-D02 does not license new ICP terms on general pages.

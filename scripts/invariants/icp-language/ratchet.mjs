@@ -1,8 +1,4 @@
-/**
- * Shrink-only id ratchet. The recorded set must equal the live set, and
- * that set must stay a subset of the ancestor baseline once one exists.
- * New ids fail. Removing an id fails until the baseline file is lowered.
- */
+/** Shrink-only ids. New ids fail. Resolved ids fail until the file shrinks. */
 import { spawnSync } from 'node:child_process';
 
 export function diffIds(current, recorded) {
@@ -13,33 +9,28 @@ export function diffIds(current, recorded) {
     removed: recorded.filter(id => !live.has(id)),
   };
 }
-
+function listed(ids, sign) {
+  return ids.map(id => `  ${sign} ${id}`).join('\n');
+}
 export function evaluateRatchet({ current, recorded, ancestor }) {
-  /** @type {string[]} */
   const errors = [];
   const { added, removed } = diffIds(current, recorded);
   if (added.length > 0) {
     errors.push(
-      `baseline is missing ${added.length} live id(s); do not add ids:\n${added
-        .map(id => `  + ${id}`)
-        .join('\n')}`
+      `baseline is missing ${added.length} live id(s); do not add ids:\n${listed(added, '+')}`
     );
   }
   if (removed.length > 0) {
     errors.push(
-      `baseline can only shrink; delete ${removed.length} resolved id(s):\n${removed
-        .map(id => `  - ${id}`)
-        .join('\n')}`
+      `baseline can only shrink; delete ${removed.length} resolved id(s):\n${listed(removed, '-')}`
     );
   }
   if (ancestor) {
-    const ancestorSet = new Set(ancestor);
-    const grown = current.filter(id => !ancestorSet.has(id));
+    const known = new Set(ancestor);
+    const grown = current.filter(id => !known.has(id));
     if (grown.length > 0) {
       errors.push(
-        `new violations are not allowed (${grown.length}):\n${grown
-          .map(id => `  + ${id}`)
-          .join('\n')}`
+        `new violations are not allowed (${grown.length}):\n${listed(grown, '+')}`
       );
     }
   }
@@ -50,12 +41,10 @@ export function evaluateRatchet({ current, recorded, ancestor }) {
   }
   return errors;
 }
-
 export function ancestorJson(repoRoot, relPath) {
-  const rev = spawnSync('git', ['rev-parse', '--verify', 'origin/main'], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-  });
+  const git = (args, encoding) =>
+    spawnSync('git', args, { cwd: repoRoot, encoding });
+  const rev = git(['rev-parse', '--verify', 'origin/main'], 'utf8');
   if (rev.status !== 0) {
     return {
       ok: false,
@@ -64,14 +53,10 @@ export function ancestorJson(repoRoot, relPath) {
     };
   }
   const spec = `origin/main:${relPath}`;
-  const exists = spawnSync('git', ['cat-file', '-e', spec], { cwd: repoRoot });
-  if (exists.status !== 0) return { ok: true, ancestor: null };
-  const show = spawnSync('git', ['show', spec], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-  });
-  if (show.status !== 0) {
-    return { ok: false, error: `unable to read ${spec}` };
+  if (git(['cat-file', '-e', spec]).status !== 0) {
+    return { ok: true, ancestor: null };
   }
+  const show = git(['show', spec], 'utf8');
+  if (show.status !== 0) return { ok: false, error: `unable to read ${spec}` };
   return { ok: true, ancestor: JSON.parse(show.stdout) };
 }

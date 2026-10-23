@@ -1,12 +1,4 @@
-/**
- * Blocking ICP-language check for homepage and general pages.
- *
- *   node scripts/invariants/icp-language/check.mjs
- *   node scripts/invariants/icp-language/check.mjs --write-baseline
- *
- * The baseline count can only shrink. --write-baseline records the live set;
- * it does not authorize a higher count once origin/main has a baseline.
- */
+/** node scripts/invariants/icp-language/check.mjs [--write-baseline] */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,12 +15,10 @@ export function readBaseline(repoRoot = REPO_ROOT) {
   }
   return parsed;
 }
-
 export function checkIcpLanguage(repoRoot = REPO_ROOT, options = {}) {
   const config = options.config ?? loadConfig();
   const scanned = scanIcpLanguage(repoRoot, config);
   const current = scanned.ids;
-  /** @type {string[]} */
   const failures = [];
   let recorded = options.recorded;
   if (!recorded) {
@@ -50,15 +40,13 @@ export function checkIcpLanguage(repoRoot = REPO_ROOT, options = {}) {
   }
   const ancestor =
     options.ancestor ?? ancestorJson(repoRoot, BASELINE_RELATIVE);
-  if (!ancestor.ok) {
-    failures.push(ancestor.error);
-  } else {
-    const ancestorIds = ancestor.ancestor?.ids ?? null;
+  if (!ancestor.ok) failures.push(ancestor.error);
+  else {
     failures.push(
       ...evaluateRatchet({
         current,
         recorded: recorded.ids,
-        ancestor: ancestorIds,
+        ancestor: ancestor.ancestor?.ids ?? null,
       })
     );
   }
@@ -70,30 +58,23 @@ export function checkIcpLanguage(repoRoot = REPO_ROOT, options = {}) {
     files: scanned.files,
   };
 }
-
 function formatFailure(failure, samples) {
   return failure
     .split('\n')
     .map(line => {
-      const id = line.trim().replace(/^[+-]\s+/u, '');
-      const sample = samples?.get(id);
+      const sample = samples?.get(line.trim().replace(/^[+-]\s+/u, ''));
       return sample ? `${line}  ${sample}` : line;
     })
     .join('\n');
 }
-
 function writeBaseline(repoRoot, ids) {
   const body = {
     schema: 'jovie.icp-language-baseline/v1',
     count: ids.length,
     ids,
   };
-  writeFileSync(
-    join(repoRoot, BASELINE_RELATIVE),
-    `${JSON.stringify(body, null, 2)}\n`
-  );
+  writeFileSync(join(repoRoot, BASELINE_RELATIVE), `${JSON.stringify(body)}\n`);
 }
-
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const scanned = scanIcpLanguage();
   if (process.argv.includes('--write-baseline')) {

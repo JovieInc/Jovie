@@ -12,42 +12,22 @@ import { evaluateRatchet } from './ratchet.mjs';
 import { collectScanFiles, REPO_ROOT } from './scan.mjs';
 
 const config = loadConfig();
+const terms = (text, extra) =>
+  matchTerms(text, config.terms, extra ?? config.suppressedPrefixes);
 
 test('word boundaries match segment words and miss lookalikes', () => {
-  assert.deepEqual(matchTerms('for artists and musicians', config.terms), [
+  assert.deepEqual(terms('for artists and musicians'), ['artist', 'musician']);
+  assert.deepEqual(terms('artistic musical fancy founded authority'), []);
+  assert.deepEqual(terms('musicians'), ['musician']);
+  assert.deepEqual(terms('music'), ['music']);
+  assert.deepEqual(terms('DJ / Producer'), ['dj', 'producer']);
+  assert.deepEqual(terms('record label'), ['record label']);
+  assert.deepEqual(terms('on a label'), ['on a label']);
+  assert.deepEqual(terms('For labels and multi-artist teams'), [
     'artist',
-    'musician',
+    'labels',
   ]);
-  assert.deepEqual(
-    matchTerms('artistic musical fancy founded', config.terms),
-    []
-  );
-  assert.deepEqual(matchTerms('authority bandwidth', config.terms), []);
-  assert.deepEqual(matchTerms('musicians', config.terms), ['musician']);
-  assert.deepEqual(matchTerms('music', config.terms), ['music']);
-  assert.ok(!matchTerms('musicians', config.terms).includes('music'));
-  assert.deepEqual(matchTerms('DJ / Producer', config.terms), [
-    'dj',
-    'producer',
-  ]);
-  assert.deepEqual(matchTerms('record label', config.terms), ['record label']);
-  assert.deepEqual(matchTerms('on a label', config.terms), ['on a label']);
-  assert.deepEqual(
-    matchTerms(
-      'For labels and multi-artist teams',
-      config.terms,
-      config.suppressedPrefixes
-    ),
-    ['artist', 'labels']
-  );
-  assert.deepEqual(
-    matchTerms(
-      'access labels and nav labels',
-      config.terms,
-      config.suppressedPrefixes
-    ),
-    []
-  );
+  assert.deepEqual(terms('access labels and nav labels'), []);
 });
 
 test('identifiers and the locked headline are not violations', () => {
@@ -73,29 +53,29 @@ test('identifiers and the locked headline are not violations', () => {
 test('audience routes are exempt and general routes are scanned', () => {
   const audience = 'apps/web/app/(marketing)/solutions/artists/page.tsx';
   assert.equal(isExemptPath(audience, config), true);
-  const found = violationsInSource(
-    "export const line = 'Built for artists';",
-    audience,
-    config
+  assert.deepEqual(
+    violationsInSource(
+      "export const line = 'Built for artists';",
+      audience,
+      config
+    ).ids,
+    []
   );
-  assert.deepEqual(found.ids, []);
-
   const files = collectScanFiles(REPO_ROOT, config);
-  assert.ok(files.includes('apps/web/app/(home)/page.tsx'));
-  assert.ok(files.includes('apps/web/app/(marketing)/pricing/layout.tsx'));
-  assert.ok(files.includes('apps/web/data/companyIdentity.ts'));
-  assert.equal(
-    files.some(file => file.includes('/solutions/')),
-    false
-  );
-  assert.equal(
-    files.some(file => file.includes('/artist-profiles/')),
-    false
-  );
-  assert.equal(
-    files.some(file => file.includes('/blog/')),
-    false
-  );
+  for (const file of [
+    'apps/web/app/(home)/page.tsx',
+    'apps/web/app/(marketing)/pricing/layout.tsx',
+    'apps/web/data/companyIdentity.ts',
+  ]) {
+    assert.ok(files.includes(file), file);
+  }
+  for (const part of ['/solutions/', '/artist-profiles/', '/blog/']) {
+    assert.equal(
+      files.some(file => file.includes(part)),
+      false,
+      part
+    );
+  }
 });
 
 test('the baseline ratchet rejects new ids and refuses to grow', () => {
@@ -105,34 +85,23 @@ test('the baseline ratchet rejects new ids and refuses to grow', () => {
     ancestor: null,
   });
   assert.match(added.join('\n'), /do not add ids/);
-
   const removed = evaluateRatchet({
     current: [],
     recorded: ['artist:old.ts:abc'],
     ancestor: null,
   });
   assert.match(removed.join('\n'), /can only shrink/);
-
   const grown = evaluateRatchet({
     current: ['artist:new.ts:abc'],
     recorded: ['artist:new.ts:abc'],
     ancestor: ['artist:old.ts:def'],
   });
   assert.match(grown.join('\n'), /new violations are not allowed/);
-
   assert.deepEqual(
     evaluateRatchet({
       current: ['artist:old.ts:def'],
       recorded: ['artist:old.ts:def'],
       ancestor: ['artist:old.ts:def', 'fan:old.ts:fff'],
-    }),
-    []
-  );
-  assert.deepEqual(
-    evaluateRatchet({
-      current: ['artist:old.ts:def'],
-      recorded: ['artist:old.ts:def'],
-      ancestor: ['artist:old.ts:def'],
     }),
     []
   );
