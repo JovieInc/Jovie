@@ -22,14 +22,14 @@ for (const width of [390, 1440]) {
           `/iframe.html?id=dashboard-releases-shellreleaserow--${state}&viewMode=story`
         );
         const row = page
-          .getByRole('grid', { name: 'Releases' })
+          .getByRole('table', { name: 'Releases' })
           .getByRole('row');
         await expect(row).toBeVisible();
         await expect(row).toHaveAttribute(
           'aria-selected',
           String(state === 'selected')
         );
-        await expect(row.getByRole('gridcell')).toBeAttached();
+        await expect(row.getByRole('cell')).toBeAttached();
 
         const title = row.getByRole('button', {
           name: 'Lost in the Light',

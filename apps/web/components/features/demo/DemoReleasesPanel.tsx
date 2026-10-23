@@ -60,8 +60,6 @@ export function DemoReleasesPanel({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (flatIds.length === 0) return;
-      if (e.target !== e.currentTarget && (e.key === 'Enter' || e.key === ' '))
-        return;
 
       let nextIndex: number;
 
@@ -71,12 +69,6 @@ export function DemoReleasesPanel({
       } else if (e.key === 'ArrowUp' || e.key === 'k') {
         e.preventDefault();
         nextIndex = Math.max(focusIndex - 1, 0);
-      } else if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        if (focusIndex >= 0 && focusIndex < flatIds.length) {
-          onSelect(flatIds[focusIndex]);
-        }
-        return;
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onSelect('');
@@ -90,17 +82,18 @@ export function DemoReleasesPanel({
       const row = listRef.current?.querySelector(
         `[data-release-id="${flatIds[nextIndex]}"]`
       );
-      row?.scrollIntoView({ block: 'nearest' });
+      if (row instanceof HTMLElement) {
+        row.focus();
+        row.scrollIntoView({ block: 'nearest' });
+      }
     },
     [flatIds, focusIndex, onSelect]
   );
 
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Delegate existing list navigation from the release buttons.
     <section
       ref={listRef}
       className='h-full overflow-y-auto overflow-x-hidden outline-none scrollbar-hide'
-      onKeyDown={handleKeyDown}
       aria-label='Releases'
     >
       {groups.map(group => {
@@ -112,6 +105,7 @@ export function DemoReleasesPanel({
             <div className='sticky top-0 z-10 flex h-8 items-center gap-1 border-b border-(--app-shell-frame-seam) bg-surface-0 px-4'>
               <button
                 type='button'
+                onKeyDown={handleKeyDown}
                 onClick={() => toggleGroup(group.status)}
                 className='flex min-h-6 min-w-0 flex-1 items-center gap-2 text-xs text-tertiary-token [font-weight:var(--font-weight-medium)]'
                 aria-expanded={!isCollapsed}
@@ -135,6 +129,7 @@ export function DemoReleasesPanel({
               </button>
               <button
                 type='button'
+                onKeyDown={handleKeyDown}
                 className='flex size-6 items-center justify-center rounded-full text-tertiary-token'
                 aria-label={`Add ${STATUS_LABEL[group.status]} release`}
               >
@@ -152,6 +147,8 @@ export function DemoReleasesPanel({
                 return (
                   <button
                     type='button'
+                    onFocus={() => setFocusIndex(globalIndex)}
+                    onKeyDown={handleKeyDown}
                     key={release.id}
                     data-release-id={release.id}
                     aria-pressed={isSelected}

@@ -178,7 +178,7 @@ interface ReleasesListContentProps {
   readonly onSelect: (release: ReleaseViewModel) => void;
   readonly onClearFilters: () => void;
   /** Ref forwarded to the listbox element for keyboard-nav focus scoping. */
-  readonly listboxRef?: RefObject<HTMLDivElement | null>;
+  readonly listboxRef?: RefObject<HTMLTableElement | null>;
 }
 
 function ReleasesListContent({
@@ -305,12 +305,10 @@ function ReleasesListContent({
   }
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: The selectable grid contains independently operable row actions.
-    <div
+    <table
       ref={listboxRef}
-      role='grid'
       aria-label='Releases'
-      className='py-1.5 space-y-px px-2'
+      className='block w-full py-1.5 space-y-px px-2'
     >
       {visibleReleases.map(r => (
         <TableContextMenu
@@ -319,7 +317,7 @@ function ReleasesListContent({
         >
           {/* Plain wrapper: Radix ContextMenu.Trigger asChild needs a host
               element that accepts the injected ref/onContextMenu props. */}
-          <div data-shell-release-row-context-target>
+          <tbody className='block' data-shell-release-row-context-target>
             <ShellReleaseRow
               release={r}
               isSelected={r.id === selectedReleaseId}
@@ -330,10 +328,10 @@ function ReleasesListContent({
               }
               syncStatus={getSyncStatus(r.id)}
             />
-          </div>
+          </tbody>
         </TableContextMenu>
       ))}
-    </div>
+    </table>
   );
 }
 
@@ -570,7 +568,7 @@ export function ShellReleasesView({
   );
 
   /** Ref for the listbox container — used to scope J/K nav to the releases list. */
-  const listboxRef = useRef<HTMLDivElement>(null);
+  const listboxRef = useRef<HTMLTableElement>(null);
 
   useAmbientListSelection({
     enabled: visibleReleases.length > 0,

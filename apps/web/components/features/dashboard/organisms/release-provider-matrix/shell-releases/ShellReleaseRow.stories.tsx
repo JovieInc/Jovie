@@ -38,14 +38,14 @@ const meta = {
   },
   decorators: [
     Story => (
-      // biome-ignore lint/a11y/useSemanticElements: Mount the interactive grid row in its production grid context.
-      <div
-        role='grid'
+      <table
         aria-label='Releases'
-        className='w-full max-w-4xl bg-surface-0 p-3 text-primary-token'
+        className='block w-full max-w-4xl bg-surface-0 p-3 text-primary-token'
       >
-        <Story />
-      </div>
+        <tbody className='block'>
+          <Story />
+        </tbody>
+      </table>
     ),
   ],
   args: {

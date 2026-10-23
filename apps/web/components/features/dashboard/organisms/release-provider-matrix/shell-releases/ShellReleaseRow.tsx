@@ -27,7 +27,7 @@ import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   contextualAction,
-  ShellListRowFrame,
+  getShellListRowFrameClassName,
 } from '@/components/organisms/table';
 import { AgentPulse } from '@/components/shell/AgentPulse';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
@@ -293,7 +293,7 @@ const WeeklyStreamsCell = memo(function WeeklyStreamsCell({
  * + type badge + artists (+ inline sync status) + status + drop date +
  * DSP avatar stack + smart link + more menu.
  *
- * Each selectable grid row owns a cell containing independent controls.
+ * Each selectable table row owns a cell containing independent controls.
  * Inner actions stop propagation so they do not double-fire row selection.
  */
 export const ShellReleaseRow = memo(function ShellReleaseRow({
@@ -360,7 +360,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
     status: release.status,
   };
 
-  function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+  function handleKeyDown(e: KeyboardEvent<HTMLTableRowElement>) {
     if (e.target !== e.currentTarget) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -369,8 +369,9 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   }
 
   return (
-    <ShellListRowFrame
-      role='row'
+    <tr
+      data-shell-list-row='true'
+      data-selected={isSelected ? 'true' : undefined}
       aria-selected={isSelected}
       tabIndex={0}
       onClick={onSelect}
@@ -380,14 +381,15 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       data-shell-release-row
       data-release-id={release.id}
       data-release-active={isActiveTrack ? 'true' : undefined}
-      chrome='shell'
-      density='dense'
-      isSelected={isSelected}
-      interactive
-      className='group/row flex h-8 items-center gap-2 overflow-hidden px-3'
+      className={getShellListRowFrameClassName({
+        chrome: 'shell',
+        density: 'dense',
+        isSelected,
+        interactive: true,
+        className: 'group/row flex h-8 items-center gap-2 overflow-hidden px-3',
+      })}
     >
-      {/* biome-ignore lint/a11y/useSemanticElements: An interactive grid cell owns the row's independent controls. */}
-      <div role='gridcell' tabIndex={-1} className='contents'>
+      <td className='contents'>
         <ArtworkCell release={release} isSyncing={syncLabel !== null} />
 
         <div className='min-w-0 flex-1'>
@@ -477,7 +479,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
             </TableActionMenu>
           </div>
         ) : null}
-      </div>
-    </ShellListRowFrame>
+      </td>
+    </tr>
   );
 });

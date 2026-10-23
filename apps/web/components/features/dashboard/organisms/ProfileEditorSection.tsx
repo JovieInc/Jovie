@@ -29,7 +29,6 @@ interface ProfileIdentityFieldRowProps {
   readonly onEdit: () => void;
   readonly input: ReactNode;
   readonly tone?: 'primary' | 'secondary';
-  readonly controlsId: string;
   readonly className?: string;
 }
 
@@ -42,7 +41,6 @@ function ProfileIdentityFieldRow({
   onEdit,
   input,
   tone = 'secondary',
-  controlsId,
   className,
 }: Readonly<ProfileIdentityFieldRowProps>) {
   return (
@@ -56,7 +54,14 @@ function ProfileIdentityFieldRow({
         {label}
       </p>
       {editing ? (
-        input
+        <div
+          className={cn(
+            'flex items-center',
+            tone === 'primary' ? 'min-h-13' : 'min-h-11'
+          )}
+        >
+          {input}
+        </div>
       ) : (
         <button
           type='button'
@@ -67,9 +72,7 @@ function ProfileIdentityFieldRow({
               : 'min-h-11 text-app font-caption tracking-tight text-secondary-token'
           )}
           onClick={onEdit}
-          aria-label={ariaLabel}
-          aria-pressed={editing}
-          aria-controls={controlsId}
+          aria-label={`${ariaLabel}: ${value || emptyLabel}`}
         >
           {value || emptyLabel}
         </button>
@@ -192,7 +195,6 @@ export function ProfileEditorSection({
             emptyLabel='Add display name'
             ariaLabel='Edit display name'
             onEdit={() => setEditingField('displayName')}
-            controlsId='profile-display-name'
             tone='primary'
             input={
               <Input
@@ -204,7 +206,7 @@ export function ProfileEditorSection({
                 onChange={e => onDisplayNameChange(e.target.value)}
                 onKeyDown={e => onInputKeyDown(e, 'displayName')}
                 onBlur={onInputBlur}
-                className='min-h-12 rounded-md border-default bg-surface-0 text-center text-mid font-semibold tracking-tighter text-primary-token'
+                size='lg'
               />
             }
           />
@@ -215,7 +217,6 @@ export function ProfileEditorSection({
             emptyLabel='Add username'
             ariaLabel='Edit username'
             onEdit={() => setEditingField('username')}
-            controlsId='profile-username'
             input={
               <Input
                 ref={usernameInputRef as React.RefObject<HTMLInputElement>}
@@ -228,7 +229,7 @@ export function ProfileEditorSection({
                 onChange={e => onUsernameChange(e.target.value)}
                 onKeyDown={e => onInputKeyDown(e, 'username')}
                 onBlur={onInputBlur}
-                className='min-h-11 rounded-md border-default bg-surface-0 text-center text-app font-caption tracking-tight text-primary-token'
+                size='lg'
               />
             }
           />
