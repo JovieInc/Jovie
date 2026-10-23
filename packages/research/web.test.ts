@@ -1,13 +1,17 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { main, UsageError } from './cli.ts';
 import { renderResult } from './report.ts';
 import {
   clip,
+  cloudflareFetch,
   exaSearch,
   firecrawlSearch,
   hyperagentDeep,
   parseDeepAnswer,
+  perplexityAnswer,
 } from './sources-web.ts';
 import {
   client,
@@ -32,6 +36,7 @@ describe('search adapters go through the api-client contract', () => {
       },
     }));
     const out = await exaSearch(client('exa', f.impl), 'q', 'week', 5);
+    expect(f.calls[0].url).toBe('https://api.exa.ai/search');
     expect(out.usd).toBe(0.007);
     expect(out.hits[0]).toMatchObject({
       source: 'exa',
@@ -64,6 +69,7 @@ describe('search adapters go through the api-client contract', () => {
       'q',
       'month'
     );
+    expect(f.calls[0].url).toBe('https://api.firecrawl.dev/v1/search');
     expect(out.hits[0].snippet).toBe('x d');
     expect((f.calls[0].body as { tbs?: string }).tbs).toBe('qdr:m');
     const bad = fakeFetch(() => ({
@@ -119,6 +125,9 @@ describe('search adapters go through the api-client contract', () => {
     );
     expect(out).toMatchObject({ threadId: 'T1', answer: 'A [1]' });
     expect(out.hits[0].url).toBe('https://s');
+    expect(new Set(f.calls.map(call => call.url))).toEqual(
+      new Set(['https://hyperagent.com/api/mcp'])
+    );
     expect(
       f.calls.filter(
         c =>
@@ -127,6 +136,52 @@ describe('search adapters go through the api-client contract', () => {
       )
     ).toHaveLength(1);
     expect(f.calls[2].headers.get('mcp-session-id')).toBe('S');
+  });
+
+  it('cloudflare and perplexity call the registered endpoints', async () => {
+    const previous = process.env.CLOUDFLARE_ACCOUNT_ID;
+    process.env.CLOUDFLARE_ACCOUNT_ID = 'acct';
+    try {
+      const cloudflare = fakeFetch(() => ({
+        body: { result: 'title: T\n\nbody' },
+      }));
+      const fetched = await cloudflareFetch(
+        client('cloudflare', cloudflare.impl),
+        'https://page.example'
+      );
+      expect(cloudflare.calls[0].url).toBe(
+        'https://api.cloudflare.com/client/v4/accounts/acct/browser-rendering/markdown'
+      );
+      expect(fetched.hits[0].url).toBe('https://page.example');
+      const perplexity = fakeFetch(() => ({
+        body: {
+          choices: [{ message: { content: 'answer' } }],
+          search_results: [],
+          usage: { cost: { total_cost: 0 } },
+        },
+      }));
+      const answered = await perplexityAnswer(
+        client('perplexity', perplexity.impl),
+        'q'
+      );
+      expect(perplexity.calls[0].url).toBe(
+        'https://api.perplexity.ai/chat/completions'
+      );
+      expect(answered.answer).toBe('answer');
+    } finally {
+      if (previous === undefined) delete process.env.CLOUDFLARE_ACCOUNT_ID;
+      else process.env.CLOUDFLARE_ACCOUNT_ID = previous;
+    }
+  });
+
+  it('keeps provider host literals out of the adapter source', () => {
+    const source = readFileSync(
+      new URL('./sources-web.ts', import.meta.url),
+      'utf8'
+    );
+    expect(source).not.toMatch(
+      /api\.exa\.ai|api\.firecrawl\.dev|api\.perplexity\.ai|api\.cloudflare\.com|hyperagent\.com/
+    );
   });
 
   it('parses non-JSON deep answers by harvesting urls', () => {

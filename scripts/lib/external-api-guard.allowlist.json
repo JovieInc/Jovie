@@ -24,12 +24,6 @@
       "rule": "provider-host",
       "max": 2,
       "reason": "Research router source: the literal is the url passed to @jovie/api-client ApiClient.request, so the call is budgeted."
-    },
-    {
-      "path": "packages/research/sources-web.ts",
-      "rule": "provider-host",
-      "max": 5,
-      "reason": "Research router source: the literal is the url passed to @jovie/api-client ApiClient.request, so the call is budgeted."
     }
   ]
 }

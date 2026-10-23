@@ -9,7 +9,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import type { ApiClient } from '@jovie/api-client';
+import { type ApiClient, callableSpec } from '@jovie/api-client';
 
 import { cloudflareAccount } from './credentials.ts';
 import { parseMcpBody } from './mcp-wire.ts';
@@ -25,6 +25,17 @@ export interface SourceOutput {
 }
 
 const READ = { write: false, idempotent: true } as const;
+
+/**
+ * Hosts stay in packages/api-client/providers.json. A literal host in this
+ * file is a direct call to the external-api guard, and growing its allowlist
+ * fails the shrink-only gate.
+ */
+function providerUrl(provider: string, path: string): string {
+  const host = callableSpec(provider).hosts[0];
+  if (!host) throw new Error(`${provider} has no registered host`);
+  return `https://${host}${path}`;
+}
 
 const DAYS: Record<Freshness, number | null> = {
   live: 1,
@@ -70,7 +81,7 @@ export async function exaSearch(
 ): Promise<SourceOutput> {
   const since = sinceIso(freshness);
   const response = await client.request({
-    url: 'https://api.exa.ai/search',
+    url: providerUrl('exa', '/search'),
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: {
@@ -116,7 +127,7 @@ export async function firecrawlSearch(
 ): Promise<SourceOutput> {
   const tbs = TBS[freshness];
   const response = await client.request({
-    url: 'https://api.firecrawl.dev/v1/search',
+    url: providerUrl('firecrawl', '/v1/search'),
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: { query, limit, ...(tbs ? { tbs } : {}) },
@@ -148,7 +159,10 @@ export async function cloudflareFetch(
 ): Promise<SourceOutput> {
   const account = await cloudflareAccount(client);
   const response = await client.request({
-    url: `https://api.cloudflare.com/client/v4/accounts/${account}/browser-rendering/markdown`,
+    url: providerUrl(
+      'cloudflare',
+      `/client/v4/accounts/${account}/browser-rendering/markdown`
+    ),
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: { url },
@@ -180,7 +194,7 @@ export async function perplexityAnswer(
   query: string
 ): Promise<SourceOutput> {
   const response = await client.request({
-    url: 'https://api.perplexity.ai/chat/completions',
+    url: providerUrl('perplexity', '/chat/completions'),
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: { model: 'sonar', messages: [{ role: 'user', content: query }] },
@@ -214,7 +228,7 @@ export async function perplexityAnswer(
 
 // ---- Hyperagent deep research thread (credits, tier 1, deep mode) ---------
 
-const HYPERAGENT_MCP = 'https://hyperagent.com/api/mcp';
+const HYPERAGENT_MCP = providerUrl('hyperagent', '/api/mcp');
 
 async function mcpSession(client: ApiClient): Promise<Record<string, string>> {
   const base = {
