@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 export const POLICY = 'scripts/invariants/copy-leak/';
 export const config = JSON.parse(
-  readFileSync(new URL('config.json', import.meta.url))
+  readFileSync(new URL('config.json', import.meta.url), 'utf8')
 );
 if (
   [
