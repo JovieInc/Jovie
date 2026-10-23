@@ -149,9 +149,16 @@ export function PreviewPanelProvider({
       setIsOpen(true);
       return;
     }
-    setIsOpen(false);
     setPreviewData(null);
-  }, [scope]);
+    // A default-open surface (profile settings) must come back open on a
+    // large screen. Closing first and waiting for a later effect lets the
+    // page opener's close() win the round trip.
+    if (defaultOpen && isLargeScreen) {
+      setIsOpen(true);
+      return;
+    }
+    setIsOpen(false);
+  }, [defaultOpen, isLargeScreen, scope]);
 
   // Open panel after mount on large screens when defaultOpen is requested.
   // Also close when switching to a small screen.
