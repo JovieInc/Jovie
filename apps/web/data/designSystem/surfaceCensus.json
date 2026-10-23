@@ -293,7 +293,10 @@
         "apps/web/app/(marketing)/pay/page.tsx",
         "apps/web/app/(marketing)/product/dsp-links/page.tsx",
         "apps/web/app/(marketing)/product/isrc/page.tsx",
+        "apps/web/app/(marketing)/product/link-analytics/page.tsx",
         "apps/web/app/(marketing)/product/page.tsx",
+        "apps/web/app/(marketing)/product/pre-save/page.tsx",
+        "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
         "apps/web/app/(marketing)/product/utm-links/page.tsx",
         "apps/web/app/(marketing)/smart-links/page.tsx",
         "apps/web/app/(marketing)/solutions/[audience]/page.tsx",
@@ -649,6 +652,27 @@
       "to": "holdout",
       "at": "2026-10-23T11:10:00Z",
       "evidence": "PR #22789 introduces the /product/dsp-links marketing page; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/link-analytics/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T13:20:00Z",
+      "evidence": "Source registration for the link analytics product page. Not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T16:05:01Z",
+      "evidence": "PR #22801 re-registers the release scheduling product page after merging main. Original branch observation: 2026-10-23T12:00:00Z. Source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/pre-save/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T17:06:39Z",
+      "evidence": "PR #22823 re-registers the pre-save product page after merging main. Original branch observation: 2026-10-23T14:00:00Z. Source registration only, not rendered certification."
     }
   ]
 }

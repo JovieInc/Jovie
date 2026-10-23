@@ -934,6 +934,37 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/product/link-analytics/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/link-analytics/LinkAnalyticsLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'Link analytics ships on /product/link-analytics',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live smart-link analytics panel. Each click is counted, with the provider that received it and the time of the last click. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/link-analytics',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/link-analytics/LinkAnalyticsPanel.tsx',
+      testId: 'release-smart-link-analytics',
+    },
+    healthCheck: {
+      path: '/product/link-analytics',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
     glob: '(marketing)/product/utm-links/page.tsx',
     recipeId: 'feature',
     renderedSections: [
@@ -960,6 +991,37 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
     healthCheck: {
       path: '/product/utm-links',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/release-scheduling/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/release-scheduling/ReleaseSchedulingLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source:
+        'Release date and reveal date fields ship on /product/release-scheduling',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live release date and reveal date fields. A future release date is stored as scheduled. A blank reveal date keeps the page off the public profile until release day. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/release-scheduling',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/components/molecules/DatePicker.tsx',
+      testId: 'release-schedule-fields',
+    },
+    healthCheck: {
+      path: '/product/release-scheduling',
       expected: 'page',
       waitFor: '[data-testid="marketing-section-hero"]',
     },
@@ -1021,6 +1083,37 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
     healthCheck: {
       path: '/product/isrc',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
+    glob: '(marketing)/product/pre-save/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/pre-save/PreSaveLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'Pre-save countdown ship on /product/pre-save',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live countdown for a dated release. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/pre-save',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath:
+        'apps/web/components/features/release/ReleaseCountdown.tsx',
+      testId: 'pre-save-countdown',
+    },
+    healthCheck: {
+      path: '/product/pre-save',
       expected: 'page',
       waitFor: '[data-testid="marketing-section-hero"]',
     },
