@@ -1,6 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  NIGHT_DJ_HARMONY_V1_ENABLED,
+  isNightDjHarmonyEnabled,
+} from '@/lib/marketing/night-dj-harmony';
 import { cn } from '@/lib/utils';
 import type { AmbientFieldHandle } from './ambient-field-gl';
 import './MarketingAmbientField.css';
@@ -38,8 +42,10 @@ interface NavigatorHints {
  * keeps the SSR poster, which is the same composition held still.
  */
 export function shouldRunAmbientField(
-  win: Window = globalThis.window
+  win: Window = globalThis.window,
+  enabled: boolean = NIGHT_DJ_HARMONY_V1_ENABLED
 ): boolean {
+  if (!enabled) return false;
   if (win.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
   const nav = win.navigator as Navigator & NavigatorHints;
   if (nav.connection?.saveData) return false;
@@ -79,7 +85,10 @@ export function MarketingAmbientField({
   useEffect(() => {
     const root = rootRef.current;
     const canvas = canvasRef.current;
-    if (!root || !canvas || !shouldRunAmbientField()) return;
+    const harmony = isNightDjHarmonyEnabled();
+    if (!root || !canvas || !shouldRunAmbientField(globalThis.window, harmony)) {
+      return;
+    }
 
     let handle: AmbientFieldHandle | null = null;
     let cancelled = false;
@@ -143,7 +152,9 @@ export function MarketingAmbientField({
       data-live={live ? 'true' : 'false'}
       data-testid='marketing-ambient-field'
     >
-      <canvas ref={canvasRef} className='marketing-ambient-field__canvas' />
+      {isNightDjHarmonyEnabled() ? (
+        <canvas ref={canvasRef} className='marketing-ambient-field__canvas' />
+      ) : null}
     </div>
   );
 }

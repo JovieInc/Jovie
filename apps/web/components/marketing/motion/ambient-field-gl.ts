@@ -3,6 +3,8 @@
  * chunk after the page is idle; the SSR poster carries the look until then
  * and on every device this declines to run on.
  *
+ * NIGHT_DJ_HARMONY_V1: the island mounts this module only while that flag is on.
+ *
  * One accent, one focal bloom, slow low-frequency drift. Renders at half
  * resolution (the field is soft by design), capped at 30fps, and stops
  * scheduling frames while offscreen or in a hidden tab.
