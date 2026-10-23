@@ -24,10 +24,12 @@ describe('DemoSettingsPanel', () => {
     render(<DemoSettingsPanel />);
 
     // Platform names ride the neutral text token — status is carried by the
-    // quiet dot plus the Reconnect/Connect label, never a brand hex.
+    // quiet dot plus the Reconnect/Connect label, never a brand hex. The
+    // element-level assertion bans ANY inline style (stronger than a color
+    // check and null-safe when the attribute is absent).
     for (const name of PLATFORM_NAMES) {
       const node = screen.getByText(name);
-      expect(node.getAttribute('style')).not.toContain('color');
+      expect(node).not.toHaveAttribute('style');
       expect(node.className).toContain('text-primary-token');
     }
   });
