@@ -299,7 +299,7 @@ function SidebarHeaderNav({
   const isDesktop = useIsElectronRuntime();
   const { state, isMobile, open: pinned } = useSidebar();
   const chromeHidden = state === 'closed' && !isMobile;
-  const { inboxNavigation } = useDashboardData();
+  const { inboxNavigation, selectedProfile } = useDashboardData();
 
   return (
     <div className='flex w-full items-center' data-sidebar-brand-row='true'>
@@ -350,7 +350,7 @@ function SidebarHeaderNav({
                     SHELL_RAIL_LABEL
                   )}
                 >
-                  Demo
+                  {selectedProfile?.displayName ?? 'Demo'}
                 </span>
               </div>
             );

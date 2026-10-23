@@ -63,7 +63,7 @@ export function ArtistNotificationFloatingCardView({
     return (
       <div
         className={cn(
-          'rounded-[1.1rem] bg-white/[0.028] p-3.5 shadow-[0_18px_40px_rgba(0,0,0,0.26)]',
+          'rounded-xl bg-white/[0.028] p-3.5 shadow-[0_18px_40px_rgba(0,0,0,0.26)]',
           className
         )}
       >
@@ -86,7 +86,7 @@ export function ArtistNotificationFloatingCardView({
   return (
     <article
       className={cn(
-        'rounded-[1.1rem] bg-white/[0.028] p-3.5 shadow-[0_18px_40px_rgba(0,0,0,0.26)]',
+        'rounded-xl bg-white/[0.028] p-3.5 shadow-[0_18px_40px_rgba(0,0,0,0.26)]',
         className
       )}
     >
@@ -221,8 +221,8 @@ export function ArtistProfileReactivationVisual({
 }>) {
   return (
     <div className={cn('mx-auto max-w-[27rem]', className)}>
-      <div className='rounded-[1.5rem] bg-white/[0.02] p-2.5 shadow-[0_24px_64px_rgba(0,0,0,0.22)]'>
-        <div className='rounded-[1.25rem] bg-(--color-bg-base) px-4 py-4'>
+      <div className='rounded-3xl bg-white/[0.02] p-2.5 shadow-[0_24px_64px_rgba(0,0,0,0.22)]'>
+        <div className='rounded-2xl bg-(--color-bg-base) px-4 py-4'>
           <div className='flex items-start gap-3'>
             <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black dark:bg-white dark:text-black'>
               <BellRing className='h-4 w-4' strokeWidth={1.9} />
@@ -248,7 +248,7 @@ export function ArtistProfileReactivationVisual({
           {reactivation.workflow.rows.map(row => (
             <article
               key={row.id}
-              className='rounded-[1.35rem] bg-white/[0.024] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+              className='rounded-3xl bg-white/[0.024] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
             >
               <div className='flex flex-wrap items-center gap-2.5'>
                 <WorkflowBeat value={row.trigger} />
@@ -282,7 +282,7 @@ export function ArtistProfileReactivationVisual({
               return (
                 <article
                   key={output.id}
-                  className='rounded-[1.25rem] bg-white/[0.028] p-4'
+                  className='rounded-2xl bg-white/[0.028] p-4'
                 >
                   <div className='flex items-center justify-between gap-3'>
                     <Icon

@@ -1682,7 +1682,7 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 :where(.system-b-pricing-page .marketing-pricing-plan-card) {
   min-height: calc(var(--space-20) + var(--space-16));
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-xl);
   background: var(--system-b-bg-surface-0);
   box-shadow: none;
   padding: var(--space-6);

@@ -228,6 +228,16 @@ function renderUnifiedSidebar({
 }
 
 describe('UnifiedSidebar library route', () => {
+  it('shows the seeded creator name in demo workspace chrome', () => {
+    renderUnifiedSidebar({ pathname: '/demo', section: 'dashboard' });
+    const brand = document.querySelector('[data-sidebar-brand-row]');
+    expect(brand).toHaveTextContent('Tim White');
+    expect(brand).not.toHaveTextContent('Demo');
+    expect(
+      screen.getByRole('button', { name: 'Search Sidebar' })
+    ).toBeVisible();
+  });
+
   it('keeps the route back link available without idle prefetch', () => {
     renderUnifiedSidebar({ overrideContent: <span>Releases</span> });
     const link = screen.getByRole('link', { name: 'Back to App' });

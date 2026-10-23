@@ -333,3 +333,27 @@ another task supplies no design requirement or action authority here.
 - **Founder evidence/status:** requirement; Tim White, 2026-10-22 21:00 PT.
 - **Enforcement:** `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready guard. Terms and the audience allowlist live in `scripts/invariants/icp-language/config.json`. Word boundaries ignore identifiers such as `artist-profile`. Existing hits are a shrink-only baseline. The count can only go down.
 - **Change/exception:** the audience allowlist in that config (`solutions/[audience]`, artist-profile, artist-profiles, artist-notifications, youtube-thumbnails, and the investor portal). Adding an exemption is a config change with a reason, not a silent skip. MKT-D02 does not license new ICP terms on general pages.
+
+## MKT-D17 — Marketing images and cards are rounded
+
+- **Scope:** homepage, pricing, solutions, about, changelog, and shared
+  marketing images, cards, carousels, logo strips, mockups, and hero cards
+  (`next/image`, `img`, video posters, real `background-image` urls, cards).
+- **Requirement:** a radius token on every subject. Canonical corner:
+  `.marketing-rounded-frame` → `--system-b-radius-panel` (`--radius-3xl`),
+  the hero's settled wide cinematic card. Other non-zero steps (`rounded-*`,
+  `var(--radius-*)`) are allowed. A raw length fails. An image may inherit a
+  clipping ancestor. A card needs its own radius.
+- **Exemptions:** full-bleed hero at its 100vh start
+  (`.homepage-editorial-hero`, `.marketing-editorial-hero-photo`,
+  `.marketing-hero-photo`, `.marketing-hero-dock`,
+  `.marketing-route-hero__media`), which rounds as it zooms out; logos,
+  icons, SVG marks, and the iPhone bezel; already-round avatars; film-grain
+  data URIs. Docked header chrome is not a card.
+- **Founder evidence/status:** Tim, 2026-10-22 9:08 PM PT. Ship enabled.
+  No feature flag.
+- **Enforcement:** `scripts/invariants/art-direction/rounded.mjs`.
+  PR Ready guard `marketing-rounded-media` requires zero violations with no
+  baseline or recorded exceptions. FS-009 checks new lines; parent clipping
+  stays on the full-source check.
+- **Change/exception:** do not weaken the check. Fix the corner.

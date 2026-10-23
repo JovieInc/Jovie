@@ -92,7 +92,7 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
 
   it('reopens a default-open profile surface after a scope round trip', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({
-      matches: query.includes('768'),
+      matches: query.includes('1024'),
       media: query,
       addEventListener: () => undefined,
       removeEventListener: () => undefined,
@@ -128,7 +128,7 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
 
   it('keeps the profile rail open when the page opener remounts on the way back', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({
-      matches: query.includes('768') || query.includes('1024'),
+      matches: query.includes('1024'),
       media: query,
       addEventListener: () => undefined,
       removeEventListener: () => undefined,
@@ -263,7 +263,7 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
     }
 
     vi.stubGlobal('matchMedia', (query: string) => ({
-      matches: query.includes('768'),
+      matches: query.includes('1024'),
       media: query,
       addEventListener: () => undefined,
       removeEventListener: () => undefined,
