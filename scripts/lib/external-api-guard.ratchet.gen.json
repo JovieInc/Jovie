@@ -129,9 +129,6 @@
     ".github/workflows/deprecation-intake.yml": {
       "gh-shell": 4
     },
-    ".github/workflows/design-gate.yml": {
-      "gh-shell": 2
-    },
     ".github/workflows/design-governance.yml": {
       "gh-shell": 4
     },
