@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   checkRounded,
   classifyRadiusValue,
-  evaluateRatchet,
   isRawArbitraryRadius,
   isRoundedClass,
   scanSources,
@@ -65,30 +67,41 @@ describe('marketing rounded media', () => {
     );
   });
 
-  it('keeps the baseline shrink-only', () => {
-    const recorded = ['a', 'b'];
-    const run = (current, ancestor, recordedCount) =>
-      evaluateRatchet({
-        current,
-        recorded,
-        ancestor,
-        recordedCount,
-      }).join('\n');
-    assert.equal(run(recorded, recorded, 2), '');
-    assert.match(run([...recorded, 'c'], null, 2), /missing 1 live id/);
-    assert.match(run(['a'], null, 2), /delete 1 resolved id/);
-    assert.match(run(recorded, null, 1), /count 1 must equal/);
-    const grown = evaluateRatchet({
-      current: ['c'],
-      recorded: ['c'],
-      ancestor: [],
-      recordedCount: 1,
-    }).join('\n');
-    assert.match(grown, /new violations are not allowed/);
-    assert.match(grown, /can only go down \(0 -> 1\)/);
+  it('rejects violations even when a baseline records them as allowed', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rounded-media-'));
+    try {
+      const directory = join(root, 'apps/web/components/marketing');
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(
+        join(directory, 'Fixture.tsx'),
+        '<article className="square-card"><img alt="Artist" /></article>'
+      );
+      const first = await checkRounded(root);
+      assert.equal(first.count, 2);
+      assert.equal(first.failures.length, 1);
+      for (const id of first.ids) assert.ok(first.failures[0].includes(id));
+
+      const baseline = join(root, 'scripts/invariants/art-direction');
+      mkdirSync(baseline, { recursive: true });
+      writeFileSync(
+        join(baseline, 'rounded.baseline.json'),
+        JSON.stringify({ count: first.count, ids: first.ids })
+      );
+      assert.deepEqual(await checkRounded(root), first);
+
+      writeFileSync(
+        join(directory, 'Fixture.tsx'),
+        '<article className="marketing-rounded-frame"><img alt="Artist" /></article>'
+      );
+      const fixed = await checkRounded(root);
+      assert.equal(fixed.count, 0);
+      assert.deepEqual(fixed.failures, []);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
-  it('matches the committed baseline', async () => {
+  it('has zero violations in the repository', async () => {
     const { failures, count } = await checkRounded();
     assert.deepEqual(failures, [], failures.join('\n'));
     assert.equal(count, 0);

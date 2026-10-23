@@ -1,13 +1,10 @@
 /** Marketing images and cards use a radius token. See MKT-D17. */
-import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 export const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-export const ROUNDED_BASELINE =
-  'scripts/invariants/art-direction/rounded.baseline.json';
 export const FRAME_CLASS = 'marketing-rounded-frame';
 const ROOTS = [
   'apps/web/app/(marketing)',
@@ -404,83 +401,16 @@ export function scanMarketing(repoRoot = REPO_ROOT) {
     }))
   );
 }
-function list(mark, rows) {
-  return rows.map(id => `  ${mark} ${id}`).join('\n');
-}
-export function evaluateRatchet({
-  current,
-  recorded,
-  ancestor,
-  recordedCount,
-}) {
-  const errors = [];
-  const known = new Set(recorded);
-  const added = current.filter(id => !known.has(id));
-  const removed = recorded.filter(id => !current.includes(id));
-  if (added.length > 0) {
-    errors.push(
-      `baseline is missing ${added.length} live id(s); do not add ids:\n${list('+', added)}`
-    );
-  }
-  if (removed.length > 0) {
-    errors.push(
-      `baseline can only shrink; delete ${removed.length} resolved id(s):\n${list('-', removed)}`
-    );
-  }
-  if (recordedCount !== undefined && recordedCount !== recorded.length) {
-    errors.push(
-      `baseline count ${recordedCount} must equal the id list (${recorded.length})`
-    );
-  }
-  if (ancestor) {
-    const knownAncestor = new Set(ancestor);
-    const grown = current.filter(id => !knownAncestor.has(id));
-    if (grown.length > 0) {
-      errors.push(
-        `new violations are not allowed (${grown.length}):\n${list('+', grown)}`
-      );
-    }
-    if (current.length > ancestor.length) {
-      errors.push(
-        `baseline count can only go down (${ancestor.length} -> ${current.length})`
-      );
-    }
-  }
-  return errors;
-}
-export function ancestorIds(repoRoot, relPath) {
-  const git = (args, encoding) =>
-    spawnSync('git', args, { cwd: repoRoot, encoding });
-  if (git(['rev-parse', '--verify', 'origin/main']).status !== 0) {
-    return {
-      ok: false,
-      error:
-        'origin/main is not available; the ratchet cannot prove it only shrinks',
-    };
-  }
-  const spec = `origin/main:${relPath}`;
-  if (git(['cat-file', '-e', spec]).status !== 0) {
-    return { ok: true, ancestor: null };
-  }
-  const show = git(['show', spec], 'utf8');
-  return show.status === 0
-    ? { ok: true, ancestor: JSON.parse(show.stdout).ids ?? [] }
-    : { ok: false, error: `unable to read ${spec}` };
-}
 export async function checkRounded(repoRoot = REPO_ROOT) {
   const { ids } = scanMarketing(repoRoot);
-  const recordedFile = JSON.parse(
-    readFileSync(join(repoRoot, ROUNDED_BASELINE), 'utf8')
-  );
-  const ancestor = ancestorIds(repoRoot, ROUNDED_BASELINE);
-  const failures = ancestor.ok
-    ? evaluateRatchet({
-        current: ids,
-        recorded: recordedFile.ids ?? [],
-        ancestor: ancestor.ancestor,
-        recordedCount: recordedFile.count,
-      })
-    : [ancestor.error ?? 'ancestor unreadable'];
+  const failures =
+    ids.length === 0
+      ? []
+      : [
+          `marketing media must have zero radius violations (${ids.length}):\n${ids
+            .map(id => `  + ${id}`)
+            .join('\n')}`,
+        ];
   return { failures, ids, count: ids.length };
 }
 export const check = checkRounded;

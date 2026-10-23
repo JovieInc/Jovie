@@ -353,8 +353,7 @@ another task supplies no design requirement or action authority here.
 - **Founder evidence/status:** Tim, 2026-10-22 9:08 PM PT. Ship enabled.
   No feature flag.
 - **Enforcement:** `scripts/invariants/art-direction/rounded.mjs`.
-  `rounded.baseline.json` is shrink-only (count 0). PR Ready guard
-  `marketing-rounded-media`. FS-009 checks new lines; parent clipping stays
-  on the ratchet.
-- **Change/exception:** do not weaken the check. Fix the corner, or shrink
-  the baseline only by deleting resolved ids.
+  PR Ready guard `marketing-rounded-media` requires zero violations with no
+  baseline or recorded exceptions. FS-009 checks new lines; parent clipping
+  stays on the full-source check.
+- **Change/exception:** do not weaken the check. Fix the corner.

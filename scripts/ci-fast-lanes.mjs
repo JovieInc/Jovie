@@ -221,7 +221,7 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
-    // Marketing images and cards use a radius token. Shrink-only baseline.
+    // Marketing images and cards use a radius token. Zero exceptions.
     id: 'marketing-rounded-media',
     command: 'node --test scripts/invariants/art-direction/rounded.test.mjs',
     inputs:
