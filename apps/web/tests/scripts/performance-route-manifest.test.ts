@@ -190,30 +190,33 @@ describe('performance route manifest shell slice coverage', () => {
     });
   });
 
-  it.each(
-    CREATOR_SHELL_SLICE_ROUTES
-  )('defines $id with route, readiness, and budget coverage', expectation => {
-    const route = requireRoute(expectation.id);
+  it.each(CREATOR_SHELL_SLICE_ROUTES)(
+    'defines $id with route, readiness, and budget coverage',
+    expectation => {
+      const route = requireRoute(expectation.id);
 
-    expect(route.group).toBe('creator-shell');
-    expect(route.surface).toBe('creator-app');
-    expect(route.path).toBe(expectation.path);
-    expect(route.requiresAuth).toBe(true);
-    expect(route.seedProfile).toBe('active-user');
-    expect(route.measureMode).toBe(expectation.measureMode);
-    expect(route.warmupStrategy).toBe(expectation.warmupStrategy);
-    expect(route.readySelectors.content?.length ?? 0).toBeGreaterThan(0);
-    expect(getPrimaryTimingMetricName(route)).toBe(expectation.primaryMetric);
-    expectBudgetCoverage(route);
+      expect(route.group).toBe('creator-shell');
+      expect(route.surface).toBe('creator-app');
+      expect(route.path).toBe(expectation.path);
+      expect(route.requiresAuth).toBe(true);
+      expect(route.seedProfile).toBe('active-user');
+      expect(route.measureMode).toBe(expectation.measureMode);
+      expect(route.warmupStrategy).toBe(expectation.warmupStrategy);
+      expect(route.readySelectors.content?.length ?? 0).toBeGreaterThan(0);
+      expect(getPrimaryTimingMetricName(route)).toBe(expectation.primaryMetric);
+      expectBudgetCoverage(route);
 
-    if ('navTrigger' in expectation) {
-      expect(route.readySelectors.navTrigger).toContain(expectation.navTrigger);
+      if ('navTrigger' in expectation) {
+        expect(route.readySelectors.navTrigger).toContain(
+          expectation.navTrigger
+        );
+      }
+
+      if ('resolvesDynamicPath' in expectation) {
+        expect(route.resolvePath).toEqual(expect.any(Function));
+      }
     }
-
-    if ('resolvesDynamicPath' in expectation) {
-      expect(route.resolvePath).toEqual(expect.any(Function));
-    }
-  });
+  );
 
   it('keeps Slice 0 shell routes on the same resource budgets as releases', () => {
     const releases = requireRoute('creator-releases');
@@ -225,38 +228,40 @@ describe('performance route manifest shell slice coverage', () => {
     }
   });
 
-  it.each(
-    CANONICAL_SHELL_PERF_PAIRS
-  )('measures $itemId with both cold-load and warm-navigation routes', expectation => {
-    const coldRoute = requireRoute(expectation.coldRouteId);
-    const warmRoute = requireRoute(expectation.warmRouteId);
+  it.each(CANONICAL_SHELL_PERF_PAIRS)(
+    'measures $itemId with both cold-load and warm-navigation routes',
+    expectation => {
+      const coldRoute = requireRoute(expectation.coldRouteId);
+      const warmRoute = requireRoute(expectation.warmRouteId);
 
-    expect(coldRoute.path).toBe(warmRoute.path);
-    expect(coldRoute.measureMode).toBe('page-load');
-    expect(coldRoute.warmupStrategy).toBe('authenticated-route');
-    expect(warmRoute.measureMode).toBe('warm-navigation');
-    expect(warmRoute.warmupStrategy).toBe('authenticated-shell');
-    expect(warmRoute.navigationItemId).toBe(expectation.itemId);
-    expectBudgetCoverage(coldRoute);
-    expectBudgetCoverage(warmRoute);
-  });
+      expect(coldRoute.path).toBe(warmRoute.path);
+      expect(coldRoute.measureMode).toBe('page-load');
+      expect(coldRoute.warmupStrategy).toBe('authenticated-route');
+      expect(warmRoute.measureMode).toBe('warm-navigation');
+      expect(warmRoute.warmupStrategy).toBe('authenticated-shell');
+      expect(warmRoute.navigationItemId).toBe(expectation.itemId);
+      expectBudgetCoverage(coldRoute);
+      expectBudgetCoverage(warmRoute);
+    }
+  );
 
-  it.each(
-    CANONICAL_SHELL_ROUTE_LOAD_PAIRS
-  )('measures $itemId with a documented route-load instead of desktop warm-nav', expectation => {
-    const coldRoute = requireRoute(expectation.coldRouteId);
-    const routeLoad = requireRoute(expectation.routeLoadId);
+  it.each(CANONICAL_SHELL_ROUTE_LOAD_PAIRS)(
+    'measures $itemId with a documented route-load instead of desktop warm-nav',
+    expectation => {
+      const coldRoute = requireRoute(expectation.coldRouteId);
+      const routeLoad = requireRoute(expectation.routeLoadId);
 
-    expect(coldRoute.path).toBe(routeLoad.path);
-    expect(coldRoute.measureMode).toBe('page-load');
-    expect(routeLoad.measureMode).toBe('page-load');
-    expect(routeLoad.warmupStrategy).toBe('authenticated-route');
-    expect(routeLoad.navigationItemId).toBe(expectation.itemId);
-    expect(routeLoad.readySelectors.navTrigger).toBeUndefined();
-    expect(routeLoad.warmNavigationStartPath).toBeUndefined();
-    expectBudgetCoverage(coldRoute);
-    expectBudgetCoverage(routeLoad);
-  });
+      expect(coldRoute.path).toBe(routeLoad.path);
+      expect(coldRoute.measureMode).toBe('page-load');
+      expect(routeLoad.measureMode).toBe('page-load');
+      expect(routeLoad.warmupStrategy).toBe('authenticated-route');
+      expect(routeLoad.navigationItemId).toBe(expectation.itemId);
+      expect(routeLoad.readySelectors.navTrigger).toBeUndefined();
+      expect(routeLoad.warmNavigationStartPath).toBeUndefined();
+      expectBudgetCoverage(coldRoute);
+      expectBudgetCoverage(routeLoad);
+    }
+  );
 
   it('uses real profile-rail content rather than its skeleton as readiness', () => {
     const profileRail = requireRoute('creator-profile-rail');
