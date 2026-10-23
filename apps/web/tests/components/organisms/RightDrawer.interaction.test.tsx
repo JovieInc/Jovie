@@ -205,6 +205,53 @@ describe('RightDrawer', () => {
     expect(onKeyDown).toHaveBeenCalledTimes(1);
   });
 
+  it('lets the active mobile rail own Escape while a superseded rail stays armed but deferential', async () => {
+    mockUseBreakpointDown.mockReturnValue(true);
+    const onKeyDownFirst = vi.fn();
+    const onKeyDownSecond = vi.fn();
+
+    render(
+      <>
+        <RightDrawer
+          isOpen
+          width={360}
+          ariaLabel='Superseded rail'
+          onKeyDown={onKeyDownFirst}
+        >
+          <button type='button'>First rail</button>
+        </RightDrawer>
+        <RightDrawer
+          isOpen
+          width={360}
+          ariaLabel='Active rail'
+          onKeyDown={onKeyDownSecond}
+        >
+          <button type='button'>Second rail</button>
+        </RightDrawer>
+      </>
+    );
+
+    // The last opened rail wins activation; the earlier one is inert and
+    // aria-hidden while still mounted and open.
+    await waitFor(() =>
+      expect(screen.getByLabelText('Active rail')).toHaveAttribute(
+        'aria-modal',
+        'true'
+      )
+    );
+    expect(screen.getByLabelText('Superseded rail')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+
+    // Escape belongs to the live modal. The superseded rail's listener is
+    // armed but defers through the open-modal arbitration instead of
+    // stealing or dropping the key.
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onKeyDownSecond).toHaveBeenCalledTimes(1);
+    expect(onKeyDownFirst).not.toHaveBeenCalled();
+  });
+
   it('does not handle Escape when a modal dialog is open above the drawer', () => {
     const onKeyDown = vi.fn();
 
