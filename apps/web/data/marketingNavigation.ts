@@ -127,6 +127,7 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
       { href: APP_ROUTES.PRODUCT_DSP_LINKS, label: 'DSP Links' },
       { href: APP_ROUTES.PRODUCT_UTM_LINKS, label: 'UTM Links' },
       { href: APP_ROUTES.PRODUCT_ISRC, label: 'ISRC' },
+      { href: APP_ROUTES.PRODUCT_PRE_SAVE, label: 'Pre-save' },
       { href: APP_ROUTES.PRODUCT_LINK_ANALYTICS, label: 'Link analytics' },
       { href: APP_ROUTES.CARD, label: 'Jovie Card' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },

@@ -234,6 +234,15 @@ export const MARKETING_PAGE_CONTRACTS = {
     successEvent: 'visitor reads the click total and the top provider',
     primaryCta: START_CTA,
   },
+  '(marketing)/product/pre-save/page.tsx': {
+    routeGlob: '(marketing)/product/pre-save/page.tsx',
+    copyScope: 'shared',
+    url: APP_ROUTES.PRODUCT_PRE_SAVE,
+    job: 'show a countdown to the release date and save the release into a Spotify library after that date',
+    proof: 'live countdown for a dated release',
+    successEvent: 'visitor reads the countdown for the fixture release',
+    primaryCta: START_CTA,
+  },
   '(marketing)/card/page.tsx': {
     routeGlob: '(marketing)/card/page.tsx',
     copyScope: 'shared',

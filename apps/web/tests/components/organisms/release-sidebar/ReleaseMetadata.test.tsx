@@ -52,10 +52,11 @@ describe('ReleaseMetadata editable fields', () => {
       </TooltipProvider>
     );
 
-    expect(screen.getByLabelText('Edit ISRC')).toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: /Edit ISRC/ });
+    expect(trigger).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Add ISRC')).not.toBeInTheDocument();
 
-    await user.click(screen.getByLabelText('Edit ISRC'));
+    await user.click(trigger);
 
     expect(screen.getByLabelText('Edit ISRC')).toHaveAttribute(
       'placeholder',
@@ -78,7 +79,7 @@ describe('ReleaseMetadata editable fields', () => {
       </TooltipProvider>
     );
 
-    await user.click(screen.getByLabelText('Edit ISRC'));
+    await user.click(screen.getByRole('button', { name: /Edit ISRC/ }));
     const input = screen.getByLabelText('Edit ISRC');
     await user.type(input, 'us-abc-1234567');
     await user.tab();
@@ -106,7 +107,7 @@ describe('ReleaseMetadata editable fields', () => {
       </TooltipProvider>
     );
 
-    await user.click(screen.getByLabelText('Edit Label'));
+    await user.click(screen.getByRole('button', { name: /Edit Label/ }));
     const input = screen.getByLabelText('Edit Label');
     await user.type(input, 'New Label');
     await user.tab();

@@ -216,6 +216,8 @@ export const APP_ROUTES = {
   PRODUCT_UTM_LINKS: '/product/utm-links',
   /** ISRC field. Nested under /product so it is not a profile handle. */
   PRODUCT_ISRC: '/product/isrc',
+  /** Pre-save countdown. Nested under /product so it is not a profile handle. */
+  PRODUCT_PRE_SAVE: '/product/pre-save',
   /** Smart-link click analytics. Live feature page. */
   PRODUCT_LINK_ANALYTICS: '/product/link-analytics',
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */

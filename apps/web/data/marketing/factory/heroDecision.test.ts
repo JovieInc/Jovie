@@ -239,6 +239,7 @@ describe('route hero audit', () => {
         "/product/dsp-links": "ok: f-layout-desktop-screenshot",
         "/product/isrc": "ok: f-layout-desktop-screenshot",
         "/product/link-analytics": "ok: f-layout-desktop-screenshot",
+        "/product/pre-save": "ok: f-layout-desktop-screenshot",
         "/product/release-scheduling": "ok: f-layout-desktop-screenshot",
         "/product/utm-links": "ok: f-layout-desktop-screenshot",
         "/smart-links": "ok: f-layout-desktop-screenshot",

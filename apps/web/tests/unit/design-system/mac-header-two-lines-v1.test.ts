@@ -72,6 +72,9 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // /product/isrc is a new marketing h1. The shrink-only headline ratchet
   // rejects a new line-clamp token, so the title stays complete.
   'apps/web/app/(marketing)/product/isrc/IsrcLanding.tsx',
+  // /product/pre-save is a new marketing h1. The shrink-only headline ratchet
+  // rejects a new line-clamp token, so the title stays complete.
+  'apps/web/app/(marketing)/product/pre-save/PreSaveLanding.tsx',
   // /product/link-analytics keeps the full headline. Balance lives in
   // .link-analytics-title; the heading does not use line-clamp.
   'apps/web/app/(marketing)/product/link-analytics/LinkAnalyticsLanding.tsx',
