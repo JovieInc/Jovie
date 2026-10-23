@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { runGh } from '../../packages/api-client/gh.ts';
 import { PRODUCER, PRODUCER_LAG_DELAYS_MS } from './screen-proof-resolver.mjs';
 
 /** GitHub's jobs API placeholder before the real job name is visible. */
@@ -54,23 +55,23 @@ export async function resolveProducerJobId({
   return last;
 }
 
-function readJobsPayload() {
+async function readJobsPayload() {
   const repository = process.env.GITHUB_REPOSITORY;
   const runId = process.env.GITHUB_RUN_ID;
   const attempt = process.env.GITHUB_RUN_ATTEMPT;
   if (!repository || !runId || !attempt) {
     throw new Error('Could not resolve the current producer job ID.');
   }
-  const result = spawnSync(
-    'gh',
+  const result = await runGh(
     [
       'api',
       `repos/${repository}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`,
     ],
-    { encoding: 'utf8' }
+    { priority: 'deploy' }
   );
-  if (result.status !== 0) {
-    throw new Error('Could not resolve the current producer job ID.');
+  if (result.code !== 0) {
+    console.error('::error::Could not resolve the current producer job ID.');
+    process.exit(result.code);
   }
   return JSON.parse(result.stdout);
 }
