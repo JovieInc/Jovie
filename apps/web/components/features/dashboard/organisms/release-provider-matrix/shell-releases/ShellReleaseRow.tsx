@@ -79,7 +79,11 @@ const RELEASE_TYPE_BADGE_LABEL: Record<ReleaseType, string> = {
   other: 'Other',
 };
 export const shellReleaseRowTypography = {
-  title: 'truncate text-app font-caption text-primary-token leading-[1.2]',
+  // min-h-6 keeps the title target at the 24px WCAG 2.5.8 floor inside the
+  // dense h-8 row (axe target-size is enabled at WCAG 2.2 AA and cannot be
+  // allowlisted); items-center on the hover link keeps the glyphs centered.
+  title:
+    'truncate text-app font-caption text-primary-token leading-[1.2] min-h-6',
   subtitle: 'truncate text-2xs text-tertiary-token leading-[1.3]',
 } as const;
 

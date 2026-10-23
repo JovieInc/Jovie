@@ -161,6 +161,26 @@ describe('ShellReleaseRow audio affordance', () => {
     expect(screen.getByText('Bahamas').className).toContain('text-2xs');
   });
 
+  it('keeps the title target at the 24px WCAG 2.5.8 floor in the dense row', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r-target-size',
+          title: 'Lost in the Light',
+          previewUrl: null,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    // The h-8 dense row renders the title as the EntityHoverLink button;
+    // axe target-size (WCAG 2.2 AA, not allowlistable) measures its box.
+    expect(screen.getByText('Lost in the Light').className).toContain(
+      'min-h-6'
+    );
+  });
+
   it('omits the play overlay when the release has no preview URL', () => {
     render(
       <ShellReleaseRow

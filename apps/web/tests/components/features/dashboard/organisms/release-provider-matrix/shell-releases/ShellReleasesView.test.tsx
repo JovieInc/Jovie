@@ -598,6 +598,16 @@ describe('ShellReleasesView', () => {
     ).toBeInTheDocument();
   });
 
+  it('exposes the connect-Spotify empty state as a real heading', () => {
+    renderShell([]);
+    // The e2e releases health spec and the axe heading outline resolve the
+    // disconnected state by role=heading 'Connect Spotify' — the same shape
+    // the connected empty state already renders.
+    expect(
+      screen.getByRole('heading', { name: /Connect Spotify to get started/ })
+    ).toBeInTheDocument();
+  });
+
   it('opens Spotify connection from the catalog connection route', () => {
     navigationState.searchParams = new URLSearchParams('connect=spotify');
 
