@@ -48,8 +48,11 @@ test.describe('Pricing Page', () => {
       await expect(footer).toHaveCount(1);
       await expect(footer).toHaveAttribute('data-footer-variant', 'expanded');
       await expect(
-        footer.getByRole('heading', { name: 'Product' })
+        footer.locator('p.mf-eyebrow', { hasText: 'Product' })
       ).toBeVisible();
+      await expect(
+        footer.getByRole('heading', { name: 'Product' })
+      ).toHaveCount(0);
       await expect(
         footer.getByRole('link', { name: 'Privacy' })
       ).toHaveAttribute('href', '/legal/privacy');

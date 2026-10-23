@@ -20,6 +20,10 @@ export const COMPANY_IDENTITY = {
   seoDescription:
     'Claim your name. Jovie makes you easy to reach, for people and for agents.',
   homepageHeadline: 'Be found. Be understood.',
+  /** Canonical public X handle. Retired `@jovieapp` must not return. */
+  xHandle: '@meetjovie',
+  /** Homepage WebSite schema names. Do not add a product-category alias. */
+  schemaAlternateNames: ['Jovie', 'jov.ie'],
   audiences: [
     'artists',
     'founders',
