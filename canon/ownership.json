@@ -1,6 +1,6 @@
 {
   "schema": "jovie-ownership-registry/v1",
-  "updated": "2026-10-20",
+  "updated": "2026-10-23",
   "policy": "Every repo, service, workflow, CI lane, runner pool, Linear team/area, canon doc, data store and control loop has one agent owner and an escalation chain that ends at the one human owner of last resort. Humans are never routine owners. scripts/ownership-registry.mjs enforces it in ci:control:test.",
   "roles": {
     "summer": {"kind": "agent", "name": "Summer", "identity": "summer", "job": "Company governor: admission, Linear lifecycle, founder decision cards, canon stewardship.", "escalation": ["summer-improvement-loop", "tim"]},
@@ -47,6 +47,7 @@
     {"id": "workflow:golden-path-prod-autofix", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/golden-path-prod-autofix.yml"},
     {"id": "workflow:help-center-recertification", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/help-center-recertification.yml"},
     {"id": "workflow:hermes-cli-worker", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/hermes-cli-worker.yml", "note": "Runs on the [self-hosted, hermes] runner although the Hermes runtime is retired (docs/operations/SUMMER_RUNTIME_RETIREMENT.md); retire or rehome."},
+    {"id": "workflow:interaction-latency-audit", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/interaction-latency-audit.yml"},
     {"id": "workflow:internal-review", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/internal-review.yml"},
     {"id": "workflow:ios-app-store-graphics", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/ios-app-store-graphics.yml"},
     {"id": "workflow:ios-ci", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/ios-ci.yml", "repair": "JOV-8657. Mac-only failures: a diff defect (e.g. GNU-only `date -d`/`sed -i`) is labelled to the PR's writer lane by Lane Fix Relay; a lane or runner defect is repaired by gem-ci-repair, filed as remediation:mac-lane; an offline or asleep jovie-mac pool falls back to hosted macOS and is repaired by gem-hostops."},
