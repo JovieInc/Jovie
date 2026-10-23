@@ -30,7 +30,7 @@ describe('ScrubGradient', () => {
         loopSection={{ from: 25, to: 50 }}
       />
     );
-    expect(off.container.querySelector('rect.text-cyan-300')).toBeNull();
+    expect(off.container.querySelector('rect.text-accent')).toBeNull();
     off.unmount();
 
     const on = render(
@@ -41,7 +41,7 @@ describe('ScrubGradient', () => {
         loopSection={{ from: 25, to: 50 }}
       />
     );
-    expect(on.container.querySelector('rect.text-cyan-300')).not.toBeNull();
+    expect(on.container.querySelector('rect.text-accent')).not.toBeNull();
   });
 
   it('uses per-instance SVG ids so multiple instances do not collide', () => {
@@ -58,7 +58,6 @@ describe('ScrubGradient', () => {
     expect(grads[0].getAttribute('id')).not.toBe(grads[1].getAttribute('id'));
   });
 });
-
 
 describe('Ion accent polish (glm/lyrics-player)', () => {
   it('tints the loop-section band with the Ion accent, not raw cyan', () => {
