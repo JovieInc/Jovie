@@ -148,6 +148,34 @@ glass and directed light. Scale follows Linear-style premium: tight
 proportions, small precise UI type, dense but calm layouts, hairline borders,
 and restrained color. Mockups read as a real pro tool at true scale.
 
+### Hero scroll behavior
+
+Design intent. This does not claim the current build is finished.
+
+The opening hero is full-bleed and 100vh, header included: no inset card and
+no rounded corners. The header is minimal: a 28px Jovie O on the left, Sign
+in on the right. The central name/handle input is the focus. The headline
+stays **Be found. Be understood.**
+
+Natural scroll zooms the hero out into a wide cinematic editorial card.
+Gutters grow, corners round, and the proportions become more cinematic.
+Spacing stays tight, not p-8 or p-12. The inset hero and the header share
+aligned outer edges. Scroll is native and fully reversible: no hijacking, no
+pinned dead zone.
+
+The sticky header turns from solid black into subtle dark glass (CSS token
+glass above). Hero content clears the header before any fade or overlap. A
+compact logo strip sits tight under the hero, with restrained glass and light.
+
+Motion follows Frame.io's creative canvas and Apple-like restraint: no bounce.
+The shader supplies atmosphere and does not fight the headline or the input.
+A live shader stays the flagged `night-dj-harmony-v1` exception.
+
+The same felt theme carries across Jovie: the audio player reveal, a canvas
+for video and lyrics, and generated imagery that leaves space for real UI and
+text overlays. Readability, performance, and reduced motion stay protected.
+Product UI rules are unchanged.
+
 ### Hard negatives
 
 - Full-width sparse sections.
@@ -157,6 +185,9 @@ and restrained color. Mockups read as a real pro tool at true scale.
 - Document-like or flat screenshots.
 - A tall mockup in a wide section.
 - Oversized consumer scale, including Raycast's, and enlarged hero-sized UI.
+- An inset or rounded opening hero.
+- Scroll hijacking, a pinned dead zone, or bounce.
+- Hero padding at p-8 or p-12.
 - Payroll mentions.
 - Naming Daniel Kang or Haruki.
 - Literal music signals: headphones on people, notes, or instruments as decoration.
@@ -193,6 +224,7 @@ The executable landing-page copy workflow is in
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-23 | Added hero scroll behavior as design intent: full-bleed opening, native zoom into a cinematic card, token-glass header, felt theme. The current build is not claimed finished. | Tim hero-scroll intent |
 | 2026-10-23 | Marketing references: Raycast for dark glass and directed light at higher fidelity; Linear-style premium for true-scale proportions. | Tim reference rule |
 | 2026-10-23 | Marketing glass is CSS token glass only. Product UI is a Playwright capture at 2x or higher from seeded demo data. AI images are mood plates with no UI, text, or logos. | Tim glass and mockup rule |
 | 2026-10-23 | Night cues drop scan. Canvas, WebGL, and video stay off the surface by default; WebGL is a flagged, approved exception. | Tim subtlety rule |
