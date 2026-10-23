@@ -244,12 +244,15 @@ jobs:
             exit 1
           fi
           cd apps/web
-          pnpm exec playwright test \
-            tests/product-screenshots/marketing-routes.spec.ts \
-            --config=playwright.config.screenshots.ts \
-            --project=screenshots \
-            --workers=4 \
-            --retries=0
+          # Same artifact secret boundary as every other Playwright producer
+          # (playwright-artifact-secrets.test.ts): no exemption is needed.
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm exec playwright test \
+              tests/product-screenshots/marketing-routes.spec.ts \
+              --config=playwright.config.screenshots.ts \
+              --project=screenshots \
+              --workers=4 \
+              --retries=0
 
       # JOV-7713: per-PR screen audit manifest for the Validating lifecycle
       # (changed inventory screens, their producer, invalidated UI matrix
