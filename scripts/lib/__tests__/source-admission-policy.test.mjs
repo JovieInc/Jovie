@@ -37,19 +37,6 @@ test('trusted source-read guards reject a deleted test on an old head and execut
   const git = (...args) =>
     execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
   try {
-    const archive = execFileSync(
-      '/usr/bin/git',
-      ['archive', 'HEAD', 'scripts'],
-      // scripts/ reached 20.0 MB on 2026-10-21 (ENOBUFS at a 20 MiB cap).
-      { maxBuffer: 128 * 1024 * 1024 }
-    );
-    execFileSync('tar', ['-x', '-C', repo], { input: archive });
-    // This synthetic base isolates the web manifest guard and predates the
-    // Codex bootstrap contract. Do not turn deletion of its checker scripts
-    // into an unrelated deletion of the Codex source/test surface.
-    for (const name of readdirSync(join(repo, 'scripts'))) {
-      if (name.startsWith('codex-')) rmSync(join(repo, 'scripts', name));
-    }
     const retired = join(repo, 'apps/web/lib/merch/qa-gate.test.ts');
     mkdirSync(join(repo, 'apps/web/lib/merch'), { recursive: true });
     mkdirSync(join(repo, 'apps/web/tests'), { recursive: true });
@@ -82,11 +69,30 @@ exec "$SOURCE_FIXTURE_NODE" "$@"
     git('config', 'user.name', 'Source guard test');
     git('config', 'user.email', 'source-guard@example.invalid');
     git('add', '.');
+    git('commit', '--quiet', '-m', 'fork point before trusted source guards');
+    const fork = git('rev-parse', 'HEAD');
+    const archive = execFileSync(
+      '/usr/bin/git',
+      ['archive', 'HEAD', 'scripts'],
+      // scripts/ reached 20.0 MB on 2026-10-21 (ENOBUFS at a 20 MiB cap).
+      { maxBuffer: 128 * 1024 * 1024 }
+    );
+    execFileSync('tar', ['-x', '-C', repo], { input: archive });
+    // This synthetic base isolates the web manifest guard and predates the
+    // Codex bootstrap contract. Do not turn deletion of its checker scripts
+    // into an unrelated deletion of the Codex source/test surface.
+    for (const name of readdirSync(join(repo, 'scripts'))) {
+      if (name.startsWith('codex-')) rmSync(join(repo, 'scripts', name));
+    }
+    git('add', '.');
     git('commit', '--quiet', '-m', 'trusted source-read guards');
     git('branch', 'main');
     git('remote', 'add', 'origin', repo);
     git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
-    rmSync(join(repo, 'scripts'), { recursive: true });
+    // Checking the fork back out drops scripts/ that main added after the
+    // branch. Removing them from the trusted parent would be a pull-request
+    // deletion of the invariant suite and the gate detector.
+    git('checkout', '--detach', fork);
     rmSync(retired);
     git('add', '--all');
     git('commit', '--quiet', '-m', 'older head deletes a manifest-listed test');
@@ -108,12 +114,22 @@ exec "$SOURCE_FIXTURE_NODE" "$@"
     const rejected = invoke();
     assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr);
     assert.match(rejected.stdout, /node-environment-files: exit 1/);
+    // The merge base is the fork, which has no scripts/. Files main added
+    // after that fork are absent from this head and are not deletions.
+    // Clearing the merch manifest removes the node-environment failure.
+    // The retired merch test is not an invariant test, so the detector passes.
+    // A deletion of a gate that existed at the fork is covered by
+    // gate-weakening-detector.test.mjs, not by restoring post-fork scripts.
     writeFileSync(manifest, '[]\n');
     git('add', '.');
     git('commit', '--quiet', '-m', 'remove the retired manifest entry');
-    const accepted = invoke();
-    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
-    assert.match(accepted.stdout, /node-environment-files: exit 0/);
+    const cleared = invoke();
+    assert.equal(cleared.status, 0, cleared.stdout + cleared.stderr);
+    assert.match(cleared.stdout, /node-environment-files: exit 0/);
+    assert.match(cleared.stdout, /gate-weakening-detector: PASS/);
+    assert.doesNotMatch(cleared.stdout, /gate-weakening-detector: FAIL/);
+    assert.doesNotMatch(cleared.stdout, /detector-deleted /);
+    assert.doesNotMatch(cleared.stdout, /invariant-test-deleted /);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
