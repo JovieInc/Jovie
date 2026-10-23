@@ -16,8 +16,10 @@ const badgeVariants = cva(BADGE_SHARED_GEOMETRY_CLASS, {
       destructive: 'border-error/20 bg-(--color-error-subtle) text-error-text',
       outline:
         'border-(--color-border-default) bg-transparent text-(--linear-text-secondary)',
-      success: 'border-success/20 bg-(--color-success-subtle) text-success-text',
-      warning: 'border-warning/20 bg-(--color-warning-subtle) text-warning-text',
+      success:
+        'border-success/20 bg-(--color-success-subtle) text-success-text',
+      warning:
+        'border-warning/20 bg-(--color-warning-subtle) text-warning-text',
       'permission-restricted':
         'border-(--state-permission-border) bg-(--state-permission-bg) text-(--state-permission-fg)',
       // Backwards-compat aliases

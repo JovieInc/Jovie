@@ -9,12 +9,14 @@ export const ERROR_BANNER_ICON_CLASS = 'h-5 w-5 text-error-text';
 export const ERROR_BANNER_BODY_CLASS = 'min-w-0 flex-1 space-y-1.5';
 export const ERROR_BANNER_TITLE_CLASS =
   'break-words text-sm font-semibold leading-snug tracking-tight text-error-text';
-export const ERROR_BANNER_DESCRIPTION_CLASS = 'text-sm leading-snug text-error-text';
+export const ERROR_BANNER_DESCRIPTION_CLASS =
+  'text-sm leading-snug text-error-text';
 export const ERROR_BANNER_ACTIONS_ROW_CLASS =
   'mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap';
 export const ERROR_BANNER_ACTION_LAYOUT_CLASS = 'w-full sm:w-auto';
 export const ERROR_BANNER_DETAILS_WRAP_CLASS = 'mt-3';
-export const ERROR_BANNER_DETAILS_TOGGLE_CLASS = 'text-error-text hover:text-error-text';
+export const ERROR_BANNER_DETAILS_TOGGLE_CLASS =
+  'text-error-text hover:text-error-text';
 export const ERROR_BANNER_DETAILS_PANEL_CLASS =
   'mt-2 space-y-1.5 border-t border-error/20 pt-2';
 export const ERROR_BANNER_DETAILS_META_CLASS = 'text-xs text-error-text';

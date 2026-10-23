@@ -451,7 +451,9 @@ export function MetadataAgentPanel({
 
       {hasBlockingFields ? (
         <div className='mt-4 rounded-lg border border-warning/20 bg-warning-subtle p-3'>
-          <p className='text-sm font-medium text-warning-text'>Missing Fields</p>
+          <p className='text-sm font-medium text-warning-text'>
+            Missing Fields
+          </p>
           <ul className='mt-2 space-y-2 text-sm text-primary-token'>
             {latestRequest?.missingFields.map(missingField => (
               <li key={`${missingField.field}-${missingField.reason}`}>

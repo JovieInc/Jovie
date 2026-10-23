@@ -302,7 +302,9 @@ export function AdminFeaturesTable({
           columnHelper.accessor(tier.key, {
             header: () => (
               <span
-                className={tier.key === currentTier ? 'text-accent-text' : undefined}
+                className={
+                  tier.key === currentTier ? 'text-accent-text' : undefined
+                }
               >
                 {tier.label}
                 {tier.key === currentTier ? ' •' : ''}
@@ -352,8 +354,8 @@ export function AdminFeaturesTable({
       start={
         <span className='text-tertiary-token text-xs'>
           {rows.length} runtime flags • this deploy is{' '}
-          <span className='text-accent-text'>{currentTier}</span> • each cell shows
-          On/Off and Default/Override
+          <span className='text-accent-text'>{currentTier}</span> • each cell
+          shows On/Off and Default/Override
         </span>
       }
     />
