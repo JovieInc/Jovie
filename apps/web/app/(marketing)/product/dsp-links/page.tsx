@@ -5,8 +5,6 @@ import { DSP_LINKS_COPY } from '@/data/dspLinksCopy';
 import { buildSoftwareSchema } from '@/lib/constants/schemas';
 import { DspLinksLanding } from './DspLinksLanding';
 
-export const revalidate = false;
-
 const PAGE_URL = `${BASE_URL}${APP_ROUTES.PRODUCT_DSP_LINKS}`;
 const PAGE_TITLE = `${DSP_LINKS_COPY.seo.title} | ${APP_NAME}`;
 

@@ -116,6 +116,13 @@ let resizeObserverTarget: Element | null = null;
 
 vi.mock('@/components/organisms/table', () => ({
   AudienceMobileCard: () => null,
+  TableEmptyState: ({
+    heading,
+    testId,
+  }: {
+    heading?: string;
+    testId?: string;
+  }) => <div data-testid={testId}>{heading}</div>,
   UnifiedTable: ({
     data,
     columnVisibility,
