@@ -37,10 +37,10 @@ function observedPattern() {
         healthy('Default Healthy'),
         {
           name: 'Default Violation',
-          state: 'passed',
+          state: 'failed',
           a11y: [
             {
-              status: 'warning',
+              status: 'failed',
               violations: ['button-name'],
               incomplete: [] as string[],
               error: null,
@@ -48,17 +48,33 @@ function observedPattern() {
           ],
         },
         healthy('Error Healthy'),
-        { name: 'Error Violation', state: 'failed', a11y: [] },
+        {
+          name: 'Error Violation',
+          state: 'failed',
+          a11y: [] as Array<{
+            status: string;
+            violations: string[];
+            incomplete: string[];
+            error: null;
+          }>,
+        },
       ],
     },
     cli: {
       numTotalTests: 4,
-      numPassedTests: 3,
-      numFailedTests: 1,
+      numPassedTests: 2,
+      numFailedTests: 2,
       testResults: [
         {
           message: '',
           assertionResults: [
+            {
+              fullName: 'A11y runner controls Default Violation',
+              status: 'failed',
+              failureMessages: [
+                'Error: expect(received).toHaveNoViolations(expected)\nButtons must have discernible text (button-name)',
+              ],
+            },
             {
               fullName: 'A11y runner controls Error Violation',
               status: 'failed',
@@ -114,7 +130,7 @@ const corruptions: [string, (value: Observation) => void][] = [
   [
     'warning control with no addon report',
     value => {
-      value.findings.records[1].a11y = [];
+      value.findings.records[1].a11y[0].status = 'warning';
     },
   ],
   [
@@ -126,7 +142,8 @@ const corruptions: [string, (value: Observation) => void][] = [
   [
     'changed default error policy',
     value => {
-      value.findings.records[1].state = 'failed';
+      value.findings.records[1].state = 'passed';
+      value.findings.records[1].a11y[0].status = 'warning';
     },
   ],
   [
@@ -160,13 +177,13 @@ const corruptions: [string, (value: Observation) => void][] = [
   [
     'additional failed tests',
     value => {
-      value.cli.numFailedTests = 2;
+      value.cli.numFailedTests = 3;
     },
   ],
   [
     'unrelated extra axe violation',
     value => {
-      value.findings.records[1].a11y[0].violations.push('color-contrast');
+      value.findings.records[1].a11y[0].violations = ['color-contrast'];
     },
   ],
 ];
@@ -286,11 +303,11 @@ describe('Storybook a11y runner diagnostic', () => {
     }
   );
 
-  it('accepts real-addon healthy/warning/error pattern, including thrown-error metadata loss', () => {
+  it('accepts real-addon error mode, including thrown-error metadata loss', () => {
     expect(verifyA11yRunnerControls(observedPattern())).toEqual({
       controls: 4,
-      rawPassed: 3,
-      rawFailed: 1,
+      rawPassed: 2,
+      rawFailed: 2,
       expectedPatternObserved: true,
     });
   });

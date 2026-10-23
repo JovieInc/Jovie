@@ -3,9 +3,8 @@
   "mode": "warn",
   "issue": "JOV-8606",
   "tighten": "auto",
-  "count": 33,
+  "count": 32,
   "violations": [
-    "apps/web/app/(home)/page.tsx :: link-in-bio :: Jovie Link in Bio",
     "apps/web/app/(marketing)/alternatives/page.tsx :: link-in-bio :: Find a musician-first alternative to generic link-in-bio tools, with smart links and release workflows instead of a list of links.",
     "apps/web/app/(marketing)/alternatives/page.tsx :: link-in-bio :: Find a musician-first alternative to generic link-in-bio tools, with smart links and release workflows instead of a list of links. #2",
     "apps/web/app/(marketing)/alternatives/page.tsx :: link-in-bio :: Jovie is a musician-first alternative to generic link-in-bio tools.",

@@ -56,7 +56,7 @@ inactiveWorkflows:
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
 generatedAt: deterministic
-normalPrCheckRecords: 24
+normalPrCheckRecords: 25
 nodes:
   - name: Workflow Lint
     path: .github/workflows/actionlint.yml
@@ -1251,7 +1251,7 @@ nodes:
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
-    jobCount: 6
+    jobCount: 7
   - name: Staging Controller
     path: .github/workflows/staging-controller.yml
     active: true

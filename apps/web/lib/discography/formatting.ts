@@ -1,3 +1,5 @@
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
+
 const longReleaseDateFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'long',
   day: 'numeric',
@@ -96,19 +98,19 @@ export function formatCompactReleaseArtistLine(
 }
 
 export function formatReleaseDate(date: string | undefined): string {
-  if (!date) return 'Release date TBD';
+  if (!date) return COPY_FALLBACKS.date;
   const parsed = parseReleaseDate(date);
   return parsed ? longReleaseDateFormatter.format(parsed) : 'Invalid date';
 }
 
 export function formatReleaseDateShort(date: string | undefined): string {
-  if (!date) return 'TBD';
+  if (!date) return COPY_FALLBACKS.date;
   const parsed = parseReleaseDate(date);
   return parsed ? shortReleaseDateFormatter.format(parsed) : 'Invalid';
 }
 
 export function formatReleaseDateMonthYear(date: string | undefined): string {
-  if (!date) return 'TBD';
+  if (!date) return COPY_FALLBACKS.date;
   const parsed = parseReleaseDate(date);
   return parsed ? monthYearReleaseDateFormatter.format(parsed) : 'Invalid';
 }

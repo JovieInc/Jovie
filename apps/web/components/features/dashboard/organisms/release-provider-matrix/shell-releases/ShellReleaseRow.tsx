@@ -151,7 +151,7 @@ const ArtworkCell = memo(function ArtworkCell({
       <ArtworkThumb
         src={release.artworkUrl ?? ''}
         title={release.title}
-        size={40}
+        size={20}
       />
       {isSyncing ? <AgentPulse className='rounded-sm' /> : null}
       {hasPreview ? (
@@ -381,10 +381,10 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       data-release-id={release.id}
       data-release-active={isActiveTrack ? 'true' : undefined}
       chrome='shell'
-      density='spacious'
+      density='dense'
       isSelected={isSelected}
       interactive
-      className='group/row flex items-center gap-3 px-3'
+      className='group/row flex h-8 items-center gap-2 overflow-hidden px-3'
     >
       <ArtworkCell release={release} isSyncing={syncLabel !== null} />
 
@@ -400,13 +400,23 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
             {release.title}
           </EntityHoverLink>
           <TypeBadge label={typeLabel} />
-        </div>
-        <div className='mt-0.5 flex min-w-0 items-center'>
-          <span className={shellReleaseRowTypography.subtitle}>
-            {artistLabel}
-          </span>
+          {artistLabel ? (
+            <>
+              <span
+                aria-hidden='true'
+                className='shrink-0 text-2xs text-quaternary-token'
+              >
+                ·
+              </span>
+              <span
+                className={cn(shellReleaseRowTypography.subtitle, 'min-w-0')}
+              >
+                {artistLabel}
+              </span>
+            </>
+          ) : null}
           {syncLabel ? (
-            <span className='ml-1 inline-flex shrink-0 items-center text-2xs text-accent-blue'>
+            <span className='inline-flex shrink-0 items-center text-2xs text-accent-blue'>
               <span aria-hidden='true' className='mr-1 text-quaternary-token'>
                 ·
               </span>

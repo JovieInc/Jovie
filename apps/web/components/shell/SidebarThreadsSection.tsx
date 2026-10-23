@@ -13,6 +13,7 @@ import React, {
 import { Icon } from '@/components/atoms/Icon';
 import { NavBadge } from '@/components/atoms/NavBadge';
 import { APP_ROUTES } from '@/constants/routes';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
 import { cn } from '@/lib/utils';
 import {
@@ -158,7 +159,7 @@ export function toSidebarThread(
   return {
     id: conversation.id,
     href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
-    title: conversation.title?.trim() || 'Untitled chat',
+    title: conversation.title?.trim() || COPY_FALLBACKS.conversation,
     status: getSidebarThreadStatus(latestTurnStatus),
     updatedAt: conversation.updatedAt,
     unread,

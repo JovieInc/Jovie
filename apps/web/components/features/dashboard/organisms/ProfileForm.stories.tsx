@@ -48,17 +48,6 @@ const meta: Meta<typeof ProfileForm> = {
         { name: 'dark', value: '#1f2937' },
       ],
     },
-    a11y: {
-      // Enable accessibility checks
-      config: {
-        rules: [
-          {
-            id: 'color-contrast',
-            enabled: true,
-          },
-        ],
-      },
-    },
   },
   tags: ['autodocs'],
   argTypes: {
