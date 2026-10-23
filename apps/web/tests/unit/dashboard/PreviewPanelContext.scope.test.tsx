@@ -1,5 +1,11 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -349,5 +355,89 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
         );
       },
     });
+  });
+
+  /**
+   * Controllable lg gate: the provider's desktop presentation is driven by
+   * a live (min-width: 1024px) media query. These tests resize across the
+   * boundary the way the browser does — via change events — because the
+   * chat composer spec proves the crossing on a live viewport.
+   */
+  function installLargeScreenGate(initialLarge: boolean) {
+    const listeners = new Set<(event: { matches: boolean }) => void>();
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('1024') ? initialLarge : false,
+      media: query,
+      addEventListener: (_type: string, listener: never) => {
+        listeners.add(listener as (event: { matches: boolean }) => void);
+      },
+      removeEventListener: (_type: string, listener: never) => {
+        listeners.delete(listener as (event: { matches: boolean }) => void);
+      },
+    }));
+    return {
+      crossInto(large: boolean) {
+        for (const listener of listeners) {
+          listener({ matches: large });
+        }
+      },
+    };
+  }
+
+  it('keeps an explicitly opened rail open when the viewport crosses below lg', () => {
+    const gate = installLargeScreenGate(true);
+    render(
+      <PreviewPanelProvider scope='chat'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    // The ?panel=profile deep link, rail toggle and `]` shortcut all open
+    // through the same explicit path.
+    fireEvent.click(screen.getByTestId('open-rail'));
+    expect(screen.getByTestId('rail-open').textContent).toBe('true');
+
+    // Below lg the drawer re-presents the SAME open rail as a modal sheet
+    // (RightDrawer's mobile branch sets aria-modal) — the crossing must not
+    // silently discard the user's open rail.
+    act(() => gate.crossInto(false));
+    expect(screen.getByTestId('rail-open').textContent).toBe('true');
+
+    // Dismissing the sheet is still the same explicit close contract.
+    fireEvent.click(screen.getByTestId('close-rail'));
+    expect(screen.getByTestId('rail-open').textContent).toBe('false');
+  });
+
+  it('closes a default-open rail when the viewport crosses below lg', async () => {
+    const gate = installLargeScreenGate(true);
+    render(
+      <PreviewPanelProvider defaultOpen scope='app-shell'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+
+    // An unsolicited default-open rail must not become an unsolicited modal
+    // when the viewport crosses below lg (JOV-7150 closed-by-default).
+    act(() => gate.crossInto(false));
+    expect(screen.getByTestId('rail-open').textContent).toBe('false');
+  });
+
+  it('keeps a user-reopened default-open rail open across the lg crossing', async () => {
+    const gate = installLargeScreenGate(true);
+    render(
+      <PreviewPanelProvider defaultOpen scope='app-shell'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+    // The user's own reopen of a surface rail is an explicit open.
+    fireEvent.click(screen.getByTestId('open-rail'));
+
+    act(() => gate.crossInto(false));
+    expect(screen.getByTestId('rail-open').textContent).toBe('true');
   });
 });
