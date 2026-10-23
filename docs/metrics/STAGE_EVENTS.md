@@ -13,7 +13,7 @@ One row per entity per stage. Stage dwell time is `exitedAt - enteredAt`.
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `schema` | `"jovie-stage-event/v1"` | Contract version. Breaking changes bump it. |
-| `entityType` | manifest key | `shipping`, `remediation`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `automation-run` |
+| `entityType` | manifest key | `shipping`, `remediation`, `release`, `release-replay`, `ios-release`, `revenue-funnel`, `summer-turn`, `linear-intake`, `automation-run` |
 | `entityId` | string | Stable id; the format is declared per entity in the manifest. |
 | `stage` | manifest stage id | Must be registered for the entity type. Unregistered stages are rejected. |
 | `enteredAt` | ISO-8601 | When the entity entered the stage. |
@@ -42,6 +42,12 @@ No new database. Two paths, both read by the daily
    stages GitHub cannot see publishes a rolling 28-day NDJSON file of contract
    rows at the source URL in the manifest. Invalid rows are counted as
    `rejected` in the snapshot, never silently kept or dropped.
+   A GitHub Actions producer instead names an `artifact` (`<name>/<file>`):
+   the collector lists that artifact's non-expired uploads in the window,
+   downloads up to 60 spread evenly across it (`gh run download` through the
+   budgeted client), and dedupes rows by entityType, entityId and stage. A
+   source whose artifacts are listed but none readable is a failure, not an
+   empty success.
    Privacy-bound producers (revenue funnel) publish only pre-aggregated
    `{entities:{<type>:{stages:{<id>:{windows,regression}}}}}` (`kind: timings`).
 
@@ -101,6 +107,7 @@ PATCH as `lanes-status.json`). Keep 28 days, drop older rows, cap at 8 MB.
 | `shipping:worker-start` | `shipping` / `JovieInc/Jovie#<pr>` once the run has a PR, else `JOV-<n>` | ledger receipt `startedAt` | receipt `endedAt` | `runs/ledger.jsonl` issue receipt (`kind` issue) |
 | `shipping:gate-seat` | `shipping` / `JovieInc/Jovie#<pr>` | adopt receipt `startedAt` | `startedAt + gateWaitS` (no seat: `endedAt`, outcome `abandoned`) | `runs/ledger.jsonl` (`kind` adopt) |
 | `shipping:gate` | `shipping` / `JovieInc/Jovie#<pr>` | `startedAt + gateWaitS` | receipt `endedAt` (`advanced` landing/verified, `failed` held/timeout) | `runs/ledger.jsonl` (`kind` adopt) |
+| `shipping:outcome-receipt` | `shipping` / `JOV-<n>` | lifecycle comment that owes `outcome` | outcome lane records the receipt (`advanced` pass, `failed` fail, `abandoned` no receipt) | `runs/ledger.jsonl` (`kind` outcome-verify) |
 | `remediation:repair-start` | `remediation` / `JovieInc/Jovie#<pr>@<first 12 chars of the red head sha>` | fix-red receipt `startedAt` | receipt `endedAt` | `runs/ledger.jsonl` (`kind` fix-red) |
 
 `actor` = provider (`codex`, `claude`, ...). `outcome`: `advanced` when the run
@@ -144,8 +151,24 @@ waiting for the token's quota reset or 2^(attempt-1) x 120s. Rows go to the arti
 | `release-replay:blocked` | the failed attempt's `updated_at`; exits at the decision. `outcome` `advanced` (replayed), `abandoned` (not transient, manual rerun, post-mutation, superseded, or prod already on main) or `failed` (CI attempt/wait cap, rejected rerun) |
 | `release-replay:replayed` | the accepted `gh run rerun` request for the source CI run |
 
-`entityId` = `<workflow file>#<run id>@<attempt>`. Like `automation-run`, the
-source is an artifact, so it reaches stage timings once the collector reads
+`entityId` = `<workflow file>#<run id>@<attempt>`. The source is an artifact
+(see "Where events live").
+
+### Claim checkout dogfood (`claim-dogfood`)
+
+Live emitter: `scripts/claim-dogfood-report.mjs stage-events` (workflow
+`claim-checkout-dogfood.yml`, after every successful Staging Controller and
+after Golden Path Nightly). Rows go to the artifact
+`claim-dogfood-receipts/stage-events.ndjson`.
+
+| Stage | Timestamp |
+| --- | --- |
+| `claim-dogfood:wait` | triggering run's `updated_at` (staging deploy done) to job start; omitted for manual dispatch |
+| `claim-dogfood:setup` | job start to app server ready (Neon branch, migrations, build); `failed` when the journey never starts |
+| `claim-dogfood:journey` | browser journey start to finish; `completed` (green) or `failed` (red) |
+
+`entityId` = `claim-checkout-dogfood#<run id>@<attempt>`. Like `release-replay`,
+the source is an artifact, so it reaches stage timings once the collector reads
 artifact sources.
 
 ### Automation liveness (`automation-run`)
@@ -163,9 +186,7 @@ carries both timestamps, into the artifact
 
 `entityId` = `<automationId>@<runRef>` (`automationId` from
 `canon/automation-registry.jsonl`). Rows without real timestamps are never
-emitted. The source has no URL yet: the shipping-slo collector reads `url`
-sources only, so reading the artifact is the remaining step before these
-timings reach the snapshot.
+emitted. The collector reads the artifact source (see "Where events live").
 
 ### LogYourBody release loop
 

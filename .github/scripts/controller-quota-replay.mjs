@@ -331,7 +331,15 @@ function failedJobLogs({ gh, repository, jobs, options }) {
     .slice(0, options.maxLogJobs);
   return failed.map(job => {
     try {
-      return gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]);
+      // gh 2.103 refuses job logs that contain ANSI sequences unless this
+      // flag is set, and that refusal text is not a transient signature.
+      // 2026-10-23: both ancestry failures were therefore abandoned after
+      // the quota wait (runs 39897328472 and 39897478370).
+      return gh([
+        'api',
+        '--allow-escape-sequences',
+        `repos/${repository}/actions/jobs/${job.id}/logs`,
+      ]);
     } catch (error) {
       // An unreadable log counts as transient only if gh's own error says so.
       return String(error?.stderr ?? error?.message ?? '');

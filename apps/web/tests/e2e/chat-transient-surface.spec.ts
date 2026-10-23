@@ -55,7 +55,11 @@ test('file drag stays passive and preserves composer geometry', async ({
   await expect(input).toBeVisible();
   const beforeDrag = await readRect(composer);
 
-  await chat.evaluate(element => {
+  // The drop target is the chat workspace (JovieChat `dropZoneRef`): the
+  // overlay is clipped to it so it never covers the header, composer dock or
+  // rails. A real drag enters there and bubbles; dispatching on the outer
+  // `chat-content` wrapper would never reach the workspace listener.
+  await page.getByTestId('chat-workspace').evaluate(element => {
     const dataTransfer = new DataTransfer();
     dataTransfer.items.add(
       new File(['visual-proof'], 'visual-proof.png', { type: 'image/png' })
@@ -111,7 +115,7 @@ test('file drag stays passive and preserves composer geometry', async ({
     contentType: 'image/png',
   });
 
-  await chat.evaluate(element => {
+  await page.getByTestId('chat-workspace').evaluate(element => {
     element.dispatchEvent(
       new DragEvent('dragleave', {
         bubbles: true,

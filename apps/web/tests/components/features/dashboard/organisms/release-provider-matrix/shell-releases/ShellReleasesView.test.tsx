@@ -287,13 +287,41 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
     release,
     onClose,
     onReleaseChange,
+    onDelete,
+    onChangeStatus,
+    isSmartLinkLocked,
+    getSmartLinkLockReason,
+    analyticsOverride,
+    tracksOverride,
+    showCredits,
   }: {
     release: ReleaseViewModel | null;
     onClose?: () => void;
     onReleaseChange?: (release: ReleaseViewModel) => void;
+    onDelete?: (id: string) => void;
+    onChangeStatus?: (
+      release: ReleaseViewModel,
+      status: ReleaseViewModel['status']
+    ) => void;
+    isSmartLinkLocked?: (id: string) => boolean;
+    getSmartLinkLockReason?: (id: string) => 'scheduled' | 'cap' | null;
+    analyticsOverride?: unknown;
+    tracksOverride?: readonly unknown[];
+    showCredits?: boolean;
   }) =>
     release ? (
-      <aside data-testid='release-sidebar'>
+      <aside
+        data-testid='release-sidebar'
+        data-has-delete={Boolean(onDelete)}
+        data-has-status={Boolean(onChangeStatus)}
+        data-has-smartlink-gate={Boolean(
+          isSmartLinkLocked && getSmartLinkLockReason
+        )}
+        data-is-smartlink-locked={isSmartLinkLocked?.(release.id) ?? false}
+        data-analytics={analyticsOverride ? 'override' : 'live'}
+        data-has-tracks={tracksOverride ? 'true' : 'false'}
+        data-show-credits={showCredits ? 'true' : 'false'}
+      >
         <div>{release.title}</div>
         <input aria-label='Release title draft' defaultValue={release.title} />
         <button type='button' onClick={onClose}>
@@ -615,6 +643,18 @@ describe('ShellReleasesView', () => {
     });
   });
 
+  it('passes the same lifecycle and eligibility capabilities to the detail rail', async () => {
+    renderShell([fakeRelease({ id: 'r1', title: 'Lost in the Light' })]);
+
+    fireEvent.click(screen.getByRole('option', { name: /Lost in the Light/ }));
+    const rail = await screen.findByTestId('release-sidebar');
+
+    expect(rail).toHaveAttribute('data-has-delete', 'true');
+    expect(rail).toHaveAttribute('data-has-status', 'true');
+    expect(rail).toHaveAttribute('data-has-smartlink-gate', 'true');
+    expect(rail).toHaveAttribute('data-is-smartlink-locked', 'false');
+  });
+
   it('keeps selected row in sync when the drawer edits a release', async () => {
     renderShell([fakeRelease({ id: 'r1', title: 'Lost in the Light' })]);
 
@@ -638,7 +678,7 @@ describe('ShellReleasesView', () => {
       })
     );
     fireEvent.click(
-      screen.getAllByRole('button', { name: 'Edit release links' })[0]
+      screen.getAllByRole('button', { name: 'Edit Release Links' })[0]
     );
 
     expect(await screen.findByTestId('release-sidebar')).toHaveTextContent(
@@ -646,7 +686,7 @@ describe('ShellReleasesView', () => {
     );
 
     fireEvent.click(
-      screen.getAllByRole('button', { name: 'Copy smart link' })[0]
+      screen.getAllByRole('button', { name: 'Copy Smart Link' })[0]
     );
 
     await waitFor(() => {
@@ -805,7 +845,7 @@ describe('ShellReleasesView', () => {
         screen.getAllByRole('button', { name: 'Scheduled smart link (Pro)' })[0]
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'Copy smart link' })
+        screen.queryByRole('button', { name: 'Copy Smart Link' })
       ).not.toBeInTheDocument();
     });
 
@@ -952,7 +992,7 @@ describe('ShellReleasesView', () => {
         screen.getAllByRole('button', { name: 'Scheduled smart link (Pro)' })[0]
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'Copy smart link' })
+        screen.queryByRole('button', { name: 'Copy Smart Link' })
       ).not.toBeInTheDocument();
     });
 
@@ -1077,5 +1117,47 @@ describe('ShellReleasesView', () => {
 
       expect(rows[0]).toHaveAttribute('aria-selected', 'false');
     });
+  });
+
+  it('uses demo adapter fixtures and skips live sync and create', () => {
+    const onSync = vi.fn();
+    const onCreateRelease = vi.fn();
+    renderShell([fakeRelease({ id: 'r1', title: 'Demo Single' })], {
+      spotifyConnected: true,
+      experienceAdapter: {
+        mode: 'demo',
+        entitlements: {
+          isPro: true,
+          canCreateManualReleases: true,
+          canEditSmartLinks: true,
+          canAccessFutureReleases: true,
+          smartLinksLimit: null,
+        },
+        onSync,
+        onCreateRelease,
+        sidebarDataByReleaseId: {
+          r1: {
+            analytics: {
+              totalClicks: 12,
+              last7DaysClicks: 3,
+              lastClickAt: null,
+              providerClicks: [],
+            },
+            tracks: [],
+          },
+        },
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sync' }));
+    expect(onSync).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'New release' }));
+    expect(onCreateRelease).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('option', { name: /Demo Single/ }));
+    const sidebar = screen.getByTestId('release-sidebar');
+    expect(sidebar).toHaveAttribute('data-analytics', 'override');
+    expect(sidebar).toHaveAttribute('data-has-tracks', 'true');
+    expect(sidebar).toHaveAttribute('data-show-credits', 'false');
   });
 });

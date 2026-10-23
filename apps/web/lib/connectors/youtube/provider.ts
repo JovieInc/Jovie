@@ -1,3 +1,4 @@
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import 'server-only';
 
 import type { YouTubeThumbnailSet } from '@/lib/db/schema/youtube-library';
@@ -199,7 +200,7 @@ function toChannelVideo(
   return {
     channelId,
     videoId: item.id,
-    title: item.snippet.title?.trim() || 'Untitled video',
+    title: item.snippet.title?.trim() || COPY_FALLBACKS.video,
     description: item.snippet.description ?? null,
     publishedAt:
       publishedAt && !Number.isNaN(publishedAt.getTime()) ? publishedAt : null,

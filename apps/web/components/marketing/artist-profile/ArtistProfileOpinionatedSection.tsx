@@ -74,7 +74,7 @@ export function ArtistProfileOpinionatedSection({
           </div>
 
           <figure
-            className='ap-opinionated__visual relative'
+            className='ap-opinionated__visual marketing-rounded-frame relative'
             data-testid='artist-profile-opinionated-profile'
           >
             {accessibleCaption ? (

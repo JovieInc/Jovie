@@ -32,6 +32,14 @@ describe('CanonicalLifecycleFunnel', () => {
     expect(screen.getAllByRole('link')).toHaveLength(11);
   });
 
+  it('labels the window and population behind the lifecycle counts', () => {
+    render(<CanonicalLifecycleFunnel metrics={metrics} />);
+
+    expect(screen.getByTestId('canonical-lifecycle-scope')).toHaveTextContent(
+      'All time · deduped contacts, each counted once at current stage'
+    );
+  });
+
   it('keeps all stages visible when the lifecycle is empty', () => {
     const emptyMetrics = Object.fromEntries(
       Object.keys(metrics).map(key => [key, 0])

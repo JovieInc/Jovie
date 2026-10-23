@@ -4,11 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildReport, stageMarkdown } from '../../shipping-slo-report.mjs';
 import {
   attachRedPrSuites,
+  collectArtifactFeed,
   collectLinearIssues,
   collectMergedPrs,
   collectStageRaw,
   listWorkflowRuns,
   parseGhOutput,
+  sampleEvenly,
 } from '../stage-collect.mjs';
 import {
   deriveStageEvents,
@@ -127,6 +129,45 @@ describe('stage derivation from receipts', () => {
     ]);
     expect(release[2]).toMatchObject({ enteredAt: ago(60), exitedAt: ago(30) });
   });
+  it.each([
+    ['after production verification', 20, 10, 'advanced'],
+    ['before a rework PR merges', 200, 190, 'failed'],
+    ['when verification is abandoned', 20, 10, 'abandoned'],
+  ])(
+    'preserves independent outcome receipts %s',
+    (_, entered, exited, outcome) => {
+      const receipt = event({
+        entityId: 'JOV-7',
+        stage: 'outcome-receipt',
+        enteredAt: ago(entered),
+        exitedAt: ago(exited),
+        outcome,
+        sourceReceipt: 'lanes-ledger:outcome-7',
+      });
+      const feeds = { lanes: { events: [receipt] } };
+      const events = deriveStageEvents(
+        { prs: [pr(7, { mergedAt: ago(90) })], controllers, feeds },
+        MANIFEST
+      );
+      expect(events.filter(e => e.stage === 'outcome-receipt')).toEqual([
+        receipt,
+      ]);
+      expect(
+        events.find(e => e.entityType === 'shipping' && e.stage === 'deployed')
+      ).toMatchObject({ enteredAt: ago(40), exitedAt: ago(30) });
+      expect(
+        events.find(e => e.entityType === 'shipping' && e.stage === 'verified')
+      ).toMatchObject({ outcome: 'completed', exitedAt: ago(30) });
+      const timings = compactStageTimings(
+        computeStageTimings(events, MANIFEST, { now: NOW })
+      );
+      expect(
+        timings.entities.shipping.stages['outcome-receipt']['24h']
+      ).toEqual([1, 600, 600]);
+      expect(deriveStageEvents({ feeds }, MANIFEST)).toEqual([receipt]);
+    }
+  );
+
   it('derives red → classified → green remediation episodes', () => {
     const at = minutes => q(ago(minutes));
     const suite = (conclusion, minutes) =>
@@ -459,5 +500,136 @@ describe('committed stage-timings snapshot', () => {
       regression: null,
     });
     expect(compact.windowFormat).toEqual(['n', 'p50', 'p95']);
+  });
+});
+
+describe('artifact stage sources', () => {
+  const runRow = (id, minutesAgo, stage = 'started') =>
+    JSON.stringify({
+      schema: 'jovie-stage-event/v1',
+      entityType: 'automation-run',
+      entityId: `github:jovie:x@${id}`,
+      stage,
+      enteredAt: ago(minutesAgo + 1),
+      exitedAt: ago(minutesAgo),
+      actor: null,
+      outcome: stage === 'finished' ? 'completed' : 'advanced',
+      sourceReceipt: `run ${id}`,
+    });
+  const listing = rows => args =>
+    args[0] === 'api' && args[1].includes('/actions/artifacts?name=')
+      ? rows.map(r => JSON.stringify(r)).join('\n')
+      : '[]';
+
+  it('reads every artifact in the window, dedupes repeats and skips expired ones', () => {
+    const files = {
+      11: [runRow(1, 30), runRow(1, 29, 'finished')].join('\n'),
+      12: [runRow(1, 30), runRow(1, 29, 'finished'), runRow(2, 5)].join('\n'),
+    };
+    const read = [];
+    const feed = collectArtifactFeed({
+      gh: listing([
+        { id: 2, created_at: ago(4), expired: false, run: 12 },
+        { id: 1, created_at: ago(28), expired: false, run: 11 },
+        { id: 0, created_at: ago(40), expired: true, run: 10 },
+        { id: 9, created_at: ago(40 * 24 * 60), expired: false, run: 9 },
+      ]),
+      readArtifact: ({ run, name, file }) => {
+        read.push([run, name, file]);
+        return files[run];
+      },
+      repository: 'JovieInc/Jovie',
+      artifact: 'automation-liveness-receipts/stage-events.ndjson',
+      manifest: MANIFEST,
+      sinceMs: NOW - 29 * 86_400_000,
+    });
+    expect(read).toEqual([
+      [12, 'automation-liveness-receipts', 'stage-events.ndjson'],
+      [11, 'automation-liveness-receipts', 'stage-events.ndjson'],
+    ]);
+    expect(feed.events.map(e => `${e.entityId}:${e.stage}`).sort()).toEqual([
+      'github:jovie:x@1:finished',
+      'github:jovie:x@1:started',
+      'github:jovie:x@2:started',
+    ]);
+    expect(feed.artifacts).toEqual({ listed: 2, sampled: 2, read: 2 });
+  });
+
+  it('samples evenly and keeps the newest and oldest artifacts', () => {
+    const items = Array.from({ length: 1000 }, (_, i) => i);
+    const picked = sampleEvenly(items, 120);
+    expect(picked).toHaveLength(120);
+    expect(picked[0]).toBe(0);
+    expect(picked.at(-1)).toBe(999);
+  });
+
+  it('is a source failure, not an empty success, when no artifact can be read', async () => {
+    const gh = args =>
+      args[1] === 'graphql'
+        ? '{"data":{"search":{"pageInfo":{"hasNextPage":false},"nodes":[]}}}'
+        : args[1]?.includes('/actions/artifacts?name=')
+          ? JSON.stringify({
+              id: 1,
+              created_at: ago(5),
+              expired: false,
+              run: 7,
+            })
+          : '[]';
+    const raw = await collectStageRaw({
+      gh,
+      fetchImpl: async () => new Response('', { status: 404 }),
+      env: {},
+      manifest: MANIFEST,
+      now: NOW,
+      days: 7,
+      readArtifact: () => {
+        throw new Error('HTTP 410 artifact expired');
+      },
+    });
+    expect(raw.sources['automation-liveness-receipts']).toMatchObject({
+      ok: false,
+      error: expect.stringMatching(/no artifact readable.*410/),
+    });
+  });
+
+  it('feeds artifact rows into stage timings', async () => {
+    const gh = args =>
+      args[1] === 'graphql'
+        ? '{"data":{"search":{"pageInfo":{"hasNextPage":false},"nodes":[]}}}'
+        : args[1]?.includes('name=automation-liveness-receipts')
+          ? JSON.stringify({
+              id: 1,
+              created_at: ago(5),
+              expired: false,
+              run: 7,
+            })
+          : '[]';
+    const raw = await collectStageRaw({
+      gh,
+      fetchImpl: async () => new Response('', { status: 404 }),
+      env: {},
+      manifest: MANIFEST,
+      now: NOW,
+      days: 7,
+      readArtifact: () => [runRow(1, 30), runRow(1, 20, 'finished')].join('\n'),
+    });
+    expect(raw.sources['automation-liveness-receipts']).toMatchObject({
+      ok: true,
+      n: 2,
+      artifacts: { listed: 1, sampled: 1, read: 1 },
+    });
+    expect(raw.sources['release-replay-receipts']).toMatchObject({
+      ok: true,
+      n: 0,
+    });
+    const timings = computeStageTimings(
+      deriveStageEvents(raw, MANIFEST),
+      MANIFEST,
+      { now: NOW }
+    );
+    expect(timings.entities['automation-run'].stages.started['24h'].n).toBe(1);
+    expect(
+      timings.entities['automation-run'].endToEnd['started->finished']['24h'].n
+    ).toBe(1);
   });
 });

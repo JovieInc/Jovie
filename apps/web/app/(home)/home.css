@@ -1,3 +1,5 @@
+@import "../../components/marketing/MarketingRoundedFrame.css";
+
 /*
  * Homepage chat intake styles.
  *
@@ -6303,7 +6305,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
    feature list settles at a consistent rhythm under the CTA. */
 .home-viewport .system-b-mounted-home-pricing .marketing-pricing-plan-card {
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-xl);
   padding: clamp(var(--space-6), 2.4vw, var(--space-8));
   background: var(--system-b-bg-surface-0);
   box-shadow: none;
@@ -6529,7 +6531,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .system-b-claim-handle-row {
   min-height: 52px;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 70%, transparent);
   border-radius: var(--radius-xl);

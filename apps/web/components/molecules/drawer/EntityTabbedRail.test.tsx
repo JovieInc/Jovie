@@ -66,6 +66,33 @@ describe('EntityTabbedRail', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('opts the tabbed card into the shared rounded drawer card without raising the rail', () => {
+    render(
+      <EntityTabbedRail
+        isOpen
+        ariaLabel='Analytics'
+        activeTab='details'
+        onTabChange={() => undefined}
+        tabOptions={TABS}
+        tabsAriaLabel='Analytics tabs'
+        tabbedCardTestId='analytics-tabbed-card'
+        tabbedSurfaceVariant='card'
+        testId='analytics-rail'
+      >
+        <div>Ranked cities</div>
+      </EntityTabbedRail>
+    );
+
+    const rail = screen.getByTestId('analytics-rail');
+    expect(rail.querySelector('[data-right-rail-workspace]')).toHaveAttribute(
+      'data-surface-variant',
+      'flat'
+    );
+    const card = screen.getByTestId('analytics-tabbed-card');
+    expect(card).toHaveAttribute('data-surface-variant', 'card');
+    expect(card.className).toContain('rounded-lg');
+  });
+
   it('places the empty state directly on the flat rail and omits tab chrome', () => {
     const { container } = render(
       <EntityTabbedRail

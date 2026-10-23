@@ -614,6 +614,41 @@ export function PersistentAudioBar() {
               aria-hidden={!playerOpen}
               className='flex items-center gap-3 px-4 py-1.5 lg:px-6'
             >
+              <div
+                className='flex w-56 min-w-0 shrink-0 items-center gap-3'
+                data-testid='desktop-player-track'
+              >
+                {playbackState.artworkUrl && !imgError ? (
+                  <ArtworkFrame
+                    size={36}
+                    className='h-9 w-9 shrink-0 bg-surface-2'
+                  >
+                    <Image
+                      src={playbackState.artworkUrl}
+                      alt=''
+                      fill
+                      sizes='36px'
+                      className={ARTWORK_FIT_CLASSNAME}
+                      unoptimized
+                      onError={() => setImgError(true)}
+                    />
+                  </ArtworkFrame>
+                ) : null}
+                <div className='min-w-0'>
+                  <TruncatedText
+                    lines={1}
+                    className='text-xs font-caption text-primary-token'
+                  >
+                    {playbackState.trackTitle ?? ''}
+                  </TruncatedText>
+                  <TruncatedText
+                    lines={1}
+                    className='text-2xs text-tertiary-token'
+                  >
+                    {playbackState.artistName ?? ''}
+                  </TruncatedText>
+                </div>
+              </div>
               <AudioBar
                 isPlaying={playbackState.isPlaying}
                 onPlay={handleToggle}

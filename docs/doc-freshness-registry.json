@@ -95,12 +95,12 @@
     ".claude/rules/environment.md": {
       "owner": "@itstimwhite",
       "claim": "Runtime versions follow the checked-in pins. Branch switches stop the local dev server; competing editor writes are resolved before committing, as recorded in the corresponding lessons.",
-      "documentSha256": "05cf43adb22321fcf70cff341154d3224d082533dde122784b4bd524a86de9ea",
+      "documentSha256": "c4a1143e376d69e48921178c88186d4c47f365c0b837140e8fc459c3e6122cfa",
       "sources": [
         {
           "path": ".nvmrc",
-          "documentValue": "24.21.0",
-          "sha256": "73fb1b615e2043a933be1c0895cde4358036acc28d785692509b822aa53c761f"
+          "documentValue": "24.22.1",
+          "sha256": "d9f318747a126ce2247661af67852b185def7789492eabfad7bba322be087c33"
         },
         {
           "path": "package.json",
@@ -122,15 +122,15 @@
     ".claude/rules/external-apis.md": {
       "owner": "@itstimwhite",
       "claim": "Every third-party API call goes through packages/api-client or scripts/apiclient, enforced by the external API guard ratchet.",
-      "documentSha256": "7ad13110ec9c4b1501f6e18737412e10432c337e75c89b769737655d72f5c1b5",
+      "documentSha256": "411824f1f7767facc09e589d7a1cb480a71a7044aade3b4bc432203011f545f9",
       "sources": [
         {
           "path": "packages/api-client/providers.json",
-          "sha256": "f8e449fcee1f5f8cef5329d41f6955d4f36de08d0cd592e469aba8f7c674c09f"
+          "sha256": "e8ade045fdaa69c64417b3cf7707fae0e20e073650086f0a117883a1b7a86dd0"
         },
         {
           "path": "scripts/lib/external-api-guard.mjs",
-          "sha256": "93114f8531a7c0bd8722e8c2086294a4ecf226cc4123c3044765e77298f9c8ba"
+          "sha256": "376b4cc66aeab4d87e18c5b1844a76794b01f2d73372f149eec1b3688cfb5f57"
         }
       ]
     },
@@ -384,7 +384,7 @@
     "CODEX.md": {
       "owner": "@itstimwhite",
       "claim": "Local hooks reference canonical setup and cleanup wrappers, with Node pinned locally.",
-      "documentSha256": "1f321d71333739508b611c530b0f08e9ce29ed63220642370942873aa779ae7f",
+      "documentSha256": "0e48aae82be60bac72a8f0f7b934435c99648d45939f58cd9273a4f1895ea6ee",
       "sources": [
         {
           "path": ".codex/hooks.json",
@@ -392,8 +392,8 @@
         },
         {
           "path": ".nvmrc",
-          "documentValue": "24.21.0",
-          "sha256": "73fb1b615e2043a933be1c0895cde4358036acc28d785692509b822aa53c761f"
+          "documentValue": "24.22.1",
+          "sha256": "d9f318747a126ce2247661af67852b185def7789492eabfad7bba322be087c33"
         }
       ]
     },
@@ -562,11 +562,11 @@
     "docs/metrics/STAGE_EVENTS.md": {
       "owner": "@itstimwhite",
       "claim": "The stage-event contract, sources, outputs and emitter specs match the manifest and the stage-timings code.",
-      "documentSha256": "df6fd9329a2587e44a5a1e924f9b520abd936e5372bcf3702c181e1631c3e3d7",
+      "documentSha256": "eeffe1bc1cafcf3bfe51b63bc58d365dcb4c559a115a701d28bed0f1ef52435b",
       "sources": [
         {
           "path": "docs/metrics/stage-manifest.json",
-          "sha256": "0ae456055b1b20adce866461813394c051b1dd4e8c2a5276fd5d1d03bdca00d3"
+          "sha256": "fa5745efcb81b1853db6a3840eba3ba23591ec4663d8df42fb357aef60532f72"
         },
         {
           "path": "scripts/lib/stage-events.mjs",

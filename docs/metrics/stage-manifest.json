@@ -102,6 +102,14 @@
           "source": "github-controller"
         },
         {
+          "id": "outcome-receipt",
+          "meaning": "independent issue span: outcome receipt owed (lifecycle comment) to receipt recorded by the outcome lane; entityId is the JOV issue",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
           "id": "verified",
           "meaning": "first Production Verified job completed at or after deploy",
           "producer": "production-controller.yml",
@@ -330,6 +338,29 @@
         }
       ]
     },
+    "linear-intake": {
+      "entityId": "Linear issue identifier (JOV-123, LYB-45)",
+      "description": "One issue that entered Triage, from entry to classification (team, priority, labels, out of Triage) or an explicit Ovie card for Tim. Dwell SLO 15 min (.claude/rules/event-driven.md); dead-man summer:triage-dwell.",
+      "endToEnd": [["triage", "classified"]],
+      "stages": [
+        {
+          "id": "triage",
+          "meaning": "issue entered Triage (create or move) until Summer's scoped triage turn read back its effect",
+          "producer": "summer-config",
+          "status": "spec",
+          "source": "summer-stage-feed",
+          "owner": "summer-config"
+        },
+        {
+          "id": "classified",
+          "meaning": "terminal: completed when moved out of Triage with priority set, failed when held as an Ovie card for Tim",
+          "producer": "summer-config",
+          "status": "spec",
+          "source": "summer-stage-feed",
+          "owner": "summer-config"
+        }
+      ]
+    },
     "summer-turn": {
       "entityId": "<hashed conversation>:<hashed turn> (summer-config hashes both)",
       "description": "One Summer turn from triggering event to measured outcome.",
@@ -363,6 +394,57 @@
           "producer": "summer-config",
           "status": "pushed",
           "source": "summer-stage-feed"
+        }
+      ]
+    },
+    "claim-dogfood": {
+      "entityId": "claim-checkout-dogfood#<run id>@<run attempt>",
+      "description": "One browser dogfood of the $12 artist claim (Stripe test mode, fixture artists): from the staging deploy (or dispatch) that made it due to the journey verdict.",
+      "endToEnd": [["wait", "journey"]],
+      "stages": [
+        {
+          "id": "wait",
+          "meaning": "staging deploy finished (Staging Controller completed) or dispatch, until the dogfood job started",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        },
+        {
+          "id": "setup",
+          "meaning": "job start to app ready: ephemeral Neon branch, migrations, build, server",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        },
+        {
+          "id": "journey",
+          "meaning": "browser journey; outcome completed (green) or failed (red)",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        }
+      ]
+    },
+    "market-signal": {
+      "entityId": "<item id> (x-post:<snowflake id> for X posts)",
+      "description": "INTERNAL ONLY. One external market signal seen by scripts/signals/signal_watch.py. X has no push trigger, so X posts come from a backstop poll (one Grok CLI call per watcher run, every 6 h). The published stage measures that poll's cost; this is the documented exception to event-driven.",
+      "endToEnd": [["published", "delivered"]],
+      "stages": [
+        {
+          "id": "published",
+          "meaning": "from the post's own createdAt (snowflake time) to the watcher run that observed it",
+          "producer": "signal-watch",
+          "status": "spec",
+          "source": "signal-watch-feed",
+          "owner": "signals"
+        },
+        {
+          "id": "delivered",
+          "meaning": "from the card entering the outbox to Summer's signed ingress answering 202 (or rejecting it)",
+          "producer": "signal-watch",
+          "status": "spec",
+          "source": "signal-watch-feed",
+          "owner": "signals"
         }
       ]
     }
@@ -418,6 +500,19 @@
       "url": "https://jov.ie/api/cron/stage-timings",
       "auth": "CRON_SECRET",
       "owner": "apps/web"
+    },
+    "claim-dogfood-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "claim-dogfood-receipts/stage-events.ndjson",
+      "workflow": "claim-checkout-dogfood.yml",
+      "owner": "revenue path (scripts/claim-dogfood-report.mjs)"
+    },
+    "signal-watch-feed": {
+      "kind": "events",
+      "url": null,
+      "artifact": "stage-events.ndjson next to the watcher state (rolling 28 d, written by scripts/signals/signal_watch.py)",
+      "owner": "signals; published through the lanes status feed once the Gem tick is live"
     }
   },
   "producers": {

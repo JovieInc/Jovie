@@ -25,10 +25,24 @@ export const stripeWebhookEvents = pgTable(
     processingStartedAt: timestamp('processing_started_at'),
     stripeCreatedAt: timestamp('stripe_created_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    // A verified event that cannot be applied yet (for example a paid
+    // subscription on an unmapped price) is acknowledged only after it is
+    // marked here. Replay grants it once the cause is fixed.
+    reconciliationStatus: text('reconciliation_status'),
+    reconciliationReason: text('reconciliation_reason'),
+    reconciliationContext: jsonb('reconciliation_context').$type<
+      Record<string, unknown>
+    >(),
+    reconciliationFlaggedAt: timestamp('reconciliation_flagged_at'),
+    reconciledAt: timestamp('reconciled_at'),
   },
   table => ({
     createdAtIdx: index('stripe_webhook_events_created_at_idx').on(
       table.createdAt
+    ),
+    reconciliationStatusCheck: check(
+      'stripe_webhook_events_reconciliation_status_check',
+      drizzleSql`${table.reconciliationStatus} IS NULL OR ${table.reconciliationStatus} IN ('needs_reconciliation', 'reconciled')`
     ),
   })
 );

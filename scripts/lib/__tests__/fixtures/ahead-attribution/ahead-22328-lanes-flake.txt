@@ -1,0 +1,95 @@
+======== lane: structural ========
+##[error]Structural command 58/58 failed (exit 1). Command: if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then { COVERAGE_FIL… | 1 failed, 644 passed, 78 deselected, 718 subtests passed in 153.16s (0:02:33)
+[ci-fast] 1 lane(s) failed: structural
+[ci-fast] structural: failure (311.9s)
+Structural command 58/58 failed (exit 1). Command: if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then { COVERAGE_FIL…
+#### Structural command timings (wall 311.9s, sum 809.8s, 58 commands)
+| 58 | 311.9s | exit 1 | `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then { COVERAGE_FILE="${RUNNER_TEMP:-/t…` |
+| 31 | 149.1s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/merge-group-failure-ho…` |
+| 30 | 59.7s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs …` |
+| 38 | 31.4s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/recheck-main-lineage-a…` |
+| 1 | 31.3s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs…` |
+| 42 | 23.1s | pass | `node --experimental-test-coverage --test --test-coverage-include='scripts/lib/source-admission-poli…` |
+| 13 | 20.6s | pass | `node --test --experimental-test-coverage --test-coverage-include=.github/scripts/canonical-staging-…` |
+| 48 | 19.1s | pass | `COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/***-gem-priority-gate.coverage" python3 -m coverage run --bra…` |
+| 16 | 17.5s | pass | `node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-release-so…` |
+| 32 | 16.9s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/validation-lifecycle.t…` |
+| 49 | 12.7s | pass | `COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/***-fleet-admission.coverage" python3 -m coverage run --branc…` |
+| 52 | 12.0s | pass | `python3 scripts/fleet-gate/tests/test_evaluate_fleet_gate.py` |
+| 35 | 8.7s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-runtime-bundle.te…` |
+| 18 | 6.2s | pass | `pnpm exec vitest run --config scripts/vitest.config.mts lib/__tests__/rolling-ci-failure-dispositio…` |
+| 2 | 5.5s | pass | `pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/provider-attempt-receipt.test…` |
+| 17 | 5.2s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/deliv…` |
+| 11 | 5.2s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-ru…` |
+| 5 | 5.0s | pass | `pnpm --filter @***/api-client test` |
+| 3 | 5.0s | pass | `pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/provider-incident-contract.te…` |
+| 23 | 4.7s | pass | `pnpm ci:harness:check` |
+| 12 | 4.7s | pass | `node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-lane-carry…` |
+| 33 | 4.6s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs…` |
+| 6 | 4.5s | pass | `if python3 -c "import coverage, pytest, xdist" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp…` |
+| 37 | 4.3s | pass | `pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib…` |
+| 4 | 4.3s | pass | `pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/symphony-health-contract.test…` |
+| 36 | 3.6s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-current-wire.test…` |
+| 34 | 3.1s | pass | `pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-native-terminal.t…` |
+| 9 | 2.9s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-co…` |
+| 57 | 2.7s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/lib/publish-coverage-repor…` |
+| 27 | 2.2s | pass | `node --test scripts/file-quarantine-clusters.test.mjs scripts/propose-quarantine-ledger.test.mjs` |
+| 7 | 1.8s | pass | `node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs` |
+| 39 | 1.4s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linea…` |
+| 24 | 1.3s | pass | `pnpm ci:incident-contract:validate` |
+| 40 | 1.3s | pass | `pnpm ci:branching-guard:validate` |
+| 44 | 1.3s | pass | `pnpm doc:freshness:check` |
+| 22 | 1.2s | pass | `node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --tes…` |
+| 41 | 1.1s | pass | `pnpm ci:merge-queue:check` |
+| 26 | 1.1s | pass | `node --test .github/scripts/collect-quarantine-evidence.test.mjs` |
+| 19 | 1.1s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mj…` |
+| 45 | 1.0s | pass | `node .github/scripts/quarantine-ledger.mjs validate` |
+| 47 | 1.0s | pass | `COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/***-closure-health.coverage" python3 -m coverage run --branch…` |
+| 15 | 0.8s | pass | `node --test --experimental-test-coverage --test-coverage-include=.github/scripts/vercel-build-queue…` |
+| 14 | 0.8s | pass | `node --test --experimental-test-coverage --test-coverage-include=.github/scripts/vercel-on-demand-l…` |
+| 28 | 0.8s | pass | `node --test .github/scripts/marketing-dom-workflow.test.mjs` |
+| 43 | 0.7s | pass | `pnpm ci:typecheck-gate-guard` |
+| 29 | 0.7s | pass | `node --test .github/scripts/update-quarantine.test.js` |
+| 21 | 0.7s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/promotion-loss-metrics.mjs…` |
+| 8 | 0.6s | pass | `node --test .github/scripts/dependency-parity-evidence.test.mjs` |
+| 10 | 0.6s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-re…` |
+| 20 | 0.6s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-subscript…` |
+| 25 | 0.6s | pass | `node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.tes…` |
+| 46 | 0.4s | pass | `python3 .github/scripts/test-security-suppression-audit.py` |
+| 50 | 0.3s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/shipp…` |
+| 51 | 0.2s | pass | `node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/summe…` |
+| 54 | 0.2s | pass | `node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs` |
+| 56 | 0.2s | pass | `node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs` |
+| 55 | 0.2s | pass | `node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs` |
+| 53 | 0.2s | pass | `python3 scripts/fleet-gate/tests/test_receipt_writer.py` |
+[ci-fast] wrote lane results → /home/runner/work/_temp/ci-fast-lanes-structural.json
+======== lane: biome ========
+[ci-fast] biome: success (0.6s)
+======== lane: eslint-server-boundaries ========
+[ci-fast] eslint-server-boundaries: success (0.0s)
+======== lane: shadcn-lint-contracts ========
+[ci-fast] shadcn-lint-contracts: success (37.6s)
+======== lane: scripts-typecheck ========
+[ci-fast] scripts-typecheck: success (74.9s)
+======== lane: guardrails ========
+[ci-fast] guardrails: success (38.1s)
+======== lane: design-system-source-ratchet ========
+[ci-fast] design-system-source-ratchet: skipped (0.0s)
+======== lane: design-exception-registry ========
+[ci-fast] design-exception-registry: skipped (0.0s)
+======== lane: design-governance-enforcement ========
+[ci-fast] design-governance-enforcement: skipped (0.0s)
+======== lane: ios-fast ========
+[ci-fast] ios-fast: skipped (0.0s)
+======== lane: billing-coverage ========
+[ci-fast] billing-coverage: skipped (0.0s)
+======== lane: copy-gate ========
+[ci-fast] copy-gate: skipped (0.0s)
+======== lane: source-guards ========
+[ci-fast] source-guards: skipped (0.0s)
+======== lane: node-runtime-contracts ========
+[ci-fast] node-runtime-contracts: skipped (0.0s)
+======== lane: structural ========
+[ci-fast] structural: skipped (0.0s)
+[ci-fast] wrote lane results → /home/runner/work/_temp/ci-fast-lanes.json
+[ci-fast] all lanes passed

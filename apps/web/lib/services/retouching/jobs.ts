@@ -10,13 +10,14 @@ import { users } from '@/lib/db/schema/auth';
  * queued -> running -> completed | failed | identity_check_failed.
  */
 
+/** `clerkUserId` is the session app `users.id` passed in from chat tools. */
 export async function resolveRetouchUserId(
   clerkUserId: string
 ): Promise<string | null> {
   const rows = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.clerkId, clerkUserId))
+    .where(eq(users.id, clerkUserId))
     .limit(1);
   return rows[0]?.id ?? null;
 }

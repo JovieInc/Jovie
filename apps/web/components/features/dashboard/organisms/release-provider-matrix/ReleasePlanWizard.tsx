@@ -304,7 +304,7 @@ export function ReleasePlanWizard({
       </DialogDescription>
       <DialogBody>
         <div className='space-y-4' data-testid='wizard-step'>
-          <div className='text-xs uppercase tracking-wide text-muted-foreground'>
+          <div className='text-xs text-tertiary-token'>
             Step {stepIndex + 1} of {STEPS.length}
           </div>
           <div>

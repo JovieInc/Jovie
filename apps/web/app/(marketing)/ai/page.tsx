@@ -4,13 +4,14 @@ import Link from 'next/link';
 import { MarketingContainer, MarketingHeroPhoto } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
+import { documentTitle } from '@/lib/seo/document-title';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import './ai-page.css';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: 'Jovie AI Operating System',
+  title: documentTitle('Jovie AI Operating System'),
   robots: NOINDEX_ROBOTS,
 };
 

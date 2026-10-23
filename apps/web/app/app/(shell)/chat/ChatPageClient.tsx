@@ -518,11 +518,20 @@ export function ChatPageClient({
     [searchParams]
   );
 
-  // Auto-open the profile drawer when redirected from /dashboard/profile (?panel=profile)
+  // Auto-open the profile drawer when redirected from /dashboard/profile
+  // (?panel=profile). Below lg the rail presents as a full-screen modal
+  // sheet, so the deep link only auto-opens where the desktop overlay rail
+  // fits; on mobile the rail stays closed until its next explicit action
+  // (the closed-by-default chat contract, JOV-7150). Live matchMedia, not
+  // the breakpoint hook: the hook's server snapshot is false through
+  // hydration and would drop a desktop deep link entirely.
   useEffect(() => {
     if (!enablePreviewPanel) return;
     if (panelParam === 'profile') {
-      openPreviewPanel();
+      const desktop =
+        typeof globalThis.matchMedia === 'function' &&
+        globalThis.matchMedia('(min-width: 1024px)').matches;
+      if (desktop) openPreviewPanel();
     }
   }, [enablePreviewPanel, openPreviewPanel, panelParam]);
 

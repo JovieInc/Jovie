@@ -5,7 +5,10 @@ import { LISTEN_COOKIE } from '@/constants/app';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
-import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
+import {
+  appendUTMParamsToUrl,
+  resolveSmartLinkOutboundUtmParams,
+} from '@/lib/utm';
 
 interface PreferredDspRedirectProps {
   /** Provider links available for this content, used to validate the preference */
@@ -132,8 +135,12 @@ export function PreferredDspRedirect({
       );
     }
 
+    // Same attribution as an explicit provider tap on the rendered page.
     globalThis.location.replace(
-      appendUTMParamsToUrl(matchingLink.url, extractUTMParams(searchParams))
+      appendUTMParamsToUrl(
+        matchingLink.url,
+        resolveSmartLinkOutboundUtmParams(searchParams)
+      )
     );
   }, [artistHandle, providerLinks, tracking]);
 

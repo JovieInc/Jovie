@@ -5,27 +5,27 @@
  * and specialist artist APIs may keep music-domain language. Do not treat this
  * as a nav/taxonomy registry (JOV-4491) or a homepage taste rewrite (JOV-5861).
  *
- * seoTitle / seoDescription / homepageHeadline must stay identical to the
- * approved homepage copy in `homepageIdentityCopy.ts`.
+ * The homepage page body sells the artist profile (EVENT 2026-10-20) from
+ * `homepageCopy.ts`; its metadata description and structured data still read
+ * this general identity. `homepageHeadline` is the auth brand-panel line.
+ * General copy stays generic (Tim, 2026-10-22): do not put a segment list back
+ * into support, definition, audiences, or knowsAbout.
  */
 export const COMPANY_IDENTITY = {
   productName: 'Jovie',
   headline: 'Presence, relationships, and growth.',
-  support:
-    'One product for artists, founders, authors, creators, and independent experts.',
+  support: 'One product for any creator.',
   definition:
-    'Jovie is one product for presence, relationships, and growth. It helps artists, founders, authors, creators, and independent experts control how they are found and turn attention into relationships.',
+    'Jovie is one product for presence, relationships, and growth. It helps any creator control how they are found and turn attention into relationships.',
   seoTitle: 'Jovie | Be found. Be understood.',
   seoDescription:
     'Claim your name. Jovie makes you easy to reach, for people and for agents.',
   homepageHeadline: 'Be found. Be understood.',
-  audiences: [
-    'artists',
-    'founders',
-    'authors',
-    'creators',
-    'independent experts',
-  ] as const,
+  /** Canonical public X handle. Retired `@jovieapp` must not return. */
+  xHandle: '@meetjovie',
+  /** Homepage WebSite schema names. Do not add a product-category alias. */
+  schemaAlternateNames: ['Jovie', 'jov.ie'],
+  audiences: ['creators'] as const,
   outcomes: ['presence', 'relationships', 'growth'] as const,
   knowsAbout: [
     'Public Profiles',
@@ -33,7 +33,7 @@ export const COMPANY_IDENTITY = {
     'Audience Relationships',
     'Independent Creators',
     'Smart Links',
-    'Music Marketing',
+    'Public Identity',
   ] as const,
   signupDescription:
     'Create your Jovie account to claim a living profile and turn attention into relationships.',

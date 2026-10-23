@@ -369,11 +369,17 @@ function fakeGh({
   const calls = [];
   const gh = args => {
     calls.push(args);
-    const [cmd, path] = args;
-    if (cmd === 'run' && path === 'rerun') {
+    const [cmd, second] = args;
+    if (cmd === 'run' && second === 'rerun') {
       if (rerunFails) throw new Error('HTTP 403: Resource not accessible');
       return '';
     }
+    const path =
+      args.find(
+        arg =>
+          arg === 'rate_limit' ||
+          (typeof arg === 'string' && arg.startsWith('repos/'))
+      ) ?? second;
     if (path === 'rate_limit')
       return JSON.stringify({ resources: { core: { remaining, reset } } });
     if (path.includes('/attempts/')) return JSON.stringify({ jobs });
@@ -423,6 +429,13 @@ describe('runReplay', () => {
     );
     // rate_limit is read before any quota-consuming call.
     assert.deepEqual(calls[0], ['api', 'rate_limit']);
+    assert.ok(
+      calls.some(
+        args =>
+          args.includes('--allow-escape-sequences') &&
+          args.some(arg => String(arg).endsWith('/jobs/11/logs'))
+      )
+    );
   });
 
   it('reads the title from display_title when present', async () => {

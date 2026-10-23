@@ -10,7 +10,7 @@ import {
   AboutPageContent,
 } from '@/components/organisms/AboutPageContent';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
-import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { buildOrganizationSchema } from '@/lib/constants/schemas';
 import {
   ARTIST_LABELED_IDENTITY_SURFACES,
@@ -20,6 +20,7 @@ import {
   requiresSpotifyCatalogOrFollowers,
   SPECIALIST_API_IDENTITY_SURFACES,
 } from '@/lib/marketing/company-identity-policy';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
@@ -82,13 +83,15 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     ).toBe(false);
   });
 
-  it('keeps canonical identity aligned with the approved homepage SEO copy', () => {
-    expect(COMPANY_IDENTITY.seoTitle).toBe(HOMEPAGE_IDENTITY_COPY.seo.title);
-    expect(COMPANY_IDENTITY.seoDescription).toBe(
-      HOMEPAGE_IDENTITY_COPY.seo.description
-    );
-    expect(COMPANY_IDENTITY.homepageHeadline).toBe(
-      HOMEPAGE_IDENTITY_COPY.hero.headline
+  it('keeps homepage metadata general while the page body sells the artist profile', () => {
+    // EVENT 2026-10-20: the visible homepage sells the artist profile, but
+    // metadata and structured data stay on the general company identity.
+    const page = readWebSource('app/(home)/page.tsx');
+    expect(page).toContain('COMPANY_IDENTITY.seoDescription');
+    expect(page).toContain('description: COMPANY_IDENTITY.seoDescription');
+    expect(isArtistOnlyCompanyDefinition(HOMEPAGE_COPY.seo.title)).toBe(false);
+    expect(isArtistOnlyCompanyDefinition(COMPANY_IDENTITY.seoDescription)).toBe(
+      false
     );
   });
 
@@ -121,7 +124,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     const { metadata } = await import('../../../app/(marketing)/about/page');
     const expectedTitle = `About Jovie: ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`;
 
-    expect(metadata.title).toBe(expectedTitle);
+    expect(applyRootTitleTemplate(metadata.title)).toBe(expectedTitle);
     expect(String(metadata.description)).toContain(COMPANY_IDENTITY.definition);
     expect(isArtistOnlyCompanyDefinition(String(metadata.description))).toBe(
       false
@@ -140,7 +143,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     expect(schema.description).toBe(COMPANY_IDENTITY.definition);
     expect(schema.knowsAbout).toEqual([...COMPANY_IDENTITY.knowsAbout]);
     expect(schema.knowsAbout).toContain('Independent Creators');
-    expect(schema.knowsAbout).toContain('Music Marketing');
+    expect(schema.knowsAbout).toContain('Public Identity');
   });
 
   it('uses general root-layout and signup metadata defaults', async () => {

@@ -129,9 +129,6 @@
     ".github/workflows/deprecation-intake.yml": {
       "gh-shell": 4
     },
-    ".github/workflows/design-gate.yml": {
-      "gh-shell": 2
-    },
     ".github/workflows/design-governance.yml": {
       "gh-shell": 4
     },
@@ -202,12 +199,9 @@
       "gh-shell": 4
     },
     ".github/workflows/screenshots.yml": {
-      "gh-shell": 13
+      "gh-shell": 4
     },
     ".github/workflows/security-suppression-audit.yml": {
-      "gh-shell": 1
-    },
-    ".github/workflows/security.yml": {
       "gh-shell": 1
     },
     ".github/workflows/sentry-autofix.yml": {
@@ -656,14 +650,14 @@
       "gh-subprocess": 1,
       "provider-host": 1
     },
-    "scripts/shipping-slo-intake.mjs": {
-      "gh-subprocess": 1
-    },
     "scripts/shipping-slo-report.mjs": {
       "gh-subprocess": 2
     },
     "scripts/shipping_origin.py": {
       "gh-subprocess": 2
+    },
+    "scripts/signals/signal_watch.py": {
+      "provider-host": 1
     },
     "scripts/source-admission-check.mjs": {
       "gh-subprocess": 1
