@@ -99,6 +99,7 @@ export function SidebarIdentityGroup({
           <Tooltip label={profileDisplayHref} side='right'>
             <Link
               href={profileHref}
+              prefetch={false}
               data-sidebar='identity-public-profile'
               aria-current={isPublicProfileActive ? 'page' : undefined}
               aria-label={publicProfileAccessibleName(profileDisplayHref)}

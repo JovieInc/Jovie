@@ -3,7 +3,7 @@
   "mode": "warn",
   "issue": "JOV-8606",
   "tighten": "auto",
-  "count": 34,
+  "count": 33,
   "violations": [
     "apps/web/app/(home)/page.tsx :: link-in-bio :: Jovie Link in Bio",
     "apps/web/app/(marketing)/alternatives/page.tsx :: link-in-bio :: Find a musician-first alternative to generic link-in-bio tools, with smart links and release workflows instead of a list of links.",
@@ -24,7 +24,6 @@
     "apps/web/app/(marketing)/launch/page.tsx :: link-in-bio :: a link-in-bio that converts in seconds.",
     "apps/web/app/(marketing)/launch/page.tsx :: link-in-bio :: A link-in-bio built to convert, not just display.",
     "apps/web/app/(marketing)/pricing/page.tsx :: link-in-bio :: link in bio platform pricing",
-    "apps/web/components/features/home/ReplacesSection.tsx :: link-in-bio :: Link-in-bio page",
     "apps/web/content/alternatives/link-in-bio.ts :: link-in-bio :: Link in Bio",
     "apps/web/content/alternatives/link-in-bio.ts :: link-in-bio :: A Link in Bio for Artists (2026)",
     "apps/web/content/alternatives/link-in-bio.ts :: link-in-bio :: Use Jovie as an artist link in bio with a public profile, release smart links, audience capture, and enrolled artist workflows.",

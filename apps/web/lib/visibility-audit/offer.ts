@@ -21,13 +21,20 @@ export type VisibilityAuditOffer =
   | VisibleVisibilityAuditOffer
   | HiddenVisibilityAuditOffer;
 
+/**
+ * The audit is a separate one-off Stripe Payment Link at $199. It used to
+ * equal the Pro monthly price; since Pro became $12/month (EVENT: Tim,
+ * 2026-10-20) it must not follow the subscription price or promise a credit
+ * larger than the first month.
+ */
+export const VISIBILITY_AUDIT_PRICE_USD = 199;
+
 export function visibilityAuditPriceUsd(): number {
-  return ARTIST_VISIBILITY_OFFER.pro.monthlyUsd;
+  return VISIBILITY_AUDIT_PRICE_USD;
 }
 
 export function visibilityAuditCreditNote(): string {
-  const price = visibilityAuditPriceUsd();
-  return `This $${price} audit is credited toward the first month of Artist Presence ($${price}/mo).`;
+  return `This $${VISIBILITY_AUDIT_PRICE_USD} audit is a one-time purchase, separate from ${ARTIST_VISIBILITY_OFFER.pro.displayName} ($${ARTIST_VISIBILITY_OFFER.pro.monthlyUsd}/mo).`;
 }
 
 /**

@@ -1,7 +1,7 @@
 {
   "schema": "jovie.spend-ledger/v1",
   "description": "Per-provider balance, burn, runway and caps. Metadata only. Snapshots are dated readings; the live check overlays fresh reads where a read path exists.",
-  "updatedAt": "2026-10-20T20:00:00Z",
+  "updatedAt": "2026-10-21T02:40:00Z",
   "thresholds": {
     "runwayAlertDays": 14,
     "capAlertPercents": [50, 80, 100],
@@ -432,6 +432,44 @@
         "method": "Gem codex-accounts.json (account/rateLimits/read)",
         "live": "codex-ledger"
       }
+    },
+    {
+      "id": "summer-trial-workers-ai",
+      "label": "Summer provider trial: Workers AI sub-cap",
+      "provider": "cloudflare",
+      "owner": "summer-config",
+      "kind": "trial-sub-cap",
+      "cap": {
+        "amountUsd": 50,
+        "period": "month",
+        "enforcement": "summer provider-trial ledger refuses bookings past the cap",
+        "alertPercents": [80, 100]
+      },
+      "snapshot": null,
+      "readPath": {
+        "method": "summer-company/provider-trial/ledger.json (schema summer.provider-trial-ledger/v1), months[YYYY-MM][channel].bookedMicroUsd; set SUMMER_PROVIDER_TRIAL_LEDGER to a file path or https URL (optional bearer SUMMER_PROVIDER_TRIAL_LEDGER_TOKEN)",
+        "live": "provider-trial-ledger"
+      },
+      "notes": "Contained Summer model-trial sub-cap funded by Cloudflare Startup credits. Machinery is summer-config#271 (idle until a trial is triggered by the eval policy)."
+    },
+    {
+      "id": "summer-trial-anthropic-api",
+      "label": "Summer provider trial: Anthropic API sub-cap",
+      "provider": "anthropic",
+      "owner": "summer-config",
+      "kind": "trial-sub-cap",
+      "cap": {
+        "amountUsd": 30,
+        "period": "month",
+        "enforcement": "summer provider-trial ledger refuses bookings past the cap",
+        "alertPercents": [80, 100]
+      },
+      "snapshot": null,
+      "readPath": {
+        "method": "summer-company/provider-trial/ledger.json (schema summer.provider-trial-ledger/v1), months[YYYY-MM][channel].bookedMicroUsd; set SUMMER_PROVIDER_TRIAL_LEDGER to a file path or https URL (optional bearer SUMMER_PROVIDER_TRIAL_LEDGER_TOKEN)",
+        "live": "provider-trial-ledger"
+      },
+      "notes": "Contained Summer model-trial sub-cap funded by the Claude Platform API credit. Machinery is summer-config#271 (idle until a trial is triggered by the eval policy)."
     }
   ]
 }

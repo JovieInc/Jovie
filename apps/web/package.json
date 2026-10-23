@@ -1,10 +1,10 @@
 {
   "name": "@jovie/web",
-  "version": "26.10.11",
+  "version": "26.10.13",
   "private": true,
   "sideEffects": false,
   "engines": {
-    "node": ">=24.21.0 <25"
+    "node": ">=24.22.1 <25"
   },
   "scripts": {
     "dev": "NODE_OPTIONS=--max-old-space-size=8192 doppler run -- node scripts/dev-fast.mjs",

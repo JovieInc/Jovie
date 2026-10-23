@@ -10,6 +10,15 @@ import * as fs from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+/**
+ * Linear takes a personal API key raw (`lin_api_…`) and an OAuth access token
+ * (an app actor such as Jovie Lanes) as `Bearer <token>`.
+ */
+export function linearAuthorization(key) {
+  if (/^Bearer\s/i.test(key) || key.startsWith('lin_api_')) return key;
+  return `Bearer ${key}`;
+}
+
 export const LINEAR_API_URL = 'https://api.linear.app/graphql';
 export const COOLDOWN_FLOOR_MS = 60_000;
 export const COOLDOWN_JITTER = 0.25;
@@ -113,7 +122,14 @@ function stateError() {
 }
 
 async function privateDirectory(path, repair = false) {
-  await fs.mkdir(path, { recursive: true, mode: 0o700 });
+  try {
+    await fs.mkdir(path, { recursive: true, mode: 0o700 });
+  } catch (error) {
+    // Concurrent publishers mkdir one scope together. Node reports that race
+    // as EEXIST. The stat check below still fail-closes a file, a symlink,
+    // or a directory this process does not own.
+    if (error?.code !== 'EEXIST') throw error;
+  }
   if (repair) {
     try {
       const current = await fs.lstat(path);
@@ -405,7 +421,7 @@ export async function linearRequest({
     response = await fetchImpl(LINEAR_API_URL, {
       method: 'POST',
       headers: {
-        Authorization: key,
+        Authorization: linearAuthorization(key),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ query, variables }),

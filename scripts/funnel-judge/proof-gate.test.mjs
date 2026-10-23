@@ -79,7 +79,7 @@ describe('funnel proof gate', () => {
       { judgedStepIds: ['upgrade'], now }
     );
     assert.equal(result.pass, false);
-    assert.match(result.failures[0], /\$199/);
+    assert.match(result.failures[0], /\$12/);
   });
 
   it('fails stale or missing reports', () => {

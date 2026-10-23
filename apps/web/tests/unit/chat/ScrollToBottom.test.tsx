@@ -1,30 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import type { ComponentProps } from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ScrollToBottom } from '@/components/jovie/components/ScrollToBottom';
-
-// motion/react animations don't run in jsdom. Render elements immediately
-// so accessibility queries and style assertions work without waiting for
-// animation frames.
-vi.mock('motion/react', () => ({
-  AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
-  motion: {
-    button: ({
-      children,
-      initial: _initial,
-      animate: _animate,
-      exit: _exit,
-      transition: _transition,
-      ...props
-    }: ComponentProps<'button'> & {
-      initial?: unknown;
-      animate?: unknown;
-      exit?: unknown;
-      transition?: unknown;
-    }) => <button {...props}>{children}</button>,
-  },
-  useReducedMotion: () => false,
-}));
+import {
+  ChatStickScrollButton,
+  ScrollToBottom,
+} from '@/components/jovie/components/ScrollToBottom';
 
 describe('ScrollToBottom', () => {
   it('renders a circular icon-only button with aria-label when visible', () => {
@@ -63,6 +42,38 @@ describe('ScrollToBottom', () => {
       screen.getByRole('button', { name: 'Scroll To Latest Messages' })
     );
 
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the latest-messages button when the stick store leaves the bottom', () => {
+    let stuck = true;
+    const listeners = new Set<() => void>();
+    const onClick = vi.fn();
+    render(
+      <ChatStickScrollButton
+        subscribe={listener => {
+          listeners.add(listener);
+          return () => {
+            listeners.delete(listener);
+          };
+        }}
+        getSnapshot={() => stuck}
+        onClick={onClick}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Scroll To Latest Messages' })
+    ).not.toBeInTheDocument();
+
+    act(() => {
+      stuck = false;
+      for (const listener of listeners) listener();
+    });
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Scroll To Latest Messages' })
+    );
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

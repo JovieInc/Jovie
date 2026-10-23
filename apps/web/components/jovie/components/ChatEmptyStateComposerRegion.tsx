@@ -126,8 +126,12 @@ export function ChatEmptyStateComposerRegion({
    * the centered welcome (Just ask + sample) instead of blank space.
    */
   readonly showDockedWelcome?: boolean;
-  /** Home welcome fills the usable space; task/Ovie stacks remain bottom-aligned. */
-  readonly alignAbove?: 'bottom' | 'center' | 'top';
+  /**
+   * Home welcome fills the usable space; task/Ovie stacks remain
+   * bottom-aligned. `fill` gives `above` exactly the height left above the
+   * composer from `lg` (Ovie Home never scrolls) and stacks below `lg`.
+   */
+  readonly alignAbove?: 'bottom' | 'center' | 'top' | 'fill';
   readonly onSelectSample?: (prompt: string) => void;
 }) {
   const showWelcomeHeader = !above && !hideWelcomeHeader;
@@ -150,7 +154,10 @@ export function ChatEmptyStateComposerRegion({
       >
         {/* Intrinsic-height inner stack keeps short suggestions near the composer. */}
         <div
-          className='flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-3'
+          className={cn(
+            'flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-3',
+            alignAbove === 'fill' && 'lg:overflow-hidden'
+          )}
           data-testid='chat-empty-state-above-scroll'
         >
           {above ? (
@@ -161,7 +168,9 @@ export function ChatEmptyStateComposerRegion({
                   ? 'my-auto'
                   : alignAbove === 'top'
                     ? 'mt-0'
-                    : 'mt-auto',
+                    : alignAbove === 'fill'
+                      ? 'lg:min-h-0 lg:flex-1 lg:shrink'
+                      : 'mt-auto',
                 fullBleed && alignAbove === 'bottom' && 'min-h-full'
               )}
               data-empty-chat-suggestions='true'
