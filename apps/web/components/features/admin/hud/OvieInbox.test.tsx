@@ -35,6 +35,7 @@ const item: OvieInboxCase = {
   createdAt: '2026-10-02T00:00:00Z',
   nextAction: 'Review',
   waitingUntil: null,
+  decisionDefault: null,
   confidence: null,
   evidence: [],
   decisionTarget: { kind: 'summer', id: 'one' },
@@ -170,12 +171,23 @@ describe('Ovie Inbox', () => {
     await screen.findByText(
       'This decision is not in the current inbox. Refresh to check its status.'
     );
-    expect(
-      screen.getByText(/Some sources are unavailable/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Source needs attention/)).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Approve' })
     ).not.toBeInTheDocument();
+  });
+  it('collapses many source issues to a count with the full list behind a disclosure', async () => {
+    const issues = Array.from(
+      { length: 27 },
+      (_, index) =>
+        `Marketing component ${index}: additional evidence is required.`
+    );
+    mount(new Response(JSON.stringify({ cases: [], issues }), { status: 200 }));
+    const disclosure = await screen.findByTestId('ovie-inbox-source-issues');
+    const summary = disclosure.querySelector('summary');
+    expect(summary).toHaveTextContent('27 source issues need attention.');
+    expect(summary).not.toHaveTextContent('Marketing component');
+    expect(disclosure.querySelectorAll('li')).toHaveLength(27);
   });
   it('keeps the requested case and its notes across a reordered refresh', async () => {
     const other = { ...item, id: 'summer:other', title: 'Other decision' };
@@ -301,6 +313,28 @@ describe('Ovie Inbox', () => {
       expect(
         screen.getByText('No pending founder decisions.')
       ).toBeInTheDocument()
+    );
+  });
+
+  it('keeps a loaded decision inside a fixed scrollport', async () => {
+    mount(
+      response([
+        {
+          ...item,
+          body: `${'A long founder decision. '.repeat(40)}\n`,
+        },
+      ])
+    );
+
+    const scrollport = screen.getByTestId('ovie-inbox-scrollport');
+    expect(scrollport.className).toContain('h-64');
+    expect(scrollport.className).toContain('overflow-hidden');
+    expect(scrollport.className).not.toContain('min-h-64');
+    expect(scrollport.querySelector('.overflow-y-auto')).not.toBeNull();
+
+    await screen.findByTestId('ovie-inbox-decision');
+    expect(scrollport).toContainElement(
+      screen.getByTestId('ovie-inbox-decision')
     );
   });
 });

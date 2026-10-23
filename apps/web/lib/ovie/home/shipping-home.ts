@@ -8,6 +8,7 @@
  * missing ("Not measured"), never zero, healthy, or "now".
  */
 
+import { APP_ROUTES } from '@/constants/routes';
 import {
   formatDurationSeconds,
   HOME_LOOP_NOT_MEASURED,
@@ -23,7 +24,12 @@ import {
   rememberTiles,
   withTileHistory,
 } from '@/lib/home-loop/contract';
-import type { OvieInbox, OvieInboxCase } from '@/lib/ovie/inbox';
+import { OVIE_CERTIFICATION_TIER_LABELS } from '@/lib/ovie/certifications/types';
+import type {
+  InboxDecisionTarget,
+  OvieInbox,
+  OvieInboxCase,
+} from '@/lib/ovie/inbox';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import type {
   CountMeasurement,
@@ -31,6 +37,9 @@ import type {
   DeliverySummary,
   StageSummary,
 } from '@/lib/ovie/shipping-state/contract';
+import { operatorAlertCopy } from './operator-copy';
+
+export { summarizeSourceIssues } from './operator-copy';
 
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
 type OperationalTask = OperationalTaskFeed['tasks'][number];
@@ -60,16 +69,35 @@ export type OvieDoneItem = HomeLoopDoneItem;
 export type OvieConstraint = HomeLoopConstraint;
 export type OvieAsk = HomeLoopAsk;
 
+/** Priority order: the row shows as many as fit, left to right. */
 export type OviePulseKey =
   | 'prod'
+  | 'merges-hour'
+  | 'queue'
+  | 'red-prs'
+  | 'lanes'
+  | 'eligible'
+  | 'held'
+  | 'ownerless'
   | 'merges-today'
   | 'merges-7d'
-  | 'lanes'
-  | 'queue'
-  | 'held'
   | 'gem-disk';
 
 export type OviePulseTile = HomeLoopTile<OviePulseKey>;
+
+const PULSE_ORDER: readonly OviePulseKey[] = [
+  'prod',
+  'merges-hour',
+  'queue',
+  'red-prs',
+  'lanes',
+  'eligible',
+  'held',
+  'ownerless',
+  'merges-today',
+  'merges-7d',
+  'gem-disk',
+];
 export type OviePulseMemory = HomeLoopTileMemory<OviePulseKey>;
 
 export interface OvieHomeShipping {
@@ -238,8 +266,16 @@ function rawPulse(
   const queue = countValue(delivery.mergeQueueDepth);
   const held = lanes.publishedAt ? sumValues(lanes.heldByReason) : null;
   const disk = lanes.diskFreePct;
+  const flow = lanes.flow ?? null;
+  const perHour = flow?.mergesPerHour ?? null;
+  const ejection = flow?.queueEjectionRate ?? null;
+  const red = flow?.redPrs ?? null;
+  const open = flow?.openPrs ?? null;
+  const eligible = flow?.eligiblePool ?? null;
+  const candidates = flow?.candidatePool ?? null;
+  const ownerless = flow?.ownerless ?? null;
 
-  return [
+  const tiles: Omit<OviePulseTile, 'was'>[] = [
     {
       key: 'prod',
       label: 'Prod',
@@ -251,6 +287,42 @@ function rawPulse(
           : behind === 0
             ? 'good'
             : 'warn',
+    },
+    {
+      key: 'merges-hour',
+      label: 'Merges / h',
+      value: perHour === null ? OVIE_NOT_MEASURED : String(perHour),
+      measured: perHour !== null,
+      tone: perHour === null ? 'neutral' : perHour >= 1 ? 'good' : 'warn',
+    },
+    {
+      key: 'queue',
+      label:
+        ejection === null
+          ? 'Queue'
+          : `Queue · ${Math.round(ejection * 100)}% ejected`,
+      value: formatCount(queue),
+      measured: queue !== null,
+      tone:
+        ejection === null
+          ? 'neutral'
+          : ejection > 0.3
+            ? 'bad'
+            : ejection > 0.1
+              ? 'warn'
+              : 'good',
+    },
+    {
+      key: 'red-prs',
+      label: 'Red PRs',
+      value:
+        red === null
+          ? OVIE_NOT_MEASURED
+          : open === null
+            ? String(red)
+            : `${red}/${open}`,
+      measured: red !== null,
+      tone: red === null ? 'neutral' : red === 0 ? 'good' : 'warn',
     },
     {
       key: 'merges-today',
@@ -287,11 +359,16 @@ function rawPulse(
             : 'warn',
     },
     {
-      key: 'queue',
-      label: 'Queue',
-      value: formatCount(queue),
-      measured: queue !== null,
-      tone: 'neutral',
+      key: 'eligible',
+      label: 'Eligible',
+      value:
+        eligible === null
+          ? OVIE_NOT_MEASURED
+          : candidates === null
+            ? String(eligible)
+            : `${eligible}/${candidates}`,
+      measured: eligible !== null,
+      tone: eligible === null ? 'neutral' : eligible > 0 ? 'good' : 'warn',
     },
     {
       key: 'held',
@@ -299,6 +376,13 @@ function rawPulse(
       value: formatCount(held),
       measured: held !== null,
       tone: held === null ? 'neutral' : held === 0 ? 'good' : 'bad',
+    },
+    {
+      key: 'ownerless',
+      label: 'Ownerless',
+      value: formatCount(ownerless),
+      measured: ownerless !== null,
+      tone: ownerless === null ? 'neutral' : ownerless === 0 ? 'good' : 'bad',
     },
     {
       key: 'gem-disk',
@@ -315,6 +399,9 @@ function rawPulse(
               : 'good',
     },
   ];
+  return [...tiles].sort(
+    (a, b) => PULSE_ORDER.indexOf(a.key) - PULSE_ORDER.indexOf(b.key)
+  );
 }
 
 function sourceWas(
@@ -360,7 +447,14 @@ export function buildConstraint(
   tasksSyncState: OperationalTaskFeed['syncState']
 ): OvieConstraint | null {
   const alert = delivery.lanes.alerts.find(text => text.trim().length > 0);
-  if (alert) return { tone: 'bad', text: alert.trim() };
+  // Lanes alerts are doctor diagnostics; Home names them in operator copy and
+  // links the Product view, which carries the full (path-redacted) text.
+  if (alert)
+    return {
+      tone: 'bad',
+      text: operatorAlertCopy(alert),
+      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+    };
 
   const blocked = rows.filter(row => row.attention === 'blocked').length;
   if (blocked > 0)
@@ -435,6 +529,105 @@ export function buildOvieHomeShipping(input: {
   };
 }
 
+/**
+ * Same primary verbs as the inbox drawer. Home must not call a Linear close
+ * or a founder certification an approval.
+ */
+export function ovieAskAction(kind: InboxDecisionTarget['kind'] | undefined): {
+  readonly actionLabel: string;
+  readonly committedLabel: string;
+} {
+  switch (kind) {
+    case 'linear':
+      return { actionLabel: 'Mark done', committedLabel: 'Marked done' };
+    case 'certification':
+      return { actionLabel: 'Certify', committedLabel: 'Certified' };
+    default:
+      return { actionLabel: 'Approve', committedLabel: 'Approved' };
+  }
+}
+
+/** `jovie.decision-default/v1` as the inbox publishes it (PR #22371). */
+type InboxDecisionDefaultWire = {
+  readonly contract?: unknown;
+  readonly decision?: unknown;
+  readonly summary?: unknown;
+  readonly deadline?: unknown;
+  readonly declared?: unknown;
+};
+
+function decisionDefaultOf(item: OvieInboxCase): OvieAsk['decisionDefault'] {
+  const wire = (
+    item as { readonly decisionDefault?: InboxDecisionDefaultWire | null }
+  ).decisionDefault;
+  if (
+    !wire ||
+    wire.contract !== 'jovie.decision-default/v1' ||
+    (wire.decision !== 'approve' && wire.decision !== 'reject') ||
+    typeof wire.summary !== 'string' ||
+    typeof wire.deadline !== 'string'
+  )
+    return null;
+  return {
+    decision: wire.decision,
+    summary: wire.summary,
+    deadline: wire.deadline,
+    declared: wire.declared === true,
+  };
+}
+
+/**
+ * `escalation` on no-default inbox cases (#22371): only levels 1 (24h) and
+ * 2 (48h) badge on Home. Parsed leniently; anything else means none.
+ */
+function escalationOf(item: OvieInboxCase): OvieAsk['escalation'] {
+  const wire = (
+    item as {
+      readonly escalation?: {
+        readonly level?: unknown;
+        readonly waitingHours?: unknown;
+      } | null;
+    }
+  ).escalation;
+  if (
+    !wire ||
+    (wire.level !== 1 && wire.level !== 2) ||
+    typeof wire.waitingHours !== 'number' ||
+    !Number.isFinite(wire.waitingHours)
+  )
+    return null;
+  return { level: wire.level, waitingHours: Math.floor(wire.waitingHours) };
+}
+
+/**
+ * Review asks (certify, accept a visual change) may only offer their action
+ * with evidence attached. Certification rows carry tier receipts; they become
+ * the inline summary even when no receipt has a navigable link.
+ */
+function reviewEvidence(
+  item: OvieInboxCase
+): Pick<OvieAsk, 'requiresEvidence' | 'evidenceSummary'> {
+  const kind = item.decisionTarget?.kind;
+  if (
+    item.kind !== 'certification' &&
+    kind !== 'certification' &&
+    kind !== 'visual'
+  )
+    return {};
+  const receipts = item.certification?.row.evidence ?? [];
+  const summary = receipts.length
+    ? receipts
+        .slice(0, 3)
+        .map(
+          receipt =>
+            `${OVIE_CERTIFICATION_TIER_LABELS[receipt.tier]} ${receipt.status}`
+        )
+        .join(' · ') +
+      (receipts.length > 3 ? ` · +${receipts.length - 3} more` : '')
+    : null;
+  return { requiresEvidence: true, evidenceSummary: summary };
+}
+
 function askFromCase(item: OvieInboxCase): OvieAsk {
   return {
     id: item.id,
@@ -442,10 +635,16 @@ function askFromCase(item: OvieInboxCase): OvieAsk {
     recommendation: item.recommendation,
     why: item.body,
     decidable: item.decisionTarget !== null,
-    // Linear asks only accept approval; their discussion lives in Linear.
-    canReply:
-      item.decisionTarget !== null && item.decisionTarget.kind !== 'linear',
+    actionLabel: ovieAskAction(item.decisionTarget?.kind).actionLabel,
+    ...(item.answers?.length ? { options: item.answers } : {}),
+    // Linear replies are posted back to the issue as the answer.
+    canReply: item.decisionTarget !== null,
     evidence: item.evidence,
+    ...reviewEvidence(item),
+    decisionDefault: decisionDefaultOf(item),
+    // Summer cards accept post-ship feedback once decided.
+    canFeedback: item.decisionTarget?.kind === 'summer',
+    escalation: escalationOf(item),
   };
 }
 

@@ -548,9 +548,14 @@ describe('HeaderSearchSurface', () => {
     const input = screen.getByRole('combobox', { name: 'Search Jovie' });
     fireEvent.change(input, { target: { value: 'empty' } });
     expect(screen.getByRole('status')).toHaveTextContent('Searching…');
+    // The loading / empty / error states render only a `role="status"`
+    // row: the popup must not claim `role="listbox"` until it holds at
+    // least one option (axe aria-required-children).
+    expect(screen.queryByRole('listbox')).toBeNull();
     await act(() => vi.advanceTimersByTimeAsync(250));
     await act(async () => Promise.resolve());
     expect(screen.getByRole('status')).toHaveTextContent('No matching results');
+    expect(screen.queryByRole('listbox')).toBeNull();
 
     fireEvent.change(input, { target: { value: 'error' } });
     expect(screen.getByRole('status')).toHaveTextContent('Searching…');

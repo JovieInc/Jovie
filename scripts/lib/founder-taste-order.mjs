@@ -25,7 +25,8 @@ export const TASTE_GATE = Object.freeze({
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const SHA_REF = /^sha:([0-9a-f]{40})$/;
 const MAX_NOTE_LENGTH = 2000;
-const DAY_MS = 24 * 60 * 60 * 1000;
+/** Default-plus-deadline contract (canon/FLEET.md): 48 hours, then the default ships. */
+export const TASTE_DEFAULT_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 /** @param {unknown} value @returns {string} */
 function canonical(value) {
@@ -125,7 +126,10 @@ export function founderTasteOrder(input) {
     permittedActions: ['decide'],
     forbiddenActions: [],
     budget: {
-      deadline: new Date(Date.parse(input.now) + 7 * DAY_MS).toISOString(),
+      // Default-plus-deadline contract: taste never blocks Done for long.
+      deadline: new Date(
+        Date.parse(input.now) + TASTE_DEFAULT_WINDOW_MS
+      ).toISOString(),
       maxAttempts: 1,
       maxSpendUsd: 0,
       maxConcurrency: 1,
@@ -160,7 +164,12 @@ export function founderTasteOrder(input) {
           0,
           500
         ),
-      defaultIfSilent: null,
+      defaultIfSilent:
+        `Accept: the live build stays and ${identifier} moves to Done once every other receipt passes; post-ship feedback in Ovie files the revision.`.slice(
+          0,
+          300
+        ),
+      defaultDecision: 'approve',
       materialChange: null,
     },
     replyTo: { kind: 'linear-comment', ref: identifier },
@@ -237,12 +246,14 @@ export function readTasteOrders(description, identifier) {
  * @param {string} identifier
  * @returns {import('./validation-lifecycle.mjs').ValidationReceipt[]}
  * @param {string | null} [episodeStartedAt]
+ * @param {string} [now] ISO time; past an order's deadline, silence accepts.
  */
 export function tasteReceiptsFromResults(
   description,
   comments,
   identifier,
-  episodeStartedAt
+  episodeStartedAt,
+  now
 ) {
   const orders = readTasteOrders(description, identifier).filter(
     ({ order }) =>
@@ -298,6 +309,26 @@ export function tasteReceiptsFromResults(
           recordedAt,
         });
       }
+    }
+  }
+  // Silence past the order deadline applies the default: accept. An order
+  // filed before defaults existed (defaultIfSilent null) gets the same rule,
+  // because a taste hold that can never expire violates the doctrine. A
+  // founder decision, even a late one, always wins: it is recorded later and
+  // the latest receipt per kind is the one the lifecycle reads.
+  if (now !== undefined) {
+    const nowMs = Date.parse(now);
+    for (const { order, sha } of orders) {
+      const deadline = Date.parse(String(order.budget?.deadline ?? ''));
+      if (!Number.isFinite(deadline) || !(nowMs > deadline)) continue;
+      if (receipts.some(receipt => receipt.sha === sha)) continue;
+      receipts.push({
+        kind: 'founder-taste',
+        status: 'pass',
+        sha,
+        evidence: `default-if-silent: no founder decision on ${order.orderId} by its deadline ${order.budget.deadline}`,
+        recordedAt: new Date(deadline).toISOString(),
+      });
     }
   }
   return receipts;

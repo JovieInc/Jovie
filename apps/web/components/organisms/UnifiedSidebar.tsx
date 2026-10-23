@@ -2,11 +2,11 @@
 
 // @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
 
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -30,6 +30,7 @@ import {
   SHELL_RAIL_LABEL,
 } from '@/components/shell/rail-motion';
 import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
+import { SIDEBAR_ENTRY_LABEL_INSET_CLASS } from '@/components/shell/sidebar-optical';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
@@ -52,6 +53,7 @@ import {
   isOperatorNavigationHrefActive,
   OPERATOR_NAV_GROUP_LABEL,
   OPERATOR_NAV_SECTIONS,
+  type OperatorNavSection,
 } from './operator-navigation';
 import { IdentitySwitcher } from './ProfileSwitcher';
 import { SidebarDockBridge } from './SidebarDockBridge';
@@ -93,24 +95,94 @@ function SettingsNavGroup({
   );
 }
 
+const TOOLS_OPEN_KEY = 'ovie.nav.tools-open.v1';
+
+/**
+ * One operator nav group. Tools is collapsed by default (Tim 2026-10-21: Ovie
+ * is one Home), remembers the viewer's choice, and is always open while one
+ * of its destinations is active so the current page is never hidden.
+ */
+function OperatorNavGroup({
+  section,
+  pathname,
+}: Readonly<{
+  readonly section: OperatorNavSection;
+  readonly pathname: string;
+}>) {
+  const [stored, setStored] = useState(false);
+  useEffect(() => {
+    if (!section.collapsible) return;
+    try {
+      setStored(globalThis.localStorage?.getItem(TOOLS_OPEN_KEY) === '1');
+    } catch {
+      // Storage is a per-viewer convenience; the group defaults to closed.
+    }
+  }, [section.collapsible]);
+  const isActive = (item: NavItem) =>
+    isOperatorNavigationHrefActive(pathname, item.href);
+  const holdsActive = section.items.some(isActive);
+  const open = !section.collapsible || stored || holdsActive;
+  const toggle = () => {
+    const next = !stored;
+    setStored(next);
+    try {
+      globalThis.localStorage?.setItem(TOOLS_OPEN_KEY, next ? '1' : '0');
+    } catch {
+      // Ignore unavailable storage.
+    }
+  };
+  const groupId = `ov-nav-${section.id}`;
+  return (
+    <div data-testid={`ov-nav-section-${section.id}`}>
+      {section.label && section.collapsible ? (
+        <button
+          type='button'
+          className={cn(
+            OPERATOR_NAV_GROUP_LABEL,
+            SHELL_RAIL_LABEL,
+            'flex w-full items-center gap-1 text-left hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+          )}
+          aria-expanded={open}
+          aria-controls={groupId}
+          disabled={holdsActive}
+          onClick={toggle}
+        >
+          <ChevronRight
+            aria-hidden='true'
+            className={cn(
+              'size-3 transition-transform duration-subtle motion-reduce:transition-none',
+              open && 'rotate-90'
+            )}
+          />
+          {section.label}
+        </button>
+      ) : section.label ? (
+        <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_LABEL)}>
+          {section.label}
+        </span>
+      ) : null}
+      <div id={groupId} hidden={!open}>
+        <SettingsNavGroup
+          items={section.items}
+          pathname={pathname}
+          isItemActive={isActive}
+        />
+      </div>
+    </div>
+  );
+}
+
 /** Dedicated operator navigation; customer DashboardNav stays customer-only. */
 function OperatorNavigation({ pathname }: { readonly pathname: string }) {
   return (
     <div className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
       <nav aria-label='OV Navigation' className='flex flex-col gap-4'>
         {OPERATOR_NAV_SECTIONS.map(section => (
-          <div key={section.label}>
-            <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_LABEL)}>
-              {section.label}
-            </span>
-            <SettingsNavGroup
-              items={section.items}
-              pathname={pathname}
-              isItemActive={item =>
-                isOperatorNavigationHrefActive(pathname, item.href)
-              }
-            />
-          </div>
+          <OperatorNavGroup
+            key={section.id}
+            section={section}
+            pathname={pathname}
+          />
         ))}
       </nav>
       {/* Dynamic list hrefs stay outside the canonical OV landmark so the
@@ -177,7 +249,8 @@ function SettingsNavigation({
       <div>
         <span
           className={cn(
-            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
+            'mb-1.5 block text-xs font-caption tracking-normal text-sidebar-muted',
+            SIDEBAR_ENTRY_LABEL_INSET_CLASS,
             SHELL_RAIL_LABEL
           )}
         >
@@ -188,7 +261,8 @@ function SettingsNavigation({
       <div>
         <span
           className={cn(
-            'mb-1.5 block px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90',
+            'mb-1.5 block text-xs font-caption tracking-normal text-sidebar-muted',
+            SIDEBAR_ENTRY_LABEL_INSET_CLASS,
             SHELL_RAIL_LABEL
           )}
         >
@@ -225,7 +299,7 @@ function SidebarHeaderNav({
   const isDesktop = useIsElectronRuntime();
   const { state, isMobile, open: pinned } = useSidebar();
   const chromeHidden = state === 'closed' && !isMobile;
-  const { inboxNavigation } = useDashboardData();
+  const { inboxNavigation, selectedProfile } = useDashboardData();
 
   return (
     <div className='flex w-full items-center' data-sidebar-brand-row='true'>
@@ -238,6 +312,7 @@ function SidebarHeaderNav({
               <div className='flex w-full items-center gap-2'>
                 <Link
                   href={routeBackHref}
+                  prefetch={false}
                   aria-label={routeBackLabel}
                   className={cn(
                     'focus-ring-themed inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
@@ -259,7 +334,7 @@ function SidebarHeaderNav({
             return (
               <div
                 className={cn(
-                  'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
+                  'flex h-7 w-full items-center gap-(--app-shell-sidebar-icon-gap) rounded-full',
                   'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
                 )}
               >
@@ -275,7 +350,7 @@ function SidebarHeaderNav({
                     SHELL_RAIL_LABEL
                   )}
                 >
-                  Demo
+                  {selectedProfile?.displayName ?? 'Demo'}
                 </span>
               </div>
             );
@@ -297,7 +372,7 @@ function SidebarHeaderNav({
           return (
             <div
               className={cn(
-                'flex h-7 w-full items-center gap-1.5',
+                'flex h-7 w-full items-center gap-(--app-shell-sidebar-icon-gap)',
                 'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
               )}
             >
@@ -388,10 +463,10 @@ export function UnifiedSidebar({
       <SidebarHeader
         data-electron-drag-region='true'
         className={cn(
-          'relative justify-center gap-0 px-(--space-2-5) group-data-[collapsible=icon]:px-0',
+          'relative justify-center gap-0 px-(--app-shell-sidebar-inset) group-data-[collapsible=icon]:px-0',
           isRouteSidebar || isOperatorSection
             ? 'h-(--app-shell-header-height) py-0.5'
-            : 'h-16 pl-4 pr-3 pt-5 pb-4'
+            : 'h-16 pt-5 pb-4'
         )}
       >
         <SidebarHeaderNav
@@ -407,7 +482,7 @@ export function UnifiedSidebar({
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 px-2 pb-(--space-2-5) pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+      <SidebarContent className='min-h-0 flex-1 overflow-anchor-none px-0 pb-(--space-2-5) pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex min-h-0 flex-1 flex-col'>
             {section === 'ov' ? (

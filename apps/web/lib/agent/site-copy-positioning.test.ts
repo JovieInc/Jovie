@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GET as getLlmsTxt } from '@/app/llms.txt/route';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
-import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import {
   buildHomepageMarkdown,
   buildNotFoundMarkdown,
@@ -28,13 +28,13 @@ function expectCreatorPositioning(body: string): void {
 }
 
 describe('agent-facing site copy positioning (JOV-7638 follow-up)', () => {
-  it('keeps /llms.txt on the shared creator identity, with music as one workflow', async () => {
+  it('keeps /llms.txt on the shared creator identity', async () => {
     const body = await getLlmsTxt().text();
 
     expectCreatorPositioning(body);
     expect(body).toContain(COMPANY_IDENTITY.definition);
     expect(body).toContain('### Public Profile');
-    expect(body).toContain('### Music workflows');
+    expect(body).toContain('### Release workflows');
     expect(body).toContain(
       'Audience notifications, advanced analytics, and release planning require enrolled access'
     );
@@ -72,17 +72,17 @@ describe('agent-facing site copy positioning (JOV-7638 follow-up)', () => {
     );
   });
 
-  it('projects the approved homepage identity instead of the music launch document', () => {
+  it('leads the homepage markdown with the general identity, then the labeled artist offer', () => {
     const body = buildHomepageMarkdown();
 
     expectCreatorPositioning(body);
-    expect(body.startsWith(`# ${HOMEPAGE_IDENTITY_COPY.hero.headline}`)).toBe(
-      true
-    );
-    expect(body).toContain(HOMEPAGE_IDENTITY_COPY.hero.subhead);
+    expect(body.startsWith(`# ${COMPANY_IDENTITY.headline}`)).toBe(true);
     expect(body).toContain(COMPANY_IDENTITY.definition);
-    expect(body).toContain('Your presence, resolved.');
-    expect(body).toContain('Make it your Jovie profile.');
+    expect(body).toContain('## Artist profiles');
+    expect(body).toContain(HOMEPAGE_COPY.hero.subhead);
+    for (const item of HOMEPAGE_COPY.offer.included) {
+      expect(body).toContain(`- ${item.label}`);
+    }
     expect(body).not.toContain('All your music');
     expect(body).not.toContain('Connect your music');
   });

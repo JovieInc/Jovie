@@ -69,14 +69,13 @@ export function SmartLinksDemo() {
           jov.ie/tim/{releaseIndex ? 'the-deep-end' : 'never-say-a-word'}
         </span>
       </div>
-      <div className='mx-auto aspect-square w-full max-w-62 overflow-hidden rounded-xl bg-surface-2'>
+      <div className='relative mx-auto aspect-square w-full max-w-62 overflow-hidden rounded-xl bg-surface-2'>
         <Image
           src={release.art}
           alt={`${release.title} cover art`}
-          width={500}
-          height={500}
-          className='h-full w-full object-contain'
-          sizes='(max-width: 640px) 248px, 248px'
+          fill
+          className='object-contain'
+          sizes='248px'
         />
       </div>
       <div className='mt-4 text-center'>

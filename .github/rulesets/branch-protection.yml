@@ -146,19 +146,20 @@ rules:
       grouping_strategy: 'ALLGREEN'
       # Groups form immediately (min 1, wait 0). Each entry still gets its own
       # synthetic head layered on the one ahead, so path-selected lanes stay
-      # per member. Up to 5 green entries land in one push (2026-10-13 tuning,
-      # .github/MERGE_QUEUE.md "Tuning log"; set live before that date).
+      # per member. Up to 10 green entries land in one push (2026-10-21
+      # tuning, .github/MERGE_QUEUE.md "Tuning log").
       min_entries_to_merge: 1
-      max_entries_to_merge: 5
-      # Live build concurrency, synced 2026-10-13. Group CI spends repo
+      max_entries_to_merge: 10
+      # Live build concurrency, synced 2026-10-21. Group CI spends repo
       # GITHUB_TOKEN quota and the org's 5-slot hosted macOS pool, so change
       # this file and the live ruleset together; lower live values remain
       # supported for rollback.
-      max_entries_to_build: 6
+      max_entries_to_build: 10
       min_entries_to_merge_wait_minutes: 0
-      # The 60-minute budget covers required CI paths configured for 30 and
-      # 40 minutes without changing required checks or ALLGREEN.
-      check_response_timeout_minutes: 60
+      # 20 minutes (2026-10-21): merge-group CI p95 is ~24 min end to end, but
+      # each required check responds well inside 20; a stuck check now ejects
+      # after 20 minutes instead of holding the queue head for an hour.
+      check_response_timeout_minutes: 20
 
   # Dormant rules are intentionally absent from this applied payload:
   # `required_signatures` and `non_fast_forward`. Live ruleset 10512119 does

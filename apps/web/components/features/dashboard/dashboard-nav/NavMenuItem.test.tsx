@@ -96,9 +96,9 @@ describe('NavMenuItem', () => {
     );
 
     const row = screen.getByRole('link', { name: 'Library' });
-    // Founder lock 2026-09-25 (Linear-scale density): calm rows are 28px
-    // (h-7), down from the prior 36px (h-9).
-    expect(row.className).toContain('h-7');
+    // Founder lock 2026-09-25 (Linear-scale density): calm rows are 28px.
+    const rowHeight = 'h-(--app-shell-sidebar-row-height)';
+    expect(row.className).toContain(rowHeight);
     // Consumers must retain the owner primitive's collapsed row height too;
     // otherwise every item below this row moves during a rail toggle.
     const collapsedHeight = getSidebarNavRowClassName({
@@ -106,8 +106,8 @@ describe('NavMenuItem', () => {
       collapsed: true,
     })
       .split(' ')
-      .find(value => /^h-\d+$/.test(value));
-    expect(collapsedHeight).toBeDefined();
+      .find(value => value.startsWith('h-'));
+    expect(collapsedHeight).toBe(rowHeight);
     expect(row).toHaveClass(collapsedHeight!);
     for (const override of row.className
       .split(' ')
@@ -138,7 +138,7 @@ describe('NavMenuItem', () => {
     expect(row).toHaveAttribute('data-navigation-item-id', 'library');
     expect(row).toHaveAttribute('data-navigation-pending', 'true');
     expect(row.className).toContain('bg-sidebar-accent-active');
-    expect(row.className).toContain('h-7');
+    expect(row.className).toContain('h-(--app-shell-sidebar-row-height)');
     expect(row.className).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
   });
 
