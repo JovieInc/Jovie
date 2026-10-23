@@ -57,6 +57,9 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // /product's closing CTA headline is the same terminal value proposition —
   // the two-line clamp truncated it at 390px, so it renders editorial-title.
   'apps/web/app/(marketing)/product/ProductLanding.tsx',
+  // /product/utm-links is a new marketing h1. The shrink-only headline
+  // ratchet rejects a new line-clamp token, so the title stays complete.
+  'apps/web/app/(marketing)/product/utm-links/UtmLinksLanding.tsx',
   // /card section titles wrap to three lines at 390px; the clamp cut
   // "An introduction. Not a list of usernames" mid-sentence.
   'apps/web/app/(marketing)/card/JovieCardLanding.tsx',

@@ -33,9 +33,11 @@ describe('UtmLinksLanding', () => {
       'apps/web/app/(marketing)/product/utm-links/UtmLinksLanding.tsx'
     );
     expect(hero).toHaveAttribute('data-accent', 'ion');
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      UTM_LINKS_COPY.headline
-    );
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveTextContent(UTM_LINKS_COPY.headline);
+    expect(heading).toHaveAttribute('data-wrap', 'editorial-title');
+    expect(heading).toHaveClass('utm-links-title');
+    expect(heading).not.toHaveClass('line-clamp-2');
     expect(screen.getByText(UTM_LINKS_COPY.support)).toBeVisible();
 
     const builder = within(hero).getByTestId('utm-builder');
