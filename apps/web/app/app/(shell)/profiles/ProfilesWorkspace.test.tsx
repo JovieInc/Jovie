@@ -597,7 +597,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     expect(
       screen.getByRole('heading', { name: 'No Identity Selected' })
-    ).toHaveClass('text-2xl', 'font-semibold', 'text-primary-token');
+    ).toHaveClass('text-sm', 'font-semibold', 'text-primary-token');
     expect(
       screen.getByRole('link', { name: 'Set Up Identity' })
     ).toHaveAttribute('href', '/app/settings/profile');
