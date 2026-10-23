@@ -12,7 +12,7 @@
  * inventory instead, because its include list is narrower than the directory.
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 const CONFIG_RE = /^vitest\.config\.(?:mts|ts|mjs|js)$/;
@@ -120,9 +120,7 @@ export function listVitestCandidates(repoRoot, excluded = NON_VITEST_TREES) {
  * @param {readonly string[]} roots
  */
 export function isCoveredByProject(file, roots) {
-  return roots.some(
-    root => file === root || file.startsWith(`${root}/`)
-  );
+  return roots.some(root => file === root || file.startsWith(`${root}/`));
 }
 
 /**
