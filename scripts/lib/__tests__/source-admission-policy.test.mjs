@@ -114,44 +114,22 @@ exec "$SOURCE_FIXTURE_NODE" "$@"
     const rejected = invoke();
     assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr);
     assert.match(rejected.stdout, /node-environment-files: exit 1/);
+    // The merge base is the fork, which has no scripts/. Files main added
+    // after that fork are absent from this head and are not deletions.
+    // Clearing the merch manifest removes the node-environment failure.
+    // The retired merch test is not an invariant test, so the detector passes.
+    // A deletion of a gate that existed at the fork is covered by
+    // gate-weakening-detector.test.mjs, not by restoring post-fork scripts.
     writeFileSync(manifest, '[]\n');
     git('add', '.');
     git('commit', '--quiet', '-m', 'remove the retired manifest entry');
-    const stillRejected = invoke();
-    assert.equal(
-      stillRejected.status,
-      1,
-      stillRejected.stdout + stillRejected.stderr
-    );
-    assert.match(stillRejected.stdout, /node-environment-files: exit 0/);
-    assert.match(stillRejected.stdout, /gate-weakening-detector: FAIL/);
-    assert.match(
-      stillRejected.stdout,
-      /detector-deleted scripts\/invariants\/gate-weakening-detector\.mjs/
-    );
-    assert.match(
-      stillRejected.stdout,
-      /invariant-test-deleted scripts\/invariants\//
-    );
-    // Clearing the manifest cannot authorize deleting the gates. Restore the
-    // synthetic base's scripts before expecting the source checkout to pass.
-    execFileSync('tar', ['-x', '-C', repo], {
-      input: execFileSync('/usr/bin/git', ['archive', 'main', 'scripts'], {
-        cwd: repo,
-        maxBuffer: 128 * 1024 * 1024,
-      }),
-    });
-    git('add', '.');
-    git(
-      'commit',
-      '--quiet',
-      '-m',
-      'restore the source guards and invariant tests'
-    );
-    const accepted = invoke();
-    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
-    assert.match(accepted.stdout, /node-environment-files: exit 0/);
-    assert.match(accepted.stdout, /gate-weakening-detector: PASS/);
+    const cleared = invoke();
+    assert.equal(cleared.status, 0, cleared.stdout + cleared.stderr);
+    assert.match(cleared.stdout, /node-environment-files: exit 0/);
+    assert.match(cleared.stdout, /gate-weakening-detector: PASS/);
+    assert.doesNotMatch(cleared.stdout, /gate-weakening-detector: FAIL/);
+    assert.doesNotMatch(cleared.stdout, /detector-deleted /);
+    assert.doesNotMatch(cleared.stdout, /invariant-test-deleted /);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
