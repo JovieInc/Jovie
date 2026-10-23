@@ -24,7 +24,8 @@ export function TrafficQualityLanding() {
         <div className='relative w-full max-w-3xl px-6 pt-16 sm:px-10 sm:pt-24'>
           <h1
             id='traffic-quality-title'
-            className='font-display text-2xl font-medium tracking-tight text-primary-token'
+            data-wrap='editorial-title'
+            className='traffic-quality-title text-balance font-display text-2xl font-medium tracking-tight text-primary-token'
           >
             {headline}
           </h1>
