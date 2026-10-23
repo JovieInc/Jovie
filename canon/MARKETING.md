@@ -141,6 +141,13 @@ eyebrows. Social proof only when it is verified.
 Claim your handle, then be found, then be understood, then proof, then the
 path for investors and founders, then the final CTA.
 
+### References
+
+Raycast's marketing look is the light reference, taken at higher fidelity: dark
+glass and directed light. Scale follows Linear-style premium: tight
+proportions, small precise UI type, dense but calm layouts, hairline borders,
+and restrained color. Mockups read as a real pro tool at true scale.
+
 ### Hard negatives
 
 - Full-width sparse sections.
@@ -149,6 +156,7 @@ path for investors and founders, then the final CTA.
 - More than two accents per fold.
 - Document-like or flat screenshots.
 - A tall mockup in a wide section.
+- Oversized consumer scale, including Raycast's, and enlarged hero-sized UI.
 - Payroll mentions.
 - Naming Daniel Kang or Haruki.
 - Literal music signals: headphones on people, notes, or instruments as decoration.
@@ -185,6 +193,7 @@ The executable landing-page copy workflow is in
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-23 | Marketing references: Raycast for dark glass and directed light at higher fidelity; Linear-style premium for true-scale proportions. | Tim reference rule |
 | 2026-10-23 | Marketing glass is CSS token glass only. Product UI is a Playwright capture at 2x or higher from seeded demo data. AI images are mood plates with no UI, text, or logos. | Tim glass and mockup rule |
 | 2026-10-23 | Night cues drop scan. Canvas, WebGL, and video stay off the surface by default; WebGL is a flagged, approved exception. | Tim subtlety rule |
 | 2026-10-23 | Added the felt-not-seen subtlety rule, scene-palette cue colors, and night-surface hard negatives to the art-directed marketing brief. | Tim subtlety rule |
