@@ -18,12 +18,10 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
 
 // Profile shell is a client island. Keep it out of public-profile first-load JS.
-const ProfileCompactTemplate = dynamic(
-  () =>
-    import('@/features/profile/templates/ProfileCompactTemplate').then(mod => ({
-      default: mod.ProfileCompactTemplate,
-    })),
-  { loading: () => null }
+const ProfileCompactTemplate = dynamic(() =>
+  import('@/features/profile/templates/ProfileCompactTemplate').then(mod => ({
+    default: mod.ProfileCompactTemplate,
+  }))
 );
 
 export type StaticArtistPagePresentation = 'full-public' | 'compact-preview';

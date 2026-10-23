@@ -13,12 +13,10 @@ import {
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 
 // Same profile island as StaticArtistPage, deferred off the public first-load.
-const ProfileCompactTemplate = dynamic(
-  () =>
-    import('@/features/profile/templates/ProfileCompactTemplate').then(mod => ({
-      default: mod.ProfileCompactTemplate,
-    })),
-  { loading: () => null }
+const ProfileCompactTemplate = dynamic(() =>
+  import('@/features/profile/templates/ProfileCompactTemplate').then(mod => ({
+    default: mod.ProfileCompactTemplate,
+  }))
 );
 
 export interface PublicProfileFixtureProps {

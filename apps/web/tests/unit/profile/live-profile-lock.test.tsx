@@ -15,6 +15,9 @@ import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
+// Prepare the real lazy module with the test dependencies, before timed work.
+import '@/features/profile/templates/ProfileCompactTemplate';
+
 // This lock covers the flagged desktop surface journey too; the shipped
 // default (flag off) keeps desktop on the compact column and is covered in
 // profile-compact-template.test.tsx.
@@ -223,12 +226,8 @@ describe('live public profile lock', () => {
       </>
     );
 
-    // ProfileCompactTemplate is a deferred chunk, so the first render waits
-    // out its compile instead of the default one-second findBy.
     expect(
-      await screen.findByTestId('public-profile-layout-shell', undefined, {
-        timeout: 20000,
-      })
+      await screen.findByTestId('public-profile-layout-shell')
     ).toHaveAttribute('data-layout', 'compact');
     // The desktop surface is server-rendered (hidden) on mobile (JOV-6452);
     // jsdom ignores the CSS that hides it, so scope to the compact slot.
