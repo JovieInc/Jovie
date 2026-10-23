@@ -84,7 +84,10 @@ jobs:
         uses: ./.github/actions/setup-playwright
       - name: Run Storybook A11y Tests
         id: a11y-test
-        run: pnpm --filter @jovie/web test:a11y --shard=${{ matrix.shard }}/16
+        run: |
+          set -o pipefail
+          pnpm --filter @jovie/web test:a11y --shard=${{ matrix.shard }}/16 2>&1 \
+            | tee "$RUNNER_TEMP/a11y-shard-${{ matrix.shard }}.log"
       - name: A11y Results Summary
         if: always()
         run: |
@@ -94,6 +97,22 @@ jobs:
             echo "FAIL: Accessibility violations detected - blocking this PR." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "To run locally: pnpm --filter @jovie/web test:a11y" >> "$GITHUB_STEP_SUMMARY"
+            # Surface the failing axe nodes in the run summary so readers
+            # without job-log access can see them. Last 2000 lines of this
+            # shard's output, ANSI stripped, capped under the 1 MiB
+            # step-summary limit.
+            LOG="$RUNNER_TEMP/a11y-shard-${{ matrix.shard }}.log"
+            if [ -s "$LOG" ]; then
+              {
+                echo ""
+                echo "<details open><summary>Shard ${{ matrix.shard }}/16 output (last 2000 lines)</summary>"
+                echo ""
+                echo '```text'
+                tail -n 2000 "$LOG" | sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g' | tail -c 900000
+                echo '```'
+                echo "</details>"
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
           else
             echo "## A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -105,7 +124,7 @@ jobs:
     # run opens or updates one standing issue, deduped by title. Not required.
     name: Report main failure
     needs: [ci-visual-path-changes, storybook-a11y]
-    if: ${{ always() && github.event_name == 'push' && contains(needs.*.result, 'failure') }}
+    if: ${{ always() && github.event_name == 'push' && github.ref_name == 'main' && contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
