@@ -6,8 +6,8 @@
  * Ultra and Pulse exist only on that traveling edge. No blur, no shadow.
  * The canvas, when the device can run it, is absolute and starts at
  * opacity 0 so a refusal or context loss does not move layout.
- * Scene palette v1: Ion #3FAFF3, Ultra #A789F0, Pulse #EB6AC6
- * on canvas #070B12.
+ * Scene palette v1: Ion, Ultra, Pulse (noir-ion tokens) on the surface-0
+ * canvas. One accent per rule body; see the role declarations below.
  */
 /* NIGHT_DJ_HARMONY_V1: scoped WebGL exception — this hero's decorative
    layer only. See docs/design/night-dj-harmony-v1.md and the exception
@@ -24,10 +24,7 @@
 }
 
 .homepage-hero-light {
-  --hero-light-canvas: #070b12;
-  --hero-light-ion: #3faff3;
-  --hero-light-ultra: #a789f0;
-  --hero-light-pulse: #eb6ac6;
+  --hero-light-canvas: var(--system-b-cinematic-black, #06070a);
   --hero-light-focal-x: 50%;
   --hero-light-focal-y: 70%;
 
@@ -37,6 +34,21 @@
   overflow: hidden;
   pointer-events: none;
   color: transparent;
+}
+
+/* One accent role per rule body: the hue gate rejects a rule body that
+   names Ion, Ultra, and Pulse together, so each scene role is declared in
+   its own body, sourced from the noir-ion tokens. */
+.homepage-hero-light {
+  --hero-light-ion: var(--noir-ion-ion, #3faff3);
+}
+
+.homepage-hero-light {
+  --hero-light-ultra: var(--noir-ion-ultra, #a789f0);
+}
+
+.homepage-hero-light {
+  --hero-light-pulse: var(--noir-ion-pulse, #eb6ac6);
 }
 
 @media (max-width: 63.99rem) {

@@ -191,8 +191,11 @@
 /* Phone-width field: the proof phone joins the field's flow under the
    copy, so it cannot cover the headline at any viewport height. The phone
    is sized by height (the screen keeps its 402/874 aspect) and shrinks
-   first on a short field; once it hits its floor the copy clips inside
-   itself, bottom-up — the headline stays whole either way. */
+   first on a short field: the height ceiling reserves the bar plus a
+   20rem copy budget, so the phone yields before the copy clips, and the
+   floor only binds on fields shorter than that. Once both bounds are
+   reached the copy clips inside itself, bottom-up — the headline and the
+   phone stay separated either way. */
 @media (max-width: 63.99rem) {
   .homepage-hero-canvas__field {
     display: flex;
@@ -215,34 +218,11 @@
     width: auto;
     flex: 0 1 auto;
     align-self: center;
-    height: min(30svh, 15.75rem);
-    min-height: 9rem;
+    height: min(30svh, 15.75rem, calc(100svh - var(--hero-canvas-bar) - 20rem));
+    min-height: 7rem;
     aspect-ratio: 402 / 874;
     margin: 0 0 var(--space-4, 1rem);
   }
-}
-
-.homepage-hero-canvas__logos {
-  border-radius: 0 0
-    calc(var(--hero-canvas-progress) * var(--hero-canvas-radius))
-    calc(var(--hero-canvas-progress) * var(--hero-canvas-radius));
-  background: color-mix(
-    in oklab,
-    var(--system-b-cinematic-black, #030406) 72%,
-    transparent
-  );
-  -webkit-backdrop-filter: blur(
-    calc(var(--hero-canvas-progress) * var(--blur-header, 20px))
-  );
-  backdrop-filter: blur(
-    calc(var(--hero-canvas-progress) * var(--blur-header, 20px))
-  );
-}
-
-.homepage-hero-canvas__logos-rail {
-  min-height: 2.75rem;
-  border-top: 1px solid
-    color-mix(in oklab, var(--hero-light-ion, #3faff3) 18%, transparent);
 }
 
 @keyframes homepage-hero-canvas-progress {
@@ -266,8 +246,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .homepage-hero-canvas__bar-plate,
-  .homepage-hero-canvas__logos {
+  .homepage-hero-canvas__bar-plate {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }

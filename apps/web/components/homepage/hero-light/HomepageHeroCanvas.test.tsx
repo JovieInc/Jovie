@@ -46,4 +46,26 @@ describe('HomepageHeroCanvas', () => {
       document.querySelector('.homepage-artist-hero__phone')
     ).not.toBeNull();
   });
+
+  it('ships no partner-logo rail on the homepage hero', () => {
+    render(
+      <HomepageHeroCanvas
+        headingId='home-hero-heading'
+        headline={hero.headline}
+        subhead={hero.subhead}
+        claim={hero.claim}
+        supportNote={hero.supportNote}
+        profile={hero.profile}
+        sectionOwner='apps/web/components/homepage/HomepageArtistProfile.tsx'
+      />
+    );
+
+    // Proof is earned, not borrowed: the homepage hero carries no
+    // distribution-partner logo rail (night-dj-harmony-v1 + the ICP gate:
+    // the trust strip's permitted-logo chain stays off the homepage graph).
+    expect(document.querySelector('.homepage-hero-canvas__logos')).toBeNull();
+    expect(
+      document.querySelector('[aria-label="Distribution partners"]')
+    ).toBeNull();
+  });
 });

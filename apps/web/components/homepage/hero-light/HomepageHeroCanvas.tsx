@@ -7,7 +7,6 @@ import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import { ProductClaimHandleForm } from '@/app/(marketing)/product/ProductClaimHandleForm';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
 import { APP_ROUTES } from '@/constants/routes';
@@ -20,8 +19,6 @@ import {
   HERO_CANVAS_SIGN_IN,
 } from './hero-light-gate';
 import { bindHeroCanvasScroll } from './hero-light-scroll';
-
-const HOMEPAGE_LOGO_PLACEMENT = { page: '/' } as const;
 
 /**
  * Shipped homepage hero. Full-bleed at rest, then a cinematic card whose
@@ -64,6 +61,7 @@ export function HomepageHeroCanvas({
       data-marketing-owner={sectionOwner}
       data-marketing-variant='split-claim-card'
       data-marketing-section='hero'
+      data-accent='ion'
       data-hero-canvas=''
     >
       <header className='homepage-hero-canvas__bar'>
@@ -120,14 +118,6 @@ export function HomepageHeroCanvas({
               />
             </ArtistProfilePhoneFrame>
           </div>
-        </div>
-        <div className='homepage-hero-canvas__logos homepage-hero-canvas__logos-rail'>
-          <HomeTrustSection
-            placement={HOMEPAGE_LOGO_PLACEMENT}
-            presentation='inline-strip'
-            variant='compact'
-            ariaLabel='Distribution partners'
-          />
         </div>
       </div>
     </section>

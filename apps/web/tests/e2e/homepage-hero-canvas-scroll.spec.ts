@@ -162,7 +162,6 @@ function canvasHtml(fallback: boolean): string {
             </div>
           </div>
         </div>
-        <div class="homepage-hero-canvas__logos homepage-hero-canvas__logos-rail"></div>
       </div>
     </section>
     <div class="spacer"></div>
