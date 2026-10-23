@@ -364,16 +364,11 @@ export function ProfileCompactTemplate({
   const suppressNextHistorySyncRef = useRef(true);
   const arrivalHistoryLengthRef = useRef<number | null>(null);
   const profileHistoryDepthRef = useRef(0);
-  // The mode this document landed with. Next's history updater can replace
-  // the landing entry with the bare profile path after the first effects;
-  // restoring that mode must not push a second entry on top of the strip.
+  // The mode this document landed with. Filled in by the effect below, before
+  // the history effect, while the landing URL is still intact. Next's history
+  // updater can replace that entry with the bare profile path after child
+  // effects; restoring the mode must not push a second entry on top of the strip.
   const landedHistoryModeRef = useRef<ProfileMode | null>(null);
-  if (
-    landedHistoryModeRef.current === null &&
-    globalThis.window !== undefined
-  ) {
-    landedHistoryModeRef.current = getModeFromUrl();
-  }
 
   const clearCloseResetTimer = useCallback(() => {
     if (closeResetTimerRef.current !== null) {
@@ -740,6 +735,16 @@ export function ProfileCompactTemplate({
     globalThis.window === undefined
       ? ''
       : `${globalThis.location.pathname}${globalThis.location.search}`;
+
+  useEffect(() => {
+    if (
+      landedHistoryModeRef.current !== null ||
+      globalThis.window === undefined
+    ) {
+      return;
+    }
+    landedHistoryModeRef.current = getModeFromUrl();
+  }, []);
 
   useEffect(() => {
     if (!initialLocationModeAlignedRef.current) {
