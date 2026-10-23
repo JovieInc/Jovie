@@ -1,5 +1,34 @@
 # Pricing certification
 
+## Current renewal, 2026-10-23, PR #22726
+
+The document-title change invalidated Pricing's source digest. Renewed after
+rendering source head `830a48dc602db723cd997431c248019f5be1fe9a` locally at
+`http://localhost:33177/pricing`, using Node 24.22.1, Next 16.4.1 and Chromium.
+The page and all listed canonical owners retain those exact source bytes in this
+renewal. This is local source/browser evidence, not a production deployment receipt.
+
+- `PUBLIC_NOAUTH_SMOKE=1 NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_E2E_MODE=1`.
+- From the repo root, with that server running:
+  `BASE_URL=http://localhost:33177 E2E_SKIP_WEB_SERVER=1 E2E_SKIP_SEED=1 E2E_SKIP_WARMUP=1 pnpm --filter @jovie/web exec playwright test tests/e2e/pricing.spec.ts tests/e2e/marketing-document-title-a11y.spec.ts --config=playwright.config.noauth.ts --project=chromium --workers=1 --reporter=line`:
+  **15 passed** (10 pricing, 5 document-title regressions).
+- Pricing's tab title is exactly `Pricing | Jovie`. The browser tests cover
+  layout stability, overflow, keyboard plan selection, reduced motion, footer
+  and main-content accessibility, offer links and campaign attribution.
+- Refreshed captures: [320px](pricing-320.png), [390px](pricing-390.png),
+  [768px](pricing-768.png), [1440px](pricing-1440.png). Reviewed 320px and 1440px;
+  all four widths have one main, one pricing heading, one footer and no overflow.
+- The three focused marketing title/SEO Vitest files passed **11 tests**.
+- Source digest: `54b25357a7c78748ebf22c8cfb2a1576de2638d76b9cb7c5ce5c8b79ba54ea5e`.
+- Additional CI evidence for that same source head:
+  [UI capture run](https://github.com/JovieInc/Jovie/actions/runs/39905314379),
+  artifact `pr-visual-review-22726-830a48dc602db723cd997431c248019f5be1fe9a`.
+  Its local production-build DOM receipts report zero findings for Pricing at
+  390px and 1440px; the screen audit marks Pricing green with its visual judge
+  unavailable. This is CI render evidence, not production or visual-judge proof.
+
+## Previous renewal, 2026-10-21
+
 Current renewal: 2026-10-21, PR #22351 after merging PR #22382 from main.
 Local source/browser evidence only. The merged source preserves the $12/month
 self-serve offer and Pro claim CTA while moving shared container CSS into its

@@ -107,6 +107,7 @@ jobs:
       start-artifact-id: ${{ steps.start-proof.outputs.artifact-id }}
       onboarding-checkout-artifact-id: ${{ steps.onboarding-checkout-proof.outputs.artifact-id }}
       marketing-solutions-artifact-id: ${{ steps.marketing-solutions-proof.outputs.artifact-id }}
+      marketing-compare-detail-artifact-id: ${{ steps.marketing-compare-detail-proof.outputs.artifact-id }}
       public-profile-about-artifact-id: ${{ steps.public-profile-about-proof.outputs.artifact-id }}
       catalog-changed: ${{ steps.diff.outputs.changed }}
     defaults:
@@ -704,6 +705,7 @@ jobs:
             web.report \
             web.start \
             web.marketing-solutions \
+            web.marketing-compare-detail \
             web.public-profile-about; do
             SUFFIX="${SCREEN#*.}"
             node scripts/invariants/screen-proof-emit.mjs \
@@ -894,6 +896,21 @@ jobs:
             apps/web/test-results/screen-browser-proof-marketing-solutions/screen-proof.json
             apps/web/test-results/screen-browser-proof-marketing-solutions/screenshots/desktop.png
             apps/web/test-results/screen-browser-proof-marketing-solutions/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
+      - name: Upload marketing-compare-detail screen proof
+        id: marketing-compare-detail-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-marketing-compare-detail
+          path: |
+            apps/web/test-results/screen-browser-proof-marketing-compare-detail/screen-proof.json
+            apps/web/test-results/screen-browser-proof-marketing-compare-detail/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-marketing-compare-detail/screenshots/mobile.png
           if-no-files-found: error
           retention-days: 14
           allow-images: true
@@ -1292,6 +1309,7 @@ jobs:
             "web.start|${{ needs.generate.outputs.start-artifact-id }}" \
             "web.onboarding-checkout|${{ needs.generate.outputs.onboarding-checkout-artifact-id }}" \
             "web.marketing-solutions|${{ needs.generate.outputs.marketing-solutions-artifact-id }}" \
+            "web.marketing-compare-detail|${{ needs.generate.outputs.marketing-compare-detail-artifact-id }}" \
             "web.public-profile-about|${{ needs.generate.outputs.public-profile-about-artifact-id }}"; do
             SCREEN="${ENTRY%%|*}"
             ARTIFACT_ID="${ENTRY##*|}"

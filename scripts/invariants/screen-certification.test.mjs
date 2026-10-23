@@ -1227,6 +1227,7 @@ if (p.endsWith('/zip')) {
       'web.report',
       'web.start',
       'web.marketing-solutions',
+      'web.marketing-compare-detail',
       'web.public-profile-about',
     ];
     const spec = readFileSync(
@@ -1898,7 +1899,8 @@ if (p.endsWith('/zip')) {
     }
   });
 
-  it('resolves a genuine /artists SCREEN_PROOF_ROUTES producer artifact into an exact-build pass (JOV-7125)', () => {
+  /** @param {string} screenId @param {string} sourcePath */
+  const assertOwnRouteProof = (screenId, sourcePath) => {
     const root = mkdtempSync(join(tmpdir(), 'screen-resolver-artists-pass-'));
     const priorPath = process.env.PATH;
     const priorDiffBase = process.env.SCREEN_CERT_DIFF_BASE;
@@ -1917,13 +1919,13 @@ if (p.endsWith('/zip')) {
       ];
       const now = Date.now();
       const iso = offset => new Date(now + offset).toISOString();
-      const proofRoute = SCREEN_PROOF_ROUTES['web.artists'];
+      const proofRoute = SCREEN_PROOF_ROUTES[screenId];
       const buildProof = () => ({
         schema: SCREEN_BROWSER_PROOF_SCHEMA,
         producer: 'external-render-runner',
         status: 'unverified-candidate',
         certificationStatus: 'not-certified',
-        screenId: 'web.artists',
+        screenId,
         headSha: head,
         tier: 'rendered-evidence',
         runUrl: `https://github.com/JovieInc/Jovie/actions/runs/78/attempts/2`,
@@ -1931,11 +1933,14 @@ if (p.endsWith('/zip')) {
         producerRunAttempt: 2,
         producerJobId: 100,
         environment: 'local-production-build',
-        sourcePaths: ['apps/web/app/artists/page.tsx'],
+        sourcePaths: [sourcePath],
         capturedAt: iso(-60_000),
         artifactDigest: `sha256:${'0'.repeat(64)}`,
         activeFlow: { disclosure: false },
-        historyProof: { separate: true, path: 'docs/VISUAL_TESTING_POLICY.md' },
+        historyProof: {
+          separate: true,
+          path: 'docs/VISUAL_TESTING_POLICY.md',
+        },
         visibleActions: ['Certify', 'Block'],
         viewports: ['desktop', 'mobile'].map(id => ({
           id,
@@ -1985,7 +1990,7 @@ if (p.endsWith('/zip')) {
         );
         return readFileSync(join(root, 'proof.zip'));
       };
-      const zip = buildArchive();
+      let zip = buildArchive();
       const makeRecords = artifactName => ({
         artifact: {
           id: 43,
@@ -2029,21 +2034,21 @@ if (p.endsWith('/zip')) {
       process.env.PATH = `${root}:${priorPath}`;
       process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
 
-      // The dedicated `screen-browser-proof-artists` artifact name resolves.
+      // The screen resolves only from its dedicated artifact.
       writeFileSync(
         join(root, 'records.json'),
-        JSON.stringify(makeRecords(screenProofArtifactName('web.artists')))
+        JSON.stringify(makeRecords(screenProofArtifactName(screenId)))
       );
       const result = runScreenCertification({
         headSha: head,
-        changedFiles: ['apps/web/app/artists/page.tsx'],
-        proofRequests: [{ artifactId: 43, screenId: 'web.artists' }],
+        changedFiles: [sourcePath],
+        proofRequests: [{ artifactId: 43, screenId }],
       });
       assert.equal(result.ok, true, result.receipt.issues.join('\n'));
       assert.equal(result.receipt.certified, true);
       assert.deepEqual(result.receipt.changedScreens, [
         {
-          id: 'web.artists',
+          id: screenId,
           verdict: 'pass',
           findings: [],
           artifactDigest: proof.artifactDigest,
@@ -2051,8 +2056,31 @@ if (p.endsWith('/zip')) {
         },
       ]);
 
+      if (screenId === 'web.marketing-compare-detail') {
+        for (const viewport of proof.viewports) {
+          viewport.requestedRoute = '/compare';
+          viewport.finalUrl = 'http://localhost:3000/compare';
+        }
+        zip = buildArchive();
+        writeFileSync(
+          join(root, 'records.json'),
+          JSON.stringify(makeRecords(screenProofArtifactName(screenId)))
+        );
+        const indexCapture = runScreenCertification({
+          headSha: head,
+          changedFiles: [sourcePath],
+          proofRequests: [{ artifactId: 43, screenId }],
+        });
+        assert.equal(indexCapture.ok, false);
+        assert.equal(indexCapture.receipt.certified, false);
+        assert.match(
+          indexCapture.receipt.issues.join('\n'),
+          /required browser measurements are unavailable/
+        );
+      }
+
       // The public-profile screen's legacy bare artifact name must not also
-      // authenticate web.artists evidence — each SCREEN_PROOF_ROUTES-style
+      // authenticate this screen’s evidence — each SCREEN_PROOF_ROUTES-style
       // producer owns its own name.
       writeFileSync(
         join(root, 'records.json'),
@@ -2060,8 +2088,8 @@ if (p.endsWith('/zip')) {
       );
       const wrongName = runScreenCertification({
         headSha: head,
-        changedFiles: ['apps/web/app/artists/page.tsx'],
-        proofRequests: [{ artifactId: 43, screenId: 'web.artists' }],
+        changedFiles: [sourcePath],
+        proofRequests: [{ artifactId: 43, screenId }],
       });
       assert.equal(wrongName.ok, false);
       assert.equal(wrongName.receipt.certified, false);
@@ -2075,7 +2103,19 @@ if (p.endsWith('/zip')) {
       else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
       rmSync(root, { force: true, recursive: true });
     }
-  });
+  };
+
+  for (const [screenId, sourcePath] of [
+    ['web.artists', 'apps/web/app/artists/page.tsx'],
+    [
+      'web.marketing-compare-detail',
+      'apps/web/app/(marketing)/compare/[slug]/page.tsx',
+    ],
+  ]) {
+    it(`resolves ${screenId} only from its own route and artifact`, () => {
+      assertOwnRouteProof(screenId, sourcePath);
+    });
+  }
 
   it('binds web.hud-isolated to its exact query-string proof route (JOV-7126)', () => {
     // web.hud-isolated is the first SCREEN_PROOF_ROUTES entry whose route
@@ -3748,6 +3788,31 @@ if (p.endsWith('/zip')) {
     assert.deepEqual(result.changedScreens, [
       { id: 'web.cli-landing', verdict: 'evidence-required', findings: [] },
     ]);
+  });
+
+  it('requires comparison detail evidence separately from the index', () => {
+    const indexSource = 'apps/web/app/(marketing)/compare/page.tsx';
+    const detailSource = 'apps/web/app/(marketing)/compare/[slug]/page.tsx';
+    const index = classifyScreenPath(indexSource).entry;
+    const detail = classifyScreenPath(detailSource).entry;
+    assert.equal(index.id, 'web.marketing-compare');
+    assert.equal(detail.id, 'web.marketing-compare-detail');
+    assert.deepEqual(index.sources, [indexSource]);
+    assert.deepEqual(detail.sources, [detailSource]);
+    assert.equal(SCREEN_MARKETING_ROUTES[detail.id], undefined);
+    assert.equal(SCREEN_PROOF_ROUTES[detail.id], '/compare/linktree');
+    const result = evaluateChangedScreens({
+      changedFiles: [detailSource],
+      headSha: HEAD,
+      proofs: [validExternalProof(index)],
+      requireExternalEvidence: true,
+    });
+    assert.equal(result.changedScreens[0].id, detail.id);
+    assert.equal(result.changedScreens[0].verdict, 'block');
+    assert.match(
+      result.issues.join('\n'),
+      /missing exact-head proof for web.marketing-compare-detail/
+    );
   });
 
   it('registers the engineering publication index as its own screen for changed-surface certification (JOV-7110)', () => {

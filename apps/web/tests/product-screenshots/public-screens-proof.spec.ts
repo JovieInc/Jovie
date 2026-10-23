@@ -10,8 +10,8 @@ import { collectBrowserErrors } from '../visual-qa/route-quality';
 // that have no dedicated spec. Each entry pairs a SCREEN_REGISTRY id with the
 // concrete anonymous route that renders its registered sources; the workflow
 // binds and uploads one `screen-browser-proof-<suffix>` artifact per entry.
-// Screens needing auth, a dynamic param, or a reserved fixture keep (or get)
-// their own producer — do not add them here.
+// Anonymous dynamic families use their declared concrete health-check path.
+// Screens needing auth or reserved fixture data keep their own producer.
 const PUBLIC_SCREENS = [
   { screenId: 'web.root-document', route: '/' },
   { screenId: 'web.root-layout', route: '/' },
@@ -29,6 +29,7 @@ const PUBLIC_SCREENS = [
   // /solutions/* is a wildcard manifest family; /solutions/artists is its
   // declared concrete health-check path.
   { screenId: 'web.marketing-solutions', route: '/solutions/artists' },
+  { screenId: 'web.marketing-compare-detail', route: '/compare/linktree' },
   // /unfazed is the reserved capture profile: the same noop-DB fallback that
   // lets the web.public-profile producer render also renders its about page.
   { screenId: 'web.public-profile-about', route: '/unfazed/about' },
@@ -66,8 +67,10 @@ const outputRoot = path.resolve(
   process.env.SCREEN_PROOF_OUTPUT_ROOT || 'test-results'
 );
 
-test('emits exact-head public screen evidence', async ({ page }) => {
-  for (const screen of PUBLIC_SCREENS) {
+for (const screen of PUBLIC_SCREENS) {
+  test(`emits exact-head public screen evidence: ${screen.screenId}`, async ({
+    page,
+  }) => {
     const suffix = screen.screenId.slice(screen.screenId.indexOf('.') + 1);
     const screenDir = path.join(outputRoot, `screen-browser-proof-${suffix}`);
     await mkdir(path.join(screenDir, 'screenshots'), { recursive: true });
@@ -196,5 +199,5 @@ test('emits exact-head public screen evidence', async ({ page }) => {
         2
       )}\n`
     );
-  }
-});
+  });
+}
