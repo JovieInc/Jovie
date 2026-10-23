@@ -58,6 +58,13 @@
   overflow-wrap: anywhere;
 }
 
+/* Hydration disables the control so a click cannot no-op. That wait is not
+   a pending request, so the button stays at full strength until it is. */
+.auth-provider-button:disabled:not([data-auth-provider-pending]) {
+  cursor: default;
+  opacity: 1;
+}
+
 .auth-provider-button[data-auth-provider-slot="apple"] {
   min-height: max(44px, 2.32em);
   border-radius: 6px;
