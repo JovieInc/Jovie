@@ -6,7 +6,7 @@ describe('AiDemo', () => {
   it('keeps the premium demo rounded while its pause control remains usable', () => {
     render(<AiDemo variant='premium' contextChips={['Verified profile']} />);
 
-    expect(screen.getByRole('figure', { name: 'AI writing demo' })).toHaveClass(
+    expect(screen.getByRole('figure', { name: 'AI Writing Demo' })).toHaveClass(
       'rounded-3xl'
     );
     expect(screen.getByText('Verified profile')).toBeVisible();
