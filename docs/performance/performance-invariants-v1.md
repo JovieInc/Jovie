@@ -98,3 +98,12 @@ Route-response-latency budgets in this file are **not** a substitute for keeping
 path free of blocking I/O. The thread-blocking gate is `JOV-INV-031`
 ([latency-sensitive-execution-v1](./latency-sensitive-execution-v1.md)). That gate invents
 no numbers here and does not claim that async metadata changes crawler/bot wait.
+
+## Sibling check class: surface media
+
+Canvas, WebGL, and video on marketing surfaces are not a second Lighthouse and
+do not add a budget number. `scripts/invariants/art-direction/surface-media.mjs`
+rejects them unless the file names `NIGHT_DJ_HARMONY_V1` and
+`apps/web/lib/marketing/night-dj-harmony.ts` keeps
+`NIGHT_DJ_HARMONY_V1_ENABLED = false`. Pre-existing `<video>` mounts stay on
+that check's shrink-only baseline. Shaders stay baked images plus CSS motion.
