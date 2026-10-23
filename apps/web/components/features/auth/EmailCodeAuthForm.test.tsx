@@ -439,3 +439,12 @@ describe('EmailCodeAuthForm page alignment', () => {
     expect(intro?.className).not.toContain('text-left');
   });
 });
+
+describe('Pen sign-in polish (glm/auth-focal-polish)', () => {
+  it('renders the email CTA at the 32px visible control scale', () => {
+    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/start' />);
+    const cta = screen.getByRole('button', { name: 'Send sign-in code' });
+    expect(cta).toHaveClass('h-8');
+    expect(cta).toHaveClass('min-h-8');
+  });
+});
