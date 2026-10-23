@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -64,4 +65,21 @@ describe('KeyboardShortcutsSheet', () => {
     renderSheet(true, '/app/ov/ops');
     expect(screen.getByText('Lock workspace')).toBeInTheDocument();
   });
+});
+
+it('renders 32px shortcut rows', () => {
+  const view = renderSheet(false);
+  const row = view.getByText('Open command menu').closest('div.group');
+  expect(row).not.toBeNull();
+  expect(row).toHaveClass('h-8');
+});
+
+it('offers a Clear Search next step from the no-results state', async () => {
+  const view = renderSheet(false);
+  const user = userEvent.setup();
+  const input = view.getByPlaceholderText('Search shortcuts');
+  await user.type(input, 'zzzz-no-such-shortcut');
+  expect(view.getByText(/No shortcuts found/i)).toBeInTheDocument();
+  await user.click(view.getByRole('button', { name: 'Clear Search' }));
+  expect(view.getByText('Open command menu')).toBeInTheDocument();
 });

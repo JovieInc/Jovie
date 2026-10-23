@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
+  CmdKPaletteDynamic,
   CommandPalette,
   CommandPaletteMainSurface,
 } from '@/components/organisms/CommandPalette';
@@ -621,5 +622,20 @@ describe('CommandPalette', () => {
     });
     expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
     await waitFor(() => expect(origin).toHaveFocus());
+  });
+});
+
+describe('CommandPalette preload', () => {
+  it('warms the palette chunk at idle so the first open is instant', async () => {
+    const preload = vi.fn().mockResolvedValue(undefined);
+    const spy = vi
+      .spyOn(CmdKPaletteDynamic, 'preload')
+      .mockImplementation(preload);
+    try {
+      render(withDashboard(<CommandPalette />));
+      await waitFor(() => expect(preload).toHaveBeenCalled());
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

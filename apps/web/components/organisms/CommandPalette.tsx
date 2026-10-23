@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/organisms/CommandPalette.test.tsx
+
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 
 /**
@@ -55,6 +57,9 @@ const CmdKPalette = dynamic(
   { ssr: false }
 );
 
+/** Exposed for tests and idle-preload triggers. */
+export const CmdKPaletteDynamic = CmdKPalette;
+
 function getCurrentConversationId(pathname: string): string | null {
   const chatPrefix = `${APP_ROUTES.CHAT}/`;
   if (!pathname.startsWith(chatPrefix)) return null;
@@ -69,6 +74,24 @@ export function CommandPalette() {
   // should be a no-op instead of crashing.
   const dashboardData = useContext(DashboardDataContext);
   const headerActions = useOptionalHeaderActions();
+  // Warm the palette chunk at idle so the first Cmd+K opens instantly
+  // instead of waiting on a cold dynamic import.
+  useEffect(() => {
+    if (typeof globalThis.requestIdleCallback === 'function') {
+      const idleId = globalThis.requestIdleCallback(() => {
+        void CmdKPaletteDynamic.preload?.();
+      });
+      return () => {
+        globalThis.cancelIdleCallback(idleId);
+      };
+    }
+    const timer = globalThis.setTimeout(() => {
+      void CmdKPaletteDynamic.preload?.();
+    }, 0);
+    return () => {
+      globalThis.clearTimeout(timer);
+    };
+  }, []);
   if (!dashboardData || !headerActions) {
     return null;
   }
