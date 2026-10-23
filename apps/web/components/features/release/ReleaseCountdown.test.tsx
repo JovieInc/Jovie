@@ -34,6 +34,19 @@ describe('ReleaseCountdown', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
+  it('renders compact unit labels with the accessible secondary token', () => {
+    render(
+      <ReleaseCountdown
+        releaseDate={new Date('2032-04-16T16:00:00.000Z')}
+        compact
+      />
+    );
+
+    const label = screen.getByText('YR');
+    expect(label).toHaveClass('text-secondary-token');
+    expect(label.className).not.toContain('text-white/35');
+  });
+
   it('renders days, hours and minutes with the supplied label', () => {
     render(
       <ReleaseCountdown
