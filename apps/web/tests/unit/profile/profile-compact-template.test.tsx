@@ -1781,12 +1781,15 @@ describe('ProfileCompactTemplate', () => {
     const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
 
     try {
+      // The Contact drawer only opens for an artist with contact channels —
+      // the typed mockContacts fixture supplies one, establishing the real
+      // open-drawer precondition (hasContacts is derived from this prop).
       render(
         <ProfileCompactTemplate
           mode='contact'
           artist={mockArtist}
           socialLinks={[]}
-          contacts={[]}
+          contacts={mockContacts}
         />
       );
 
