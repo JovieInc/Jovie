@@ -211,13 +211,18 @@ export function JovieAuthValuesProvider({
  */
 export function JovieAuthDefaultsProvider({
   children,
+  fixtureUser = null,
 }: {
   readonly children: ReactNode;
+  /** Local demo identity only. Never creates a session or enables auth UI. */
+  readonly fixtureUser?: JovieUser | null;
 }) {
   return (
     <JovieAuthContext.Provider
       value={{
-        user: DEFAULT_USER_RETURN,
+        user: fixtureUser
+          ? { isLoaded: true, isSignedIn: false, user: fixtureUser }
+          : DEFAULT_USER_RETURN,
         auth: DEFAULT_AUTH_RETURN,
         session: DEFAULT_SESSION_RETURN,
         canRenderAuthUi: false,
