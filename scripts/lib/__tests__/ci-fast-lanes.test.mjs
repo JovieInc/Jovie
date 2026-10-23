@@ -2177,6 +2177,7 @@ describe('source-read guard selection', () => {
         'artist-launch-contract',
         'merge-group-unit-guards',
         'static-revalidate-policy',
+        'marketing-rounded-media',
       ],
     ],
     [
@@ -2317,6 +2318,13 @@ describe('source-read guard selection', () => {
       if (guard.id === 'external-api-guard') {
         expect(guard.command).toContain(
           join(REPO_ROOT, 'scripts/external-api-guard.mjs')
+        );
+        continue;
+      }
+      if (guard.id === 'marketing-rounded-media') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toBe(
+          'node --test scripts/invariants/art-direction/rounded.test.mjs'
         );
         continue;
       }

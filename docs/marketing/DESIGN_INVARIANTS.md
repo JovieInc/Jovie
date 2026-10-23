@@ -320,3 +320,28 @@ another task supplies no design requirement or action authority here.
   header authorization, or proof the edit was saved. Communicate actual
   navigation behavior consistently; do not impose a new-context destination
   merely to justify an icon. Re-evaluate scoped label size after rendered comparison.
+
+## MKT-D16 — Marketing images and cards are rounded
+
+- **Scope:** homepage, pricing, solutions, about, changelog, and shared
+  marketing images, cards, carousels, logo strips, mockups, and hero cards
+  (`next/image`, `img`, video posters, real `background-image` urls, cards).
+- **Requirement:** a radius token on every subject. Canonical corner:
+  `.marketing-rounded-frame` → `--system-b-radius-panel` (`--radius-3xl`),
+  the hero's settled wide cinematic card. Other non-zero steps (`rounded-*`,
+  `var(--radius-*)`) are allowed. A raw length fails. An image may inherit a
+  clipping ancestor. A card needs its own radius.
+- **Exemptions:** full-bleed hero at its 100vh start
+  (`.homepage-editorial-hero`, `.marketing-editorial-hero-photo`,
+  `.marketing-hero-photo`, `.marketing-hero-dock`,
+  `.marketing-route-hero__media`), which rounds as it zooms out; logos,
+  icons, SVG marks, and the iPhone bezel; already-round avatars; film-grain
+  data URIs. Docked header chrome is not a card.
+- **Founder evidence/status:** Tim, 2026-10-22 9:08 PM PT. Ship enabled.
+  No feature flag.
+- **Enforcement:** `scripts/invariants/art-direction/rounded.mjs`.
+  `rounded.baseline.json` is shrink-only (count 0). PR Ready guard
+  `marketing-rounded-media`. FS-009 checks new lines; parent clipping stays
+  on the ratchet.
+- **Change/exception:** do not weaken the check. Fix the corner, or shrink
+  the baseline only by deleting resolved ids.

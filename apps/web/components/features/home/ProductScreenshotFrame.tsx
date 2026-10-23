@@ -73,7 +73,7 @@ function renderScreenshotContent({
       priority={priority}
       quality={quality}
       sizes={sizes}
-      className='w-full'
+      className='marketing-rounded-frame w-full'
       onError={onImageError}
     />
   );
@@ -100,7 +100,7 @@ export function ProductScreenshotFrame({
       aria-label={isAvailable === true ? undefined : alt}
       data-testid={testId}
       className={[
-        'relative overflow-hidden rounded-[0.95rem] border border-subtle bg-surface-0 shadow-card-elevated md:rounded-xl',
+        'marketing-rounded-frame relative border border-subtle bg-surface-0 shadow-card-elevated',
         className,
       ]
         .filter(Boolean)

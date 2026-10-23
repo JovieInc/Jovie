@@ -223,7 +223,7 @@ export function AiDemo({
       className={cn(
         'overflow-hidden font-sans',
         isPremium
-          ? 'rounded-[1.35rem] border border-subtle bg-surface-1 shadow-panel-ring'
+          ? 'rounded-3xl border border-subtle bg-surface-1 shadow-panel-ring'
           : 'rounded-t-xl rounded-b-none bg-surface-0 shadow-panel-ring',
         className
       )}

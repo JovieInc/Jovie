@@ -197,6 +197,14 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
+    // Marketing images and cards use a radius token. Shrink-only baseline.
+    id: 'marketing-rounded-media',
+    command: 'node --test scripts/invariants/art-direction/rounded.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage|features\/(?:home|pricing|visibility-audit))\/|apps\/web\/components\/organisms\/(?:AboutPage|Blog|ComparisonPage|PricingRecipe|SupportPage|VoicePage)|apps\/web\/components\/site\/Marketing|apps\/web\/tests\/unit\/marketing\/art-direction\/rounded|scripts\/invariants\/art-direction\/rounded)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
     // Third-party API calls go through packages/api-client / scripts/apiclient
     // (.claude/rules/external-apis.md). A new provider host, SDK client or gh
     // call in any scanned source fails here; grandfathered sites only shrink.
