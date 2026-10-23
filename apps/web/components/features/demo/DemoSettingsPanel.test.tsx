@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
 
 const mockSearchParams = vi.hoisted(() => ({
-  get: vi.fn(() => null),
+  get: vi.fn((_key?: string): string | null => null),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -35,7 +35,7 @@ describe('DemoSettingsPanel', () => {
   });
 
   it('keeps capture-card section labels Title Case (no uppercase eyebrow)', () => {
-    mockSearchParams.get.mockImplementation((key: string) =>
+    mockSearchParams.get.mockImplementation((key?: string) =>
       key === 'capture' ? 'quality' : null
     );
     try {
