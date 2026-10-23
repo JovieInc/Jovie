@@ -1,10 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { generateMusicStructuredData } from '@/lib/seo/structured-data';
 import {
   discoveryApiSchema,
   inspectDiscoveryGuide,
   inspectPublicItem,
   publicJsonLd,
 } from './artist-discovery-proof';
+
+vi.mock('@/constants/app', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/constants/app')>()),
+  BASE_URL: 'https://jov.ie',
+}));
 
 const profileUrl = 'https://jov.ie/tim';
 const item = {
@@ -35,6 +41,36 @@ function documentFor(value: unknown, canonical = item.url) {
   );
 }
 describe('creator discovery proof', () => {
+  it('certifies every named provider emitted by the production release schema', () => {
+    const providerLinks = [
+      { providerId: 'spotify', url: 'https://open.spotify.com/album/song' },
+      { providerId: 'apple_music', url: destination },
+      { providerId: 'youtube', url: 'https://youtube.com/watch?v=song' },
+      { providerId: 'soundcloud', url: 'https://soundcloud.com/artist/song' },
+      { providerId: 'deezer', url: 'https://deezer.com/album/song' },
+      { providerId: 'tidal', url: 'https://tidal.com/album/song' },
+    ];
+    const schema = generateMusicStructuredData(
+      {
+        type: 'release',
+        title: item.title,
+        slug: 'song',
+        artworkUrl: null,
+        releaseDate: new Date(item.releaseDate),
+        providerLinks,
+      },
+      { displayName: 'Tim White', username: 'tim', usernameNormalized: 'tim' }
+    );
+    const result = inspectPublicItem(documentFor(schema), item, 'release');
+
+    expect(result.passed).toBe(true);
+    expect(result.destinations).toHaveLength(6);
+    expect(result.destinations).toContainEqual({
+      label: 'Listen on Tidal',
+      url: 'https://tidal.com/album/song',
+    });
+  });
+
   it('recovers named service destinations from raw HTML without JavaScript', () => {
     expect(
       inspectPublicItem(documentFor({ '@graph': [node] }), item, 'release')
