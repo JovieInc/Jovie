@@ -1,7 +1,8 @@
 // Builds `jovie.journey-evidence/v1` (see promotion-journey-evidence.mjs) from
 // the Playwright JSON report of the real Golden Path lane. The lane's single
-// spec walks auth -> claim -> catalog -> billing -> return against real Better
-// Auth and Stripe, so one executed spec backs both journeys. Evidence is built
+// spec walks auth -> claim -> catalog -> billing -> return using real Better
+// Auth and Stripe test APIs; completion-event delivery is synthesized by the
+// test. One executed spec backs both journeys. Evidence is built
 // from what the report says ran; a missing report or spec yields zero tests,
 // which the gate rejects.
 import { EVIDENCE_SCHEMA } from './promotion-journey-evidence.mjs';
@@ -25,11 +26,23 @@ export function countJourneyTests(report, specFile = JOURNEY_SPEC) {
   const startedAt = report?.stats?.startTime ?? null;
   for (const suite of report?.suites ?? []) {
     for (const spec of walkSpecs(suite)) {
-      if (!String(spec.file ?? '').endsWith(specFile)) continue;
+      if (
+        String(spec.file ?? '')
+          .split(/[\\/]/)
+          .at(-1) !== specFile
+      )
+        continue;
       for (const t of spec.tests ?? []) {
         tests.total += 1;
-        if (t.status === 'expected') tests.passed += 1;
-        else if (t.status === 'skipped') tests.skipped += 1;
+        if (
+          t?.status === 'expected' &&
+          t.expectedStatus === 'passed' &&
+          Array.isArray(t.results) &&
+          t.results.length > 0 &&
+          t.results.every(result => result?.status === 'passed')
+        )
+          tests.passed += 1;
+        else if (t?.status === 'skipped') tests.skipped += 1;
         else tests.failed += 1; // unexpected and flaky both fail the gate
       }
     }
