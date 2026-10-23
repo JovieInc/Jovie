@@ -441,10 +441,11 @@ describe('EmailCodeAuthForm page alignment', () => {
 });
 
 describe('Pen sign-in polish (glm/auth-focal-polish)', () => {
-  it('renders the email CTA at the 32px visible control scale', () => {
+  it('renders the email CTA on the approved auth pill geometry with no restyled Button sizes', () => {
     render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/start' />);
     const cta = screen.getByRole('button', { name: 'Send sign-in code' });
-    expect(cta).toHaveClass('h-8');
-    expect(cta).toHaveClass('min-h-8');
+    expect(cta).toHaveClass('w-full');
+    expect(cta.className).not.toMatch(/\bh-8\b/);
+    expect(cta.className).not.toMatch(/\bmin-h-8\b/);
   });
 });
