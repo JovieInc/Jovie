@@ -996,6 +996,36 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/product/dsp-links/page.tsx',
+    recipeId: 'feature',
+    renderedSections: [
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/product/dsp-links/DspLinksLanding.tsx',
+        'hero',
+        'split-screenshot-right'
+      ),
+    ],
+    bindingEvidence: {
+      status: 'verified',
+      source: 'DSP link rows ship on /product/dsp-links',
+      notes:
+        'Mounted stamp is split-screenshot-right. The hero shows the live DSP rows: a saved URL opens that service, and a missing service stays on Find. Pen identity is explicitly unknown. No visual admission.',
+    },
+    status: 'active',
+    specVersion: '1.4.0',
+    url: '/product/dsp-links',
+    productEvidence: {
+      kind: 'interactive-mockup',
+      componentPath: 'apps/web/components/molecules/inspector/DspQuietRow.tsx',
+      testId: 'dsp-links',
+    },
+    healthCheck: {
+      path: '/product/dsp-links',
+      expected: 'page',
+      waitFor: '[data-testid="marketing-section-hero"]',
+    },
+  },
+  {
     glob: '(marketing)/product/isrc/page.tsx',
     recipeId: 'feature',
     renderedSections: [
