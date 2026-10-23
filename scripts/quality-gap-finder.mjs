@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * Quality gap finder: proposes missing tests, guardrails, and invariants from
  * repo and tracker evidence. Deterministic and model-free; one filesystem
@@ -16,6 +17,11 @@
  *   escaped-defect-closure-unverified
  *                                completed escaped defect missing product +
  *                                detector closure evidence
+ *   founder-rescue-detection-gap founder-discovered defect with no detector
+ *                                demonstrably live before the report
+ *   detection-capability-unlearned
+ *                                highest-value planned capability in the
+ *                                detection coverage registry
  *   component-state-untested     recently changed UI component with neither a
  *                                story nor a test
  *   changed-code-untested        recently changed API route / lib module with
@@ -59,9 +65,11 @@ import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ownedHere } from './invariants/registry.mjs';
 import {
-  ESCAPED_DEFECT_LABEL,
+  DETECTION_GAP_CLASSES,
   evaluateEscapedDefectClosure,
+  extractEscapedDefectClosureEvidence,
 } from './lib/escaped-defect-closure.mjs';
+import { assertEventDrivenLearning } from './lib/learning-trigger.mjs';
 import {
   JOVIE_TEAM_ID,
   upsertLinearIssueByTitleFingerprint,
@@ -79,6 +87,8 @@ export const LABEL_AGENT_READY = 'agent-ready';
 export const HEATMAP_STALE_DAYS = 30;
 export const COVERAGE_DROP_PP = 3;
 export const PER_COLLECTOR_LIMIT = 5;
+export const DETECTION_GAP_SCHEMA = 'jovie.detection-gap/v1';
+export const DETECTION_COVERAGE_SCHEMA = 'jovie.detection-coverage-registry/v1';
 export const DEFECT_LABELS = Object.freeze([
   'bug',
   'dogfood',
@@ -102,6 +112,8 @@ const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const STORY_FILE = /\.stories\.[cm]?[jt]sx?$/;
 const NON_PUBLIC_ROUTE =
   /^\/(?:api|app|admin|exp|dev|demo|ui|renders|hud|sandbox|test|internal|signin|signup|sign-in|sign-up|auth|onboarding|start|claim|account|settings|billing|investor-portal)(?:\/|$)/;
+const FOUNDER_RESCUE_PATTERN =
+  /\b(?:founder(?:[- ](?:found|discovered|reported|visible|rescue)|\s+(?:live\s+)?dogfood)|tim\s+(?:manually\s+)?(?:found|discovered|reported|reproduced|rescued|chased|explained)|manual(?:ly)?\s+(?:found|discovered|rescued)|found by tim)\b/i;
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -122,6 +134,8 @@ function proposal({
   evidence,
   suggestion,
   originatingIssue = null,
+  detectionGap = null,
+  refreshExisting = false,
 }) {
   return {
     fingerprint: fingerprintOf(kind, key),
@@ -135,6 +149,8 @@ function proposal({
     evidence,
     suggestion,
     originatingIssue,
+    detectionGap,
+    refreshExisting,
   };
 }
 
@@ -542,6 +558,264 @@ export function collectEscapedDefectGaps(issues, repoRoot, testIndex) {
   return out;
 }
 
+function issueComments(issue) {
+  return Array.isArray(issue.comments) ? issue.comments : [];
+}
+
+function founderRescueOccurrences(issue) {
+  const occurrences = [];
+  const issueText = `${issue.title ?? ''}\n${issue.description ?? ''}`;
+  if (FOUNDER_RESCUE_PATTERN.test(issueText)) {
+    occurrences.push({
+      evidence: 'issue description',
+      occurredAt: issue.createdAt ?? null,
+      text: issueText,
+    });
+  }
+  for (const comment of issueComments(issue)) {
+    const body =
+      typeof comment === 'string' ? comment : String(comment?.body ?? '');
+    if (!FOUNDER_RESCUE_PATTERN.test(body)) continue;
+    occurrences.push({
+      evidence:
+        typeof comment === 'string'
+          ? 'issue comment'
+          : `issue comment by ${comment.authorName ?? 'unknown'}`,
+      occurredAt:
+        typeof comment === 'string' ? null : (comment.createdAt ?? null),
+      text: body,
+    });
+  }
+  return occurrences;
+}
+
+function classifyFounderDetectionGap(text) {
+  const classes = new Set(['founder-only-surface']);
+  if (
+    /\b(?:coverage|test|certif|single[- ]click|one[- ]click|transition|state machine|sibling)\b/i.test(
+      text
+    )
+  ) {
+    classes.add('coverage-gap');
+  } else {
+    classes.add('missing-signal');
+  }
+  if (
+    /\b(?:false[- ]green|green|passed?|healthy|done|certified)\b[\s\S]{0,80}\b(?:broken|failed?|regression|contradict)/i.test(
+      text
+    ) ||
+    /\b(?:broken|failed?|regression|contradict)[\s\S]{0,80}\b(?:green|passed?|healthy|done|certified)\b/i.test(
+      text
+    )
+  ) {
+    classes.add('false-green');
+  }
+  if (
+    /\b(?:contradict|mismatch|independently|relationship|lineage)\b/i.test(text)
+  ) {
+    classes.add('missing-join');
+  }
+  return DETECTION_GAP_CLASSES.filter(cls => classes.has(cls));
+}
+
+function existingDetectorPredatesReport(issue, reportedAt) {
+  if (!reportedAt || !Number.isFinite(Date.parse(reportedAt))) return false;
+  const extracted = extractEscapedDefectClosureEvidence(issue);
+  const verification = extracted.evidence?.detection?.verification;
+  return (
+    verification?.status === 'live-verified' &&
+    Number.isFinite(Date.parse(verification.verifiedAt)) &&
+    Date.parse(verification.verifiedAt) <= Date.parse(reportedAt)
+  );
+}
+
+function learnedRepeat(registry, gapClasses, discoveredAt) {
+  const discovered = Date.parse(discoveredAt ?? '');
+  if (!registry || !Number.isFinite(discovered)) return null;
+  const matches = (registry.capabilities ?? []).filter(item => {
+    if (item.status !== 'live-verified') return false;
+    const verifiedAt = Date.parse(
+      item.proof?.lastVerifiedLiveFiring?.verifiedAt ?? ''
+    );
+    if (!Number.isFinite(verifiedAt) || verifiedAt > discovered) return false;
+    const covered = new Set(item.failureClasses ?? []);
+    return gapClasses.some(cls => covered.has(cls));
+  });
+  matches.sort((a, b) => a.id.localeCompare(b.id));
+  return matches[0] ?? null;
+}
+
+/** Founder-discovered defects always emit a typed DetectionGap unless a live detector demonstrably fired first. */
+export function collectFounderDetectionGaps(issues, registry = null) {
+  const out = [];
+  for (const issue of issues) {
+    const labels = (issue.labels ?? []).map(label =>
+      String(label).toLowerCase()
+    );
+    if (!labels.some(label => DEFECT_LABELS.includes(label))) continue;
+    const occurrences = founderRescueOccurrences(issue);
+    if (occurrences.length === 0) continue;
+    const timestamps = occurrences
+      .map(item => item.occurredAt)
+      .filter(value => value && Number.isFinite(Date.parse(value)))
+      .sort();
+    const discoveredAt = timestamps[0] ?? issue.createdAt ?? null;
+    if (existingDetectorPredatesReport(issue, discoveredAt)) continue;
+    const text = occurrences.map(item => item.text).join('\n');
+    const gapClasses = classifyFounderDetectionGap(text);
+    const repeat = learnedRepeat(registry, gapClasses, discoveredAt);
+    const detectionGap = {
+      schema: DETECTION_GAP_SCHEMA,
+      originatingIssue: issue.id,
+      discoveredAt,
+      source: 'founder-rescue',
+      gapClasses,
+      existingLiveVerifiedDetectorCaughtFirst: false,
+      repeatOfLearnedDetector: repeat?.id ?? null,
+      learningCompiler: {
+        issue: 'JOV-7084',
+        frontierRoute: 'JOV-2967',
+      },
+      proofRequired: {
+        historicalReplay: true,
+        validControlCase: true,
+        livePathInjection: true,
+      },
+    };
+    out.push(
+      proposal({
+        kind: 'founder-rescue-detection-gap',
+        key: issue.id,
+        title: repeat
+          ? `P0 regression: ${issue.id} repeated learned detector ${repeat.id}`
+          : `${issue.id} founder rescue requires a compiled DetectionGap`,
+        confidence: 1,
+        impact: 5,
+        area: 'detection-coverage',
+        originatingIssue: issue.id,
+        detectionGap,
+        refreshExisting: true,
+        evidence: [
+          `${issue.id}: ${issue.title}`,
+          `founder rescue evidence: ${occurrences.map(item => item.evidence).join(', ')}`,
+          `typed gap classes: ${gapClasses.join(', ')}`,
+          repeat
+            ? `learned detector ${repeat.id} predates this rescue and did not catch it`
+            : 'no live-verified detector receipt predates the founder report',
+        ],
+        suggestion: repeat
+          ? `Treat the repeat of ${repeat.id} as a P0 compiler regression. Repair that detector, then replay the originating failure and one valid control through the live Summer path.`
+          : 'Route ambiguous/high-impact generalization through JOV-2967, then compile the smallest detector and bounded remediator through existing owners.',
+      })
+    );
+  }
+  return out;
+}
+
+export function readDetectionCoverageRegistry(repoRoot = DEFAULT_ROOT) {
+  const source = readText(
+    repoRoot,
+    'apps/web/data/detection-coverage-registry.json'
+  );
+  return source ? JSON.parse(source) : null;
+}
+
+function capabilityScore(priority = {}) {
+  return (
+    Number(priority.impact ?? 0) *
+    Math.max(1, Number(priority.historicalRecurrence ?? 0)) *
+    Number(priority.invisibilityRisk ?? 0) *
+    Number(priority.detectionTractability ?? 0) *
+    Number(priority.remediationLeverage ?? 0) *
+    (1 + Number(priority.founderRescues ?? 0))
+  );
+}
+
+function proofTarget(ref) {
+  const value = String(ref ?? '');
+  const hash = value.indexOf('#');
+  if (hash === -1) return { path: value, fragment: null };
+  return { path: value.slice(0, hash), fragment: value.slice(hash + 1) };
+}
+
+function assertProofRef(ref, label) {
+  const { path, fragment } = proofTarget(ref);
+  if (!path.includes('/')) return;
+  const absolute = resolve(DEFAULT_ROOT, path);
+  if (!existsSync(absolute)) {
+    throw new Error(`${label} proof is missing: ${path}`);
+  }
+  if (fragment && !readFileSync(absolute, 'utf8').includes(fragment)) {
+    throw new Error(`${label} proof fragment is missing: ${fragment}`);
+  }
+}
+
+/** Highest-value unlearned capability; live-verified entries must carry red, control, and firing proof. */
+export function collectDetectionCoverageGaps(registry) {
+  if (!registry) return [];
+  if (registry.schema !== DETECTION_COVERAGE_SCHEMA) {
+    throw new Error(
+      `detection coverage schema must be ${DETECTION_COVERAGE_SCHEMA}`
+    );
+  }
+  const capabilities = Array.isArray(registry.capabilities)
+    ? registry.capabilities
+    : [];
+  const ids = capabilities.map(item => item.id);
+  if (ids.join('\n') !== [...ids].sort().join('\n')) {
+    throw new Error('detection coverage capabilities must be sorted by id');
+  }
+  for (const item of capabilities) {
+    if (item.priority?.score !== capabilityScore(item.priority)) {
+      throw new Error(`${item.id} priority score does not match its factors`);
+    }
+    const learned = item.status === 'live-verified';
+    if (
+      learned &&
+      (item.proof?.deliberateRedFixtures?.length === 0 ||
+        item.proof?.controlCases?.length === 0 ||
+        !item.proof?.lastVerifiedLiveFiring?.evidenceRef)
+    ) {
+      throw new Error(
+        `${item.id} cannot be learned without red, control, and live proof`
+      );
+    }
+    for (const ref of item.proof?.deliberateRedFixtures ?? []) {
+      assertProofRef(ref, item.id);
+    }
+    for (const ref of item.proof?.controlCases ?? []) {
+      assertProofRef(ref, item.id);
+    }
+    if (item.proof?.lastVerifiedLiveFiring?.evidenceRef) {
+      assertProofRef(item.proof.lastVerifiedLiveFiring.evidenceRef, item.id);
+    }
+    if (learned && !item.proof?.lastVerifiedLiveFiring?.verifiedAt) {
+      throw new Error(`${item.id} live firing needs a verifiedAt timestamp`);
+    }
+  }
+  const [next] = capabilities
+    .filter(item => item.status !== 'live-verified')
+    .sort(
+      (a, b) => b.priority.score - a.priority.score || a.id.localeCompare(b.id)
+    );
+  if (!next) return [];
+  return [
+    proposal({
+      kind: 'detection-capability-unlearned',
+      key: next.id,
+      title: `Learn detection capability: ${next.title}`,
+      confidence: 0.95,
+      impact: next.priority.impact,
+      area: 'detection-coverage',
+      evidence: [
+        `highest registry score ${next.priority.score} (${next.priority.impact} impact × ${next.priority.historicalRecurrence} recurrence × ${next.priority.invisibilityRisk} invisibility × ${next.priority.detectionTractability} tractability × ${next.priority.remediationLeverage} leverage × ${1 + next.priority.founderRescues} rescue multiplier)`,
+        ...next.knownBlindSpots,
+      ],
+      suggestion: `${next.nextExpansion}. Prove the originating deliberate red and one valid control, then observe the detector through the live Summer path before marking it learned.`,
+    }),
+  ];
+}
+
 /** Completed escaped defects must carry product and detector repair proof. */
 export function collectEscapedDefectClosureGaps(issues) {
   const out = [];
@@ -829,14 +1103,14 @@ export function route(proposals) {
 }
 
 /**
- * Drop proposals already filed (any state) and apply caps. `existing` holds
- * fingerprints found in Linear titles; `lowFiledToday` counts needs-tim
- * issues this finder created since UTC midnight.
+ * Refresh open lifecycle records, suppress terminal duplicates, and apply caps.
+ * `lowFiledToday` counts needs-tim issues created since UTC midnight.
  */
 export function selectForFiling(
   proposals,
   {
     existing = new Set(),
+    refreshable = new Set(),
     lowFiledToday = 0,
     maxHigh = MAX_HIGH_PER_RUN,
     maxLowPerDay = MAX_LOW_PER_DAY,
@@ -845,21 +1119,33 @@ export function selectForFiling(
   const rank = (a, b) =>
     b.confidence * b.impact - a.confidence * a.impact ||
     a.fingerprint.localeCompare(b.fingerprint);
-  const fresh = route(proposals).filter(
-    item => !existing.has(item.fingerprint)
+  const routed = route(proposals);
+  const refresh = routed.filter(
+    item => item.refreshExisting && refreshable.has(item.fingerprint)
   );
+  const fresh = routed.filter(item => !existing.has(item.fingerprint));
   const high = fresh.filter(item => item.lane === 'issue').sort(rank);
   const low = fresh.filter(item => item.lane === 'needs-tim').sort(rank);
   const lowBudget = Math.max(0, maxLowPerDay - lowFiledToday);
   return {
-    file: [...high.slice(0, maxHigh), ...low.slice(0, lowBudget)],
+    file: [...refresh, ...high.slice(0, maxHigh), ...low.slice(0, lowBudget)],
     deferred: [...high.slice(maxHigh), ...low.slice(lowBudget)],
-    suppressed: route(proposals).filter(item => existing.has(item.fingerprint)),
+    suppressed: routed.filter(
+      item =>
+        existing.has(item.fingerprint) &&
+        !(item.refreshExisting && refreshable.has(item.fingerprint))
+    ),
   };
 }
 
 export function issueTitle(item) {
   return `[${item.fingerprint}] Quality gap: ${item.title}`.slice(0, 250);
+}
+
+/** Linear priority: 1 urgent for a repeated learned failure, else lane default. */
+export function filingPriority(item) {
+  if (item.detectionGap?.repeatOfLearnedDetector) return 1;
+  return item.lane === 'needs-tim' ? 4 : 3;
 }
 
 export function issueDescription(item, runUrl = 'local run') {
@@ -873,6 +1159,10 @@ export function issueDescription(item, runUrl = 'local run') {
       ? `Originating defect: ${item.originatingIssue}`
       : null,
     item.originatingIssue ? '' : null,
+    item.detectionGap
+      ? `<!-- detection-gap:v1\n${JSON.stringify(item.detectionGap, null, 2)}\n-->`
+      : null,
+    item.detectionGap ? '' : null,
     '## Evidence',
     ...item.evidence.map(line => `- ${line}`),
     '',
@@ -881,6 +1171,12 @@ export function issueDescription(item, runUrl = 'local run') {
     '',
     '## Done when',
     '- The gap is closed by an executable test, invariant, or budget that fails on the old behavior.',
+    ...(item.detectionGap
+      ? [
+          '- The originating replay and at least one valid control case prove the generalized detector.',
+          '- A live or injected event is observed through the Summer path, then the original journey is re-tested.',
+        ]
+      : []),
     '- Or this issue is canceled with the reason the gap is intentional.',
     '',
     `<!-- quality-gap-fingerprint: ${item.fingerprint} kind: ${item.kind} key: ${item.key} -->`,
@@ -914,7 +1210,7 @@ export async function fetchExistingFingerprints(apiKey, now, fetchImpl) {
   const data = await linearQuery(
     `query($teamId: ID!) {
       issues(filter: { team: { id: { eq: $teamId } }, title: { contains: "[qg-" } }, first: 250, includeArchived: true) {
-        nodes { title createdAt labels { nodes { name } } }
+        nodes { title createdAt state { type } labels { nodes { name } } }
       }
     }`,
     { teamId: JOVIE_TEAM_ID },
@@ -927,14 +1223,20 @@ export async function fetchExistingFingerprints(apiKey, now, fetchImpl) {
     now.getUTCDate()
   );
   const existing = new Set();
+  const refreshable = new Set();
   let lowFiledToday = 0;
   for (const node of data?.issues?.nodes ?? []) {
     const fingerprint = node.title.match(/\[(qg-[0-9a-f]{8})\]/)?.[1];
-    if (fingerprint) existing.add(fingerprint);
+    if (fingerprint) {
+      existing.add(fingerprint);
+      if (!['completed', 'canceled'].includes(node.state?.type)) {
+        refreshable.add(fingerprint);
+      }
+    }
     const isLow = node.labels?.nodes?.some(label => label.name === LABEL_LOW);
     if (isLow && Date.parse(node.createdAt) >= midnight) lowFiledToday += 1;
   }
-  return { existing, lowFiledToday };
+  return { existing, refreshable, lowFiledToday };
 }
 
 export async function fetchRecentDefects(apiKey, sinceDays, fetchImpl) {
@@ -942,7 +1244,7 @@ export async function fetchRecentDefects(apiKey, sinceDays, fetchImpl) {
   const data = await linearQuery(
     `query($teamId: ID!, $since: DateTimeOrDuration!) {
       issues(filter: { team: { id: { eq: $teamId } }, updatedAt: { gte: $since } }, first: 250) {
-        nodes { identifier title description state { name type } labels { nodes { name } } }
+        nodes { identifier title description createdAt creator { name } state { name type } labels { nodes { name } } }
       }
     }`,
     { teamId: JOVIE_TEAM_ID, since },
@@ -954,23 +1256,23 @@ export async function fetchRecentDefects(apiKey, sinceDays, fetchImpl) {
     identifier: node.identifier,
     title: node.title,
     description: node.description ?? '',
+    createdAt: node.createdAt ?? null,
+    creatorName: node.creator?.name ?? null,
     status: node.state?.name,
     statusType: node.state?.type,
     labels: node.labels?.nodes?.map(label => label.name) ?? [],
     comments: [],
   }));
-  const closureCandidates = issues.filter(
-    issue =>
-      ['completed', 'Done'].includes(issue.statusType ?? issue.status) &&
-      issue.labels.some(
-        label => String(label).toLowerCase() === ESCAPED_DEFECT_LABEL
-      )
+  const commentCandidates = issues.filter(issue =>
+    issue.labels.some(label =>
+      DEFECT_LABELS.includes(String(label).toLowerCase())
+    )
   );
-  if (closureCandidates.length === 0) return issues;
-  const commentFields = closureCandidates
+  if (commentCandidates.length === 0) return issues;
+  const commentFields = commentCandidates
     .map(
       (issue, index) =>
-        `i${index}: issue(id: "${issue.id}") { identifier comments(first: 50) { nodes { body } } }`
+        `i${index}: issue(id: "${issue.id}") { identifier comments(first: 50) { nodes { body createdAt user { name } } } }`
     )
     .join('\n');
   const commentData = await linearQuery(
@@ -984,7 +1286,11 @@ export async function fetchRecentDefects(apiKey, sinceDays, fetchImpl) {
       .filter(Boolean)
       .map(issue => [
         issue.identifier,
-        issue.comments?.nodes?.map(comment => comment.body) ?? [],
+        issue.comments?.nodes?.map(comment => ({
+          body: comment.body,
+          createdAt: comment.createdAt ?? null,
+          authorName: comment.user?.name ?? null,
+        })) ?? [],
       ])
   );
   return issues.map(issue => ({
@@ -1050,6 +1356,7 @@ export function collectAll({
   runGit = defaultGit,
 } = {}) {
   const testIndex = buildTestIndex(repoRoot);
+  const detectionRegistry = readDetectionCoverageRegistry(repoRoot);
   const churn = gitChurn(repoRoot, sinceDays, runGit);
   const guardCorpus = [
     readText(repoRoot, 'canon/invariants.jsonl'),
@@ -1074,6 +1381,8 @@ export function collectAll({
       guardCorpus,
       actionStates
     ),
+    ...collectDetectionCoverageGaps(detectionRegistry),
+    ...collectFounderDetectionGaps(issues, detectionRegistry),
     ...collectEscapedDefectClosureGaps(issues),
     ...collectEscapedDefectGaps(issues, repoRoot, testIndex),
     ...collectComponentStateGaps(churn, repoRoot, testIndex),
@@ -1114,6 +1423,7 @@ export function summarize(report) {
 }
 
 async function main() {
+  assertEventDrivenLearning();
   const args = process.argv.slice(2);
   const file = args.includes('--file');
   const sinceDays = Number(argValue(args, '--since-days') ?? 14);
@@ -1142,7 +1452,7 @@ async function main() {
   });
   const dedupe = apiKey
     ? await fetchExistingFingerprints(apiKey, now)
-    : { existing: new Set(), lowFiledToday: 0 };
+    : { existing: new Set(), refreshable: new Set(), lowFiledToday: 0 };
   const selection = selectForFiling(proposals, dedupe);
   const routed = route(proposals);
   const report = {
@@ -1182,7 +1492,7 @@ async function main() {
         fingerprint: item.fingerprint,
         title: issueTitle(item),
         description: issueDescription(item, runUrl),
-        priority: item.lane === 'needs-tim' ? 4 : 3,
+        priority: filingPriority(item),
         createStateName: 'Backlog',
         createLabelIds: labelIds,
         apiKey,

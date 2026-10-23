@@ -9,12 +9,13 @@ const mockLoggerError = vi.hoisted(() => vi.fn());
 const mockLoggerWarn = vi.hoisted(() => vi.fn());
 const mockLoggerInfo = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/env-server', () => ({
-  env: {
-    LINEAR_WEBHOOK_SECRET: 'linear-secret',
-    GH_DISPATCH_TOKEN: 'gh-token',
-  },
+const mockEnv = vi.hoisted(() => ({
+  LINEAR_WEBHOOK_SECRET: 'linear-secret',
+  GH_DISPATCH_TOKEN: 'gh-token',
+  LINEAR_API_KEY: 'linear-read-key' as string | undefined,
 }));
+
+vi.mock('@/lib/env-server', () => ({ env: mockEnv }));
 
 vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
@@ -422,7 +423,86 @@ describe('POST /api/webhooks/linear', () => {
     expect(mockServerFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('ignores non-JOV and non-Triage Issue updates', async () => {
+  it('requests guarded Backlog observation when current priority or a shared readiness tier changes', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    for (const scope of [
+      { priority: 1 },
+      {
+        priority: 2,
+        labels: [{ name: 'agent-ready' }, { name: 'dispatch-next' }],
+      },
+      { priority: 3, labels: [{ name: 'P0' }] },
+      { priority: 0, title: 'P0 — existing bounded contract' },
+    ]) {
+      const body = JSON.stringify({
+        type: 'Issue',
+        action: 'update',
+        updatedFrom: { priority: 4 },
+        data: {
+          id: '68b3e8de-588e-46ba-8209-84329d154627',
+          identifier: 'JOV-6641',
+          description: 'Private scope must stay out of dispatch',
+          teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+          stateId: '1551ed21-7743-4573-82d8-8949410d3b8d',
+          updatedAt: '2026-10-16T19:00:00.000Z',
+          ...scope,
+        },
+      });
+      const response = await POST(
+        new Request('https://example.com/api/webhooks/linear', {
+          method: 'POST',
+          headers: { 'linear-signature': sign(body) },
+          body,
+        }) as never
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ dispatched: true });
+      const dispatch = JSON.parse(mockServerFetch.mock.lastCall?.[1]?.body);
+      expect(dispatch.event_type).toBe('linear_triage_assess');
+      expect(dispatch.client_payload).toMatchObject({
+        state_name: 'Backlog',
+        issue_identifier: 'JOV-6641',
+        issue_updated_at: '2026-10-16T19:00:00.000Z',
+      });
+      expect(JSON.stringify(dispatch)).not.toContain('Private scope');
+      expect(dispatch.client_payload).not.toHaveProperty('priority');
+    }
+  });
+
+  it('ignores unrelated Backlog updates without inflating missing or malformed priority', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    for (const priority of [undefined, 0, 2, 3, 4, '1', true]) {
+      const body = JSON.stringify({
+        type: 'Issue',
+        action: 'update',
+        data: {
+          id: '68b3e8de-588e-46ba-8209-84329d154627',
+          identifier: 'JOV-6641',
+          teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+          state: { name: 'Backlog' },
+          priority,
+          labels: [{ name: 'agent-ready' }],
+        },
+      });
+      const response = await POST(
+        new Request('https://example.com/api/webhooks/linear', {
+          method: 'POST',
+          headers: { 'linear-signature': sign(body) },
+          body,
+        }) as never
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ ignored: true });
+    }
+    expect(mockServerFetch).not.toHaveBeenCalled();
+  });
+
+  it('ignores non-JOV and unrelated-state Issue updates', async () => {
     const { POST } = await import('@/app/api/webhooks/linear/route');
     for (const data of [
       {
@@ -569,7 +649,12 @@ describe('POST /api/webhooks/linear', () => {
     });
     mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
     const { POST } = await import('@/app/api/webhooks/linear/route');
-    for (const label of ['postmortem-action', 'bug']) {
+    for (const label of [
+      'postmortem-action',
+      'bug',
+      'escaped-defect',
+      'sentry',
+    ]) {
       const body = JSON.stringify({
         type: 'Issue',
         action: 'update',
@@ -594,34 +679,111 @@ describe('POST /api/webhooks/linear', () => {
         eventId: eventId(body, 'quality-gap-input'),
       });
     }
-    const gained = JSON.stringify({
-      type: 'Issue',
-      action: 'update',
-      updatedFrom: { labelIds: ['label-feature'] },
-      data: {
-        id: 'issue-gained',
-        identifier: 'JOV-7004',
-        teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
-        state: { id: 'todo', name: 'Todo', type: 'unstarted' },
-        labels: [
-          { id: 'label-feature', name: 'feature' },
-          { id: 'label-dogfood', name: 'dogfood' },
-        ],
-      },
-    });
-    const response = await POST(
-      new Request('https://example.com/api/webhooks/linear', {
-        method: 'POST',
-        headers: { 'linear-signature': sign(gained) },
-        body: gained,
-      }) as never
-    );
-    expect(await response.json()).toMatchObject({ dispatched: true });
+    for (const exceptionLabel of ['dogfood', 'sentry']) {
+      const gained = JSON.stringify({
+        type: 'Issue',
+        action: 'update',
+        updatedFrom: { labelIds: ['label-feature'] },
+        data: {
+          id: `issue-gained-${exceptionLabel}`,
+          identifier: 'JOV-7004',
+          teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+          state: { id: 'todo', name: 'Todo', type: 'unstarted' },
+          labels: [
+            { id: 'label-feature', name: 'feature' },
+            { id: `label-${exceptionLabel}`, name: exceptionLabel },
+          ],
+        },
+      });
+      const response = await POST(
+        new Request('https://example.com/api/webhooks/linear', {
+          method: 'POST',
+          headers: { 'linear-signature': sign(gained) },
+          body: gained,
+        }) as never
+      );
+      expect(await response.json()).toMatchObject({ dispatched: true });
+    }
     expect(
       mockServerFetch.mock.calls.map(
         call => JSON.parse(call[1].body).event_type
       )
-    ).toEqual(['quality-gap-scan', 'quality-gap-scan', 'quality-gap-scan']);
+    ).toEqual(Array(6).fill('quality-gap-scan'));
+  });
+
+  it('wakes the compiler when Tim records a founder rescue in a defect comment', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const body = JSON.stringify({
+      type: 'Comment',
+      action: 'create',
+      data: {
+        id: 'comment-founder-rescue',
+        body: 'Founder manually found the composed sidebar failed after the second transition.',
+        user: { name: 'Tim White' },
+        issue: {
+          id: 'issue-founder-rescue',
+          identifier: 'JOV-7207',
+          teamId: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+          state: { name: 'In Progress', type: 'started' },
+        },
+      },
+    });
+
+    const response = await POST(
+      new Request('https://example.com/api/webhooks/linear', {
+        method: 'POST',
+        headers: { 'linear-signature': sign(body) },
+        body,
+      }) as never
+    );
+
+    expect(await response.json()).toMatchObject({
+      dispatched: true,
+      eventId: eventId(body, 'quality-gap-input'),
+    });
+    expect(
+      JSON.parse(mockServerFetch.mock.calls[0]?.[1]?.body).event_type
+    ).toBe('quality-gap-scan');
+  });
+
+  it('wakes the compiler from a Tim rescue comment that only carries a JOV identifier', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const body = JSON.stringify({
+      type: 'Comment',
+      action: 'create',
+      data: {
+        id: 'comment-founder-rescue-identifier-only',
+        body: 'Tim manually found the rail toggle dead after one cycle.',
+        user: { name: 'Tim White' },
+        issue: {
+          id: 'issue-founder-rescue-identifier-only',
+          identifier: 'JOV-7207',
+        },
+      },
+    });
+
+    const response = await POST(
+      new Request('https://example.com/api/webhooks/linear', {
+        method: 'POST',
+        headers: { 'linear-signature': sign(body) },
+        body,
+      }) as never
+    );
+
+    expect(await response.json()).toMatchObject({
+      dispatched: true,
+      eventId: eventId(body, 'quality-gap-input'),
+    });
   });
 
   it('ignores receipts off JOV, open defects, unlabeled closes, non-state edits, and kept labels', async () => {
@@ -646,6 +808,15 @@ describe('POST /api/webhooks/linear', () => {
         action: 'create',
         data: {
           body: 'plain comment',
+          issue: { id: 'issue-x', identifier: 'JOV-7003' },
+        },
+      },
+      {
+        type: 'Comment',
+        action: 'create',
+        data: {
+          body: 'Founder manually found this.',
+          user: { name: 'CodeRabbit' },
           issue: { id: 'issue-x', identifier: 'JOV-7003' },
         },
       },
@@ -696,5 +867,476 @@ describe('POST /api/webhooks/linear', () => {
       expect(await response.json()).toEqual({ received: true, ignored: true });
     }
     expect(mockServerFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('native Linear validation Comment delivery', () => {
+  const issueId = '73c573ca-b66b-4e41-89db-218489a2d915';
+  const teamId = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
+  const receiptBody =
+    '<!-- validation-receipt:v1\n{"schema":"jovie.validation-receipt/v1","issue":"JOV-999999"}\n-->';
+
+  function nativePayload(body = receiptBody) {
+    return {
+      type: 'Comment',
+      action: 'create',
+      webhookTimestamp: Date.now(),
+      data: { id: 'bcbc4542-5ae4-4358-930c-975f2630a244', issueId, body },
+    };
+  }
+
+  function issueResponse(
+    issue: unknown = {
+      id: issueId,
+      identifier: 'JOV-8405',
+      updatedAt: '2026-10-16T20:13:29.834Z',
+      team: { id: teamId, key: 'JOV' },
+    }
+  ) {
+    return Response.json({ data: { issue } });
+  }
+
+  function request(
+    body: string,
+    signature = sign(body),
+    delivery = 'delivery-a'
+  ) {
+    return new Request('https://example.com/api/webhooks/linear', {
+      method: 'POST',
+      body,
+      headers: { 'linear-signature': signature, 'linear-delivery': delivery },
+    });
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.resetModules();
+    mockEnv.LINEAR_API_KEY = 'linear-read-key';
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+  });
+
+  it.each([
+    ['receipt', receiptBody],
+    [
+      'founder result',
+      '```json\n' +
+        JSON.stringify({
+          schema: 'jovie.work-result/v1',
+          phase: 'terminal',
+          actor: { class: 'founder-decision' },
+          terminalState: 'succeeded',
+        }) +
+        '\n```',
+    ],
+  ])(
+    'resolves a flat native %s through Linear without trusting marker identity',
+    async (_kind, commentBody) => {
+      mockServerFetch
+        .mockResolvedValueOnce(issueResponse())
+        .mockResolvedValueOnce(new Response(null, { status: 204 }));
+      const { POST } = await import('@/app/api/webhooks/linear/route');
+      const body = JSON.stringify(nativePayload(commentBody));
+      const response = await POST(request(body) as never);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        dispatched: true,
+        eventId: eventId(body, 'validation-receipt'),
+      });
+      expect(mockServerFetch).toHaveBeenNthCalledWith(
+        1,
+        'https://api.linear.app/graphql',
+        expect.objectContaining({
+          method: 'POST',
+          timeoutMs: 4500,
+          redirect: 'error',
+          headers: expect.objectContaining({
+            Authorization: 'linear-read-key',
+          }),
+        })
+      );
+      const lookup = JSON.parse(mockServerFetch.mock.calls[0][1].body);
+      expect(lookup.variables).toEqual({ id: issueId });
+      const dispatch = JSON.parse(mockServerFetch.mock.calls[1][1].body);
+      expect(dispatch).toMatchObject({
+        event_type: 'linear_validation_receipt',
+        client_payload: {
+          issue_id: issueId,
+          issue_identifier: 'JOV-8405',
+          team_key: 'JOV',
+        },
+      });
+      expect(JSON.stringify(dispatch)).not.toContain('JOV-999999');
+      expect(mockServerFetch.mock.invocationCallOrder[0]).toBeLessThan(
+        mockAcquireRecentDispatch.mock.invocationCallOrder[0]
+      );
+    }
+  );
+
+  it.each(['bad-signature', ''])(
+    'verifies signature %j before any provider read or dedupe',
+    async signature => {
+      const { POST } = await import('@/app/api/webhooks/linear/route');
+      const response = await POST(
+        request(JSON.stringify(nativePayload()), signature) as never
+      );
+      expect(response.status).toBe(signature ? 401 : 400);
+      expect(mockServerFetch).not.toHaveBeenCalled();
+      expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('ignores stale native receipts before any provider read', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const body = JSON.stringify({
+      ...nativePayload(),
+      webhookTimestamp: Date.now() - 6 * 60 * 60 * 1000 - 1000,
+    });
+    const response = await POST(request(body) as never);
+    expect(await response.json()).toEqual({
+      received: true,
+      ignored: true,
+      reason: 'stale-provider-event',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it('does not hydrate ordinary native comments', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const response = await POST(
+      request(JSON.stringify(nativePayload('Ordinary discussion'))) as never
+    );
+    expect(await response.json()).toEqual({ received: true, ignored: true });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'projectId',
+    'projectUpdateId',
+    'documentContentId',
+    'initiativeId',
+    'initiativeUpdateId',
+    'postId',
+  ])(
+    'ignores an explicit native non-issue %s receipt illustration',
+    async parent => {
+      const { POST } = await import('@/app/api/webhooks/linear/route');
+      const payload = nativePayload();
+      const body = JSON.stringify({
+        ...payload,
+        data: {
+          ...payload.data,
+          issueId: null,
+          [parent]: 'd16e3e1c-4c63-41d2-979d-689322667ec2',
+        },
+      });
+      const response = await POST(request(body) as never);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ received: true, ignored: true });
+      expect(mockServerFetch).not.toHaveBeenCalled();
+      expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { issueId, projectId: 'd16e3e1c-4c63-41d2-979d-689322667ec2' },
+    {
+      issueId: null,
+      issue: { id: issueId, identifier: 'JOV-8405' },
+      projectId: 'd16e3e1c-4c63-41d2-979d-689322667ec2',
+    },
+    {
+      issueId: null,
+      projectId: 'd16e3e1c-4c63-41d2-979d-689322667ec2',
+      projectUpdateId: 'malformed',
+    },
+    { issueId: null, projectId: 'malformed' },
+    { issueId: '', projectId: 'd16e3e1c-4c63-41d2-979d-689322667ec2' },
+    {
+      issueId: null,
+      projectId: null,
+      projectUpdateId: null,
+      documentContentId: null,
+    },
+  ])(
+    'keeps ambiguous or malformed native parent identity %j retryable',
+    async parent => {
+      const { POST } = await import('@/app/api/webhooks/linear/route');
+      const payload = nativePayload();
+      const body = JSON.stringify({
+        ...payload,
+        data: { ...payload.data, ...parent },
+      });
+      const response = await POST(request(body) as never);
+      expect(response.status).toBe(503);
+      expect(mockServerFetch).not.toHaveBeenCalled();
+      expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('ignores an explicit native non-issue parent when optional issueId is omitted', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const payload = nativePayload();
+    const body = JSON.stringify({
+      ...payload,
+      data: {
+        ...payload.data,
+        issueId: undefined,
+        projectUpdateId: 'd16e3e1c-4c63-41d2-979d-689322667ec2',
+      },
+    });
+    const response = await POST(request(body) as never);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ received: true, ignored: true });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it('ignores positive non-issue parents without assuming provider exclusivity', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const payload = nativePayload();
+    const body = JSON.stringify({
+      ...payload,
+      data: {
+        ...payload.data,
+        issueId: null,
+        projectId: 'd16e3e1c-4c63-41d2-979d-689322667ec2',
+        projectUpdateId: '1e4fa971-2b83-4dcb-8c16-a9f641732ea2',
+      },
+    });
+    const response = await POST(request(body) as never);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ received: true, ignored: true });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it('keeps a missing Linear reader key retryable without taking the dedupe lock', async () => {
+    mockEnv.LINEAR_API_KEY = undefined;
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const response = await POST(
+      request(JSON.stringify(nativePayload())) as never
+    );
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: 'Receipt issue lookup unavailable',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, 'JOV-8405', 'not-an-id'])(
+    'does not infer a missing or malformed native issueId %j from the marker',
+    async nativeId => {
+      const { POST } = await import('@/app/api/webhooks/linear/route');
+      const payload = nativePayload();
+      const body = JSON.stringify({
+        ...payload,
+        data: { ...payload.data, issueId: nativeId },
+      });
+      const response = await POST(request(body) as never);
+      expect(response.status).toBe(503);
+      expect(mockServerFetch).not.toHaveBeenCalled();
+      expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([401, 429, 500])(
+    'keeps a Linear HTTP %s retryable rather than acknowledging ambiguous dispatch',
+    async status => {
+      mockServerFetch.mockResolvedValue(new Response(null, { status }));
+      const { POST } = await import('@/app/api/webhooks/linear/route');
+      const response = await POST(
+        request(JSON.stringify(nativePayload())) as never
+      );
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({
+        error: 'Receipt issue lookup unavailable',
+      });
+      expect(mockServerFetch).toHaveBeenCalledTimes(1);
+      expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+      expect(mockClearRecentDispatch).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    [
+      'GraphQL error',
+      { errors: [{ message: 'provider unavailable' }], data: { issue: null } },
+    ],
+    ['null response', null],
+    ['missing issue', { data: {} }],
+    [
+      'wrong issue id',
+      {
+        data: {
+          issue: {
+            id: '68b3e8de-588e-46ba-8209-84329d154627',
+            identifier: 'JOV-8405',
+            team: { id: teamId, key: 'JOV' },
+          },
+        },
+      },
+    ],
+    [
+      'missing team',
+      { data: { issue: { id: issueId, identifier: 'JOV-8405' } } },
+    ],
+  ])(
+    'rejects %s before acquiring a dispatch lock',
+    async (_kind, providerResult) => {
+      mockServerFetch.mockResolvedValue(Response.json(providerResult));
+      const { POST } = await import('@/app/api/webhooks/linear/route');
+      const response = await POST(
+        request(JSON.stringify(nativePayload())) as never
+      );
+      expect(response.status).toBe(503);
+      expect(mockServerFetch).toHaveBeenCalledTimes(1);
+      expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps a malformed expanded receipt identity retryable without guessing a flat id', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const payload = nativePayload();
+    const body = JSON.stringify({
+      ...payload,
+      data: { ...payload.data, issueId: undefined, issue: {} },
+    });
+    const response = await POST(request(body) as never);
+    expect(response.status).toBe(503);
+    expect(mockServerFetch).not.toHaveBeenCalled();
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it('keeps malformed provider JSON retryable before dedupe', async () => {
+    mockServerFetch.mockResolvedValue(
+      new Response('not-json', { status: 200 })
+    );
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const response = await POST(
+      request(JSON.stringify(nativePayload())) as never
+    );
+    expect(response.status).toBe(503);
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it('bounds stalled response decoding as a retryable read failure', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    mockServerFetch.mockResolvedValue({
+      ok: true,
+      json: () => new Promise(() => {}),
+    });
+    vi.useFakeTimers();
+    try {
+      const pending = POST(request(JSON.stringify(nativePayload())) as never);
+      await vi.advanceTimersByTimeAsync(4501);
+      const response = await pending;
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({
+        error: 'Receipt issue lookup unavailable',
+      });
+      expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects conflicting flat and expanded identities before dispatch', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const payload = nativePayload();
+    const body = JSON.stringify({
+      ...payload,
+      data: {
+        ...payload.data,
+        issue: {
+          id: '68b3e8de-588e-46ba-8209-84329d154627',
+          identifier: 'JOV-8405',
+        },
+      },
+    });
+    const response = await POST(request(body) as never);
+    expect(response.status).toBe(503);
+    expect(mockServerFetch).not.toHaveBeenCalled();
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it('ignores an authoritative issue outside the JOV team', async () => {
+    mockServerFetch.mockResolvedValue(
+      issueResponse({
+        id: issueId,
+        identifier: 'LYB-8405',
+        team: { id: '68b3e8de-588e-46ba-8209-84329d154627', key: 'LYB' },
+      })
+    );
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const response = await POST(
+      request(JSON.stringify(nativePayload())) as never
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ received: true, ignored: true });
+    expect(mockServerFetch).toHaveBeenCalledTimes(1);
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it('retries a timed-out Linear read without classifying it as an ambiguous GitHub write', async () => {
+    const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
+    mockServerFetch
+      .mockRejectedValueOnce(
+        new ServerFetchTimeoutError(
+          'reader timed out',
+          4500,
+          'Linear issue read'
+        )
+      )
+      .mockResolvedValueOnce(issueResponse())
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const body = JSON.stringify(nativePayload());
+    const failed = await POST(request(body) as never);
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).not.toHaveProperty('dispatchState');
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+    const retried = await POST(
+      request(body, sign(body), 'new-header') as never
+    );
+    expect(retried.status).toBe(200);
+    expect(await retried.json()).toMatchObject({ dispatched: true });
+    expect(mockAcquireRecentDispatch).toHaveBeenCalledOnce();
+    expect(mockClearRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it('keeps the signed native body as the dedupe identity across delivery-header replay', async () => {
+    mockAcquireRecentDispatch
+      .mockResolvedValueOnce({ acquired: true, reason: 'acquired' })
+      .mockResolvedValueOnce({ acquired: false, reason: 'duplicate' });
+    mockServerFetch
+      .mockResolvedValueOnce(issueResponse())
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(issueResponse());
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const body = JSON.stringify(nativePayload());
+    const first = await POST(request(body) as never);
+    const replay = await POST(
+      request(body, sign(body), 'changed-header') as never
+    );
+    expect(await first.json()).toMatchObject({ dispatched: true });
+    expect(await replay.json()).toMatchObject({
+      deduplicated: true,
+      eventId: eventId(body, 'validation-receipt'),
+    });
+    expect(mockAcquireRecentDispatch.mock.calls.map(call => call[1])).toEqual([
+      eventId(body, 'validation-receipt'),
+      eventId(body, 'validation-receipt'),
+    ]);
+    expect(
+      mockServerFetch.mock.calls.filter(call =>
+        String(call[0]).includes('api.github.com')
+      )
+    ).toHaveLength(1);
   });
 });

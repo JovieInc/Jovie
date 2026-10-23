@@ -21,6 +21,10 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
+import {
+  approveProfileAction,
+  ProfileActionError,
+} from '@/lib/connectors/profile-action-store';
 import { resolveSuggestedActionDispatch } from '@/lib/connectors/suggested-action-dispatch';
 import {
   SOCIAL_REPLY_DRAFT_KIND,
@@ -31,6 +35,7 @@ import {
   recoverOrphanedApprovedAction,
 } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { db } from '@/lib/db';
+import { isInvalidUuidInput } from '@/lib/db/invalid-uuid-input';
 import { suggestedActions } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
@@ -70,7 +75,7 @@ async function reconcileYoutubeApproval(input: {
   }
 }
 
-export async function POST(_request: Request, { params }: RouteParams) {
+export async function POST(request: Request, { params }: RouteParams) {
   const { id } = await params;
   const { userId, error } = await requireAuth();
   if (error) return error;
@@ -100,6 +105,15 @@ export async function POST(_request: Request, { params }: RouteParams) {
       return NextResponse.json(
         { error: dispatch.error },
         { status: 422, headers: NO_STORE_HEADERS }
+      );
+    }
+    if (dispatch.mode === 'profile-consent') {
+      const confirmation: unknown = await request.json().catch(() => null);
+      const receipt = await approveProfileAction({ id, userId, confirmation });
+      revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+      return NextResponse.json(
+        { ok: true, ...receipt },
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     }
     if (dispatch.mode === 'workflow-capture') {
@@ -307,6 +321,18 @@ export async function POST(_request: Request, { params }: RouteParams) {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (err) {
+    if (err instanceof ProfileActionError) {
+      return NextResponse.json(
+        { error: err.code, requiresNewPreview: err.status === 409 },
+        { status: err.status, headers: NO_STORE_HEADERS }
+      );
+    }
+    if (isInvalidUuidInput(err)) {
+      return NextResponse.json(
+        { error: 'not-found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
     logger.error('[approve] Failed to approve suggested_action', err);
     await captureError('suggest-action approve failed', err, {
       route: '/api/connectors/suggested-actions/[id]/approve',

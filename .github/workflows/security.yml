@@ -92,6 +92,10 @@ jobs:
               ./scripts/security/scan-secrets.sh ci-pr "${{ github.event.before }}"
             fi
           else
+            # Worktree-sweep snapshots live under refs/jovie-preserved/* in this
+            # public repo; checkout fetches only branches and tags, so map them
+            # into local heads for the full-history scan.
+            git fetch --no-tags origin '+refs/jovie-preserved/*:refs/heads/jovie-preserved/*'
             ./scripts/security/scan-secrets.sh full
           fi
 
@@ -125,7 +129,7 @@ jobs:
             exit "$code"
           fi
       - name: Upload osv SARIF
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: osv.sarif
           category: osv
@@ -156,7 +160,7 @@ jobs:
             exit "$code"
           fi
       - name: Upload Semgrep SARIF
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: semgrep.sarif
           category: semgrep
@@ -222,6 +226,7 @@ jobs:
               ./scripts/security/scan-secrets.sh ci-pr-trufflehog "${{ github.event.before }}"
             fi
           else
+            git fetch --no-tags origin '+refs/jovie-preserved/*:refs/heads/jovie-preserved/*'
             ./scripts/security/scan-secrets.sh full-trufflehog
           fi
 
@@ -239,6 +244,7 @@ jobs:
             exit 1
           fi
           TRUFFLEHOG_BIN="$trufflehog_bin" ./scripts/security/scan-secrets.test.sh
+          node --test scripts/security/prepare-ci-secret-scan-range.test.mjs
 
   trivy:
     name: Trivy Vulnerability Scanning
@@ -264,7 +270,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy-filesystem'
@@ -272,7 +278,15 @@ jobs:
   scorecard:
     name: OSSF Scorecard Supply Chain Security
     runs-on: ubuntu-latest
-    # Scorecard only runs on main branch push and schedule to avoid token issues on PRs
+    # Scorecard only runs on main branch push and schedule to avoid token issues on PRs.
+    # 50 minutes stays under the one-hour installation token. Scorecard sleeps
+    # until x-ratelimit-reset, then retries the same request. That retry adds a
+    # second Authorization header and GitHub answers 401 while the token is
+    # still valid. The guard waits on the job token and stops that retry.
+    # A GitHub GraphQL "Something went wrong" or HTTP 5xx on that query is
+    # retried inside the guard (three attempts, short backoff, same token
+    # margin). Any other Scorecard error fails the job. The scan is not skipped.
+    timeout-minutes: 50
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
@@ -284,16 +298,17 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run OSSF Scorecard
-        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
-        with:
-          results_file: scorecard-results.sarif
-          results_format: sarif
-          # Avoid flaky failures from transient api.scorecard.dev timeouts.
-          publish_results: false
+      # Action pin: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e (v2.5.0)
+      # Image: ghcr.io/ossf/scorecard-action@sha256:1e1481c65fc2407d3fd6ab18a23c741eb4d1c0d9359ebafc4b3ab13aa61d8627
+      # publish_results stays false. The guard passes the job github.token as
+      # both repo_token and internal_default_token, which is the action default.
+      - name: Run OSSF Scorecard under the token lifetime
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/lib/scorecard-credential-guard.mjs
 
       - name: Upload Scorecard results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: 'scorecard-results.sarif'
           category: 'ossf-scorecard'

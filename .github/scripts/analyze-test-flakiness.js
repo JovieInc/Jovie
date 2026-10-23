@@ -14,7 +14,6 @@
  *   - GITHUB_REPOSITORY: owner/repo (or passed as args)
  */
 
-const https = require('https');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -39,36 +38,40 @@ const UNIT_FLAKY_ARTIFACT_PATTERN = 'unit-flaky-*';
 const UNIT_FLAKY_REPORT_SUFFIX = '.flaky.json';
 
 /**
- * Make GitHub API request
+ * GitHub reads go through the shared client (.claude/rules/external-apis.md)
+ * at `report` priority: the report sheds itself while the token's bucket is
+ * under its reserve instead of competing with merge-group admission, and it
+ * honors Retry-After / reset headers. Immutable run evidence is already
+ * cached per (run id, attempt) below.
  */
-function githubRequest(path, token) {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: 'api.github.com',
-      path: path,
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'User-Agent': 'Jovie-Test-Flakiness-Analyzer',
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-    };
+const githubClients = new Map();
 
-    https
-      .get(options, res => {
-        let data = '';
-        res.on('data', chunk => (data += chunk));
-        res.on('end', () => {
-          if (res.statusCode !== 200) {
-            reject(new Error(`GitHub API error: ${res.statusCode} ${data}`));
-          } else {
-            resolve(JSON.parse(data));
-          }
-        });
+async function githubRequest(path, token) {
+  if (!githubClients.has(token)) {
+    const { pathToFileURL } = require('node:url');
+    const api = await import(
+      pathToFileURL(require.resolve('../../packages/api-client/index.ts')).href
+    );
+    githubClients.set(
+      token,
+      api.createGitHubClient({
+        token,
+        // Installation tokens rotate per wake; ETags and budget stay keyed to the repo.
+        credential: `github-report:${process.env.GITHUB_REPOSITORY ?? 'local'}`,
+        // One job, one process: the ledger only needs to live for this wake.
+        store: new api.MemoryLedgerStore(),
+        fetch: (input, init) => globalThis.fetch(input, init),
       })
-      .on('error', reject);
+    );
+  }
+  const response = await githubClients.get(token).rest('GET', path, undefined, {
+    priority: 'report',
+    headers: { 'user-agent': 'Jovie-Test-Flakiness-Analyzer' },
   });
+  if (response.status !== 200) {
+    throw new Error(`GitHub API error: ${response.status} ${response.text}`);
+  }
+  return response.json();
 }
 
 /**
@@ -387,9 +390,8 @@ async function collectRunFailureRecords(token, owner, repo, run) {
  * Cluster failure records by signature hash across shards, runs, and events.
  * A js-yaml-style failure across 10 shards reads as ONE incident.
  */
-function clusterFailureRecords(records) {
+function clusterFailureRecords(records, now = Date.now()) {
   const clusters = new Map();
-  const now = Date.now();
   const windowStart = now - QUARANTINE_WINDOW_HOURS * 3600 * 1000;
 
   for (const rec of records) {
@@ -403,6 +405,7 @@ function clusterFailureRecords(records) {
         occurrences24h: 0,
         flakyRetries: 0,
         flakyRunAttempts24h: new Set(),
+        flakyAttempts24h: new Map(),
         shards: new Set(),
         firstSeenAt: rec.runAt,
         lastSeenAt: rec.runAt,
@@ -426,6 +429,11 @@ function clusterFailureRecords(records) {
         rec.runAttempt > 0
       ) {
         c.flakyRunAttempts24h.add(`${rec.runId}:${rec.runAttempt}`);
+        c.flakyAttempts24h.set(`${rec.runId}:${rec.runAttempt}`, {
+          runId: rec.runId,
+          runAttempt: rec.runAttempt,
+          runAt: rec.runAt,
+        });
       }
     }
     if (rec.artifactShard) c.shards.add(rec.artifactShard);
@@ -443,6 +451,7 @@ function clusterFailureRecords(records) {
       runUrls: [...c.runUrls],
       events: [...c.events],
       flakyRunAttempts24h: c.flakyRunAttempts24h.size,
+      flakyAttempts24h: [...c.flakyAttempts24h.values()],
       quarantineCandidate:
         c.flakyRunAttempts24h.size >= QUARANTINE_MIN_OCCURRENCES,
     }))
@@ -468,17 +477,100 @@ async function analyzeFailureSignatures(token, owner, repo, mainRuns) {
   const allRecords = [];
 
   for (const run of candidates) {
-    try {
-      const records = await runEvidence('junit', run, () =>
+    const results = await Promise.allSettled([
+      runEvidence('junit', run, () =>
         collectRunFailureRecords(token, owner, repo, run)
-      );
-      allRecords.push(...records);
-    } catch (error) {
-      console.warn(`Run ${run.id}: ${error.message}`);
+      ),
+      runEvidence('verified-retries-v1', run, () =>
+        collectRunRetryFailureRecords(token, owner, repo, run)
+      ),
+    ]);
+    for (const result of results) {
+      if (result.status === 'fulfilled') allRecords.push(...result.value);
+      else console.warn(`Run ${run.id}: ${result.reason.message}`);
     }
   }
 
   return clusterFailureRecords(allRecords);
+}
+
+// JUnit does not retain Vitest's successful retries. Read the schema-v2
+// execution receipts too; legacy, partial, skipped or foreign reports cannot
+// turn a terminal failure into a quarantine candidate.
+async function retryFailureRecords(bundles, now = Date.now()) {
+  const { buildQuarantineEvidence } = await import(
+    './collect-quarantine-evidence.mjs'
+  );
+  const report = buildQuarantineEvidence(bundles, {
+    headSha: bundles[0]?.run.head_sha,
+    now,
+  });
+  const eligible = new Set(
+    report.observations
+      .filter(row => row.outcome === 'flaky')
+      .map(row => `${row.runId}:${row.runAttempt}:${row.file}`)
+  );
+  const records = [];
+  for (const { run, artifacts } of bundles) {
+    for (const { artifact, reports } of artifacts) {
+      for (const retryReport of reports) {
+        if (retryReport.schemaVersion !== 2) continue;
+        for (const entry of retryReport.flaky ?? []) {
+          if (
+            !eligible.has(`${run.id}:${run.run_attempt}:${entry.file}`) ||
+            typeof entry.name !== 'string' ||
+            !entry.name.trim() ||
+            !Number.isSafeInteger(entry.retryCount) ||
+            entry.retryCount < 1
+          )
+            continue;
+          const execution = retryReport.executions.find(
+            row => row.file === entry.file
+          );
+          const failure = execution.failures?.find(
+            row =>
+              row.name === entry.name &&
+              row.outcome === 'flaky' &&
+              typeof row.error === 'string'
+          );
+          records.push({
+            testId: `${entry.file}::${entry.name}`,
+            file: entry.file,
+            name: entry.name,
+            kind: 'flaky-retry',
+            // Vitest may discard recovered errors. Keep that lack explicit;
+            // never borrow a neighboring test's terminal error signature.
+            error:
+              failure?.error ||
+              'passed after retry (failure message unavailable)',
+            artifactId: artifact.id,
+            runId: run.id,
+            runAttempt: run.run_attempt,
+            runUrl: `https://github.com/${run.repository}/actions/runs/${run.id}`,
+            runEvent: run.event,
+            runAt: run.created_at,
+          });
+        }
+      }
+    }
+  }
+  return records;
+}
+
+async function collectRunRetryFailureRecords(token, owner, repo, run) {
+  const artifacts = await runEvidence('artifacts', run, () =>
+    fetchRunArtifacts(token, owner, repo, run.id)
+  );
+  const { collectArtifacts } = await import(
+    './collect-quarantine-evidence.mjs'
+  );
+  // A positive-only, bounded sample: this is filing evidence, never proof of
+  // clean history or authority to remove a quarantine entry.
+  const bundles = collectArtifacts([run], () => ({
+    total_count: artifacts.length,
+    artifacts,
+  }));
+  return retryFailureRecords(bundles);
 }
 
 /**
@@ -1188,6 +1280,14 @@ async function main() {
       `   Retry rate: ${((runsWithRetries / totalRuns) * 100).toFixed(1)}%`
     );
   } catch (error) {
+    // A shed or deferred report is infrastructure, not a verdict: run evidence
+    // stays cached and the next wake catches up.
+    if (error?.exitCode === 75) {
+      console.log(
+        `::warning::github-quota-deferred: flakiness report skipped this wake (${error.message})`
+      );
+      return;
+    }
     console.error(`❌ Error: ${error.message}`);
     process.exit(1);
   }
@@ -1221,6 +1321,7 @@ module.exports = {
   failureSignature,
   parseJunitXml,
   clusterFailureRecords,
+  retryFailureRecords,
   analyzeFailureSignatures,
   runsWithUnitFlakeArtifacts,
   boundRunEvidenceCache,

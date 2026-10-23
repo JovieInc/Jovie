@@ -116,6 +116,34 @@ describe('RightDrawer', () => {
     ).toHaveFocus();
   });
 
+  it('returns hidden desktop rail focus when closing at the mobile breakpoint', () => {
+    const fixture = (isOpen: boolean) => (
+      <>
+        <button type='button' data-rail-toggle='right'>
+          Open mobile preview
+        </button>
+        <RightDrawer
+          isOpen={isOpen}
+          width={360}
+          ariaLabel='Responsive inspector'
+        >
+          <button type='button'>Inside responsive inspector</button>
+        </RightDrawer>
+      </>
+    );
+    const { rerender } = render(fixture(true));
+    screen.getByRole('button', { name: 'Inside responsive inspector' }).focus();
+    mockUseBreakpointDown.mockReturnValue(true);
+    rerender(fixture(false));
+    expect(
+      screen.getByRole('button', { name: 'Open mobile preview' })
+    ).toHaveFocus();
+    expect(screen.getByLabelText('Responsive inspector')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+  });
+
   it('handles Escape while open even when focus remains outside the drawer', () => {
     const onKeyDown = vi.fn();
 
@@ -431,6 +459,41 @@ describe('RightDrawer', () => {
 
     expect(drawer).toHaveStyle({ width: '280px' });
     expect(drawer).toHaveAttribute('aria-hidden', 'false');
+  });
+
+  it('prioritizes the actual mobile opener over an unrelated registered rail toggle', async () => {
+    mockUseBreakpointDown.mockReturnValue(true);
+    const fixture = (isOpen: boolean) => (
+      <>
+        <button type='button' data-rail-toggle='right'>
+          Other rail toggle
+        </button>
+        <button type='button'>Actual mobile opener</button>
+        <RightDrawer
+          isOpen={isOpen}
+          width={360}
+          ariaLabel='Mobile priority drawer'
+        >
+          <button type='button' data-drawer-initial-focus>
+            Mobile action
+          </button>
+        </RightDrawer>
+      </>
+    );
+    const { rerender } = render(fixture(false));
+    const opener = screen.getByRole('button', { name: 'Actual mobile opener' });
+    opener.focus();
+    rerender(fixture(true));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Mobile action' })
+      ).toHaveFocus()
+    );
+    rerender(fixture(false));
+    await waitFor(() => expect(opener).toHaveFocus());
+    expect(
+      screen.getByRole('button', { name: 'Other rail toggle' })
+    ).not.toHaveFocus();
   });
 
   it('moves initial focus into the active mobile drawer and restores its trigger on close', async () => {

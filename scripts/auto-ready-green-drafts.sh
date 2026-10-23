@@ -7,7 +7,7 @@
 #
 # This controller never enables native auto-merge and never enrolls the merge
 # queue. Auto-Enroll / jovie-bot own admission after ready_for_review.
-# Writer-owned proof recovery stays in auto-ready-agent-drafts.sh.
+# All wakes require persisted exact-head, author-owned proof.
 #
 # Never mutates HOLD #17156. Tim/machine hold labels (GREEN_SOURCE_HOLD_LABELS)
 # cover other open holds — do not keep merged/closed PR numbers here.
@@ -53,7 +53,7 @@ read_state() {  # read_state <num>
   local name="${REPO#*/}"
   [[ -n "$owner" && -n "$name" && "$owner" != "$name" ]]
   gh_retry api graphql \
-    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName baseRefName body title state mergeable mergeStateStatus labels(first:100){nodes{name}} timelineItems(last:50,itemTypes:[CONVERT_TO_DRAFT_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on ConvertToDraftEvent{createdAt} ... on PullRequestCommit{commit{committedDate}} ... on HeadRefForcePushedEvent{createdAt}}}}}}' \
+    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName baseRefName body title author{login} state mergeable mergeStateStatus labels(first:100){nodes{name}} timelineItems(last:50,itemTypes:[CONVERT_TO_DRAFT_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on ConvertToDraftEvent{createdAt} ... on PullRequestCommit{commit{committedDate}} ... on HeadRefForcePushedEvent{createdAt}}}}}}' \
     -f owner="$owner" \
     -f name="$name" \
     -F number="$n" \
@@ -63,6 +63,7 @@ read_state() {  # read_state <num>
       branch: .headRefName,
       base: .baseRefName,
       body: (.body // ""),
+      authorLogin: .author.login,
       title: (.title // ""),
       labels: [.labels.nodes[].name],
       state: .state,
@@ -119,13 +120,17 @@ classify_live() {  # classify_live <num> <json> <checks-json> [expected-head]
       title: $state.title,
       branch: $state.branch,
       body: $state.body,
+      authorLogin: $state.authorLogin,
       checks: $checks
     }' | node "$CLASSIFY_LIB" classify
 }
 
-undo_ready() {  # undo_ready <num>
-  local n="$1"
-  if ! gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1; then
+undo_ready() {  # undo_ready <num> <expected-head>
+  local n="$1" expected_head="$2" current
+  current="$(read_state "$n" 2>/dev/null)" || return 1
+  # Compensation must not change a newer author's head.
+  jq -e --arg head "$expected_head" '.state == "OPEN" and .head == $head' <<<"$current" >/dev/null || return 1
+  if ! gh pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1; then
     echo "    !! compensating draft restore failed for #$n"
     return 1
   fi
@@ -159,6 +164,8 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
     echo "    ~ could not read live PR state for #$n; leaving PR unchanged"
     return 0
   fi
+  # Pin discovery too: a missed-cohort wake cannot follow a replacement head.
+  expected_head="${expected_head:-$(jq -r '.head' <<<"$before")}"
   # State-only screen first: a ready, held, conflicting or non-main PR (most
   # wakes) is rejected without spending a second API read on its checks.
   verdict="$(classify_live "$n" "$before" '[]' "$expected_head")"
@@ -199,7 +206,9 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
     return 0
   fi
 
-  if ! gh_retry pr ready "$n" -R "$REPO" >/dev/null 2>&1; then
+  # Ready has no expected-head CAS. Never replay an uncertain mutation against
+  # a head that may have advanced while a transport retry was sleeping.
+  if ! gh pr ready "$n" -R "$REPO" >/dev/null 2>&1; then
     echo "    !! failed to mark #$n ready"
     upsert_status_comment "$n" "⚠️ Auto-ready green-source: undraft failed on the exact head. Auto-Enroll was not invoked. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
     return 1
@@ -207,7 +216,7 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
 
   local after
   if ! after="$(read_state "$n" 2>/dev/null)"; then
-    if ! undo_ready "$n"; then
+    if ! undo_ready "$n" "$live_head"; then
       upsert_status_comment "$n" "🚨 Auto-ready green-source: post-undraft state was unreadable and fail-closed draft restoration could not be verified. _(failed at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
       return 2
     fi
@@ -215,12 +224,13 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
     return 1
   fi
 
-  local head_after draft_after state_after held_after merge_after
+  local head_after draft_after state_after held_after merge_after proof_after
   head_after="$(jq -r '.head // ""' <<<"$after")"
   draft_after="$(jq -r '.draft' <<<"$after")"
   state_after="$(jq -r '.state // "UNKNOWN"' <<<"$after")"
   merge_after="$(jq -r '.mergeStateStatus // "UNKNOWN"' <<<"$after")"
   held_after="$(jq -r --arg hold_re "$HOLD_LABEL_RE" '[.labels[] | select(test($hold_re))] | join(",")' <<<"$after")"
+  proof_after="$(jq --argjson prNumber "$n" '. + {headSha: .head, prNumber: $prNumber}' <<<"$after" | node "$SCRIPT_DIR/lib/auto-ready-provenance.mjs" classify)"
 
   if [[ "$state_after" != "OPEN" ]]; then
     upsert_status_comment "$n" "🤖 Auto-ready green-source: the exact head reached terminal state=${state_after} during verification. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
@@ -229,13 +239,13 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
   # Mergeability was proven on this exact head before mutation. Leaving draft
   # wakes new (often advisory) checks, so a transient BLOCKED/UNSTABLE here is
   # expected and must not trigger a re-draft loop.
-  if [[ "$draft_after" == "false" && "$head_after" == "$live_head" && -z "$held_after" ]]; then
+  if [[ "$draft_after" == "false" && "$head_after" == "$live_head" && -z "$held_after" && "$(jq -r '.eligible' <<<"$proof_after")" == "true" ]]; then
     echo "    ✓ marked #$n ready; Auto-Enroll owns queue admission"
     upsert_status_comment "$n" "🤖 Auto-ready green-source: marked ready after PR Ready + required checks SUCCESS and mergeable CLEAN. Auto-Enroll / jovie-bot own queue admission. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
     return 0
   fi
 
-  if ! undo_ready "$n"; then
+  if ! undo_ready "$n" "$live_head"; then
     upsert_status_comment "$n" "🚨 Auto-ready green-source: verification failed and fail-closed draft restoration could not be verified. _(failed at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
     return 2
   fi
@@ -243,18 +253,62 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
   return 1
 }
 
+read_missed_snapshot() {
+  # gh pr list requests 100 mergeability records per GraphQL page. That query
+  # exceeds GitHub's resource limit on busy repositories. Keep the same 200-PR
+  # discovery bound, but read at most 20 records per call. No partial snapshot
+  # reaches cohort selection if any page fails.
+  local owner="${REPO%%/*}" name="${REPO#*/}"
+  local cursor="" page snapshot='[]' batch
+  for ((batch=0; batch<10; batch++)); do
+    local cursor_args=()
+    [[ -n "$cursor" ]] && cursor_args=(-f endCursor="$cursor")
+    page="$(gh_retry api graphql \
+      -f query='query($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:20,after:$endCursor,states:OPEN,orderBy:{field:CREATED_AT,direction:DESC}){nodes{number isDraft title headRefName baseRefName mergeable mergeStateStatus labels(first:100){nodes{name}}} pageInfo{hasNextPage endCursor}}}}' \
+      -f owner="$owner" -f name="$name" "${cursor_args[@]}" \
+      --jq '.data.repository.pullRequests')" || return 1
+    snapshot="$(jq -c --argjson page "$page" '. + [$page.nodes[] | .labels = .labels.nodes]' <<<"$snapshot")" || return 1
+    if [[ "$(jq -r '.pageInfo.hasNextPage' <<<"$page")" != "true" ]]; then
+      break
+    fi
+    cursor="$(jq -er '.pageInfo.endCursor' <<<"$page")" || return 1
+  done
+  printf '%s\n' "$snapshot"
+}
+
 resolve_head_pr() {  # resolve_head_pr <sha>
   # One REST read of the PRs that own this exact commit, instead of listing
   # every open PR per event (the shared API budget is the bottleneck).
+  # The association for a SHA does not change. A later wake reads the cached
+  # numbers and spends no installation REST. Empty results are not cached.
   local sha="$1"
   [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || return 1
-  gh_retry api "repos/${REPO}/commits/${sha}/pulls" --jq "
+  local cache=""
+  if [[ -n "${HEAD_PR_CACHE_DIR:-}" ]]; then
+    cache="${HEAD_PR_CACHE_DIR}/${sha}"
+    if [[ -s "$cache" ]]; then
+      echo "  head-pr cache hit ${sha:0:12}" >&2
+      cat "$cache"
+      return 0
+    fi
+  fi
+  local numbers
+  numbers="$(
+    gh_retry api "repos/${REPO}/commits/${sha}/pulls" --jq "
       .[]
       | select(.state == \"open\")
       | select(.base.ref == \"main\")
       | select(((.head.sha // \"\") | ascii_downcase) == \"${sha}\")
       | .number
     "
+  )" || return 1
+  if [[ -n "$cache" && -n "$numbers" ]]; then
+    mkdir -p "$HEAD_PR_CACHE_DIR"
+    printf '%s\n' "$numbers" >"$cache"
+  fi
+  if [[ -n "$numbers" ]]; then
+    printf '%s\n' "$numbers"
+  fi
 }
 
 echo "=== AUTO-READY GREEN-SOURCE: event-driven undraft (no queue enroll) ==="
@@ -297,8 +351,7 @@ fi
 
 if [[ "$MISSED_COHORT" =~ ^[1-9][0-9]*$ ]]; then
   echo "=== MISSED COHORT: up to $MISSED_COHORT already-green drafts (offset $RUN_OFFSET) ==="
-  SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-    --json number,isDraft,labels,title,headRefName,baseRefName,mergeable,mergeStateStatus)"
+  SNAP="$(read_missed_snapshot)"
   mapfile -t cohort < <(node "$CLASSIFY_LIB" cohort "$MISSED_COHORT" "$RUN_OFFSET" "${TARGET_PR:-0}" <<<"$SNAP")
   for n in "${cohort[@]}"; do
     [[ -z "$n" ]] && continue

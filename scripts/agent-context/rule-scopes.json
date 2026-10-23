@@ -12,12 +12,12 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "2d377b00193d605a7b5edafcfd64d2fb75bf87fe426bdb6bbf2267c2d15af609"
+    "bodySha256": "d5f52bdb4af7fb39e6cf4eef8aaade5edbd285d900a3d13f9bf55f57f315d182"
   },
   {
     "file": ".claude/rules/db.md",
     "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
-    "bodySha256": "4e1b3dc1066ae0ce224369eac942cbc97d07e4d30c518c47ec1885ff429688b0"
+    "bodySha256": "dd8a0de6daeb7b37b8507fd9c2f6ea6e19ada223aad91f1adf9ea7c612e0b8a1"
   },
   {
     "file": ".claude/rules/environment.md",
@@ -30,7 +30,30 @@
       "scripts/setup*",
       ".codex/**"
     ],
-    "bodySha256": "b0c5be920c0f2f5b75be43e8325735d313b0167fd9148cdb49aa1af176ec59b1"
+    "bodySha256": "3dbed7e15801a9c4e7591606fb8402bf57d040e1b2afff3996ece2ccf18e9633"
+  },
+  {
+    "file": ".claude/rules/event-driven.md",
+    "paths": [
+      ".github/workflows/**",
+      "scripts/lanes/**",
+      "scripts/backlog-orchestrator/**",
+      "canon/automation-registry.jsonl",
+      "docs/metrics/**"
+    ],
+    "bodySha256": "231c6da1fc81dee71971f0fbb887af84a64e3ca878746b78036c5e72d539006a"
+  },
+  {
+    "file": ".claude/rules/external-apis.md",
+    "paths": [
+      "apps/**",
+      "packages/**",
+      "scripts/**",
+      ".github/**",
+      "workers/**",
+      "tools/**"
+    ],
+    "bodySha256": "f946155ee825bd90ecab6f451012b05f69fe819e0e615748c8d07be5f6580199"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -44,7 +67,7 @@
   {
     "file": ".claude/rules/hermes-air.md",
     "paths": ["docs/HERMES_AIR.md"],
-    "bodySha256": "d495fddaadb7e03ab601b6076351bc0aa0e507c61fc4065a096146ab345bd89c"
+    "bodySha256": "1146534132d4a342e1ed2d00e9594d10e4e3fcf347054041bfe91323c5de98e7"
   },
   {
     "file": ".claude/rules/infra.md",
@@ -54,7 +77,7 @@
       "apps/web/app/api/cron/**",
       "vercel.json"
     ],
-    "bodySha256": "6d35e726878f810fea9671ebadc6eb90094787ddcf74723e44c47bab71d86513"
+    "bodySha256": "164b4bac543f555d7584cfdf8ba8e3d62767b14bbaae1f8128f98d1220470d3d"
   },
   {
     "file": ".claude/rules/ios.md",
@@ -68,7 +91,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "6009923711c8ee459258f7ae96f1783b02dacc906353dba72a5345a61e91ad22"
+    "bodySha256": "a6a5e499e9dd40815b2db9048512cc41d75d4408d7fbd9c4197f9eee6379b4b7"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -112,7 +135,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "ceb43bd5254511d31a6499da86ef99028579eed93ca359baf9fd71fbddc15b03"
+    "bodySha256": "58152f4ec8c78b5f966f72df3eba353992a1d6bfd2f853220634c3406a59e90b"
   },
   {
     "file": ".claude/rules/security.md",
@@ -154,6 +177,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "69b2dc2d9d14719b5fcce3081840add44c03fd6a38208dda1127e4e840ffed2f"
+    "bodySha256": "23a75b08079b5bd35a073dbae96ea95288b9737d3281183d423780590e6994a3"
   }
 ]

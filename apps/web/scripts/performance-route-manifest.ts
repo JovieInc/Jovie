@@ -1320,11 +1320,11 @@ const CREATOR_SHELL_ROUTES = [
       shell: ['[data-app-shell-frame="true"]'],
       content: ['[data-testid="opportunity-inbox-page"]'],
       loading: ['[data-testid="dashboard-segment-skeleton"]'],
-      navTrigger: [
-        `a[href="${APP_ROUTES.DASHBOARD}"]:has-text("Home")`,
-        `a[href="${APP_ROUTES.DASHBOARD}"]`,
-        `a[href^="${APP_ROUTES.DASHBOARD}?"]`,
-      ],
+      // The rail destination and the header bell both point at /app. The
+      // bell is `data-navigation-item-id="inbox"` and is first in DOM order,
+      // so an href selector clicks the wrong control and the probe rejects
+      // the identity. Measure the rail item whose id is `home`.
+      navTrigger: ['[data-navigation-item-id="home"]'],
     },
     timings: [
       { metric: 'warm-shell-response', budget: 100 },
@@ -1515,7 +1515,7 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['[data-testid="library-surface"]'],
+      content: ['[data-testid="shell-releases-view"]'],
       redirectDestinations: [`${APP_ROUTES.LIBRARY}?view=releases`],
     },
     timings: [

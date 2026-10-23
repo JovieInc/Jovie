@@ -8,19 +8,21 @@
  * Uses Neon WebSocket driver for stateful connection pooling.
  * This is the serverless-native pattern:
  * - Stateful WebSocket connections required for Row Level Security (RLS)
- * - Keep app-level transaction usage isolated via legacy wrappers
- * - Prefer sequential/batch operations for new application code
+ * - Keep app-level transaction usage inside audited wrappers
+ * - Use runAtomicDbOperation for business invariants spanning statements
  *
  * DO NOT create additional database connections elsewhere in the app.
  * Scripts in apps/web/scripts/ are exempt since they run standalone.
  */
 
-import { neonConfig, Pool } from '@neondatabase/serverless';
+import { neonConfig, Pool, type PoolClient } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from 'ws';
 import { env, isTestEnv } from '@/lib/env-server';
+import { assertGlobalDbAllowed } from '../atomic-context';
 import * as schema from '../schema';
 import { logDbError, logDbInfo } from './logging';
+import { preserveTransactionErrors } from './transaction-errors';
 import type { DbType, PoolMetrics } from './types';
 
 // Configure Neon to use the ws library for WebSocket connections in Node.js
@@ -260,25 +262,72 @@ export function initializeDb(): DbType {
   const recordPoolPeak = () => {
     _poolPeak = Math.max(_poolPeak, pool.totalCount);
   };
+  // The driver removes the pool's idle error listener on checkout. A server
+  // disconnect between transaction queries otherwise emits an unhandled error.
+  // Keep query rejection/rollback with the driver; observe this event only.
+  const onCheckedOutClientError = (err: Error) => {
+    _poolConnectionErrors += 1;
+    logDbError(
+      'client_error',
+      err,
+      { event: 'pool_checked_out_error' },
+      { asBreadcrumb: true }
+    );
+  };
   pool.on('connect', recordPoolPeak);
-  pool.on('acquire', recordPoolPeak);
+  pool.on('acquire', (client: PoolClient) => {
+    recordPoolPeak();
+    client.on('error', onCheckedOutClientError);
+  });
+  pool.on('release', (_error: Error | undefined, client: PoolClient) => {
+    client.removeListener('error', onCheckedOutClientError);
+  });
+
+  // Guard execution too: a query builder may have been captured before entry.
+  pool.query = new Proxy(pool.query, {
+    apply(target, receiver, args) {
+      assertGlobalDbAllowed();
+      return Reflect.apply(target, receiver, args);
+    },
+  });
 
   _pool = pool;
 
   // Create drizzle instance with WebSocket driver
-  const dbInstance = drizzle(pool, {
-    schema,
-    logger: isProduction
-      ? false
-      : {
-          logQuery: (query: string, params: unknown[]): void => {
-            logDbInfo('query', 'Database query executed', {
-              query: query.slice(0, 200) + (query.length > 200 ? '...' : ''),
-              paramsLength: params.length,
-            });
+  const createDbInstance = (client: Pool | PoolClient) =>
+    drizzle(client, {
+      schema,
+      logger: isProduction
+        ? false
+        : {
+            logQuery: (query: string, params: unknown[]): void => {
+              logDbInfo('query', 'Database query executed', {
+                query: query.slice(0, 200) + (query.length > 200 ? '...' : ''),
+                paramsLength: params.length,
+              });
+            },
           },
-        },
-  });
+    });
+  const dbInstance = createDbInstance(pool);
+  // Drizzle's pooled transaction awaits BEGIN before entering its own
+  // release finally. Own the checkout here so even a failed BEGIN releases
+  // capacity. A client-bound Drizzle session never acquires/releases again.
+  dbInstance.transaction = async (callback, config) => {
+    const client = await pool.connect();
+    let releaseError: Error | undefined;
+    const operation: typeof callback = tx =>
+      preserveTransactionErrors(tx, callback);
+    try {
+      return await createDbInstance(client).transaction(operation, config);
+    } catch (error) {
+      // Discard failed transactions, including uncertain rollback/commit
+      // transport failures, rather than returning them to another request.
+      releaseError = error instanceof Error ? error : new Error(String(error));
+      throw error;
+    } finally {
+      client.release(releaseError);
+    }
+  };
 
   // Store in global for development HMR reuse
   if (!isProduction && hasGlobal) {
@@ -293,10 +342,11 @@ export function initializeDb(): DbType {
  * Get the current database instance, initializing if needed
  */
 export function getDb(): DbType {
+  assertGlobalDbAllowed();
   if (!_db) {
     _db = initializeDb();
   }
-  return _db;
+  return db;
 }
 
 /**
@@ -307,23 +357,30 @@ export function getInternalDb(): DbType | undefined {
 }
 
 /**
- * Set the internal database reference (for internal use)
+ * Set the internal database reference (for internal use).
+ * `undefined` clears an injected client without closing the process pool.
  */
-export function setInternalDb(db: DbType): void {
+export function setInternalDb(db: DbType | undefined): void {
   _db = db;
 }
 
 // Export a lazy-initializing proxy that forwards all access to the real db instance.
 // Transactions remain available at the driver level but should stay behind
-// audited legacy wrappers rather than app-level call-sites.
+// audited wrappers rather than app-level call-sites.
 export const db = new Proxy({} as DbType, {
   get(_target, prop) {
+    assertGlobalDbAllowed();
     if (!_db) {
       _db = initializeDb();
     }
 
     const value = Reflect.get(_db, prop, _db);
-    return typeof value === 'function' ? value.bind(_db) : value;
+    return typeof value === 'function'
+      ? (...args: unknown[]) => {
+          assertGlobalDbAllowed();
+          return Reflect.apply(value, _db, args);
+        }
+      : value;
   },
 });
 

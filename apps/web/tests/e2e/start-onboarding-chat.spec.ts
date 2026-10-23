@@ -342,7 +342,8 @@ test.describe('canonical /start onboarding chat', () => {
     expect(navigations.length).toBeLessThanOrEqual(3);
 
     await page.goto('/waitlist', { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/\/start(?:\?|$)/);
+    await expect(page).toHaveURL(/\/waitlist(?:\?|$)/);
+    await expect(page.locator('#auth-form')).toBeVisible();
   });
 
   test('first screen and root picker are visually stable', async ({ page }) => {
@@ -482,9 +483,11 @@ test.describe('canonical /start onboarding chat', () => {
 
     const bubble = page.getByTestId('chat-user-bubble').first();
     await expect(bubble).toBeVisible();
+    // Chat body text follows --text-app, which #19154 consolidated onto the
+    // 10/12/14 scale (12px; was 13px).
     await expect(bubble.locator('.system-b-chat-user-text')).toHaveCSS(
       'font-size',
-      '13px'
+      '12px'
     );
     await expect(bubble).toHaveCSS('padding-top', '6px');
     await expect(bubble).toHaveCSS('padding-right', '12px');
@@ -693,8 +696,18 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       sideRail.getByTestId('onboarding-phone-preview')
     ).toBeVisible();
-    const sideRailText = await sideRail.innerText();
-    expect(sideRailText.match(/\bTest Artist\b/g) ?? []).toHaveLength(1);
+    await expect(sideRail.getByTestId('profile-identity-link')).toHaveCount(1);
+    await expect(sideRail.getByTestId('profile-identity-link')).toHaveText(
+      'Test Artist'
+    );
+    await expect(
+      sideRail.getByRole('heading', {
+        name: 'Profile Highlights From Test Artist',
+      })
+    ).toHaveCount(1);
+    await expect(
+      sideRail.getByRole('heading', { name: 'Test Artist', exact: true })
+    ).toHaveCount(1);
     await expect(sideRail.getByTitle('Apple Music').first()).toBeVisible();
     await expect(
       sideRail.getByText('12.3K Spotify followers').first()

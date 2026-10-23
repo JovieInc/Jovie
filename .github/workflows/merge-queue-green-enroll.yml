@@ -14,9 +14,20 @@ name: Merge Queue Green Enroll
 # Enqueues open, non-draft, same-repo PRs into main whose required checks are
 # green with no conflicts (mergeStateStatus CLEAN, HAS_HOOKS or UNSTABLE: an
 # UNSTABLE head only has a non-required check pending or red, which the
-# ruleset does not gate on), that carry no hold/gated/incident label. GitHub
+# ruleset does not gate on), that carry no hold/gated/incident label.
+# lane-fix-red stays blocking until the Lane Fix Relay deletes it. That relay
+# already applies the label with GITHUB_TOKEN (issues: write, pull-requests:
+# write). This job's app token cannot remove labels, so enroll never calls
+# removeLabel for lane-fix-red. A labeled head is not admitted; a red head
+# keeps the label. GitHub
 # recomputes mergeability lazily, so a read right after main moves returns
-# UNKNOWN; the controller re-reads it briefly instead of dropping the wake. It runs when a required-check workflow finishes on a PR, or a PR loses
+# UNKNOWN; the controller re-reads it briefly instead of dropping the wake.
+# A per-PR wake can also read BLOCKED for minutes after every required check
+# is already green (JOV-8788, #22618). That path re-reads like UNKNOWN and,
+# while the head stays BLOCKED, dispatches this workflow again with the job
+# GITHUB_TOKEN (actions: write). The Jovie Bot app token does not request
+# actions: write. Roster sweeps do not dispatch.
+# It runs when a required-check workflow finishes on a PR, or a PR loses
 # a hold label, plus a reconciliation sweep on every push to main: a queue
 # ejection while checks are already green produces no new check completion, so
 # without the sweep a dequeued green head is never re-armed (JOV-7589).
@@ -33,7 +44,7 @@ on:
   # an unchanged head never earns a second CI flight), so this is the wake
   # that admits an already-green head. Sole ready_for_review subscriber.
   pull_request_target:
-    types: [labeled, unlabeled, reopened, ready_for_review, synchronize]
+    types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review, synchronize]
   # Event-driven reconciliation (JOV-7589): every landing on main re-scans the
   # roster (re-enrolls green heads whose dequeue left no wake) and re-checks
   # hold receipts, so neither waits on a timer. Pushes coalesce into the one
@@ -50,16 +61,29 @@ on:
         description: 'Admit only this PR (per-PR path, no roster sweep); empty sweeps every open PR'
         required: false
         default: ''
+      blocked_recheck:
+        description: 'Follow-up attempt after a required-green head stayed BLOCKED (0-4)'
+        required: false
+        default: '0'
 
 permissions: {}
 
 concurrency:
   # A global pending slot loses another PR's final wake. Coalesce only wakes
-  # attributed to the same PR; association-free receipts retain their run ID.
-  group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
-  cancel-in-progress: false
+  # attributed to the same PR. Successful pull_request completions share one
+  # cancellable slot per PR (or head, when the receipt has no PR number) so
+  # Source Validation, Fork PR Gate, and PR Size Guard do not each mint a
+  # token. That slot is distinct from pull_request_target, so a green wake
+  # cannot cancel a draft dequeue. Failure holds, merge-group receipts, and
+  # association-free non-success receipts keep a per-workflow slot. A success
+  # must not replace a failure hold. Receipts with no head stay on their run ID.
+  group: merge-queue-green-enroll-${{ ((github.event_name == 'workflow_dispatch' && inputs.pr_number == '') || github.event_name == 'push') && 'reconcile' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'merge_group' && format('success-{0}', github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.event.workflow_run.id)) || inputs.pr_number || github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || (github.event.workflow_run.head_sha && format('{0}-{1}', github.event.workflow_run.head_sha, github.event.workflow_run.name)) || github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event != 'merge_group' }}
 
 jobs:
+  # CI failures, plus PR Size Guard's "Require combined-head workflows to
+  # load" step: a ci.yml GitHub cannot load reports no CI check at all
+  # (2026-10-20, #21826), and the script ignores every other size failure.
   hold-failed-revision:
     name: Hold failed source revision
     outputs:
@@ -67,7 +91,7 @@ jobs:
       admission_recovery_receipt: ${{ steps.failure-hold.outputs.admission_recovery_receipt }}
     if: >-
       github.event_name == 'workflow_run' &&
-      github.event.workflow_run.workflow_id == 178737329 &&
+      (github.event.workflow_run.workflow_id == 178737329 || github.event.workflow_run.workflow_id == 299199506) &&
       github.event.workflow_run.event == 'merge_group' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       contains(fromJSON('["failure","timed_out","action_required","startup_failure","stale"]'), github.event.workflow_run.conclusion)
@@ -140,8 +164,37 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      actions: write
       contents: read
     steps:
+      - name: Debounce repeated green wakes
+        # The newer success cancels this run during the sleep, before the
+        # Jovie Bot token is minted. Failure holds and merge-group receipts
+        # do not sleep.
+        if: >-
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event != 'merge_group'
+        run: sleep 20
+
+      # The in-job re-read is a few seconds. GitHub left #22618 BLOCKED for
+      # minutes after PR Ready, so the follow-up waits here, before the app
+      # token is minted, and only on a dispatch this job itself requested.
+      - name: Wait for a stale BLOCKED merge state to settle
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          (inputs.blocked_recheck == '1' || inputs.blocked_recheck == '2' ||
+           inputs.blocked_recheck == '3' || inputs.blocked_recheck == '4')
+        env:
+          BLOCKED_RECHECK: ${{ inputs.blocked_recheck }}
+        run: |
+          case "$BLOCKED_RECHECK" in
+            1) sleep 60 ;;
+            2) sleep 120 ;;
+            3|4) sleep 180 ;;
+            *) exit 0 ;;
+          esac
+
       - name: Checkout trusted failure policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -170,11 +223,33 @@ jobs:
           # ("`workflows` scope may be required"); the installation grants it.
           permission-workflows: write
 
+      # JOV-8754: sample both REST buckets this fleet shares. GET /rate_limit
+      # costs no quota. 2026-10-21 03:25-03:52Z the repo GITHUB_TOKEN bucket ran
+      # dry and Merge Group Admission waited out the reset, so every group
+      # stalled ~25 min. One notice per bucket feeds scripts/ci/api-quota-report.mjs.
+      - name: Sample API quota
+        continue-on-error: true
+        env:
+          REPO_TOKEN: ${{ github.token }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -uo pipefail
+          for bucket in github-token jovie-bot; do
+            if [[ "$bucket" == github-token ]]; then token="$REPO_TOKEN"; else token="$APP_TOKEN"; fi
+            core="$(curl -fsS --max-time 10 -H "Authorization: Bearer $token" \
+              -H 'Accept: application/vnd.github+json' https://api.github.com/rate_limit \
+              | jq -r '.resources.core | "remaining=\(.remaining) limit=\(.limit) used=\(.used) reset=\(.reset)"')" \
+              || core="unavailable"
+            echo "::notice title=api-quota::bucket=${bucket} ${core} at=$(date -u +%s)"
+          done
+
       - name: Enqueue green PRs
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
           DISPATCH_PR_NUMBER: ${{ inputs.pr_number || '' }}
+          BLOCKED_RECHECK: ${{ inputs.blocked_recheck || '0' }}
+          RECHECK_TOKEN: ${{ github.token }}
           MERGE_STATE_RETRY_MS: '3000'
           FAILURE_HOLD_RECEIPT: ${{ needs.hold-failed-revision.outputs.failure_receipt || '' }}
           ADMISSION_RECOVERY_RECEIPT: ${{ needs.hold-failed-revision.outputs.admission_recovery_receipt || '' }}
@@ -185,18 +260,28 @@ jobs:
             const failurePolicy = await import(pathToFileURL(
               `${process.env.GITHUB_WORKSPACE}/scripts/merge-group-failure-hold.mjs`
             ));
-            // Single source: scripts/lib/admission-hold-labels.json (stop labels plus
-            // queue-poison, which the lanes add after two ejections and remove with their fix).
+            // Single source: scripts/lib/admission-hold-labels.json. Stop labels,
+            // queue-poison, and lane-fix-red skip the sweep. The Lane Fix Relay
+            // deletes a stale lane-fix-red; this token cannot remove labels.
             const holdLabels = JSON.parse(require('node:fs').readFileSync(
               `${process.env.GITHUB_WORKSPACE}/scripts/lib/admission-hold-labels.json`, 'utf8'
             ));
-            const BLOCKING = new Set([...holdLabels.stopHoldLabels, holdLabels.queuePoisonLabel]);
+            const BLOCKING = new Set([
+              ...holdLabels.stopHoldLabels,
+              holdLabels.queuePoisonLabel,
+              ...holdLabels.machineBlockLabels,
+            ]);
             const BREAKER_LABEL = 'queue-breaker';
             if (BLOCKING.size < 2) throw new Error('admission hold labels are unreadable');
             // Required checks green and no conflicts. UNSTABLE only adds a
             // non-required pending/red context (e.g. lane execution receipts).
             const ADMISSIBLE = new Set(['CLEAN', 'HAS_HOOKS', 'UNSTABLE']);
             const retryMs = Math.max(0, Number(process.env.MERGE_STATE_RETRY_MS ?? 3000) || 0);
+            const blockedRecheckRaw = Number(process.env.BLOCKED_RECHECK ?? 0);
+            const blockedRecheck =
+              Number.isInteger(blockedRecheckRaw) && blockedRecheckRaw > 0
+                ? blockedRecheckRaw
+                : 0;
             const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
             const { owner, repo } = context.repo;
             // Main's SHA only resolves a base-branch failure hold, so read it
@@ -222,6 +307,10 @@ jobs:
               });
             } else {
               let numbers = [];
+              const associatedByNumber = new Map();
+              // A merge-group head_sha is the synthetic queue commit. Keep
+              // pulls.get on that path so the candidate carries the source head.
+              let sourceHeadSha = '';
               if (context.eventName === 'workflow_dispatch') {
                 numbers = [dispatchedPr];
               } else if (context.eventName === 'pull_request_target') {
@@ -241,26 +330,56 @@ jobs:
                   });
                   numbers = [parsed.prNumber];
                 }
+                if (run.event !== 'merge_group' && /^[a-f0-9]{40}$/.test(run.head_sha || '')) {
+                  sourceHeadSha = run.head_sha;
+                }
                 // PR-target workflow receipts can omit their pull_requests association.
                 // Resolve only the exact source SHA and branch, never a fallback full scan.
                 // GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls is
                 // repos.listPullRequestsAssociatedWithCommit. github.rest.commits
                 // does not exist, so calling it throws before any enqueue.
-                if (numbers.length === 0 && /^[a-f0-9]{40}$/.test(run.head_sha || '') && run.head_branch) {
+                if (numbers.length === 0 && sourceHeadSha && run.head_branch) {
                   const pages = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
-                    owner, repo, commit_sha: run.head_sha, per_page: 100,
+                    owner, repo, commit_sha: sourceHeadSha, per_page: 100,
                   });
                   const associated = Array.isArray(pages) ? pages : [];
-                  numbers = associated.flatMap(pr => {
-                    if (!pr || pr.state !== 'open' || pr.base?.ref !== 'main') return [];
-                    if (pr.head?.sha !== run.head_sha || pr.head?.ref !== run.head_branch) return [];
-                    if (pr.head?.repo?.full_name !== `${owner}/${repo}`) return [];
-                    return validNumber(pr.number) ? [pr.number] : [];
-                  });
+                  numbers = [];
+                  for (const pr of associated) {
+                    if (!pr || pr.state !== 'open' || pr.base?.ref !== 'main') continue;
+                    if (pr.head?.sha !== sourceHeadSha || pr.head?.ref !== run.head_branch) continue;
+                    if (pr.head?.repo?.full_name !== `${owner}/${repo}`) continue;
+                    if (!validNumber(pr.number) || associatedByNumber.has(pr.number)) continue;
+                    numbers.push(pr.number);
+                    associatedByNumber.set(pr.number, pr);
+                  }
                 }
               }
               prs = [];
               for (const number of new Set(numbers)) {
+                const known = associatedByNumber.get(number);
+                if (known) {
+                  // The association payload is already the open main candidate.
+                  // pulls.get would repeat that REST read.
+                  prs.push({
+                    ...known,
+                    draft: known.draft === true,
+                    labels: Array.isArray(known.labels) ? known.labels : [],
+                  });
+                  continue;
+                }
+                if (sourceHeadSha) {
+                  // GraphQL readPr is the admission proof and checks this SHA.
+                  // The event already supplied it, so pulls.get is not a proof.
+                  prs.push({
+                    number,
+                    draft: false,
+                    state: 'open',
+                    base: { ref: 'main' },
+                    head: { sha: sourceHeadSha, repo: { full_name: `${owner}/${repo}` } },
+                    labels: [],
+                  });
+                  continue;
+                }
                 const { data } = await github.rest.pulls.get({ owner, repo, pull_number: number });
                 if (data.state === 'open' && data.base.ref === 'main') prs.push(data);
               }
@@ -289,9 +408,11 @@ jobs:
                       isInMergeQueue isCrossRepository
                       autoMergeRequest { enabledAt }
                       labels(first: 100) { pageInfo { hasNextPage } nodes { name } }
-                      commits(last: 1) { nodes { commit { committedDate } } }
+                      commits(last: 1) {
+                        nodes { commit { committedDate statusCheckRollup { state } } }
+                      }
                       timelineItems(last: 1, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
-                        nodes { ... on RemovedFromMergeQueueEvent { createdAt reason } }
+                        nodes { ... on RemovedFromMergeQueueEvent { createdAt reason actor { __typename login } } }
                       }
                       breakerEvents: timelineItems(last: 100, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT, LABELED_EVENT]) {
                         nodes {
@@ -329,6 +450,10 @@ jobs:
               await Promise.all(Array.from({ length: Math.min(width, prs.length) }, worker));
             }
             let enqueued = 0;
+            // Every decision on an open, ready, unqueued PR leaves a receipt (pr, head, reason) in the
+            // job summary and one machine line, so a non-enroll is never silent (event-driven dwell).
+            const receipts = [];
+            const receipt = (pr, decision, reason) => receipts.push({ pr: pr?.number, head: String(pr?.headRefOid ?? '').slice(0, 12), decision, reason });
             for (const [index, candidate] of prs.entries()) {
               if (overBudget()) {
                 core.warning(`sweep budget spent after ${index}/${prs.length} PRs; the rest wait for their own events or the next sweep`);
@@ -345,15 +470,81 @@ jobs:
               };
               // UNKNOWN means GitHub has not recomputed mergeability since main
               // moved; the read itself starts that, so two short re-reads settle it.
+              // BLOCKED with a green rollup is the same lag lasting minutes
+              // (JOV-8788). Re-read it on the per-PR path only. A head that is
+              // still BLOCKED is not enrolled; one GITHUB_TOKEN dispatch looks
+              // again. Sweeps never sleep or dispatch for it.
+              const requiredChecksGreen = currentPr =>
+                currentPr?.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state === 'SUCCESS';
+              const admissibleExceptState = currentPr => {
+                if (!currentPr || currentPr.state !== 'OPEN' || currentPr.baseRefName !== 'main') return false;
+                if (currentPr.isDraft || currentPr.isInMergeQueue || currentPr.isCrossRepository) return false;
+                if (currentPr.headRefOid !== candidate.head.sha) return false;
+                if (currentPr.labels.pageInfo.hasNextPage) return false;
+                return !currentPr.labels.nodes.some(l => BLOCKING.has(l.name.toLowerCase()));
+              };
               let pr = prefetched.get(candidate.number);
               if (!pr || pr.mergeStateStatus === 'UNKNOWN') pr = await readCurrent();
               for (let attempt = 1; !sweep && pr?.mergeStateStatus === 'UNKNOWN' && attempt <= 2; attempt += 1) {
                 await sleep(retryMs * attempt);
                 pr = await readCurrent();
               }
+              const blockedWhileGreen = () =>
+                !sweep && pr?.mergeStateStatus === 'BLOCKED' &&
+                requiredChecksGreen(pr) && admissibleExceptState(pr);
+              for (let attempt = 1; blockedWhileGreen() && attempt <= 2; attempt += 1) {
+                await sleep(retryMs * attempt);
+                pr = await readCurrent();
+              }
+              if (blockedWhileGreen()) {
+                const prNumber = String(candidate.number);
+                const next = blockedRecheck + 1;
+                if (blockedRecheck >= 4) {
+                  core.warning(`#${prNumber} stayed BLOCKED after required checks succeeded; blocked recheck exhausted`);
+                  receipt(pr, 'skip', 'blocked-recheck-exhausted');
+                } else if (!/^[1-9]\d*$/.test(prNumber) || next < 1 || next > 4 || !process.env.RECHECK_TOKEN) {
+                  core.warning(`#${prNumber} blocked recheck not dispatched`);
+                  receipt(pr, 'skip', 'blocked-recheck-undispatched');
+                } else {
+                  try {
+                    const response = await fetch(
+                      `https://api.github.com/repos/${owner}/${repo}/actions/workflows/merge-queue-green-enroll.yml/dispatches`,
+                      {
+                        method: 'POST',
+                        headers: {
+                          Accept: 'application/vnd.github+json',
+                          Authorization: `Bearer ${process.env.RECHECK_TOKEN}`,
+                          'Content-Type': 'application/json',
+                          'X-GitHub-Api-Version': '2022-11-28',
+                        },
+                        body: JSON.stringify({
+                          ref: 'main',
+                          inputs: {
+                            dry_run: 'false',
+                            pr_number: prNumber,
+                            blocked_recheck: String(next),
+                          },
+                        }),
+                      }
+                    );
+                    if (!response.ok) {
+                      core.warning(`#${prNumber} blocked recheck dispatch failed: ${response.status}`);
+                      receipt(pr, 'error', `blocked-recheck-dispatch-${response.status}`);
+                    } else {
+                      core.info(`recheck #${prNumber}: blocked-recheck=${next}`);
+                      receipt(pr, 'recheck', `blocked-recheck=${next}`);
+                    }
+                  } catch (error) {
+                    core.warning(`#${prNumber} blocked recheck dispatch failed: ${error.message}`);
+                    receipt(pr, 'error', 'blocked-recheck-dispatch-failed');
+                  }
+                }
+                continue;
+              }
               if (!eligible(pr)) {
                 if (pr && pr.state === 'OPEN' && !pr.isDraft && !pr.isInMergeQueue) {
                   core.info(`skip #${candidate.number}: mergeStateStatus=${pr.mergeStateStatus}`);
+                  receipt(pr, 'skip', `mergeStateStatus=${pr.mergeStateStatus}`);
                 }
                 continue;
               }
@@ -380,9 +571,20 @@ jobs:
                   ? await readMainSha()
                   : undefined,
               });
-              let failure = sourceFailure;
+              // JOV-6620: a head whose merge group failed stays out until a new
+              // head or a person removes `hold`/`queue-poison` from this exact
+              // head. A bot lifting the label (lanes) never releases it.
+              let failure = failurePolicy.humanReleaseDisposition({
+                failure: sourceFailure,
+                release: failurePolicy.humanFailureReleaseIntent({
+                  eventName: context.eventName, event: context.payload,
+                }),
+                prNumber: pr.number,
+                headSha: pr.headRefOid,
+              });
               if (failure.action === 'block') {
                 core.notice(`HELD #${pr.number}@${pr.headRefOid}: ${failure.reason}`);
+                receipt(pr, 'held', failure.reason);
                 continue;
               }
               // Native history is revision-scoped: a commit/force-push after
@@ -440,10 +642,18 @@ jobs:
                   ownerHoldRelease,
                 });
               }
+              // A person pulling this head out of the queue also withdraws any
+              // automatic retry; only their explicit release re-admits it.
+              const removalActor = pr.timelineItems.nodes[0]?.actor;
+              const humanDequeued = Boolean(removedUnchangedHead) && removalReason === 'manual' &&
+                removalActor?.__typename === 'User' && !/\[bot\]$/i.test(String(removalActor?.login || ''));
               if (failure.action === 'block' ||
+                  (humanDequeued && failure.action === 'retry-once' &&
+                   failure.reason !== 'human-failure-release') ||
                   (removedUnchangedHead && failure.action !== 'retry-once' &&
                    failure.reason !== 'owner-hold-release' && !releasedAfterManualRemoval)) {
                 core.info(`skip #${pr.number}: head unchanged since queue removal (${removalReason}; ${failure.reason})`);
+                receipt(pr, 'skip', `head-unchanged-since-removal:${removalReason}:${failure.reason}`);
                 continue;
               }
               if (process.env.DRY_RUN === 'true') {
@@ -564,6 +774,7 @@ jobs:
                   }`, { id: pr.id, oid: pr.headRefOid });
                 enqueued += 1;
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                receipt(pr, 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position}`);
                 if (breakerMarked && !breakerRestore) {
                   await github.rest.issues.removeLabel({
                     owner, repo, issue_number: pr.number, name: BREAKER_LABEL,
@@ -577,9 +788,72 @@ jobs:
                   core.notice(`RELEASED rejected enqueue reservation for #${pr.number}@${pr.headRefOid}`);
                 }
                 core.warning(`#${pr.number} not enqueued: ${error.message}`);
+                receipt(pr, 'error', String(error.message).slice(0, 200));
               }
             }
             core.info(`enqueued=${enqueued}`);
+            core.info(`enroll-receipts ${JSON.stringify(receipts)}`);
+            if (receipts.length > 0 && core.summary) {
+              await core.summary
+                .addHeading('Enroll decisions', 3)
+                .addTable([
+                  [{ data: 'PR', header: true }, { data: 'Head', header: true }, { data: 'Decision', header: true }, { data: 'Reason', header: true }],
+                  ...receipts.map(row => [`#${row.pr}`, row.head, row.decision, row.reason]),
+                ])
+                .write()
+                .catch(error => core.warning(`enroll receipt summary not written: ${error.message}`));
+            }
+
+  # Conversion to draft does not remove GitHub's native queue entry. Reuse the
+  # existing exact-head/entry guard under the same admission owner, even during
+  # a queue freeze. Never run PR code or grant new installation permissions.
+  dequeue-draft:
+    name: Dequeue an exact draft head
+    if: github.event_name == 'pull_request_target' && github.event.action == 'converted_to_draft'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout trusted queue policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/merge-queue-backend.mjs
+            scripts/lib/merge-queue-guard.mjs
+            scripts/lib/pre-land-changelog.mjs
+            scripts/version-fanout-guard.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Generate Jovie Bot dequeue token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Reconcile only the event's current draft queue entry
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { reconcileDraftQueueEntry } from './scripts/merge-queue-backend.mjs';
+          console.log(JSON.stringify(await reconcileDraftQueueEntry({
+            event: JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')),
+            repository: process.env.GITHUB_REPOSITORY,
+          })));
+          NODE
 
   # Hold contract (scripts/hold-contract.mjs, jovie-hold/v1): every stop label
   # (hold, gated, incident, do-not-merge, tim-hold variants) needs a receipt
@@ -642,7 +916,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request_target' &&
       github.event.action == 'labeled' &&
-      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-deferred","queue-poison"]'), github.event.label.name)
+      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-deferred","queue-poison","lane-fix-red"]'), github.event.label.name)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions: {}
@@ -666,7 +940,7 @@ jobs:
             const sourceHead = context.payload.pull_request?.head?.sha;
             const rawLabel = context.payload.label?.name;
             const label = typeof rawLabel === 'string' ? rawLabel.toLowerCase() : null;
-            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-deferred', 'queue-poison']);
+            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-deferred', 'queue-poison', 'lane-fix-red']);
             if (!Number.isSafeInteger(number) || number <= 0 ||
                 typeof sourceHead !== 'string' || !/^[a-f0-9]{40}$/.test(sourceHead) || !blocking.has(label)) {
               core.info('Ignoring an incomplete blocking-label event');
@@ -700,8 +974,10 @@ jobs:
             }
 
   # Runs only after the hold has dropped merge intent. A green PR dequeued by
-  # another member of the group, or by the base branch, gets squash auto-merge
-  # back on that same SHA. Two rearms per SHA; the enroll job is not involved.
+  # another member of the group, or by the base branch, is enqueued again on
+  # that same SHA via enqueuePullRequest (no --auto, no --squash). A token
+  # that still cannot enqueue names the PR with ::error:: and the step
+  # summary. Two rearms per SHA; the enroll job is not involved.
   rearm-green-victims:
     name: Rearm green merge-group victims
     needs: [hold-failed-revision]
@@ -743,10 +1019,11 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-actions: read
-          permission-contents: read
+          # enqueuePullRequest needs the same contents grant as the enroll job.
+          permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
-          # Rearming auto-merge on a head that edits .github/workflows needs it.
+          # Enqueueing a head that edits .github/workflows needs it.
           permission-workflows: write
 
       - name: Rearm green victims of this merge group

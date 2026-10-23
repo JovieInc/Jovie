@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView.test.tsx
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -36,7 +37,10 @@ import {
   useRegisterHeaderSearch,
 } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
-import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
+import {
+  buildReleaseActions,
+  type ReleaseActionCapabilities,
+} from '@/features/dashboard/organisms/releases/release-actions';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -618,6 +622,23 @@ export function ShellReleasesView({
     [router]
   );
 
+  // One capability contract powers the row context menu, row overflow and
+  // selected-release rail. Keep eligibility and callbacks in sync by design.
+  const releaseActionCapabilities = useMemo<ReleaseActionCapabilities>(
+    () => ({
+      onDelete: handleDeleteRequest,
+      onChangeStatus: handleSaveStatus,
+      isSmartLinkLocked,
+      getSmartLinkLockReason,
+    }),
+    [
+      getSmartLinkLockReason,
+      handleDeleteRequest,
+      handleSaveStatus,
+      isSmartLinkLocked,
+    ]
+  );
+
   const contextMenuItemsByReleaseId = useMemo(() => {
     return new Map(
       visibleReleases.map(release => [
@@ -627,26 +648,20 @@ export function ShellReleasesView({
           onEdit: openEditor,
           onCopy: handleCopy,
           artistName,
-          isSmartLinkLocked,
-          getSmartLinkLockReason,
-          onDelete: handleDeleteRequest,
+          ...releaseActionCapabilities,
           canGenerateAlbumArt: showGenerateAlbumArtAction,
           onGenerateAlbumArt: handleGenerateAlbumArt,
           onGeneratePitch: handleGeneratePitch,
-          onChangeStatus: handleSaveStatus,
         }),
       ])
     );
   }, [
     artistName,
-    getSmartLinkLockReason,
     handleCopy,
-    handleDeleteRequest,
     handleGenerateAlbumArt,
     handleGeneratePitch,
-    handleSaveStatus,
-    isSmartLinkLocked,
     openEditor,
+    releaseActionCapabilities,
     showGenerateAlbumArtAction,
     visibleReleases,
   ]);
@@ -803,6 +818,7 @@ export function ShellReleasesView({
       width: RELEASE_DETAIL_PANEL_WIDTH,
       providerConfig,
       artistName,
+      ...releaseActionCapabilities,
       onClose: closeEditor,
       onRefresh: editingRelease
         ? () => handleRefreshRelease(editingRelease.id)
@@ -881,6 +897,7 @@ export function ShellReleasesView({
     isTrackSidebarOpen,
     openTrackDrawer,
     providerConfig,
+    releaseActionCapabilities,
     refreshingReleaseId,
     showGenerateAlbumArtAction,
   ]);
@@ -987,48 +1004,53 @@ export function ShellReleasesView({
         data-testid='shell-releases-view'
         surfaceMode='table'
       >
-        <ReleaseStateBanners
-          rows={rows}
-          appleMusicMatches={appleMusicMatches}
-          isAppleMusicEligibilityLoading={isAppleMusicEligibilityLoading}
-          showImportProgress={showImportProgress}
-          showReleasesTable={rows.length > 0}
-          artistName={artistName}
-          importedCount={importedCount}
-          totalCount={totalCount}
-          isAppleMusicConnected={isAmConnected}
-          isImporting={isImporting}
-          isSpotifyConnected={isConnected}
-          isPro={isPro}
-          canAccessFutureReleases={canAccessFutureReleases}
-          releasedCount={releasedCount}
-          unreleasedCount={unreleasedCount}
-          onAppleMusicMatchStatusChange={handleMatchStatusChange}
-        />
+        <div
+          className='flex min-h-0 flex-1 flex-col'
+          data-testid='releases-matrix'
+        >
+          <ReleaseStateBanners
+            rows={rows}
+            appleMusicMatches={appleMusicMatches}
+            isAppleMusicEligibilityLoading={isAppleMusicEligibilityLoading}
+            showImportProgress={showImportProgress}
+            showReleasesTable={rows.length > 0}
+            artistName={artistName}
+            importedCount={importedCount}
+            totalCount={totalCount}
+            isAppleMusicConnected={isAmConnected}
+            isImporting={isImporting}
+            isSpotifyConnected={isConnected}
+            isPro={isPro}
+            canAccessFutureReleases={canAccessFutureReleases}
+            releasedCount={releasedCount}
+            unreleasedCount={unreleasedCount}
+            onAppleMusicMatchStatusChange={handleMatchStatusChange}
+          />
 
-        <div className='flex-1 min-h-0 overflow-y-auto'>
-          {!shouldGateListPaint && (
-            <ReleasesListContent
-              showEmptyState={showEmptyState}
-              showConnectedEmptyState={showConnectedEmptyState}
-              visibleReleases={visibleReleases}
-              selectedReleaseId={selectedReleaseId}
-              pills={pills}
-              canCreateManualReleases={canCreateManualReleases}
-              isSyncing={isSyncing}
-              actionMenusByReleaseId={actionMenusByReleaseId}
-              contextMenuItemsByReleaseId={contextMenuItemsByReleaseId}
-              isSmartLinkLocked={isSmartLinkLocked}
-              getSmartLinkLockReason={getSmartLinkLockReason}
-              getSyncStatus={getSyncStatus}
-              onConnectSpotify={() => setSpotifySearchOpen(true)}
-              onNewRelease={handleNewRelease}
-              onSync={handleSync}
-              onSelect={handleSelect}
-              onClearFilters={handleClearFilters}
-              listboxRef={listboxRef}
-            />
-          )}
+          <div className='flex-1 min-h-0 overflow-y-auto'>
+            {!shouldGateListPaint && (
+              <ReleasesListContent
+                showEmptyState={showEmptyState}
+                showConnectedEmptyState={showConnectedEmptyState}
+                visibleReleases={visibleReleases}
+                selectedReleaseId={selectedReleaseId}
+                pills={pills}
+                canCreateManualReleases={canCreateManualReleases}
+                isSyncing={isSyncing}
+                actionMenusByReleaseId={actionMenusByReleaseId}
+                contextMenuItemsByReleaseId={contextMenuItemsByReleaseId}
+                isSmartLinkLocked={isSmartLinkLocked}
+                getSmartLinkLockReason={getSmartLinkLockReason}
+                getSyncStatus={getSyncStatus}
+                onConnectSpotify={() => setSpotifySearchOpen(true)}
+                onNewRelease={handleNewRelease}
+                onSync={handleSync}
+                onSelect={handleSelect}
+                onClearFilters={handleClearFilters}
+                listboxRef={listboxRef}
+              />
+            )}
+          </div>
         </div>
       </PageShell>
 

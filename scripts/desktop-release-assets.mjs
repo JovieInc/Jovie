@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { appendFile, readFile } from 'node:fs/promises';
+import { appendFile, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { isInstallationQuota403 } from './lib/github-installation-quota.mjs';
+import { classifyGitHubFailure, planRetry } from './lib/github-rate-limit.mjs';
 
 const API_VERSION = '2022-11-28';
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -18,6 +20,209 @@ const RELEASE_PAGE_SIZE = 100;
 const MAX_RELEASE_PAGES = 20;
 const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const BASE64_SHA512_PATTERN = /^[A-Za-z0-9+/]{86}==$/;
+// Same budget the production publish step already passes to
+// github-rate-limit.mjs (`--attempts 4 --max-wait-seconds 600`). Installation
+// 403s wait until x-ratelimit-reset inside that window. Production prepare
+// keeps JOV-8374's defer: a known reset past the window warns and returns
+// without claiming prepared=true. Publish and recover defer that same reset
+// with exit 75 so the quota waiter can retry this generation once. A missing
+// reset is learned from GET /rate_limit. Permission failures, an unproven
+// reset, verification, and the attempt cap stay fatal. Nothing here lengthens
+// the wait or turns a 403 into a published release.
+export const RELEASE_ASSET_READ_ATTEMPTS = 4;
+export const RELEASE_ASSET_READ_MAX_WAIT_MS = 600_000;
+export const DESKTOP_QUOTA_DEFER_EXIT = 75;
+
+/** Known production-prepare reset past the read budget. JOV-8374. */
+export class ReleaseAssetQuotaDeferred extends Error {
+  /** @param {number} resetAtMs */
+  constructor(resetAtMs) {
+    const resetAt = new Date(resetAtMs).toISOString();
+    super(
+      `Installation quota resets at ${resetAt}, beyond the release read budget.`
+    );
+    this.name = 'ReleaseAssetQuotaDeferred';
+    this.resetAt = resetAt;
+    this.resetAtMs = resetAtMs;
+  }
+}
+
+/**
+ * @param {number} resetEpoch
+ * @param {string} releaseSha
+ */
+export function desktopQuotaDeferralSentence(resetEpoch, releaseSha) {
+  const resetIso = new Date(resetEpoch * 1000)
+    .toISOString()
+    .replace(/\.\d{3}Z$/, 'Z');
+  return `Installation quota resets at ${resetIso}. Deferring desktop publication of ${releaseSha} to the quota retry. No release was published.`;
+}
+
+export class DesktopReleaseQuotaDeferred extends Error {
+  /**
+   * @param {number} resetEpoch
+   * @param {string} [releaseSha]
+   */
+  constructor(resetEpoch, releaseSha = '') {
+    super(
+      `Installation quota reset ${resetEpoch} is outside the desktop publisher budget.`
+    );
+    this.name = 'DesktopReleaseQuotaDeferred';
+    this.resetEpoch = resetEpoch;
+    this.releaseSha = releaseSha;
+    this.exitCode = DESKTOP_QUOTA_DEFER_EXIT;
+  }
+}
+
+/**
+ * Epoch seconds of an exhausted installation bucket, or null when the reset
+ * was not proven. Header retry instants include the shared +1s slack.
+ * @param {{ retryAtMs: number | null }} classification
+ * @param {{ remaining: number, resetMs: number } | null} quotaReset
+ * @returns {number | null}
+ */
+function exhaustedResetEpoch(classification, quotaReset) {
+  if (classification.retryAtMs != null) {
+    return Math.floor((classification.retryAtMs - 1000) / 1000);
+  }
+  if (
+    quotaReset &&
+    quotaReset.remaining === 0 &&
+    Number.isFinite(quotaReset.resetMs)
+  ) {
+    return Math.floor(quotaReset.resetMs / 1000);
+  }
+  return null;
+}
+
+/**
+ * Wait, defer, or fail an installation-quota 403.
+ * `wait` is the existing primary-limit plan inside the publish budget.
+ * `defer` is a known reset past that budget. Everything else fails closed.
+ * @param {{
+ *   attempt: number,
+ *   body?: string,
+ *   deadlineMs: number,
+ *   headers?: Headers | Record<string, string> | null,
+ *   nowMs: number,
+ *   status?: number | null,
+ *   attempts?: number,
+ *   quotaReset?: { remaining: number, resetMs: number } | null,
+ * }} input
+ * @returns {{ action: 'wait', waitMs: number } | { action: 'defer', resetEpoch: number } | { action: 'fail' }}
+ */
+export function decideReleaseAssetQuotaHold({
+  attempt,
+  body = '',
+  deadlineMs,
+  headers = null,
+  nowMs,
+  status = null,
+  attempts = RELEASE_ASSET_READ_ATTEMPTS,
+  quotaReset = null,
+}) {
+  if (!isInstallationQuota403(body, status)) return { action: 'fail' };
+  const classification = classifyGitHubFailure({
+    status,
+    message: body,
+    headers,
+    now: nowMs,
+  });
+  if (classification.kind !== 'primary-rate-limit') return { action: 'fail' };
+  if (attempt >= attempts) return { action: 'fail' };
+  const waitMs = planRetry({
+    classification,
+    attempt,
+    attempts,
+    nowMs,
+    deadlineMs,
+    quotaReset,
+  });
+  if (waitMs !== null) return { action: 'wait', waitMs };
+  const resetEpoch = exhaustedResetEpoch(classification, quotaReset);
+  if (resetEpoch == null) return { action: 'fail' };
+  if (resetEpoch * 1000 + 1000 > deadlineMs) {
+    return { action: 'defer', resetEpoch };
+  }
+  return { action: 'fail' };
+}
+
+/**
+ * Wait before repeating a publisher REST call, or null when this attempt
+ * must not sleep. Outside-budget resets defer via decideReleaseAssetQuotaHold.
+ * @param {{
+ *   attempt: number,
+ *   body?: string,
+ *   deadlineMs: number,
+ *   headers?: Headers | Record<string, string> | null,
+ *   nowMs: number,
+ *   status?: number | null,
+ *   attempts?: number,
+ *   quotaReset?: { remaining: number, resetMs: number } | null,
+ * }} input
+ * @returns {number | null}
+ */
+export function planReleaseAssetReadHold(input) {
+  const decision = decideReleaseAssetQuotaHold(input);
+  return decision.action === 'wait' ? decision.waitMs : null;
+}
+
+/**
+ * @param {{
+ *   releaseSha: string,
+ *   resetEpoch: number,
+ *   outputPath?: string,
+ *   summaryPath?: string,
+ *   runnerTemp?: string,
+ * }} input
+ */
+export async function announceDesktopQuotaDeferral({
+  releaseSha,
+  resetEpoch,
+  outputPath = process.env.GITHUB_OUTPUT,
+  summaryPath = process.env.GITHUB_STEP_SUMMARY,
+  runnerTemp = process.env.RUNNER_TEMP,
+}) {
+  const sentence = desktopQuotaDeferralSentence(resetEpoch, releaseSha);
+  process.stderr.write(`::warning::github-quota-deferred: ${sentence}\n`);
+  if (summaryPath) await appendFile(summaryPath, `${sentence}\n`);
+  if (outputPath) {
+    await appendFile(
+      outputPath,
+      `quota_deferred=true\nquota_reset_epoch=${resetEpoch}\n`
+    );
+  }
+  if (runnerTemp) {
+    await writeFile(
+      join(runnerTemp, 'desktop-publish-quota-defer'),
+      `${resetEpoch}\n`
+    );
+  }
+  return sentence;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {Promise<number>}
+ */
+export async function reportDesktopReleaseFailure(error) {
+  if (error instanceof DesktopReleaseQuotaDeferred) {
+    if (!SHA_PATTERN.test(error.releaseSha || '')) {
+      process.stderr.write(
+        '::error::Installation quota defer has no release candidate SHA.\n'
+      );
+      return 1;
+    }
+    await announceDesktopQuotaDeferral({
+      releaseSha: error.releaseSha,
+      resetEpoch: error.resetEpoch,
+    });
+    return DESKTOP_QUOTA_DEFER_EXIT;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  process.stderr.write(`[desktop-release-assets] ${message}\n`);
+  return 1;
+}
 
 function invariant(condition, message) {
   if (!condition) {
@@ -123,7 +328,43 @@ export function selectRecoverableStagingDraft(releases) {
   return release;
 }
 
-export async function fetchRecoverableStagingDraft(
+export function selectRecoverableProductionDraft(
+  releases,
+  { releaseSha, version }
+) {
+  releaseSpec('production', version);
+  invariant(SHA_PATTERN.test(releaseSha), 'Release SHA is malformed.');
+  invariant(Array.isArray(releases), 'GitHub releases are malformed.');
+  const candidates = releases.filter(
+    release =>
+      UNTAGGED_RELEASE_PATTERN.test(release?.tag_name || '') &&
+      release.name === version &&
+      release.target_commitish === releaseSha
+  );
+  invariant(
+    candidates.length <= 1,
+    'Multiple recoverable production drafts exist.'
+  );
+  const release = candidates[0] || null;
+  if (!release) return null;
+  invariant(
+    Number.isInteger(release.id) && release.id > 0,
+    'Recoverable production draft ID is malformed.'
+  );
+  invariant(
+    release.draft === true &&
+      release.prerelease === false &&
+      release.published_at === null,
+    'Recoverable production release must be a private nonprerelease draft.'
+  );
+  invariant(
+    Array.isArray(release.assets) && release.assets.length === 0,
+    'Recoverable production draft must be empty.'
+  );
+  return release;
+}
+
+async function fetchReleaseInventory(
   request,
   { maxPages = MAX_RELEASE_PAGES, pageSize = RELEASE_PAGE_SIZE } = {}
 ) {
@@ -146,11 +387,24 @@ export async function fetchRecoverableStagingDraft(
     );
     releases.push(...batch);
     if (batch.length < pageSize) {
-      return selectRecoverableStagingDraft(releases);
+      return releases;
     }
   }
   throw new Error(
     `GitHub release inventory exceeds the ${maxPages}-page safety bound.`
+  );
+}
+
+export async function fetchRecoverableStagingDraft(request, options) {
+  return selectRecoverableStagingDraft(
+    await fetchReleaseInventory(request, options)
+  );
+}
+
+export async function fetchRecoverableProductionDraft(request, input, options) {
+  return selectRecoverableProductionDraft(
+    await fetchReleaseInventory(request, options),
+    input
   );
 }
 
@@ -592,8 +846,17 @@ function retainedPublishedStagingAssetNames(oldFeedBuffer, release, version) {
   );
 }
 
-class GitHubClient {
-  constructor({ repository, token }) {
+export class GitHubClient {
+  constructor({
+    repository,
+    token,
+    fetchImpl = fetch,
+    sleep = null,
+    now = Date.now,
+    log = null,
+    releaseSha = '',
+    quotaMode = 'prepare',
+  }) {
     invariant(
       /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository),
       'GitHub repository is malformed.'
@@ -602,38 +865,139 @@ class GitHubClient {
     this.repository = repository;
     this.token = token;
     this.apiUrl = process.env.GITHUB_API_URL || 'https://api.github.com';
+    this.fetchImpl = fetchImpl;
+    this.sleep =
+      sleep || (ms => new Promise(resolve => setTimeout(resolve, ms)));
+    this.now = now;
+    this.releaseSha = releaseSha;
+    this.quotaMode = quotaMode;
+    this.log =
+      log ||
+      (message =>
+        process.stderr.write(`[desktop-release-assets] ${message}\n`));
+  }
+
+  /**
+   * GET /rate_limit does not spend the bucket it reports, including while that
+   * bucket is empty. Direct fetch so a 403 here cannot recurse into request().
+   * @returns {Promise<{ remaining: number, resetMs: number } | null>}
+   */
+  async readCoreQuota() {
+    let response;
+    try {
+      response = await this.fetchImpl(`${this.apiUrl}/rate_limit`, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${this.token}`,
+          'User-Agent': 'jovie-desktop-release-proof',
+          'X-GitHub-Api-Version': API_VERSION,
+        },
+      });
+    } catch {
+      return null;
+    }
+    if (!response?.ok) return null;
+    // Node types Response.json() as unknown under scripts/tsconfig (lib es2022).
+    const body =
+      /** @type {{ resources?: { core?: { remaining?: unknown, reset?: unknown } } } | null} */ (
+        await response.json()
+      );
+    const core = body?.resources?.core;
+    const remaining = Number(core?.remaining);
+    const reset = Number(core?.reset);
+    if (!Number.isFinite(remaining) || !Number.isFinite(reset)) return null;
+    return { remaining, resetMs: reset * 1000 };
   }
 
   async request(path, options = {}) {
     const url = path.startsWith('https://') ? path : `${this.apiUrl}${path}`;
     const { allowNotFound, raw, timeout, ...fetchOptions } = options;
-    const response = await fetch(url, {
-      ...fetchOptions,
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${this.token}`,
-        'User-Agent': 'jovie-desktop-release-proof',
-        'X-GitHub-Api-Version': API_VERSION,
-        ...options.headers,
-      },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(timeout ?? 120_000),
-    });
-    if (allowNotFound && response.status === 404) {
-      return null;
+    const method = options.method || 'GET';
+    const deadlineMs = this.now() + RELEASE_ASSET_READ_MAX_WAIT_MS;
+    for (let attempt = 1; ; attempt += 1) {
+      const response = await this.fetchImpl(url, {
+        ...fetchOptions,
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${this.token}`,
+          'User-Agent': 'jovie-desktop-release-proof',
+          'X-GitHub-Api-Version': API_VERSION,
+          ...options.headers,
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(timeout ?? 120_000),
+      });
+      if (allowNotFound && response.status === 404) {
+        return null;
+      }
+      if (!response.ok) {
+        const body = await response.text();
+        const nowMs = this.now();
+        const holdable = method === 'GET' || this.quotaMode === 'publish';
+        let quotaReset = null;
+        let classification = null;
+        if (holdable && isInstallationQuota403(body, response.status)) {
+          classification = classifyGitHubFailure({
+            status: response.status,
+            message: body,
+            headers: response.headers,
+            now: nowMs,
+          });
+          if (
+            classification.kind === 'primary-rate-limit' &&
+            classification.retryAtMs == null
+          ) {
+            quotaReset = await this.readCoreQuota();
+          }
+        }
+        const decision = holdable
+          ? decideReleaseAssetQuotaHold({
+              attempt,
+              body,
+              deadlineMs,
+              headers: response.headers,
+              nowMs,
+              status: response.status,
+              quotaReset,
+            })
+          : /** @type {{ action: 'fail' }} */ ({ action: 'fail' });
+        if (decision.action === 'wait') {
+          this.log(
+            `installation quota on ${method} ${url}; holding ${Math.ceil(decision.waitMs / 1000)}s for x-ratelimit-reset (attempt ${attempt}/${RELEASE_ASSET_READ_ATTEMPTS}).`
+          );
+          await this.sleep(decision.waitMs);
+          continue;
+        }
+        if (decision.action === 'defer' && this.quotaMode === 'publish') {
+          throw new DesktopReleaseQuotaDeferred(
+            decision.resetEpoch,
+            this.releaseSha
+          );
+        }
+        if (
+          decision.action === 'defer' &&
+          this.quotaMode === 'prepare' &&
+          method === 'GET'
+        ) {
+          const resetAtMs =
+            classification?.retryAtMs ??
+            (quotaReset ? quotaReset.resetMs + 1000 : null);
+          if (resetAtMs != null) throw new ReleaseAssetQuotaDeferred(resetAtMs);
+        }
+        const quotaContext = isInstallationQuota403(body, response.status)
+          ? ` [x-ratelimit-remaining=${response.headers.get('x-ratelimit-remaining') ?? 'missing'} x-ratelimit-reset=${response.headers.get('x-ratelimit-reset') ?? 'missing'}]`
+          : '';
+        throw new Error(
+          `GitHub API ${method} ${url} failed (${response.status}): ${body.slice(0, 500)}${quotaContext}`
+        );
+      }
+      if (raw) {
+        return Buffer.from(await response.arrayBuffer());
+      }
+      return response.status === 204
+        ? null
+        : /** @type {any} */ (await response.json());
     }
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `GitHub API ${options.method || 'GET'} ${url} failed (${response.status}): ${body.slice(0, 500)}`
-      );
-    }
-    if (raw) {
-      return Buffer.from(await response.arrayBuffer());
-    }
-    return response.status === 204
-      ? null
-      : /** @type {any} */ (await response.json());
   }
 
   async releaseByTag(tag, allowNotFound = false) {
@@ -663,6 +1027,13 @@ class GitHubClient {
   async recoverableStagingDraft() {
     return fetchRecoverableStagingDraft(path =>
       this.request(`/repos/${this.repository}/releases${path}`)
+    );
+  }
+
+  async recoverableProductionDraft(input) {
+    return fetchRecoverableProductionDraft(
+      path => this.request(`/repos/${this.repository}/releases${path}`),
+      input
     );
   }
 
@@ -954,6 +1325,35 @@ export async function prepare({
 }) {
   const spec = releaseSpec(environment, version);
   let release = await client.releaseOrDraftByTag(spec.tag, true);
+  if (environment === 'production' && !release) {
+    const input = { releaseSha, version };
+    const recoverable = await client.recoverableProductionDraft(input);
+    if (recoverable) {
+      const releaseId = recoverable.id;
+      const fresh = await client.releaseById(releaseId);
+      invariant(
+        fresh?.id === releaseId &&
+          selectRecoverableProductionDraft([fresh], input) === fresh,
+        'Recoverable production draft changed before normalization.'
+      );
+      await updateRelease(client, fresh, environment, releaseSha, version);
+      release = await client.releaseById(releaseId);
+      invariant(
+        release?.id === releaseId &&
+          release.published_at === null &&
+          Array.isArray(release.assets) &&
+          release.assets.length === 0,
+        'Recovered production draft identity or empty private state changed.'
+      );
+      validateReleaseEnvelope({
+        environment,
+        release,
+        releaseSha,
+        version,
+        draft: true,
+      });
+    }
+  }
   if (environment === 'staging') {
     assertStagingVersionTransition({ installedVersion, version });
     if (!release) {
@@ -997,7 +1397,10 @@ export async function prepare({
 
   if (!release) {
     release = await client.createDraft({ environment, releaseSha, version });
-  } else if (release.target_commitish !== releaseSha) {
+  } else if (
+    environment === 'staging' &&
+    release.target_commitish !== releaseSha
+  ) {
     invariant(
       release.draft === true &&
         Array.isArray(release.assets) &&
@@ -1369,7 +1772,17 @@ async function main() {
     'Installed desktop floor is not valid stable semver.'
   );
   releaseSpec(environment, version);
-  const client = new GitHubClient({ repository, token });
+  const client = new GitHubClient({
+    repository,
+    token,
+    releaseSha,
+    quotaMode:
+      command === 'upload-and-publish'
+        ? 'publish'
+        : command === 'verify-published'
+          ? 'verify'
+          : 'prepare',
+  });
   const common = {
     client,
     environment,
@@ -1380,7 +1793,47 @@ async function main() {
   };
 
   if (command === 'prepare') {
-    await prepare(common);
+    if (common.output) await writeOutputs(common.output, { prepared: false });
+    try {
+      await prepare(common);
+    } catch (error) {
+      // JOV-8374: only production draft preparation yields. Staging prepare,
+      // upload, and verification must not turn unavailable proof into success.
+      if (
+        environment !== 'production' ||
+        !(error instanceof ReleaseAssetQuotaDeferred)
+      ) {
+        throw error;
+      }
+      if (process.env.DESKTOP_QUOTA_RETRY === '1') {
+        process.stderr.write(
+          `::error::Desktop publication of ${releaseSha} deferred again after the quota retry. Not passing.\n`
+        );
+        throw new Error(
+          `Desktop publication of ${releaseSha} deferred again after the quota retry. Not passing.`
+        );
+      }
+      const message = `Installation quota resets at ${error.resetAt}. Deferring desktop preparation of ${releaseSha} to the next reconciliation. No desktop release was published.`;
+      process.stderr.write(`::warning::github-quota-deferred: ${message}\n`);
+      if (process.env.GITHUB_STEP_SUMMARY) {
+        await appendFile(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
+      }
+      const resetEpoch = Math.floor(error.resetAtMs / 1000);
+      if (common.output) {
+        await appendFile(
+          common.output,
+          `quota_deferred=true\nquota_reset_epoch=${resetEpoch}\n`
+        );
+      }
+      if (process.env.RUNNER_TEMP) {
+        await writeFile(
+          join(process.env.RUNNER_TEMP, 'desktop-publish-quota-defer'),
+          `${resetEpoch}\n`
+        );
+      }
+      return;
+    }
+    if (common.output) await writeOutputs(common.output, { prepared: true });
   } else if (command === 'upload-and-publish') {
     invariant(args.dist, '--dist is required.');
     await uploadAndPublish({ ...common, dist: args.dist });
@@ -1393,8 +1846,18 @@ async function main() {
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch(error => {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`[desktop-release-assets] ${message}\n`);
-    process.exitCode = 1;
+    reportDesktopReleaseFailure(error).then(
+      code => {
+        process.exitCode = code;
+      },
+      reportError => {
+        const message =
+          reportError instanceof Error
+            ? reportError.message
+            : String(reportError);
+        process.stderr.write(`[desktop-release-assets] ${message}\n`);
+        process.exitCode = 1;
+      }
+    );
   });
 }

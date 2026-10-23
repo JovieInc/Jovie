@@ -1,7 +1,8 @@
 'use client';
+// @coverage-via apps/web/tests/unit/DesktopQrOverlay.test.tsx
 
 import { Smartphone, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { getQrCodeUrl, QRCode } from '@/components/molecules/QRCode';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
@@ -10,9 +11,28 @@ interface DesktopQrOverlayProps {
   readonly handle: string;
 }
 
+function resolveDesktopQrPresentation(handle: string): {
+  mode: 'hidden' | 'icon' | 'open';
+  url: string;
+} {
+  const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
+  const hasFinePointer = globalThis.matchMedia('(any-pointer: fine)').matches;
+  if (!isMdUp || !hasFinePointer) {
+    return { mode: 'hidden', url: '' };
+  }
+
+  const payMode =
+    new URLSearchParams(globalThis.location.search).get('mode') === 'pay';
+  return {
+    mode: payMode ? 'open' : 'icon',
+    url: `${globalThis.location.origin}/${handle}`,
+  };
+}
+
 export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   const [mode, setMode] = useState<'hidden' | 'icon' | 'open'>('hidden');
   const [url, setUrl] = useState('');
+  const openCardRef = useRef<HTMLDivElement>(null);
   const qrUrl = useMemo(() => {
     if (!url) return '';
     return getQrCodeUrl(url, 120);
@@ -47,17 +67,9 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   useEffect(() => {
     if (typeof globalThis.matchMedia !== 'function') return;
 
-    const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
-    const hasFinePointer = globalThis.matchMedia('(any-pointer: fine)').matches;
-
-    if (!isMdUp || !hasFinePointer) {
-      setMode('hidden');
-      setUrl('');
-      return;
-    }
-
-    setMode('icon');
-    setUrl(`${globalThis.location.origin}/${handle}`);
+    const presentation = resolveDesktopQrPresentation(handle);
+    setMode(presentation.mode);
+    setUrl(presentation.url);
   }, [handle]);
 
   // React to viewport resizes: show on desktop if not dismissed, hide on mobile
@@ -68,17 +80,9 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
     const mqlPointer = globalThis.matchMedia('(any-pointer: fine)');
 
     const onChange = (_e: MediaQueryListEvent | MediaQueryList) => {
-      const isMdUp = mqlMd.matches;
-      const hasFinePointer = mqlPointer.matches;
-
-      if (!isMdUp || !hasFinePointer) {
-        setMode('hidden');
-        setUrl('');
-        return;
-      }
-
-      setMode('icon');
-      setUrl(`${globalThis.location.origin}/${handle}`);
+      const presentation = resolveDesktopQrPresentation(handle);
+      setMode(presentation.mode);
+      setUrl(presentation.url);
     };
 
     // Initial sync in case state drifted
@@ -92,6 +96,22 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
       mqlPointer.removeEventListener('change', onChange);
     };
   }, [handle]);
+
+  // Pay mode opens this card while the pay drawer is an aria-modal. A
+  // modal marks the rest of the page inert, so the close control was
+  // visible but not clickable. The top layer sits above that dialog.
+  useEffect(() => {
+    const node = openCardRef.current;
+    if (mode !== 'open' || !node || typeof node.showPopover !== 'function') {
+      return;
+    }
+    try {
+      if (!node.matches(':popover-open')) node.showPopover();
+    } catch {
+      // jsdom and older engines have no popover top layer. The card still
+      // renders in place for those runtimes.
+    }
+  }, [mode]);
 
   const close = () => {
     setMode('icon');
@@ -113,7 +133,13 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
       {mode === 'open' && (
         <div
           key='qr'
-          className={`group fixed bottom-4 right-4 ${PROFILE_Z.DRAWER_CONTENT} flex flex-col items-center overflow-hidden rounded-xl bg-surface-0 p-3 shadow-xl ring-1 ring-(--color-border-subtle) backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-cinematic ease-out motion-reduce:animate-none`}
+          ref={openCardRef}
+          popover='manual'
+          // Pay mode opens this card beside the aria-modal pay drawer. The
+          // drawer's focus boundary would otherwise mark it inert, leaving the
+          // close control visible but unusable.
+          data-modal-companion=''
+          className={`group fixed bottom-4 right-4 m-0 w-fit border-0 ${PROFILE_Z.DRAWER_CONTENT} flex flex-col items-center overflow-hidden rounded-xl bg-surface-0 p-3 shadow-xl ring-1 ring-(--color-border-subtle) backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-cinematic ease-out motion-reduce:animate-none`}
         >
           <div className='pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-slower group-hover:opacity-100'>
             <div className='absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
@@ -151,9 +177,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
             variant='surface'
             onClick={reopen}
             ariaLabel='Open On Phone'
-            className='group backdrop-blur-sm'
           >
-            <span className='pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity duration-slower group-hover:opacity-100 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
             <Smartphone className='relative h-5 w-5' aria-hidden='true' />
           </CircleIconButton>
         </div>

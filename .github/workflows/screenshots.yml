@@ -15,6 +15,9 @@ on:
       - '.github/actions/upload-safe-playwright-artifact/**'
       - '.github/scripts/guard-playwright-artifacts.mjs'
       - '.github/workflows/screenshots.yml'
+      - 'scripts/invariants/screen-certification.mjs'
+      - 'scripts/invariants/screen-proof-emit.mjs'
+      - 'scripts/invariants/screen-proof-resolver.mjs'
       - 'apps/web/app/artists/**'
       - 'apps/web/app/hud/**'
       - 'apps/web/lib/admin/roles.ts'
@@ -34,6 +37,7 @@ on:
       - 'apps/web/app/(marketing)/**'
       - 'apps/web/app/(home)/**'
       - 'apps/web/app/(dynamic)/**'
+      - 'apps/web/app/onboarding/checkout/**'
       - 'apps/web/app/demo/**'
       - 'apps/web/app/go/**'
       - 'apps/web/app/r/**'
@@ -55,6 +59,7 @@ on:
       - 'apps/web/tailwind.config.*'
       - 'apps/web/app/**/layout.tsx'
       - 'apps/web/app/globals.css'
+      - 'apps/web/styles/**'
       - 'packages/ui/**'
       - '!apps/web/public/product-screenshots/**'
       - '!apps/web/screenshot-catalog/current/**'
@@ -100,6 +105,7 @@ jobs:
       brand-artifact-id: ${{ steps.brand-proof.outputs.artifact-id }}
       report-artifact-id: ${{ steps.report-proof.outputs.artifact-id }}
       start-artifact-id: ${{ steps.start-proof.outputs.artifact-id }}
+      onboarding-checkout-artifact-id: ${{ steps.onboarding-checkout-proof.outputs.artifact-id }}
       marketing-solutions-artifact-id: ${{ steps.marketing-solutions-proof.outputs.artifact-id }}
       public-profile-about-artifact-id: ${{ steps.public-profile-about-proof.outputs.artifact-id }}
       catalog-changed: ${{ steps.diff.outputs.changed }}
@@ -909,6 +915,66 @@ jobs:
           public-images: true
           diagnostic-paths: true
 
+      # Checkout capture starts another Playwright process. That process
+      # must not run until the public-screen proofs above are uploaded:
+      # Playwright empties its output directory on startup, and these
+      # bundles live next to it under test-results/.
+      # Auth-gated. Signed-out /onboarding/checkout 307s to /signin, so this
+      # producer enters through the test-auth session and then requires the
+      # final pathname to be exactly /onboarding/checkout.
+      - name: Capture onboarding checkout screen proof
+        timeout-minutes: 10
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/onboarding-checkout-screen-proof.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=1
+        env:
+          BASE_URL: http://localhost:3000
+          SCREEN_PROOF_OUTPUT_DIR: test-results/screen-browser-proof-onboarding-checkout
+          SCREEN_PROOF_MEASUREMENTS: test-results/screen-browser-proof-onboarding-checkout-measurements.json
+
+      - name: Bind onboarding checkout proof to producer provenance
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRODUCER_JOB_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name == "Generate Screenshots") | .id' | head -n 1)"
+          if ! [[ "$PRODUCER_JOB_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not resolve the current producer job ID."
+            exit 1
+          fi
+          node scripts/invariants/screen-proof-emit.mjs \
+            --screen=web.onboarding-checkout \
+            --head-sha="$GITHUB_SHA" \
+            --run-url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            --bundle=apps/web/test-results/screen-browser-proof-onboarding-checkout \
+            --measurements=apps/web/test-results/screen-browser-proof-onboarding-checkout-measurements.json \
+            --out=apps/web/test-results/screen-browser-proof-onboarding-checkout/screen-proof.json \
+            --artifact-root="$GITHUB_WORKSPACE" \
+            --producer-run-id="$GITHUB_RUN_ID" \
+            --producer-run-attempt="$GITHUB_RUN_ATTEMPT" \
+            --producer-job-id="$PRODUCER_JOB_ID" \
+            --environment=local-production-build
+
+      - name: Upload onboarding checkout screen proof
+        id: onboarding-checkout-proof
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: screen-browser-proof-onboarding-checkout
+          path: |
+            apps/web/test-results/screen-browser-proof-onboarding-checkout/screen-proof.json
+            apps/web/test-results/screen-browser-proof-onboarding-checkout/screenshots/desktop.png
+            apps/web/test-results/screen-browser-proof-onboarding-checkout/screenshots/mobile.png
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+          public-images: true
+          diagnostic-paths: true
+
       # Keep this readback before catalog.spec.ts refreshes canonical screenshots.
       - name: Verify public screenshot exports from production build
         timeout-minutes: 5
@@ -1224,6 +1290,7 @@ jobs:
             "web.brand|${{ needs.generate.outputs.brand-artifact-id }}" \
             "web.report|${{ needs.generate.outputs.report-artifact-id }}" \
             "web.start|${{ needs.generate.outputs.start-artifact-id }}" \
+            "web.onboarding-checkout|${{ needs.generate.outputs.onboarding-checkout-artifact-id }}" \
             "web.marketing-solutions|${{ needs.generate.outputs.marketing-solutions-artifact-id }}" \
             "web.public-profile-about|${{ needs.generate.outputs.public-profile-about-artifact-id }}"; do
             SCREEN="${ENTRY%%|*}"

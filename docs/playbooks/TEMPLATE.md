@@ -33,6 +33,31 @@ cases, and promoted mechanically — so the contract below is enforced by CI.
 | `requiredConnectors` | Connector slugs that must be linked |
 | `requiredEntitlements` | Entitlement keys gating the playbook |
 
+### Growth preparation drafts
+
+`growth-*` sources must declare `growthGovernance` using the strict
+`growth-preparation/v1` contract in `lib/playbooks/growth-governance.ts`.
+See `growth-presence-repair-offer.playbook.md` for the native example. Only
+prompt steps, supplied authorized evidence and private preparation are allowed;
+tool and connector declarations must be empty. `quiet_strict` restricts social
+discovery as well as social writes, outbound, public publishing and paid media.
+
+The compiler preserves governance and every required entitlement, and binds the
+exact source bytes (including the body) by SHA-256. Unknown fields fail validation
+rather than disappearing. The primary catalog entitlement is not runtime proof
+of all required grants. Research dates keep publication, update, event, discovery
+and retrieval separate; the rolling window is exactly run start minus 30 days.
+Evergreen retrieval does not make an old source recent. Coverage failures and
+unperformed discovery remain explicit.
+
+Cost placeholders and proposed metrics remain `unmeasured` and `unbound`.
+Validation, compilation and visible seeds do not establish independent evaluation
+or efficacy. Registration rejects these preparation drafts before any catalog
+lookup/write. Optional growth preparation can be attached to an existing launch
+read-model record without creating another experiment or changing its decision,
+delivery receipts or outcomes. The read model is currently in memory; this is
+source-level integration, not persisted commissioning or external authorization.
+
 ### Measurable success metric sources
 
 `successMetric.source` must be one of: `smart_link_clicks`, `presave_count`,

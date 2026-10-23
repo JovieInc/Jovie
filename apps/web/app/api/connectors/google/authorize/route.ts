@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { signGoogleOAuthState } from '@/lib/connectors/google-calendar/oauth-state';
 import { getOAuthScopesForBundle } from '@/lib/connectors/registry';
 import { db } from '@/lib/db';
@@ -21,8 +22,11 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
+  // Only same-origin relative paths are signed into state; existing query
+  // context such as ?tab= is kept and anything else returns to Settings.
   const returnTo =
-    searchParams.get('returnTo') ?? APP_ROUTES.SETTINGS_CONNECTORS;
+    sanitizeRedirectUrl(searchParams.get('returnTo')) ??
+    APP_ROUTES.SETTINGS_CONNECTORS;
 
   // Mock mode: if GOOGLE_OAUTH_CLIENT_ID is missing in non-production, seed a
   // fixture token instead of failing with "OAuth not configured".

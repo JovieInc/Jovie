@@ -7,9 +7,9 @@ const combinations = [
   ['whats-new-and-audio', ['whats-new', 'now-playing']],
   ['update-only', ['update']],
   ['update-and-audio', ['update', 'now-playing']],
-  ['update-and-whats-new', ['update', 'whats-new']],
-  ['all-three', ['update', 'whats-new', 'now-playing']],
-  ['with-install', ['update', 'whats-new', 'now-playing', 'install']],
+  ['update-and-whats-new', ['update']],
+  ['all-three', ['update', 'now-playing']],
+  ['with-install', ['update', 'now-playing']],
   ['collapsed', []],
   ['collapsed-empty', []],
 ] as const;
@@ -56,9 +56,11 @@ test('dock changes preserve navigation coordinates and scroll', async ({
   );
   const rail = page.locator('[data-dock-preview]');
   const anchor = rail.getByTestId('nav-anchor');
-  await expect(rail.locator('[data-dock-card]')).toHaveCount(4);
+  await expect(rail.locator('[data-dock-card]')).toHaveCount(2);
   const before = await anchor.boundingBox();
   await rail.getByRole('button', { name: 'Collapse update' }).click();
+  expect(await anchor.boundingBox()).toEqual(before);
+  await rail.getByRole('button', { name: 'Dismiss update' }).click();
   expect(await anchor.boundingBox()).toEqual(before);
   await rail.getByRole('button', { name: "Dismiss what's new" }).click();
   expect(await anchor.boundingBox()).toEqual(before);

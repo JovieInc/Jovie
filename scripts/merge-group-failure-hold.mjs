@@ -17,6 +17,30 @@ export const ADMISSION_RECOVERY_CONTEXT = 'jovie-queue-admission-recovery/v1';
 export const ADMISSION_RECOVERY_SCHEMA =
   'jovie-merge-group-admission-recovery/v1';
 export const CI_WORKFLOW_ID = 178737329;
+// PR Size Guard owns the merge-group "Require combined-head workflows to
+// load" step. A ci.yml GitHub cannot load runs zero jobs and reports no
+// merge_group check (2026-10-20, #21826), so that required context is the
+// only merge-group evidence of the failure.
+export const PR_SIZE_GUARD_WORKFLOW_ID = 299199506;
+export const WORKFLOW_LOAD_STEP = 'Require combined-head workflows to load';
+// CI never reports on a group whose ci.yml does not load, so the queue would
+// wait for the ruleset's response timeout. Reporting the required context
+// failed on the exact synthetic head ejects the group now.
+export const WORKFLOW_LOAD_EJECT_CONTEXT = 'PR Ready';
+const MERGE_GROUP_FAILURE_WORKFLOWS = new Map([
+  [CI_WORKFLOW_ID, '.github/workflows/ci.yml'],
+  [PR_SIZE_GUARD_WORKFLOW_ID, '.github/workflows/pr-size-guard.yml'],
+]);
+
+/** Only the workflow-load step makes a PR Size Guard failure a source hold. */
+export function isHeldWorkflowFailure(run, failedSteps = []) {
+  if (run?.workflow_id === CI_WORKFLOW_ID) return true;
+  return (
+    run?.workflow_id === PR_SIZE_GUARD_WORKFLOW_ID &&
+    Array.isArray(failedSteps) &&
+    failedSteps.includes(WORKFLOW_LOAD_STEP)
+  );
+}
 export const FAILURE_CLASSES = Object.freeze([
   'deterministic-source',
   'retryable-product',
@@ -198,6 +222,8 @@ export function classifyMergeGroupFailure({
     ? [...new Set(failedSteps.filter(step => typeof step === 'string'))]
     : [];
   if (conclusion === 'failure' || conclusion === 'action_required') {
+    // The group's own diff made a workflow unloadable; only the source fixes it.
+    if (steps.includes(WORKFLOW_LOAD_STEP)) return 'deterministic-source';
     if (
       steps.some(step => DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS.has(step)) ||
       // ci-fast namespace, coverage and structural failures require source repair.
@@ -407,6 +433,71 @@ export function ownerHoldReleaseIntent({ eventName, event } = {}) {
   return { prNumber: pr.number, headSha: pr.head.sha, releasedAt };
 }
 
+export const REVISION_FAILED_AT_HEAD = 'revision-failed-at-head';
+// Labels whose removal by a person is an explicit release of a failed head.
+export const HUMAN_RELEASE_LABELS = Object.freeze(['hold', 'queue-poison']);
+
+/**
+ * A person (never a bot or app) removing `hold` or `queue-poison` from the
+ * current head is the explicit release JOV-6620 allows for a head whose merge
+ * group failed. jovie-bot's lanes lift `queue-poison` on their own schedule
+ * (#22280 and #21869, 2026-10-20), so a bot removal is never a release.
+ * @param {{ eventName?: string, event?: any }} [input]
+ */
+export function humanFailureReleaseIntent({ eventName, event } = {}) {
+  const pr = event?.pull_request;
+  const sender = event?.sender;
+  const label = String(event?.label?.name ?? '').toLowerCase();
+  if (
+    eventName !== 'pull_request_target' ||
+    event?.action !== 'unlabeled' ||
+    !HUMAN_RELEASE_LABELS.includes(label) ||
+    sender?.type !== 'User' ||
+    typeof sender?.login !== 'string' ||
+    /\[bot\]$/i.test(sender.login) ||
+    pr?.state !== 'open' ||
+    pr?.draft !== false ||
+    !Number.isSafeInteger(pr?.number) ||
+    pr.number <= 0 ||
+    !/^[0-9a-f]{40}$/.test(pr?.head?.sha ?? '')
+  )
+    return null;
+  return {
+    prNumber: pr.number,
+    headSha: pr.head.sha,
+    releasedBy: sender.login,
+    label,
+  };
+}
+
+/**
+ * Converts a failed-head block into one retry only for an exact human release
+ * of that head. Deterministic failures stay blocked: a rerun cannot pass. The
+ * retry reservation (FAILURE_RETRY_CONTEXT) makes each release single-use.
+ * @param {{ failure: any, release: any, prNumber: number, headSha: string }} input
+ */
+export function humanReleaseDisposition({
+  failure,
+  release,
+  prNumber,
+  headSha,
+}) {
+  if (
+    !release ||
+    failure?.action !== 'block' ||
+    ![
+      REVISION_FAILED_AT_HEAD,
+      'revision-retry-spent',
+      'revision-retry-exhausted',
+    ].includes(failure.reason) ||
+    release.prNumber !== prNumber ||
+    release.headSha !== headSha ||
+    !failure.latest
+  )
+    return failure;
+  return { ...failure, action: 'retry-once', reason: 'human-failure-release' };
+}
+
 /**
  * Recovery never replaces a source failure; owner hold release is not a CI retry.
  * @param {{ failure: object, statuses: object[], repository: string, prNumber: number, lastRemoval: string|undefined, headCommittedAt: string|undefined, autoMergeEnabled: boolean, headSha?: string, lastRemovalReason?: string, ownerHoldRelease?: object|null }} input
@@ -502,9 +593,16 @@ export function attributableFailureCount(failures) {
   ).length;
 }
 
-// The exact commit endpoint scopes failures: deterministic blocks immediately;
-// other failures receive one queue-authority retry. Each infrastructure failure
-// gets its own retry and never exhausts the revision.
+// The exact commit endpoint scopes failures. JOV-6620: a merge group that
+// failed at source head X never re-enrolls X automatically, whatever product
+// step failed (deterministic, retryable product test, or unclassified). X
+// waits for a new head or an explicit human release (humanFailureRelease).
+// PR #22280 (2026-10-20) re-entered at its failed head twice: once through
+// victim rearm and once through the old one-retry allowance for
+// retryable-product failures, and each re-entry ejected the groups behind it.
+// Only failures that say nothing about X (a runner/checkout failure, or a red
+// queue base after main moves) keep an automatic retry. Each infrastructure
+// failure gets its own retry and never exhausts the revision.
 /** @param {{ statuses?: unknown[], repository?: string, currentMainSha?: string }} input */
 export function revisionFailureDisposition({
   statuses,
@@ -535,11 +633,11 @@ export function revisionFailureDisposition({
       currentMainSha !== latest.mainSha;
     if (!resolved) return result('block', 'base-branch-failure');
   }
-  if (
-    !NON_ATTRIBUTABLE_CLASSES.has(latest.classification) &&
-    attributableFailureCount(failures) >= 2
-  ) {
+  if (attributableFailureCount(failures) >= 2) {
     return result('block', 'revision-retry-exhausted');
+  }
+  if (!NON_ATTRIBUTABLE_CLASSES.has(latest.classification)) {
+    return result('block', REVISION_FAILED_AT_HEAD);
   }
   // Newest statuses win: a proven rejection releases only its reservation.
   const latestRetry = retries.find(
@@ -689,10 +787,10 @@ function validateRun(run, repository) {
   const front = parseMergeQueueBranch(run?.head_branch);
   if (!front) fail('run is not an exact main merge-queue ref');
   if (
-    run.workflow_id !== CI_WORKFLOW_ID ||
+    !MERGE_GROUP_FAILURE_WORKFLOWS.has(run.workflow_id) ||
     run.event !== 'merge_group' ||
     run.status !== 'completed' ||
-    run.path !== '.github/workflows/ci.yml' ||
+    run.path !== MERGE_GROUP_FAILURE_WORKFLOWS.get(run.workflow_id) ||
     run.repository?.full_name !== repository ||
     run.head_repository?.full_name !== repository ||
     !MERGE_GROUP_FAILURE_CONCLUSIONS.has(run.conclusion) ||
@@ -851,7 +949,10 @@ export async function applyMergeGroupFailure(
       autoMergeDisabled: false,
     };
   }
-  if (aheadEntryUnproven(aheadGroup)) {
+  if (
+    !failedSteps?.includes?.(WORKFLOW_LOAD_STEP) &&
+    aheadEntryUnproven(aheadGroup)
+  ) {
     return {
       schema: FAILURE_HOLD_SCHEMA,
       repository,
@@ -892,6 +993,18 @@ export async function applyMergeGroupFailure(
       state: 'success',
       targetUrl: run.html_url,
     });
+  }
+
+  let groupEjected = false;
+  if (failedSteps?.includes?.(WORKFLOW_LOAD_STEP)) {
+    await writeStatus({
+      sha: groupHeadSha,
+      context: WORKFLOW_LOAD_EJECT_CONTEXT,
+      description: `Workflows in this group cannot load; held ${sourceHeadSha.slice(0, 12)}`,
+      state: 'failure',
+      targetUrl: run.html_url,
+    });
+    groupEjected = true;
   }
 
   current = await readPullRequest(front.prNumber);
@@ -965,14 +1078,9 @@ export async function applyMergeGroupFailure(
     retryDisposition:
       classification === 'base-branch'
         ? 'requeue-after-base-moves'
-        : classification === 'deterministic-source' ||
-            (!NON_ATTRIBUTABLE_CLASSES.has(classification) &&
-              attributableFailureCount([
-                ...existing.failures.filter(item => item !== duplicate),
-                { classification },
-              ]) >= 2)
-          ? 'blocked-until-new-source-head'
-          : 'one-queue-authority-retry',
+        : NON_ATTRIBUTABLE_CLASSES.has(classification)
+          ? 'one-queue-authority-retry'
+          : 'blocked-until-new-source-head',
     statusWritten: !duplicate,
     currentHeadSha:
       typeof current?.headRefOid === 'string'
@@ -982,6 +1090,7 @@ export async function applyMergeGroupFailure(
     dequeued,
     dequeueOutcome,
     autoMergeDisabled,
+    ...(groupEjected ? { groupEjected } : {}),
   };
 }
 
@@ -1227,6 +1336,13 @@ async function main(argv) {
           .map(step => step.name)
       : []
   );
+  if (!isHeldWorkflowFailure(run, failedSteps)) {
+    // Other PR Size Guard failures keep their existing handling: no hold.
+    process.stdout.write(
+      `${JSON.stringify({ skipped: true, reason: 'not-a-held-workflow-failure', workflowRunId: run.id })}\n`
+    );
+    return;
+  }
   const evidence = instructionContractEvidence(
     repository,
     run,

@@ -27,7 +27,7 @@ The harness, not the model, owns:
 | Execution attempts: stable action phases fence boundary replay. The dual-format reader supports immutable candidate ownership and terminal recovery; its incompatible writer remains disabled pending verified reader/writer readiness. Enabled recovery publishes only the reserved winner and seals unknown boundaries without another attempt or grant | `execution_attempt.py` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
 | No open-PR ceiling (Tim 2026-10-12): new-issue intake is bounded only by real limits in autoscale (compute, credits, quotas); `new_issue_budget()` reports counts, never refuses | `new_issue_budget()` |
-| Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = explicit dispatch-next in the admitted pool → tier (urgent or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
+| Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = explicit Urgent → dispatch-next in the admitted pool → tier (aged or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
 | File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
 | Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
@@ -49,7 +49,7 @@ The harness, not the model, owns:
 | Disabled-lane drafts: adopted for bounded repair; provider state, issue completion and exhausted attempts never authorize closing unlabelled work | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
-| Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is pushed to `backup/<host>/<name>-<date>` first, else only build output is stripped. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
+| Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is pushed to `refs/jovie-preserved/sweep/<host>/<name>-<date>` first (a non-branch ref: no Actions or Vercel build), else only build output is stripped. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
 | Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source. The same sweep also removes transient `_work` output of runners with no `Runner.Worker` running, retires idle Symphony workspaces on a low filesystem (never through a mount; dirty or unpushed work is pushed to a backup branch first, else only build output goes) and lane logs idle 14 days | `disk_guard.py`, `dispatch()`, `worker()` |
 | Adaptive slots (default on, every tick, measured limits only; kill switch `SYMPHONY_AUTOSCALE=0`) | `autoscale.decide()`, `dispatch()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
@@ -243,19 +243,20 @@ infrastructure first:
 `library-content` → `analytics-gtm` → `docs-changelog` → `lyb` → `memory-gbrain` →
 `general` → `human-decision`.
 
-`pick_issue()` orders candidates by `admission_order()`: an operator-designated
-`dispatch-next` issue carrying `agent-ready` is first among eligible new claims.
-Use it for the measured bottleneck (including binding CI or deployment work),
-clear a stale designation before replacing it, and verify the actual worker claim.
-It cannot interrupt active work or bypass repair-first, budget, routing, design,
-retry, duplicate, file-overlap or hotspot admission. Untagged aging is unchanged;
-multiple designations retain the existing priority/workstream/age tie-breakers.
-The Todo state filter consumes the designation when work starts. Otherwise tier 0 is urgent work
-(effective P1, including work aged to P1) or a compounding workstream (CI, Symphony
-throughput); then aged priority; then workstream rank; then age. Urgent-first and
-anti-starvation aging are preserved; a non-urgent CI or throughput fix runs ahead of
-non-urgent product work. The Linear backlog carries the same `ws:*` labels so new
-intake and existing work follow one rule.
+`pick_issue()` and the doctor share `admission_order()`. Current explicit Linear
+Urgent ranks before every lower-priority eligible unclaimed candidate, including
+aged CI work and `dispatch-next` (Tim, 2026-10-16; JOV-8022/JOV-7073). Only integer
+priority 1 is Urgent; missing and malformed priorities cannot acquire that status.
+Priority edits take effect on the next claim scan after the canonical Linear mirror
+receives them. Installed ingestion and actual claims require separate receipts.
+
+Within each explicit urgency band, an operator-designated `dispatch-next` issue
+carrying `agent-ready` is first. Otherwise tier 0 is aged priority 1 or compounding
+CI/Symphony throughput; tier 1 is other work. Aged priority, workstream rank and age
+break ties. Aging still prevents starvation among non-urgent work. Designation
+cannot interrupt active work or bypass repair-first, budget, routing, design,
+retry, duplicate, file-overlap or hotspot admission. Todo filtering consumes the
+designation when work starts; labels on Backlog do not establish admission.
 
 Duplicate identity is deliberately exact: titles equal after case, punctuation and
 conventional `bug:`/`P1:` prefixes are stripped (bracketed tags such as `[web-053]`
@@ -269,7 +270,10 @@ Lane reads paginate the Todo pool (up to `LANE_ISSUE_PAGES` × 100).
 Gem has no inbound webhook, so `.github/workflows/lane-fix-relay.yml` turns each GitHub signal
 into a label on the exact PR: CI failure `lane-fix-red`, merge-queue removal `lane-fix-dequeued`,
 a push to main that leaves the PR conflicting `lane-fix-conflict`, requested changes or a human
-review comment `lane-fix-review`, green CI on a lane draft `lane-fix-green`. Every worker pass
+review comment `lane-fix-review`, green CI on a lane draft `lane-fix-green`.
+The same relay deletes a stale `lane-fix-red` once that head is required-green
+(CLEAN, HAS_HOOKS, or UNSTABLE), using the workflow token that applied the label.
+Every worker pass
 does one label search and takes a queued PR ahead of the rest of its work. Labels are consumed
 on claim, or when the PR's own state no longer backs them. A PR whose attempts are spent keeps
 its label, so the PR shows why it is waiting. The dispatch tick handles `green` (ready +
@@ -384,6 +388,62 @@ health is recorded under `ycCorpus` in `tick.json`; it never silently converts a
 A release self-test (`LANES_SELFTEST`) never schedules the refresh, and its default fetch and `gbrain`
 helpers refuse to run there; every self-test process carries a per-run `JOVIE_SELFTEST_RUN` marker and
 `prove_staging` stops any still running when the tests end (`leftoverProcesses` in the diagnostic).
+
+### Bounded lesson analysis (JOV-8420)
+
+[`runLessonAnalysis`](../lib/lesson-analysis.mjs) consumes a sealed reasoning
+WorkOrder after event-driven admission (JOV-8419). It reconstructs the ordered
+attempt graph from sanitized, revision-bound development evidence and returns
+evidence-linked findings plus `target`, `no-change`, or `held`. It grants no
+implementation or promotion authority. JOV-8421 owns compilation.
+
+The existing transport/certification owners supply `environment.routes`,
+`routesVersion`, `certify(route)` and `dispatch(call)`. These are trusted owner
+adapters, never callbacks or capability claims supplied by a model. `certify`
+projects an authenticated current `jovie.certification/v1` receipt: exact route
+ID and tuple digest, certified capabilities and risk ceiling, policy version,
+evidence reference and expiry. Unavailable routes are omitted by that owner.
+This boundary does not mint certificates or maintain another route registry.
+
+The governor's `routeByExpectedCost` selects both actors. Broad, ambiguous,
+control-plane, founder-invariant and repeated-escape lessons require certified
+`reasoning` + `frontier` capability. The existing generator-family exclusion
+policy selects an independent challenger; matching providers or exact models
+are also excluded. Both resolutions retain the exact tuple, governor/routes
+versions, certification receipt, and canonical WorkResult. The challenger sees
+the evidence and proposal, and answers its digest. Its challenge is retained.
+
+`dispatch` receives the sealed child WorkOrder, `toReasoningJob` intake, selected
+route, sanitized packet, output JSON schema, AbortSignal and limits. The owner
+must honor the exact route/schema/packet and enforce the spend, inference and
+zero-tool caps before execution; the legacy ranking lane alone does not satisfy
+this contract. It returns `{ result, output, resolvedTuple, usage }`, where
+`result` is that exact order's WorkResult and `usage` reports inference calls,
+tool calls, inference USD and tool USD. Two calls maximum, one per child order;
+the parent deadline and a maximum 15-minute wall limit apply. There is no local
+retry/failover. Aborted or unknown expense requires owner reconciliation before
+any redispatch under the existing idempotency/lease policy.
+
+Evidence must already be sanitized/authenticated by its source owner. Protected
+cases never enter model inputs; unsafe, cross-binding, wrong-revision or
+incomplete attempt evidence holds analysis. A causal claim needs an independent
+verification link joining a failed attempt to a verified success. Agreement or
+a successful retry alone supplies no causal proof. Missing routes, expiration,
+timeouts, exhausted limits, unsupported claims or disagreement return `held`
+with the original escalation owner/action. Implementation expense is excluded
+from the measured analysis expense. Event wiring and live commissioning remain
+with JOV-8419 and the JOV-2967 acceptance chain; these fixtures prove source
+behavior only.
+
+Ship now: expose this bounded owner boundary. Re-evaluate when admitted live
+events supply route/certificate and expense receipts. Then verify those receipts
+through the existing parent commissioning chain.
+
+Run the deterministic suite and coverage with installed pinned tools:
+
+```bash
+node --import tsx --test --test-isolation=none --experimental-test-coverage --test-coverage-include=scripts/lib/lesson-analysis.mjs scripts/lib/__tests__/lesson-analysis.test.mjs
+```
 
 ## Nothing fails silently
 
@@ -741,8 +801,10 @@ Remediation-sweep also files ordinary labeled issues (`remediation:pr-<n>-hold`,
 stuck-PR ladder runs by default (Tim 2026-10-12: every exhausted head needs an automatic exit)
 while `LANES_ESCALATION` is on; `LANES_ESCALATION_STUCK_PRS=0` turns it off. Terminal heads
 (exhausted, escalated, `queue-poison`) also get a no-model main sync each time main moves, with
-no clock; the sync lifts `queue-poison`, and that removal is the boundary the poison count
-restarts from. A bot hold whose head moved past it is lifted at once
+no clock, on every local worker pass rather than only an idle one. The sync lifts
+`queue-poison` and `lane-fix-exhausted`: the new head is ordinary re-entry, and a green
+observation of the same exhausted head does not clear it. Poison removal is the boundary
+the poison count restarts from. A bot hold whose head moved past it is lifted at once
 (`LANES_STALE_HOLD_UNHOLD=0` keeps alert-only). An oversize diff goes to a repair lane that
 splits it into a stack instead of bug intake.
 
@@ -774,8 +836,9 @@ MusicFetch.
 `by_class`, `routed_by_lane`, `failovers24h`, `escalations24h`, `ladder_exhausted`,
 `surfaced`, plus the event counters). The same event counters are top-level:
 `eventsOpen`, `eventsClaimed`, `eventsHuman`, `eventsExhausted`, and `byFingerprint`
-(state, issue, class, lane, and the exact ask). A non-empty `surfaced` list raises
-alert `escalation-needs-human`.
+(state, issue, class, lane, and the exact ask). A surfaced PR that is still open raises
+alert `escalation-surfaced` for the lanes repair owner (never a human by default); PRs
+that merged or closed drop out once the reconcile pass has a complete open-PR view.
 
 ## Tests
 

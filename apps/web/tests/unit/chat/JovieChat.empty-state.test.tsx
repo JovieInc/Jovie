@@ -4,43 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 
 import { JovieChat } from '@/components/jovie/JovieChat';
-import type { OvieHomeBriefing } from '@/lib/ovie/home-briefing';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 import type { InsightResponse } from '@/types/insights';
-
-const ovieHomeBriefing: OvieHomeBriefing = {
-  greeting: 'Good morning, Tim.',
-  updatedLabel: 'Updated Sep 28, 8:00 AM PDT',
-  signal: {
-    id: 'activation.first-user',
-    title: 'The first real user completed onboarding',
-    summary: 'Activation moved from theory to observed behavior.',
-    currentValue: '1 activated user',
-    delta: '+1 today',
-    target: 'Preserve the shortest successful path',
-    sourceLabel: 'Founder Funnel',
-    nextAction: 'Review the session.',
-    removalEvent: 'The activation lesson is recorded.',
-    summerCanAct: true,
-  },
-  actions: [
-    {
-      id: 'activation.first-user:next',
-      label: 'Start The Next Step',
-      prompt: 'Review the first activation with me.',
-    },
-    {
-      id: 'activation.first-user:evidence',
-      label: 'Show The Evidence',
-      prompt: 'Show the activation evidence.',
-    },
-    {
-      id: 'activation.first-user:clear',
-      label: 'Review The Clear Condition',
-      prompt: 'Review the activation clear condition.',
-    },
-  ],
-};
 
 let mockCurrentDraft = createComposerDraft('');
 
@@ -200,6 +165,7 @@ const mockOpportunityQueryOptions = vi.fn();
 let mockInsightsLoading = false;
 let mockInsightsError = false;
 let mockInsightsPending = false;
+let mockInsightsEnabled = true;
 let mockInsightsSummary: {
   readonly insights: InsightResponse[];
   readonly totalActive: number;
@@ -233,6 +199,7 @@ vi.mock('@/lib/queries', () => ({
     data: mockInsightsPending ? undefined : mockInsightsSummary,
     isLoading: mockInsightsLoading,
     isError: mockInsightsError,
+    isEnabled: mockInsightsEnabled,
   }),
 }));
 
@@ -280,6 +247,7 @@ describe('JovieChat empty state', () => {
     mockInsightsLoading = false;
     mockInsightsError = false;
     mockInsightsPending = false;
+    mockInsightsEnabled = true;
     mockInsightsSummary = {
       insights: [],
       totalActive: 0,
@@ -456,8 +424,74 @@ describe('JovieChat empty state', () => {
     expect(
       screen.getByRole('button', { name: 'Draft This With Jovie' })
     ).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(
+      screen.getByRole('button', { name: 'Draft This With Jovie' })
+    ).toBeInTheDocument();
     vi.useRealTimers();
   });
+
+  it('offers profile review immediately when the insights query is disabled (JOV-8482)', () => {
+    mockInsightsEnabled = false;
+    mockInsightsPending = true;
+    renderWithQueryClient(
+      <JovieChat profileId='profile-1' displayName='Tim White' />
+    );
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'Review Your Profile' })
+    ).toHaveAttribute('href', '/app/chat?panel=profile');
+  });
+
+  it.each([false, true])(
+    'bounds the welcome wait with undefined data and isLoading=%s (JOV-8482)',
+    isLoading => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-10-14T20:00:00Z'));
+      try {
+        mockInsightsPending = true;
+        mockInsightsLoading = isLoading;
+        const { rerender } = renderWithQueryClient(
+          <JovieChat profileId='profile-1' displayName='Tim White' />
+        );
+        const greeting = screen.getByRole('heading');
+        const composer = screen.getByTestId('chat-input');
+        expect(screen.getByRole('status')).toHaveTextContent(
+          'Finding your next step'
+        );
+
+        act(() => vi.advanceTimersByTime(5_000));
+        mockInsightsLoading = !isLoading;
+        rerender(<JovieChat profileId='profile-1' displayName='Tim White' />);
+        act(() => vi.advanceTimersByTime(4_999));
+        expect(screen.getByRole('status')).toBeInTheDocument();
+        act(() => vi.advanceTimersByTime(1));
+        expect(screen.queryByRole('status')).toBeNull();
+        expect(
+          screen.getByRole('link', { name: 'Review Your Profile' })
+        ).toHaveAttribute('href', '/app/chat?panel=profile');
+        expect(screen.getByRole('heading')).toBe(greeting);
+        expect(screen.getByTestId('chat-input')).toBe(composer);
+
+        mockInsightsLoading = false;
+        mockInsightsPending = false;
+        mockInsightsSummary = {
+          insights: [actionableInsight()],
+          totalActive: 1,
+          lastGeneratedAt: null,
+        };
+        rerender(<JovieChat profileId='profile-1' displayName='Tim White' />);
+        expect(
+          screen.queryByRole('button', { name: 'Draft This With Jovie' })
+        ).toBeNull();
+        expect(
+          screen.getByRole('link', { name: 'Review Your Profile' })
+        ).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
 
   it('keeps one welcome through delayed resolution and freezes the resolved next step', () => {
     mockInsightsLoading = true;
@@ -614,39 +648,29 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Ask Jovie to plan your next release...')).toBeNull();
   });
 
-  it('renders Ovie as a full-bleed editorial briefing instead of the generic chat welcome', () => {
-    const { getByRole, getByTestId, queryByText } = renderWithQueryClient(
+  it('renders a supplied Home canvas full-bleed above the docked composer', () => {
+    const { getByTestId, queryByText } = renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
         chatMode='ov'
-        ovieHomeBriefing={ovieHomeBriefing}
+        homeCanvas={<div data-testid='home-canvas-fixture'>Company loop</div>}
       />
     );
 
     expect(getByTestId('chat-empty-state-viewport')).toHaveAttribute(
       'data-empty-affordance',
-      'ovie-briefing'
+      'home-canvas'
     );
     expect(getByTestId('chat-empty-state-composer-region')).toHaveClass(
       'w-full'
     );
-    expect(getByTestId('ovie-home-greeting')).toHaveTextContent(
-      'Good morning, Tim.'
+    expect(getByTestId('home-canvas-fixture')).toHaveTextContent(
+      'Company loop'
     );
-    expect(
-      getByRole('heading', {
-        name: 'The first real user completed onboarding',
-      })
-    ).toBeInTheDocument();
     expect(queryByText('Just ask')).toBeNull();
     expect(queryByText('Plan my next release')).toBeNull();
     expect(getByTestId('chat-input')).toBeInTheDocument();
     expect(screen.queryByTestId('chat-usage')).not.toBeInTheDocument();
-
-    fireEvent.click(getByRole('button', { name: 'Show The Evidence' }));
-    expect(mockChatState.handleSuggestedPrompt).toHaveBeenCalledExactlyOnceWith(
-      'Show the activation evidence.'
-    );
   });
 
   it('renders exactly one empty-state thought even when card data is pending (JOV-7150)', () => {

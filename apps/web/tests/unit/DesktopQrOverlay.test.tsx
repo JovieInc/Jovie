@@ -59,6 +59,24 @@ describe('DesktopQrOverlay', () => {
     );
   });
 
+  it('opens the QR code on desktop when the profile is in pay mode', async () => {
+    window.history.pushState({}, '', '/testartist?mode=pay');
+    render(<DesktopQrOverlay handle='testartist' />);
+    const qrCode = await screen.findByAltText(
+      'Scan To Open This Profile On Your Phone'
+    );
+    expect(qrCode).toHaveAttribute(
+      'src',
+      expect.stringContaining('api.qrserver.com')
+    );
+    expect(qrCode.getAttribute('src')).toContain('testartist');
+    const card = qrCode.closest('[popover="manual"]');
+    expect(card).not.toBeNull();
+    // The pay drawer's modal focus boundary must leave this card usable.
+    expect(card).toHaveAttribute('data-modal-companion');
+    window.history.pushState({}, '', '/');
+  });
+
   it('opens QR code when icon is clicked', async () => {
     render(<DesktopQrOverlay handle='tim' />);
     fireEvent.click(screen.getByLabelText('Open On Phone'));

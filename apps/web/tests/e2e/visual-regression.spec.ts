@@ -112,7 +112,7 @@ test.describe('homepage visual regression', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await openHomepageForScreenshot(page);
 
-    await expect(page).toHaveScreenshot('homepage-mobile.png', {
+    await expect(page).toHaveScreenshot('homepage-375.png', {
       fullPage: false,
     });
   });

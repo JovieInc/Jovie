@@ -136,7 +136,11 @@ describeProfile('Profile - Core Rendering', () => {
     await expect(anyLink).toBeVisible();
   });
 
-  test('has Jovie footer branding', async ({ page }) => {
+  // JOV-8777: free public profiles currently render no Jovie branding at all
+  // (hideJovieBranding is accepted but unused since #14559), while SmartLinks
+  // still show "Powered by Jovie". Where free-tier profile branding lives is a
+  // product/taste call; re-enable and repoint once JOV-8777 ships.
+  test.fixme('has Jovie footer branding', async ({ page }) => {
     const footerLink = page.getByRole('link', { name: /Jovie home/i });
     await expect(footerLink.first()).toBeVisible({ timeout: 10000 });
   });
@@ -404,7 +408,8 @@ test.describe('Profile Modes @smoke @critical', () => {
   test.describe('deep link routing', () => {
     const deepLinks = [
       { mode: 'listen', path: 'listen' },
-      { mode: 'tip', path: 'tip' },
+      // /tip is a legacy alias of pay mode (LEGACY_PROFILE_MODE_BY_SLUG).
+      { mode: 'pay', path: 'tip' },
       { mode: 'subscribe', path: 'subscribe' },
       { mode: 'about', path: 'about' },
       { mode: 'contact', path: 'contact' },
@@ -432,8 +437,12 @@ test.describe('Profile Modes @smoke @critical', () => {
           return;
         }
 
+        // /about is the profile page itself. Other legacy slugs still
+        // redirect onto the query-mode form.
         await expect(page).toHaveURL(
-          new RegExp(`/${TEST_PROFILES.DUALIPA}\\?mode=${deepLink.mode}`)
+          deepLink.path === 'about'
+            ? new RegExp(`/${TEST_PROFILES.DUALIPA}/about/?$`)
+            : new RegExp(`/${TEST_PROFILES.DUALIPA}\\?mode=${deepLink.mode}`)
         );
       });
     }

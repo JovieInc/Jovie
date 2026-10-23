@@ -12,7 +12,10 @@ import { type ReactNode, useRef } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
-import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
+import {
+  AUTH_FORM_MAX_WIDTH_CLASS,
+  preserveAuthTouchOwnership,
+} from '@/features/auth/constants';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
@@ -82,7 +85,7 @@ function AuthFormColumn({
     <div
       data-auth-form-column
       className={cn(
-        'relative flex min-h-0 flex-col items-center',
+        'relative flex min-h-min min-w-0 w-full shrink-0 flex-col items-center',
         isKeyboardVisible &&
           '[&_[data-auth-shell-identity]]:hidden [&_[data-auth-provider-slots]]:hidden [&_[data-auth-method-divider]]:hidden [&_[data-auth-mode-switch]]:hidden [&_[data-auth-legal-copy]]:hidden',
         className
@@ -90,13 +93,13 @@ function AuthFormColumn({
     >
       {showLogo && isSplashB ? (
         <div
-          className='mb-4 flex h-8 shrink-0 items-center justify-center'
+          className='mb-4 flex min-h-11 shrink-0 items-center justify-center'
           data-auth-splash-logo-slot
         >
           <Link
             href={APP_ROUTES.HOME}
             className={cn(
-              'inline-flex items-center justify-center text-white dark:text-white transition-[color,opacity] duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
+              'auth-quiet-target focus-ring-themed text-white dark:text-white transition-[color,opacity] duration-subtle hover:text-white/85',
               isKeyboardVisible && 'pointer-events-none opacity-0'
             )}
             // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
@@ -229,6 +232,7 @@ export function AuthLayout({
   return (
     <div
       data-auth-shell
+      onTouchEndCapture={preserveAuthTouchOwnership}
       data-auth-shell-kind={
         isSplitVariant
           ? AUTH_SHELL_KIND.desktopSplitRoute
@@ -238,7 +242,7 @@ export function AuthLayout({
       data-auth-chrome={chrome}
       data-auth-keyboard-visible={isKeyboardVisible ? '' : undefined}
       className={cn(
-        'fixed inset-0 isolate flex flex-col items-center overflow-hidden overscroll-none max-w-[100dvw] text-white dark:text-white [color-scheme:dark]',
+        'fixed inset-0 isolate flex flex-col items-center overflow-x-hidden overflow-y-auto overscroll-none max-w-[100dvw] text-white dark:text-white [color-scheme:dark]',
         'bg-(--color-bg-base)',
         'transition-[padding] duration-subtle ease-subtle'
       )}
@@ -263,7 +267,7 @@ export function AuthLayout({
         >
           <Link
             href={APP_ROUTES.HOME}
-            className='inline-flex size-5 shrink-0 items-center justify-center text-white/45 dark:text-white/45 transition-colors duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+            className='auth-quiet-target focus-ring-themed shrink-0 text-white/45 dark:text-white/45 transition-colors duration-subtle hover:text-white/85'
             // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
             aria-label='Go to homepage'
             tabIndex={isKeyboardVisible ? -1 : undefined}

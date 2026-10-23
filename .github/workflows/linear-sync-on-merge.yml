@@ -7,20 +7,21 @@ name: Linear Sync on Merge
 
 # Projects merged pull requests onto the Linear validation lifecycle
 # (JOV-7694): Merging -> Validating -> Done, with Rework on a required
-# failure. A merge event evaluates its linked issue; a completed Production
-# Controller run, a validation receipt, or a manual dispatch re-evaluates
-# every issue in Merging, Validating, or Rework. Both paths run the same
-# evaluation, so replayed and out-of-order events converge. Receipts are
-# Linear comments; /api/webhooks/linear bridges each one to the
-# linear_validation_receipt dispatch, so there is no clock. The lifecycle has
-# no time-based transition, and every Production Controller completion
-# re-evaluates all open issues if a bridged dispatch is ever lost.
+# failure. A merge event or bridged receipt evaluates its linked issue. A
+# completed Production Controller or Sentry Autofix Recurrence run, or a
+# manual dispatch, re-evaluates every issue in Merging, Validating, or Rework.
+# All paths run the same evaluation, so replayed and out-of-order events
+# converge. Receipts are Linear comments; /api/webhooks/linear bridges them
+# to linear_validation_receipt dispatches. Producer completion only wakes a
+# fresh receipt read: quiet or unknown Sentry observations never prove a pass.
+# The lifecycle has no clock or time-based transition; maintained producer
+# completions also recover receipts whose comment bridge is unavailable.
 
 on:
   pull_request:
     types: [closed]
   workflow_run:
-    workflows: [Production Controller]
+    workflows: [Production Controller, Sentry Autofix Recurrence]
     types: [completed]
   repository_dispatch:
     types: [linear_validation_receipt]
@@ -37,11 +38,12 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Sweeps serialize so two runs never decide from different snapshots.
-    # Merge events stay unqueued: a pending run replaced in a concurrency
-    # group would drop its event, and each write re-reads state first.
+    # Full sweeps coalesce globally; receipt wakes coalesce per issue so a
+    # pending sweep or another issue cannot replace their only causal wake.
+    # Merge events retain their per-PR group. Every write re-reads the full
+    # lifecycle preimage; concurrency grouping is not an atomic state lock.
     concurrency:
-      group: linear-validation-lifecycle-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'sweep' }}
+      group: linear-validation-lifecycle-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.event_name == 'repository_dispatch' && github.event.client_payload.issue_identifier && format('receipt-{0}', github.event.client_payload.issue_identifier) || 'sweep' }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -53,6 +55,10 @@ jobs:
         with:
           # Always the default branch: a replayed event must not run an
           # older closer revision from its merge commit.
+          # pull_request runs this file from the PR merge ref, whose
+          # sparse-checkout can lag main. The writer loads
+          # github-installation-quota.mjs dynamically and stays
+          # fail-closed when that checkout omitted it.
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 1
           persist-credentials: false
@@ -61,6 +67,7 @@ jobs:
             .github/ci-harness/manifest.json
             .github/scripts/production-marker-state.mjs
             scripts/lib/linear-sync-on-merge.mjs
+            scripts/lib/github-installation-quota.mjs
             scripts/lib/validation-lifecycle.mjs
             scripts/lib/validation-sync.mjs
             scripts/lib/escaped-defect-closure.mjs
@@ -72,6 +79,27 @@ jobs:
             scripts/lib/linear-cooldown.mjs
             scripts/invariants/assurance-matrix.mjs
             scripts/invariants/assurance-matrix.json
+            scripts/lib/screen-audit-receipts.mjs
+            scripts/invariants/screen-audit.mjs
+            scripts/invariants/screen-certification.mjs
+            scripts/invariants/screen-decision-routing.mjs
+            scripts/invariants/browser-owned-input.mjs
+            scripts/invariants/browser-owned-input-matrix.json
+            scripts/invariants/product-reference-coherence.mjs
+            scripts/invariants/screen-proof-resolver.mjs
+            scripts/lib/playwright-png.mjs
+            packages/api-client/cache.ts
+            packages/api-client/cli.ts
+            packages/api-client/client.ts
+            packages/api-client/contract.ts
+            packages/api-client/gh.ts
+            packages/api-client/github.ts
+            packages/api-client/headers.ts
+            packages/api-client/legacy.ts
+            packages/api-client/linear.ts
+            packages/api-client/policy.ts
+            packages/api-client/providers.json
+            packages/api-client/store.ts
           sparse-checkout-cone-mode: false
 
       - name: Set up pinned Node.js
@@ -92,19 +120,53 @@ jobs:
       # The sweep cursor is the next issue identifier, not a GitHub read.
       # A unique key per run keeps the save, and the prefix restores the
       # newest cursor so a rate limit resumes instead of restarting.
+      # Targeted receipt jobs never restore or publish full-sweep progress.
       - name: Restore sweep cursor
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && (github.event_name != 'repository_dispatch' || !github.event.client_payload.issue_identifier)
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .linear-sync-cursor
           key: linear-sync-cursor-v1-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: linear-sync-cursor-v1-
 
+      # Machine screen-audit receipts (JOV-7713) for the verified production
+      # build, written before this run's sweep reads them, so the 98 issues
+      # that owed one have an exit without a clock (2026-10-21). The producer
+      # proves the screenshots render that exact build; otherwise it skips.
+      # A failure here never blocks the lifecycle evaluation below.
+      - name: Record screen-audit receipts for the production build
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Production Controller')
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          sha="$(curl -fsS --max-time 10 https://jov.ie/api/health/build-info | jq -r '.commitSha // empty')"
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::warning::production build sha unreadable; no screen-audit receipts"
+            exit 0
+          fi
+          run="$(node packages/api-client/cli.ts gh --priority default -- run list -R "$REPO" --workflow screenshots.yml --branch main --event push --status success --limit 1 --json databaseId,headSha --jq '.[0] | "\(.databaseId) \(.headSha)"')"
+          read -r run_id screens_sha <<<"$run"
+          if [ -z "${run_id:-}" ]; then
+            echo "::warning::no successful Product Screenshots run on main"
+            exit 0
+          fi
+          dir="$RUNNER_TEMP/screen-evidence"
+          node packages/api-client/cli.ts gh --priority default -- run download "$run_id" -R "$REPO" -D "$dir" \
+            -p 'route-dom-certification-*' -p 'screen-browser-proof*'
+          node scripts/lib/screen-audit-receipts.mjs --artifacts "$dir" --sha "$sha" \
+            --screens-sha "$screens_sha" \
+            --run-url "https://github.com/$REPO/actions/runs/$run_id" \
+            --out "$RUNNER_TEMP/screen-audit-receipts.json"
+
       - name: Evaluate the validation lifecycle
         id: evaluate
         env:
           LINEAR_SYNC_GITHUB_CACHE_DIR: .linear-sync-github-cache
-          LINEAR_SYNC_CURSOR_DIR: .linear-sync-cursor
+          LINEAR_SYNC_CURSOR_DIR: ${{ (github.event_name != 'repository_dispatch' || !github.event.client_payload.issue_identifier) && '.linear-sync-cursor' || '' }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -115,16 +177,17 @@ jobs:
           LINEAR_VALIDATION_ISSUE: ${{ github.event.client_payload.issue_identifier }}
         run: node scripts/lib/linear-sync-on-merge.mjs
 
-      # Main-scoped only: a pull_request (merge) run restores but never saves.
+      # Full sweeps own shared cache publication. Merge and targeted receipt
+      # runs may restore immutable reads but never replace the shared cache.
       - name: Save immutable GitHub reads
-        if: ${{ !cancelled() && github.event_name != 'pull_request' && steps.evaluate.outputs.github_cache_key != '' }}
+        if: ${{ !cancelled() && github.event_name != 'pull_request' && (github.event_name != 'repository_dispatch' || !github.event.client_payload.issue_identifier) && steps.evaluate.outputs.github_cache_key != '' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .linear-sync-github-cache
           key: ${{ steps.evaluate.outputs.github_cache_key }}
 
       - name: Save sweep cursor
-        if: ${{ !cancelled() && github.event_name != 'pull_request' && hashFiles('.linear-sync-cursor/cursor.json') != '' }}
+        if: ${{ !cancelled() && github.event_name != 'pull_request' && (github.event_name != 'repository_dispatch' || !github.event.client_payload.issue_identifier) && hashFiles('.linear-sync-cursor/cursor.json') != '' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .linear-sync-cursor

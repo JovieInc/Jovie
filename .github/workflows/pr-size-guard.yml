@@ -135,7 +135,11 @@ jobs:
         # Publishes fork_verdict before any size failure, so the Fork PR Gate
         # job below judges the members it was asked about. The helper is absent
         # on the pinned bootstrap base; a missing file or a failed fetch falls
-        # back to the API inside the policy.
+        # back to the API inside the policy. Blob sizes are not in the tree
+        # object. This checkout is a blob:none partial clone, so a fetch
+        # without --refetch does not backfill those sizes. --refetch asks for
+        # the blobs. Otherwise ls-tree times out and the trees API 403 ejects
+        # an in-cap group.
         run: |
           set -euo pipefail
           mkdir -p "$MERGE_GROUP_POLICY_CACHE_DIR"
@@ -151,8 +155,8 @@ jobs:
               GIT_TERMINAL_PROMPT=0 \
               GCM_INTERACTIVE=never \
               GIT_LFS_SKIP_SMUDGE=1 \
-                timeout --kill-after=5s 20s \
-                  git fetch --filter=blob:none --no-tags --depth=2 origin "$GROUP_HEAD" \
+                timeout --kill-after=5s 70s \
+                  git fetch --refetch --filter=blob:limit=1g --no-tags --depth=2 origin "$GROUP_HEAD" \
                   || true
               node scripts/lib/merge-group-local-evidence.mjs || true
             )
@@ -178,6 +182,67 @@ jobs:
             exit 1
           fi
           echo "Every merge-group member passed the fork policy."
+
+  merge-group-workflow-load:
+    # A combined head whose workflows GitHub cannot load (an interpolated run
+    # script over the 21,000-character expression limit) gets a zero-job CI run
+    # attributed to push, never a merge_group check, so groups sat in
+    # AWAITING_CHECKS for 39 minutes on 2026-10-20 (#21826). This job fails only
+    # for the group whose own diff introduced it (a group stacked on an already
+    # broken base passes), and the failure hold then holds that exact head and
+    # reports the required PR Ready context failed so the queue ejects the
+    # group. Tool errors, unreadable trees and timeouts fail open. It stays out
+    # of the reviewed merge-group-size job (merge-group-size-bootstrap-contract).
+    name: ${{ github.event_name == 'merge_group' && 'Workflow Load Guard' || 'Workflow Load Guard (merge-group inactive)' }}
+    if: github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - name: Check out trusted workflow load guard
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/workflow-expression-budget.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Require combined-head workflows to load
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GROUP_BASE: ${{ github.event.merge_group.base_sha }}
+          GROUP_HEAD: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! -f scripts/workflow-expression-budget.mjs ]]; then
+            echo 'Trusted main predates the workflow load guard; nothing to check.'
+            exit 0
+          fi
+          [[ "$GROUP_HEAD" =~ ^[0-9a-f]{40}$ && "$GROUP_BASE" =~ ^[0-9a-f]{40}$ ]]
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          # The group commit and its parent, which is the group base.
+          GIT_CONFIG_COUNT=2 \
+          GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+          GIT_CONFIG_VALUE_0="$AUTH_HEADER" \
+          GIT_CONFIG_KEY_1=core.hooksPath \
+          GIT_CONFIG_VALUE_1=/dev/null \
+          GIT_TERMINAL_PROMPT=0 \
+          GIT_LFS_SKIP_SMUDGE=1 \
+            timeout --kill-after=5s 60s \
+              git fetch --filter=blob:limit=1g --no-tags --depth=2 origin "$GROUP_HEAD" \
+            || echo '::warning::Could not fetch the combined head; the guard fails open.'
+          unset AUTH_HEADER
+          status=0
+          timeout --kill-after=5s 45s \
+            node scripts/workflow-expression-budget.mjs --ref "$GROUP_HEAD" --introduced-since "$GROUP_BASE" \
+            || status=$?
+          if [[ "$status" -eq 124 || "$status" -eq 137 ]]; then
+            echo '::warning::Workflow load guard timed out; not blocking the group.'
+            status=0
+          fi
+          exit "$status"
 
   size:
     name: ${{ github.event_name == 'pull_request' && 'PR Size Guard' || 'PR Size Guard (source inactive)' }}

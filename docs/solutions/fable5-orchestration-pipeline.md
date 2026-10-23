@@ -1,5 +1,11 @@
 # Fable 5 → Haiku Orchestration Pipeline
 
+> **Superseded historical material.** These provider, model, cost, and dispatch
+> examples do not authorize runtime reactivation, a scheduled learning loop, or
+> a full-log sweep. Current evidence owners and bounded event delivery govern
+> [learning](../quality/EVENT_DRIVEN_LEARNING.md); use current source and
+> authorization for any operational action.
+
 ## Problem
 Developer agent was running on Opus 4.8 ($15/task) when most work is
 mechanical implementation. Planning (taste) and coding (execution) should

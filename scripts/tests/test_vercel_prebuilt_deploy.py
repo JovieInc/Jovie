@@ -43,6 +43,24 @@ def test_staging_controller_is_independent_and_exact_sha() -> None:
     assert "https://staging.jov.ie/api/health/build-info" in production
 
 
+def test_blocked_fleet_deployment_fails_the_production_controller() -> None:
+    """A denied production deploy must fail Authorize fleet deployment state.
+
+    Exit 0 with deployment_allowed=false skipped Production Release and left
+    the controller green. The wrapper fails the deployment consumer, and the
+    job still fails if that step is ever reported success without authority.
+    """
+    production = (REPO_ROOT / ".github/workflows/production-controller.yml").read_text()
+    job = production.split("  fleet-promotion:", 1)[1].split("  authorize-production:", 1)[0]
+    assert "continue-on-error:" not in job
+    assert "Fail closed when fleet deployment is blocked" in job
+    assert "steps.policy.outputs.deployment_allowed != 'true'" in job
+    wrapper = (REPO_ROOT / "scripts/fleet-gate/evaluate-fleet-gate.sh").read_text()
+    assert 'consumer" == "deployment" && "$deployment_allowed" != "true"' in wrapper
+    assert "Fleet gate blocked production deployment" in wrapper
+    assert "fleet-gate.scoped allowed=$scoped_allowed" in wrapper
+
+
 def test_staging_lineage_receipt_accepts_merge_group_provenance(tmp_path: Path) -> None:
     """JOV-7182: release.json provenance is the merge-queue proof run, not the
     main push run. When CI is re-run or evidence came from merge_group, the
@@ -723,9 +741,13 @@ if [ "$cmd" = "inspect" ]; then
   printf '%s\n' \
     'Vercel CLI 54.14.5 (Node.js 22.23.1)' \
     'Fetching deployment "jov.ie" in test-team' >&2
-  if [ "$FAKE_SCENARIO" = "inspect-error" ]; then
-    printf '%s\n' \
-      '{"status":"error","reason":"api_error","message":"do-not-leak-sensitive-marker"}' >&2
+  if [[ "$FAKE_SCENARIO" == inspect-error* ]]; then
+    if [ "$FAKE_SCENARIO" = "inspect-error-stdout" ]; then
+      echo '{"reason":"api_error","message":"do-not-leak-sensitive-marker"}'
+      echo '{"reason":"forbidden"}' >&2
+    else
+      echo '{"reason":"api_error","message":"do-not-leak-sensitive-marker"}' >&2
+    fi
     exit 1
   fi
   if [ "$FAKE_SCENARIO" = "malformed" ]; then
@@ -743,7 +765,38 @@ if [ "$cmd" = "inspect" ]; then
   elif grep -q '^promote ' "$VERCEL_CALL_LOG"; then
     current="dpl_target"
   fi
-  printf '{"id":"%s","url":"%s.vercel.app","readyState":"READY","target":"production"}\n' "$current" "$current"
+  if [[ "$FAKE_SCENARIO" == inspect-noise-* ]]; then
+    python3 - "$current" "$FAKE_SCENARIO" <<'PYTHON'
+import json
+import sys
+
+current, scenario = sys.argv[1:]
+payload = json.dumps({
+    "id": current, "url": f"{current}.vercel.app",
+    "readyState": "READY", "target": "production",
+    "builds": [{"output": "x" * 3_800_000}] if scenario.endswith("large") else [],
+})
+# A large stdout write may still be draining when the CLI prints an update
+# notice to stderr. Force that ordering so merged streams corrupt JSON.
+split = len(payload) // 2
+sys.stdout.write(payload[:split])
+sys.stdout.flush()
+sys.stderr.write("Update available! do-not-leak-sensitive-marker\n")
+sys.stderr.flush()
+sys.stdout.write(payload[split:] + "\n")
+sys.stdout.flush()
+sys.stderr.write("Run the package manager to update.\n")
+PYTHON
+  elif [[ "$FAKE_SCENARIO" == inspect-stdout-* ]]; then
+    if [ "$FAKE_SCENARIO" = "inspect-stdout-invalid" ]; then echo '{'; fi
+    printf '{"id":"%s","url":"%s.vercel.app","readyState":"READY","target":"production"}\n' "$current" "$current" >&2
+  elif [ "$FAKE_SCENARIO" = "inspect-nonzero-json" ]; then
+    printf '{"id":"%s","url":"%s.vercel.app","readyState":"READY","target":"production"}\n' "$current" "$current"
+    echo '{"reason":"api_error","message":"do-not-leak-sensitive-marker"}' >&2
+    exit 1
+  else
+    printf '{"id":"%s","url":"%s.vercel.app","readyState":"READY","target":"production"}\n' "$current" "$current"
+  fi
   exit 0
 fi
 
@@ -802,27 +855,81 @@ exit 0
     return fake_vercel
 
 
+def _promotion_lineage_remote(tmp_path: Path, mode: str) -> tuple[Path, str, str]:
+    """Build a local main the git-only promotion recheck can prove.
+
+    The controller no longer asks `gh` for main. `exact` keeps the release SHA
+    equal to main. `diverged` rewrites main so the release SHA is no longer an
+    ancestor and the controller must yield the observed tip.
+    """
+    src = tmp_path / "lineage-src"
+    src.mkdir()
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "Lineage",
+        "GIT_AUTHOR_EMAIL": "lineage@example.com",
+        "GIT_COMMITTER_NAME": "Lineage",
+        "GIT_COMMITTER_EMAIL": "lineage@example.com",
+    }
+
+    def git(*args: str) -> str:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=src,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    git("init", "-q", "-b", "main")
+    (src / "file").write_text("base\n")
+    git("add", "file")
+    git("commit", "-qm", "base")
+    base = git("rev-parse", "HEAD")
+    if mode == "diverged":
+        git("checkout", "-q", "--orphan", "rewritten")
+        (src / "other").write_text("other\n")
+        git("add", "other")
+        git("commit", "-qm", "rewritten")
+        git("branch", "-M", "main")
+    elif mode != "exact":
+        raise ValueError(f"unknown lineage mode: {mode}")
+    tip = git("rev-parse", "HEAD")
+    expected = tip if mode == "exact" else base
+    return src, expected, tip
+
+
 def _run_promotion_controller(
-    tmp_path: Path, scenario: str, *, main_sha: str | None = None
+    tmp_path: Path, scenario: str, *, lineage: str = "exact"
 ) -> subprocess.CompletedProcess[str]:
     fake_vercel = _write_fake_promotion_vercel(tmp_path)
+    remote, expected_main_sha, main_sha = _promotion_lineage_remote(
+        tmp_path, lineage
+    )
+    (tmp_path / "lineage-expected").write_text(expected_main_sha)
+    (tmp_path / "lineage-tip").write_text(main_sha)
+    # Git transport must not fall back to a stub SHA. A call here fails closed.
     fake_gh = tmp_path / "gh"
     fake_gh.write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        "printf '%s\\n' \"${FAKE_MAIN_SHA}\"\n"
+        "printf '%s\\n' \"$*\" >> \"$GH_CALL_LOG\"\n"
+        "echo 'promotion lineage must not call gh' >&2\n"
+        "exit 1\n"
     )
     fake_gh.chmod(0o755)
-    expected_main_sha = "a" * 40
     env = {
         **os.environ,
         "FAKE_SCENARIO": scenario,
         "PRODUCTION_DEPLOYMENT_ID": "dpl_target",
         "EXPECTED_MAIN_SHA": expected_main_sha,
-        "FAKE_MAIN_SHA": main_sha or expected_main_sha,
         "GITHUB_REPOSITORY": "jovie/jovie",
         "GH_TOKEN": "github-token",
         "GH_CLI": str(fake_gh),
+        "GH_CALL_LOG": str(tmp_path / "gh-calls"),
+        "MAIN_LINEAGE_REMOTE": str(remote),
         "PRODUCTION_PROMOTION_POLL_SECONDS": "0",
         "PRODUCTION_PROMOTION_SETTLE_ATTEMPTS": "4",
         "PRODUCTION_PROMOTION_CLEANUP_ATTEMPTS": "2",
@@ -854,6 +961,43 @@ def test_promotion_controller_promotes_once_and_requires_terminal_current(
     calls = (tmp_path / "vercel-calls").read_text()
     assert calls.count("promote dpl_target") == 1
     assert "Production Current is terminal on dpl_target" in result.stdout
+
+
+@pytest.mark.parametrize("size", ["small", "large"])
+def test_promotion_controller_keeps_inspect_json_separate_from_cli_diagnostics(
+    tmp_path: Path, size: str,
+) -> None:
+    result = _run_promotion_controller(tmp_path, f"inspect-noise-{size}")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert calls.count("promote dpl_target") == 1
+    assert "Production Current is terminal on dpl_target." in result.stdout
+    # Inspect build output and the CLI update notice stay off the controller's
+    # streams. The 10s subprocess budget is what fails if the builds payload
+    # is copied through shell parameters instead of projected from a file.
+    combined = result.stdout + result.stderr
+    assert "do-not-leak-sensitive-marker" not in combined
+    assert "x" * 64 not in combined
+    assert "failure_subtype=" not in (tmp_path / "github-output").read_text()
+
+
+@pytest.mark.parametrize(
+    "scenario", ["inspect-stdout-empty", "inspect-stdout-invalid", "inspect-nonzero-json"],
+)
+def test_promotion_controller_rejects_unproven_inspect_stdout(
+    tmp_path: Path, scenario: str,
+) -> None:
+    result = _run_promotion_controller(tmp_path, scenario)
+
+    assert result.returncode == 1
+    assert (tmp_path / "github-output").read_text().strip() == (
+        "failure_subtype=production_promotion_state_invalid"
+    )
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert "promote dpl_target" not in calls
+    assert "rolling-release fetch" not in calls
+    assert "do-not-leak-sensitive-marker" not in result.stdout + result.stderr
 
 
 def test_promotion_controller_accepts_legacy_rollout_json_on_stdout(
@@ -901,7 +1045,7 @@ def test_promotion_controller_rejects_foreign_rollout_without_mutation(
     outputs = (tmp_path / "github-output").read_text()
     assert "previous_production_deployment_id=dpl_previous" in outputs
     assert "previous_production_deployment_url=" not in outputs
-    assert f"promotion_sha={'a' * 40}" in outputs
+    assert f"promotion_sha={(tmp_path / 'lineage-expected').read_text()}" in outputs
     assert "is_current=" not in outputs
     assert "failure_subtype=production_promotion_foreign_rollout" in outputs
 
@@ -909,16 +1053,18 @@ def test_promotion_controller_rejects_foreign_rollout_without_mutation(
 def test_promotion_controller_emits_observed_newer_sha_without_mutation(
     tmp_path: Path,
 ) -> None:
-    newer_sha = "b" * 40
-    result = _run_promotion_controller(
-        tmp_path, "standard", main_sha=newer_sha
-    )
+    result = _run_promotion_controller(tmp_path, "standard", lineage="diverged")
 
     assert result.returncode == 0, result.stdout + result.stderr
     calls = (tmp_path / "vercel-calls").read_text()
     assert "promote dpl_target" not in calls
+    expected = (tmp_path / "lineage-expected").read_text()
+    newer_sha = (tmp_path / "lineage-tip").read_text()
+    assert newer_sha != expected
+    assert len(newer_sha) == 40
     outputs = (tmp_path / "github-output").read_text()
     assert f"promotion_sha={newer_sha}" in outputs
+    assert f"promotion_sha={expected}" not in outputs
     assert "is_current=" not in outputs
 
 
@@ -973,10 +1119,11 @@ def test_promotion_controller_fails_closed_on_malformed_preflight(
     assert "promote dpl_target" not in (tmp_path / "vercel-calls").read_text()
 
 
+@pytest.mark.parametrize("scenario", ["inspect-error", "inspect-error-stdout"])
 def test_promotion_controller_reports_safe_inspect_failure_reason(
-    tmp_path: Path,
+    tmp_path: Path, scenario: str,
 ) -> None:
-    result = _run_promotion_controller(tmp_path, "inspect-error")
+    result = _run_promotion_controller(tmp_path, scenario)
 
     assert result.returncode == 1
     assert "Vercel inspect current failed (exit 1, reason=api_error)." in result.stderr

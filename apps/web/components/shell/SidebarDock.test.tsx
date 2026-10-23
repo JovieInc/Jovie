@@ -1,10 +1,29 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BannerViewport } from '@/components/feedback/BannerViewport';
+import { banner } from '@/components/feedback/banner-store';
 import {
   SidebarDock,
   type SidebarDockProps,
   sidebarDockSeenKey,
 } from './SidebarDock';
+
+// Expose the Next Link contract without starting a router in jsdom.
+vi.mock('next/link', () => ({
+  default: forwardRef<
+    HTMLAnchorElement,
+    ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+  >(function TestLink({ prefetch, ...props }, ref) {
+    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
+  }),
+}));
 
 const release = {
   id: '2026-10-15',
@@ -38,6 +57,7 @@ const cards = (container: HTMLElement) =>
   );
 
 beforeEach(() => {
+  banner.dismiss();
   localStorage.clear();
   vi.clearAllMocks();
 });
@@ -57,7 +77,7 @@ describe('SidebarDock', () => {
       expect(cards(container)).toEqual(
         [
           mask & 4 ? 'update' : null,
-          mask & 2 ? 'whats-new' : null,
+          !(mask & 4) && mask & 2 ? 'whats-new' : null,
           mask & 1 ? 'now-playing' : null,
         ].filter(Boolean)
       );
@@ -76,20 +96,47 @@ describe('SidebarDock', () => {
         install={install}
       />
     );
-    expect(cards(container)).toEqual([
-      'update',
-      'whats-new',
-      'now-playing',
-      'install',
-    ]);
+    expect(cards(container)).toEqual(['update', 'now-playing']);
     fireEvent.click(screen.getByRole('button', { name: 'Update available' }));
     expect(onUpdate).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss update' }));
+    expect(cards(container)).toEqual(['whats-new', 'now-playing']);
+    fireEvent.click(screen.getByRole('button', { name: "Dismiss what's new" }));
+    expect(cards(container)).toEqual(['now-playing', 'install']);
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
     expect(audio.onDismiss).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Install' }));
     expect(install.onInstall).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss Prompt' }));
     expect(install.onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it('yields install/update/release to a canonical permission notice without discarding them', () => {
+    const { container } = render(
+      <>
+        <BannerViewport />
+        <SidebarDock
+          userId='one'
+          update={update}
+          release={release}
+          install={install}
+        />
+      </>
+    );
+    act(() => {
+      banner.warning('Allow notifications', {
+        id: 'permission',
+        action: { label: 'Review', onClick: vi.fn() },
+      });
+    });
+    expect(cards(container)).toEqual([]);
+    expect(screen.getAllByTestId('app-banner')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Review' })).toBeVisible();
+    act(() => {
+      banner.dismiss('permission');
+    });
+    expect(cards(container)).toEqual(['update']);
+    expect(screen.queryByTestId('app-banner')).toBeNull();
   });
 
   it('persists the release per user and shows a newer release', () => {
@@ -101,6 +148,7 @@ describe('SidebarDock', () => {
     expect(screen.queryByRole('link')).toBeNull();
     rerender(<SidebarDock userId='two' release={release} />);
     expect(screen.getByRole('link')).toHaveAttribute('href', '/changelog');
+    expect(screen.getByRole('link')).toHaveAttribute('data-prefetch', 'false');
     rerender(<SidebarDock userId='one' release={release} />);
     expect(screen.queryByRole('link')).toBeNull();
     unmount();

@@ -1,8 +1,9 @@
 /**
  * GET /api/connectors/google/callback
  *
- * Mocks only `@/lib/db`, `@/lib/http/server-fetch`, `@/lib/env-server`, and
- * `@/lib/error-tracking`. State verification (`verifyGoogleOAuthState`) and
+ * Mocks only `@/lib/db`, `@/lib/http/server-fetch`, `@/lib/env-server`,
+ * `@/lib/auth/cached` (the current session), and `@/lib/error-tracking`.
+ * State verification (`verifyGoogleOAuthState`) and
  * token persistence (`storeTokens` → real `encryptPII`/`decryptPII`) run for
  * real, so a dropped signature check or a dropped encryption call is caught
  * by these assertions rather than by an inspected mock call.
@@ -18,6 +19,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
 const hoisted = vi.hoisted(() => ({
+  getCachedAuthMock: vi.fn(),
   dbInsertMock: vi.fn(),
   dbUpdateMock: vi.fn(),
   serverFetchMock: vi.fn(),
@@ -39,6 +41,10 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('@/lib/db', () => ({
   db: { insert: hoisted.dbInsertMock, update: hoisted.dbUpdateMock },
+}));
+
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: hoisted.getCachedAuthMock,
 }));
 
 vi.mock('@/lib/http/server-fetch', () => ({
@@ -146,21 +152,198 @@ describe('GET /api/connectors/google/callback', () => {
     // Unset by default so encryptPII/decryptPII take the cheap dev/test
     // plaintext-passthrough branch (no scryptSync). One test below opts in.
     hoisted.mockEnv.PII_ENCRYPTION_KEY = undefined;
+    // The signed-in user who started the flow (signed into every state below).
+    hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'db-user-1' });
   });
 
-  it('redirects with ?error=oauth_denied when Google reports a provider error, without exchanging anything', async () => {
+  it.each([
+    ['access_denied', 'oauth_canceled'],
+    ['server_error', 'oauth_provider_error'],
+  ])(
+    'maps provider error=%s to ?error=%s on Settings when the state is unverifiable, without exchanging anything',
+    async (providerError, code) => {
+      const { GET } = await import(
+        '@/app/api/connectors/google/callback/route'
+      );
+      const response = await GET(
+        callbackRequest({ error: providerError, code: 'x', state: 'y' })
+      );
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe(
+        `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=${code}`
+      );
+      expect(hoisted.serverFetchMock).not.toHaveBeenCalled();
+      expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('returns a verified decline to its originating surface with its query, writing nothing', async () => {
+    const validState = signGoogleOAuthState({
+      userId: 'db-user-1',
+      returnTo: '/app/ov/integrations?tab=google',
+    });
+    const updates = trackUpdates();
+
     const { GET } = await import('@/app/api/connectors/google/callback/route');
     const response = await GET(
-      callbackRequest({ error: 'access_denied', code: 'x', state: 'y' })
+      callbackRequest({ error: 'access_denied', state: validState })
     );
 
-    expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe(
-      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=oauth_denied`
+      'http://localhost/app/ov/integrations?tab=google&error=oauth_canceled'
     );
     expect(hoisted.serverFetchMock).not.toHaveBeenCalled();
     expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(hoisted.captureErrorMock).not.toHaveBeenCalled();
   });
+
+  it('sends a decline to Settings when the session no longer matches the signed state', async () => {
+    hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'db-user-2' });
+    const validState = signGoogleOAuthState({
+      userId: 'db-user-1',
+      returnTo: '/app/ov/integrations',
+    });
+
+    const { GET } = await import('@/app/api/connectors/google/callback/route');
+    const response = await GET(
+      callbackRequest({ error: 'access_denied', state: validState })
+    );
+
+    expect(response.headers.get('location')).toBe(
+      `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=oauth_canceled`
+    );
+  });
+
+  it.each([
+    { label: 'a different user', session: { userId: 'db-user-2' } },
+    { label: 'signed out', session: { userId: null } },
+  ])(
+    'never exchanges or writes when the current session is $label',
+    async ({ session }) => {
+      hoisted.getCachedAuthMock.mockResolvedValue(session);
+      const validState = signGoogleOAuthState({
+        userId: 'db-user-1',
+        returnTo: '/app/custom-return',
+      });
+      const updates = trackUpdates();
+
+      const { GET } = await import(
+        '@/app/api/connectors/google/callback/route'
+      );
+      const response = await GET(
+        callbackRequest({ code: 'auth-code-123', state: validState })
+      );
+
+      expect(response.headers.get('location')).toBe(
+        `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=oauth_session_changed`
+      );
+      expect(hoisted.serverFetchMock).not.toHaveBeenCalled();
+      expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
+      expect(updates).toHaveLength(0);
+    }
+  );
+
+  it.each(['https://evil.example/steal', '//evil.example', '/%5Cevil.example'])(
+    'never follows an unsafe signed returnTo (%s) after a real exchange',
+    async unsafeReturnTo => {
+      const validState = signGoogleOAuthState({
+        userId: 'db-user-1',
+        returnTo: unsafeReturnTo,
+      });
+      hoisted.serverFetchMock
+        .mockResolvedValueOnce(tokenResponse())
+        .mockResolvedValueOnce(userInfoResponse());
+      trackInserts(['gmail-acct-id', 'calendar-acct-id']);
+      trackUpdates();
+
+      const { GET } = await import(
+        '@/app/api/connectors/google/callback/route'
+      );
+      const response = await GET(
+        callbackRequest({ code: 'auth-code-123', state: validState })
+      );
+
+      expect(response.headers.get('location')).toBe(
+        `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?connected=google`
+      );
+    }
+  );
+
+  it('appends the result to a returnTo that already carries query context', async () => {
+    const validState = signGoogleOAuthState({
+      userId: 'db-user-1',
+      returnTo: '/app/ov/integrations?tab=google',
+    });
+    hoisted.serverFetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(userInfoResponse());
+    trackInserts(['gmail-acct-id', 'calendar-acct-id']);
+    trackUpdates();
+
+    const { GET } = await import('@/app/api/connectors/google/callback/route');
+    const response = await GET(
+      callbackRequest({ code: 'auth-code-123', state: validState })
+    );
+
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/app/ov/integrations?tab=google&connected=google'
+    );
+  });
+
+  it('replaces a stale error marker with this attempt success, keeping unrelated context', async () => {
+    const validState = signGoogleOAuthState({
+      userId: 'db-user-1',
+      returnTo: '/app/ov/integrations?tab=google&error=oauth_canceled',
+    });
+    hoisted.serverFetchMock
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(userInfoResponse());
+    trackInserts(['gmail-acct-id', 'calendar-acct-id']);
+    trackUpdates();
+
+    const { GET } = await import('@/app/api/connectors/google/callback/route');
+    const response = await GET(
+      callbackRequest({ code: 'auth-code-123', state: validState })
+    );
+
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/app/ov/integrations?tab=google&connected=google'
+    );
+  });
+
+  it.each([
+    ['access_denied', 'oauth_canceled'],
+    ['server_error', 'oauth_provider_error'],
+  ])(
+    'drops a stale connected marker when provider error=%s returns ?error=%s, exchanging and writing nothing',
+    async (providerError, code) => {
+      const validState = signGoogleOAuthState({
+        userId: 'db-user-1',
+        returnTo: '/app/ov/integrations?connected=google&tab=google',
+      });
+      const updates = trackUpdates();
+
+      const { GET } = await import(
+        '@/app/api/connectors/google/callback/route'
+      );
+      const response = await GET(
+        callbackRequest({
+          error: providerError,
+          code: 'auth-code-123',
+          state: validState,
+        })
+      );
+
+      expect(response.headers.get('location')).toBe(
+        `http://localhost/app/ov/integrations?tab=google&error=${code}`
+      );
+      expect(hoisted.serverFetchMock).not.toHaveBeenCalled();
+      expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
+      expect(updates).toHaveLength(0);
+    }
+  );
 
   it('redirects with ?error=oauth_missing_params when code or state is absent', async () => {
     const { GET } = await import('@/app/api/connectors/google/callback/route');
@@ -203,7 +386,7 @@ describe('GET /api/connectors/google/callback', () => {
     );
   });
 
-  it('rejects an expired (>15 min old) state without exchanging the code', async () => {
+  it('rejects an expired (>15 min old) state as oauth_expired without exchanging the code', async () => {
     const now = Date.now();
     const validState = signGoogleOAuthState({
       userId: 'db-user-1',
@@ -221,9 +404,12 @@ describe('GET /api/connectors/google/callback', () => {
       );
 
       expect(response.headers.get('location')).toBe(
-        `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=oauth_callback`
+        `http://localhost${APP_ROUTES.SETTINGS_CONNECTORS}?error=oauth_expired`
       );
       expect(hoisted.serverFetchMock).not.toHaveBeenCalled();
+      expect(hoisted.dbInsertMock).not.toHaveBeenCalled();
+      // A slow or reopened consent tab is expected, not an incident.
+      expect(hoisted.captureErrorMock).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

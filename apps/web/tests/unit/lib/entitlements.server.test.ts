@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
+const mockRevenueFailure = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/observability/revenue-spine', () => ({
+  captureRevenueSpineFailure: mockRevenueFailure,
+}));
+
 const { mockCachedAuth, mockCachedCurrentUser } = vi.hoisted(() => ({
   mockCachedAuth: vi.fn(),
   mockCachedCurrentUser: vi.fn(),
@@ -122,6 +127,12 @@ describe('getCurrentUserEntitlements', () => {
     expect(e.isPro).toBe(false);
     expect(e.isAuthenticated).toBe(true);
     expect(e.userId).toBe('user_123');
+    expect(mockRevenueFailure).toHaveBeenCalledWith({
+      stage: 'entitlement_readback',
+      failureCode: 'billing_unavailable',
+      severity: 'degraded',
+      userId: 'user_123',
+    });
   });
 
   it('billing failure preserves admin status in degraded result', async () => {

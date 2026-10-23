@@ -4,6 +4,7 @@
 // JovieChat.styling.test.tsx component render suite.
 // @coverage-via apps/web/tests/unit/chat/JovieChat.styling.test.tsx
 
+import { Button } from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -42,15 +43,15 @@ import { ChatEmptyStateGreeting } from './components/ChatEmptyStateGreeting';
 import { ChatPinnedOpportunityHeader } from './components/ChatPinnedOpportunityHeader';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
-import { OvieEditorialBriefing } from './components/OvieEditorialBriefing';
+import { ChatStickScrollButton } from './components/ScrollToBottom';
 import {
   useChatFileAttachments,
   useChatJankMonitor,
   useJovieChatController,
-  useStickToBottom,
 } from './hooks';
 import { useChatRailContextTargets } from './hooks/useChatRailContextTargets';
 import { useComposerDraftIntent } from './hooks/useComposerDraft';
+import { useStickToBottomController } from './hooks/useStickToBottom';
 import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
   CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
@@ -69,6 +70,8 @@ import type { JovieChatProps } from './types';
 const VIRTUALIZATION_THRESHOLD =
   CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount;
 const CHAT_PICKER_THREAD_CLEARANCE = 'min(620px, calc(100vh - 8rem))';
+// Match the insights fetch deadline without waiting through query retries.
+const EMPTY_NEXT_STEP_TIMEOUT_MS = 10_000;
 
 function findLastAssistantIndex(
   messages: readonly { id: string; role: string }[]
@@ -93,7 +96,8 @@ export function JovieChat({
   avatarUrl,
   username,
   chatMode,
-  ovieHomeBriefing,
+  homeCanvas,
+  homeCanvasMode = 'empty-state',
   ambientOwnedByShell = false,
 }: JovieChatProps) {
   // TanStack Virtual returns fresh rows from a stable `virtualizer` object. React
@@ -133,7 +137,6 @@ export function JovieChat({
     inputRef,
     handleSubmit,
     handleRetry,
-    handleSuggestedPrompt,
     handleInterruptAndSubmit,
     submitMessage,
     setChatError,
@@ -152,14 +155,20 @@ export function JovieChat({
 
   // ─── Sticky scroll via ResizeObserver ────────────────────────────
   const {
-    isStuckToBottom,
     setStuckToBottom,
+    subscribe: subscribeStuckToBottom,
+    getSnapshot: getStuckToBottom,
     totalSizeRef,
     scrollContainerRef,
     bottomSentinelRef,
-  } = useStickToBottom(messages.length);
-  const isStuckToBottomRef = useRef(isStuckToBottom);
-  isStuckToBottomRef.current = isStuckToBottom;
+  } = useStickToBottomController(messages.length);
+  const isStuckToBottomRef = useRef(true);
+  useEffect(() => {
+    isStuckToBottomRef.current = getStuckToBottom();
+    return subscribeStuckToBottom(() => {
+      isStuckToBottomRef.current = getStuckToBottom();
+    });
+  }, [getStuckToBottom, subscribeStuckToBottom]);
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
@@ -169,7 +178,11 @@ export function JovieChat({
     conversationId: activeConversationId,
     messages,
     status,
-    isStuckToBottom,
+    // The boolean is ignored while the store subscription is set. Reading
+    // stick state here would re-render the transcript on every sentinel cross.
+    isStuckToBottom: true,
+    subscribeStuckToBottom,
+    getStuckToBottom,
     scrollContainerRef,
     enabled: jankMonitorEnabled,
   });
@@ -525,14 +538,20 @@ export function JovieChat({
 
   // Pin mode uses the thread chrome (docked composer + header) so the card
   // stays above the transcript, matching inbox → pinned-card behavior.
-  const showThreadView =
+  const livingCanvas = homeCanvas != null && homeCanvasMode === 'living';
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const hasThread =
     conversationExists || conversationInProgress || pinnedOpportunity !== null;
+  // A living canvas keeps owning the surface after messages arrive; the
+  // transcript is an explicit disclosure.
+  const showThreadView = hasThread && (!livingCanvas || transcriptOpen);
   const showBottomComposer = showThreadView;
-  const showOvieBriefing =
-    chatMode === 'ov' && ovieHomeBriefing != null && !showThreadView;
+  // Shared shell (founder decision 2026-10-20): any persona may supply a
+  // living Home canvas that owns the empty state above the docked composer.
+  const showHomeCanvas = homeCanvas != null && !showThreadView;
   const hasDraftIntent = useComposerDraftIntent(
     draft,
-    !showThreadView && !showOvieBriefing
+    !showThreadView && !showHomeCanvas
   );
   const composerHasIntent =
     composerPickerOpen || hasDraftIntent || chipTray.chips.length > 0;
@@ -543,11 +562,12 @@ export function JovieChat({
   // back so the composer owns attention.
   const chatEmptyStateFirstName = getChatEmptyStateFirstName(displayName);
   const showEmptyGreeting =
-    !showThreadView && !showOvieBriefing && !composerHasIntent;
+    !showThreadView && !showHomeCanvas && !composerHasIntent;
   const {
     data: insightsSummary,
     isLoading: insightsLoading,
     isError: insightsError,
+    isEnabled: insightsEnabled,
   } = useInsightsSummaryQuery({
     enabled: showEmptyGreeting,
   });
@@ -557,17 +577,17 @@ export function JovieChat({
     readonly action: ChatEmptyStateAction | null;
   } | null>(null);
   useEffect(() => {
-    // isLoading is false while data is still undefined (disabled, or the
-    // render before the in-flight summary arrives). Committing that gap as
-    // "no action" freezes the welcome on the profile link and drops the
-    // fixture that lands a moment later.
+    // An enabled query can have no data before its request starts. Wait for
+    // that summary, but a disabled or failed query can use the fallback now.
+    const insightsUnavailable = insightsEnabled === false || insightsError;
     const insightsSettled =
-      insightsError || (!insightsLoading && insightsSummary !== undefined);
+      insightsUnavailable ||
+      (!insightsLoading && insightsSummary !== undefined);
     if (showThreadView) {
       setEmptyNextStep(null);
     } else if (showEmptyGreeting && insightsSettled && !emptyNextStep) {
       setEmptyNextStep({
-        action: insightsError
+        action: insightsUnavailable
           ? null
           : resolveChatEmptyStateInsight(insightsSummary?.insights ?? []),
       });
@@ -577,9 +597,18 @@ export function JovieChat({
     showEmptyGreeting,
     insightsLoading,
     insightsError,
+    insightsEnabled,
     insightsSummary,
     emptyNextStep,
   ]);
+  useEffect(() => {
+    if (!showEmptyGreeting || emptyNextStep) return;
+    // Keep one deadline for this visible wait; query updates must not restart it.
+    const timer = setTimeout(() => {
+      setEmptyNextStep({ action: null });
+    }, EMPTY_NEXT_STEP_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [showEmptyGreeting, emptyNextStep]);
   const selectedEmptyAction = emptyNextStep?.action;
   const currentEmptyInsight = insightsSummary?.insights.find(
     insight => insight.id === selectedEmptyAction?.insightId
@@ -811,9 +840,9 @@ export function JovieChat({
       chatInputProps={chatInputProps}
       chatMode={chatMode}
       showThreadView={showThreadView}
-      // one-chrome-layer-v1: the Ovie briefing owns the empty-state chrome
+      // one-chrome-layer-v1: the Home canvas owns the empty-state chrome
       // layer, so the usage banner yields to it.
-      suppressUsageAlert={showOvieBriefing}
+      suppressUsageAlert={showHomeCanvas}
       isRateLimited={isRateLimited}
       showManifest={showManifest}
       manifestCollapsed={manifestCollapsed}
@@ -920,8 +949,8 @@ export function JovieChat({
               <div
                 className='flex min-h-0 flex-1 flex-col'
                 data-empty-affordance={
-                  showOvieBriefing
-                    ? 'ovie-briefing'
+                  showHomeCanvas
+                    ? 'home-canvas'
                     : showEmptyGreeting
                       ? 'greeting'
                       : 'none'
@@ -930,15 +959,20 @@ export function JovieChat({
                 data-testid='chat-empty-state-viewport'
                 data-top-spacing-owner={CHAT_EMPTY_TOP_SPACING_OWNER}
               >
-                {showOvieBriefing ? (
+                {showHomeCanvas ? (
                   <ChatEmptyStateComposerRegion
                     stableDocked
                     fullBleed
+                    alignAbove={livingCanvas ? 'fill' : 'top'}
                     above={
-                      <OvieEditorialBriefing
-                        briefing={ovieHomeBriefing}
-                        onSelectAction={handleSuggestedPrompt}
-                      />
+                      typeof homeCanvas === 'function'
+                        ? homeCanvas({
+                            messages,
+                            isStreaming:
+                              status === 'submitted' || status === 'streaming',
+                            onOpenTranscript: () => setTranscriptOpen(true),
+                          })
+                        : homeCanvas
                     }
                   >
                     <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
@@ -975,12 +1009,26 @@ export function JovieChat({
               </div>
             ) : (
               <>
+                {livingCanvas ? (
+                  <div className='mb-3 flex justify-start'>
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => setTranscriptOpen(false)}
+                      data-testid='chat-back-to-home-canvas'
+                    >
+                      Back To Home
+                    </Button>
+                  </div>
+                ) : null}
                 {pinnedOpportunity ? (
                   <ChatPinnedOpportunityHeader
                     card={pinnedOpportunity}
                     onUnpin={handleUnpinOpportunity}
                   />
                 ) : null}
+                {/* Stick updates render ChatStickScrollButton only. */}
                 <ChatThreadMessages
                   messages={messages}
                   shouldVirtualizeMessages={shouldVirtualizeMessages}
@@ -998,11 +1046,16 @@ export function JovieChat({
                   profileId={profileId}
                   knownMessageIds={knownMessageIdsRef.current}
                   inlineChatError={inlineChatError}
-                  isStuckToBottom={isStuckToBottom}
+                  isStuckToBottom
                   onScrollToBottom={() => scrollToBottom()}
                   conversationId={activeConversationId ?? conversationId}
                   collapsedFailureCount={collapsedSummerFailureCount}
                   onShowCollapsedFailures={showCollapsedSummerFailures}
+                />
+                <ChatStickScrollButton
+                  subscribe={subscribeStuckToBottom}
+                  getSnapshot={getStuckToBottom}
+                  onClick={() => scrollToBottom()}
                 />
               </>
             )}

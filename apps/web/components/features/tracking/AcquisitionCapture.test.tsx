@@ -5,12 +5,18 @@ import { AcquisitionCapture } from './AcquisitionCapture';
 const consent = vi.hoisted(() => ({
   allowed: true,
   clearAcquisitionId: vi.fn(),
+  rememberAcquisitionId: vi.fn(),
   getOrCreateAcquisitionId: vi.fn(() => 'acq-123'),
   onChange: vi.fn(),
   unsubscribe: vi.fn(),
 }));
 const runtime = vi.hoisted(() => ({
   e2eMode: undefined as string | undefined,
+  pathname: '/artist',
+}));
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => runtime.pathname,
 }));
 
 vi.mock('@/lib/env-public', () => ({
@@ -23,6 +29,7 @@ vi.mock('@/lib/env-public', () => ({
 
 vi.mock('@/lib/tracking/consent', () => ({
   clearAcquisitionId: consent.clearAcquisitionId,
+  rememberAcquisitionId: consent.rememberAcquisitionId,
   getOrCreateAcquisitionId: consent.getOrCreateAcquisitionId,
   isAnalyticsAllowed: () => consent.allowed,
 }));
@@ -30,6 +37,7 @@ vi.mock('@/lib/tracking/consent', () => ({
 describe('AcquisitionCapture', () => {
   beforeEach(() => {
     runtime.e2eMode = undefined;
+    runtime.pathname = '/artist';
     consent.allowed = true;
     consent.clearAcquisitionId.mockClear();
     consent.getOrCreateAcquisitionId.mockClear();
@@ -71,6 +79,7 @@ describe('AcquisitionCapture', () => {
     const [, request] = vi.mocked(fetch).mock.calls[0];
     expect(JSON.parse(String(request?.body))).toMatchObject({
       acquisitionId: 'acq-123',
+      currentPath: '/artist',
       firstTouch: {
         source: 'instagram',
         claimId: 'claim-1',
@@ -80,6 +89,32 @@ describe('AcquisitionCapture', () => {
 
     unmount();
     expect(consent.unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('captures again on client navigation into /pricing for the funnel stage', async () => {
+    const { rerender } = render(<AcquisitionCapture />);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    runtime.pathname = '/about';
+    rerender(<AcquisitionCapture />);
+    runtime.pathname = '/pricing';
+    globalThis.history.replaceState({}, '', '/pricing');
+    rerender(<AcquisitionCapture />);
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    const [, request] = vi.mocked(fetch).mock.calls[1];
+    expect(JSON.parse(String(request?.body))).toMatchObject({
+      currentPath: '/pricing',
+    });
+  });
+
+  it('adopts the server-verified handoff identity for subsequent events and revocation', async () => {
+    const acquisitionId = '7f5bb735-8e88-4d78-ae32-5228cc12a8bb';
+    vi.mocked(fetch).mockResolvedValue(Response.json({ acquisitionId }));
+    render(<AcquisitionCapture />);
+    await waitFor(() =>
+      expect(consent.rememberAcquisitionId).toHaveBeenCalledWith(acquisitionId)
+    );
   });
 
   it('clears the acquisition identity when consent is revoked', () => {

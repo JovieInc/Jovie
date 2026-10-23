@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import VoiceLandingPage from '@/app/(marketing)/voice/page';
 
@@ -72,6 +72,26 @@ describe('VoiceLandingPage (gh-9809 hero landing)', () => {
     fireEvent.click(btn);
     // After click, state updates to playing (button text or transcript appears)
     expect(screen.getByTestId('voice-demo-transcript')).toBeInTheDocument();
+  });
+
+  it('uses the visible demo label as its accessible name through play, stop, and completion', () => {
+    vi.useFakeTimers();
+    try {
+      render(<VoiceLandingPage />);
+      const button = screen.getByRole('button', {
+        name: 'Play 4s sample (your voice)',
+      });
+
+      fireEvent.click(button);
+      expect(button).toHaveAccessibleName('Playing sample…');
+      fireEvent.click(button);
+      expect(button).toHaveAccessibleName('Play 4s sample (your voice)');
+      fireEvent.click(button);
+      act(() => vi.advanceTimersByTime(4000));
+      expect(button).toHaveAccessibleName('Play 4s sample (your voice)');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('renders the explicit 4-step how-it-works section and final CTA', () => {

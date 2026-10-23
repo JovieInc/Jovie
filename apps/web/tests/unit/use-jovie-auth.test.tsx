@@ -194,6 +194,54 @@ describe('useJovieAuth', () => {
     expect(result.current.user.user).toBeNull();
   });
 
+  it('shows the server-resolved bypass user while useSession is still pending', () => {
+    useSessionMock.mockReturnValue({
+      data: null,
+      isPending: true,
+      isRefetching: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { result } = renderWithWrapper(({ children }) => (
+      <JovieAuthValuesProvider
+        initialUser={{
+          id: 'ba_admin',
+          email: 'admin@jov.ie',
+          name: 'Admin User',
+          username: 'admin',
+        }}
+      >
+        {children}
+      </JovieAuthValuesProvider>
+    ));
+
+    expect(result.current.user.isLoaded).toBe(true);
+    expect(result.current.user.isSignedIn).toBe(true);
+    expect(result.current.user.user?.id).toBe('ba_admin');
+    expect(result.current.user.user?.fullName).toBe('Admin User');
+    expect(result.current.auth.userId).toBe('ba_admin');
+  });
+
+  it('prefers a settled session user over the bypass seed', () => {
+    mockSignedInSession();
+
+    const { result } = renderWithWrapper(({ children }) => (
+      <JovieAuthValuesProvider
+        initialUser={{
+          id: 'ba_seed',
+          email: 'seed@jov.ie',
+          name: 'Seed User',
+        }}
+      >
+        {children}
+      </JovieAuthValuesProvider>
+    ));
+
+    expect(result.current.user.user?.id).toBe('ba_user_tim');
+    expect(result.current.auth.sessionId).toBe('ba_sess_1');
+  });
+
   it('resolves getToken to null — cookie sessions need no client token', async () => {
     mockSignedInSession();
 

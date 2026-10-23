@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -13,6 +14,8 @@ import {
   runContrastChecks,
 } from '../../../lib/a11y-gates/contrast-engine';
 
+import { loadContrastGate } from '../../../lib/a11y-gates/contrast-matrix';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(__dirname, '..', '..', '..');
 const loadDefaultTables = () =>
@@ -26,40 +29,48 @@ const loadDefaultPairs = () =>
  * Unlike the regex contrast-ratchet (a raw-color class counter), this gate
  * resolves real token pairs from styles/design-system.css +
  * styles/linear-tokens.css and computes actual WCAG 2.1 contrast ratios.
- * A token pair dropping below AA fails this test — and this test runs in
- * the Unit Tests merge gate, so the failure blocks CI.
+ * Newly failing pairs, worsening baselined debt and unresolvable pairs fail
+ * this test in the Unit Tests merge gate.
  *
- * The pair manifest lives in contrast-pairs.config.json.
+ * Contextual pairs live in contrast-pairs.config.json; the semantic matrix
+ * is generated from tokens. Existing debt is in contrast-computed.baseline.json.
  * CLI equivalent: `pnpm --filter web run lint:contrast-computed`.
  */
 
 describe('computed contrast gate — WCAG AA on design tokens', () => {
-  it('every declared token pair meets its WCAG AA threshold in light and dark themes', () => {
-    const tables = loadDefaultTables();
-    const pairs = loadDefaultPairs();
-    const { failures, warnings } = runContrastChecks(pairs, tables);
+  it.each(['light', 'dark'] as const)(
+    'keeps destructive fill text above AA without a debt allowance [%s]',
+    theme => {
+      const result = checkPair(
+        {
+          name: 'primary destructive button',
+          fg: '--color-btn-destructive-fg',
+          bg: '--color-btn-destructive-bg',
+          minRatio: 4.5,
+        },
+        loadDefaultTables()[theme]
+      );
+      expect(result.status, JSON.stringify(result)).toBe('pass');
+      expect(result.ratio).toBeGreaterThanOrEqual(4.5);
+    }
+  );
 
-    const failureReport = failures
-      .map(
-        f =>
-          `${f.name} [${f.theme}]: ${f.ratio?.toFixed(2)}:1 < ${f.minRatio}:1 (${f.fg} on ${f.bg})`
-      )
-      .join('\n');
-    expect(
-      failures,
-      `Token pairs below WCAG AA:\n${failureReport}`
-    ).toHaveLength(0);
+  it('loads the contrast CLI under tsx cjs output', () => {
+    const result = spawnSync(
+      process.execPath,
+      ['--import', 'tsx', join(WEB_ROOT, 'scripts/lint-contrast-computed.ts')],
+      { cwd: WEB_ROOT, encoding: 'utf8', timeout: 30_000 }
+    );
+    const stderr = result.stderr ?? '';
+    expect(stderr).not.toContain('Top-level await');
+    expect(stderr).not.toContain('Transform failed');
+    expect(result.status, `${result.stdout ?? ''}\n${stderr}`).toBe(0);
+  });
 
-    // Every declared pair must stay statically resolvable — if a token is
-    // refactored to color-mix()/etc., re-point the pair or move the check
-    // to the rendered-story axe gate rather than silently losing coverage.
-    const warningReport = warnings
-      .map(w => `${w.name} [${w.theme}]: ${w.detail}`)
-      .join('\n');
-    expect(
-      warnings,
-      `Unresolvable contrast pairs (coverage lost):\n${warningReport}`
-    ).toHaveLength(0);
+  it('blocks new debt or coverage loss across generated text, state and status pairs', async () => {
+    const { errors, warnings } = await loadContrastGate(WEB_ROOT);
+    expect(warnings, 'Every pair must be measured').toEqual([]);
+    expect(errors, errors.join('\n')).toEqual([]);
   });
 
   it('keeps canonical focus one opaque ion #11AFFF; dark ≥3:1, light KEEP below 3:1', () => {
@@ -98,11 +109,13 @@ describe('computed contrast gate — WCAG AA on design tokens', () => {
     }
   });
 
-  it('checks a meaningful number of pair-theme combinations', () => {
+  it('checks a meaningful number of pair-theme combinations', async () => {
     const tables = loadDefaultTables();
     const pairs = loadDefaultPairs();
     const { passes } = runContrastChecks(pairs, tables);
     expect(passes.length).toBeGreaterThanOrEqual(20);
+    const gate = await loadContrastGate(WEB_ROOT);
+    expect(gate.passes.length + gate.failures.length).toBeGreaterThan(5000);
   });
 });
 
@@ -211,7 +224,7 @@ describe('computed contrast primitives', () => {
     expect(parseColor('rgba(0, 0, 0, 0.9)')?.alpha).toBeCloseTo(0.9, 5);
     expect(parseColor('lch(100% 0 0)')?.luminance).toBeCloseTo(1, 2);
     expect(parseColor('oklch(0.5 0 0)')?.luminance).toBeCloseTo(0.125, 5);
-    expect(parseColor('oklch(0.5 0.2 180)')).toBeNull();
+    expect(parseColor('oklch(0.5 0.2 180)')?.luminance).toBeGreaterThan(0);
   });
 
   it('resolveValue supports fallbacks and rejects cycles', () => {

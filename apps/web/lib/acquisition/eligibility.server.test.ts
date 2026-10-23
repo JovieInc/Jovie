@@ -195,6 +195,46 @@ describe('computeAcquisitionEligibility', () => {
     });
   });
 
+  it('blocks acquisition on a reconciled rail even when the old canary and other evidence remain green', async () => {
+    const input = commerce();
+    input.reconciliations = [
+      {
+        schema: 'jovie.capability-backlog-reconciliation/v1',
+        status: 'ready',
+        commerceInvalidations: [
+          {
+            offer: ARTIST_VISIBILITY_OFFER_CONTRACT_ID,
+            channel: 'agent-handoff',
+            rail: 'ordinary-web-checkout',
+            priorDecision: 'commerce-web-checkout',
+            decisionRevision: 'decision-r4',
+            invalidatingEvidence: 'evidence:openai-eligibility-change',
+            sourceEventId: 'capability-event:commerce-change',
+            matrixEvidenceDigest: 'a'.repeat(64),
+            accountAccessReceiptDigest: 'b'.repeat(64),
+            reasons: ['eligibility-changed'],
+            nextReevaluationTrigger:
+              'eligibility-restored-and-canary-recertified',
+            state: 'blocked',
+            canary: 'invalidated',
+          },
+        ],
+      },
+    ];
+    const result = await computeAcquisitionEligibility(
+      deps({ readCommerceDecision: async () => input })
+    );
+    expect(result.eligible).toBe(false);
+    expect(result.verdict).toBe('BLOCKED');
+    expect(result.blockers.map(item => item.id)).toEqual([
+      'selected_rail',
+      'commerce_canary',
+    ]);
+    expect(result.commerce.matrix[0].invalidations[0].priorDecision).toBe(
+      'commerce-web-checkout'
+    );
+  });
+
   it('maps a failing live M2 step to its cone requirement', async () => {
     const result = await computeAcquisitionEligibility(
       deps({

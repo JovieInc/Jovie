@@ -1,13 +1,21 @@
 #!/usr/bin/env node
-// Re-request squash auto-merge after a merge-group failure dequeues a PR
-// whose own head is still green, when the failure belongs to another PR in
-// the group or to the base branch. Bounded to REARM_CAP successful rearms
-// per head SHA. A repeated decision for the same CI run does not increment.
-// A head the failure hold already blocked (its second failure on the same
-// revision) is never rearmed: it waits for a new head (JOV-7708).
+// Re-enqueue a PR after a merge-group failure dequeues it while its own head
+// is still green, when the failure belongs to another PR in the group or to
+// the base branch. The mutation is enqueuePullRequest on the verified head,
+// the same call the enroll job uses. The merge queue owns the merge method,
+// so this path does not arm auto-merge or choose a strategy. Bounded to REARM_CAP
+// successful rearms per head SHA. A repeated decision for the same CI run
+// does not increment. The revision the failure hold names is the failure
+// owner's: the enroll job alone decides whether it may re-enter (JOV-6620).
+// Victim rearm restores it only on positive evidence that another PR in the
+// group owns the failing paths. "No implicated path is in this PR's files" is
+// not that evidence: on 2026-10-20 #22280 (a lockfile-only dependency bump)
+// broke an untouched UnifiedTable test, was classified base-branch here, and
+// was re-enqueued at its failed head 35 s after the ejection (run
+// 39457131496), ejecting the groups behind it again (JOV-7708).
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
 
 export const REARM_CONTEXT = 'jovie-queue-victim-rearm/v1';
@@ -102,9 +110,12 @@ export function planVictimRearms({
       reason,
     });
     if (!SHA.test(candidate.headSha ?? '')) return skip('head-sha');
-    if (
+    const failureOwner =
       heldRevision?.prNumber === candidate.prNumber &&
-      heldRevision.headSha === candidate.headSha
+      heldRevision.headSha === candidate.headSha;
+    if (
+      failureOwner &&
+      heldRevision.retryDisposition === 'blocked-until-new-source-head'
     ) {
       return skip('revision-held');
     }
@@ -125,6 +136,9 @@ export function planVictimRearms({
     }
     const verdict = classify(candidate, candidates, paths);
     if (!verdict.classification) return skip(verdict.reason);
+    if (failureOwner && verdict.classification !== 'another-pr') {
+      return skip('failure-owner');
+    }
     const records = trustedRearmRecords(candidate.statuses).filter(
       record => record.sha === candidate.headSha
     );
@@ -155,9 +169,9 @@ export function planVictimRearms({
 }
 
 /**
- * The failure-hold job's receipt names the exact revision it blocked until a
- * new head. Anything else (absent, unparsable, or retryable) blocks nothing.
- * @returns {{ prNumber: number, headSha: string } | null}
+ * The failure-hold job's receipt names the exact revision whose merge group
+ * failed, with its retry disposition. Absent or unparsable receipts name none.
+ * @returns {{ prNumber: number, headSha: string, retryDisposition: string } | null}
  */
 export function heldRevisionFromReceipt(raw, repository) {
   if (!raw) return null;
@@ -170,13 +184,17 @@ export function heldRevisionFromReceipt(raw, repository) {
   if (
     receipt?.schema !== 'jovie-merge-group-failure-hold/v1' ||
     receipt.repository !== repository ||
-    receipt.retryDisposition !== 'blocked-until-new-source-head' ||
+    typeof receipt.retryDisposition !== 'string' ||
     !Number.isSafeInteger(receipt.prNumber) ||
     !SHA.test(String(receipt.sourceHeadSha ?? ''))
   ) {
     return null;
   }
-  return { prNumber: receipt.prNumber, headSha: receipt.sourceHeadSha };
+  return {
+    prNumber: receipt.prNumber,
+    headSha: receipt.sourceHeadSha,
+    retryDisposition: receipt.retryDisposition,
+  };
 }
 
 export function rearmDescription({ n, headSha, runId }) {
@@ -184,6 +202,152 @@ export function rearmDescription({ n, headSha, runId }) {
   if (description.length > 140)
     fail('rearm description exceeds 140 characters');
   return description;
+}
+
+// Kept in lockstep with the enroll job's Enqueue green PRs mutation.
+// No mergeMethod: the ruleset sets the strategy for main.
+export const ENQUEUE_PULL_REQUEST_MUTATION =
+  'mutation($id:ID!,$oid:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$oid}){mergeQueueEntry{position}}}';
+
+const NODE_ID = /^[A-Za-z0-9+/=_-]{3,256}$/;
+
+function errorText(error) {
+  if (typeof error === 'string') return error;
+  if (!error || typeof error !== 'object') return '';
+  return ['message', 'stderr', 'stdout']
+    .map(key => {
+      const value = error[key];
+      if (typeof value === 'string') return value;
+      if (value instanceof Uint8Array)
+        return Buffer.from(value).toString('utf8');
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function isIntegrationPermissionDenied(error) {
+  return /resource not accessible by integration/i.test(errorText(error));
+}
+
+function assertPullNumber(prNumber) {
+  if (!Number.isSafeInteger(prNumber) || prNumber < 1) {
+    fail('pr number is missing');
+  }
+  return prNumber;
+}
+
+export class RearmPermissionError extends Error {
+  /**
+   * @param {number} prNumber
+   * @param {unknown} [cause]
+   */
+  constructor(prNumber, cause) {
+    const number = assertPullNumber(prNumber);
+    const detail = `Rearm of #${number} denied: Resource not accessible by integration (enqueuePullRequest)`;
+    super(`::error::${detail}`, cause === undefined ? undefined : { cause });
+    this.name = 'RearmPermissionError';
+    /** @type {'ENQUEUE_PERMISSION_DENIED'} */
+    this.code = 'ENQUEUE_PERMISSION_DENIED';
+    /** @type {number} */
+    this.prNumber = number;
+    /** @type {string} */
+    this.annotation = `::error::${detail}`;
+    /** @type {string} */
+    this.summary = detail;
+  }
+}
+
+/** @param {number} prNumber @param {unknown} [cause] */
+export function permissionDeniedRearm(prNumber, cause) {
+  return new RearmPermissionError(prNumber, cause);
+}
+
+export function enqueuePullRequestArgs({ nodeId, headOid }) {
+  if (!NODE_ID.test(String(nodeId ?? ''))) fail('pull request id is missing');
+  const oid = String(headOid ?? '').toLowerCase();
+  if (!SHA.test(oid)) fail('expected head oid is missing');
+  return [
+    'api',
+    'graphql',
+    '-f',
+    `query=${ENQUEUE_PULL_REQUEST_MUTATION}`,
+    '-f',
+    `id=${nodeId}`,
+    '-f',
+    `oid=${oid}`,
+  ];
+}
+
+function asGraphqlBody(raw) {
+  if (raw && typeof raw === 'object') return raw;
+  return JSON.parse(String(raw ?? ''));
+}
+
+/**
+ * Enqueue one verified head. A token that cannot call enqueuePullRequest
+ * throws ENQUEUE_PERMISSION_DENIED instead of returning success.
+ */
+export function enqueueVictim({ prNumber, nodeId, headOid, exec }) {
+  const number = assertPullNumber(prNumber);
+  const args = enqueuePullRequestArgs({ nodeId, headOid });
+  let raw;
+  try {
+    raw = exec(args);
+  } catch (error) {
+    if (isIntegrationPermissionDenied(error)) {
+      throw permissionDeniedRearm(number, error);
+    }
+    throw error;
+  }
+  const body = asGraphqlBody(raw);
+  if (isIntegrationPermissionDenied(JSON.stringify(body?.errors ?? ''))) {
+    throw permissionDeniedRearm(number);
+  }
+  const position = body?.data?.enqueuePullRequest?.mergeQueueEntry?.position;
+  if (!Number.isInteger(position)) {
+    fail(`enqueue of #${number} returned no queue position`);
+  }
+  return { position };
+}
+
+/** @returns {1} the step always fails; permission denials are annotated */
+export function surfaceRearmFailure(error, { writeError, writeSummary }) {
+  if (error instanceof RearmPermissionError) {
+    writeError(error.annotation);
+    writeSummary(error.summary);
+    return 1;
+  }
+  writeError(error instanceof Error ? error.message : String(error));
+  return 1;
+}
+
+/**
+ * @param {unknown} error
+ * @param {{
+ *   env?: { GITHUB_STEP_SUMMARY?: string },
+ *   stderr?: { write(line: string): void },
+ *   appendFile?: (path: string, data: string) => void,
+ * }} [io]
+ */
+export function commitRearmFailure(
+  error,
+  {
+    env = process.env,
+    stderr = process.stderr,
+    appendFile = appendFileSync,
+  } = {}
+) {
+  return surfaceRearmFailure(error, {
+    writeError(line) {
+      stderr.write(line.endsWith('\n') ? line : `${line}\n`);
+    },
+    writeSummary(line) {
+      const summaryPath = env.GITHUB_STEP_SUMMARY;
+      if (!summaryPath) return;
+      appendFile(summaryPath, line.endsWith('\n') ? line : `${line}\n`);
+    },
+  });
 }
 
 export async function applyVictimRearms(decisions, io) {
@@ -199,6 +363,9 @@ export async function applyVictimRearms(decisions, io) {
     ) {
       continue;
     }
+    // The cap counts successful enqueues only. A denied or failed mutation
+    // leaves no receipt, so a later run can try this head again.
+    await io.enable(decision.prNumber, current);
     if (decision.increment) {
       await io.writeStatus({
         sha: decision.headSha,
@@ -206,7 +373,6 @@ export async function applyVictimRearms(decisions, io) {
         targetUrl: io.targetUrl,
       });
     }
-    await io.enable(decision.prNumber);
     applied.push(decision);
   }
   return applied;
@@ -322,7 +488,7 @@ function readArmState(repository, prNumber) {
     'api',
     'graphql',
     '-f',
-    'query=query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){headRefOid mergeStateStatus isInMergeQueue autoMergeRequest{enabledAt}}}}',
+    'query=query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){id headRefOid mergeStateStatus isInMergeQueue autoMergeRequest{enabledAt}}}}',
     '-F',
     `owner=${owner}`,
     '-F',
@@ -331,6 +497,7 @@ function readArmState(repository, prNumber) {
     `number=${prNumber}`,
   ]).data.repository.pullRequest;
   return {
+    nodeId: typeof data?.id === 'string' ? data.id : '',
     headSha: String(data?.headRefOid ?? '').toLowerCase(),
     mergeStateStatus: data?.mergeStateStatus,
     inQueue: data?.isInMergeQueue === true,
@@ -396,16 +563,14 @@ function main() {
         `target_url=${url}`,
       ]);
     },
-    enable(prNumber) {
-      gh([
-        'pr',
-        'merge',
-        String(prNumber),
-        '--repo',
-        repository,
-        '--auto',
-        '--squash',
-      ]);
+    enable(prNumber, current) {
+      const result = enqueueVictim({
+        prNumber,
+        nodeId: current?.nodeId,
+        headOid: current?.headSha,
+        exec: args => gh(args),
+      });
+      console.log(`enqueued #${prNumber} at position ${result.position}`);
     },
   })
     .then(applied => {
@@ -419,8 +584,7 @@ function main() {
       console.log(`applied=${applied.length}`);
     })
     .catch(error => {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exitCode = 1;
+      process.exitCode = commitRearmFailure(error);
     });
 }
 

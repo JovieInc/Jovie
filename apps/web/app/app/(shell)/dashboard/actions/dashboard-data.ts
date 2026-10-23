@@ -18,13 +18,16 @@ import { resolveUserState } from '@/lib/auth/gate';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
-import { type DbOrTransaction, doesTableExist } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
+import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
+import { getDeepErrorMessage, unwrapPgError } from '@/lib/db/errors';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import {
   dashboardQuery,
   isPostgresTimeoutError,
   isQueryTimeoutError,
   QUERY_TIMEOUTS,
+  setStatementTimeout,
 } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
@@ -67,6 +70,7 @@ import {
   UNKNOWN_AVATAR_QUALITY,
 } from '@/lib/profile/avatar-quality';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
+import { executeWithRetry } from '@/lib/resilience/primitives';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { isMissingTourDatesConfirmationStatusError } from '@/lib/tour-dates/queries';
 import { mapSocialLinkExistence } from './social-link-utils';
@@ -211,8 +215,17 @@ const BIO_LINK_ACTIVATION_EVENT_TYPES = [
 type BioLinkActivationEventType =
   (typeof BIO_LINK_ACTIVATION_EVENT_TYPES)[number];
 
+function isIdleTransactionTermination(error: unknown): boolean {
+  const { code } = unwrapPgError(error);
+  return code
+    ? code === '25P03'
+    : /terminating connection due to idle-in-transaction timeout/i.test(
+        getDeepErrorMessage(error)
+      );
+}
+
 async function buildBioLinkActivation(
-  tx: DbOrTransaction,
+  clerkUserId: string,
   profile: Pick<CreatorProfile, 'id' | 'onboardingCompletedAt'>
 ): Promise<BioLinkActivation | null> {
   const windowEndsAt = getBioLinkActivationWindowEnd(
@@ -231,78 +244,88 @@ async function buildBioLinkActivation(
     platform_opened: null,
   };
 
-  const hasDistributionEventsTable = await doesTableExist(
-    'creator_distribution_events'
-  );
-
-  if (hasDistributionEventsTable) {
-    const eventRows = await dashboardQuery(
-      () =>
-        tx
-          .select({
-            createdAt: creatorDistributionEvents.createdAt,
-            eventType: creatorDistributionEvents.eventType,
-          })
-          .from(creatorDistributionEvents)
-          .where(
-            and(
-              eq(creatorDistributionEvents.creatorProfileId, profile.id),
-              eq(
-                creatorDistributionEvents.platform,
-                INSTAGRAM_DISTRIBUTION_PLATFORM
-              ),
-              inArray(
-                creatorDistributionEvents.eventType,
-                BIO_LINK_ACTIVATION_EVENT_TYPES
+  // Read the migrated table directly. A separate schema probe adds a cold
+  // connection round-trip; missing-table fallback already runs after cleanup.
+  const eventRows = await executeWithRetry(
+    () =>
+      withDbSessionTx(
+        async tx => {
+          // Await PostgreSQL cancellation instead of racing a JS timer against
+          // SQL that could still be running when Drizzle queues COMMIT/ROLLBACK.
+          await setStatementTimeout(tx, QUERY_TIMEOUTS.dashboard);
+          return tx
+            .select({
+              createdAt: creatorDistributionEvents.createdAt,
+              eventType: creatorDistributionEvents.eventType,
+            })
+            .from(creatorDistributionEvents)
+            .where(
+              and(
+                eq(creatorDistributionEvents.creatorProfileId, profile.id),
+                eq(
+                  creatorDistributionEvents.platform,
+                  INSTAGRAM_DISTRIBUTION_PLATFORM
+                ),
+                inArray(
+                  creatorDistributionEvents.eventType,
+                  BIO_LINK_ACTIVATION_EVENT_TYPES
+                )
               )
             )
-          )
-          .orderBy(asc(creatorDistributionEvents.createdAt)),
-      'Creator distribution events query',
-      { db: tx }
-    ).catch((error: unknown) => {
-      if (isMissingCreatorDistributionEventsTableError(error)) {
-        Sentry.logger.warn(
-          '[Dashboard] creator_distribution_events table missing; skipping activation lookup',
-          { profileId: profile.id }
-        );
-        return [];
-      }
-
-      const migrationResult = handleMigrationErrors(error, {
-        userId: profile.id,
-        operation: 'creator_distribution_events',
-      });
-
-      if (!migrationResult.shouldRetry) {
-        return (migrationResult.fallbackData ?? []) as Array<{
-          createdAt: Date;
-          eventType: string;
-        }>;
-      }
-
-      const level =
-        isQueryTimeoutError(error) || isPostgresTimeoutError(error)
-          ? 'warning'
-          : 'error';
-
-      Sentry.captureException(error, {
-        level,
-        tags: {
-          query: 'creator_distribution_events',
-          context: 'dashboard_data_settled',
+            .orderBy(asc(creatorDistributionEvents.createdAt));
         },
-        extra: { profileId: profile.id },
-      });
+        { clerkUserId }
+      ),
+    {
+      maxRetries: 1,
+      baseDelayMs: DB_CONFIG.retryDelay,
+      isRetryable: error =>
+        isIdleTransactionTermination(error) ||
+        (isRetryableError(error) && !isPostgresTimeoutError(error)),
+    }
+  ).catch((error: unknown) => {
+    // The transaction wrapper has completed rollback/release before a
+    // tolerated failure becomes fallback data or another read is attempted.
+    if (isMissingCreatorDistributionEventsTableError(error)) {
+      Sentry.logger.warn(
+        '[Dashboard] creator_distribution_events table missing; skipping activation lookup',
+        { profileId: profile.id }
+      );
       return [];
+    }
+
+    const migrationResult = handleMigrationErrors(error, {
+      userId: profile.id,
+      operation: 'creator_distribution_events',
     });
 
-    for (const eventRow of eventRows) {
-      const eventType = eventRow.eventType as BioLinkActivationEventType;
-      timestamps[eventType] ??= eventRow.createdAt;
+    if (!migrationResult.shouldRetry) {
+      return (migrationResult.fallbackData ?? []) as Array<{
+        createdAt: Date;
+        eventType: string;
+      }>;
     }
-  }
 
+    const level =
+      isQueryTimeoutError(error) || isPostgresTimeoutError(error)
+        ? 'warning'
+        : 'error';
+
+    Sentry.captureException(error, {
+      level,
+      tags: {
+        query: 'creator_distribution_events',
+        context: 'dashboard_data_settled',
+      },
+      extra: { profileId: profile.id },
+    });
+    return [];
+  });
+
+  for (const eventRow of eventRows) {
+    const eventType = eventRow.eventType as BioLinkActivationEventType;
+    timestamps[eventType] ??= eventRow.createdAt;
+  }
   return {
     activatedAt: serializeNullableDate(timestamps.activated),
     copiedAt: serializeNullableDate(timestamps.link_copied),
@@ -887,6 +910,38 @@ async function fetchDashboardBaseWithSession(
   };
 }
 
+/** Retry only this pure read after an idle-terminated setup has closed. */
+async function fetchAvatarQualityWithSession(
+  clerkUserId: string,
+  profileId: string
+): Promise<AvatarQuality> {
+  // This bounds retry admission, not connection acquisition or setup duration.
+  const retryDeadline = performance.now() + QUERY_TIMEOUTS.dashboard;
+  const read = () =>
+    withDbSessionTx(
+      async tx => {
+        // Wait for PostgreSQL cancellation; do not race SQL with a JS timer.
+        await setStatementTimeout(tx, QUERY_TIMEOUTS.api);
+        return getAvatarQualityForProfile(profileId, tx);
+      },
+      { clerkUserId }
+    );
+
+  try {
+    return await read();
+  } catch (error) {
+    if (
+      !isIdleTransactionTermination(error) ||
+      performance.now() >= retryDeadline
+    )
+      throw error;
+
+    // The first wrapper has completed rollback/release. RLS reporting remains
+    // intact; only this side-effect-free avatar read gets one fresh attempt.
+    return read();
+  }
+}
+
 /**
  * Full dashboard data fetch. Calls the base fetch for user/profiles/settings,
  * then augments with slow supplementary queries (links, avatar, tipping).
@@ -945,9 +1000,9 @@ async function fetchDashboardCoreWithSession(
       { clerkUserId }
     );
 
-    const avatarQuality = await withDbSessionTx(
-      async tx => getAvatarQualityForProfile(selected.id, tx),
-      { clerkUserId }
+    const avatarQuality = await fetchAvatarQualityWithSession(
+      clerkUserId,
+      selected.id
     ).catch((error: unknown) => {
       Sentry.captureException(error, {
         level: 'warning',
@@ -964,9 +1019,9 @@ async function fetchDashboardCoreWithSession(
       { clerkUserId }
     );
 
-    const bioLinkActivation = await withDbSessionTx(
-      async tx => buildBioLinkActivation(tx, selected),
-      { clerkUserId }
+    const bioLinkActivation = await buildBioLinkActivation(
+      clerkUserId,
+      selected
     );
 
     const hasMusicLinks = linkCounts.hasMusicLinks;

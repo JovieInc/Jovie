@@ -90,9 +90,12 @@ export function resolvePrivacyBoundaryShellAlias(
 
 const config: StorybookConfig = {
   stories:
-    process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
-      ? [...LIVE_CERT_STORIES]
-      : [...FULL_CATALOG_STORIES],
+    // Deliberately invalid controls belong only to the explicit runner diagnostic.
+    process.env.JOVIE_STORYBOOK_A11Y_CONTROLS === '1'
+      ? ['../tests/fixtures/storybook-a11y-runner/controls.stories.tsx']
+      : process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+        ? [...LIVE_CERT_STORIES]
+        : [...FULL_CATALOG_STORIES],
   addons: storybookAddonsForEnvironment(),
   framework: storybookFrameworkForEnvironment(),
   docs: {},
@@ -189,6 +192,13 @@ const config: StorybookConfig = {
           // homepage Recently Shipped section; serve fixture releases instead.
           find: '@/lib/recent-releases',
           replacement: require.resolve('./recent-releases-mock.ts'),
+        },
+        {
+          // lib/observability/revenue-spine imports node:crypto at module
+          // scope and is reachable from auth/session/entitlement modules that
+          // stories render; the externalized import blanks those stories.
+          find: '@/lib/observability/revenue-spine',
+          replacement: require.resolve('./revenue-spine-mock.ts'),
         },
         {
           find: '@/lib/releases/release-matrix-loader',

@@ -414,7 +414,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   seo: {
     title: 'Artist Profiles',
     description:
-      'Claim your free artist profile on Jovie. One link that adapts to every release, show, and fan moment.',
+      'Claim your free artist profile on Jovie. Keep your music, bio, and social links together at your Jovie URL.',
     keywords: [
       'artist profile',
       'link in bio for musicians',
@@ -429,7 +429,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     eyebrow: '',
     headline: 'The link your music deserves.',
     subhead:
-      'One profile that puts the right action first for release alerts, launch day, nearby shows, support, and fan follow-up.',
+      'Your music, artist bio, and social links in one free profile. Review the details, then share your Jovie link.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
     proofWhisper: 'Used by artists on',
@@ -1170,24 +1170,24 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     headline: 'Questions',
     items: [
       {
-        question: 'How is this different from Linktree?',
-        answer:
-          'Linktree is a general-purpose link page. Jovie is built for music release behavior: smart routing, release pages, show moments, support flows, fan capture, and notifications in one profile.',
-      },
-      {
-        question: 'Can I use this before release day?',
-        answer:
-          'Yes. Before release day, the profile can collect release alerts, then switch behavior when the song lands.',
-      },
-      {
-        question: 'Can I use it for shows and support?',
-        answer:
-          'Yes. Touring, tickets, QR sharing, and support flows all fit inside the same profile instead of living on separate links.',
-      },
-      {
         question: 'Is an Artist Profile free?',
         answer:
-          'Yes. Artist Profiles are free. Pro adds release tools when you need them.',
+          'Yes. Your Jovie profile is free to claim and edit, with your artist bio, music, and social links together at your Jovie URL.',
+      },
+      {
+        question: 'How do I claim an existing profile?',
+        answer:
+          'Start with Claim your profile and follow the steps to confirm which artist profile you can manage. A matching name does not establish ownership.',
+      },
+      {
+        question: 'What should I check before sharing?',
+        answer:
+          'Check the artist name, bio, music, and social links. Correct anything that is out of date before sharing your Jovie link.',
+      },
+      {
+        question: 'Does a paid plan prove profile ownership?',
+        answer:
+          'Payment and profile ownership are separate. A paid subscription does not replace the checks required to manage an artist profile.',
       },
     ],
   },

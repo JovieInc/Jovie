@@ -71,7 +71,7 @@ async function assertAction(
 for (const route of [
   {
     path: '/voice',
-    hero: 'voice-hero-section',
+    hero: 'marketing-section-hero',
     primary: 'voice-hero-primary-cta',
     href: '/pricing',
   },
@@ -99,6 +99,10 @@ for (const route of [
       // submitting a conversion; href is independently checked above.
       await secondary.evaluate(element => {
         element.setAttribute('data-test-activations', '0');
+        // Pressing and sliding off a link starts a native link drag in
+        // Firefox; Playwright's emulated drop never clears :active. Cancel
+        // the drag so the press-feedback assertion sees the pointer release.
+        element.addEventListener('dragstart', event => event.preventDefault());
         element.addEventListener('click', event => {
           event.preventDefault();
           element.setAttribute(

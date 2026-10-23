@@ -7,7 +7,10 @@ import * as React from 'react';
 import { memo, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
-import { EmptyState } from '@/components/molecules/EmptyState';
+import {
+  EmptyState,
+  type EmptyStateProps,
+} from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   AudienceMobileCard,
@@ -73,6 +76,27 @@ function getSrDescription(isEmpty: boolean): string {
     return 'Track visitors and grow your fan base';
   }
   return 'Every visitor, anonymous or identified, lives in this table.';
+}
+
+function AudienceCrmEmptyState({
+  heading,
+  description,
+  action,
+  secondaryAction,
+}: Pick<
+  EmptyStateProps,
+  'heading' | 'description' | 'action' | 'secondaryAction'
+>) {
+  return (
+    <EmptyState
+      icon={<Users className='h-6 w-6' aria-hidden='true' />}
+      heading={heading}
+      description={description}
+      action={action}
+      secondaryAction={secondaryAction}
+      testId='dashboard-audience-empty-state'
+    />
+  );
 }
 
 /** Map column ID → server sort field for URL state bridge. */
@@ -651,7 +675,6 @@ export const DashboardAudienceTableUnified = memo(
     const emptyStateHeading = 'Grow Your Audience';
     const emptyStateDescription =
       'Share your profile link on social media to invite visitors. Most creators get their first audience member by sharing on X or IG bio.';
-    const emptyStateIcon = <Users className='h-6 w-6' aria-hidden='true' />;
     const emptyStatePrimaryAction = profileUrl
       ? {
           label: copiedProfileLink ? 'Link copied' : 'Copy profile link',
@@ -840,6 +863,8 @@ export const DashboardAudienceTableUnified = memo(
                     actions={bulkActions}
                   />
                   <AudienceTableSubheader
+                    mode={mode}
+                    profileId={profileId}
                     view={view}
                     onViewChange={onViewChange}
                     filters={filters}
@@ -869,71 +894,66 @@ export const DashboardAudienceTableUnified = memo(
                 {/* Scrollable content area */}
                 <div className='flex-1 min-h-0 overflow-auto'>
                   {rows.length === 0 ? (
-                    <EmptyState
-                      icon={emptyStateIcon}
-                      heading={emptyStateHeading}
-                      description={emptyStateDescription}
-                      action={emptyStatePrimaryAction}
-                      secondaryAction={emptyStateSecondaryAction}
-                      testId='dashboard-audience-empty-state'
-                    />
-                  ) : (
-                    <>
-                      {/* Mobile card list (virtualized) */}
-                      <MobileCardList
-                        rows={rows}
-                        mode={mode}
-                        selectedMemberId={selectedMember?.id ?? null}
-                        onTap={setSelectedMember}
-                        onAction={handleSendNotification}
-                        hasNextPage={hasNextPage}
-                        isFetchingNextPage={isFetchingNextPage}
-                        onLoadMore={onLoadMore}
+                    <div className='md:hidden'>
+                      <AudienceCrmEmptyState
+                        heading={emptyStateHeading}
+                        description={emptyStateDescription}
+                        action={emptyStatePrimaryAction}
+                        secondaryAction={emptyStateSecondaryAction}
                       />
-
-                      {/* Desktop table */}
-                      <div
-                        ref={setDesktopTableNode}
-                        className='max-md:hidden h-full'
-                      >
-                        <UnifiedTable
-                          data={rows}
-                          columns={columns}
-                          isLoading={false}
-                          emptyState={
-                            <EmptyState
-                              icon={emptyStateIcon}
-                              heading={emptyStateHeading}
-                              description={emptyStateDescription}
-                              action={emptyStatePrimaryAction}
-                              secondaryAction={emptyStateSecondaryAction}
-                              testId='dashboard-audience-empty-state'
-                            />
-                          }
-                          getRowId={row => row.id}
-                          enableVirtualization={true}
-                          enableKeyboardNavigation={true}
-                          rowMode='dense'
-                          rowSelection={rowSelectionState}
-                          onToggleRowSelection={toggleMemberSelection}
-                          onSelectRowRange={selectRows}
-                          sorting={sorting}
-                          onSortingChange={handleSortingChange}
-                          columnVisibility={columnVisibility}
-                          minWidth={tableMinWidth}
-                          className='text-app'
-                          getRowClassName={getRowClassName}
-                          onRowClick={row => handleViewProfile(row)}
-                          onFocusedRowChange={handleFocusedRowChange}
-                          getContextMenuItems={getContextMenuItems}
-                          hasNextPage={hasNextPage}
-                          isFetchingNextPage={isFetchingNextPage}
-                          onLoadMore={onLoadMore}
-                          containerClassName={AUDIENCE_TABLE_CONTAINER_CLASS}
-                        />
-                      </div>
-                    </>
+                    </div>
+                  ) : (
+                    <MobileCardList
+                      rows={rows}
+                      mode={mode}
+                      selectedMemberId={selectedMember?.id ?? null}
+                      onTap={setSelectedMember}
+                      onAction={handleSendNotification}
+                      hasNextPage={hasNextPage}
+                      isFetchingNextPage={isFetchingNextPage}
+                      onLoadMore={onLoadMore}
+                    />
                   )}
+
+                  {/* Desktop CRM keeps its columns when the workspace is empty. */}
+                  <div
+                    ref={setDesktopTableNode}
+                    className='max-md:hidden h-full'
+                  >
+                    <UnifiedTable
+                      data={rows}
+                      columns={columns}
+                      isLoading={false}
+                      emptyState={
+                        <AudienceCrmEmptyState
+                          heading={emptyStateHeading}
+                          description={emptyStateDescription}
+                          action={emptyStatePrimaryAction}
+                          secondaryAction={emptyStateSecondaryAction}
+                        />
+                      }
+                      getRowId={row => row.id}
+                      enableVirtualization={true}
+                      enableKeyboardNavigation={true}
+                      rowMode='dense'
+                      rowSelection={rowSelectionState}
+                      onToggleRowSelection={toggleMemberSelection}
+                      onSelectRowRange={selectRows}
+                      sorting={sorting}
+                      onSortingChange={handleSortingChange}
+                      columnVisibility={columnVisibility}
+                      minWidth={tableMinWidth}
+                      className='text-app'
+                      getRowClassName={getRowClassName}
+                      onRowClick={row => handleViewProfile(row)}
+                      onFocusedRowChange={handleFocusedRowChange}
+                      getContextMenuItems={getContextMenuItems}
+                      hasNextPage={hasNextPage}
+                      isFetchingNextPage={isFetchingNextPage}
+                      onLoadMore={onLoadMore}
+                      containerClassName={AUDIENCE_TABLE_CONTAINER_CLASS}
+                    />
+                  </div>
                 </div>
               </div>
 

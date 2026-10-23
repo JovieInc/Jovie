@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { buildClaimProfileStartHref } from '@/data/marketingCtaIntents';
 import { PRODUCT_COPY } from '@/data/productCopy';
 import { ProductLanding } from './ProductLanding';
@@ -125,16 +125,14 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
   it('keeps the homepage hero H1 on the homepage, not /product', () => {
     render(<ProductLanding />);
 
-    expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
-      'Be found. Be understood.'
-    );
+    expect(HOMEPAGE_COPY.hero.headline).toBe('One profile. For every fan.');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Your living identity on the internet.'
     );
     expect(
       screen.queryByRole('heading', {
         level: 1,
-        name: 'Be found. Be understood.',
+        name: HOMEPAGE_COPY.hero.headline,
       })
     ).toBeNull();
   });
@@ -160,7 +158,7 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     // JOV-7230: Pen dClrT/DbI9f closes /product on the two-line "See what
     // shows up / when people search for you." headline plus the canonical
     // handle-search action — not a "Claim your Jovie" link button.
-    const close = screen.getByTestId('product-close');
+    const close = screen.getByTestId('marketing-section-cta');
     expect(close.tagName).toBe('SECTION');
     expect(close).toHaveAttribute('data-marketing-variant', 'editorial-search');
 

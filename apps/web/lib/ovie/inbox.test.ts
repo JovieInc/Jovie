@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { OvieCertificationInventory } from './certifications/types';
-import { inboxDecisionRequest, projectOvieInbox } from './inbox';
+import {
+  inboxDecisionRequest,
+  projectOvieInbox,
+  summerCardEscalation,
+} from './inbox';
 import type { SummerCard } from './summer-cards';
 
 const inventory: OvieCertificationInventory = {
@@ -44,6 +48,11 @@ const card: SummerCard = {
   comment: null,
   createdAt: inventory.generatedAt,
   decidedAt: null,
+  decideBy: '2026-10-22T12:00:00.000Z',
+  defaultDecision: 'reject',
+  resolution: null,
+  feedback: [],
+  feedbackAt: null,
 };
 
 describe('Ovie inbox projection', () => {
@@ -61,6 +70,44 @@ describe('Ovie inbox projection', () => {
       evidence: card.evidence,
     });
     expect(result.cases[0]?.body).toContain('USD 25');
+  });
+  it('carries the default and deadline every founder ask resolves to', () => {
+    const [taste] = projectOvieInbox(
+      [],
+      [
+        {
+          ...card,
+          kind: 'taste',
+          defaultIfSilent: 'Ship the darker header',
+          defaultDecision: 'approve',
+        },
+      ],
+      inventory
+    ).cases;
+    expect(taste).toMatchObject({
+      waitingUntil: '2026-10-22T12:00:00.000Z',
+      decisionDefault: {
+        contract: 'jovie.decision-default/v1',
+        decision: 'approve',
+        summary: 'Ship the darker header',
+        deadline: '2026-10-22T12:00:00.000Z',
+        declared: true,
+      },
+    });
+    expect(taste?.body).toContain(
+      'If silent by 2026-10-22T12:00:00.000Z: Ship the darker header'
+    );
+
+    const [legacy] = projectOvieInbox(
+      [],
+      [{ ...card, defaultIfSilent: null }],
+      inventory
+    ).cases;
+    expect(legacy?.decisionDefault).toMatchObject({
+      decision: 'reject',
+      summary: 'No action is taken.',
+      declared: false,
+    });
   });
   it('preserves source failures rather than claiming complete coverage', () => {
     expect(
@@ -100,6 +147,67 @@ describe('Ovie inbox projection', () => {
       decision: 'no',
       notes: 'Different direction',
     });
+  });
+});
+
+describe('No-default escalation (claim verification)', () => {
+  const claim: SummerCard = {
+    ...card,
+    id: 'sc_claim',
+    idempotencyKey: 'claim-key',
+    kind: 'decision',
+    amountUsd: null,
+    recipient: null,
+    createdAt: '2026-10-20T00:00:00.000Z',
+    defaultDecision: 'none',
+  };
+  const at = (hours: number) =>
+    new Date(Date.parse(claim.createdAt) + hours * 3_600_000);
+
+  it.each([
+    [2, 0],
+    [24, 1],
+    [47, 1],
+    [48, 2],
+    [200, 2],
+  ])('escalates at %ih to level %i', (hours, level) => {
+    expect(summerCardEscalation(claim, at(hours))).toEqual({
+      level,
+      waitingHours: hours,
+    });
+  });
+
+  it('shows no default and ranks an escalated card above everything', () => {
+    const fresh = projectOvieInbox(
+      [],
+      [card, claim],
+      null,
+      [],
+      undefined,
+      at(2)
+    );
+    const freshClaim = fresh.cases.find(
+      item => item.id === 'summer-card:sc_claim'
+    );
+    expect(freshClaim?.decisionDefault).toBeNull();
+    expect(freshClaim?.waitingUntil).toBeNull();
+    expect(freshClaim?.body).toContain('No automatic default');
+    expect(fresh.cases[0]?.id).toBe('summer-card:sc_1');
+
+    const late = projectOvieInbox(
+      [],
+      [card, claim],
+      null,
+      [],
+      undefined,
+      at(30)
+    );
+    expect(late.cases[0]).toMatchObject({
+      id: 'summer-card:sc_claim',
+      priority: 0,
+      escalation: { level: 1, waitingHours: 30 },
+    });
+    expect(summerCardEscalation(card, at(30))).toBeNull();
   });
 });
 
@@ -170,16 +278,53 @@ describe('Inbox coverage and producer adapters', () => {
         url: '/api/admin/hud/tim-actions',
         body: { issueId: 'issue' },
       });
-      expect(() =>
+      expect(
         inboxDecisionRequest(
           { kind: 'linear', id: 'issue' },
           'reject',
-          'no',
+          ' Use the annual plan ',
           'a'
         )
-      ).toThrow('linked work');
+      ).toEqual({
+        url: '/api/admin/hud/tim-actions',
+        body: { issueId: 'issue', answer: 'Use the annual plan' },
+      });
     }
   );
+
+  it('offers the asker options and their body on Linear asks', () => {
+    const result = projectOvieInbox([], [], null, [], {
+      issues: [
+        {
+          id: 'ask',
+          identifier: 'JOV-2',
+          title: 'Claim guard threshold',
+          url: 'https://example.com/ask',
+          priority: 2,
+          priorityLabel: 'High',
+          createdAt: '2026-10-01T00:00:00Z',
+          description:
+            'Artists with 50k+ followers need verification.\nOptions: OK | Change something',
+          daysOld: 0,
+          stateType: 'unstarted',
+        },
+      ],
+      fetchedAt: inventory.generatedAt,
+      available: true,
+      observation: 'ok',
+      errorMessage: null,
+    });
+    const ask = result.cases.find(item => item.id === 'linear:ask');
+    expect(ask?.answers).toEqual(['OK', 'Change something']);
+    expect(ask?.body).toBe('Artists with 50k+ followers need verification.');
+    expect(ask?.recommendation).toBe('Answer: OK or Change something.');
+    expect(
+      inboxDecisionRequest({ kind: 'linear', id: 'ask' }, 'approve', 'OK', 'a')
+    ).toEqual({
+      url: '/api/admin/hud/tim-actions',
+      body: { issueId: 'ask', answer: 'OK' },
+    });
+  });
 });
 
 describe('Certification Inbox convergence', () => {

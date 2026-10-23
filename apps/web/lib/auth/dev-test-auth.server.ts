@@ -26,12 +26,16 @@ import {
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { baUsers } from '@/lib/db/schema/better-auth';
+import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   DEVELOPMENT_ONLY_ERROR,
   isExplicitDevelopmentEnvironment,
   isLocalDevelopmentAutomationHostname,
 } from '@/lib/security/development-only';
+// Pre-existing cycle through proxy-state and admin roles. Seeding a release
+// does not add a new edge; the changed-file lint now sees the old import.
+// eslint-disable-next-line import/no-cycle -- existing bypass seed cycle
 import {
   DEFAULT_TEST_AVATAR_URL,
   ensureBetterAuthTestUser,
@@ -39,6 +43,7 @@ import {
   ensureSocialLinkRecord,
   ensureUserProfileClaim,
   ensureUserRecord,
+  getDeterministicTestClerkId,
   invalidateTestUserCaches,
   setActiveProfileForUser,
 } from '@/lib/testing/test-user-provision.server';
@@ -343,6 +348,49 @@ async function findDevTestAuthSession(
   };
 }
 
+/**
+ * Fresh golden-path users are addressed by `user_dev_*`, derived from a
+ * `+clerk_test@test.jovie.com` mailbox. `ensureClerkTestUser` no longer
+ * inserts that row, so the session route must provision it before it can
+ * mint a Better Auth session. Arbitrary ids stay fail-closed.
+ */
+export function isDeterministicFreshDevTestUser(input: {
+  readonly existingUserId: string;
+  readonly email: string;
+}): boolean {
+  const email = normalizeEmail(input.email) ?? '';
+  if (!input.existingUserId.startsWith('user_dev_')) return false;
+  if (
+    !email.endsWith('+clerk_test@test.jovie.com') &&
+    !email.endsWith('@test.jovie.com')
+  ) {
+    return false;
+  }
+  return getDeterministicTestClerkId(email) === input.existingUserId;
+}
+
+export async function provisionDeterministicFreshDevTestActor(input: {
+  readonly existingUserId: string;
+  readonly email: string;
+  readonly fullName?: string;
+}): Promise<boolean> {
+  if (!isDeterministicFreshDevTestUser(input)) return false;
+  const fullName = input.fullName?.trim() || 'Golden Path';
+  const betterAuthUserId = await ensureBetterAuthTestUser({
+    email: input.email,
+    fullName,
+  });
+  await ensureUserRecord(db, {
+    clerkId: input.existingUserId,
+    betterAuthUserId,
+    email: input.email,
+    name: fullName,
+    userStatus: 'active',
+    isAdmin: false,
+  });
+  return true;
+}
+
 export async function ensureExistingDevTestAuthActor(
   betterAuthUserId: string,
   requestedPersona: DevTestAuthPersona | null
@@ -443,6 +491,29 @@ async function ensurePersonaProfile(
       }
     }
   }
+
+  await ensurePersonaRelease(profileId);
+}
+
+async function ensurePersonaRelease(profileId: string) {
+  const [existingRelease] = await db
+    .select({ id: discogReleases.id })
+    .from(discogReleases)
+    .where(eq(discogReleases.creatorProfileId, profileId))
+    .limit(1);
+  if (existingRelease) return;
+
+  await db
+    .insert(discogReleases)
+    .values({
+      creatorProfileId: profileId,
+      title: 'Browse Test Single',
+      slug: 'browse-test-single',
+      status: 'released',
+      releaseDate: new Date('2024-01-15T00:00:00.000Z'),
+      totalTracks: 1,
+    })
+    .onConflictDoNothing();
 }
 
 export const getCachedDevTestAuthSession = cache(async () => {

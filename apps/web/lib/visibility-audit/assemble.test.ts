@@ -52,7 +52,8 @@ describe('visibility audit', () => {
   it('builds the Tim /tim sample from verified profile evidence only', () => {
     const report = assembleVisibilityAudit(TIM_WHITE_VISIBILITY_AUDIT_INPUT);
     expect(report.profilePath).toBe('/tim');
-    expect(report.priceUsd).toBe(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd);
+    expect(report.priceUsd).toBe(199);
+    expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(12);
     expect(report.creditNote).toContain(`$${report.priceUsd}`);
     expect(report.identity.mbid).toBeNull();
     expect(report.identity.wikidataQid).toBeNull();
@@ -92,7 +93,7 @@ describe('visibility audit', () => {
     ).toBe(true);
     expect(
       report.fixes.some(fix => fix.agenticFix.kind === 'dsp_bio_sync')
-    ).toBe(true);
+    ).toBe(false);
     expect(report.searchOwnership.instruction).toContain('SerpAPI');
     expect(report.catalog.policy).toContain('Spotify Developer Policy III.13');
 
@@ -100,6 +101,7 @@ describe('visibility audit', () => {
     expect(markdown).toContain('MusicFetch is not called');
     expect(markdown).toContain('SerpAPI requests: 0');
     expect(markdown).toContain('Spotify Developer Policy III.13');
+    expect(markdown).not.toContain('DSP bio sync');
     expect(markdown).toMatchSnapshot();
   });
 

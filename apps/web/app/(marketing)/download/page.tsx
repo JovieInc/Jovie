@@ -20,6 +20,7 @@ import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
+import { MAC_APP_SUPPORT } from '@/lib/desktop/mac-compatibility';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 export const revalidate = false;
@@ -107,7 +108,7 @@ const FEATURE_ROWS = [
 ] as const;
 
 const REQUIREMENTS = [
-  { label: 'Operating System', value: 'macOS 11 Big Sur or later' },
+  { label: 'Operating System', value: MAC_APP_SUPPORT.minimumMacOSLabel },
   { label: 'Architecture', value: 'Apple Silicon or Intel Mac' },
   { label: 'Memory', value: '4 GB RAM minimum, 8 GB recommended' },
   { label: 'Disk Space', value: '500 MB free' },
@@ -155,25 +156,30 @@ export default function DownloadPage() {
       <script type='application/ld+json'>{FAQ_SCHEMA}</script>
       <script type='application/ld+json'>{BREADCRUMB_SCHEMA}</script>
 
-      <main
+      <div
         data-page='download'
         className='marketing-hero-dock marketing-hero-dock--inset overflow-x-clip bg-(--system-b-cinematic-black) text-(--system-b-text-primary)'
       >
-        <section aria-labelledby='download-hero-heading'>
+        <section
+          aria-labelledby='download-hero-heading'
+          data-testid='marketing-section-hero'
+          data-marketing-variant='split-screenshot-right'
+          data-marketing-owner='apps/web/app/(marketing)/download/page.tsx'
+        >
           <div className='relative flex min-h-svh flex-col overflow-hidden pt-28 sm:pt-32'>
             <MarketingHeroPhoto {...DOWNLOAD_HERO_PHOTO} />
             <MarketingContainer
               width='page'
               className='relative z-3 flex flex-1 flex-col'
             >
-              <div className='grid min-h-0 flex-1 items-center gap-12 pb-16 sm:pb-20 lg:grid-cols-2 lg:gap-16 lg:pb-24'>
-                <div className='max-w-xl'>
+              <div className='grid min-h-0 flex-1 items-start gap-12 pb-16 sm:pb-20 lg:grid-cols-2 lg:items-center lg:gap-16 lg:pb-24'>
+                <div className='max-w-xl max-sm:min-h-103'>
                   <p className='homepage-section-eyebrow'>
                     Mac app available now / iPhone alpha in TestFlight
                   </p>
                   <h1
                     id='download-hero-heading'
-                    className='mt-5 text-balance text-4xl font-bold leading-none tracking-normal text-(--system-b-text-primary) sm:text-6xl line-clamp-2'
+                    className='mt-5 min-h-18 text-balance text-4xl font-bold leading-none tracking-normal text-(--system-b-text-primary) line-clamp-2 sm:min-h-30 sm:text-6xl'
                   >
                     Jovie, Installed Where You Work.
                   </h1>
@@ -261,7 +267,13 @@ export default function DownloadPage() {
           </div>
         </section>
 
-        <section className='border-y border-subtle bg-(--system-b-cinematic-black)'>
+        <section
+          className='border-y border-subtle bg-(--system-b-cinematic-black)'
+          data-testid='marketing-section-feature-grid'
+          data-marketing-variant='two-column-text'
+          data-marketing-owner='apps/web/app/(marketing)/download/page.tsx'
+          data-marketing-occurrence='platforms'
+        >
           <MarketingContainer width='page'>
             <div className='grid lg:grid-cols-2'>
               {PLATFORM_ROWS.map((platform, index) => {
@@ -323,36 +335,49 @@ export default function DownloadPage() {
           </MarketingContainer>
         </section>
 
-        <MarketingContainer width='page' className='py-20 sm:py-28 lg:py-32'>
-          <div className='grid gap-12 lg:grid-cols-2 lg:gap-20'>
-            <div>
-              <p className='homepage-section-eyebrow'>Release workflow</p>
-              <h2
-                data-wrap='editorial-title'
-                className='mt-4 text-pretty text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
-              >
-                Everything In Jovie, Closer.
-              </h2>
+        <section
+          data-testid='marketing-section-feature-grid'
+          data-marketing-variant='4-ledger'
+          data-marketing-owner='apps/web/app/(marketing)/download/page.tsx'
+          data-marketing-occurrence='workflow'
+        >
+          <MarketingContainer width='page' className='py-20 sm:py-28 lg:py-32'>
+            <div className='grid gap-12 lg:grid-cols-2 lg:gap-20'>
+              <div>
+                <p className='homepage-section-eyebrow'>Release workflow</p>
+                <h2
+                  data-wrap='editorial-title'
+                  className='mt-4 text-pretty text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
+                >
+                  Everything In Jovie, Closer.
+                </h2>
+              </div>
+              <div className='grid gap-x-10 gap-y-10 sm:grid-cols-2'>
+                {FEATURE_ROWS.map(row => (
+                  <section key={row.title}>
+                    <div className='mb-4 flex size-8 items-center justify-center rounded-full bg-surface-1/10 text-secondary-token'>
+                      <Check className='size-4' aria-hidden='true' />
+                    </div>
+                    <h3 className='text-pretty text-xl font-semibold tracking-normal text-(--system-b-text-primary)'>
+                      {row.title}
+                    </h3>
+                    <p className={`mt-3 text-mid leading-relaxed ${muted}`}>
+                      {row.body}
+                    </p>
+                  </section>
+                ))}
+              </div>
             </div>
-            <div className='grid gap-x-10 gap-y-10 sm:grid-cols-2'>
-              {FEATURE_ROWS.map(row => (
-                <section key={row.title}>
-                  <div className='mb-4 flex size-8 items-center justify-center rounded-full bg-surface-1/10 text-secondary-token'>
-                    <Check className='size-4' aria-hidden='true' />
-                  </div>
-                  <h3 className='text-xl font-semibold tracking-normal text-(--system-b-text-primary)'>
-                    {row.title}
-                  </h3>
-                  <p className={`mt-3 text-mid leading-relaxed ${muted}`}>
-                    {row.body}
-                  </p>
-                </section>
-              ))}
-            </div>
-          </div>
-        </MarketingContainer>
+          </MarketingContainer>
+        </section>
 
-        <section className='border-y border-subtle bg-(--system-b-cinematic-black)'>
+        <section
+          className='border-y border-subtle bg-(--system-b-cinematic-black)'
+          data-testid='marketing-section-feature-grid'
+          data-marketing-variant='3-large'
+          data-marketing-owner='apps/web/app/(marketing)/download/page.tsx'
+          data-marketing-occurrence='install-details'
+        >
           <MarketingContainer width='page' className='py-16 sm:py-20 lg:py-24'>
             <div className='grid gap-12 lg:grid-cols-2 lg:items-start'>
               <div>
@@ -419,6 +444,7 @@ export default function DownloadPage() {
         </section>
 
         <FaqSection
+          sectionVariant='objection-handler' /* copy-lint-allow: objection */
           items={FAQ_ITEMS}
           heading='Questions'
           headingClassName='text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary)'
@@ -428,6 +454,7 @@ export default function DownloadPage() {
         />
 
         <MarketingFooterCta
+          sectionVariant='final-single-claim'
           title='Ready to install Jovie?'
           body='Download the Mac app today. The iPhone build stays internal while auth and TestFlight quality harden.'
           ctaLabel='Download for Mac'
@@ -459,7 +486,7 @@ export default function DownloadPage() {
             .
           </p>
         </MarketingContainer>
-      </main>
+      </div>
     </>
   );
 }

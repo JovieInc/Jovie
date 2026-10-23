@@ -8,18 +8,27 @@ interface ArtistProfileReactivationSectionProps {
   readonly id?: string;
   readonly reactivation: ArtistProfileLandingCopy['reactivation'];
   readonly notification: ArtistProfileLandingCopy['capture']['notification'];
+  readonly sectionId?: 'feature-split';
+  readonly sectionVariant?: string;
+  readonly sectionOwner?: string;
 }
 
 export function ArtistProfileReactivationSection({
   id,
   reactivation,
   notification,
+  sectionId,
+  sectionVariant,
+  sectionOwner,
 }: Readonly<ArtistProfileReactivationSectionProps>) {
   return (
     <ArtistProfileSectionShell
       className='overflow-hidden bg-(--color-bg-base)'
       id={id}
       width='page'
+      sectionId={sectionId}
+      sectionVariant={sectionVariant}
+      sectionOwner={sectionOwner}
     >
       <div className='mx-auto max-w-280'>
         <ArtistProfileSectionHeader

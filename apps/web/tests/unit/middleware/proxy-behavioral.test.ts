@@ -175,6 +175,32 @@ async function callMiddleware(
   return result as NextResponse;
 }
 
+function snapshotFixtureEnv() {
+  return {
+    CI: process.env.CI,
+    NEXT_PUBLIC_E2E_MODE: process.env.NEXT_PUBLIC_E2E_MODE,
+    PUBLIC_NOAUTH_SMOKE: process.env.PUBLIC_NOAUTH_SMOKE,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+  };
+}
+
+function clearFixtureEnv() {
+  delete process.env.CI;
+  delete process.env.NEXT_PUBLIC_E2E_MODE;
+  delete process.env.PUBLIC_NOAUTH_SMOKE;
+  delete process.env.VERCEL_ENV;
+}
+
+function restoreFixtureEnv(previous: ReturnType<typeof snapshotFixtureEnv>) {
+  for (const [key, value] of Object.entries(previous)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
 function resetMocks() {
   for (const mock of Object.values(mocks)) {
     if (typeof mock.mockClear === 'function') mock.mockClear();
@@ -679,6 +705,79 @@ describe('proxy.ts middleware', () => {
       );
     });
 
+    it('redirects anonymous /onboarding/checkout to sign-in outside the screenshot fixture', async () => {
+      const previous = snapshotFixtureEnv();
+      clearFixtureEnv();
+      try {
+        const req = createUnauthenticatedRequest({
+          pathname: APP_ROUTES.ONBOARDING_CHECKOUT,
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBeGreaterThanOrEqual(300);
+        expect(res.status).toBeLessThan(400);
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+      } finally {
+        restoreFixtureEnv(previous);
+      }
+    });
+
+    it('keeps anonymous /onboarding/checkout behind sign-in when the screenshot fixture is admitted', async () => {
+      const previous = snapshotFixtureEnv();
+      clearFixtureEnv();
+      process.env.CI = 'true';
+      process.env.PUBLIC_NOAUTH_SMOKE = '1';
+      try {
+        const req = createUnauthenticatedRequest({
+          pathname: APP_ROUTES.ONBOARDING_CHECKOUT,
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBe(307);
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+        expect(res.headers.get('location')).toContain(
+          'redirect_url=%2Fonboarding%2Fcheckout'
+        );
+      } finally {
+        restoreFixtureEnv(previous);
+      }
+    });
+
+    it('keeps anonymous /onboarding/checkout behind sign-in on a production deployment', async () => {
+      const previous = snapshotFixtureEnv();
+      clearFixtureEnv();
+      process.env.CI = 'true';
+      process.env.PUBLIC_NOAUTH_SMOKE = '1';
+      process.env.VERCEL_ENV = 'production';
+      try {
+        const req = createUnauthenticatedRequest({
+          pathname: APP_ROUTES.ONBOARDING_CHECKOUT,
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBeGreaterThanOrEqual(300);
+        expect(res.status).toBeLessThan(400);
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+      } finally {
+        restoreFixtureEnv(previous);
+      }
+    });
+
+    it('does not open other protected routes when the screenshot fixture is admitted', async () => {
+      const previous = snapshotFixtureEnv();
+      clearFixtureEnv();
+      process.env.CI = 'true';
+      process.env.PUBLIC_NOAUTH_SMOKE = '1';
+      try {
+        const req = createUnauthenticatedRequest({ pathname: '/app' });
+        const res = await callMiddleware(req);
+
+        expect(isRedirectTo(res, '/signin')).toBe(true);
+      } finally {
+        restoreFixtureEnv(previous);
+      }
+    });
+
     it('redirects unauthenticated GET /onboarding to /start before rendering', async () => {
       const req = createUnauthenticatedRequest({
         pathname: '/onboarding',
@@ -762,7 +861,8 @@ describe('proxy.ts middleware', () => {
       expect(mocks.checkProfileVisitorBlocked).toHaveBeenCalledWith(
         'timwhite',
         'masked-ip',
-        'Mozilla/5.0'
+        'Mozilla/5.0',
+        expect.any(AbortSignal)
       );
     });
 
@@ -782,7 +882,8 @@ describe('proxy.ts middleware', () => {
       expect(mocks.checkProfileVisitorBlocked).toHaveBeenCalledWith(
         'timwhite',
         'masked-ip',
-        'Mozilla/5.0'
+        'Mozilla/5.0',
+        expect.any(AbortSignal)
       );
     });
 
@@ -799,12 +900,21 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toBe('https://jov.ie/');
     });
 
-    it('bounds a cold audience lookup and keeps its reconciliation alive', async () => {
-      let resolveBlockCheck: ((blocked: boolean) => void) | undefined;
-      mocks.checkProfileVisitorBlocked.mockReturnValue(
-        new Promise<boolean>(resolve => {
-          resolveBlockCheck = resolve;
-        })
+    it('aborts a cold audience lookup instead of holding the cached document', async () => {
+      let capturedSignal: AbortSignal | undefined;
+      mocks.checkProfileVisitorBlocked.mockImplementation(
+        (
+          _username: string,
+          _ip: string | null,
+          _ua: string | null,
+          signal?: AbortSignal
+        ) =>
+          new Promise<boolean>(resolve => {
+            capturedSignal = signal;
+            signal?.addEventListener('abort', () => resolve(false), {
+              once: true,
+            });
+          })
       );
       const backgroundWork: Promise<unknown>[] = [];
       const event = createFetchEvent(promise => backgroundWork.push(promise));
@@ -816,10 +926,8 @@ describe('proxy.ts middleware', () => {
 
       expect(res.status).toBeLessThan(300);
       expect(durationMs).toBeLessThan(250);
-      expect(backgroundWork).toHaveLength(1);
-
-      resolveBlockCheck?.(true);
-      await Promise.all(backgroundWork);
+      expect(backgroundWork).toHaveLength(0);
+      expect(capturedSignal?.aborted).toBe(true);
     });
 
     it('normalizes /sign-in to /signin', async () => {

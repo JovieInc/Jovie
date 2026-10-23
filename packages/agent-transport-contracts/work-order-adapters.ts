@@ -9,7 +9,7 @@ import {
   type TerminalState,
   WORK_RESULT_SCHEMA,
   type WorkResult,
-} from './work-order';
+} from './work-order.ts';
 
 /**
  * JOV-7703 adapters. Each maps a sealed WorkOrder onto an actor class's
@@ -339,6 +339,10 @@ export function toSummerCard(
       .slice(0, 4000),
     recommendation: ask.recommendation,
     defaultIfSilent: ask.defaultIfSilent ?? undefined,
+    // The order's deadline is the card's: at it the declared default is recorded.
+    decideBy: order.budget.deadline,
+    // Undeclared: the card records `reject` at the deadline.
+    defaultDecision: ask.defaultDecision,
     preflightReceiptId: options.preflightReceiptId ?? null,
     evidence: order.evidence
       .map(item => item.ref)
@@ -353,6 +357,8 @@ export type SummerCardRecord = {
   readonly status: 'pending' | 'approved' | 'rejected';
   readonly comment: string | null;
   readonly decidedAt: string | null;
+  /** `default` when the deadline recorded the declared default. */
+  readonly resolution?: 'founder' | 'default' | null;
 };
 
 export function fromSummerCard(
@@ -406,7 +412,9 @@ export function fromSummerCard(
     });
   }
   const decided = [
-    `founder ${card.status} at ${card.decidedAt ?? 'an unknown time'}`,
+    card.resolution === 'default'
+      ? `default ${card.status} at the ${card.decidedAt ?? 'unknown'} deadline; founder feedback may still revise it`
+      : `founder ${card.status} at ${card.decidedAt ?? 'an unknown time'}`,
   ];
   if (card.status === 'rejected') {
     return bind(binding, {

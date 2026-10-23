@@ -17,6 +17,11 @@ const DETERMINISTIC_ASSERTION_PATTERNS = [
   /expected[^\n]*(?:>=|<=)[^\n]*(?:found|received|actual)/i,
 ];
 
+const RETRYABLE_FAILURE_CLASSES = new Set([
+  'transient_protocol',
+  'retryable_infra',
+]);
+
 const MAX_CAPTURE_BYTES = 256 * 1024;
 
 /** Conservative per-run budget for production Lighthouse on hosted runners. */
@@ -47,7 +52,28 @@ export function classifyLighthouseFailure(output) {
     return 'job_deadline';
   }
 
+  if (isBrowserLaunchCrash(normalized)) {
+    return 'retryable_infra';
+  }
+
   return 'unknown';
+}
+
+/**
+ * Puppeteer reports this when Chromium dies during process launch, before any
+ * page loads. Signal 11 / SIGSEGV is runner infra. A launch error without a
+ * crash signal stays unknown so a missing binary still fails closed.
+ */
+function isBrowserLaunchCrash(output) {
+  return (
+    /Failed to launch the browser process/i.test(output) &&
+    /Received signal 11\b|\bSIGSEGV\b/.test(output)
+  );
+}
+
+function retryableFailureNarration(failureClass) {
+  if (failureClass === 'retryable_infra') return 'Browser launch crash';
+  return 'Transient Chrome DevTools protocol failure';
 }
 
 /**
@@ -340,7 +366,10 @@ export async function runWithClassifiedRetries({
         .join(' ')
     );
 
-    if (failureClass !== 'transient_protocol' || attempt === maxAttempts) {
+    if (
+      !RETRYABLE_FAILURE_CLASSES.has(failureClass) ||
+      attempt === maxAttempts
+    ) {
       return {
         ...result,
         attempts: attempt,
@@ -368,7 +397,10 @@ export async function runWithClassifiedRetries({
         routeLabel,
       });
       report(
-        `Transient Chrome DevTools protocol failure; skipping further retries because the job deadline cannot fit another attempt.`
+        [
+          `${retryableFailureNarration(failureClass)}; skipping further`,
+          'retries because the job deadline cannot fit another attempt.',
+        ].join(' ')
       );
       report(receipt);
       return {
@@ -382,7 +414,10 @@ export async function runWithClassifiedRetries({
     }
 
     report(
-      `Transient Chrome DevTools protocol failure; cooling down for ${cooldownMs}ms before bounded retry.`
+      [
+        `${retryableFailureNarration(failureClass)}; cooling down for`,
+        `${cooldownMs}ms before bounded retry.`,
+      ].join(' ')
     );
     await sleep(cooldownMs);
   }

@@ -71,6 +71,7 @@ vi.mock('@/lib/queries', async importOriginal => ({
     data: mockInsightsSummary.data,
     isLoading: false,
     isError: false,
+    isEnabled: true,
   }),
 }));
 
@@ -261,6 +262,7 @@ beforeAll(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   mockRailPanel.enabled = false;
   mockRailPanel.value.upsertContexts.mockClear();
   mockRailPanel.value.clearContexts.mockClear();
@@ -318,6 +320,45 @@ describe('JovieChat styling regressions', () => {
     submitting.unmount();
     expect(getDesktopWorkState()).toBeNull();
   });
+  it('shows scroll-to-latest without remounting the transcript when the sentinel leaves', () => {
+    let onIntersect: ((entries: IntersectionObserverEntry[]) => void) | null =
+      null;
+    const original = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver = vi.fn().mockImplementation(function (
+      this: IntersectionObserver,
+      callback: (entries: IntersectionObserverEntry[]) => void
+    ) {
+      onIntersect = callback;
+      this.observe = vi.fn();
+      this.unobserve = vi.fn();
+      this.disconnect = vi.fn();
+      this.takeRecords = vi.fn(() => []);
+    }) as unknown as typeof IntersectionObserver;
+
+    try {
+      const view = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+      const message = view.getByTestId('chat-message');
+      const scroll = view.getByTestId('chat-message-scroll');
+      expect(
+        scroll.querySelector('.system-b-scroll-to-bottom-icon')
+      ).toBeNull();
+
+      act(() => {
+        onIntersect?.([{ isIntersecting: false } as IntersectionObserverEntry]);
+      });
+
+      const button = scroll.querySelector('.system-b-scroll-to-bottom');
+      expect(button).not.toBeNull();
+      expect(
+        button?.querySelector('.system-b-scroll-to-bottom-icon')
+      ).not.toBeNull();
+      expect(scroll.lastElementChild).toBe(button);
+      expect(view.getByTestId('chat-message')).toBe(message);
+    } finally {
+      globalThis.IntersectionObserver = original;
+    }
+  });
+
   it('renders thinking placeholder as a ChatMessage with isThinking when loading', () => {
     const { container } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
@@ -602,6 +643,7 @@ describe('JovieChat styling regressions', () => {
   });
 
   it('renders a responsive personal welcome and one next step above the composer (JOV-7150)', () => {
+    vi.useFakeTimers();
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
@@ -635,11 +677,26 @@ describe('JovieChat styling regressions', () => {
     expect(
       container.querySelector('[data-testid="chat-empty-state-insight"]')
     ).toBeNull();
-    // Insights data is still undefined. Do not freeze the profile link or the
-    // draft button until that summary settles.
+    // Allow the enabled query to settle before committing the fallback.
     expect(container.textContent).toContain('Finding your next step');
     expect(container.textContent).not.toContain('Draft This With Jovie');
     expect(container.textContent).not.toContain('Review Your Profile');
+
+    const nextStep = container.querySelector(
+      '[data-testid="chat-empty-state-next-step"]'
+    );
+    expect(nextStep?.className).toContain('min-h-24');
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(container.textContent).not.toContain('Finding your next step');
+    expect(container.textContent).toContain('Review Your Profile');
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-next-step"]')
+    ).toBe(nextStep);
+    expect(
+      container.querySelector(
+        '[data-testid="chat-empty-state-greeting-region"]'
+      )
+    ).toBe(region);
   });
 
   it('preserves the welcome and offers one action without promoting Insight prose to a win (JOV-7150)', () => {
@@ -691,7 +748,7 @@ describe('JovieChat styling regressions', () => {
     ).toBeNull();
   });
 
-  it('renders the Ovie editorial briefing as the empty-state affordance in ov mode', () => {
+  it('renders a supplied Home canvas as the empty-state affordance', () => {
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
@@ -702,45 +759,69 @@ describe('JovieChat styling regressions', () => {
       <JovieChat
         profileId='profile-1'
         chatMode='ov'
-        ovieHomeBriefing={{
-          greeting: 'Good morning, Tim.',
-          updatedLabel: 'Updated Sep 28, 8:00 AM PDT',
-          signal: {
-            id: 'activation.first-user',
-            title: 'The first real user completed onboarding',
-            summary: 'Activation has moved from theory to observed behavior.',
-            currentValue: '1 activated user',
-            delta: '+1 today',
-            target: 'Learn what made the path work',
-            sourceLabel: 'Founder Funnel',
-            nextAction: 'Review the session.',
-            removalEvent: 'The activation lesson is applied.',
-            summerCanAct: true,
-          },
-          actions: [
-            {
-              id: 'activation.first-user:next',
-              label: 'Start The Next Step',
-              prompt: 'Review the first activation with me.',
-            },
-          ],
-        }}
+        homeCanvas={<div data-testid='home-canvas-fixture' />}
       />
     );
 
     expect(
-      container.querySelector('[data-testid="ovie-editorial-briefing"]')
+      container.querySelector('[data-testid="home-canvas-fixture"]')
     ).toBeTruthy();
     expect(
       container
         .querySelector('[data-testid="chat-empty-state-viewport"]')
         ?.getAttribute('data-empty-affordance')
-    ).toBe('ovie-briefing');
-    // The briefing owns the empty-state chrome layer — no usage banner stack.
+    ).toBe('home-canvas');
+    // The canvas owns the empty-state chrome layer — no usage banner stack.
     expect(container.querySelector('[data-testid="chat-usage"]')).toBeNull();
   });
 
-  it('never renders the Ovie briefing outside ov mode', () => {
+  it('keeps a living Home canvas as the surface after messages, with the transcript on request', () => {
+    const states: { isStreaming: boolean; count: number }[] = [];
+    const { container, getByRole } = renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        chatMode='ov'
+        homeCanvasMode='living'
+        homeCanvas={state => {
+          states.push({
+            isStreaming: state.isStreaming,
+            count: state.messages.length,
+          });
+          return (
+            <button type='button' onClick={state.onOpenTranscript}>
+              Open Transcript Fixture
+            </button>
+          );
+        }}
+      />
+    );
+
+    expect(
+      container
+        .querySelector('[data-testid="chat-empty-state-viewport"]')
+        ?.getAttribute('data-empty-affordance')
+    ).toBe('home-canvas');
+    expect(states.at(-1)).toEqual({ isStreaming: true, count: 1 });
+    // Living Home fills the space above the composer (no page scroll).
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-above-scroll"]')
+    ).toHaveClass('lg:overflow-hidden');
+
+    act(() => {
+      getByRole('button', { name: 'Open Transcript Fixture' }).click();
+    });
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-viewport"]')
+    ).toBeNull();
+    act(() => {
+      getByRole('button', { name: 'Back To Home' }).click();
+    });
+    expect(
+      container.querySelector('[data-testid="chat-empty-state-viewport"]')
+    ).toBeTruthy();
+  });
+
+  it('keeps the bare Jovie empty state when no Home canvas is supplied', () => {
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
@@ -752,8 +833,10 @@ describe('JovieChat styling regressions', () => {
     );
 
     expect(
-      container.querySelector('[data-testid="ovie-editorial-briefing"]')
-    ).toBeNull();
+      container
+        .querySelector('[data-testid="chat-empty-state-viewport"]')
+        ?.getAttribute('data-empty-affordance')
+    ).not.toBe('home-canvas');
   });
 
   it.each([

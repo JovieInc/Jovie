@@ -54,7 +54,7 @@ export function useRailPreview({
 
   useEffect(() => {
     if (!enabled) return;
-    const selector = `[data-rail-toggle="${side}"], [data-rail-preview-region="${side}"]`;
+    const selector = `[data-rail-toggle="${side}"]:not([data-rail-preview-trigger="false"]), [data-rail-preview-region="${side}"]`;
     const inside = (target: EventTarget | null) =>
       target instanceof Element && Boolean(target.closest(selector));
     const enter = (event: Event) => {

@@ -139,7 +139,16 @@ export function EmailCodeAuthForm({
   // email address in the URL (and server/analytics logs). Keep submit
   // disabled until the handler is attached.
   const [isHydrated, setIsHydrated] = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
+    // Hydration keeps whatever the visitor typed or autofilled into the
+    // server-rendered field, but `emailAddress` state is still empty. The
+    // next render (this effect's own `setIsHydrated`) would write that empty
+    // state back into the DOM, wiping the field so the click shows "Enter
+    // your email address." and no code is sent. Adopt the DOM value first;
+    // it equals the rendered value unless the visitor changed it.
+    const input = emailInputRef.current;
+    if (input) setEmailAddress(input.value);
     setIsHydrated(true);
   }, []);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -350,7 +359,7 @@ export function EmailCodeAuthForm({
         </p>
         <Button
           type='button'
-          className={AUTH_CLASSES.authCta}
+          className={`${AUTH_CLASSES.authCta} my-2`}
           static
           onClick={handleRequestNewCode}
         >
@@ -384,23 +393,23 @@ export function EmailCodeAuthForm({
         <FormError id='auth-email-code-error' message={errorMessage} />
         <Button
           type='submit'
-          className={AUTH_CLASSES.authCta}
+          className={`${AUTH_CLASSES.authCta} my-2`}
           static
           disabled={isPending || code.length < 6}
         >
           {isPending ? 'Verifying…' : 'Verify Code'}
         </Button>
-        <div className='flex flex-wrap items-center justify-center gap-x-3 gap-y-1'>
+        <div className='grid grid-cols-2 items-stretch gap-3 text-center'>
           <button
             type='button'
             onClick={handleBackToEmail}
-            className='focus-ring-themed max-w-full rounded-md text-app text-secondary-token underline underline-offset-2'
+            className='auth-quiet-target focus-ring-themed rounded-md text-app text-secondary-token underline underline-offset-2'
           >
             {AUTH_EMAIL_CHANGE_LABEL}
           </button>
           {resendCooldown > 0 ? (
             <span
-              className='shrink-0 text-app text-tertiary-token'
+              className='auth-quiet-target text-app text-tertiary-token'
               aria-live='polite'
             >
               Resend in {resendCooldown}s
@@ -411,7 +420,7 @@ export function EmailCodeAuthForm({
               onClick={handleResendCode}
               disabled={isPending}
               aria-label='Resend Verification Code'
-              className='focus-ring-themed max-w-full rounded-md text-app text-secondary-token underline underline-offset-2 disabled:opacity-50'
+              className='auth-quiet-target focus-ring-themed rounded-md text-app text-secondary-token underline underline-offset-2 disabled:opacity-50'
             >
               Resend code
             </button>
@@ -436,6 +445,7 @@ export function EmailCodeAuthForm({
           Email
         </label>
         <AuthInput
+          ref={emailInputRef}
           id='auth-email'
           type='email'
           name='emailAddress'
@@ -455,7 +465,7 @@ export function EmailCodeAuthForm({
       </div>
       <Button
         type='submit'
-        className={AUTH_CLASSES.authCta}
+        className={`${AUTH_CLASSES.authCta} my-2`}
         static
         disabled={isPending || !isHydrated}
         aria-busy={isPending || undefined}

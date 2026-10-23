@@ -100,7 +100,9 @@ test('emits exact-head public screen evidence', async ({ page }) => {
         waitUntil: 'domcontentloaded',
         timeout: 120_000,
       });
-      expect(response?.status()).toBe(200);
+      expect(response?.status(), `${screen.screenId} ${screen.route}`).toBe(
+        200
+      );
       const finalUrl = new URL(page.url());
       expect(finalUrl.pathname).toBe(screen.route);
       expect(finalUrl.search).toBe('');

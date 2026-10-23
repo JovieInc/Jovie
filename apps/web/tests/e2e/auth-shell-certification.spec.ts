@@ -426,34 +426,123 @@ test('valid email pending, send transport failure and retry retain claim context
   await expectClaim(page);
 });
 
-// Known runtime defect owned by JOV-8342. Keep the detector red until repaired;
-// a generic transport error cannot count as client validation.
-test('malformed mailbox is rejected before any OTP request @auth-certification', async ({
+// Production regression (2026-10-18/20): an email typed or autofilled before
+// hydration was wiped by the first client render, so the click showed "Enter
+// your email address." and no OTP request was made. Script chunks are held
+// until the field is filled so the typing always lands before hydration.
+test('email typed before hydration survives and is sent @auth-certification', async ({
   page,
-}, testInfo) => {
-  await page.goto(APP_ROUTES.SIGNUP, { waitUntil: 'domcontentloaded' });
-  const shell = await expectLiveShell(page);
-  const requests: unknown[] = [];
+}) => {
+  const typedEmail = 'e2e+prehydration@example.com';
+  let releaseScripts: (() => void) | undefined;
+  const scriptsReleased = new Promise<void>(resolve => {
+    releaseScripts = resolve;
+  });
+  // Hold JavaScript only; stylesheets share the chunks path and must load
+  // for the server-rendered form to become visible.
+  await page.route(
+    url =>
+      url.pathname.startsWith('/_next/static/chunks/') &&
+      url.pathname.endsWith('.js'),
+    async route => {
+      await scriptsReleased;
+      await route.continue();
+    }
+  );
+  const sentBodies: string[] = [];
   await page.route(
     '**/api/auth/email-otp/send-verification-otp',
     async route => {
-      requests.push(route.request().postDataJSON());
+      sentBodies.push(route.request().postData() ?? '');
       await route.abort('internetdisconnected');
     }
   );
-  await shell
-    .getByRole('textbox', { name: 'Email', exact: true })
-    .fill('<script>@example.com');
+
+  try {
+    await page.goto(APP_ROUTES.SIGNIN, { waitUntil: 'commit' });
+    const email = page.locator('#auth-email');
+    await email.waitFor({ state: 'visible' });
+    await expect(page.locator(SHELL)).toHaveAttribute(
+      'data-auth-shell-hydrated',
+      'false'
+    );
+    await email.fill(typedEmail);
+  } finally {
+    releaseScripts?.();
+  }
+
+  const shell = await expectLiveShell(page);
+  const email = shell.getByRole('textbox', { name: 'Email', exact: true });
+  await expect(email).toHaveValue(typedEmail);
   await shell
     .getByRole('button', { name: 'Send sign-in code', exact: true })
     .click();
-  await expect(page.locator('#auth-email-error')).toBeVisible();
-  await testInfo.attach('unexpected-otp-requests', {
-    body: Buffer.from(JSON.stringify(requests)),
-    contentType: 'application/json',
-  });
-  expect(
-    requests,
-    'Malformed mailbox must be rejected without requesting OTP'
-  ).toHaveLength(0);
+
+  await expect.poll(() => sentBodies.length).toBe(1);
+  expect(JSON.parse(sentBodies[0])).toMatchObject({ email: typedEmail });
+  await expect(email).toHaveValue(typedEmail);
+  await expect(page.locator('#auth-email-error')).not.toHaveText(
+    'Enter your email address.'
+  );
 });
+
+// JOV-8342: abort every auth POST even when the client validator regresses.
+// A generic transport failure is not evidence of client validation.
+for (const width of [390, 768, 1440]) {
+  test(`malformed mailboxes are rejected before any auth POST at ${width}px @auth-certification`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 1000 });
+    const requests: string[] = [];
+    page.on('request', request => {
+      if (
+        new URL(request.url()).pathname.startsWith('/api/auth/') &&
+        request.method() === 'POST'
+      ) {
+        requests.push(new URL(request.url()).pathname);
+      }
+    });
+    await page.goto(APP_ROUTES.SIGNUP, { waitUntil: 'domcontentloaded' });
+    const shell = await expectLiveShell(page);
+    const email = shell.getByRole('textbox', { name: 'Email', exact: true });
+    const submit = shell.getByRole('button', {
+      name: 'Send sign-in code',
+      exact: true,
+    });
+    for (const [index, value] of [
+      '<script>@example.com',
+      'artist,name@example.com',
+      'artíst@example.com',
+      'artist@-example.com',
+      'artist@example-.com',
+      'artist..name@example.com',
+    ].entries()) {
+      await email.fill(value);
+      if (index % 2 === 0) await email.press('Enter');
+      else await submit.click();
+      await expect(page.locator('#auth-email-error')).toBeVisible();
+      expect(requests, `${value} must not reach auth`).toHaveLength(0);
+      await expect(email).toHaveAttribute('aria-invalid', 'true');
+      await expect(email).toHaveAccessibleDescription(
+        'That email address doesn’t look right. Check it and try again.'
+      );
+      await expect(email).toBeEditable();
+      await expect(email).toHaveValue(value);
+      await expect(submit).toBeEnabled();
+      await expect(page.locator('[data-auth-email-code-step]')).toHaveAttribute(
+        'data-auth-email-code-step',
+        'email'
+      );
+      await expect
+        .poll(() =>
+          page.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+        )
+        .toBeLessThanOrEqual(1);
+    }
+    await testInfo.attach('unexpected-auth-posts', {
+      body: Buffer.from(JSON.stringify(requests)),
+      contentType: 'application/json',
+    });
+    await capture(page, testInfo, 'mailbox-validation');
+  });
+}

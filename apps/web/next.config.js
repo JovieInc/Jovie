@@ -6,6 +6,9 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 const { withWorkflow } = require('workflow/next');
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
+const {
+  legacyProfileAliasRedirects,
+} = require('./lib/routing/legacy-profile-alias-redirects');
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
 const screenshotCatalogTraceIncludes = [
   'screenshot-catalog/current/**/*',
@@ -112,6 +115,7 @@ const nextConfig = {
   // Build optimizations
   poweredByHeader: false,
   compress: true,
+  // JOV-7985: Node.js is supported; enable after the dated migration exception clears.
   // JOV-7987: Cache Components requires migrating route-segment exports and
   // validating this entire app. Node.js is supported; the explicit `runtime`
   // export is rejected in 16.4.1. Keep the rendering migration separate from
@@ -502,6 +506,9 @@ const nextConfig = {
         source: '/app/admin/ingest',
         destination: '/app/ov/growth?view=ingest',
       },
+      // Needs You folded into Ovie Home's asks (Tim 2026-10-21: one Home).
+      { source: '/app/ov/needs-you', destination: '/app/ov' },
+      { source: '/app/admin/needs-you', destination: '/app/ov' },
       {
         source: '/app/admin/:path*',
         destination: '/app/ov/:path*',
@@ -549,6 +556,10 @@ const nextConfig = {
         permanent: false,
       },
       ...legacyAppRedirects,
+      // Legacy profile deep links (`/dualipa/listen`) redirect at the edge,
+      // before the Node proxy. The catch-all resolver remains for collisions
+      // via `?alias-content=1` or the `jovie_alias_content` hold cookie.
+      ...legacyProfileAliasRedirects(),
       // Old /tips landing page redirect
       {
         source: '/tips',
@@ -621,6 +632,7 @@ const nextConfig = {
       'tour',
       'shows',
       'events',
+      'contact',
     ].flatMap(alias => [
       {
         source: `/:username/${alias}`,

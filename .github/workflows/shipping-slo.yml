@@ -2,7 +2,7 @@ name: Shipping SLO Ratchet
 # clock-class: upstream-advisory
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Devin
-# necessary-trust-boundary: A hosted clock measures repo-local GitHub signals (workflow runs, PR timelines, deployments) and writes only committed metric snapshots, baseline ratchet PRs, and slo-regression issues under the Jovie Bot app token; it never merges, deploys, or records founder decisions.
+# necessary-trust-boundary: A hosted clock measures repo-local GitHub signals (workflow runs, PR timelines, deployments) and writes only committed metric snapshots and baseline ratchet PRs under the Jovie Bot app token, plus deduped Linear findings under JOV-6783; it never merges, deploys, or records founder decisions.
 # removal-trigger: Remove the schedule when the Symphony control plane emits these SLO measurements natively and the daily GitHub-Actions sweep becomes redundant.
 
 # JOV-6783: deterministic, zero-token shipping-SLO ratchet.
@@ -12,10 +12,15 @@ name: Shipping SLO Ratchet
 # its second-order trend. Compares against docs/metrics/shipping-slo-baseline.json:
 #   >10% p95 improvement held 3 days → bot PR tightens the baseline
 #   >20% regression / >20% throughput drop / flat growth → one deduped
-#     `slo-regression` issue per metric (top offenders + measurement diff)
+#     Linear `slo-regression` issue per metric (top offenders + measurement diff)
 # Also publishes docs/metrics/shipping-slo-latest.json through a bot PR so the
 # Symphony lanes status gist (scripts/lanes/doctor.py) can embed the `slo` block
 # for Summer without bypassing protected-main admission.
+# Stage timings (docs/metrics/STAGE_EVENTS.md): the same run derives
+# jovie-stage-event/v1 rows from PR timelines, controller jobs, LogYourBody
+# release runs, Linear history and registered producer feeds, and commits
+# p50/p95/n per stage over 24h/7d/28d plus regression flags to
+# docs/metrics/stage-timings-latest.json (summary embedded in the slo block).
 
 on:
   schedule:
@@ -29,7 +34,7 @@ on:
       workflows:
         description: 'Comma-separated required workflow files'
         required: false
-        default: 'ci.yml'
+        default: 'ci.yml,source-validation.yml'
 
 permissions: {}
 
@@ -41,7 +46,8 @@ jobs:
   measure:
     name: Measure shipping SLOs and evaluate ratchet
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # ~8 min SLO collection + ~6 min 29-day stage backfill (GraphQL, batched).
+    timeout-minutes: 35
     permissions:
       contents: read
     env:
@@ -64,40 +70,33 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
-      - name: Run weekly post-mortem failure-class review
-        id: postmortems
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          GBRAIN_API_URL: ${{ secrets.GBRAIN_API_URL }}
-          GBRAIN_API_KEY: ${{ secrets.GBRAIN_API_KEY }}
-        run: |
-          set -euo pipefail
-          echo "ran=false" >> "$GITHUB_OUTPUT"
-          if [ "$EVENT_NAME" != 'workflow_dispatch' ] && [ "$(date -u +%u)" != '1' ]; then
-            exit 0
-          fi
-          # JOV-INV-042: scheduled reconciliation is read-only in Linear;
-          # Quality Gap Finder owns event-driven control/class issue writes.
-          node scripts/postmortem-review-report.mjs \
-            --out "$RUNNER_TEMP/postmortem-review.json" > /dev/null
-          echo "ran=true" >> "$GITHUB_OUTPUT"
-
-      - name: Preserve weekly post-mortem review
-        if: ${{ steps.postmortems.outputs.ran == 'true' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - name: Generate read-only stage evidence token
+        id: stage-read-token
+        # Optional: without it the LogYourBody stage source records unavailable.
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          name: postmortem-review-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/postmortem-review.json
-          retention-days: 30
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          owner: JovieInc
+          repositories: |
+            Jovie
+            LogYourBody
+          permission-actions: read
+          permission-checks: read
+          permission-contents: read
+          permission-pull-requests: read
+          permission-statuses: read
 
       - name: Measure and evaluate
         id: slo
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          STAGE_GH_TOKEN: ${{ steps.stage-read-token.outputs.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           GH_REPO: ${{ github.repository }}
           DAYS: ${{ github.event.inputs.days || '21' }}
-          WORKFLOWS: ${{ github.event.inputs.workflows || 'ci.yml' }}
+          WORKFLOWS: ${{ github.event.inputs.workflows || 'ci.yml,source-validation.yml' }}
         run: |
           set -euo pipefail
           node scripts/shipping-slo-report.mjs validate
@@ -126,7 +125,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
           git switch -c "$BRANCH"
-          git add docs/metrics/shipping-slo-latest.json docs/metrics/blog-publish-latency-latest.json
+          git add docs/metrics/shipping-slo-latest.json docs/metrics/blog-publish-latency-latest.json docs/metrics/stage-timings-latest.json
           if git diff --staged --quiet; then
             echo "Snapshot unchanged — nothing to commit."
             exit 0
@@ -148,7 +147,7 @@ jobs:
         # (API outage, auth failure) is a collection bug, not a regression.
         if: ${{ (steps.slo.outputs.regressions != '0' || steps.slo.outputs.flat_stall == 'true') && steps.slo.outputs.samples != '0' }}
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REPORT: ${{ runner.temp }}/shipping-slo.json
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |

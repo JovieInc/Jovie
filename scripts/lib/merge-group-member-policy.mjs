@@ -1138,14 +1138,11 @@ export async function runPolicy({
       );
     } catch (error) {
       if (!(error instanceof MergeGroupPolicyRateLimitError)) throw error;
+      // No checkout diff. A green check here would merge an unread change.
       log(
-        `::notice::PR Size Guard deferred a GitHub rate limit before a diff was available: ${error.message}`
+        `::notice::PR Size Guard refused a GitHub rate limit with no local diff: ${error.message}`
       );
-      if (also) await emit(`${also}_verdict=pass`);
-      log(
-        'PR Size Guard rate-limit deferral: diff unread, so this is not a size-cap failure.'
-      );
-      return;
+      throw error;
     }
   }
   const members = resolveMergeGroupMembers({ event, comparison });
@@ -1163,13 +1160,9 @@ export async function runPolicy({
     if (!(error instanceof MergeGroupPolicyRateLimitError)) throw error;
     if (!Array.isArray(local?.files)) {
       log(
-        `::notice::PR Size Guard deferred a GitHub rate limit before a diff was available: ${error.message}`
+        `::notice::PR Size Guard refused a GitHub rate limit with no local diff: ${error.message}`
       );
-      if (also) await emit(`${also}_verdict=pass`);
-      log(
-        'PR Size Guard rate-limit deferral: diff unread, so this is not a size-cap failure.'
-      );
-      return;
+      throw error;
     }
     log(
       `::notice::PR Size Guard kept the size cap on the local diff after a GitHub rate limit: ${error.message}`
@@ -1218,6 +1211,12 @@ export async function runPolicy({
   }
 
   if (policy === 'size') {
+    // Bytes come from the checkout evidence (`git ls-tree -r -l` in
+    // merge-group-local-evidence.mjs). This process must not spawn git.
+    // The git/trees read is only the fallback when that object is not local.
+    // githubRequest already holds a rate-limit 403 until x-ratelimit-reset
+    // when the reset is inside this job's budget. A rate limit that still
+    // escapes, with nothing measured, fails closed.
     if (local?.tracked) {
       logTrackedPayload(enforceTrackedBudget(local.tracked), log);
     } else {
@@ -1235,8 +1234,9 @@ export async function runPolicy({
       } catch (error) {
         if (!(error instanceof MergeGroupPolicyRateLimitError)) throw error;
         log(
-          `::notice::PR Size Guard deferred the combined-tree byte budget on a GitHub rate limit: ${error.message}`
+          `::notice::PR Size Guard refused a GitHub rate limit with no local tree byte count: ${error.message}`
         );
+        throw error;
       }
     }
   }

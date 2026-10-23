@@ -97,7 +97,7 @@ const buttonVariants = cva(
 
 const DESTRUCTIVE_CLASSES: Record<ButtonVariant, string> = {
   primary:
-    'border-error bg-error text-error-foreground hover:border-error/90 hover:bg-error/90',
+    'border-btn-destructive bg-btn-destructive text-btn-destructive-foreground hover:border-btn-destructive/95 hover:bg-btn-destructive/95',
   secondary:
     'border-0 bg-error-subtle text-error hover:bg-error-subtle hover:text-error',
   tertiary: 'text-error hover:bg-error-subtle hover:text-error',
@@ -191,7 +191,9 @@ function ButtonLoadingSpinner({
       <Spinner
         size='sm'
         tone={primary ? 'inverse' : 'primary'}
-        className={primary && destructive ? 'text-error-foreground' : undefined}
+        className={
+          primary && destructive ? 'text-btn-destructive-foreground' : undefined
+        }
         label='Loading'
       />
     </span>
@@ -652,7 +654,9 @@ const ButtonMorph = React.forwardRef<HTMLButtonElement, ButtonMorphProps>(
                   size='sm'
                   tone={primary ? 'inverse' : 'primary'}
                   className={
-                    primary && destructive ? 'text-error-foreground' : undefined
+                    primary && destructive
+                      ? 'text-btn-destructive-foreground'
+                      : undefined
                   }
                 />
               </span>

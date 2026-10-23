@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 
-// Every repo workflow shares one GITHUB_TOKEN REST bucket (1,000 calls/h per
+// Every repo workflow shares one GITHUB_TOKEN REST bucket (5,000 calls/h per
 // repo), and merge-group rebuilds multiply each call. This ledger is the
 // complete list of ci.yml steps that receive the token, with the REST calls
 // each one spends in a green merge group. A new token-bearing step fails here
@@ -116,6 +116,10 @@ const LEDGER = {
     kind: 'skipped-in-merge-group',
     greenGroupCalls: 0,
   },
+  'ci-golden-path/Certify canonical outbound artist journey': {
+    kind: 'off',
+    greenGroupCalls: 0,
+  },
   'main-release-ready/Resolve sealed product-lane release routing': {
     kind: 'off',
     greenGroupCalls: 0,
@@ -153,17 +157,12 @@ describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
     expect(total).toBeLessThanOrEqual(MAX_GREEN_GROUP_CALLS);
   });
 
-  it('spends the ejection call only after a lane failure', () => {
+  it('does not post an early PR Ready status that rebuilds the queue', () => {
     const ejectors = tokenSteps().filter(
       ({ step }) => step.name === FAIL_FAST_STEP
     );
-    expect(ejectors.length).toBeGreaterThan(0);
-    for (const { key, job } of ejectors) {
-      // The step-only <lane>-fail-fast job carries the failure gate (#21592).
-      expect(CI.jobs[job].if, key).toBe(
-        "${{ failure() && github.event_name == 'merge_group' }}"
-      );
-    }
+    expect(ejectors).toEqual([]);
+    expect(JSON.stringify(CI)).not.toContain('ejected before the slowest lane');
   });
 
   it('gates off-merge-group steps by event or a disabled variable', () => {
@@ -181,6 +180,10 @@ describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
     expect(CI.jobs['ci-unit-runner-route'].if).toBe(
       "github.event_name == 'workflow_dispatch'"
     );
+    expect(CI.jobs['ci-golden-path'].if).toContain(
+      "github.event_name == 'workflow_dispatch'"
+    );
+    expect(CI.jobs['ci-golden-path'].if).not.toContain("'merge_group'");
     expect(CI.jobs['main-release-ready'].if ?? '').not.toContain(
       "'merge_group'"
     );

@@ -49,7 +49,7 @@ test.describe('Admin Dashboard', () => {
     );
     test.setTimeout(120_000);
 
-    const response = await smokeNavigateWithRetry(page, APP_ROUTES.HUD, {
+    const response = await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_OPS, {
       timeout: 90_000,
       retries: fastIteration ? 3 : 2,
     });
