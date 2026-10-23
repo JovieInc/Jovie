@@ -12,17 +12,27 @@ import { logger } from '@/lib/utils/logger';
  * from the CDN without invoking the catch-all resolver function.
  *
  * The decision JSON is visitor-independent public routing state, so it is
- * CDN-cacheable with a short window: `s-maxage=15` keeps newly created
- * smart-link content at a reserved alias slug at most ~15s away from its
- * canonical URL, and `stale-while-revalidate` keeps every refresh off the
- * request path. Inner data reads reuse the resolver's unstable_cache (300s,
- * smartlink-content tags). Any failure returns a non-cacheable 503 and the
- * proxy falls through to the historical resolver page — this endpoint can
- * only make aliases faster, never change their outcome.
+ * CDN-cacheable. The fresh window must cover a complete staged-build alias
+ * measurement: the exact-build performance gate measures every reserved
+ * alias (listen, music, subscribe, tip, tour, releases) with three discarded
+ * shared-context warmups plus five timed samples, and a fresh deployment
+ * serves each alias decision cold — the proxy's 250ms response budget then
+ * declines and the hop pays the catch-all resolver page instead, which
+ * pushed /subscribe over the usable-alias-result budget on staged build
+ * e494d86 (Production Controller 39919971407: hop1 307 phases
+ * 219/1816/547/540/689ms). `s-maxage=120` keeps one cold fill (the proxy's
+ * waitUntil cache-fill from #22734) fresh through that whole per-route
+ * measurement, and `stale-while-revalidate` keeps every refresh off the
+ * request path. Fresh + stale = 300s, aligned with the resolver's inner
+ * unstable_cache (300s, smartlink-content tags) so this endpoint's servable
+ * window never exceeds the data freshness the resolver itself already
+ * tolerates. Any failure returns a non-cacheable 503 and the proxy falls
+ * through to the historical resolver page — this endpoint can only make
+ * aliases faster, never change their outcome.
  */
 
 const DECISION_CACHE_CONTROL =
-  'public, s-maxage=15, stale-while-revalidate=285';
+  'public, s-maxage=120, stale-while-revalidate=180';
 
 export async function GET(req: Request) {
   const url = new URL(req.url);

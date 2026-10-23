@@ -56,13 +56,37 @@ describe('GET /api/profile-alias-decision', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe(
-      'public, s-maxage=15, stale-while-revalidate=285'
+      'public, s-maxage=120, stale-while-revalidate=180'
     );
     await expect(response.json()).resolves.toEqual({
       creatorUsername: 'dualipa',
       href: '/dualipa?mode=listen',
       kind: 'mode',
     });
+  });
+
+  it('keeps a fresh window that covers a staged alias measurement and aligns with the resolver cache TTL', async () => {
+    // The exact-build performance gate measures every reserved alias with
+    // three discarded warmups plus five timed samples. A fresh window
+    // shorter than that per-route measurement (the old 15s) expired
+    // mid-measurement, so later samples re-paid the cold decision hop and
+    // the catch-all resolver fallback, which pushed /subscribe over the
+    // usable-alias-result budget on staged build e494d86 (controller run
+    // 39919971407). Fresh + stale must stay aligned with the resolver's
+    // inner unstable_cache TTL (300s) so this endpoint is never servable
+    // staler than the data the resolver itself tolerates.
+    const response = await GET(
+      new Request(endpointUrl({ alias: 'subscribe', username: 'dualipa' }))
+    );
+
+    const cacheControl = response.headers.get('cache-control') ?? '';
+    const maxAge = Number(/s-maxage=(\d+)/.exec(cacheControl)?.[1] ?? 0);
+    const staleWhileRevalidate = Number(
+      /stale-while-revalidate=(\d+)/.exec(cacheControl)?.[1] ?? 0
+    );
+
+    expect(maxAge).toBeGreaterThanOrEqual(120);
+    expect(maxAge + staleWhileRevalidate).toBe(300);
   });
 
   it('returns a moved decision for renamed-content old slugs', async () => {

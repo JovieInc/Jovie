@@ -179,7 +179,8 @@ describe('resolveProfileModeAliasAtEdge', () => {
         if (response.writableEnded || request.destroyed) return;
         completedResponses += 1;
         response.writeHead(200, {
-          'cache-control': 'public, s-maxage=15, stale-while-revalidate=285',
+          // Mirrors the decision endpoint's real header (route.ts).
+          'cache-control': 'public, s-maxage=120, stale-while-revalidate=180',
           'content-type': 'application/json',
         });
         response.end(
