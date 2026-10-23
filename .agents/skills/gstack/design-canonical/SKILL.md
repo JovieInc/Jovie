@@ -505,6 +505,12 @@ work even when they are internal or generated.
    `scripts/invariants/icp-language/check.mjs` enforce this. The baseline only
    shrinks.
 
+### Taste Rule: Copy Is the Message, Never the Brief
+
+Reject AI instructions, editing rules, and unfinished text in every user-visible string, including metadata, accessibility labels, emails, errors, empty states, and demos. Use the copy system.
+Run `node scripts/invariants/copy-leak/check.mjs` before review: it blocks PR Ready and merge groups. Fix real leaks; its baseline only shrinks.
+Exact exceptions in `scripts/invariants/copy-leak/config.json` require reasons.
+
 ### Logo asset normalization
 
 Logo bars normalize visible non-transparent ink, never file-canvas dimensions.
