@@ -438,4 +438,13 @@ describe('EmailCodeAuthForm page alignment', () => {
     expect(intro?.className).toContain('text-center');
     expect(intro?.className).not.toContain('text-left');
   });
+
+  it('renders the code step digit boxes on the 32px hero scale (glm/auth-focal-polish)', async () => {
+    await reachCodeStepWithAlign('left');
+    const firstDigit = screen.getByLabelText('Digit 1 of 6');
+    const shell = firstDigit.closest('div');
+    expect(shell?.className).toMatch(/\bh-8\b/);
+    expect(shell?.className).toMatch(/\bw-7\b/);
+    expect(shell?.className).not.toMatch(/\bh-12\b/);
+  });
 });
