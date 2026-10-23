@@ -2177,6 +2177,7 @@ describe('source-read guard selection', () => {
         'artist-launch-contract',
         'merge-group-unit-guards',
         'static-revalidate-policy',
+        'art-direction',
       ],
     ],
     [
@@ -2318,6 +2319,25 @@ describe('source-read guard selection', () => {
         expect(guard.command).toContain(
           join(REPO_ROOT, 'scripts/external-api-guard.mjs')
         );
+        continue;
+      }
+      if (guard.id === 'art-direction') {
+        expect(guard.command).toContain(
+          'scripts/invariants/art-direction/run.mjs'
+        );
+        expect(guard.command).toContain(
+          'scripts/invariants/art-direction/art-direction.test.mjs'
+        );
+        expect(guard.prOnly).toBe(true);
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/art-direction/art-direction.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain('describe(');
         continue;
       }
       if (guard.id === 'script-contracts') {

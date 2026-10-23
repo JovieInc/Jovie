@@ -197,6 +197,17 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
+    // Art-direction ratchets (one accent, hue, plates, surface media, hero
+    // scroll, shadow vision judges). prOnly: merge groups run the same
+    // checks via web unit tests. Path-filtered so product-only diffs skip it.
+    id: 'art-direction',
+    command:
+      'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/art-direction.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|apps\/web\/lib\/marketing\/night-dj-harmony\.ts$|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|scripts\/invariants\/art-direction\/)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
     // Third-party API calls go through packages/api-client / scripts/apiclient
     // (.claude/rules/external-apis.md). A new provider host, SDK client or gh
     // call in any scanned source fails here; grandfathered sites only shrink.
