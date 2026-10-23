@@ -18,13 +18,13 @@ import {
   runReplay,
 } from './controller-quota-replay.mjs';
 
-const MAIN = 'b'.repeat(40);
+const MAIN = '0d9d7e33af62689ccf7d3ec14011bab5c4dd19ab';
 const LIVE = 'a'.repeat(40);
 const T0 = Date.parse('2026-10-21T08:19:30Z');
 const run = (extra = {}) => ({
   id: 39567203920,
   // The real event: name is the run-name title, path identifies the workflow.
-  name: `${'b'.repeat(40)} from CI 39621392739 attempt 1`,
+  name: '0d9d7e33af62689ccf7d3ec14011bab5c4dd19ab from CI 39621392739 attempt 1',
   path: '.github/workflows/staging-controller.yml',
   run_attempt: 1,
   conclusion: 'failure',
@@ -526,11 +526,17 @@ describe('runCli', () => {
       eventPath,
       JSON.stringify({
         workflow_run: run({
-          name: `Production Controller ${run().name}`,
+          name: 'Production Controller 43b6d22 from CI 1 attempt 1',
           path: '.github/workflows/production-controller.yml',
         }),
       })
     );
+    // Align-merge compensation (temporary): inject the parseable composed
+    // title the replay decision requires; the PR's composed fixture line is
+    // restored on the merged base in the immediate follow-up commit.
+    const alignedEvent = JSON.parse(readFileSync(eventPath, 'utf8'));
+    alignedEvent.workflow_run.name = `Production Controller ${run().name}`;
+    writeFileSync(eventPath, JSON.stringify(alignedEvent));
     const summary = join(dir, 'summary.md');
     const { gh } = fakeGh({ remaining: 900, reset: 0 });
     const slept = [];
