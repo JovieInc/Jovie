@@ -1,7 +1,5 @@
 .artist-profiles-home-system {
   --homepage-page-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
-  --homepage-grid-max: var(--ds-public-content-max);
-  --homepage-grid-gutter: var(--homepage-page-gutter);
   --homepage-section-title-size: clamp(
     var(--text-3xl),
     3.6vw,

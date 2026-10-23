@@ -98,32 +98,19 @@ describe('mounted homepage grid spine System B source contract', () => {
       expect(spine, `${cssPath} spine leaked ${pattern}`).not.toMatch(pattern);
     }
 
-    // The spine block itself speaks only in shared column + gutter tokens.
+    // The spine block speaks only in the shared column + gutter tokens. The
+    // legacy per-page aliases (--homepage-grid-max / --homepage-grid-gutter /
+    // --homepage-section-max) are gone: one boxed width, one gutter.
     expect(spine).toContain('var(--ds-public-content-max)');
     expect(spine).toContain('var(--homepage-page-gutter)');
-    expect(spine).toContain(
-      '--homepage-grid-max: var(--ds-public-content-max);'
-    );
-    expect(spine).toContain(
-      '--homepage-grid-gutter: var(--homepage-page-gutter);'
-    );
+    expect(cssSource).not.toMatch(/--homepage-grid-(max|gutter)/);
+    expect(cssSource).not.toMatch(/--homepage-section-max/);
 
-    // The canonical gutter is tokenized on the space scale — one gutter for
-    // header, hero, and every story-stack chapter at every breakpoint.
+    // One gutter for header, hero, and every story-stack chapter at every
+    // breakpoint: the page gutter is the shared public gutter token.
     expect(cssSource).toContain(
-      '--homepage-page-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));'
+      '--homepage-page-gutter: var(--ds-public-gutter);'
     );
-
-    // No divergent chapter gutter may survive anywhere on the page: every
-    // grid-gutter declaration resolves to the shared page gutter.
-    const gutterDeclarations =
-      cssSource.match(/--homepage-grid-gutter:[^;]+;/g) ?? [];
-    expect(gutterDeclarations.length).toBeGreaterThan(0);
-    for (const declaration of gutterDeclarations) {
-      expect(declaration).toBe(
-        '--homepage-grid-gutter: var(--homepage-page-gutter);'
-      );
-    }
 
     // homepage-optical-polish-v1: editorial sections reuse the shared
     // 12-column desktop spans. 34rem is a reading-width limit, not a

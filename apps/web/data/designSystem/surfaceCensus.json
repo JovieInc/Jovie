@@ -388,9 +388,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-23T19:00:44.000Z",
-        "ref": "PR 22831 single-container renewal: header, hero and footer share one .public-container edge on /pricing (x 71-1369 at 1440, 24-366 at 390, no horizontal overflow), measured with a Playwright run against the dev build of the PR source (merge base of main a4eb75a8627); full-page captures at 1440 and 390; prior JOV-8097 interaction states unchanged",
-        "sourceDigest": "c9b5369b7347ee82a453dd6ef25fec3f8ca61eeca9b0e43f60248c4fd8598c22"
+        "at": "2026-10-23T20:43:34.826Z",
+        "ref": "PR 3 of the single-container work: home.css, section, blog and artist-profile widths moved onto the one .public-container token; /pricing edges re-measured with a Playwright run against the dev build of this branch (x 71-1369 at 1440, 24-366 at 390, no horizontal overflow); full-page captures at 1440 and 390 reviewed, no regression; ArtistProfileLandingPage.css only lost its unused homepage-grid aliases",
+        "sourceDigest": "512c534167adf8fb586d5fdda03f289fed7cfb0f0b5787ff6037161e177d6622"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
