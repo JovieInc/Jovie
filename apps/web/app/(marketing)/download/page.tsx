@@ -1,4 +1,4 @@
-import { Badge, Button, Link as UiLink } from '@jovie/ui';
+import { Button, Link as UiLink } from '@jovie/ui';
 import {
   ArrowDownToLine,
   Check,
@@ -19,6 +19,7 @@ import {
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { DOWNLOAD_COPY } from '@/data/downloadCopy';
 import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 import { MAC_APP_SUPPORT } from '@/lib/desktop/mac-compatibility';
@@ -38,94 +39,51 @@ const DOWNLOAD_HERO_PHOTO = {
   opacity: 0.22,
 } as const;
 
-const FAQ_ITEMS = [
-  {
-    question: 'Is the Mac app safe?',
-    answer: `Yes. Each release is signed with Jovie's Apple Developer ID and notarized by Apple before it is published. macOS verifies the app the first time you open it.`,
-  },
-  {
-    question: 'Does the app update itself?',
-    answer:
-      'Yes. Jovie checks for updates automatically and installs the latest version when you quit the app.',
-  },
-  {
-    question: 'Does it work on Apple Silicon and Intel Macs?',
-    answer:
-      'Yes. Jovie for Mac is a universal app, so the same download works on both Apple Silicon and Intel Macs.',
-  },
-  {
-    question: 'Do I need a Jovie account?',
-    answer:
-      'Yes. The Mac app connects to your existing Jovie workspace. You can sign in with the same account you use on jov.ie.',
-  },
-  {
-    question: 'What about the iPhone app?',
-    answer:
-      'Jovie for iPhone is in internal TestFlight while we harden install, auth, Profile QR, Settings, and release reliability.',
-  },
-  {
-    question: 'Where does the download come from?',
-    answer:
-      'The download button redirects to the latest signed Jovie release hosted on GitHub.',
-  },
-];
-
 const PLATFORM_ROWS = [
   {
     icon: Laptop,
-    label: 'Mac',
-    title: 'Native desktop\u00a0workspace',
-    body: 'Open Jovie from your Dock, keep your release workflow out of browser noise, and stay current with automatic updates.',
-    action: 'Download for Mac',
-    href: DOWNLOAD_URL,
+    kind: 'mac' as const,
+    ...DOWNLOAD_COPY.platforms.mac,
   },
   {
     icon: Smartphone,
-    // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Apple platform casing
-    label: 'iPhone',
-    title: 'Internal TestFlight alpha',
-    body: 'Mobile stays private while the alpha proves auth, Profile QR, Settings, and TestFlight reliability on real devices.',
-    action: 'Internal alpha only',
-    href: '#ios-alpha',
+    kind: 'iphone' as const,
+    ...DOWNLOAD_COPY.platforms.iphone,
   },
-] as const;
-
-const FEATURE_ROWS = [
-  {
-    title: 'One workspace',
-    body: 'Releases, links, audience data, and campaigns stay connected to the same Jovie account you use on the web.',
-  },
-  {
-    title: 'Signed releases',
-    body: 'The Mac build is Developer ID signed, Apple notarized, and distributed from the latest GitHub release.',
-  },
-  {
-    title: 'Daily updates',
-    body: 'The app updates in the background when you quit, so internal fixes and product improvements reach your workspace quickly.',
-  },
-  {
-    title: 'Mobile proof loop',
-    body: 'The iPhone alpha focuses on install, auth return, Profile QR, Settings, and TestFlight quality before wider access.',
-  },
-] as const;
+];
 
 const REQUIREMENTS = [
-  { label: 'Operating System', value: MAC_APP_SUPPORT.minimumMacOSLabel },
-  { label: 'Architecture', value: 'Apple Silicon or Intel Mac' },
-  { label: 'Memory', value: '4 GB RAM minimum, 8 GB recommended' },
-  { label: 'Disk Space', value: '500 MB free' },
-  { label: 'Network', value: 'Internet connection required' },
+  {
+    label: DOWNLOAD_COPY.requirementLabels[0],
+    value: MAC_APP_SUPPORT.minimumMacOSLabel,
+  },
+  {
+    label: DOWNLOAD_COPY.requirementLabels[1],
+    value: DOWNLOAD_COPY.requirementValues.architecture,
+  },
+  {
+    label: DOWNLOAD_COPY.requirementLabels[2],
+    value: DOWNLOAD_COPY.requirementValues.memory,
+  },
+  {
+    label: DOWNLOAD_COPY.requirementLabels[3],
+    value: DOWNLOAD_COPY.requirementValues.disk,
+  },
+  {
+    label: DOWNLOAD_COPY.requirementLabels[4],
+    value: DOWNLOAD_COPY.requirementValues.network,
+  },
 ] as const;
 
 export const metadata: Metadata = {
-  title: documentTitle('Download Jovie'),
-  description: `Download the ${APP_NAME} desktop app for macOS. Code-signed, notarized by Apple, and updates itself in the background.`,
+  title: documentTitle(DOWNLOAD_COPY.metadata.title),
+  description: DOWNLOAD_COPY.metadata.description,
   alternates: {
     canonical: `${BASE_URL}/download`,
   },
   openGraph: {
     title: `Download ${APP_NAME}`,
-    description: `${APP_NAME} for Mac, with iPhone in internal TestFlight alpha.`,
+    description: DOWNLOAD_COPY.metadata.socialDescription,
     url: `${BASE_URL}/download`,
     type: 'website',
     images: [marketingOgImage('download')],
@@ -133,12 +91,12 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: `Download ${APP_NAME}`,
-    description: `${APP_NAME} for Mac, with iPhone in internal TestFlight alpha.`,
+    description: DOWNLOAD_COPY.metadata.socialDescription,
     images: [marketingOgImage('download').url],
   },
 };
 
-const FAQ_SCHEMA = buildFaqSchema(FAQ_ITEMS);
+const FAQ_SCHEMA = buildFaqSchema([...DOWNLOAD_COPY.faq]);
 const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
   { name: APP_NAME, url: BASE_URL },
   { name: 'Download', url: `${BASE_URL}/download` },
@@ -151,7 +109,7 @@ const legalLinkClassName =
 
 /**
  * /download — reuses MarketingContainer, homepage-section-eyebrow,
- * public-action-*, Button, Badge, and FaqSection. No page-scoped
+ * public-action-*, Button, and FaqSection. No page-scoped
  * download CSS class layer (JOV-3872).
  */
 export default function DownloadPage() {
@@ -179,19 +137,18 @@ export default function DownloadPage() {
               <div className='grid min-h-0 flex-1 items-start gap-12 pb-16 sm:pb-20 lg:grid-cols-2 lg:items-center lg:gap-16 lg:pb-24'>
                 <div className='max-w-xl max-sm:min-h-103'>
                   <p className='homepage-section-eyebrow'>
-                    Mac app available now / iPhone alpha in TestFlight
+                    {DOWNLOAD_COPY.eyebrow}
                   </p>
                   <h1
                     id='download-hero-heading'
                     className='mt-5 min-h-18 text-balance text-4xl font-bold leading-none tracking-normal text-(--system-b-text-primary) line-clamp-2 sm:min-h-30 sm:text-6xl'
                   >
-                    Jovie, Installed Where You Work.
+                    {DOWNLOAD_COPY.headline}
                   </h1>
                   <p
                     className={`mt-6 max-w-xl text-balance text-lg leading-relaxed tracking-normal ${muted}`}
                   >
-                    Run the native Mac workspace today. Keep the iPhone build
-                    internal while we harden auth, Profile QR, and TestFlight.
+                    {DOWNLOAD_COPY.hero}
                   </p>
                   <div className='mt-8 flex flex-wrap items-center gap-3'>
                     <Button
@@ -209,27 +166,25 @@ export default function DownloadPage() {
                           className='size-4'
                           aria-hidden='true'
                         />
-                        Download for Mac
+                        {DOWNLOAD_COPY.heroDownload}
                       </a>
                     </Button>
-                    <div className='flex items-center gap-2'>
-                      {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- Apple product name casing */}
-                      <Badge variant='outline'>iPhone Alpha</Badge>
-                      <UiLink
-                        asChild
-                        variant='subtle'
-                        className='text-sm font-medium'
-                      >
-                        <Link href='#ios-alpha'>See status</Link>
-                      </UiLink>
-                    </div>
+                    <UiLink
+                      asChild
+                      variant='subtle'
+                      className='text-sm font-medium'
+                    >
+                      <Link href='#iphone'>
+                        {DOWNLOAD_COPY.iphoneStatusLink}
+                      </Link>
+                    </UiLink>
                   </div>
                   <div
                     className={`mt-6 flex flex-wrap gap-x-5 gap-y-2 text-app leading-5 ${soft}`}
                   >
-                    <span>Developer ID signed</span>
-                    <span>Apple notarized</span>
-                    <span>Apple Silicon + Intel</span>
+                    {DOWNLOAD_COPY.proof.map(item => (
+                      <span key={item}>{item}</span>
+                    ))}
                   </div>
                 </div>
 
@@ -256,7 +211,7 @@ export default function DownloadPage() {
                   >
                     <Image
                       src={PROFILE_IMAGE.publicUrl}
-                      alt='Jovie iPhone alpha profile QR and public profile surface'
+                      alt={DOWNLOAD_COPY.phoneAlt}
                       width={PROFILE_IMAGE.width}
                       height={PROFILE_IMAGE.height}
                       priority
@@ -282,11 +237,11 @@ export default function DownloadPage() {
             <div className='grid lg:grid-cols-2'>
               {PLATFORM_ROWS.map((platform, index) => {
                 const Icon = platform.icon;
-                const isMac = platform.label === 'Mac';
+                const isMac = platform.kind === 'mac';
                 return (
                   <div
                     key={platform.label}
-                    id={isMac ? undefined : 'ios-alpha'}
+                    id={isMac ? undefined : 'iphone'}
                     className={
                       index === 0
                         ? 'border-subtle py-12 sm:py-16 max-lg:border-b lg:border-r lg:pr-12 lg:pl-0 xl:pr-16'
@@ -311,26 +266,35 @@ export default function DownloadPage() {
                       {platform.body}
                     </p>
                     {isMac ? (
-                      <a
-                        href={platform.href}
-                        className='public-action-primary mt-7 inline-flex min-h-11 items-center gap-2'
-                        data-analytics-event='download_mac_dmg'
-                        data-analytics-source='download_page_platform'
-                      >
-                        <ArrowDownToLine
-                          className='size-4'
-                          aria-hidden='true'
-                        />
-                        {platform.action}
-                      </a>
+                      <div className='mt-7 flex flex-wrap items-center gap-3'>
+                        <a
+                          href={DOWNLOAD_URL}
+                          className='public-action-primary inline-flex min-h-11 items-center gap-2'
+                          data-analytics-event='download_mac_dmg'
+                          data-analytics-source='download_page_platform'
+                        >
+                          <ArrowDownToLine
+                            className='size-4'
+                            aria-hidden='true'
+                          />
+                          {DOWNLOAD_COPY.platforms.mac.action}
+                        </a>
+                        <a
+                          href={DESKTOP_RELEASES_HTML_URL}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='public-action-secondary inline-flex min-h-11 items-center'
+                        >
+                          {DOWNLOAD_COPY.platforms.mac.releasesAction}
+                        </a>
+                      </div>
                     ) : (
-                      <button
-                        type='button'
-                        disabled
-                        className='public-action-secondary mt-7 inline-flex min-h-11 cursor-not-allowed items-center opacity-60'
+                      <p
+                        role='status'
+                        className={`mt-7 text-sm font-medium ${muted}`}
                       >
-                        {platform.action}
-                      </button>
+                        {DOWNLOAD_COPY.platforms.iphone.status}
+                      </p>
                     )}
                   </div>
                 );
@@ -348,16 +312,18 @@ export default function DownloadPage() {
           <MarketingContainer width='page' className='py-20 sm:py-28 lg:py-32'>
             <div className='grid gap-12 lg:grid-cols-2 lg:gap-20'>
               <div>
-                <p className='homepage-section-eyebrow'>Release workflow</p>
+                <p className='homepage-section-eyebrow'>
+                  {DOWNLOAD_COPY.workflowEyebrow}
+                </p>
                 <h2
                   data-wrap='editorial-title'
                   className='mt-4 text-pretty text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
                 >
-                  Everything In Jovie, Closer.
+                  {DOWNLOAD_COPY.workflowTitle}
                 </h2>
               </div>
               <div className='grid gap-x-10 gap-y-10 sm:grid-cols-2'>
-                {FEATURE_ROWS.map(row => (
+                {DOWNLOAD_COPY.features.map(row => (
                   <section key={row.title}>
                     <div className='mb-4 flex size-8 items-center justify-center rounded-full bg-surface-1/10 text-secondary-token'>
                       <Check className='size-4' aria-hidden='true' />
@@ -385,12 +351,14 @@ export default function DownloadPage() {
           <MarketingContainer width='page' className='py-16 sm:py-20 lg:py-24'>
             <div className='grid gap-12 lg:grid-cols-2 lg:items-start'>
               <div>
-                <p className='homepage-section-eyebrow'>Install details</p>
+                <p className='homepage-section-eyebrow'>
+                  {DOWNLOAD_COPY.installEyebrow}
+                </p>
                 <h2
                   data-wrap='editorial-title'
                   className='mt-4 text-pretty text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-5xl'
                 >
-                  Built To Stay Out Of The Way.
+                  {DOWNLOAD_COPY.installTitle}
                 </h2>
               </div>
               <div className='grid gap-8 sm:grid-cols-3'>
@@ -400,10 +368,10 @@ export default function DownloadPage() {
                     aria-hidden='true'
                   />
                   <h3 className='text-lg font-semibold text-(--system-b-text-primary)'>
-                    Signed
+                    {DOWNLOAD_COPY.installCards[0].title}
                   </h3>
                   <p className={`mt-2 text-sm leading-relaxed ${soft}`}>
-                    Developer ID signed and notarized before release.
+                    {DOWNLOAD_COPY.installCards[0].body}
                   </p>
                 </div>
                 <div>
@@ -412,10 +380,10 @@ export default function DownloadPage() {
                     aria-hidden='true'
                   />
                   <h3 className='text-lg font-semibold text-(--system-b-text-primary)'>
-                    Updating
+                    {DOWNLOAD_COPY.installCards[1].title}
                   </h3>
                   <p className={`mt-2 text-sm leading-relaxed ${soft}`}>
-                    New builds install automatically after you quit.
+                    {DOWNLOAD_COPY.installCards[1].body}
                   </p>
                 </div>
                 <div>
@@ -424,10 +392,10 @@ export default function DownloadPage() {
                     aria-hidden='true'
                   />
                   <h3 className='text-lg font-semibold text-(--system-b-text-primary)'>
-                    Connected
+                    {DOWNLOAD_COPY.installCards[2].title}
                   </h3>
                   <p className={`mt-2 text-sm leading-relaxed ${soft}`}>
-                    Same account, profile, QR, and workspace data.
+                    {DOWNLOAD_COPY.installCards[2].body}
                   </p>
                 </div>
               </div>
@@ -449,8 +417,8 @@ export default function DownloadPage() {
 
         <FaqSection
           sectionVariant='objection-handler' /* copy-lint-allow: objection */
-          items={FAQ_ITEMS}
-          heading='Questions'
+          items={DOWNLOAD_COPY.faq}
+          heading={DOWNLOAD_COPY.faqHeading}
           headingClassName='text-4xl font-bold leading-tight tracking-normal text-(--system-b-text-primary)'
           className='mx-auto w-full max-w-3xl px-6 py-20'
           analyticsEventName='download_faq_opened'
@@ -459,9 +427,9 @@ export default function DownloadPage() {
 
         <MarketingFooterCta
           sectionVariant='final-single-claim'
-          title='Ready to install Jovie?'
-          body='Download the Mac app today. The iPhone build stays internal while auth and TestFlight quality harden.'
-          ctaLabel='Download for Mac'
+          title={DOWNLOAD_COPY.footerTitle}
+          body={DOWNLOAD_COPY.footerBody}
+          ctaLabel={DOWNLOAD_COPY.footerCta}
           ctaHref={DOWNLOAD_URL}
           ctaAnalyticsEvent='download_mac_dmg'
           ctaAnalyticsSource='download_page_footer'
@@ -470,22 +438,26 @@ export default function DownloadPage() {
 
         <MarketingContainer width='page' className='py-8'>
           <p className={`text-xs leading-5 ${soft}`}>
-            Releases are hosted on{' '}
+            {DOWNLOAD_COPY.legal.hosted}{' '}
             <a
               href={DESKTOP_RELEASES_HTML_URL}
               target='_blank'
               rel='noopener noreferrer'
               className={legalLinkClassName}
             >
-              GitHub
+              {DOWNLOAD_COPY.legal.hostLabel}
             </a>
-            . By downloading the app you agree to the {APP_NAME}{' '}
+            . {DOWNLOAD_COPY.legal.agree} {APP_NAME}{' '}
             <UiLink asChild variant='inline' className={legalLinkClassName}>
-              <Link href={APP_ROUTES.LEGAL_TERMS}>Terms of Service</Link>
+              <Link href={APP_ROUTES.LEGAL_TERMS}>
+                {DOWNLOAD_COPY.legal.terms}
+              </Link>
             </UiLink>{' '}
-            and{' '}
+            {DOWNLOAD_COPY.legal.and}{' '}
             <UiLink asChild variant='inline' className={legalLinkClassName}>
-              <Link href={APP_ROUTES.LEGAL_PRIVACY}>Privacy Policy</Link>
+              <Link href={APP_ROUTES.LEGAL_PRIVACY}>
+                {DOWNLOAD_COPY.legal.privacy}
+              </Link>
             </UiLink>
             .
           </p>
