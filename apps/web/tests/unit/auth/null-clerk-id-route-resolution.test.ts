@@ -4,6 +4,7 @@ import {
   type PgTable,
 } from 'drizzle-orm/pg-core';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import type { DbType } from '@/lib/db';
 import {
   clickEvents,
   notificationSubscriptions,
@@ -63,7 +64,7 @@ interface FixtureDb {
 
 const harness = vi.hoisted(() => ({
   userId: '7b4b948f-9720-4c5f-98da-8a7335015da9',
-  db: null as FixtureDb | null,
+  db: null as DbType | null,
   client: null as QueryClient | null,
 }));
 
@@ -146,7 +147,8 @@ vi.mock('@/lib/db', async () => {
   const client = new PGlite();
   const db = drizzle(client, { schema: { users: userTable } });
   harness.client = client;
-  harness.db = db;
+  // Disposable PGlite client, asserted to the Neon DbType production helpers require.
+  harness.db = db as unknown as DbType;
 
   return {
     db,
