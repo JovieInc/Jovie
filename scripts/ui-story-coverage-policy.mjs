@@ -16,8 +16,6 @@ const VISUAL_EVIDENCE_RE =
   /^(?:apps\/web\/tests\/e2e\/.*(?:visual|a11y|axe|overflow).*\.spec\.ts|.*\.stories\.(?:[jt]sx?|mdx))$/i;
 const UI_CONFIG_RE =
   /^(?:apps\/web\/\.storybook\/|apps\/web\/app\/globals\.css$|apps\/web\/styles\/|apps\/web\/design\/|packages\/ui\/)/;
-const LINEAR_ISSUE_RE = /^JOV-\d+$/u;
-const COMPONENT_ROOTS = ['apps/web/components', 'packages/ui'];
 
 function positiveInteger(value) {
   const parsed = typeof value === 'number' ? value : Number(value);
@@ -28,6 +26,9 @@ function isoTimestamp(value) {
   if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) return null;
   return new Date(value).toISOString();
 }
+
+const LINEAR_ISSUE_RE = /^JOV-\d+$/u;
+const COMPONENT_ROOTS = ['apps/web/components', 'packages/ui'];
 
 function validateAllowlist(policy) {
   if (policy.allowlist === undefined) return;
