@@ -9,6 +9,8 @@ import importlib.util
 import io
 import json
 import os
+import signal
+import subprocess
 import sys
 import tempfile
 import threading
@@ -467,6 +469,39 @@ for line in sys.stdin:
         again = codex.lease('current-login')
         self.assertIsNotNone(again)
         again.close()
+
+    def test_collection_scrubs_host_login_slots_before_the_delayed_reap(self):
+        # The lanes host exports CODEX_LANE_LOGIN_SLOTS=5. Without the conftest
+        # scrub, the test above takes a free slot, the assertion raises inside
+        # reap_current_metadata, and cleanup retries until the shard hits 30 min.
+        if os.environ.get('JOVIE_NESTED_CODEX_HERMETIC') == '1':
+            self.skipTest('nested probe')
+        env = os.environ.copy()
+        env.update({
+            'JOVIE_NESTED_CODEX_HERMETIC': '1',
+            'CODEX_LANE_LOGIN_SLOTS': '5',
+            'CODEX_LANE_AUTH_MODE': 'subscription-pool',
+            'CODEX_LANE_CLI': '/does/not/exist',
+            'CODEX_LANE_SUBSCRIPTION_PROFILES': '{}',
+            'CODEX_LEDGER_CADENCE_S': '1',
+        })
+        node = (
+            'scripts/tests/test_codex_lane.py::CurrentLoginTest::'
+            'test_real_metadata_child_retains_lease_until_delayed_reap'
+        )
+        with tempfile.TemporaryDirectory(prefix='jovie-codex-hermetic-') as base:
+            proc = subprocess.Popen(
+                [sys.executable, '-m', 'pytest', node, '-q', '-p', 'no:cacheprovider',
+                 '--basetemp', base],
+                cwd=ROOT, env=env, start_new_session=True,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            try:
+                stdout, stderr = proc.communicate(timeout=60)
+            except subprocess.TimeoutExpired:
+                os.killpg(proc.pid, signal.SIGKILL)
+                proc.communicate()
+                self.fail('delayed reap hung while host login slots were widened')
+        self.assertEqual(proc.returncode, 0, (stdout + stderr)[-4000:])
 
     def test_interruption_during_cleanup_reaps_before_propagating(self):
         proc = SimpleNamespace(poll=lambda: None, terminate=lambda: None, kill=lambda: None)
