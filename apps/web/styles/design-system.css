@@ -1266,24 +1266,26 @@
 
   --color-accent-gray: #7f7f85;
   --color-accent-gray-subtle: #efeff2;
-  --color-accent-blue: #11afff;
-  --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
+  --color-accent-blue: #0a6fa8;
+  --color-accent-blue-subtle: rgba(10, 111, 168, 0.1);
   --color-accent-purple: #8e56f5;
   --color-accent-purple-subtle: rgba(142, 86, 245, 0.12);
+  /* Purple as TEXT on white (7:1); fills keep --color-accent-purple. */
+  --color-accent-purple-text: #6d28d9;
   --color-accent-pink: #f52bb5;
   --color-accent-pink-subtle: rgba(245, 43, 181, 0.12);
-  --color-accent-red: #f72a36;
-  --color-accent-red-subtle: rgba(247, 42, 54, 0.12);
-  --color-accent-orange: #ff7800;
-  --color-accent-orange-subtle: rgba(255, 120, 0, 0.12);
-  --color-accent-green: #3ffa8b;
-  --color-accent-green-subtle: rgba(63, 250, 139, 0.12);
+  --color-accent-red: #d0212c;
+  --color-accent-red-subtle: rgba(208, 33, 44, 0.1);
+  --color-accent-orange: #b34700;
+  --color-accent-orange-subtle: rgba(179, 71, 0, 0.1);
+  --color-accent-green: #0b7a3b;
+  --color-accent-green-subtle: rgba(11, 122, 59, 0.1);
   --color-accent-teal: #3ffa8b;
   --color-accent-teal-subtle: rgba(63, 250, 139, 0.12);
 
-  --color-accent: #11afff;
-  --color-accent-hover: #11afff;
-  --color-accent-active: #11afff;
+  --color-accent: #0a6fa8;
+  --color-accent-hover: #0a6fa8;
+  --color-accent-active: #0a6fa8;
   --color-accent-subtle: var(--noir-ion-ion-soft);
   --color-accent-foreground: oklch(100% 0 0);
 
@@ -1605,6 +1607,8 @@
   --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
   --color-accent-purple: #8e56f5;
   --color-accent-purple-subtle: rgba(142, 86, 245, 0.12);
+  /* Purple as TEXT on dark surfaces (6:1 on #131417); fills keep --color-accent-purple. */
+  --color-accent-purple-text: #a47bff;
   --color-accent-pink: #f52bb5;
   --color-accent-pink-subtle: rgba(245, 43, 181, 0.12);
   --color-accent-red: #f72a36;
@@ -2602,7 +2606,7 @@
   /* Warning */
   --color-warning: var(--color-accent-orange);
   --color-warning-subtle: var(--color-accent-orange-subtle);
-  --color-warning-foreground: oklch(20% 0 0);
+  --color-warning-foreground: oklch(100% 0 0);
 
   /* Error/Destructive */
   --color-error: var(--color-accent-red);
@@ -2625,9 +2629,12 @@
   /* Warning — Orange */
   --color-warning: var(--color-accent-orange);
   --color-warning-subtle: var(--color-accent-orange-subtle);
+  --color-warning-foreground: oklch(20% 0 0);
 
-  /* Error — Red (danger) */
-  --color-error: var(--color-accent-red);
+  /* Error — Red (danger). Text red is lifted slightly above the brand fill red
+     so error copy clears 4.5:1 on the error-subtle tint and on elevated
+     surfaces; fills keep --color-accent-red. */
+  --color-error: #ff4a55;
   --color-error-subtle: var(--color-accent-red-subtle);
   --color-danger: var(--color-error);
   --color-danger-subtle: var(--color-error-subtle);

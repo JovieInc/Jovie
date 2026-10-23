@@ -28,7 +28,13 @@ const TEXT_ROLES = [
   { name: 'Disabled', color: 'var(--noir-ion-text-disabled)' },
 ] as const;
 
-const ACCENTS = [
+const ACCENTS: ReadonlyArray<{
+  name: string;
+  role: string;
+  color: string;
+  textColor?: string;
+  soft: string;
+}> = [
   {
     name: 'Ion',
     role: 'Primary action / focus / selection',
@@ -39,6 +45,7 @@ const ACCENTS = [
     name: 'Ultra',
     role: 'Agent intelligence',
     color: 'var(--noir-ion-ultra)',
+    textColor: 'var(--color-accent-purple-text)',
     soft: 'var(--noir-ion-ultra-soft)',
   },
   {
@@ -63,9 +70,10 @@ const ACCENTS = [
     name: 'Red',
     role: 'Danger / error (flare aliases red)',
     color: 'var(--noir-ion-red)',
+    textColor: 'var(--color-error)',
     soft: 'var(--noir-ion-flare-soft)',
   },
-] as const;
+];
 
 const ROW_STATES = [
   { label: 'Default', className: '' },
@@ -216,7 +224,7 @@ export function NoirIonSpecimen() {
                   />
                   <span
                     className='text-sm font-medium'
-                    style={{ color: accent.color }}
+                    style={{ color: accent.textColor ?? accent.color }}
                   >
                     {accent.name}
                   </span>
