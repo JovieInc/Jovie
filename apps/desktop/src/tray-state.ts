@@ -1,6 +1,6 @@
-// The Electron menu-bar tray is retired. The SwiftUI MenuMonitor in
-// apps/macos owns the menu bar. These types remain for the renderer
-// state bridge and for app-menu actions (for example New Message, Cmd+N).
+// IPC compatibility state only. The Electron menu-bar tray is retired;
+// apps/macos/MenuMonitor owns the menu bar. These types remain for the renderer
+// state bridge and app-menu actions (for example New Message, Cmd+N).
 
 export type TrayAppState = 'idle' | 'active' | 'unread' | 'error';
 

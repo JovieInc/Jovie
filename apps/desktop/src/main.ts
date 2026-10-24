@@ -174,7 +174,7 @@ import {
   isTrayAppState,
   type TrayAction,
   type TrayStatePayload,
-} from './tray';
+} from './tray-state';
 import {
   persistNativeFullscreen,
   shouldRestoreNativeFullscreen,

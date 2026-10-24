@@ -1,13 +1,17 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { evaluateChangedScreens } from '../../../scripts/invariants/screen-certification.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test('tray module keeps state types only (Electron tray retired)', async () => {
-  const traySource = await readFile(join(desktopRoot, 'src/tray.ts'), 'utf8');
+  const traySource = await readFile(
+    join(desktopRoot, 'src/tray-state.ts'),
+    'utf8'
+  );
 
   assert.match(
     traySource,
@@ -15,6 +19,43 @@ test('tray module keeps state types only (Electron tray retired)', async () => {
   );
   assert.doesNotMatch(traySource, /MenuBarTray|from 'electron'/);
   assert.match(traySource, /export \{ isTrayAppState \}/);
+});
+
+test('retired tray screen is deleted while its state module needs no screen registration', async () => {
+  await assert.rejects(access(join(desktopRoot, 'src/tray.ts')), {
+    code: 'ENOENT',
+  });
+  const result = evaluateChangedScreens({
+    changedFiles: [
+      { path: 'apps/desktop/src/tray.ts', status: 'D' },
+      { path: 'apps/desktop/src/tray-state.ts', status: 'A' },
+    ],
+    headSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  assert.deepEqual(result.issues, []);
+  assert.deepEqual(result.changedScreens, []);
+  assert.deepEqual(result.removedScreens, ['apps/desktop/src/tray.ts']);
+});
+
+test('tray state validation accepts supported IPC states and rejects malformed values', async () => {
+  const { isTrayAppState } = await import('../src/tray-state.ts');
+  for (const state of ['idle', 'active', 'unread', 'error']) {
+    assert.equal(isTrayAppState(state), true);
+  }
+  for (const value of [
+    undefined,
+    null,
+    '',
+    'IDLE',
+    'unknown',
+    0,
+    true,
+    {},
+    ['idle'],
+  ]) {
+    assert.equal(isTrayAppState(value), false);
+  }
 });
 
 test('main.ts keeps the state IPC but creates no Electron tray', async () => {
