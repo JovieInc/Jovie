@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import {
   chmodSync,
   closeSync,
@@ -819,7 +819,189 @@ export function withDynamicSecretValues(environment, values) {
   ]);
 }
 
-function runProducer(command) {
+/**
+ * Spawn the wrapped Playwright command, tee'ing its streams through this
+ * process so the caller's log (and `$RUNNER_TEMP/e2e-full.log`) keep their
+ * live, byte-identical feed, while capturing stdout for the
+ * failure-annotation parse after the child exits.
+ */
+function spawnTeeingFailures(command) {
+  return new Promise(resolveSpawn => {
+    const child = spawn(command[0], command.slice(1), {
+      env: process.env,
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', chunk => {
+      stdout += chunk;
+      process.stdout.write(chunk);
+    });
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', chunk => {
+      process.stderr.write(chunk);
+    });
+    child.on('close', status => resolveSpawn({ status: status ?? 1, stdout }));
+    child.on('error', () => resolveSpawn({ status: 1, stdout }));
+  });
+}
+
+/** Emit bounded, secret-redacted job annotations for failed Playwright tests. */
+function reportPlaywrightFailureAnnotations(stdout, scanEnvironment) {
+  const { annotations, total, omitted } = collectPlaywrightFailureAnnotations(
+    stdout,
+    { redact: text => redactSecretValues(text, scanEnvironment) }
+  );
+  if (total === 0) return;
+  for (const annotation of annotations) {
+    writeSync(process.stdout.fd, `${annotation}\n`);
+  }
+  console.log(
+    `playwright-failure-annotations: ${total} failing test(s) annotated${omitted > 0 ? ` (${omitted} omitted, cap reached)` : ''}`
+  );
+}
+
+/**
+ * Playwright failure → job annotations (JOV-8501).
+ *
+ * The E2E Full Browser Matrix runs inside this guard and its per-test
+ * results only reach the admin-gated job log and the auth-gated result
+ * artifacts. Every remediation sandbox reads neither, so failed shards
+ * were repaired blind (five consecutive fix attempts on the
+ * settings-profile-pane / shell-navigation residuals never saw the actual
+ * assertion). These helpers parse the line reporter's failure blocks out
+ * of the wrapped child's captured stdout and format bounded `::error`
+ * annotations naming each failing spec, line and first error lines —
+ * visible on the job page for every future run.
+ *
+ * Security: annotation text is untrusted (test titles/errors can embed
+ * page content). Every annotation is passed through the caller's redact
+ * function (redactSecretValues over the producer's scan environment) and
+ * length-capped before emission.
+ */
+
+/** Never emit more than this per run — annotations land on a public job page. */
+export const PLAYWRIGHT_ANNOTATION_LIMIT = 20;
+const ANNOTATION_MAX_TITLE_LENGTH = 250;
+const ANNOTATION_MAX_ERROR_LINES = 4;
+const ANNOTATION_MAX_MESSAGE_LENGTH = 2000;
+const ANNOTATION_FAILURE_HEADER = /^\s*\d+\)\s+(.+)$/;
+
+function truncateAnnotation(value, maxLength) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 1)}…`;
+}
+
+/**
+ * Parse one line-reporter output stream into failure records.
+ * Summary lines ("N flaky", "N passed", "N skipped", "N failed") and their
+ * indented project/test echoes are deliberately not failures — only the
+ * numbered `N)` blocks that the reporter prints for tests that exhausted
+ * their retries.
+ */
+export function parsePlaywrightFailures(output) {
+  const failures = [];
+  const lines = String(output ?? '').split('\n');
+  let current = null;
+  for (const line of lines) {
+    const header = line.match(ANNOTATION_FAILURE_HEADER);
+    if (header) {
+      if (current) failures.push(current);
+      current = { header: header[1], error: '' };
+      continue;
+    }
+    if (!current) continue;
+    // Failure blocks end at the first unindented line (summary text).
+    // Error detail lines are indented.
+    if (/^\s{4,}\S/.test(line) && !/^\s*Call log:/.test(line)) {
+      const detail = line.trim();
+      if (
+        detail.length > 0 &&
+        current.error.split('\n').length < ANNOTATION_MAX_ERROR_LINES
+      ) {
+        current.error = current.error ? `${current.error}\n${detail}` : detail;
+      }
+      continue;
+    }
+    if (line.trim().length === 0) continue;
+    // Unindented (or shallow) content ends the current failure block.
+    failures.push(current);
+    current = null;
+  }
+  if (current) failures.push(current);
+  return failures.flatMap(record => {
+    const parts = record.header.split('›');
+    if (parts.length < 2) return [];
+    const project = parts[0].trim().replace(/^\[(.+)\]$/, '$1');
+    const location = parts[1].trim();
+    const title = parts.slice(2).join('›').trim();
+    const match = location.match(/^(.*\.spec\.ts):(\d+)(?::\d+)?$/);
+    return [
+      {
+        project,
+        file: match ? match[1] : location,
+        line: match ? Number(match[2]) : null,
+        title,
+        error: record.error,
+      },
+    ];
+  });
+}
+
+/** Format one `::error` annotation line for a parsed failure record. */
+export function formatPlaywrightFailureAnnotation(failure, { redact } = {}) {
+  const safe = redact ?? (value => value);
+  const location = failure.line
+    ? `${failure.file}:${failure.line}`
+    : failure.file;
+  const title = safe(
+    truncateAnnotation(
+      `${location} — ${failure.title}`,
+      ANNOTATION_MAX_TITLE_LENGTH
+    )
+  );
+  const message = safe(
+    truncateAnnotation(
+      failure.error || 'no error detail captured from the line reporter',
+      ANNOTATION_MAX_MESSAGE_LENGTH
+    )
+  ).replaceAll('\n', '%0A');
+  return `::error title=${title} ::${message}`;
+}
+
+/**
+ * Parse `output` and return bounded annotation lines plus omission counts.
+ * When more failures than the limit are present, the last annotation is a
+ * summary naming how many were omitted (the full log stays in the log/artifacts).
+ */
+export function collectPlaywrightFailureAnnotations(
+  output,
+  { redact, limit = PLAYWRIGHT_ANNOTATION_LIMIT } = {}
+) {
+  const failures = parsePlaywrightFailures(output);
+  const omitted = Math.max(0, failures.length - limit);
+  // The annotation list never exceeds the cap: when truncating, the last
+  // slot carries the omission summary instead of a failure.
+  const kept = omitted > 0 ? failures.slice(0, limit - 1) : failures;
+  const annotations = kept.map(failure =>
+    formatPlaywrightFailureAnnotation(failure, { redact })
+  );
+  if (omitted > 0) {
+    annotations.push(
+      `::error title=E2E failure summary ::${omitted} more failing tests omitted (annotation cap ${limit}) — read the full list from the run's test-results artifact or the job log`
+    );
+  }
+  return { annotations, total: failures.length, omitted };
+}
+
+async function runProducer(command) {
+  // Runs the wrapped Playwright command under the producer's artifact
+  // policy. The captured child output is parsed into bounded, secret-redacted
+  // `::error` annotations naming each failing spec (JOV-8501): the per-test
+  // failure detail otherwise only exists in the admin-gated job log and the
+  // auth-gated result artifacts, which no remediation sandbox can read —
+  // five consecutive blind fix attempts on the chromium-4 residuals prove
+  // the loop.
   let root;
   let childStatus = 0;
   let dynamicReceipt;
@@ -840,16 +1022,14 @@ function runProducer(command) {
     if (hasShortCredentialValue(process.env))
       throw new Error('credential value is too short to mask safely');
     maskValues(secretValues(process.env));
-    const child = spawnSync(command[0], command.slice(1), {
-      env: process.env,
-      stdio: 'inherit',
-    });
-    childStatus = child.status ?? 1;
+    const childResult = await spawnTeeingFailures(command);
+    childStatus = childResult.status;
     const dynamicValues = readDynamicSecretReceipt(undefined, {
       required: childStatus === 0,
     });
     maskValues(dynamicValues);
     const scanEnvironment = withDynamicSecretValues(process.env, dynamicValues);
+    reportPlaywrightFailureAnnotations(childResult.stdout, scanEnvironment);
     const configured = configuredPaths();
     const producerOptions = options();
     // Producer stages omit images by default, even when a job permits image
@@ -897,24 +1077,28 @@ if (import.meta.filename === process.argv[1]) {
       report([{ category: 'inspection-error' }]);
       process.exit(1);
     }
-    process.exit(runProducer(cli.slice(2)));
-  }
-  try {
-    const paths = cli.length ? cli : configuredPaths();
-    const workspace = canonicalRoot();
-    const result = inspect(paths, process.env, { ...options(), workspace });
-    if (result.findings.length) {
-      report(result.findings);
+    // runProducer is async (it tees the wrapped run's streams); the exit
+    // happens in its then() and the standalone inspect path below must not
+    // run for --run invocations.
+    runProducer(cli.slice(2)).then(status => process.exit(status));
+  } else {
+    try {
+      const paths = cli.length ? cli : configuredPaths();
+      const workspace = canonicalRoot();
+      const result = inspect(paths, process.env, { ...options(), workspace });
+      if (result.findings.length) {
+        report(result.findings);
+        process.exit(1);
+      }
+      if (process.env.PLAYWRIGHT_ARTIFACT_STAGE_DIR)
+        stageRecords(
+          process.env.PLAYWRIGHT_ARTIFACT_STAGE_DIR,
+          uploadRecords(paths, workspace, result.records)
+        );
+      console.log('Playwright artifact secret guard passed.');
+    } catch {
+      report([{ category: 'inspection-error' }]);
       process.exit(1);
     }
-    if (process.env.PLAYWRIGHT_ARTIFACT_STAGE_DIR)
-      stageRecords(
-        process.env.PLAYWRIGHT_ARTIFACT_STAGE_DIR,
-        uploadRecords(paths, workspace, result.records)
-      );
-    console.log('Playwright artifact secret guard passed.');
-  } catch {
-    report([{ category: 'inspection-error' }]);
-    process.exit(1);
   }
 }
