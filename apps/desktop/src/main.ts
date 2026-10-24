@@ -258,7 +258,9 @@ const printBuildIdentityOnStart = process.argv.includes(
   DESKTOP_BUILD_IDENTITY_PRINT_FLAG
 );
 const MACOS_TRAFFIC_LIGHT_X = 20;
-const MACOS_TRAFFIC_LIGHT_Y = 17;
+// JOV-8974: the titlebar band sits one app-shell gap (8px) below the window
+// top, so the native lights ride down with the band (was 17 flush-top).
+const MACOS_TRAFFIC_LIGHT_Y = 25;
 const MACOS_TRAFFIC_LIGHT_POSITION = {
   x: MACOS_TRAFFIC_LIGHT_X,
   y: MACOS_TRAFFIC_LIGHT_Y,
