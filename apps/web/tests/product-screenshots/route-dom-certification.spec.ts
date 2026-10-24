@@ -173,6 +173,7 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
       'Find yourself',
       '<p>Find yourself</p>',
       '<div><span>Find yourself</span></div>',
+      '<div aria-hidden="true">Find yourself</div>',
     ]) {
       await page.setContent(
         `<header>Navigation</header><main>${stray}<section><h1>Link analytics</h1></section></main>`
@@ -188,7 +189,7 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     page,
   }) => {
     await page.setContent(
-      '<header>Navigation</header><main><div hidden><a>Find yourself</a></div><nav aria-label="Breadcrumb"><a>Product</a></nav><section><h1>Link analytics</h1></section></main>'
+      '<header>Navigation</header><main><div hidden><a>Find yourself</a></div><div style="opacity:0"><span>Hidden marker</span></div><div style="display:none"><span>Hidden marker</span></div><nav aria-label="Breadcrumb"><a>Product</a></nav><section><h1>Link analytics</h1></section></main>'
     );
     const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
     expect(

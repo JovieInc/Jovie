@@ -14,6 +14,7 @@ export type RouteDomFindingKind =
   | 'container-width-sheet'
   | 'unreachable-content'
   | 'raw-control'
+  | 'stray-before-h1'
   // Marketing taste invariants (ui.md, DESIGN_INVARIANTS.md). Ratcheted by
   // route-dom-marketing-baseline.json until existing routes are fixed.
   | 'nested-decorative-surface'
@@ -321,6 +322,59 @@ export async function inspectRouteDom(
       }
 
       if (surface === 'marketing') {
+        // Inspect text nodes so raw JSX text and nested wrappers are both
+        // covered. Only breadcrumbs may precede the hero's first heading.
+        const firstHeading = root.querySelector('h1');
+        if (firstHeading) {
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+          const strayParents = new Set<Element>();
+          let node = walker.nextNode();
+          while (node) {
+            if (firstHeading.contains(node)) break;
+            const parent = node.parentElement;
+            if (
+              normalizedText(node.textContent) &&
+              parent &&
+              !parent.closest(
+                'nav[aria-label="Breadcrumb" i],script,style,template,noscript'
+              ) &&
+              !optedOut(parent)
+            ) {
+              const range = document.createRange();
+              range.selectNodeContents(node);
+              const visibleText = Array.from(range.getClientRects()).some(
+                rect => rect.width > 1 && rect.height > 1
+              );
+              let visibleAncestors = true;
+              for (
+                let ancestor: Element | null = parent;
+                ancestor;
+                ancestor = ancestor.parentElement
+              ) {
+                const style = getComputedStyle(ancestor);
+                if (
+                  ancestor.hasAttribute('hidden') ||
+                  style.display === 'none' ||
+                  style.visibility !== 'visible' ||
+                  Number.parseFloat(style.opacity || '1') === 0
+                ) {
+                  visibleAncestors = false;
+                  break;
+                }
+              }
+              if (visibleText && visibleAncestors) strayParents.add(parent);
+            }
+            node = walker.nextNode();
+          }
+          if (strayParents.size) {
+            findings.push({
+              kind: 'stray-before-h1',
+              message:
+                'Visible text precedes the first page heading outside approved breadcrumbs.',
+              elements: [...strayParents].map(describe),
+            });
+          }
+        }
         const visibleIn = (element: Element): boolean =>
           isRendered(element) &&
           !optedOut(element) &&

@@ -39,7 +39,7 @@ describe('LinkAnalyticsLanding', () => {
     expect(
       screen.getByRole('heading', { name: 'Recent clicks' })
     ).toBeVisible();
-    expect(screen.getByText(/Oct 23, 2026/)).toBeVisible();
+    expect(screen.getByText('Demo data · Oct 23, 2026 · UTC')).toBeVisible();
     expect(screen.getByRole('heading', { name: /UTM.*ISRC/ })).toBeVisible();
   });
 
@@ -82,7 +82,7 @@ describe('LinkAnalyticsLanding', () => {
   it('server-renders the analytics panel without wall-clock text', () => {
     const html = renderToString(<LinkAnalyticsLanding />);
 
-    expect(html).toContain('Aug 20, 2026');
+    expect(html).toContain('Oct 23, 2026');
     expect(html).not.toMatch(/(?:just now)|(?:\d+\s?(?:m|h|d|w|mo|y)\s?ago)/u);
   });
 });
