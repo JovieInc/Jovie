@@ -46,6 +46,8 @@ jobs:
             scripts/cheap-fixer
             scripts/invariants
             packages/api-client
+            scripts/pr-fleet-rules.mjs
+            biome.json
           sparse-checkout-cone-mode: false
 
       - name: Generate Jovie Bot read token
@@ -66,6 +68,7 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: write
           permission-contents: write
           permission-issues: write
           permission-pull-requests: write
@@ -75,8 +78,8 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install the Jev evaluation client
-        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "ai-evaluation@npm:ai@7.0.105"
+      - name: Install the Jev evaluation client and the pinned formatter
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "ai-evaluation@npm:ai@7.0.105" "@biomejs/biome@2.5.14"
 
       - name: Attempt a cheap fix
         env:
