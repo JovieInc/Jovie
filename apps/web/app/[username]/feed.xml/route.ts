@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { isPublicProfilePublished } from '@/lib/profile/public-profile-access';
 import {
   isPublicProfileIndexable,
   PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
@@ -7,7 +8,8 @@ import {
 import { getCachedPublicReleasesForProfile } from '@/lib/releases/public-release-loader';
 import { getProfileByUsername } from '@/lib/services/profile';
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function escapeXml(s: string): string {
   return s
@@ -32,8 +34,11 @@ export async function GET(
 
   const profile = await getProfileByUsername(username);
 
-  if (!profile?.isPublic) {
-    return new NextResponse('Not found', { status: 404 });
+  if (!profile || !isPublicProfilePublished(profile.isPublic)) {
+    return new NextResponse('Not found', {
+      status: 404,
+      headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
+    });
   }
   if (!isPublicProfileIndexable(profile.username, profile.displayName)) {
     return new NextResponse('Not found', {
@@ -84,7 +89,7 @@ export async function GET(
   return new Response(xml, {
     headers: {
       'Content-Type': 'application/rss+xml; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+      'Cache-Control': 'no-store',
     },
   });
 }

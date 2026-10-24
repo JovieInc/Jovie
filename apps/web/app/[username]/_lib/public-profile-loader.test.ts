@@ -102,6 +102,7 @@ describe('public profile loading boundaries', () => {
     const result = await getProfileAndLinks('TestArtist');
     expect(mocks.profile).toHaveBeenCalledExactlyOnceWith('testartist', {
       skipCache: true,
+      throwOnError: true,
     });
     expect(result).toMatchObject({
       status: 'ok',
@@ -182,29 +183,23 @@ describe('public profile loading boundaries', () => {
   });
 });
 
-describe('ISR cache recovery', () => {
+describe('per-request public authority', () => {
   beforeEach(() => vi.stubEnv('NODE_ENV', 'production'));
 
-  it('uses the profile invalidation tag and a one-hour success TTL', async () => {
+  it('does not register a cross-request public success cache', async () => {
     expect((await getProfileAndLinks('TestArtist')).status).toBe('ok');
-    expect(mocks.cache).toHaveBeenCalledWith(
-      expect.any(Function),
-      ['public-profile-testartist'],
-      { tags: ['profiles-all', 'profile:testartist'], revalidate: 3600 }
-    );
+    expect(mocks.cache).not.toHaveBeenCalled();
     expect(mocks.profile).toHaveBeenCalledTimes(1);
   });
 
   it.each([null, new Error('temporary failure')])(
-    'never stores a negative result or rereads it within one request',
+    'rechecks after a missing or temporarily unavailable read',
     async value => {
-      let rejected: unknown;
       mocks.cache.mockImplementation(
         (fn: () => Promise<unknown>) => async () => {
           try {
             return await fn();
           } catch (error) {
-            rejected = error;
             throw error;
           }
         }
@@ -214,18 +209,19 @@ describe('ISR cache recovery', () => {
       expect((await getProfileAndLinks('testartist')).status).toBe(
         value instanceof Error ? 'error' : 'not_found'
       );
-      expect(rejected).toBeInstanceOf(Error);
+      expect(mocks.cache).not.toHaveBeenCalled();
       expect(mocks.profile).toHaveBeenCalledTimes(1);
       expect((await getProfileAndLinks('testartist')).status).toBe('ok');
     }
   );
 
-  it('recovers from cache infrastructure failure by fetching storage once', async () => {
+  it('reads current storage without consulting an unavailable shared cache', async () => {
     mocks.cache.mockImplementation(() => async () => {
       throw new Error('cache unavailable');
     });
     expect((await getProfileAndLinks('testartist')).status).toBe('ok');
     expect(mocks.profile).toHaveBeenCalledTimes(1);
+    expect(mocks.cache).not.toHaveBeenCalled();
   });
 
   it('bypasses the production cache for the explicit QA path', async () => {
@@ -233,4 +229,68 @@ describe('ISR cache recovery', () => {
     expect((await getProfileAndLinks('testartist')).status).toBe('ok');
     expect(mocks.cache).not.toHaveBeenCalled();
   });
+});
+
+describe('fresh public authority after a warm response', () => {
+  beforeEach(() => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const retained = new Map<string, unknown>();
+    mocks.cache.mockImplementation(
+      (fn: () => Promise<unknown>, keys: string[]) => async () => {
+        const key = JSON.stringify(keys);
+        if (!retained.has(key)) retained.set(key, await fn());
+        return retained.get(key);
+      }
+    );
+  });
+
+  it.each([false, null])(
+    'does not let a cached success authorize a revoked profile (%s)',
+    async isPublic => {
+      mocks.profile
+        .mockResolvedValueOnce(profile())
+        .mockResolvedValueOnce({ ...profile(), isPublic });
+      expect((await getProfileAndLinks('testartist')).status).toBe('ok');
+      expect(await getProfileAndLinks('testartist')).toMatchObject({
+        status: 'not_found',
+        profile: null,
+        links: [],
+        contacts: [],
+      });
+      expect(mocks.profile).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it('fails closed after a warm success when the authoritative storage read fails', async () => {
+    mocks.profile
+      .mockResolvedValueOnce(profile())
+      .mockRejectedValueOnce(new Error('storage unavailable'));
+    expect((await getProfileAndLinks('testartist')).status).toBe('ok');
+    expect(await getProfileAndLinks('testartist')).toMatchObject({
+      status: 'error',
+      profile: null,
+      links: [],
+      contacts: [],
+    });
+  });
+
+  it('does not resurrect an old handle after a rename without invalidation', async () => {
+    mocks.profile.mockResolvedValueOnce(profile()).mockResolvedValueOnce(null);
+    expect((await getProfileAndLinks('testartist')).status).toBe('ok');
+    expect(await getProfileAndLinks('testartist')).toMatchObject({
+      status: 'not_found',
+      profile: null,
+    });
+  });
+
+  it.each(['false', 'f', 2, [], {}])(
+    'does not treat malformed publication %j as a public grant',
+    async isPublic => {
+      mocks.profile.mockResolvedValue({ ...profile(), isPublic });
+      expect(await getProfileAndLinks('testartist')).toMatchObject({
+        status: 'not_found',
+        profile: null,
+      });
+    }
+  );
 });

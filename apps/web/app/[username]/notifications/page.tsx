@@ -5,6 +5,9 @@ import { getProfileModeHref } from '@/features/profile/registry';
 import { sanitizeMetadataText } from '@/lib/profile/metadata';
 import { getProfileAndLinks } from '../_lib/public-profile-loader';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface Props {
   readonly params: Promise<{ username: string }>;
 }
