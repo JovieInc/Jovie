@@ -162,3 +162,90 @@
 [data-public-page-shell]:has(> [data-footer-variant="expanded"]) > main {
   flex: none;
 }
+
+/* CCDnQ full mode: a mark and five equal columns on the shared content axis. */
+.marketing-footer-locked .mf-shell {
+  padding-block: calc(var(--space-7) * 2) var(--space-4);
+}
+
+.marketing-footer-locked .mf-main-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 7fr);
+  gap: var(--space-12);
+  min-height: calc(var(--space-16) * 4 + var(--space-8));
+}
+
+.marketing-footer-locked .mf-columns {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+.marketing-footer-locked .mf-eyebrow {
+  line-height: 1.45;
+  margin-bottom: var(--space-6);
+}
+
+.marketing-footer-locked .mf-link {
+  color: var(--mf-text);
+  font-weight: var(--font-weight-normal);
+}
+
+.marketing-footer-locked .mf-baseband {
+  margin-top: 0;
+  padding-top: var(--space-4);
+}
+
+.marketing-footer-locked .mf-legal-link {
+  color: var(--mf-text-secondary);
+}
+
+@media (max-width: 48rem) {
+  .marketing-footer-locked .mf-main-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-8);
+  }
+
+  .marketing-footer-locked .mf-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-8) var(--space-4);
+    padding-bottom: var(--space-8);
+  }
+}
+
+.marketing-footer-locked .mf-baseband__meta {
+  flex: 1;
+  margin-left: 0;
+}
+
+.marketing-footer-locked .mf-preferences {
+  margin-left: auto;
+}
+
+.marketing-footer-locked .mf-locale-static {
+  min-height: var(--space-7);
+  background: transparent;
+  font-weight: var(--font-weight-normal);
+}
+
+@media (min-width: 48rem) {
+  .marketing-footer-locked .mf-shell {
+    width: calc(100% - var(--space-24) * 2);
+    max-width: var(--ds-public-content-max);
+  }
+}
+
+@media (max-width: 40rem) {
+  .marketing-footer-locked .mf-baseband,
+  .marketing-footer-locked .mf-baseband__meta {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .marketing-footer-locked .mf-baseband__meta {
+    flex: auto;
+  }
+
+  .marketing-footer-locked .mf-preferences {
+    margin-left: 0;
+    flex-wrap: nowrap;
+  }
+}

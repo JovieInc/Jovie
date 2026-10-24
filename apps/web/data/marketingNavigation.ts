@@ -283,4 +283,67 @@ export function getPublicCommercialFooterColumn(
 export const MARKETING_LEGAL_LINKS: readonly MarketingFooterLink[] = [
   { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
   { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },
+  { href: APP_ROUTES.LEGAL_COOKIES, label: 'Cookies' },
+  { href: APP_ROUTES.LEGAL_DMCA, label: 'DMCA' },
 ] as const;
+
+/** Founder-locked CCDnQ composition. Public availability still owns destinations. */
+export const LOCKED_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] =
+  [
+    {
+      title: 'Product',
+      links: [
+        { href: APP_ROUTES.ARTIST_PROFILES, label: 'Your Jovie profile' },
+        { href: APP_ROUTES.CARD, label: 'Jovie Card' },
+        { href: APP_ROUTES.SMART_LINKS, label: 'Smart links' },
+        { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Updates' },
+        { href: APP_ROUTES.PAY, label: 'Payments' },
+        { href: APP_ROUTES.PRICING, label: 'Pricing' },
+      ],
+    },
+    {
+      title: 'Features',
+      links: [
+        {
+          href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
+          label: 'Contact capture',
+        },
+        {
+          href: `${APP_ROUTES.ARTIST_PROFILES}#bring-them-back-automatically`,
+          label: 'Audience',
+        },
+        { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
+        { href: APP_ROUTES.LAUNCH, label: 'Automation' },
+      ],
+    },
+    {
+      title: 'Company',
+      links: [
+        { href: APP_ROUTES.ABOUT, label: 'About' },
+        { href: APP_ROUTES.BLOG, label: 'Blog' },
+        { href: APP_ROUTES.CHANGELOG, label: 'Changelog' },
+      ],
+    },
+    {
+      title: 'Resources',
+      links: [
+        MARKETING_DEVELOPER_LINK,
+        MARKETING_CLI_LINK,
+        { href: APP_ROUTES.SUPPORT, label: 'Support' },
+        { href: APP_ROUTES.COMPARE, label: 'Compare' },
+        { href: APP_ROUTES.ALTERNATIVES, label: 'Alternatives' },
+      ],
+    },
+    {
+      title: 'Connect',
+      links: [
+        {
+          href: 'https://instagram.com/meetjovie',
+          label: 'Instagram',
+          external: true,
+        },
+        { href: 'https://x.com/meetjovie', label: 'X', external: true },
+        { href: APP_ROUTES.SUPPORT, label: 'Contact' },
+      ],
+    },
+  ].map(column => ({ ...column, links: eligibleLinks(column.links) }));

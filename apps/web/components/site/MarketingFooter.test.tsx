@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
-// These cases cover the theme-switching policy itself; production ships with
-// theme switching off (dark forced), covered in lib/theme/route-policy.test.ts.
+// These cases cover declared marketing theme routes. The homepage always
+// supports switching; other routes retain the policy covered in route-policy.test.ts.
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_FEATURE_THEME_SWITCHING = '1';
 });
@@ -30,6 +30,8 @@ vi.mock('next-themes', () => ({
   useTheme: () => themeState,
 }));
 
+const footerFlags = vi.hoisted(() => ({ full: true }));
+
 // Product default: SHOW_MARKETING_FULL_FOOTER is false (clean homepage baseline).
 // Enable it here so footer content assertions exercise expanded chrome in isolation.
 vi.mock('@/lib/flags/marketing-static', async importOriginal => {
@@ -39,7 +41,9 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
     ...actual,
     FEATURE_FLAGS: {
       ...actual.FEATURE_FLAGS,
-      SHOW_MARKETING_FULL_FOOTER: true,
+      get SHOW_MARKETING_FULL_FOOTER() {
+        return footerFlags.full;
+      },
     },
   };
 });
@@ -50,6 +54,7 @@ function footerColumnTitle(name: string) {
 
 describe('MarketingFooter', () => {
   beforeEach(() => {
+    footerFlags.full = true;
     mockUsePathname.mockReturnValue('/about');
     themeState.theme = 'dark';
     themeState.resolvedTheme = 'dark';
@@ -334,3 +339,51 @@ describe('MarketingFooter', () => {
     expect(screen.queryByTestId('marketing-footer-controls')).toBeNull();
   });
 });
+
+it.each(['auto', 'expanded'] as const)(
+  'pins the locked homepage footer structure for %s independently of legacy flags',
+  variant => {
+    footerFlags.full = false;
+    mockUsePathname.mockReturnValue('/');
+    render(<MarketingFooter variant={variant} />);
+    const footer = screen.getByTestId('marketing-footer');
+    expect(footer).toHaveAttribute('data-footer-variant', 'expanded');
+    expect(footer).toHaveClass('marketing-footer-locked');
+    expect(
+      footer.querySelectorAll('nav[aria-label="Footer"] section')
+    ).toHaveLength(5);
+    expect(
+      Array.from(
+        footer.querySelectorAll('.mf-eyebrow'),
+        node => node.textContent
+      )
+    ).toEqual(['Product', 'Features', 'Company', 'Resources', 'Connect']);
+    expect(
+      Array.from(
+        footer.querySelectorAll(
+          'nav[aria-label="Footer"] section:first-child a'
+        ),
+        node => [node.textContent, node.getAttribute('href')]
+      )
+    ).toEqual([
+      ['Your Jovie profile', '/artist-profiles'],
+      ['Jovie Card', '/card'],
+      ['Smart links', '/smart-links'],
+      ['Updates', '/artist-notifications'],
+      ['Payments', '/pay'],
+      ['Pricing', '/pricing'],
+    ]);
+    expect(screen.getByRole('link', { name: 'Jovie Home' })).toHaveAttribute(
+      'href',
+      '/'
+    );
+    for (const [name, href] of [
+      ['Privacy', '/legal/privacy'],
+      ['Terms', '/legal/terms'],
+      ['Cookies', '/legal/cookies'],
+      ['DMCA', '/legal/dmca'],
+    ])
+      expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);
+    expect(screen.getByTestId('marketing-footer-controls')).toBeInTheDocument();
+  }
+);

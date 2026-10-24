@@ -1,6 +1,7 @@
 'use client';
 
 import './MarketingFooter.css';
+import { Link as DesignLink } from '@jovie/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -9,6 +10,7 @@ import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
   getMarketingFooterColumns,
   getPublicCommercialFooterColumn,
+  LOCKED_MARKETING_FOOTER_COLUMNS,
   MARKETING_CLI_LINK,
   MARKETING_DEVELOPER_LINK,
   MARKETING_LEGAL_LINKS,
@@ -77,6 +79,7 @@ function resolveFooterVariant(
   variant: 'auto' | 'expanded' | 'minimal',
   pathname: string | null
 ): ResolvedVariant {
+  if (pathname === APP_ROUTES.HOME && variant !== 'minimal') return 'expanded';
   const isMinimalPath = pathname ? MINIMAL_FOOTER_PATHS.has(pathname) : false;
   const autoVariant: ResolvedVariant =
     FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER && !isMinimalPath
@@ -98,15 +101,17 @@ const footerLegalLinkClassName =
 
 function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
   return (
-    <Link
-      href={link.href}
-      prefetch={link.external ? undefined : false}
-      className={footerLinkClassName}
-      target={link.external ? '_blank' : undefined}
-      rel={link.external ? 'noreferrer' : undefined}
-    >
-      {link.label}
-    </Link>
+    <DesignLink asChild variant={null}>
+      <Link
+        href={link.href}
+        prefetch={link.external ? undefined : false}
+        className={footerLinkClassName}
+        target={link.external ? '_blank' : undefined}
+        rel={link.external ? 'noreferrer' : undefined}
+      >
+        {link.label}
+      </Link>
+    </DesignLink>
   );
 }
 
@@ -154,15 +159,19 @@ export function MarketingFooter({
     (PAGE_OWNS_FINAL_CTA_PATHS.has(pathname) ||
       isEditorialFooterCtaPath(pathname));
   const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
-  const footerColumns = FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH
-    ? [getPublicCommercialFooterColumn(genericCreatorNav)]
-    : getMarketingFooterColumns(genericCreatorNav);
+  const isLockedHome = pathname === APP_ROUTES.HOME && !isMinimal;
+  const footerColumns = isLockedHome
+    ? LOCKED_MARKETING_FOOTER_COLUMNS
+    : FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH
+      ? [getPublicCommercialFooterColumn(genericCreatorNav)]
+      : getMarketingFooterColumns(genericCreatorNav);
 
   return (
     <footer
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.shell.footer}
       className={cn(
         'marketing-footer-premium',
+        isLockedHome && 'marketing-footer-locked',
         isMinimal && 'system-b-mounted-home-footer',
         className
       )}
@@ -172,6 +181,7 @@ export function MarketingFooter({
       <div
         className={cn(
           'public-container',
+          isLockedHome && 'mf-shell',
           isMinimal
             ? 'pt-[clamp(3rem,5vw,4.5rem)] pb-[clamp(2.5rem,4vw,3.5rem)]'
             : shouldShowCta
@@ -182,7 +192,12 @@ export function MarketingFooter({
         {shouldShowCta ? <MarketingFooterCta /> : null}
 
         {isMinimal ? null : (
-          <div className='grid gap-12 md:grid-cols-[minmax(0,1fr)_minmax(0,2.6fr)] md:gap-x-16 md:gap-y-14 lg:gap-x-24'>
+          <div
+            className={cn(
+              'grid gap-12 md:grid-cols-[minmax(0,1fr)_minmax(0,2.6fr)] md:gap-x-16 md:gap-y-14 lg:gap-x-24',
+              isLockedHome && 'mf-main-grid'
+            )}
+          >
             <div className='min-w-0'>
               <FooterBrandMark />
             </div>
@@ -190,6 +205,7 @@ export function MarketingFooter({
             <nav
               className={cn(
                 'grid gap-x-8 gap-y-10 lg:gap-x-12 xl:gap-x-16',
+                isLockedHome && 'mf-columns',
                 footerColumns.length === 1
                   ? 'grid-cols-1'
                   : 'grid-cols-2 sm:grid-cols-3',
