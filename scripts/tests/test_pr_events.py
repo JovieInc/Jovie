@@ -1191,6 +1191,22 @@ class ClaimCommentTest(unittest.TestCase):
 
 
 class ClaimTest(unittest.TestCase):
+    def test_explicit_queue_inventory_never_refills_and_preserves_input(self):
+        module = fake_lane(Shell())
+        module.open_prs_summary = Mock(side_effect=AssertionError('unexpected inventory refill'))
+        self.assertEqual(events.queued_prs(module, events.FIX_KINDS, inventory=[]), [])
+        rows = [pr(labels=['lane-fix-red', 'lane-fix-green'], labelsComplete=True)]
+        before = json.loads(json.dumps(rows))
+        fixed = events.queued_prs(module, events.FIX_KINDS, inventory=rows)
+        ticked = events.queued_prs(module, ('green',), inventory=rows)
+        fixed[0]['eventKinds'].append('stale')
+        self.assertEqual(ticked[0]['eventKinds'], ['green'])
+        self.assertEqual(rows, before)
+        with self.assertRaisesRegex(RuntimeError, 'event-label-inventory-incomplete'):
+            events.queued_prs(module, events.FIX_KINDS, inventory=[pr(labelsComplete=False)])
+        module.open_prs_summary.assert_not_called()
+        self.assertEqual(module.sh.calls, [])
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.host = SimpleNamespace(state=Path(self.tmp.name))
