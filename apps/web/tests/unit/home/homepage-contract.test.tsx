@@ -247,6 +247,51 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     expect(component).not.toMatch(/>\s*[A-Z][a-z]+(?: [a-z]+){2,}[.!]?\s*</);
   });
 
+  it('keeps the homepage JSON-LD on the approved artist-profile copy and canonical billing (JOV-8565)', async () => {
+    const { container } = await renderHomePage();
+    const { ARTIST_PROFILE_COPY } = await import('@/data/artistProfileCopy');
+    const { BASE_URL } = await import('@/constants/app');
+
+    const schemas = [
+      ...container.querySelectorAll('script[type="application/ld+json"]'),
+    ].map(script => JSON.parse(script.textContent ?? '{}'));
+    const website = schemas.find(s => s['@type'] === 'WebSite');
+    const software = schemas.find(s => s['@type'] === 'SoftwareApplication');
+
+    // The homepage WebSite schema speaks with the approved artist-profile
+    // landing-page copy, verbatim (JOV-8565) — not a hand-rolled line.
+    expect(website).toBeDefined();
+    expect(website.url).toBe(BASE_URL);
+    expect(website.description).toBe(ARTIST_PROFILE_COPY.seo.description);
+
+    // Billing claims come from offer truth: the free-forever profile and the
+    // self-serve monthly Pro offer. No hardcoded or stale prices.
+    const freeClaim = getPublicPriceClaim('free');
+    const proClaim = getPublicPriceClaim('pro');
+    const offers = software?.offers;
+    expect(Array.isArray(offers)).toBe(true);
+    expect(offers).toHaveLength(2);
+    expect(offers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          price: String(freeClaim.priceUsd),
+          priceCurrency: 'USD',
+          availability: 'https://schema.org/InStock',
+        }),
+        expect.objectContaining({
+          price: String(proClaim.priceUsd),
+          priceCurrency: 'USD',
+          availability: 'https://schema.org/InStock',
+        }),
+      ])
+    );
+
+    // No fabricated social proof, and no speculative capability claims: the
+    // SearchAction stays off until the route serves search queries.
+    expect(software).not.toHaveProperty('aggregateRating');
+    expect(website).not.toHaveProperty('potentialAction');
+  });
+
   it('keeps the homepage stylesheets on tokens', () => {
     for (const path of HOMEPAGE_STYLES) {
       const css = read(path).replace(/\/\*[\s\S]*?\*\//g, '');
