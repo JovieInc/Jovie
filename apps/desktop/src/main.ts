@@ -172,10 +172,9 @@ import { authHandoffWindowBounds } from './auth-handoff-window';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import {
   isTrayAppState,
-  MenuBarTray,
   type TrayAction,
   type TrayStatePayload,
-} from './tray';
+} from './tray-state';
 import {
   persistNativeFullscreen,
   shouldRestoreNativeFullscreen,
@@ -368,7 +367,6 @@ const visualActivityReaders = new Map<number, () => boolean>();
 let publicProfilePreviewWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
-let menuBarTray: MenuBarTray | null = null;
 let pendingAuthCompletion: DesktopAuthCompletion | null = null;
 let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
@@ -2961,12 +2959,57 @@ function buildUpdateMenuItem(): MenuItemConstructorOptions {
   };
 }
 
+type MenuClickWindow = Electron.BaseWindow | undefined;
+
+function menuWindow(target: MenuClickWindow): BrowserWindow | null {
+  return target instanceof BrowserWindow && !target.isDestroyed()
+    ? target
+    : null;
+}
+
+function openFocusedWindowInBrowser(
+  _item: Electron.MenuItem,
+  target: MenuClickWindow
+): void {
+  const url = menuWindow(target)?.webContents.getURL();
+  if (url && url === publicProfilePreviewWindow?.webContents.getURL()) {
+    void openPublicProfileInBrowser(url);
+  }
+}
+
+function buildGoMenu(): MenuItemConstructorOptions[] {
+  return [
+    {
+      label: 'Back',
+      accelerator: 'CommandOrControl+[',
+      click: (_item, target) => {
+        const win = menuWindow(target);
+        if (win?.webContents.canGoBack()) win.webContents.goBack();
+      },
+    },
+    {
+      label: 'Forward',
+      accelerator: 'CommandOrControl+]',
+      click: (_item, target) => {
+        const win = menuWindow(target);
+        if (win?.webContents.canGoForward()) win.webContents.goForward();
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'New Message',
+      accelerator: 'CommandOrControl+N',
+      click: () => handleTrayAction('new-message'),
+    },
+  ];
+}
+
 function buildViewMenu(): MenuItemConstructorOptions[] {
   const viewMenu: MenuItemConstructorOptions[] = [];
 
+  viewMenu.push({ role: 'reload' });
   if (ENABLE_DEVTOOLS) {
     viewMenu.push(
-      { role: 'reload' },
       { role: 'forceReload' },
       { role: 'toggleDevTools' },
       { type: 'separator' }
@@ -2989,6 +3032,7 @@ function buildApplicationMenu(): Menu {
   const template: MenuItemConstructorOptions[] = [
     { role: 'editMenu' },
     { label: 'View', submenu: viewMenu },
+    { label: 'Go', submenu: buildGoMenu() },
     { role: 'windowMenu' },
   ];
 
@@ -3024,10 +3068,7 @@ function buildApplicationMenu(): Menu {
         submenu: [
           {
             label: 'Open in Browser',
-            click: () => {
-              const url = publicProfilePreviewWindow?.webContents.getURL();
-              if (url) void openPublicProfileInBrowser(url);
-            },
+            click: openFocusedWindowInBrowser,
           },
           { role: 'close', accelerator: 'Command+W' },
         ],
@@ -3039,10 +3080,7 @@ function buildApplicationMenu(): Menu {
       submenu: [
         {
           label: 'Open in Browser',
-          click: () => {
-            const url = publicProfilePreviewWindow?.webContents.getURL();
-            if (url) void openPublicProfileInBrowser(url);
-          },
+          click: openFocusedWindowInBrowser,
         },
         {
           label: 'Preferences…',
@@ -3753,10 +3791,7 @@ app.whenReady().then(async () => {
   await hydrateWindowState();
   await bootSplashWordmarkReady;
 
-  // macOS menu bar extra (NSStatusItem via Electron Tray)
-  if (process.platform === 'darwin') {
-    menuBarTray = new MenuBarTray(handleTrayAction);
-  }
+  // Menu bar is owned by the SwiftUI MenuMonitor (apps/macos); no Electron tray.
 
   startupMaintenance = createStartupMaintenanceGate();
   createWindow(
@@ -3819,15 +3854,14 @@ ipcMain.handle(
       return { ok: false, reason: 'invalid-request' };
     }
     if (
-      !menuBarTray ||
       payload === null ||
       typeof payload !== 'object' ||
       !isTrayAppState((payload as Record<string, unknown>).state)
     ) {
       return { ok: false, reason: 'invalid-payload' };
     }
-    menuBarTray.setState(payload as TrayStatePayload);
-    return { ok: true };
+    // Accepted and dropped: the Electron tray is retired.
+    return { ok: false, reason: 'tray-retired' };
   }
 );
 

@@ -58,12 +58,13 @@ const nativeSurfaces = [
   surface('native.application-menu', 'Application menu and shortcuts', {
     kind: 'native-menu',
     sources: [NATIVE_SOURCE],
-    states: ['default', 'preferences', 'back-forward', 'fullscreen'],
-  }),
-  surface('native.tray-menu', 'Menu bar tray', {
-    kind: 'native-menu',
-    sources: ['apps/desktop/src/tray.ts'],
-    states: ['idle', 'active', 'unread', 'error'],
+    states: [
+      'default',
+      'preferences',
+      'back-forward',
+      'new-message',
+      'fullscreen',
+    ],
   }),
   surface('native.about', 'About Jovie window', {
     kind: 'native-window',

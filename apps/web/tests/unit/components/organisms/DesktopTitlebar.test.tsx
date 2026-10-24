@@ -173,6 +173,20 @@ describe('DesktopTitlebar', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('uses the canonical focus ring and surface hover on nav buttons', () => {
+    renderTitlebar();
+    for (const id of ['electron-nav-back', 'electron-nav-forward']) {
+      const button = screen.getByTestId(id);
+      expect(button.className).toContain('focus-visible:ring-focus/30');
+      expect(button.className).toContain('hover:bg-surface-1');
+      expect(button.className).not.toMatch(/white\//);
+    }
+    expect(screen.getByTestId('electron-nav-back')).toHaveAttribute(
+      'title',
+      'Back (⌘[)'
+    );
+  });
+
   it('keeps back/forward nav in the sidebar titlebar cell', () => {
     renderTitlebar();
 

@@ -1,10 +1,6 @@
-'use client';
-
-import { Download, Loader2, RotateCcw } from 'lucide-react';
-import { useState } from 'react';
-import { useDesktopUpdate } from '@/lib/desktop/electron-bridge';
+import { Download, RotateCcw } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { cn } from '@/lib/utils';
-import { useWebUpdate } from '@/lib/version/use-web-update';
 
 export type UpdateAvailablePillState =
   | 'downloading'
@@ -52,20 +48,18 @@ export function UpdateAvailablePillView({
       disabled={isBusy}
       aria-busy={isBusy}
       aria-label={ariaLabel}
-      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
       className={cn(
-        'inline-flex h-6 w-24 items-center justify-center gap-1 rounded-full border px-1.5 text-2xs font-caption tracking-tight',
+        'inline-flex h-6 min-w-24 items-center justify-center gap-1 rounded-full border px-1.5 text-2xs font-caption tracking-tight',
         'transition-[background-color,border-color,color,opacity] duration-subtle',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:ring-offset-1 focus-visible:ring-offset-surface-page',
         isDownloading
           ? 'border-subtle bg-surface-1 text-secondary-token'
-          : 'border-transparent bg-primary-token text-surface-1 hover:opacity-90',
+          : 'border-default bg-surface-1 text-primary-token hover:bg-surface-0',
         'disabled:cursor-default disabled:opacity-70'
       )}
     >
-      {isBusy ? (
-        <Loader2 className='h-3 w-3 shrink-0 animate-spin' aria-hidden='true' />
-      ) : isDesktopReady ? (
+      {isBusy ? null : isDesktopReady ? (
         <RotateCcw className='h-3 w-3 shrink-0' aria-hidden='true' />
       ) : (
         <Download className='h-3 w-3 shrink-0' aria-hidden='true' />
@@ -73,37 +67,4 @@ export function UpdateAvailablePillView({
       <span className='whitespace-nowrap leading-none'>{label}</span>
     </button>
   );
-}
-
-export function UpdateAvailablePill() {
-  const desktop = useDesktopUpdate();
-  const web = useWebUpdate();
-  const [updating, setUpdating] = useState(false);
-
-  const isAvailable = desktop.available || web.available;
-  const isDesktopDownloading = desktop.available && !desktop.downloaded;
-
-  if (!isAvailable) return null;
-
-  function handleClick() {
-    if (updating || isDesktopDownloading) return;
-    setUpdating(true);
-
-    if (desktop.available) {
-      desktop.install();
-    } else {
-      web.reload();
-    }
-  }
-
-  const state: UpdateAvailablePillState = (() => {
-    if (updating) {
-      return desktop.available ? 'restarting' : 'web-updating';
-    }
-    if (isDesktopDownloading) return 'downloading';
-    if (desktop.downloaded) return 'ready-to-restart';
-    return 'web-ready';
-  })();
-
-  return <UpdateAvailablePillView state={state} onClick={handleClick} />;
 }

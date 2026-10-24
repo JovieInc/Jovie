@@ -226,7 +226,7 @@ apps/desktop/src/*
 !apps/desktop/src/window-state.ts
 !apps/desktop/src/visual-activity.ts
 !apps/desktop/src/renderer-recovery.ts
-!apps/desktop/src/tray.ts
+!apps/desktop/src/tray-state.ts
 !apps/desktop/src/ovie-door.ts
 !apps/desktop/src/operator-launch.ts
 !apps/desktop/src/summer-runtime-bridge.ts

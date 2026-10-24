@@ -22,6 +22,17 @@ final class MenuMonitorConformanceTests: XCTestCase {
     XCTAssertFalse(presentationSource.contains("shippingCountText"))
   }
 
+  func testMenuOwnsOpenJovieShortcutsAndTypeFloor() throws {
+    let source = try String(contentsOf: menuMonitorAppSourceURL, encoding: .utf8)
+
+    XCTAssertTrue(source.contains("Button(\"Open Jovie\")"))
+    XCTAssertTrue(source.contains("withBundleIdentifier: \"app.jov.ie\""))
+    XCTAssertTrue(source.contains(".keyboardShortcut(\"r\")"))
+    XCTAssertTrue(source.contains(".keyboardShortcut(\"d\")"))
+    XCTAssertFalse(source.contains(".font(.system(.caption"))
+    XCTAssertFalse(source.contains(".font(.caption"))
+  }
+
   func testMenuRendersEveryPublishedPresentationState() throws {
     let source = try String(contentsOf: menuMonitorAppSourceURL, encoding: .utf8)
 

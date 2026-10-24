@@ -103,19 +103,25 @@ struct MenuMonitorMenu: View {
       if let status = presentation.statusOutput, !status.isEmpty {
         Divider()
         Text(status)
-          .font(.system(.caption, design: .monospaced))
+          .font(.system(size: 12, design: .monospaced))
           .lineLimit(12)
           .foregroundStyle(.secondary)
       }
 
       Divider()
 
+      Button("Open Jovie") {
+        openJovieApp()
+      }
+      .keyboardShortcut("o")
       Button("Open Dashboard") {
         store.openDashboard()
       }
+      .keyboardShortcut("d")
       Button("Refresh Now") {
         Task { await store.refresh() }
       }
+      .keyboardShortcut("r")
       Button("Quit MenuMonitor") {
         NSApplication.shared.terminate(nil)
       }
@@ -125,4 +131,13 @@ struct MenuMonitorMenu: View {
       await store.start()
     }
   }
+}
+
+/// Replaces the retired Electron tray's "Open Chat": activates the Jovie app.
+@MainActor
+func openJovieApp() {
+  guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "app.jov.ie") else {
+    return
+  }
+  NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
 }
