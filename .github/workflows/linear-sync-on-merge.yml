@@ -147,26 +147,41 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REPO: ${{ github.repository }}
+          GH_API_HOLD_BUDGET_SECONDS: '300'
+          GH_API_HOLD_LABEL: screen-audit-quota-hold
         run: |
-          set -euo pipefail
-          sha="$(curl -fsS --max-time 10 https://jov.ie/api/health/build-info | jq -r '.commitSha // empty')"
-          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::warning::production build sha unreadable; no screen-audit receipts"
-            exit 0
-          fi
-          run="$(node packages/api-client/cli.ts gh --priority default -- run list -R "$REPO" --workflow screenshots.yml --branch main --event push --status success --limit 1 --json databaseId,headSha --jq '.[0] | "\(.databaseId) \(.headSha)"')"
-          read -r run_id screens_sha <<<"$run"
-          if [ -z "${run_id:-}" ]; then
-            echo "::warning::no successful Product Screenshots run on main"
-            exit 0
-          fi
-          dir="$RUNNER_TEMP/screen-evidence"
-          node packages/api-client/cli.ts gh --priority default -- run download "$run_id" -R "$REPO" -D "$dir" \
-            -p 'route-dom-certification-*' -p 'screen-browser-proof*'
-          node scripts/lib/screen-audit-receipts.mjs --artifacts "$dir" --sha "$sha" \
-            --screens-sha "$screens_sha" \
-            --run-url "https://github.com/$REPO/actions/runs/$run_id" \
-            --out "$RUNNER_TEMP/screen-audit-receipts.json"
+          set -uo pipefail
+          # The first live backfill (2026-10-24 23:45Z) died on the shared GITHUB_TOKEN
+          # quota ("github exhausted: GET .../compare"). Probe through the hold helper
+          # first (sleeps to the reset when it is within 300s), and attempt twice.
+          attempt() {
+            set -e
+            sha="$(curl -fsS --max-time 10 https://jov.ie/api/health/build-info | jq -r '.commitSha // empty')"
+            if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::warning::production build sha unreadable; no screen-audit receipts"
+              return 0
+            fi
+            run="$(node packages/api-client/cli.ts gh --priority default -- run list -R "$REPO" --workflow screenshots.yml --branch main --event push --status success --limit 1 --json databaseId,headSha --jq '.[0] | "\(.databaseId) \(.headSha)"')"
+            read -r run_id screens_sha <<<"$run"
+            if [ -z "${run_id:-}" ]; then
+              echo "::warning::no successful Product Screenshots run on main"
+              return 0
+            fi
+            dir="$RUNNER_TEMP/screen-evidence"
+            node packages/api-client/cli.ts gh --priority default -- run download "$run_id" -R "$REPO" -D "$dir" \
+              -p 'route-dom-certification-*' -p 'screen-browser-proof*'
+            node scripts/lib/screen-audit-receipts.mjs --artifacts "$dir" --sha "$sha" \
+              --screens-sha "$screens_sha" \
+              --run-url "https://github.com/$REPO/actions/runs/$run_id" \
+              --out "$RUNNER_TEMP/screen-audit-receipts.json"
+          }
+          for try in 1 2; do
+            .github/scripts/gh-api-hold.sh api "repos/$REPO/pulls?per_page=1&state=open" --silent || true
+            if (attempt); then exit 0; fi
+            echo "::warning::screen-audit receipts attempt $try failed (see above); retrying after the quota hold"
+          done
+          echo "::error::screen-audit receipts were not recorded after two attempts"
+          exit 1
 
       - name: Evaluate the validation lifecycle
         id: evaluate
