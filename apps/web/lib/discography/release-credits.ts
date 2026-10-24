@@ -417,7 +417,7 @@ export function reconcilePrimaryArtists(input: {
             sameNamePrimary,
             providerArtist.provider
           ),
-          providerId: providerArtist.id,
+          providerId: providerArtist.id ?? null,
         });
       }
       continue;

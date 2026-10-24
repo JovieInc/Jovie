@@ -31,6 +31,16 @@ describe('planCreditSpotifyIdRepairs', () => {
     ]);
   });
 
+  it('skips when the owning artist is already credited on the release', () => {
+    const plan = planCreditSpotifyIdRepairs([
+      { ...base, ownerArtistId: 'artist-real', ownerAlreadyCredited: true },
+    ]);
+    expect(summarizeRepairs(plan)).toMatchObject({
+      'skip:owner_already_credited': 1,
+      repoint_credit: 0,
+    });
+  });
+
   it('sets the id on an unclaimed auto-created artist', () => {
     expect(planCreditSpotifyIdRepairs([base])).toEqual([
       {
