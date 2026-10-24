@@ -196,8 +196,8 @@
     },
     ".claude/rules/macos.md": {
       "owner": "@itstimwhite",
-      "claim": "Current Mac owners and planned Swift-native direction follow the stack receipt and accepted ADR; no native parity is certified.",
-      "documentSha256": "3e478342371997f9537a7194222b21221735e6ea564eee3651fb3dd9319945f9",
+      "claim": "Current Mac owners and planned Swift-native direction follow the stack receipt and accepted ADR; no native parity is certified. New surfaces default to SwiftUI, Electron stays maintenance-only, and the production ultrawide Ovie surface stays under a perpetual design loop.",
+      "documentSha256": "81e758d169e66a1235c43e67ca33e634d9bbdb711a8abcd8d013f50aff91abe7",
       "sources": [
         {
           "path": "docs/macos/swift-control-invariants.md",
