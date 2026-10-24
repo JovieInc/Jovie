@@ -12,6 +12,11 @@
 # A reset outside the window exits non-zero. A non-rate-limit error exits
 # non-zero. Exit 0 happens only after `gh` itself succeeds, so a 403 never
 # passes as an empty result.
+#
+# Visibility: callers such as release-lineage-gate.sh discard stderr, so the
+# hold is also announced out of band (see announce_hold). That output is
+# metadata only: label, trigger status, wait, reset, bucket and quota counts.
+# It never includes tokens, headers or URLs.
 set -euo pipefail
 
 budget="${GH_API_HOLD_BUDGET_SECONDS:-3900}"
@@ -54,6 +59,39 @@ run_gh() {
   set -e
 }
 
+# Emit an annotation that survives a caller's `2>/dev/null`. Two channels,
+# both best effort and never able to change the exit code or the sleep:
+#   1. GITHUB_STEP_SUMMARY, a file, so it always reaches the run summary.
+#   2. The stderr pipe of the highest ancestor that still owns one (the Actions
+#      step shell), opened through /proc so it is live in the step log.
+#      Ancestors are walked only up to Runner.Worker, or to
+#      GH_API_HOLD_ANNOTATION_ROOT_PID (exclusive) when set.
+announce_hold() {
+  local line="$1" md="$2" pid parent comm target="" fd
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    printf '%s\n' "$md" >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+  fi
+  pid="$PPID"
+  while [ -n "$pid" ] && [ "$pid" -gt 1 ] 2>/dev/null; do
+    if [ "$pid" = "${GH_API_HOLD_ANNOTATION_ROOT_PID:-}" ]; then
+      break
+    fi
+    comm="$(cat "/proc/$pid/comm" 2>/dev/null || true)"
+    if [ "$comm" = "Runner.Worker" ]; then
+      break
+    fi
+    fd="/proc/$pid/fd/2"
+    if [ -p "$fd" ]; then
+      target="$fd"
+    fi
+    parent="$(awk '/^PPid:/{print $2}' "/proc/$pid/status" 2>/dev/null || true)"
+    pid="$parent"
+  done
+  if [ -n "$target" ]; then
+    printf '%s\n' "$line" >"$target" 2>/dev/null || true
+  fi
+}
+
 run_gh "$@"
 if [ "$status" -eq 0 ]; then
   cat "$out"
@@ -69,9 +107,10 @@ fi
 # GET /rate_limit does not spend the bucket it reports, including while that
 # bucket is empty. The reset instant is x-ratelimit-reset for the core resource.
 set +e
-reset="$("$gh_bin" api rate_limit --jq '.resources.core.reset // empty' 2>/dev/null)"
+rate_fields="$("$gh_bin" api rate_limit --jq '.resources.core | "\(.reset // "") \(.limit // "") \(.remaining // "")"' 2>/dev/null)"
 reset_status=$?
 set -e
+read -r reset rl_limit rl_remaining _ <<<"$rate_fields" || true
 now="$(date +%s)"
 if [ "$reset_status" -ne 0 ] || ! [[ "$reset" =~ ^[0-9]+$ ]]; then
   echo "::error::GitHub rate limit response had no x-ratelimit-reset; refusing to continue." >&2
@@ -88,6 +127,23 @@ if [ "$wait" -gt "$budget" ]; then
   exit "$status"
 fi
 echo "::warning::Holding ${wait}s for the GitHub rate limit reset." >&2
+{
+  trigger_http="$(printf '%s\n' "$message" | grep -oE 'HTTP [0-9]{3}' | head -n1 | cut -d' ' -f2 || true)"
+  bucket="$(printf '%s\n' "$message" | grep -ioE 'x-ratelimit-resource:[[:space:]]*[A-Za-z_]+' | head -n1 | sed -E 's/^[^:]*:[[:space:]]*//' || true)"
+  bucket_src="x-ratelimit-resource"
+  if [ -z "$bucket" ]; then
+    bucket="core"
+    bucket_src="rate_limit.resources.core"
+  fi
+  label="${GH_API_HOLD_LABEL:-gh $1 ${2:-}}"
+  label="${label%%\?*}"
+  label="$(printf '%s' "$label" | tr -c 'A-Za-z0-9 ._/:@=-' '?' | cut -c1-120)"
+  reset_iso="$(date -u -d "@${reset}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$reset" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)"
+  fields="label=${label} http=${trigger_http:-unknown} wait_s=${wait} reset_epoch=${reset} reset_iso=${reset_iso} bucket=${bucket} bucket_source=${bucket_src}"
+  if [[ "${rl_limit:-}" =~ ^[0-9]+$ ]]; then fields="${fields} limit=${rl_limit}"; fi
+  if [[ "${rl_remaining:-}" =~ ^[0-9]+$ ]]; then fields="${fields} remaining=${rl_remaining}"; fi
+  announce_hold "::notice title=GitHub API hold::${fields}" "- GitHub API hold: ${fields}"
+} 2>/dev/null || true
 sleep "$wait"
 
 run_gh "$@"
