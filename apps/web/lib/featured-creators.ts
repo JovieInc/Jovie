@@ -426,7 +426,6 @@ async function queryFeaturedCreatorsForSearch(): Promise<VipArtistLookup> {
   return vipLookup;
 }
 
-// VIP prioritization reads current consent on each search request.
 export const getFeaturedCreatorsForSearch = queryFeaturedCreatorsForSearch;
 
 /**
