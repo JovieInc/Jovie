@@ -1193,7 +1193,9 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       screen.getByRole('button', { name: /Add public profile/i })
     );
     const url = screen.getByRole('textbox', { name: 'Public Profile URL' });
-    await user.type(url, 'Instagram.com/tim/?utm_source=test');
+    // Paste a profile URL; typed-handle keyboard selection is covered below.
+    await user.click(url);
+    await user.paste('Instagram.com/tim/?utm_source=test');
     expect(screen.getByText(/instagram\.com\/tim/)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Review Profile' })
