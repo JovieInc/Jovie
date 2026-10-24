@@ -219,6 +219,22 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(pe.watcher_health(self.dir, probe={"receiver": True})["receiver"]["status"], "ok")
         self.assertEqual(pe.watcher_health(self.dir, probe={"receiver": False})["receiver"]["status"], "down")
 
+    def test_synthetic_loop_gate_clears_between_episodes(self):
+        # The stuck-synthetic gate must clear when the episode ends, so a NEW stuck synthetic
+        # (fresh fingerprint each week) files a fresh issue instead of being suppressed forever.
+        ep1 = {"9": {"synthetic": True, "status": "claimed", "openedAt": time.time() - 4 * 86400, "sentryId": "9"}}
+        pe.write_json(self.dir / "ledger.json", ep1)
+        pe.deadman(self.l, self.dir)
+        self.assertEqual(len(self.l.created), 1)
+        self.assertIn("synthetic-loop is stuck", self.l.created[0]["body"])
+        pe.write_json(self.dir / "ledger.json", {})  # episode over, gate clears
+        pe.deadman(self.l, self.dir)
+        self.assertEqual(len(self.l.created), 1)
+        ep2 = {"10": {"synthetic": True, "status": "claimed", "openedAt": time.time() - 4 * 86400, "sentryId": "10"}}
+        pe.write_json(self.dir / "ledger.json", ep2)  # a new episode must re-alert
+        pe.deadman(self.l, self.dir)
+        self.assertEqual(len(self.l.created), 2)
+
     def test_bottleneck_fragment(self):
         pe.handle_issue(self.issue(userCount=30), self.ledger, self.s, self.l, [], self.t, self.dir)
         frag = pe.write_bottleneck(self.ledger, self.dir)

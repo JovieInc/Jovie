@@ -506,6 +506,8 @@ def deadman(linear: Linear | None, state: Path = STATE, port: int = 8788) -> dic
     # ONE issue per watcher per unhealthy episode: recovery clears the watcher's gate, a watcher
     # that stays unhealthy is never re-filed, and newly unhealthy ones batch into ONE alert.
     seen_alerts = read_json(state / "deadman-alerts.json", {})
+    if "synthetic-loop" not in health:
+        seen_alerts.pop("synthetic-loop", None)  # episode over: a NEW stuck synthetic must re-alert
     newly = []
     for name, h in sorted(health.items()):
         if h["status"] in ("ok", "pending-first-run"):
@@ -517,6 +519,8 @@ def deadman(linear: Linear | None, state: Path = STATE, port: int = 8788) -> dic
         text = f"{name} is {h['status']}"
         if h["status"] == "missing-config":
             text += f": {h.get('lastDetail', '')}. Fix the env file, then restart the unit."
+        elif name == "synthetic-loop" and h.get("sentryId"):
+            text += f" (Sentry {h['sentryId']})"  # per-episode fingerprint: each stuck synthetic re-alerts
         newly.append(text)
     if newly:
         alert("dead-man", "watchers unhealthy: " + ", ".join(newly), False, linear, state)
