@@ -12,6 +12,7 @@ import {
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { HomepageHeroCanvas } from './hero-light/HomepageHeroCanvas';
 import './HomepageArtistProfile.css';
+import './HomepageAtmosphere.css';
 
 const OWNER = 'apps/web/components/homepage/HomepageArtistProfile.tsx';
 
