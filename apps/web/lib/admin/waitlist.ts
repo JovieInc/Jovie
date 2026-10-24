@@ -159,8 +159,8 @@ export async function getWaitlistIntegritySummary(): Promise<WaitlistIntegritySu
         ON by_email.canonical = true
         AND u.email IS NOT NULL
         AND (
-          by_email.email_normalized = lower(u.email)
-          OR lower(by_email.email) = lower(u.email)
+          by_email.email_normalized = lower(trim(u.email))
+          OR lower(trim(by_email.email)) = lower(trim(u.email))
         )
       WHERE u.deleted_at IS NULL
         AND u.user_status IN ('waitlist_pending', 'waitlist_approved')
@@ -176,7 +176,8 @@ export async function getWaitlistIntegritySummary(): Promise<WaitlistIntegritySu
       LEFT JOIN users by_email
         ON by_email.deleted_at IS NULL
         AND by_email.email IS NOT NULL
-        AND lower(by_email.email) = w.email_normalized
+        AND (lower(trim(by_email.email)) = w.email_normalized
+          OR lower(trim(by_email.email)) = lower(trim(w.email)))
       WHERE w.canonical = true
         AND w.status IN ('approved', 'invited', 'claimed', 'signed_up')
         AND by_id.id IS NULL
@@ -191,7 +192,8 @@ export async function getWaitlistIntegritySummary(): Promise<WaitlistIntegritySu
       LEFT JOIN users by_email
         ON by_email.deleted_at IS NULL
         AND by_email.email IS NOT NULL
-        AND lower(by_email.email) = w.email_normalized
+        AND (lower(trim(by_email.email)) = w.email_normalized
+          OR lower(trim(by_email.email)) = lower(trim(w.email)))
       WHERE w.canonical = true
         AND w.status = 'signed_up'
         AND by_id.id IS NULL
@@ -213,10 +215,8 @@ export async function getWaitlistIntegritySummary(): Promise<WaitlistIntegritySu
     usersMissingWaitlistEntry,
     entriesMissingUser,
     signedUpEntriesMissingUser,
-    totalIssues:
-      usersMissingWaitlistEntry +
-      entriesMissingUser +
-      signedUpEntriesMissingUser,
+    // Signed-up orphans are a subset of entriesMissingUser.
+    totalIssues: usersMissingWaitlistEntry + entriesMissingUser,
   };
 }
 

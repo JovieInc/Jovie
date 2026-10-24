@@ -1,0 +1,555 @@
+{
+  "schema": "jovie-stage-manifest/v1",
+  "eventSchema": "jovie-stage-event/v1",
+  "_comment": "Canonical stage registry (docs/metrics/STAGE_EVENTS.md). Every pipeline stage that can be timed is listed here with its producer and how it is measured. status: derived = computed by the shipping-slo collector from durable receipts (GitHub, Linear), so history backfills automatically; pushed = a live emitter writes jovie-stage-event/v1 rows; spec = emitter specified for its owner, not live yet; gap = no source exists. scripts/stage-manifest-check.mjs fails CI when a release/controller/deploy workflow is not registered here.",
+  "windows": ["24h", "7d", "28d"],
+  "regression": {
+    "recentWindow": "7d",
+    "baselineWindow": "days 8-28",
+    "minRecentSamples": 10,
+    "minBaselineSamples": 20,
+    "ratio": 1.25,
+    "minAbsoluteSeconds": 60
+  },
+  "entities": {
+    "shipping": {
+      "entityId": "owner/repo#pr (Linear identifier in actor-independent joins)",
+      "description": "One unit of shipped work: Linear issue to production-verified PR.",
+      "endToEnd": [
+        ["issue", "verified"],
+        ["pr-open", "merged"],
+        ["merged", "verified"]
+      ],
+      "stages": [
+        {
+          "id": "issue",
+          "meaning": "Linear issue created",
+          "producer": "linear",
+          "status": "derived",
+          "source": "linear-history"
+        },
+        {
+          "id": "eligible",
+          "meaning": "issue entered Todo (unstarted) and became admissible",
+          "producer": "linear",
+          "status": "derived",
+          "source": "linear-history"
+        },
+        {
+          "id": "admitted",
+          "meaning": "a lane claimed the issue (moved to started)",
+          "producer": "lanes",
+          "status": "derived",
+          "source": "linear-history"
+        },
+        {
+          "id": "worker-start",
+          "meaning": "lane worker process started on the issue",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "pr-open",
+          "meaning": "pull request created",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
+        },
+        {
+          "id": "gate-seat",
+          "meaning": "lane gate waiting for a host gate seat (admission deferrals exit as abandoned)",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "gate",
+          "meaning": "lane gate run on the exact head (seat acquired to verdict)",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "ready",
+          "meaning": "pull request ready for review (non-draft)",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
+        },
+        {
+          "id": "queued",
+          "meaning": "last admission to the merge queue before merge",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
+        },
+        {
+          "id": "merged",
+          "meaning": "pull request merged to main",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
+        },
+        {
+          "id": "deployed",
+          "meaning": "first production promotion completed at or after merge",
+          "producer": "production-release.yml",
+          "status": "derived",
+          "source": "github-controller"
+        },
+        {
+          "id": "outcome-receipt",
+          "meaning": "independent issue span: outcome receipt owed (lifecycle comment) to receipt recorded by the outcome lane; entityId is the JOV issue",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "verified",
+          "meaning": "first Production Verified job completed at or after deploy",
+          "producer": "production-controller.yml",
+          "status": "derived",
+          "source": "github-controller"
+        }
+      ]
+    },
+    "remediation": {
+      "entityId": "owner/repo#pr@red-sha",
+      "description": "A red pull request returning to green.",
+      "endToEnd": [["red", "green"]],
+      "stages": [
+        {
+          "id": "red",
+          "meaning": "first failing GitHub Actions check suite on a PR commit",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
+        },
+        {
+          "id": "classified",
+          "meaning": "lane-fix-<kind> label applied after the red",
+          "producer": "lane-fix-relay.yml",
+          "status": "derived",
+          "source": "github-pr"
+        },
+        {
+          "id": "repair-start",
+          "meaning": "fix-red lane run started",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "green",
+          "meaning": "first later commit whose check rollup is SUCCESS",
+          "producer": "github",
+          "status": "derived",
+          "source": "github-pr"
+        }
+      ]
+    },
+    "release": {
+      "entityId": "JovieInc/Jovie@sha (release generation)",
+      "description": "One main generation from staging to production verification.",
+      "endToEnd": [["staging", "verified"]],
+      "stages": [
+        {
+          "id": "staging",
+          "meaning": "Staging Controller run started for the generation",
+          "producer": "staging-controller.yml",
+          "status": "derived",
+          "source": "github-controller"
+        },
+        {
+          "id": "canary",
+          "meaning": "staging Canary Health Gate started; exits when production promotion starts",
+          "producer": "production-release.yml",
+          "status": "derived",
+          "source": "github-controller"
+        },
+        {
+          "id": "prod",
+          "meaning": "Promote to Production started; exits at Production Verified",
+          "producer": "production-release.yml",
+          "status": "derived",
+          "source": "github-controller"
+        },
+        {
+          "id": "verified",
+          "meaning": "Production Verified job completed",
+          "producer": "production-controller.yml",
+          "status": "derived",
+          "source": "github-controller"
+        }
+      ]
+    },
+    "release-replay": {
+      "entityId": "<controller workflow file>#<run id>@<run attempt> (the failed controller attempt)",
+      "description": "One failed Staging/Production Controller attempt, from its failure to the replay decision of controller-quota-replay.yml. Only transient failures (quota, GitHub 5xx, network, runner loss) of attempt 1 at current main are replayed, by rerunning the source CI run, at most to CI attempt 3.",
+      "endToEnd": [["blocked", "replayed"]],
+      "stages": [
+        {
+          "id": "blocked",
+          "meaning": "the controller attempt failed; exits at the replay decision (advanced = replayed, abandoned = not transient or superseded, failed = attempt or wait cap)",
+          "producer": "controller-quota-replay.yml",
+          "status": "pushed",
+          "source": "release-replay-receipts"
+        },
+        {
+          "id": "replayed",
+          "meaning": "gh run rerun of the exact source CI run was accepted",
+          "producer": "controller-quota-replay.yml",
+          "status": "pushed",
+          "source": "release-replay-receipts"
+        }
+      ]
+    },
+    "ios-release": {
+      "entityId": "JovieInc/LogYourBody@sha",
+      "description": "LogYourBody iOS build from merge to App Store release.",
+      "endToEnd": [["merge", "testflight"], ["merge", "released"]],
+      "stages": [
+        {
+          "id": "merge",
+          "meaning": "iOS Release Loop run created for the merged main commit",
+          "producer": "LogYourBody ios-release-loop.yml",
+          "status": "derived",
+          "source": "github-lyb"
+        },
+        {
+          "id": "testflight",
+          "meaning": "Deploy to TestFlight job completed",
+          "producer": "LogYourBody ios-release-loop.yml",
+          "status": "derived",
+          "source": "github-lyb"
+        },
+        {
+          "id": "review",
+          "meaning": "Deploy to App Store job completed (submitted for review)",
+          "producer": "LogYourBody ios-release-loop.yml",
+          "status": "derived",
+          "source": "github-lyb"
+        },
+        {
+          "id": "released",
+          "meaning": "App Store version released to customers",
+          "producer": "LogYourBody ios-app-store-approved-release.yml",
+          "status": "spec",
+          "source": "lyb-stage-feed",
+          "owner": "LogYourBody release loop"
+        }
+      ]
+    },
+    "revenue-funnel": {
+      "entityId": "pseudonymous user id (never leaves the app; only aggregates are published)",
+      "description": "Artist acquisition to the paid $12 profile.",
+      "endToEnd": [["signup", "paid"], ["visit", "paid"]],
+      "stages": [
+        {
+          "id": "visit",
+          "meaning": "first-touch acquisition journey captured",
+          "producer": "apps/web acquisition_journeys",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        },
+        {
+          "id": "signup",
+          "meaning": "user row created",
+          "producer": "apps/web users",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        },
+        {
+          "id": "profile-claim",
+          "meaning": "user_profile_claims.claimed_at",
+          "producer": "apps/web claim flow",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        },
+        {
+          "id": "checkout",
+          "meaning": "checkout_initiated server analytics event",
+          "producer": "apps/web /api/stripe/checkout",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        },
+        {
+          "id": "paid",
+          "meaning": "first paid billing event",
+          "producer": "apps/web Stripe webhooks",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        },
+        {
+          "id": "pending-verification",
+          "meaning": "branch after paid: a high-reach artist claim (>=50k Spotify followers) is held for ownership verification instead of going live (acquisition_journey_stages, lib/claim/claim-verification.ts)",
+          "producer": "apps/web Stripe checkout webhook (markClaimVerificationsPaid)",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        },
+        {
+          "id": "claim-verified",
+          "meaning": "branch after pending-verification: an operator approved the claim and the artist was linked",
+          "producer": "apps/web claim verification review (decideClaimVerification)",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        },
+        {
+          "id": "claim-rejected",
+          "meaning": "branch after pending-verification: an operator rejected the claim; first month refunded and subscription canceled",
+          "producer": "apps/web claim verification review (decideClaimVerification)",
+          "status": "spec",
+          "source": "revenue-funnel-timings",
+          "owner": "apps/web"
+        }
+      ]
+    },
+    "automation-run": {
+      "entityId": "<automationId>@<runRef> (registry id in canon/automation-registry.jsonl plus the run's own reference)",
+      "description": "One run of a registered automation, from start to its terminal receipt, as observed by the dead-man liveness check.",
+      "endToEnd": [["started", "finished"]],
+      "stages": [
+        {
+          "id": "started",
+          "meaning": "the automation's run started (from its receipt)",
+          "producer": "automation-liveness",
+          "status": "pushed",
+          "source": "automation-liveness-receipts"
+        },
+        {
+          "id": "finished",
+          "meaning": "the run reached a terminal receipt (completed or failed)",
+          "producer": "automation-liveness",
+          "status": "pushed",
+          "source": "automation-liveness-receipts"
+        }
+      ]
+    },
+    "linear-intake": {
+      "entityId": "Linear issue identifier (JOV-123, LYB-45)",
+      "description": "One issue that entered Triage, from entry to classification (team, priority, labels, out of Triage) or an explicit Ovie card for Tim. Dwell SLO 15 min (.claude/rules/event-driven.md); dead-man summer:triage-dwell.",
+      "endToEnd": [["triage", "classified"]],
+      "stages": [
+        {
+          "id": "triage",
+          "meaning": "issue entered Triage (create or move) until Summer's scoped triage turn read back its effect",
+          "producer": "summer-config",
+          "status": "spec",
+          "source": "summer-stage-feed",
+          "owner": "summer-config"
+        },
+        {
+          "id": "classified",
+          "meaning": "terminal: completed when moved out of Triage with priority set, failed when held as an Ovie card for Tim",
+          "producer": "summer-config",
+          "status": "spec",
+          "source": "summer-stage-feed",
+          "owner": "summer-config"
+        }
+      ]
+    },
+    "summer-turn": {
+      "entityId": "<hashed conversation>:<hashed turn> (summer-config hashes both)",
+      "description": "One Summer turn from triggering event to measured outcome.",
+      "endToEnd": [["event", "outcome"], ["model-turn", "outcome"]],
+      "stages": [
+        {
+          "id": "event",
+          "meaning": "trigger received by Summer ingress",
+          "producer": "summer-config",
+          "status": "spec",
+          "source": "summer-stage-feed",
+          "owner": "summer-config"
+        },
+        {
+          "id": "model-turn",
+          "meaning": "model call started",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "action",
+          "meaning": "tool/action dispatched",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        },
+        {
+          "id": "outcome",
+          "meaning": "terminal receipt with outcome recorded",
+          "producer": "summer-config",
+          "status": "pushed",
+          "source": "summer-stage-feed"
+        }
+      ]
+    },
+    "claim-dogfood": {
+      "entityId": "claim-checkout-dogfood#<run id>@<run attempt>",
+      "description": "One browser dogfood of the $12 artist claim (Stripe test mode, fixture artists): from the staging deploy (or dispatch) that made it due to the journey verdict.",
+      "endToEnd": [["wait", "journey"]],
+      "stages": [
+        {
+          "id": "wait",
+          "meaning": "staging deploy finished (Staging Controller completed) or dispatch, until the dogfood job started",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        },
+        {
+          "id": "setup",
+          "meaning": "job start to app ready: ephemeral Neon branch, migrations, build, server",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        },
+        {
+          "id": "journey",
+          "meaning": "browser journey; outcome completed (green) or failed (red)",
+          "producer": "claim-checkout-dogfood.yml",
+          "status": "pushed",
+          "source": "claim-dogfood-receipts"
+        }
+      ]
+    },
+    "market-signal": {
+      "entityId": "<item id> (x-post:<snowflake id> for X posts)",
+      "description": "INTERNAL ONLY. One external market signal seen by scripts/signals/signal_watch.py. X has no push trigger, so X posts come from a backstop poll (one Grok CLI call per watcher run, every 6 h). The published stage measures that poll's cost; this is the documented exception to event-driven.",
+      "endToEnd": [["published", "delivered"]],
+      "stages": [
+        {
+          "id": "published",
+          "meaning": "from the post's own createdAt (snowflake time) to the watcher run that observed it",
+          "producer": "signal-watch",
+          "status": "spec",
+          "source": "signal-watch-feed",
+          "owner": "signals"
+        },
+        {
+          "id": "delivered",
+          "meaning": "from the card entering the outbox to Summer's signed ingress answering 202 (or rejecting it)",
+          "producer": "signal-watch",
+          "status": "spec",
+          "source": "signal-watch-feed",
+          "owner": "signals"
+        }
+      ]
+    }
+  },
+  "sources": {
+    "github-pr": {
+      "kind": "derived",
+      "description": "GraphQL merged-PR search with timeline items and commit check suites (28d window)."
+    },
+    "github-controller": {
+      "kind": "derived",
+      "description": "Staging/Production Controller runs and their jobs."
+    },
+    "github-lyb": {
+      "kind": "derived",
+      "description": "JovieInc/LogYourBody iOS Release Loop runs and jobs; unavailable when the token cannot read that repo."
+    },
+    "linear-history": {
+      "kind": "derived",
+      "description": "Linear issue createdAt/startedAt/state history for JOV identifiers found on merged PRs; needs LINEAR_API_KEY."
+    },
+    "lanes-stage-feed": {
+      "kind": "events",
+      "url": "https://gist.githubusercontent.com/itstimwhite/07ec460956451da7632fe852934f21c5/raw/stage-events.ndjson",
+      "owner": "lanes worker"
+    },
+    "lyb-stage-feed": {
+      "kind": "events",
+      "url": null,
+      "owner": "LogYourBody release loop"
+    },
+    "automation-liveness-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "automation-liveness-receipts/stage-events.ndjson",
+      "workflow": "automation-liveness.yml",
+      "owner": "automation registry (scripts/automation-liveness.mjs)"
+    },
+    "release-replay-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "release-replay-receipts/stage-events.ndjson",
+      "workflow": "controller-quota-replay.yml",
+      "owner": "release path (.github/scripts/controller-quota-replay.mjs)"
+    },
+    "summer-stage-feed": {
+      "kind": "events",
+      "url": "https://summer.jov.ie/runtime/v1/summer-stage-events.ndjson",
+      "owner": "summer-config"
+    },
+    "revenue-funnel-timings": {
+      "kind": "timings",
+      "url": "https://jov.ie/api/cron/stage-timings",
+      "auth": "CRON_SECRET",
+      "owner": "apps/web"
+    },
+    "claim-dogfood-receipts": {
+      "kind": "events",
+      "url": null,
+      "artifact": "claim-dogfood-receipts/stage-events.ndjson",
+      "workflow": "claim-checkout-dogfood.yml",
+      "owner": "revenue path (scripts/claim-dogfood-report.mjs)"
+    },
+    "signal-watch-feed": {
+      "kind": "events",
+      "url": null,
+      "artifact": "stage-events.ndjson next to the watcher state (rolling 28 d, written by scripts/signals/signal_watch.py)",
+      "owner": "signals; published through the lanes status feed once the Gem tick is live"
+    }
+  },
+  "producers": {
+    "workflows": {
+      "automation-liveness.yml": [
+        "automation-run:started",
+        "automation-run:finished"
+      ],
+      "ci.yml": ["shipping:ready", "remediation:red", "remediation:green"],
+      "lane-fix-relay.yml": ["remediation:classified"],
+      "staging-controller.yml": ["release:staging"],
+      "production-controller.yml": ["release:verified", "shipping:verified"],
+      "controller-quota-replay.yml": [
+        "release-replay:blocked",
+        "release-replay:replayed"
+      ],
+      "production-release.yml": [
+        "release:canary",
+        "release:prod",
+        "shipping:deployed"
+      ],
+      "canary-health-gate.yml": ["release:canary"],
+      "shipping-slo.yml": ["metrics:stage-timings"]
+    },
+    "exempt": {
+      "ci-shard-contract-canary.yml": "contract self-test, not a delivery stage",
+      "fixed-runner-canary.yml": "runner health probe, not a delivery stage",
+      "pr-preparation-canary.yml": "harness self-test, not a delivery stage",
+      "runner-autoscaler-canary.yml": "runner health probe, not a delivery stage",
+      "m2-revenue-path-canary.yml": "synthetic revenue probe; gap tracked in the stage gap audit",
+      "production-controller-health.yml": "controller liveness monitor; measures the controller, not a stage",
+      "postdeploy-probes.yml": "manual re-run of production probes; production-controller.yml owns the stage",
+      "desktop-release.yml": "desktop app release; gap tracked in the stage gap audit",
+      "jovie-agent-release.yml": "agent package release; gap tracked in the stage gap audit",
+      "ios-testflight.yml": "Jovie iOS TestFlight; gap tracked in the stage gap audit",
+      "ios-app-store-graphics.yml": "store asset generation, not a delivery stage",
+      "shipping-origin.yml": "origin receipt writer consumed by shipping attribution"
+    }
+  }
+}

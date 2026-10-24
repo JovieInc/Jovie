@@ -11,7 +11,7 @@
  * additional wiring.
  */
 
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { ToolSchemaKey } from '@/lib/chat/tool-schemas';
@@ -378,7 +378,10 @@ export function buildCommands(
       'Releases',
       'Open the releases view of your work.',
       'Layers',
-      APP_ROUTES.RELEASES
+      // The /app/releases alias is a redirect. Opening it from the palette
+      // makes the client fetch the alias and then the library view, and Next
+      // rewrites the loopback host on that hop. Go straight to the view.
+      buildLibraryViewRoute('releases')
     ),
     nav(
       'go-calendar',

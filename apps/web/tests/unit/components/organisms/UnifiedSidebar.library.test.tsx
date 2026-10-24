@@ -2,8 +2,18 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import {
+  type ComponentPropsWithoutRef,
+  forwardRef,
+  type ReactNode,
+} from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -21,6 +31,16 @@ import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { resetDashboardNavTestMocks } from '@/tests/utils/dashboard-nav-test-support';
 
 const unifiedPathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
+
+// Expose the Next Link contract without starting a router in jsdom.
+vi.mock('next/link', () => ({
+  default: forwardRef<
+    HTMLAnchorElement,
+    ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+  >(function TestLink({ prefetch, ...props }, ref) {
+    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
+  }),
+}));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => unifiedPathnameMock(),
@@ -40,7 +60,8 @@ const signOutMock = vi.hoisted(() => vi.fn());
 const userButtonPropsMock = vi.hoisted(() => vi.fn());
 const nowPlayingBridgePropsMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/desktop/electron-bridge', () => ({
+vi.mock('@/lib/desktop/electron-bridge', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/desktop/electron-bridge')>()),
   isElectronRuntime: () =>
     document.documentElement.dataset.desktopRuntime === 'electron' ||
     electronRuntimeMock.isElectronRuntime,
@@ -208,6 +229,31 @@ function renderUnifiedSidebar({
 }
 
 describe('UnifiedSidebar library route', () => {
+  it('shows the seeded creator name in demo workspace chrome', () => {
+    renderUnifiedSidebar({ pathname: '/demo', section: 'dashboard' });
+    const brand = document.querySelector('[data-sidebar-brand-row]');
+    expect(brand).toHaveTextContent('Tim White');
+    expect(brand).not.toHaveTextContent('Demo');
+    expect(
+      screen.getByRole('button', { name: 'Search Sidebar' })
+    ).toBeVisible();
+  });
+
+  it('keeps the route back link available without idle prefetch', () => {
+    renderUnifiedSidebar({ overrideContent: <span>Releases</span> });
+    const link = screen.getByRole('link', { name: 'Back to App' });
+    expect(link).toHaveAttribute('href', APP_ROUTES.CHAT);
+    expect(link).toHaveAttribute('data-prefetch', 'false');
+  });
+
+  it('pins the sidebar content scrollport so focusing New Chat does not shift the shell', () => {
+    renderUnifiedSidebar();
+
+    expect(document.querySelector('[data-sidebar="content"]')).toHaveClass(
+      'overflow-anchor-none'
+    );
+  });
+
   afterEach(() => {
     document.cookie = 'sidebar:state=; path=/; max-age=0';
     electronRuntimeMock.isElectronRuntime = true;
@@ -349,6 +395,21 @@ describe('UnifiedSidebar library route', () => {
     expect(
       within(panel).getByRole('link', { name: /Public Profile/i })
     ).toHaveAttribute('href', '/timwhite');
+    const settingsNav = screen.getByRole('navigation', {
+      name: 'settings navigation',
+    });
+    for (const label of ['Account', 'Artist']) {
+      const group = within(settingsNav)
+        .getAllByText(label)
+        .find(node => node.className.includes('font-caption'));
+      expect(group?.className).toContain('text-sidebar-muted');
+      expect(group?.className).not.toMatch(/text-sidebar-muted\/\d+/);
+      expect(group).toHaveClass(
+        'ps-(--app-shell-sidebar-label-inset)',
+        'pe-(--app-shell-sidebar-inset)'
+      );
+      expect(group).not.toHaveClass('px-2.5');
+    }
   });
 
   it('keeps the unified user panel when a route-owned sidebar override replaces nav', () => {
@@ -586,6 +647,27 @@ describe('UnifiedSidebar library route', () => {
     expect(marks[0]?.closest('[data-sidebar="header"]')).not.toBeNull();
   });
 
+  it('prefetches Shipping on hover and keyboard focus without duplicate requests', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => new Promise(() => {}));
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.ADMIN_OPS,
+      section: 'ov',
+      variant: 'ov',
+    });
+    const nav = screen.getByRole('navigation', { name: 'OV Navigation' });
+    const link = within(nav).getByRole('link', { name: 'Shipping' });
+    fireEvent.mouseOver(link);
+    fireEvent.focus(link);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/hud/shipping-state',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    fetchMock.mockRestore();
+  });
+
   it('renders dedicated operator navigation without the customer dashboard nav', () => {
     const { container } = renderUnifiedSidebar({
       pathname: APP_ROUTES.ADMIN_OPS,
@@ -647,7 +729,7 @@ describe('UnifiedSidebar library route', () => {
       name: 'OV Navigation',
     });
     expect(
-      within(operatorNavigation).getByRole('link', { name: 'Chat' })
+      within(operatorNavigation).getByRole('link', { name: 'Ops' })
     ).not.toHaveAttribute('aria-current');
     const operationsLink = within(operatorNavigation).getByRole('link', {
       name: 'Operations',
@@ -675,6 +757,53 @@ describe('UnifiedSidebar library route', () => {
     expect(screen.queryByTestId('operator-lists-nav')).not.toBeInTheDocument();
   });
 
+  it('keeps Tools collapsed on Ovie Home until the founder opens it', () => {
+    globalThis.localStorage?.removeItem('ovie.nav.tools-open.v1');
+    renderUnifiedSidebar({ pathname: APP_ROUTES.OV, section: 'ov' });
+    const operatorNavigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    expect(
+      within(operatorNavigation).getByRole('link', { name: 'Home' })
+    ).toBeVisible();
+    const tools = within(operatorNavigation).getByRole('button', {
+      name: 'Tools',
+    });
+    expect(tools).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      within(operatorNavigation).queryByRole('link', { name: 'Growth' })
+    ).toBeNull();
+    fireEvent.click(tools);
+    expect(tools).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      within(operatorNavigation).getByRole('link', { name: 'Growth' })
+    ).toBeVisible();
+    expect(globalThis.localStorage?.getItem('ovie.nav.tools-open.v1')).toBe(
+      '1'
+    );
+  });
+
+  it('exposes Inbox while Tools is collapsed and selects only Inbox', () => {
+    globalThis.localStorage?.removeItem('ovie.nav.tools-open.v1');
+    renderUnifiedSidebar({ pathname: APP_ROUTES.ADMIN_INBOX, section: 'ov' });
+    const navigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    const inbox = within(navigation).getByRole('link', { name: 'Inbox' });
+    expect(inbox).toBeVisible();
+    expect(inbox).toHaveAttribute('href', APP_ROUTES.ADMIN_INBOX);
+    expect(inbox).toHaveAttribute('aria-current', 'page');
+    expect(
+      within(navigation).getByRole('link', { name: 'Home' })
+    ).not.toHaveAttribute('aria-current');
+    expect(
+      within(navigation).getByRole('button', { name: 'Tools' })
+    ).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      within(navigation).queryByRole('link', { name: 'Needs You' })
+    ).toBeNull();
+  });
+
   it('renders founder lists in the Ovie sidebar outside the canonical landmark', async () => {
     renderUnifiedSidebar({ pathname: APP_ROUTES.ADMIN_OPS, section: 'ov' });
     const operatorNavigation = screen.getByRole('navigation', {
@@ -683,10 +812,19 @@ describe('UnifiedSidebar library route', () => {
     // Lazy chunk: the lists block is split out of creator routes.
     const lists = await screen.findByTestId('operator-lists-nav');
     expect(operatorNavigation).not.toContainElement(lists);
-    const labels = within(operatorNavigation)
-      .getAllByText(/^(Workspaces|Utilities)$/)
-      .map(node => node.textContent);
-    expect(labels).toEqual(['Workspaces', 'Utilities']);
+    // Ovie is one Home plus Tools (Tim 2026-10-21). Tools holds the active
+    // Ops page, so it is open and cannot be collapsed over it.
+    expect(
+      within(operatorNavigation).queryByText(/^(Workspaces|Utilities)$/)
+    ).toBeNull();
+    const tools = within(operatorNavigation).getByRole('button', {
+      name: 'Tools',
+    });
+    expect(tools).toHaveAttribute('aria-expanded', 'true');
+    expect(tools).toBeDisabled();
+    expect(
+      within(operatorNavigation).getByRole('link', { name: 'Ops' })
+    ).toBeVisible();
     expect(lists).toBeInTheDocument();
 
     renderUnifiedSidebar({ pathname: APP_ROUTES.CHAT, section: 'dashboard' });

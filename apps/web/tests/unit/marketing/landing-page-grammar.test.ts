@@ -164,8 +164,7 @@ describe('certified landing-page grammar', () => {
     expect(LANDING_PAGE_HOMEPAGE_LOCK.maxSections).toBe(9);
     expect(LANDING_PAGE_HOMEPAGE_LOCK.sectionJobs).toEqual([
       'hero',
-      'feature-split',
-      'feature-split',
+      'product-gallery',
       'cta',
     ]);
     expect(LANDING_PAGE_HOMEPAGE_LOCK.primaryAction).toBe('Find me');
@@ -208,7 +207,7 @@ describe('certified landing-page grammar', () => {
   });
 
   it('exposes canonical route and content-slot lookups', () => {
-    expect(getLandingPageRouteType('homepage').sectionJobs).toHaveLength(4);
+    expect(getLandingPageRouteType('homepage').sectionJobs).toHaveLength(3);
     expect(getLandingPageSlots('hero')).toEqual(
       expect.arrayContaining(['headline', 'primaryCta'])
     );

@@ -1,3 +1,5 @@
+'use client';
+
 // @coverage-via apps/web/components/organisms/home-loop/HomeLoopParts.test.tsx
 
 import { Check } from 'lucide-react';
@@ -9,6 +11,7 @@ import type {
 } from '@/lib/home-loop/contract';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
+import { useFitList } from './useFitList';
 
 const ATTENTION_LABEL: Record<Exclude<HomeLoopAttention, null>, string> = {
   blocked: 'Blocked',
@@ -162,52 +165,86 @@ export function HomeLoopStageRowsSkeleton({
 
 const SKELETON_ROWS = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8'] as const;
 
-/** Compact chips for work that landed today. */
+function DoneChip({ item }: Readonly<{ readonly item: HomeLoopDoneItem }>) {
+  return (
+    <li
+      className='inline-flex min-h-6 max-w-full items-center gap-1.5 pr-2 text-xs text-secondary-token'
+      data-fit-item
+      data-verified={item.verified}
+    >
+      <Check
+        aria-hidden='true'
+        className={cn(
+          'size-3 shrink-0',
+          item.verified ? 'text-success' : 'text-tertiary-token'
+        )}
+      />
+      {item.url ? (
+        <a
+          href={item.url}
+          target='_blank'
+          rel='noreferrer'
+          className='truncate hover:text-primary-token focus-visible:underline'
+        >
+          {item.label}
+        </a>
+      ) : (
+        <span className='truncate'>{item.label}</span>
+      )}
+      <span className='sr-only'>
+        {item.verified ? 'Verified in production' : 'Landed'}
+      </span>
+    </li>
+  );
+}
+
+/**
+ * Compact chips for work that landed today. With `fit` the chips fill their
+ * bounded parent and the rest collapse into "+N more" instead of scrolling.
+ */
 export function HomeLoopDoneChips({
   items,
   summary,
+  fit = false,
 }: Readonly<{
   readonly items: readonly HomeLoopDoneItem[];
   /** Optional aggregate, e.g. "12 merges", shown as the first chip. */
   readonly summary?: string | null;
+  readonly fit?: boolean;
 }>) {
-  return (
-    <ul className='flex flex-wrap gap-1.5' data-testid='home-loop-done'>
+  const { ref, hidden } = useFitList<HTMLUListElement>(
+    items.map(item => item.id).join('|'),
+    fit
+  );
+  const list = (
+    <ul
+      ref={ref}
+      className={cn(
+        'flex flex-wrap gap-x-3 gap-y-1',
+        fit && 'relative min-h-0 flex-1 content-start overflow-hidden'
+      )}
+      data-testid='home-loop-done'
+    >
       {summary ? (
-        <li className='inline-flex min-h-7 items-center rounded-full border border-subtle px-2 text-xs font-medium tabular-nums text-primary-token'>
+        <li className='inline-flex min-h-6 items-center pr-2 text-xs font-medium tabular-nums text-primary-token'>
           {summary}
         </li>
       ) : null}
       {items.map(item => (
-        <li
-          key={item.id}
-          className='inline-flex min-h-7 max-w-full items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-2 text-xs text-secondary-token'
-          data-verified={item.verified}
-        >
-          <Check
-            aria-hidden='true'
-            className={cn(
-              'size-3 shrink-0',
-              item.verified ? 'text-success' : 'text-tertiary-token'
-            )}
-          />
-          {item.url ? (
-            <a
-              href={item.url}
-              target='_blank'
-              rel='noreferrer'
-              className='truncate hover:text-primary-token focus-visible:underline'
-            >
-              {item.label}
-            </a>
-          ) : (
-            <span className='truncate'>{item.label}</span>
-          )}
-          <span className='sr-only'>
-            {item.verified ? 'Verified in production' : 'Landed'}
-          </span>
-        </li>
+        <DoneChip key={item.id} item={item} />
       ))}
     </ul>
+  );
+  if (!fit) return list;
+  return (
+    <div className='flex min-h-0 flex-1 flex-col gap-1'>
+      {list}
+      <p
+        className='h-4 shrink-0 px-1 text-2xs tabular-nums text-tertiary-token'
+        data-testid='home-loop-done-more'
+      >
+        {hidden > 0 ? `+${hidden} more` : null}
+      </p>
+    </div>
   );
 }

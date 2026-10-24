@@ -156,11 +156,15 @@ function installDefaultDbMocks() {
 function stubRuntimeEnv({
   nodeEnv = 'development',
   vercelEnv,
+  gatewayKey = 'test-gateway-key',
 }: {
   readonly nodeEnv?: string;
   readonly vercelEnv?: string;
+  readonly gatewayKey?: string;
 } = {}) {
   vi.stubEnv('NODE_ENV', nodeEnv);
+  vi.stubEnv('AI_GATEWAY_API_KEY', gatewayKey);
+  vi.stubEnv('VERCEL', '');
   if (vercelEnv) {
     vi.stubEnv('VERCEL_ENV', vercelEnv);
   } else {
@@ -564,6 +568,28 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(result?.headers.get('x-onboarding-fallback')).toMatch(/^greet:/);
     expect(await result?.text()).toContain("I'm Jovie");
     // The LLM must NOT have been called when the gate is closed.
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
+
+  it('serves the scripted fallback when the AI gateway is not configured', async () => {
+    vi.resetModules();
+    stubRuntimeEnv({ gatewayKey: '' });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({
+      mode: 'onboarding',
+      messages: [userMessage('hi, I want in')],
+    });
+    const result = await tryHandleAnonymousOnboardingChat(
+      req,
+      'req-no-gateway'
+    );
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-fallback-reason')).toBe('llm_error');
+    expect(result?.headers.get('x-onboarding-fallback')).toMatch(/^greet:/);
+    expect(await result?.text()).toContain("I'm Jovie");
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
   });
 

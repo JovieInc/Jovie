@@ -60,12 +60,15 @@ export function extractCopy(line: string, path: string): string[] {
     });
 }
 
-function addedLines(path: string, base: string): Set<number> {
+function addedLines(path: string, base: string): Set<number> | null {
   const diff = execFileSync(
     'git',
     ['diff', '-U0', `${base}...HEAD`, '--', path],
     { encoding: 'utf8' }
   );
+  // A committed deletion has no current copy to read. Other missing inputs
+  // must still fail closed, even when their diff contains no added lines.
+  if (/^deleted file mode \d+$/m.test(diff)) return null;
   const lines = new Set<number>();
   for (const [, start, count] of diff.matchAll(
     /^@@ -\S+ \+(\d+)(?:,(\d+))? @@/gm
@@ -84,6 +87,7 @@ function check(args: string[]): number {
     const register = registerFor(path);
     if (!register) continue;
     const only = base ? addedLines(path, base) : undefined;
+    if (only === null) continue;
     readFileSync(path, 'utf8')
       .split('\n')
       .forEach((line, index) => {

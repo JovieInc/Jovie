@@ -53,3 +53,31 @@ describe('JOV-5466 token retire', () => {
     expect(source).not.toMatch(/--linear-app-/);
   });
 });
+
+describe('Ion accent polish (glm/lyrics-player)', () => {
+  it('stamps selected/focused edit rows with the Ion accent, not raw cyan', () => {
+    const source = readFileSync(resolve(__dirname, './LyricRow.tsx'), 'utf8');
+    expect(source).not.toMatch(/cyan-/);
+    expect(source).toContain('data-[selected]:bg-accent/[0.06]');
+    expect(source).toContain('data-[selected]:before:bg-accent/85');
+    expect(source).toContain(
+      'bg-accent/15 text-accent border border-accent/30'
+    );
+  });
+
+  it('keeps lyric line rhythm on the canonical leading scale', () => {
+    const source = readFileSync(resolve(__dirname, './LyricRow.tsx'), 'utf8');
+    expect(source).not.toMatch(/leading-\[/);
+    expect(source).toContain('text-3xl leading-tight font-display');
+    expect(source).toContain('text-xl leading-snug font-display');
+  });
+
+  it('seeks from a focus-ringed button in display mode', () => {
+    render(<LyricRow {...baseProps} />);
+    const button = screen.getByText(
+      'You were humming a tune I forgot'
+    ) as HTMLButtonElement;
+    expect(button.tagName).toBe('BUTTON');
+    expect(button.className).toContain('focus-visible:ring-ring/55');
+  });
+});

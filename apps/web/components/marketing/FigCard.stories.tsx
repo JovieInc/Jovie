@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Music, Rocket, Users } from 'lucide-react';
 import { FigCard } from './FigCard';
 
-// Real /home ValuePropsSection cards (apps/web/components/features/home/ValuePropsSection.tsx).
+// Cards in the shape of the retired homepage value-props section.
 const meta = {
   title: 'Marketing/FigCard',
   component: FigCard,

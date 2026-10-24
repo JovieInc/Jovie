@@ -87,6 +87,10 @@ export function ReleaseSidebar({
   canGenerateAlbumArt,
   onGenerateAlbumArt,
   onGeneratePitch,
+  onDelete,
+  onChangeStatus,
+  isSmartLinkLocked,
+  getSmartLinkLockReason,
   onClose,
   onRefresh,
   isRefreshing = false,
@@ -294,6 +298,10 @@ export function ReleaseSidebar({
         canGenerateAlbumArt,
         onGenerateAlbumArt,
         onGeneratePitch: onGeneratePitch ?? handleGeneratePitch,
+        onDelete,
+        onChangeStatus,
+        isSmartLinkLocked,
+        getSmartLinkLockReason,
       })
     );
 
@@ -327,6 +335,10 @@ export function ReleaseSidebar({
     handleGeneratePitch,
     onGenerateAlbumArt,
     onGeneratePitch,
+    onDelete,
+    onChangeStatus,
+    isSmartLinkLocked,
+    getSmartLinkLockReason,
     isRefreshing,
     onRefresh,
     router,

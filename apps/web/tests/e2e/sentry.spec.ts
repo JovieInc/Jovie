@@ -19,9 +19,6 @@ test.describe('Sentry Integration', () => {
   test('sentry-example-page renders without crashing', async ({ page }) => {
     test.setTimeout(90_000);
 
-    const errors: string[] = [];
-    page.on('pageerror', err => errors.push(err.message));
-
     let response: Awaited<ReturnType<typeof page.goto>>;
     try {
       response = await page.goto('/sentry-example-page', {
@@ -45,22 +42,29 @@ test.describe('Sentry Integration', () => {
       'Sentry example page returned 5xx'
     ).toBeLessThan(500);
 
-    const bodyText = (await page.locator('body').textContent()) ?? '';
-    expect(
-      bodyText.trim().length,
-      'Sentry example page rendered empty'
-    ).toBeGreaterThan(0);
-
-    const hasContent = await page
-      .locator('main, h1, h2, p, button')
-      .first()
-      .isVisible({ timeout: 10_000 })
-      .catch(() => false);
-
-    expect(
-      hasContent,
+    // /sentry-example-page is development-only (requireDevelopmentOnlyPage).
+    // Production-mode builds, including the standalone server the full
+    // matrix runs, statically prerender the gate, so the route serves the
+    // root not-found page there. Either surface must paint real content; a
+    // blank body means the client bundle (and Sentry's error boundary)
+    // failed. `isVisible()` never waits, so use web-first assertions.
+    const examplePage = page.getByRole('heading', {
+      level: 1,
+      name: 'Frontend error example',
+    });
+    const devOnlyGate = page
+      .getByTestId('not-found')
+      .getByRole('heading', { level: 1, name: "We can't find that page." });
+    await expect(
+      examplePage.or(devOnlyGate),
       'Sentry example page is a white screen — Sentry error handling may be broken'
-    ).toBe(true);
+    ).toBeVisible({ timeout: 15_000 });
+
+    if (await examplePage.isVisible()) {
+      await expect(
+        page.getByRole('button', { name: 'Throw sample error' })
+      ).toBeVisible();
+    }
   });
 
   test('Sentry CI reporter config valid when E2E reporting enabled', () => {

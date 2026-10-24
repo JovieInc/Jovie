@@ -26,6 +26,11 @@ describe('ReleasePlanWizard', () => {
   it('renders step 1 (release format) by default', () => {
     render(<ReleasePlanWizard {...baseProps} />);
     expect(screen.getByText('Step 1 of 6')).toBeInTheDocument();
+    // Linear-scale dialog: the step counter is a quiet tertiary label, not an
+    // all-caps eyebrow.
+    expect(screen.getByText('Step 1 of 6').className).not.toContain(
+      'uppercase'
+    );
     expect(screen.getByTestId('choice-single')).toBeInTheDocument();
     expect(screen.getByTestId('choice-ep')).toBeInTheDocument();
     expect(screen.getByTestId('choice-album')).toBeInTheDocument();

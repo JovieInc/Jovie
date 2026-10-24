@@ -75,6 +75,31 @@ describe('DashboardAudienceTableUnified', () => {
       )
     );
   });
+  it('renders the workspace empty state as the shared focal card', () => {
+    renderWithProviders(
+      <DashboardAudienceTableUnified
+        mode='members'
+        view='all'
+        rows={[]}
+        total={0}
+        sort='lastSeen'
+        direction='desc'
+        onSortChange={() => undefined}
+        onViewChange={() => undefined}
+        onFiltersChange={() => undefined}
+        filters={DEFAULT_AUDIENCE_FILTERS}
+        subscriberCount={0}
+      />
+    );
+
+    const card = document.querySelector('[data-empty-state-card]');
+    expect(card).not.toBeNull();
+    expect(card).toHaveClass('rounded-md');
+    expect(card).toHaveClass('border-subtle');
+    expect(card).toHaveClass('bg-surface-0');
+    expect(card).toHaveClass('text-left');
+  });
+
   it('renders the empty members view', () => {
     renderWithProviders(
       <DashboardAudienceTableUnified
@@ -96,10 +121,24 @@ describe('DashboardAudienceTableUnified', () => {
     expect(
       screen.getByRole('heading', { name: 'Audience', hidden: true })
     ).toBeInTheDocument();
-    expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
+    expect(screen.getAllByText('Grow Your Audience').length).toBeGreaterThan(0);
     expect(
-      screen.getByRole('link', { name: 'Open Profile Settings' })
+      screen.getAllByRole('link', { name: 'Open Profile Settings' })[0]
     ).toHaveAttribute('href', '/app/settings/profile');
+    const headerLabels = screen
+      .getAllByRole('columnheader')
+      .map(header => header.textContent?.replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
+    expect(headerLabels).toEqual(
+      expect.arrayContaining([
+        'Fan',
+        'State',
+        'Alerts',
+        'Engagement',
+        'Last Seen',
+        'Action',
+      ])
+    );
   });
 
   it('renders members on the 32px dense people row with a face', () => {

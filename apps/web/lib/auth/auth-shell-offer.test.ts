@@ -33,7 +33,7 @@ describe('auth offer reconciliation', () => {
   it('uses canonical price and terms for the current offer', () => {
     const summary = resolveAuthOfferSummary({ handoff: pro });
     expect(summary?.title).toBe('Start 14-day Artist Presence trial');
-    expect(summary?.detail).toContain('$199/month');
+    expect(summary?.detail).toContain('$12/month');
     expect(summary?.detail).toContain('14-day Artist Presence trial');
     expect(summary?.detail).toContain('No credit card');
     expect(

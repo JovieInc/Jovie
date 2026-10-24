@@ -340,7 +340,8 @@ dates. It never holds a secret value.
 - at 7 days (High) and 1 day (Urgent) before any dated credential, grant or
   credit, and every day after an active one expires;
 - when runway drops under 14 days (Urgent under 7), or spend crosses 50%, 80%
-  or 100% of a cap (one fingerprint per period and threshold);
+  or 100% of a cap (one fingerprint per period and threshold; a line can set
+  its own `cap.alertPercents`, as the Summer trial sub-caps do with 80/100);
 - when a credential has no owner or no consumer, a secret-like name in a store
   belongs to no registered credential, or a workflow reads a secret the store
   does not hold.
@@ -349,7 +350,11 @@ Live reads, when their token is present: AI Gateway credits
 (`AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN`; burn is the `total_used` slope
 from the committed snapshot), every Summer `*_GRANT` declaration's expiry on
 Vercel (a new grant is watched from the first run after it is declared), and
-Gem's Codex ledger (banked-reset redemption deadlines). Every run records stage
+Gem's Codex ledger (banked-reset redemption deadlines), and Summer's
+provider-trial ledger (`summer-company/provider-trial/ledger.json`, the current
+month's `bookedMicroUsd` per channel against the Workers AI $50 and Anthropic
+API $30 sub-caps; set `SUMMER_PROVIDER_TRIAL_LEDGER` to a file or https URL,
+with optional bearer `SUMMER_PROVIDER_TRIAL_LEDGER_TOKEN`). Every run records stage
 timestamps (`jovie.credentials-spend-run/v1`).
 
 Routing: the daily Remediation Sweep runs `--mode credentials` and files one

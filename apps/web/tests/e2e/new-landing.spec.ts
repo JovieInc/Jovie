@@ -1,5 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { expect, test } from './setup';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -42,10 +42,7 @@ test.describe('/new landing page', () => {
 
     await expect(hero).toBeVisible();
     await expect(
-      hero.getByRole('heading', {
-        level: 1,
-        name: /Be found\.\s*Be understood\./,
-      })
+      hero.getByRole('heading', { level: 1, name: HOMEPAGE_COPY.hero.headline })
     ).toBeVisible();
     await expect(
       headerNav.getByRole('link', { name: 'Product', exact: true })
@@ -61,44 +58,36 @@ test.describe('/new landing page', () => {
 
     const cta = page.getByTestId('homepage-primary-cta');
     await expect(cta).toBeVisible();
-    await expect(cta).toHaveText(HOMEPAGE_IDENTITY_COPY.hero.claim.action);
+    await expect(cta).toHaveText(HOMEPAGE_COPY.hero.claim.action);
     await expect(page.getByTestId('homepage-claim-form')).toHaveAttribute(
       'action',
       '/start'
     );
   });
 
-  test('mounts the identity homepage sections after the redirect', async ({
-    page,
-  }) => {
+  test('mounts the homepage sections after the redirect', async ({ page }) => {
     await gotoLegacyNewLanding(page);
 
     const headings = await page
       .locator('main h1:visible, main h2:visible')
       .evaluateAll(nodes => nodes.map(node => node.textContent?.trim()));
-    expect(headings.filter(Boolean)).toEqual([
-      'Be found.Be understood.',
-      'Your presence, resolved.',
-      'Structure that travels.',
-      'Make it your Jovie profile.',
-    ]);
+    expect(headings.filter(Boolean)[0]).toBe(HOMEPAGE_COPY.hero.headline);
     await expect(page.getByTestId('homepage-close-claim-cta')).toHaveText(
-      'Claim'
+      HOMEPAGE_COPY.hero.claim.action
     );
   });
 
-  test('keeps the claim card proof on the redirected homepage', async ({
+  test('keeps the artist-profile hero on the redirected homepage', async ({
     page,
   }) => {
     await gotoLegacyNewLanding(page);
 
     const hero = page.getByTestId('marketing-section-hero');
     await expect(
-      hero.getByText(HOMEPAGE_IDENTITY_COPY.hero.preview.name)
+      hero.getByRole('heading', { level: 1, name: HOMEPAGE_COPY.hero.headline })
     ).toBeVisible();
-    await expect(
-      hero.getByText(HOMEPAGE_IDENTITY_COPY.hero.preview.label)
-    ).toBeVisible();
+    await expect(hero.getByText(/Tim White|Founder, Jovie/)).toHaveCount(0);
+    await expect(page.getByPlaceholder('Search your name')).toHaveCount(0);
     await expect(page.getByTestId('homepage-v2-pricing')).toHaveCount(0);
     await expect(page.getByTestId('homepage-v2-hero')).toHaveCount(0);
   });

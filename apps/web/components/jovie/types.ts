@@ -31,6 +31,21 @@ export interface ArtistContext {
   };
 }
 
+/** What a living Home canvas needs from the shared chat. */
+export interface HomeCanvasState {
+  readonly messages: readonly MessageLike[];
+  /** A turn is being submitted or streamed. */
+  readonly isStreaming: boolean;
+  readonly onOpenTranscript: () => void;
+}
+
+/** The subset of a chat message a canvas reads; parts are untyped tool data. */
+export interface MessageLike {
+  readonly id: string;
+  readonly role: string;
+  readonly parts: readonly unknown[];
+}
+
 export interface JovieChatProps {
   /** Profile ID for server-side context fetching (preferred) */
   readonly profileId?: string;
@@ -72,7 +87,14 @@ export interface JovieChatProps {
    * message. Persona-neutral: Ovie passes the company loop; Jovie may pass
    * the creator loop (founder decision 2026-10-20, one mirrored shell).
    */
-  readonly homeCanvas?: ReactNode;
+  readonly homeCanvas?: ReactNode | ((state: HomeCanvasState) => ReactNode);
+  /**
+   * `empty-state` (default): the canvas shows until the first message, then
+   * the transcript takes over. `living`: the canvas stays the main surface
+   * and renders each turn's generated UI in place; the transcript opens on
+   * request (founder decision 2026-10-20, Q3).
+   */
+  readonly homeCanvasMode?: 'empty-state' | 'living';
   /** Whether profile setup is complete, used to suppress setup quick actions. */
   readonly isProfileComplete?: boolean;
   /**

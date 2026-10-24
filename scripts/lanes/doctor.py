@@ -53,6 +53,9 @@ POOL_EMPTY_S = 30 * 60
 HUD_STALE_S = 120
 GATE_TIMEOUT_ALERT = 5
 FAILED_RUN_ALERT = 10
+# JOV-8931: a relayed red check must be claimed within this window of red_at.
+RED_DISPATCH_CLAIM_GRACE_S = 180
+RED_DISPATCH_LEDGER_LIMIT = 1024 * 1024
 # Repairs that ended before any agent work: each still spends one of the PR's bounded fix
 # attempts (no refunds, by design), so a run of them exhausts PRs on infrastructure alone.
 NO_WORK_REPAIR_VERDICTS = frozenset({"recovery-handoff", "reconcile-unavailable", "skipped"})
@@ -183,7 +186,18 @@ def provider_payloads(state: Path, providers, proc: Path = Path("/proc")) -> dic
     return result
 
 
-AUTOMATION_REGISTRY = "ops/automation/registry.jsonl"
+def _linear_app_credential(lane) -> bool | None:
+    """Installed Jovie Lanes app credential (presence only; never read into the report).
+    None where no host file applies (self-test, fixtures)."""
+    tokens = getattr(lane, "linear_app_token", None)
+    path = tokens.default_path() if tokens else None
+    return None if path is None else bool(tokens.credentials(path))
+
+
+# #22354 shipped the registry at canon/ (the repo-root allowlist rejects new top-level dirs).
+# Reading a path that is not on main must alert, never read as "nothing silent" (2026-10-21:
+# the doctor watched ops/automation/registry.jsonl, which never existed, so no row was checked).
+AUTOMATION_REGISTRY = "canon/automation-registry.jsonl"
 AUTOMATION_LIVENESS_WORKFLOW = "automation-liveness.yml"
 AUTOMATION_LIVENESS_MAX_S = 60 * 60
 AUTOMATION_LIVENESS_TTL_S = 600
@@ -243,9 +257,13 @@ def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: 
 
 
 def automation_liveness(lane, now: float) -> dict:
-    """Latest run of the hosted automation-liveness workflow (Gem watches it back)."""
+    """Latest *successful* run of the hosted automation-liveness workflow (Gem watches it back).
+
+    It follows Production Continuity Guard and runs its job only every 5th trigger, so most
+    runs are job-skipped: the latest run of any conclusion would make a dead check look alive."""
     def fetch():
-        result = lane.sh(["gh", "api", f"repos/{lane.REPO_SLUG}/actions/workflows/{AUTOMATION_LIVENESS_WORKFLOW}/runs?per_page=1",
+        result = lane.sh(["gh", "api", f"repos/{lane.REPO_SLUG}/actions/workflows/{AUTOMATION_LIVENESS_WORKFLOW}"
+                          "/runs?branch=main&status=success&per_page=1",
                           "--jq", "[.workflow_runs[0].created_at // \"\"]"], timeout=30)
         if result.returncode != 0:
             text = f"{result.stdout or ''} {result.stderr or ''}"
@@ -255,14 +273,15 @@ def automation_liveness(lane, now: float) -> dict:
         except (ValueError, IndexError, TypeError):
             return None
         return {"installed": True, "lastRunAt": created or None}
-    found = lane.shared("automation-liveness", AUTOMATION_LIVENESS_TTL_S, fetch)
+    found = lane.shared("automation-liveness-success", AUTOMATION_LIVENESS_TTL_S, fetch)
     return found if isinstance(found, dict) else {"installed": None}
 
 
 def automation_observation(host, lane, now: float) -> dict:
     """Registry watch for observe(); fixtures and self-tests read no registry or GitHub."""
     if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
-        return {"automation": {"known": False, "silent": {}}, "automationLiveness": {"installed": None}}
+        return {"automation": {"known": False, "silent": {}, "skipped": True},
+                "automationLiveness": {"installed": None}}
     try:
         watch = automation_watch(automation_registry(host.repo), lane.HOST, now)
     except Exception as error:  # observability never takes the doctor down
@@ -452,6 +471,9 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "noWorkRepairs24h": dict(Counter(
             (r.get("reasons") or ["?"])[0].split(":", 1)[0] for r in receipts
             if r.get("kind") == "fix-red" and r.get("verdict") in NO_WORK_REPAIR_VERDICTS)),
+        "refundedNoWorkRepairs24h": sum(1 for r in receipts if r.get("kind") == "fix-red"
+                                       and r.get("verdict") in NO_WORK_REPAIR_VERDICTS
+                                       and r.get("attemptRefunded")),
         "lastLandingAge": min(landings) if landings else None, "runs24h": len(receipts),
         "lastWorkAge": min((age_s(r.get("endedAt"), now) for r in receipts if r.get("kind") != "sync-main"), default=None),
         # Per-provider age of the last clean claim-scan exit: proves spawned workers reach the
@@ -479,6 +501,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         **automation_observation(host, lane, now),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
+        "linearAppCredential": _linear_app_credential(lane),
         "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
                       if key not in ("ownerlessSince", "evidenceNoted", "moved", "claimsReleased")},
         "merged24h": merged, "mergedAttributionError": merged_error,
@@ -486,9 +509,12 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "autoscale": _autoscale_block(host),
         "mergedWindow": ({k: v for k, v in merged_window.items() if k != "prs"} if merged_window else None),
         "diskFreePct": round(100 * disk.free / disk.total, 1),
+        "sweepSecretHeld": [row for row in (read_json(state / "worktree-sweep.json", {}).get("secretHeld") or [])
+                            if isinstance(row, dict) and row.get("path") and Path(row["path"]).exists()],
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
+        "redDispatch": red_dispatch_summary(state, now),
         "failedByReason": failed_by_reason(failures),
         "escalation": remediation.escalation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
         "remediation": remediation.remediation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
@@ -496,6 +522,42 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "_receipts24h": receipts, "_allReceipts": all_receipts,
         "_ledgerEvidence": ledger_evidence, "_mergeEvidenceByRepository": merged_projects,
     }
+
+
+def red_dispatch_summary(state: Path, now: float) -> dict:
+    """JOV-8931: relayed red checks with no lane claim inside the grace window.
+    Rows join the CI timing collector (JOV-8933) on (pr, sha, runId, runAttempt)."""
+    rows = []
+    try:
+        raw = (state / "runs/red-dispatch.jsonl").read_text()
+    except OSError:
+        raw = ""
+    if len(raw) <= RED_DISPATCH_LEDGER_LIMIT:
+        for line in raw.splitlines():
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict):
+                rows.append(row)
+    claimed = {(row.get("pr"), row.get("sha"))
+               for row in rows if row.get("status") == "claimed"}
+    unclaimed = []
+    for row in rows:
+        if row.get("status") != "dispatched":
+            continue
+        epoch = row.get("redAtEpoch")
+        pr = row.get("pr")
+        if not isinstance(epoch, (int, float)) or not isinstance(pr, int):
+            continue
+        if (pr, row.get("sha")) in claimed:
+            continue
+        age = now - epoch
+        if age < RED_DISPATCH_CLAIM_GRACE_S:
+            continue
+        unclaimed.append({"pr": pr, "sha": row.get("sha"), "redAt": row.get("redAt"),
+                          "dispatchedAt": row.get("dispatchedAt"), "ageS": age})
+    return {"graceS": RED_DISPATCH_CLAIM_GRACE_S, "unclaimed": unclaimed}
 
 
 def open_pr_numbers() -> set[int] | None:
@@ -784,9 +846,24 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     tick = obs.get("tick") or {}
     if tick.get("error"):
         alerts["tick-error"] = f"last dispatch tick failed: {tick['error'][:140]}"
+    if tick.get("uncleanPreviousRun"):
+        # A run-intent marker survived its own tick: that tick was killed (crash, SIGKILL,
+        # power loss). Its bounded recovery already refunded stranded fix-attempt charges.
+        refunded = len(((tick.get("uncleanRecovery") or {}).get("refundedFixAttempts")) or [])
+        alerts["lanes-tick-unclean"] = (f"the previous lanes tick terminated without a clean receipt "
+                                        f"(pid {tick['uncleanPreviousRun'].get('pid')}); recovery refunded "
+                                        f"{refunded} stranded fix-attempt charge(s); check the host journal for the kill cause")
+    # JOV-8931: the relay's wake path fired, fix-now dispatched, but no lane
+    # agent claimed within the grace window — the fast path is silently down.
+    for row in (obs.get("redDispatch") or {}).get("unclaimed") or []:
+        alerts[f"red-dispatch-unclaimed:{row.get('pr')}"] = (
+            f"PR {row.get('pr')} went red at {row.get('redAt')}, dispatched to the lanes at "
+            f"{row.get('dispatchedAt')}, still unclaimed {int(row.get('ageS') or 0)}s after red_at; "
+            "check gem worker slots and the wake dir")
     delivery = tick.get("remediationEvents") or {}
     delivery_error = tick.get("remediationEventsError")
-    if delivery.get("deliveryFailed"):
+    if delivery.get("deliveryFailed") or delivery.get("deliveryExhausted"):
+        # Terminal exhausted rows are a visible failure, not silence: they never retry.
         alerts["remediation-delivery"] = (
             "remediation action lacks authoritative acknowledgement; "
             f"failed={delivery.get('deliveryFailed', 'unknown')}, "
@@ -851,11 +928,20 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    if obs.get("linearAppCredential") is False:
+        alerts["linear-app-credential-missing"] = (
+            "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
+            "access fails closed (no personal-key fallback) until the lanes host owner reinstalls it")
     for automation_id, row in sorted(((obs.get("automation") or {}).get("silent") or {}).items()):
         age = row.get("ageS")
         alerts[f"automation-silent:{automation_id}"] = (
             f"registered automation {automation_id} left no fresh receipt at {row.get('location')} "
-            f"({'missing' if age is None else f'{round(age / 60)} min old'}); owner per ops/automation/registry.jsonl")
+            f"({'missing' if age is None else f'{round(age / 60)} min old'}); owner per {AUTOMATION_REGISTRY}")
+    watched = obs.get("automation") or {}
+    if watched.get("known") is False and not watched.get("skipped"):
+        alerts["automation-registry-unreadable"] = (
+            f"origin/main:{AUTOMATION_REGISTRY} is unreadable ({watched.get('error') or 'missing or not JSONL'}); "
+            "no Gem host-local automation receipt is being watched")
     liveness = obs.get("automationLiveness") or {}
     if liveness.get("installed"):
         last = _iso_epoch(liveness.get("lastRunAt"))
@@ -945,10 +1031,18 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     no_work = obs.get("noWorkRepairs24h") or {}
     if sum(no_work.values()) >= NO_WORK_REPAIR_ALERT:
         causes = ", ".join(f"{reason} {count}" for reason, count in sorted(no_work.items(), key=lambda kv: -kv[1])[:3])
-        alerts["repairs-without-work"] = (f"{sum(no_work.values())} PR repairs in 24h spent a fix attempt before any "
-                                          f"agent work ({causes}); infrastructure, not the PRs, is exhausting them")
+        requeued = obs.get("refundedNoWorkRepairs24h") or 0
+        alerts["repairs-without-work"] = (f"{sum(no_work.values())} PR repairs in 24h stopped before any "
+                                          f"agent work ({causes}); {sum(no_work.values()) - requeued} spent a fix "
+                                          f"attempt and {requeued} were refunded and requeued with backoff; "
+                                          "infrastructure, not the PRs, is exhausting them")
     # No design-brief-stale alert: since 2026-10-11 no issue is held for a brief (the
     # claiming run writes it), so a held brief is no longer a condition to watch.
+    for row in obs.get("sweepSecretHeld") or []:
+        # The public repo's refs/jovie-preserved/* must never carry a secret; the checkout is kept.
+        alerts[f"sweep-snapshot-secret:{row.get('name')}"] = (
+            f"worktree sweep did not publish a snapshot of {row.get('path')}: {row.get('reason')}; "
+            "the checkout is kept untouched until its owner reviews it")
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"root disk {obs['diskFreePct']}% free even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
