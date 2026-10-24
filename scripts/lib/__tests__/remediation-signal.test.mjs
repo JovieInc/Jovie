@@ -489,6 +489,14 @@ describe('real monitor intake preserves quota canary identity', () => {
 
 describe('continuity intake treats unknown freshness as neither green nor silent', () => {
   let entry = 0;
+  /**
+   * @param {{
+   *   conclusion: string,
+   *   previous?: string,
+   *   seedState?: string,
+   *   run: { calls: any[], fetchImpl: (...args: any[]) => any },
+   * }} options
+   */
   async function runContinuityIntake({ conclusion, previous, seedState, run }) {
     clearRemediationLabelCache();
     const dir = mkdtempSync(join(tmpdir(), 'continuity-intake-'));
