@@ -145,6 +145,8 @@ export function parseCapacityHorizon(value: unknown): CapacityHorizon | null {
   return parsed.success ? parsed.data : null;
 }
 
+const nullableCount = z.number().int().nonnegative().nullable();
+
 const deliveryLanesSchema = z.object({
   running: countMeasurementSchema,
   slots: countMeasurementSchema,
@@ -163,6 +165,59 @@ const deliveryLanesSchema = z.object({
   heldByReason: z.record(z.string(), z.number().int().nonnegative()),
   failedByReason: z.record(z.string(), z.number().int().nonnegative()),
   capacity: capacityHorizonSchema.nullable().optional().default(null),
+  stageSummary: z
+    .object({
+      at: z.string(),
+      stagesTotal: z.number().int().nonnegative().nullable(),
+      stagesWithData: z.number().int().nonnegative().nullable(),
+      regressions: z.array(z.string().max(120)).max(10),
+      slowestP95: z
+        .array(
+          z.object({
+            stage: z.string().min(1).max(96),
+            p50: z.number().finite().nonnegative().nullable(),
+            p95: z.number().finite().nonnegative().nullable(),
+            n: z.number().int().nonnegative(),
+          })
+        )
+        .max(10),
+      endToEnd7d: z
+        .array(
+          z.object({
+            pipeline: z.string().min(1).max(96),
+            p50: z.number().finite().nonnegative().nullable(),
+            p95: z.number().finite().nonnegative().nullable(),
+            n: z.number().int().nonnegative(),
+            regressed: z.boolean(),
+          })
+        )
+        .max(8)
+        .optional()
+        .default([]),
+    })
+    .nullable()
+    .optional()
+    .default(null),
+  flow: z
+    .object({
+      openPrs: nullableCount,
+      redPrs: nullableCount,
+      dirtyPrs: nullableCount,
+      cleanNotQueued: nullableCount,
+      exhaustedPrs: nullableCount,
+      mergesPerHour: z.number().finite().nonnegative().nullable(),
+      queueEjectionRate: z.number().finite().min(0).max(1).nullable(),
+      queueWaitP95Seconds: z.number().finite().nonnegative().nullable(),
+      productionLagP95Seconds: z.number().finite().nonnegative().nullable(),
+      eligiblePool: nullableCount,
+      candidatePool: nullableCount,
+      ownerless: nullableCount,
+      regressions: z.array(z.string().max(120)).max(10),
+      at: z.string().nullable(),
+    })
+    .nullable()
+    .optional()
+    .default(null),
   publishedAt: z.string().nullable(),
   stale: z.boolean(),
 });
@@ -180,6 +235,19 @@ const deliveryMergesSchema = z.object({
   ),
   last7Days: countMeasurementSchema,
   prior7Days: countMeasurementSchema,
+  recent: z
+    .array(
+      z.object({
+        repo: z.string().min(1).max(100),
+        number: z.number().int().positive(),
+        title: z.string().min(1).max(200),
+        url: z.string().url().startsWith('https://github.com/'),
+        mergedAt: z.string(),
+      })
+    )
+    .max(12)
+    .optional()
+    .default([]),
 });
 
 const deliveryProductionSchema = z.object({

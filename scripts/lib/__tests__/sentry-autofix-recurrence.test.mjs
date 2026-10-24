@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
   alreadyRecorded,
@@ -266,6 +267,54 @@ describe('sentry autofix recurrence runner', () => {
     }
   });
 
+  it('propagates a pending-artifact deferral as a non-failing deferred run', async () => {
+    const deferred = {
+      reason: 'verified_production_artifact_pending',
+      sha: '2'.repeat(40),
+      retry: 'next sentry-autofix-recurrence clock tick re-dispatches',
+    };
+    vi.resetModules();
+    vi.doMock('../../lib/sentry-validation-observation.mjs', () => ({
+      runSentryValidationObservations: vi.fn(async () => ({
+        ok: true,
+        results: [],
+        deferred,
+      })),
+    }));
+    try {
+      const { runSentryAutofixRecurrence } = await import(
+        '../../sentry-autofix-recurrence.mjs'
+      );
+      const fetchImpl = vi.fn(async url => {
+        if (String(url).includes('/commits/main'))
+          return jsonResponse(200, { sha: MAIN_SHA });
+        if (String(url).includes('/search/issues'))
+          return jsonResponse(200, { items: [] });
+        return jsonResponse(404, {});
+      });
+      expect(
+        await runSentryAutofixRecurrence({
+          githubToken: 'gh',
+          sentryToken: 'sentry',
+          linearApiKey: 'linear',
+          observationsOnly: true,
+          fetchImpl,
+        })
+      ).toMatchObject({ ok: true, results: [], deferred });
+      expect(
+        await runSentryAutofixRecurrence({
+          githubToken: 'gh',
+          sentryToken: 'sentry',
+          linearApiKey: 'linear',
+          fetchImpl,
+        })
+      ).toMatchObject({ ok: true, currentMainSha: MAIN_SHA, deferred });
+    } finally {
+      vi.doUnmock('../../lib/sentry-validation-observation.mjs');
+      vi.resetModules();
+    }
+  });
+
   it('fails closed without tokens and on a malformed search payload', async () => {
     await expect(
       runSentryAutofixRecurrence({ githubToken: '' })
@@ -394,5 +443,107 @@ describe('sentry autofix recurrence runner', () => {
         String(init?.method) === 'PUT'
     );
     expect(JSON.parse(String(put[1].body))).toEqual({ status: 'resolved' });
+  });
+});
+
+describe('sentry recurrence CLI artifacts', () => {
+  it.each([
+    ['', '', false, 'missing_github_token'],
+    ['github-fixture', '', false, 'missing_sentry_auth_token'],
+    ['github-fixture', 'sentry-fixture', true, 'missing_linear_api_key'],
+  ])(
+    'preserves a red JSON result for %s / %s / %s',
+    async (github, sentry, observationsOnly, reason) => {
+      const previousEntry = process.argv[1];
+      const previousExitCode = process.exitCode;
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('Immediate exit would truncate the CLI artifact');
+      });
+      try {
+        vi.stubEnv('GH_TOKEN', github);
+        vi.stubEnv('SENTRY_AUTH_TOKEN', sentry);
+        vi.stubEnv('LINEAR_API_KEY', '');
+        vi.stubEnv(
+          'SENTRY_RECURRENCE_OBSERVATIONS_ONLY',
+          observationsOnly ? '1' : ''
+        );
+        process.argv[1] = fileURLToPath(
+          new URL('../../sentry-autofix-recurrence.mjs', import.meta.url)
+        );
+        vi.resetModules();
+        await import('../../sentry-autofix-recurrence.mjs');
+        await vi.waitFor(() => expect(error).toHaveBeenCalledWith(reason));
+        expect(log).toHaveBeenCalledTimes(1);
+        const result = JSON.parse(log.mock.calls[0][0]);
+        expect(result).toMatchObject({ ok: false, reason });
+        if (observationsOnly) {
+          expect(result.observations).toEqual({
+            ok: false,
+            results: [],
+            reason,
+          });
+        }
+        expect(process.exitCode).toBe(1);
+        expect(exit).not.toHaveBeenCalled();
+      } finally {
+        process.argv[1] = previousEntry;
+        process.exitCode = previousExitCode;
+        vi.unstubAllEnvs();
+        log.mockRestore();
+        error.mockRestore();
+        exit.mockRestore();
+        vi.resetModules();
+      }
+    }
+  );
+
+  it('keeps the successful CLI result machine-readable without a failure exit', async () => {
+    const previousEntry = process.argv[1];
+    const previousExitCode = process.exitCode;
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('Successful CLI must not exit immediately');
+    });
+    const fetchImpl = vi.fn(async url => {
+      if (String(url).includes('/commits/main'))
+        return jsonResponse(200, { sha: MAIN_SHA });
+      if (String(url).includes('/search/issues'))
+        return jsonResponse(200, { items: [] });
+      throw new Error('Unexpected CLI request');
+    });
+    try {
+      vi.stubEnv('GH_TOKEN', 'github-fixture');
+      vi.stubEnv('SENTRY_AUTH_TOKEN', 'sentry-fixture');
+      vi.stubEnv('LINEAR_API_KEY', undefined);
+      vi.stubEnv('SENTRY_RECURRENCE_OBSERVATIONS_ONLY', '');
+      vi.stubGlobal('fetch', fetchImpl);
+      process.argv[1] = fileURLToPath(
+        new URL('../../sentry-autofix-recurrence.mjs', import.meta.url)
+      );
+      vi.resetModules();
+      await import('../../sentry-autofix-recurrence.mjs');
+      await vi.waitFor(() => expect(log).toHaveBeenCalledTimes(1));
+      expect(JSON.parse(log.mock.calls[0][0])).toEqual({
+        ok: true,
+        currentMainSha: MAIN_SHA,
+        results: [],
+      });
+      expect(error).not.toHaveBeenCalled();
+      expect(exit).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(previousExitCode);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    } finally {
+      process.argv[1] = previousEntry;
+      process.exitCode = previousExitCode;
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+      log.mockRestore();
+      error.mockRestore();
+      exit.mockRestore();
+      vi.resetModules();
+    }
   });
 });

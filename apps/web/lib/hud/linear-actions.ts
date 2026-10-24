@@ -16,6 +16,8 @@ export interface TimActionIssue {
   priority: number; // 0=none, 1=urgent, 2=high, 3=medium, 4=low
   priorityLabel: string;
   createdAt: string; // ISO
+  /** Issue description (markdown); may carry an `Options: A | B` line. */
+  description?: string | null;
   /** Days since created (rounded down) */
   daysOld: number;
   stateType: string;
@@ -44,6 +46,7 @@ interface LinearIssueNode {
   priority: number;
   priorityLabel: string;
   createdAt: string;
+  description?: string | null;
   state: {
     type: string;
   };
@@ -106,6 +109,7 @@ export async function fetchTimActionIssues(): Promise<TimActionsResponse> {
           priority
           priorityLabel
           createdAt
+          description
           state {
             type
           }
@@ -183,6 +187,7 @@ export async function fetchTimActionIssues(): Promise<TimActionsResponse> {
       priority: node.priority,
       priorityLabel: node.priorityLabel,
       createdAt: node.createdAt,
+      description: node.description?.slice(0, 4000) ?? null,
       daysOld: computeDaysOld(node.createdAt),
       stateType: node.state.type,
     }));
@@ -346,6 +351,61 @@ export async function closeLinearIssue(issueId: string): Promise<boolean> {
       `[hud/linear-actions] Failed to close issue ${issueId}`,
       error
     );
+    return false;
+  }
+}
+
+/**
+ * Posts the founder's answer as a comment so the asking agent can read it
+ * back from Linear. Returns true on success.
+ */
+export async function commentOnLinearIssue(
+  issueId: string,
+  body: string
+): Promise<boolean> {
+  const apiKey = env.LINEAR_API_KEY;
+  if (!apiKey) {
+    logger.warn(
+      '[hud/linear-actions] LINEAR_API_KEY not configured; cannot comment'
+    );
+    return false;
+  }
+  const mutation = `
+    mutation AnswerIssue($issueId: String!, $body: String!) {
+      commentCreate(input: { issueId: $issueId, body: $body }) {
+        success
+      }
+    }
+  `;
+  try {
+    const response = await fetch(LINEAR_GRAPHQL_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: apiKey,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Jovie-HUD/1.0',
+      },
+      body: JSON.stringify({ query: mutation, variables: { issueId, body } }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) {
+      logger.error('[hud/linear-actions] Failed to comment', response.status);
+      return false;
+    }
+    const payload = (await response.json()) as {
+      data?: { commentCreate?: { success: boolean } };
+      errors?: Array<{ message: string }>;
+    };
+    if (payload.errors?.length) {
+      logger.error(
+        '[hud/linear-actions] GraphQL error commenting',
+        payload.errors[0]?.message
+      );
+      return false;
+    }
+    return payload.data?.commentCreate?.success ?? false;
+  } catch (error) {
+    logger.error('[hud/linear-actions] Comment request failed', error);
     return false;
   }
 }

@@ -3,7 +3,8 @@
 // @coverage-via apps/web/tests/unit/dashboard/SettingsSearchabilitySection.test.tsx
 
 import { Search } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useContext } from 'react';
+import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
 import { useOptimisticToggle } from '@/features/dashboard/hooks/useOptimisticToggle';
@@ -21,14 +22,18 @@ export function SettingsSearchabilitySection({
   artist,
   onArtistUpdate,
 }: SettingsSearchabilitySectionProps) {
+  const updateSelectedProfileSettings =
+    useContext(DashboardDataContext)?.updateSelectedProfileSettings;
   const mutation = useUpdateSettingsMutation({
     profileId: artist.id,
     silentSuccess: true,
   });
   const save = useCallback(
-    (searchable: boolean) =>
-      mutation.mutateAsync({ updates: { settings: { searchable } } }),
-    [mutation]
+    async (searchable: boolean) => {
+      await mutation.mutateAsync({ updates: { settings: { searchable } } });
+      updateSelectedProfileSettings?.(artist.id, { searchable });
+    },
+    [artist.id, mutation, updateSelectedProfileSettings]
   );
   const update = useCallback(
     (searchable: boolean) => {

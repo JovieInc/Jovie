@@ -101,6 +101,26 @@ function formatTimestamp(value: string | null): string {
   })}`;
 }
 
+/**
+ * An empty list is only "no tasks" when the cache is fresh. Stale or failed
+ * reads mean the active task set is unknown, never zero.
+ */
+export function emptyTaskMessage(
+  syncState: OperationalTaskFeed['syncState'],
+  lastSyncedAt: string | null
+): string {
+  switch (syncState) {
+    case 'fresh':
+      return 'No active operational tasks.';
+    case 'syncing':
+      return 'Loading the local task cache…';
+    case 'failed':
+      return 'Task cache unavailable. Active tasks are unknown. Retrying automatically.';
+    case 'stale':
+      return `Task cache is stale (${formatTimestamp(lastSyncedAt)}). Active tasks are unknown until the next sync.`;
+  }
+}
+
 function RegisteredTaskRail({ panel }: Readonly<{ panel: ReactNode }>) {
   useRegisterRightPanel(panel);
   return null;
@@ -173,11 +193,7 @@ export function OperationalTasksPanelView({
           {feed.tasks.length === 0 ? (
             <div className='grid min-h-32 h-full place-items-center text-center'>
               <p className='text-app text-secondary-token'>
-                {effectiveSyncState === 'syncing'
-                  ? 'Loading the local task cache…'
-                  : effectiveSyncState === 'failed'
-                    ? 'Task cache unavailable. Retrying automatically.'
-                    : 'No active operational tasks.'}
+                {emptyTaskMessage(effectiveSyncState, feed.lastSyncedAt)}
               </p>
             </div>
           ) : (

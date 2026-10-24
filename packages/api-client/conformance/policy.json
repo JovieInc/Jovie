@@ -1,0 +1,565 @@
+{
+  "schema": "jovie-api-conformance/v1",
+  "note": "Executed by both packages/api-client and scripts/apiclient tests; both languages must agree.",
+  "scenarios": [
+    {
+      "name": "polling is shed below its reserve while merges proceed",
+      "steps": [
+        {
+          "op": "observe",
+          "at": 0,
+          "observations": [
+            {
+              "resource": "core",
+              "limit": 1000,
+              "remaining": 250,
+              "resetAt": 3600000
+            }
+          ]
+        },
+        {
+          "op": "decide",
+          "at": 1000,
+          "priority": "poll",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "shed",
+            "reason": "budget-reserve:core",
+            "until": 3600000
+          }
+        },
+        {
+          "op": "decide",
+          "at": 1000,
+          "priority": "report",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "go"
+          }
+        },
+        {
+          "op": "decide",
+          "at": 1000,
+          "priority": "merge",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "go"
+          }
+        },
+        {
+          "op": "expect",
+          "bucket": "core",
+          "remaining": 248
+        }
+      ]
+    },
+    {
+      "name": "critical spends the last call, then waits for the reset",
+      "steps": [
+        {
+          "op": "observe",
+          "at": 0,
+          "observations": [
+            {
+              "resource": "core",
+              "limit": 1000,
+              "remaining": 1,
+              "resetAt": 600000
+            }
+          ]
+        },
+        {
+          "op": "decide",
+          "at": 1,
+          "priority": "default",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "wait",
+            "reason": "budget-reserve:core",
+            "until": 600000
+          }
+        },
+        {
+          "op": "decide",
+          "at": 1,
+          "priority": "deploy",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "go"
+          }
+        },
+        {
+          "op": "decide",
+          "at": 2,
+          "priority": "merge",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "wait",
+            "until": 600000
+          }
+        },
+        {
+          "op": "decide",
+          "at": 600000,
+          "priority": "poll",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "go"
+          }
+        }
+      ]
+    },
+    {
+      "name": "background pacing allows a headroom-sized burst, then spreads the rest over the window",
+      "steps": [
+        {
+          "op": "observe",
+          "at": 0,
+          "observations": [
+            {
+              "resource": "core",
+              "limit": 1000,
+              "remaining": 1000,
+              "resetAt": 3600000
+            }
+          ]
+        },
+        {
+          "op": "repeat",
+          "times": 75,
+          "at": 0,
+          "priority": "poll",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "go"
+          }
+        },
+        {
+          "op": "decide",
+          "at": 0,
+          "priority": "poll",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "shed",
+            "reason": "pace:core"
+          }
+        },
+        {
+          "op": "decide",
+          "at": 0,
+          "priority": "repair",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "go"
+          }
+        },
+        {
+          "op": "decide",
+          "at": 6000,
+          "priority": "poll",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "go"
+          }
+        }
+      ]
+    },
+    {
+      "name": "writes are spaced by the provider interval",
+      "steps": [
+        {
+          "op": "decide",
+          "at": 100,
+          "priority": "merge",
+          "costs": {
+            "core": 1
+          },
+          "write": true,
+          "minWriteIntervalMs": 1000,
+          "expect": {
+            "action": "go"
+          }
+        },
+        {
+          "op": "decide",
+          "at": 400,
+          "priority": "merge",
+          "costs": {
+            "core": 1
+          },
+          "write": true,
+          "minWriteIntervalMs": 1000,
+          "expect": {
+            "action": "wait",
+            "reason": "write-spacing",
+            "until": 1100
+          }
+        },
+        {
+          "op": "decide",
+          "at": 400,
+          "priority": "merge",
+          "costs": {
+            "core": 1
+          },
+          "write": false,
+          "expect": {
+            "action": "go"
+          }
+        }
+      ]
+    },
+    {
+      "name": "secondary limit opens the breaker; probe closes it",
+      "steps": [
+        {
+          "op": "outcome",
+          "at": 0,
+          "priority": "default",
+          "resource": "core",
+          "failure": {
+            "kind": "secondary",
+            "retryAtMs": 60000
+          },
+          "expect": {
+            "transition": {
+              "from": "closed",
+              "to": "open",
+              "reason": "secondary-rate-limit",
+              "until": 60000
+            }
+          }
+        },
+        {
+          "op": "decide",
+          "at": 30000,
+          "priority": "merge",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "wait",
+            "until": 60000,
+            "reason": "breaker-open:secondary-rate-limit"
+          }
+        },
+        {
+          "op": "decide",
+          "at": 30000,
+          "priority": "poll",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "shed",
+            "until": 60000
+          }
+        },
+        {
+          "op": "decide",
+          "at": 60000,
+          "priority": "default",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "go",
+            "probe": true,
+            "transition": {
+              "from": "open",
+              "to": "half-open"
+            }
+          }
+        },
+        {
+          "op": "decide",
+          "at": 60001,
+          "priority": "merge",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "wait",
+            "reason": "breaker-probe-in-flight",
+            "until": 90000
+          }
+        },
+        {
+          "op": "outcome",
+          "at": 60500,
+          "priority": "default",
+          "resource": "core",
+          "probe": true,
+          "failure": {
+            "kind": "none",
+            "retryAtMs": null
+          },
+          "expect": {
+            "transition": {
+              "from": "half-open",
+              "to": "closed"
+            }
+          }
+        },
+        {
+          "op": "expect",
+          "breaker": "closed"
+        }
+      ]
+    },
+    {
+      "name": "repeated 5xx open the breaker; a failed probe doubles the cooldown",
+      "steps": [
+        {
+          "op": "outcome",
+          "at": 0,
+          "priority": "default",
+          "resource": "core",
+          "failure": {
+            "kind": "transient",
+            "retryAtMs": null
+          },
+          "expect": {
+            "transition": null
+          }
+        },
+        {
+          "op": "outcome",
+          "at": 1,
+          "priority": "default",
+          "resource": "core",
+          "failure": {
+            "kind": "transient",
+            "retryAtMs": null
+          },
+          "expect": {
+            "transition": null
+          }
+        },
+        {
+          "op": "outcome",
+          "at": 2,
+          "priority": "default",
+          "resource": "core",
+          "failure": {
+            "kind": "transient",
+            "retryAtMs": null
+          },
+          "expect": {
+            "transition": null
+          }
+        },
+        {
+          "op": "outcome",
+          "at": 3,
+          "priority": "default",
+          "resource": "core",
+          "failure": {
+            "kind": "transient",
+            "retryAtMs": null
+          },
+          "expect": {
+            "transition": null
+          }
+        },
+        {
+          "op": "outcome",
+          "at": 4,
+          "priority": "default",
+          "resource": "core",
+          "failure": {
+            "kind": "transient",
+            "retryAtMs": null
+          },
+          "expect": {
+            "transition": {
+              "from": "closed",
+              "to": "open",
+              "reason": "transient-failures",
+              "until": 15004
+            }
+          }
+        },
+        {
+          "op": "decide",
+          "at": 15004,
+          "priority": "default",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "go",
+            "probe": true
+          }
+        },
+        {
+          "op": "outcome",
+          "at": 15100,
+          "priority": "default",
+          "resource": "core",
+          "probe": true,
+          "failure": {
+            "kind": "transient",
+            "retryAtMs": null
+          },
+          "expect": {
+            "transition": {
+              "from": "half-open",
+              "to": "open",
+              "reason": "probe-failed",
+              "until": 45100
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "primary exhaustion empties only that resource",
+      "steps": [
+        {
+          "op": "outcome",
+          "at": 0,
+          "priority": "default",
+          "resource": "graphql",
+          "failure": {
+            "kind": "primary",
+            "retryAtMs": 900000
+          },
+          "expect": {
+            "transition": null
+          }
+        },
+        {
+          "op": "decide",
+          "at": 10,
+          "priority": "merge",
+          "costs": {
+            "graphql": 1
+          },
+          "expect": {
+            "action": "wait",
+            "until": 900000
+          }
+        },
+        {
+          "op": "decide",
+          "at": 10,
+          "priority": "merge",
+          "costs": {
+            "core": 1
+          },
+          "expect": {
+            "action": "go"
+          }
+        },
+        {
+          "op": "expect",
+          "breaker": "closed"
+        }
+      ]
+    },
+    {
+      "name": "late responses from an older window do not overwrite the budget",
+      "steps": [
+        {
+          "op": "observe",
+          "at": 0,
+          "observations": [
+            {
+              "resource": "core",
+              "limit": 5000,
+              "remaining": 4000,
+              "resetAt": 7200000
+            }
+          ]
+        },
+        {
+          "op": "observe",
+          "at": 5,
+          "observations": [
+            {
+              "resource": "core",
+              "limit": 5000,
+              "remaining": 10,
+              "resetAt": 3600000
+            }
+          ]
+        },
+        {
+          "op": "expect",
+          "bucket": "core",
+          "remaining": 4000
+        },
+        {
+          "op": "observe",
+          "at": 6,
+          "observations": [
+            {
+              "resource": "core",
+              "limit": 5000,
+              "remaining": 3990,
+              "resetAt": 7200000
+            }
+          ]
+        },
+        {
+          "op": "expect",
+          "bucket": "core",
+          "remaining": 3990
+        }
+      ]
+    }
+  ],
+  "backoff": [
+    {
+      "attempt": 1,
+      "random": 0.5,
+      "now": 0,
+      "retryAtMs": null,
+      "expect": 500
+    },
+    {
+      "attempt": 4,
+      "random": 0.5,
+      "now": 0,
+      "retryAtMs": null,
+      "expect": 4000
+    },
+    {
+      "attempt": 10,
+      "random": 0.999,
+      "now": 0,
+      "retryAtMs": null,
+      "expect": 59940
+    },
+    {
+      "attempt": 1,
+      "random": 0.1,
+      "now": 1000,
+      "retryAtMs": 61000,
+      "expect": 60000
+    }
+  ]
+}

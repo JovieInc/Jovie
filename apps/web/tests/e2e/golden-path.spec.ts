@@ -249,7 +249,9 @@ async function verifyHomeWelcome(page: Page) {
       await assertGeometry();
       expect(chatPosts).toBe(0);
       if (process.env.GOLDEN_PATH_KEYFRAME_DIR)
-        await captureKeyframe(page, `home-welcome-${viewport.width}`);
+        await captureKeyframe(page, `home-welcome-${viewport.width}`, {
+          expectedArtistName: TEST_SPOTIFY_ARTIST.name,
+        });
     }
     for (const state of ['empty', 'error'] as const) {
       mode = state;
@@ -1104,7 +1106,7 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
       try {
         await ensureSignedInUser(adminPage, getAdminCredentials());
 
-        await adminPage.goto(APP_ROUTES.HUD, {
+        await adminPage.goto(APP_ROUTES.ADMIN_OPS, {
           waitUntil: 'domcontentloaded',
           timeout: 30_000,
         });

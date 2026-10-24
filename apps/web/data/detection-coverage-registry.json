@@ -1,0 +1,295 @@
+{
+  "schema": "jovie.detection-coverage-registry/v1",
+  "generatedAt": "2026-10-14T08:00:00.000Z",
+  "sourceIssue": "JOV-7084",
+  "capabilities": [
+    {
+      "id": "founder-rescue-detection-gap-intake",
+      "title": "Founder rescue DetectionGap intake",
+      "status": "planned",
+      "failureClasses": [
+        "bad-classification",
+        "coverage-gap",
+        "false-green",
+        "founder-only-surface",
+        "missing-signal"
+      ],
+      "authoritativeSignalSources": [
+        "Linear defect descriptions and comments",
+        "escaped-defect closure receipts"
+      ],
+      "expectedFreshness": "event-driven; quality-gap-scan begins within 10 minutes",
+      "detector": {
+        "version": "1",
+        "references": [
+          "apps/web/app/api/webhooks/linear/route.ts",
+          "scripts/quality-gap-finder.mjs"
+        ]
+      },
+      "coveredSurfaces": [
+        "founder dogfood reports",
+        "founder rescue comments",
+        "manually discovered operational defects"
+      ],
+      "classification": {
+        "severity": "P0 when the learned class repeats; otherwise inherit impact",
+        "policy": "Emit one deduplicated typed DetectionGap unless a live-verified detector predates the report"
+      },
+      "ownerRemediator": {
+        "owner": "Summer",
+        "remediator": "canonical originating issue owner",
+        "issue": "JOV-7084"
+      },
+      "escalationConditions": [
+        "founder rescue repeats after a live-verified detector",
+        "quality-gap-scan cannot file or update the DetectionGap"
+      ],
+      "proof": {
+        "deliberateRedFixtures": [
+          "scripts/quality-gap-finder.test.mjs#founder rescue intake"
+        ],
+        "controlCases": [
+          "scripts/quality-gap-finder.test.mjs#live detector proof predates"
+        ],
+        "lastVerifiedLiveFiring": null
+      },
+      "knownBlindSpots": [
+        "The source change still needs one dry-run quality-gap-scan receipt on the published branch"
+      ],
+      "nextExpansion": "Bind the published-branch injection receipt, then watch recurrence as a P0 compiler regression",
+      "priority": {
+        "impact": 5,
+        "historicalRecurrence": 3,
+        "invisibilityRisk": 5,
+        "detectionTractability": 5,
+        "remediationLeverage": 5,
+        "founderRescues": 3,
+        "score": 7500
+      }
+    },
+    {
+      "id": "production-marker-lineage-inconsistency",
+      "title": "Production marker and lineage inconsistency",
+      "status": "live-verified",
+      "failureClasses": ["false-green", "missing-join", "missing-remediator"],
+      "authoritativeSignalSources": [
+        "Production Controller artifacts",
+        "deployed build-info commit",
+        "production marker artifacts"
+      ],
+      "expectedFreshness": "every production-controller and controller-health run",
+      "detector": {
+        "version": "3",
+        "references": [
+          ".github/scripts/production-marker-state.mjs",
+          ".github/workflows/production-controller-health.yml"
+        ]
+      },
+      "coveredSurfaces": [
+        "contradictory healthy artifact and invalid marker evidence",
+        "exact artifact mismatch",
+        "forward-only production lineage",
+        "normal retry and bounded recovery markers"
+      ],
+      "classification": {
+        "severity": "P0 when production cannot converge",
+        "policy": "Classify exact mismatch, valid forward movement, pending recovery, supersession, and contradictory evidence separately"
+      },
+      "ownerRemediator": {
+        "owner": "Production Controller",
+        "remediator": "canonical production recovery",
+        "issue": "JOV-7083"
+      },
+      "escalationConditions": [
+        "contradictory evidence",
+        "recovery budget exhaustion",
+        "unknown or divergent lineage"
+      ],
+      "proof": {
+        "deliberateRedFixtures": [
+          "apps/web/tests/unit/ci/production-marker-state.test.ts#refuses contradictory converged marker evidence"
+        ],
+        "controlCases": [
+          "apps/web/tests/unit/ci/production-marker-state.test.ts#classifies the recorded live REST attempt"
+        ],
+        "lastVerifiedLiveFiring": {
+          "kind": "recorded-live-controller-replay",
+          "verifiedAt": "2026-10-10T10:58:45.000Z",
+          "evidenceRef": "apps/web/tests/unit/ci/fixtures/production-controller-run-live-shape.json"
+        }
+      },
+      "knownBlindSpots": [
+        "The recorded controller replay is not yet joined to a production-controller-health run URL"
+      ],
+      "nextExpansion": "Extend declared exact-versus-forward lineage semantics to the remaining JOV-7083 inventory",
+      "priority": {
+        "impact": 5,
+        "historicalRecurrence": 3,
+        "invisibilityRisk": 5,
+        "detectionTractability": 4,
+        "remediationLeverage": 5,
+        "founderRescues": 1,
+        "score": 3000
+      }
+    },
+    {
+      "id": "reversible-shell-control-transition-graph",
+      "title": "Reversible shell control transition graph",
+      "status": "live-verified",
+      "failureClasses": ["coverage-gap", "false-green", "founder-only-surface"],
+      "authoritativeSignalSources": [
+        "composed Playwright shell",
+        "hydrated AuthShell compositions",
+        "shared reversible-control detector"
+      ],
+      "expectedFreshness": "every affected shell change and nightly composed-runtime run",
+      "detector": {
+        "version": "2",
+        "references": [
+          "apps/web/tests/e2e/shell-control-quality.spec.ts",
+          "apps/web/tests/utils/reversible-control-detector.ts"
+        ]
+      },
+      "coveredSurfaces": [
+        "canonical right-rail drawers",
+        "left sidebar",
+        "persistent audio-player reveal and hide",
+        "right rail"
+      ],
+      "classification": {
+        "severity": "P0 on repeat founder rescue; otherwise escaped UI defect",
+        "policy": "Exercise every supported edge, at least two full cycles, pointer, keyboard, mixed input, continuity, and restored state"
+      },
+      "ownerRemediator": {
+        "owner": "UI assurance",
+        "remediator": "canonical shell owner",
+        "issue": "JOV-7207"
+      },
+      "escalationConditions": [
+        "control becomes duplicated, detached, hidden, inert, stale-bound, or desynchronized",
+        "one-click evidence is offered as reversible certification"
+      ],
+      "proof": {
+        "deliberateRedFixtures": [
+          "apps/web/tests/unit/testing/reversible-control-detector.test.ts#JOV-7207 historical sidebar replay"
+        ],
+        "controlCases": [
+          "apps/web/tests/e2e/shell-control-quality.spec.ts#ten complete mixed-input cycles"
+        ],
+        "lastVerifiedLiveFiring": {
+          "kind": "composed-runtime-injection",
+          "verifiedAt": "2026-10-07T07:02:33.000Z",
+          "evidenceRef": "apps/web/tests/e2e/shell-control-quality.spec.ts"
+        }
+      },
+      "knownBlindSpots": [
+        "Packaged macOS traffic-light geometry remains a separate native certification surface"
+      ],
+      "nextExpansion": "Register any newly canonical shell-level sheet with the same detector before it ships",
+      "priority": {
+        "impact": 4,
+        "historicalRecurrence": 2,
+        "invisibilityRisk": 4,
+        "detectionTractability": 5,
+        "remediationLeverage": 4,
+        "founderRescues": 1,
+        "score": 1280
+      }
+    },
+    {
+      "id": "sentry-terminal-disposition",
+      "title": "Sentry terminal disposition receipts",
+      "status": "planned",
+      "failureClasses": [
+        "bad-classification",
+        "coverage-gap",
+        "missing-remediator",
+        "remediator-failed"
+      ],
+      "authoritativeSignalSources": [
+        "Sentry grouped production issues",
+        "Sentry webhook remediation records"
+      ],
+      "expectedFreshness": "event-driven acknowledgement; bounded terminal disposition",
+      "detector": {
+        "version": "0",
+        "references": [
+          "apps/web/app/api/webhooks/sentry/route.ts",
+          "scripts/sentry-autofix-recurrence.mjs"
+        ]
+      },
+      "coveredSurfaces": [],
+      "classification": {
+        "severity": "inherit customer impact after immediate classification",
+        "policy": "Every signal ends as defect, duplicate, benign, synthetic, provider, capacity, or insufficient-evidence disposition"
+      },
+      "ownerRemediator": {
+        "owner": "Summer",
+        "remediator": "canonical Sentry remediation owner",
+        "issue": "JOV-7084"
+      },
+      "escalationConditions": [
+        "no owner or advancing state",
+        "quarantine expires without repair",
+        "signal remains unresolved without a bounded block"
+      ],
+      "proof": {
+        "deliberateRedFixtures": [],
+        "controlCases": [],
+        "lastVerifiedLiveFiring": null
+      },
+      "knownBlindSpots": [
+        "Benign filters currently skip intake without a durable resolution receipt",
+        "No evaluation-window sweep proves every grouped signal reached a terminal disposition"
+      ],
+      "nextExpansion": "Compile terminal disposition receipts and source suppression through the existing Sentry webhook and recurrence owner",
+      "priority": {
+        "impact": 5,
+        "historicalRecurrence": 4,
+        "invisibilityRisk": 5,
+        "detectionTractability": 3,
+        "remediationLeverage": 5,
+        "founderRescues": 0,
+        "score": 1500
+      }
+    }
+  ],
+  "metricWindows": [
+    {
+      "asOf": "2026-09-26T23:59:59.000Z",
+      "incidentCount": 1,
+      "founderRescues": 1,
+      "founderRescueRate": 1,
+      "medianDetectionMinutes": 2820,
+      "source": "docs/postmortems/2026-09-26-production-freeze.md"
+    },
+    {
+      "asOf": "2026-10-14T06:00:00.000Z",
+      "incidentCount": 4,
+      "founderRescues": 2,
+      "founderRescueRate": 0.5,
+      "medianDetectionMinutes": 1421.5,
+      "source": "docs/postmortems/reports/2026-10-14-weekly-failure-class-review.json"
+    }
+  ],
+  "recentFounderRescues": [
+    {
+      "id": "2026-09-26-production-freeze",
+      "occurredAt": "2026-09-23T19:50:00.000Z",
+      "source": "docs/postmortems/2026-09-26-production-freeze.md",
+      "summary": "Production stayed stale while green signals contradicted marker and lineage evidence"
+    },
+    {
+      "id": "2026-09-28-codex-lane-attribution-gap",
+      "occurredAt": "2026-09-28T20:08:00.000Z",
+      "source": "docs/postmortems/2026-09-28-codex-lane-attribution-gap.md",
+      "summary": "Founder reopened an idle-lane incident after false recovery evidence"
+    },
+    {
+      "id": "JOV-7207",
+      "occurredAt": "2026-10-03T00:00:00.000Z",
+      "source": "https://linear.app/jovie/issue/JOV-7207",
+      "summary": "Founder dogfood found a sidebar control that failed after one transition"
+    }
+  ]
+}

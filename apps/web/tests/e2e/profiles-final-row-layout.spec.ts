@@ -131,6 +131,12 @@ async function captureFirstSuggestionsResponse(page: Page): Promise<{
     resolveCapture = resolve;
   });
   let settled = false;
+  let lastError: { status: number; body: string } | null = null;
+  const giveUp = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    resolveCapture(lastError ?? { status: 0, body: '' });
+  }, 30_000);
   // Read the body on the response event. route.fetch() plus continue() on an
   // aborted redirect never resolves, and the test then waits until its own
   // timeout with no assertion. A later successful response can still settle.
@@ -147,7 +153,16 @@ async function captureFirstSuggestionsResponse(page: Page): Promise<{
       .text()
       .then(body => {
         if (settled) return;
+        // The auth enter redirect can answer /api/suggestions with 404
+        // before the session cookie is on the document. Keep the first 200.
+        // Settling the 404 makes the retry pass and the first attempt write
+        // an error-context that the artifact guard rejects.
+        if (response.status() !== 200) {
+          lastError = { status: response.status(), body };
+          return;
+        }
         settled = true;
+        clearTimeout(giveUp);
         resolveCapture({ status: response.status(), body });
       })
       .catch(() => {

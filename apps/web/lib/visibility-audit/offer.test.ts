@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 import { resolveVisibilityAuditOffer } from './offer';
 
 const PAYMENT_LINK = 'https://buy.stripe.com/test_a1b2c3';
@@ -35,7 +34,7 @@ describe('visibility audit offer', () => {
     ).toBe(false);
   });
 
-  it('shows the credited price only when the flag and payment link are both set', () => {
+  it('shows the one-off audit price only when the flag and payment link are both set', () => {
     const offer = resolveVisibilityAuditOffer({
       flagEnabled: true,
       paymentLinkUrl: PAYMENT_LINK,
@@ -43,10 +42,10 @@ describe('visibility audit offer', () => {
     expect(offer).toMatchObject({
       visible: true,
       href: PAYMENT_LINK,
-      priceUsd: ARTIST_VISIBILITY_OFFER.pro.monthlyUsd,
+      priceUsd: 199,
     });
     if (offer.visible) {
-      expect(offer.detail).toContain('credited toward the first month');
+      expect(offer.detail).toContain('one-time purchase');
       expect(offer.label).toContain(`$${offer.priceUsd}`);
     }
   });

@@ -89,7 +89,7 @@ export const ABOUT_FAQ_ITEMS = [
   {
     question: 'What does Jovie do?',
     answer:
-      'Jovie gives you a living profile for your work, links, and story, plus a way to turn attention into a next step. For artists, that includes smart links, audience intelligence, release notifications, and AI that uses your actual career data.',
+      'Jovie gives you a living profile for your work, links, and story, plus a way to turn attention into a next step. That includes smart links, audience intelligence, release notifications, and AI that uses your actual career data.',
   },
   {
     question: 'Is Jovie free?',
@@ -99,6 +99,6 @@ export const ABOUT_FAQ_ITEMS = [
   {
     question: 'How is Jovie different from Linktree?',
     answer:
-      'Linktree is a general-purpose link list. Jovie keeps your work, links, and a clear next step in one living profile. For artists, that includes smart links for releases, fan capture, and notifications when new music drops.',
+      'Linktree is a general-purpose link list. Jovie keeps your work, links, and a clear next step in one living profile, including smart links and notifications when something new is ready.',
   },
 ] as const;

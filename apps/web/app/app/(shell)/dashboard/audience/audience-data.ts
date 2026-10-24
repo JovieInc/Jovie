@@ -823,9 +823,10 @@ function buildDataPromise(
 /**
  * Inner fetch function that runs inside withDbSessionTx.
  * Separated from getAudienceServerData so unstable_cache can wrap it
- * without conflicting with the noStore() that withDbSessionTx calls internally.
+ * with the already authenticated app user ID, without reading request headers.
  */
 async function fetchAudienceData(
+  userId: string,
   selectedProfileId: string,
   searchParams: SearchParams,
   includeDetails: boolean,
@@ -835,26 +836,29 @@ async function fetchAudienceData(
 ): Promise<AudienceServerData> {
   const columns = await getAudienceMemberColumnAvailability();
 
-  return await withDbSessionTx(async (tx, appUserId) => {
-    const data = await buildDataPromise(
-      tx,
-      appUserId,
-      selectedProfileId,
-      view,
-      searchParams,
-      { includeDetails, memberId, segments, columns }
-    );
+  return await withDbSessionTx(
+    async (tx, appUserId) => {
+      const data = await buildDataPromise(
+        tx,
+        appUserId,
+        selectedProfileId,
+        view,
+        searchParams,
+        { includeDetails, memberId, segments, columns }
+      );
 
-    // Exact subscriber/audience counts are omitted per JOV-1262 —
-    // running COUNT(*) on every page load adds avoidable DB overhead.
-    // Clients use hasMore/nextCursor for pagination state instead.
-    return {
-      ...data,
-      view,
-      subscriberCount: null,
-      totalAudienceCount: null,
-    };
-  });
+      // Exact subscriber/audience counts are omitted per JOV-1262 —
+      // running COUNT(*) on every page load adds avoidable DB overhead.
+      // Clients use hasMore/nextCursor for pagination state instead.
+      return {
+        ...data,
+        view,
+        subscriberCount: null,
+        totalAudienceCount: null,
+      };
+    },
+    { clerkUserId: userId }
+  );
 }
 
 export async function getAudienceServerData(params: {
@@ -910,6 +914,7 @@ export async function getAudienceServerData(params: {
   return unstable_cache(
     () =>
       fetchAudienceData(
+        userId,
         selectedProfileId,
         searchParams,
         includeDetails,

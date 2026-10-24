@@ -111,7 +111,11 @@ describe('public profile Liquid Glass navigation', () => {
     // The rail listen slot keeps the glass tone; the featured mode card
     // swaps the face to the neutral card CTA through `shape`.
     expect(PAC).toMatch(
-      /<PrimaryPill shape=\{pillShape\} tone='glass' href=\{listenHref\}>\s*\{isFeatured \? 'Listen now' : 'Listen'\}/
+      /<PrimaryPill shape=\{pillShape\} tone='glass' href=\{listenHref\}>\s*\{listenLabel\}/
+    );
+    // Label resolves per release state; an upcoming subject never says Listen.
+    expect(PAC).toMatch(
+      /listenLabel = isPacReleaseUpcoming\(release\)\s*\?\s*'Coming soon'\s*:\s*isFeatured\s*\?\s*'Listen now'\s*:\s*'Listen'/
     );
     expect(PAC).toMatch(
       /<PrimaryPill\s+shape=\{pillShape\}\s+tone='glass'\s+href=\{listenHref\}\s+onClick=\{handlePlayClick\}/

@@ -40,8 +40,15 @@ export function captureInputGeometry({
       role: input === field ? role : null,
       type: input.type,
       name: input.name,
-      autocomplete: input.autocomplete,
-      inputmode: input.inputMode || 'text',
+      // Read the authored attributes, not only the IDL reflections: Firefox
+      // does not reflect every token through `inputMode`/`autocomplete`, which
+      // turned a valid email field into `semantics:email:invalid` there.
+      autocomplete:
+        input.autocomplete || input.getAttribute('autocomplete')?.trim() || '',
+      inputmode:
+        input.inputMode ||
+        input.getAttribute('inputmode')?.trim().toLowerCase() ||
+        'text',
       label:
         input.getAttribute('aria-label') ||
         input.labels?.[0]?.textContent?.trim() ||

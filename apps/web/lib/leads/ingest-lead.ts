@@ -14,6 +14,7 @@ import {
   enqueueDspArtistDiscoveryJob,
   enqueueMusicFetchEnrichmentJob,
 } from '@/lib/ingestion/jobs';
+import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
 import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { logger } from '@/lib/utils/logger';
@@ -119,7 +120,10 @@ export async function ingestLeadAsCreator(
       handle
     );
 
-    const displayName = extraction.displayName?.trim() || handle;
+    // Keep leads.displayName as the raw scrape provenance; only the public
+    // profile receives the artist-name projection.
+    const displayName =
+      cleanScrapedDisplayName(extraction.displayName) ?? handle;
     const hostedAvatarUrl = await resolveHostedAvatarUrl(handle, extraction);
 
     const extractionWithHostedAvatar = {

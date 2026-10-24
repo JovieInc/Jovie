@@ -741,9 +741,13 @@ if [ "$cmd" = "inspect" ]; then
   printf '%s\n' \
     'Vercel CLI 54.14.5 (Node.js 22.23.1)' \
     'Fetching deployment "jov.ie" in test-team' >&2
-  if [ "$FAKE_SCENARIO" = "inspect-error" ]; then
-    printf '%s\n' \
-      '{"status":"error","reason":"api_error","message":"do-not-leak-sensitive-marker"}' >&2
+  if [[ "$FAKE_SCENARIO" == inspect-error* ]]; then
+    if [ "$FAKE_SCENARIO" = "inspect-error-stdout" ]; then
+      echo '{"reason":"api_error","message":"do-not-leak-sensitive-marker"}'
+      echo '{"reason":"forbidden"}' >&2
+    else
+      echo '{"reason":"api_error","message":"do-not-leak-sensitive-marker"}' >&2
+    fi
     exit 1
   fi
   if [ "$FAKE_SCENARIO" = "malformed" ]; then
@@ -761,7 +765,38 @@ if [ "$cmd" = "inspect" ]; then
   elif grep -q '^promote ' "$VERCEL_CALL_LOG"; then
     current="dpl_target"
   fi
-  printf '{"id":"%s","url":"%s.vercel.app","readyState":"READY","target":"production"}\n' "$current" "$current"
+  if [[ "$FAKE_SCENARIO" == inspect-noise-* ]]; then
+    python3 - "$current" "$FAKE_SCENARIO" <<'PYTHON'
+import json
+import sys
+
+current, scenario = sys.argv[1:]
+payload = json.dumps({
+    "id": current, "url": f"{current}.vercel.app",
+    "readyState": "READY", "target": "production",
+    "builds": [{"output": "x" * 3_800_000}] if scenario.endswith("large") else [],
+})
+# A large stdout write may still be draining when the CLI prints an update
+# notice to stderr. Force that ordering so merged streams corrupt JSON.
+split = len(payload) // 2
+sys.stdout.write(payload[:split])
+sys.stdout.flush()
+sys.stderr.write("Update available! do-not-leak-sensitive-marker\n")
+sys.stderr.flush()
+sys.stdout.write(payload[split:] + "\n")
+sys.stdout.flush()
+sys.stderr.write("Run the package manager to update.\n")
+PYTHON
+  elif [[ "$FAKE_SCENARIO" == inspect-stdout-* ]]; then
+    if [ "$FAKE_SCENARIO" = "inspect-stdout-invalid" ]; then echo '{'; fi
+    printf '{"id":"%s","url":"%s.vercel.app","readyState":"READY","target":"production"}\n' "$current" "$current" >&2
+  elif [ "$FAKE_SCENARIO" = "inspect-nonzero-json" ]; then
+    printf '{"id":"%s","url":"%s.vercel.app","readyState":"READY","target":"production"}\n' "$current" "$current"
+    echo '{"reason":"api_error","message":"do-not-leak-sensitive-marker"}' >&2
+    exit 1
+  else
+    printf '{"id":"%s","url":"%s.vercel.app","readyState":"READY","target":"production"}\n' "$current" "$current"
+  fi
   exit 0
 fi
 
@@ -928,6 +963,43 @@ def test_promotion_controller_promotes_once_and_requires_terminal_current(
     assert "Production Current is terminal on dpl_target" in result.stdout
 
 
+@pytest.mark.parametrize("size", ["small", "large"])
+def test_promotion_controller_keeps_inspect_json_separate_from_cli_diagnostics(
+    tmp_path: Path, size: str,
+) -> None:
+    result = _run_promotion_controller(tmp_path, f"inspect-noise-{size}")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert calls.count("promote dpl_target") == 1
+    assert "Production Current is terminal on dpl_target." in result.stdout
+    # Inspect build output and the CLI update notice stay off the controller's
+    # streams. The 10s subprocess budget is what fails if the builds payload
+    # is copied through shell parameters instead of projected from a file.
+    combined = result.stdout + result.stderr
+    assert "do-not-leak-sensitive-marker" not in combined
+    assert "x" * 64 not in combined
+    assert "failure_subtype=" not in (tmp_path / "github-output").read_text()
+
+
+@pytest.mark.parametrize(
+    "scenario", ["inspect-stdout-empty", "inspect-stdout-invalid", "inspect-nonzero-json"],
+)
+def test_promotion_controller_rejects_unproven_inspect_stdout(
+    tmp_path: Path, scenario: str,
+) -> None:
+    result = _run_promotion_controller(tmp_path, scenario)
+
+    assert result.returncode == 1
+    assert (tmp_path / "github-output").read_text().strip() == (
+        "failure_subtype=production_promotion_state_invalid"
+    )
+    calls = (tmp_path / "vercel-calls").read_text()
+    assert "promote dpl_target" not in calls
+    assert "rolling-release fetch" not in calls
+    assert "do-not-leak-sensitive-marker" not in result.stdout + result.stderr
+
+
 def test_promotion_controller_accepts_legacy_rollout_json_on_stdout(
     tmp_path: Path,
 ) -> None:
@@ -1047,10 +1119,11 @@ def test_promotion_controller_fails_closed_on_malformed_preflight(
     assert "promote dpl_target" not in (tmp_path / "vercel-calls").read_text()
 
 
+@pytest.mark.parametrize("scenario", ["inspect-error", "inspect-error-stdout"])
 def test_promotion_controller_reports_safe_inspect_failure_reason(
-    tmp_path: Path,
+    tmp_path: Path, scenario: str,
 ) -> None:
-    result = _run_promotion_controller(tmp_path, "inspect-error")
+    result = _run_promotion_controller(tmp_path, scenario)
 
     assert result.returncode == 1
     assert "Vercel inspect current failed (exit 1, reason=api_error)." in result.stderr

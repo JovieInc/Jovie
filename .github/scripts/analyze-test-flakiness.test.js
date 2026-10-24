@@ -366,24 +366,20 @@ test('a terminal JUnit failure with retry history is never a successful flaky re
 // JOV-7744: completed-run evidence is read from the shared GITHUB_TOKEN quota
 // once per (run id, attempt), not once per report wake.
 function withFakeGitHub(routes, fn) {
-  const https = require('node:https');
-  const { EventEmitter } = require('node:events');
-  const original = https.get;
+  const original = globalThis.fetch;
   const paths = [];
-  https.get = (options, onResponse) => {
-    paths.push(options.path);
-    const route = routes(options.path);
-    const res = new EventEmitter();
-    res.statusCode = route.status ?? 200;
-    process.nextTick(() => {
-      onResponse(res);
-      res.emit('data', JSON.stringify(route.body ?? {}));
-      res.emit('end');
+  globalThis.fetch = async input => {
+    const url = new URL(String(input));
+    const path = `${url.pathname}${url.search}`;
+    paths.push(path);
+    const route = routes(path);
+    return new Response(JSON.stringify(route.body ?? {}), {
+      status: route.status ?? 200,
+      headers: { 'content-type': 'application/json', ...route.headers },
     });
-    return new EventEmitter();
   };
   return Promise.resolve(fn(paths)).finally(() => {
-    https.get = original;
+    globalThis.fetch = original;
   });
 }
 
@@ -665,4 +661,40 @@ test('unit-flaky artifacts are downloaded once per completed run attempt', async
     flakiness.setRunEvidenceCacheDir('');
     fs.rmSync(cacheDir, { recursive: true, force: true });
   }
+});
+
+// External API contract: a report wake never spends the reserve that
+// merge-group admission needs from the same token bucket.
+test('the report sheds itself below the reserve instead of draining the shared bucket', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const flakiness = require('./analyze-test-flakiness');
+  flakiness.setRunEvidenceCacheDir(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'flaky-shed-'))
+  );
+  const reset = String(Math.floor(Date.now() / 1000) + 1800);
+  const headers = {
+    'x-ratelimit-limit': '1000',
+    'x-ratelimit-remaining': '100',
+    'x-ratelimit-reset': reset,
+    'x-ratelimit-resource': 'core',
+  };
+  const routes = p =>
+    p.includes('/actions/workflows/ci.yml/runs?')
+      ? {
+          body: {
+            workflow_runs: [{ id: 9, run_attempt: 1, conclusion: 'success' }],
+          },
+          headers,
+        }
+      : { body: { jobs: [], artifacts: [] }, headers };
+  const paths = await withFakeGitHub(routes, async calls => {
+    await assert.rejects(
+      flakiness.analyzeFlakiness('low-budget-token', 'JovieInc', 'Jovie'),
+      error => error.exitCode === 75 && error.kind === 'shed'
+    );
+    return calls;
+  });
+  assert.equal(paths.length, 1);
 });

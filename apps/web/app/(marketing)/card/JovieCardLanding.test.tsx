@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { JOVIE_CARD_COPY } from '@/data/jovieCardCopy';
 import { JovieCardLanding } from './JovieCardLanding';
@@ -23,8 +23,15 @@ describe('JovieCardLanding', () => {
     expect(heading).toBeVisible();
     expect(heading).toHaveClass('line-clamp-3');
     expect(screen.getByText(JOVIE_CARD_COPY.hero.body)).toBeVisible();
-    // Status is disclosed once, beside the visual — not as a stranded line.
-    expect(screen.getByText(/^Coming soon · /u)).toBeVisible();
+    expect(screen.getByText(JOVIE_CARD_COPY.hero.body)).toHaveTextContent(
+      'Jovie Card'
+    );
+    // The planned announcement cannot be mistaken for Wallet UI proof.
+    const hero = screen.getByTestId('marketing-section-hero');
+    expect(
+      within(hero).getByTestId('jovie-card-planned-description')
+    ).toHaveTextContent('Coming soon. Wallet passes are not available yet.');
+    expect(within(hero).queryByRole('img')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Join the list' })).toHaveAttribute(
       'href',
       '#join-the-list'
@@ -33,9 +40,6 @@ describe('JovieCardLanding', () => {
     expect(
       screen.getByRole('link', { name: 'See how it works' })
     ).toHaveAttribute('href', '#how-it-works');
-    expect(
-      screen.getByTestId('product-screenshot-frame-public-profile-mobile')
-    ).toBeVisible();
 
     expect(
       [...container.querySelectorAll('[data-marketing-section]')].map(section =>

@@ -513,7 +513,18 @@ test('records David Guetta Spotify-first onboarding demo', async ({
   await expect(
     sideRail.getByTestId('onboarding-profile-compact-surface')
   ).toBeVisible();
-  await expect(sideRail.getByText('David Guetta')).toHaveCount(1);
+  await expect(sideRail.getByTestId('profile-identity-link')).toHaveCount(1);
+  await expect(sideRail.getByTestId('profile-identity-link')).toHaveText(
+    'David Guetta'
+  );
+  await expect(
+    sideRail.getByRole('heading', {
+      name: 'Profile Highlights From David Guetta',
+    })
+  ).toHaveCount(1);
+  await expect(
+    sideRail.getByRole('heading', { name: 'David Guetta', exact: true })
+  ).toHaveCount(1);
   await expect(
     sideRail.getByTestId('onboarding-dsp-match-strip')
   ).toBeVisible();

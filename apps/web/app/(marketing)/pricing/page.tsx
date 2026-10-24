@@ -9,6 +9,7 @@ import {
 } from '@/data/marketingPricingPlans';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
+import { documentTitle } from '@/lib/seo/document-title';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
@@ -17,11 +18,13 @@ const VISIBLE_PRICING_PLANS = getVisibleMarketingPricingPlans();
 const PRO_MONTHLY_PRICE = `${getPublicPriceClaim('pro').priceLabel}/month`;
 const PRICING_OG_IMAGE = `${BASE_URL}/og/default.png`;
 const PRICING_TITLE = `Pricing | ${APP_NAME}`;
-const requestAccessCopy = `Artist Presence is ${PRO_MONTHLY_PRICE} with limited access. Request access.`;
+const PRO_NAME = getPublicPriceClaim('pro').displayName;
+const PRICING_DESCRIPTION = `Jovie profiles are free forever. ${PRO_NAME} is ${PRO_MONTHLY_PRICE}, self-serve.`;
+const requestAccessCopy = `${PRO_NAME} is ${PRO_MONTHLY_PRICE}. Claim your profile.`;
 
 export const metadata: Metadata = {
-  title: PRICING_TITLE,
-  description: `Jovie profiles are free forever. Artist Presence is ${PRO_MONTHLY_PRICE} with limited access.`,
+  title: documentTitle(PRICING_TITLE),
+  description: PRICING_DESCRIPTION,
   keywords: [
     'Jovie pricing',
     'Jovie profile pricing',
@@ -31,7 +34,7 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     title: `Pricing - ${APP_NAME}`,
-    description: `Jovie profiles are free forever. Artist Presence is ${PRO_MONTHLY_PRICE} with limited access.`,
+    description: PRICING_DESCRIPTION,
     url: `${BASE_URL}/pricing`,
     siteName: APP_NAME,
     type: 'website',
@@ -42,7 +45,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: `Pricing - ${APP_NAME}`,
-    description: `Jovie profiles are free forever. Artist Presence is ${PRO_MONTHLY_PRICE} with limited access.`,
+    description: PRICING_DESCRIPTION,
     images: [PRICING_OG_IMAGE],
   },
   robots: {
@@ -93,7 +96,7 @@ const PRICING_SCHEMA = {
   '@context': 'https://schema.org',
   '@type': 'WebPage',
   name: `Pricing - ${APP_NAME}`,
-  description: `Jovie profiles are free forever. Artist Presence is ${PRO_MONTHLY_PRICE} with limited access.`,
+  description: PRICING_DESCRIPTION,
   url: `${BASE_URL}/pricing`,
   mainEntity: {
     '@type': 'ItemList',

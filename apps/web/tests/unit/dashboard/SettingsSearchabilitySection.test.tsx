@@ -7,6 +7,11 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import {
+  DashboardDataProvider,
+  useDashboardData,
+} from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SettingsSearchabilitySection } from '@/components/features/dashboard/organisms/SettingsSearchabilitySection';
 import type { Artist } from '@/types/db';
 
@@ -32,7 +37,76 @@ function artist(id = 'profile-a', searchable?: boolean): Artist {
 
 beforeEach(() => vi.clearAllMocks());
 
+function PrivacyPageFixture() {
+  const { selectedProfile } = useDashboardData();
+  return selectedProfile ? (
+    <SettingsSearchabilitySection
+      artist={{
+        ...artist(selectedProfile.id),
+        settings: selectedProfile.settings,
+      }}
+    />
+  ) : null;
+}
+
 describe('owner discovery choice', () => {
+  it.each([true, false])(
+    'retains the saved choice after navigating away from an initially %s profile',
+    async initial => {
+      save.mockResolvedValue({});
+      const profile = {
+        id: 'profile-a',
+        settings: { searchable: initial },
+      } as DashboardData['creatorProfiles'][number];
+      const data: DashboardData = {
+        user: { id: 'owner' },
+        creatorProfiles: [profile],
+        selectedProfile: profile,
+        needsOnboarding: false,
+        sidebarCollapsed: false,
+        hasSocialLinks: false,
+        hasMusicLinks: false,
+        isAdmin: false,
+        tippingStats: {
+          tipClicks: 0,
+          qrTipClicks: 0,
+          linkTipClicks: 0,
+          tipsSubmitted: 0,
+          totalReceivedCents: 0,
+          monthReceivedCents: 0,
+        },
+        profileCompletion: {
+          percentage: 0,
+          completedCount: 0,
+          totalCount: 0,
+          steps: [],
+          profileIsLive: false,
+        },
+      };
+      const page = (visible: boolean) => (
+        <DashboardDataProvider value={data}>
+          {visible ? <PrivacyPageFixture /> : null}
+        </DashboardDataProvider>
+      );
+      const { rerender } = render(page(true));
+      fireEvent.click(screen.getByRole('switch'));
+      await screen.findByText('Saved');
+      rerender(page(false));
+      rerender(page(true));
+      if (initial) {
+        expect(screen.getByRole('switch')).not.toBeChecked();
+      } else {
+        expect(screen.getByRole('switch')).toBeChecked();
+      }
+      fireEvent.click(screen.getByRole('switch'));
+      await waitFor(() =>
+        expect(save).toHaveBeenLastCalledWith({
+          updates: { settings: { searchable: initial } },
+        })
+      );
+    }
+  );
+
   it('preserves the legacy choice and explains direct public sharing for humans and bots', () => {
     render(<SettingsSearchabilitySection artist={artist()} />);
     expect(

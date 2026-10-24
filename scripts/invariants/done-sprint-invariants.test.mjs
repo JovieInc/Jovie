@@ -103,7 +103,7 @@ describe('JOV-INV-033 done sprint invariants', () => {
     assert.ok(errors.some(error => error.includes('fail closed')));
   });
 
-  it('accepts pricing HTML locked to Artist Visibility Pro at $199', async () => {
+  it('accepts pricing HTML locked to self-serve Artist Visibility Pro at $12', async () => {
     const errors = await rescanProduction({
       env: { DONE_INVARIANT_PRODUCTION_BASE_URL: 'https://jov.ie' },
       fetchImpl: async url => {
@@ -113,7 +113,7 @@ describe('JOV-INV-033 done sprint invariants', () => {
           status: 200,
           text: async () =>
             path === '/pricing'
-              ? '<main data-offer-contract="artist-visibility-offer-contract-v1">Artist Visibility Pro is $199/month. <a href="/waitlist">Request access</a></main>'
+              ? '<main data-offer-contract="artist-visibility-offer-contract-v1">Artist Visibility Pro is $12/month. <a href="/claim?plan=pro">Claim your profile</a></main>'
               : '<html></html>',
         };
       },
@@ -138,7 +138,7 @@ describe('JOV-INV-033 done sprint invariants', () => {
           url,
           text: async () =>
             path === '/pricing'
-              ? '<main data-offer-contract="artist-visibility-offer-contract-v1">Artist Visibility Pro is $199/month. <a href="/waitlist">Request access</a></main>'
+              ? '<main data-offer-contract="artist-visibility-offer-contract-v1">Artist Visibility Pro is $12/month. <a href="/claim?plan=pro">Claim your profile</a></main>'
               : '<html></html>',
         };
       },
@@ -176,7 +176,7 @@ describe('JOV-INV-033 done sprint invariants', () => {
         error.includes('deployment protection without a bypass secret')
       )
     );
-    assert.ok(!errors.some(error => error.includes('missing $199')));
+    assert.ok(!errors.some(error => error.includes('missing $12')));
   });
 
   it('deliberate red: production pricing that still shows Max $149 is a release blocker', async () => {

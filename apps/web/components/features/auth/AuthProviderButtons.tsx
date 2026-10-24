@@ -35,13 +35,13 @@ export function AuthProviderButtonSlot({
     <button
       type='button'
       disabled={isDisabled}
-      aria-label={isDisabled ? `${label} loading` : undefined}
+      aria-label={pending ? `${label} loading` : undefined}
       data-auth-provider-slot={provider}
       data-auth-provider-pending={pending ? 'true' : undefined}
       onClick={onClick}
       className={cn(
         AUTH_PROVIDER_BUTTON_CLASS,
-        isDisabled && 'cursor-wait opacity-75'
+        pending && 'cursor-wait opacity-75'
       )}
     >
       <Image

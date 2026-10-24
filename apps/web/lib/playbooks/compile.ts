@@ -7,10 +7,12 @@
  * errors, never runtime surprises.
  */
 
+import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
 import type { SkillDefinition, ToolDefinition } from '@/lib/agents/types';
 import type { BooleanEntitlement } from '@/lib/entitlements/registry';
-import type { PlaybookDefinition } from './schema';
+import { type PlaybookDefinition, validatePlaybookSource } from './schema';
 
 export type PlaybookCompileRule =
   | 'unresolved-tool'
@@ -104,6 +106,11 @@ function buildSkillMetadata(
     evalSeedNames: playbook.evalSeeds.map(seed => seed.name).join(','),
     requiredTools: playbook.requiredTools.join(','),
     requiredConnectors: playbook.requiredConnectors.join(','),
+    // The primary entitlement is a catalog compatibility field, not all grants.
+    requiredEntitlements: JSON.stringify(playbook.requiredEntitlements),
+    ...(playbook.growthGovernance
+      ? { growthGovernance: JSON.stringify(playbook.growthGovernance) }
+      : {}),
     costCredits:
       playbook.costEstimate.credits !== undefined
         ? String(playbook.costEstimate.credits)
@@ -124,8 +131,29 @@ export function compilePlaybookToSkill(
   options?: {
     readonly knownTools?: ReadonlySet<string>;
     readonly model?: string;
+    /** Exact authored bytes, including rationale. Required for growth drafts. */
+    readonly source?: string;
   }
 ): PlaybookCompileResult {
+  const validated = validatePlaybookSource(
+    options?.source ?? `---\n${JSON.stringify(playbook)}\n---\n`
+  );
+  if (
+    !validated.ok ||
+    !isDeepStrictEqual(validated.definition, playbook) ||
+    (playbook.growthGovernance && !options?.source)
+  ) {
+    return {
+      ok: false,
+      errors: [
+        {
+          rule: 'invalid-playbook',
+          message:
+            'compile requires a valid definition and matching exact source for growth drafts',
+        },
+      ],
+    };
+  }
   const knownTools = options?.knownTools ?? getRegistryToolIds();
   const errors: PlaybookCompileError[] = [];
 
@@ -164,7 +192,16 @@ export function compilePlaybookToSkill(
     entitlement: resolveEntitlement(playbook.requiredEntitlements),
     model: options?.model ?? DEFAULT_PLAYBOOK_MODEL,
     promptPath: `docs/playbooks/${playbook.id}.playbook.md`,
-    metadata: buildSkillMetadata(playbook),
+    metadata: {
+      ...buildSkillMetadata(playbook),
+      ...(options?.source
+        ? {
+            playbookSourceSha256: createHash('sha256')
+              .update(options.source)
+              .digest('hex'),
+          }
+        : {}),
+    },
   };
 
   return { ok: true, skill };

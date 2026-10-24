@@ -1,4 +1,6 @@
 'use client';
+
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 // @coverage-via apps/web/tests/unit/dashboard/TasksPageClient.test.tsx
 
 import {
@@ -479,18 +481,21 @@ const TaskMetaTrigger = forwardRef<
     ariaLabel: string;
   }
 >(function TaskMetaTrigger({ children, ariaLabel, className, ...props }, ref) {
+  // The accessible name must contain the visible value (WCAG 2.5.3 Label in
+  // Name; axe label-content-name-mismatch since @axe-core/playwright 4.14).
+  // Name the control from its content: a visually hidden action prefix
+  // followed by the visible value, so the name always includes what is shown.
   return (
     <button
       ref={ref}
       type='button'
-      aria-label={ariaLabel}
       className={cn(
         '-mx-1 relative inline-flex h-8 min-w-0 items-center rounded-full px-2 text-secondary-token transition-[background-color,color] duration-subtle before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token sm:before:h-8 sm:before:min-w-0',
         className
       )}
       {...props}
     >
-      {children}
+      <span className='sr-only'>{ariaLabel}</span> {children}
     </button>
   );
 });
@@ -940,7 +945,7 @@ function TaskTitleEditor({
         rows={1}
         aria-label='Task Title'
         onChange={event => onChange(event.target.value)}
-        placeholder='Untitled Task' // ui-casing-allow: default task title placeholder
+        placeholder={COPY_FALLBACKS.task}
         className='w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-[1.75rem] font-semibold leading-[1.15] tracking-normal text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
         style={{
           height: measuredHeight,
@@ -2257,7 +2262,6 @@ export function TasksPageClient() {
         artistName={artistName}
         selectedTaskId={effectiveSelectedTaskId}
         compactColumnLabels={Boolean(selectedTask)}
-        showAssigneeChip={assigneeFilter === 'all'}
         onOpenTask={openTaskDocument}
         onCreateTask={() => setHeaderMode('create')}
         onMoveTask={handleMoveTask}

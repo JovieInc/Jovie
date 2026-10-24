@@ -41,7 +41,6 @@ on:
       - 'apps/web/package.json'
       - 'packages/ui/**'
       - 'DESIGN.md'
-      - 'DESIGN_COMPLETE.md'
       - 'design.tokens.json'
       - 'package.json'
       - '.claude/rules/code-style.md'

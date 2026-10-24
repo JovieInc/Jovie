@@ -24,6 +24,16 @@ import {
 const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
 
 describe('JOV-5288 CI repo lanes', () => {
+  it('treats native playbook sources as product inputs rather than prose', () => {
+    expect(
+      classifyCiRepoLanes([
+        'docs/playbooks/growth-presence-repair-offer.playbook.md',
+      ]).runJovieProduct
+    ).toBe(true);
+    expect(
+      classifyCiRepoLanes(['docs/playbooks/TEMPLATE.md']).runJovieProduct
+    ).toBe(false);
+  });
   it('keeps Symphony control-plane files off the Jovie product suite', () => {
     const plan = classifyCiRepoLanes([
       'scripts/fleet-gate/gem-priority-gate.py',

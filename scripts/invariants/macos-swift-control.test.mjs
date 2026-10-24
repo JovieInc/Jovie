@@ -97,7 +97,7 @@ describe('Mac ownership during the Swift-native transition', () => {
     assert.match(main, /\bBrowserWindow\b/);
     assert.doesNotMatch(main, /WKWebView/);
     const ovieDoor = read('apps/desktop/src/ovie-door.ts');
-    assert.match(ovieDoor, /OVIE_OPERATOR_OPS_ROUTE = '\/hud'/);
+    assert.match(ovieDoor, /OVIE_OPERATOR_OPS_ROUTE = '\/app\/ov'/);
     assert.match(ovieDoor, /OVIE_OPERATOR_OPS_SEARCH = 'ovie=mac'/);
   });
 

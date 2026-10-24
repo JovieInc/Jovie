@@ -260,7 +260,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Stage | Exact responsibility |
 | --- | --- |
-| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, exact-head coverage, diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
+| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, exact-head coverage, unit tests the exact diff can affect (`--changed` against the merge base, aggregated into `PR Ready`), diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
 | Native merge queue | Re-run deterministic gates plus exact-head coverage on the exact `merge_group` head, then require only path-selected Web unit/build, Mac test/package, iOS Xcode, shared-contract integration, and model-free semantic evidence. |
 | Queue-proven main | Reuse the exact successful merge-group `PR Ready` proof and skip duplicate fallback work. |
 | Direct/admin main | Fail closed through path/risk/fast/secret/migration plus every product lane selected by the exact push diff; skipped selected lanes and executed unselected lanes are invalid. |
@@ -327,6 +327,23 @@ Sensitive changes are classified deterministically on source PRs. Smoke and prev
 | Environment and runtime config | high | yes | yes | no |
 | Public UI and profile surfaces | medium | no | yes | no |
 <!-- ci-harness:end -->
+
+### Pre-merge exact marketing route capture
+
+`tests/product-screenshots/marketing-routes.spec.ts` (every registered marketing
+route, console/HTTP/axe quality checks, no retries) used to run only on main push
+in `screenshots.yml`, so failing feature pages merged untested. It now also runs
+before merge, unchanged, in two places on builds those lanes already make:
+
+- PRs that change marketing inputs: `PR Visual Review` -> `Capture changed UI
+  (desktop + mobile)` -> step `Capture exact marketing routes (marketing-routes.spec.ts)`.
+- The merge queue (`run_marketing_dom`): `Visual Snapshot Compare` -> the same
+  step name. `PR Ready` requires that job whenever marketing inputs are
+  selected, so a failing route is ejected from the queue before it reaches main.
+
+Keep the spec, config and flags identical to `screenshots.yml`'s
+`Capture exact marketing routes` step; `.github/scripts/marketing-dom-workflow.test.mjs`
+fails if they drift.
 
 ### Adopting intentional visual changes
 

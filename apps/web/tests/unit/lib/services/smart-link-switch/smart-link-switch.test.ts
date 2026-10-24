@@ -12,6 +12,7 @@ import {
   MISSING_LINK_SKIP_REASON,
   SMART_LINK_SWITCH_LIVE_RULES,
   SMART_LINK_SWITCH_RULE_CASE_IDS,
+  SWITCHED_LIVE_REASON,
 } from '@/lib/services/smart-link-switch/switch-rules';
 
 const ROOT = resolveMonorepoRoot();
@@ -137,5 +138,260 @@ describe('smart_link_switch_live evidence floor', () => {
     );
     expect(planner).toContain('Never invent a jov.ie URL');
     expect(planner).toContain('no-op keep');
+  });
+});
+
+const SKIPPED = {
+  disposition: 'skip',
+  switched: false,
+  minted: false,
+  runSucceeded: true,
+  stopped: false,
+  shareUrl: null,
+  citedDsps: [],
+  omittedInvented: [],
+  reason:
+    'No smart link exists for this release. Skip switch. Run still succeeds. Do not mint a live link.',
+} as const;
+
+const preSave = (over: Record<string, unknown> = {}) => ({
+  shareUrl: EXISTING,
+  live: false,
+  resolvedDsps: ['spotify', 'apple_music'],
+  ...over,
+});
+
+describe('gateSmartLinkSwitch outcomes', () => {
+  it('exposes the exact operator-facing reasons', () => {
+    expect(MISSING_LINK_SKIP_REASON).toBe(SKIPPED.reason);
+    expect(ALREADY_LIVE_KEEP_REASON).toBe(
+      'Smart link is already live. No-op keep. Do not mint a second live link.'
+    );
+    expect(SWITCHED_LIVE_REASON).toBe(
+      'Existing pre-save/countdown smart link switched to live. Same shareUrl. No new link minted.'
+    );
+    expect(LOOKUP_STOP_REASON).toBe(
+      'Smart link lookup/switch failed. STOP. Never invent a jov.ie URL.'
+    );
+  });
+
+  it('switches an existing pre-save link to live on the same shareUrl', () => {
+    expect(
+      gateSmartLinkSwitch({
+        existing: preSave({ resolvedDsps: [' spotify ', '', 'apple_music'] }),
+      })
+    ).toEqual({
+      disposition: 'switch',
+      switched: true,
+      minted: false,
+      runSucceeded: true,
+      stopped: false,
+      shareUrl: EXISTING,
+      citedDsps: ['spotify', 'apple_music'],
+      omittedInvented: [],
+      reason: SWITCHED_LIVE_REASON,
+    });
+  });
+
+  it('keeps an already-live link without rebuilding it', () => {
+    expect(gateSmartLinkSwitch({ existing: preSave({ live: true }) })).toEqual({
+      disposition: 'keep',
+      switched: false,
+      minted: false,
+      runSucceeded: true,
+      stopped: false,
+      shareUrl: EXISTING,
+      citedDsps: ['spotify', 'apple_music'],
+      omittedInvented: [],
+      reason: ALREADY_LIVE_KEEP_REASON,
+    });
+  });
+
+  it('skips when there is no input or no existing link', () => {
+    expect(gateSmartLinkSwitch()).toEqual(SKIPPED);
+    expect(gateSmartLinkSwitch({ existing: null })).toEqual(SKIPPED);
+    expect(
+      gateSmartLinkSwitch({ lookupStatus: 'ok', existing: { shareUrl: null } })
+    ).toEqual(SKIPPED);
+    expect(
+      gateSmartLinkSwitch({ lookupStatus: 'missing', existing: preSave() })
+    ).toEqual(SKIPPED);
+  });
+
+  it('records a minting attempt and an invented url on a skip', () => {
+    expect(
+      gateSmartLinkSwitch({
+        proposed: { shareUrl: 'https://jov.ie/tim/new', mintNew: true },
+      })
+    ).toEqual({ ...SKIPPED, omittedInvented: ['mint', 'shareUrl'] });
+  });
+
+  it('stops on a lookup error, inferring the status from the message', () => {
+    expect(
+      gateSmartLinkSwitch({
+        existing: preSave(),
+        lookupError: '  lookup timed out ',
+        proposed: { shareUrl: 'https://jov.ie/placeholder', mintNew: true },
+      })
+    ).toEqual({
+      disposition: 'stop',
+      switched: false,
+      minted: false,
+      runSucceeded: false,
+      stopped: true,
+      shareUrl: null,
+      citedDsps: [],
+      omittedInvented: ['mint', 'placeholder'],
+      reason: `${LOOKUP_STOP_REASON} lookup timed out`,
+    });
+  });
+
+  it('ignores a blank lookup error', () => {
+    expect(
+      gateSmartLinkSwitch({ existing: preSave(), lookupError: '   ' })
+        .disposition
+    ).toBe('switch');
+  });
+
+  it('prefers the switch error and falls back to a generic detail', () => {
+    expect(
+      gateSmartLinkSwitch({
+        existing: preSave(),
+        lookupError: 'lookup slow',
+        switchError: 'write failed',
+      }).reason
+    ).toBe(`${LOOKUP_STOP_REASON} write failed`);
+    expect(gateSmartLinkSwitch({ lookupStatus: 'error' }).reason).toBe(
+      `${LOOKUP_STOP_REASON} lookup failed`
+    );
+    expect(
+      gateSmartLinkSwitch({ existing: preSave(), switchError: '  ' })
+        .disposition
+    ).toBe('switch');
+  });
+});
+
+describe('gateSmartLinkSwitch proposed URLs', () => {
+  it.each([
+    'https://jov.ie/placeholder',
+    'https://example.com/x',
+    'https://jov.ie/your-link',
+    'https://jov.ie/YOUR-RELEASE',
+    'https://jov.ie/eval/abc',
+    'https://jov.ie/todo',
+    'https://jov.ie/tbd',
+    'https://jov.ie/dummy',
+  ])('refuses placeholder %s', shareUrl => {
+    const gated = gateSmartLinkSwitch({
+      existing: preSave(),
+      proposed: { shareUrl },
+    });
+    expect(gated.omittedInvented).toEqual(['placeholder']);
+    expect(gated.shareUrl).toBe(EXISTING);
+  });
+
+  it('accepts the canonical url, even padded', () => {
+    expect(
+      gateSmartLinkSwitch({
+        existing: preSave(),
+        proposed: { shareUrl: `  ${EXISTING} ` },
+      }).omittedInvented
+    ).toEqual([]);
+  });
+
+  it('accepts a canonical url that happens to look like a placeholder', () => {
+    const canonical = 'https://jov.ie/tim/todo-list';
+    expect(
+      gateSmartLinkSwitch({
+        existing: preSave({ shareUrl: canonical }),
+        proposed: { shareUrl: canonical },
+      })
+    ).toMatchObject({ shareUrl: canonical, omittedInvented: [] });
+  });
+
+  it('refuses a different real-looking url', () => {
+    expect(
+      gateSmartLinkSwitch({
+        existing: preSave(),
+        proposed: { shareUrl: 'https://jov.ie/tim/other' },
+      }).omittedInvented
+    ).toEqual(['shareUrl']);
+  });
+
+  it('ignores a blank proposed url and an explicit no-mint', () => {
+    expect(
+      gateSmartLinkSwitch({
+        existing: preSave(),
+        proposed: { shareUrl: '  ', mintNew: false },
+      }).omittedInvented
+    ).toEqual([]);
+  });
+});
+
+describe('gateSmartLinkSwitch DSP citations', () => {
+  it('cites only resolved DSPs and flags each invented one', () => {
+    expect(
+      gateSmartLinkSwitch({
+        existing: preSave(),
+        proposed: { claimedDsps: [' spotify ', 'tidal', '', 'deezer'] },
+      })
+    ).toMatchObject({
+      citedDsps: ['spotify'],
+      omittedInvented: ['dsp', 'dsp'],
+    });
+  });
+
+  it('cites nothing when the existing link resolved no DSPs', () => {
+    expect(
+      gateSmartLinkSwitch({
+        existing: preSave({ resolvedDsps: null }),
+        proposed: { claimedDsps: ['spotify'] },
+      })
+    ).toMatchObject({ citedDsps: [], omittedInvented: ['dsp'] });
+    expect(
+      gateSmartLinkSwitch({ existing: preSave({ resolvedDsps: null }) })
+        .citedDsps
+    ).toEqual([]);
+  });
+});
+
+describe('smart link switch rule cases', () => {
+  it('passes every case with its success reason', () => {
+    expect(SMART_LINK_SWITCH_RULE_CASE_IDS).toEqual([
+      'placeholder-refused',
+      'missing-link-skips-no-mint',
+      'already-live-is-noop',
+      'failed-lookup-stops',
+      'only-resolved-dsps-cited',
+    ]);
+    expect(evaluateAllSmartLinkSwitchRuleCases()).toEqual([
+      {
+        id: 'placeholder-refused',
+        passed: true,
+        reason:
+          'Placeholder and minted URLs are refused; existing shareUrl is kept',
+      },
+      {
+        id: 'missing-link-skips-no-mint',
+        passed: true,
+        reason: 'Missing smart link skips switch, succeeds, and does not mint',
+      },
+      {
+        id: 'already-live-is-noop',
+        passed: true,
+        reason: 'Already-live is a no-op keep of the existing shareUrl',
+      },
+      {
+        id: 'failed-lookup-stops',
+        passed: true,
+        reason:
+          'Failed lookup/switch STOPs, surfaces the error, and invents no URL',
+      },
+      {
+        id: 'only-resolved-dsps-cited',
+        passed: true,
+        reason: 'Only DSPs resolved on the existing link are cited',
+      },
+    ]);
   });
 });
