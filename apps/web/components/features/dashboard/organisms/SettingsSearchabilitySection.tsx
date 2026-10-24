@@ -64,7 +64,7 @@ export function SettingsSearchabilitySection({
         description='Allow your public profile in Jovie search, directories, and featured lists. When off, anyone with your public URL can still view it, including bots.'
         checked={checked}
         onCheckedChange={handleToggle}
-        disabled={isPending}
+        busy={isPending}
         ariaLabel='Show in Jovie discovery'
       />
     </SettingsPanel>

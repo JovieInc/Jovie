@@ -43,7 +43,7 @@ function PrivacyPageFixture() {
     <SettingsSearchabilitySection
       artist={{
         ...artist(selectedProfile.id),
-        settings: selectedProfile.settings,
+        settings: selectedProfile.settings ?? undefined,
       }}
     />
   ) : null;
@@ -56,33 +56,13 @@ describe('owner discovery choice', () => {
       save.mockResolvedValue({});
       const profile = {
         id: 'profile-a',
-        settings: { searchable: initial },
-      } as DashboardData['creatorProfiles'][number];
-      const data: DashboardData = {
+        settings: { searchable: initial, require_double_opt_in: true },
+      } as unknown as DashboardData['creatorProfiles'][number];
+      const data = {
         user: { id: 'owner' },
         creatorProfiles: [profile],
         selectedProfile: profile,
-        needsOnboarding: false,
-        sidebarCollapsed: false,
-        hasSocialLinks: false,
-        hasMusicLinks: false,
-        isAdmin: false,
-        tippingStats: {
-          tipClicks: 0,
-          qrTipClicks: 0,
-          linkTipClicks: 0,
-          tipsSubmitted: 0,
-          totalReceivedCents: 0,
-          monthReceivedCents: 0,
-        },
-        profileCompletion: {
-          percentage: 0,
-          completedCount: 0,
-          totalCount: 0,
-          steps: [],
-          profileIsLive: false,
-        },
-      };
+      } as DashboardData;
       const page = (visible: boolean) => (
         <DashboardDataProvider value={data}>
           {visible ? <PrivacyPageFixture /> : null}
@@ -93,17 +73,14 @@ describe('owner discovery choice', () => {
       await screen.findByText('Saved');
       rerender(page(false));
       rerender(page(true));
-      if (initial) {
-        expect(screen.getByRole('switch')).not.toBeChecked();
-      } else {
-        expect(screen.getByRole('switch')).toBeChecked();
-      }
-      fireEvent.click(screen.getByRole('switch'));
-      await waitFor(() =>
-        expect(save).toHaveBeenLastCalledWith({
-          updates: { settings: { searchable: initial } },
-        })
+      expect(screen.getByRole('switch')).toHaveAttribute(
+        'aria-checked',
+        String(!initial)
       );
+      fireEvent.click(screen.getByRole('switch'));
+      expect(save).toHaveBeenLastCalledWith({
+        updates: { settings: { searchable: initial } },
+      });
     }
   );
 
@@ -142,7 +119,7 @@ describe('owner discovery choice', () => {
     control.focus();
     fireEvent.click(control);
     expect(control).not.toBeChecked();
-    expect(control).toBeDisabled();
+    expect(control).toHaveAttribute('aria-disabled', 'true');
     expect(status).toHaveAttribute('data-state', 'saving');
     expect(status).toHaveClass('min-h-4');
     expect(save).toHaveBeenCalledWith({
