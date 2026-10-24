@@ -1,7 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LinkRow } from '@/app/app/(shell)/links/links-model';
+import {
+  RightPanelProvider,
+  useRightPanel,
+} from '@/contexts/RightPanelContext';
 
 const { copyToClipboardMock } = vi.hoisted(() => ({
   copyToClipboardMock: vi.fn(),
@@ -12,6 +17,26 @@ vi.mock('@/hooks/useClipboard', () => ({
 }));
 
 import { LinksPageClient } from '@/app/app/(shell)/links/LinksPageClient';
+
+/**
+ * The shell owns the right-rail slot (AppShellFrame renders whatever a route
+ * registers through RightPanelProvider). Render the page inside a provider
+ * with a visible slot so tests can assert the inspector presents through the
+ * canonical entity rail instead of a local aside.
+ */
+function RightPanelSlot() {
+  const panel = useRightPanel();
+  return <div data-testid='shell-right-panel-slot'>{panel}</div>;
+}
+
+function renderLinksWorkspace(ui: ReactElement) {
+  return render(
+    <RightPanelProvider>
+      <RightPanelSlot />
+      {ui}
+    </RightPanelProvider>
+  );
+}
 
 const baseRow: LinkRow = {
   id: 'row-1',
@@ -35,7 +60,7 @@ describe('LinksPageClient', () => {
   });
 
   it('renders the empty state when there are no links', () => {
-    render(<LinksPageClient rows={[]} />);
+    renderLinksWorkspace(<LinksPageClient rows={[]} />);
 
     expect(screen.getByTestId('links-empty-state')).toBeInTheDocument();
     expect(screen.getByText('No links yet')).toBeInTheDocument();
@@ -70,7 +95,7 @@ describe('LinksPageClient', () => {
       },
     ];
 
-    render(<LinksPageClient rows={rows} />);
+    renderLinksWorkspace(<LinksPageClient rows={rows} />);
 
     expect(screen.getByTestId('links-workspace')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
@@ -83,7 +108,7 @@ describe('LinksPageClient', () => {
 
   it('opens the inspector for a selected row and copies the Jovie link', async () => {
     const user = userEvent.setup();
-    render(<LinksPageClient rows={[baseRow]} />);
+    renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);
 
     await user.click(
       screen.getByRole('button', { name: 'jov.ie/tim/midnight-city' })
@@ -112,7 +137,7 @@ describe('LinksPageClient', () => {
   it('keeps the Copy label when the clipboard write fails', async () => {
     copyToClipboardMock.mockResolvedValue(false);
     const user = userEvent.setup();
-    render(<LinksPageClient rows={[baseRow]} />);
+    renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);
 
     await user.click(
       screen.getByRole('button', { name: 'jov.ie/tim/midnight-city' })
@@ -132,7 +157,7 @@ describe('LinksPageClient', () => {
       utmSummary: null,
       clicks: null,
     };
-    render(<LinksPageClient rows={[row]} />);
+    renderLinksWorkspace(<LinksPageClient rows={[row]} />);
 
     await user.click(
       screen.getByRole('button', { name: 'jov.ie/tim/midnight-city' })
@@ -145,5 +170,37 @@ describe('LinksPageClient', () => {
     expect(
       screen.queryByRole('link', { name: /open entity/i })
     ).not.toBeInTheDocument();
+  });
+
+  it('presents the inspector through the shell right-rail panel', async () => {
+    const user = userEvent.setup();
+    renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'jov.ie/tim/midnight-city' })
+    );
+
+    // Entity-rail parity: the inspector must present through the shell's
+    // registered right-panel slot, not as a local aside next to the table.
+    const slot = screen.getByTestId('shell-right-panel-slot');
+    expect(within(slot).getByTestId('links-inspector')).toBeInTheDocument();
+    expect(
+      within(slot).getByRole('button', { name: 'Close' })
+    ).toBeInTheDocument();
+  });
+
+  it('closes the inspector on Escape', async () => {
+    const user = userEvent.setup();
+    renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'jov.ie/tim/midnight-city' })
+    );
+    expect(screen.getByTestId('links-inspector')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByTestId('links-inspector')).not.toBeInTheDocument();
+    expect(screen.getByTestId('shell-right-panel-slot')).toBeEmptyDOMElement();
   });
 });
