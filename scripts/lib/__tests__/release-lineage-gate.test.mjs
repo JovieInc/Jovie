@@ -371,6 +371,26 @@ describe('release lineage gate', () => {
     }
   });
 
+  it('re-prints only exact hold lines, not look-alikes with extra content', () => {
+    const run = runGate({
+      main: NEWER_SHA,
+      lineageStatus: 'ahead',
+      lineageFailTimes: 1,
+      lineageFailureText: [
+        '::warning::Holding 5s for the GitHub rate limit reset.',
+        '::warning::Holding 5s for the GitHub rate limit reset. TRAILING-JUNK-1',
+        '::notice title=GitHub API hold::label=x http=403 wait_s=5 reset_epoch=1 reset_iso=2026-10-24T10:00:00Z bucket=core bucket_source=a TRAILING-JUNK-2',
+        '::notice title=GitHub API hold::label=x http=403 wait_s=5 reset_epoch=1 reset_iso=2026-10-24T10:00:00Z bucket=core bucket_source=a limit=1 remaining=0',
+      ].join('\n'),
+    });
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.result.stderr).toContain(
+      '::warning::Holding 5s for the GitHub rate limit reset.\n'
+    );
+    expect(run.result.stderr).toContain('limit=1 remaining=0');
+    expect(run.result.stderr).not.toContain('TRAILING-JUNK');
+  });
+
   it('keeps a hold with a missing reset fatal and silent', () => {
     const run = runGate({
       main: NEWER_SHA,

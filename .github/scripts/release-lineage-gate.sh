@@ -67,7 +67,9 @@ emit() {
 # notices (prefix filter; never the rest of gh's stderr).
 emit_hold_notices() {
   [ -s "$1" ] || return 0
-  grep -E '^::(notice title=GitHub API hold::|warning::Holding [0-9]+s for the GitHub rate limit reset)' "$1" >&2 || true
+  grep -E -e '^::warning::Holding [0-9]+s for the GitHub rate limit reset\.$' \
+    -e '^::notice title=GitHub API hold::label=[A-Za-z0-9 ._/@-]* http=[a-z0-9]+ wait_s=[0-9]+ reset_epoch=[0-9]+ reset_iso=[0-9A-Za-z:-]+ bucket=[A-Za-z_]+ bucket_source=[A-Za-z_.-]+( limit=[0-9]+)?( remaining=[0-9]+)?$' \
+    "$1" >&2 || true
 }
 
 successor_scan_limit="${SUCCESSOR_SCAN_LIMIT:-10}"
