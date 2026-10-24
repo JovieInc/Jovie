@@ -2528,6 +2528,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   mainWindow = win;
+  configureSidebarShortcut(win);
   const navigationContentsId = win.webContents.id;
   win.webContents.on('render-process-gone', () => {
     desktopNavigation.setReady(navigationContentsId, false);
@@ -2961,6 +2962,19 @@ function buildUpdateMenuItem(): MenuItemConstructorOptions {
   };
 }
 
+// Keep Cmd/Ctrl+B in the renderer so editors, dialogs, IME, and repeats
+// retain the existing shortcut policy. Pointer activation uses the menu IPC.
+function configureSidebarShortcut(win: BrowserWindow): void {
+  win.webContents.on('before-input-event', (_event, input) => {
+    win.webContents.setIgnoreMenuShortcuts(
+      input.key.toLowerCase() === 'b' &&
+        (input.meta || input.control) &&
+        !input.alt &&
+        !input.shift
+    );
+  });
+}
+
 function buildViewMenu(): MenuItemConstructorOptions[] {
   const viewMenu: MenuItemConstructorOptions[] = [];
 
@@ -2974,6 +2988,15 @@ function buildViewMenu(): MenuItemConstructorOptions[] {
   }
 
   viewMenu.push(
+    {
+      label: 'Toggle Sidebar',
+      accelerator: 'CommandOrControl+B',
+      click: () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        mainWindow.webContents.send('shell:toggle-sidebar');
+      },
+    },
+    { type: 'separator' },
     { role: 'resetZoom' },
     { role: 'zoomIn' },
     { role: 'zoomOut' },
