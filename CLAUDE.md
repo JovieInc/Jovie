@@ -101,3 +101,10 @@ coverage. Skip redundant reruns. Report changes, exact checks, failures, and lim
 local source, hosted CI, native merge queue, deployed build, or observed runtime
 from each other. Preserve the goal and user corrections across compaction; resume
 at the next unfinished step.
+
+## Mac app platform
+
+All Mac app work defaults to SwiftUI. Do not add new Electron, AppKit-only, or other non-SwiftUI Mac surfaces unless Tim explicitly overrides this for that task. The long-term goal is a fully SwiftUI Mac app.
+
+- New native Mac surfaces go in `apps/macos` (for example `apps/macos/MenuMonitor`).
+- `apps/desktop` (Electron) is maintenance-only: fixes and migrations out, not new surfaces.
