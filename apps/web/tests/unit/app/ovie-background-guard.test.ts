@@ -3,9 +3,6 @@ import { resolve } from 'node:path';
 import type { ImportGlobFunction } from 'vite';
 import { describe, expect, it } from 'vitest';
 
-// Track CSS in the affected module graph, then read it directly: Vitest stubs CSS.
-import '@/styles/system-b-app.css';
-
 // Only type the glob API. vite/client also adds wildcard asset declarations,
 // which would mask unresolved assets elsewhere in the test typecheck program.
 declare global {
@@ -18,6 +15,14 @@ const workspaceCss = readFileSync(
   resolve(__dirname, '../../../styles/system-b-app.css'),
   'utf8'
 );
+
+// Track the stylesheet without blanket CSS/asset module declarations. Vitest
+// stubs CSS, so assertions use the actual text read above rather than its import.
+const stylesheetOwner = import.meta.glob('/styles/system-b-app.css', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+});
 
 // Eager raw imports put every guarded component in the affected module graph.
 const canvasOwners = import.meta.glob<string>(
@@ -92,6 +97,7 @@ describe('Ovie Home and dashboard background contract', () => {
   });
 
   it('uses the canonical Noir Ion canvas throughout the Ovie shell', () => {
+    expect(Object.keys(stylesheetOwner)).toEqual(['/styles/system-b-app.css']);
     expect(Object.keys(canvasOwners).length).toBeGreaterThan(40);
     const start = workspaceCss.indexOf(selector);
     expect(
