@@ -26,6 +26,25 @@ jobs:
       contents: read
       pull-requests: read
     steps:
+      # The preflight runs before the source checkout and dependency install.
+      # Bootstrap only the existing, dependency-free client from the trusted base.
+      - &quota-client
+        name: Checkout the trusted quota client
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .source-validation-client
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            packages/api-client
+      - &quota-runtime
+        name: Setup the quota client runtime
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .source-validation-client/.nvmrc
       # A PR body/title edit re-runs this workflow at an unchanged head and
       # base. 262 of 303 same-head reruns on 2026-10-03 were body edits. When
       # the newest completed earlier run for this exact head and branch
@@ -48,10 +67,11 @@ jobs:
           # Quota preflight (rate_limit itself does not count against core).
           # Low quota never passes the gate: it waits for a near reset, or
           # skips the reuse lookup so every validation below runs in full.
-          if quota="$(gh api rate_limit --jq '"\(.resources.core.remaining) \(.resources.core.reset)"' 2>/dev/null)"; then
-            read -r remaining reset <<<"$quota"
-            wait_s=$(( reset - $(date +%s) ))
-            if [[ "$remaining" =~ ^[0-9]+$ && "$remaining" -lt 50 ]]; then
+          if quota="$(node .source-validation-client/packages/api-client/cli.ts gh --priority default -- api rate_limit --jq '"\(.resources.core.remaining) \(.resources.core.reset)"' 2>/dev/null)" &&
+            read -r remaining reset <<<"$quota" &&
+            [[ "$remaining" =~ ^[0-9]+$ && "$reset" =~ ^[0-9]+$ ]]; then
+            wait_s=$(( 10#$reset - $(date +%s) ))
+            if (( 10#$remaining < 50 )); then
               if (( wait_s > 0 && wait_s <= 900 )); then
                 echo "::warning::GitHub rate limited (core remaining=$remaining). Waiting ${wait_s}s for reset before the proof-reuse lookup."
                 echo "GitHub rate limited: waited ${wait_s}s for core quota reset." >> "$GITHUB_STEP_SUMMARY"
@@ -341,6 +361,8 @@ jobs:
       actions: read
       contents: read
     steps:
+      - *quota-client
+      - *quota-runtime
       - *proof-reuse
       # TruffleHog reads the object store directly and cannot use a partial
       # clone (#13994), so this job keeps the full-blob history fetch.
@@ -392,6 +414,8 @@ jobs:
       actions: read
       contents: read
     steps:
+      - *quota-client
+      - *quota-runtime
       - *proof-reuse
       - &reused-checkout
         if: steps.reuse.outputs.reuse != 'true'
@@ -435,6 +459,8 @@ jobs:
       actions: read
       contents: read
     steps:
+      - *quota-client
+      - *quota-runtime
       - *proof-reuse
       - *reused-checkout
       - *reused-setup
@@ -548,6 +574,8 @@ jobs:
       matrix:
         shard: ['1/4', '2/4', '3/4', '4/4']
     steps:
+      - *quota-client
+      - *quota-runtime
       - *proof-reuse
       - *reused-checkout
       - name: Select unit-affecting diff
@@ -621,6 +649,8 @@ jobs:
       actions: read
       contents: read
     steps:
+      - *quota-client
+      - *quota-runtime
       - *proof-reuse
       - *reused-checkout
       - name: Select UI accessibility diff
