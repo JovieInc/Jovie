@@ -70,10 +70,8 @@ Company domain canon: [index](canon/README.md). API/cron/webhook maps:
 
 ## Account limits
 
-Early-access opt-in/out changes are capped at 5 per authenticated account per
-day. The single source of truth is
-`apps/web/lib/early-access/constants.ts` (`EARLY_ACCESS_TOGGLE_LIMIT_PER_DAY`),
-and the API enforces it server-side with the account key.
+Early-access opt-in/out is capped at 5 changes/day per authenticated account.
+Source: `apps/web/lib/early-access/constants.ts` (`EARLY_ACCESS_TOGGLE_LIMIT_PER_DAY`); the API enforces it by account.
 
 ## Tools and workflow
 
@@ -81,14 +79,12 @@ Use repo-root `pnpm` / `pnpm turbo`; pins in `.nvmrc` and `package.json` are
 authoritative. Secret-bound commands use Doppler wrappers. Never bypass hooks,
 weaken CI gates, or use `--no-verify`.
 
-Select a skill by intent and capabilities, not a keyword. Load its entry and
-needed references. Edit `.tmpl` sources and regenerate.
+Select skills by intent; read their entries and needed references. Edit `.tmpl`
+sources and regenerate.
 Keep provider tuning out of shared policy.
 CLAUDE.md stays a router. Use Playwright only for repo web QA.
-Message other agents: `jovie mesh send/read`.
-Batch independent reads; serialize dependent edits and state changes. Delegate
-only when authorized and useful; bound scope and require evidence before
-integrating.
+Message agents with `jovie mesh send/read`. Batch independent reads; serialize
+state changes. Delegate only when authorized; bound scope and require evidence.
 
 Before publication follow `docs/PR_FLOW.md`: coherent draft → rolling CI → review
 and required checks. Auth/payment edits use CI + Migration Guard, not an extra
