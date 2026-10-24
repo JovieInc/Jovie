@@ -2261,6 +2261,88 @@ class ClaimScanCacheTest(unittest.TestCase):
                 patch.object(lane, 'maintenance_json', return_value={'at': now, 'value': [{'number': 99}]}):
             self.assertIsNone(lane.capture_repair_inventory('codex')['summary']['sourceAt'])
 
+    def _inventory_cache(self, size=None, **overrides):
+        """Write the real shared inventory file; pad a PR body so the file is exactly `size` bytes."""
+        row = repair_inventory_pr()
+        path = lane.SHARED_CACHE_DIR / 'open-prs-labels-v2.json'
+        doc = {'at': self.clock['now'], 'value': [row], **overrides}
+        if size is not None:
+            row['body'] = ''
+            base = len(json.dumps(doc))
+            row['body'] = 'x' * (size - base)
+            doc['value'] = [row]
+        path.write_text(json.dumps(doc))
+        if size is not None:
+            self.assertEqual(path.stat().st_size, size)
+        return path, copy.deepcopy(doc['value'])
+
+    def _capture_from_cache(self, rows, name='codex'):
+        lane._SUMMARY.update(at=0, prs=[], readable=False)
+        lane._SUMMARY.pop('sourceAt', None)
+        with patch.object(lane.time, 'time', side_effect=lambda: self.clock['now']), \
+                patch.object(lane, 'shared', return_value=copy.deepcopy(rows)), \
+                contextlib.redirect_stderr(io.StringIO()):
+            receipt = lane.capture_repair_inventory(name)
+            return receipt, lane.repair_inventory_valid(receipt, name)
+
+    def test_inventory_over_one_mib_is_qualified_with_a_finite_source_stamp(self):
+        _, rows = self._inventory_cache(size=1_615_098)
+        receipt, valid = self._capture_from_cache(rows)
+        self.assertEqual(receipt['summary']['sourceAt'], self.clock['now'])
+        self.assertNotIn('sourceAtReason', receipt['summary'])
+        self.assertTrue(valid)
+
+    def test_inventory_limit_boundary_passes_at_the_limit_and_names_oversize_above_it(self):
+        limit = lane.REPAIR_INVENTORY_MAX_BYTES
+        _, rows = self._inventory_cache(size=limit)
+        receipt, valid = self._capture_from_cache(rows)
+        self.assertTrue(valid, 'a file exactly at the limit is accepted')
+        _, rows = self._inventory_cache(size=limit + 1)
+        receipt, valid = self._capture_from_cache(rows)
+        self.assertFalse(valid)
+        self.assertIsNone(receipt['summary']['sourceAt'])
+        self.assertEqual(receipt['summary']['sourceAtReason'], 'inventory-oversize')
+        self.assertEqual(receipt['summary']['sourceAtBytes'], limit + 1)
+
+    def test_inventory_that_is_stale_malformed_missing_or_mismatched_still_fails_closed(self):
+        path, rows = self._inventory_cache(size=2 * 1024 * 1024, at=self.clock['now'] - lane.CLAIM_SCAN_TTL_S)
+        receipt, valid = self._capture_from_cache(rows)
+        self.assertFalse(valid, 'stale at is refused even for a large file')
+        self.assertNotIn('sourceAtReason', receipt['summary'])
+        path.write_text('{not json' + ' ' * (2 * 1024 * 1024))
+        receipt, valid = self._capture_from_cache(rows)
+        self.assertFalse(valid)
+        self.assertEqual(receipt['summary']['sourceAtReason'], 'inventory-unreadable')
+        path.unlink()
+        receipt, valid = self._capture_from_cache(rows)
+        self.assertFalse(valid)
+        self.assertEqual(receipt['summary']['sourceAtReason'], 'inventory-unreadable')
+        self._inventory_cache(size=2 * 1024 * 1024)
+        receipt, valid = self._capture_from_cache([{**rows[0], 'headRefOid': 'b' * 40}])
+        self.assertFalse(valid)
+        self.assertEqual(receipt['summary']['sourceAtReason'], 'inventory-mismatch')
+
+    def test_inventory_symlink_or_special_file_is_refused_regardless_of_size(self):
+        path, rows = self._inventory_cache(size=2 * 1024 * 1024)
+        target = lane.SHARED_CACHE_DIR / 'real.json'
+        path.rename(target)
+        path.symlink_to(target)
+        receipt, valid = self._capture_from_cache(rows)
+        self.assertFalse(valid)
+        self.assertIsNone(receipt['summary']['sourceAt'])
+        self.assertNotEqual(receipt['summary'].get('sourceAtReason'), 'inventory-oversize')
+        path.unlink(); target.unlink()
+        os.mkfifo(path)
+        receipt, valid = self._capture_from_cache(rows)
+        self.assertFalse(valid)
+        self.assertNotEqual(receipt['summary'].get('sourceAtReason'), 'inventory-oversize')
+
+    def test_other_maintenance_json_callers_keep_the_one_mib_default(self):
+        path = lane.SHARED_CACHE_DIR / 'other.json'
+        path.write_text(json.dumps({'pad': 'x' * (1024 * 1024)}))
+        with self.assertRaisesRegex(ValueError, 'maintenance-state-not-bounded-regular-file'):
+            lane.maintenance_json(path)
+
     def test_repair_receipt_refuses_unknown_malformed_stale_and_cross_scope_pairs(self):
         now = self.clock['now']
         lane._SUMMARY.update(at=now, sourceAt=now, prs=[], readable=True)
@@ -3605,6 +3687,36 @@ class WorkerTest(unittest.TestCase):
             self.assertEqual(lane.worker(self.host, "devin"), 0)
         repair.assert_called_once(); new_work.assert_not_called()
 
+    def test_oversize_inventory_idles_with_a_distinct_reason_and_stderr_line(self):
+        good = lane.capture_repair_inventory('devin')
+        bad = {**good, 'summary': {**good['summary'], 'sourceAt': None,
+                                   'sourceAtReason': 'inventory-oversize', 'sourceAtBytes': 17 * 1024 * 1024}}
+        err = io.StringIO()
+        with patch.object(lane, 'capture_repair_inventory', return_value=bad), \
+                patch.object(lane, 'run_issue') as work, contextlib.redirect_stderr(err):
+            self.assertEqual(lane.worker(self.host, 'devin'), 0)
+        work.assert_not_called()
+        self.assertEqual(json.loads((self.host.state/'worker-idle.json').read_text())['devin']['reason'],
+                         'repair-inventory-oversize')
+        self.assertIn(str(17 * 1024 * 1024), err.getvalue())
+
+    def test_large_valid_inventory_cache_does_not_hold_the_worker(self):
+        rows = [{**repair_inventory_pr(), 'body': 'x' * (2 * 1024 * 1024)}]
+        (lane.SHARED_CACHE_DIR).mkdir(parents=True, exist_ok=True)
+        (lane.SHARED_CACHE_DIR/'open-prs-labels-v2.json').write_text(json.dumps({'at': time.time(), 'value': rows}))
+        lane._SUMMARY.update(at=0.0, prs=[], readable=False)
+        with patch.dict(os.environ, {'LANES_EXECUTION_BACKEND': 'mesh'}), \
+                patch.object(lane, 'shared', return_value=copy.deepcopy(rows)), \
+                patch.object(lane, 'record_idle_exit') as idle, patch.object(lane, 'run_issue'), \
+                contextlib.redirect_stderr(io.StringIO()):
+            receipt = lane.capture_repair_inventory('devin')
+            self.assertTrue(lane.repair_inventory_valid(receipt, 'devin'))
+            try: lane.worker(self.host, 'devin')
+            except Exception: pass  # downstream work is out of scope; only the hold matters
+        reasons = [c.args[2] for c in idle.call_args_list]
+        self.assertNotIn('repair-inventory-unknown-or-stale', reasons)
+        self.assertNotIn('repair-inventory-oversize', reasons)
+
     def test_initial_invalid_repair_receipt_records_idle_only_after_global_release(self):
         real_idle = lane.record_idle_exit
         def idle(host, name, reason):
@@ -4644,35 +4756,54 @@ class PublicationRevocationTest(unittest.TestCase):
             self.assertEqual(revoked["reason"], "test-stop")
             self.assertEqual(revoked["runId"], "run-1")
 
-    def test_sigterm_is_a_stop_that_revokes_before_kill(self):
+    def _assert_sigterm_revokes_before_kill(self, child):
         import signal
         with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
             root = Path(tmp)
             host = lane.Host(state=root)
             pidfile = root / "pid"
-            # Startup may exceed the old 0.5s timer on a loaded installer host.
-            command = [sys.executable, "-c",
-                       "import os,time,pathlib; time.sleep(0.75); pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
+
+            def ready_pid():
+                # Readiness handshake: a complete pid line, not mere file existence.
+                # A created-but-unwritten file made on_kill read "" (merge group 40121302814).
+                try:
+                    text = pidfile.read_text()
+                except FileNotFoundError:
+                    return None
+                return int(text) if text.endswith("\n") and text.strip().isdigit() else None
 
             def signal_when_ready():
-                if pidfile.exists():
+                if ready_pid() is not None:
                     os.kill(os.getpid(), signal.SIGTERM)
 
             observed = []
 
             def on_kill(error):
                 # Preserve receipt-before-kill proof for a real SIGTERM too.
-                os.kill(int(pidfile.read_text()), 0)
+                os.kill(ready_pid(), 0)
                 observed.append(type(error).__name__)
                 lane.revoke_publication(host, branch="devin/jov-9-1", reason="run-stopped")
 
             with self.assertRaises(lane.RunStopped):
-                lane.run_agent(command, root, log, timeout=30,
+                lane.run_agent([sys.executable, "-c", child], root, log, timeout=30,
                                guard=signal_when_ready, guard_interval=0.05, on_kill=on_kill)
             self.assertEqual(observed, ["RunStopped"])
             self.assertIsNotNone(lane.publication_revocation(host, "devin/jov-9-1"))
             with self.assertRaises(ProcessLookupError):
-                os.kill(int(pidfile.read_text()), 0)
+                os.kill(ready_pid(), 0)
+
+    def test_sigterm_is_a_stop_that_revokes_before_kill(self):
+        # Startup may exceed the old 0.5s timer on a loaded installer host.
+        self._assert_sigterm_revokes_before_kill(
+            "import os,time,pathlib; time.sleep(0.75); "
+            "pathlib.Path('pid').write_text(f'{os.getpid()}\\n'); time.sleep(30)")
+
+    def test_sigterm_waits_for_a_complete_pid_not_a_created_file(self):
+        # Regression: the file exists empty, then holds a partial pid, before the line completes.
+        self._assert_sigterm_revokes_before_kill(
+            "import os,time,pathlib; p=pathlib.Path('pid'); time.sleep(0.2); p.touch(); "
+            "time.sleep(0.3); p.write_text(str(os.getpid())); time.sleep(0.3); "
+            "p.write_text(f'{os.getpid()}\\n'); time.sleep(30)")
 
     def test_unreadable_ledger_fails_closed_as_revoked(self):
         with tempfile.TemporaryDirectory() as tmp:
