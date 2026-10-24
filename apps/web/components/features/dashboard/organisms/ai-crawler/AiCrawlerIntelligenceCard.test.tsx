@@ -62,7 +62,7 @@ describe('AiCrawlerIntelligenceCard', () => {
     render(<AiCrawlerIntelligenceCard onOpenDetail={() => undefined} />);
 
     const trigger = screen.getByRole('button', {
-      name: /^View AI Crawler Reads/,
+      name: /^View AI crawler read details/,
     });
     expect(trigger).toHaveAccessibleName(/420 reads · 2 services tracked/);
     expect(trigger).toHaveAccessibleName(/Active$/);

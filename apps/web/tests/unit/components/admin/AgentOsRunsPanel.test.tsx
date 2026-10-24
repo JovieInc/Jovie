@@ -62,7 +62,9 @@ describe('AgentOsRunsPanel', () => {
         screen.getByTestId(
           'agent-os-board-card-agentos-run-post-land-certification'
         )
-      ).getByRole('button', { name: /^Feature-flag certification / })
+      ).getByRole('button', {
+        name: /^Select run:.*Feature-flag certification /,
+      })
     );
 
     expect(screen.getByTestId('agent-os-artifact-drawer')).toHaveTextContent(

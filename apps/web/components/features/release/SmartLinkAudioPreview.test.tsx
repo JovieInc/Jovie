@@ -16,7 +16,9 @@ describe('SmartLinkAudioPreview', () => {
     expect(
       screen.getByRole('button', { name: 'Play preview' })
     ).toBeInTheDocument();
-    expect(screen.getByText('0:00')).toHaveClass('text-secondary-token');
+    expect(screen.getByText('0:00').parentElement).toHaveClass(
+      'text-secondary-token'
+    );
   });
 
   it('labels fallback sources with the secondary text token for contrast', () => {

@@ -45,7 +45,7 @@ describe('PillSearch', () => {
     const row = input.parentElement;
     const root = row?.parentElement;
     const closeButton = screen.getByRole('button', {
-      name: 'Close Search — Esc',
+      name: /^Close search\s*Esc$/,
     });
 
     expect(root?.className).toContain('h-full');

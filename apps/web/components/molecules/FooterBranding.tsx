@@ -103,6 +103,7 @@ export function FooterBranding({
         className={logoLinkClass}
       >
         {renderLogoMark(mark, size, isLinear, logoClass)}
+        {mark === 'text' && <span className='sr-only'> Home</span>}
       </Link>
 
       {showCTA && (

@@ -28,10 +28,23 @@ import { capitalizeFirst } from '@/lib/utils/string-utils';
 // render a stable em-dash placeholder instead of fabricated values.
 // ---------------------------------------------------------------------------
 
+/**
+ * Data labels that are not plain title-case words (JOV-8963): 'ep' is the
+ * industry abbreviation EP, never title-cased to "Ep".
+ */
+const RELEASE_TYPE_LABEL_OVERRIDES: Partial<
+  Record<LibraryReleaseAsset['releaseType'], string>
+> = {
+  ep: 'EP',
+};
+
 export function formatReleaseType(
   type: LibraryReleaseAsset['releaseType']
 ): string {
-  return type.split('_').map(capitalizeFirst).join(' ');
+  return (
+    RELEASE_TYPE_LABEL_OVERRIDES[type] ??
+    type.split('_').map(capitalizeFirst).join(' ')
+  );
 }
 
 export function formatLibraryItemType(asset: LibraryReleaseAsset): string {
@@ -338,6 +351,24 @@ export const LibraryCatalogWaveformCell = memo(
   }
 );
 
+export const LibraryCatalogArtistCell = memo(function LibraryCatalogArtistCell({
+  asset,
+}: {
+  readonly asset: LibraryReleaseAsset;
+}) {
+  return (
+    // Full artist value on one line (JOV-8963): the column sizes to its
+    // content instead of truncating the name, so every row keeps the same
+    // single-line text-cell treatment as Length.
+    <span
+      title={asset.artist}
+      className='system-b-library-meta-text block whitespace-nowrap text-tertiary-token'
+    >
+      {asset.artist}
+    </span>
+  );
+});
+
 const libraryCatalogColumnHelper = createColumnHelper<LibraryReleaseAsset>();
 
 /**
@@ -392,16 +423,9 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
   libraryCatalogColumnHelper.accessor('artist', {
     id: 'artist',
     header: 'Artist',
-    cell: ({ row }) => (
-      <span
-        title={row.original.artist}
-        className='system-b-library-meta-text system-b-library-fluid-cell block truncate text-tertiary-token'
-      >
-        {row.original.artist}
-      </span>
-    ),
-    size: 160,
-    minSize: 120,
+    cell: ({ row }) => <LibraryCatalogArtistCell asset={row.original} />,
+    size: 220,
+    minSize: 160,
     enableSorting: false,
     meta: {
       className: 'px-2',

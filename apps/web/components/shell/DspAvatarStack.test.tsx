@@ -68,7 +68,9 @@ describe('DspAvatarStack', () => {
   it('exposes the popover to keyboard focus without changing layout', () => {
     render(<DspAvatarStack dsps={ITEMS} />);
 
-    const trigger = screen.getByLabelText(/^View DSP Distribution Details:/);
+    const trigger = screen.getByRole('button', {
+      name: /^View DSP distribution details/,
+    });
     const popover = screen.getByRole('tooltip');
 
     expect(trigger.tagName).toBe('BUTTON');

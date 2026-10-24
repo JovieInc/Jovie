@@ -18,6 +18,10 @@ function decorate(): Decorate {
   return preview.decorators![0] as unknown as Decorate;
 }
 
+function DecoratedStory({ context }: { readonly context: StoryInput }) {
+  return decorate()(() => <div>story</div>, context);
+}
+
 function beforeEachHook(): (context: StoryInput) => void {
   return preview.beforeEach as unknown as (context: StoryInput) => void;
 }
@@ -95,10 +99,12 @@ describe('preview theme reset', () => {
   describe('decorator forcedTheme', () => {
     it('renders a parameters light override as the light class', () => {
       render(
-        decorate()(() => <div>story</div>, {
-          parameters: { themes: { themeOverride: 'light' } },
-          globals: {},
-        })
+        <DecoratedStory
+          context={{
+            parameters: { themes: { themeOverride: 'light' } },
+            globals: {},
+          }}
+        />
       );
       expect(screen.getByText('story')).toBeInTheDocument();
       expect(document.documentElement.className).toMatch(/\blight\b/);
@@ -107,19 +113,19 @@ describe('preview theme reset', () => {
 
     it('renders a themes global light request as the light class', () => {
       render(
-        decorate()(() => <div>story</div>, {
-          parameters: {},
-          globals: { themes: { value: 'light' } },
-        })
+        <DecoratedStory
+          context={{
+            parameters: {},
+            globals: { themes: { value: 'light' } },
+          }}
+        />
       );
       expect(document.documentElement.className).toMatch(/\blight\b/);
       expect(document.documentElement.className).not.toMatch(/\bdark\b/);
     });
 
     it('renders an unrequested story with the default theme', () => {
-      render(
-        decorate()(() => <div>story</div>, { parameters: {}, globals: {} })
-      );
+      render(<DecoratedStory context={{ parameters: {}, globals: {} }} />);
       expect(document.documentElement.className).toMatch(/\bdark\b/);
     });
   });

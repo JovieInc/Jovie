@@ -5,23 +5,23 @@
   },
   {
     "heading": "## Surface Classification",
-    "sha256": "17e022f6c74f087615089efeb71b721bf1bb836e4b2d1a84f89dd87c2055c756"
+    "sha256": "a92a85dd33bf210ae0dd2a9db42a6b277bad904767da704adb9948e5673a99ac"
   },
   {
     "heading": "## Typography",
-    "sha256": "3017a47fff5776cfebbd100636858ff9fac8d6d3149d57533a857f8d41c72b24"
+    "sha256": "55be6a1bb1990b6aaa71d7eb3878655f0c84ddd29f43dab4b0b18a9ad4605927"
   },
   {
     "heading": "## Copywriting",
-    "sha256": "bc4b6db62fda887197352a68bede3f53ba89a8ff5787c87435600920778a9928"
+    "sha256": "524172e582f50bf2a94b5fa2c483a3410c271526e8b46df80c42a65f69968fe3"
   },
   {
     "heading": "## Subtraction Principle",
-    "sha256": "b5f1771a61f7690af972d9832a98fd0fc35bb972bb2ead7d99fea653e48b6390"
+    "sha256": "b978a89bb985390799420c8145599ea07ec04d00921696041a84d8c850448d37"
   },
   {
     "heading": "## Use Tokens, Not Raw Colors",
-    "sha256": "c15e41abab6fe05ebe3f7617aef0ef14110e20100a08bb6b078cb567d8c3c52c"
+    "sha256": "064268ed4512217381c3e59b95a687fe43a83024cfea8eca4f2686e07fd5169a"
   },
   {
     "heading": "## Color System",
@@ -29,27 +29,27 @@
   },
   {
     "heading": "## Spacing",
-    "sha256": "d02fc2dad28b89cc8cdb67885c341ccc68ce28ef0073ee8c1c1a59fd6ec9d690"
+    "sha256": "b5c5d01230514b6ee31a9b7302be1b00d6619a174b6bbcb3f474adaca3b7eb3d"
   },
   {
     "heading": "## DS_FOUNDATION_V1 canonical decisions",
-    "sha256": "17a3cb65a827467d23aafc81b154022788c1e762eb98591af83e7004c57ce84a"
+    "sha256": "aa513d0f67a8a981495fa8d63d342d17f287b381f6a3c9c2b4514e25abaa2309"
   },
   {
     "heading": "## Borders & Radius",
-    "sha256": "4f814092c949a23ca9e5c4d7a99042bdd4dbe537a5bab729330cab91825fe5fc"
+    "sha256": "4e6b7dcfac163d18867190fd5577f389ec46a174518ec52997688b61b1d157ff"
   },
   {
     "heading": "## Shadows",
-    "sha256": "a35ee3f2824f3e74abada8ceca63cc026e158a7342656847a19c04b058770eab"
+    "sha256": "d27ea2b39408c7ccc877df042b4dd22e89dd342531a60c50e965c3e2dfdbbe6a"
   },
   {
     "heading": "## Motion",
-    "sha256": "1a00660de1e58d0c5331245c46fa3c894e60406b226296bd6b6ca94bc29aef5f"
+    "sha256": "7ba61ab993b4f9e5ea010148090f85f8e90e51a395e3fb248e57751508df8fdf"
   },
   {
     "heading": "## App IA & Page Scaffold",
-    "sha256": "3f4917fa28e4c03a78ce89c171ae16ddf4004970b856b1aab9afff00eeaa69f7"
+    "sha256": "2b381186120b6c09c7c0edf6f0699d81c3caca72371a784b5402ce0fbf5a9dbd"
   },
   {
     "heading": "## Component Patterns",
@@ -57,7 +57,7 @@
   },
   {
     "heading": "## Full-Screen Status Screens",
-    "sha256": "9f7d836b1d0463d53ae5a8c7036aeb2b7f1a4dec5f3ed6e38cf6417648c5d452"
+    "sha256": "5a7ffc0b78175154767f01868e2976c43aac47469977d5030afa5094df10aa8c"
   },
   {
     "heading": "## Layout Shift Prevention (Visual Stability)",
@@ -65,18 +65,18 @@
   },
   {
     "heading": "## Text Casing",
-    "sha256": "1f4602a991c9b34afbe54f9a2f4475c9b5d3febd330d8971284b9f5f8e7fb0d4"
+    "sha256": "72ca9843efd3700de2cf8f05d9ea0e6218eed63f2656e60bb3c92eac57df9886"
   },
   {
     "heading": "## Canonical Surface Split",
-    "sha256": "ec58c1877747673868cbe63598a745c8df9785cced288bef4bfc8c1c87089b6c"
+    "sha256": "46649ef01644d150514adda1de6b78e79276ef0aa91f8fcb3b49682c6d0742a7"
   },
   {
     "heading": "## Source-of-Truth File Map",
-    "sha256": "f9ffaf9d908bdb8a980303f3d0f643296eea4431635614ffae2a7f47488e21d2"
+    "sha256": "e9f39a9a6fadb9110ab831ecbd69ca221f52a40def3483a03e497c4b827a76b8"
   },
   {
     "heading": "## Decisions Log",
-    "sha256": "f526047a5f751e257fdda67ddddcaea25f777f1b9e5f232d6a2ef2feebc8be90"
+    "sha256": "d2543abcbfc7530528dde23e9382d2401dac2b8a5462ebc731483c0eef0760d1"
   }
 ]

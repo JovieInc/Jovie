@@ -914,6 +914,43 @@ describe('UserButton billing actions', () => {
     expect(openModal).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    {
+      label: 'icon',
+      showUserInfo: false,
+      trigger: undefined,
+      accessibleName: 'Adele Adkins Open user menu',
+    },
+    {
+      label: 'custom',
+      showUserInfo: true,
+      trigger: <button type='button'>Open user menu</button>,
+      accessibleName: 'Open user menu',
+    },
+  ])('preserves the default width for the $label trigger', async props => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: 'free', hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+    const user = userEvent.setup();
+    render(
+      <UserButton showUserInfo={props.showUserInfo} trigger={props.trigger} />
+    );
+
+    const trigger = screen.getByRole('button', { name: props.accessibleName });
+    await user.click(trigger);
+    const menu = screen.getByRole('menu');
+    expect(menu).toHaveClass('w-80', 'max-w-[calc(100vw-1rem)]');
+    expect(menu).not.toHaveClass('w-(--radix-dropdown-menu-trigger-width)');
+    expect(menu).not.toHaveClass('min-w-60');
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    );
+    expect(trigger).toHaveFocus();
+  });
+
   it('gives identity and help enough width while preserving menu focus order', async () => {
     const longDisplayName =
       'Adele Adkins and the Very Long International Touring Ensemble';
@@ -946,9 +983,11 @@ describe('UserButton billing actions', () => {
     );
     expect(identityRow).not.toBeNull();
     expect(screen.getByRole('menu')).toHaveClass(
-      'w-80',
+      'w-(--radix-dropdown-menu-trigger-width)',
+      'min-w-60',
       'max-w-[calc(100vw-1rem)]'
     );
+    expect(screen.getByRole('menu')).not.toHaveClass('w-80');
     expect(identityRow).toHaveClass(
       'grid',
       'grid-cols-[minmax(0,1fr)_auto]',
@@ -976,8 +1015,7 @@ describe('UserButton billing actions', () => {
     expect(proBadge).toHaveAttribute('data-variant', 'secondary');
     expect(proBadge).toHaveAttribute('data-size', 'sm');
 
-    // The responsive max width protects the row contract on 390px screens,
-    // while the wider default keeps ordinary names from clipping.
+    // Keep the viewport bound when matching the expanded sidebar trigger.
     expect(screen.getByRole('menu')).toHaveClass('max-w-[calc(100vw-1rem)]');
 
     const helpItem = within(identityRow as HTMLElement).getByRole('menuitem', {

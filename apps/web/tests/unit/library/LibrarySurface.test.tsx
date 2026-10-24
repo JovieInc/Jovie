@@ -14,6 +14,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   LibrarySurface,
+  PRESETS,
   resolveLibraryReviewStep,
   workPrimaryActionLabel,
 } from '@/app/app/(shell)/library/LibrarySurface';
@@ -1832,7 +1833,7 @@ describe('LibrarySurface', () => {
       screen.getByTestId('library-catalog-waveform-release-1')
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText(/^View DSP Distribution Details:/)
+      screen.getByRole('button', { name: /^View DSP distribution details/ })
     ).toBeInTheDocument();
 
     // Metrics the production schema does not carry render a stable em-dash
@@ -1842,6 +1843,28 @@ describe('LibrarySurface', () => {
         screen.getByTestId(`library-catalog-${metric}-release-1`)
       ).toHaveTextContent('—');
     }
+  });
+
+  it('renders full artist values and the EP type label in table rows (JOV-8963)', () => {
+    const longBilling =
+      'A Really Long Collaborative Artist Billing That Must Stay Visible';
+    renderLibrary([
+      buildAsset({
+        artist: longBilling,
+        releaseType: 'ep',
+      }),
+    ]);
+    fireEvent.click(screen.getByRole('radio', { name: 'Table View' }));
+
+    const row = screen.getByTestId('library-catalog-row-release-1');
+    // The artist column shows the whole value on one line instead of
+    // truncating it.
+    const artistCell = within(row).getByTitle(longBilling);
+    expect(artistCell.textContent).toBe(longBilling);
+    expect(artistCell.className).toContain('whitespace-nowrap');
+    expect(artistCell.className).not.toContain('truncate');
+    // EP is the data label, never title-cased to "Ep".
+    expect(within(row).getByTitle('EP').textContent).toBe('EP');
   });
 
   it('keeps asset-type tabs and smart filters working in table mode (JOV-4846)', () => {
@@ -2101,7 +2124,7 @@ describe('LibrarySurface', () => {
       /^Album · 2026$/u
     );
     expect(screen.getByTestId('library-card-meta-release-2')).toHaveTextContent(
-      /^Ep$/u
+      /^EP$/u
     );
   });
 
@@ -2652,48 +2675,121 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
   });
 
-  it('restores URL presets and persisted smart filters without changing their contracts', async () => {
-    navigationMock.searchParams = new URLSearchParams('view=audio');
-    window.localStorage.setItem(
-      LIBRARY_SAVED_VIEW_STORAGE_KEY,
-      'needs-attention'
-    );
+  it.each(PRESETS)(
+    'keeps the toolbar and table mode when applying $label',
+    async ({ id, label }) => {
+      const user = userEvent.setup();
+      navigationMock.searchParams = new URLSearchParams(
+        'view=audio&mode=table&stage=all'
+      );
+      navigationMock.replace.mockImplementationOnce((url: string) => {
+        navigationMock.searchParams = new URL(
+          url,
+          'https://jov.ie'
+        ).searchParams;
+      });
+      renderLibrary([buildAsset()]);
+      const surface = screen.getByTestId('library-surface');
+      const slider = screen.getByTestId('library-view-mode-slider');
 
-    const user = userEvent.setup();
-    renderLibrary([
-      buildAsset(),
-      buildAsset({
-        id: 'release-2',
-        title: 'Missing Audio',
-        previewUrl: null,
-        assetKinds: ['artwork', 'providers'],
-      }),
-    ]);
+      fireEvent.click(screen.getByRole('button', { name: /^Show filters/i }));
+      fireEvent.click(
+        within(screen.getByTestId('library-view-filter-chips')).getByRole(
+          'button',
+          {
+            name: new RegExp(`^${label}\\s*\\d+$`, 'u'),
+          }
+        )
+      );
 
-    await user.click(screen.getByRole('button', { name: /^Show filters/i }));
-    const kindFilters = screen.getByTestId('library-view-filter-chips');
-    expect(
-      within(kindFilters).getByRole('button', { name: /Audio/u })
-    ).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
-    expect(screen.queryByText('Missing Audio')).not.toBeInTheDocument();
+      const expected = new URLSearchParams('mode=table&stage=all');
+      if (id !== 'all') expected.set('preset', id);
+      expect(navigationMock.replace).toHaveBeenLastCalledWith(
+        `${APP_ROUTES.LIBRARY}?${expected}`,
+        { scroll: false }
+      );
+      expect(screen.getByTestId('library-surface')).toBe(surface);
+      expect(screen.getByTestId('library-view-mode-slider')).toBe(slider);
+      expect(window.localStorage.getItem(LIBRARY_VIEW_MODE_STORAGE_KEY)).toBe(
+        'table'
+      );
+      await user.keyboard('{Escape}');
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId('library-filter-sheet')
+        ).not.toBeInTheDocument();
+      });
+      expect(
+        screen.getByRole('button', {
+          name: id === 'all' ? 'Show filters' : 'Show filters (1)',
+        })
+      ).toBeInTheDocument();
+    }
+  );
 
-    await user.click(
-      within(kindFilters).getByRole('button', { name: /^All/u })
-    );
-    expect(navigationMock.replace).toHaveBeenCalledWith(APP_ROUTES.LIBRARY, {
-      scroll: false,
-    });
-    expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
-    expect(screen.getByText('Missing Audio')).toBeInTheDocument();
-
-    expect(
-      within(screen.getByTestId('library-saved-filter-views')).getByRole(
+  it('applies the Releases suggestion without navigating to the releases matrix', () => {
+    renderLibrary([buildAsset()]);
+    fireEvent.click(
+      within(screen.getByTestId('library-filter-suggestions')).getByRole(
         'button',
-        { name: /Needs Attention/u }
+        { name: /Type.*Releases/u }
       )
-    ).toHaveAttribute('aria-pressed', 'true');
+    );
+    expect(navigationMock.replace).toHaveBeenLastCalledWith(
+      `${APP_ROUTES.LIBRARY}?preset=releases`,
+      { scroll: false }
+    );
+    expect(screen.getByTestId('library-surface')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Show filters (1)' })
+    ).toBeInTheDocument();
   });
+
+  it.each(['view=audio', 'preset=audio', 'view=merch&preset=audio'])(
+    'restores URL presets (%s) and persisted smart filters without changing their contracts',
+    async query => {
+      navigationMock.searchParams = new URLSearchParams(query);
+      window.localStorage.setItem(
+        LIBRARY_SAVED_VIEW_STORAGE_KEY,
+        'needs-attention'
+      );
+
+      const user = userEvent.setup();
+      renderLibrary([
+        buildAsset(),
+        buildAsset({
+          id: 'release-2',
+          title: 'Missing Audio',
+          previewUrl: null,
+          assetKinds: ['artwork', 'providers'],
+        }),
+      ]);
+
+      await user.click(screen.getByRole('button', { name: /^Show filters/i }));
+      const kindFilters = screen.getByTestId('library-view-filter-chips');
+      expect(
+        within(kindFilters).getByRole('button', { name: /Audio/u })
+      ).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
+      expect(screen.queryByText('Missing Audio')).not.toBeInTheDocument();
+
+      await user.click(
+        within(kindFilters).getByRole('button', { name: /^All/u })
+      );
+      expect(navigationMock.replace).toHaveBeenCalledWith(APP_ROUTES.LIBRARY, {
+        scroll: false,
+      });
+      expect(screen.queryByText('Take Me Over')).not.toBeInTheDocument();
+      expect(screen.getByText('Missing Audio')).toBeInTheDocument();
+
+      expect(
+        within(screen.getByTestId('library-saved-filter-views')).getByRole(
+          'button',
+          { name: /Needs Attention/u }
+        )
+      ).toHaveAttribute('aria-pressed', 'true');
+    }
+  );
 
   it('uses a mobile overlay without moving content, losing scroll, or hiding the asset drawer', async () => {
     const user = userEvent.setup();

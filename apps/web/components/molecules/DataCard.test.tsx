@@ -19,9 +19,9 @@ describe('DataCard', () => {
   });
 
   it.each([
-    ['success', 'text-success-text'],
-    ['warning', 'text-warning-text'],
-    ['error', 'text-error-text'],
+    ['success', 'text-success'],
+    ['warning', 'text-warning'],
+    ['error', 'text-primary-token'],
   ] as const)(
     'renders the %s badge with the AA text token',
     (variant, token) => {

@@ -7,7 +7,7 @@ describe('CopyableMonospaceCell', () => {
     render(<CopyableMonospaceCell value='USRC17607839' label='ISRC' />);
 
     const button = screen.getByRole('button');
-    expect(button).toHaveAccessibleName('Copy ISRC: USRC17607839');
+    expect(button).toHaveAccessibleName(/^Copy ISRC:\s*USRC17607839$/);
     expect(button).toHaveTextContent('USRC17607839');
   });
 

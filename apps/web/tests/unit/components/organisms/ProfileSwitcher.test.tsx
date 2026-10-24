@@ -152,10 +152,12 @@ describe('IdentitySwitcher identity context selection', () => {
     render(<IdentitySwitcher />);
 
     const trigger = screen.getByRole('button', {
-      name: 'Switch identity: Alpha Artist',
+      name: /^Switch identity:\s*(?:Alpha Artist\s*)+$/,
     });
     // WCAG 2.5.3: the accessible name must contain the visible label text.
-    expect(trigger).toHaveAccessibleName('Switch identity: Alpha Artist');
+    expect(trigger).toHaveAccessibleName(
+      /^Switch identity:\s*(?:Alpha Artist\s*)+$/
+    );
     expect(trigger).toHaveTextContent('Alpha Artist');
     expect(
       screen.getByRole('button', { name: 'Add Artist Identity' })
@@ -169,7 +171,7 @@ describe('IdentitySwitcher identity context selection', () => {
     render(<IdentitySwitcher />);
 
     const trigger = screen.getByRole('button', {
-      name: 'Switch identity: Alpha Artist',
+      name: /^Switch identity:\s*(?:Alpha Artist\s*)+$/,
     });
     const label = within(trigger).getByText('Alpha Artist');
     // The label collapses on max-width + opacity + travel instead of

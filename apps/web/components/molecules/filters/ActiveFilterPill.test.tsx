@@ -19,9 +19,7 @@ describe('ActiveFilterPill', () => {
         onClear={onClear}
       />
     );
-    expect(screen.getByText('2 selected')).toHaveClass(
-      'text-(--color-accent-purple-text)'
-    );
+    expect(screen.getByText('2 selected')).toHaveClass('text-accent');
     fireEvent.click(
       screen.getByRole('button', { name: 'Clear Status filter' })
     );
