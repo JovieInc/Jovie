@@ -1,15 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { ImportGlobFunction } from 'vite';
 import { describe, expect, it } from 'vitest';
 
-// Only type the glob API. vite/client also adds wildcard asset declarations,
-// which would mask unresolved assets elsewhere in the test typecheck program.
-declare global {
-  interface ImportMeta {
-    glob: ImportGlobFunction;
-  }
-}
+// Next.js already types import.meta.glob. Avoid vite/client: its wildcard asset
+// declarations would mask unresolved assets elsewhere in the test typecheck.
 
 const workspaceCss = readFileSync(
   resolve(__dirname, '../../../styles/system-b-app.css'),

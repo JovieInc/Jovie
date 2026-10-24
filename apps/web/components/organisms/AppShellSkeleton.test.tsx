@@ -9,6 +9,21 @@ describe('AppShellSkeleton', () => {
     expect(container.querySelector('.skeleton')).toBeTruthy();
   });
 
+  it('scopes the Ovie canvas to its loading frame when switching workspaces', () => {
+    const { container, rerender } = render(
+      <AppShellSkeleton brandVariant='ov' />
+    );
+    const frame = container.querySelector(
+      '[data-app-shell-placeholder="true"]'
+    );
+
+    expect(frame).toHaveAttribute('data-app-shell-workspace', 'ov');
+
+    rerender(<AppShellSkeleton brandVariant='jovie' />);
+
+    expect(frame).not.toHaveAttribute('data-app-shell-workspace');
+  });
+
   it('uses the single unified header-height token for the sidebar and header skeletons (founder lock 2026-09-25)', () => {
     const { container } = render(<AppShellSkeleton />);
 
