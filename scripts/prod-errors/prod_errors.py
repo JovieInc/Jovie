@@ -35,8 +35,11 @@ USER_THRESHOLD = int(os.environ.get("PROD_ERRORS_USER_THRESHOLD", "25"))
 CLAIM_S = int(os.environ.get("PROD_ERRORS_CLAIM_S", str(4 * 3600)))
 QUIET_S = 24 * 3600
 SUSPECT_WINDOW_S = 6 * 3600
-# Watcher -> expected interval in seconds (dead-man alerts at 2x, or N straight errors).
-WATCHERS = {"sentry-sweep": 1800, "ci-main": 900, "deadman": 900, "receiver": 300, "synthetic": 7 * 86400}
+# Watcher -> expected heartbeat interval in seconds (dead-man alerts at 2x, or N straight errors).
+# Each watcher is judged on its OWN cadence: the receiver only heartbeats when the dead-man pokes
+# its /health (a 15-min timer), so its interval is 900, not the webhook latency; the synthetic is
+# weekly.
+WATCHERS = {"sentry-sweep": 1800, "ci-main": 900, "deadman": 900, "receiver": 900, "synthetic": 7 * 86400}
 ERROR_STREAK = 3
 GOLDEN = [
     ("checkout", r"checkout|stripe|billing|upgrade|subscription|price|payment"),
@@ -138,16 +141,32 @@ def heartbeat(watcher: str, ok: bool, detail: str = "", state: Path = STATE) -> 
     write_json(path, hb)
 
 
+def install_seed(state: Path, at: float) -> float:
+    """Grace anchor for the dead-man: every watcher gets one full 2x-interval window counted from
+    install (written by install.sh, self-seeded on first read) before a missing heartbeat can
+    alert -- a watcher that has not been due yet is not dead."""
+    p = state / "installed_at"
+    try:
+        return float(p.read_text().strip())
+    except (OSError, ValueError):
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(str(int(at)))
+        except OSError:
+            pass
+        return at
+
+
 def watcher_health(state: Path = STATE, at: float | None = None) -> dict:
     at = at or now()
     out = {}
+    seed = install_seed(state, at)
     for name, interval in WATCHERS.items():
         hb = read_json(state / "heartbeats" / f"{name}.json", None)
-        if hb is None and name in ("synthetic", "deadman"):
-            out[name] = {"status": "pending-first-run", "interval": interval}
-            continue
         if hb is None:
-            out[name] = {"status": "missing", "interval": interval}
+            # Never-run watcher: grace until 2x its interval after install, then it is missing.
+            status = "pending-first-run" if at - seed < 2 * interval else "missing"
+            out[name] = {"status": status, "interval": interval}
             continue
         age = at - float(hb.get("lastRunAt") or 0)
         runs = hb.get("runs") or []
@@ -472,9 +491,12 @@ def deadman(linear: Linear | None, state: Path = STATE, port: int = 8788) -> dic
     for e in ledger.values():
         if e.get("synthetic") and e["status"] != "closed" and now() - e["openedAt"] > 3 * 86400:
             health["synthetic-loop"] = {"status": "stuck", "sentryId": e["sentryId"]}
-    for name, h in health.items():
-        if h["status"] not in ("ok", "pending-first-run"):
-            alert("dead-man", f"watcher {name} is {h['status']}", False, linear, state)
+    # One aggregated alert per dead-man run (deduped by alert()'s label fingerprint), so an
+    # install burst or a shared outage files a single issue, not one per watcher.
+    unhealthy = [f"{name} is {h['status']}" for name, h in sorted(health.items())
+                 if h["status"] not in ("ok", "pending-first-run")]
+    if unhealthy:
+        alert("dead-man", "watchers unhealthy: " + ", ".join(unhealthy), False, linear, state)
     write_bottleneck(ledger, state)
     return health
 
@@ -550,8 +572,9 @@ def main(argv=None) -> int:
         if a.cmd == "sweep":
             result = sweep(Sentry(http), linear)
             write_bottleneck(read_json(STATE / "ledger.json", {}))
-            if watcher_health(STATE)["deadman"]["status"] != "ok":  # watch the watcher-watcher
-                alert("dead-man", "deadman timer itself is not heartbeating", False, linear)
+            dm = watcher_health(STATE)["deadman"]["status"]
+            if dm not in ("ok", "pending-first-run"):  # watch the watcher-watcher
+                alert("dead-man", f"deadman timer itself is not heartbeating ({dm})", False, linear)
         elif a.cmd == "ci-main":
             result = ci_main(linear)
         elif a.cmd == "deadman":

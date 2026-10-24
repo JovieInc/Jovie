@@ -115,8 +115,56 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(h["sentry-sweep"]["status"], "ok")
         self.assertEqual(h["ci-main"]["status"], "erroring")
         self.assertEqual(pe.watcher_health(self.dir, time.time() + 3 * 1800)["sentry-sweep"]["status"], "stale")
-        self.assertEqual(h["receiver"]["status"], "missing")
+        self.assertEqual(h["receiver"]["status"], "pending-first-run")
         self.assertEqual(h["synthetic"]["status"], "pending-first-run")
+
+    def test_fresh_install_is_graced_no_alerts(self):
+        # A fresh install with zero heartbeats must not page: every watcher is pending until its
+        # own 2x-interval window after install has passed.
+        h = pe.watcher_health(self.dir)
+        self.assertTrue(all(v["status"] == "pending-first-run" for v in h.values()))
+        result = pe.deadman(self.l, self.dir)
+        self.assertEqual(self.l.created, [])
+        alerts = [json.loads(x) for x in (self.dir / "alerts.jsonl").read_text().splitlines()] if \
+            (self.dir / "alerts.jsonl").exists() else []
+        self.assertEqual(alerts, [])
+        self.assertTrue(all(v["status"] == "pending-first-run" for v in result.values()))
+
+    def test_install_burst_files_one_issue_not_one_per_watcher(self):
+        # Everything genuinely missing (anchor far in the past) files exactly ONE aggregated issue.
+        (self.dir / "installed_at").write_text(str(int(self.t - 10 ** 9)))
+        pe.deadman(self.l, self.dir)
+        self.assertEqual(len(self.l.created), 1)
+        self.assertIn("watchers unhealthy", self.l.created[0]["title"])
+        self.assertIn("sentry-sweep", self.l.created[0]["body"])
+        self.assertIn("synthetic", self.l.created[0]["body"])
+
+    def test_truly_stale_heartbeat_still_pages(self):
+        # Beyond 2x the interval with no heartbeat, the dead-man still fires (never disabled).
+        pe.heartbeat("sentry-sweep", True, "", self.dir)
+        later = time.time() + 3 * 1800
+        original_now = pe.now
+        try:
+            pe.now = lambda: later
+            h = pe.watcher_health(self.dir)
+            self.assertEqual(h["sentry-sweep"]["status"], "stale")
+            result = pe.deadman(self.l, self.dir)
+        finally:
+            pe.now = original_now
+        self.assertEqual(len(self.l.created), 1)
+        self.assertIn("sentry-sweep is stale", self.l.created[0]["title"])
+        self.assertEqual(result["sentry-sweep"]["status"], "stale")
+
+    def test_receiver_judged_on_own_cadence(self):
+        # The receiver heartbeats when the dead-man pokes it, every 900s -- not at webhook latency.
+        pe.heartbeat("receiver", True, "health", self.dir)
+        self.assertEqual(pe.watcher_health(self.dir, time.time() + 700)["receiver"]["status"], "ok")
+        self.assertEqual(pe.watcher_health(self.dir, time.time() + 1900)["receiver"]["status"], "stale")
+
+    def test_synthetic_judged_on_weekly_cadence(self):
+        pe.heartbeat("synthetic", True, "sent", self.dir)
+        self.assertEqual(pe.watcher_health(self.dir, time.time() + 8 * 86400)["synthetic"]["status"], "ok")
+        self.assertEqual(pe.watcher_health(self.dir, time.time() + 15 * 86400)["synthetic"]["status"], "stale")
 
     def test_bottleneck_fragment(self):
         pe.handle_issue(self.issue(userCount=30), self.ledger, self.s, self.l, [], self.t, self.dir)

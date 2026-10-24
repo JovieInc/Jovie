@@ -8,6 +8,10 @@ lanes, which pick up the Linear issue this loop opens.
 Timers: `sweep` (30 min: Sentry sweep, webhook inbox, claims, post-deploy verifier), `receiver`
 (always-on HMAC webhook on 127.0.0.1:8788), `ci-main` (15 min: canary/E2E/a11y/nightly on main),
 `deadman` (15 min: stale or erroring heartbeats, stuck synthetic), `synthetic` (weekly test error).
+Dead-man heartbeats are graced: a watcher that has never run stays `pending-first-run` until one
+full 2x-interval window after install (`installed_at`), and each watcher is judged on its own
+cadence (the receiver at the 15-min poke, the synthetic weekly). Unhealthy watchers file ONE
+deduplicated aggregated alert per run, never one issue per watcher.
 
 Rules: golden-path flows (checkout, auth, onboarding, public profile/track pages, navigation) trigger
 at any count; others at `PROD_ERRORS_USER_THRESHOLD` (25) users. One Linear issue per Sentry ID

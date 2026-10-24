@@ -7,6 +7,9 @@ base="$HOME/.local/share/jovie-prod-errors"
 state="$HOME/.local/state/jovie-prod-errors"
 units="$HOME/.config/systemd/user"
 mkdir -p "$base" "$state" "$units" "$HOME/.config/jovie-prod-errors"
+# Dead-man grace anchor: watchers get one full 2x-interval window counted from install before a
+# missing heartbeat can alert. First install only -- re-installs keep the original anchor.
+[ -f "$state/installed_at" ] || date +%s > "$state/installed_at"
 install -m 755 "$here/run.sh" "$base/run.sh"
 [ -d "$base/current" ] || { cp -r "$here" "$base/current"; }
 envf="$HOME/.config/jovie-prod-errors/env"
