@@ -8,13 +8,14 @@ import { cn } from '@/lib/utils';
 /* ─── Dot color by status ────────────────────────────────────────────── */
 
 const DOT_COLOR: Record<OpportunityInboxTourDateItem['status'], string> = {
-  pending: 'var(--color-accent-orange)',
+  // JOV-8964: pending status is neutral — the loud orange read as an alarm.
+  pending: 'var(--color-text-secondary-token)',
   confirmed: 'var(--color-accent-green)',
   rejected: 'var(--color-text-quaternary-token)',
 };
 
 const ACTION_ACCENT: Record<OpportunityInboxTourDateItem['status'], string> = {
-  pending: 'var(--color-accent-orange)',
+  pending: 'var(--color-text-secondary-token)',
   confirmed: 'var(--color-accent-green)',
   rejected: 'transparent',
 };
@@ -37,11 +38,11 @@ export interface OpportunityInboxTourDateRowProps {
  * Flat row for a detected tour date in the opportunity inbox.
  *
  * Follows the same visual pattern as OpportunityRow (dot + two-line type +
- * hover-reveal actions) but uses orange accent (event/tour date) instead
+ * hover-reveal actions) with a neutral pending accent (JOV-8964) instead
  * of the blue-purple primary accent.
  *
  * States:
- * - pending → orange dot, hover-reveal {accent-ring ✓ · faint ×}
+ * - pending → neutral dot, hover-reveal {neutral-ring ✓ · faint ×}
  * - confirmed → green dot, persistent green-ring ✓
  * - rejected → gray dot, no actions
  */

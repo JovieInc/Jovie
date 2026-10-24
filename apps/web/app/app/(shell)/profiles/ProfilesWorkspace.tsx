@@ -43,7 +43,6 @@ import {
 } from '@/components/atoms/SocialIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
-import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import {
   PRESENCE_BUTTON_DESKTOP_DENSITY,
   PresenceSignalList,
@@ -76,7 +75,6 @@ import {
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { SourceIdentity } from '@/lib/profile-surfaces/presence-identity';
 import {
@@ -1588,21 +1586,6 @@ function ProfilesWorkspaceContent({
     setPendingCandidate(null);
     setIsAddConnectionOpen(true);
   }, [setSelected]);
-  const headerActions = useMemo(
-    () => (
-      <DashboardHeaderActionGroup>
-        <DashboardHeaderActionButton
-          ariaLabel='Add Profile Or Site'
-          onClick={handleAddConnection}
-          icon={<Plus className='h-3.5 w-3.5' />}
-          label='Add Profile'
-          hideLabelOnMobile
-        />
-      </DashboardHeaderActionGroup>
-    ),
-    [handleAddConnection]
-  );
-  useRegisterHeaderActions(headerActions);
   const getContextMenuItems = useCallback(
     (row: ProfileWorkspaceRow): ContextMenuItemType[] => {
       if (row.id.startsWith('preview:')) return [];
@@ -1873,6 +1856,9 @@ function ProfilesWorkspaceContent({
       contentPadding='none'
       data-testid='profiles-workspace'
       surfaceMode='table'
+      // JOV-8964: the workspace reads as one centered content column on wide
+      // (ultrawide) windows instead of a full-bleed table.
+      maxWidth='wide'
       toolbar={
         <PageToolbar
           data-testid='connections-workspace-toolbar'
@@ -1882,17 +1868,28 @@ function ProfilesWorkspaceContent({
             </span>
           }
           end={
-            <Button
-              variant='ghost'
-              size='sm'
-              aria-expanded={showSuggestions}
-              aria-controls='profile-suggestions'
-              onClick={() => setShowSuggestions(value => !value)}
-            >
-              {showSuggestions
-                ? 'Close Suggestions'
-                : `Review Suggestions (${connectionSuggestions.length})`}
-            </Button>
+            <>
+              <Button
+                variant='ghost'
+                size='sm'
+                aria-expanded={showSuggestions}
+                aria-controls='profile-suggestions'
+                onClick={() => setShowSuggestions(value => !value)}
+              >
+                {showSuggestions
+                  ? 'Close Suggestions'
+                  : `Review Suggestions (${connectionSuggestions.length})`}
+              </Button>
+              {/* JOV-8964: moved out of the floating shell-header slot into
+                  the page toolbar where the table it targets lives. */}
+              <DashboardHeaderActionButton
+                ariaLabel='Add Profile Or Site'
+                onClick={handleAddConnection}
+                icon={<Plus className='h-3.5 w-3.5' />}
+                label='Add Profile'
+                hideLabelOnMobile
+              />
+            </>
           }
         />
       }

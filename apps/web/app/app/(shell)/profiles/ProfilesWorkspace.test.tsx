@@ -670,6 +670,20 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).toBeInTheDocument();
   });
 
+  // JOV-8964: the Add Profile action moved from the floating shell-header
+  // registration slot into the page toolbar, next to Review Suggestions.
+  it('renders Add Profile in the page toolbar and leaves the header registration empty', () => {
+    renderWorkspace(dataWithConnector);
+    const toolbar = screen.getByTestId('connections-workspace-toolbar');
+    expect(
+      within(toolbar).getByRole('button', { name: 'Add Profile Or Site' })
+    ).toBeInTheDocument();
+    expect(within(toolbar).getByText('Profiles')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('registered-header-actions')
+    ).toBeEmptyDOMElement();
+  });
+
   it('renders one explanation per suggested identity without a duplicate recommendation', async () => {
     renderWorkspace({
       ...data,
@@ -792,8 +806,10 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(screen.getByText('YouTube')).toBeInTheDocument();
     expect(screen.getByText('Fan Wiki')).toBeInTheDocument();
 
+    // JOV-8964: Add Profile lives in the page toolbar (next to Review
+    // Suggestions), not the floating shell-header registration slot.
     await user.click(
-      within(screen.getByTestId('registered-header-actions')).getByRole(
+      within(screen.getByTestId('connections-workspace-toolbar')).getByRole(
         'button',
         { name: 'Add Profile Or Site' }
       )
