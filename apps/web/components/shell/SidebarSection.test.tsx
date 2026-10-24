@@ -28,6 +28,7 @@ describe('SidebarSection', () => {
       screen.getByRole('button', { name: /Releases/ })
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Releases/ })).toHaveClass(
+      'hover:bg-sidebar-accent',
       'h-(--app-shell-sidebar-row-height)',
       'px-(--app-shell-sidebar-inset)',
       'gap-x-(--app-shell-sidebar-icon-gap)',
