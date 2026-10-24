@@ -115,6 +115,19 @@ vi.mock('@/lib/notifications/providers/slack', () => ({
   notifySlackCancellation: mockNotifySlackCancellation,
 }));
 
+// JOV-8861: the handler graph reaches @/lib/ingestion/session through
+// base-handler -> webhooks/reconciliation. The real module pulls 'server-only',
+// @/lib/auth/session (the Clerk auth stack) and @/lib/db/client — a cold import
+// that runs inside the CI hookTimeout (12s under the affected gate) and can
+// time out in loaded shards. None of these tests exercise system-ingestion
+// transactions for real, so mock the seam and keep setup imports light.
+vi.mock('@/lib/ingestion/session', () => ({
+  SYSTEM_INGESTION_USER: 'system_ingestion',
+  withSystemIngestionSession: vi.fn(
+    async (operation: (tx: unknown) => Promise<unknown>) => operation({})
+  ),
+}));
+
 vi.mock('@/lib/utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));

@@ -890,7 +890,7 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
 
 HOLD_DEQUEUE = "dequeued-by-hand"
 FAILURE_HOLD_CONTEXT = "jovie-queue-failure-hold/v1"
-FAILURE_HOLD_WRITERS = frozenset({"jovie-bot[bot]", "jovie-bot"})
+FAILURE_HOLD_WRITERS = frozenset({"jovie-bot[bot]", "jovie-ci-lane[bot]", "jovie-symphony-lane[bot]", "jovie-agents-lane[bot]", "jovie-bot", "jovie-ci-lane", "jovie-symphony-lane", "jovie-agents-lane"})
 
 
 def failure_held(sha: str | None, sh=run) -> bool:

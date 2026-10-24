@@ -4330,10 +4330,21 @@ def fetch_labeled_events(linear) -> list:
 
 EVENT_DELIVERY_SCHEMA = "jovie.event-delivery/v1"
 EVENT_DELIVERY_ATTEMPTS = 3
+EVENT_DELIVERY_ATTEMPTS_CAP = 10
 EXHAUSTED_READBACK_S = 6 * 3600  # an exhausted delivery is only re-read for a late acknowledgement
 EVENT_DELIVERY_HISTORY = 50      # retained attempt history per delivery row
 EVENT_DELIVERY_PENDING_CAP = 256
 EVENT_DELIVERY_STALE_S = 3600
+
+
+def event_delivery_max_attempts() -> int:
+    """The one configurable bound on every delivery retry loop (Gem 2026-10-23: nothing
+    retries unbounded). Clamped to a hard cap; the default stays EVENT_DELIVERY_ATTEMPTS."""
+    try:
+        value = int(os.environ.get("LANES_EVENT_DELIVERY_MAX_ATTEMPTS", ""))
+    except ValueError:
+        return EVENT_DELIVERY_ATTEMPTS
+    return max(1, min(EVENT_DELIVERY_ATTEMPTS_CAP, value))
 
 
 def _event_digest(value) -> str:
@@ -4515,7 +4526,25 @@ def _event_delivery_snapshot(host: Host, now: float) -> dict:
               for row in (_event_escalation(host).get("events") or {}).values()
               if isinstance(row, dict)]
     report["deliveryFailed"] += sum(row.get("status") in {"failed", "sending"} for row in starts)
+    report["deliveryExhausted"] += sum(row.get("status") == "exhausted" for row in starts)
     return report
+
+
+def drain_event_delivery(host: Host, linear) -> dict:
+    """Drain the durable journal without claiming new events, for a tick whose wider
+    remediation reconciliation failed: a failed delivery still retries with backoff here
+    instead of waiting for a healthy planning pass that may never come (Gem 2026-10-23:
+    57 failed actions with no authoritative ack and no next retry scheduled)."""
+    delivery_lock = Locked(host.state / "event-delivery.lock", blocking=False)
+    if not delivery_lock.held:
+        delivery_lock.release()
+        return {"deliveryBusy": True}
+    try:
+        journal = _event_delivery_state(host)  # Fail closed before changing event rows.
+        _recover_event_preparation(host, journal)
+        return _apply_event_plan(linear, {}, host, journal, time.time())
+    finally:
+        delivery_lock.release()
 
 
 def _event_delivery_diagnostic(error, phase: str, operation: str) -> dict:
@@ -4563,7 +4592,7 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
         phase = "readback"
         try:
             acknowledged, receipt = _event_delivery_readback(linear, row)
-            if not acknowledged and row["attempts"] < EVENT_DELIVERY_ATTEMPTS and now < row["deadline"]:
+            if not acknowledged and row["attempts"] < event_delivery_max_attempts() and now < row["deadline"]:
                 lock = Locked(host.state / "claim.lock", blocking=True)
                 try:
                     owner = (_event_escalation(host).get("events") or {}).get(row["fingerprint"]) or {}
@@ -4627,7 +4656,7 @@ def _apply_event_plan(linear, plan: dict, host: Host, data: dict, now: float) ->
                            "event-mutation-rejected", "event-delivery-unacknowledged"}
             row["error"] = str(error) if isinstance(error, RuntimeError) and str(error) in safe_events else type(error).__name__
             row["diagnostic"] = _event_delivery_diagnostic(error, phase, row["kind"])
-            row["status"] = "exhausted" if row["attempts"] >= EVENT_DELIVERY_ATTEMPTS or now >= row["deadline"] else "failed"
+            row["status"] = "exhausted" if row["attempts"] >= event_delivery_max_attempts() or now >= row["deadline"] else "failed"
             row["history"].append({"at": now, "outcome": row["status"], "error": row["error"],
                                    "diagnostic": row["diagnostic"]})
         row["nextAt"] = now + (EXHAUSTED_READBACK_S if row["status"] == "exhausted"
@@ -4728,6 +4757,7 @@ def claim_remediation_events(host: Host, linear) -> dict:
     summary = remediation.events_summary({"events": plan["events"]})
     starts = [row.get("startDelivery") or {} for row in plan["events"].values()]
     delivery["deliveryFailed"] += sum(row.get("status") in {"failed", "sending"} for row in starts)
+    delivery["deliveryExhausted"] += sum(row.get("status") == "exhausted" for row in starts)
     return {"eventsOpen": summary["eventsOpen"], "eventsClaimed": summary["eventsClaimed"],
             "eventsHuman": summary["eventsHuman"], "eventsExhausted": summary["eventsExhausted"], **delivery}
 
@@ -4759,8 +4789,11 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
         if started:
             delivery = row.setdefault("startDelivery", {"attempts": 0, "status": "pending", "nextAt": now,
                                                         "deadline": now + EVENT_DELIVERY_STALE_S})
-            if now < delivery.get("nextAt", 0):
+            # A terminal start delivery is a visible failure, never a retry loop: exhausted
+            # rows used to re-fail every 60s forever (Gem 2026-10-23: 57 stuck actions).
+            if delivery.get("status") == "exhausted" or now < delivery.get("nextAt", 0):
                 continue
+            attempts_cap = event_delivery_max_attempts()
             try:
                 query = 'query($id:String!){issue(id:$id){id state{id name}}}'
                 remote = linear.gql(query, {"id": row["issueId"]})
@@ -4768,11 +4801,31 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
                 if not isinstance(state, dict):
                     raise RuntimeError("event-start-readback-unreadable")
                 correlation = _event_start_claim(fingerprint, row)["correlation"]
-                receipt = delivery.get("mutationReceipt") or {}
-                if state.get("id") == started and receipt != {"correlation": correlation, "success": True}:
+                if state.get("id") == started and delivery.get("mutationReceipt") != {"correlation": correlation, "success": True}:
                     # A rejected/ambiguous intent never proves this host owns
-                    # another host's start. Preserve it for owned recovery.
-                    raise RuntimeError("event-start-ownership-unproven")
+                    # another host's start. But our OWN persisted intent (status
+                    # 'sending') whose receipt was lost to a crash between the
+                    # mutation and its save may re-prove ownership with one
+                    # idempotent resend, still inside the attempt cap.
+                    if delivery.get("status") != "sending" or delivery["attempts"] >= attempts_cap \
+                            or now >= delivery["deadline"]:
+                        raise RuntimeError("event-start-ownership-unproven")
+                    delivery.update(status="sending", attempts=delivery["attempts"] + 1)
+                    _save_event_json(host, "escalation.json", data)
+                    result = linear.gql('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success}}',
+                                        {"id": row["issueId"], "s": started})
+                    if not isinstance(result, dict) or (result.get("issueUpdate") or {}).get("success") is not True:
+                        raise RuntimeError("event-start-mutation-rejected")
+                    delivery["mutationReceipt"] = {"correlation": correlation, "success": True}
+                    _save_event_json(host, "escalation.json", data)
+                    remote = linear.gql(query, {"id": row["issueId"]})
+                    observed_state = (remote.get("issue") or {}).get("state")
+                    if not isinstance(observed_state, dict):
+                        raise RuntimeError("event-start-readback-unreadable")
+                    if observed_state.get("id") != started:
+                        delivery.pop("mutationReceipt", None)
+                        _save_event_json(host, "escalation.json", data)
+                        raise RuntimeError("event-start-unacknowledged")
                 if state.get("id") != started:
                     # Fresh contradictory state invalidates every earlier
                     # success before any retry can be sent or adopted.
@@ -4780,7 +4833,7 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
                     _save_event_json(host, "escalation.json", data)
                     if state.get("name") != "Todo":
                         raise RuntimeError("event-start-preimage-changed")
-                    if delivery["attempts"] >= EVENT_DELIVERY_ATTEMPTS or now >= delivery["deadline"]:
+                    if delivery["attempts"] >= attempts_cap or now >= delivery["deadline"]:
                         raise RuntimeError("event-start-cap-exhausted")
                     delivery.update(status="sending", attempts=delivery["attempts"] + 1)
                     _save_event_json(host, "escalation.json", data)
@@ -4800,7 +4853,13 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
                         raise RuntimeError("event-start-unacknowledged")
                 delivery.update(status="acknowledged", acknowledgedAt=now)
             except Exception as error:
-                delivery.update(status="failed", error=str(error) if isinstance(error, RuntimeError) and str(error).startswith("event-") else type(error).__name__,
+                # These stops can never succeed by design: the retry budget is spent, the
+                # remote preimage moved on, or this host can never prove ownership. They
+                # are a terminal visible failure, not a 60s retry loop forever.
+                terminal = str(error) in {"event-start-cap-exhausted", "event-start-ownership-unproven",
+                                          "event-start-preimage-changed"}
+                delivery.update(status="exhausted" if terminal else "failed",
+                                error=str(error) if isinstance(error, RuntimeError) and str(error).startswith("event-") else type(error).__name__,
                                 nextAt=now + 60)
                 _save_event_json(host, "escalation.json", data)
                 continue  # No model invocation or local running claim from intent alone.
@@ -5697,11 +5756,19 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
     return None
 
 
+# Infra-class no-work stops requeue with the same capped exponential backoff as recovery
+# handoffs: the precondition (an unreadable target, a failed checkout) is host infrastructure,
+# not the PR, and an immediate next-tick re-claim would crash-loop the same failure (Gem
+# 2026-10-23: 7 target-state-unavailable + 6 worktree-unavailable stops in 24h).
+INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable"})
+
+
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
     """Release the host-local claim without fabricating an attempt when called directly."""
     handoff = False
+    requeued = False
     def finish(attempts: dict) -> None:
-        nonlocal handoff
+        nonlocal handoff, requeued
         attempt = attempts.get(str(pr["number"]))
         if not attempt or attempt.get("sha") != pr.get("headRefOid"):
             return
@@ -5717,10 +5784,13 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
                                        "at": time.time()}
             receipt["attemptRefunded"] = refund[:120]
             handoff = receipt.get("verdict") == "recovery-handoff"
+            requeued = handoff or refund in pr_events.UNRESUMABLE_PRESERVED \
+                or refund.split(":", 1)[0] in INFRA_PRECONDITION_REASONS
     update_json(host.state / "fix-attempts.json", finish)
-    if handoff:
+    if requeued:
         try:
-            path = (receipt.get("recovery") or {}).get("worktree")
+            path = (receipt.get("recovery") or {}).get("worktree") \
+                if receipt.get("verdict") == "recovery-handoff" else None
             note_recovery_handoff(host, f"pr:{pr['number']}:{pr['headRefOid']}",
                                   preserved=Path(path) if isinstance(path, str) and path else None)
         except Exception as exc:
@@ -7857,9 +7927,96 @@ def collect_shipping_origin(state: Path) -> dict:
     return shipping_origin.collect(state)
 
 
+TICK_INTENT_SCHEMA = "jovie.tick-intent/v1"
+
+
+def _begin_tick_intent(host: Host) -> dict | None:
+    """Durable run-intent marker: written at dispatch start, cleared on a clean exit.
+    A marker left behind by a dead run (crash, SIGKILL, host power loss — Gem 2026-10-23:
+    ~180 unclean-termination warnings in the jovie-lanes.service journal) makes the
+    previous tick's unclean termination visible and authorizes one bounded recovery.
+    A marker whose pid is still alive inside its lease is a long tick, not an unclean one."""
+    path = host.state / "tick-in-flight.json"
+    previous = None
+    try:
+        raw = json.loads(path.read_text())
+    except (OSError, ValueError):
+        raw = None
+    if isinstance(raw, dict) and raw.get("schema") == TICK_INTENT_SCHEMA:
+        pid, started = raw.get("pid"), raw.get("startedAt")
+        alive, stale = False, True
+        if type(pid) is int and pid > 0:
+            try:
+                os.kill(pid, 0)
+                alive = True
+            except ProcessLookupError:
+                alive = False
+            except OSError:
+                alive = True  # unreadable liveness keeps the conservative reading
+        if type(started) in (int, float) and started > 0:
+            stale = started < time.time() - pr_events.FIX_LEASE_S
+        if not alive or stale:
+            previous = {"pid": pid, "startedAt": started}
+    update_json(path, lambda data: (data.clear(), data.update({
+        "schema": TICK_INTENT_SCHEMA, "host": HOST, "pid": os.getpid(), "startedAt": time.time()})))
+    return previous
+
+
+def _clear_tick_intent(host: Host) -> None:
+    try:
+        (host.state / "tick-in-flight.json").unlink()
+    except OSError:
+        pass
+
+
+def recover_unclean_tick(host: Host) -> dict:
+    """Bounded recovery after an unclean termination: refund fix-attempt charges whose run
+    died between the claim charge and its own verdict (no endedAt, lease expired — the
+    runner's own wall budget is inside FIX_LEASE_S), so host death does not permanently
+    spend a PR's bounded fix budget on no work."""
+    refunded: list[int] = []
+
+    def sweep(data: dict) -> None:
+        for number, record in data.items():
+            if not isinstance(record, dict) or record.get("endedAt") \
+                    or record.get("noWorkRefund") or not record.get("at"):
+                continue
+            if type(record.get("count")) is not int or record["count"] <= 0:
+                continue
+            at = record.get("at")
+            if type(at) not in (int, float) or not math.isfinite(at) \
+                    or at > time.time() - pr_events.FIX_LEASE_S:
+                continue
+            record["count"] -= 1
+            record["noWorkRefund"] = {"reason": "unclean-worker-termination", "at": time.time()}
+            refunded.append(number)
+
+    update_json(host.state / "fix-attempts.json", sweep)
+    return {"schema": "jovie.unclean-tick-recovery/v1", "refundedFixAttempts": sorted(refunded)}
+
+
 def dispatch(host: Host) -> int:
+    unclean_previous = None
+    try:
+        unclean_previous = _begin_tick_intent(host)
+    except Exception:
+        unclean_previous = {"unavailable": True}  # a failed marker write must not skip the tick
+    try:
+        result = _dispatch(host, unclean_previous)
+    finally:
+        _clear_tick_intent(host)
+    return result
+
+
+def _dispatch(host: Host, unclean_previous: dict | None) -> int:
     tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "quotaBlocked": {},
-            "spawned": [], "error": None, "admissionDenied": None}
+            "spawned": [], "error": None, "admissionDenied": None,
+            "uncleanPreviousRun": unclean_previous}
+    if unclean_previous:
+        try:
+            tick["uncleanRecovery"] = recover_unclean_tick(host)
+        except Exception as error:  # recovery failure must not take dispatch down
+            tick["uncleanRecoveryError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         tick["disk"] = disk_guard.check(host)
         try:
@@ -7896,6 +8053,13 @@ def dispatch(host: Host) -> int:
                 tick["remediationEvents"] = _event_delivery_snapshot(host, time.time())
             except Exception as status_error:
                 tick["remediationDeliveryStatusError"] = f"{type(status_error).__name__}: {status_error}"[:200]
+            try:
+                # Reconciliation is down; the durable intents are not. A failed
+                # delivery still drains with backoff here instead of sitting
+                # unsent until a healthy planning pass happens to return.
+                tick["remediationDeliveryDrain"] = drain_event_delivery(host, Linear(host.linear_env))
+            except (Exception, SystemExit) as drain_error:
+                tick["remediationDeliveryDrainError"] = f"{type(drain_error).__name__}: {drain_error}"[:200]
         if not os.environ.get("LANES_SELFTEST"):  # a release self-test never calls Linear
             try:
                 teams = ["JOV", *(binding.key for binding in bindings.extra_bindings(THIS))]

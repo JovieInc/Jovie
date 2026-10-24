@@ -161,6 +161,14 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    id: 'synthetic-canary-liveness',
+    command:
+      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=synthetic-canary-liveness.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-synthetic-canary-coverage" --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90 lib/__tests__/synthetic-canary-liveness.test.mjs',
+    inputs:
+      /^(?:\.github\/workflows\/(?:automation-liveness|synthetic-monitoring)\.yml|scripts\/synthetic-canary-liveness\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.test\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     id: 'node-environment-files',
     command:
       'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/node-environment-files.test.ts',

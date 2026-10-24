@@ -296,7 +296,16 @@ export function parseTrustedFailureStatus(status, repository) {
   const creator = statusCreator(status);
   if (
     creator.type !== 'Bot' ||
-    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+    ![
+      'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
+      'jovie-bot',
+      'jovie-ci-lane',
+      'jovie-symphony-lane',
+      'jovie-agents-lane',
+    ].includes(creator.login)
   ) {
     return null;
   }
@@ -323,7 +332,16 @@ export function parseTrustedRetryStatus(status, repository) {
   const creator = statusCreator(status);
   if (
     creator.type !== 'Bot' ||
-    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+    ![
+      'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
+      'jovie-bot',
+      'jovie-ci-lane',
+      'jovie-symphony-lane',
+      'jovie-agents-lane',
+    ].includes(creator.login)
   ) {
     return null;
   }
@@ -390,7 +408,16 @@ function parseTrustedAdmissionRecoveryStatus(status, repository) {
   const creator = statusCreator(status);
   if (
     creator.type !== 'Bot' ||
-    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+    ![
+      'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
+      'jovie-bot',
+      'jovie-ci-lane',
+      'jovie-symphony-lane',
+      'jovie-agents-lane',
+    ].includes(creator.login)
   )
     return null;
   const match =
