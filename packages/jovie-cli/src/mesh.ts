@@ -30,6 +30,13 @@ export const MESH_KINDS = [
   'devin',
   'muse',
   'lola',
+  'summer',
+  'zoe',
+  'gem-lanes',
+  'lane-codex',
+  'lane-grok',
+  'boardy',
+  'ops-mac-host',
 ] as const;
 export const MESH_FLAG_NAMES = [
   'to',
