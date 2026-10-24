@@ -108,3 +108,5 @@ All Mac app work defaults to SwiftUI. Do not add new Electron, AppKit-only, or o
 
 - New native Mac surfaces go in `apps/macos` (for example `apps/macos/MenuMonitor`).
 - `apps/desktop` (Electron) is maintenance-only: fixes and migrations out, not new surfaces.
+- Production runs full screen on an ultrawide monitor. That view, Ovie, is where Tim works, and anything that needs his attention lands there. Design and test Mac layouts at ultrawide full screen first.
+- The IA of that full-screen surface is a perpetual work item: keep improving it and keep refining the components inside it.
