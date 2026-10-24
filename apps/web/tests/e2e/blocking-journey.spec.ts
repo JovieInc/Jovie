@@ -6,6 +6,7 @@ import {
   fillControlledInputUntilEnabled,
   prepareBetterAuthEmailOtp,
 } from '../helpers/auth';
+import { subscribeAsFan } from './helpers/fan-subscribe-flow';
 import { installPublicRouteMocks } from './utils/public-surface-helpers';
 import { installRuntimeAutomationBypass } from './utils/runtime-automation-bypass';
 
@@ -207,6 +208,37 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
       await fan.close();
     }
   });
+  await test.step('a fan subscribes and the artist sees them in the audience', async () => {
+    const fanEmail = `fan-${handle}@test.jov.ie`;
+    const fan = await page
+      .context()
+      .browser()!
+      .newContext({ baseURL: new URL(page.url()).origin });
+    try {
+      const fanPage = await fan.newPage();
+      await installPublicRouteMocks(fanPage);
+      await subscribeAsFan(fanPage, handle, fanEmail);
+    } finally {
+      await fan.close();
+    }
+    await expect
+      .poll(async () => {
+        const rows = await sql`
+          SELECT 1 FROM notification_subscriptions ns
+          JOIN creator_profiles cp ON cp.id = ns.creator_profile_id
+          WHERE cp.username_normalized = ${handle}
+            AND ns.channel = 'email' AND lower(ns.email) = ${fanEmail}
+            AND ns.confirmed_at IS NOT NULL
+        `;
+        return rows.length;
+      })
+      .toBe(1);
+    await page.goto(APP_ROUTES.AUDIENCE);
+    await expect(page.getByText(fanEmail).first()).toBeVisible({
+      timeout: 60_000,
+    });
+  });
+
   await test.step('start checkout from the product upgrade screen', async () => {
     const checkoutUrl =
       'https://checkout.stripe.com/c/pay/cs_test_jovie_journey';
