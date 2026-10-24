@@ -18,6 +18,16 @@ const LAYLO_CONFIG = {
   platformName: 'Laylo',
   canonicalHost: 'laylo.com',
   validHosts: new Set(['laylo.com', 'www.laylo.com']),
+  // fetchLayloProfile reads public profile/user JSON from Laylo's
+  // CloudFront distributions. The fetch allowlist must cover them or
+  // INVALID_HOST rejects every request before it is sent. URL validation
+  // (validHosts) stays scoped to Laylo profile pages.
+  jsonHosts: new Set([
+    'laylo.com',
+    'www.laylo.com',
+    'd21i0hc4hl3bvt.cloudfront.net',
+    'd3oyaxbt9vo0fg.cloudfront.net',
+  ]),
   defaultTimeoutMs: 10000,
 } as const;
 
@@ -46,7 +56,7 @@ async function fetchJson<T>(url: string, options?: FetchOptions): Promise<T> {
       Accept: 'application/json',
       ...options?.headers,
     },
-    allowedHosts: LAYLO_CONFIG.validHosts,
+    allowedHosts: LAYLO_CONFIG.jsonHosts,
   });
   try {
     return JSON.parse(html) as T;
