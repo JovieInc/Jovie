@@ -205,12 +205,13 @@ export function DesktopTitlebar() {
               onClick={goBack}
               disabled={!canGoBack}
               aria-label='Go Back'
+              title='Back (⌘[)'
               data-testid='electron-nav-back'
               className={cn(
                 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
                 'transition-colors duration-subtle',
-                'hover:bg-white/[0.06] hover:text-primary-token',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
+                'hover:bg-surface-1 hover:text-primary-token',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:ring-offset-1 focus-visible:ring-offset-surface-page',
                 'disabled:pointer-events-none disabled:opacity-30'
               )}
             >
@@ -221,12 +222,13 @@ export function DesktopTitlebar() {
               onClick={goForward}
               disabled={!canGoForward}
               aria-label='Go Forward'
+              title='Forward (⌘])'
               data-testid='electron-nav-forward'
               className={cn(
                 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
                 'transition-colors duration-subtle',
-                'hover:bg-white/[0.06] hover:text-primary-token',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
+                'hover:bg-surface-1 hover:text-primary-token',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:ring-offset-1 focus-visible:ring-offset-surface-page',
                 'disabled:pointer-events-none disabled:opacity-30'
               )}
             >
