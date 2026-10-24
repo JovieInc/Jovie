@@ -81,6 +81,7 @@ describe('AccountSettingsSection', () => {
     );
     expect(screen.getByTestId('appearance-section')).toBeTruthy();
     expect(screen.getByTestId('notifications-section')).toBeTruthy();
+    expect(screen.getByText('Early access')).toBeTruthy();
     expect(screen.queryByText(/connected accounts/i)).toBeNull();
     expect(screen.getByText('Active Sessions')).toBeTruthy();
     // One sessions card; it owns its fixed loading geometry (no CLS).

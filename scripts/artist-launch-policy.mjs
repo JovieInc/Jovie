@@ -25,6 +25,7 @@ export const SURFACES = [
       '/app/settings',
       '/app/settings/account',
       '/api/account/email',
+      '/api/account/early-access',
       '/api/notifications/preferences',
     ],
     entry: '/app/settings/account',
@@ -32,6 +33,7 @@ export const SURFACES = [
     components: [
       `${settings}account-settings/AccountSettingsSection.tsx`,
       `${settings}account-settings/EmailManagementCard.tsx`,
+      `${settings}account-settings/EarlyAccessSettingsSection.tsx`,
       `${settings}account-settings/SessionManagementCard.tsx`,
     ],
     actions: [],
