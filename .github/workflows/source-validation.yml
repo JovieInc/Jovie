@@ -26,6 +26,25 @@ jobs:
       contents: read
       pull-requests: read
     steps:
+      # The preflight runs before the source checkout and dependency install.
+      # Bootstrap only the existing, dependency-free client from the trusted base.
+      - &quota-client
+        name: Checkout the trusted quota client
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .source-validation-client
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            packages/api-client
+      - &quota-runtime
+        name: Setup the quota client runtime
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .source-validation-client/.nvmrc
       # A PR body/title edit re-runs this workflow at an unchanged head and
       # base. 262 of 303 same-head reruns on 2026-10-03 were body edits. When
       # the newest completed earlier run for this exact head and branch
@@ -44,8 +63,16 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           set -uo pipefail
-          reuse=false proof=''
-          if [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
+          reuse=false proof='' lookup=true
+          # Low quota skips proof reuse and runs full validation immediately.
+          # Never hold a hosted runner waiting for GitHub's hourly reset.
+          if quota="$(node .source-validation-client/packages/api-client/cli.ts gh --priority default -- api rate_limit --jq '.resources.core.remaining' 2>/dev/null)" &&
+            [[ "$quota" =~ ^[0-9]+$ ]] && (( 10#$quota < 50 )); then
+            lookup=false
+            echo "::warning::GitHub rate limited (core remaining=$quota). Skipping proof reuse; running full validation."
+            echo "GitHub rate limited: proof reuse skipped, full validation runs." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "$lookup" == true && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
             runs="$(gh api "repos/$REPOSITORY/actions/workflows/source-validation.yml/runs?head_sha=$HEAD_SHA&event=pull_request&status=completed&per_page=100")"; then
             proof="$(jq -r --arg sha "$HEAD_SHA" --arg ref "$HEAD_REF" --argjson run "$RUN_ID" '
               [.workflow_runs[]
@@ -328,6 +355,8 @@ jobs:
       actions: read
       contents: read
     steps:
+      - *quota-client
+      - *quota-runtime
       - *proof-reuse
       # TruffleHog reads the object store directly and cannot use a partial
       # clone (#13994), so this job keeps the full-blob history fetch.
@@ -379,6 +408,8 @@ jobs:
       actions: read
       contents: read
     steps:
+      - *quota-client
+      - *quota-runtime
       - *proof-reuse
       - &reused-checkout
         if: steps.reuse.outputs.reuse != 'true'
@@ -422,6 +453,8 @@ jobs:
       actions: read
       contents: read
     steps:
+      - *quota-client
+      - *quota-runtime
       - *proof-reuse
       - *reused-checkout
       - *reused-setup
@@ -535,6 +568,8 @@ jobs:
       matrix:
         shard: ['1/4', '2/4', '3/4', '4/4']
     steps:
+      - *quota-client
+      - *quota-runtime
       - *proof-reuse
       - *reused-checkout
       - name: Select unit-affecting diff
@@ -608,6 +643,8 @@ jobs:
       actions: read
       contents: read
     steps:
+      - *quota-client
+      - *quota-runtime
       - *proof-reuse
       - *reused-checkout
       - name: Select UI accessibility diff

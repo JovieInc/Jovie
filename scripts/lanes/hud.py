@@ -420,14 +420,14 @@ def promotion_model(now: float | None = None, run=subprocess.run) -> dict:
 
 def promotion_line(metrics: dict) -> str:
     if not metrics or metrics.get("error"):
-        return rgb(FG, "PROMOTION 8h  ", bold=True) + rgb(RED, (metrics or {}).get("error", "unread"))
+        return tag("PROMO 8h") + rgb(RED, "✕ " + str((metrics or {}).get("error", "unread")))
     first = metrics["firstPass"]["rate"]
     back = metrics["reenqueueMinutes"]
     intake = metrics["intake"]
     occupancy = metrics["occupancy"]
     queue_per_merge = metrics.get("queueEntriesPerMerge")
     rate_color = GREEN if first is not None and first >= 0.9 else ORANGE
-    return (rgb(FG, "PROMOTION 8h  ", bold=True)
+    return (tag("PROMO 8h")
             + rgb(rate_color, f"first-pass {'n/a' if first is None else f'{round(first * 100)}%'}")
             + rgb(DIM, f" · ejected→back p75 {back['p75'] if back['p75'] is not None else 'n/a'}m ({back['pending']} waiting)"
                        f" · open→enqueue p75 {metrics['openToFirstEnqueueMinutes']['p75']}m"
@@ -441,7 +441,7 @@ def file_overlap_line(summary: dict) -> str:
     summary = summary or {}
     pairs = summary.get("pairs") or []
     metrics = summary.get("metrics") or {}
-    text = (rgb(FG, "FILE OVERLAP  ", bold=True)
+    text = (tag("OVERLAP")
             + rgb(DIM, f"{summary.get('mode', 'enforce')} · active {len(pairs)}"
                        f" · prevented {metrics.get('conflicts_prevented', 0)}"
                        f" · flags {metrics.get('overlap_flags', 0)}"
@@ -758,6 +758,104 @@ def closer(width: int) -> str:
     return rgb(DIM, "└" + "─" * (width - 2) + "┘")
 
 
+# Legacy layout: every section label sits in the same 12-cell inverse column as the
+# CONSTRAINT / PRODUCTION / FLOW rows, and detail rows hang under it at one indent.
+INDENT = "  "
+
+
+def tag(name: str, text: str = "") -> str:
+    return paint("label", f" {name:<10} ") + " " + text
+
+
+def sub(text: str) -> str:
+    """A detail row under a section; every section uses the same indent."""
+    return INDENT + text
+
+
+
+TARGET_TITLES = "hud-target-titles.json"
+TARGET_ALERTS = "hud-target-alerts.jsonl"
+TARGET_TTL_S = 300
+TARGET_PR = re.compile(r"^PR(\d+)$")
+
+
+def fetch_target_titles(numbers: list[int], cache: Path | None, now: float | None = None,
+                        fetch=None) -> tuple[dict, str | None]:
+    """Titles and states for running PR targets the lane-branch inventory cannot see (a fix
+    run on a screenshots/ or ci/ branch). One batched GraphQL read, cached TARGET_TTL_S."""
+    now = time.time() if now is None else now
+    try:
+        stored = json.loads(cache.read_text()) if cache and cache.exists() else {}
+    except (OSError, ValueError):
+        stored = {}
+    entries = stored.get("prs", {}) if isinstance(stored, dict) else {}
+    stale = [n for n in numbers if str(n) not in entries or now - float(entries[str(n)].get("at", 0)) > TARGET_TTL_S]
+    error = None
+    if stale:
+        owner, name = lane.REPO_SLUG.split("/", 1)
+        fields = " ".join(f"p{n}: pullRequest(number: {int(n)}) {{ title state }}" for n in stale)
+        query = f'query {{ repository(owner: "{owner}", name: "{name}") {{ {fields} }} }}'
+        try:
+            data = (fetch or gh_json)(["api", "graphql", "-f", f"query={query}"])
+            repo = ((data or {}).get("data") or {}).get("repository") or {}
+            for n in stale:
+                pr = repo.get(f"p{n}")
+                if pr:
+                    entries[str(n)] = {"title": pr.get("title") or "", "state": pr.get("state") or "", "at": now}
+        except Exception as exc:  # a failed read is shown, never guessed
+            error = f"{type(exc).__name__}: {exc}"[:100]
+        if cache:
+            try:
+                stored = {"prs": entries, "alerted": stored.get("alerted", {}) if isinstance(stored, dict) else {}}
+                cache.write_text(json.dumps(stored, sort_keys=True))
+            except OSError:
+                pass
+    return {f"PR{n}": entries[str(n)] for n in numbers if str(n) in entries}, error
+
+
+def record_closed_target_alerts(targets: dict, cache: Path | None, log: Path | None) -> list[str]:
+    """One alert per running lane whose PR is closed or merged; the lane is never touched."""
+    if not cache or not log:
+        return []
+    try:
+        stored = json.loads(cache.read_text()) if cache.exists() else {}
+    except (OSError, ValueError):
+        stored = {}
+    alerted = stored.setdefault("alerted", {})
+    fresh = []
+    for target, info in targets.items():
+        state = info.get("state")
+        if state in ("CLOSED", "MERGED") and alerted.get(target) != state:
+            alerted[target] = state
+            fresh.append(target)
+            try:
+                with log.open("a") as out:
+                    out.write(json.dumps({"at": utcnow().isoformat(), "target": target, "state": state,
+                                          "title": info.get("title", "")}) + "\n")
+            except OSError:
+                pass
+    if fresh:
+        try:
+            cache.write_text(json.dumps(stored, sort_keys=True))
+        except OSError:
+            pass
+    return fresh
+
+
+def lane_title(titles: dict, github: dict, target: str, now: datetime) -> str:
+    if title := titles.get(target):
+        return title
+    info = (github.get("targets") or {}).get(target)
+    if info:
+        if info.get("state") in ("CLOSED", "MERGED"):
+            return f"CLOSED/MERGED · {info.get('title', '')}"
+        return info.get("title") or "untitled PR"
+    error = github.get("errors", {}).get("targets") or github_source_error(github, "open", now)
+    if error and TARGET_PR.match(target or ""):
+        return f"GitHub read failed: {error}"
+    return "title not in current GitHub/Linear read"
+
+
 def github_source_error(github: dict, source: str, now: datetime) -> str | None:
     """A quota read or refresh attempt cannot renew an older source's truth."""
     if error := github.get("errors", {}).get(source):
@@ -977,7 +1075,8 @@ def render(model: dict, width: int = 160, height: int = 45,
         parts.append(label)
     per = " · ".join(parts)
     auto = f" · auto:{autoscale_mode}" if autoscale_mode != "off" else ""
-    lines.append(section(f"ACTIVE SLOTS · {len(busy)} running / {total_slots if slots_known else 'unknown'} ({per}){auto} · gate seats {local['gateSeats']}", width))
+    lines.append(tag("SLOTS", rgb(WHITE, f"{len(busy)} running / {total_slots if slots_known else 'unknown'}", bold=True)
+                     + rgb(DIM, f" ({per}){auto} · gate seats {local['gateSeats']}")))
     slot_rows = []
     slot_names = list(local["slots"])
     slot_names.extend(dict.fromkeys(w["provider"] for w in workers if w["provider"] not in local["slots"]))
@@ -986,31 +1085,35 @@ def render(model: dict, width: int = 160, height: int = 45,
         mine = [w for w in workers if w["provider"] == name]
         # Seats taken before an autoscale reduction finish naturally; hiding them showed
         # "codex 2/0" with no rows while two codex workers were still running.
-        for index in range(max(count, len(mine))):
-            worker = mine[index] if index < len(mine) else None
-            if worker and worker["run"]:
-                run = worker["run"]
-                title = titles.get(run["target"]) or titles.get(run["target"].replace("PR", "PR")) or rgb(DIM, "title not in current GitHub/Linear read")
-                kind = {"issue": "issue", "adopt": "gate", "fix": "fix-red"}[run["kind"]]
-                phase = run.get("phase", "?")
-                color = PURPLE if phase.startswith("agent") else BLUE if phase == "gate" else GREEN if phase == "landing" else FG
-                shown_title = clip(title, 62)
-                shown_title += " " * (62 - visible(shown_title))
-                elapsed = age(run["startedAt"], now).replace(" ago", "")
-                text = (rgb(GREEN, "● ") + rgb(FG, f"{name:<6} ", bold=True) + rgb(WHITE, f"{run['target']:<10}") + " " + shown_title
-                        + rgb(DIM, f"  {kind:<7} ") + rgb(color, f"{phase:<14}") + rgb(DIM, f" {elapsed}"))
-            elif worker:
-                text = rgb(DIM, "○ ") + rgb(FG, f"{name:<6} ") + rgb(DIM, "worker polling · " + pool_hint(name, local))
-            else:
-                text = rgb(DIM, "○ ") + rgb(FG, f"{name:<6} ") + rgb(DIM, "vacant · " + vacancy_hint(name, local, linear))
-            slot_rows.append(pad("│ " + text, width - 1) + rgb(DIM, "│"))
+        running = [w for w in mine if w["run"]]
+        for worker in running:
+            run = worker["run"]
+            known_title = run["target"] in titles
+            title = titles.get(run["target"]) or lane_title(titles, github, run["target"], now)
+            kind = {"issue": "issue", "adopt": "gate", "fix": "fix-red"}[run["kind"]]
+            phase = run.get("phase", "?")
+            color = PURPLE if phase.startswith("agent") else BLUE if phase == "gate" else GREEN if phase == "landing" else FG
+            elapsed = age(run["startedAt"], now).replace(" ago", "")
+            prefix = (INDENT + rgb(GREEN, "● ") + rgb(FG, f"{name:<10} ", bold=True) + rgb(WHITE, f"{run['target']:<10}")
+                      + rgb(DIM, f"{kind:<8}") + rgb(color, f"{phase:<14}") + rgb(DIM, f"{elapsed:>6}") + "   ")
+            row = titled(prefix, title, width)
+            text = prefix + (row[len(prefix):] if known_title else rgb(DIM, row[len(prefix):]))
+            slot_rows.append(pad(text, width))
+        # Idle seats of one lane say the same thing; one row with a count reads faster than N copies.
+        polling = len(mine) - len(running)
+        vacant = max(0, count - len(mine))
+        if polling:
+            slot_rows.append(pad(INDENT + rgb(DIM, "○ ") + rgb(FG, f"{name:<10} ") + rgb(DIM, "worker polling"
+                             + (f" ×{polling}" if polling > 1 else "") + " · " + pool_hint(name, local)), width))
+        if vacant:
+            slot_rows.append(pad(INDENT + rgb(DIM, "○ ") + rgb(FG, f"{name:<10} ") + rgb(DIM, "vacant"
+                             + (f" ×{vacant}" if vacant > 1 else "") + " · " + vacancy_hint(name, local, linear)), width))
     viewport = viewport or SlotViewport()
     rows_budget = max(1, min(len(slot_rows), max(3, height - 30)))
     visible_slots = viewport.window(slot_rows, rows_budget)
     lines.extend(visible_slots)
-    lines.append(closer(width))
     if len(slot_rows) > rows_budget:
-        lines.append(pad(rgb(DIM, f"  Rows {viewport.offset + 1}-{viewport.offset + len(visible_slots)} of {len(slot_rows)}"
+        lines.append(pad(rgb(DIM, f"{INDENT}Rows {viewport.offset + 1}-{viewport.offset + len(visible_slots)} of {len(slot_rows)}"
                              " · ↑↓ scroll · PgUp/PgDn · Home/End"), width))
 
     # Perishable capacity: the exact receipt Ovi consumes, with no HUD-side forecast math.
@@ -1021,7 +1124,7 @@ def render(model: dict, width: int = 160, height: int = 45,
         incidents = capacity.get("incidents") or []
         leases = [] if capacity_error else capacity.get("leases") or []
         source_gaps = sorted({capacity_freshness(row, now) for row in leases} - {"fresh"})
-        lines.append(pad(rgb(FG, "CAPACITY HORIZON  ", bold=True) +
+        lines.append(pad(tag("CAPACITY") +
                          rgb(ORANGE if capacity_error else RED if incidents else DIM,
                              f"unknown ({capacity_error}) · show-only" if capacity_error else
                              f"{len(leases)} leases · {len(incidents)} reported incident(s) · show-only"), width))
@@ -1046,12 +1149,12 @@ def render(model: dict, width: int = 160, height: int = 45,
                 mode, job = "UNKNOWN", "selection unknown"
             detail = (f"{row.get('alias', '?')} {remaining} · banked {banked} · {event.get('label', 'source gap')} "
                       f"{deadline} · drain {drain} @ {rate} · unused {unused} · coverage {coverage} · {mode} · {job} · {status}")
-            lines.append(pad("  " + rgb(RED if mode == "EMERGENCY" else GREEN if mode == "NORMAL" and known else ORANGE, detail), width))
+            lines.append(pad(sub(rgb(RED if mode == "EMERGENCY" else GREEN if mode == "NORMAL" and known else ORANGE, detail)), width))
         blocker = f"unknown ({capacity_error})" if capacity_error else \
             "capacity source " + ", ".join(source_gaps) if source_gaps else capacity.get("topBlocker") or "no material blocker"
-        lines.append(pad("  " + rgb(ORANGE if capacity_error or source_gaps else RED if incidents else DIM, f"top blocker: {blocker}"), width))
+        lines.append(pad(sub(rgb(ORANGE if capacity_error or source_gaps else RED if incidents else DIM, f"top blocker: {blocker}")), width))
     elif accounts.get("error"):
-        lines.append(pad(rgb(FG, "CODEX ACCOUNTS  ", bold=True) + rgb(RED, accounts["error"]), width))
+        lines.append(pad(tag("ACCOUNTS") + rgb(RED, "✕ " + accounts["error"]), width))
     else:
         parts = []
         for name, row in accounts.get("accounts", {}).items():
@@ -1071,9 +1174,9 @@ def render(model: dict, width: int = 160, height: int = 45,
             else:
                 parts.append(rgb(RED, f"✕ {detail} · retry {dur(row['resetsInS'])}"))
         summary = f"{len(accounts.get('available', []))}/{accounts.get('count', 0)} available"
-        lines.append(pad(rgb(FG, "CODEX ACCOUNTS  ", bold=True) + rgb(DIM, summary), width))
+        lines.append(pad(tag("ACCOUNTS") + rgb(DIM, "codex " + summary), width))
         for part in parts or [rgb(DIM, "no ChatGPT profiles found")]:
-            lines.append(pad("  " + part, width))
+            lines.append(pad(sub(part), width))
 
     # pipeline
     queue_error = github_source_error(github, "queue", now)
@@ -1085,13 +1188,13 @@ def render(model: dict, width: int = 160, height: int = 45,
     queued = {e["number"]: e for e in queue.get("entries", [])}
     counts = (f"open lane PRs {len(open_prs)} · draft {sum(1 for p in open_prs if p['draft'])} · non-draft {sum(1 for p in open_prs if not p['draft'])}"
               if open_known else "open lane PRs unknown · draft unknown · non-draft unknown")
-    head = f"PIPELINE · {counts} · merge queue {queue.get('depth', rgb(RED, "unknown · " + (queue_error or "unread")))}"
+    head = f"{counts} · merge queue {queue.get('depth', rgb(RED, "unknown · " + (queue_error or "unread")))}"
     if open_known:
         stamp = (github.get("readAt") or {}).get("open") or github.get("fetchedAt")
         head += " · PR read " + age(stamp, now)
     if not open_known:
         head += " · " + rgb(RED, "PR list: " + (open_error or "not-read-yet"))
-    lines.append(rgb(FG, head, bold=True))
+    lines.append(tag("PIPELINE") + head)
     pipeline_budget = max(4, height - len(lines) - 15)
     merge_colors = {"CLEAN": GREEN, "UNSTABLE": ORANGE, "BLOCKED": ORANGE, "DIRTY": RED, "BEHIND": DIM, "HAS_HOOKS": DIM, "UNKNOWN": DIM}
     for pr in open_prs[:pipeline_budget]:
@@ -1120,12 +1223,12 @@ def render(model: dict, width: int = 160, height: int = 45,
         state = rgb(DIM, "DRAFT" if pr["draft"] else "OPEN ")
         number, lane_name, issue_id = rgb(WHITE, "#" + str(pr["number"])), rgb(DIM, f"{pr['lane']:<6}"), f"{pr['issue']:<9}"
         # Keep the full disposition visible on the console before spending space on the title.
-        title_width = max(16, min(58, width - visible(f" {number} {lane_name} {issue_id}  {state} {check_text}  {note}")))
+        title_width = max(16, min(58, width - visible(f"{INDENT}{number} {lane_name} {issue_id}  {state} {check_text}  {note}")))
         title = clip(pr["title"], title_width)
         title += " " * (title_width - visible(title))
-        lines.append(pad(f" {number} {lane_name} {issue_id} {title} {state} {check_text}  {note}", width))
+        lines.append(pad(f"{INDENT}{number} {lane_name} {issue_id} {title} {state} {check_text}  {note}", width))
     if len(open_prs) > pipeline_budget:
-        lines.append(rgb(DIM, f" … {len(open_prs) - pipeline_budget} more"))
+        lines.append(rgb(DIM, f"{INDENT}… {len(open_prs) - pipeline_budget} more"))
 
     # recently merged
     merge_error = github_source_error(github, "merged", now)
@@ -1142,15 +1245,21 @@ def render(model: dict, width: int = 160, height: int = 45,
     inferred = sum(value.get("confidence") == "inferred" for value in attributions.values())
     unknown = sum(value.get("confidence") == "unknown" for value in attributions.values())
     if merge_error:
-        lines.append(rgb(FG, "RECENTLY MERGED · unknown · ", bold=True) + rgb(RED, merge_error))
+        lines.append(tag("MERGED 24h") + rgb(RED, "? unknown · " + merge_error))
     else:
         coverage = f"{verified}/{len(merged)}" if merged else "0/0"
-        lines.append(rgb(FG, f"RECENTLY MERGED · verified {coverage} · inferred {inferred} · unknown {unknown} · "
-                         f"total {len(merged)} in 24h · last lane gate {age(local.get('lastLanding'), now)}", bold=True))
-    for m in merged[:3]:
+        lines.append(tag("MERGED 24h") + rgb(WHITE, f"verified {coverage}", bold=True)
+                     + rgb(DIM, f" · inferred {inferred} · unknown {unknown} · total {len(merged)} in 24h"
+                                f" · last lane gate {age(local.get('lastLanding'), now)}"))
+
+    def merged_row(m):
         label = attribution_label(attributions[m["number"]])
-        lines.append(pad(f" {rgb(GREEN, '✓')} #{m['number']} {clip(m['title'], 90)} "
-                         f"{rgb(DIM, label + ' · ' + age(m['mergedAt'], now))}", width))
+        when = f"{age(m['mergedAt'], now).replace(' ago', ''):>6}  "
+        tail = rgb(DIM, "  " + label)
+        prefix = INDENT + rgb(GREEN, "✓ ") + rgb(DIM, when) + rgb(WHITE, f"#{m['number']} ")
+        return pad(titled(prefix, m["title"], width - visible(tail)) + tail, width)
+    merged_at = len(lines)
+    lines.extend(merged_row(m) for m in merged[:3])
 
     lines.append(promotion_line(github.get("promotion")))
     lines.append(file_overlap_line(local.get("doctor", {}).get("fileOverlap") or {}))
@@ -1177,7 +1286,7 @@ def render(model: dict, width: int = 160, height: int = 45,
                                      f"surfaced {len(escalation.get('surfaced') or [])}"))
     if not attention:
         attention.append(rgb(DIM, "no alerts recorded"))
-    lines.append(rgb(FG, "NEEDS ATTENTION  ", bold=True) + rgb(DIM, f"hold records {'unknown' if local.get('heldError') else len(local['held'])} · failures {len(local['failures'])} · ") + " · ".join(attention[:4]))
+    lines.append(tag("ATTENTION") + rgb(DIM, f"hold records {'unknown' if local.get('heldError') else len(local['held'])} · failures {len(local['failures'])} · ") + " · ".join(attention[:4]))
     throughput = joins["throughput"]
     provider_parts = []
     for provider, metric in throughput["providers"].items():
@@ -1188,28 +1297,39 @@ def render(model: dict, width: int = 160, height: int = 45,
                               f"first-pass {'n/a' if first_pass is None else f'{round(first_pass * 100)}%'} "
                               f"repair {metric['remediationRuns']} landed {landed}")
     counts = " · ".join(f"{k} {v}" for k, v in sorted(ledger.items(), key=lambda item: str(item[0]))) or "no runs"
-    lines.append(rgb(DIM, f"  24h verdicts: {counts}"))
-    lines.append(rgb(DIM, "  THROUGHPUT 24h · " + " | ".join(provider_parts)))
+    lines.append(sub(rgb(DIM, f"24h verdicts: {counts}")))
+    lines.append(sub(rgb(DIM, "THROUGHPUT 24h · " + " │ ".join(provider_parts))))
 
     # backlog
+    # Lanes reporting the same intake state share one row instead of repeating it per lane.
+    hints: dict[str, list[str]] = {}
     for name in local["slots"]:
-        lines.append(rgb(FG, f"NEW ISSUES {name}  ", bold=True) + rgb(DIM, pool_hint(name, local)))
+        hints.setdefault(pool_hint(name, local), []).append(name)
+    for hint, names in hints.items():
+        lines.append(tag("NEW ISSUES") + rgb(FG, " · ".join(names)) + rgb(DIM, "  " + hint))
     if linear.get("ok"):
         pool = linear["pool"]
         backlog = " · ".join(f"{label} {pool.get(label, 0)}" for label in LANE_LABELS)
-        lines.append(rgb(FG, "BACKLOG  ", bold=True) + rgb(DIM, f"Todo candidates {linear['poolTotal']} ({backlog}) · in progress {len(linear['active'])} · triage returns {linear['triage']}"))
+        lines.append(tag("BACKLOG") + rgb(DIM, f"Todo candidates {linear['poolTotal']} ({backlog}) · in progress {len(linear['active'])} · triage returns {linear['triage']}"))
     else:
-        lines.append(rgb(FG, "BACKLOG  ", bold=True) + rgb(RED, "Linear unavailable: " + linear.get("error", "?")))
+        lines.append(tag("BACKLOG") + rgb(RED, "✕ Linear unavailable: " + linear.get("error", "?")))
 
     # system
     cores = system["cores"]
     load = system["load1"]
     disk_color = RED if system["diskFreePct"] < 10 else ORANGE if system["diskFreePct"] < 20 else GREEN
-    lines.append(rgb(FG, "SYSTEM  ", bold=True) + rgb(DIM, f"load {load if load is not None else '?'} / {cores} cores · mem {system['memAvailPct']}% free · ")
+    lines.append(tag("SYSTEM") + rgb(DIM, f"load {load if load is not None else '?'} / {cores} cores · mem {system['memAvailPct']}% free · ")
                  + rgb(disk_color, f"disk {system['diskFreePct']}% free") + rgb(DIM, f" · runs 24h {local['runs24h']}"))
-    lines.append(rgb(DIM, "Sources: lane state + run logs (this host) · runs/ledger · Linear · GitHub · /proc | ✓ ok  ✕ problem  ○ idle  ● running"))
+    footer_row = rgb(DIM, " ● running  ○ idle  ✓ ok  ✕ problem   │   sources: lane state + run logs (this host) · runs/ledger · Linear · GitHub · /proc")
 
-    lines = [pad(line, width) for line in lines[:height]]
+    # Spare rows go to more recent merges instead of a blank bottom third; the footer stays last.
+    spare = height - len(lines) - 1
+    if spare > 0 and len(merged) > 3:
+        lines[merged_at + 3:merged_at + 3] = [merged_row(m) for m in merged[3:3 + spare]]
+    lines = [pad(line, width) for line in lines[:height - 1]]
+    while len(lines) < height - 1:
+        lines.append(" " * width)
+    lines.append(pad(footer_row, width))
     while len(lines) < height:
         lines.append(" " * width)
     return lines
@@ -1548,7 +1668,7 @@ def worker_rows(f: dict, width: int) -> list[str]:
         mine = [w for w in workers if w["provider"] == name]
         for worker in (w for w in mine if w.get("run")):
             run = worker["run"]
-            title = f["titles"].get(run["target"]) or "title not in current GitHub/Linear read"
+            title = lane_title(f["titles"], f["github"], run["target"], now)
             kind = {"issue": "issue", "adopt": "gate", "fix": "fix-red"}.get(run["kind"], run["kind"])
             elapsed = since(run["startedAt"], now)
             rows.append(titled(paint("ok", "● ") + f"{name:<10} {run['target']:<9} {kind:<7} {run.get('phase', '?'):<13} "
@@ -2101,6 +2221,15 @@ def build_model(host, remote: Remote | None = None) -> dict:
     local = local_model(host)
     targets = [w["run"]["target"] for w in local["workers"] if w["run"]]
     github = remote.github if remote else github_model()
+    if not remote:
+        known = {f"PR{pr['number']}" for pr in github.get("open") or []}
+        missing = sorted({int(m.group(1)) for t in targets if t not in known and (m := TARGET_PR.match(t or ""))})
+        if missing:
+            cache = host.state / TARGET_TITLES
+            github["targets"], error = fetch_target_titles(missing, cache)
+            if error:
+                github.setdefault("errors", {})["targets"] = error
+            record_closed_target_alerts(github["targets"], cache, host.state / TARGET_ALERTS)
     model = {"local": local,
              "linear": remote.linear if remote else linear_model(host.linear_env, targets),
              "github": github,

@@ -14,6 +14,9 @@ import { pathToFileURL } from 'node:url';
 
 export const TRUSTED_SIZE_GUARD_LABEL_BOTS = Object.freeze([
   'jovie-bot[bot]',
+  'jovie-ci-lane[bot]',
+  'jovie-symphony-lane[bot]',
+  'jovie-agents-lane[bot]',
   'claude[bot]',
 ]);
 
