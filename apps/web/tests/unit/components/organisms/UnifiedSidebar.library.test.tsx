@@ -60,7 +60,8 @@ const signOutMock = vi.hoisted(() => vi.fn());
 const userButtonPropsMock = vi.hoisted(() => vi.fn());
 const nowPlayingBridgePropsMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/desktop/electron-bridge', () => ({
+vi.mock('@/lib/desktop/electron-bridge', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/desktop/electron-bridge')>()),
   isElectronRuntime: () =>
     document.documentElement.dataset.desktopRuntime === 'electron' ||
     electronRuntimeMock.isElectronRuntime,
@@ -646,6 +647,27 @@ describe('UnifiedSidebar library route', () => {
     expect(marks[0]?.closest('[data-sidebar="header"]')).not.toBeNull();
   });
 
+  it('prefetches Shipping on hover and keyboard focus without duplicate requests', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => new Promise(() => {}));
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.ADMIN_OPS,
+      section: 'ov',
+      variant: 'ov',
+    });
+    const nav = screen.getByRole('navigation', { name: 'OV Navigation' });
+    const link = within(nav).getByRole('link', { name: 'Shipping' });
+    fireEvent.mouseOver(link);
+    fireEvent.focus(link);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/hud/shipping-state',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    fetchMock.mockRestore();
+  });
+
   it('renders dedicated operator navigation without the customer dashboard nav', () => {
     const { container } = renderUnifiedSidebar({
       pathname: APP_ROUTES.ADMIN_OPS,
@@ -759,6 +781,27 @@ describe('UnifiedSidebar library route', () => {
     expect(globalThis.localStorage?.getItem('ovie.nav.tools-open.v1')).toBe(
       '1'
     );
+  });
+
+  it('exposes Inbox while Tools is collapsed and selects only Inbox', () => {
+    globalThis.localStorage?.removeItem('ovie.nav.tools-open.v1');
+    renderUnifiedSidebar({ pathname: APP_ROUTES.ADMIN_INBOX, section: 'ov' });
+    const navigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    const inbox = within(navigation).getByRole('link', { name: 'Inbox' });
+    expect(inbox).toBeVisible();
+    expect(inbox).toHaveAttribute('href', APP_ROUTES.ADMIN_INBOX);
+    expect(inbox).toHaveAttribute('aria-current', 'page');
+    expect(
+      within(navigation).getByRole('link', { name: 'Home' })
+    ).not.toHaveAttribute('aria-current');
+    expect(
+      within(navigation).getByRole('button', { name: 'Tools' })
+    ).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      within(navigation).queryByRole('link', { name: 'Needs You' })
+    ).toBeNull();
   });
 
   it('renders founder lists in the Ovie sidebar outside the canonical landmark', async () => {

@@ -864,6 +864,18 @@ nodes:
       - workflow_run
     terminalReceipt: job:deliver
     jobCount: 5
+  - name: PR Fleet Rules
+    path: .github/workflows/pr-fleet-rules.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - merge_group
+      - pull_request
+    terminalReceipt: job:fleet
+    jobCount: 1
   - name: PR Preparation Canary
     path: .github/workflows/pr-preparation-canary.yml
     active: true
