@@ -40,7 +40,8 @@ export function createElevenLabsStreamProvider(
     },
     health: () =>
       typeof globalThis.WebSocket !== 'undefined' &&
-      typeof globalThis.AudioContext !== 'undefined',
+      typeof globalThis.AudioContext !== 'undefined' &&
+      typeof globalThis.AudioWorkletNode !== 'undefined',
     async openStream(mic, signal) {
       if (!mic) throw new DictationError('audio-capture');
       const csrfToken = getBrowserCsrfToken();
@@ -181,7 +182,7 @@ export function createElevenLabsStreamProvider(
             else stopCapture = dispose;
           })
           .catch(() => {
-            if (!closed && !stopping) fail('audio-capture');
+            if (!closed && !stopping) fail('provider-down');
           });
       };
       socket.onmessage = event => {
