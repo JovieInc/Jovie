@@ -220,13 +220,10 @@ test.describe('App-shell scroll-pane regression', () => {
       expectedPath: /\/app\/ov\/ops(?:\?|$)/,
       scrollSelector: '[data-testid="hud-admin-page"]',
     },
-    {
-      label: 'dashboard earnings',
-      bypass:
-        '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/dashboard/earnings',
-      expectedPath: /\/app\/dashboard\/earnings/,
-      scrollSelector: '[data-testid="dashboard-earnings-content-panel"]',
-    },
+    // `dashboard earnings` retired: since #20359 (JOV-7636) /app/dashboard/
+    // earnings redirects to the profile settings pay tab, so the earnings
+    // scroll pane no longer exists. Settings scroll is covered by
+    // settings-profile-pane.spec.ts.
     {
       label: 'dashboard audience',
       bypass:

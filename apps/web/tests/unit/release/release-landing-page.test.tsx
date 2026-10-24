@@ -177,6 +177,12 @@ vi.mock('@/lib/utm', () => ({
     return url.includes('?') ? `${url}&${qs}` : `${url}?${qs}`;
   },
   extractUTMParams: () => ({}),
+  SMART_LINK_DEFAULT_UTM_PARAMS: { utm_source: 'jovie' },
+  // No visit UTMs in jsdom, so the shared rule falls back to the defaults.
+  resolveSmartLinkOutboundUtmParams: (
+    _searchParams: URLSearchParams,
+    defaults: Record<string, string> = { utm_source: 'jovie' }
+  ) => ({ ...defaults }),
 }));
 
 // ---------------------------------------------------------------------------

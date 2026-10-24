@@ -1,13 +1,21 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { useEffect } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   PreviewPanelProvider,
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { ProfilePreviewOpener } from '@/app/app/(shell)/dashboard/profile/ProfilePreviewOpener';
 import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
@@ -21,7 +29,7 @@ import { detectReversibleControl } from '@/tests/utils/reversible-control-detect
  * survived the route change.
  */
 function RailProbe() {
-  const { isOpen, open } = usePreviewPanelState();
+  const { isOpen, open, close } = usePreviewPanelState();
   const { previewData } = usePreviewPanelData();
 
   return (
@@ -32,6 +40,9 @@ function RailProbe() {
       </div>
       <button data-testid='open-rail' onClick={open} type='button'>
         open rail
+      </button>
+      <button data-testid='close-rail' onClick={close} type='button'>
+        close rail
       </button>
     </div>
   );
@@ -66,6 +77,10 @@ function ReversibleRightRailProbe() {
 }
 
 describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('starts closed', () => {
     renderShell('chat');
     expect(screen.getByTestId('rail-open').textContent).toBe('false');
@@ -82,6 +97,73 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
     );
     expect(screen.getByTestId('rail-open').textContent).toBe('true');
     window.history.pushState({}, '', '/');
+  });
+
+  it('reopens a default-open profile surface after a scope round trip', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('1024'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+
+    const { rerender } = render(
+      <PreviewPanelProvider defaultOpen scope='artist-profile-settings'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+
+    rerender(
+      <PreviewPanelProvider scope='app-shell'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('false');
+    });
+
+    rerender(
+      <PreviewPanelProvider defaultOpen scope='artist-profile-settings'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+  });
+
+  it('keeps the profile rail open when the page opener remounts on the way back', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('1024'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+
+    const roundTrip = (scope: string, defaultOpen = false) => (
+      <PreviewPanelProvider defaultOpen={defaultOpen} scope={scope}>
+        <RailProbe />
+        {scope === 'artist-profile-settings' ? <ProfilePreviewOpener /> : null}
+      </PreviewPanelProvider>
+    );
+
+    const { rerender } = render(roundTrip('artist-profile-settings', true));
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+
+    rerender(roundTrip('app-shell'));
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('false');
+    });
+
+    rerender(roundTrip('artist-profile-settings', true));
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
   });
 
   it('closes the rail when the surface scope changes to chat', () => {
@@ -158,6 +240,69 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
     expect(screen.getByTestId('rail-data').textContent).toBe('none');
   });
 
+  it('keeps the reopened default-open rail hydrated after a scope round trip', async () => {
+    function MountOnlyHydrator() {
+      const { setPreviewData } = usePreviewPanelData();
+      useEffect(() => {
+        setPreviewData(current =>
+          current
+            ? current
+            : {
+                username: 'alex',
+                displayName: 'Alex',
+                avatarUrl: null,
+                bio: null,
+                genres: null,
+                location: null,
+                hometown: null,
+                activeSinceYear: null,
+                links: [],
+                profilePath: '/alex',
+                dspConnections: {
+                  spotify: { connected: false, artistName: null },
+                  appleMusic: { connected: false, artistName: null },
+                },
+              }
+        );
+        // Mount-only on purpose: the real page hydrator re-runs on its own
+        // dependencies and never re-runs after a provider-side wipe.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return null;
+    }
+
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('1024'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+
+    const { rerender } = render(
+      <PreviewPanelProvider scope='app-shell'>
+        <MountOnlyHydrator />
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-data').textContent).toBe('alex');
+    });
+
+    rerender(
+      <PreviewPanelProvider defaultOpen scope='artist-profile-settings'>
+        <MountOnlyHydrator />
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+    // The scope reset reopens the rail; the wipe must not swallow the data
+    // the page hydrator already mounted, or the rail sticks on its empty
+    // skeleton (Account → Back round trip).
+    expect(screen.getByTestId('rail-data').textContent).toBe('alex');
+  });
+
   it('certifies repeated cycles on the composed right rail and drawer', async () => {
     const user = userEvent.setup();
     render(
@@ -210,5 +355,89 @@ describe('PreviewPanelProvider scope reset (JOV-7150)', () => {
         );
       },
     });
+  });
+
+  /**
+   * Controllable lg gate: the provider's desktop presentation is driven by
+   * a live (min-width: 1024px) media query. These tests resize across the
+   * boundary the way the browser does — via change events — because the
+   * chat composer spec proves the crossing on a live viewport.
+   */
+  function installLargeScreenGate(initialLarge: boolean) {
+    const listeners = new Set<(event: { matches: boolean }) => void>();
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('1024') ? initialLarge : false,
+      media: query,
+      addEventListener: (_type: string, listener: never) => {
+        listeners.add(listener as (event: { matches: boolean }) => void);
+      },
+      removeEventListener: (_type: string, listener: never) => {
+        listeners.delete(listener as (event: { matches: boolean }) => void);
+      },
+    }));
+    return {
+      crossInto(large: boolean) {
+        for (const listener of listeners) {
+          listener({ matches: large });
+        }
+      },
+    };
+  }
+
+  it('keeps an explicitly opened rail open when the viewport crosses below lg', () => {
+    const gate = installLargeScreenGate(true);
+    render(
+      <PreviewPanelProvider scope='chat'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    // The ?panel=profile deep link, rail toggle and `]` shortcut all open
+    // through the same explicit path.
+    fireEvent.click(screen.getByTestId('open-rail'));
+    expect(screen.getByTestId('rail-open').textContent).toBe('true');
+
+    // Below lg the drawer re-presents the SAME open rail as a modal sheet
+    // (RightDrawer's mobile branch sets aria-modal) — the crossing must not
+    // silently discard the user's open rail.
+    act(() => gate.crossInto(false));
+    expect(screen.getByTestId('rail-open').textContent).toBe('true');
+
+    // Dismissing the sheet is still the same explicit close contract.
+    fireEvent.click(screen.getByTestId('close-rail'));
+    expect(screen.getByTestId('rail-open').textContent).toBe('false');
+  });
+
+  it('closes a default-open rail when the viewport crosses below lg', async () => {
+    const gate = installLargeScreenGate(true);
+    render(
+      <PreviewPanelProvider defaultOpen scope='app-shell'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+
+    // An unsolicited default-open rail must not become an unsolicited modal
+    // when the viewport crosses below lg (JOV-7150 closed-by-default).
+    act(() => gate.crossInto(false));
+    expect(screen.getByTestId('rail-open').textContent).toBe('false');
+  });
+
+  it('keeps a user-reopened default-open rail open across the lg crossing', async () => {
+    const gate = installLargeScreenGate(true);
+    render(
+      <PreviewPanelProvider defaultOpen scope='app-shell'>
+        <RailProbe />
+      </PreviewPanelProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('rail-open').textContent).toBe('true');
+    });
+    // The user's own reopen of a surface rail is an explicit open.
+    fireEvent.click(screen.getByTestId('open-rail'));
+
+    act(() => gate.crossInto(false));
+    expect(screen.getByTestId('rail-open').textContent).toBe('true');
   });
 });

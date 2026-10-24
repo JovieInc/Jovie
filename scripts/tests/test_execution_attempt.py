@@ -682,14 +682,20 @@ print(json.dumps(result))
         self.env = {**attempt.os.environ, "PATH": f"{self.root}:/usr/bin:/bin", "PYTHONPATH": str(MODULE.parent),
                     "LANES_STATE": str(self.root / "state"), "FIXTURE_GITHUB_STATE": str(self.remote)}
         self.env.pop(attempt.lifecycle.FD_ENV, None)
+    # One CLI transition verifies several immutable objects through real
+    # tracked helpers (13 calls for claim, 22 for an ambiguous boundary), so a
+    # loaded runner pays one interpreter start per helper call. That cost is
+    # wall-clock, not a hang: the fixed 30 s bound timed out on merge groups
+    # (2026-10-24 queue ejections) and, through the staged release self-test,
+    # refused the release and ejected UpdateTest with it (JOV-8483). The guard
+    # below only bounds a hung CLI; the assertions are unchanged.
+    CLI_HANG_GUARD_S = 120
+
     def cli(self, command, *, enabled=False, **fields):
         request = {"command": command, "path": str(self.root / "ledger.jsonl"), "ident": self.ident,
                    "coordination": self.coord, **fields}
-        # One CLI transition verifies several immutable objects through real
-        # tracked helpers (13 calls for claim, 22 for an ambiguous boundary).
-        # Bound the whole fixture without imposing a 10s budget on all helpers.
         result = subprocess.run([sys.executable, str(self.enabled if enabled else MODULE)], input=json.dumps(request),
-                                capture_output=True, text=True, env=self.env, timeout=30)
+                                capture_output=True, text=True, env=self.env, timeout=self.CLI_HANG_GUARD_S)
         return result.returncode, json.loads(result.stdout)
     def claim(self, *, enabled=False):
         return self.cli("claim", enabled=enabled, owner=owner(), policy=policy(), trigger={"triggerId": "same"}, now=100)

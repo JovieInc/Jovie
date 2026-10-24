@@ -403,9 +403,11 @@ export function parseCanonicalSurfaces(source) {
   }
 
   const surfaces = [];
+  // Surface records have two-space indentation; nested outcomeMission ids
+  // belong to the record and must never split it.
   const chunks = source
     .slice(start)
-    .split(/\{\s*\n\s*id:\s*'/)
+    .split(/\n  \{\s*\n    id:\s*'/)
     .slice(1);
 
   for (const chunk of chunks) {

@@ -1247,7 +1247,7 @@ export async function createFreshUser(page: Page, uniqueSeed: string) {
       metadata: { source: 'e2e-smoke-bypass' },
     });
 
-    await setTestAuthBypassSession(page, null, clerkUserId);
+    await setTestAuthBypassSession(page, null, clerkUserId, { email });
     return { email, clerkUserId };
   }
 

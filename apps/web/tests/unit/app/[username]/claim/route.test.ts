@@ -33,6 +33,15 @@ vi.mock('@/lib/claim/context', () => ({
   clearPendingClaimContext: mockClearPendingClaimContext,
   readPendingClaimContext: mockReadPendingClaimContext,
   writePendingClaimContext: mockWritePendingClaimContext,
+  applyPendingClaimCookie: (
+    response: {
+      cookies: { set: (name: string, value: string) => void };
+    },
+    _context: unknown
+  ) => {
+    response.cookies.set('jovie_pending_claim', 'attached');
+    return response;
+  },
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -165,6 +174,34 @@ describe('Claim route', () => {
     );
     expect(response.headers.get('location')).toContain('handle=e2eclaimartist');
     expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+
+    mockGetProfileByUsername.mockResolvedValueOnce({
+      id: 'fixture-profile',
+      username: 'e2eclaimartist',
+      usernameNormalized: 'e2eclaimartist',
+      displayName: 'E2E Claim Artist',
+      spotifyId: 'fixture_spotify',
+      spotifyUrl: 'https://open.spotify.com/artist/fixture_spotify',
+      isClaimed: false,
+      settings: {},
+    });
+    mockReadPendingClaimContext.mockResolvedValueOnce({
+      mode: 'token_backed',
+      creatorProfileId: 'fixture-profile',
+      username: 'e2eclaimartist',
+      claimTokenHash: 'verified-hash',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    const loopbackResponse = await GET(
+      new NextRequest('http://127.0.0.1:3100/e2eclaimartist/claim?next=auth', {
+        headers: { host: '127.0.0.1:3100' },
+      }),
+      { params: Promise.resolve({ username: 'e2eclaimartist' }) }
+    );
+    expect(loopbackResponse.headers.get('location')).toContain(
+      'http://127.0.0.1:3100/signup?'
+    );
   });
 
   it('redirects to / for invalid username (length or pattern)', async () => {

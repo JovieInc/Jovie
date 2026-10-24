@@ -16,6 +16,7 @@ import {
   mockHandlerHandle,
   mockUpdateBilling,
   setSimulateLeaseLossBeforeFinalize,
+  setSimulateReconciliationCaptureFailure,
   setSkipProcessing,
 } from './webhooks.test-utils';
 
@@ -24,6 +25,7 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
     vi.clearAllMocks();
     setSkipProcessing(false);
     setSimulateLeaseLossBeforeFinalize(false);
+    setSimulateReconciliationCaptureFailure(false);
     mockGetPlanFromPriceId.mockReturnValue('standard');
     mockGetHandler.mockReturnValue(null);
   });
@@ -65,6 +67,85 @@ describe('/api/stripe/webhooks - Error Propagation', () => {
     expect(response.status).toBe(500);
     const data = await response.json();
     expect(data.error).toBe('Webhook processing failed');
+    expect(mockDbUpdateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ processedAt: expect.any(Date) })
+    );
+    expect(mockDbUpdateSet).toHaveBeenCalledWith({
+      processingStartedAt: null,
+    });
+  });
+
+  // Imported lazily: a static import would load the real DB session before
+  // webhooks.test-utils registers its mocks.
+  async function reconciliationModule() {
+    return import('@/lib/stripe/webhooks/reconciliation');
+  }
+
+  async function unknownPriceRequest() {
+    const { StripeReconciliationRequiredError } = await reconciliationModule();
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_unknown_price',
+      type: 'customer.subscription.updated',
+      created: Math.floor(Date.now() / 1000),
+      data: { object: { id: 'sub_unknown_price' } },
+    });
+    mockGetHandler.mockReturnValue({
+      eventTypes: ['customer.subscription.updated'] as const,
+      handle: mockHandlerHandle,
+    });
+    mockHandlerHandle.mockRejectedValue(
+      new StripeReconciliationRequiredError(
+        'unknown_price_id',
+        'Unknown price ID: price_unknown',
+        { priceIds: ['price_unknown'], customerId: 'cus_123' }
+      )
+    );
+    return new NextRequest('http://localhost:3000/api/stripe/webhooks', {
+      method: 'POST',
+      headers: { 'stripe-signature': 'sig_test' },
+      body: 'test-body',
+    });
+  }
+
+  it('acknowledges an unmapped paid price only after durably queuing it for reconciliation', async () => {
+    const response = await (await getPost())(await unknownPriceRequest());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      received: true,
+      reconciliation: 'needs_reconciliation',
+    });
+    expect(mockDbUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reconciliationStatus: 'needs_reconciliation',
+        reconciliationReason: 'unknown_price_id',
+        reconciliationContext: expect.objectContaining({
+          priceIds: ['price_unknown'],
+          customerId: 'cus_123',
+          stripeEventId: 'evt_unknown_price',
+        }),
+        processingStartedAt: null,
+      })
+    );
+    // Never marked processed, so replay re-drives it once the price is mapped.
+    expect(mockDbUpdateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ processedAt: expect.any(Date) })
+    );
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Stripe event needs reconciliation',
+      expect.any(
+        (await reconciliationModule()).StripeReconciliationRequiredError
+      ),
+      expect.objectContaining({ stripeEventId: 'evt_unknown_price' })
+    );
+  });
+
+  it('returns 500 so Stripe retries when the reconciliation capture cannot be written', async () => {
+    setSimulateReconciliationCaptureFailure(true);
+
+    const response = await (await getPost())(await unknownPriceRequest());
+
+    expect(response.status).toBe(500);
     expect(mockDbUpdateSet).not.toHaveBeenCalledWith(
       expect.objectContaining({ processedAt: expect.any(Date) })
     );

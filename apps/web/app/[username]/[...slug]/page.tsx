@@ -1,18 +1,8 @@
 import type { Metadata } from 'next';
-import { unstable_cache } from 'next/cache';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
-import {
-  getLegacyProfileModeRedirectHref,
-  isLegacyProfileModeAlias,
-} from '@/app/[username]/_lib/mode-route-redirect';
-import { shouldBypassPublicProfileQaCache } from '@/app/[username]/_lib/public-profile-qa';
-import {
-  getContentBySlug,
-  getCreatorByUsername,
-  getUnpublishedReleasePresence,
-} from '@/app/[username]/[slug]/_lib/data';
-import { sanitizeCacheTags } from '@/lib/cache/tags';
-import { findRedirectByOldSlug } from '@/lib/discography/slug';
+import { isLegacyProfileModeAlias } from '@/app/[username]/_lib/mode-route-redirect';
+import { resolveProfileModeAliasDecision } from '@/app/[username]/_lib/profile-mode-alias-resolution';
+import { getCreatorByUsername } from '@/app/[username]/[slug]/_lib/data';
 import { REDIRECT_SINK_METADATA } from '@/lib/profile/metadata';
 import { hasProfileModeAliasContentCandidate } from './_lib/content-candidate';
 
@@ -64,42 +54,6 @@ function getAliasRequest(
     : { aliasSlug };
 }
 
-async function getAliasCollisionState(
-  creatorProfileId: string,
-  aliasSlug: string
-) {
-  const load = () =>
-    Promise.all([
-      findRedirectByOldSlug(creatorProfileId, aliasSlug, {
-        onError: 'throw',
-      }),
-      getUnpublishedReleasePresence(creatorProfileId, aliasSlug, {
-        onError: 'throw',
-      }),
-    ]);
-
-  if (
-    process.env.NODE_ENV === 'test' ||
-    process.env.NODE_ENV === 'development' ||
-    shouldBypassPublicProfileQaCache()
-  ) {
-    return load();
-  }
-
-  return unstable_cache(
-    load,
-    [`profile-mode-alias-collision-${creatorProfileId}-${aliasSlug}`],
-    {
-      tags: sanitizeCacheTags([
-        'smartlink-content',
-        `smartlink-content:${creatorProfileId}`,
-        `smartlink-content:${creatorProfileId}:${aliasSlug}`,
-      ]),
-      revalidate: 300,
-    }
-  )();
-}
-
 // Catch-all for unknown sub-paths — returns a context-aware 404.
 // Marked noindex to avoid indexing transient or unknown paths.
 export async function generateMetadata({
@@ -134,57 +88,34 @@ export default async function CatchAllPage({
   const aliasRequest = getAliasRequest(slug);
   if (!aliasRequest) notFound();
 
-  const creator = await getCreatorByUsername(username.toLowerCase());
-  if (!creator) notFound();
-
-  // Start independent collision and candidate checks together. The common
-  // profile-mode alias path performs bounded ID-only checks in parallel;
-  // any possible content still delegates to the canonical smart-link loader.
-  const collisionStatePromise = getAliasCollisionState(
-    creator.id,
-    aliasRequest.aliasSlug
-  ).then(
-    value => ({ ok: true as const, value }),
-    error => ({ error, ok: false as const })
+  // The shared decision owns the full collision/redirect order and is also
+  // used by the edge decision endpoint, so the page and the fast path can
+  // never disagree about which outcome an alias resolves to.
+  const decision = await resolveProfileModeAliasDecision(
+    username,
+    aliasRequest.aliasSlug,
+    aliasRequest.source
   );
-  const hasContentCandidate = await hasProfileModeAliasContentCandidate(
-    creator.id,
-    aliasRequest.aliasSlug
-  );
-  const content = hasContentCandidate
-    ? await getContentBySlug(creator.id, aliasRequest.aliasSlug)
-    : null;
-  if (!content) {
-    const collisionState = await collisionStatePromise;
-    if (!collisionState.ok) throw collisionState.error;
-    const [oldSlugRedirect, unpublished] = collisionState.value;
-    if (oldSlugRedirect) {
-      permanentRedirect(
-        `/${creator.usernameNormalized}/${oldSlugRedirect.currentSlug}`
-      );
-    }
 
-    if (!unpublished) {
-      const legacyModeHref = getLegacyProfileModeRedirectHref(
-        creator.usernameNormalized,
-        aliasRequest.aliasSlug,
-        aliasRequest.source ? { source: aliasRequest.source } : undefined
-      );
-      if (legacyModeHref) redirect(legacyModeHref);
-      notFound();
-    }
+  if (decision.kind === 'moved' && decision.href) {
+    permanentRedirect(decision.href);
+  }
+  if (decision.kind === 'mode' && decision.href) {
+    redirect(decision.href);
+  }
+  if (decision.kind === 'missing' || !decision.creatorUsername) {
+    notFound();
   }
 
   // Published and unpublished collisions keep the original public URL and use
-  // the canonical smart-link renderer. Data helpers are request-memoized, so
-  // this delegation does not turn the collision check into duplicate DB work.
+  // the canonical smart-link renderer.
   const { default: ContentSmartLinkPage } = await import(
     '@/app/[username]/[slug]/page'
   );
   return (
     <ContentSmartLinkPage
       params={Promise.resolve({
-        username: creator.usernameNormalized,
+        username: decision.creatorUsername,
         slug: aliasRequest.aliasSlug,
       })}
     />

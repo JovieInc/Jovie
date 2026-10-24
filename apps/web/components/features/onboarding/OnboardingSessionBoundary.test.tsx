@@ -134,6 +134,12 @@ describe('onboarding identity boundary', () => {
     render(<OnboardingSessionBoundary sessionLabel='pending' />);
     expect(mocks.fetch).not.toHaveBeenCalled();
     expect(mocks.shell).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Restoring your conversation…',
+      })
+    ).toBeVisible();
   });
   it('keeps an actual empty anonymous entry available for a new homepage handoff', async () => {
     mocks.auth.userId = null;

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { INSTANT_MERCH_COPY } from '@/data/instantMerchCopy';
+import { documentTitle } from '@/lib/seo/document-title';
 import { InstantMerchLanding } from './InstantMerchLanding';
 
 export const revalidate = false;
@@ -9,7 +10,7 @@ export const revalidate = false;
 const INSTANT_MERCH_URL = `${BASE_URL}${APP_ROUTES.INSTANT_MERCH}`;
 
 export const metadata: Metadata = {
-  title: `${INSTANT_MERCH_COPY.seo.title} | ${APP_NAME}`,
+  title: documentTitle(`${INSTANT_MERCH_COPY.seo.title} | ${APP_NAME}`),
   description: INSTANT_MERCH_COPY.seo.description,
   metadataBase: new URL(BASE_URL),
   alternates: { canonical: INSTANT_MERCH_URL },

@@ -34,7 +34,14 @@ const BLOCKED: ReadinessInputs = {
     payers: 0,
     worst: { stepId: 'start', score: 0.8 },
   },
-  queue: { ready: 44, certified: 0, approved: 0, needsProfile: 38 },
+  queue: {
+    ready: 6,
+    needsEvidence: 38,
+    flagged: 2,
+    certified: 0,
+    approved: 0,
+    needsProfile: 38,
+  },
   evidence: { built: 6, covered: 0 },
   sendPath: {
     pipelineEnabled: false,
@@ -103,7 +110,7 @@ describe('onboarding readiness', () => {
       'Fail · 0/5 would pay · worst step start 0.8/10 · today'
     );
     expect(byId(readiness, 'certifications').detail).toBe(
-      '6 built profiles to review · 38 waiting on a profile build · 0 certified · 0 approved'
+      '6 ready to certify · 38 need evidence (38 waiting on a profile build) · 2 flagged · 0 certified · 0 approved'
     );
     expect(byId(readiness, 'evidence')).toMatchObject({
       status: 'red',
@@ -154,7 +161,14 @@ describe('onboarding readiness', () => {
       ...BLOCKED,
       cone: { eligible: true, requirements: [] },
       funnel: { at: NOW.toISOString(), pass: true, payers: 4, worst: null },
-      queue: { ready: 0, certified: 3, approved: 2, needsProfile: 0 },
+      queue: {
+        ready: 0,
+        needsEvidence: 0,
+        flagged: 0,
+        certified: 3,
+        approved: 2,
+        needsProfile: 0,
+      },
       evidence: { built: 6, covered: 6 },
       sendPath: {
         ...BLOCKED.sendPath!,

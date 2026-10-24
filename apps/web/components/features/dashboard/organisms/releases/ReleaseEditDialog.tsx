@@ -18,6 +18,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { formatReleaseDateShort } from '@/lib/discography/formatting';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
@@ -102,7 +103,7 @@ export function ReleaseEditDialog({
                   >
                     {release.releaseDate
                       ? formatReleaseDateShort(release.releaseDate)
-                      : 'Date TBD'}
+                      : COPY_FALLBACKS.date}
                   </Badge>
                 }
               />
