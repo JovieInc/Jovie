@@ -509,3 +509,29 @@ describe('Navigation config', () => {
     });
   });
 });
+
+describe('SuggestedDspMatches action semantics (JOV-8873)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseDspMatchActions.mockReturnValue(defaultMatchActions);
+  });
+
+  it('names confirm and reject actions and keeps them outside the popover trigger', () => {
+    mockUseDspMatchesQuery.mockReturnValue({
+      data: [createMatch()],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    render(<SuggestedDspMatches profileId='profile-1' />);
+
+    const confirm = screen.getByRole('button', {
+      name: /^Confirm .+ match for Test Artist$/,
+    });
+    const reject = screen.getByRole('button', {
+      name: /^Reject .+ match for Test Artist$/,
+    });
+    expect(confirm.parentElement?.closest('button')).toBeNull();
+    expect(reject.parentElement?.closest('button')).toBeNull();
+  });
+});

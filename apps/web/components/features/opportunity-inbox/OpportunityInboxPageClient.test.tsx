@@ -1234,3 +1234,19 @@ describe('creator-only empty home', () => {
     expect(screen.getByRole('link', { name: 'Start A Chat' })).toBeVisible();
   });
 });
+
+describe('OpportunityInboxPageClient a11y contract (JOV-8873)', () => {
+  it('renders the completed feed as a semantic list', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/opportunity-inbox/OpportunityInboxPageClient.tsx'),
+      'utf8'
+    );
+    expect(source).toContain("<ul className='system-b-opportunity-inbox-feed-list'>");
+    expect(source).not.toContain("<div className='system-b-opportunity-inbox-feed-list'>");
+  });
+});

@@ -120,3 +120,20 @@ describe('AdminTablePagination', () => {
     expect(screen.queryByTestId('admin-pagination-range')).toBeNull();
   });
 });
+
+describe('AdminTablePagination page-size name (JOV-8873)', () => {
+  it('names the rows-per-page select', () => {
+    render(
+      <AdminTablePagination
+        {...baseProps}
+        canPrev
+        canNext
+        pageSize={20}
+        onPageSizeChange={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('combobox', { name: 'Rows Per Page' })
+    ).toBeInTheDocument();
+  });
+});

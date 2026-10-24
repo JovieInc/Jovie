@@ -371,3 +371,18 @@ describe('TourDateSidebar analytics section', () => {
     expect(screen.queryByText('No city data yet')).not.toBeInTheDocument();
   });
 });
+
+describe('TourDateSidebar a11y contract (JOV-8873)', () => {
+  it('names the delete action explicitly', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/dashboard/organisms/tour-dates/TourDateSidebar.tsx'),
+      'utf8'
+    );
+    expect(source).toContain("aria-label='Delete Tour Date'");
+  });
+});
