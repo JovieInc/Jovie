@@ -637,7 +637,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     // wraps the PG error — outer message names the query, the 42P01 code and
     // "relation does not exist" live on the cause.
     const driftError = new Error(
-      'Failed query: select count(*) from "suggested_actions" where ("suggested_actions"."user_id" = $1 and "suggested_actions"."status" = $2)',
+      'Failed query: select count(*) from "suggested_actions" where ("suggested_actions"."user_id" = $1 and "suggested_actions"."status" = $2 and ("suggested_actions"."kind" <> $3 and "suggested_actions"."kind" not ilike $4 and "suggested_actions"."kind" not ilike $5 and "suggested_actions"."kind" not ilike $6))',
       {
         cause: Object.assign(
           new Error('relation "suggested_actions" does not exist'),

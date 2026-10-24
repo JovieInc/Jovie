@@ -545,15 +545,14 @@ export function DashboardNav({
                       className='size-(--app-shell-sidebar-icon-size)'
                       aria-hidden='true'
                     />
-                    {inboxNavigation?.state === 'available' &&
-                    (inboxNavigation.pendingCount ?? 0) > 0 ? (
+                    {/* JOV-8968: passive dot only — no count badge. The dot
+                        reads the same Inbox source the page renders. */}
+                    {(inboxNavigation?.pendingCount ?? 0) > 0 ? (
                       <span
-                        role='status'
-                        aria-label={`${inboxNavigation.pendingCount} pending items`}
-                        className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent text-(length:--app-shell-sidebar-badge-font-size) font-bold text-(--color-bg-base)'
-                      >
-                        {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
-                      </span>
+                        data-inbox-attention-dot=''
+                        aria-hidden='true'
+                        className='absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-accent'
+                      />
                     ) : hasRuntimeUpdate ? (
                       <span
                         aria-hidden='true'

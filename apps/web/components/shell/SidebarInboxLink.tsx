@@ -15,8 +15,9 @@ export function SidebarInboxLink({
 }) {
   const hasRuntimeUpdate = Boolean(useRuntimeUpdate()?.available);
   const pending = availability?.state === 'available';
+  // JOV-8968: the bell is a passive dot — state text only, never a count.
   const label = pending
-    ? `Inbox — ${availability?.pendingCount} Items Need Attention`
+    ? 'Inbox — Items Need Attention'
     : availability?.state === 'empty'
       ? 'Inbox — All Caught Up'
       : 'Inbox — Status Unavailable';
@@ -40,6 +41,7 @@ export function SidebarInboxLink({
         />
         {pending || hasRuntimeUpdate ? (
           <span
+            data-inbox-attention-dot=''
             data-runtime-update={hasRuntimeUpdate || undefined}
             aria-hidden='true'
             className='absolute bottom-1 right-1 size-1.5 rounded-full bg-accent'
