@@ -100,6 +100,67 @@ describe('bug-to-test rule', () => {
     ]);
   });
 
+  it('accepts the maintained fleet Python regression and its changed-file reference', () => {
+    const regression = 'scripts/fleet-gate/tests/gem-priority-gate.test.py';
+    const evaluation = evaluateBugToTestRule({
+      changedFiles: ['scripts/fleet-gate/gem-priority-gate.py', regression],
+      commitMessages: ['fix(symphony): bind fresh fleet observations'],
+      prBody: `Regression test: \`${regression}\` exercises admission refusal`,
+    });
+
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.waived).toBe(false);
+    expect(evaluation.regressionTestSignals).toEqual([
+      `changed test files: ${regression}`,
+      `PR body references changed regression test: ${regression}`,
+    ]);
+  });
+
+  it.each([
+    'scripts/fleet-gate/gem-priority-gate.py',
+    'scripts/fleet-gate/tests/gem-priority-gate.test.pyc',
+    'scripts/fleet-gate/tests/gem-priority-gate.test.pyi',
+    'scripts/fleet-gate/tests/gem-priority-gate.test.py.md',
+    'scripts/fleet-gate/tests/gem-priority-gate.test.py/snapshot.txt',
+    'scripts/fleet-gate/tests/gem-priority-gate.spec.py',
+  ])('rejects production Python and lookalike regression path %s', path => {
+    const evaluation = evaluateBugToTestRule({
+      changedFiles: [path],
+      commitMessages: ['fix(symphony): bind fresh fleet observations'],
+      prBody: `Regression test: ${path} exercises admission refusal`,
+    });
+
+    expect(evaluation.passed).toBe(false);
+    expect(evaluation.hasRegressionTestEvidence).toBe(false);
+    expect(evaluation.regressionTestSignals).toEqual([]);
+  });
+
+  it('rejects a body reference to an unchanged maintained Python regression', () => {
+    const evaluation = evaluateBugToTestRule({
+      changedFiles: ['scripts/fleet-gate/gem-priority-gate.py'],
+      commitMessages: ['fix(symphony): bind fresh fleet observations'],
+      prBody:
+        'Regression test: scripts/fleet-gate/tests/gem-priority-gate.test.py exercises admission refusal',
+    });
+
+    expect(evaluation.passed).toBe(false);
+    expect(evaluation.regressionTestSignals).toEqual([]);
+  });
+
+  it('does not credit an unchanged body reference when another Python test changed', () => {
+    const changed = 'scripts/fleet-gate/tests/gem-priority-gate.test.py';
+    const evaluation = evaluateBugToTestRule({
+      changedFiles: [changed],
+      commitMessages: ['fix(symphony): bind fresh fleet observations'],
+      prBody: 'Regression test: scripts/tests/test_lane_runner.py',
+    });
+
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.regressionTestSignals).toEqual([
+      `changed test files: ${changed}`,
+    ]);
+  });
+
   it.each([
     'apps/ios/JovieTests/JovieAppIntentsTests.swift',
     'apps/ios/Packages/JovieKit/Tests/JovieKitTests/JovieKitTests.swift',
