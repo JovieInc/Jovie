@@ -38,7 +38,7 @@ export function YoutubeThumbnailsLanding() {
             <h1
               id='youtube-thumbnails-hero-heading'
               data-testid='youtube-thumbnails-hero-heading'
-              className='marketing-h1-linear mt-5 max-w-3xl text-primary-token line-clamp-2'
+              className='marketing-h1-linear youtube-thumbnails-hero-title mt-5 max-w-3xl text-primary-token line-clamp-2'
             >
               {copy.hero.title}
             </h1>
@@ -75,7 +75,7 @@ export function YoutubeThumbnailsLanding() {
                 {copy.workflow.body}
               </p>
             </div>
-            <div className='mx-auto mt-12 grid max-w-5xl gap-8 md:grid-cols-3'>
+            <div className='mt-12 grid gap-8 md:grid-cols-3'>
               {copy.workflow.steps.map((step, index) => (
                 <article
                   key={step.title}

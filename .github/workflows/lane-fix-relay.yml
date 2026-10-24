@@ -151,8 +151,8 @@ jobs:
         continue-on-error: true
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.SYMPHONY_APP_ID }}
+          private-key: ${{ secrets.SYMPHONY_APP_PRIVATE_KEY }}
           permission-actions: read
           permission-contents: read
           permission-issues: read

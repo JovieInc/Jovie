@@ -92,6 +92,18 @@ describe('public CTA guard', () => {
     // in cookies.spec.ts hit-testing; JSDOM cannot certify rendered dimensions.
   });
 
+  it('puts the glass header content on the single public container', () => {
+    render(
+      createElement<HeaderNavProps>(HeaderNav, {
+        authMode: 'public-static',
+        presentation: 'marketing-glass',
+      })
+    );
+    const shell = document.querySelector('.marketing-glass-header__shell');
+    expect(shell).toHaveClass('public-container');
+    expect(shell?.className).not.toMatch(/\bpx-|\bmax-w-/);
+  });
+
   it('adds no competing CTA through the compact Customers flyout', () => {
     render(
       createElement<HeaderNavProps>(HeaderNav, {

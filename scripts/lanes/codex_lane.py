@@ -668,9 +668,27 @@ CURRENT_METADATA_CALLS = [("account/read", {"refreshToken": False}),
                           ("model/list", {"limit": 100, "includeHidden": False})]
 
 
-def current_subscription_snapshot(name: str, *, lease_handle=None) -> dict:
-    account, rates, models = app_server_calls(name, CURRENT_METADATA_CALLS, lease_handle=lease_handle)
-    return {"account": account, "rateLimits": rates, "models": models}
+# Gem 2026-10-23: the 15s app-server budget timed out under host load (load ~14),
+# leaving the hourly identity proof to lapse. Give the read-only metadata session
+# a longer budget and retry transient timeouts with backoff; a final failure still
+# keeps the previous observation (never certifies new capacity).
+CURRENT_METADATA_TIMEOUT_S = float(os.environ.get("CODEX_METADATA_TIMEOUT_S", "45"))
+CURRENT_METADATA_ATTEMPTS = 3
+CURRENT_METADATA_BACKOFF_S = (2.0, 6.0)
+
+
+def current_subscription_snapshot(name: str, *, lease_handle=None, sleep=time.sleep) -> dict:
+    for attempt in range(CURRENT_METADATA_ATTEMPTS):
+        try:
+            account, rates, models = app_server_calls(name, CURRENT_METADATA_CALLS,
+                                                      timeout=CURRENT_METADATA_TIMEOUT_S,
+                                                      lease_handle=lease_handle)
+            return {"account": account, "rateLimits": rates, "models": models}
+        except TimeoutError:
+            if attempt + 1 >= CURRENT_METADATA_ATTEMPTS:
+                raise
+            sleep(CURRENT_METADATA_BACKOFF_S[min(attempt, len(CURRENT_METADATA_BACKOFF_S) - 1)])
+    raise TimeoutError("unreachable")
 
 
 def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> dict:

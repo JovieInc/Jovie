@@ -24,7 +24,7 @@ export function HomeStatQuoteSection({
   const id = 'sq-purple';
   return (
     <section
-      className='relative overflow-hidden bg-black dark:bg-black px-6 py-32 sm:py-40'
+      className='relative overflow-hidden bg-black dark:bg-black py-32 sm:py-40'
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.stats}
     >
       <svg
@@ -51,7 +51,7 @@ export function HomeStatQuoteSection({
           />
         ))}
       </svg>
-      <div className='relative mx-auto max-w-300 text-left'>
+      <div className='public-container relative text-left'>
         <h3 className='m-0 max-w-[22ch] font-(--marketing-font-display) text-[clamp(1.875rem,4vw,2.75rem)] font-bold leading-[1.12] tracking-[-0.025em] text-primary-token'>
           <span>Jovie delivers {stat}</span>
           <span className='text-tertiary-token'> {body}</span>

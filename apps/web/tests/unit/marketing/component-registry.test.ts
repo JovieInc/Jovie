@@ -47,7 +47,7 @@ it('renders a standalone artist section with the shared page spine', () => {
   expect(container.querySelectorAll('section')).toHaveLength(1);
   expect(heading.parentElement).toHaveClass(
     'ap-section-container',
-    'max-w-public-content'
+    'public-container'
   );
 });
 
@@ -1772,4 +1772,18 @@ it('preserves the mounted homepage front-door auth boundary and public secondary
   const publicLink = container.querySelector('a.public-action-secondary');
   expect(publicLink).toHaveAttribute('href', '/artist-profiles');
   expect(publicLink).toHaveAttribute('data-test-prefetch', 'undefined');
+});
+
+const OWN_WIDTH_CAP =
+  /max-w-(?:300|315|280|4xl|6xl|linear-content)|--homepage-section-max/;
+
+describe('single container width', () => {
+  it.each([
+    'components/marketing/artist-profile/ArtistProfileCaptureSection.tsx',
+    'components/marketing/homepage-v2/HomepageV2Route.tsx',
+    'components/site/MarketingTerminalCta.tsx',
+  ])('%s takes its width from the shared container, not its own cap', file => {
+    const source = fs.readFileSync(path.join(process.cwd(), file), 'utf8');
+    expect(source).not.toMatch(OWN_WIDTH_CAP);
+  });
 });

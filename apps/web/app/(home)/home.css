@@ -58,7 +58,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
  */
 .home-viewport {
   --homepage-header-height: calc(var(--space-12) + var(--space-1));
-  --homepage-page-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
+  --homepage-page-gutter: var(--ds-public-gutter);
   --homepage-header-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
   --homepage-radius: 1rem;
   --homepage-hero-top: calc(
@@ -77,10 +77,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   --homepage-carousel-step: clamp(54rem, 74vw, 76rem);
   --homepage-carousel-control-inset: clamp(1.5rem, 4vw, 3.75rem);
   --homepage-section-space: clamp(5rem, 8.5vw, 7.5rem);
-  --homepage-section-max: min(
-    90rem,
-    calc(100vw - var(--homepage-page-gutter) - var(--homepage-page-gutter))
-  );
   --homepage-section-border: rgba(255, 255, 255, 0.06);
   --homepage-section-title-size: clamp(
     var(--text-3xl),
@@ -129,10 +125,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
   [data-testid="header-nav"]:not([data-presentation="marketing-glass"])
   nav {
   width: min(
-    var(--homepage-grid-max),
-    calc(100% - var(--homepage-grid-gutter) * 2)
+    var(--ds-public-content-max),
+    calc(100% - var(--ds-public-gutter) * 2)
   ) !important;
-  max-width: var(--homepage-grid-max) !important;
+  max-width: var(--ds-public-content-max) !important;
   margin-inline: auto !important;
   padding-inline: 0 !important;
 }
@@ -649,7 +645,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-profile-outcome-inner {
-  max-width: var(--homepage-section-max);
+  max-width: var(--ds-public-content-max);
   padding-inline: var(--homepage-page-gutter);
 }
 
@@ -723,7 +719,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-overview-grid {
-  max-width: 64rem;
   margin-top: 3rem;
   margin-inline: auto;
   display: grid;
@@ -779,7 +774,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-split-surface {
-  max-width: 66rem;
   margin-inline: auto;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.055);
@@ -1041,7 +1035,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .home-viewport [data-presentation="homepage-embedded"] nav > div {
   pointer-events: auto;
   height: 54px !important;
-  max-width: min(74rem, calc(100vw - var(--homepage-page-gutter) * 2));
+  max-width: min(
+    var(--ds-public-content-max),
+    calc(100vw - var(--ds-public-gutter) * 2)
+  );
   margin: 0.75rem auto 0;
   padding-inline: 0.9rem 0.65rem;
   border: 1px solid transparent;
@@ -1096,7 +1093,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-showcase {
-  width: min(100%, var(--homepage-section-max));
+  width: min(100%, var(--ds-public-content-max));
   margin: clamp(1.35rem, 2.6vw, 2.25rem) auto 0;
   overflow: visible;
   padding: 0;
@@ -1135,7 +1132,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   left: 50%;
   z-index: var(--carousel-z);
   display: grid;
-  width: min(100%, 72rem);
+  width: 100%;
   min-height: calc(var(--homepage-carousel-stage-height) - 3.25rem);
   grid-template-rows: minmax(0, 1fr);
   pointer-events: none;
@@ -1215,7 +1212,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-product-proof-frame--desktop {
-  width: min(100%, 58rem);
+  width: 100%;
   margin-inline: auto;
   border-radius: 14px;
   padding: 5px;
@@ -1321,7 +1318,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-workflow-strip__inner,
 .homepage-profile-proof-band__inner {
   display: grid;
-  width: min(100%, var(--homepage-section-max));
+  width: min(100%, var(--ds-public-content-max));
   margin-inline: auto;
   padding-inline: var(--homepage-page-gutter);
   gap: clamp(2.5rem, 5vw, 5rem);
@@ -1638,10 +1635,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   padding-bottom: clamp(4.5rem, 8vw, 7.5rem);
 }
 
-.homepage-hero-copy {
-  max-width: min(100%, 68rem);
-}
-
 .home-viewport .homepage-section-eyebrow,
 .home-viewport .homepage-hero-eyebrow {
   display: block;
@@ -1707,7 +1700,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-slide {
-  width: min(55rem, 61vw);
+  width: 61vw;
   min-height: var(--homepage-carousel-stage-height);
   align-items: start;
   transform: translate3d(calc(-50% + var(--carousel-offset) * 112%), 0, 0)
@@ -1830,8 +1823,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: flex;
   flex-shrink: 0;
   width: min(
-    var(--homepage-grid-max),
-    calc(100% - var(--homepage-grid-gutter) * 2)
+    var(--ds-public-content-max),
+    calc(100% - var(--ds-public-gutter) * 2)
   );
   flex-direction: column;
   align-items: center;
@@ -1935,8 +1928,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   min-height: 0;
   flex-direction: column;
   width: min(
-    var(--homepage-grid-max),
-    calc(100% - var(--homepage-grid-gutter) * 2)
+    var(--ds-public-content-max),
+    calc(100% - var(--ds-public-gutter) * 2)
   );
 }
 
@@ -2019,7 +2012,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   overflow: clip;
   isolation: isolate;
   padding: calc(var(--homepage-header-height) + var(--space-8))
-    var(--homepage-grid-gutter) var(--space-16);
+    var(--ds-public-gutter) var(--space-16);
   background: var(--system-b-bg-page);
   color: var(--color-text-primary-token);
 }
@@ -2037,6 +2030,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: absolute;
   top: 48%;
   left: 50%;
+  /* container-width-allow: decorative glow ornament, not a content container */
   width: min(80rem, 120vw);
   height: min(42rem, 62vw);
   border: 0;
@@ -2070,7 +2064,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   z-index: 1;
   display: flex;
-  width: min(var(--homepage-grid-max), 100%);
+  width: min(var(--ds-public-content-max), 100%);
   flex-direction: column;
   align-items: center;
   text-align: center;
@@ -2326,8 +2320,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-certified-proof__statement {
   width: min(
-    var(--homepage-grid-max),
-    calc(100% - var(--homepage-grid-gutter) * 2)
+    var(--ds-public-content-max),
+    calc(100% - var(--ds-public-gutter) * 2)
   );
   margin: 0 auto;
   color: var(--color-text-secondary-token);
@@ -2385,8 +2379,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-certified-section__inner,
 .homepage-close__inner {
   width: min(
-    var(--homepage-grid-max),
-    calc(100% - var(--homepage-grid-gutter) * 2)
+    var(--ds-public-content-max),
+    calc(100% - var(--ds-public-gutter) * 2)
   );
   margin-inline: auto;
 }
@@ -2778,8 +2772,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-editorial-changelog__inner {
   width: min(
-    var(--homepage-grid-max),
-    calc(100% - var(--homepage-grid-gutter) * 2)
+    var(--ds-public-content-max),
+    calc(100% - var(--ds-public-gutter) * 2)
   );
   margin-inline: auto;
 }
@@ -3286,7 +3280,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-profile-proof-band__cta {
-  width: min(100%, var(--homepage-section-max));
+  width: min(100%, var(--ds-public-content-max));
   margin: clamp(1.3rem, 2vw, 1.8rem) auto 0;
   padding-inline: var(--homepage-page-gutter);
 }
@@ -3317,7 +3311,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-artist-profiles-section__inner {
-  width: min(100%, 106rem);
+  width: 100%;
   margin-inline: auto;
   padding-inline: var(--homepage-page-gutter);
 }
@@ -3403,13 +3397,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-artist-profiles-carousel {
   position: relative;
-  width: calc(
-    100vw -
-    max(
-      var(--homepage-page-gutter),
-      calc((100vw - 106rem) / 2 + var(--homepage-page-gutter))
-    )
-  );
+  width: 100%;
   margin-top: clamp(1.8rem, 3.5vw, 2.65rem);
 }
 
@@ -5278,7 +5266,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-outcome-inner {
   width: min(
     var(--ds-public-content-max),
-    calc(100% - var(--homepage-grid-gutter) * 2)
+    calc(100% - var(--ds-public-gutter) * 2)
   );
   margin-inline: auto;
 }
@@ -5315,24 +5303,16 @@ body:has(.home-viewport)::-webkit-scrollbar {
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scroll-padding-left: max(
-    var(--homepage-grid-gutter),
-    calc(
-      (100vw - var(--ds-public-content-max)) /
-      2 +
-      var(--homepage-grid-gutter)
-    )
+    var(--ds-public-gutter),
+    calc((100vw - var(--ds-public-content-max)) / 2 + var(--ds-public-gutter))
   );
   scroll-snap-type: x mandatory;
   padding-left: max(
-    var(--homepage-grid-gutter),
-    calc(
-      (100vw - var(--ds-public-content-max)) /
-      2 +
-      var(--homepage-grid-gutter)
-    )
+    var(--ds-public-gutter),
+    calc((100vw - var(--ds-public-content-max)) / 2 + var(--ds-public-gutter))
   );
   padding-right: max(
-    var(--homepage-grid-gutter),
+    var(--ds-public-gutter),
     calc((100vw - var(--ds-public-content-max)) / 2 + 18vw)
   );
   padding-bottom: var(--space-4);
@@ -5654,8 +5634,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
    ============================================ */
 
 .home-viewport {
-  --homepage-grid-max: var(--ds-public-content-max);
-  --homepage-grid-gutter: var(--homepage-page-gutter);
   --homepage-chapter-space: clamp(
     calc(var(--space-24) + var(--space-2)),
     8.5vw,
@@ -5714,8 +5692,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 [data-testid="homepage-v2-pricing"] .homepage-pricing-shell {
   display: grid;
   width: min(
-    var(--homepage-grid-max),
-    calc(100% - var(--homepage-grid-gutter) * 2)
+    var(--ds-public-content-max),
+    calc(100% - var(--ds-public-gutter) * 2)
   );
   max-width: none;
   margin-inline: auto;
@@ -6212,8 +6190,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
    ============================================ */
 
 .home-viewport {
-  --homepage-grid-max: var(--ds-public-content-max);
-  --homepage-grid-gutter: var(--homepage-page-gutter);
 }
 
 .homepage-story-stack,
@@ -6678,6 +6654,7 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 
 :where(.homepage-showcase-reference) {
   width: 100%;
+  /* container-width-allow: design-studio reference frame, not a page container */
   max-width: 53.3125rem;
   margin-inline: auto;
 }
@@ -7503,3 +7480,52 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 /* SYSTEM B HOME RELEASE OPERATING SYSTEM SHOWCASE PRIMITIVES END */
+
+/* ── Shared marketing lit focal + entrance (MKT lit-focal-v1) ────────────
+ * One lit focal point on near-black: a quiet Ion wash behind a hero's
+ * focal column. Token-sourced (accent over transparent), never a raw
+ * hex, pointer-transparent, and out of the layout flow.
+ * ────────────────────────────────────────────────────────────────────── */
+.marketing-lit-focal {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 62% 46% at 62% 34%,
+      color-mix(in oklab, var(--color-accent) 12%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse 38% 26% at 70% 22%,
+      color-mix(in oklab, var(--color-accent) 8%, transparent),
+      transparent 78%
+    );
+}
+
+/* One entrance moment per surface: the focal column rises in once, then
+ * is still. Reduced motion keeps the settled state with no animation. */
+.marketing-lit-enter {
+  animation: marketing-lit-rise 420ms var(--ease-out) both;
+}
+
+@keyframes marketing-lit-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-lit-enter {
+    animation: none;
+  }
+}
+
+/* SHARED MARKETING LIT FOCAL + ENTRANCE END */

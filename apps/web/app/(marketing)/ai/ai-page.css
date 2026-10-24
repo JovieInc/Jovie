@@ -1,10 +1,4 @@
-/* /ai hero headline renders complete at every width (JOV-8164). The
-   .system-b-marketing shell clamps every h1 to two painted lines at zero
-   specificity, so this named class restores the full editorial title. */
+/* Keep the complete hero copy within the shared two-line H1 contract. */
 .ai-hero-title {
-  display: block;
-  max-block-size: none;
-  overflow: visible;
-  -webkit-box-orient: initial;
-  -webkit-line-clamp: unset;
+  letter-spacing: var(--ds-marketing-display-tracking);
 }

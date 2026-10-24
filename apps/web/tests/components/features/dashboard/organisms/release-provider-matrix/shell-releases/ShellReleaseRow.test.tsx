@@ -105,10 +105,12 @@ describe('ShellReleaseRow audio affordance', () => {
     );
 
     const row = container.querySelector('[data-shell-release-row]');
-    // Rows are `listitem`s inside `role="list"` — an ARIA `option` cannot
-    // contain the row's real controls (axe nested-interactive), so selection
-    // stays visual (`data-selected` + selected tokens), not `aria-selected`.
-    expect(row).toHaveAttribute('role', 'listitem');
+    // Rows ARE native list items inside `role="list"` (implicit listitem —
+    // no explicit role, no wrapper element): an ARIA `option` cannot contain
+    // the row's real controls (axe nested-interactive), so selection stays
+    // visual (`data-selected` + selected tokens), not `aria-selected`.
+    expect(row?.tagName).toBe('LI');
+    expect(row).not.toHaveAttribute('role');
     // name-from-author: the row announces its release title.
     expect(row).toHaveAttribute('aria-label', 'Lost in the Light');
     expect(row).not.toHaveAttribute('aria-selected');
@@ -165,6 +167,26 @@ describe('ShellReleaseRow audio affordance', () => {
       'leading-[1.2]'
     );
     expect(screen.getByText('Bahamas').className).toContain('text-2xs');
+  });
+
+  it('keeps the title target at the 24px WCAG 2.5.8 floor in the dense row', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r-target-size',
+          title: 'Lost in the Light',
+          previewUrl: null,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    // The h-8 dense row renders the title as the EntityHoverLink button;
+    // axe target-size (WCAG 2.2 AA, not allowlistable) measures its box.
+    expect(screen.getByText('Lost in the Light').className).toContain(
+      'min-h-6'
+    );
   });
 
   it('omits the play overlay when the release has no preview URL', () => {

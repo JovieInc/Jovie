@@ -161,6 +161,14 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    id: 'synthetic-canary-liveness',
+    command:
+      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=synthetic-canary-liveness.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-synthetic-canary-coverage" --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90 lib/__tests__/synthetic-canary-liveness.test.mjs',
+    inputs:
+      /^(?:\.github\/workflows\/(?:automation-liveness|synthetic-monitoring)\.yml|scripts\/synthetic-canary-liveness\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.test\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     id: 'node-environment-files',
     command:
       'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/node-environment-files.test.ts',
@@ -226,6 +234,16 @@ export const SOURCE_GUARDS = Object.freeze([
     command: 'node --test scripts/invariants/art-direction/rounded.test.mjs',
     inputs:
       /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage|features\/(?:home|pricing|visibility-audit))\/|apps\/web\/components\/organisms\/(?:AboutPage|Blog|ComparisonPage|PricingRecipe|SupportPage|VoicePage)|apps\/web\/components\/site\/Marketing|apps\/web\/tests\/unit\/marketing\/art-direction\/rounded|scripts\/invariants\/art-direction\/rounded)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
+    // Marketing and public pages use one boxed width and one full-bleed
+    // override. New hits fail against origin/main. See MKT-D18.
+    id: 'marketing-container-width',
+    command:
+      'node --test scripts/invariants/art-direction/container-width.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage|site|features\/(?:home|pay|pricing|visibility-audit))\/|apps\/web\/components\/organisms\/(?:HeaderNav|AboutPage|Blog|ComparisonPage|PricingRecipe|SupportPage|VoicePage)|apps\/web\/styles\/design-system\.css$|scripts\/invariants\/art-direction\/container-width)/u,
     prOnly: true,
   }),
   Object.freeze({

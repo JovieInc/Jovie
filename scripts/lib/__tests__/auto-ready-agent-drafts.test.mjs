@@ -393,9 +393,9 @@ describe('Auto-Ready App-token workflow', () => {
       'actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510';
     expect(workflow).toContain(tokenAction);
     expect(workflow).toContain('id: app-token');
-    expect(workflow).toContain('app-id: ${{ vars.JOVIE_BOT_APP_ID }}');
+    expect(workflow).toContain('app-id: ${{ vars.CI_APP_ID }}');
     expect(workflow).toContain(
-      'private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
+      'private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}'
     );
     expect(workflow).toContain(
       'GH_TOKEN: ${{ steps.app-token.outputs.token }}'

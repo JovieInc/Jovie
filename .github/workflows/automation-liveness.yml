@@ -53,7 +53,50 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # JOV-6813: independent of the canary's own job/alert steps. Reuse this
+      # sanctioned ~25m backstop; a daily AI-only success is not a heartbeat.
+      - name: Check synthetic canary heartbeat
+        id: synthetic-heartbeat
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/synthetic-canary-liveness.mjs
+
+      - name: Send Slack Alert on Synthetic Silence
+        if: ${{ always() && (steps.synthetic-heartbeat.outcome != 'success' || steps.synthetic-heartbeat.outputs.test_status != 'passed') }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Synthetic Monitoring'
+          custom_payload: |
+            {
+              "text": "Production Synthetic Monitoring Failed - jov.ie",
+              "attachments": [{
+                "color": "danger",
+                "fields": [
+                  { "title": "Failed Tests", "value": ${{ toJSON(steps.synthetic-heartbeat.outputs.failed_tests || 'JOV-6813 dead-man: heartbeat check did not complete') }}, "short": false },
+                  { "title": "Canary", "value": ${{ toJSON(steps.synthetic-heartbeat.outputs.run_url || format('{0}/{1}/actions/workflows/synthetic-monitoring.yml', github.server_url, github.repository)) }}, "short": false },
+                  { "title": "Watchdog", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>", "short": false }
+                ]
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: File synthetic heartbeat Linear issue
+        if: ${{ always() && (steps.synthetic-heartbeat.outcome != 'success' || steps.synthetic-heartbeat.outputs.test_status != 'passed') }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          TEST_STATUS: failed
+          FAILED_TESTS: >-
+            ${{ steps.synthetic-heartbeat.outputs.failed_tests || 'JOV-6813 dead-man: heartbeat check did not complete' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/synthetic-monitoring-intake.mjs
+
       - name: Restore previous alert state
+        if: ${{ always() }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -65,6 +108,7 @@ jobs:
           fi
 
       - name: Compare receipts to max staleness
+        if: ${{ always() }}
         env:
           GH_TOKEN: ${{ github.token }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
@@ -81,13 +125,19 @@ jobs:
           node scripts/automation-liveness.mjs "${args[@]}"
 
       - name: Save alert state
-        if: ${{ hashFiles('liveness/state.json') != '' }}
+        if: ${{ always() && hashFiles('liveness/state.json') != '' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: automation-liveness-state
           path: liveness/state.json
           if-no-files-found: ignore
           retention-days: 90
+
+      - name: Preserve synthetic dead-man failure
+        if: ${{ always() && (steps.synthetic-heartbeat.outcome != 'success' || steps.synthetic-heartbeat.outputs.test_status != 'passed') }}
+        run: |
+          echo '::error::JOV-6813 synthetic canary heartbeat missing, skipped, failed, stalled, or unreadable'
+          exit 1
 
       - name: Save run receipts
         if: ${{ always() }}

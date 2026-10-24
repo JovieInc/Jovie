@@ -16,7 +16,10 @@ const meta = {
       },
     },
   },
-  render: () => <DemoReleasesExperience />,
+  // capturePlayer is forced via the prop: per-story search params never reach
+  // useSearchParams in the vitest browser runner, so the URL opt-in left the
+  // capture player unmounted and the Playing play function failed (shard 15).
+  render: () => <DemoReleasesExperience capturePlayer />,
 } satisfies Meta<typeof DemoPlayerCapture>;
 
 export default meta;

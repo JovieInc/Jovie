@@ -3,6 +3,7 @@ import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { YOUTUBE_THUMBNAILS_COPY } from '@/data/youtubeThumbnailsCopy';
 import { YoutubeThumbnailsLanding } from './YoutubeThumbnailsLanding';
+import './youtube-thumbnails.css';
 
 export const revalidate = false;
 
