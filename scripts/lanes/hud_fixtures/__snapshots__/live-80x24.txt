@@ -1,0 +1,24 @@
+● JOVIE · SYMPHONY · lanes fe27f07 on gem · ✓ hud=release · tick 3m   github 27s
+ CONSTRAINT ! WARN   deploy · 7 merged PR(s) not in production · oldest 1h41m
+ PRODUCTION  ! WARN    serves 060037d · 7 undeployed · oldest 1h41m
+ FLOW 24h    prepared 2 → queued 3 → merged 10 → deployed 3 → verified 3
+ WORKERS   ✓ OK      1 running / 4 (codex 1/3 · grok 0/1) · gate seats 2
+● codex      PR21774   fix-red agent             3m  feat(marketing): unify…
+○ codex      polling ×2 · eligible 1/27 · new issues 1
+○ grok       polling · eligible 0/27 · new issues 0
+ SUPPLY    ✓ OK      Todo 26 → eligible 1 → new issues 1 · triage returns 11
+    17 excluded  sensitive-text             all lanes
+  +6 more
+ REPAIR    ! WARN    open lane PRs 8 · draft 6 · non-draft 2 · PR read 41s
+  repo PRs open 36 · red 11 · dirty 2 · clean not queued 2 · exhausted 2
+  hold records 3 · fix-exhausted 3 · gate-check-failed 2
+#21748 JOV-6226  DRAFT merge conflict  codex · fix(auth): honor provider…
+  +8 more
+ QUEUE     ✓ OK      merge queue 3 · wait p50 11.4m · ejections 20%
+ SHIPPED   ! WARN    merged 10 in 24h · deployed 3 · verified 3
+#22307 merged        5m  fix(ci): set up Playwright when proof reuse still runs…
+ BUDGETS   ✓ OK      GitHub graphql 4526/5000 · core 4773 · resets in 46m
+ HOST      ! WARN    disk 19.9% free · mem 90% free · load 1.1 / 16 cores
+ ALERTS    ! WARN    4 active · 0 critical/failing
+! warn remediation-delivery 12d7h · owner symphony-lanes-doctor
+● running ○ idle ✓ ok ! warn ✕ fail ? unknown

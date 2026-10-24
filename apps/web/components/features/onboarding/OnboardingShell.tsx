@@ -242,6 +242,7 @@ export function OnboardingShell({
     <SidebarProvider defaultOpen={false}>
       <AppShellFrame
         sidebar={null}
+        flushContent
         containerClassName='[color-scheme:dark]'
         contentClassName='overflow-hidden!'
         main={

@@ -223,7 +223,7 @@ useQuery({
 
 ## Custom ESLint Rules
 
-21 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
+22 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
 
 | Rule | What It Blocks | Fix |
 |------|---------------|-----|
@@ -248,6 +248,7 @@ useQuery({
 | `no-hardcoded-theme-colors` | Bare `text-black`/`bg-white` or `text-[#hex]` that bypass semantic tokens | Use token utilities (`text-primary-token`) or pair light/dark classes |
 | `no-direct-stripe-client` | Runtime `stripe` imports, `require('stripe')`, or `new Stripe(...)` outside `lib/stripe/` | Import the canonical client from `@/lib/stripe/client` (type-only imports are allowed) |
 | `ui-feel` | Numeral displays without `tabular-nums`, headings without `text-balance`/`text-pretty`, dual-axis sub-40px hit areas, child radius larger than its parent's | Add `tabular-nums` / `text-balance`, size hit areas to 44px (or a `before:`/`after:` hit container), keep child radius ≤ parent |
+| `no-users-clerk-id-lookup` | `eq(users.clerkId, ...)` outside the legacy identity allowlist | Match session ids on `users.id`; keep `clerkId` only for external or legacy ids |
 
 **Run:** `pnpm --filter web lint:eslint` (all rules) or `pnpm --filter web lint:server-boundaries` (boundary rules only).
 

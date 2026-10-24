@@ -5,6 +5,7 @@ import {
   buildHudDrilldownHref,
   filterOpsExceptions,
   getHudDrilldownTarget,
+  HUD_DRILLDOWN_SCOPE_LABELS,
   HUD_DRILLDOWN_SCOPES,
 } from '@/lib/hud/drilldowns';
 
@@ -33,7 +34,19 @@ describe('buildHudDrilldownHref', () => {
     );
   });
 
+  it('trims and encodes the query', () => {
+    expect(buildHudDrilldownHref('events', '  a&b=c  ')).toBe(
+      `${APP_ROUTES.ADMIN_ACTIVITY}?q=a%26b%3Dc`
+    );
+    expect(buildHudDrilldownHref('customers', '  tim w ')).toBe(
+      `${APP_ROUTES.ADMIN_PEOPLE}?q=tim+w&view=contacts`
+    );
+  });
+
   it('omits q for empty queries', () => {
+    expect(buildHudDrilldownHref('releases', ' ')).toBe(
+      `${APP_ROUTES.ADMIN_PEOPLE}?view=releases`
+    );
     expect(buildHudDrilldownHref('events', '   ')).toBe(
       APP_ROUTES.ADMIN_ACTIVITY
     );
@@ -44,12 +57,42 @@ describe('buildHudDrilldownHref', () => {
 });
 
 describe('getHudDrilldownTarget', () => {
-  it('declares a target for every scope', () => {
-    for (const scope of HUD_DRILLDOWN_SCOPES) {
-      const target = getHudDrilldownTarget(scope);
-      expect(target.action).toBeTruthy();
-      expect(target.recordLabel).toBeTruthy();
-    }
+  it('maps every scope to its authoritative record surface', () => {
+    expect(HUD_DRILLDOWN_SCOPES.map(getHudDrilldownTarget)).toEqual([
+      {
+        scope: 'customers',
+        action: APP_ROUTES.ADMIN_PEOPLE,
+        hiddenParams: { view: 'contacts' },
+        recordLabel: 'People · Contacts',
+      },
+      {
+        scope: 'releases',
+        action: APP_ROUTES.ADMIN_PEOPLE,
+        hiddenParams: { view: 'releases' },
+        recordLabel: 'People · Releases',
+      },
+      {
+        scope: 'events',
+        action: APP_ROUTES.ADMIN_ACTIVITY,
+        hiddenParams: {},
+        recordLabel: 'Activity timeline',
+      },
+      {
+        scope: 'exceptions',
+        action: APP_ROUTES.ADMIN_OPERATIONS,
+        hiddenParams: {},
+        recordLabel: 'Operations',
+      },
+    ]);
+  });
+
+  it('labels every scope for the scope picker', () => {
+    expect(HUD_DRILLDOWN_SCOPE_LABELS).toEqual({
+      customers: 'Customers',
+      releases: 'Releases',
+      events: 'Events',
+      exceptions: 'Exceptions',
+    });
   });
 });
 
@@ -69,13 +112,36 @@ describe('filterOpsExceptions', () => {
     },
   ];
 
-  it('returns all exceptions for an empty query', () => {
-    expect(filterOpsExceptions(exceptions, '')).toHaveLength(2);
+  const noDetail: OpsException = {
+    id: 'queue-stuck',
+    label: 'Merge queue stuck',
+    detail: null,
+    href: 'https://example.com/queue',
+  };
+
+  it('returns a copy of every exception for a blank query', () => {
+    const all = filterOpsExceptions(exceptions, '   ');
+    expect(all).toEqual(exceptions);
+    expect(all).not.toBe(exceptions);
   });
 
   it('matches on label and detail, case-insensitive', () => {
-    expect(filterOpsExceptions(exceptions, 'DEPLOY')).toHaveLength(1);
-    expect(filterOpsExceptions(exceptions, 'credentials')).toHaveLength(1);
-    expect(filterOpsExceptions(exceptions, 'nomatch')).toHaveLength(0);
+    expect(filterOpsExceptions(exceptions, 'DEPLOY')).toEqual([exceptions[0]]);
+    expect(filterOpsExceptions(exceptions, 'credentials')).toEqual([
+      exceptions[1],
+    ]);
+    expect(filterOpsExceptions(exceptions, 'stripe')).toEqual([exceptions[1]]);
+    expect(filterOpsExceptions(exceptions, 'nomatch')).toEqual([]);
+  });
+
+  it('trims the query and matches across the label/detail boundary', () => {
+    expect(filterOpsExceptions(exceptions, '  Failed MAIN  ')).toEqual([
+      exceptions[0],
+    ]);
+  });
+
+  it('treats a missing detail as empty text', () => {
+    expect(filterOpsExceptions([noDetail], 'undefined')).toEqual([]);
+    expect(filterOpsExceptions([noDetail], 'queue')).toEqual([noDetail]);
   });
 });

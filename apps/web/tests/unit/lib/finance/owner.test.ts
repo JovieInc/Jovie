@@ -28,7 +28,22 @@ describe('requireFinancialOwnerId', () => {
   it('rejects a non-UUID principal (e.g. a creator or legacy id)', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_2abc' });
     const { requireFinancialOwnerId } = await import('@/lib/finance/owner');
-    await expect(requireFinancialOwnerId()).rejects.toThrow('Unauthorized');
+    const { UnauthorizedSessionError } = await import('@/lib/auth/session');
+    await expect(requireFinancialOwnerId()).rejects.toBeInstanceOf(
+      UnauthorizedSessionError
+    );
+  });
+
+  it.each([
+    ['prefixed', `x${OWNER_ID}`],
+    ['suffixed', `${OWNER_ID}x`],
+  ])('rejects a %s UUID principal', async (_label, userId) => {
+    mockGetCachedAuth.mockResolvedValue({ userId });
+    const { requireFinancialOwnerId } = await import('@/lib/finance/owner');
+    const { UnauthorizedSessionError } = await import('@/lib/auth/session');
+    await expect(requireFinancialOwnerId()).rejects.toBeInstanceOf(
+      UnauthorizedSessionError
+    );
   });
 });
 
@@ -37,6 +52,9 @@ describe('assertFinancialOwnerId', () => {
     const { assertFinancialOwnerId } = await import('@/lib/finance/owner');
     expect(assertFinancialOwnerId(OWNER_ID)).toBe(OWNER_ID);
     expect(assertFinancialOwnerId(OTHER_ID)).toBe(OTHER_ID);
+    expect(assertFinancialOwnerId(OWNER_ID.toUpperCase())).toBe(
+      OWNER_ID.toUpperCase()
+    );
   });
 
   it.each([
@@ -47,6 +65,11 @@ describe('assertFinancialOwnerId', () => {
     ['non-string', 42],
     ['null', null],
     ['undefined', undefined],
+    ['UUID with a leading prefix', `x${OWNER_ID}`],
+    ['UUID with a trailing suffix', `${OWNER_ID}x`],
+    ['UUID embedded in a sentence', `owner ${OWNER_ID} here`],
+    ['array wrapping a UUID', [OWNER_ID]],
+    ['object stringifying to a UUID', { toString: () => OWNER_ID }],
   ])('rejects %s', async (_label, value) => {
     const { assertFinancialOwnerId } = await import('@/lib/finance/owner');
     expect(() => assertFinancialOwnerId(value)).toThrow(

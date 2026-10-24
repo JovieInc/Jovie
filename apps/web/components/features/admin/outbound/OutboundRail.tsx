@@ -28,6 +28,7 @@ import type {
   ContactEvidenceItem,
 } from '@/lib/contacts/certification';
 import {
+  OUTBOUND_FLAG_LABELS,
   OUTBOUND_REJECT_REASON_LABELS,
   OUTBOUND_REJECT_REASONS,
   OUTBOUND_VIEW_LABELS,
@@ -142,10 +143,13 @@ function MessageSection({
   if (!message || !copy) {
     return (
       <DrawerSection title='Message' collapsible={false}>
-        <p className='px-1 pb-2 text-xs text-secondary-token'>
+        <p
+          className='px-1 pb-2 text-xs text-secondary-token'
+          data-testid='outbound-message-empty'
+        >
           {row.channel
             ? 'No claim link yet. Build the profile to draft a message.'
-            : 'No email or Instagram on file, so there is no way to reach them.'}
+            : 'No reachable channel: no email address or Instagram handle on file.'}
         </p>
       </DrawerSection>
     );
@@ -157,7 +161,8 @@ function MessageSection({
     <DrawerSection title='Message' collapsible={false}>
       <div className='space-y-2 px-1 pb-2'>
         <p className='text-2xs text-tertiary-token'>
-          {message.channel === 'email' ? 'Email' : 'Instagram DM'} ·{' '}
+          {message.channel === 'email' ? 'Email' : 'Instagram DM'}
+          {message.channel === row.channel ? '' : ' (no recipient on file)'} ·{' '}
           <span data-testid='outbound-approval-line'>{approvalLine(row)}</span>
         </p>
         {message.channel === 'email' ? (
@@ -348,15 +353,39 @@ export function OutboundRail({
             key={row.leadId}
             row={row}
             pending={pending}
-            canApprove={certified}
+            canApprove={
+              certified &&
+              row.channel !== null &&
+              row.message?.channel === row.channel
+            }
             blockedReason={
-              certification?.status === 'conflicted'
-                ? 'Resolve the conflict to approve.'
-                : 'Certify facts to approve.'
+              row.channel === null || row.message?.channel !== row.channel
+                ? 'No reachable channel.'
+                : certification?.status === 'conflicted'
+                  ? 'Resolve the conflict to approve.'
+                  : 'Certify facts to approve.'
             }
             onApprove={onApprove}
             onSaveCopy={onSaveCopy}
           />
+          {row.entityNote || row.missingEvidence.length ? (
+            <DrawerSection title='Eligibility' collapsible={false}>
+              <ul
+                className='space-y-1 px-1 pb-2 text-xs text-secondary-token'
+                data-testid='outbound-eligibility'
+              >
+                {row.entityNote ? (
+                  <li>
+                    {OUTBOUND_FLAG_LABELS.possible_non_artist}: {row.entityNote}
+                    . Reject it as not an artist, or keep it if it is one.
+                  </li>
+                ) : null}
+                {row.missingEvidence.length ? (
+                  <li>Needs evidence: {row.missingEvidence.join(', ')}.</li>
+                ) : null}
+              </ul>
+            </DrawerSection>
+          ) : null}
           <DrawerSection title='Profile' collapsible={false}>
             <div className='flex items-center gap-2 px-1 pb-2 text-xs'>
               {row.profilePath ? (

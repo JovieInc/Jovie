@@ -159,21 +159,14 @@ const VERCEL_CONGESTION_CONTROL_PYTHON_TESTS = [
 // otherwise sails through affected-test selection and only fails on the
 // merge-group full suite (PR #15566 looped enroll→group-red 3× on 2026-08-06).
 const HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS = [
-  'apps/web/tests/unit/home/bento-feature-grid-system-b-style-guard.test.tsx',
-  'apps/web/tests/unit/home/claim-handle-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/dead-home-actions-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/home-profile-showcase-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-artist-outcomes-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-closed-loop-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-command-center-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-faq-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-footer-cta-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-grid-spine-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-hero-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-pricing-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-product-statement-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-trust-strip-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-workspace-system-b-style-guard.test.ts',
 ];
 const HOMEPAGE_SYSTEM_B_GUARD_EXACT_INPUTS = new Set([
   'apps/web/components/marketing/ClientFaqAccordion.tsx',

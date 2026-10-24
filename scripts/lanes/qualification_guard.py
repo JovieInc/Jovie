@@ -20,7 +20,8 @@ class CheckoutHeld(RuntimeError):
 class SafetyPolicy:
     required_commit: str
     fixture_path: str
-    fixture_sha256: str
+    # One reviewed sha256, or a tuple of every reviewed version merged on main.
+    fixture_sha256: str | tuple
 
 
 def _checked_source(repo, expected_head, policy, *, current_checkout, run=subprocess.run):
@@ -29,7 +30,10 @@ def _checked_source(repo, expected_head, policy, *, current_checkout, run=subpro
         raise CheckoutHeld("invalid-expected-head")
     if not re.fullmatch(r"[0-9a-f]{40}", policy.required_commit or ""):
         raise CheckoutHeld("invalid-safety-floor")
-    if not re.fullmatch(r"[0-9a-f]{64}", policy.fixture_sha256 or ""):
+    reviewed = ((policy.fixture_sha256,) if isinstance(policy.fixture_sha256, str)
+                else tuple(policy.fixture_sha256 or ()))
+    if not reviewed or not all(isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
+                               for value in reviewed):
         raise CheckoutHeld("invalid-fixture-policy")
     rel = PurePosixPath(policy.fixture_path)
     if rel.is_absolute() or ".." in rel.parts or str(rel) != policy.fixture_path:
@@ -72,11 +76,12 @@ def _checked_source(repo, expected_head, policy, *, current_checkout, run=subpro
     if mode != "100644" or kind != "blob":
         raise CheckoutHeld("fixture-not-regular")
     committed = git("cat-file", "blob", blob)
-    if hashlib.sha256(committed).hexdigest() != policy.fixture_sha256:
+    digest = hashlib.sha256(committed).hexdigest()
+    if digest not in reviewed:
         raise CheckoutHeld("fixture-not-reviewed")
     proof = {"head": expected_head, "safetyFloor": policy.required_commit,
              "fixturePath": policy.fixture_path, "fixtureBlob": blob,
-             "fixtureSha256": policy.fixture_sha256}
+             "fixtureSha256": digest}
     if not current_checkout:
         return proof
     index = git("ls-files", "--stage", "-z", "--", policy.fixture_path)
@@ -102,10 +107,21 @@ def checked_checkout(repo, expected_head, policy, *, run=subprocess.run):
 
 
 HERE = Path(__file__).resolve().parent
+# Every reviewed (merged-on-main) version of the fixture since the safety floor. A merged
+# change to the fixture must add its hash here in the same PR: CI enforces that
+# (test_qualification_guard: the repo's own fixture is reviewed). A single pinned hash
+# silently deferred every lane draft's gate after #22301 changed the fixture (2026-10-20
+# 17:26Z to 2026-10-21): 45 jovie-bot drafts were never qualified or promoted.
+REVIEWED_FIXTURE_SHA256 = (
+    "be680e72198db2174f6c0ac5fe05157a4a03f7bd791941c9254f13b21d0686fb",  # 5db1a60 (#22010)
+    "aa24ace3f9cf6fc485806d2c8395c9344e7680cc4e8b7fd5c126d777515e4f0c",  # 0fa7c7a (#22301)
+    "e533ec43dfa16b7d869712515bcf724e671a4fa438d3ba11608f9747e70d12aa",  # 2f3af5b (#22373)
+    "cea3f65dc681620b08138f4c1f35a6695083196c60e79e6a021da02b0a05851b",  # #22495 (scan stub in setUp)
+)
 DEFAULT_POLICY = SafetyPolicy(
     "5db1a60487c0a29dda45315d9aa5da14493d9409",
     "scripts/tests/test_disk_guard.py",
-    "be680e72198db2174f6c0ac5fe05157a4a03f7bd791941c9254f13b21d0686fb",
+    REVIEWED_FIXTURE_SHA256,
 )
 
 

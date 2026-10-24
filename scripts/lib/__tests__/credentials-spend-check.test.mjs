@@ -1,12 +1,15 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { loadRegistry, runCheck } from '../../credentials-spend-check.mjs';
 import { loadCredentialsPlans } from '../../remediation-sweep.mjs';
 import {
   codexOverlays,
   grantOverlays,
+  readProviderTrialLedger,
   summarizeCodexAccounts,
   summarizeGrants,
+  summarizeProviderTrialLedger,
 } from '../credentials-live-reads.mjs';
 import {
   DAY_MS,
@@ -187,12 +190,14 @@ describe('runCheck', () => {
       'read-gateway-credits',
       'read-summer-grants',
       'read-codex-ledger',
+      'read-provider-trial-ledger',
       'evaluate',
     ]);
     expect(report.run.reads).toEqual({
       gatewayCredits: 'no-gateway-token',
       summerGrants: 'no-vercel-token',
       codexLedger: 'no-codex-ledger',
+      providerTrialLedger: 'no-trial-ledger-source',
     });
     for (const stage of report.run.stages) {
       expect(Date.parse(stage.finishedAt)).toBeGreaterThanOrEqual(
@@ -353,5 +358,113 @@ describe('inventory collector', () => {
     const refs = workflowSecretReferences();
     expect(refs.has('LINEAR_API_KEY')).toBe(true);
     expect(refs.has('GITHUB_TOKEN')).toBe(false);
+  });
+});
+
+describe('Summer provider-trial ledger', () => {
+  const FIXTURE = fileURLToPath(
+    new URL('./fixtures/provider-trial-ledger.json', import.meta.url)
+  );
+  const trialSpend = () =>
+    JSON.parse(
+      readFileSync(
+        fileURLToPath(
+          new URL('../../../ops/registry/spend.json', import.meta.url)
+        ),
+        'utf8'
+      )
+    ).providers.filter(entry => entry.id.startsWith('summer-trial-'));
+
+  it('books the current UTC month per channel, $0 for an empty channel', () => {
+    const ledger = JSON.parse(readFileSync(FIXTURE, 'utf8'));
+    const read = summarizeProviderTrialLedger(
+      ledger,
+      at('2026-10-21T03:00:00Z')
+    );
+    expect(read.ok).toBe(true);
+    expect(read.value['summer-trial-anthropic-api']).toMatchObject({
+      periodKey: '2026-10',
+      spentUsd: 24.5,
+    });
+    expect(read.value['summer-trial-workers-ai'].spentUsd).toBe(0);
+    const november = summarizeProviderTrialLedger(
+      ledger,
+      at('2026-11-01T00:00:00Z')
+    );
+    expect(november.value['summer-trial-anthropic-api'].spentUsd).toBe(0);
+  });
+
+  it('rejects another schema or a malformed amount', () => {
+    expect(summarizeProviderTrialLedger({ schema: 'x' }, 0).reason).toBe(
+      'trial-ledger-schema'
+    );
+    expect(
+      summarizeProviderTrialLedger(
+        {
+          schema: 'summer.provider-trial-ledger/v1',
+          months: { '1970-01': { 'workers-ai': { bookedMicroUsd: -1 } } },
+        },
+        0
+      ).reason
+    ).toBe('trial-ledger-unparsed:workers-ai');
+  });
+
+  it('reads an https source with a bearer token and treats 404 as absent', async () => {
+    const calls = [];
+    const fetchImpl = async (url, init) => {
+      calls.push({ url, auth: init.headers.authorization });
+      return url.endsWith('missing.json')
+        ? new Response('', { status: 404 })
+        : new Response(readFileSync(FIXTURE, 'utf8'), { status: 200 });
+    };
+    const now = () => at('2026-10-21T03:00:00Z');
+    const ok = await readProviderTrialLedger({
+      source: 'https://blob.example/ledger.json',
+      token: 'read-token',
+      fetchImpl,
+      now,
+    });
+    expect(ok.ok).toBe(true);
+    expect(calls[0].auth).toBe('Bearer read-token');
+    const missing = await readProviderTrialLedger({
+      source: 'https://blob.example/missing.json',
+      fetchImpl,
+      now,
+    });
+    expect(missing.reason).toBe('trial-ledger-absent');
+  });
+
+  it('alerts the registered sub-caps at 80% and 100% only, keyed by month', async () => {
+    const report = await runCheck({
+      env: {},
+      live: true,
+      codexPath: '/nonexistent',
+      trialLedger: FIXTURE,
+      now: () => at('2026-10-21T03:00:00Z'),
+      registry: { credentials: credentials(), spend: spend(trialSpend()) },
+    });
+    expect(report.run.reads.providerTrialLedger).toBe('ok');
+    const caps = report.findings.filter(item => item.type === 'cap');
+    expect(caps.map(item => [item.fingerprint, item.severity])).toEqual([
+      ['spend-cap:summer-trial-anthropic-api:2026-10:80', 'high'],
+    ]);
+    const row = report.spend.find(
+      item => item.id === 'summer-trial-workers-ai'
+    );
+    expect(row).toMatchObject({ capUsd: 50, spentUsd: 0, live: true });
+
+    const full = await runCheck({
+      env: {},
+      live: true,
+      codexPath: '/nonexistent',
+      trialLedger: FIXTURE,
+      now: () => at('2026-09-30T12:00:00Z'),
+      registry: { credentials: credentials(), spend: spend(trialSpend()) },
+    });
+    expect(
+      full.findings
+        .filter(item => item.type === 'cap')
+        .map(item => [item.fingerprint, item.severity])
+    ).toEqual([['spend-cap:summer-trial-workers-ai:2026-09:100', 'critical']]);
   });
 });

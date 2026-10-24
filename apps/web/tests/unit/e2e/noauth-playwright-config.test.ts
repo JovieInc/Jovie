@@ -21,7 +21,7 @@ describe('no-auth Playwright config', () => {
     expect(config).toContain("testMatch: '**/*.spec.ts'");
   });
 
-  it('broad discovery collects at least one spec', () => {
+  it('broad discovery includes the onboarding chat spec', () => {
     const output = execFileSync(
       'pnpm',
       [
@@ -46,5 +46,6 @@ describe('no-auth Playwright config', () => {
     const total = /Total: (\d+) tests? in (\d+) files?/.exec(output);
     expect(total, output).not.toBeNull();
     expect(Number(total?.[1])).toBeGreaterThan(0);
+    expect(output).toContain('start-onboarding-chat.spec.ts:');
   }, 120_000);
 });

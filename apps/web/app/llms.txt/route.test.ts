@@ -77,8 +77,9 @@ describe('GET /llms.txt', () => {
   });
   it('exposes canonical offer truth and the decision-gated attribution handoff', async () => {
     const body = await GET().text();
-    expect(body).toContain('$199/mo');
-    expect(body).toContain('Limited access');
+    expect(body).toContain('$12/mo');
+    expect(body).toContain('Self-serve');
+    expect(body).not.toContain('Limited access');
     expect(body).toContain('/api/acquisition/agent-handoff');
     expect(body).toContain('requires human purchase confirmation');
   });

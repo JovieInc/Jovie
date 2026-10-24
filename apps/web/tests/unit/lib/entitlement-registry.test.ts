@@ -231,7 +231,7 @@ describe('Entitlement Registry Consistency', () => {
 
   it('plans with yearly pricing offer a discount', () => {
     expect(ENTITLEMENT_REGISTRY.pro.marketing.price).toEqual({
-      monthly: 199,
+      monthly: 12,
       yearly: null,
     });
 

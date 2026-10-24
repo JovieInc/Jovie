@@ -265,10 +265,14 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     expect(onToken).not.toHaveBeenCalled();
   });
 
-  it('bypasses verification when NEXT_PUBLIC_AUTH_MOCK is enabled', async () => {
+  it('bypasses an auth-mock build through its runtime E2E marker', async () => {
+    // Auth-mock and E2E builds are not a build-time bypass (JOV-7771): the
+    // layout marks them with data-e2e-mode, which a controlled-verification
+    // spec can clear.
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
     vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    document.documentElement.dataset.e2eMode = '1';
     const onToken = vi.fn();
     const onStateChange = vi.fn();
     const { render: renderMock } = mockTurnstile();
@@ -285,6 +289,22 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     expect(onStateChange).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'bypassed' })
     );
+  });
+
+  it('verifies an E2E build once the runtime marker is cleared', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MOCK', '1');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const onToken = vi.fn();
+    mockTurnstile();
+
+    render(<OnboardingTurnstile onToken={onToken} onStateChange={vi.fn()} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('next-script')).toBeInTheDocument()
+    );
+    expect(onToken).not.toHaveBeenCalledWith('local-dev-turnstile-bypass');
   });
 
   it('bypasses verification in runtime E2E mode (no script, no UI)', async () => {

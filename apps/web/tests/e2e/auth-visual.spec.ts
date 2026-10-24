@@ -86,13 +86,28 @@ async function openInterceptedAuthModal(
 
   if (mode === 'signin') {
     const mobileMenuButton = page.getByRole('button', { name: 'Open menu' });
-    if (await mobileMenuButton.isVisible()) {
-      await mobileMenuButton.click();
-    }
-    await page
+    const headerSignIn = page
       .locator(`a[href="${APP_ROUTES.SIGNIN}"]:visible`)
-      .first()
-      .click();
+      .first();
+    // Below 1024px "Log in" lives in the mobile nav panel. Wait for whichever
+    // entry point the breakpoint renders instead of sampling isVisible() once
+    // before the header has painted.
+    await expect(headerSignIn.or(mobileMenuButton).first()).toBeVisible({
+      timeout: NAV_TIMEOUT,
+    });
+    if (await mobileMenuButton.isVisible()) {
+      const panelSignIn = page.locator(
+        `#mobile-nav-panel a[href="${APP_ROUTES.SIGNIN}"]`
+      );
+      // The SSR button is inert until hydration; retry until the panel opens.
+      await expect(async () => {
+        if (!(await panelSignIn.isVisible())) await mobileMenuButton.click();
+        await expect(panelSignIn).toBeVisible({ timeout: 2_000 });
+      }).toPass({ timeout: SNAPSHOT_TIMEOUT });
+      await panelSignIn.click();
+    } else {
+      await headerSignIn.click();
+    }
   } else {
     const signUpCta = page.locator('[data-cta-sign-up="true"]').first();
     const signUpEntryExists = await signUpCta
@@ -219,6 +234,9 @@ test.describe('/signin page visual regression', () => {
         .isVisible({ timeout: SNAPSHOT_TIMEOUT })
         .catch(() => false);
 
+      // glm/auth-focal-polish: the tab title is the heading copy verbatim.
+      await expect(page).toHaveTitle('Log in to Jovie');
+
       await neutralizeAuthScreenshotPointer(page);
       await expect(page).toHaveScreenshot(`signin-page-${bp.name}.png`, {
         fullPage: false,
@@ -259,6 +277,9 @@ test.describe('/signup page visual regression', () => {
         .first()
         .isVisible({ timeout: SNAPSHOT_TIMEOUT })
         .catch(() => false);
+
+      // glm/auth-focal-polish: the tab title is the heading copy verbatim.
+      await expect(page).toHaveTitle('Continue to Jovie');
 
       await neutralizeAuthScreenshotPointer(page);
       await expect(page).toHaveScreenshot(`signup-page-${bp.name}.png`, {

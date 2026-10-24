@@ -17,6 +17,7 @@
 
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import type { CreatorProfile } from '@/types/db';
 import { getPublicProfileRobots } from './public-profile-indexing-policy';
@@ -253,8 +254,8 @@ export function buildPublicProfileMetadata(
       card: 'summary_large_image',
       title: socialTitle,
       description,
-      creator: '@jovieapp',
-      site: '@jovieapp',
+      creator: COMPANY_IDENTITY.xHandle,
+      site: COMPANY_IDENTITY.xHandle,
     },
     other: {
       ...(profile.is_verified && { 'profile:verified': 'true' }),

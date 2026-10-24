@@ -1,0 +1,135 @@
+/*
+ * Artist-profile homepage (EVENT 2026-10-20).
+ *
+ * Tokens only: spacing from --space-*, type from the shared marketing scale
+ * classes in the TSX, color from semantic tokens. One page spine: the hero
+ * and every section use .ap-section-container (ArtistProfileSectionShell.css).
+ * No scroll reveals; the only motion is the claim form's own feedback.
+ */
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+
+.homepage-artist-hero {
+  /* <main> already clears the shell header; this is hero rhythm only. */
+  overflow: clip;
+  padding-block: var(--space-12) var(--space-16);
+}
+
+.homepage-artist-hero__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-12);
+  /* Width and gutter come from .ap-section-container, the one marketing
+     spine shared with every ArtistProfileSectionShell section below. */
+  margin-inline: auto;
+  align-items: center;
+}
+
+.homepage-artist-hero__copy {
+  max-width: 36rem;
+}
+
+.homepage-artist-hero__subhead {
+  margin-top: var(--space-6);
+  max-width: 32rem;
+}
+
+.homepage-artist-hero__claim {
+  margin-top: var(--space-8);
+  max-width: 28rem;
+}
+
+/* The form reserves its own status line; the support note sits under it. */
+.homepage-artist-hero__support {
+  padding-inline: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary-token);
+}
+
+.homepage-artist-hero__media {
+  display: flex;
+  justify-content: center;
+}
+
+.homepage-artist-hero__phone {
+  width: min(72vw, 18rem);
+}
+
+@media (min-width: 64rem) {
+  .homepage-artist-hero {
+    padding-block: var(--space-16) var(--space-24);
+  }
+
+  .homepage-artist-hero__inner {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: var(--space-16);
+  }
+
+  .homepage-artist-hero__phone {
+    width: 21.25rem;
+  }
+}
+
+/* ── Sections ─────────────────────────────────────────────────────────── */
+/* ArtistProfileSectionShell owns rhythm, container, and the content spine. */
+
+.homepage-artist-section {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.homepage-artist-section__headline {
+  max-width: 22ch;
+}
+
+/* ── Fan states ───────────────────────────────────────────────────────── */
+
+.homepage-fan-states__gallery {
+  --marketing-phone-gallery-bleed: var(--ap-page-gutter);
+
+  margin-top: var(--space-12);
+}
+
+/* ── Offer and close ──────────────────────────────────────────────────── */
+
+.homepage-offer-close__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-12);
+  align-items: start;
+}
+
+.homepage-offer-close__subhead {
+  margin-top: var(--space-5);
+  max-width: 30rem;
+}
+
+.homepage-offer-close__claim {
+  margin-top: var(--space-8);
+  max-width: 28rem;
+}
+
+.homepage-offer-close__plans {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-11);
+  padding-inline: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary-token);
+  text-decoration: underline;
+  text-decoration-color: var(--color-border-subtle);
+  text-underline-offset: var(--space-1);
+  transition: color var(--duration-subtle) var(--ease-subtle);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .homepage-offer-close__plans:hover {
+    color: var(--color-text-primary-token);
+  }
+}
+
+@media (min-width: 64rem) {
+  .homepage-offer-close__grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
+    gap: var(--space-16);
+  }
+}

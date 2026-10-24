@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, LoadingSkeleton } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, GitPullRequest } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -14,10 +14,8 @@ import {
   EntityHeaderThumbnail,
 } from '@/components/molecules/drawer';
 import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
-import {
-  parseShippingCockpitProjection,
-  type ShippingCockpitProjection,
-} from '@/lib/ovie/shipping-state/client';
+import { type ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
+import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 
@@ -388,6 +386,24 @@ function matrixSummary(
 }
 
 /**
+ * An empty matrix means "no open lane PRs" only on a fresh observation.
+ * Failed, stale, or syncing caches leave in-flight work unknown, never zero.
+ */
+export function emptyMatrixMessage(
+  isError: boolean,
+  feed: Pick<TaskFeed, 'syncState' | 'lastSyncedAt'> | undefined
+): string {
+  if (isError || !feed || feed.syncState === 'failed') {
+    return 'Work matrix unavailable. In-flight work is unknown.';
+  }
+  if (feed.syncState === 'stale') {
+    return `Shipping cache is stale (${feed.lastSyncedAt ? `last synced ${formatTimeAgo(feed.lastSyncedAt)}` : 'never synced'}). In-flight work is unknown until the next sync.`;
+  }
+  if (feed.syncState === 'syncing') return 'Syncing in-flight work…';
+  return 'No open lane pull requests.';
+}
+
+/**
  * Live PR / merge-queue status matrix: one row per Linear-owned work item in
  * flight, with checks, queue state, owner, age, and last transition. Rows open
  * the right rail for GitHub/Linear drill-in (JOV-6893).
@@ -398,27 +414,7 @@ export function ShippingMatrix() {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
-  const query = useQuery({
-    queryKey: ['ovie', 'shipping-state'],
-    queryFn: async ({ signal }) => {
-      const response = await fetch('/api/hud/shipping-state', {
-        signal,
-        cache: 'no-store',
-      });
-      if (!response.ok) {
-        throw new Error(
-          `Shipping observation unavailable (${response.status})`
-        );
-      }
-      const data = parseShippingCockpitProjection(await response.json());
-      if (!data) throw new Error('Shipping receipt could not be validated');
-      return data;
-    },
-    staleTime: 0,
-    gcTime: 60 * 1000,
-    retry: false,
-    refetchOnWindowFocus: true,
-  });
+  const query = useQuery(shippingStateQueryOptions);
   const [selectedId, setSelectedId] = useState<MatrixRow['id'] | null>(null);
   const feed = query.data?.operationalTasks;
   const rows = feed ? buildMatrixRows(feed, now) : [];
@@ -465,7 +461,10 @@ export function ShippingMatrix() {
             {query.isFetching ? 'Refreshing' : 'Refresh'}
           </Button>
         </div>
-        <div className='overflow-x-auto'>
+        <div
+          className='h-64 overflow-auto'
+          data-testid='shipping-matrix-viewport'
+        >
           <table
             className='w-full text-left text-xs tabular-nums'
             aria-labelledby='shipping-matrix-title'
@@ -492,15 +491,39 @@ export function ShippingMatrix() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && !query.isPending ? (
+              {query.isPending ? (
+                ['first', 'second', 'third', 'fourth', 'fifth'].map(row => (
+                  <tr
+                    key={`loading-${row}`}
+                    className='border-t border-subtle'
+                    aria-busy='true'
+                  >
+                    {[
+                      'work',
+                      'stage',
+                      'checks',
+                      'queue',
+                      'owner',
+                      'age',
+                      'transition',
+                    ].map(column => (
+                      <td key={`loading-${column}`} className='p-2'>
+                        <LoadingSkeleton
+                          height='h-4'
+                          width='w-full'
+                          announce={false}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : rows.length === 0 ? (
                 <tr className='border-t border-subtle'>
                   <td
                     colSpan={7}
                     className='p-6 text-center text-secondary-token'
                   >
-                    {query.isError
-                      ? 'Work matrix unavailable.'
-                      : 'No open lane pull requests.'}
+                    {emptyMatrixMessage(query.isError, feed)}
                   </td>
                 </tr>
               ) : (

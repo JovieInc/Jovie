@@ -39,8 +39,6 @@ const HEADLINE_CLAMP_BASELINE: Readonly<Record<string, number>> = {
   'components/marketing/artist-profile/ArtistProfileOutcomeDuo.tsx': 1,
   'components/marketing/changelog/ChangelogTimeline.tsx': 1,
   'components/marketing/engineering/EngineeringPublication.tsx': 3,
-  'components/marketing/friday-rhythm-section.tsx': 1,
-  'components/marketing/go-live-in-sixty-section.tsx': 1,
   'components/marketing/homepage-v2/HomepageV2Ctas.tsx': 1,
   'components/marketing/homepage-v2/HomepageV2Route.tsx': 2,
   [join('app', '(marketing)', 'ai', 'page.tsx')]: 7,

@@ -6,6 +6,11 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  # PR runs coalesce per PR; main pushes key by SHA and are never cancelled.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || format('{0}-{1}', github.ref, github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   parity:
     continue-on-error: true

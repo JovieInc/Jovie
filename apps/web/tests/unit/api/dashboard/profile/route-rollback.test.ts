@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   withDbSessionTx: vi.fn(),
   buildThemeWithProfileAccent: vi.fn(),
   getProfileUpdatePreflight: vi.fn(),
+  readWritableProfileUsername: vi.fn(),
   getCurrentUserEntitlements: vi.fn(),
   parseJsonBody: vi.fn(),
   validateUpdatesPayload: vi.fn(),
@@ -47,6 +48,7 @@ vi.mock('@/app/api/dashboard/profile/lib', () => ({
   parseProfileUpdates: mocks.parseProfileUpdates,
   buildProfileUpdateContext: mocks.buildProfileUpdateContext,
   getProfileUpdatePreflight: mocks.getProfileUpdatePreflight,
+  readWritableProfileUsername: mocks.readWritableProfileUsername,
   updateProfileRecords: mocks.updateProfileRecords,
   finalizeProfileResponse: mocks.finalizeProfileResponse,
   addAvatarCacheBust: (profile: unknown) => profile,
@@ -66,6 +68,7 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
       avatarUrl: 'https://example.com/old-avatar.png',
       profileEditVersion: 3,
     });
+    mocks.readWritableProfileUsername.mockResolvedValue('oldname');
     mocks.getCurrentUserEntitlements.mockResolvedValue({ plan: 'max' });
     const tx = { marker: 'transaction' };
     mocks.withDbSessionTx.mockImplementation(callback =>
@@ -125,6 +128,44 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
         oldUsernameNormalized: 'oldname',
         clerkUserId: APP_USER_ID,
       })
+    );
+    expect(mocks.parseProfileUpdates).toHaveBeenCalledWith(
+      { username: 'newname', displayName: 'New Name' },
+      { currentUsername: 'oldname' }
+    );
+  });
+
+  it('compares a reserved fixture handle with the owned username before saving', async () => {
+    mocks.readWritableProfileUsername.mockResolvedValue('browse-ready-user');
+    mocks.parseJsonBody.mockResolvedValue({
+      ok: true,
+      data: {
+        profileId: PROFILE_ID,
+        updates: {
+          username: 'browse-ready-user',
+          careerHighlights: 'Golden path test',
+        },
+      },
+    });
+    mocks.validateUpdatesPayload.mockReturnValue({
+      ok: true,
+      updates: {
+        username: 'browse-ready-user',
+        careerHighlights: 'Golden path test',
+      },
+    });
+
+    const { PUT } = await import('@/app/api/dashboard/profile/route');
+    await PUT(
+      new Request('http://localhost/api/dashboard/profile', { method: 'PUT' })
+    );
+
+    expect(mocks.parseProfileUpdates).toHaveBeenCalledWith(
+      {
+        username: 'browse-ready-user',
+        careerHighlights: 'Golden path test',
+      },
+      { currentUsername: 'browse-ready-user' }
     );
   });
 

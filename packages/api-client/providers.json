@@ -156,6 +156,75 @@
       "budgetHeaders": [],
       "primaryText": [],
       "secondaryText": []
+    },
+    "exa": {
+      "hosts": ["api.exa.ai"],
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": ["rate limit"],
+      "secondaryText": []
+    },
+    "firecrawl": {
+      "hosts": ["api.firecrawl.dev"],
+      "defaultResource": "requests",
+      "budgetHeaders": [
+        {
+          "resource": "requests",
+          "limit": "x-ratelimit-limit",
+          "remaining": "x-ratelimit-remaining",
+          "reset": "x-ratelimit-reset",
+          "resetUnit": "epoch-s"
+        }
+      ],
+      "primaryText": ["Rate limit exceeded"],
+      "secondaryText": []
+    },
+    "perplexity": {
+      "hosts": ["api.perplexity.ai"],
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": ["rate_limit"],
+      "secondaryText": []
+    },
+    "cloudflare": {
+      "hosts": ["api.cloudflare.com"],
+      "pathPrefix": "/client/v4/",
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": ["\\bRate limited\\b"],
+      "secondaryText": []
+    },
+    "hyperagent": {
+      "hosts": ["hyperagent.com"],
+      "pathPrefix": "/api/",
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": [],
+      "secondaryText": []
+    },
+    "xai-grok-cli": {
+      "hosts": [],
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": [
+        "rate.?limit(ed)? (exceeded|reached)",
+        "usage limit",
+        "quota (exceeded|exhausted)"
+      ],
+      "secondaryText": [
+        "HTTP 429",
+        "429 Too Many Requests",
+        "too many requests"
+      ]
+    },
+    "composio": {
+      "status": "blocked",
+      "blockedReason": "Composio Instant bills per call after the fact with no spend cap and keeps credentials outside config/registry (handoff composio-instant, 2026-10-21). Call paid APIs through their own provider entries.",
+      "hosts": ["backend.composio.dev"],
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": [],
+      "secondaryText": []
     }
   }
 }

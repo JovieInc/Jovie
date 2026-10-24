@@ -12,7 +12,6 @@ export const RUNTIME_ROOTS = Object.freeze([
   'apps/web/lib',
   'apps/web/components',
   'apps/web/hooks',
-  'apps/web/middleware.ts',
   'apps/web/proxy.ts',
   'apps/desktop/src',
   'packages/ui',

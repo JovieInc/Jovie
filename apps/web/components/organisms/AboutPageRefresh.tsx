@@ -7,7 +7,7 @@ import {
   MarketingHeroPhoto,
 } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
-import { ABOUT_FAQ_ITEMS } from '@/data/aboutCopy';
+import { ABOUT_COPY, ABOUT_FAQ_ITEMS } from '@/data/aboutCopy';
 import {
   ABOUT_REFRESH_DIFFERENTIATORS,
   ABOUT_REFRESH_OPENER,
@@ -63,7 +63,7 @@ export function AboutPageRefresh() {
           </h2>
           {publishedTeam.length === 0 ? (
             <p className='mt-6 text-base leading-relaxed text-secondary-token'>
-              TODO: Add team members from existing repo team records.
+              {ABOUT_COPY.origin.signoff}
             </p>
           ) : (
             <ul className='mt-6 flex list-none flex-col gap-10 p-0'>

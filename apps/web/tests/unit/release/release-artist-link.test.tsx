@@ -171,6 +171,12 @@ describe('release artist links', () => {
     const artistLink = screen.getByRole('link', { name: 'Test Artist' });
     expect(artistLink).toHaveAttribute('href', '/test-artist');
 
+    // The report link must identify the exact page, not a bare slug.
+    expect(screen.getByRole('link', { name: /Report/ })).toHaveAttribute(
+      'href',
+      `/report?type=smart_link&target=${encodeURIComponent('/test-artist/future-release')}`
+    );
+
     const title = screen.getByRole('heading', { name: 'Future Release' });
     expect(title).toHaveClass('text-2xl', 'tracking-tight');
     expect(title).not.toHaveClass('text-3xl', 'text-4xl');
