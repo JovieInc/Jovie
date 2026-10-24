@@ -1973,3 +1973,20 @@ test('auth handoff uses compact outer bounds and stays inside the active work ar
   );
   assert.doesNotMatch(mainSource, /const AUTH_HANDOFF_WINDOW_BOUNDS/);
 });
+
+test('Go menu binds Mac back/forward/new-message shortcuts to the focused window', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const goMenu = mainSource.match(
+    /function buildGoMenu\(\): MenuItemConstructorOptions\[\] \{[\s\S]*?\n\}/
+  )?.[0];
+  assert.ok(goMenu, 'buildGoMenu must exist');
+  assert.match(goMenu, /accelerator: 'CommandOrControl\+\['/);
+  assert.match(goMenu, /accelerator: 'CommandOrControl\+\]'/);
+  assert.match(goMenu, /accelerator: 'CommandOrControl\+N'/);
+  assert.match(goMenu, /menuWindow\(target\)/);
+  assert.match(mainSource, /\{ label: 'Go', submenu: buildGoMenu\(\) \}/);
+  assert.doesNotMatch(
+    mainSource,
+    /click: \(\) => \{\s*const url = publicProfilePreviewWindow\?\.webContents\.getURL\(\);/
+  );
+});
