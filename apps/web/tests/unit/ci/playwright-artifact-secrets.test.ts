@@ -682,6 +682,7 @@ function baseEnv(
 ): NodeJS.ProcessEnv {
   return {
     NODE_ENV: process.env.NODE_ENV,
+    NODE_V8_COVERAGE: process.env.NODE_V8_COVERAGE,
     PATH: process.env.PATH,
     HOME: process.env.HOME,
     GITHUB_WORKSPACE: workspace,
@@ -1382,6 +1383,99 @@ ${fixtureCheckout}
     expect(upload?.with?.['include-hidden-files']).toBe(true);
   });
 
+  it('uploads synthetic JSON failure evidence after exhausted retries without Markdown', () => {
+    const job = policyWorkflow('synthetic-monitoring.yml').jobs![
+      'synthetic-test'
+    ]!;
+    const upload = job.steps!.find(
+      step => step.name === 'Upload test results'
+    )!;
+    const actionPath = join(
+      githubRoot,
+      'actions/upload-safe-playwright-artifact'
+    );
+    const action = parseYaml(
+      readFileSync(join(actionPath, 'action.yml'), 'utf8')
+    ) as {
+      inputs: Record<string, { default?: string }>;
+      runs: { steps: PolicyStep[] };
+    };
+    const uploadGuard = action.runs.steps.find(step => step.id === 'guard')!;
+    const workspace = fixture();
+    const runner = fixture();
+    const jobEnv = Object.fromEntries(
+      Object.entries(job.env ?? {}).map(([name, value]) => [
+        name,
+        String(value),
+      ])
+    );
+    const report = {
+      status: 'failed',
+      error: 'Required canary config missing',
+    };
+    const resultPath =
+      'apps/web/test-results/synthetic-production-waitlist-results.json';
+    const packetPath =
+      'apps/web/test-results/journey-failure-packets/waitlist.json';
+    write(join(workspace, resultPath), JSON.stringify(report));
+    write(join(workspace, packetPath), JSON.stringify(report));
+    for (let retry = 0; retry < 3; retry++) {
+      write(
+        join(
+          workspace,
+          `apps/web/test-results/waitlist-retry${retry}/error-context.md`
+        ),
+        '# Page snapshot\n- heading: Required canary config missing\n'
+      );
+    }
+
+    const producer = runChild(workspace, runner, 'process.exit(1)', {
+      ...jobEnv,
+      PLAYWRIGHT_ARTIFACT_PATHS: 'apps/web/test-results',
+    });
+    expect(producer.status, producer.stderr).toBe(1);
+    expect(producer.stdout + producer.stderr).toContain('secret guard passed');
+    expect(
+      globSync('**/error-context.md', { cwd: currentStage(runner).stage })
+    ).toHaveLength(3);
+
+    const uploadEnv = Object.fromEntries(
+      Object.entries(uploadGuard.env ?? {}).map(([name, expression]) => {
+        const input = String(expression).match(/inputs\.([\w-]+)/)![1]!;
+        return [
+          name,
+          String(upload.with?.[input] ?? action.inputs[input]?.default ?? ''),
+        ];
+      })
+    );
+    const output = join(runner, 'upload-output');
+    const uploaded = spawnSync(
+      'bash',
+      ['--noprofile', '--norc', '-euo', 'pipefail', '-c', uploadGuard.run!],
+      {
+        cwd: workspace,
+        encoding: 'utf8',
+        env: baseEnv(workspace, runner, {
+          ...jobEnv,
+          ...uploadEnv,
+          GITHUB_ACTION_PATH: actionPath,
+          GITHUB_OUTPUT: output,
+        }),
+      }
+    );
+    expect(uploaded.status, uploaded.stdout + uploaded.stderr).toBe(0);
+    const artifactStage = readFileSync(output, 'utf8').split('\n')[1]!;
+    expect(globSync('**/*.md', { cwd: artifactStage })).toEqual([]);
+    for (const path of [
+      'synthetic-production-waitlist-results.json',
+      'journey-failure-packets/waitlist.json',
+    ]) {
+      expect(
+        JSON.parse(readFileSync(join(artifactStage, path), 'utf8'))
+      ).toEqual(report);
+    }
+  });
+
   it('scopes release auth probes to their step and orders the OAuth gate after the alias', () => {
     const canary = policyWorkflow('canary-health-gate.yml');
     const canaryJob = canary.jobs?.['canary-health-gate'];
@@ -1864,22 +1958,6 @@ ${fixtureCheckout}
     );
   });
 
-  it('reports the guarded artifact path when Extended Smoke blocks an artifact', () => {
-    const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
-    const job = jobBlock(source, 'ci-smoke-required');
-    const run = stepBlock(job, 'Run Required Smoke Tests');
-    const upload = stepBlock(job, 'Upload Playwright Artifacts on Failure');
-
-    // A manual-dispatch lane has no webhook to diagnose from, and the producer
-    // refuses uploads after a finding by design. The blocked-file path must be
-    // named in the guard diagnostic (safely redacted) or the red class from
-    // run 39820205877 (credential-text:1, tests passing) stays unfixable.
-    expect(run).toContain("PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'");
-    expect(run).toContain("PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true'");
-    expect(upload).toContain("allow-markdown: 'true'");
-    expect(upload).toContain("diagnostic-paths: 'true'");
-  });
-
   it.each(
     ['', 'tests/e2e/synthetic-status.spec.ts'].flatMap(filter =>
       ['test-failure', 'guard-failure', 'success'].map(outcome => ({
@@ -2187,7 +2265,7 @@ ${fixtureCheckout}
     });
     expect(diagnostic.status).toBe(1);
     expect(`${diagnostic.stdout}\n${diagnostic.stderr}`).toContain(
-      'image-policy:"fake.png"'
+      'file-classes=image:1'
     );
     const sensitiveFile = join(workspace, 'person@example.com.png');
     write(sensitiveFile, invalid[0]);
@@ -2209,7 +2287,7 @@ ${fixtureCheckout}
     ).not.toContain('person@example.com');
     expect(
       `${sensitiveDiagnostic.stdout}\n${sensitiveDiagnostic.stderr}`
-    ).toContain('image-policy:"[sensitive]"');
+    ).toContain('file-classes=image:1');
     const outsideWorkspace = fixture();
     const outsideFile = join(outsideWorkspace, 'outside.png');
     write(outsideFile, invalid[0]);
@@ -2372,6 +2450,161 @@ ${fixtureCheckout}
     expect(() => resolveArtifactFiles(['real/safe.json'], rootAlias)).toThrow();
   });
 
+  it.each([
+    [
+      'report.json',
+      '{"headers":{"authorization":"Bearer fixture-only-value"}}',
+      'json',
+      'credential-text',
+    ],
+    [
+      'events.JSONL',
+      '{"env":[["API_KEY","fixture-only-value"]]}\n',
+      'jsonl',
+      'credential-text',
+    ],
+    [
+      'error-context.md',
+      '# Page snapshot\nAPI_KEY=fixture-only-value',
+      'markdown',
+      'credential-text',
+    ],
+    [
+      'broken.json',
+      '{"private-fragment":fixture-only-value',
+      'json',
+      'malformed-structured-text',
+    ],
+    [
+      'broken.jsonl',
+      '{}\n{"private-fragment":fixture-only-value',
+      'jsonl',
+      'malformed-structured-text',
+    ],
+    [
+      'broken.md',
+      Buffer.from([0xff, 0xfe]),
+      'markdown',
+      'malformed-structured-text',
+    ],
+    ['capture.png', 'not a PNG', 'image', 'image-policy'],
+    [
+      'trace.zip',
+      'private container payload',
+      'container',
+      'forbidden-container',
+    ],
+    [
+      'unrecognized.bin',
+      'private unknown payload',
+      'unknown',
+      'unknown-binary',
+    ],
+  ])(
+    'emits bounded rejection diagnostics for %s',
+    (name, contents, fileClass, category) => {
+      const workspace = fixture();
+      const runner = fixture();
+      // Identity-like text, a credential-like fragment, control characters and
+      // Actions syntax belong only to the fixture path, never to diagnostics.
+      const adversarial = join(
+        workspace,
+        'person@example.invalid',
+        'token=fixture-only-value',
+        '::error::injected\n%0A',
+        name
+      );
+      write(adversarial, contents);
+      const expected = `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=${category}:1; file-classes=${fileClass}:1\n`;
+      for (const reportPaths of ['false', 'true']) {
+        const result = spawnSync(process.execPath, [guardScript, adversarial], {
+          cwd: workspace,
+          encoding: 'utf8',
+          env: baseEnv(workspace, runner, {
+            GITHUB_ACTIONS: 'false',
+            PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+            PLAYWRIGHT_ARTIFACT_REPORT_PATHS: reportPaths,
+            PLAYWRIGHT_ARTIFACT_STAGE_DIR: join(runner, 'must-not-stage'),
+          }),
+        });
+        expect(result.status).toBe(1);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toBe(expected);
+        expect(existsSync(join(runner, 'must-not-stage'))).toBe(false);
+      }
+    }
+  );
+
+  it('aggregates rejected file classes without listing files or counting secret occurrences', () => {
+    const workspace = fixture();
+    const runner = fixture();
+    for (let index = 0; index < 120; index++) {
+      write(
+        join(workspace, 'out', `person-${index}@example.invalid.json`),
+        JSON.stringify({
+          API_KEY: 'fixture-only-value',
+          PASSWORD: 'another-fixture-value',
+        })
+      );
+    }
+    write(
+      join(workspace, 'out/error-context.md'),
+      'API_KEY=fixture-only-value'
+    );
+    write(join(workspace, 'out/trace.har'), '{}');
+    write(join(workspace, 'out/unknown.custom-extension'), 'private');
+    write(join(workspace, 'out/safe.json'), '{}');
+    const result = runChild(workspace, runner, 'process.exit(23)', {
+      GITHUB_ACTIONS: 'false',
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+      PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
+    });
+    expect(result.status).toBe(23);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe(
+      'PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 123 unsafe or unverifiable Playwright artifact file(s); categories=credential-text:121,forbidden-container:1,unknown-binary:1; file-classes=container:1,json:120,markdown:1,unknown:1\n'
+    );
+    expect(result.stderr.length).toBeLessThan(512);
+    expect(existsSync(join(runner, 'safe-playwright-producer/blocked'))).toBe(
+      true
+    );
+    expect(existsSync(join(runner, 'safe-playwright-producer/current'))).toBe(
+      false
+    );
+    const retry = runChild(
+      workspace,
+      runner,
+      "require('node:fs').writeFileSync('child-ran','1')",
+      { GITHUB_ACTIONS: 'false' }
+    );
+    expect(retry.status).toBe(1);
+    expect(existsSync(join(workspace, 'child-ran'))).toBe(false);
+    expect(retry.stderr).toBe(
+      'PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=inspection-error:1; file-classes=unknown:1\n'
+    );
+  });
+
+  it('uses unknown for inspection failures without exposing raw errors or requested paths', () => {
+    const workspace = fixture();
+    const result = spawnSync(
+      process.execPath,
+      [guardScript, 'missing-person@example.invalid.json'],
+      {
+        cwd: workspace,
+        encoding: 'utf8',
+        env: baseEnv(workspace, fixture(), {
+          PLAYWRIGHT_ARTIFACT_REPORT_PATHS: 'true',
+        }),
+      }
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe(
+      'PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=inspection-error:1; file-classes=unknown:1\n' +
+        '::error::PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=inspection-error:1; file-classes=unknown:1\n'
+    );
+  });
+
   it.each([undefined, 'false'])(
     'does not print mask commands outside GitHub Actions (%s)',
     githubActions => {
@@ -2398,31 +2631,33 @@ ${fixtureCheckout}
 
   it('surfaces the bounded rejection counts as an Actions error annotation', () => {
     const workspace = fixture();
+    const runner = fixture();
     const leakChild =
       "const f=require('node:fs');f.mkdirSync('out',{recursive:true});f.writeFileSync('out/report.json',JSON.stringify({leak:process.env.FLAGS_SECRET}));console.log('ANNOTATION_CHILD')";
-    const extra = { FLAGS_SECRET: 'annotation-sentinel-secret' };
+    const counts =
+      'blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=credential-text:1; file-classes=json:1';
 
-    const annotated = runChild(workspace, fixture(), leakChild, extra);
+    // In Actions the counts-only line is duplicated as a step error annotation
+    // so a fresh failing step is diagnosable from check annotations without
+    // admin job-log access (run 39820205877 class). Content is identical to
+    // the stderr line — never paths, file names, or values.
+    const annotated = runChild(workspace, runner, leakChild, {
+      FLAGS_SECRET: 'annotation-sentinel-secret',
+    });
     expect(annotated.status).toBe(1);
-    const output = `${annotated.stdout}\n${annotated.stderr}`;
-    // The annotation carries the runbook's counts only — never paths, file
-    // names, or values — so a fresh failing step is diagnosable from check
-    // annotations without admin job-log access (run 39820205877 class).
-    expect(output).toContain(
-      '::error::PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=credential-text:1'
+    expect(annotated.stdout).toContain('ANNOTATION_CHILD');
+    expect(annotated.stderr).toBe(
+      `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: ${counts}\n::error::PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: ${counts}\n`
     );
-    expect(output).toContain('ANNOTATION_CHILD');
 
     const plain = runChild(fixture(), fixture(), leakChild, {
-      ...extra,
-      GITHUB_ACTIONS: undefined,
+      FLAGS_SECRET: 'annotation-sentinel-secret',
+      GITHUB_ACTIONS: 'false',
     });
     expect(plain.status).toBe(1);
-    const plainOutput = `${plain.stdout}\n${plain.stderr}`;
-    expect(plainOutput).toContain(
-      'PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=credential-text:1'
+    expect(plain.stderr).toBe(
+      `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: ${counts}\n`
     );
-    expect(plainOutput).not.toContain('::error::');
   });
 
   it('masks before the child, scans after failure, and permanently poisons leaks', () => {
