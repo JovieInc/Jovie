@@ -37,3 +37,22 @@ Sources checked 2026-10-24:
 Ship now: the internal provider contract. Re-evaluate when strict token-bound
 quotas are available or a server-mediated transport is approved. Then use its
 server-measured audio ledger to settle reservations without undercounting.
+
+## Batch recovery
+
+MediaRecorder retains the shared microphone locally throughout streaming and its
+single reconnect. On batch fallback, stopping capture transcribes that complete
+recording and replaces the streamed text once. Cancellation aborts upload and
+invalidates late callbacks. Successful streaming discards the local buffer.
+
+The browser decodes the recorder container and resamples to mono PCM16 at 16 kHz.
+Uploads are canonical WAV chunks of at most 100 seconds (3.2 MB), under the
+4,000,000-byte route limit. The server reads a bounded body, validates the complete
+WAV header and data length, and reserves `ceil(dataBytes / 32000)` audio seconds
+before calling Scribe v2. It accepts no client duration field or remote audio URL.
+Streaming reservations and batch audio share the same UTC-day account bucket;
+reprocessing audio in batch is a second provider operation and consumes quota too.
+No audio or transcript is persisted by this feature in Jovie.
+
+Batch API checked 2026-10-24:
+https://elevenlabs.io/docs/api-reference/speech-to-text/convert

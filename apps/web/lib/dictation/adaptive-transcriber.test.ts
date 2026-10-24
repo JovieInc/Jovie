@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createAdaptiveTranscriber } from './adaptive-transcriber';
+import {
+  type AdaptiveTranscriberOptions,
+  createAdaptiveTranscriber,
+} from './adaptive-transcriber';
 import { createDictationRegistry } from './registry';
 import {
   DICTATION_MIC_CONSTRAINTS,
@@ -45,7 +48,7 @@ function provider(id: string) {
 async function flush() {
   for (let i = 0; i < 12; i++) await Promise.resolve();
 }
-function setup() {
+function setup(options: Partial<AdaptiveTranscriberOptions> = {}) {
   const first = provider('elevenlabs-stream');
   const second = provider('elevenlabs-batch');
   const stop = vi.fn();
@@ -60,6 +63,7 @@ function setup() {
   const transcriber = createAdaptiveTranscriber(
     { onTranscript, onError, onEnd },
     {
+      ...options,
       providers: [second.instance, first.instance],
       getMicrophone,
       onFallback,
@@ -194,5 +198,99 @@ describe('adaptive dictation', () => {
     await flush();
     expect(stop).toHaveBeenCalledOnce();
     expect(p.instance.openStream).not.toHaveBeenCalled();
+  });
+  it('keeps streaming audio buffered across reconnect and replaces the session once with batch text', async () => {
+    const audio = new Blob(['complete session']);
+    const stopRecording = vi.fn(async () => audio);
+    const abortRecording = vi.fn();
+    const s = setup({
+      createRecording: () => ({ stop: stopRecording, abort: abortRecording }),
+    });
+    s.second.instance.capabilities.batch = true;
+    s.second.instance.openStream = undefined;
+    s.second.instance.transcribe = vi.fn(async () => 'Hello world');
+    s.transcriber.start();
+    await flush();
+    s.first.emit({ type: 'committed', segmentId: 'a', text: 'Hello' });
+    for (let i = 0; i < 2; i++) {
+      s.first.emit({ type: 'error', code: 'network' });
+      await flush();
+    }
+    expect(stopRecording).not.toHaveBeenCalled();
+    s.transcriber.stop();
+    await flush();
+    expect(s.second.instance.transcribe).toHaveBeenCalledWith(
+      audio,
+      expect.any(AbortSignal)
+    );
+    expect(s.onTranscript).toHaveBeenLastCalledWith('Hello world');
+    expect(s.onTranscript).not.toHaveBeenCalledWith('Hello Hello world');
+    expect(s.stop).toHaveBeenCalledOnce();
+    expect(s.onEnd).toHaveBeenCalledOnce();
+  });
+  it('uses the recording if the stream fails during graceful stop', async () => {
+    const audio = new Blob(['final audio']);
+    const s = setup({
+      createRecording: () => ({ stop: async () => audio, abort() {} }),
+    });
+    s.second.instance.capabilities.batch = true;
+    s.second.instance.openStream = undefined;
+    s.second.instance.transcribe = vi.fn(async () => 'Recovered final');
+    s.transcriber.start();
+    await flush();
+    s.transcriber.stop();
+    await flush();
+    s.first.emit({ type: 'error', code: 'network' });
+    await flush();
+    expect(s.getMicrophone).toHaveBeenCalledOnce();
+    expect(s.onTranscript).toHaveBeenLastCalledWith('Recovered final');
+    expect(s.onEnd).toHaveBeenCalledOnce();
+  });
+  it('drops a batch response that arrives after cancellation', async () => {
+    let resolve: (text: string) => void = () => {};
+    const s = setup({
+      createRecording: () => ({
+        stop: async () => new Blob(['audio']),
+        abort() {},
+      }),
+    });
+    s.first.instance.health = () => false;
+    s.second.instance.capabilities.batch = true;
+    s.second.instance.openStream = undefined;
+    s.second.instance.transcribe = vi.fn(
+      () =>
+        new Promise<string>(r => {
+          resolve = r;
+        })
+    );
+    s.transcriber.start();
+    await flush();
+    s.transcriber.stop();
+    await flush();
+    s.transcriber.cancel();
+    resolve('Late');
+    await flush();
+    expect(s.onTranscript).not.toHaveBeenCalled();
+  });
+  it('recovers retained audio when stop races an in-flight reconnect', async () => {
+    const audio = new Blob(['retained speech']);
+    const s = setup({
+      createRecording: () => ({ stop: async () => audio, abort() {} }),
+    });
+    s.second.instance.capabilities.batch = true;
+    s.second.instance.openStream = undefined;
+    s.second.instance.transcribe = vi.fn(async () => 'Retained speech');
+    s.transcriber.start();
+    await flush();
+    s.first.instance.openStream = vi.fn(() => new Promise<never>(() => {}));
+    s.first.emit({ type: 'error', code: 'network' });
+    await flush();
+    s.transcriber.stop();
+    await flush();
+    expect(s.onTranscript).toHaveBeenLastCalledWith('Retained speech');
+    expect(s.second.instance.transcribe).toHaveBeenCalledWith(
+      audio,
+      expect.any(AbortSignal)
+    );
   });
 });
