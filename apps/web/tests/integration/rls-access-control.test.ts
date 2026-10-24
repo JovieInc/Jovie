@@ -388,7 +388,6 @@ describe.skipIf(!process.env.DATABASE_URL)(
             appUserId: userBId,
             profileId: publicProfileId,
             dbProfileUpdates: updates,
-            displayNameForUserUpdate: undefined,
             usernameUpdate:
               'usernameNormalized' in updates
                 ? updates.usernameNormalized

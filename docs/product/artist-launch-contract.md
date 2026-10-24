@@ -1,8 +1,8 @@
 # Artist launch surface contract
 
 JOV-8369 establishes the **intended** web launch cut line and a reproducible
-source inventory. It does not certify a deployed launch. Runtime enforcement,
-claims reconciliation and browser evidence are required in
+source inventory. It does not certify a deployed launch. Remaining runtime
+enforcement, claims-path auditing and browser evidence are required in
 [JOV-8505](https://linear.app/jovie/issue/JOV-8505), with deployed certification
 in [JOV-8370](https://linear.app/jovie/issue/JOV-8370) and launch commissioning
 in [JOV-8368](https://linear.app/jovie/issue/JOV-8368).
@@ -41,19 +41,22 @@ Canonical claims take precedence over the deprecated profile `user_id` field.
 Required proof must edit two distinct entities, reload owner and public views,
 and reject a different account, stale legacy owner and ambiguous claim graph.
 
-Reconciliation against source and Linear on 2026-10-15:
+Reconciliation against source and Linear (2026-10-15; ownership update 2026-10-24):
 
 - **JOV-3768 is canceled.** Current main retains `/app/settings/profile`, its
   artist-profile alias, account and individual settings pages. The seven-page
   proposal is not evidence of shipped consolidation. This slice preserves the
   current entry points so required profile controls are not retired prematurely.
-- **JOV-6211 remains open.** Dashboard base loading still filters the deprecated
-  `creatorProfiles.userId`; `updateCreatorProfile` also uses that legacy owner.
-  `getExactProfileAccess` already has canonical-claim precedence, but that does
-  not prove every read/write path uses it. The September triage deliberately
-  retained the indexed legacy read until identity hardening or stop-write;
-  preserve that safety index. JOV-8505 must reconcile these paths against the
-  launch ownership contract before changing the query.
+- **JOV-6211 remains open.** The 2026-10-24 ownership slice changes dashboard
+  candidates, profile API reads/writes, profile edit actions and switching to
+  canonical-claim precedence. A session-bound boolean DB function sees claims
+  hidden by tenant RLS; legacy ownership is allowed only when the entity has no
+  canonical claims. Indexed candidate IDs retain the legacy safety index.
+  Profile settings use the same authorized active selection as the owner shell;
+  artist display-name edits no longer rename either account. Existing dashboard
+  cache keys are versioned to discard pre-repair ownership results. This is
+  source/fixture evidence, not an audit of every legacy ownership path or a
+  deployed persistence claim; JOV-8505 retains that remaining audit.
 - **JOV-8368 remains commissioning work.** No price, existing plan, entitlement,
   invitation or live Stripe behavior is changed by this source contract.
 - **gbrain-unavailable:** the local service refused the preflight query; these
@@ -87,7 +90,28 @@ defaults/all-on/all-off, empty/pending/error/recovery, direct URLs and API/actio
 entry, persistence and public/owner parity. No screenshots or runtime receipts
 are fabricated by this generator. JOV-8370 must bind those to a deployed SHA.
 
-**Ship now:** inventory and source-contract drift detection.
-**Re-evaluate when:** JOV-8505 integrates launch enforcement and claims ownership.
+## Ownership regression evidence
+
+The fast CI suite executes production Drizzle queries and transactions using
+installed embedded PostgreSQL (PGlite), with no database credentials or skips:
+
+```sh
+pnpm --filter @jovie/web exec vitest run tests/unit/auth/artist-profile-ownership.test.ts --maxWorkers=1
+```
+
+The same suite can target a disposable loopback PostgreSQL database named
+`jov8369_profile_contract` via `PROFILE_OWNERSHIP_TEST_DATABASE_URL`. It never
+falls back to the application `DATABASE_URL`. It creates fixture tables and
+executes the new migration; the restricted-role case replays existing profile
+policies and verifies rejection when RLS hides another account's claim. Cases
+cover exact entity writes, managers, viewers, ambiguous roles, legacy fallback,
+revoked selection, account-name separation, empty accounts, reloads, cache
+invalidation and rollback. Fixture rows and policies do not certify deployed
+schema, database roles, public browser rendering or query performance. Migration
+0148 requires a trusted owner with RLS bypass capability and fails before
+activation if that prerequisite is absent; no role or credential is granted.
+
+**Ship now:** inventory drift detection and the bounded ownership repair.
+**Re-evaluate when:** JOV-8505 completes launch enforcement and remaining claim paths.
 **Then:** certify the matrix on the deployed generation under JOV-8370 before
 JOV-8368 invites the first artists.

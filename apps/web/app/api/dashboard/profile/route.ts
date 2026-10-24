@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isCanonicalUuid } from '@/lib/auth/profile-access';
-import {
-  requireAuth,
-  withDbSession,
-  withDbSessionTx,
-} from '@/lib/auth/session';
+import { requireAuth, withDbSessionTx } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { dashboardQuery } from '@/lib/db/query-timeout';
@@ -97,9 +93,9 @@ async function parseProfileUpdateRequest(req: Request, appUserId: string) {
 
 export async function GET() {
   try {
-    return await withDbSession(async clerkUserId => {
+    return await withDbSessionTx(async (tx, clerkUserId) => {
       const userProfile = await dashboardQuery(
-        () => getProfileByClerkId(clerkUserId),
+        () => getProfileByClerkId(clerkUserId, tx),
         'User profile fetch'
       );
 
@@ -145,7 +141,6 @@ export async function PUT(req: Request) {
     const {
       parsedUpdates,
       dbProfileUpdates,
-      displayNameForUserUpdate,
       avatarUrl,
       usernameUpdate,
       expectedVersion,
@@ -187,7 +182,6 @@ export async function PUT(req: Request) {
           appUserId,
           profileId,
           dbProfileUpdates,
-          displayNameForUserUpdate,
           usernameUpdate,
           expectedVersion,
           precomputedAvatarTheme,

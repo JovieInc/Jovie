@@ -4,14 +4,15 @@
  * Database operations for profile updates.
  */
 
-import { and, sql as drizzleSql, eq, or } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import type { DbOrTransaction } from '@/lib/db';
-import { db } from '@/lib/db';
-import { getUserByClerkId } from '@/lib/db/queries/shared';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
+import {
+  getActiveWritableProfile,
+  writableProfileForUser,
+} from '@/lib/db/queries/profile-ownership';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   mergeProfileTheme,
   type ProfileThemeRecord,
@@ -23,7 +24,6 @@ export interface UpdateProfileRecordsParams {
   appUserId: string;
   profileId: string;
   dbProfileUpdates: Record<string, unknown>;
-  displayNameForUserUpdate: string | undefined;
   usernameUpdate: string | undefined;
   expectedVersion?: number;
   precomputedAvatarTheme: ProfileThemeRecord | undefined;
@@ -59,19 +59,6 @@ function profileNotFoundResponse() {
   return NextResponse.json(
     { error: 'Profile not found' },
     { status: 404, headers: NO_STORE_HEADERS }
-  );
-}
-
-function writableProfileForUser(appUserId: string) {
-  return or(
-    eq(creatorProfiles.userId, appUserId),
-    drizzleSql`EXISTS (
-      SELECT 1
-      FROM ${userProfileClaims} ownership_claim
-      WHERE ownership_claim.creator_profile_id = ${creatorProfiles.id}
-        AND ownership_claim.user_id = ${appUserId}
-        AND ownership_claim.role IN ('owner', 'manager')
-    )`
   );
 }
 
@@ -134,7 +121,6 @@ export async function updateProfileRecords({
   appUserId,
   profileId,
   dbProfileUpdates,
-  displayNameForUserUpdate,
   usernameUpdate,
   expectedVersion,
   precomputedAvatarTheme,
@@ -278,32 +264,16 @@ export async function updateProfileRecords({
     );
   }
 
-  if (displayNameForUserUpdate && access.ownerUserId) {
-    await tx
-      .update(users)
-      .set({ name: displayNameForUserUpdate, updatedAt: new Date() })
-      .where(eq(users.id, access.ownerUserId));
-  }
-
   return {
     updatedProfile,
     oldUsernameNormalized: existingProfile?.usernameNormalized ?? null,
   };
 }
 
-export async function getProfileByClerkId(clerkUserId: string) {
-  const user = await getUserByClerkId(db, clerkUserId);
-  if (!user) {
-    return null;
-  }
-
-  const [userProfile] = await db
-    .select({
-      profile: creatorProfiles,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.userId, user.id))
-    .limit(1);
-
-  return userProfile ?? null;
+export async function getProfileByClerkId(
+  appUserId: string,
+  tx: DbOrTransaction
+) {
+  const profile = await getActiveWritableProfile(tx, appUserId);
+  return profile ? { profile } : null;
 }
