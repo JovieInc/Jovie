@@ -755,8 +755,8 @@ def stale_hold(number: int, pr: dict, now: float, sh=run) -> dict | None:
     blocker (a dependency, a qualification pass, a pricing red line) are human gates, not
     storm leftovers: no row, no alert. The row's `auto` marks the stricter mode's subset:
     the hold came from automation and the head moved after it."""
-    if HUMAN_DECISION_LABEL in {label.lower() for label in label_names(pr)}:
-        return None  # a human-decision hold is released by a human removing it, never by staleness
+    if human_holds(pr):
+        return None  # a human hold is released by a human removing it, never by staleness
     ctx = hold_context(number, sh)
     if not ctx or not ctx["events"]:
         return None
@@ -780,8 +780,9 @@ def stale_hold(number: int, pr: dict, now: float, sh=run) -> dict | None:
 
 def auto_unhold_labels(pr: dict) -> list[str]:
     """Labels the stale-hold sweep may lift. The human-decision hold is never among them."""
-    return [label for label in label_names(pr)
-            if (label.lower() in HOLD_LABELS and label.lower() != HUMAN_DECISION_LABEL) or label == POISON_LABEL]
+    if human_holds(pr):
+        return []  # any human-owned hold keeps every other hold and poison label in place too
+    return [label for label in label_names(pr) if label.lower() in HOLD_LABELS or label == POISON_LABEL]
 
 
 def stale_hold_alert(row: dict) -> str:
@@ -1369,7 +1370,18 @@ def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict
     return None
 
 
+def unconfirmed_human_hold(host, pr: dict) -> bool:
+    """A needs-human-decision disposition exists for this exact head but its label write has not
+    been confirmed. The PR is held until a later pass applies the label."""
+    rows = read_state(host, "escalation.json").get("surfaced")
+    return isinstance(rows, list) and any(
+        isinstance(row, dict) and row.get("holdPending") is True and row.get("pr") == pr.get("number")
+        and row.get("head") == pr.get("headRefOid") for row in rows)
+
+
 def maintenance_hold(host, lane, pr: dict, now: float, *, terminal_ok: bool = False) -> str | None:
+    if unconfirmed_human_hold(host, pr):
+        return "human-hold-pending"
     reason = preservation_reason(pr, read_state(host, "fix-attempts.json").get(str(pr["number"]), {}),
                                  lane.MAX_FIX_ATTEMPTS, held=read_state(host, "held.json").get(str(pr["number"])), now=now,
                                  terminal_ok=terminal_ok)
