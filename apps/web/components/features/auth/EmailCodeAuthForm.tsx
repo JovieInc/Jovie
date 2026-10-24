@@ -395,6 +395,7 @@ export function EmailCodeAuthForm({
           </span>
         </p>
         <OtpInput
+          size='hero'
           value={code}
           onChange={setCode}
           onComplete={verifyCode}

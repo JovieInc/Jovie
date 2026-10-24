@@ -599,10 +599,48 @@ describe('ShellReleasesView', () => {
     expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
   });
 
+  it('keeps the release list axe list-clean through the real context-menu path', () => {
+    // The default suite mock wraps rows in a div; the production
+    // ContextMenuPrimitive.Trigger asChild renders the row host directly, so
+    // the ul's children contract is only observable with the real menu.
+    testState.realActionMenu = true;
+    renderShell([
+      fakeRelease({ id: '1', title: 'Lost in the Light' }),
+      fakeRelease({ id: '2', title: 'Take Me Over' }),
+    ]);
+
+    // axe `list` rule: ul children must carry listitem semantics — a
+    // suppressed wrapper (role=presentation) is rejected exactly like a div,
+    // and any wrapper element breaks the singular listitem set the shell's
+    // keyboard navigation indexes. Each row IS a native li with an implicit
+    // listitem role (no explicit role, no nested rows).
+    const list = screen.getByRole('list', { name: 'Releases' });
+    const directChildren = [...list.children];
+    expect(directChildren.length).toBeGreaterThanOrEqual(2);
+    for (const child of directChildren) {
+      expect(child.tagName).toBe('LI');
+      expect(child).not.toHaveAttribute('role');
+      expect(child).toHaveAttribute('data-shell-release-row');
+      expect(child.querySelectorAll('[role="listitem"]')).toHaveLength(0);
+    }
+    // Every row resolves by role, exactly one listitem per release.
+    expect(screen.getAllByRole('listitem')).toHaveLength(directChildren.length);
+  });
+
   it('shows the connect-Spotify empty state when not yet connected', () => {
     renderShell([]);
     expect(
-      screen.getByText(/Connect Spotify to get started/)
+      screen.getByText(/Connect Spotify To Get Started/)
+    ).toBeInTheDocument();
+  });
+
+  it('exposes the connect-Spotify empty state as a real heading', () => {
+    renderShell([]);
+    // The e2e releases health spec and the axe heading outline resolve the
+    // disconnected state by role=heading 'Connect Spotify' — the same shape
+    // the connected empty state already renders.
+    expect(
+      screen.getByRole('heading', { name: /Connect Spotify To Get Started/ })
     ).toBeInTheDocument();
   });
 

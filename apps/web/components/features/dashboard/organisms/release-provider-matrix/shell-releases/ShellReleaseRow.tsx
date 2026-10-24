@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import {
+  type ComponentPropsWithoutRef,
   type KeyboardEvent,
   type MouseEvent,
   memo,
@@ -79,8 +80,12 @@ const RELEASE_TYPE_BADGE_LABEL: Record<ReleaseType, string> = {
   other: 'Other',
 };
 export const shellReleaseRowTypography = {
-  title: 'truncate text-app font-caption text-primary-token leading-[1.2]',
-  subtitle: 'truncate text-2xs text-tertiary-token leading-[1.3]',
+  // min-h-6 keeps the title target at the 24px WCAG 2.5.8 floor inside the
+  // dense h-8 row (axe target-size is enabled at WCAG 2.2 AA and cannot be
+  // allowlisted); items-center on the hover link keeps the glyphs centered.
+  titleClassName:
+    'truncate text-app font-caption text-primary-token leading-[1.2] min-h-6',
+  subtitleClassName: 'truncate text-2xs text-tertiary-token leading-[1.3]',
 } as const;
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
@@ -308,6 +313,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   actionMenuItems,
   smartLinkLockReason = null,
   syncStatus = null,
+  ...hostProps
 }: {
   readonly release: ReleaseViewModel;
   readonly isSelected: boolean;
@@ -320,7 +326,18 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
    * label. Degrades to nothing when `null` (the common idle case).
    */
   readonly syncStatus?: ShellReleaseSyncStatus;
-}) {
+} & Omit<
+  ComponentPropsWithoutRef<'li'>,
+  | 'children'
+  | 'className'
+  | 'onClick'
+  | 'onKeyDown'
+  | 'onPointerEnter'
+  | 'onFocus'
+  | 'aria-label'
+  | 'role'
+  | 'tabIndex'
+>) {
   const dspItems = useMemo(() => releaseToDspItems(release), [release]);
   const dropMeta = useMemo(
     () => (release.releaseDate ? dropDateMeta(release.releaseDate) : null),
@@ -365,7 +382,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
     status: release.status,
   };
 
-  function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+  function handleKeyDown(e: KeyboardEvent<HTMLLIElement>) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onSelect();
@@ -374,11 +391,13 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
 
   return (
     <ShellListRowFrame
-      role='listitem'
-      // `listitem` is name-from-author (unlike the old `option`, which was
-      // name-from-content): give the row an explicit accessible name so
-      // role-based queries and screen-reader item navigation announce the
-      // release title.
+      as='li'
+      // The row IS the list item (implicit listitem): axe's `list` rule
+      // rejects suppressed-role wrapper children of a ul, and any wrapper
+      // element breaks the singular listitem queries the shell lists rely
+      // on. `listitem` is name-from-author, so keep the explicit accessible
+      // name for role-based queries and screen-reader item navigation.
+      {...hostProps}
       aria-label={release.title}
       tabIndex={0}
       onClick={onSelect}
@@ -401,7 +420,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
           <EntityHoverLink
             entity={releaseEntity}
             className={cn(
-              shellReleaseRowTypography.title,
+              shellReleaseRowTypography.titleClassName,
               'inline-flex min-w-0 hover:no-underline'
             )}
           >
@@ -417,7 +436,10 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
                 ·
               </span>
               <span
-                className={cn(shellReleaseRowTypography.subtitle, 'min-w-0')}
+                className={cn(
+                  shellReleaseRowTypography.subtitleClassName,
+                  'min-w-0'
+                )}
               >
                 {artistLabel}
               </span>

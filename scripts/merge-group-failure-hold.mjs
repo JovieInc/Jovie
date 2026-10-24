@@ -296,7 +296,16 @@ export function parseTrustedFailureStatus(status, repository) {
   const creator = statusCreator(status);
   if (
     creator.type !== 'Bot' ||
-    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+    ![
+      'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
+      'jovie-bot',
+      'jovie-ci-lane',
+      'jovie-symphony-lane',
+      'jovie-agents-lane',
+    ].includes(creator.login)
   ) {
     return null;
   }
@@ -323,7 +332,16 @@ export function parseTrustedRetryStatus(status, repository) {
   const creator = statusCreator(status);
   if (
     creator.type !== 'Bot' ||
-    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+    ![
+      'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
+      'jovie-bot',
+      'jovie-ci-lane',
+      'jovie-symphony-lane',
+      'jovie-agents-lane',
+    ].includes(creator.login)
   ) {
     return null;
   }
@@ -390,7 +408,16 @@ function parseTrustedAdmissionRecoveryStatus(status, repository) {
   const creator = statusCreator(status);
   if (
     creator.type !== 'Bot' ||
-    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+    ![
+      'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
+      'jovie-bot',
+      'jovie-ci-lane',
+      'jovie-symphony-lane',
+      'jovie-agents-lane',
+    ].includes(creator.login)
   )
     return null;
   const match =
@@ -1292,9 +1319,23 @@ function instructionContractEvidence(repository, run, jobs, baseSha) {
   }
 }
 
-function ciFastRemainingLog(repository, jobs) {
+// The current log is only consumed for a failing `ci-fast (remaining)` job.
+// The ahead log is also read when that job SUCCEEDED (JOV-8760): an ahead run
+// that failed in another job still proves, through its successful structural
+// timings table, that this group's failing commands passed on the base —
+// skipping the successful log left every such group waiting unattributed.
+function ciFastRemainingLog(
+  repository,
+  jobs,
+  { includeSuccessful = false } = {}
+) {
   const job = jobs.find(item => item?.name === CI_FAST_REMAINING_JOB);
-  if (!job || job.conclusion !== 'failure' || !Number.isSafeInteger(job.id))
+  const accepted = includeSuccessful ? ['failure', 'success'] : ['failure'];
+  if (
+    !job ||
+    !accepted.includes(job.conclusion) ||
+    !Number.isSafeInteger(job.id)
+  )
     return null;
   return gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]);
 }
@@ -1321,7 +1362,9 @@ function withAheadAttribution(repository, jobs, aheadGroup) {
         aheadJobs,
         aheadConclusion: aheadGroup.aheadConclusion,
         currentCiFastLog: ciFastRemainingLog(repository, jobs),
-        aheadCiFastLog: ciFastRemainingLog(repository, aheadJobs),
+        aheadCiFastLog: ciFastRemainingLog(repository, aheadJobs, {
+          includeSuccessful: true,
+        }),
       }),
     };
   } catch {

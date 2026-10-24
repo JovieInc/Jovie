@@ -37,7 +37,8 @@ const {
  * card titles complete with an explicit, per-row subgrid contract below.
  */
 
-const CLAMP_BOUND = /(line-clamp-1|line-clamp-2|truncate|sr-only)/;
+const CLAMP_BOUND =
+  /(line-clamp-1|line-clamp-2|marketing-h1-max-two-lines|truncate|sr-only)/;
 const NON_PRODUCT = /\.(test|spec|stories)\.[jt]sx?$/;
 
 /**
@@ -57,6 +58,16 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // /product's closing CTA headline is the same terminal value proposition —
   // the two-line clamp truncated it at 390px, so it renders editorial-title.
   'apps/web/app/(marketing)/product/ProductLanding.tsx',
+  // The /product/* feature pages (release-scheduling, dsp-links, utm-links,
+  // isrc, link-analytics) share one hero. Its title stays complete; balance
+  // comes from text-balance, so the heading does not use line-clamp.
+  'apps/web/app/(marketing)/product/ProductFeatureLanding.tsx',
+  // /product/command-palette keeps the full headline with text-balance;
+  // the heading does not use line-clamp.
+  'apps/web/app/(marketing)/product/command-palette/CommandPaletteLanding.tsx',
+  // /product/pre-save is a new marketing h1. The shrink-only headline ratchet
+  // rejects a new line-clamp token, so the title stays complete.
+  'apps/web/app/(marketing)/product/pre-save/PreSaveLanding.tsx',
   // /card section titles wrap to three lines at 390px; the clamp cut
   // "An introduction. Not a list of usernames" mid-sentence.
   'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
@@ -67,9 +78,6 @@ const FULL_TITLE_HEADING_FILES: ReadonlySet<string> = new Set([
   // copy at desktop and 390px (route DOM clipped-heading, JOV-7713).
   'apps/web/app/(marketing)/launch/page.tsx',
   'apps/web/app/(marketing)/download/page.tsx',
-  // /ai hero headline: the two-line clamp truncated the page's value
-  // proposition at phone widths (route DOM clipped-heading, JOV-8164).
-  'apps/web/app/(marketing)/ai/page.tsx',
 ]);
 
 function hasEditorialTitleContract(
@@ -118,6 +126,19 @@ function shellSurfaceFiles(): string[] {
 }
 
 describe('mac-header-two-lines-v1', () => {
+  it('recognizes the canonical two-line H1 bound without an editorial exemption', () => {
+    expect(CLAMP_BOUND.test("className='marketing-h1-max-two-lines'")).toBe(
+      true
+    );
+    expect(CLAMP_BOUND.test("className='ai-hero-title'")).toBe(false);
+    expect(
+      hasEditorialTitleContract(
+        'apps/web/app/(marketing)/ai/page.tsx',
+        "data-wrap='editorial-title'",
+        ''
+      )
+    ).toBe(false);
+  });
   it('requires the complete-title contract on the Artist Profiles section heading', () => {
     const file =
       'apps/web/components/marketing/artist-profile/ArtistProfileSectionHeader.tsx';

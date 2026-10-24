@@ -2183,6 +2183,7 @@ describe('source-read guard selection', () => {
         'art-direction',
         'icp-language',
         'marketing-rounded-media',
+        'marketing-container-width',
       ],
     ],
     [
@@ -2275,6 +2276,7 @@ describe('source-read guard selection', () => {
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
+      'synthetic-canary-liveness',
       'playbook-authoring',
       'icp-language',
       'external-api-guard',
@@ -2288,6 +2290,7 @@ describe('source-read guard selection', () => {
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
+      'synthetic-canary-liveness',
       'playbook-authoring',
       'icp-language',
       'external-api-guard',
@@ -2395,6 +2398,13 @@ describe('source-read guard selection', () => {
         expect(guard.prOnly).toBe(true);
         expect(guard.command).toBe(
           'node --test scripts/invariants/art-direction/rounded.test.mjs'
+        );
+        continue;
+      }
+      if (guard.id === 'marketing-container-width') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toBe(
+          'node --test scripts/invariants/art-direction/container-width.test.mjs'
         );
         continue;
       }
