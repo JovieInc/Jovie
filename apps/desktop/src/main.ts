@@ -1501,12 +1501,13 @@ function buildDesktopShellHtml(input: {
       .shell { position: relative; display: grid; width: min(420px, calc(100vw - 48px)); gap: 16px; padding: 32px 24px; text-align: center; justify-items: center; }
       .mark { width: ${SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx}px; height: ${SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx}px; color: var(--system-b-mark-cream); }
       .copy { position: relative; display: grid; gap: 8px; justify-items: center; }
-      h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
+      h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; text-wrap: balance; }
       p { margin: 0; max-width: 34ch; color: var(--system-b-text-secondary); font-size: 13px; line-height: 1.55; }
       .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
       a { display: inline-flex; height: 34px; align-items: center; justify-content: center; border-radius: var(--system-b-radius-pill); padding: 0 13px; color: var(--system-b-text-primary); font-size: 12px; font-weight: 590; text-decoration: none; }
       .primary { background: var(--system-b-primary-bg); color: var(--system-b-primary-fg); }
       .secondary { color: var(--system-b-text-secondary); }
+      a:focus-visible { outline: 2px solid var(--system-b-text-primary); outline-offset: 3px; }
       ${DESKTOP_BUILD_IDENTITY_SHELL_CSS}
     </style>
   </head>
@@ -2988,7 +2989,7 @@ function buildApplicationMenu(): Menu {
           buildUpdateMenuItem(),
           { type: 'separator' },
           {
-            label: 'Preferences...',
+            label: 'Preferences…',
             accelerator: 'Command+,',
             click: openPreferences,
           },
@@ -3028,7 +3029,7 @@ function buildApplicationMenu(): Menu {
           },
         },
         {
-          label: 'Preferences...',
+          label: 'Preferences…',
           accelerator: 'Ctrl+,',
           click: openPreferences,
         },

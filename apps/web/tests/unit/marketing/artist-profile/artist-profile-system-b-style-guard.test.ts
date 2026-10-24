@@ -109,7 +109,7 @@ describe('artist profile landing family System B source contract', () => {
       ),
       'utf8'
     );
-    expect(sectionShell).toContain("'ap-section-container !px-0'");
+    expect(sectionShell).toContain("'ap-section-container'");
     expect(sectionShell).toContain('ap-section-shell frame-section');
 
     const outcomes = readFileSync(
@@ -134,7 +134,7 @@ describe('artist profile landing family System B source contract', () => {
       "data-testid='artist-profile-opinionated-profile'"
     );
     expect(opinionated).toContain(
-      "className='ap-opinionated__visual relative'"
+      "className='ap-opinionated__visual marketing-rounded-frame relative'"
     );
     expect(opinionated).not.toContain('MarketingSnapRail');
 

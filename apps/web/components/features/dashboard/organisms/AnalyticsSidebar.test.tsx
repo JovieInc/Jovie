@@ -1,6 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+
 import {
   AnalyticsSidebar,
   AnalyticsSidebarView,
@@ -56,6 +62,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     activeTab,
     onTabChange,
     tabbedCardTestId,
+    tabbedSurfaceVariant = 'flat',
     testId,
   }: {
     children?: ReactNode;
@@ -65,6 +72,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     activeTab: string;
     onTabChange: (value: string) => void;
     tabbedCardTestId?: string;
+    tabbedSurfaceVariant?: 'card' | 'flat';
     testId?: string;
   }) => (
     <div
@@ -73,7 +81,10 @@ vi.mock('@/components/molecules/drawer', () => ({
       data-close-handler={onClose ? 'present' : 'none'}
     >
       {entityHeader}
-      <div data-testid={tabbedCardTestId} data-surface-variant='flat'>
+      <div
+        data-testid={tabbedCardTestId}
+        data-surface-variant={tabbedSurfaceVariant}
+      >
         <div role='tablist' aria-label='Analytics data tabs'>
           {tabOptions.map(option => (
             <button
@@ -141,16 +152,20 @@ describe('calculateConversionRate', () => {
 });
 
 describe('AnalyticsSidebar', () => {
-  it('renders the canonical tabbed rail without nested raised surfaces', () => {
+  it('renders the funnel and tabbed rail on the shared rounded drawer card', () => {
     const { container } = render(<AnalyticsSidebar isOpen onClose={vi.fn()} />);
 
     expect(screen.getByTestId('analytics-sidebar-tabbed-card')).toHaveAttribute(
       'data-surface-variant',
-      'flat'
+      'card'
     );
     expect(
       container.querySelectorAll('[data-surface-variant="card"]')
-    ).toHaveLength(0);
+    ).toHaveLength(2);
+    expect(screen.getByTestId('analytics-sidebar')).toHaveAttribute(
+      'data-surface-variant',
+      'flat'
+    );
     expect(screen.getByTestId('analytics-sidebar')).toHaveAttribute(
       'data-close-handler',
       'present'
@@ -191,7 +206,7 @@ describe('AnalyticsSidebar', () => {
 
     expect(
       container.querySelectorAll('[data-surface-variant="card"]')
-    ).toHaveLength(0);
+    ).toHaveLength(2);
     expect(screen.queryByText('Tip Link Visits')).not.toBeInTheDocument();
 
     rerender(
@@ -278,6 +293,23 @@ describe('FunnelStage (regression: JOV-4158 / #13819 skeleton layout parity)', (
     );
     expect(withRate.firstElementChild?.firstElementChild?.className).toBe(
       FUNNEL_STAGE_METRIC_ROW_CLASS
+    );
+  });
+});
+
+describe('AnalyticsSidebar ranked-list density (JOV densify pass)', () => {
+  it('keeps the desktop ranked rows and their loading shell on the 32px scale', () => {
+    const source = readFileSync(
+      resolve(
+        webRoot,
+        'components/features/dashboard/organisms/AnalyticsSidebar.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toContain('flex h-9 items-center justify-between');
+    expect(source).toContain(
+      'flex h-8 items-center justify-between rounded-lg px-2.5'
     );
   });
 });

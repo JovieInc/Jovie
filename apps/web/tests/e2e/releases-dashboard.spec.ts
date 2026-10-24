@@ -340,8 +340,8 @@ test.describe('Releases dashboard', () => {
         }
       );
       // /app/releases aliases the shell catalog. Tracks/Releases tabs belong
-      // to the retired matrix switcher; the canonical surface is this listbox.
-      const releaseList = page.getByRole('listbox', { name: 'Releases' });
+      // to the retired matrix switcher; the canonical surface is this list.
+      const releaseList = page.getByRole('list', { name: 'Releases' });
       await expect(releaseList).toBeVisible({
         timeout: TIMEOUTS.ELEMENT_CHECK,
       });
@@ -456,9 +456,9 @@ test.describe('Releases dashboard', () => {
     // /app/releases renders the shell release list (ShellReleasesView, via
     // the library alias since #22071). Each row owns its smart link and
     // action menu; the table-era toolbar (export, preview toggle) is gone.
-    const releaseList = page.getByRole('listbox', { name: 'Releases' });
+    const releaseList = page.getByRole('list', { name: 'Releases' });
     await expect(releaseList).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
-    const rows = releaseList.getByRole('option');
+    const rows = releaseList.getByRole('listitem');
     await expect
       .poll(() => rows.count(), { timeout: TIMEOUTS.ELEMENT_CHECK })
       .toBeGreaterThan(0);
@@ -516,8 +516,7 @@ test.describe('Releases dashboard', () => {
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_CHECK });
 
     await addReleaseSidebar
-      .getByRole('button', { name: /Pick a date/i })
-      .first()
+      .getByRole('button', { name: 'Release Date', exact: true })
       .click();
     await expect(
       addReleaseSidebar.locator('[role="grid"]').first()

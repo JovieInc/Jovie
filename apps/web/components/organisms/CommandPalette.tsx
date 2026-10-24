@@ -1,5 +1,9 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/organisms/CommandPalette.test.tsx
+
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
+
 /**
  * CommandPalette — global Cmd+K shell.
  *
@@ -42,7 +46,10 @@ import type { NavCommand } from '@/lib/commands/registry';
 import { WORKSPACE_SWITCH_SHORTCUT } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { isFormElement } from '@/lib/utils/keyboard';
-import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
+import {
+  OPEN_COMMAND_PALETTE_EVENT,
+  preloadCommandPaletteChunk,
+} from './command-palette-events';
 
 const RECENT_CHAT_QUERY_LIMIT = 50;
 
@@ -67,6 +74,24 @@ export function CommandPalette() {
   // should be a no-op instead of crashing.
   const dashboardData = useContext(DashboardDataContext);
   const headerActions = useOptionalHeaderActions();
+  // Warm the palette chunk at idle so the first Cmd+K opens instantly
+  // instead of waiting on a cold dynamic import.
+  useEffect(() => {
+    if (typeof globalThis.requestIdleCallback === 'function') {
+      const idleId = globalThis.requestIdleCallback(() => {
+        void preloadCommandPaletteChunk();
+      });
+      return () => {
+        globalThis.cancelIdleCallback(idleId);
+      };
+    }
+    const timer = globalThis.setTimeout(() => {
+      void preloadCommandPaletteChunk();
+    }, 0);
+    return () => {
+      globalThis.clearTimeout(timer);
+    };
+  }, []);
   if (!dashboardData || !headerActions) {
     return null;
   }
@@ -153,10 +178,12 @@ function CommandPaletteController() {
       if (isCommandPaletteOpen) closeCommandPalette();
       else openCommandPalette();
     }
-    globalThis.addEventListener('keydown', onKeyDown);
+    // Capture so a focused drawer or menu cannot swallow Cmd/Ctrl+K.
+    // Editors still own the shortcut via the isFormElement guard above.
+    globalThis.addEventListener('keydown', onKeyDown, true);
     globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, openCommandPalette);
     return () => {
-      globalThis.removeEventListener('keydown', onKeyDown);
+      globalThis.removeEventListener('keydown', onKeyDown, true);
       globalThis.removeEventListener(
         OPEN_COMMAND_PALETTE_EVENT,
         openCommandPalette
@@ -231,7 +258,7 @@ function CommandPaletteInner({
           const entity: EntityRef = {
             kind: 'track', // Reuses the generic Music2 fallback art.
             id: `thread:${convo.id}`,
-            label: convo.title || 'Untitled chat',
+            label: convo.title || COPY_FALLBACKS.conversation,
             meta: {
               kind: 'track',
               subtitle: getPaletteConversationSubtitle(

@@ -45,14 +45,14 @@ vi.mock('@/features/demo/DemoReleasesExperience', () => ({
 }));
 
 vi.mock(
-  '@/features/dashboard/organisms/release-provider-matrix/ReleasesExperience',
+  '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView',
   () => ({
-    ReleasesExperience: ({
+    ShellReleasesView: ({
       experienceAdapter,
     }: {
       readonly experienceAdapter?: ReleaseExperienceAdapter;
     }) => (
-      <div data-testid='stub-releases-experience'>
+      <div data-testid='stub-shell-releases-view'>
         <button type='button' onClick={() => experienceAdapter?.onSync?.()}>
           Sync adapter
         </button>

@@ -152,19 +152,19 @@ unless linked below.
 | --- | --- | --- | --- | --- |
 | `@jovie/no-hardcoded-theme-colors` | `error` | L | Yes | None (no grandfathered count) |
 | `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
-| `arbitrary-radius` | `error` | S + G | Yes | 27 occurrences; 12 files |
+| `arbitrary-radius` | `error` | S + G | Yes | 14 occurrences; 8 files |
 | `arbitrary-values` | `error` | G + I | Yes | 2169 |
 | `component-family` | `error` | G | Yes | button=37; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
 | `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
 | `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
 | `deprecated-button-alias` | `error` | G | Yes | 91 |
-| `linear-namespace` | `error` | G + I | Yes | 701 |
-| `shadcn/no-restyle` | `error` | L + G | Yes | 218 files; 3106 messages (grandfathered) |
-| `source-identity` | `error` | I | Yes | 2076 |
-| `spacing-scale (conservative)` | `error` | S + G | Yes | 615; armed=true; marketing=47; packages/ui=11; web-other=304; web-shell=253 |
-| `spacing-scale (strict)` | `warn` | S + G | No | 2206; armed=false; marketing=147; packages/ui=60; web-other=1126; web-shell=851 |
+| `linear-namespace` | `error` | G + I | Yes | 700 |
+| `shadcn/no-restyle` | `error` | L + G | Yes | 217 files; 3105 messages (grandfathered) |
+| `source-identity` | `error` | I | Yes | 2057 |
+| `spacing-scale (conservative)` | `error` | S + G | Yes | 590; armed=true; marketing=46; packages/ui=11; web-other=290; web-shell=243 |
+| `spacing-scale (strict)` | `warn` | S + G | No | 2190; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=837 |
 | `touch-target` | `error` | D | Yes | 153 |
-| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=282; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=266; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
 
 The [raw-color baseline](apps/web/contrast-ratchet.baseline.json) and
 [computed pair config](apps/web/contrast-pairs.config.json) cover separate
@@ -258,6 +258,10 @@ for full tokens and sizing when changing this area.
 | Width | 224px | 224px |
 | Background RGB | `247 248 248` | `7 8 10` |
 
+
+## Tooltip eligibility and input
+
+[Details](docs/design-system/DETAILS.md#tooltip-eligibility-and-input).
 
 ## Full-Screen Status Screens
 

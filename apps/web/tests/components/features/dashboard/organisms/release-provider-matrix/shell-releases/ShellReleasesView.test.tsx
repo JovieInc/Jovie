@@ -291,6 +291,9 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
     onChangeStatus,
     isSmartLinkLocked,
     getSmartLinkLockReason,
+    analyticsOverride,
+    tracksOverride,
+    showCredits,
   }: {
     release: ReleaseViewModel | null;
     onClose?: () => void;
@@ -302,6 +305,9 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
     ) => void;
     isSmartLinkLocked?: (id: string) => boolean;
     getSmartLinkLockReason?: (id: string) => 'scheduled' | 'cap' | null;
+    analyticsOverride?: unknown;
+    tracksOverride?: readonly unknown[];
+    showCredits?: boolean;
   }) =>
     release ? (
       <aside
@@ -312,6 +318,9 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
           isSmartLinkLocked && getSmartLinkLockReason
         )}
         data-is-smartlink-locked={isSmartLinkLocked?.(release.id) ?? false}
+        data-analytics={analyticsOverride ? 'override' : 'live'}
+        data-has-tracks={tracksOverride ? 'true' : 'false'}
+        data-show-credits={showCredits ? 'true' : 'false'}
       >
         <div>{release.title}</div>
         <input aria-label='Release title draft' defaultValue={release.title} />
@@ -434,7 +443,7 @@ describe('ShellReleasesView', () => {
       initialImporting: true,
     });
     expect(screen.getByTestId('releases-matrix')).toBeInTheDocument();
-    const row = screen.getByRole('option', { name: /Lost in the Light/ });
+    const row = screen.getByRole('listitem', { name: /Lost in the Light/ });
     const progress = screen.getByTestId('spotify-import-progress-banner');
     const progressSlot = screen.getByTestId('release-import-progress-slot');
     expect(progress).toHaveAttribute('aria-hidden', 'false');
@@ -481,7 +490,9 @@ describe('ShellReleasesView', () => {
       spotifyConnected: true,
       initialImporting: true,
     });
-    await user.click(screen.getByRole('option', { name: /Lost in the Light/ }));
+    await user.click(
+      screen.getByRole('listitem', { name: /Lost in the Light/ })
+    );
     const drawer = await screen.findByTestId('release-sidebar');
     const input = within(drawer).getByRole('textbox', {
       name: 'Release title draft',
@@ -504,8 +515,8 @@ describe('ShellReleasesView', () => {
     expect(input).toHaveFocus();
     expect([input.selectionStart, input.selectionEnd]).toEqual([2, 7]);
     expect(
-      screen.getByRole('option', { name: /Updated from Spotify/ })
-    ).toHaveAttribute('aria-selected', 'true');
+      screen.getByRole('listitem', { name: /Updated from Spotify/ })
+    ).toHaveAttribute('data-selected', 'true');
   });
 
   it('waits to mount the list until Apple eligibility resolves, then commits banner and rows together', () => {
@@ -516,7 +527,7 @@ describe('ShellReleasesView', () => {
     );
 
     expect(
-      screen.queryByRole('option', { name: /Wait for eligibility/ })
+      screen.queryByRole('listitem', { name: /Wait for eligibility/ })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('apple-music-sync-banner')
@@ -544,7 +555,7 @@ describe('ShellReleasesView', () => {
     );
 
     expect(
-      screen.getByRole('option', { name: /Wait for eligibility/ })
+      screen.getByRole('listitem', { name: /Wait for eligibility/ })
     ).toBeInTheDocument();
     expect(screen.getByTestId('apple-music-sync-banner')).toBeInTheDocument();
   });
@@ -560,7 +571,7 @@ describe('ShellReleasesView', () => {
     });
 
     expect(
-      screen.getByRole('option', { name: /Already linked/ })
+      screen.getByRole('listitem', { name: /Already linked/ })
     ).toBeInTheDocument();
     expect(
       screen.queryByTestId('apple-music-sync-banner')
@@ -580,12 +591,54 @@ describe('ShellReleasesView', () => {
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
     expect(screen.getByText('Other')).toBeInTheDocument();
+    // The catalog is a native list (not an ARIA listbox): rows own real
+    // per-cell controls, which an ARIA `option` cannot contain (axe
+    // nested-interactive).
+    const list = screen.getByRole('list', { name: 'Releases' });
+    expect(list.tagName).toBe('UL');
+    expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('keeps the release list axe list-clean through the real context-menu path', () => {
+    // The default suite mock wraps rows in a div; the production
+    // ContextMenuPrimitive.Trigger asChild renders the row host directly, so
+    // the ul's children contract is only observable with the real menu.
+    testState.realActionMenu = true;
+    renderShell([
+      fakeRelease({ id: '1', title: 'Lost in the Light' }),
+      fakeRelease({ id: '2', title: 'Take Me Over' }),
+    ]);
+
+    // axe `list` rule: a ul's direct children must be li (script/template).
+    // The context-menu wrapper is a presentation li, and each carries exactly
+    // one listitem row — the row inside, never a nested second listitem.
+    const list = screen.getByRole('list', { name: 'Releases' });
+    const directChildren = [...list.children];
+    expect(directChildren.length).toBeGreaterThanOrEqual(2);
+    for (const child of directChildren) {
+      expect(child.tagName).toBe('LI');
+      expect(child).toHaveAttribute('role', 'presentation');
+      expect(child).toHaveAttribute('data-shell-release-row-context-target');
+      expect(child.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+    }
+    // The listbox contract still resolves exactly one listitem per row.
+    expect(screen.getAllByRole('listitem')).toHaveLength(directChildren.length);
   });
 
   it('shows the connect-Spotify empty state when not yet connected', () => {
     renderShell([]);
     expect(
-      screen.getByText(/Connect Spotify to get started/)
+      screen.getByText(/Connect Spotify To Get Started/)
+    ).toBeInTheDocument();
+  });
+
+  it('exposes the connect-Spotify empty state as a real heading', () => {
+    renderShell([]);
+    // The e2e releases health spec and the axe heading outline resolve the
+    // disconnected state by role=heading 'Connect Spotify' — the same shape
+    // the connected empty state already renders.
+    expect(
+      screen.getByRole('heading', { name: /Connect Spotify To Get Started/ })
     ).toBeInTheDocument();
   });
 
@@ -616,12 +669,12 @@ describe('ShellReleasesView', () => {
   it('opens and dismisses the production release drawer from a row', async () => {
     renderShell([fakeRelease({ id: 'r1', title: 'Lost in the Light' })]);
 
-    const row = screen.getByRole('option', { name: /Lost in the Light/ });
-    expect(row).toHaveAttribute('aria-selected', 'false');
+    const row = screen.getByRole('listitem', { name: /Lost in the Light/ });
+    expect(row).not.toHaveAttribute('data-selected');
 
     fireEvent.click(row);
 
-    expect(row).toHaveAttribute('aria-selected', 'true');
+    expect(row).toHaveAttribute('data-selected', 'true');
     expect(await screen.findByTestId('release-sidebar')).toHaveTextContent(
       'Lost in the Light'
     );
@@ -629,7 +682,7 @@ describe('ShellReleasesView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     await waitFor(() => {
-      expect(row).toHaveAttribute('aria-selected', 'false');
+      expect(row).not.toHaveAttribute('data-selected');
       expect(screen.queryByTestId('release-sidebar')).not.toBeInTheDocument();
     });
   });
@@ -637,7 +690,9 @@ describe('ShellReleasesView', () => {
   it('passes the same lifecycle and eligibility capabilities to the detail rail', async () => {
     renderShell([fakeRelease({ id: 'r1', title: 'Lost in the Light' })]);
 
-    fireEvent.click(screen.getByRole('option', { name: /Lost in the Light/ }));
+    fireEvent.click(
+      screen.getByRole('listitem', { name: /Lost in the Light/ })
+    );
     const rail = await screen.findByTestId('release-sidebar');
 
     expect(rail).toHaveAttribute('data-has-delete', 'true');
@@ -649,11 +704,13 @@ describe('ShellReleasesView', () => {
   it('keeps selected row in sync when the drawer edits a release', async () => {
     renderShell([fakeRelease({ id: 'r1', title: 'Lost in the Light' })]);
 
-    fireEvent.click(screen.getByRole('option', { name: /Lost in the Light/ }));
+    fireEvent.click(
+      screen.getByRole('listitem', { name: /Lost in the Light/ })
+    );
     fireEvent.click(await screen.findByRole('button', { name: 'Save Edit' }));
 
-    expect(screen.getByRole('option', { name: /Edited/ })).toHaveAttribute(
-      'aria-selected',
+    expect(screen.getByRole('listitem', { name: /Edited/ })).toHaveAttribute(
+      'data-selected',
       'true'
     );
   });
@@ -1018,13 +1075,13 @@ describe('ShellReleasesView', () => {
         fakeRelease({ id: 'r2', title: 'Beta' }),
       ]);
 
-      const rows = screen.getAllByRole('option');
-      expect(rows[0]).toHaveAttribute('aria-selected', 'false');
+      const rows = screen.getAllByRole('listitem');
+      expect(rows[0]).not.toHaveAttribute('data-selected');
 
       fireEvent.keyDown(document, { key: 'j' });
 
       await waitFor(() => {
-        expect(rows[0]).toHaveAttribute('aria-selected', 'true');
+        expect(rows[0]).toHaveAttribute('data-selected', 'true');
       });
     });
 
@@ -1035,26 +1092,26 @@ describe('ShellReleasesView', () => {
         fakeRelease({ id: 'r3', title: 'Gamma' }),
       ]);
 
-      const rows = screen.getAllByRole('option');
+      const rows = screen.getAllByRole('listitem');
 
       // J selects first
       fireEvent.keyDown(document, { key: 'j' });
       await waitFor(() =>
-        expect(rows[0]).toHaveAttribute('aria-selected', 'true')
+        expect(rows[0]).toHaveAttribute('data-selected', 'true')
       );
 
       // J again moves to second
       fireEvent.keyDown(document, { key: 'j' });
       await waitFor(() => {
-        expect(rows[0]).toHaveAttribute('aria-selected', 'false');
-        expect(rows[1]).toHaveAttribute('aria-selected', 'true');
+        expect(rows[0]).not.toHaveAttribute('data-selected');
+        expect(rows[1]).toHaveAttribute('data-selected', 'true');
       });
 
       // K moves back to first
       fireEvent.keyDown(document, { key: 'k' });
       await waitFor(() => {
-        expect(rows[0]).toHaveAttribute('aria-selected', 'true');
-        expect(rows[1]).toHaveAttribute('aria-selected', 'false');
+        expect(rows[0]).toHaveAttribute('data-selected', 'true');
+        expect(rows[1]).not.toHaveAttribute('data-selected');
       });
     });
 
@@ -1067,8 +1124,8 @@ describe('ShellReleasesView', () => {
       // Navigate to first release with J
       fireEvent.keyDown(document, { key: 'j' });
       await waitFor(() => {
-        expect(screen.getAllByRole('option')[0]).toHaveAttribute(
-          'aria-selected',
+        expect(screen.getAllByRole('listitem')[0]).toHaveAttribute(
+          'data-selected',
           'true'
         );
       });
@@ -1087,7 +1144,7 @@ describe('ShellReleasesView', () => {
         fakeRelease({ id: 'r2', title: 'Beta' }),
       ]);
 
-      const rows = screen.getAllByRole('option');
+      const rows = screen.getAllByRole('listitem');
       const input = document.createElement('input');
       document.body.appendChild(input);
       input.focus();
@@ -1095,18 +1152,60 @@ describe('ShellReleasesView', () => {
       fireEvent.keyDown(input, { key: 'j' });
 
       // Selection should not change because focus is in a form element
-      expect(rows[0]).toHaveAttribute('aria-selected', 'false');
+      expect(rows[0]).not.toHaveAttribute('data-selected');
       document.body.removeChild(input);
     });
 
     it('does not fire J/K when a modifier key is held', () => {
       renderShell([fakeRelease({ id: 'r1', title: 'Alpha' })]);
 
-      const rows = screen.getAllByRole('option');
+      const rows = screen.getAllByRole('listitem');
 
       fireEvent.keyDown(document, { key: 'j', metaKey: true });
 
-      expect(rows[0]).toHaveAttribute('aria-selected', 'false');
+      expect(rows[0]).not.toHaveAttribute('data-selected');
     });
+  });
+
+  it('uses demo adapter fixtures and skips live sync and create', () => {
+    const onSync = vi.fn();
+    const onCreateRelease = vi.fn();
+    renderShell([fakeRelease({ id: 'r1', title: 'Demo Single' })], {
+      spotifyConnected: true,
+      experienceAdapter: {
+        mode: 'demo',
+        entitlements: {
+          isPro: true,
+          canCreateManualReleases: true,
+          canEditSmartLinks: true,
+          canAccessFutureReleases: true,
+          smartLinksLimit: null,
+        },
+        onSync,
+        onCreateRelease,
+        sidebarDataByReleaseId: {
+          r1: {
+            analytics: {
+              totalClicks: 12,
+              last7DaysClicks: 3,
+              lastClickAt: null,
+              providerClicks: [],
+            },
+            tracks: [],
+          },
+        },
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sync' }));
+    expect(onSync).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'New release' }));
+    expect(onCreateRelease).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('listitem', { name: /Demo Single/ }));
+    const sidebar = screen.getByTestId('release-sidebar');
+    expect(sidebar).toHaveAttribute('data-analytics', 'override');
+    expect(sidebar).toHaveAttribute('data-has-tracks', 'true');
+    expect(sidebar).toHaveAttribute('data-show-credits', 'false');
   });
 });

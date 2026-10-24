@@ -11,8 +11,9 @@
  * only go DOWN. New sub-44px interactive elements fail CI; fixing them
  * lets you lower the baseline with --update.
  *
- * Runtime complement: axe `target-size` on rendered stories lands with the
- * Storybook+axe gate (#12008); this is the deterministic zero-render half.
+ * This script does not measure a rendered box. WCAG 2.2 AA target size
+ * (24 CSS px, axe `target-size`) is `wcag22AaAxeOptions()` and
+ * `tests/a11y/rendered-gate.spec.ts`. The 44px count here stays a source ratchet.
  *
  * Usage:
  *   pnpm --filter web run lint:touch-target            # check only

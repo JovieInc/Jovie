@@ -198,7 +198,8 @@ export default defineConfig({
       'tests/performance/**',
       'tests/integration/**',
       'tests/**/*.nightly.test.ts',
-      // Playwright specs own this directory; they fail under Vitest's runner.
+      // Playwright specs own these directories; they fail under Vitest's runner.
+      'tests/a11y/**',
       'tests/docs-guides/**',
       'tests/product-screenshots/**',
       'tests/visual-qa/**',

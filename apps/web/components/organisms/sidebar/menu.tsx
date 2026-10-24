@@ -37,7 +37,7 @@ const sidebarMenuButtonVariants = cva(
   [
     // Base layout — tighter and calmer so the rail reads as one system.
     // Borderless nav-row chrome (#13217): no resting/hover/active borders.
-    'peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-xl px-2.5 text-left text-xs leading-[1.15] tracking-normal outline-none',
+    'peer/menu-button flex w-full items-center gap-(--app-shell-sidebar-icon-gap) overflow-hidden rounded-xl px-(--app-shell-sidebar-inset) text-left text-xs leading-[1.15] tracking-normal outline-none',
     // Font weight 500 — Linear's --font-weight-medium for sidebar nav
     '[font-weight:var(--font-weight-nav)]',
     // Transitions — Linear: instant for background, colors
@@ -63,10 +63,10 @@ const sidebarMenuButtonVariants = cva(
     // spans still leave the layout instantly.
     '[&>span:is(:last-child,[data-rail-label])]:truncate [&>span:is(:last-child,[data-rail-label])]:max-w-full [&>span:is(:last-child,[data-rail-label])]:overflow-hidden [&>span:is(:last-child,[data-rail-label])]:whitespace-nowrap [&>span:is(:last-child,[data-rail-label])]:transition-[max-width,opacity,transform] [&>span:is(:last-child,[data-rail-label])]:duration-cinematic [&>span:is(:last-child,[data-rail-label])]:ease-cinematic [&>span:is(:last-child,[data-rail-label])]:motion-reduce:transition-none',
     'group-data-[collapsible=icon]:[&>span:is(:last-child,[data-rail-label])]:max-w-0 group-data-[collapsible=icon]:[&>span:is(:last-child,[data-rail-label])]:opacity-0 group-data-[collapsible=icon]:[&>span:is(:last-child,[data-rail-label])]:-translate-x-1.5 group-data-[collapsible=icon]:[&>span:is(:last-child,[data-rail-label])]:pointer-events-none group-data-[collapsible=icon]:[&>span:not(.sr-only):not(:last-child):not([data-rail-label])]:hidden',
-    // Icon styling — 14px to match Linear's nav icon size
-    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-3.5 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
+    // Icon styling — the shared 16px sidebar icon token.
+    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-(--app-shell-sidebar-icon-size) [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
     // Icon color snaps instantly with the row (no transition — Linear: instant for icon colors)
-    '[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon',
+    '[&>svg]:size-(--app-shell-sidebar-icon-size) [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon',
     '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon',
     'hover:[&>svg]:text-sidebar-item-foreground',
     'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground',
@@ -81,7 +81,7 @@ const sidebarMenuButtonVariants = cva(
           'bg-sidebar-background border border-sidebar-border hover:border-sidebar-accent',
       },
       size: {
-        default: 'h-6.5',
+        default: 'h-(--app-shell-sidebar-row-height)',
         sm: 'h-6 text-xs',
         lg: 'h-8 group-data-[collapsible=icon]:!size-8',
       },
@@ -317,12 +317,12 @@ export const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        'flex min-h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-full px-2.5 text-app leading-[1.15] text-sidebar-item-foreground outline-none transition-[background-color,color,box-shadow] duration-normal ease-interactive [font-weight:var(--font-weight-nav)]',
+        'flex min-h-(--app-shell-sidebar-row-height) min-w-0 items-center gap-(--app-shell-sidebar-icon-gap) overflow-hidden rounded-full px-(--app-shell-sidebar-inset) text-app leading-[1.15] text-sidebar-item-foreground outline-none transition-[background-color,color,box-shadow] duration-normal ease-interactive [font-weight:var(--font-weight-nav)]',
         'hover:bg-sidebar-accent hover:text-sidebar-item-foreground',
         'focus-visible:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/35',
         'active:bg-sidebar-accent active:text-sidebar-item-foreground',
         'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
-        '[&>span:last-child]:truncate [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors',
+        '[&>span:last-child]:truncate [&>svg]:size-(--app-shell-sidebar-icon-size) [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors',
         'data-[active=true]:bg-sidebar-accent-active data-[active=true]:text-sidebar-item-foreground',
         'data-[active=true]:[&>svg]:text-sidebar-item-foreground hover:[&>svg]:text-sidebar-item-foreground',
         size === 'sm' && 'min-h-6 text-xs',

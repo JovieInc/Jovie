@@ -3,6 +3,7 @@
 // @coverage-via apps/web/tests/unit/sidebar-row-alignment.test.tsx
 import { Slot } from '@radix-ui/react-slot';
 import React from 'react';
+import { SIDEBAR_ENTRY_LABEL_INSET_CLASS } from '@/components/shell/sidebar-optical';
 import { cn } from '@/lib/utils';
 
 export const SidebarGroup = React.forwardRef<
@@ -35,8 +36,9 @@ export const SidebarGroupLabel = React.forwardRef<
       ref={ref}
       data-sidebar='group-label'
       className={cn(
-        'flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-caption tracking-normal text-sidebar-muted/90 outline-none transition-[background-color,color,opacity,margin] duration-slow ease-interactive motion-reduce:transition-none focus-visible:bg-sidebar-accent focus-visible:ring-1 focus-visible:ring-ring/35 [&>svg]:size-3.5 [&>svg]:shrink-0',
-        'group-data-[collapsible=icon]:-mt-7 group-data-[collapsible=icon]:opacity-0',
+        'flex h-(--app-shell-sidebar-row-height) shrink-0 items-center rounded-full text-xs font-caption tracking-normal text-sidebar-muted outline-none transition-[background-color,color,opacity,margin] duration-slow ease-interactive motion-reduce:transition-none focus-visible:bg-sidebar-accent focus-visible:ring-1 focus-visible:ring-ring/35 [&>svg]:size-(--app-shell-sidebar-icon-size) [&>svg]:shrink-0',
+        SIDEBAR_ENTRY_LABEL_INSET_CLASS,
+        'group-data-[collapsible=icon]:-mt-(--app-shell-sidebar-row-height) group-data-[collapsible=icon]:opacity-0',
         className
       )}
       {...props}

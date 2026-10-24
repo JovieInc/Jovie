@@ -62,4 +62,19 @@ describe('AboutPageRefresh', () => {
       .find(link => /stats/i.test(link.getAttribute('href') ?? ''));
     expect(statsLink).toBeUndefined();
   });
+
+  it('uses the founder signoff when no team member is published', async () => {
+    vi.resetModules();
+    vi.doMock('@/data/aboutFooterRefresh', async importOriginal => ({
+      ...(await importOriginal<typeof import('@/data/aboutFooterRefresh')>()),
+      ABOUT_REFRESH_TEAM: [],
+    }));
+    const { AboutPageRefresh } = await import('./AboutPageRefresh');
+    render(<AboutPageRefresh />);
+
+    expect(screen.getByRole('heading', { name: 'Team' })).toBeVisible();
+    expect(screen.getByText('Tim White, Founder')).toBeVisible();
+    expect(screen.queryByText(/TODO|placeholder/i)).toBeNull();
+    vi.doUnmock('@/data/aboutFooterRefresh');
+  });
 });

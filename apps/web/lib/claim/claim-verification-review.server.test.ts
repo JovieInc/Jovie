@@ -274,7 +274,7 @@ describe('claim verification review', () => {
 
     expect(mocks.refund).toHaveBeenCalledWith({
       subscriptionId: 'sub_1',
-      idempotencyKey: `claim-verification-reject:${PROFILE}`,
+      idempotencyKey: `claim-verification-reject:${PROFILE}:sub_1`,
     });
     expect(result).toMatchObject({
       outcome: 'decided',

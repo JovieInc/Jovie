@@ -11,6 +11,8 @@ import {
   decideReplay,
   defaultLiveSha,
   defaultSleep,
+  parseControllerTitle,
+  productionMutationStarted,
   renderSummary,
   runCli,
   runReplay,
@@ -22,7 +24,7 @@ const T0 = Date.parse('2026-10-21T08:19:30Z');
 const run = (extra = {}) => ({
   id: 39567203920,
   // The real event: name is the run-name title, path identifies the workflow.
-  name: '0d9d7e33af62689ccf7d3ec14011bab5c4dd19ab from CI 39621392739 attempt 1',
+  name: `${'b'.repeat(40)} from CI 39621392739 attempt 1`,
   path: '.github/workflows/staging-controller.yml',
   run_attempt: 1,
   conclusion: 'failure',
@@ -121,20 +123,75 @@ describe('computeWaitSeconds', () => {
   });
 });
 
+describe('parseControllerTitle', () => {
+  it('reads staging and production run titles', () => {
+    assert.deepEqual(parseControllerTitle(run().name), {
+      sha: MAIN,
+      ciRunId: 39621392739,
+      ciAttempt: 1,
+    });
+    assert.deepEqual(
+      parseControllerTitle(`Production Controller ${MAIN} from CI 7 attempt 2`),
+      { sha: MAIN, ciRunId: 7, ciAttempt: 2 }
+    );
+    assert.equal(parseControllerTitle('Staging Controller'), null);
+    assert.equal(parseControllerTitle(undefined), null);
+  });
+});
+
+describe('productionMutationStarted', () => {
+  it('is true once any Production Release job ran', () => {
+    assert.equal(
+      productionMutationStarted([
+        {
+          name: 'Production Release / Promote to Production',
+          conclusion: 'failure',
+        },
+      ]),
+      true
+    );
+    assert.equal(
+      productionMutationStarted([
+        {
+          name: 'Production Release / Promote to Production',
+          conclusion: 'skipped',
+        },
+        { name: 'Authorize exact main CI evidence', conclusion: 'failure' },
+        {},
+      ]),
+      false
+    );
+  });
+});
+
+const ci = (extra = {}) => ({
+  id: 39621392739,
+  run_attempt: 1,
+  status: 'completed',
+  conclusion: 'success',
+  head_sha: MAIN,
+  head_branch: 'main',
+  event: 'push',
+  path: '.github/workflows/ci.yml',
+  ...extra,
+});
+
 describe('decideReplay', () => {
   const base = {
     run: run(),
     runs: [run()],
+    source: parseControllerTitle(run().name),
+    ciRun: ci(),
     transientKinds: ['quota'],
     liveSha: LIVE,
     mainSha: MAIN,
   };
-  it('replays the newest transient failure while production lags main', () => {
+  it('replays the source CI of the newest transient failure at main', () => {
     const decision = decideReplay(base);
     assert.equal(decision.replay, true);
-    assert.match(decision.reason, /quota/);
+    assert.match(decision.reason, /quota.*source CI 39621392739/);
   });
-  it('ignores successes, cancellations and non-main runs', () => {
+  it('ignores successes, cancellations, non-main runs and manual reruns', () => {
     assert.equal(
       decideReplay({ ...base, run: run({ conclusion: 'success' }) }).replay,
       false
@@ -147,13 +204,26 @@ describe('decideReplay', () => {
       decideReplay({ ...base, run: run({ head_branch: 'feature' }) }).replay,
       false
     );
+    assert.match(
+      decideReplay({ ...base, run: run({ run_attempt: 2 }) }).reason,
+      /manual rerun/
+    );
     assert.equal(
       decideReplay({ ...base, run: run({ conclusion: 'timed_out' }) }).replay,
       true
     );
   });
-  it('stops at the attempt cap and records the stop as failed', () => {
-    const decision = decideReplay({ ...base, run: run({ run_attempt: 3 }) });
+  it('needs a source CI run in the title', () => {
+    assert.match(
+      decideReplay({ ...base, source: null }).reason,
+      /no source CI/
+    );
+  });
+  it('stops at the source CI attempt cap and records the stop as failed', () => {
+    const decision = decideReplay({
+      ...base,
+      source: { ...base.source, ciAttempt: 3 },
+    });
     assert.equal(decision.replay, false);
     assert.equal(decision.outcome, 'failed');
     assert.match(decision.reason, /3\/3/);
@@ -162,6 +232,18 @@ describe('decideReplay', () => {
     const decision = decideReplay({ ...base, transientKinds: [] });
     assert.equal(decision.replay, false);
     assert.match(decision.reason, /deterministic/);
+  });
+  it('leaves post-mutation failures to production-controller-health', () => {
+    assert.match(
+      decideReplay({ ...base, mutationStarted: true }).reason,
+      /controller-health/
+    );
+  });
+  it('yields when main moved past the generation', () => {
+    assert.match(
+      decideReplay({ ...base, mainSha: 'c'.repeat(40) }).reason,
+      /main moved/
+    );
   });
   it('yields to a newer run that ran or is running, not to skipped duplicates', () => {
     const newerRunning = {
@@ -195,6 +277,21 @@ describe('decideReplay', () => {
     const decision = decideReplay({ ...base, liveSha: MAIN });
     assert.equal(decision.replay, false);
     assert.match(decision.reason, /already serves main/);
+  });
+  it('refuses a source CI run that changed or was already replayed', () => {
+    for (const ciRun of [
+      null,
+      ci({ id: 1 }),
+      ci({ run_attempt: 2 }),
+      ci({ status: 'in_progress' }),
+      ci({ conclusion: 'failure' }),
+      ci({ head_sha: 'c'.repeat(40) }),
+      ci({ head_branch: 'x' }),
+      ci({ event: 'merge_group' }),
+      ci({ path: '.github/workflows/other.yml' }),
+    ]) {
+      assert.match(decideReplay({ ...base, ciRun }).reason, /already replayed/);
+    }
   });
 });
 
@@ -256,29 +353,38 @@ function fakeGh({
   reset,
   logs = [QUOTA_LOG],
   runs = [run()],
+  ciRun = ci(),
   rerunFails = false,
+  jobs = [
+    { id: 11, name: 'authorize-staging', conclusion: 'failure' },
+    { id: 12, name: 'staging-result', conclusion: 'success' },
+    {
+      id: 13,
+      name: 'Production Release / Promote to Production',
+      conclusion: 'skipped',
+    },
+    { id: 14, name: 'x', conclusion: 'failure' },
+  ],
 } = {}) {
   const calls = [];
   const gh = args => {
     calls.push(args);
-    const [cmd, path] = args;
-    if (cmd === 'run' && path === 'rerun') {
+    const [cmd, second] = args;
+    if (cmd === 'run' && second === 'rerun') {
       if (rerunFails) throw new Error('HTTP 403: Resource not accessible');
       return '';
     }
+    const path =
+      args.find(
+        arg =>
+          arg === 'rate_limit' ||
+          (typeof arg === 'string' && arg.startsWith('repos/'))
+      ) ?? second;
     if (path === 'rate_limit')
       return JSON.stringify({ resources: { core: { remaining, reset } } });
-    if (path.includes('/attempts/')) {
-      return JSON.stringify({
-        jobs: [
-          { id: 11, conclusion: 'failure' },
-          { id: 12, conclusion: 'success' },
-          { id: 13, conclusion: 'failure' },
-        ],
-      });
-    }
+    if (path.includes('/attempts/')) return JSON.stringify({ jobs });
     if (path.endsWith('/jobs/11/logs')) return logs[0] ?? '';
-    if (path.endsWith('/jobs/13/logs')) {
+    if (path.endsWith('/jobs/14/logs')) {
       const error = new Error('gh failed');
       error.stderr = logs[1] ?? 'HTTP 404';
       throw error;
@@ -286,6 +392,8 @@ function fakeGh({
     if (path.includes('/workflows/'))
       return JSON.stringify({ workflow_runs: runs });
     if (path.endsWith('/commits/main')) return `${MAIN}\n`;
+    if (path.endsWith('/actions/runs/39621392739'))
+      return JSON.stringify(ciRun);
     throw new Error(`unexpected gh call ${args.join(' ')}`);
   };
   return { gh, calls };
@@ -301,7 +409,7 @@ describe('runReplay', () => {
     liveSha: async () => LIVE,
   });
 
-  it('waits for the quota reset, then reruns the failed jobs once', async () => {
+  it('waits for the quota reset, then replays the exact source CI once', async () => {
     const slept = [];
     const { gh, calls } = fakeGh({ reset: Math.floor(T0 / 1000) + 600 });
     const result = await runReplay({ event, ...deps(gh, slept) });
@@ -311,8 +419,7 @@ describe('runReplay', () => {
     assert.deepEqual(calls.at(-1), [
       'run',
       'rerun',
-      '39567203920',
-      '--failed',
+      '39621392739',
       '--repo',
       'JovieInc/Jovie',
     ]);
@@ -322,20 +429,42 @@ describe('runReplay', () => {
     );
     // rate_limit is read before any quota-consuming call.
     assert.deepEqual(calls[0], ['api', 'rate_limit']);
+    assert.ok(
+      calls.some(
+        args =>
+          args.includes('--allow-escape-sequences') &&
+          args.some(arg => String(arg).endsWith('/jobs/11/logs'))
+      )
+    );
   });
 
-  it('skips without API calls when the attempt cap is reached', async () => {
+  it('reads the title from display_title when present', async () => {
+    const slept = [];
+    const { gh } = fakeGh({ remaining: 900, reset: 0 });
+    const result = await runReplay({
+      event: {
+        workflow_run: run({
+          name: 'Staging Controller',
+          display_title: run().name,
+        }),
+      },
+      ...deps(gh, slept),
+    });
+    assert.equal(result.decision.replay, true);
+  });
+
+  it('skips without API calls for a manual controller rerun', async () => {
     const slept = [];
     const { gh, calls } = fakeGh();
     const result = await runReplay({
-      event: { workflow_run: run({ run_attempt: 3 }) },
+      event: { workflow_run: run({ run_attempt: 2 }) },
       ...deps(gh, slept),
     });
     assert.equal(result.decision.replay, false);
     assert.equal(calls.length, 0);
     assert.deepEqual(
       result.events.map(e => [e.stage, e.outcome]),
-      [['blocked', 'failed']]
+      [['blocked', 'abandoned']]
     );
   });
 
@@ -349,7 +478,7 @@ describe('runReplay', () => {
     assert.equal(calls.length, 1);
   });
 
-  it('does not rerun a deterministic failure', async () => {
+  it('does not replay a deterministic failure', async () => {
     const slept = [];
     const { gh, calls } = fakeGh({
       remaining: 900,
@@ -360,6 +489,23 @@ describe('runReplay', () => {
     assert.equal(result.decision.replay, false);
     assert.ok(!calls.some(args => args[0] === 'run'));
     assert.deepEqual(slept, [120]);
+  });
+
+  it('leaves a run whose Production Release started to controller-health', async () => {
+    const slept = [];
+    const { gh } = fakeGh({
+      remaining: 900,
+      reset: 0,
+      jobs: [
+        {
+          id: 11,
+          name: 'Production Release / Promote to Production',
+          conclusion: 'failure',
+        },
+      ],
+    });
+    const result = await runReplay({ event, ...deps(gh, slept) });
+    assert.match(result.decision.reason, /controller-health/);
   });
 
   it('records a rejected rerun request', async () => {
@@ -393,7 +539,7 @@ describe('runCli', () => {
       eventPath,
       JSON.stringify({
         workflow_run: run({
-          name: 'Production Controller 43b6d22 from CI 1 attempt 1',
+          name: `Production Controller ${run().name}`,
           path: '.github/workflows/production-controller.yml',
         }),
       })
@@ -418,7 +564,7 @@ describe('runCli', () => {
     const rows = readFileSync(join(dir, 'out', 'stage-events.ndjson'), 'utf8')
       .trim()
       .split('\n')
-      .map(JSON.parse);
+      .map(line => JSON.parse(line));
     assert.deepEqual(
       rows.map(r => r.entityId),
       [

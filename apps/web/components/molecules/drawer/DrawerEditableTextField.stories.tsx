@@ -52,7 +52,7 @@ export const WithCopyAction: Story = {
 export const EditingCommitsOnEnter: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    const trigger = canvas.getByRole('button', { name: 'Edit Display name' });
+    const trigger = canvas.getByRole('button', { name: /Edit Display name/ });
     await userEvent.click(trigger);
     const input = canvas.getByRole('textbox', { name: 'Edit Display name' });
     await userEvent.clear(input);

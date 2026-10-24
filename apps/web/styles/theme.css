@@ -58,8 +58,18 @@
   overflow-wrap: anywhere;
 }
 
+/* Hydration disables the control so a click cannot no-op. That wait is not
+   a pending request, so the button stays at full strength until it is. */
+.auth-provider-button:disabled:not([data-auth-provider-pending]) {
+  cursor: default;
+  opacity: 1;
+}
+
 .auth-provider-button[data-auth-provider-slot="apple"] {
-  min-height: max(44px, 2.32em);
+  /* round() keeps the em-scaled height on integer CSS px: at 19px text the
+     raw 2.32em is 44.078125px, whose sub-pixel flow residue clips controls
+     past the viewport edge at 200% zoom (toBeInViewport ratio: 1). */
+  min-height: max(44px, round(2.32em, 1px));
   border-radius: 6px;
   overflow: hidden;
   padding-right: 12px;
@@ -70,7 +80,7 @@
 
 .auth-provider-button[data-auth-provider-slot="apple"] img {
   width: auto;
-  height: 2.32em;
+  height: round(2.32em, 1px);
   flex-shrink: 0;
 }
 

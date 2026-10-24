@@ -1,12 +1,12 @@
 {
   "name": "@jovie/ui",
-  "version": "26.10.12",
+  "version": "26.10.15",
   "private": true,
   "sideEffects": [
     "*.css"
   ],
   "engines": {
-    "node": ">=24.21.0"
+    "node": ">=24.22.1"
   },
   "main": "./index.ts",
   "types": "./index.ts",

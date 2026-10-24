@@ -196,7 +196,10 @@ function legacyEntry(
   };
 }
 
-export function parseQuarantineLedger(raw: unknown): ParsedQuarantineLedger {
+export function parseQuarantineLedger(
+  raw: unknown,
+  now: Date = new Date()
+): ParsedQuarantineLedger {
   const issues: QuarantineLedgerValidationIssue[] = [];
 
   if (!isRecord(raw)) {
@@ -383,8 +386,19 @@ export function parseQuarantineLedger(raw: unknown): ParsedQuarantineLedger {
     });
   }
 
-  const unitEntries = entries.filter(entry => entry.kind === 'unit');
-  const e2eEntries = entries.filter(entry => entry.kind === 'e2e');
+  // An expired quarantine is no longer a quarantine: it must not exclude the
+  // test from blocking runs (release-integrity repair 2, JOV-8540).
+  const nowMs = now.getTime();
+  const isActive = (entry: QuarantineLedgerEntry): boolean => {
+    const expiresMs = Date.parse(entry.expiresAt);
+    return Number.isNaN(expiresMs) || expiresMs >= nowMs;
+  };
+  const unitEntries = entries.filter(
+    entry => entry.kind === 'unit' && isActive(entry)
+  );
+  const e2eEntries = entries.filter(
+    entry => entry.kind === 'e2e' && isActive(entry)
+  );
   const unitPaths = unitEntries.map(entry => entry.path);
   const e2ePaths = e2eEntries.map(entry => entry.path);
 

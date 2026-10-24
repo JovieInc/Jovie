@@ -16,6 +16,8 @@ interface ReleaseCellProps {
   readonly release: ReleaseViewModel;
   readonly artistName?: string | null;
   readonly showType?: boolean;
+  /** Dense desktop rows keep the artist on the title line so 32px rows do not clip. */
+  readonly artistPlacement?: 'stacked' | 'inline';
   readonly onSelect?: (release: ReleaseViewModel) => void;
 }
 
@@ -23,6 +25,7 @@ export const ReleaseCell = memo(function ReleaseCell({
   release,
   artistName,
   showType = true,
+  artistPlacement = 'stacked',
   onSelect,
 }: ReleaseCellProps) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
@@ -143,8 +146,24 @@ export const ReleaseCell = memo(function ReleaseCell({
                 {typeStyle.label}
               </span>
             )}
+            {artistPlacement === 'inline' && artistLine ? (
+              <span className='inline-flex min-w-0 max-w-[45%] shrink items-center gap-1'>
+                <span
+                  aria-hidden='true'
+                  className='shrink-0 text-2xs text-quaternary-token'
+                >
+                  ·
+                </span>
+                <TruncatedText
+                  lines={1}
+                  className='min-w-0 text-2xs font-normal leading-none tracking-[-0.005em] text-secondary-token'
+                >
+                  {artistLine}
+                </TruncatedText>
+              </span>
+            ) : null}
           </div>
-          {artistLine ? (
+          {artistPlacement === 'stacked' && artistLine ? (
             <TruncatedText
               lines={1}
               className='mt-px text-2xs font-normal leading-[1.2] tracking-[-0.005em] text-secondary-token'
@@ -174,8 +193,24 @@ export const ReleaseCell = memo(function ReleaseCell({
                 {typeStyle.label}
               </span>
             )}
+            {artistPlacement === 'inline' && artistLine ? (
+              <span className='inline-flex min-w-0 max-w-[45%] shrink items-center gap-1'>
+                <span
+                  aria-hidden='true'
+                  className='shrink-0 text-2xs text-quaternary-token'
+                >
+                  ·
+                </span>
+                <TruncatedText
+                  lines={1}
+                  className='min-w-0 text-2xs font-normal leading-none tracking-[-0.005em] text-secondary-token'
+                >
+                  {artistLine}
+                </TruncatedText>
+              </span>
+            ) : null}
           </div>
-          {artistLine ? (
+          {artistPlacement === 'stacked' && artistLine ? (
             <TruncatedText
               lines={1}
               className='mt-px text-2xs font-normal leading-[1.2] tracking-[-0.005em] text-secondary-token'

@@ -27,6 +27,12 @@ describe('SidebarSection', () => {
     expect(
       screen.getByRole('button', { name: /Releases/ })
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Releases/ })).toHaveClass(
+      'h-(--app-shell-sidebar-row-height)',
+      'px-(--app-shell-sidebar-inset)',
+      'gap-x-(--app-shell-sidebar-icon-gap)',
+      'grid-cols-(--app-shell-sidebar-nav-grid)'
+    );
     expect(screen.getByText('Releases')).toBeInTheDocument();
     expect(screen.getByText('item-1')).toBeInTheDocument();
   });

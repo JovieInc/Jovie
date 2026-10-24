@@ -22,20 +22,21 @@ export type WaitlistInviteRedeemResult =
 
 async function upsertApprovedUser(params: {
   tx: DbOrTransaction;
-  clerkUserId: string;
+  /** App `users.id` from `getCachedAuth`. */
+  appUserId: string;
   email: string;
   entryId: string;
 }) {
   const [existing] = await params.tx
     .select({ id: users.id, userStatus: users.userStatus })
     .from(users)
-    .where(eq(users.clerkId, params.clerkUserId))
+    .where(eq(users.id, params.appUserId))
     .for('update')
     .limit(1);
 
   if (!existing) {
     await params.tx.insert(users).values({
-      clerkId: params.clerkUserId,
+      id: params.appUserId,
       email: params.email,
       userStatus: 'waitlist_approved',
       waitlistEntryId: params.entryId,
@@ -60,7 +61,7 @@ async function upsertApprovedUser(params: {
 
 async function hasLinkedApprovedUser(params: {
   tx: DbOrTransaction;
-  clerkUserId: string;
+  appUserId: string;
   entryId: string;
 }): Promise<boolean> {
   const [existing] = await params.tx
@@ -69,7 +70,7 @@ async function hasLinkedApprovedUser(params: {
       userStatus: users.userStatus,
     })
     .from(users)
-    .where(eq(users.clerkId, params.clerkUserId))
+    .where(eq(users.id, params.appUserId))
     .for('update')
     .limit(1);
 
@@ -149,7 +150,7 @@ export async function redeemWaitlistInviteToken(input: {
 
           const linkedApprovedUser = await hasLinkedApprovedUser({
             tx,
-            clerkUserId: input.clerkUserId,
+            appUserId: input.clerkUserId,
             entryId: entry.id,
           });
 
@@ -194,7 +195,7 @@ export async function redeemWaitlistInviteToken(input: {
 
         await upsertApprovedUser({
           tx,
-          clerkUserId: input.clerkUserId,
+          appUserId: input.clerkUserId,
           email: matchedVerifiedEmail,
           entryId: entry.id,
         });

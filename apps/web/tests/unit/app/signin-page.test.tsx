@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -98,6 +100,7 @@ describe('signin page', () => {
         showFormTitle: false,
         showFooterPrompt: false,
         layoutVariant: 'stack',
+        contentPlacement: 'center',
       })
     );
     expect(authLayoutMock.mock.calls[0]?.[0].chrome).not.toBe('splash-b');
@@ -210,5 +213,15 @@ describe('signin page', () => {
     expect(authShellMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId('auth-shell')).not.toBeInTheDocument();
     expect(screen.queryByTestId('auth-brand-panel')).not.toBeInTheDocument();
+  });
+});
+
+describe('sign-in page document title (glm/auth-focal-polish)', () => {
+  it('exports the heading copy verbatim as the tab title', () => {
+    const source = readFileSync(
+      resolve(__dirname, '../../../app/(auth)/signin/page.tsx'),
+      'utf8'
+    );
+    expect(source).toContain("title: documentTitle('Log in to Jovie')");
   });
 });

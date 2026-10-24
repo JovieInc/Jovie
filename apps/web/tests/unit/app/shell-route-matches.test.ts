@@ -18,6 +18,7 @@ import {
   resolveAppShellLoadingPath,
   resolveAppShellRequestPath,
   resolveDashboardSegmentSkeletonVariant,
+  shouldDefaultOpenShellPreview,
   shouldRedirectToOnboarding,
   shouldUseEssentialShellData,
 } from '@/app/app/(shell)/shell-route-matches';
@@ -420,5 +421,27 @@ describe('shell foundation Wave 3 — route persistence + request budgets (no fu
   it('full-data routes (earnings etc) correctly opt out of essential to preserve request budget semantics', () => {
     // Non-essential still hydrate inside the *same* stable HydrateClient + AuthShellWrapper tree.
     expect(shouldUseEssentialShellData(APP_ROUTES.EARNINGS)).toBe(false);
+  });
+});
+
+describe('shouldDefaultOpenShellPreview', () => {
+  it('reopens the profile settings rail after an essential-shell scope reset', () => {
+    expect(
+      shouldDefaultOpenShellPreview(APP_ROUTES.SETTINGS_PROFILE, true)
+    ).toBe(true);
+    expect(
+      shouldDefaultOpenShellPreview(`${APP_ROUTES.SETTINGS_PROFILE}/edit`, true)
+    ).toBe(true);
+  });
+
+  it('keeps other essential-shell routes closed and non-essential routes open', () => {
+    expect(
+      shouldDefaultOpenShellPreview(APP_ROUTES.SETTINGS_ACCOUNT, true)
+    ).toBe(false);
+    expect(shouldDefaultOpenShellPreview(APP_ROUTES.CHAT, true)).toBe(false);
+    expect(shouldDefaultOpenShellPreview(APP_ROUTES.DASHBOARD, false)).toBe(
+      true
+    );
+    expect(shouldDefaultOpenShellPreview(null, true)).toBe(false);
   });
 });

@@ -46,7 +46,7 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     expect(headerCss).toContain('min-width: 2.75rem');
     expect(headerCss).toContain('outline: 2px solid var(--noir-ion-ion)');
     expect(headerCss).toContain('var(--space-2-5)');
-    expect(headerCss).toContain('var(--space-6)');
+    expect(headerCss).toContain('var(--ds-public-gutter)');
     expect(header).toContain("? 'sm'");
     const primaryAuthLink = headerNav.match(
       /function HeaderPrimaryAuthLink\([\s\S]*?(?=function GlassAuthActions)/
@@ -111,21 +111,17 @@ describe('locked Pen marketing chrome (JOV-6179)', () => {
     expect(footer).toContain("size='chrome'");
   });
 
-  it('does not reopen the locked homepage IA or Find me conversion', () => {
-    const homepagePage = readWebSource('app/(home)/page.tsx');
+  it('keeps the certified section body off the locked shell chrome', () => {
     const certified = readWebSource(
       'components/homepage/HomepageCertifiedSections.tsx'
     );
 
-    expect(HOMEPAGE_LAUNCH_COPY.hero.search.action).toBe('Find me');
-    // Pen My0zu (JOV-6946): one relationships beat after the hero.
+    // Pen My0zu (JOV-6946): one relationships beat, now reused by the
+    // solutions pages; the homepage composition lives in homepage-contract.
     expect(HOMEPAGE_LAUNCH_COPY.certified.sections).toHaveLength(1);
     expect(
       HOMEPAGE_LAUNCH_COPY.certified.sections.map(section => section.id)
     ).toEqual(['relationships']);
-    expect(homepagePage).toContain('HomepageIdentityHero');
-    expect(homepagePage).toContain('HomepageCertifiedSections');
-    expect(homepagePage).toContain('HomepageClose');
     expect(certified).toContain('HOMEPAGE_LAUNCH_COPY.certified');
     expect(certified).not.toContain('GTcgO');
     expect(certified).not.toContain('jhV4a');

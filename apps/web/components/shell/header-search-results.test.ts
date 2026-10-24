@@ -81,9 +81,9 @@ describe('buildHeaderSearchGroups', () => {
       ],
     };
 
-    const untitledThread = buildHeaderSearchGroups('untitled', catalog);
+    const untitledThread = buildHeaderSearchGroups('conversation', catalog);
     expect(untitledThread[0]?.items[0]).toMatchObject({
-      label: 'Untitled chat',
+      label: 'Conversation',
       href: '/app/chat/thread%2Fwith%20space',
     });
 

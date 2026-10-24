@@ -1,9 +1,9 @@
 {
   "name": "@jovie/should-i-make",
-  "version": "26.10.12",
+  "version": "26.10.15",
   "private": true,
   "engines": {
-    "node": ">=24.21.0"
+    "node": ">=24.22.1"
   },
   "scripts": {
     "dev": "next dev --port 3001",

@@ -66,6 +66,7 @@ import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-7704)
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
+import outcome_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 import credentials_spend  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
@@ -141,6 +142,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority
                   "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
                   "scripts/fleet-gate/symphony_proof_context.py", "scripts/fleet-gate/scoped_admission.py",
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
+                  "scripts/lib/merge-group-ahead-attribution.mjs",
                   "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
@@ -198,6 +200,9 @@ GENERATED_SIZE = re.compile(r"(^|/)generated/")
 # Test files: JS/TS conventions plus Python test_*.py and Xcode *Tests/ dirs.
 TEST_FILE = re.compile(r"(\.test\.|\.spec\.|/(?:tests?|__tests__|[^/]*Tests)/|(^|/)test_[^/]+\.py$)")
 DOC_FILE = re.compile(r"(\.mdx?c?$|^docs/|^canon/|\.txt$)")
+# Reviewed source-reference inventory for the nonblocking feedback-linkage audit.
+# Exempt only from the new-test requirement; canonical qualification still runs.
+REFERENCE_DATA_FILES = frozenset({"LESSONS.guards.json"})
 SECRET_FILE = re.compile(r"(^|/)\.env(\.|$)|\.pem$|credentials|id_rsa")
 MAX_REVIEWABLE_LINES = 1500
 PROVIDER_EVIDENCE_SCHEMA = "jovie-provider-lease/v1"
@@ -1338,7 +1343,8 @@ def gate_assessment(changes: list[Change], max_reviewable_lines: int = MAX_REVIE
     paths = [change.path for change in changes]
     if any(SECRET_FILE.search(path) for path in paths):
         failures.append("secret-like-file-changed")
-    code = [p for p in paths if not DOC_FILE.search(p) and not TEST_FILE.search(p) and not GENERATED.search(p)]
+    code = [p for p in paths if p not in REFERENCE_DATA_FILES
+            and not DOC_FILE.search(p) and not TEST_FILE.search(p) and not GENERATED.search(p)]
     if code and not any(TEST_FILE.search(p) for p in paths):
         versions = (dependency_diff.classify(worktree, pr.get("headRefOid"), paths, pr)
                     if worktree is not None and isinstance(pr, dict) else None)
@@ -4137,8 +4143,7 @@ def terminal_prs(prs: list[dict], attempts: dict, held: dict) -> list[dict]:
         if hold and hold.get("sha") == head:
             # Exhaustion is the condition this exit repairs. Preserve the underlying
             # gate evidence so a secret-file or empty-diff hold still blocks a sync.
-            hold = {**hold, "evidence": [line for line in hold.get("evidence") or []
-                                        if not str(line).startswith("fix-exhausted")]}
+            hold = {**hold, "evidence": pr_events.without_exhaustion_evidence(hold.get("evidence"))}
         if not isinstance(head, str) or not head or not isinstance(record, dict) \
                 or labels & pr_events.HOLD_LABELS or pr.get("isInMergeQueue") is not False \
                 or pr.get("isCrossRepository") is not False \
@@ -5011,7 +5016,7 @@ def rung_blocker(pr: dict, record: dict, entry: dict) -> dict | None:
     if not isinstance(evidence, list) or (entry.get("reason") is not None
                                         and not isinstance(entry["reason"], str)):
         return None
-    evidence = [line for line in evidence if not str(line).startswith("fix-exhausted")]
+    evidence = pr_events.without_exhaustion_evidence(evidence)
     reason = entry.get("reason")
     if not reason or reason == "fix-exhausted":
         reason = pr_events.held_reason(evidence)[0]
@@ -7943,6 +7948,12 @@ def dispatch(host: Host) -> int:
         tick["reason"] = reason_lane.tick(host, THIS, lambda: Linear(host.linear_env))
     except (Exception, SystemExit) as error:  # Summer's reasoning jobs never take dispatch down
         tick["reasonError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        owner = os.environ.get("OUTCOME_LANE_OWNER", "gem").split(".")[0]
+        tick["outcome"] = (outcome_lane.tick(host, THIS) if HOST == owner else
+                           {"status": "not-owner", "owner": owner})
+    except (Exception, SystemExit) as error:  # outcome verification never takes dispatch down
+        tick["outcomeError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         if not os.environ.get("LANES_SELFTEST"):  # a release self-test never writes to Linear
             teams = ["JOV", *(binding.key for binding in bindings.extra_bindings(THIS))]

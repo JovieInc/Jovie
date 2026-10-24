@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceEngagementBars.test.tsx
+
 import { memo } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +33,7 @@ export const AudienceEngagementBars = memo(function AudienceEngagementBars({
             className={cn(
               'w-0.5 rounded-sm',
               heightClass,
-              i < filled ? 'bg-emerald-500/70' : 'bg-surface-2'
+              i < filled ? 'bg-success/70' : 'bg-surface-2'
             )}
             aria-hidden='true'
           />

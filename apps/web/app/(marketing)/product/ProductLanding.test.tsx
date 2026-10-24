@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { buildClaimProfileStartHref } from '@/data/marketingCtaIntents';
 import { PRODUCT_COPY } from '@/data/productCopy';
 import { ProductLanding } from './ProductLanding';
@@ -97,7 +97,8 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     // actually rendered — tailwind-merge collapses them into one conflict
     // group and keeps only the last, and outline-width without
     // outline-style paints nothing regardless. focus-ring-themed is the
-    // shared box-shadow-based ring the rest of the app uses.
+    // shared box-shadow-based ring the rest of the app uses, and the locked
+    // route-quality focus check reads the focused input's own styles.
     const input = within(screen.getByTestId('product-claim-card')).getByRole(
       'textbox',
       { name: 'Choose Your Handle' }
@@ -125,16 +126,14 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
   it('keeps the homepage hero H1 on the homepage, not /product', () => {
     render(<ProductLanding />);
 
-    expect(HOMEPAGE_IDENTITY_COPY.hero.headline).toBe(
-      'Be found. Be understood.'
-    );
+    expect(HOMEPAGE_COPY.hero.headline).toBe('Be found. Be understood.');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Your living identity on the internet.'
     );
     expect(
       screen.queryByRole('heading', {
         level: 1,
-        name: 'Be found. Be understood.',
+        name: HOMEPAGE_COPY.hero.headline,
       })
     ).toBeNull();
   });

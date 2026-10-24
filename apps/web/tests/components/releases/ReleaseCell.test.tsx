@@ -83,6 +83,32 @@ const baseRelease: ReleaseViewModel = {
 };
 
 describe('ReleaseCell', () => {
+  it.each([false, true])(
+    'keeps the dense artist on the title line with selection enabled: %s',
+    selectable => {
+      render(
+        <ReleaseCell
+          release={baseRelease}
+          artistName='Jovie Artist'
+          artistPlacement='inline'
+          onSelect={selectable ? vi.fn() : undefined}
+        />
+      );
+
+      const titleLine = screen.getByText('Skyline Dreams').parentElement;
+      expect(titleLine).toContainElement(screen.getByText('Jovie Artist'));
+      expect(screen.getAllByText('Jovie Artist')).toHaveLength(1);
+      expect(screen.getByText('·')).toHaveAttribute('aria-hidden', 'true');
+    }
+  );
+
+  it('omits the inline separator when the release has no artist', () => {
+    render(<ReleaseCell release={baseRelease} artistPlacement='inline' />);
+
+    expect(screen.getByText('Skyline Dreams')).toBeInTheDocument();
+    expect(screen.queryByText('·')).not.toBeInTheDocument();
+  });
+
   it('renders release title, type badge, and artist line', () => {
     render(<ReleaseCell release={baseRelease} artistName='Jovie Artist' />);
 

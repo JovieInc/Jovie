@@ -105,7 +105,7 @@ function HowItWorksSection() {
       data-marketing-owner='apps/web/components/features/pay/PayLanding.tsx'
     >
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-300'>
+        <div>
           <div className='homepage-section-intro'>
             <div>
               <p className='marketing-kicker'>How it works</p>
@@ -185,7 +185,7 @@ function BenefitsSection() {
       data-marketing-occurrence='benefits'
     >
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-300'>
+        <div>
           <div className='marketing-divider mb-14' />
 
           <div className='homepage-section-intro'>
@@ -253,7 +253,7 @@ function SocialProofSection() {
       data-marketing-occurrence='use-cases'
     >
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-300'>
+        <div>
           <div className='homepage-section-intro'>
             <div>
               <p className='marketing-kicker'>
