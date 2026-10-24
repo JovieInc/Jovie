@@ -49,7 +49,12 @@ HUMAN_GATE = re.compile(
     r"no such price|stripe_[a-z_]*(price|key|secret)|missing (env|environment)|env var|"
     r"secret|api key|invalid api key|webhook secret|drop table|truncate|delete from|price_[A-Za-z0-9]{6,}",
     re.I)
-CI_WATCH = re.compile(r"canary|synthetic|e2e|a11y|accessib|golden path|nightly|smoke|ci", re.I)
+WORKFLOWS = json.loads(os.environ.get("PROD_ERRORS_WORKFLOWS", "null")) or [
+    "CI", "Production Synthetic Monitoring", "Canary Health Gate", "E2E Full Browser Matrix", "Visual & A11y Tests",
+    "Golden Path Nightly", "M2 Revenue-Path Canary", "Nightly Testing Agent"]
+# Scheduled watchers: a missed run (no completed main run within 2x schedule) alerts.
+EXPECTED_RUNS = {"Production Synthetic Monitoring": 6 * 3600, "Golden Path Nightly": 86400,
+                 "M2 Revenue-Path Canary": 86400}
 
 
 now = time.time
@@ -138,6 +143,9 @@ def watcher_health(state: Path = STATE, at: float | None = None) -> dict:
     out = {}
     for name, interval in WATCHERS.items():
         hb = read_json(state / "heartbeats" / f"{name}.json", None)
+        if hb is None and name in ("synthetic", "deadman"):
+            out[name] = {"status": "pending-first-run", "interval": interval}
+            continue
         if hb is None:
             out[name] = {"status": "missing", "interval": interval}
             continue
@@ -415,13 +423,14 @@ def sweep(sentry: Sentry, linear: Linear, state: Path = STATE) -> dict:
 
 
 def ci_main(linear: Linear, state: Path = STATE) -> dict:
-    runs = gh_json(["run", "list", "-R", REPO, "--branch", "main", "--limit", "100",
-                    "--json", "databaseId,workflowName,conclusion,status,event,createdAt,url"]) or []
-    seen = read_json(state / "ci-ledger.json", {})
     latest: dict[str, dict] = {}
-    for r in runs:
-        if r.get("status") == "completed" and CI_WATCH.search(r["workflowName"]):
-            latest.setdefault(r["workflowName"], r)
+    for wf in WORKFLOWS:
+        runs = gh_json(["run", "list", "-R", REPO, "--branch", "main", "--workflow", wf, "--limit", "5",
+                        "--json", "databaseId,workflowName,conclusion,status,event,createdAt,url"]) or []
+        done = [r for r in runs if r.get("status") == "completed"]
+        if done:
+            latest[wf] = done[0]
+    seen = read_json(state / "ci-ledger.json", {})
     opened = 0
     for wf, r in latest.items():
         key = f"ci:{hashlib.sha1(wf.encode()).hexdigest()[:10]}"
@@ -445,7 +454,7 @@ def ci_main(linear: Linear, state: Path = STATE) -> dict:
         if r["conclusion"] != "cancelled":
             entry["cancelStreak"] = 0
         entry["lastRunAt"] = r["createdAt"]
-    for wf, max_age in json.loads(os.environ.get("PROD_ERRORS_EXPECTED_RUNS", "{}")).items():
+    for wf, max_age in EXPECTED_RUNS.items():
         last = parse_ts(seen.get(f"ci:{hashlib.sha1(wf.encode()).hexdigest()[:10]}", {}).get("lastRunAt"))
         if last is None or now() - last > 2 * max_age:
             alert("missed-run", f"{wf} has not completed a run on main within 2x its schedule.", False, linear, state)
@@ -464,7 +473,7 @@ def deadman(linear: Linear | None, state: Path = STATE, port: int = 8788) -> dic
         if e.get("synthetic") and e["status"] != "closed" and now() - e["openedAt"] > 3 * 86400:
             health["synthetic-loop"] = {"status": "stuck", "sentryId": e["sentryId"]}
     for name, h in health.items():
-        if h["status"] != "ok":
+        if h["status"] not in ("ok", "pending-first-run"):
             alert("dead-man", f"watcher {name} is {h['status']}", False, linear, state)
     write_bottleneck(ledger, state)
     return health

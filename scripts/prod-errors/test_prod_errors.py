@@ -116,6 +116,7 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(h["ci-main"]["status"], "erroring")
         self.assertEqual(pe.watcher_health(self.dir, time.time() + 3 * 1800)["sentry-sweep"]["status"], "stale")
         self.assertEqual(h["receiver"]["status"], "missing")
+        self.assertEqual(h["synthetic"]["status"], "pending-first-run")
 
     def test_bottleneck_fragment(self):
         pe.handle_issue(self.issue(userCount=30), self.ledger, self.s, self.l, [], self.t, self.dir)
