@@ -11,6 +11,7 @@ import {
 } from '@/constants/admin-navigation';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import type { AppShellMode, AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
@@ -93,23 +94,14 @@ export function useAuthRouteConfig(
     const UUID_REGEX =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let lastPart = parts[parts.length - 1];
-    if (
-      pathname === APP_ROUTES.LIBRARY &&
-      searchParams.get('view') === 'releases'
-    ) {
-      lastPart = 'releases';
-    } else if (
-      pathname === APP_ROUTES.CONTACTS ||
-      pathname === APP_ROUTES.INSIGHTS
-    ) {
-      // Contacts / Audience / Insights are tabs of the one Audience root
-      // (sidebar name); the segmented control names the tab.
-      lastPart = 'audience';
-    } else if (isChatThreadPath(parts)) {
+    if (isChatThreadPath(parts)) {
       lastPart = 'chat';
     } else if (UUID_REGEX.test(lastPart) && parts.length >= 2) {
       lastPart = parts[parts.length - 2];
     }
+
+    const sidebarLabel = getSidebarRouteLabel(pathname, mode);
+    if (sidebarLabel) return [{ label: sidebarLabel, href: pathname }];
 
     if (pathname === APP_ROUTES.ADMIN_PEOPLE) {
       const adminPeopleView = searchParams.get('view');
@@ -148,7 +140,7 @@ export function useAuthRouteConfig(
         href: pathname,
       },
     ];
-  }, [isDemoRoute, pathname, searchParams]);
+  }, [isDemoRoute, mode, pathname, searchParams]);
 
   // Customer navigation never leaks into the dedicated OV shell.
   const showMobileTabs = mode === 'customer';

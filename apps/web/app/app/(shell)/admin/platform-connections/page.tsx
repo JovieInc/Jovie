@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AdminReadUnavailable } from '@/components/features/admin/AdminReadUnavailable';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import { captureError } from '@/lib/error-tracking';
 import { PlatformConnectionsClient } from './PlatformConnectionsClient';
 import {
@@ -10,7 +12,9 @@ import {
   loadAdminPlatformConnectionsData,
 } from './platform-connections-data';
 
-export const metadata: Metadata = { title: 'Platform Connections — Admin' };
+export const metadata: Metadata = {
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS, 'ov'),
+};
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 

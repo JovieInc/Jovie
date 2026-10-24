@@ -367,6 +367,30 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(entry?.owner, 'admin-share-studio');
     assert.deepEqual(entry?.viewports, ['desktop', 'mobile']);
   });
+  it('registers sidebar title surfaces without claiming runtime certification', () => {
+    for (const name of ['interviews', 'playlists', 'revenue-lift']) {
+      const source = `apps/web/app/app/(shell)/admin/${name}/page.tsx`;
+      const classified = classifyScreenPath(source);
+      assert.equal(classified.kind, 'registered');
+      assert.equal(classified.entry?.id, `web.admin-${name}`);
+      assert.deepEqual(classified.entry?.viewports, ['desktop', 'mobile']);
+      const registration = runScreenCertification({
+        headSha: HEAD,
+        changedFiles: [source],
+        registrationOnly: true,
+      });
+      assert.equal(
+        registration.ok,
+        true,
+        registration.receipt.issues.join('\n')
+      );
+      assert.equal(registration.receipt.certified, false);
+      assert.equal(
+        runScreenCertification({ headSha: HEAD, changedFiles: [source] }).ok,
+        false
+      );
+    }
+  });
   it('registers typed screen ownership across web, macOS Electron, and iOS', () => {
     assert.deepEqual(validateScreenRegistry(), []);
     const platforms = [...new Set(gated().map(e => e.platform))].sort();

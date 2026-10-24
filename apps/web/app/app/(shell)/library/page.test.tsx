@@ -76,7 +76,8 @@ vi.mock('./LibraryPageClient', () => ({
   LibraryPageClient: vi.fn(() => null),
 }));
 
-import LibraryPage from './page';
+import { libraryNavItem } from '@/components/features/dashboard/dashboard-nav/config';
+import LibraryPage, { metadata } from './page';
 
 const profileId = '22222222-2222-4222-8222-222222222222';
 const privateDocument = {
@@ -102,6 +103,9 @@ function renderLibraryPage(section?: string) {
 }
 
 describe('LibraryPage private document boundary', () => {
+  it('uses the sidebar label as its page title', () => {
+    expect(metadata.title).toBe(libraryNavItem.name);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.loadAppShellRouteContext.mockResolvedValue({

@@ -13,6 +13,7 @@ import { getLeadFunnelCounts } from '@/components/features/admin/leads/LeadPipel
 import { LeadTable } from '@/components/features/admin/leads/LeadTable';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCanonicalContactMetrics } from '@/lib/admin/contacts';
 import {
   getFounderFunnelData,
@@ -20,6 +21,7 @@ import {
   isFounderFunnelDrilldownStage,
 } from '@/lib/admin/founder-funnel';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import { adminGrowthSearchParams } from '@/lib/nuqs';
 import { GrowthFounderFunnel } from './GrowthFounderFunnel';
 
@@ -28,7 +30,7 @@ interface AdminGrowthPageProps {
 }
 
 export const metadata: Metadata = {
-  title: 'Admin Growth',
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_GROWTH, 'ov'),
   description: 'Acquisition funnel, referral, outreach, and conversion.',
 };
 

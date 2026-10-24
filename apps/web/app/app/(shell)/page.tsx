@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { homeNavItem } from '@/components/features/dashboard/dashboard-nav/config';
 import { OnboardingInterviewModal } from '@/components/onboarding/OnboardingInterviewModal';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState } from '@/lib/queries/server';
@@ -6,7 +7,7 @@ import { OpportunityInboxRoute } from './OpportunityInboxRoute';
 
 const DASHBOARD_DESCRIPTION =
   'Review Jovie suggestions, approve actions, and send feedback from your inbox.';
-const DASHBOARD_TITLE = 'Home';
+const DASHBOARD_TITLE = homeNavItem.name;
 
 export function generateMetadata(): Metadata {
   return {

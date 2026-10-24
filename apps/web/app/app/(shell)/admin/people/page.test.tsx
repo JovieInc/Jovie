@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import AdminPeoplePage from './page';
+import AdminPeoplePage, { metadata } from './page';
 
 const {
   mockAdminAssetsPageWrapper,
@@ -68,7 +68,8 @@ vi.mock(
   '@/components/features/admin/waitlist-table/AdminWaitlistTableWithViews',
   () => ({ AdminWaitlistTableWithViews: () => null })
 );
-vi.mock('@/constants/admin-navigation', () => ({
+vi.mock('@/constants/admin-navigation', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/constants/admin-navigation')>()),
   adminPeopleViews: ['assets'],
   buildAdminPeopleHref: (view: string) => `/admin/people?view=${view}`,
   getAdminPeopleViewLabel: (view: string) => view,
@@ -108,6 +109,9 @@ vi.mock('@/lib/nuqs', () => ({
 }));
 
 describe('AdminPeoplePage assets view', () => {
+  it('uses the People sidebar label for page metadata', () => {
+    expect(metadata.title).toBe('People');
+  });
   it('loads canonical assets and renders the asset table', async () => {
     mockGetAdminAssets.mockResolvedValue({
       assets: [{ id: 'asset-1' }],

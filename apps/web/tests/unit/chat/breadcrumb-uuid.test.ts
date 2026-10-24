@@ -11,14 +11,14 @@ describe('getBreadcrumbLabel', () => {
     expect(getBreadcrumbLabel('dashboard')).toBe('Dashboard');
   });
 
-  it('returns "Presence" for the internal profiles route', () => {
-    expect(getBreadcrumbLabel('profiles')).toBe('Profiles');
-    expect(getBreadcrumbLabel('presence')).toBe('Profiles');
+  it('uses the sidebar labels for internal product routes', () => {
+    expect(getBreadcrumbLabel('profiles')).toBe('Identity');
+    expect(getBreadcrumbLabel('presence')).toBe('Identity');
     expect(getBreadcrumbLabel('library')).toBe('Work');
   });
 
-  it('returns "Home" for the app root segment', () => {
-    expect(getBreadcrumbLabel('app')).toBe('Home');
+  it('returns "Inbox" for the app root segment', () => {
+    expect(getBreadcrumbLabel('app')).toBe('Inbox');
   });
 
   it('returns the explicit title for the visibility audit', () => {

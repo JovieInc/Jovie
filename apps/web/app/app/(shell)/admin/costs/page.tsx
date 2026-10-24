@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import { AdminReadUnavailable } from '@/components/features/admin/AdminReadUnavailable';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { APP_ROUTES } from '@/constants/routes';
 import { getAdminCosts, getCostsLastRefreshedAt } from '@/lib/admin/costs';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import { captureError } from '@/lib/error-tracking';
 import { CostsTable } from './CostsTable';
 
 export const metadata: Metadata = {
-  title: 'Costs | Admin',
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_COSTS, 'ov'),
 };
 
 export const runtime = 'nodejs';
