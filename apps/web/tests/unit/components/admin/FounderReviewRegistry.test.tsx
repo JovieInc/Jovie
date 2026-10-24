@@ -465,3 +465,21 @@ describe('FounderReviewRegistry', () => {
     });
   });
 });
+
+describe('FounderReviewRegistry text contrast contract (JOV-8873)', () => {
+  it('renders status glyph labels with the AA text tokens', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/admin/FounderReviewRegistry.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('text-success-text');
+    expect(source).toContain('text-warning-text');
+    expect(source).not.toContain("'text-success']");
+    expect(source).not.toContain("'text-warning']");
+  });
+});

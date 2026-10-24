@@ -111,3 +111,19 @@ describe('ReleasesView', () => {
     );
   });
 });
+
+describe('ReleasesView text contrast contract (JOV-8873)', () => {
+  it('raises release metadata to white/50', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/profile/views/ReleasesView.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('tracking-tight text-white/50');
+    expect(source).not.toContain('text-white/42');
+  });
+});

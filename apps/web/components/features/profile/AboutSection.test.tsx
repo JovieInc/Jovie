@@ -76,3 +76,19 @@ describe('AboutSection', () => {
     expect(screen.queryByTestId('profile-about-contacts')).toBeNull();
   });
 });
+
+describe('AboutSection text contrast contract (JOV-8873)', () => {
+  it('raises muted copy to white/50', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/profile/AboutSection.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('text-sm font-book text-white/50');
+    expect(source).not.toContain('text-white/40');
+  });
+});

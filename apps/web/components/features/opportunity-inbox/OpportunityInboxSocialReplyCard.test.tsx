@@ -178,3 +178,18 @@ describe('OpportunityInboxSocialReplyCard', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('OpportunityInboxSocialReplyCard text contrast contract (JOV-8873)', () => {
+  it('gives the source link a 24px minimum target', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/opportunity-inbox/OpportunityInboxSocialReplyCard.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('inline-flex min-h-6 items-center text-secondary-token text-2xs underline');
+  });
+});

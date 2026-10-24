@@ -273,3 +273,19 @@ describe('AdminUsersTableUnified', () => {
     ]);
   });
 });
+
+describe('AdminUsersTableUnified text contrast contract (JOV-8873)', () => {
+  it('tints the selection checkbox with the AA accent text token', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/admin/admin-users-table/AdminUsersTableUnified.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('text-(--color-accent-purple-text)');
+    expect(source).not.toContain('text-(--linear-accent)');
+  });
+});

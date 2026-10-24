@@ -112,3 +112,21 @@ describe('ProfileMobileNotificationsFlow', () => {
     expect(source).toContain('text-error');
   });
 });
+
+describe('ProfileMobileNotificationsFlow text contrast contract (JOV-8873)', () => {
+  it('raises muted step labels to white/50', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/profile/artist-notifications-cta/ProfileMobileNotificationsFlow.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('tracking-tight text-white/50');
+    expect(
+      source.match(/text-app font-semibold tracking-tight text-white\/50/g)
+    ).toHaveLength(2);
+  });
+});

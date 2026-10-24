@@ -128,3 +128,21 @@ describe('TimActionRequiredSection', () => {
     expect(source).toContain('text-error');
   });
 });
+
+describe('TimActionRequiredSection text contrast contract (JOV-8873)', () => {
+  it('uses AA error and warning text tokens for urgency copy', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/admin/TimActionRequiredSection.tsx'),
+      'utf8'
+    );
+    expect(source).toContain('tabular-nums text-error-text');
+    expect(source).toContain('group-hover:text-warning-text');
+    expect(source).not.toContain('tabular-nums text-error ');
+    expect(source).not.toContain('group-hover:text-warning ');
+  });
+});

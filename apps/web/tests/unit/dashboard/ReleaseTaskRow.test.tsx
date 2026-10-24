@@ -176,3 +176,19 @@ describe('ReleaseTaskCompactRow', () => {
     expect(taskButton.className).not.toContain('hover:text-accent');
   });
 });
+
+describe('ReleaseTaskRowPrimitives text contrast contract (JOV-8873)', () => {
+  it('keeps completed task titles at full opacity', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(webRoot, 'components/features/dashboard/release-tasks/ReleaseTaskRowPrimitives.tsx'),
+      'utf8'
+    );
+    expect(source).toContain("'text-tertiary-token line-through'");
+    expect(source).not.toContain('line-through opacity-60');
+  });
+});
