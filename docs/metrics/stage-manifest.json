@@ -118,6 +118,27 @@
         }
       ]
     },
+    "blocking-journey": {
+      "entityId": "owner/repo#workflow-run-id/attempt",
+      "description": "Blocking browser journey on one web-affecting merge-group head, including isolated database setup and cleanup.",
+      "endToEnd": [["run", "finished"]],
+      "stages": [
+        {
+          "id": "run",
+          "meaning": "combined-head golden-path job execution",
+          "producer": "ci-blocking-golden-path",
+          "status": "pushed",
+          "source": "blocking-journey-events"
+        },
+        {
+          "id": "finished",
+          "meaning": "combined-head journey outcome recorded",
+          "producer": "ci-blocking-golden-path",
+          "status": "pushed",
+          "source": "blocking-journey-events"
+        }
+      ]
+    },
     "remediation": {
       "entityId": "owner/repo#pr@red-sha",
       "description": "A red pull request returning to green.",
@@ -476,6 +497,13 @@
       "url": null,
       "owner": "LogYourBody release loop"
     },
+    "blocking-journey-events": {
+      "kind": "events",
+      "url": null,
+      "artifact": "blocking-journey-stage-events/blocking-journey-stage-events.ndjson",
+      "workflow": "ci.yml",
+      "owner": "CI golden-path browser admission"
+    },
     "automation-liveness-receipts": {
       "kind": "events",
       "url": null,
@@ -521,7 +549,13 @@
         "automation-run:started",
         "automation-run:finished"
       ],
-      "ci.yml": ["shipping:ready", "remediation:red", "remediation:green"],
+      "ci.yml": [
+        "shipping:ready",
+        "remediation:red",
+        "remediation:green",
+        "blocking-journey:run",
+        "blocking-journey:finished"
+      ],
       "lane-fix-relay.yml": ["remediation:classified"],
       "staging-controller.yml": ["release:staging"],
       "production-controller.yml": ["release:verified", "shipping:verified"],

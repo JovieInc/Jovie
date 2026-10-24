@@ -428,7 +428,18 @@ describe('Neon endpoint admission', () => {
       'utf8'
     );
 
-    expect(creatorCount).toBe(7);
+    // The blocking journey adds one admitted creator to the seven existing lanes.
+    expect(creatorCount).toBe(8);
+    const journey = workflows[0]
+      ?.split('  ci-blocking-golden-path:')[1]
+      ?.split('\n  ci-golden-path:')[0];
+    expect(journey).toContain(
+      'uses: ./.github/actions/neon-create-branch-with-retry'
+    );
+    expect(journey).toContain("expires_in_hours: '1'");
+    expect(journey).toContain(
+      'branch_name: golden-path-${{ github.run_id }}-${{ github.run_attempt }}'
+    );
     expect(visualWorkflow).toContain(
       'uses: ./.github/actions/neon-create-branch-with-retry'
     );
