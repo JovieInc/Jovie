@@ -2945,13 +2945,19 @@ function buildUpdateMenuItem(): MenuItemConstructorOptions {
   };
 }
 
-function focusedAppWindow(): BrowserWindow | null {
-  const win = BrowserWindow.getFocusedWindow();
-  return win && !win.isDestroyed() ? win : null;
+type MenuClickWindow = Electron.BaseWindow | undefined;
+
+function menuWindow(target: MenuClickWindow): BrowserWindow | null {
+  return target instanceof BrowserWindow && !target.isDestroyed()
+    ? target
+    : null;
 }
 
-function openFocusedWindowInBrowser(): void {
-  const url = focusedAppWindow()?.webContents.getURL();
+function openFocusedWindowInBrowser(
+  _item: Electron.MenuItem,
+  target: MenuClickWindow
+): void {
+  const url = menuWindow(target)?.webContents.getURL();
   if (url && url === publicProfilePreviewWindow?.webContents.getURL()) {
     void openPublicProfileInBrowser(url);
   }
@@ -2962,16 +2968,16 @@ function buildGoMenu(): MenuItemConstructorOptions[] {
     {
       label: 'Back',
       accelerator: 'CommandOrControl+[',
-      click: () => {
-        const win = focusedAppWindow();
+      click: (_item, target) => {
+        const win = menuWindow(target);
         if (win?.webContents.canGoBack()) win.webContents.goBack();
       },
     },
     {
       label: 'Forward',
       accelerator: 'CommandOrControl+]',
-      click: () => {
-        const win = focusedAppWindow();
+      click: (_item, target) => {
+        const win = menuWindow(target);
         if (win?.webContents.canGoForward()) win.webContents.goForward();
       },
     },

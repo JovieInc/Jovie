@@ -1983,7 +1983,7 @@ test('Go menu binds Mac back/forward/new-message shortcuts to the focused window
   assert.match(goMenu, /accelerator: 'CommandOrControl\+\['/);
   assert.match(goMenu, /accelerator: 'CommandOrControl\+\]'/);
   assert.match(goMenu, /accelerator: 'CommandOrControl\+N'/);
-  assert.match(goMenu, /focusedAppWindow\(\)/);
+  assert.match(goMenu, /menuWindow\(target\)/);
   assert.match(mainSource, /\{ label: 'Go', submenu: buildGoMenu\(\) \}/);
   assert.doesNotMatch(
     mainSource,
