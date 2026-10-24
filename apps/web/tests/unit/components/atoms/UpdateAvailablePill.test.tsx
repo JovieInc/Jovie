@@ -43,6 +43,9 @@ describe('UpdateAvailablePill', () => {
     expect(pill).toBeDisabled();
     expect(pill).toHaveAttribute('aria-busy', 'true');
     expect(pill).toHaveTextContent('Downloading…');
+    expect(pill.querySelector('.animate-spin')).toBeNull();
+    expect(pill.className).toContain('min-w-24');
+    expect(pill.className).not.toMatch(/(^|\s)w-24(\s|$)/);
 
     fireEvent.click(pill);
     expect(updateState.install).not.toHaveBeenCalled();
@@ -58,7 +61,7 @@ describe('UpdateAvailablePill', () => {
     expect(pill).toBeEnabled();
     expect(pill).toHaveAttribute('aria-busy', 'false');
     expect(pill).toHaveTextContent('Restart');
-    expect(pill).toHaveClass('w-24', 'rounded-full');
+    expect(pill).toHaveClass('min-w-24', 'rounded-full');
     expect(pill.className).toContain('focus-visible:ring-focus/30');
 
     fireEvent.click(pill);
