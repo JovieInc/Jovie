@@ -99,6 +99,21 @@ describe('AuthModalShell', () => {
     );
   });
 
+  it('sizes the centered desktop dialog to its content rather than stretching between insets', () => {
+    render(
+      <AuthModalShell>
+        <button type='button'>Continue</button>
+      </AuthModalShell>
+    );
+    expect(screen.getByRole('dialog')).toHaveClass(
+      'fixed',
+      'inset-0',
+      'sm:m-auto',
+      'sm:h-fit'
+    );
+    expect(screen.getByRole('dialog')).not.toHaveClass('sm:h-auto');
+  });
+
   it('paints the modal surface with the defined bg-base theme token', () => {
     const { container } = render(
       <AuthModalShell ariaLabel='Create your Jovie account'>
