@@ -115,7 +115,7 @@ export function survivorFingerprint(file, mutant) {
 
 /**
  * @param {string} source
- * @param {{ line: number, column: number }} position 1-based line, 0-based column (Stryker)
+ * @param {{ line: number, column: number }} position 1-based line and column (Stryker)
  */
 function offsetOf(source, position) {
   let offset = 0;
@@ -123,7 +123,7 @@ function offsetOf(source, position) {
   for (let index = 0; index < position.line - 1; index += 1) {
     offset += (lines[index] ?? '').length + 1;
   }
-  return offset + position.column; // Stryker columns are 0-based
+  return offset + position.column - 1; // Stryker columns are 1-based
 }
 
 /**

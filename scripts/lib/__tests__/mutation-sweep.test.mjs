@@ -31,7 +31,7 @@ const mutant = (
   status,
   mutatorName,
   replacement,
-  location: { start: { line, column: 15 }, end: { line, column: 19 } },
+  location: { start: { line, column: 16 }, end: { line, column: 20 } },
 });
 const SOURCE = [
   'export function ok(a: number) {',
