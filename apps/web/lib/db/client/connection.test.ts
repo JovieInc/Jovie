@@ -1,8 +1,10 @@
 import { EventEmitter } from 'node:events';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resetPool } from './connection';
 import type { DbType } from './types';
+
+type ConnectionModule = typeof import('./connection');
+let resetPoolFn: ConnectionModule['resetPool'];
 
 type FixtureClient = EventEmitter & {
   release: ReturnType<typeof vi.fn>;
@@ -63,8 +65,9 @@ describe('enforced database deadlines (JOV-8527)', () => {
     vi.clearAllMocks();
     mocks.clients.length = 0;
     mocks.query.mockReset().mockResolvedValue({ rows: [] });
-    const { initializeDb } = await import('./connection');
-    database = initializeDb();
+    const connection = (await import('./connection')) as ConnectionModule;
+    database = connection.initializeDb();
+    resetPoolFn = connection.resetPool;
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -77,7 +80,7 @@ describe('enforced database deadlines (JOV-8527)', () => {
       .spyOn(mocks.pool as unknown as { end: () => Promise<void> }, 'end')
       .mockImplementation(() => new Promise<void>(() => {}));
 
-    const pending = resetPool();
+    const pending = resetPoolFn();
     const assertion = expect(pending).resolves.toBeUndefined();
     await vi.advanceTimersByTimeAsync(5_000);
     await assertion;
@@ -96,9 +99,9 @@ describe('enforced database deadlines (JOV-8527)', () => {
       .spyOn(mocks.pool as unknown as { end: () => Promise<void> }, 'end')
       .mockResolvedValue(undefined);
 
-    await expect(resetPool()).resolves.toBeUndefined();
+    await expect(resetPoolFn()).resolves.toBeUndefined();
 
-    expect(endSpy).toHaveBeenCalledExactlyOnce();
+    expect(endSpy.mock.calls).toHaveLength(1);
     expect(mocks.logDbError).not.toHaveBeenCalled();
     endSpy.mockRestore();
   });
@@ -115,7 +118,7 @@ describe('enforced database deadlines (JOV-8527)', () => {
           })
       );
 
-    const pending = resetPool();
+    const pending = resetPoolFn();
     const assertion = expect(pending).resolves.toBeUndefined();
     await vi.runAllTimersAsync();
     await assertion;
