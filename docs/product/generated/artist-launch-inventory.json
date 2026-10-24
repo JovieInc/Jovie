@@ -3281,6 +3281,22 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/pipeline-bottleneck/contributions/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/pipeline-bottleneck/contributions",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/pipeline-bottleneck/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/pipeline-bottleneck",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/summer-bottleneck/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/summer-bottleneck",
