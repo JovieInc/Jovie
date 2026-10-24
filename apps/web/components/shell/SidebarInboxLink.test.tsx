@@ -32,6 +32,10 @@ describe('central Inbox bell', () => {
     const link = screen.getByRole('link', {
       name: 'Inbox — 3 Items Need Attention',
     });
+    expect(link.querySelector('svg')).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)'
+    );
+    expect(link).toHaveClass('size-7', 'items-center', 'justify-center');
     expect(link).toHaveAttribute('href', '/app');
     expect(link).toHaveAttribute('data-prefetch', 'false');
     expect(link.querySelector('span')).toHaveClass(

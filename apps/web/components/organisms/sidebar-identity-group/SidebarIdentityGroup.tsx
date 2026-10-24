@@ -117,7 +117,7 @@ export function SidebarIdentityGroup({
               </span>
               <ExternalLink
                 aria-hidden='true'
-                className='size-3 shrink-0 text-sidebar-item-icon'
+                className='size-(--app-shell-sidebar-icon-size) shrink-0 text-sidebar-item-icon'
               />
             </Link>
           </Tooltip>
