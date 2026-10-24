@@ -111,7 +111,7 @@ export function DspPresenceSummary({
             ariaLabel='Toggle presence details sidebar'
           />
           <PageToolbarActionButton
-            label='Add Platform'
+            label='Add platform'
             icon={<Plus className='h-3.5 w-3.5' />}
             onClick={onAddPlatform}
             iconOnly

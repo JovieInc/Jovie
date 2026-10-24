@@ -355,7 +355,7 @@ export function ReleaseAudioAssetPanel({
                       handleRequestType({
                         ...uploadRejection,
                         cta: {
-                          label: 'Request This Type',
+                          label: 'Request this type',
                           action: 'request_type',
                         },
                       })
@@ -363,7 +363,7 @@ export function ReleaseAudioAssetPanel({
                     className='focus-ring-themed rounded-md px-2 py-1 text-2xs font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token'
                     data-testid='upload-request-type-cta'
                   >
-                    Request This Type
+                    Request this type
                   </button>
                 ) : null}
               </div>

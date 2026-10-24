@@ -60,7 +60,7 @@ function SearchResultsLoadingSkeleton() {
     <output
       className='block space-y-1 p-2.5'
       aria-live='polite'
-      aria-label='Loading Spotify Artist Results'
+      aria-label='Loading Spotify artist results'
       aria-busy='true'
     >
       {LOADING_SKELETON_KEYS.map(key => (
@@ -542,7 +542,7 @@ export function SpotifyConnectDialog({
                   id='spotify-connect-results'
                   className='sr-only'
                   size={Math.min(totalItems, 6)}
-                  aria-label='Spotify Artist Results'
+                  aria-label='Spotify artist results'
                   value={
                     formState.activeResultIndex === pasteUrlIndex
                       ? '__paste__'

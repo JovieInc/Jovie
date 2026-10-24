@@ -194,7 +194,7 @@ export function MismatchCard({
           className='h-7 min-w-17 text-xs max-sm:h-10 max-sm:flex-1'
           onClick={() => handleAction('confirmed_mismatch')}
         >
-          Not Mine
+          Not mine
         </Button>
       </div>
     </li>

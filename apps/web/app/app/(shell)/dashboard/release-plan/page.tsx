@@ -33,7 +33,7 @@ export default function ReleasePlanPage() {
 
   return (
     <AppShellContentPanel
-      aria-label='Release Plan'
+      aria-label='Release plan'
       frame='content-container'
       contentPadding='default'
       className='h-full'
@@ -55,7 +55,7 @@ export default function ReleasePlanPage() {
                 onClick={() => setPlan(generateDemoPlan())}
                 size='sm'
               >
-                Generate Plan
+                Generate plan
               </Button>
             }
             subtitleClassName='whitespace-normal'

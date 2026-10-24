@@ -1144,7 +1144,7 @@ describe('LibrarySurface', () => {
     expect(search).toHaveFocus();
     await user.type(search, 'share link');
     await user.click(
-      screen.getByRole('menuitem', { name: 'Copy › Share Link' })
+      screen.getByRole('menuitem', { name: 'Copy › Share link' })
     );
 
     expect(writeText).toHaveBeenCalledWith('https://jov.ie/p/token-1');
@@ -1575,7 +1575,7 @@ describe('LibrarySurface', () => {
     );
   });
 
-  it('opens private file sharing in place from Share Privately (one share concept)', () => {
+  it('opens private file sharing in place from Share privately (one share concept)', () => {
     renderLibrary([
       buildAsset({
         id: 'release-a',
@@ -1588,7 +1588,7 @@ describe('LibrarySurface', () => {
     const drawer = within(screen.getByTestId('library-asset-drawer'));
     expect(drawer.queryByTestId('work-private-share')).toBeNull();
 
-    fireEvent.click(drawer.getByRole('button', { name: 'Share Privately' }));
+    fireEvent.click(drawer.getByRole('button', { name: 'Share privately' }));
 
     expect(drawer.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
       'aria-selected',
@@ -1814,7 +1814,7 @@ describe('LibrarySurface', () => {
       'Rating',
       'Length',
       'Waveform',
-      'DSP Providers',
+      'DSP providers',
     ]) {
       expect(
         screen.getByRole('columnheader', { name: header })

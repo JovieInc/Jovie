@@ -130,7 +130,7 @@ export function VideoReleasePage({
             href={youtubeUrl}
             target='_blank'
             rel='noopener noreferrer'
-            aria-label='Watch On YouTube (Opens In New Tab)'
+            aria-label='Watch on YouTube (opens in new tab)'
             className='inline-flex items-center gap-1.5 text-app font-book text-white/40 transition-colors hover:text-white/60'
           >
             <ExternalLink className='size-3.5' />

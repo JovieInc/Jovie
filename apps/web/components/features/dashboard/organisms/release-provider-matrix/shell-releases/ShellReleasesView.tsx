@@ -209,7 +209,7 @@ function ReleasesListContent({
               disconnected state by its 'Connect Spotify' heading, matching
               the h3 the connected empty state already renders. */}
           <h3 className='text-app font-caption text-primary-token text-balance'>
-            Connect Spotify To Get Started
+            Connect Spotify to get started
           </h3>
           <p className='mt-1 text-xs text-tertiary-token leading-normal'>
             Sync your catalog from Spotify or add a release manually to start
@@ -247,7 +247,7 @@ function ReleasesListContent({
           data-testid='shell-releases-empty-state-connected'
         >
           <h3 className='text-app font-caption text-primary-token'>
-            No Releases Yet
+            No releases yet
           </h3>
           <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
             {canCreateManualReleases
@@ -987,8 +987,8 @@ export function ShellReleasesView({
       visibleCount: visibleReleases.length,
       triggerLabel:
         pills.length > 0
-          ? `Filter Releases (${pills.length})`
-          : 'Filter Releases',
+          ? `Filter releases (${pills.length})`
+          : 'Filter releases',
       ariaLabel: 'Filter releases',
       placeholder: 'Search releases',
       allowedFields: ['artist', 'title', 'album', 'status', 'has'] as const,

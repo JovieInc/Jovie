@@ -68,7 +68,7 @@ describe('AddPlatformDialog', () => {
 
     await user.click(screen.getByRole('button', { name: /Spotify/ }));
 
-    const submitButton = screen.getByRole('button', { name: 'Add Platform' });
+    const submitButton = screen.getByRole('button', { name: 'Add platform' });
     expect(submitButton).toBeDisabled();
 
     await user.type(screen.getByLabelText('Artist name'), 'Midnight Echo');
@@ -103,7 +103,7 @@ describe('AddPlatformDialog', () => {
       screen.getByLabelText('Profile URL'),
       'https://open.spotify.com/artist/123'
     );
-    await user.click(screen.getByRole('button', { name: 'Add Platform' }));
+    await user.click(screen.getByRole('button', { name: 'Add platform' }));
 
     expect(addManualDspMatchMock).toHaveBeenCalledWith({
       providerId: 'spotify',
@@ -144,7 +144,7 @@ describe('AddPlatformDialog', () => {
 
     const artistName = screen.getByLabelText('Artist name');
     const profileUrl = screen.getByLabelText('Profile URL');
-    const submitButton = screen.getByRole('button', { name: 'Add Platform' });
+    const submitButton = screen.getByRole('button', { name: 'Add platform' });
 
     await user.type(artistName, '   ');
     await user.type(profileUrl, 'https://open.spotify.com/artist/123');

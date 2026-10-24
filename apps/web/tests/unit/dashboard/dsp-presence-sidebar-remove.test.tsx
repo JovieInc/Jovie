@@ -15,7 +15,7 @@ describe('DspPresenceSidebar remove platform source contract', () => {
     expect(source).toContain('presence-remove-platform');
     expect(source).toContain('ConfirmDialog');
     expect(source).toContain('user_disconnected');
-    expect(source).toContain('Remove Platform');
+    expect(source).toContain('Remove platform');
   });
 
   it('only offers remove for linked (non-suggested) matches', () => {

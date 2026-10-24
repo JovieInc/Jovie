@@ -242,7 +242,7 @@ export function ReleaseFilterDropdown({
   const FILTER_CATEGORIES = useMemo(
     () =>
       [
-        { id: 'releaseType', label: 'Release Type', iconName: 'Layers' },
+        { id: 'releaseType', label: 'Release type', iconName: 'Layers' },
         { id: 'popularity', label: 'Popularity', iconName: 'Signal' },
         { id: 'label', label: 'Label', iconName: 'Building2' },
       ] as const,
@@ -284,8 +284,8 @@ export function ReleaseFilterDropdown({
     typeFilterCount + popularityFilterCount + labelFilterCount;
   const triggerLabel =
     activeFilterCount > 0
-      ? `Filter Releases (${activeFilterCount})`
-      : 'Filter Releases';
+      ? `Filter releases (${activeFilterCount})`
+      : 'Filter releases';
 
   // Reset searches when dropdown closes
   const handleOpenChange = useCallback((open: boolean) => {
@@ -348,9 +348,9 @@ export function ReleaseFilterDropdown({
               <DropdownEmptyRow message='No filters found' />
             ) : (
               <>
-                {/* Release Type Submenu */}
+                {/* Release type Submenu */}
                 <FilterSubmenu
-                  label='Release Type'
+                  label='Release type'
                   iconName='Layers'
                   options={RELEASE_TYPE_OPTIONS}
                   selectedIds={filters.releaseTypes}
@@ -463,7 +463,7 @@ export function ReleaseFilterDropdown({
       {/* Active Filter Pills */}
       {filters.releaseTypes.length > 0 && (
         <ActiveFilterPill
-          groupLabel='Release Type'
+          groupLabel='Release type'
           values={activeTypeLabels}
           icon={<Icon name='Layers' className='h-3.5 w-3.5' />}
           onClear={handleClearTypes}

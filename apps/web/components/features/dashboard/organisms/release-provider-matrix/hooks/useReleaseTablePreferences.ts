@@ -16,7 +16,7 @@ export const DENSITY_ROW_HEIGHTS: Record<Density, number> = {
 export const TOGGLEABLE_COLUMNS = [
   { id: 'releaseType', label: 'Type' },
   { id: 'availability', label: 'Availability' },
-  { id: 'smartLink', label: 'Smart Link' },
+  { id: 'smartLink', label: 'Smart link' },
   { id: 'genres', label: 'Genres' },
   { id: 'stats', label: 'Stats' },
   { id: 'upc', label: 'UPC' },

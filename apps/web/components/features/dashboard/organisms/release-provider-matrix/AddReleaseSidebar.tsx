@@ -248,7 +248,7 @@ export function AddReleaseSidebar({
               Creating...
             </>
           ) : (
-            'Create Release'
+            'Create release'
           )}
         </DrawerButton>
       }
@@ -318,13 +318,13 @@ export function AddReleaseSidebar({
               id='release-title'
               value={title}
               onChange={event => setTitle(event.target.value)}
-              placeholder='My New Release' // ui-casing-allow: default release title placeholder
+              placeholder='My new release'
               autoFocus
               className='h-8 rounded-lg border-subtle bg-surface-0 text-xs'
             />
           </DrawerFormField>
 
-          <DrawerFormField label='Release Type' htmlFor='release-type'>
+          <DrawerFormField label='Release type' htmlFor='release-type'>
             <Select
               value={releaseType}
               onValueChange={value => setReleaseType(value as ReleaseType)}
@@ -345,7 +345,7 @@ export function AddReleaseSidebar({
             </Select>
           </DrawerFormField>
 
-          <DrawerFormField label='Release Date' htmlFor='release-date'>
+          <DrawerFormField label='Release date' htmlFor='release-date'>
             <DatePicker
               id='release-date'
               value={releaseDate}
@@ -355,7 +355,7 @@ export function AddReleaseSidebar({
           </DrawerFormField>
 
           {isFutureRelease && (
-            <DrawerFormField label='Reveal Date' htmlFor='reveal-date'>
+            <DrawerFormField label='Reveal date' htmlFor='reveal-date'>
               <DatePicker
                 id='reveal-date'
                 value={revealDate}

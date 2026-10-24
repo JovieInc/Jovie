@@ -89,7 +89,7 @@ function SidebarEntityHeader({
             <div
               className='absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/60'
               role='img'
-              aria-label='Profile Image Missing'
+              aria-label='Profile image missing'
             >
               <Icon
                 name='Camera'
@@ -99,7 +99,7 @@ function SidebarEntityHeader({
           </div>
         )
       }
-      title={item.externalArtistName ?? 'Unknown Artist'}
+      title={item.externalArtistName ?? 'Unknown artist'}
       subtitle={
         <span className='flex min-w-0 items-center gap-1.5'>
           <DspProviderIcon provider={item.providerId} size='sm' />
@@ -153,7 +153,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
   return (
     <div className='space-y-2'>
       <DrawerSection
-        title='Match Status'
+        title='Match status'
         sectionKind='facts'
         className='space-y-1.5'
       >
@@ -171,7 +171,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
           {item.matchingIsrcCount > 0 && (
             <div className='flex items-center justify-between'>
               <span className='text-xs text-tertiary-token'>
-                Tracks Verified
+                Tracks verified
               </span>
               <span className='text-xs text-primary-token'>
                 {item.matchingIsrcCount}
@@ -207,7 +207,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
               className='h-8 w-full justify-start rounded-full border-subtle bg-surface-0 px-3 text-xs font-caption'
             >
               <Icon name='ExternalLink' className='mr-1.5 h-3.5 w-3.5' />
-              View On {label}
+              View on {label}
             </Button>
           </a>
         </DrawerSection>
@@ -263,7 +263,7 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
         disabled={isLoading}
         className='h-8 flex-1 rounded-full text-xs font-caption'
       >
-        {isConfirming ? 'Confirming...' : 'Confirm Match'}
+        {isConfirming ? 'Confirming...' : 'Confirm match'}
       </Button>
     </div>
   );
@@ -314,7 +314,7 @@ function RemovePlatformAction({
         data-testid='presence-remove-platform'
       >
         <Icon name='Trash2' className='mr-1.5 h-3.5 w-3.5' />
-        {isRejecting ? 'Removing...' : 'Remove Platform'}
+        {isRejecting ? 'Removing...' : 'Remove platform'}
       </Button>
       <ConfirmDialog
         open={confirmOpen}

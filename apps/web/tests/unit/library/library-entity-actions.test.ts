@@ -357,7 +357,7 @@ describe('library entity actions', () => {
     expect(
       copy?.children?.find(action => action.id === 'copy-tracked-link')
     ).toMatchObject({
-      label: 'Tracked Link',
+      label: 'Tracked link',
       children: expect.arrayContaining([
         expect.objectContaining({ id: 'utm-share-instagram-story' }),
       ]),

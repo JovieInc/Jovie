@@ -190,7 +190,7 @@ export const LibraryCatalogProvidersCell = memo(
       return (
         <span
           role='img'
-          aria-label='No Providers'
+          aria-label='No providers'
           className='system-b-library-meta-text text-quaternary-token'
         >
           &mdash;
@@ -228,7 +228,7 @@ export const LibraryCatalogMetricCell = memo(function LibraryCatalogMetricCell({
   return (
     <span
       role='img'
-      aria-label={`${label}: Not Available`}
+      aria-label={`${label}: not available`}
       title={`${label} is not available for this item yet`}
       data-testid={`library-catalog-${metric}-${asset.id}`}
       className='system-b-library-meta-text block text-right text-quaternary-token'
@@ -251,7 +251,7 @@ export const LibraryCatalogLengthCell = memo(function LibraryCatalogLengthCell({
       {asset.totalDurationMs ? (
         formatLibraryDuration(asset.totalDurationMs)
       ) : (
-        <span role='img' aria-label='Length: Not Available'>
+        <span role='img' aria-label='Length: not available'>
           &mdash;
         </span>
       )}
@@ -430,7 +430,7 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
   }),
   libraryCatalogColumnHelper.display({
     id: 'bpm',
-    header: 'BPM',
+    header: 'BPM', // ui-casing-allow: beats-per-minute acronym
     cell: ({ row }) => (
       <LibraryCatalogMetricCell asset={row.original} metric='bpm' />
     ),
@@ -507,7 +507,7 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
   }),
   libraryCatalogColumnHelper.display({
     id: 'providers',
-    header: 'DSP Providers',
+    header: 'DSP providers',
     cell: ({ row }) => <LibraryCatalogProvidersCell asset={row.original} />,
     size: 120,
     minSize: 96,

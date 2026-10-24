@@ -98,7 +98,7 @@ vi.mock(
       <div>
         Summary {confirmedCount}/{suggestedCount}
         <button type='button' onClick={onAddPlatform}>
-          Open Add Platform
+          Open Add platform
         </button>
       </div>
     ),
@@ -119,7 +119,7 @@ vi.mock('@/components/molecules/EmptyState', () => ({
       {heading}
       {action?.onClick ? (
         <button type='button' onClick={action.onClick}>
-          Empty State Add Platform
+          Empty State Add platform
         </button>
       ) : null}
     </div>
@@ -293,7 +293,7 @@ describe('DspPresenceView', () => {
     });
 
     await user.click(
-      screen.getByRole('button', { name: 'Empty State Add Platform' })
+      screen.getByRole('button', { name: 'Empty State Add platform' })
     );
 
     await waitFor(() => {

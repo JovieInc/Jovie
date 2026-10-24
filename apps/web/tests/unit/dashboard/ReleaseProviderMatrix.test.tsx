@@ -194,10 +194,10 @@ vi.mock(
         {canCreateManualReleases ? (
           <button
             type='button'
-            aria-label='Create A New Release'
+            aria-label='Create a new release'
             onClick={onCreateManual}
           >
-            Create A New Release
+            Create a new release
           </button>
         ) : null}
         <button
@@ -263,10 +263,10 @@ vi.mock(
           {canCreateManualReleases && onCreateRelease ? (
             <button
               type='button'
-              aria-label='Create A New Release'
+              aria-label='Create a new release'
               onClick={onCreateRelease}
             >
-              Create A New Release
+              Create a new release
             </button>
           ) : null}
         </div>
@@ -346,10 +346,10 @@ vi.mock(
         <div role='dialog' aria-modal='true'>
           <h2>
             {isGateLoading
-              ? 'Release Plan'
+              ? 'Release plan'
               : canGenerateReleasePlans
-                ? 'Generate Release Plan'
-                : 'Upgrade to Generate a Release Plan'}
+                ? 'Generate release plan'
+                : 'Upgrade to generate a release plan'}
           </h2>
           <p>
             {isGateLoading
@@ -364,7 +364,7 @@ vi.mock(
             onClick={onClose}
             disabled={isGeneratingReleasePlan}
           >
-            Maybe Later
+            Maybe later
           </button>
           {isGateLoading ? (
             <button type='button' disabled>
@@ -387,7 +387,7 @@ vi.mock(
             >
               {isGeneratingReleasePlan
                 ? 'Generating...'
-                : 'Generate Release Plan'}
+                : 'Generate release plan'}
             </button>
           ) : (
             <button type='button'>Upgrade to Pro</button>
@@ -658,7 +658,7 @@ describe('ReleaseProviderMatrix', () => {
         />
       );
       // When connected but no releases and not importing, shows connected empty state
-      expect(screen.getByText('No Releases Yet')).toBeInTheDocument();
+      expect(screen.getByText('No releases yet')).toBeInTheDocument();
     });
 
     it('shows releases table when releases exist', () => {
@@ -785,7 +785,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -807,7 +807,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -826,7 +826,7 @@ describe('ReleaseProviderMatrix', () => {
       expect(screen.queryByTestId('release-sidebar')).not.toBeInTheDocument();
       expect(
         await screen.findByRole('heading', {
-          name: 'Upgrade to Generate a Release Plan',
+          name: 'Upgrade to generate a release plan',
         })
       ).toBeInTheDocument();
       expect(mockRouterRefresh).not.toHaveBeenCalled();
@@ -843,7 +843,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -856,7 +856,7 @@ describe('ReleaseProviderMatrix', () => {
 
       expect(
         await screen.findByRole('heading', {
-          name: 'Upgrade to Generate a Release Plan',
+          name: 'Upgrade to generate a release plan',
         })
       ).toBeInTheDocument();
       expect(
@@ -886,7 +886,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -897,7 +897,7 @@ describe('ReleaseProviderMatrix', () => {
 
       fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Generate Release Plan' })
+        await screen.findByRole('button', { name: 'Generate release plan' })
       );
 
       await waitFor(() => {
@@ -938,7 +938,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -951,11 +951,11 @@ describe('ReleaseProviderMatrix', () => {
 
       expect(
         await screen.findByRole('heading', {
-          name: 'Upgrade to Generate a Release Plan',
+          name: 'Upgrade to generate a release plan',
         })
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'Generate Release Plan' })
+        screen.queryByRole('button', { name: 'Generate release plan' })
       ).not.toBeInTheDocument();
     });
 
@@ -980,7 +980,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -992,7 +992,7 @@ describe('ReleaseProviderMatrix', () => {
       fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
 
       expect(
-        await screen.findByRole('heading', { name: 'Release Plan' })
+        await screen.findByRole('heading', { name: 'Release plan' })
       ).toBeInTheDocument();
       expect(
         screen.getByText(
@@ -1002,7 +1002,7 @@ describe('ReleaseProviderMatrix', () => {
       expect(screen.getByRole('button', { name: 'Loading...' })).toBeDisabled();
       expect(
         screen.queryByRole('heading', {
-          name: 'Upgrade to Generate a Release Plan',
+          name: 'Upgrade to generate a release plan',
         })
       ).not.toBeInTheDocument();
     });
@@ -1018,7 +1018,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -1029,13 +1029,13 @@ describe('ReleaseProviderMatrix', () => {
 
       fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Maybe Later' })
+        await screen.findByRole('button', { name: 'Maybe later' })
       );
 
       await waitFor(() => {
         expect(
           screen.queryByRole('heading', {
-            name: 'Upgrade to Generate a Release Plan',
+            name: 'Upgrade to generate a release plan',
           })
         ).not.toBeInTheDocument();
       });
@@ -1057,7 +1057,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -1071,12 +1071,12 @@ describe('ReleaseProviderMatrix', () => {
       await waitFor(() => {
         expect(
           screen.getByRole('heading', {
-            name: 'Upgrade to Generate a Release Plan',
+            name: 'Upgrade to generate a release plan',
           })
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Maybe Later' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Maybe later' }));
       fireEvent.click(screen.getByTestId('edit-release-created-release'));
 
       await waitFor(() => {
@@ -1105,7 +1105,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       fireEvent.click(
-        screen.getAllByRole('button', { name: 'Create A New Release' })[0]
+        screen.getAllByRole('button', { name: 'Create a new release' })[0]
       );
 
       await waitFor(() => {
@@ -1119,12 +1119,12 @@ describe('ReleaseProviderMatrix', () => {
       await waitFor(() => {
         expect(
           screen.getByRole('heading', {
-            name: 'Upgrade to Generate a Release Plan',
+            name: 'Upgrade to generate a release plan',
           })
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Maybe Later' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Maybe later' }));
       fireEvent.click(screen.getByTestId('edit-release-created-release'));
 
       await waitFor(() => {

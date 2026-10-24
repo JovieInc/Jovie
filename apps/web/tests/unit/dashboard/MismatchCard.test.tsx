@@ -55,7 +55,7 @@ describe('MismatchCard', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders Mine and Not Mine buttons', () => {
+  it('renders Mine and Not mine buttons', () => {
     render(
       <MismatchCard
         mismatch={baseMismatch}
@@ -64,7 +64,7 @@ describe('MismatchCard', () => {
       />
     );
     expect(screen.getByText('Mine')).toBeInTheDocument();
-    expect(screen.getByText('Not Mine')).toBeInTheDocument();
+    expect(screen.getByText('Not mine')).toBeInTheDocument();
   });
 
   it('renders artwork as clickable Spotify link', () => {
@@ -109,7 +109,7 @@ describe('MismatchCard', () => {
     expect(screen.getByText('Undo')).toBeInTheDocument();
   });
 
-  it('shows undo state after clicking Not Mine', async () => {
+  it('shows undo state after clicking Not mine', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(
       <MismatchCard
@@ -119,7 +119,7 @@ describe('MismatchCard', () => {
       />
     );
 
-    await user.click(screen.getByText('Not Mine'));
+    await user.click(screen.getByText('Not mine'));
     expect(screen.getByText('Marked as not yours')).toBeInTheDocument();
     expect(screen.getByText('Undo')).toBeInTheDocument();
   });
@@ -158,7 +158,7 @@ describe('MismatchCard', () => {
     await user.click(screen.getByText('Undo'));
     // Card should return to normal state
     expect(screen.getByText('Mine')).toBeInTheDocument();
-    expect(screen.getByText('Not Mine')).toBeInTheDocument();
+    expect(screen.getByText('Not mine')).toBeInTheDocument();
 
     // Advance past undo delay — action should NOT fire
     vi.advanceTimersByTime(4000);
@@ -177,7 +177,7 @@ describe('MismatchCard', () => {
       />
     );
 
-    await user.click(screen.getByText('Not Mine'));
+    await user.click(screen.getByText('Not mine'));
     vi.advanceTimersByTime(3000);
 
     await waitFor(() => {

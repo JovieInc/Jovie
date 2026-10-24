@@ -349,16 +349,16 @@ describe('AddReleaseSidebar', () => {
     );
     expect(within(sidebar).getByLabelText('Title')).toBeInTheDocument();
     expect(
-      within(sidebar).getByRole('button', { name: 'Create Release' })
+      within(sidebar).getByRole('button', { name: 'Create release' })
     ).toBeDisabled();
   });
 
   it('keeps calendar selection inside the release drawer without closing it', async () => {
     render(<AddReleaseSidebar {...defaultProps} />);
     const sidebar = screen.getByTestId('add-release-sidebar');
-    await userEvent.click(within(sidebar).getByLabelText('Release Date'));
+    await userEvent.click(within(sidebar).getByLabelText('Release date'));
     await userEvent.click(within(sidebar).getByTestId('calendar-select-date'));
-    expect(within(sidebar).getByLabelText('Release Date')).toHaveTextContent(
+    expect(within(sidebar).getByLabelText('Release date')).toHaveTextContent(
       'May 20, 2030'
     );
     expect(defaultProps.onClose).not.toHaveBeenCalled();
@@ -370,7 +370,7 @@ describe('AddReleaseSidebar', () => {
     render(<AddReleaseSidebar {...defaultProps} />);
 
     await user.type(screen.getByLabelText('Title'), 'Midnight Sun');
-    await user.click(screen.getByLabelText('Release Date'));
+    await user.click(screen.getByLabelText('Release date'));
     await user.click(screen.getByTestId('calendar-select-date'));
 
     expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
@@ -385,8 +385,8 @@ describe('AddReleaseSidebar', () => {
     render(<AddReleaseSidebar {...defaultProps} />);
 
     expect(screen.getByLabelText('Title')).toBeInTheDocument();
-    expect(screen.getByLabelText('Release Type')).toBeInTheDocument();
-    const releaseDateTrigger = screen.getByLabelText('Release Date');
+    expect(screen.getByLabelText('Release type')).toBeInTheDocument();
+    const releaseDateTrigger = screen.getByLabelText('Release date');
     expect(releaseDateTrigger).toBeInTheDocument();
     // Shared DatePicker molecule renders a non-submitting button trigger.
     expect(releaseDateTrigger.tagName).toBe('BUTTON');
@@ -405,10 +405,10 @@ describe('AddReleaseSidebar', () => {
     const user = userEvent.setup();
     render(<AddReleaseSidebar {...defaultProps} />);
 
-    await user.click(screen.getByLabelText('Release Date'));
+    await user.click(screen.getByLabelText('Release date'));
     await user.click(screen.getByTestId('calendar-select-date'));
 
-    const revealDatePicker = screen.getByLabelText('Reveal Date');
+    const revealDatePicker = screen.getByLabelText('Reveal date');
     expect(revealDatePicker).toBeInTheDocument();
     expect(revealDatePicker.tagName).toBe('BUTTON');
     expect(revealDatePicker).toHaveAttribute('type', 'button');
@@ -426,7 +426,7 @@ describe('AddReleaseSidebar', () => {
     render(<AddReleaseSidebar {...defaultProps} />);
 
     const submitButton = screen.getByRole('button', {
-      name: 'Create Release',
+      name: 'Create release',
     });
     expect(submitButton).toBeDisabled();
 
@@ -451,7 +451,7 @@ describe('AddReleaseSidebar', () => {
     await user.click(screen.getByLabelText('Explicit'));
     await user.click(
       screen.getByRole('button', {
-        name: 'Create Release',
+        name: 'Create release',
       })
     );
 
@@ -491,7 +491,7 @@ describe('AddReleaseSidebar', () => {
     );
     await user.click(
       screen.getByRole('button', {
-        name: 'Create Release',
+        name: 'Create release',
       })
     );
 
@@ -535,7 +535,7 @@ describe('AddReleaseSidebar', () => {
     );
     await user.click(
       screen.getByRole('button', {
-        name: 'Create Release',
+        name: 'Create release',
       })
     );
 
@@ -578,7 +578,7 @@ describe('AddReleaseSidebar', () => {
     await user.type(screen.getByLabelText('Title'), 'Midnight Sun');
     await user.click(
       screen.getByRole('button', {
-        name: 'Create Release',
+        name: 'Create release',
       })
     );
 

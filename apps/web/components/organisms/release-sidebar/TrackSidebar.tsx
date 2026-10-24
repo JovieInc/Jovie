@@ -75,14 +75,14 @@ function getPreviewStatusLabel(
 ): string {
   switch (previewVerification) {
     case 'verified':
-      return 'Verified Preview';
+      return 'Verified preview';
     case 'fallback':
-      return 'Fallback Preview';
+      return 'Fallback preview';
     case 'unknown':
-      return 'Preview Unverified';
+      return 'Preview unverified';
     case 'missing':
     default:
-      return 'Preview Not Checked';
+      return 'Preview not checked';
   }
 }
 
@@ -231,7 +231,7 @@ export function TrackSidebar({
       {
         type: 'action',
         id: 'copy-track-link',
-        label: isSmartLinkCopied ? 'Copied!' : 'Copy Track Link',
+        label: isSmartLinkCopied ? 'Copied!' : 'Copy track link',
         icon: isSmartLinkCopied ? (
           <Check className='h-4 w-4' />
         ) : (
@@ -242,7 +242,7 @@ export function TrackSidebar({
       {
         type: 'action',
         id: 'open-track-link',
-        label: 'Open Track Link',
+        label: 'Open track link',
         icon: <ExternalLink className='h-4 w-4' />,
         onClick: () => {
           if (track.smartLinkPath) {
@@ -385,8 +385,8 @@ export function TrackSidebar({
                     url={smartLinkUrl}
                     density='compact'
                     surface='boxed'
-                    copyButtonTitle='Copy Track Link'
-                    openButtonTitle='Open Track Link'
+                    copyButtonTitle='Copy track link'
+                    openButtonTitle='Open track link'
                     onCopySuccess={() => {
                       showSmartLinkCopied();
                     }}
@@ -499,7 +499,7 @@ export function TrackSidebar({
           {fallbackProviders.length > 0 ? (
             <TrackPlatformLinksSection
               providers={fallbackProviders}
-              title='Search Fallback'
+              title='Search fallback'
               emptyMessage='No fallback DSP links available.'
             />
           ) : null}

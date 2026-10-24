@@ -192,7 +192,7 @@ export function ConnectedReleaseEmptyState({
           />
         </div>
         <h3 className='text-app font-caption text-primary-token'>
-          No Releases Yet
+          No releases yet
         </h3>
         <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
           {description}
@@ -222,7 +222,7 @@ export function ConnectedReleaseEmptyState({
               data-testid='create-release-empty-state'
             >
               <Icon name='Plus' className='size-4' aria-hidden='true' />
-              Create Release
+              Create release
             </DrawerButton>
           ) : null}
         </div>

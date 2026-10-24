@@ -69,9 +69,9 @@ const RELEASE_FORMAT_CHOICES: Choice<ReleaseFormat>[] = [
 ];
 
 const DISTRIBUTION_CHOICES: Choice<DistributionModel>[] = [
-  { value: 'diy', label: 'DIY' },
-  { value: 'indie_label', label: 'Indie Label' },
-  { value: 'major_label', label: 'Major Label' },
+  { value: 'diy', label: 'DIY' }, // ui-casing-allow: preserve proper nouns and acronyms
+  { value: 'indie_label', label: 'Indie label' },
+  { value: 'major_label', label: 'Major label' },
 ];
 
 const PUBLISHER_CHOICES: Choice<PublisherAnswer>[] = [
@@ -97,17 +97,17 @@ const GOAL_CHOICES: Choice<Goal>[] = [
   { value: 'streams', label: 'Streams' },
   { value: 'radio', label: 'Radio' },
   { value: 'press', label: 'Press' },
-  { value: 'fanbase', label: 'Fanbase Growth' },
-  { value: 'catalog', label: 'Catalog Depth' },
+  { value: 'fanbase', label: 'Fanbase growth' },
+  { value: 'catalog', label: 'Catalog depth' },
 ];
 
 const TERRITORY_CHOICES: Choice<Territory>[] = [
   { value: 'GLOBAL', label: 'Global' },
-  { value: 'US', label: 'US' },
-  { value: 'EU', label: 'EU' },
-  { value: 'UK', label: 'UK' },
-  { value: 'LATAM', label: 'LATAM' },
-  { value: 'APAC', label: 'APAC' },
+  { value: 'US', label: 'US' }, // ui-casing-allow: preserve proper nouns and acronyms
+  { value: 'EU', label: 'EU' }, // ui-casing-allow: preserve proper nouns and acronyms
+  { value: 'UK', label: 'UK' }, // ui-casing-allow: preserve proper nouns and acronyms
+  { value: 'LATAM', label: 'LATAM' }, // ui-casing-allow: preserve proper nouns and acronyms
+  { value: 'APAC', label: 'APAC' }, // ui-casing-allow: preserve proper nouns and acronyms
 ];
 
 const STEP_META: Record<StepKey, { title: string; description: string }> = {
@@ -118,7 +118,7 @@ const STEP_META: Record<StepKey, { title: string; description: string }> = {
   distribution: {
     title: 'How is it being distributed?',
     description:
-      'DIY covers your own submissions. A label handles most rights paperwork for you.',
+      'DIY covers your own submissions. A label handles most rights paperwork for you.', // ui-casing-allow: preserve proper nouns and acronyms
   },
   hasPublisher: {
     title: 'Do you control publishing?',
@@ -128,7 +128,7 @@ const STEP_META: Record<StepKey, { title: string; description: string }> = {
   genre: {
     title: "What's the genre?",
     description:
-      'Genre decides radio lanes, YouTube network fits, and DJ promo pools.',
+      'Genre decides radio lanes, YouTube network fits, and DJ promo pools.', // ui-casing-allow: preserve proper nouns and acronyms
   },
   primaryGoal: {
     title: "What's the #1 goal for this release?",
@@ -138,7 +138,7 @@ const STEP_META: Record<StepKey, { title: string; description: string }> = {
   territory: {
     title: 'Where do you care most?',
     description:
-      'Territory governs things like NACC college radio (US) and other region-specific work.',
+      'Territory governs things like NACC college radio (US) and other region-specific work.', // ui-casing-allow: preserve proper nouns and acronyms
   },
 };
 
@@ -258,7 +258,7 @@ export function ReleasePlanWizard({
   if (isGateLoading) {
     return (
       <Dialog open={open} onClose={handleClose} size='md'>
-        <DialogTitle>Release Plan</DialogTitle>
+        <DialogTitle>Release plan</DialogTitle>
         <DialogDescription>
           Checking whether this workspace can generate a release plan.
         </DialogDescription>
@@ -274,7 +274,7 @@ export function ReleasePlanWizard({
   if (!canGenerateReleasePlans) {
     return (
       <Dialog open={open} onClose={handleClose} size='md'>
-        <DialogTitle>Release Plan</DialogTitle>
+        <DialogTitle>Release plan</DialogTitle>
         <DialogDescription>
           {`Release plans are an ${PRO_PLAN_DISPLAY_NAME} feature. Upgrade to generate a tailored task list for `}
           <span className='font-medium'>{releaseTitle ?? 'this release'}</span>.
@@ -286,7 +286,7 @@ export function ReleasePlanWizard({
             variant='secondary'
             onClick={handleClose}
           >
-            Maybe Later
+            Maybe later
           </Button>
           <Button type='button' size='sm' onClick={handleUpgrade}>
             Upgrade
@@ -298,7 +298,7 @@ export function ReleasePlanWizard({
 
   return (
     <Dialog open={open} onClose={handleClose} size='lg'>
-      <DialogTitle>Plan For {releaseTitle ?? 'This Release'}</DialogTitle>
+      <DialogTitle>Plan for {releaseTitle ?? 'This release'}</DialogTitle>
       <DialogDescription>
         Six quick questions. Jovie picks a task list tailored to your context.
       </DialogDescription>

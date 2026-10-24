@@ -202,7 +202,7 @@ export function WorkInspectorActions({
             data-testid='work-action-share-page'
           >
             <Copy className='h-3.5 w-3.5' strokeWidth={2.25} />
-            {copied ? 'Copied' : 'Share Page'}
+            {copied ? 'Copied' : 'Share page'}
           </Button>
         ) : null}
 
@@ -232,7 +232,7 @@ export function WorkInspectorActions({
             disabled={disabled}
             data-testid='work-action-share-privately'
           >
-            Share Privately
+            Share privately
           </Button>
         ) : null}
 

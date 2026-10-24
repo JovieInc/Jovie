@@ -49,7 +49,7 @@ const SHELL_DSP_META: ReadonlyArray<{
   {
     id: 'youtube_music',
     providerKey: 'youtube_music',
-    label: 'YouTube Music',
+    label: 'YouTube Music', // ui-casing-allow: preserve proper nouns and acronyms
     glyph: 'Y',
     iconPath: DSP_LOGO_CONFIG.youtube_music.iconPath,
     color: DSP_CONFIGS.youtube_music.color,
@@ -57,7 +57,7 @@ const SHELL_DSP_META: ReadonlyArray<{
   {
     id: 'tidal',
     providerKey: 'tidal',
-    label: 'TIDAL',
+    label: 'TIDAL', // ui-casing-allow: preserve proper nouns and acronyms
     glyph: 'T',
     iconPath: DSP_LOGO_CONFIG.tidal.iconPath,
     color: DSP_CONFIGS.tidal.color,

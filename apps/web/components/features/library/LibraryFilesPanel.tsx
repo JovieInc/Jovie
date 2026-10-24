@@ -113,7 +113,7 @@ export interface LibraryFilesPanelProps {
 }
 
 /**
- * Populated work files, focused detail and ONE Attach File control. Click,
+ * Populated work files, focused detail and ONE Attach file control. Click,
  * drop, paste or ⌘U all take any file; the kind is detected after hand-off.
  */
 export function LibraryFilesPanel({
@@ -276,7 +276,7 @@ export function LibraryFilesPanel({
       type='file'
       multiple
       hidden
-      aria-label='Attach File'
+      aria-label='Attach file'
       data-testid='library-attach-file-input'
       onChange={event => {
         attachFiles(event.target.files);
@@ -493,7 +493,7 @@ export function LibraryFilesPanel({
               aria-hidden='true'
             />
             <span className='min-w-0 flex-1 truncate text-left'>
-              Attach File
+              Attach file
             </span>
             <span className='shrink-0 text-2xs text-quaternary-token'>
               Drop or paste
@@ -572,16 +572,16 @@ function attachElsewhereRoute(
   stemsHref: string | undefined
 ): { readonly label: string; readonly href: string } | null {
   if (kind === 'video') {
-    return { label: 'Open Videos', href: buildLibraryViewRoute('videos') };
+    return { label: 'Open videos', href: buildLibraryViewRoute('videos') };
   }
   if (kind === 'document') {
     return {
-      label: 'Open Documents',
+      label: 'Open documents',
       href: buildLibraryViewRoute('documents'),
     };
   }
   if (kind === 'download' && stemsHref) {
-    return { label: 'Open Downloads', href: stemsHref };
+    return { label: 'Open downloads', href: stemsHref };
   }
   return null;
 }

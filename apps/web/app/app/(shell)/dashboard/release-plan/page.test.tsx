@@ -55,7 +55,7 @@ describe('ReleasePlanPage', () => {
     expect(screen.getAllByTestId(/release-plan-track-/)).toHaveLength(4);
     expect(screen.getByText('Closed')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Generate Plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate plan' }));
     const calendar = screen.getByRole('button', {
       name: /Calendar with \d+ moments/,
     });

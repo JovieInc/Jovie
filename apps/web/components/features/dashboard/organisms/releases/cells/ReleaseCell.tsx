@@ -113,7 +113,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {!hasPreview && !(showType && typeStyle) && (
           <VolumeX
             className='h-3 w-3 text-quaternary-token'
-            aria-label='No Preview Available'
+            aria-label='No preview available'
           />
         )}
       </div>

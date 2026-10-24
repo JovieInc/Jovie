@@ -45,7 +45,7 @@ const RELEASE_STATUS_OPTIONS: ReadonlyArray<{
  *
  * Uses SocialIcon (brand-shaped monochrome SVG) so the Spotify / Apple Music /
  * YouTube Music / Deezer entries in the release row menu match the platform
- * icons already used in the sibling "Tracked Links" submenu, instead of a
+ * icons already used in the sibling "Tracked links" submenu, instead of a
  * generic ExternalLink.
  *
  * Falls back to ExternalLink for providers without a SocialIcon entry so new
@@ -125,7 +125,7 @@ function buildPrimaryCopySmartLinkItem(
 
   return {
     id: 'copy-smart-link',
-    label: 'Copy Smart Link',
+    label: 'Copy smart link',
     icon: menuIcon('Copy'),
     onClick: () => {
       void onCopy(
@@ -172,7 +172,7 @@ function buildShareItems(
   const utmShareItems: ContextMenuItemType[] = [
     {
       id: 'tracked-share-submenu',
-      label: 'Tracked Links',
+      label: 'Tracked links',
       icon: menuIcon('Link2'),
       items: groupTrackedPresetsBySource(ALL_UTM_PRESETS).map(sourceGroup => {
         if (sourceGroup.presets.length === 1) {
@@ -233,7 +233,7 @@ function buildShareItems(
   if (release.hasVideoLinks) {
     items.push({
       id: 'copy-sounds-link',
-      label: 'Copy Use Sound Link',
+      label: 'Copy use sound link',
       icon: menuIcon('Music'),
       onClick: () => {
         void onCopy(
@@ -248,7 +248,7 @@ function buildShareItems(
   if (onCopyQrCode) {
     items.push({
       id: 'copy-qr-code',
-      label: 'Copy QR Code',
+      label: 'Copy QR code',
       icon: qrCodeIcon,
       onClick: onCopyQrCode,
     });
@@ -314,7 +314,7 @@ export function buildReleaseActions({
   const items: ContextMenuItemType[] = [
     {
       id: 'edit',
-      label: 'Edit Release Links',
+      label: 'Edit release links',
       icon: menuIcon('PencilLine'),
       onClick: () => onEdit(release),
     },
@@ -322,7 +322,7 @@ export function buildReleaseActions({
       ? [
           {
             id: 'generate-album-art',
-            label: 'Generate Album Art',
+            label: 'Generate album art',
             icon: menuIcon('Sparkles'),
             onClick: () => onGenerateAlbumArt(release),
           } satisfies ContextMenuItemType,
@@ -332,7 +332,7 @@ export function buildReleaseActions({
       ? [
           {
             id: 'generate-pitch',
-            label: 'Generate Pitch',
+            label: 'Generate pitch',
             icon: menuIcon('Sparkles'),
             onClick: () => onGeneratePitch(release),
           } satisfies ContextMenuItemType,
@@ -348,7 +348,7 @@ export function buildReleaseActions({
   if (shareItems.length > 0) {
     items.push({
       id: 'share-link',
-      label: 'Share Link',
+      label: 'Share link',
       icon: menuIcon('Link2'),
       items: shareItems,
     });
@@ -356,7 +356,7 @@ export function buildReleaseActions({
 
   items.push({
     id: 'copy-metadata',
-    label: 'Copy Metadata',
+    label: 'Copy metadata',
     icon: menuIcon('Hash'),
     items: metadataItems,
   });
@@ -415,7 +415,7 @@ export function buildReleaseActions({
   } else if (externalProviders.length > 1) {
     items.push({
       id: 'open-release',
-      label: 'Open In',
+      label: 'Open in',
       icon: menuIcon('ExternalLink'),
       items: externalProviders.map(provider => ({
         id: `open-${provider.key}`,
@@ -434,7 +434,7 @@ export function buildReleaseActions({
       { type: 'separator' },
       {
         id: 'delete',
-        label: 'Delete Release',
+        label: 'Delete release',
         icon: menuIcon('Trash2'),
         destructive: true,
         onClick: () => onDelete(release.id),

@@ -14,7 +14,7 @@ describe('ConnectedReleaseEmptyState', () => {
       />
     );
 
-    expect(screen.getByText('No Releases Yet')).toBeInTheDocument();
+    expect(screen.getByText('No releases yet')).toBeInTheDocument();
     const icon = container.querySelector(
       '[data-testid="releases-empty-state-connected"] svg'
     );

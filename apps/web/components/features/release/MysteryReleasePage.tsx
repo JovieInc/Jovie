@@ -75,7 +75,7 @@ export function MysteryReleasePage({
         {/* Countdown + CTA */}
         {!minimal && (
           <div className='mt-5 space-y-4' data-testid='release-countdown'>
-            <ReleaseCountdown releaseDate={revealDate} label='Reveals In' />
+            <ReleaseCountdown releaseDate={revealDate} label='Reveals in' />
 
             <ProfileInlineNotificationsCTA artist={artistData} />
           </div>

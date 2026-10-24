@@ -630,7 +630,7 @@ describe('ShellReleasesView', () => {
   it('shows the connect-Spotify empty state when not yet connected', () => {
     renderShell([]);
     expect(
-      screen.getByText(/Connect Spotify To Get Started/)
+      screen.getByText(/Connect Spotify to get started/)
     ).toBeInTheDocument();
   });
 
@@ -640,7 +640,7 @@ describe('ShellReleasesView', () => {
     // disconnected state by role=heading 'Connect Spotify' — the same shape
     // the connected empty state already renders.
     expect(
-      screen.getByRole('heading', { name: /Connect Spotify To Get Started/ })
+      screen.getByRole('heading', { name: /Connect Spotify to get started/ })
     ).toBeInTheDocument();
   });
 
@@ -662,7 +662,7 @@ describe('ShellReleasesView', () => {
 
   it('shows the connected empty state when connected with no releases', () => {
     renderShell([], { spotifyConnected: true });
-    expect(screen.getByText(/No Releases Yet/)).toBeInTheDocument();
+    expect(screen.getByText(/No releases yet/)).toBeInTheDocument();
     expect(
       screen.getByTestId('shell-releases-empty-state-connected')
     ).not.toHaveAttribute('data-surface-variant');
@@ -728,7 +728,7 @@ describe('ShellReleasesView', () => {
       })
     );
     fireEvent.click(
-      screen.getAllByRole('button', { name: 'Edit Release Links' })[0]
+      screen.getAllByRole('button', { name: 'Edit release links' })[0]
     );
 
     expect(await screen.findByTestId('release-sidebar')).toHaveTextContent(
@@ -736,7 +736,7 @@ describe('ShellReleasesView', () => {
     );
 
     fireEvent.click(
-      screen.getAllByRole('button', { name: 'Copy Smart Link' })[0]
+      screen.getAllByRole('button', { name: 'Copy smart link' })[0]
     );
 
     await waitFor(() => {
@@ -895,7 +895,7 @@ describe('ShellReleasesView', () => {
         screen.getAllByRole('button', { name: 'Scheduled smart link (Pro)' })[0]
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'Copy Smart Link' })
+        screen.queryByRole('button', { name: 'Copy smart link' })
       ).not.toBeInTheDocument();
     });
 
@@ -1042,7 +1042,7 @@ describe('ShellReleasesView', () => {
         screen.getAllByRole('button', { name: 'Scheduled smart link (Pro)' })[0]
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: 'Copy Smart Link' })
+        screen.queryByRole('button', { name: 'Copy smart link' })
       ).not.toBeInTheDocument();
     });
 

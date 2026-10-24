@@ -139,14 +139,14 @@ describe('DspPresenceSidebar', () => {
 
     expect(screen.getByText('Verified by ISRC matching')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Confirm Match' })
+      screen.getByRole('button', { name: 'Confirm match' })
     ).toBeInTheDocument();
     expect(screen.getByTestId('dsp-presence-entity-header')).toHaveClass(
       'relative',
       'flex'
     );
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
-    expect(screen.getByText('View On Spotify')).toBeInTheDocument();
+    expect(screen.getByText('View on Spotify')).toBeInTheDocument();
   });
 
   it('hides suggested actions for manually linked platforms', () => {
@@ -171,12 +171,12 @@ describe('DspPresenceSidebar', () => {
 
     expect(screen.getByText('Linked manually')).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Confirm Match' })
+      screen.queryByRole('button', { name: 'Confirm match' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Reject' })
     ).not.toBeInTheDocument();
-    expect(screen.getByText('View On Apple Music')).toBeInTheDocument();
+    expect(screen.getByText('View on Apple Music')).toBeInTheDocument();
   });
 
   it('calls confirm and reject match actions', async () => {
@@ -201,7 +201,7 @@ describe('DspPresenceSidebar', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Confirm Match' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm match' }));
     await user.click(screen.getByRole('button', { name: 'Reject' }));
 
     const { confirmMatch, rejectMatch } =

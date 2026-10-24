@@ -73,7 +73,7 @@ export function NewReleaseHeaderAction({
           type='button'
           variant='ghost'
           size='sm'
-          aria-label='Create A New Release'
+          aria-label='Create a new release'
           className={cn(DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS, 'pr-1.5')}
           data-testid='new-release-header-trigger'
         >

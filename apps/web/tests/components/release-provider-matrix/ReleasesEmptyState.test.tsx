@@ -35,10 +35,10 @@ describe('ReleasesEmptyState', () => {
       screen.getByTestId('releases-empty-state-failed')
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Music Search Failed' })
+      screen.getByRole('heading', { name: 'Music search failed' })
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Try Again' }));
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
 
     expect(onRetryEnrichment).toHaveBeenCalledTimes(1);
   });
@@ -65,8 +65,8 @@ describe('ReleasesEmptyState', () => {
       'workspace'
     );
     expect(
-      screen.getByRole('heading', { name: 'Some Music Found' })
+      screen.getByRole('heading', { name: 'Some music found' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Try Again' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled();
   });
 });

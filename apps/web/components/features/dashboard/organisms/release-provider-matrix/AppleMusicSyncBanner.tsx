@@ -228,7 +228,7 @@ export function AppleMusicSyncBanner({
               {externalArtistUrl && (
                 <DrawerInlineIconButton
                   type='button'
-                  aria-label='View On Apple Music'
+                  aria-label='View on Apple Music'
                   onClick={() =>
                     globalThis.open(
                       externalArtistUrl,

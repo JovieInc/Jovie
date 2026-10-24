@@ -117,22 +117,22 @@ describe('ReleasePlanWizard', () => {
   it('uses Title Case for the dialog title and choice labels', () => {
     render(<ReleasePlanWizard {...baseProps} />);
     expect(
-      screen.getByRole('heading', { name: 'Plan For The Deep End' })
+      screen.getByRole('heading', { name: 'Plan for The Deep End' })
     ).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('choice-single'));
     fireEvent.click(screen.getByTestId('wizard-next'));
     expect(screen.getByTestId('choice-indie_label')).toHaveTextContent(
-      'Indie Label'
+      'Indie label'
     );
     expect(screen.getByTestId('choice-major_label')).toHaveTextContent(
-      'Major Label'
+      'Major label'
     );
   });
 
   it('falls back to a Title Case title when the release is untitled', () => {
     render(<ReleasePlanWizard {...baseProps} releaseTitle={null} />);
     expect(
-      screen.getByRole('heading', { name: 'Plan For This Release' })
+      screen.getByRole('heading', { name: 'Plan for This release' })
     ).toBeInTheDocument();
   });
 
@@ -156,7 +156,7 @@ describe('ReleasePlanWizard', () => {
         onClose={onClose}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Maybe Later' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Maybe later' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

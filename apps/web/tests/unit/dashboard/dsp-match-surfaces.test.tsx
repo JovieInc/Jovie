@@ -134,7 +134,7 @@ describe('DSP match surfaces', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    await user.click(screen.getByRole('button', { name: 'Confirm Match' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm match' }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onConfirm).toHaveBeenCalledTimes(1);

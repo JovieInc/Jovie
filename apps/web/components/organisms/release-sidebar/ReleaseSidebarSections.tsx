@@ -53,7 +53,7 @@ const RELEASE_TYPE_LABELS: Record<string, string> = {
   compilation: 'Compilation',
   live: 'Live',
   mixtape: 'Mixtape',
-  music_video: 'Music Video',
+  music_video: 'Music video',
   other: 'Other',
 };
 
@@ -423,7 +423,7 @@ export function ReleaseArtworkDownloadsSetting({
   return (
     <DrawerFormGridRow label='Artwork' className='items-start'>
       <DrawerAsyncToggle
-        label='Allow Downloads'
+        label='Allow downloads'
         ariaLabel='Allow artwork downloads on public pages'
         checked={allowDownloads}
         onToggle={onToggleArtworkDownloads ?? defaultToggleArtworkDownloads}

@@ -21,7 +21,7 @@ export function ReleasesEmptyState({
   onRetryEnrichment,
 }: ReleasesEmptyStateProps) {
   const retryAction: TableEmptyStateProps['action'] = onRetryEnrichment
-    ? { label: 'Try Again', onClick: onRetryEnrichment }
+    ? { label: 'Try again', onClick: onRetryEnrichment }
     : undefined;
 
   // During enrichment: show progress message
@@ -34,7 +34,7 @@ export function ReleasesEmptyState({
             aria-hidden='true'
           />
         }
-        heading='Finding Your Music'
+        heading='Finding your music'
         description='We are discovering your releases across streaming platforms. This usually takes a few seconds.'
         testId='releases-empty-state-enriching'
       />
@@ -46,7 +46,7 @@ export function ReleasesEmptyState({
     return (
       <TableEmptyState
         icon={<Layers className='h-5 w-5' aria-hidden='true' />}
-        heading='Some Music Found'
+        heading='Some music found'
         description='Some streaming links were not found. Add them manually or try again.'
         action={retryAction}
         testId='releases-empty-state-partial'
@@ -59,7 +59,7 @@ export function ReleasesEmptyState({
     return (
       <TableEmptyState
         icon={<SearchX className='h-5 w-5' aria-hidden='true' />}
-        heading='Music Search Failed'
+        heading='Music search failed'
         description='Something went wrong while searching streaming platforms. Try again or add releases manually.'
         variant='error'
         action={retryAction}

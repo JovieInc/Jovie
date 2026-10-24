@@ -71,7 +71,7 @@ export function ReleaseEditDialog({
           className='h-4.5 w-4.5 text-secondary-token'
           aria-hidden='true'
         />
-        Edit Release Links
+        Edit release links
       </DialogTitle>
       <DialogDescription className='text-app text-secondary-token'>
         Swap in a preferred DSP link or revert back to our detected URL. All

@@ -64,7 +64,13 @@ type ActionState = 'idle' | 'loading' | 'error';
 function formatStatusLabel(value: string): string {
   return value
     .split('_')
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part, index) =>
+      ['isrc', 'upc', 'url', 'id', 'dsp'].includes(part)
+        ? part.toUpperCase()
+        : index === 0
+          ? part.charAt(0).toUpperCase() + part.slice(1)
+          : part
+    )
     .join(' ');
 }
 
@@ -294,14 +300,14 @@ export function MetadataAgentPanel({
     });
   };
 
-  let currentStatusLabel = 'Current Status: Unavailable';
+  let currentStatusLabel = 'Current status: unavailable';
   if (storageAvailable) {
     currentStatusLabel = latestRequest
-      ? `Current Status: ${formatStatusLabel(latestRequest.status)}`
-      : 'Current Status: Not Started';
+      ? `Current status: ${latestRequest.status.replaceAll('_', ' ')}`
+      : 'Current status: not started';
   }
 
-  let reviewLabel = 'Unavailable In This Environment';
+  let reviewLabel = 'Unavailable in this environment';
   if (storageAvailable && hasBlockingFields) {
     reviewLabel = `${latestRequest?.missingFields.length ?? 0} blockers`;
   } else if (storageAvailable && latestRequest) {
@@ -332,10 +338,10 @@ export function MetadataAgentPanel({
       <div className='flex flex-col gap-2 md:flex-row md:items-start md:justify-between'>
         <div>
           <p className='text-2xs font-medium text-tertiary-token'>
-            Metadata Agent
+            Metadata agent
           </p>
           <h2 className='mt-1 text-base font-semibold text-primary-token'>
-            Xperi Submission Ops For {releaseTitle}
+            Xperi submission ops for {releaseTitle}
           </h2>
           <p className='mt-1 max-w-2xl text-sm text-secondary-token'>
             Prepare the Xperi or AllMusic package, approve the outbound send,
@@ -351,7 +357,7 @@ export function MetadataAgentPanel({
       <div className='mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
         <div className='rounded-lg border border-subtle bg-surface-1 p-3'>
           <p className='text-2xs font-medium text-tertiary-token'>
-            Source Of Truth
+            Source of truth
           </p>
           <p className='mt-2 text-sm text-primary-token'>{releaseTitle}</p>
           <p className='mt-1 text-xs text-secondary-token'>
@@ -405,7 +411,7 @@ export function MetadataAgentPanel({
             disabled={actionState === 'loading' || isPending}
             className='rounded-md border border-(--linear-btn-primary-border) bg-btn-primary px-3 py-2 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:cursor-not-allowed disabled:opacity-60'
           >
-            {latestRequest ? 'Rebuild Package' : 'Prepare Package'}
+            {latestRequest ? 'Rebuild package' : 'Prepare package'}
           </button>
 
           {latestRequest?.status === 'awaiting_approval' &&
@@ -418,7 +424,7 @@ export function MetadataAgentPanel({
               disabled={actionState === 'loading' || isPending}
               className='rounded-md border border-subtle px-3 py-2 text-sm font-medium text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
             >
-              Approve And Send
+              Approve and send
             </button>
           ) : null}
 
@@ -431,7 +437,7 @@ export function MetadataAgentPanel({
               disabled={actionState === 'loading' || isPending}
               className='rounded-md border border-subtle px-3 py-2 text-sm font-medium text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
             >
-              Draft Correction
+              Draft correction
             </button>
           ) : null}
         </div>
@@ -451,7 +457,7 @@ export function MetadataAgentPanel({
 
       {hasBlockingFields ? (
         <div className='mt-4 rounded-lg border border-warning/20 bg-warning-subtle p-3'>
-          <p className='text-sm font-medium text-warning'>Missing Fields</p>
+          <p className='text-sm font-medium text-warning'>Missing fields</p>
           <ul className='mt-2 space-y-2 text-sm text-primary-token'>
             {latestRequest?.missingFields.map(missingField => (
               <li key={`${missingField.field}-${missingField.reason}`}>
@@ -475,7 +481,7 @@ export function MetadataAgentPanel({
               <p>Approved: {formatTimestamp(latestRequest.approvedAt)}</p>
               <p>Sent: {formatTimestamp(latestRequest.sentAt)}</p>
               <p>
-                Last Snapshot: {formatTimestamp(latestRequest.latestSnapshotAt)}
+                Last snapshot: {formatTimestamp(latestRequest.latestSnapshotAt)}
               </p>
             </div>
             {latestRequest.providerMessageId ? (
@@ -492,7 +498,7 @@ export function MetadataAgentPanel({
 
           <div className='rounded-lg border border-subtle bg-surface-1 p-3'>
             <p className='text-2xs font-medium text-tertiary-token'>
-              Tracking State
+              Tracking state
             </p>
             {latestRequest.targets.length > 0 ? (
               <ul className='mt-2 space-y-2 text-sm text-primary-token'>

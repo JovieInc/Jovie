@@ -43,7 +43,7 @@ export const RELEASES_CSV_COLUMNS: CSVColumn<ReleaseViewModel>[] = [
   { header: 'Title', accessor: 'title' },
   { header: 'Type', accessor: 'releaseType' },
   {
-    header: 'Release Date',
+    header: 'Release date',
     accessor: 'releaseDate',
     formatter: value => formatDate(value as string | undefined),
   },
@@ -81,7 +81,7 @@ export const RELEASES_CSV_COLUMNS: CSVColumn<ReleaseViewModel>[] = [
     },
   },
   {
-    header: 'Smart Link',
+    header: 'Smart link',
     accessor: row =>
       typeof window === 'undefined'
         ? row.smartLinkPath
@@ -113,7 +113,7 @@ export const RELEASES_CSV_COLUMNS: CSVColumn<ReleaseViewModel>[] = [
     accessor: row => row.providers.find(p => p.key === 'tidal')?.url || '',
   },
   {
-    header: 'Amazon Music URL',
+    header: 'Amazon Music URL', // ui-casing-allow: preserve proper nouns and acronyms
     accessor: row =>
       row.providers.find(p => p.key === 'amazon_music')?.url || '',
   },

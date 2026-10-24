@@ -156,10 +156,10 @@ export function DspPresenceView({
           <EmptyState
             testId='presence-empty-state'
             icon={<Radio className='h-5 w-5' aria-hidden='true' />}
-            heading='No DSP Profiles Found'
+            heading='No DSP profiles found'
             description='We automatically find your profiles on streaming platforms. You can also add them manually.'
             action={{
-              label: 'Add Platform',
+              label: 'Add platform',
               onClick: openAddPlatformDialog,
             }}
           />

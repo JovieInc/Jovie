@@ -107,7 +107,7 @@ export function AddPlatformDialog({
 
   return (
     <Dialog open={open} onClose={handleClose} size='sm'>
-      <DialogTitle>Add Platform</DialogTitle>
+      <DialogTitle>Add platform</DialogTitle>
       <DialogDescription className='sr-only'>
         Link your artist profile on a streaming platform
       </DialogDescription>
@@ -183,7 +183,7 @@ export function AddPlatformDialog({
               size='sm'
               disabled={!url || !artistName || isPending}
             >
-              {isPending ? 'Adding...' : 'Add Platform'}
+              {isPending ? 'Adding...' : 'Add platform'}
             </Button>
           </>
         )}

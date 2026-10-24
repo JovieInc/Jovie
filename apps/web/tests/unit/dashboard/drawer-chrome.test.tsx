@@ -127,8 +127,8 @@ describe('dashboard drawer chrome', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('DSP profile')).not.toBeInTheDocument();
     expect(screen.getByText('Discovered via Spotify')).toBeInTheDocument();
-    expect(screen.getByText('Tracks Verified')).toBeInTheDocument();
-    expect(screen.getByLabelText('Profile Image Missing')).toBeInTheDocument();
+    expect(screen.getByText('Tracks verified')).toBeInTheDocument();
+    expect(screen.getByLabelText('Profile image missing')).toBeInTheDocument();
     expect(screen.queryByText('Confidence Breakdown')).not.toBeInTheDocument();
   });
 
@@ -153,6 +153,6 @@ describe('dashboard drawer chrome', () => {
     );
 
     expect(screen.getByText('Imported from profile')).toBeInTheDocument();
-    expect(screen.queryByText('Tracks Verified')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tracks verified')).not.toBeInTheDocument();
   });
 });

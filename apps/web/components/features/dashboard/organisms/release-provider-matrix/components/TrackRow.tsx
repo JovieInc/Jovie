@@ -145,7 +145,7 @@ export const TrackRow = memo(function TrackRow({
     </button>
   ) : (
     <span className='system-b-track-row-preview-unavailable flex h-7 w-7 items-center justify-center rounded-full text-secondary-token/80'>
-      <VolumeX className='h-3.5 w-3.5' aria-label='No Preview Available' />
+      <VolumeX className='h-3.5 w-3.5' aria-label='No preview available' />
     </span>
   );
 
@@ -177,7 +177,7 @@ export const TrackRow = memo(function TrackRow({
             tone='neutral'
             className='shrink-0'
             title='Explicit content'
-            aria-label='Explicit Content'
+            aria-label='Explicit content'
           >
             E
           </Badge>
@@ -307,7 +307,7 @@ export const TrackRow = memo(function TrackRow({
                     tone='neutral'
                     className='shrink-0'
                     title='Explicit content'
-                    aria-label='Explicit Content'
+                    aria-label='Explicit content'
                   >
                     E
                   </Badge>

@@ -483,7 +483,7 @@ export function AudioWaveformEditor({
                 />
                 <button
                   type='button'
-                  aria-label='Adjust Snippet Start'
+                  aria-label='Adjust snippet start'
                   onPointerDown={handleHandlePointerDown('start')}
                   onPointerMove={handleHandlePointerMove}
                   onPointerUp={handleHandlePointerUp}
@@ -492,7 +492,7 @@ export function AudioWaveformEditor({
                 />
                 <button
                   type='button'
-                  aria-label='Adjust Snippet End'
+                  aria-label='Adjust snippet end'
                   onPointerDown={handleHandlePointerDown('end')}
                   onPointerMove={handleHandlePointerMove}
                   onPointerUp={handleHandlePointerUp}

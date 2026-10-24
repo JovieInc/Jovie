@@ -282,13 +282,13 @@ export function ReleaseSmartLinkAnalytics({
     ? [
         {
           id: 'total-clicks',
-          label: 'Total Clicks',
+          label: 'Total clicks',
           value: numberFormatter.format(totalClicks),
           hint: topProviderLabel ? `Top: ${topProviderLabel}` : 'All time',
         },
         {
           id: 'last-click',
-          label: 'Last Click',
+          label: 'Last click',
           value: lastClickAt
             ? hasHydrated
               ? formatTimeAgo(lastClickAt)

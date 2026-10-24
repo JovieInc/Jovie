@@ -64,9 +64,9 @@ function getCatalogHeaderText(opts: {
 }): string {
   if (opts.isScanning) return 'Scanning...';
   if (opts.scanFailed) return 'Scan failed';
-  if (opts.neverScanned) return 'Catalog Health';
+  if (opts.neverScanned) return 'Catalog health';
   if (opts.allClear) return `All clear — ${opts.matchedCount} ISRCs matched`;
-  return `Catalog Health — ${opts.unresolvedCount} to review`;
+  return `Catalog health — ${opts.unresolvedCount} to review`;
 }
 
 function CatalogStatusIcon({
@@ -371,7 +371,7 @@ function CatalogHealthSectionContent({
                 Check if any releases on your Spotify profile aren&apos;t yours.
               </p>
               <Button size='sm' onClick={triggerScan}>
-                Scan Catalog
+                Scan catalog
               </Button>
             </div>
           )}
@@ -445,7 +445,7 @@ function CatalogHealthSectionContent({
                     className='h-7 text-xs'
                     onClick={() => setBulkDismissOpen(true)}
                   >
-                    Dismiss All
+                    Dismiss all
                   </Button>
                 )}
               </div>

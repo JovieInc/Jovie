@@ -114,11 +114,11 @@ describe('LibraryFilesPanel', () => {
     expect(screen.queryByText('Stems')).toBeNull();
   });
 
-  it('offers ONE Attach File control instead of a button per media type', () => {
+  it('offers ONE Attach file control instead of a button per media type', () => {
     render(<LibraryFilesPanel asset={asset()} downloads={[]} />);
 
     const attach = screen.getByTestId('library-attach-file');
-    expect(attach).toHaveTextContent('Attach File');
+    expect(attach).toHaveTextContent('Attach file');
     expect(attach).toHaveAttribute('aria-keyshortcuts', 'Meta+U');
     expect(screen.queryByText('Add File')).toBeNull();
     expect(screen.queryByTestId('library-add-audio-acquisition')).toBeNull();

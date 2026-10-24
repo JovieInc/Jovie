@@ -141,7 +141,7 @@ describe('TrackRow', () => {
         'data-state',
         'selected'
       );
-      const badge = screen.getByLabelText('Explicit Content');
+      const badge = screen.getByLabelText('Explicit content');
       expect(badge).toHaveTextContent('E');
       expect(badge).toHaveAttribute('data-size', 'sm');
       expect(badge).toHaveAttribute('data-tone', 'neutral');

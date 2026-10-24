@@ -74,14 +74,20 @@ describe('MetadataAgentPanel status callouts', () => {
     mockPanelFetch({
       requests: [
         baseRequest({
-          missingFields: [{ field: 'isrc', reason: 'Required by provider' }],
+          missingFields: [
+            { field: 'release_date', reason: 'Required by provider' },
+            { field: 'isrc', reason: 'Required by provider' },
+          ],
         }),
       ],
     });
     renderPanel();
 
-    const heading = await screen.findByText('Missing Fields');
+    const heading = await screen.findByText('Missing fields');
     expect(heading).toHaveClass('text-warning');
+    expect(screen.getByText('Release date')).toBeInTheDocument();
+    expect(screen.getByText('ISRC')).toBeInTheDocument();
+    expect(screen.getByText('Current status: draft')).toBeInTheDocument();
     expect(heading.parentElement).toHaveClass('bg-warning-subtle');
     expect(heading.parentElement?.className).not.toMatch(PALETTE);
   });

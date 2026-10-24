@@ -75,7 +75,7 @@ describe('CatalogHealthSection', () => {
       await screen.findByText(/Spotify availability is unverified/)
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Catalog Health — 1 to review')
+      screen.getByText('Catalog health — 1 to review')
     ).toBeInTheDocument();
     expect(screen.queryByText(/All clear/)).not.toBeInTheDocument();
     expect(screen.queryByText(/on Spotify yet/)).not.toBeInTheDocument();
@@ -101,7 +101,7 @@ describe('CatalogHealthSection', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders collapsed with "Catalog Health" header when no prior scan', async () => {
+  it('renders collapsed with "Catalog health" header when no prior scan', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ scan: null, mismatches: [] }),
@@ -115,7 +115,7 @@ describe('CatalogHealthSection', () => {
       />
     );
 
-    expect(screen.getByText('Catalog Health')).toBeInTheDocument();
+    expect(screen.getByText('Catalog health')).toBeInTheDocument();
   });
 
   it('auto-expands when hasUnresolvedMismatches is true', async () => {
@@ -142,7 +142,7 @@ describe('CatalogHealthSection', () => {
     });
   });
 
-  it('shows "Scan Catalog" CTA when section is opened and never scanned', async () => {
+  it('shows "Scan catalog" CTA when section is opened and never scanned', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ scan: null, mismatches: [] }),
@@ -158,10 +158,10 @@ describe('CatalogHealthSection', () => {
     );
 
     // Click to open
-    await user.click(screen.getByText('Catalog Health'));
+    await user.click(screen.getByText('Catalog health'));
 
     await waitFor(() => {
-      expect(screen.getByText('Scan Catalog')).toBeInTheDocument();
+      expect(screen.getByText('Scan catalog')).toBeInTheDocument();
     });
   });
 
@@ -298,8 +298,8 @@ describe('CatalogHealthSection', () => {
       expect(screen.getByText('Bad Love')).toBeInTheDocument();
     });
 
-    // Click "Not Mine"
-    await user.click(screen.getByText('Not Mine'));
+    // Click "Not mine"
+    await user.click(screen.getByText('Not mine'));
 
     // Advance past undo delay
     vi.advanceTimersByTime(3000);
@@ -328,7 +328,7 @@ describe('CatalogHealthSection', () => {
     vi.useRealTimers();
   });
 
-  it('triggers scan when Scan Catalog button is clicked', async () => {
+  it('triggers scan when Scan catalog button is clicked', async () => {
     // Initial load — no scan
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -344,10 +344,10 @@ describe('CatalogHealthSection', () => {
       />
     );
 
-    await user.click(screen.getByText('Catalog Health'));
+    await user.click(screen.getByText('Catalog health'));
 
     await waitFor(() => {
-      expect(screen.getByText('Scan Catalog')).toBeInTheDocument();
+      expect(screen.getByText('Scan catalog')).toBeInTheDocument();
     });
 
     // Mock the scan trigger response
@@ -361,7 +361,7 @@ describe('CatalogHealthSection', () => {
         }),
     });
 
-    await user.click(screen.getByText('Scan Catalog'));
+    await user.click(screen.getByText('Scan catalog'));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
@@ -418,13 +418,13 @@ describe('CatalogHealthSection', () => {
       />
     );
 
-    await user.click(screen.getByText('Catalog Health'));
+    await user.click(screen.getByText('Catalog health'));
 
     await waitFor(() => {
-      expect(screen.getByText('Scan Catalog')).toBeInTheDocument();
+      expect(screen.getByText('Scan catalog')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('Scan Catalog'));
+    await user.click(screen.getByText('Scan catalog'));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
@@ -525,7 +525,7 @@ it('drops a cached all-clear and reloads when the artist connection changes', as
       />
     );
     expect(
-      await screen.findByRole('button', { name: 'Scan Catalog' })
+      await screen.findByRole('button', { name: 'Scan catalog' })
     ).toBeInTheDocument();
     expect(screen.queryByText(/All clear/)).not.toBeInTheDocument();
     expect(fetcher).toHaveBeenCalledTimes(2);

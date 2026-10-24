@@ -251,7 +251,7 @@ function buildCopyAction({
   if (shareUrl) {
     children.push({
       id: 'copy-share-link',
-      label: 'Share Link',
+      label: 'Share link',
       icon: Share2,
       authority: 'none',
       disabled: false,
@@ -274,7 +274,7 @@ function buildCopyAction({
       children.push({
         ...tableActionToLibraryEntityAction(trackedLinkMenu),
         id: 'copy-tracked-link',
-        label: 'Tracked Link',
+        label: 'Tracked link',
       });
     }
   }
@@ -371,7 +371,7 @@ export function buildLibraryEntityActions({
   if (asset.previewUrl) {
     actions.push({
       id: 'play-preview',
-      label: isPreviewPlaying ? 'Pause Preview' : 'Play Preview',
+      label: isPreviewPlaying ? 'Pause preview' : 'Play preview',
       icon: isPreviewPlaying ? Pause : PlayCircle,
       authority: 'none',
       disabled: false,
@@ -384,7 +384,7 @@ export function buildLibraryEntityActions({
   if (videoUrl) {
     actions.push({
       id: 'open-video',
-      label: 'Open Video',
+      label: 'Open video',
       icon: Video,
       authority: 'none',
       disabled: false,
@@ -397,7 +397,7 @@ export function buildLibraryEntityActions({
   if (artworkUrl) {
     actions.push({
       id: 'open-artwork',
-      label: 'Open Artwork',
+      label: 'Open artwork',
       icon: ImageIcon,
       authority: 'none',
       disabled: false,
@@ -409,7 +409,7 @@ export function buildLibraryEntityActions({
   actions.push(
     {
       id: 'open-primary',
-      label: asset.primaryActionLabel ?? 'Open Smart Link',
+      label: asset.primaryActionLabel ?? 'Open smart link',
       icon: ExternalLink,
       authority: 'none',
       disabled: false,

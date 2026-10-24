@@ -89,7 +89,7 @@ describe('TrackSidebar', () => {
 
     await user.click(screen.getByTestId('drawer-tab-assets'));
 
-    expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
+    expect(screen.getByText(/Preview unverified/i)).toBeInTheDocument();
     expect(
       screen.getByText(/Providers: 1 canonical, 0 fallback, 3 unknown/i)
     ).toBeInTheDocument();
@@ -129,17 +129,17 @@ describe('TrackSidebar', () => {
     );
 
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
-    expect(screen.getByTitle('Copy Track Link')).toBeInTheDocument();
+    expect(screen.getByTitle('Copy track link')).toBeInTheDocument();
     const header = screen.getByTestId('track-entity-header');
     expect(header).toHaveAttribute('data-layout', 'inline');
-    expect(header).toContainElement(screen.getByTitle('Copy Track Link'));
+    expect(header).toContainElement(screen.getByTitle('Copy track link'));
     expect(
       screen.queryByTestId('drawer-card-action-bar')
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId('drawer-tab-assets'));
 
-    expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
+    expect(screen.getByText(/Preview unverified/i)).toBeInTheDocument();
     const assets = screen.getByTestId('track-tabbed-card');
     expect(
       header.compareDocumentPosition(assets) & Node.DOCUMENT_POSITION_FOLLOWING
@@ -149,10 +149,10 @@ describe('TrackSidebar', () => {
     await user.click(screen.getByRole('button', { name: 'More actions' }));
 
     expect(
-      screen.getByRole('menuitem', { name: 'Copy Track Link' })
+      screen.getByRole('menuitem', { name: 'Copy track link' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('menuitem', { name: 'Open Track Link' })
+      screen.getByRole('menuitem', { name: 'Open track link' })
     ).toBeInTheDocument();
   });
 
@@ -205,8 +205,8 @@ describe('TrackSidebar', () => {
 
     await user.click(screen.getByTestId('drawer-tab-assets'));
 
-    expect(screen.getByText(/Preview Not Checked/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Verified Preview/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Preview not checked/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Verified preview/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId('drawer-tab-links'));
 

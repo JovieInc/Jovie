@@ -334,7 +334,7 @@ describe('ReleaseFilterDropdown', () => {
     it('shows type filter pill when types are selected', () => {
       renderDropdown({ releaseTypes: ['album'] as ReleaseType[] });
 
-      expect(screen.getByText('Release Type')).toBeInTheDocument();
+      expect(screen.getByText('Release type')).toBeInTheDocument();
     });
 
     it('uses the banned-icon-safe Layers glyph for the release-type pill', () => {
@@ -360,7 +360,7 @@ describe('ReleaseFilterDropdown', () => {
     it('shows no pills when no filters are active', () => {
       renderDropdown();
 
-      // "Release Type" text only exists inside the submenu trigger, not as a pill
+      // "Release type" text only exists inside the submenu trigger, not as a pill
       const pills = screen.queryAllByLabelText(/Clear .* filter/);
       expect(pills).toHaveLength(0);
     });
@@ -373,7 +373,7 @@ describe('ReleaseFilterDropdown', () => {
         releaseTypes: ['album', 'single'] as ReleaseType[],
       });
 
-      const clearButton = screen.getByLabelText('Clear Release Type filter');
+      const clearButton = screen.getByLabelText('Clear Release type filter');
       await user.click(clearButton);
 
       expect(onFiltersChange).toHaveBeenCalledWith(

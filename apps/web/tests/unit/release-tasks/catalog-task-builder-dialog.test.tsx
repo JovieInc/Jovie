@@ -71,7 +71,7 @@ describe('CatalogTaskBuilderDialog', () => {
   it('renders an accessible search control with canonical field and keyboard-focus styling', () => {
     render(<CatalogTaskBuilderDialog {...base} addAction={vi.fn()} />);
 
-    const search = screen.getByRole('searchbox', { name: 'Search Tasks' });
+    const search = screen.getByRole('searchbox', { name: 'Search tasks' });
     expect(search).toBe(screen.getByTestId('catalog-search'));
     expect(search).toHaveAttribute('placeholder', 'Search tasks');
     expect(search).toHaveValue('');
@@ -104,7 +104,7 @@ describe('CatalogTaskBuilderDialog', () => {
   it('keeps the search control and focus through filtering, empty results, and clearing', async () => {
     const user = userEvent.setup();
     render(<CatalogTaskBuilderDialog {...base} addAction={vi.fn()} />);
-    const search = screen.getByRole('searchbox', { name: 'Search Tasks' });
+    const search = screen.getByRole('searchbox', { name: 'Search tasks' });
 
     await user.click(search);
     await user.type(search, 'DJcity');
@@ -124,7 +124,7 @@ describe('CatalogTaskBuilderDialog', () => {
     ).toBeInTheDocument();
 
     await user.clear(search);
-    expect(screen.getByRole('searchbox', { name: 'Search Tasks' })).toBe(
+    expect(screen.getByRole('searchbox', { name: 'Search tasks' })).toBe(
       search
     );
     expect(search).toHaveValue('');
@@ -139,7 +139,7 @@ describe('CatalogTaskBuilderDialog', () => {
     const user = userEvent.setup();
     const addAction = vi.fn().mockResolvedValue(undefined);
     render(<CatalogTaskBuilderDialog {...base} addAction={addAction} />);
-    const search = screen.getByRole('searchbox', { name: 'Search Tasks' });
+    const search = screen.getByRole('searchbox', { name: 'Search tasks' });
 
     await user.type(search, 'editorial');
     await user.click(screen.getByTestId('catalog-add-amazon-editorial-pitch'));
