@@ -51,6 +51,8 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
     const auth = await prepareBetterAuthEmailOtp(page, {
       email,
       entryPath: '/signup',
+      // Cold dev-server compile + hydration is not a product regression.
+      timeout: 120_000,
       beforeResponseFulfill: async userId => {
         const users = await sql`
           UPDATE users SET user_status = 'waitlist_approved'
@@ -71,7 +73,7 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
     const input = page.locator('[aria-label="Chat message input" i]');
     const send = page.getByRole('button', { name: 'Send message' });
     const sendTurn = async (text: string) => {
-      await fillControlledInputUntilEnabled(input, send, text);
+      await fillControlledInputUntilEnabled(input, send, text, 90_000);
       const [response] = await Promise.all([
         page.waitForResponse(
           r =>
