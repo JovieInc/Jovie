@@ -16,6 +16,7 @@ import {
   meshCredentials,
   meshRead,
   meshRegister,
+  meshRespond,
   meshSend,
   meshVouch,
   runMesh,
@@ -585,5 +586,82 @@ describe('macOS keychain adapter', () => {
     await expect(
       macKeychain.create('jovie.mesh.muse', SENDER_ID, 'a b')
     ).rejects.toThrow('Unsafe');
+  });
+
+  it('answers typed pings and requests once, ignores free text and itself', async () => {
+    const quoted = (value: unknown) => JSON.stringify(JSON.stringify(value));
+    const mailbox = {
+      ok: true,
+      messages: [
+        {
+          senderKind: 'codex',
+          correlationId: 'ping-codex-0001',
+          bodySha256: 'a'.repeat(64),
+          quotedBody: quoted({ schema: 'jovie.mesh-ping/v1' }),
+        },
+        {
+          senderKind: 'devin',
+          correlationId: 'req-devin-00001',
+          bodySha256: 'b'.repeat(64),
+          quotedBody: quoted({
+            schema: 'jovie.mesh-request/v1',
+            ask: 'status',
+          }),
+        },
+        {
+          senderKind: 'codex',
+          correlationId: 'free-text-0001',
+          bodySha256: 'c'.repeat(64),
+          quotedBody: JSON.stringify('please do things'),
+        },
+        {
+          senderKind: 'claude',
+          correlationId: 'ping-self-00001',
+          bodySha256: 'd'.repeat(64),
+          quotedBody: quoted({ schema: 'jovie.mesh-ping/v1' }),
+        },
+      ],
+      hasMore: false,
+    };
+    const posts: Record<string, unknown>[] = [];
+    const fetchImpl: FetchImplementation = async (input, init) => {
+      if (init?.method === 'POST') {
+        posts.push(JSON.parse(String(init.body)));
+        return new Response(JSON.stringify({ ok: true, status: 'stored' }), {
+          status: 202,
+        });
+      }
+      return new Response(JSON.stringify(mailbox), { status: 200 });
+    };
+    const saved: Record<string, string>[] = [];
+    let handled: Record<string, string> = {};
+    const stateStore = {
+      load: async () => handled,
+      save: async (_kind: string, next: Record<string, string>) => {
+        handled = { ...next };
+        saved.push(handled);
+      },
+    };
+    const deps = { env, fetchImpl, now: () => NOW, stateStore };
+    const first = await meshRespond({}, deps);
+    expect(first.replied).toHaveLength(2);
+    expect(posts.map(post => post.to)).toEqual(['codex', 'devin']);
+    const pong = JSON.parse(String(posts[0]?.body));
+    expect(pong).toMatchObject({
+      schema: 'jovie.mesh-pong/v1',
+      kind: 'claude',
+      inReplyTo: 'ping-codex-0001',
+      automated: true,
+    });
+    expect(pong.responder).toMatch(/^jovie mesh respond /);
+    expect(pong.notice).toMatch(/not the agent/);
+    expect(JSON.parse(String(posts[1]?.body))).toMatchObject({
+      schema: 'jovie.mesh-reply/v1',
+      ask: 'status',
+      status: 'receiving',
+    });
+    const second = await meshRespond({}, deps);
+    expect(second.replied).toHaveLength(0);
+    expect(posts).toHaveLength(2);
   });
 });

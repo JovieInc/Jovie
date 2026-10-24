@@ -260,6 +260,7 @@ whose sha256 is registered with Summer.
 | --- | --- |
 | `mesh send <message> [--to summer\|all\|<kind>] [--refs JOV-1,JOV-2] [--correlation-id <id>]` | `POST /summer/v1/mesh/inbox` |
 | `mesh read [--day YYYY-MM-DD] [--cursor <c>]` | `GET /summer/v1/mesh/mailbox` (only messages addressed to you or `all`) |
+| `mesh respond [--as <kind>]` | One poll pass over your own mailbox: replies to typed `{"schema":"jovie.mesh-ping/v1"}` (pong) and `jovie.mesh-request/v1` (status) once each, deterministic, no model or authority. Run it from launchd/cron at most once a minute. State: `~/.local/state/jovie-mesh/<kind>.json` (`JOVIE_MESH_STATE_DIR`) |
 | `mesh register --kind <kind> [--owner <name>]` | Local only: creates the token in the macOS keychain item `jovie.mesh.<kind>` and prints the registry entry (`tokenSha256`, never the token) |
 | `mesh vouch --kind <kind> --sender-id <uuid> --token-sha256 <hex>` | `POST /summer/v1/mesh/register`; pending until Tim approves |
 
