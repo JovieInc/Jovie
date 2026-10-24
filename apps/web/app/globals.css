@@ -2926,8 +2926,9 @@ body {
    element: marketing, claim (/start, handle claim), focus rooms and the app.
    :focus-visible only, so pointer clicks never show a ring. Base layer, so
    component utilities still win, and Tailwind ring shadows compose with
-   shadow-* utilities instead of being wiped by them. The page-colored offset
-   keeps the ring readable on dark, glass and image backgrounds.
+   shadow-* utilities instead of being wiped by them. The offset uses the
+   semantic page canvas (--color-bg-page), same as .focus-ring-themed, so the
+   ring stays readable on dark, glass and image backgrounds.
    Guard: @jovie/no-raw-focus-ring bans focus-visible:ring-0/shadow-none on
    buttons and links without a focus-visible replacement. */
 @layer base {
@@ -2947,7 +2948,7 @@ body {
     [role="radio"],
     [tabindex]:not([tabindex="-1"])
   ) {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page);
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-page);
   }
 
   :where(
