@@ -75,6 +75,17 @@ class RegistryTests(unittest.TestCase):
     def test_repository_registry_is_valid_and_matches_sources(self):
         self.assertEqual(radar.validate_registry(radar.load_registry()), [])
 
+    def test_grok_subscription_chains_match_the_active_lane(self):
+        registry = json.loads((ROOT / "scripts/backlog-orchestrator/config/model-registry.json").read_text())
+        active = json.loads((ROOT / "scripts/lanes/providers.json").read_text())["grok"]["model"]
+        models = {model["id"]: model for model in registry["models"]}
+        for chain in ("remediation", "new_pr"):
+            self.assertNotIn("cursor-grok-4.6", registry["route_chains"][chain])
+            grok = [models[key] for key in registry["route_chains"][chain] if models[key]["provider"] == "grok"]
+            self.assertEqual(len(grok), 1)
+            self.assertEqual(grok[0]["model"], active)
+            self.assertEqual(grok[0]["channel"], "subscription")
+
     def test_drift_and_structure_errors(self):
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "a.ts").write_text("model: 'anthropic/claude-sonnet-5.5'")

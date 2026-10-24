@@ -151,7 +151,7 @@ describe('runVisualReview', () => {
 
   it('rejects a judge from the producer family before judging', async () => {
     const pair = {
-      cheap: stage('anthropic/claude-sonnet-5', 0.99),
+      cheap: stage('anthropic/claude-sonnet-5.5', 0.99),
       flagship: stage('openai/gpt-5.6-sol', 0.99),
     };
     const review = await runVisualReview(request, pair);
@@ -264,7 +264,7 @@ describe('visual taste admission', () => {
       captures,
       review: {
         status: 'reviewed',
-        judgeModel: 'anthropic/claude-sonnet-5',
+        judgeModel: 'anthropic/claude-sonnet-5.5',
         verdict: 'pass',
         score: 1,
         findings: [],
@@ -275,7 +275,7 @@ describe('visual taste admission', () => {
 
     expect(receipts.find(r => r.gateId === 'visual-review')).toMatchObject({
       verdict: 'fail',
-      reviewerModelId: 'anthropic/claude-sonnet-5',
+      reviewerModelId: 'anthropic/claude-sonnet-5.5',
     });
     expect(sameFamilyFinding('openai/gpt-5.6-luna', PRODUCER)).toBeNull();
     expect(sameFamilyFinding('anthropic/x', '')).toBeNull();
@@ -323,7 +323,7 @@ describe('liveVisualJudges', () => {
 
   it.each([
     [PRODUCER, 'openai/gpt-5.6-luna'],
-    ['openai/gpt-5.6-sol', 'anthropic/claude-sonnet-5'],
+    ['openai/gpt-5.6-sol', 'anthropic/claude-sonnet-5.5'],
   ])(
     'never seats the %s producer family as an escalation judge',
     async (producer, cheap) => {

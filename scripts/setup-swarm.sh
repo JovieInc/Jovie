@@ -107,7 +107,7 @@ echo "    git worktree add /private/tmp/jovie-worktrees/<slug> -b tim/<slug> ori
 echo ""
 echo "    # Then spawn coder agents in parallel via Agent()"
 echo "    #   subagent_type: general-purpose"
-echo "    #   model: claude-sonnet-4-6"
+echo "    #   model: claude-sonnet-5-5"
 echo "    #   mode: bypassPermissions"
 echo "    #   run_in_background: true"
 echo ""

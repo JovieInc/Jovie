@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-09-09",
+  "updated_at": "2026-10-21",
   "deterministic_first": true,
   "state_file_env": "GEM_MODEL_ROUTER_STATE",
   "routing_policy": {
@@ -76,46 +76,10 @@
   },
   "models": [
     {
-      "id": "cursor-grok-4.6",
-      "provider": "cursor",
-      "model": "cursor-grok-4.6-high-fast",
-      "family": "grok-4.6",
-      "channel": "subscription",
-      "pool": "cursor-models",
-      "quality": 100,
-      "list_price_in": 2.0,
-      "list_price_out": 6.0,
-      "capabilities": [
-        "mechanical",
-        "code",
-        "review",
-        "semantic",
-        "architecture",
-        "root-cause"
-      ],
-      "cost_tier": "subscription-included",
-      "executable_env": "GEM_CURSOR_EXECUTABLE",
-      "executable_default": "cursor-agent-std",
-      "agent_executable_env": "GEM_CURSOR_EXECUTABLE",
-      "agent_executable_default": "cursor-agent-std",
-      "agent_cwd_mode": "process",
-      "agent_argv": ["-p", "--force", "--model", "{model}", "{prompt}"],
-      "probe_argv": ["{executable}", "--version"],
-      "probe_mode": "exit-zero",
-      "cooldown_seconds": 1800,
-      "pool_cooldown_seconds": 3600,
-      "strengths": [
-        "long-running-agents",
-        "included-cursor-models",
-        "architecture"
-      ],
-      "weaknesses": ["requires-cursor-agent", "fast-tier-is-2x"]
-    },
-    {
-      "id": "grok-4.6",
+      "id": "grok-4.7",
       "provider": "grok",
-      "model": "grok-4.6",
-      "family": "grok-4.6",
+      "model": "grok-4.7",
+      "family": "grok-4.7",
       "channel": "subscription",
       "pool": "grok-build",
       "quality": 100,
@@ -748,7 +712,7 @@
         "description": "Picks registered section and hero variants; never invents layout.",
         "candidates": [
           {
-            "id": "anthropic/claude-sonnet-5",
+            "id": "anthropic/claude-sonnet-5.5",
             "family": "anthropic",
             "channel": "subscription",
             "pool": "claude-code",
@@ -890,7 +854,7 @@
         "description": "Cheap first-pass judge for rendered captures.",
         "candidates": [
           {
-            "id": "anthropic/claude-sonnet-5",
+            "id": "anthropic/claude-sonnet-5.5",
             "family": "anthropic",
             "channel": "subscription",
             "pool": "claude-code",
@@ -911,9 +875,8 @@
   },
   "route_chains": {
     "remediation": [
-      "grok-4.6",
+      "grok-4.7",
       "kimi-k3",
-      "cursor-grok-4.6",
       "codex-sol",
       "codex-terra",
       "codex-luna",
@@ -928,8 +891,7 @@
       "qwen-coder-local"
     ],
     "new_pr": [
-      "cursor-grok-4.6",
-      "grok-4.6",
+      "grok-4.7",
       "codex-sol",
       "codex-terra",
       "kimi-k3",
