@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -25,6 +26,7 @@ import {
   parentHoldReason,
   pullRequestLinksIssue,
   recordValidationReceipt,
+  reportQuotaDeferral,
   syncLinearIssueOnMerge,
 } from '../linear-sync-on-merge.mjs';
 import {
@@ -2393,5 +2395,73 @@ describe('conflictRemediationResolved', () => {
         { pulls: [], complete: true }
       )
     ).toBeNull();
+  });
+});
+
+describe('Linear Sync workflow closes its own loops', () => {
+  const workflow = readFileSync(
+    new URL(
+      '../../../.github/workflows/linear-sync-on-merge.yml',
+      import.meta.url
+    ),
+    'utf8'
+  );
+
+  it('matches the Production Controller by path, not by its run-name title', () => {
+    const step = workflow
+      .split('- name: Record screen-audit receipts')[1]
+      .split('- name:')[0];
+    expect(step).toContain(
+      "github.event.workflow_run.path == '.github/workflows/production-controller.yml'"
+    );
+    expect(step).not.toMatch(/workflow_run\.name\s*==/);
+    // The cause: production-controller.yml sets run-name, which replaces workflow_run.name.
+    expect(
+      readFileSync(
+        new URL(
+          '../../../.github/workflows/production-controller.yml',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    ).toMatch(/^run-name:/m);
+  });
+
+  it('holds for the quota reset, retries once, then fails visibly', () => {
+    const order = [
+      '- name: Evaluate the validation lifecycle\n',
+      '- name: Hold for the GitHub quota reset',
+      '- name: Evaluate the validation lifecycle (retry after quota reset)',
+      '- name: Fail visibly when the sync stayed deferred',
+    ].map(marker => workflow.indexOf(marker));
+    expect(order.every(index => index > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(workflow).toContain(
+      "steps.evaluate.outputs.quota_deferred == 'true'"
+    );
+    expect(workflow).toContain(
+      "steps.evaluate_retry.outputs.quota_deferred == 'true'"
+    );
+    expect(workflow).toMatch(/GH_API_HOLD_BUDGET_SECONDS: '600'/);
+    expect(workflow).toContain('.github/scripts/gh-api-hold.sh\n');
+    const timeout = Number(/timeout-minutes: (\d+)/.exec(workflow)[1]);
+    expect(timeout).toBeGreaterThanOrEqual(20);
+  });
+
+  it('flags a soft-failed quota 403 in the step output and summary only', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'quota-deferral-'));
+    try {
+      const output = join(dir, 'out');
+      const summary = join(dir, 'summary');
+      const env = { GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary };
+      expect(reportQuotaDeferral({ softFailed: false }, env)).toBe(false);
+      expect(existsSync(output)).toBe(false);
+      expect(reportQuotaDeferral({ softFailed: true }, env)).toBe(true);
+      expect(readFileSync(output, 'utf8')).toBe('quota_deferred=true\n');
+      expect(readFileSync(summary, 'utf8')).toContain('DEFERRED');
+      expect(reportQuotaDeferral({ softFailed: true }, {})).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
