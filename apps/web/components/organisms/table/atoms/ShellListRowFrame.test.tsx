@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import type { KeyboardEvent } from 'react';
 import { describe, expect, it } from 'vitest';
 import {
   getShellListRowFrameClassName,
@@ -40,6 +41,7 @@ describe('ShellListRowFrame', () => {
     );
 
     const row = getByTestId('row');
+    expect(row.tagName).toBe('DIV');
     expect(row).toHaveAttribute('data-shell-list-row', 'true');
     expect(row).toHaveAttribute('data-selected', 'true');
     expect(row.className).toContain('system-b-table-row-selected');
@@ -83,7 +85,14 @@ describe('ShellListRowFrame', () => {
 
   it('renders a native li host for shell lists that own their rows', () => {
     render(
-      <ShellListRowFrame as='li' aria-label='Row host'>
+      <ShellListRowFrame
+        as='li'
+        aria-label='Row host'
+        value={2}
+        onKeyDown={(event: KeyboardEvent<HTMLLIElement>) => {
+          void event.currentTarget.value;
+        }}
+      >
         <button type='button'>row control</button>
       </ShellListRowFrame>
     );
@@ -91,6 +100,9 @@ describe('ShellListRowFrame', () => {
     const row = screen.getByRole('listitem', { name: 'Row host' });
     expect(row.tagName).toBe('LI');
     expect(row).not.toHaveAttribute('role');
+    // `value` exists on li and not on div, so this stays a typecheck
+    // regression for the host-specific props as well as a pass-through check.
+    expect(row).toHaveProperty('value', 2);
     // Host props flow through so the caller's trigger wiring (Radix asChild
     // ref/handlers/global aria) lands on the row element itself.
     expect(row).toHaveAttribute('data-shell-list-row', 'true');

@@ -12,8 +12,8 @@ import {
   Play,
 } from 'lucide-react';
 import Link from 'next/link';
-import type { ComponentPropsWithoutRef } from 'react';
 import {
+  type ComponentPropsWithoutRef,
   type KeyboardEvent,
   type MouseEvent,
   memo,
@@ -382,7 +382,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
     status: release.status,
   };
 
-  function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+  function handleKeyDown(e: KeyboardEvent<HTMLLIElement>) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onSelect();
