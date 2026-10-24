@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   getShellListRowFrameClassName,
@@ -79,6 +79,21 @@ describe('ShellListRowFrame', () => {
     expect(row.className).toContain('system-b-table-row-selected');
     expect(row.className).toContain('cursor-pointer');
     expect(row.className).toContain('px-3');
+  });
+
+  it('renders a native li host for shell lists that own their rows', () => {
+    render(
+      <ShellListRowFrame as='li' aria-label='Row host'>
+        <button type='button'>row control</button>
+      </ShellListRowFrame>
+    );
+
+    const row = screen.getByRole('listitem', { name: 'Row host' });
+    expect(row.tagName).toBe('LI');
+    expect(row).not.toHaveAttribute('role');
+    // Host props flow through so the caller's trigger wiring (Radix asChild
+    // ref/handlers/global aria) lands on the row element itself.
+    expect(row).toHaveAttribute('data-shell-list-row', 'true');
   });
 
   it('renders a shared disclosure chevron without local row icon chrome', () => {

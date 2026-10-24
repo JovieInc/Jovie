@@ -13,6 +13,10 @@ export type ShellListRowInteraction = 'self' | 'task-row-group' | 'none';
 
 export interface ShellListRowFrameProps
   extends ComponentPropsWithoutRef<'div'> {
+  /** Host element for the row frame. A native `li` carries implicit
+   * listitem semantics for the shell lists that own their rows (the
+   * releases catalog renders rows directly as list items — no wrapper). */
+  readonly as?: 'div' | 'li';
   readonly chrome?: ShellListRowChrome;
   readonly density?: ShellListRowDensity;
   readonly isSelected?: boolean;
@@ -87,6 +91,7 @@ export function getShellListRowFrameClassName({
 }
 
 export function ShellListRowFrame({
+  as: As = 'div',
   chrome = 'plain',
   className,
   density = 'none',
@@ -96,7 +101,7 @@ export function ShellListRowFrame({
   ...props
 }: Readonly<ShellListRowFrameProps>) {
   return (
-    <div
+    <As
       data-shell-list-row='true'
       data-selected={isSelected ? 'true' : undefined}
       className={getShellListRowFrameClassName({

@@ -610,22 +610,21 @@ describe('ShellReleasesView', () => {
     ]);
 
     // axe `list` rule: ul children must carry listitem semantics — a
-    // suppressed wrapper (role=presentation) is rejected exactly like a
-    // div. The wrapper li carries a constant accessible name so the
-    // release-title listitem queries keep resolving to exactly the row
-    // inside, one named row per wrapper.
+    // suppressed wrapper (role=presentation) is rejected exactly like a div,
+    // and any wrapper element breaks the singular listitem set the shell's
+    // keyboard navigation indexes. Each row IS a native li with an implicit
+    // listitem role (no explicit role, no nested rows).
     const list = screen.getByRole('list', { name: 'Releases' });
     const directChildren = [...list.children];
     expect(directChildren.length).toBeGreaterThanOrEqual(2);
     for (const child of directChildren) {
       expect(child.tagName).toBe('LI');
-      expect(child).toHaveAttribute('aria-label', 'Release row');
-      expect(child.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+      expect(child).not.toHaveAttribute('role');
+      expect(child).toHaveAttribute('data-shell-release-row');
+      expect(child.querySelectorAll('[role="listitem"]')).toHaveLength(0);
     }
-    // Release-title queries stay singular: only the inner rows match.
-    expect(
-      screen.getAllByRole('listitem', { name: /Lost in the Light/ })
-    ).toHaveLength(1);
+    // Every row resolves by role, exactly one listitem per release.
+    expect(screen.getAllByRole('listitem')).toHaveLength(directChildren.length);
   });
 
   it('shows the connect-Spotify empty state when not yet connected', () => {
