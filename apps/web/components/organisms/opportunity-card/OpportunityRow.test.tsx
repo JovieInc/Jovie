@@ -33,7 +33,8 @@ describe('OpportunityRow', () => {
     const btn = screen.getByLabelText('Plan Opportunity');
     const wrapper = btn.parentElement;
     expect(wrapper).toHaveClass('opacity-0');
-    expect(wrapper).toHaveClass('pointer-events-none');
+    expect(wrapper).toHaveAttribute('data-slot', 'hover-reveal');
+    expect(wrapper).toHaveClass('group-focus-within:opacity-100');
   });
 
   it('fires primary action on plan button click', () => {

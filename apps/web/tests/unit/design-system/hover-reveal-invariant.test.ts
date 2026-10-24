@@ -25,6 +25,8 @@ describe('hover-reveal invariant (JOV-8957)', () => {
   });
 
   it.each([
+    'components/organisms/opportunity-card/OpportunityRow.tsx',
+    'components/features/opportunity-inbox/OpportunityInboxTourDateRow.tsx',
     'components/molecules/inspector/DspQuietRow.tsx',
     'components/molecules/drawer/DrawerEditableTextField.tsx',
     'components/organisms/table/atoms/TableCheckboxCell.tsx',

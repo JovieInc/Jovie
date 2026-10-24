@@ -88,6 +88,10 @@ and regenerate. CLAUDE.md stays a router; use Playwright only for repo web QA.
 Message agents: `jovie mesh send/read`. Batch independent reads, serialize
 state changes, and require evidence to integrate delegated work.
 
+Secondary controls use `HoverReveal`: opacity reserves space; hover/focus
+reveals controls, and engagement keeps them visible. Add matching
+interaction tests. [Invariant](docs/design-system/INVARIANTS.md).
+
 Before publication follow `docs/PR_FLOW.md`: coherent draft → rolling CI → review
 and required checks. Auth/payment edits use CI + Migration Guard, not an extra
 human merge gate. Sensitive surfaces: proxy, migrations, billing, entitlements,
