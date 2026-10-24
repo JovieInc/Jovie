@@ -96,6 +96,13 @@ const FETCH_TIMEOUT_CASCADE_STEPS = new Set([
   'Join exact lane results',
   'Evaluate combined-head checks',
 ]);
+const LANE_AGGREGATE_STEP = 'Require every ci-fast lane group to pass';
+const LANE_AGGREGATE_TITLE = 'ci-fast failed closed';
+// "ci-fast (structural web)" reports itself as `structural-web`.
+const laneOfJob = name =>
+  String(name ?? '')
+    .replace(/^ci-fast \((.*)\)$/, '$1')
+    .replace(/ /g, '-');
 const INFRASTRUCTURE_STEP =
   /^(?:Set up job|Initialize containers|Prepare all required actions|Complete job|Post |Checkout|Set up |Restore |Upload |Download )/i;
 
@@ -281,6 +288,43 @@ export function fetchTimeoutEvidence(run, jobs, readAnnotations) {
     )
       return '';
     messages.push(...failures.map(note => note.message));
+  }
+  // The aggregate job names every failed lane. A failed lane other than the
+  // one whose job hit the fetch timeout is not proven infrastructure.
+  const fetchLanes = new Set(failedJobs.map(job => laneOfJob(job.name)));
+  const aggregateJobs = jobs.filter(
+    job =>
+      Array.isArray(job?.steps) &&
+      job.steps.some(
+        step =>
+          step?.name === LANE_AGGREGATE_STEP && step?.conclusion === 'failure'
+      )
+  );
+  for (const job of aggregateJobs) {
+    if (job.run_id !== run?.id || job.run_attempt !== run?.run_attempt)
+      return '';
+    let notes;
+    try {
+      notes = readAnnotations(job);
+    } catch {
+      return '';
+    }
+    if (!Array.isArray(notes)) return '';
+    const closed = notes.filter(
+      note =>
+        note?.annotation_level === 'failure' &&
+        note.title === LANE_AGGREGATE_TITLE
+    );
+    if (closed.length !== 1) return '';
+    const lanes = String(closed[0].message ?? '').split(' ');
+    const failedLanes = [];
+    for (const lane of lanes) {
+      const match = /^([a-z][a-z-]*)=([a-z_]+)$/.exec(lane);
+      if (!match) return '';
+      if (match[2] !== 'success') failedLanes.push(match[1]);
+    }
+    if (failedLanes.length === 0 || !failedLanes.every(l => fetchLanes.has(l)))
+      return '';
   }
   return messages.join('\n');
 }

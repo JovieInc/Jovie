@@ -2662,4 +2662,85 @@ describe('base-branch fetch timeout (merge-group infrastructure)', () => {
       retryDisposition: 'blocked-until-new-source-head',
     });
   });
+
+  // Replays run 39561016233 (PR #22390): ci-fast (remaining) hit the fetch
+  // timeout and the aggregate jobs only reported it.
+  describe('real run 39561016233 shape', () => {
+    const realRun = { ...run, id: 39561016233, run_attempt: 1 };
+    const job = (id, name, step, overrides = {}) => ({
+      id,
+      name,
+      run_id: 39561016233,
+      run_attempt: 1,
+      check_run_url: `https://api.github.com/repos/JovieInc/Jovie/check-runs/${id}`,
+      steps: [{ name: step, conclusion: 'failure' }],
+      ...overrides,
+    });
+    const jobs = [
+      job(119092450020, 'ci-fast (remaining)', FETCH_STEP),
+      job(119096342018, 'ci-fast', 'Require every ci-fast lane group to pass'),
+      job(119096374291, 'Product Lane Receipt', 'Join exact lane results'),
+      job(119096483064, 'PR Ready', 'Evaluate combined-head checks'),
+    ];
+    const closed = lanes => ({
+      annotation_level: 'failure',
+      title: 'ci-fast failed closed',
+      message: lanes,
+    });
+    const closedOnlyRemaining =
+      'typecheck=success remaining=failure profile-browser=success structural-python=success structural-web=success';
+    const annotations = (closedLine = closedOnlyRemaining) => ({
+      119092450020: [exitNote, timeoutNote()],
+      119096342018: [exitNote, closed(closedLine)],
+      119096374291: [exitNote],
+      119096483064: [
+        exitNote,
+        {
+          annotation_level: 'failure',
+          message:
+            'ci-fast did not pass on the merge-group combined head (result: failure)',
+        },
+      ],
+    });
+    const replay = (notes, jobList = jobs) => {
+      const text = fetchTimeoutEvidence(
+        realRun,
+        jobList,
+        j => notes[j.id] ?? []
+      );
+      return classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: jobList.flatMap(j => j.steps.map(s => s.name)),
+        fetchTimeoutText: text,
+      });
+    };
+
+    it('classifies the real fetch timeout as transient infrastructure', () => {
+      expect(replay(annotations())).toBe('transient-infrastructure');
+    });
+
+    it('does not reclassify when another lane of the failed-closed line failed', () => {
+      for (const line of [
+        closedOnlyRemaining.replace(
+          'structural-web=success',
+          'structural-web=failure'
+        ),
+        closedOnlyRemaining.replace('typecheck=success', 'typecheck=cancelled'),
+        'remaining=success typecheck=success',
+        'not a lane line',
+      ]) {
+        expect(replay(annotations(line))).toBe('unclassified');
+      }
+      const missing = annotations();
+      missing[119096342018] = [exitNote];
+      expect(replay(missing)).toBe('unclassified');
+    });
+
+    it('rejects an aggregate job from another attempt', () => {
+      const other = jobs.map(j =>
+        j.id === 119096342018 ? { ...j, run_attempt: 2 } : j
+      );
+      expect(replay(annotations(), other)).toBe('unclassified');
+    });
+  });
 });
