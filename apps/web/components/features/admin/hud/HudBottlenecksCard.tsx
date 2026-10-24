@@ -22,6 +22,7 @@ export function HudBottlenecksCard({
   readonly funnel?: FounderFunnelData | null;
 }>) {
   const bottlenecks = rankOpsBottlenecks(metrics, funnel);
+  const sentry = metrics.pipelineBottleneck?.golden_path_sentry;
 
   return (
     <ContentSurfaceCard
@@ -30,7 +31,12 @@ export function HudBottlenecksCard({
       data-testid='hud-bottlenecks'
     >
       <div className='space-y-2 p-3'>
-        <p className='text-xs font-caption text-tertiary-token'>Bottlenecks</p>
+        <p className='flex items-center justify-between gap-2 text-xs font-caption text-tertiary-token'>
+          <span>Bottlenecks</span>
+          <span className='shrink-0 tabular-nums' title={sentry?.checked_at}>
+            {sentry ? `Golden path ${sentry.score}/100` : null}
+          </span>
+        </p>
         {bottlenecks.length === 0 ? (
           <p className='text-app text-secondary-token'>
             No bottlenecks detected.
@@ -40,6 +46,7 @@ export function HudBottlenecksCard({
             {bottlenecks.map((bottleneck, index) => (
               <ShellListRowFrame
                 key={bottleneck.id}
+                as='li'
                 className='flex items-center gap-3 border border-subtle bg-surface-0 px-3 py-2'
               >
                 <span className='shrink-0 text-xs font-semibold tabular-nums text-tertiary-token'>
@@ -50,7 +57,10 @@ export function HudBottlenecksCard({
                     {bottleneck.title}
                   </p>
                   {bottleneck.detail ? (
-                    <p className='mt-0.5 truncate text-2xs text-tertiary-token'>
+                    <p
+                      className='mt-0.5 truncate text-2xs text-tertiary-token'
+                      title={bottleneck.detail}
+                    >
                       {bottleneck.detail}
                     </p>
                   ) : null}

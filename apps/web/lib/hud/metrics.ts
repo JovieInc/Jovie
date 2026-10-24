@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { readPipelineBottleneck } from '@jovie/agent-transport-contracts/pipeline-bottleneck.node';
 import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminReliabilitySummary } from '@/lib/admin/overview';
 import { getAdminSentryMetrics } from '@/lib/admin/sentry-metrics';
@@ -356,6 +357,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     deployments,
     aiOps,
     gbrain,
+    pipelineBottleneck,
   ] = await Promise.all([
     getAdminStripeOverviewMetrics(),
     getAdminMercuryMetrics(),
@@ -365,6 +367,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     getHudDeployments(),
     getHudAiOpsSummary(requestedAt),
     getGbrainHealth(env.GBRAIN_HEALTH_URL),
+    readPipelineBottleneck(env.HUD_BOTTLENECK_STATE_PATH),
   ]);
 
   // Stamp the payload after every producer resolves. Provider observations are
@@ -458,6 +461,7 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     sources,
     agentRuns: buildHudAgentRuns(),
     ...(gbrain ? { gbrain } : {}),
+    pipelineBottleneck,
     generatedAtIso: fetchedAtIso,
   };
 }

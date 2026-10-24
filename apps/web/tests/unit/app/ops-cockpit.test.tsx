@@ -1,3 +1,4 @@
+import { pipelineBottleneckSchema } from '@jovie/agent-transport-contracts/pipeline-bottleneck';
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HudBottlenecksCard } from '@/components/features/admin/hud/HudBottlenecksCard';
@@ -5,6 +6,10 @@ import { HudCompanyMetricCards } from '@/components/features/admin/hud/HudCompan
 import { HudExceptionsStrip } from '@/components/features/admin/hud/HudExceptionsStrip';
 import { HudShippingStrip } from '@/components/features/admin/hud/HudShippingStrip';
 import { cockpitMetrics, cockpitShipping } from '@/tests/fixtures/hud-cockpit';
+import {
+  goldenPathSentry,
+  legacyBottleneckState,
+} from '@/tests/fixtures/pipeline-bottleneck';
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -88,5 +93,58 @@ describe('Ops cockpit sections', () => {
     expect(screen.getByTestId('hud-bottlenecks')).toHaveTextContent(
       'Shipping pipeline is failing'
     );
+  });
+
+  it('renders the Sentry score and puts golden-path regressions ahead of failed shipping', () => {
+    render(
+      <HudBottlenecksCard
+        metrics={{
+          ...cockpitMetrics({
+            deployments: {
+              current: { status: 'failure', branch: 'main', url: null },
+            },
+          }),
+          pipelineBottleneck: pipelineBottleneckSchema.parse({
+            ...legacyBottleneckState,
+            golden_path_sentry: goldenPathSentry,
+          }),
+        }}
+      />
+    );
+    const card = screen.getByTestId('hud-bottlenecks');
+    expect(card).toHaveTextContent('Golden path 72/100');
+    const rows = screen.getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('Golden-path Sentry regressions');
+    expect(rows[0]).toHaveTextContent('3 unresolved issues');
+    expect(rows[0]).toHaveTextContent('12 users affected');
+    expect(rows[0]).toHaveTextContent(
+      'checkout/upgrade: Checkout failed (8 users)'
+    );
+    expect(rows[0]).toHaveTextContent(goldenPathSentry.checked_at);
+    expect(rows[1]).toHaveTextContent('Shipping pipeline is failing');
+  });
+
+  it('keeps healthy scores visible without creating a regression row', () => {
+    render(
+      <HudBottlenecksCard
+        metrics={{
+          ...cockpitMetrics(),
+          pipelineBottleneck: pipelineBottleneckSchema.parse({
+            ...legacyBottleneckState,
+            golden_path_sentry: {
+              ...goldenPathSentry,
+              score: 100,
+              unresolved_issues: 0,
+              users_affected_24h: 0,
+              top_issue: null,
+            },
+          }),
+        }}
+      />
+    );
+    expect(screen.getByTestId('hud-bottlenecks')).toHaveTextContent(
+      'Golden path 100/100'
+    );
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
   });
 });
