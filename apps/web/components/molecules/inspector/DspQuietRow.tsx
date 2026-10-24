@@ -50,7 +50,7 @@ export function DspQuietRow({
           {label}
         </span>
         <ExternalLink
-          className='h-3 w-3 shrink-0 text-tertiary-token'
+          className='h-3 w-3 shrink-0 text-tertiary-token opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
           aria-hidden='true'
         />
       </a>

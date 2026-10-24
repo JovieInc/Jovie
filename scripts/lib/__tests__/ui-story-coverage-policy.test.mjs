@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SCRIPT_CONTRACT_VITEST_TESTS } from '../../ci-fast-lanes.mjs';
@@ -6,10 +6,24 @@ import {
   assertBaselineAllowlist,
   auditUiStoryCoverage,
   classifyUiPath,
+  listComponentsMissingAdjacentStories,
   validateUiStoryCoveragePolicy,
 } from '../../ui-story-coverage-policy.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+
+/** Allowlist entries graduated in the JOV-8847 burn-down with an adjacent story. */
+const GRADUATED_JOV_8847_COMPONENTS = [
+  'apps/web/components/features/auth/ButtonSpinner.tsx',
+  'apps/web/components/shell/ArtworkPlayOverlay.tsx',
+  'apps/web/components/shell/DashboardSegmentSkeleton.tsx',
+  'apps/web/components/shell/EntityThreadGlyph.tsx',
+  'apps/web/components/shell/LoopBtn.tsx',
+  'apps/web/components/shell/PlayingBars.tsx',
+  'apps/web/components/shell/PriorityGlyph.tsx',
+  'apps/web/components/shell/ShellLoader.tsx',
+  'apps/web/components/shell/TaskStatusIcon.tsx',
+];
 
 describe('ui story coverage policy', () => {
   it('runs from the structural script contract lane', () => {
@@ -63,6 +77,42 @@ describe('ui story coverage policy', () => {
     );
     expect(source).not.toContain('chromatic.config.json');
     expect(classifyUiPath('chromatic.config.json')).toBeNull();
+  });
+
+  it('has an adjacent story for every graduated JOV-8847 entry', () => {
+    for (const componentPath of GRADUATED_JOV_8847_COMPONENTS) {
+      const storyPath = componentPath.replace(/\.tsx$/, '.stories.tsx');
+      expect(
+        existsSync(resolve(REPO_ROOT, storyPath)),
+        `${storyPath} must exist`
+      ).toBe(true);
+    }
+  });
+
+  it('removed every graduated JOV-8847 entry from the allowlist', () => {
+    const policy = JSON.parse(
+      readFileSync(
+        resolve(REPO_ROOT, '.github/ui-story-coverage-policy.json'),
+        'utf8'
+      )
+    );
+    const listed = new Set((policy.allowlist ?? []).map(entry => entry.path));
+    for (const componentPath of GRADUATED_JOV_8847_COMPONENTS) {
+      expect(
+        listed.has(componentPath),
+        `${componentPath} must no longer be allowlisted`
+      ).toBe(false);
+    }
+  });
+
+  it('graduated JOV-8847 components are no longer measured as uncovered', () => {
+    const measured = new Set(listComponentsMissingAdjacentStories(REPO_ROOT));
+    for (const componentPath of GRADUATED_JOV_8847_COMPONENTS) {
+      expect(
+        measured.has(componentPath),
+        `${componentPath} must have an adjacent story`
+      ).toBe(false);
+    }
   });
 
   it('does not let an allowlist entry hide a changed route surface', () => {
