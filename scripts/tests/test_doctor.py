@@ -518,6 +518,35 @@ class JudgeTest(unittest.TestCase):
                              doctor.judge(obs(automation={"known": False, "silent": {}, "skipped": True}, now=now)))
             self.assertNotIn("automation-registry-unreadable", doctor.judge(obs(now=now)))
 
+    def test_outcome_lane_stall_is_alerted_only_when_owed_receipts_age_out(self):
+        now = 1_800_000_000.0
+        old = doctor.epoch_iso(now - 30 * 3600)
+        fresh = doctor.epoch_iso(now - 3600)
+        capped = {"queued": 7, "status": "budget-exhausted", "at": now - 600, "oldestOwedAt": old,
+                  "spentToday": 30, "perDay": 30}
+        alert = doctor.judge(obs(outcomeQueue=capped, now=now))["outcome-lane-stalled"]
+        self.assertIn("7 Validating", alert)
+        self.assertIn("30/30", alert)
+        silent = {**capped, "status": "drained", "at": now - 3 * 3600}
+        self.assertIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue=silent, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue={**capped, "oldestOwedAt": fresh}, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue={**capped, "status": "drained"}, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue={**capped, "queued": 0}, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(now=now)))
+
+    def test_outcome_queue_status_feeds_the_doctor_alert(self):
+        import outcome_lane
+        with tempfile.TemporaryDirectory() as raw:
+            state = Path(raw)
+            queue = [({"identifier": "JOV-1"}, {"at": "2026-10-23T00:00:00Z"}),
+                     ({"identifier": "JOV-2"}, {"at": "2026-10-22T00:00:00Z"})]
+            outcome_lane.write_queue(state, "budget-exhausted", queue, 1_792_800_000.0, 30)
+            row = json.loads((state / "outcome-queue.json").read_text())
+            self.assertEqual((row["queued"], row["oldestOwedAt"], row["status"]),
+                             (2, "2026-10-22T00:00:00Z", "budget-exhausted"))
+            alerts = doctor.judge(obs(outcomeQueue=row, now=1_792_800_000.0 + 60))
+            self.assertIn("outcome-lane-stalled", alerts)
+
     def test_the_watched_registry_is_the_one_merged_on_main(self):
         # The doctor must read the path the registry actually ships at (#22354: canon/).
         repo = Path(__file__).resolve().parents[2]

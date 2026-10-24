@@ -313,6 +313,25 @@ def ledger(state: Path, issue: str, ask: dict, result: dict) -> None:
         pass  # measurement never blocks a recorded receipt
 
 
+QUEUE_FILE = "outcome-queue.json"
+
+
+def write_queue(state: Path, status: str, queue: list, now: float, spent: int) -> None:
+    """Owed-outcome queue depth and age for the doctor (a capped or dead lane was silent).
+
+    `oldestOwedAt` is the earliest lifecycle comment still owed a receipt; the doctor alerts
+    when it stays old while the daily budget is exhausted or this file stops refreshing."""
+    owed = [ask.get("at") for _, ask in queue if ask.get("at")]
+    row = {"at": now, "status": status, "queued": len(queue), "oldestOwedAt": min(owed) if owed else None,
+           "spentToday": spent, "perDay": PER_DAY}
+    try:
+        tmp = state / (QUEUE_FILE + ".tmp")
+        tmp.write_text(json.dumps(row))
+        os.replace(tmp, state / QUEUE_FILE)
+    except OSError:
+        pass  # a status write never blocks verification
+
+
 def drain(host, lane, run=lifecycle.run, now: float | None = None) -> dict:
     """At most PER_DRAIN issues per drain and PER_DAY per UTC day, one at a time per host."""
     if not enabled():
@@ -324,11 +343,13 @@ def drain(host, lane, run=lifecycle.run, now: float | None = None) -> dict:
     try:
         linear = lane.Linear(host.linear_env)
         now = time.time() if now is None else now
-        for issue, ask in candidates(linear, host.state, now):
+        queue = candidates(linear, host.state, now)
+        for issue, ask in queue:
             if len(done) >= PER_DRAIN or lifecycle.draining(host.state):
                 break
             records = read_state(host.state)
             if spent_today(records, now) >= PER_DAY:
+                write_queue(host.state, "budget-exhausted", queue, now, spent_today(records, now))
                 return {"status": "budget-exhausted", "done": done}
             entered = time.time()
             records[issue["identifier"]] = {"digest": ask["digest"], "sha": ask["sha"], "at": entered,
@@ -344,6 +365,9 @@ def drain(host, lane, run=lifecycle.run, now: float | None = None) -> dict:
             write_state(host.state, records)
             ledger(host.state, issue["identifier"], ask, result)
             done.append({"issue": issue["identifier"], **result})
+        remaining = [(i, k) for i, k in queue if i["identifier"] not in {d["issue"] for d in done}]
+        write_queue(host.state, "idle" if not done else "drained", remaining, now,
+                    spent_today(read_state(host.state), now))
         return {"status": "idle" if not done else "drained", "done": done}
     except lane.LinearRateLimited as error:
         return {"status": "linear-rate-limited", "resetAt": error.reset_at, "done": done}
