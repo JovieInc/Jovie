@@ -43,9 +43,13 @@ describe('AppShellFrame', () => {
     // #main-content keeps its full rounded shell radius — no Electron override
     // strips the top corners now that the header lives inside the card.
     expect(mainContent).toHaveClass('lg:rounded-(--app-shell-radius)');
-    // Founder lock 2026-09-25: one rounded, borderless panel — no border.
+    // JOV-8976: the 2025-09-25 borderless lock is superseded — the canvas
+    // carries the L2 elevation (1px border ring + soft shadow) through the
+    // --app-shell-shadow alias, which resolves to --elev-2-shadow. No real
+    // border class: the ring is part of the elevation shadow token.
     expect(mainContent).not.toHaveClass('lg:border');
     expect(mainContent).not.toHaveClass('lg:border-(--app-shell-border)');
+    expect(mainContent).not.toHaveClass('lg:border-(--elev-2-border)');
     const routeContent = mainContent.querySelector(
       '[data-app-shell-main-content]'
     );
@@ -492,5 +496,19 @@ describe('AppShellFrame', () => {
       screen.getByRole('navigation', { name: 'Mobile Navigation' })
     );
     expect(surface).not.toHaveClass('fixed', 'absolute');
+  });
+
+  it('documents the unified elevation contract on the shell frame (JOV-8976)', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/organisms/AppShellFrame.tsx'),
+      'utf8'
+    );
+
+    // The borderless founder comment is superseded: the canvas panel carries
+    // the L2 elevation (surface + 1px border ring + soft shadow) through the
+    // --app-shell-shadow alias of --elev-2-shadow.
+    expect(source).not.toContain('borderless');
+    expect(source).toContain('JOV-8976');
+    expect(source).toContain('lg:shadow-(--app-shell-shadow)');
   });
 });

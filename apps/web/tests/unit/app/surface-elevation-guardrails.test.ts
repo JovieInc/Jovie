@@ -472,6 +472,45 @@ describe('surface elevation guardrails', () => {
     );
   });
 
+  it('defines one elevation ladder from window background to overlays (JOV-8976)', () => {
+    const designSystem = readFileSync(
+      join(ROOT, 'styles/design-system.css'),
+      'utf-8'
+    );
+
+    // Levels follow importance page -> category -> entity. Each level =
+    // surface + 1px border + shadow, defined in both light and dark.
+    for (let level = 0; level <= 4; level++) {
+      for (const part of ['surface', 'border', 'shadow']) {
+        expect(
+          designSystem.match(new RegExp(`--elev-${level}-${part}:`, 'g')),
+          `--elev-${level}-${part} is defined in light and dark`
+        ).toHaveLength(2);
+      }
+    }
+
+    // L0 is the window background plane; L4 overlays ride the popover shadow.
+    expect(designSystem).toContain('--elev-0-border: transparent;');
+    expect(designSystem).toContain('--elev-0-shadow: none;');
+    expect(designSystem).toContain('--elev-4-shadow: var(--shadow-popover);');
+
+    // L1 and L2 share one border treatment (canvas + sidebar).
+    expect(designSystem).toContain('--elev-1-border: var(--app-shell-border);');
+    expect(designSystem).toContain('--elev-2-border: var(--app-shell-border);');
+
+    // Legacy names resolve through the ladder instead of diverging.
+    expect(designSystem).toContain('--app-shell-shadow: var(--elev-2-shadow);');
+    expect(designSystem).toContain(
+      '--app-shell-sidebar-shadow: var(--elev-1-shadow);'
+    );
+    expect(designSystem).toContain(
+      '--app-shell-card-shadow: var(--elev-2-shadow);'
+    );
+    expect(designSystem).toContain(
+      '--app-shell-drawer-shadow: var(--elev-3-shadow);'
+    );
+  });
+
   it('does not use semi-transparent bg-surface-1 in app shell (bg-surface-1/XX)', () => {
     // Semi-transparent surface-1 on a surface-1 parent is nearly invisible.
     // Use solid bg-surface-0 for recessed areas instead.
