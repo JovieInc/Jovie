@@ -92,6 +92,13 @@ describe('DesktopTitlebar', () => {
     ).toHaveAttribute('data-electron-drag-region', 'true');
   });
 
+  it('keeps the native history action outside window drag strips', () => {
+    renderTitlebar();
+    const history = screen.getByRole('button', { name: 'History' });
+    expect(history.closest('[data-electron-drag-region="true"]')).toBeNull();
+    expect(screen.getByTestId('electron-nav-pill')).toContainElement(history);
+  });
+
   it('renders Electron titlebar navigation without duplicating sidebar notifications', () => {
     renderTitlebar();
 
