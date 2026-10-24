@@ -72,13 +72,13 @@ describe('exclusive customer vs OV navigation', () => {
     ).toEqual([]);
   });
 
-  it('organizes Ovie as one Home with everything else under Tools (Tim 2026-10-21)', () => {
-    expect(ADMIN_PRIMARY_WORKSPACE_IDS).toEqual(['overview']);
+  it('keeps Home and Inbox primary with operational workspaces under Tools', () => {
+    expect(ADMIN_PRIMARY_WORKSPACE_IDS).toEqual(['overview', 'inbox']);
     expect(
       ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces').map(
         item => item.label
       )
-    ).toEqual(['Home']);
+    ).toEqual(['Home', 'Inbox']);
     expect(ADMIN_NAV_REGISTRY.some(item => item.id === 'needs_you')).toBe(
       false
     );
