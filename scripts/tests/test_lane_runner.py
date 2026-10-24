@@ -4756,37 +4756,54 @@ class PublicationRevocationTest(unittest.TestCase):
             self.assertEqual(revoked["reason"], "test-stop")
             self.assertEqual(revoked["runId"], "run-1")
 
-    def test_sigterm_is_a_stop_that_revokes_before_kill(self):
+    def _assert_sigterm_revokes_before_kill(self, child):
         import signal
         with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
             root = Path(tmp)
             host = lane.Host(state=root)
             pidfile = root / "pid"
-            # Startup may exceed the old 0.5s timer on a loaded installer host.
-            # Publish the pid atomically: the guard signals on existence, and a
-            # created-but-unwritten file made on_kill read "" (merge group 40121302814).
-            command = [sys.executable, "-c",
-                       "import os,time,pathlib; time.sleep(0.75); pathlib.Path('pid.tmp').write_text(str(os.getpid())); os.replace('pid.tmp', 'pid'); time.sleep(30)"]
+
+            def ready_pid():
+                # Readiness handshake: a complete pid line, not mere file existence.
+                # A created-but-unwritten file made on_kill read "" (merge group 40121302814).
+                try:
+                    text = pidfile.read_text()
+                except FileNotFoundError:
+                    return None
+                return int(text) if text.endswith("\n") and text.strip().isdigit() else None
 
             def signal_when_ready():
-                if pidfile.exists():
+                if ready_pid() is not None:
                     os.kill(os.getpid(), signal.SIGTERM)
 
             observed = []
 
             def on_kill(error):
                 # Preserve receipt-before-kill proof for a real SIGTERM too.
-                os.kill(int(pidfile.read_text()), 0)
+                os.kill(ready_pid(), 0)
                 observed.append(type(error).__name__)
                 lane.revoke_publication(host, branch="devin/jov-9-1", reason="run-stopped")
 
             with self.assertRaises(lane.RunStopped):
-                lane.run_agent(command, root, log, timeout=30,
+                lane.run_agent([sys.executable, "-c", child], root, log, timeout=30,
                                guard=signal_when_ready, guard_interval=0.05, on_kill=on_kill)
             self.assertEqual(observed, ["RunStopped"])
             self.assertIsNotNone(lane.publication_revocation(host, "devin/jov-9-1"))
             with self.assertRaises(ProcessLookupError):
-                os.kill(int(pidfile.read_text()), 0)
+                os.kill(ready_pid(), 0)
+
+    def test_sigterm_is_a_stop_that_revokes_before_kill(self):
+        # Startup may exceed the old 0.5s timer on a loaded installer host.
+        self._assert_sigterm_revokes_before_kill(
+            "import os,time,pathlib; time.sleep(0.75); "
+            "pathlib.Path('pid').write_text(f'{os.getpid()}\\n'); time.sleep(30)")
+
+    def test_sigterm_waits_for_a_complete_pid_not_a_created_file(self):
+        # Regression: the file exists empty, then holds a partial pid, before the line completes.
+        self._assert_sigterm_revokes_before_kill(
+            "import os,time,pathlib; p=pathlib.Path('pid'); time.sleep(0.2); p.touch(); "
+            "time.sleep(0.3); p.write_text(str(os.getpid())); time.sleep(0.3); "
+            "p.write_text(f'{os.getpid()}\\n'); time.sleep(30)")
 
     def test_unreadable_ledger_fails_closed_as_revoked(self):
         with tempfile.TemporaryDirectory() as tmp:
