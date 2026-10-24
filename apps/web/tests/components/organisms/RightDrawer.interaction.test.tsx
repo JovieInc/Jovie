@@ -205,6 +205,44 @@ describe('RightDrawer', () => {
     expect(onKeyDown).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps Escape live on the active mobile rail with another rail mounted', async () => {
+    mockUseBreakpointDown.mockReturnValue(true);
+    const onKeyDownOther = vi.fn();
+    const onKeyDownActive = vi.fn();
+
+    render(
+      <>
+        <RightDrawer
+          isOpen={false}
+          width={360}
+          ariaLabel='Other rail'
+          onKeyDown={onKeyDownOther}
+        >
+          <button type='button'>First rail</button>
+        </RightDrawer>
+        <RightDrawer
+          isOpen
+          width={360}
+          ariaLabel='Active rail'
+          onKeyDown={onKeyDownActive}
+        >
+          <button type='button'>Second rail</button>
+        </RightDrawer>
+      </>
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Active rail')).toHaveAttribute(
+        'aria-modal',
+        'true'
+      )
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onKeyDownActive).toHaveBeenCalledTimes(1);
+    expect(onKeyDownOther).not.toHaveBeenCalled();
+  });
+
   it('does not handle Escape when a modal dialog is open above the drawer', () => {
     const onKeyDown = vi.fn();
 

@@ -92,7 +92,8 @@ describe('admin nav IA copy (JOV-2098)', () => {
     expect(source).toContain(
       'Autonomous execution outcomes, exceptions, costs, and queues'
     );
-    expect(source).toContain(
+    // Needs You folded into Home's asks (Tim 2026-10-21: one Home).
+    expect(source).not.toContain(
       'Founder judgments that automation cannot safely make'
     );
     expect(source).not.toContain(

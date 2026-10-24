@@ -3,6 +3,7 @@ import type {
   HomeLoopCopy,
   HomeLoopDoneItem,
   HomeLoopRow,
+  HomeLoopStripItem,
   HomeLoopTile,
 } from '@/lib/home-loop/contract';
 
@@ -120,3 +121,105 @@ export const HOME_LOOP_FIXTURE_DONE: readonly HomeLoopDoneItem[] = [
   { id: 'd2', label: 'Lane Cleanup Leaks · #22301', url: null, verified: true },
   { id: 'd3', label: 'Source Validation · #22307', url: null, verified: false },
 ];
+
+const BUSY_TITLES = [
+  'Checkout for the $12 plan',
+  'Claim guard for large artists',
+  'Merge-queue startup guard',
+  'Lanes pytest sharding',
+  'Stage events feed',
+  'Automation dead-man',
+  'Summer card defaults',
+  'Release screenshots and axe',
+  'Sign-in pre-hydration fix',
+  'API client ledger lock',
+  'Spotify follower sync',
+  'Pricing page offer truth',
+  'Homepage hero copy',
+  'LYB review metadata',
+  'Gateway budget alert',
+  'Codex quota refresh',
+  'Ownership reconcile',
+  'Stale branch sweep',
+  'Sentry thread resolver',
+  'Credentials expiry check',
+  'Model radar eval',
+  'YC metrics export',
+  'Boardy prep notes',
+  'Instinct Linear filing',
+  'Gem disk watchdog',
+  'Vercel guard exclusions',
+  'iOS Ovie Home',
+  'Free-text Linear replies',
+  'Creator loop canvas',
+  'Status gist refresh',
+  'Release notes digest',
+  'Profile verification badge',
+  'Fan email opt-in',
+  'Tour dates import',
+  'Playlist pitch queue',
+  'Share card renderer',
+] as const;
+
+/** A busy day: more work than any lane can show, so "+N more" appears. */
+export const HOME_LOOP_FIXTURE_BUSY_ROWS: readonly HomeLoopRow[] = [
+  ...HOME_LOOP_FIXTURE_ROWS,
+  ...Array.from({ length: BUSY_TITLES.length - 6 }, (_, index) =>
+    row(
+      8500 + index,
+      BUSY_TITLES[index % BUSY_TITLES.length] ?? 'Work item',
+      index % 6,
+      index % 9 === 0 ? 'failing' : null
+    )
+  ),
+];
+
+export const HOME_LOOP_FIXTURE_BUSY_DONE: readonly HomeLoopDoneItem[] =
+  Array.from({ length: 24 }, (_, index) => ({
+    id: `busy-done-${index}`,
+    label: `${BUSY_TITLES[BUSY_TITLES.length - 1 - index]} · #${22400 + index}`,
+    url: null,
+    verified: index % 3 !== 0,
+  }));
+
+export const HOME_LOOP_FIXTURE_STRIP: readonly HomeLoopStripItem[] = [
+  {
+    id: 'a',
+    label: 'Shipping · PR Open → Merged',
+    value: '38m / 28h',
+    tone: 'neutral',
+  },
+  {
+    id: 'b',
+    label: 'Shipping · Merged → Verified',
+    value: '34m / 2.4h',
+    tone: 'neutral',
+  },
+  {
+    id: 'c',
+    label: 'Remediation · Red → Green',
+    value: '57m / 3.0d',
+    tone: 'bad',
+  },
+  { id: 'd', label: 'Queue Wait P95', value: '2.9h', tone: 'neutral' },
+  { id: 'e', label: 'Prod Lag P95', value: '6.1d', tone: 'warn' },
+];
+
+/** Distinct decisions for a busy day (no repeated titles). */
+export const HOME_LOOP_FIXTURE_BUSY_ASKS: readonly HomeLoopAsk[] = [
+  ...HOME_LOOP_FIXTURE_ASKS,
+  ...[
+    'Raise the Summer budget cap',
+    'Retire the local dashboard',
+    'Turn on Vercel staging builds',
+    'Approve the speedrun application',
+    'Rotate the CI Claude token',
+    'Merge-queue timeout at 20 minutes',
+  ].map((title, index) => ({
+    ...HOME_LOOP_FIXTURE_ASKS[index % HOME_LOOP_FIXTURE_ASKS.length],
+    id: `busy-ask-${index}`,
+    title,
+    recommendation: 'Recommended by the coordinator.',
+    decisionDefault: null,
+  })),
+] as HomeLoopAsk[];

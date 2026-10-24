@@ -5,8 +5,11 @@ import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
+// Background color is excluded from the transition. Stripping `.dark` would
+// otherwise spend 150ms on a mid-gray mix, and axe samples that mix under
+// text that already meets AA on the settled card.
 const cardVariants = cva(
-  'min-w-0 max-w-full rounded-(--system-b-radius-card) border border-subtle bg-surface-1 text-primary-token shadow-card transition-[background-color,border-color,box-shadow] duration-subtle ease-subtle motion-reduce:transition-none',
+  'min-w-0 max-w-full rounded-(--system-b-radius-card) border border-subtle bg-surface-1 text-primary-token shadow-card transition-card-chrome duration-subtle ease-subtle motion-reduce:transition-none',
   {
     variants: {
       variant: {

@@ -2,6 +2,7 @@ export * from './cache.ts';
 export { STATUS_SCHEMA, status, summarize } from './cli.ts';
 export * from './client.ts';
 export * from './contract.ts';
+export * from './credentials.ts';
 export * from './gh.ts';
 export * from './github.ts';
 export * from './headers.ts';

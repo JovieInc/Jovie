@@ -102,6 +102,9 @@ describe('OperatorMobileNavigation', () => {
     expect(within(menu).getByRole('link', { name: 'Home' })).toHaveFocus();
 
     await user.tab();
+    expect(within(menu).getByRole('link', { name: 'Inbox' })).toHaveFocus();
+
+    await user.tab();
     expect(within(menu).getByRole('link', { name: 'Growth' })).toHaveFocus();
 
     await user.tab();
@@ -111,9 +114,6 @@ describe('OperatorMobileNavigation', () => {
     expect(
       within(menu).getByRole('link', { name: 'Operations' })
     ).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Needs You' })).toHaveFocus();
 
     await user.tab();
     expect(within(menu).getByRole('link', { name: 'Ops' })).toHaveFocus();
@@ -198,6 +198,22 @@ describe('OperatorMobileNavigation', () => {
     expect(
       expandedNavigation.querySelectorAll('[aria-current="page"]')
     ).toHaveLength(1);
+  });
+
+  it('exposes Inbox directly and selects it without selecting Home', () => {
+    pathnameMock.mockReturnValue(APP_ROUTES.ADMIN_INBOX);
+    render(<OperatorMobileNavigation />);
+    const tabs = screen.getByRole('navigation', {
+      name: 'OV Mobile Navigation',
+    });
+    const inbox = within(tabs).getByRole('link', { name: 'Inbox' });
+    expect(inbox).toHaveAttribute('href', APP_ROUTES.ADMIN_INBOX);
+    expect(inbox).toHaveAttribute('aria-current', 'page');
+    expect(
+      within(tabs).getByRole('link', { name: 'Home' })
+    ).not.toHaveAttribute('aria-current');
+    expect(tabs.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+    expect(screen.queryByRole('link', { name: 'Needs You' })).toBeNull();
   });
 
   it('keeps five 44px bottom-bar targets within the 320px contract', () => {

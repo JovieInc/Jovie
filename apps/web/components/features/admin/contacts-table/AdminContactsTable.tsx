@@ -25,6 +25,7 @@ import type {
   ContactEvidenceDecision,
   ContactEvidenceItem,
 } from '@/lib/contacts/certification';
+import { evidenceConfidenceLabel } from '@/lib/contacts/evidence-display';
 import {
   CONTACT_LIFECYCLE_STAGES,
   type ContactLifecycleStage,
@@ -186,10 +187,6 @@ export function EvidenceItemCard({
   ) => Promise<void>;
 }>) {
   const [correction, setCorrection] = useState('');
-  const confidenceLabel =
-    item.confidence === null
-      ? 'unknown'
-      : `${Math.round(item.confidence * 100)}%`;
   return (
     <article
       className={cn(
@@ -212,8 +209,8 @@ export function EvidenceItemCard({
         <p className='break-words text-xs text-secondary-token'>{item.value}</p>
       )}
       <p className='text-2xs text-tertiary-token'>
-        {item.source} · {formatDate(item.observedAt)} · {confidenceLabel}{' '}
-        confidence · {item.freshness}
+        {item.source} · {formatDate(item.observedAt)} ·{' '}
+        {evidenceConfidenceLabel(item)}
       </p>
       <p className='text-2xs text-secondary-token'>{item.rationale}</p>
       <fieldset

@@ -18,6 +18,12 @@
 // before the retry and a new process starts after the reset. A wait that
 // would pass the token margin fails closed. No threshold, token, or
 // permission change.
+//
+// A GitHub GraphQL server fault is separate. Scorecard exits when ListCommits
+// gets "Something went wrong while executing your query" or an HTTP 5xx from
+// that query. The guard retries that signature only, at most three times,
+// with a short backoff that must fit the same token-lifetime planner. Any
+// other Scorecard error fails the job on that exit. The scan is not skipped.
 
 import { spawn } from 'node:child_process';
 import { mkdir, rm } from 'node:fs/promises';
@@ -33,6 +39,22 @@ export const SCORECARD_RESULTS_FILE = 'scorecard-results.sarif';
 // that the preflight can miss if another job spends it mid-run. A second
 // ~31 minute wait fails the token-lifetime planner before this cap matters.
 export const MAX_SCORECARD_RESTARTS = 2;
+// Three attempts for a GitHub GraphQL server fault. The same sentence failed
+// main on runs 39813671687 and 39817926087 and passed on the commit between
+// them, so two short backoffs cover the blip without a rate-limit wait.
+export const MAX_SCORECARD_GRAPHQL_ATTEMPTS = 3;
+export const SCORECARD_GRAPHQL_BACKOFF_BASE_SECONDS = 15;
+const SCORECARD_OUTPUT_CHARS = 64 * 1024;
+const GRAPHQL_5XX_WINDOW = 240;
+const GRAPHQL_QUERY_FAULT = /Something went wrong while executing your query/i;
+const GITHUB_5XX_SOURCE =
+  '\\b(?:HTTP\\s+5\\d\\d|GitHub API 5\\d\\d|status code:\\s*5\\d\\d|5\\d\\d\\s+(?:Internal Server Error|Bad Gateway|Service Unavailable|Gateway Time-?out))\\b';
+const GRAPHQL_FAULT_MARKERS = [
+  'githubv4',
+  'graphqlhandler',
+  'scorecard had an error',
+  'non-200 ok status code',
+];
 export const SCORECARD_RATE_LIMIT_BUCKETS = Object.freeze([
   'core',
   'graphql',
@@ -186,6 +208,77 @@ export function planPoisonedScorecardRetry({
     resetEpoch: nowSeconds + Math.ceil(seconds),
     elapsedSeconds,
   });
+}
+
+/**
+ * True only for the GitHub GraphQL server fault Scorecard hit on main:
+ * "Something went wrong while executing your query", or an HTTP 5xx sitting
+ * next to that same githubv4 / graphqlHandler / scorecard error. A probe
+ * finding, a 401, and a rate-limit wait are not this.
+ * @param {unknown} text
+ */
+export function isScorecardGraphqlTransient(text) {
+  const message = String(text ?? '');
+  if (GRAPHQL_QUERY_FAULT.test(message)) return true;
+  const lower = message.toLowerCase();
+  const pattern = new RegExp(GITHUB_5XX_SOURCE, 'gi');
+  for (const match of message.matchAll(pattern)) {
+    const at = match.index ?? 0;
+    const window = lower.slice(
+      Math.max(0, at - GRAPHQL_5XX_WINDOW),
+      Math.min(lower.length, at + match[0].length + GRAPHQL_5XX_WINDOW)
+    );
+    if (GRAPHQL_FAULT_MARKERS.some(marker => window.includes(marker))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * @param {number} failures Transient failures already observed, starting at 1.
+ */
+export function scorecardGraphqlBackoffSeconds(failures) {
+  const count = Number(failures);
+  if (!Number.isInteger(count) || count < 1) return 0;
+  return SCORECARD_GRAPHQL_BACKOFF_BASE_SECONDS * 2 ** (count - 1);
+}
+
+/**
+ * The backoff has to fit the same token-lifetime rule as a rate-limit wait.
+ * The planner treats the backoff as a reset instant so a retry that would
+ * land after the token margin fails closed.
+ * @param {{ nowSeconds: number, elapsedSeconds?: number, backoffSeconds: number }} input
+ */
+export function planScorecardGraphqlRetry({
+  nowSeconds,
+  elapsedSeconds = 0,
+  backoffSeconds,
+}) {
+  const seconds = Number(backoffSeconds);
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return {
+      action: 'fail',
+      waitSeconds: 0,
+      message:
+        'OSSF Scorecard GraphQL retry backoff is unreadable. Failing this run instead of waiting without a bound.',
+    };
+  }
+  const plan = planScorecardRateLimitWait({
+    nowSeconds,
+    remaining: 0,
+    resetEpoch: nowSeconds + seconds,
+    elapsedSeconds,
+  });
+  if (plan.action !== 'wait') {
+    return {
+      action: 'fail',
+      waitSeconds: plan.waitSeconds,
+      message:
+        'OSSF Scorecard hit a transient GitHub GraphQL error, but another attempt would pass the token lifetime. Failing this run instead of retrying into a 401.',
+    };
+  }
+  return { action: 'wait', waitSeconds: plan.waitSeconds, message: '' };
 }
 
 /**
@@ -380,6 +473,7 @@ export async function waitForScorecardBuckets({
  *     waitSeconds?: number | null,
  *     code?: number,
  *     sawBadCredentials?: boolean,
+ *     output?: string,
  *   }>,
  *   sleep: (ms: number) => Promise<unknown>,
  *   now: () => number,
@@ -400,9 +494,42 @@ export async function superviseScorecardRun({
 }) {
   let unobservedWait = 0;
   let restarts = 0;
+  let graphqlFailures = 0;
   for (let attempt = 1; ; attempt += 1) {
     const outcome = await runAttempt(attempt);
-    if (!outcome.poisoned) return outcome.code ?? 1;
+    if (!outcome.poisoned) {
+      const code = outcome.code ?? 1;
+      if (code === 0 || !isScorecardGraphqlTransient(outcome.output)) {
+        return code;
+      }
+      graphqlFailures += 1;
+      if (graphqlFailures >= MAX_SCORECARD_GRAPHQL_ATTEMPTS) {
+        log(
+          `::error::OSSF Scorecard hit a transient GitHub GraphQL error on all ${MAX_SCORECARD_GRAPHQL_ATTEMPTS} attempts. Failing this run. Other Scorecard errors fail on the first exit.`
+        );
+        return code;
+      }
+      const elapsedSeconds =
+        Math.max(0, Math.floor((now() - startedAt) / 1000)) + unobservedWait;
+      const plan = planScorecardGraphqlRetry({
+        nowSeconds: Math.floor(now() / 1000),
+        elapsedSeconds,
+        backoffSeconds: scorecardGraphqlBackoffSeconds(graphqlFailures),
+      });
+      if (plan.action !== 'wait') {
+        log(`::error::${plan.message}`);
+        return code;
+      }
+      log(
+        `::warning::OSSF Scorecard hit a transient GitHub GraphQL error (attempt ${graphqlFailures} of ${MAX_SCORECARD_GRAPHQL_ATTEMPTS}). Retrying after ${plan.waitSeconds}s. The backoff stays under the token lifetime. Any other Scorecard error still fails this job.`
+      );
+      await removeResults();
+      const before = now();
+      await sleep(plan.waitSeconds * 1000);
+      const observed = Math.max(0, Math.floor((now() - before) / 1000));
+      unobservedWait += Math.max(0, plan.waitSeconds - observed);
+      continue;
+    }
     if (outcome.sawBadCredentials) {
       log(
         '::error::OSSF Scorecard already retried with a second Authorization header and GitHub answered 401 Bad credentials. Failing this run instead of hiding that retry.'
@@ -496,6 +623,7 @@ export async function runScorecardContainer({
   /** @type {{ kind: 'wait' | 'retry-started', waitSeconds: number | null } | null} */
   let poison = null;
   let sawBadCredentials = false;
+  let output = '';
   /** @type {Promise<boolean> | null} */
   let killPromise = null;
   const requestKill = () => {
@@ -520,6 +648,7 @@ export async function runScorecardContainer({
     stream.on('data', chunk => {
       const text = redact(chunk.toString('utf8'), token);
       write(text);
+      output = `${output}${text}`.slice(-SCORECARD_OUTPUT_CHARS);
       buffer += text;
       let newline = buffer.indexOf('\n');
       while (newline >= 0) {
@@ -547,6 +676,7 @@ export async function runScorecardContainer({
       code,
       sawBadCredentials,
       waitSeconds: null,
+      output,
     };
   }
   return {
@@ -556,6 +686,7 @@ export async function runScorecardContainer({
     waitSeconds: poison.waitSeconds,
     code,
     sawBadCredentials,
+    output,
   };
 }
 

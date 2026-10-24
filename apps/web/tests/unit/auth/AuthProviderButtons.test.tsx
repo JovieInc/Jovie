@@ -19,16 +19,30 @@ describe('AuthProviderButtonSlots', () => {
     expect(slots).not.toBeNull();
     expect(
       within(slots!).getByRole('button', {
-        name: 'Continue with Google loading',
+        name: 'Continue with Google',
       })
     ).toBeDisabled();
     expect(
       within(slots!).getByRole('button', {
-        name: 'Continue with Apple loading',
+        name: 'Continue with Apple',
       })
     ).toBeDisabled();
+    expect(
+      within(slots!).getByRole('button', { name: 'Continue with Google' })
+    ).not.toHaveClass('opacity-75');
     expect(screen.queryByRole('button', { name: /^Google$/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Apple$/ })).toBeNull();
+  });
+
+  it('dims and renames only the provider that is actually pending', () => {
+    render(<AuthProviderButtonSlot provider='google' pending />);
+
+    const button = screen.getByRole('button', {
+      name: 'Continue with Google loading',
+    });
+    expect(button).toBeDisabled();
+    expect(button).toHaveClass('opacity-75');
+    expect(button).toHaveAttribute('data-auth-provider-pending', 'true');
   });
 
   it('uses the same label when a provider button is enabled', () => {

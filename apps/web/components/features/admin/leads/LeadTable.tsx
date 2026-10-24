@@ -1,5 +1,5 @@
 'use client';
-// @coverage-via apps/web/tests/unit/app/surface-elevation-guardrails.test.ts
+// @coverage-via apps/web/tests/unit/admin/LeadTable.test.tsx
 
 import { Badge, Button } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -167,11 +167,47 @@ function renderStatusBadgeCell({ getValue }: { getValue: () => string }) {
 }
 
 function renderFitScoreCell({ getValue }: { getValue: () => number | null }) {
-  return <span className='tabular-nums'>{getValue() ?? '-'}</span>;
+  const score = getValue();
+  if (score === null) {
+    return <span className='text-tertiary-token'>Not scored</span>;
+  }
+  return <span className='tabular-nums'>{score}</span>;
+}
+
+function hasLeadSignals(lead: AdminLead): boolean {
+  return Boolean(
+    lead.hasSpotifyLink ||
+      lead.hasPaidTier ||
+      lead.hasInstagram ||
+      lead.contactEmail ||
+      lead.hasTrackingPixels
+  );
+}
+
+type LeadEnrichmentColumnId = 'fitScore' | 'signals' | 'tools';
+
+/**
+ * Enrichment columns with no data in any loaded row. Hidden rather than
+ * rendering a column of placeholders; never hidden before rows load.
+ */
+export function getEmptyLeadEnrichmentColumns(
+  leads: readonly AdminLead[]
+): ReadonlySet<LeadEnrichmentColumnId> {
+  const empty = new Set<LeadEnrichmentColumnId>();
+  if (leads.length === 0) return empty;
+  if (leads.every(lead => lead.fitScore === null)) empty.add('fitScore');
+  if (!leads.some(hasLeadSignals)) empty.add('signals');
+  if (leads.every(lead => lead.musicToolsDetected.length === 0)) {
+    empty.add('tools');
+  }
+  return empty;
 }
 
 function renderSignalsCell({ row }: { row: { original: AdminLead } }) {
   const lead = row.original;
+  if (!hasLeadSignals(lead)) {
+    return <span className='text-tertiary-token'>None</span>;
+  }
   return (
     <div className='flex gap-1'>
       {lead.hasSpotifyLink && (
@@ -206,7 +242,7 @@ function renderSignalsCell({ row }: { row: { original: AdminLead } }) {
 function renderToolsCell({ row }: { row: { original: AdminLead } }) {
   const tools = row.original.musicToolsDetected;
   if (tools.length === 0) {
-    return <span className='text-tertiary-token'>-</span>;
+    return <span className='text-tertiary-token'>None detected</span>;
   }
   return <span className='text-secondary-token'>{tools.join(', ')}</span>;
 }
@@ -228,6 +264,7 @@ function buildLeadColumns(deps: {
       cell: renderStatusBadgeCell,
     }),
     columnHelper.accessor('fitScore', {
+      id: 'fitScore',
       header: 'Score',
       size: 70,
       cell: renderFitScoreCell,
@@ -353,15 +390,18 @@ export function LeadTable({
     [updateLeadStatusMutation, queryClient]
   );
 
-  const columns = useMemo(
-    () =>
-      // eslint-disable-next-line react-hooks/refs -- Pre-existing pattern; ref only read inside column event handlers. Out of JOV-4869 scope.
-      buildLeadColumns({
-        updateLeadStatus,
-        actioningRef,
-      }),
-    [updateLeadStatus]
+  // Stable string key so columns only rebuild when emptiness changes.
+  const emptyEnrichmentKey = [...getEmptyLeadEnrichmentColumns(leads)].join(
+    ','
   );
+  const columns = useMemo(() => {
+    const hidden = new Set(emptyEnrichmentKey.split(',').filter(Boolean));
+    // eslint-disable-next-line react-hooks/refs -- Pre-existing pattern; ref only read inside column event handlers. Out of JOV-4869 scope.
+    return buildLeadColumns({
+      updateLeadStatus,
+      actioningRef,
+    }).filter(column => column.id === undefined || !hidden.has(column.id));
+  }, [updateLeadStatus, emptyEnrichmentKey]);
 
   const handleLoadMore = useCallback(() => {
     fetchNextPage().catch(() => {}); // NOSONAR — fire-and-forget, errors handled by React Query

@@ -31,8 +31,10 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-const { summerCardId, summerCardInputSchema, summerCardPayloadDigest } =
-  await import('./summer-cards');
+const { summerCardInputSchema } = await import('./summer-cards');
+const { summerCardId, summerCardPayloadDigest } = await import(
+  './summer-card-digest'
+);
 const { decideSummerCard, submitSummerCard } = await import(
   './summer-cards.server'
 );

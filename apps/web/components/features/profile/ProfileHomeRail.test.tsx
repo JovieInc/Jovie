@@ -17,6 +17,13 @@ vi.mock('next/image', () => ({
   ),
 }));
 
+const RELEASE_BASE = {
+  releaseType: 'single',
+  artworkUrl: null,
+  artistNames: ['Tim White'],
+  previewUrl: null,
+} as const;
+
 describe('ProfileHomeRail', () => {
   it('renders the featured editorial card as the only card surface', () => {
     render(
@@ -60,5 +67,65 @@ describe('ProfileHomeRail', () => {
 
     expect(screen.queryByTestId('profile-pac')).toBeNull();
     expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
+  });
+
+  it('features the newest playable release, not a far-future one', () => {
+    render(
+      <ProfileHomeRail
+        artist={PROFILE_STORY_ARTIST}
+        releases={[
+          {
+            ...RELEASE_BASE,
+            id: 'future',
+            title: 'Future Glow',
+            slug: 'future-glow',
+            releaseDate: '2036-11-30T00:00:00.000Z',
+          },
+          {
+            ...RELEASE_BASE,
+            id: 'out',
+            title: 'Raw Energy',
+            slug: 'raw-energy',
+            releaseDate: '2024-06-01T00:00:00.000Z',
+          },
+        ]}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={false}
+      />
+    );
+
+    const pacCard = screen.getByTestId('profile-pac');
+    expect(pacCard).toHaveTextContent('Raw Energy');
+    expect(pacCard).not.toHaveTextContent('Future Glow');
+    expect(screen.getByRole('link', { name: 'Listen now' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('/raw-energy')
+    );
+  });
+
+  it('never labels an unreleased-only subject as listenable', () => {
+    render(
+      <ProfileHomeRail
+        artist={PROFILE_STORY_ARTIST}
+        releases={[
+          {
+            ...RELEASE_BASE,
+            id: 'future',
+            title: 'Future Glow',
+            slug: 'future-glow',
+            releaseDate: '2036-11-30T00:00:00.000Z',
+          },
+        ]}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={false}
+      />
+    );
+
+    expect(screen.queryByRole('link', { name: 'Listen now' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Coming soon' })).toBeTruthy();
   });
 });

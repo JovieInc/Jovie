@@ -4,10 +4,12 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { captureError } from '@/lib/error-tracking';
 import {
+  type ArtistOfferFunnelDiagnostics,
   type ArtistOfferFunnelReport,
   type ArtistOfferJourneyTimeline,
   buildArtistOfferFunnelReport,
   isRecordedArtistOfferStage,
+  OFFER_LANDING_PATHS,
   type RecordedArtistOfferStage,
 } from './artist-offer-funnel';
 
@@ -133,5 +135,58 @@ export async function getArtistOfferFunnelReport(input?: {
     'claim-rejected': toDate(row.stages?.['claim-rejected']),
   }));
 
-  return buildArtistOfferFunnelReport({ start, end, totalVisits, timelines });
+  const diagnostics = await getFunnelDiagnostics(start, end);
+  return buildArtistOfferFunnelReport({
+    start,
+    end,
+    totalVisits,
+    timelines,
+    diagnostics,
+  });
+}
+
+async function getFunnelDiagnostics(
+  start: Date,
+  end: Date
+): Promise<ArtistOfferFunnelDiagnostics> {
+  // Same normalization as landingPathname(): drop origin, query and trailing /.
+  // Offer paths contain no commas, so one text parameter carries the list.
+  const landingResult = await db.execute(drizzleSql`
+    WITH landing AS (
+      SELECT coalesce(nullif(rtrim(regexp_replace(regexp_replace(
+               coalesce(first_touch ->> 'landingPath', ''),
+               '^https?://[^/]+', '', 'i'), '[?#].*$', ''), '/'), ''), '/') AS path
+      FROM acquisition_journeys
+      WHERE captured_at >= ${start} AND captured_at < ${end}
+        AND consent_revoked_at IS NULL
+    )
+    SELECT count(*) FILTER (WHERE path = ANY(string_to_array(${OFFER_LANDING_PATHS.join(',')}, ',')))::int AS offer,
+           count(*) FILTER (WHERE NOT (path = ANY(string_to_array(${OFFER_LANDING_PATHS.join(',')}, ','))))::int AS other
+    FROM landing
+  `);
+  const landing = rowsOf<{ offer: number; other: number }>(landingResult)[0];
+
+  const eventResult = await db.execute(drizzleSql`
+    SELECT s.stage, count(DISTINCT s.acquisition_id)::int AS journeys
+    FROM acquisition_journey_stages s
+    INNER JOIN acquisition_journeys j ON j.id = s.acquisition_id
+    WHERE s.occurred_at >= ${start} AND s.occurred_at < ${end}
+      AND j.consent_revoked_at IS NULL
+    GROUP BY s.stage
+  `);
+  const stageEventsInWindow: Partial<Record<RecordedArtistOfferStage, number>> =
+    {};
+  for (const row of rowsOf<{ stage: string; journeys: number }>(eventResult)) {
+    if (isRecordedArtistOfferStage(row.stage)) {
+      stageEventsInWindow[row.stage] = Number(row.journeys);
+    }
+  }
+
+  return {
+    visitsByLanding: {
+      offer: Number(landing?.offer ?? 0),
+      other: Number(landing?.other ?? 0),
+    },
+    stageEventsInWindow,
+  };
 }

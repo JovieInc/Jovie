@@ -1,0 +1,8 @@
+{
+  "schema": "pen-token-aliases/v1",
+  "aliases": {
+    "atom-surface-canvas": "color.surface.canvas",
+    "atom-surface-card": "color.surface.card",
+    "atom-border-subtle": "color.border.subtle"
+  }
+}

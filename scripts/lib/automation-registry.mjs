@@ -64,6 +64,8 @@ export const RECEIPT_KINDS = Object.freeze([
   'json-timestamp',
   'production-freshness',
   'merge-queue-progress',
+  'linear-triage-dwell',
+  'green-to-enqueue',
   'host-local',
   'none',
 ]);
@@ -73,6 +75,8 @@ export const HOSTED_RECEIPT_KINDS = Object.freeze([
   'json-timestamp',
   'production-freshness',
   'merge-queue-progress',
+  'linear-triage-dwell',
+  'green-to-enqueue',
 ]);
 
 const ID_RE = /^[a-z0-9][a-z0-9:._-]*$/;
@@ -154,6 +158,16 @@ export function validateRegistry(registry) {
     }
     if (receipt.kind === 'merge-queue-progress' && !nonEmpty(receipt.repo)) {
       errors.push(`${at}: merge-queue-progress receipts need repo`);
+    }
+    if (
+      receipt.kind === 'green-to-enqueue' &&
+      (!nonEmpty(receipt.repo) ||
+        !Array.isArray(receipt.requiredChecks) ||
+        receipt.requiredChecks.length === 0)
+    ) {
+      errors.push(
+        `${at}: green-to-enqueue receipts need repo and requiredChecks`
+      );
     }
     if (
       receipt.kind === 'production-freshness' &&
@@ -400,8 +414,9 @@ export function evaluateEntry(entry, observation, nowMs) {
     status: stale ? 'stale' : 'fresh',
     lastProofAt: new Date(proofMs).toISOString(),
     ageMinutes,
+    // Keep the observer's detail (which issue or PR is waiting) on a red row.
     reason: stale
-      ? `silent-for-${ageMinutes}m-over-${budget}m`
+      ? `silent-for-${ageMinutes}m-over-${budget}m${observation.detailOnStale && observation.reason ? `; ${observation.reason}` : ''}`
       : (observation.reason ?? null),
   };
 }

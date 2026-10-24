@@ -16,6 +16,55 @@ No lesson is declared unable to recur in this inventory. H-EX-06 stays partial
 until shadow-qualification and promotion receipts meet `canon/ENGINEERING.md`;
 policy-only fingerprints are listed explicitly and do not prove executable prevention.
 
+## Linkage audit — 2026-10-21 (JOV-7355)
+
+Reviewed every level-three lesson heading and its guard rationale against the
+current source, including the three marketing fingerprints added after the
+original 36-lesson audit. The companion inventory has no exclusions, duplicate
+fingerprints, orphan entries, changed lesson digests or missing guard anchors.
+
+| Existing linkage receipt | Result |
+| --- | --- |
+| Fingerprints linked / total | 39 / 39 |
+| Fingerprints with named test links | 21 |
+| Fingerprints with scoped rules only | 18 |
+| Test links / scoped-rule links | 33 / 20 |
+| Cannot-recur dispositions / unlinked fingerprints | 0 / 0 |
+| `ok` / findings | `true` / `[]` |
+
+The existing `jovie.feedback-linkage-qualification/v1` receipt includes every
+fingerprint, reviewed lesson digest, guard path, exact anchor, rationale and
+guard-source digest. SHA-256 of `JSON.stringify(receipt.lessons)` for this review:
+`48f29f68ece99b109131a78f8d24e340ea98fcc547afb650d8a7ef83cbe11bac`.
+Source base: `5d32064364b29dd67f6c9ff09aa4fbf83e9b1d16`.
+
+The initial audit failed on the removed deployment-test anchor. Commit
+`76e7e0e871368266bb0859cde86c89f8d74c1cf2` replaced that test with the executed
+canary-shell suite; its exact-deployment, cookie-only, no-redirect test now owns
+the link. Lesson digests remain unchanged after review.
+
+Reproduce the full receipt and its digest from the repository root with the
+pinned Node version:
+
+```sh
+node --input-type=module <<'JS'
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { auditFeedbackLinkage } from './scripts/invariants/feedback-linkage.mjs';
+const receipt = auditFeedbackLinkage();
+console.log(JSON.stringify(receipt, null, 2));
+console.log(createHash('sha256').update(JSON.stringify(receipt.lessons)).digest('hex'));
+assert.equal(receipt.ok, true, receipt.findings.join('\n'));
+JS
+```
+
+This records source linkage; linked-test execution is separate evidence. The
+18 policy-only fingerprints remain identified in the full receipt. The existing
+audit remains nonblocking, and this receipt does not renew H-EX-06 or promote it.
+Ship now: repair the stale reference and record the exhaustive audit.
+Re-evaluate when a lesson or linked guard changes; then review that linkage and
+regenerate the receipt before reusing this dated evidence.
+
 ---
 
 ## Sentry / Error Tracking
@@ -114,8 +163,13 @@ policy-only fingerprints are listed explicitly and do not prove executable preve
 
 ## Marketing Pages
 
+### A page change goes through one page contract, not a wall of locks
+**Mistake:** Replacing the homepage meant editing about 25 test files: per-component source-string locks, a role-invariant fixture, a stale redesign contract, grammar locks pinned to a retired "Find me" action, and section inventories that each re-declared the same page. The YouTube-MVP draft touched 50 files for a three-section page. Several of these locks asserted off-flag code that no visitor ever saw.
+
+**Rule:** Bind a marketing page through its typed records (recipe, route manifest, copy modules, offer truth). Test it with one rendered contract that reads those records, like `homepage-contract.test.tsx`: manifest order, one h1, one primary action, offer-truth prices, registry media and tokenized CSS. Do not add per-component source-string locks or literals that duplicate the records.
+
 ### Marketing plan prices come only from offer truth
-**Mistake:** The artist-profile homepage brief asked for the $12 offer before it existed in `lib/billing/offer-truth.ts`. Typing "$12/mo" into page copy would have sold a price that billing did not charge. The offer is now published in offer truth; marketing reads it from that owner.
+**Mistake:** The artist-profile homepage brief asked for the $12 offer before it existed in `lib/billing/offer-truth.ts`. Typing "$12/mo" into page copy would have sold a price that billing does not charge. The offer is now published in offer truth; marketing reads it from that owner.
 
 **Rule:** Render plan prices through `MarketingOfferSummary` or `getPublicPriceClaim`, never as literals. Publish a new offer in offer truth first; marketing pages pick it up from there. `offer-price-source-guard` blocks recurring-price literals in marketing source.
 

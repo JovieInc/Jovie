@@ -31,6 +31,14 @@
  * ElementHandle (not a `:focus-visible` Locator, which re-queries live and
  * stops matching the instant the element blurs) keeps a stable reference
  * to the same DOM node across the focus/blur sample.
+ *
+ * The ring lives ON the input (focus-ring-themed), matching what the
+ * production check measures. A `:has()` variant that drew the ring on the
+ * field frame instead (merged 2026-10-23) left the input's own computed
+ * styles unchanged focus-to-blur and red the exact marketing-routes
+ * screenshot check on home/pay/product — the frame ring is real but
+ * invisible to a check that samples the focused control itself, so the
+ * input-owned ring is the canonical form.
  */
 
 import type { ElementHandle, Page } from '@playwright/test';
@@ -88,7 +96,7 @@ for (const route of ROUTES) {
 
     expect(
       hasVisibleFocusStyleChange(focused, blurred),
-      `${route} claim-handle input focus indicator ${JSON.stringify({ focused, blurred })}`
+      `${route} claim-handle field focus indicator ${JSON.stringify({ focused, blurred })}`
     ).toBe(true);
   });
 }
