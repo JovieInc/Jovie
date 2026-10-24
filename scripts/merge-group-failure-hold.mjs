@@ -82,6 +82,20 @@ const ADMISSION_FAILURE_SUMMARIES = new Set([
 ]);
 const RETRY_DESCRIPTION =
   /^(spent|released):run=([1-9][0-9]*);try=([1-9][0-9]*)$/;
+// The base-branch fetch await step (ci.yml `&base-fetch-await`) emits exactly
+// this annotation when the detached background fetch never reports an exit
+// status. Only that timeout is infrastructure; any other fetch failure says
+// something we cannot attribute and stays unclassified.
+export const FETCH_STEP = 'Fetch base-branch history';
+export const FETCH_TIMEOUT_TITLE = 'Base-branch fetch';
+export const FETCH_TIMEOUT_MESSAGE =
+  'background fetch did not finish within 540s';
+// Aggregate steps that only report a lane job's failure, never originate one.
+const FETCH_TIMEOUT_CASCADE_STEPS = new Set([
+  'Require every ci-fast lane group to pass',
+  'Join exact lane results',
+  'Evaluate combined-head checks',
+]);
 const INFRASTRUCTURE_STEP =
   /^(?:Set up job|Initialize containers|Prepare all required actions|Complete job|Post |Checkout|Set up |Restore |Upload |Download )/i;
 
@@ -211,13 +225,74 @@ function instructionErrorsFromLog(log) {
   return errors.includes(RUNNER_EXIT_FAILURE) ? errors : null;
 }
 
-/** @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string, changedFiles?: string[], admissionText?: string }} [input] */
+function hasOnlyFetchTimeoutErrors(text) {
+  const errors = String(text ?? '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+  let timeoutFound = false;
+  for (const error of errors) {
+    if (error === RUNNER_EXIT_FAILURE) continue;
+    if (error !== FETCH_TIMEOUT_MESSAGE) return false;
+    timeoutFound = true;
+  }
+  return timeoutFound;
+}
+
+/**
+ * Failure annotations of every failed fetch-step job, only when each job
+ * belongs to this exact run and attempt and carries nothing but the fetch
+ * timeout. Anything else (other run/attempt, other message, unreadable
+ * annotations) returns '' and leaves the failure unclassified.
+ * @param {{ id?: number, run_attempt?: number }} run
+ * @param {object[]} jobs
+ * @param {(job: object) => object[]} readAnnotations
+ */
+export function fetchTimeoutEvidence(run, jobs, readAnnotations) {
+  const failedJobs = (Array.isArray(jobs) ? jobs : []).filter(
+    job =>
+      Array.isArray(job?.steps) &&
+      job.steps.some(
+        step => step?.name === FETCH_STEP && step?.conclusion === 'failure'
+      )
+  );
+  if (failedJobs.length === 0) return '';
+  const messages = [];
+  for (const job of failedJobs) {
+    if (job.run_id !== run?.id || job.run_attempt !== run?.run_attempt)
+      return '';
+    let notes;
+    try {
+      notes = readAnnotations(job);
+    } catch {
+      return '';
+    }
+    if (!Array.isArray(notes)) return '';
+    const failures = notes.filter(note => note?.annotation_level === 'failure');
+    if (
+      failures.some(
+        note =>
+          typeof note.message !== 'string' ||
+          (note.message !== RUNNER_EXIT_FAILURE &&
+            (note.message !== FETCH_TIMEOUT_MESSAGE ||
+              note.title !== FETCH_TIMEOUT_TITLE))
+      ) ||
+      !failures.some(note => note.message === FETCH_TIMEOUT_MESSAGE)
+    )
+      return '';
+    messages.push(...failures.map(note => note.message));
+  }
+  return messages.join('\n');
+}
+
+/** @param {{ conclusion?: string, failedSteps?: string[], annotationText?: string, changedFiles?: string[], admissionText?: string, fetchTimeoutText?: string }} [input] */
 export function classifyMergeGroupFailure({
   conclusion,
   failedSteps = [],
   annotationText = '',
   changedFiles,
   admissionText = '',
+  fetchTimeoutText = '',
 } = {}) {
   if (!MERGE_GROUP_FAILURE_CONCLUSIONS.has(conclusion)) {
     fail(`unsupported terminal conclusion ${JSON.stringify(conclusion)}`);
@@ -260,6 +335,20 @@ export function classifyMergeGroupFailure({
       return changedFiles.some(file => AGENT_CONTEXT_BUDGET_FILES.has(file))
         ? 'deterministic-source'
         : 'base-branch';
+    }
+    // Reached only after every deterministic and product step above declined,
+    // so any stronger failure in the same run has already won.
+    if (
+      steps.includes(FETCH_STEP) &&
+      steps.every(
+        step =>
+          step === FETCH_STEP ||
+          FETCH_TIMEOUT_CASCADE_STEPS.has(step) ||
+          INFRASTRUCTURE_STEP.test(step)
+      ) &&
+      hasOnlyFetchTimeoutErrors(fetchTimeoutText)
+    ) {
+      return 'transient-infrastructure';
     }
     if (
       steps.length > 0 &&
@@ -884,7 +973,7 @@ export function aheadEntryUnproven({
 // Dequeue denial is non-fatal: this token cannot call dequeuePullRequest, and
 // GitHub already removes the PR when the merge_group run fails.
 /**
- * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string, aheadGroup?: AheadGroup }} input
+ * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string, fetchTimeoutText?: string, aheadGroup?: AheadGroup }} input
  * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function }} io
  */
 export async function applyMergeGroupFailure(
@@ -898,6 +987,7 @@ export async function applyMergeGroupFailure(
     changedFiles,
     mainSha,
     admissionText = '',
+    fetchTimeoutText = '',
     aheadGroup,
   },
   { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
@@ -910,6 +1000,7 @@ export async function applyMergeGroupFailure(
     annotationText,
     changedFiles,
     admissionText,
+    fetchTimeoutText,
   });
   const groupHeadSha = String(run.head_sha).toLowerCase();
   // Quota or gateway trouble spends no source-failure retry and removes no merge
@@ -1461,12 +1552,24 @@ async function main(argv) {
   const admissionText = failedSteps.includes(ADMISSION_STEP)
     ? admissionEvidence(repository, jobs)
     : '';
+  const fetchTimeoutText = failedSteps.includes(FETCH_STEP)
+    ? fetchTimeoutEvidence(run, jobs, job => {
+        const checkRunId = String(job.check_run_url ?? '').match(
+          /\/check-runs\/([1-9][0-9]*)$/
+        )?.[1];
+        if (!checkRunId) throw new Error('check-run identity unavailable');
+        return restPages(
+          `repos/${repository}/check-runs/${checkRunId}/annotations`
+        );
+      })
+    : '';
   const preview = classifyMergeGroupFailure({
     conclusion: run.conclusion,
     failedSteps,
     annotationText: evidence.annotationText,
     changedFiles: evidence.changedFiles,
     admissionText,
+    fetchTimeoutText,
   });
   const mainSha =
     preview === 'base-branch'
@@ -1489,6 +1592,7 @@ async function main(argv) {
       changedFiles: evidence.changedFiles,
       mainSha,
       admissionText,
+      fetchTimeoutText,
       aheadGroup: withAheadAttribution(
         repository,
         jobs,

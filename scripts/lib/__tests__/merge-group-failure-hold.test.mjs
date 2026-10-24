@@ -27,7 +27,11 @@ import {
   enqueueWasRejected,
   FAILURE_HOLD_CONTEXT,
   FAILURE_RETRY_CONTEXT,
+  FETCH_STEP,
+  FETCH_TIMEOUT_MESSAGE,
+  FETCH_TIMEOUT_TITLE,
   failureReceiptStatus,
+  fetchTimeoutEvidence,
   humanFailureReleaseIntent,
   humanReleaseDisposition,
   isHeldWorkflowFailure,
@@ -2419,5 +2423,237 @@ describe('workflow-load guard failures (2026-10-20 queue stall, #21826)', () => 
         }
       )
     ).rejects.toThrow(/terminal merge-group CI failure/);
+  });
+});
+
+describe('base-branch fetch timeout (merge-group infrastructure)', () => {
+  const TIMEOUT_TEXT = [
+    'Process completed with exit code 1.',
+    FETCH_TIMEOUT_MESSAGE,
+  ].join('\n');
+  const CASCADE = [
+    'Require every ci-fast lane group to pass',
+    'Join exact lane results',
+    'Evaluate combined-head checks',
+  ];
+  const classifyFetch = (failedSteps, fetchTimeoutText = TIMEOUT_TEXT) =>
+    classifyMergeGroupFailure({
+      conclusion: 'failure',
+      failedSteps,
+      fetchTimeoutText,
+    });
+  const timeoutNote = (overrides = {}) => ({
+    annotation_level: 'failure',
+    title: FETCH_TIMEOUT_TITLE,
+    message: FETCH_TIMEOUT_MESSAGE,
+    ...overrides,
+  });
+  const exitNote = {
+    annotation_level: 'failure',
+    title: '',
+    message: 'Process completed with exit code 1.',
+  };
+  const fetchJob = (overrides = {}) => ({
+    id: 9,
+    run_id: run.id,
+    run_attempt: run.run_attempt,
+    check_run_url: 'https://api.github.com/repos/JovieInc/Jovie/check-runs/77',
+    steps: [{ name: FETCH_STEP, conclusion: 'failure' }],
+    ...overrides,
+  });
+
+  it('classifies only the exact fetch timeout as transient infrastructure', () => {
+    expect(classifyFetch([FETCH_STEP])).toBe('transient-infrastructure');
+    expect(classifyFetch([FETCH_STEP, ...CASCADE])).toBe(
+      'transient-infrastructure'
+    );
+    expect(classifyFetch([FETCH_STEP, 'Post Checkout', 'Complete job'])).toBe(
+      'transient-infrastructure'
+    );
+  });
+
+  it('keeps every other failure of the fetch step unclassified (fail closed)', () => {
+    for (const text of [
+      '',
+      'Process completed with exit code 1.',
+      'Process completed with exit code 1.\ngit fetch exited 128',
+      `${FETCH_TIMEOUT_MESSAGE} (retrying)`,
+      `prefix ${FETCH_TIMEOUT_MESSAGE}`,
+      `${FETCH_TIMEOUT_MESSAGE}\nanother failure`,
+      'background fetch did not finish within 300s',
+    ]) {
+      expect(classifyFetch([FETCH_STEP], text)).toBe('unclassified');
+    }
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: [FETCH_STEP],
+      })
+    ).toBe('unclassified');
+  });
+
+  it('lets a stronger failure win over the fetch timeout', () => {
+    expect(classifyFetch([FETCH_STEP, 'Run structural ci-fast lane'])).toBe(
+      'deterministic-source'
+    );
+    expect(classifyFetch([FETCH_STEP, 'Run unit tests'])).toBe(
+      'retryable-product'
+    );
+    expect(classifyFetch([FETCH_STEP, 'Await ci-fast lanes'])).toBe(
+      'unclassified'
+    );
+    expect(
+      classifyFetch([FETCH_STEP, 'Run ./.github/actions/setup-node-pnpm'])
+    ).toBe('unclassified');
+    expect(classifyFetch([FETCH_STEP, WORKFLOW_LOAD_STEP])).toBe(
+      'deterministic-source'
+    );
+  });
+
+  it('never reclassifies the structural lane or the cascade without the fetch step', () => {
+    expect(classifyFetch(['Run structural ci-fast lane'])).toBe(
+      'deterministic-source'
+    );
+    expect(classifyFetch(CASCADE)).toBe('unclassified');
+    expect(classifyFetch(['Await ci-fast lanes', ...CASCADE])).toBe(
+      'unclassified'
+    );
+  });
+
+  it('reads timeout evidence only from the exact run and attempt', () => {
+    const read = notes => vi.fn(() => notes);
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob()], read([exitNote, timeoutNote()]))
+    ).toBe(TIMEOUT_TEXT);
+    for (const job of [
+      fetchJob({ run_id: run.id + 1 }),
+      fetchJob({ run_attempt: run.run_attempt + 1 }),
+      fetchJob({ run_id: undefined }),
+      fetchJob({ run_attempt: undefined }),
+    ]) {
+      const reader = read([exitNote, timeoutNote()]);
+      expect(fetchTimeoutEvidence(run, [job], reader)).toBe('');
+      expect(reader).not.toHaveBeenCalled();
+    }
+    // A timeout on another job of the run does not cover a fetch failure elsewhere.
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob(), fetchJob({ id: 10 })], job =>
+        job.id === 9 ? [exitNote, timeoutNote()] : [exitNote]
+      )
+    ).toBe('');
+  });
+
+  it('fails closed on missing, partial or unreadable evidence', () => {
+    expect(fetchTimeoutEvidence(run, [], () => [timeoutNote()])).toBe('');
+    expect(
+      fetchTimeoutEvidence(
+        run,
+        [
+          {
+            ...fetchJob(),
+            steps: [{ name: FETCH_STEP, conclusion: 'success' }],
+          },
+        ],
+        () => [timeoutNote()]
+      )
+    ).toBe('');
+    expect(fetchTimeoutEvidence(run, undefined, () => [timeoutNote()])).toBe(
+      ''
+    );
+    for (const notes of [
+      [],
+      [exitNote],
+      [exitNote, timeoutNote({ title: 'Other title' })],
+      [exitNote, timeoutNote({ title: undefined })],
+      [
+        exitNote,
+        timeoutNote(),
+        { annotation_level: 'failure', message: 'git fetch exited 128' },
+      ],
+      [exitNote, timeoutNote({ message: undefined })],
+      [exitNote, timeoutNote({ message: `${FETCH_TIMEOUT_MESSAGE}.` })],
+      null,
+      'unreadable',
+    ]) {
+      expect(fetchTimeoutEvidence(run, [fetchJob()], () => notes)).toBe('');
+    }
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob()], () => {
+        throw new Error('annotations unavailable');
+      })
+    ).toBe('');
+    // Non-failure annotations (notices) are ignored.
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob()], () => [
+        exitNote,
+        timeoutNote(),
+        {
+          annotation_level: 'notice',
+          message: 'ubuntu-latest label will migrate',
+        },
+      ])
+    ).toBe(TIMEOUT_TEXT);
+  });
+
+  it('retries a fetch timeout once, then holds on a repeat via the existing budget', async () => {
+    const io = () => ({
+      writeStatus: vi.fn(),
+      readPullRequest: vi.fn(async () => ({
+        id: 'PR_42',
+        state: 'OPEN',
+        headRefOid: SOURCE,
+        isInMergeQueue: false,
+        mergeQueueEntry: null,
+        autoMergeRequest: null,
+      })),
+      dequeuePullRequest: vi.fn(),
+      disableAutoMerge: vi.fn(),
+    });
+    const first = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        failedSteps: [FETCH_STEP, ...CASCADE],
+        fetchTimeoutText: TIMEOUT_TEXT,
+        statuses: [],
+      },
+      io()
+    );
+    expect(first).toMatchObject({
+      classification: 'transient-infrastructure',
+      failureNumber: 1,
+      retryDisposition: 'one-queue-authority-retry',
+    });
+    const infra = (number, runId) =>
+      status({ classification: 'transient-infrastructure', number, runId });
+    const spent = runId =>
+      status({
+        runId,
+        context: FAILURE_RETRY_CONTEXT,
+        description: retrySpentDescription({ runId, runAttempt: 1 }),
+      });
+    expect(disposition([infra(1, 123)])).toMatchObject({
+      action: 'retry-once',
+      reason: 'bounded-infrastructure-recovery',
+    });
+    // The retry was spent and the same timeout repeated: no second free retry.
+    expect(disposition([infra(1, 123), spent(123)])).toMatchObject({
+      action: 'block',
+      reason: 'revision-retry-spent',
+    });
+    expect(
+      disposition([infra(1, 123), spent(123), infra(2, 124), spent(124)])
+    ).toMatchObject({
+      action: 'block',
+      reason: 'revision-retry-spent',
+    });
+    // Without the signature, the same step failure is held at once.
+    const unproven = await applyMergeGroupFailure(
+      { ...failureInput, failedSteps: [FETCH_STEP, ...CASCADE], statuses: [] },
+      io()
+    );
+    expect(unproven).toMatchObject({
+      classification: 'unclassified',
+      retryDisposition: 'blocked-until-new-source-head',
+    });
   });
 });
