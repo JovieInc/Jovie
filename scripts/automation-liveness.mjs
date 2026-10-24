@@ -975,13 +975,19 @@ export async function main({
   if (env.GITHUB_STEP_SUMMARY)
     appendFileSync(env.GITHUB_STEP_SUMMARY, summary(report));
 
-  const state = { ...previous };
-  for (const row of report.results) {
-    if (row.critical)
-      state[livenessFingerprint(row.id)] =
-        row.status === 'fresh' ? 'green' : 'red';
-  }
+  // Alert state only moves when the decisions are actually applied
+  // (JOV-8843). A diagnostic run (no --file) or a disabled-intake run
+  // (REMEDIATION_INTAKE_DISABLED=1) observes and reports but must preserve
+  // the persisted state: otherwise a run that never filed could still flip a
+  // fingerprint green, silently dropping a red->green resolution the next
+  // filing run would have delivered (an open alert stuck unresolved).
   if (args.file && env.REMEDIATION_INTAKE_DISABLED !== '1') {
+    const state = { ...previous };
+    for (const row of report.results) {
+      if (row.critical)
+        state[livenessFingerprint(row.id)] =
+          row.status === 'fresh' ? 'green' : 'red';
+    }
     const { applyRemediationDecisionWithRetry } = await import(
       './lib/remediation-signal.mjs'
     );
@@ -1001,9 +1007,9 @@ export async function main({
         state[decision.fingerprint] =
           previous[decision.fingerprint] ?? 'unknown';
     }
+    if (args.previous)
+      writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   }
-  if (args.previous)
-    writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   process.stdout.write(
     `${JSON.stringify({ status: report.status, red: report.results.filter(row => row.status !== 'fresh').map(row => row.id) })}\n`
   );

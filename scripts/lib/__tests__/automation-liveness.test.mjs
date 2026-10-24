@@ -1,4 +1,6 @@
-import { dirname, resolve } from 'node:path';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
@@ -6,6 +8,7 @@ import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
   lsRemoteMain,
   runLiveness as runLivenessImpl,
+  main as runMain,
 } from '../../automation-liveness.mjs';
 import { ADMISSION_BLOCKING_LABELS } from '../admission-hold-labels.mjs';
 import {
@@ -13,9 +16,16 @@ import {
   livenessFingerprint,
   loadRegistry,
 } from '../automation-registry.mjs';
+import { applyRemediationDecisionWithRetry } from '../remediation-signal.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const registry = loadRegistry(repoRoot);
+
+// JOV-8843: the filing branch's intake is mocked so state-preservation tests
+// never reach Linear. Restore the mock per test that counts calls.
+vi.mock('../remediation-signal.mjs', () => ({
+  applyRemediationDecisionWithRetry: vi.fn(async () => ({ ok: true })),
+}));
 const NOW = Date.parse('2026-10-20T19:35:00Z');
 const iso = minutesAgo => new Date(NOW - minutesAgo * 60_000).toISOString();
 const MAIN = 'a'.repeat(40);
@@ -1594,5 +1604,106 @@ describe('liveness run receipts', () => {
       ['started', 'advanced'],
       ['finished', 'failed'],
     ]);
+  });
+});
+
+describe('alert state preservation (JOV-8843)', () => {
+  const FINGERPRINT = livenessFingerprint('summer:model-turns');
+  const failFetch = async () => new Response('{}', { status: 404 });
+  // The JOV-8803 critical loop back fresh: its heartbeat returned while an
+  // alert for it was already filed (persisted red state).
+  const recoveredFetch = fakeFetch({
+    'summer.jov.ie/runtime/v1/health': {
+      receiptFreshness: {
+        modelTurn: {
+          // main() judges against real wall-clock time; a fixed fixture
+          // timestamp would age past the 120-minute silence budget.
+          observedAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+          status: 'verified',
+        },
+      },
+    },
+  });
+  const summerStatus = report =>
+    report.results.find(row => row.id === 'summer:model-turns')?.status;
+
+  function persistState(at) {
+    const dir = mkdtempSync(join(tmpdir(), 'automation-liveness-'));
+    const path = join(dir, 'state.json');
+    writeFileSync(path, `${JSON.stringify(at, null, 2)}\n`);
+    return path;
+  }
+
+  beforeEach(() => {
+    vi.mocked(applyRemediationDecisionWithRetry).mockClear();
+  });
+
+  it('keeps filed alert state on a diagnostic run without --file', async () => {
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    const result = await runMain({
+      argv: ['--previous', path],
+      env: {},
+      fetchImpl: recoveredFetch,
+    });
+    expect(summerStatus(result)).toBe('fresh');
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+      [FINGERPRINT]: 'red',
+    });
+    expect(applyRemediationDecisionWithRetry).not.toHaveBeenCalled();
+  });
+
+  it('keeps filed alert state when remediation intake is disabled', async () => {
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    const result = await runMain({
+      argv: ['--file', '--previous', path],
+      env: { REMEDIATION_INTAKE_DISABLED: '1' },
+      fetchImpl: recoveredFetch,
+    });
+    expect(summerStatus(result)).toBe('fresh');
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+      [FINGERPRINT]: 'red',
+    });
+    expect(applyRemediationDecisionWithRetry).not.toHaveBeenCalled();
+  });
+
+  it('still advances state and files decisions when intake is active', async () => {
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    const result = await runMain({
+      argv: ['--file', '--previous', path],
+      env: {},
+      fetchImpl: recoveredFetch,
+    });
+    expect(summerStatus(result)).toBe('fresh');
+    expect(JSON.parse(readFileSync(path, 'utf8'))[FINGERPRINT]).toBe('green');
+    const decisions = vi
+      .mocked(applyRemediationDecisionWithRetry)
+      .mock.calls.map(([decision]) => decision);
+    expect(decisions.find(row => row.fingerprint === FINGERPRINT)?.action).toBe(
+      'green'
+    );
+    expect(applyRemediationDecisionWithRetry).toHaveBeenCalledTimes(
+      result.decisions.length
+    );
+  });
+
+  it('keeps the prior state for a fingerprint whose filing failed', async () => {
+    vi.mocked(applyRemediationDecisionWithRetry).mockResolvedValue({
+      ok: false,
+      reason: 'linear-4xx',
+    });
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    try {
+      const result = await runMain({
+        argv: ['--file', '--previous', path],
+        env: {},
+        fetchImpl: failFetch,
+      });
+      expect(summerStatus(result)).toBe('unknown');
+      expect(JSON.parse(readFileSync(path, 'utf8'))[FINGERPRINT]).toBe('red');
+    } finally {
+      vi.mocked(applyRemediationDecisionWithRetry).mockResolvedValue({
+        ok: true,
+      });
+    }
   });
 });
