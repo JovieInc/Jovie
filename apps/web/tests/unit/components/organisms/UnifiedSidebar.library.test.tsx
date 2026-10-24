@@ -783,6 +783,27 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
+  it('exposes Inbox while Tools is collapsed and selects only Inbox', () => {
+    globalThis.localStorage?.removeItem('ovie.nav.tools-open.v1');
+    renderUnifiedSidebar({ pathname: APP_ROUTES.ADMIN_INBOX, section: 'ov' });
+    const navigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    const inbox = within(navigation).getByRole('link', { name: 'Inbox' });
+    expect(inbox).toBeVisible();
+    expect(inbox).toHaveAttribute('href', APP_ROUTES.ADMIN_INBOX);
+    expect(inbox).toHaveAttribute('aria-current', 'page');
+    expect(
+      within(navigation).getByRole('link', { name: 'Home' })
+    ).not.toHaveAttribute('aria-current');
+    expect(
+      within(navigation).getByRole('button', { name: 'Tools' })
+    ).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      within(navigation).queryByRole('link', { name: 'Needs You' })
+    ).toBeNull();
+  });
+
   it('renders founder lists in the Ovie sidebar outside the canonical landmark', async () => {
     renderUnifiedSidebar({ pathname: APP_ROUTES.ADMIN_OPS, section: 'ov' });
     const operatorNavigation = screen.getByRole('navigation', {
