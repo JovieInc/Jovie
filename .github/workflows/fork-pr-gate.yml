@@ -111,11 +111,19 @@ jobs:
             .github/dependency-review-config.yml
           sparse-checkout-cone-mode: false
 
+      - name: Mint dependency review read token
+        id: dependency-review-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-contents: read
+
       - name: Review added and upgraded dependencies
         id: dependency-review
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
-          repo-token: ${{ steps.app-token.outputs.token }}
+          repo-token: ${{ steps.dependency-review-token.outputs.token }}
           config-file: ./.github/dependency-review-config.yml
 
       - name: Report dependency review verdict
