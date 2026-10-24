@@ -8827,7 +8827,11 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
             try:
                 bases = {name: (host.base_slots(name, spec.get("slots", 1)) if spec.get("enabled", True) else 0)
                          for name, spec in load_providers().items()}
-                tick["autoscale"] = autoscale.apply_tick(host.state, tick, bases)
+                # Remote-only lanes run off gem, so gem host pressure does not size them.
+                remote = sorted(name for name, spec in load_providers().items()
+                                if spec.get("remote") is True or spec.get("repairs") is False)
+                tick["autoscale"] = autoscale.apply_tick(host.state, tick, bases,
+                                                         config={**autoscale.load_config(), "remote": remote})
             except Exception as error:  # a bad sample never blocks the spawn loop
                 tick["autoscaleError"] = f"{type(error).__name__}: {error}"[:200]
         try:
