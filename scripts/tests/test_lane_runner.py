@@ -4584,6 +4584,79 @@ class DispatchTest(unittest.TestCase):
                 lane.ensure_full_history, lane.doctor.run = saved
             self.assertIn("git exploded", json.loads((host.state / "tick.json").read_text())["error"])
 
+    def test_an_unclean_previous_run_is_visible_and_recovers_stranded_charges(self):
+        # Gem 2026-10-23: ~180 unclean-termination warnings and no recovery path. A dead
+        # run's intent marker makes the unclean tick visible and refunds exactly the
+        # fix-attempt charges that died between the claim and their own verdict.
+        finished = subprocess.Popen(["python3", "-c", "pass"])
+        finished.wait()
+        dead_pid = finished.pid
+        for _ in range(8):  # a just-exited pid; probe instead of guessing at recycling
+            try:
+                os.kill(dead_pid, 0)
+            except ProcessLookupError:
+                break
+            dead_pid += 1
+        stranded = {"6": {"sha": "a" * 40, "count": 1, "lane": "codex", "at": time.time() - lane.pr_events.FIX_LEASE_S - 10}}
+        healthy = {"7": {"sha": "b" * 40, "count": 1, "lane": "codex", "at": time.time()}}
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off", "LANES_SLOTS_CODEX": "1"}), \
+                patch.object(lane.autoscale, "mode", return_value="off"), \
+                patch.object(lane.disk_guard, "check", return_value={"freePct": 50, "admitted": True}), \
+                patch.object(lane.worktree_sweep, "maybe_spawn", return_value="not-due"), \
+                patch.object(lane, "ensure_full_history"), \
+                patch.object(lane, "load_providers", return_value={"codex": {"slots": 1}}), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "claim_remediation_events", side_effect=RuntimeError("coordinator offline")), \
+                patch.object(lane, "Linear", side_effect=AssertionError("no Linear in tests")), \
+                patch.object(lane.linear_sync, "tick", return_value={}), \
+                patch.object(lane.epics, "reconcile", return_value={}), \
+                patch.object(lane.pr_events, "tick", return_value={}), \
+                patch.object(lane.reason_lane, "tick", return_value={}), \
+                patch.object(lane.doctor, "run"), \
+                patch.object(lane.subprocess, "Popen"):
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            attempts = {**stranded, **healthy}
+            (host.state / "fix-attempts.json").write_text(json.dumps(attempts))
+            (host.state / "tick-in-flight.json").write_text(json.dumps({
+                "schema": lane.TICK_INTENT_SCHEMA, "host": "gem", "pid": dead_pid,
+                "startedAt": time.time() - lane.pr_events.FIX_LEASE_S - 10}))
+            self.assertEqual(lane.dispatch(host), 0)
+            tick = json.loads((host.state / "tick.json").read_text())
+            self.assertTrue(tick["uncleanPreviousRun"])
+            self.assertEqual(tick["uncleanRecovery"]["refundedFixAttempts"], ["6"])
+            recovered = json.loads((host.state / "fix-attempts.json").read_text())
+            self.assertEqual(recovered["6"]["count"], 0)
+            self.assertEqual(recovered["6"]["noWorkRefund"]["reason"], "unclean-worker-termination")
+            self.assertEqual(recovered["7"]["count"], 1, "a live lease keeps its charge")
+            self.assertFalse((host.state / "tick-in-flight.json").exists(), "a clean exit clears its marker")
+
+    def test_a_live_recent_marker_is_a_long_tick_not_an_unclean_one(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off", "LANES_SLOTS_CODEX": "1"}), \
+                patch.object(lane.autoscale, "mode", return_value="off"), \
+                patch.object(lane.disk_guard, "check", return_value={"freePct": 50, "admitted": True}), \
+                patch.object(lane.worktree_sweep, "maybe_spawn", return_value="not-due"), \
+                patch.object(lane, "ensure_full_history"), \
+                patch.object(lane, "load_providers", return_value={"codex": {"slots": 1}}), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "claim_remediation_events", side_effect=RuntimeError("coordinator offline")), \
+                patch.object(lane, "Linear", side_effect=AssertionError("no Linear in tests")), \
+                patch.object(lane.linear_sync, "tick", return_value={}), \
+                patch.object(lane.epics, "reconcile", return_value={}), \
+                patch.object(lane.pr_events, "tick", return_value={}), \
+                patch.object(lane.reason_lane, "tick", return_value={}), \
+                patch.object(lane.doctor, "run"), \
+                patch.object(lane.subprocess, "Popen"):
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            (host.state / "tick-in-flight.json").write_text(json.dumps({
+                "schema": lane.TICK_INTENT_SCHEMA, "host": "gem", "pid": os.getpid(),
+                "startedAt": time.time() - 60}))
+            self.assertEqual(lane.dispatch(host), 0)
+            tick = json.loads((host.state / "tick.json").read_text())
+            self.assertIsNone(tick["uncleanPreviousRun"])
+            self.assertNotIn("uncleanRecovery", tick)
+
     def test_unprotected_worktree_removal_does_not_kill_processes_by_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             fake = FakeShell([])
@@ -5835,6 +5908,28 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertEqual(receipt["verdict"], "skipped")
         self.assertTrue(receipt["attemptRefunded"].startswith("worktree-unavailable"))
         self.assertEqual(self.attempt_count(), 0)
+
+    def test_infra_precondition_stops_requeue_with_backoff(self):
+        # Gem 2026-10-23: target-state and worktree infra stops re-claimed the same head
+        # on the next tick (no backoff at all), crash-looping the same precondition.
+        # Like recovery handoffs, the refund now starts the capped exponential cooldown.
+        for patch_target, side_effect, verdict in [
+                ("reconcile_fix_target", None, "target-state-unavailable"),
+                ("add_worktree", lane.WorktreeUnavailable("checkout failed"), "worktree-unavailable")]:
+            with self.subTest(reason=verdict):
+                self.charge_attempt()
+                cooldown = self.host.state / "handoff-cooldown.json"
+                cooldown.unlink(missing_ok=True)
+                with patch.object(lane, patch_target, return_value=side_effect) if side_effect is None else \
+                        patch.object(lane, patch_target, side_effect=side_effect), \
+                        patch.object(lane, "run_agent", side_effect=AssertionError("agent must not run")):
+                    receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+                self.assertTrue(receipt["attemptRefunded"].startswith(verdict))
+                rows = json.loads(cooldown.read_text())
+                row = rows[f"pr:{self.pr['number']}:{self.pr['headRefOid']}"]
+                self.assertGreater(row["until"], time.time())
+                self.assertTrue(lane.pr_events.pr_recovery_held(self.host, self.pr))  # requeue holds
+                self.assertLessEqual(row["until"], time.time() + lane.HANDOFF_BACKOFF_CAP_S)  # bounded
 
     def test_recovery_handoff_refunds_the_attempt(self):
         self.cancelled_predecessor(commit=True)
@@ -10765,6 +10860,108 @@ class EventDeliveryTest(unittest.TestCase):
         data = lane._event_delivery_state(self.host)
         lane._queue_event_delivery(data, {'events': self.events, 'comments': [{'id': 'issue', 'body': 'one receipt'}]}, [self.issue], set(), 100)
         self.assertEqual(data['actions'], {})
+
+    def start_delivery_event(self, delivery):
+        self.events['fp'].update(status='claimed', lane='codex', startedStateId='started')
+        delivery = {'nextAt': 0, 'deadline': time.time() + 3600, **delivery}
+        lane.save_escalation(self.host, {'events': {**self.events, 'fp': {**self.events['fp'], 'startDelivery': delivery}}})
+
+    def test_start_delivery_past_its_cap_is_terminal_and_never_retries(self):
+        # Gem 2026-10-23: a start delivery past its cap re-failed every 60s forever —
+        # unbounded retries with no terminal state and no authoritative ack.
+        self.start_delivery_event({'attempts': 3, 'status': 'failed'})
+        self.issue['state'] = {'id': 'todo-J', 'name': 'Todo'}
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        event = lane.load_escalation(self.host)['events']['fp']
+        self.assertEqual((event['startDelivery']['status'], event['startDelivery']['error']),
+                         ('exhausted', 'event-start-cap-exhausted'))
+        reads = self.writes
+        with patch.object(self.linear, 'gql', wraps=self.linear.gql) as remote:
+            self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        remote.assert_not_called()  # a terminal row never touches Linear again
+        self.assertEqual(lane.load_escalation(self.host)['events']['fp']['startDelivery']['status'], 'exhausted')
+        self.assertEqual(reads, [])
+
+    def test_crash_lost_start_receipt_is_reproved_by_one_idempotent_resend(self):
+        # Crash between the start mutation and its receipt save: our own persisted intent
+        # ('sending') re-proves ownership with one idempotent resend instead of wedging
+        # on ownership-unproven forever.
+        self.start_delivery_event({'attempts': 1, 'status': 'sending'})
+        self.issue['state'] = {'id': 'started', 'name': 'In Progress'}
+        claimed = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertIsNotNone(claimed)
+        event = lane.load_escalation(self.host)['events']['fp']
+        self.assertEqual(event['startDelivery']['status'], 'acknowledged')
+        self.assertEqual(event['startDelivery']['attempts'], 2)
+        self.assertEqual(event['startDelivery']['mutationReceipt']['success'], True)
+        self.assertEqual(sum('issueUpdate' in q for q, _ in self.writes), 1)
+
+    def test_unproven_start_ownership_is_a_terminal_visible_failure(self):
+        # The remote start exists but this host can never prove it owns it (no persisted
+        # intent): terminal exhausted and visible, never a 60s retry loop.
+        self.start_delivery_event({'attempts': 2, 'status': 'failed'})
+        self.issue['state'] = {'id': 'started', 'name': 'In Progress'}
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        event = lane.load_escalation(self.host)['events']['fp']
+        self.assertEqual((event['startDelivery']['status'], event['startDelivery']['error']),
+                         ('exhausted', 'event-start-ownership-unproven'))
+
+    def test_moved_remote_start_is_terminal_not_a_forever_retry(self):
+        self.start_delivery_event({'attempts': 0, 'status': 'pending'})
+        self.issue['state'] = {'id': 'done-J', 'name': 'Done'}
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        event = lane.load_escalation(self.host)['events']['fp']
+        self.assertEqual((event['startDelivery']['status'], event['startDelivery']['error']),
+                         ('exhausted', 'event-start-preimage-changed'))
+
+    def test_exhausted_start_delivery_is_reported(self):
+        self.start_delivery_event({'attempts': 3, 'status': 'exhausted'})
+        report = lane._event_delivery_snapshot(self.host, 200)
+        self.assertEqual(report['deliveryExhausted'], 1)
+        self.assertEqual(report['deliveryFailed'], 0)
+
+    def test_drain_event_delivery_drains_the_journal_without_claiming_events(self):
+        # Reconciliation is down; the durable intents still retry with backoff here
+        # instead of waiting for a healthy planning pass that never comes.
+        self.intent(comments=[{'id': 'issue', 'body': 'drained receipt'}])
+        data = lane._event_delivery_state(self.host)
+        for row in data['actions'].values():  # the drain runs on the real clock
+            row['deadline'] = time.time() + 3600
+        lane._save_event_delivery(self.host, data)
+        report = lane.drain_event_delivery(self.host, self.linear)
+        self.assertEqual(report['deliveryAcknowledged'], 1)
+        self.assertEqual([w[1]['i']['body'] for w in self.writes], ['drained receipt'])
+
+    def test_delivery_attempt_cap_is_one_configurable_bounded_setting(self):
+        self.assertEqual(lane.event_delivery_max_attempts(), lane.EVENT_DELIVERY_ATTEMPTS)
+        for raw, expected in [('1', 1), ('5', 5), ('99', lane.EVENT_DELIVERY_ATTEMPTS_CAP),
+                              ('0', 1), ('-3', 1), ('nonsense', lane.EVENT_DELIVERY_ATTEMPTS)]:
+            with patch.dict(os.environ, {'LANES_EVENT_DELIVERY_MAX_ATTEMPTS': raw}):
+                self.assertEqual(lane.event_delivery_max_attempts(), expected)
+
+    def test_one_attempt_cap_exhausts_a_failing_delivery_after_one_send(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'rejected receipt'}])
+        data = lane._event_delivery_state(self.host)
+        for row in data['actions'].values():
+            row['deadline'] = time.time() + 3600
+        lane._save_event_delivery(self.host, data)
+        self.false = True  # the mutation reports failure
+        with patch.dict(os.environ, {'LANES_EVENT_DELIVERY_MAX_ATTEMPTS': '1'}):
+            report = lane._apply_event_plan(self.linear, {}, self.host,
+                                            lane._event_delivery_state(self.host), time.time())
+            [row] = lane._event_delivery_state(self.host)['actions'].values()
+            self.assertEqual(row['attempts'], 1)
+            self.assertEqual((row['status'], row['error']), ('exhausted', 'event-mutation-rejected'))
+            self.assertEqual(report['deliveryFailed'], 1)
+
+    def test_drain_event_delivery_yields_when_another_pass_holds_the_lock(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'busy receipt'}])
+        lock = lane.Locked(self.host.state / 'event-delivery.lock', blocking=False)
+        try:
+            self.assertEqual(lane.drain_event_delivery(self.host, self.linear), {'deliveryBusy': True})
+            self.assertEqual(self.writes, [])
+        finally:
+            lock.release()
 
 
 class RemediationEventRecoveryTest(unittest.TestCase):
