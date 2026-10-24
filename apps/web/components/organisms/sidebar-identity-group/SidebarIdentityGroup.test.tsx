@@ -177,6 +177,10 @@ describe('SidebarIdentityGroup', () => {
     const profile = within(group).getByRole('link', {
       name: PROFILE_LINK_NAME,
     });
+    expect(profile.querySelector('svg')).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)'
+    );
+    expect(profile).toHaveClass('size-8', 'items-center', 'justify-center');
     expect(profile).toHaveAttribute('href', PROFILE_HREF);
     expect(profile).toHaveAttribute('data-prefetch', 'false');
     expect(group).toContainElement(identity);

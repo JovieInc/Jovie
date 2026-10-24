@@ -43,6 +43,53 @@ Complete this section when the PR is a bug fix (`fix:` commits/title, `fix/` bra
 
 If this is **not** a bug fix and no new test is required, say so explicitly (for example: `bug-to-test: not applicable — feature work`).
 
+## Red-before-green
+
+Required for bug fixes and CI repairs (including `fix:`, bug/repair labels and
+`lane-fix-red` / `lane-fix-dequeued`). iOS and visual-regression lanes are exempt.
+Capture this evidence **before the fix**, then retain it when green. Do not
+remove or broaden existing assertions to manufacture green.
+
+Failing command:
+<!-- Exact command, followed by a fenced red-output snippet OR the failing run URL below. -->
+Failing run (before fix):
+
+## Premise check
+
+When the same check fails twice in a row, state the assumption and run one test
+that could falsify it **before patching**. A repeated retry is not a falsifier.
+If this did not happen, state that explicitly.
+
+Assumption:
+Falsifying test:
+Result:
+
+## Blast radius
+
+What could break:
+<!-- Name an affected caller, shared state, workflow or product outside the diff. -->
+Proof:
+<!-- Exact check/command and result, or a linked receipt. Missing evidence warns only. -->
+
+## Locked areas
+
+Changes to design-system.css, auth/Clerk, baseline/ratchet JSON, or locked
+homepage copy require a prior-decision citation. Include one of:
+
+GBrain:
+<!-- A real page URL or slug, e.g. GBrain: jovie-landing-architecture -->
+Locking PR:
+<!-- A locking PR number or URL, e.g. Locking PR: #123 -->
+
+## Done receipt
+
+Not yet — awaiting merge queue and production verification.
+<!-- Replace only when claiming Done; existing activation/deployed-SHA gates still apply.
+Merge-group run: <numeric workflow run id or https://github.com/JovieInc/Jovie/actions/runs/ID>
+Durable delivery JSON must carry mergeGroupRun: { event: "merge_group", id: ID }
+(or url). A source PR run or production run is not merge-group evidence.
+-->
+
 ## Icon Usage Standards ✅
 
 *Complete this section if your PR includes any icon usage*
