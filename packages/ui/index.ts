@@ -210,6 +210,7 @@ export {
   type FounderPenAtomFamily,
   type FounderPenVideoAtomId,
 } from './atoms/founder-pen-atoms';
+export { HoverReveal, type HoverRevealProps } from './atoms/hover-reveal';
 // IconButton
 export type { IconButtonProps } from './atoms/icon-button';
 export { IconButton, iconButtonVariants } from './atoms/icon-button';
