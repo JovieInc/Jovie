@@ -414,6 +414,9 @@ export function SlashCommandMenu({
   attachmentActions,
   onQueryChange,
 }: SlashCommandMenuProps) {
+  // aria-controls on the combobox must always reference a real listbox id
+  // (axe aria-required-attr); fall back to a generated id when the caller
+  // does not pass one.
   const generatedListId = useId();
   const listId = listIdProp ?? generatedListId;
   const filterInputRef = useRef<HTMLInputElement>(null);

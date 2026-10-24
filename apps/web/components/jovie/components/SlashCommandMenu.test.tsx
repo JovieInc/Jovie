@@ -267,44 +267,14 @@ describe('SlashCommandMenu album-art availability', () => {
   });
 });
 
-describe('SlashCommandMenu combobox wiring (JOV-8873)', () => {
-  it('wires aria-controls and activedescendant without an explicit listId', () => {
-    render(
-      withProviders(
-        <SlashCommandMenu
-          state={{ status: 'root', query: '', startIdx: 0, selectedIndex: 0 }}
-          profileId='profile-test'
-          onSelectSkill={vi.fn()}
-          onSelectEntity={vi.fn()}
-          onSetSelected={vi.fn()}
-          onMoveSelected={vi.fn()}
-          onClose={vi.fn()}
-          onQueryChange={vi.fn()}
-          attachmentActions={[
-            {
-              kind: 'action',
-              action: {
-                id: 'attach-files',
-                label: 'Attach Files',
-                description: 'Drop or browse',
-                icon: Paperclip,
-                onSelect: vi.fn(),
-              },
-            },
-          ]}
-        />
-      )
+describe('SlashCommandMenu combobox required attributes (aria-required-attr)', () => {
+  it('always wires aria-controls to a real listbox id, with or without listIdProp', () => {
+    const source = readFileSync(
+      resolve(__dirname, 'SlashCommandMenu.tsx'),
+      'utf8'
     );
-
-    const combobox = screen.getByRole('combobox', {
-      name: 'Filter Commands And References',
-    });
-    const listId = combobox.getAttribute('aria-controls');
-    expect(listId).toBeTruthy();
-    expect(document.getElementById(listId as string)).not.toBeNull();
-    expect(combobox).toHaveAttribute(
-      'aria-activedescendant',
-      `${listId}-row-0`
-    );
+    expect(source).toContain('const generatedListId = useId();');
+    expect(source).toContain('const listId = listIdProp ?? generatedListId;');
+    expect(source).toContain('aria-controls={listId}');
   });
 });

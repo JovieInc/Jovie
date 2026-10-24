@@ -107,62 +107,63 @@ export function OpportunityInboxFeed({
       aria-label='Opportunity Inbox Feed'
     >
       <div className='system-b-opportunity-inbox-section-label'>Today</div>
-      <ul className='system-b-opportunity-inbox-feed-list'>
+      <div className='system-b-opportunity-inbox-feed-list'>
         {cards
           .filter(card => card.category !== 'workflow_capture')
           .map(card =>
             card.category === 'report' && card.report ? (
-              <li key={card.id}>
-                <OpportunityInboxReportCard
-                  card={card}
-                  onNextStep={onNextStep ?? onApprove}
-                  onDismiss={onDismiss}
-                  isSubmittingNextStep={pendingNextStepId === card.id}
-                  isDismissing={pendingActionId === card.id}
-                />
-              </li>
+              <OpportunityInboxReportCard
+                key={card.id}
+                card={card}
+                onNextStep={onNextStep ?? onApprove}
+                onDismiss={onDismiss}
+                isSubmittingNextStep={pendingNextStepId === card.id}
+                isDismissing={pendingActionId === card.id}
+              />
             ) : card.category === 'social_reply' && card.socialReply ? (
-              <li key={card.id}>
-                <OpportunityInboxSocialReplyCard
-                  card={card}
-                  onApprove={id => void onApprove(id)}
-                  onDismiss={id => void onDismiss(id)}
-                  onRevise={onRevise ?? (() => undefined)}
-                  isApproving={pendingActionId === card.id}
-                  isDismissing={pendingActionId === card.id}
-                  isRevising={pendingReviseId === card.id}
-                />
-              </li>
+              <OpportunityInboxSocialReplyCard
+                key={card.id}
+                card={card}
+                onApprove={id => void onApprove(id)}
+                onDismiss={id => void onDismiss(id)}
+                onRevise={onRevise ?? (() => undefined)}
+                isApproving={pendingActionId === card.id}
+                isDismissing={pendingActionId === card.id}
+                isRevising={pendingReviseId === card.id}
+              />
             ) : card.category === 'youtube_thumbnail' &&
               card.youtubeThumbnail ? (
-              <li key={card.id}>
-                <OpportunityInboxYoutubeThumbnailCard
-                  card={card}
-                  onApprove={onApprove}
-                  onReject={onDismiss}
-                  isBusy={pendingActionId === card.id}
-                />
-              </li>
-            ) : (
-              <OpportunityRow
+              <OpportunityInboxYoutubeThumbnailCard
                 key={card.id}
-                id={card.id}
-                state={mapCardState(card.status)}
-                title={card.title}
-                metadata={card.why}
-                hideDot={false}
-                primaryActionLabel={
-                  card.category === 'brand_deal'
-                    ? card.primaryActionLabel
-                    : undefined
-                }
-                onPrimaryAction={id => onApprove(id)}
-                onDismiss={id => onDismiss(id)}
+                card={card}
+                onApprove={onApprove}
+                onReject={onDismiss}
                 isBusy={pendingActionId === card.id}
               />
+            ) : (
+              // OpportunityRow renders an li; each row gets its own list
+              // context because sibling card types are not list items
+              // (axe listitem / list).
+              <ul key={card.id} className='m-0 list-none p-0'>
+                <OpportunityRow
+                  id={card.id}
+                  state={mapCardState(card.status)}
+                  title={card.title}
+                  metadata={card.why}
+                  hideDot={false}
+                  primaryActionLabel={
+                    card.category === 'brand_deal'
+                      ? card.primaryActionLabel
+                      : undefined
+                  }
+                  onPrimaryAction={id => onApprove(id)}
+                  onDismiss={id => onDismiss(id)}
+                  isBusy={pendingActionId === card.id}
+                />
+              </ul>
             )
           )}
-      </ul>
+      </div>
     </section>
   );
 }

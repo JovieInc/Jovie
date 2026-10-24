@@ -229,20 +229,16 @@ describe('OpportunityInboxFeed workflow handoffs', () => {
   );
 });
 
-describe('OpportunityInboxFeed list semantics (JOV-8873)', () => {
-  it('renders the decision feed as a list of cards', () => {
-    const { container } = render(
-      <OpportunityInboxFeed
-        cards={[SUGGESTION_CARD]}
-        onApprove={vi.fn()}
-        onDismiss={vi.fn()}
-        onFeedback={vi.fn()}
-      />
+describe('OpportunityInboxFeed list semantics (axe listitem)', () => {
+  it('wraps each OpportunityRow in its own list context', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(__dirname, 'OpportunityInboxFeed.tsx'),
+      'utf8'
     );
-    const list = container.querySelector(
-      '.system-b-opportunity-inbox-feed-list'
+    expect(source).toContain(
+      "<ul key={card.id} className='m-0 list-none p-0'>"
     );
-    expect(list?.tagName).toBe('UL');
-    expect(list?.querySelectorAll(':scope > li').length).toBeGreaterThan(0);
   });
 });

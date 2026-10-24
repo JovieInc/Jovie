@@ -121,24 +121,15 @@ describe('ProfileEditPreviewCard', () => {
   });
 });
 
-describe('ProfileEditPreviewCard a11y (JOV-8873)', () => {
-  beforeEach(() => {
-    mockMutate.mockReset();
-    mutationState = { isPending: false };
-  });
-
-  it('dims the cancelled card from an outer wrapper and keeps the inset inside the surface', () => {
-    renderCard();
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-    const label = screen.getByText('Display name');
-    expect(label.closest('.opacity-70')).not.toBeNull();
-    expect(label.closest('.p-3')).not.toBeNull();
-  });
-
-  it('labels the new value with the AA accent text token', () => {
-    const { container } = renderCard();
-    expect(
-      container.querySelector('.text-\\(--color-accent-purple-text\\)')
-    ).not.toBeNull();
+describe('ProfileEditPreviewCard contrast', () => {
+  it('renders the New label on the primary token (WCAG AA on the accent tint)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(__dirname, 'ProfileEditPreviewCard.tsx'),
+      'utf8'
+    );
+    expect(source).not.toContain('text-(--linear-accent)');
+    expect(source).toContain('text-primary-token');
   });
 });

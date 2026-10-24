@@ -9,11 +9,11 @@ const meta: Meta<typeof OpportunityRow> = {
   },
   decorators: [
     Story => (
-      <div className='w-[min(48rem,calc(100vw-2rem))] bg-base p-4'>
-        <ul>
-          <Story />
-        </ul>
-      </div>
+      // OpportunityRow renders an li; give the story a real list parent
+      // (axe listitem).
+      <ul className='m-0 w-[min(48rem,calc(100vw-2rem))] list-none bg-base p-4'>
+        <Story />
+      </ul>
     ),
   ],
   args: {
