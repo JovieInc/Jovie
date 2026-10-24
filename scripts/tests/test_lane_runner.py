@@ -13095,6 +13095,133 @@ class RepositoryBindingTest(unittest.TestCase):
         self.assertFalse(Path(receipt["worktree"]).exists())
         self.assertFalse(any("pre-push-gate" in " ".join(map(str, args)) for args in calls))
 
+    def issue_origin(self):
+        """A bare origin with a main the binding clone tracks (the push tests' fixture)."""
+        root = Path(self.tmp.name)
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
+        env.pop("GIT_DIR", None)
+        run = lambda *args, cwd=root: subprocess.run(args, cwd=cwd, env=env, check=True, capture_output=True)
+        run("git", "init", "-q", "--bare", "-b", "main", str(root / "origin.git"))
+        shutil.rmtree(self.repo)
+        run("git", "clone", "-q", str(root / "origin.git"), str(self.repo))
+        run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=self.repo)
+        run("git", "push", "-q", "origin", "HEAD:main", cwd=self.repo)
+        return env
+
+    def test_binding_fetch_serializes_per_repo_and_retries_a_lost_ref_lock(self):
+        # JOV-8902 (LYB-226): three seats claimed in the same second raced the shared clone's
+        # refs/remotes/origin/main and the run died "cannot lock ref" 2s in. One fetch at a
+        # time per binding repo; a lost race retries once instead of failing the run.
+        calls, in_flight, overlap, guard = [], [], [], threading.Lock()
+
+        def sh(args, *rest, **kwargs):
+            if args[:2] == ["git", "fetch"]:
+                with guard:
+                    calls.append(args)
+                    in_flight.append(args)
+                    if len(in_flight) > 1:
+                        overlap.append(list(args))
+                time.sleep(0.05)
+                with guard:
+                    in_flight.pop()
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with patch.object(lane, "sh", side_effect=sh):
+            threads = [threading.Thread(target=lane.bindings.fetch,
+                                        args=(lane, self.host, self.binding, None, "main"))
+                       for _ in range(3)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(10)
+        self.assertFalse(any(thread.is_alive() for thread in threads))
+        self.assertEqual(overlap, [], "concurrent seats never fetch the same clone at once")
+        self.assertEqual(len(calls), 3)
+
+    def test_binding_fetch_retries_a_lost_ref_lock_and_fails_closed_after_the_cap(self):
+        lost_lock = ("error: cannot lock ref 'refs/remotes/origin/main': "
+                     "is at 8c586db0 but expected 4e376fa0")
+        calls = []
+
+        def sh(args, *rest, **kwargs):
+            if args[:2] == ["git", "fetch"]:
+                calls.append(args)
+                if len(calls) == 1:
+                    return SimpleNamespace(returncode=1, stdout="", stderr=lost_lock)
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with patch.object(lane, "sh", side_effect=sh):
+            lane.bindings.fetch(lane, self.host, self.binding, None, "main")
+        self.assertEqual(len(calls), 2, "one lost ref-lock race retried once")
+        calls.clear()
+
+        def always(args, *rest, **kwargs):
+            if args[:2] == ["git", "fetch"]:
+                calls.append(args)
+                return SimpleNamespace(returncode=1, stdout="", stderr=lost_lock)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with patch.object(lane, "sh", side_effect=always):
+            with self.assertRaises(RuntimeError) as caught:
+                lane.bindings.fetch(lane, self.host, self.binding, None, "main")
+        self.assertEqual(str(caught.exception), "git-fetch-failed")
+        self.assertEqual(len(calls), lane.bindings.FETCH_ATTEMPTS, "bounded, no unbounded re-fetching")
+        calls.clear()
+
+        def real_fault(args, *rest, **kwargs):
+            if args[:2] == ["git", "fetch"]:
+                calls.append(args)
+                return SimpleNamespace(returncode=128, stdout="", stderr="fatal: not a git repository")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with patch.object(lane, "sh", side_effect=real_fault):
+            with self.assertRaises(RuntimeError):
+                lane.bindings.fetch(lane, self.host, self.binding, None, "main")
+        self.assertEqual(len(calls), 1, "a non-ref-lock fault fails immediately, no retry")
+
+    def test_a_flaky_pre_push_hook_does_not_fail_the_issue(self):
+        # JOV-8902: LYB's pre-push hook runs the test suite; a flaky suite must not fail the
+        # run's push (and the issue with it). One retry, never --no-verify: the hook still
+        # gates every attempt.
+        env = self.issue_origin()
+        real_sh, pushes = lane.sh, []
+
+        def sh(args, *rest, **kwargs):
+            if args[:2] == ["git", "push"]:
+                pushes.append(args)
+                if len(pushes) == 1:
+                    return SimpleNamespace(returncode=1, stdout="", stderr="Pre-push checks failed. Push aborted.")
+            if args[0] == "gh":
+                return SimpleNamespace(returncode=0, stdout="https://github.com/JovieInc/LogYourBody/pull/9\n", stderr="")
+            return real_sh(args, *rest, **kwargs)
+        spec = {"model": "m", "cmd": ["sh", "-c", "echo fix > fix.txt && git add fix.txt && git commit -qm 'fix: x'"]}
+        with patch.dict(os.environ, env), patch.object(lane, "sh", side_effect=sh), \
+                patch.object(lane, "context_pack", return_value=""):
+            binding = dataclasses.replace(self.binding, install=())
+            receipt = lane.bindings.run(lane, self.host, binding, "codex", spec, issue=self.lyb("LYB-7"))
+        self.assertEqual(receipt["verdict"], "pr-opened", receipt)
+        self.assertEqual(len(pushes), 2, "the flaky push retried once and succeeded")
+        self.assertFalse(any("--no-verify" in args for args in pushes), "the hook still gates every push")
+
+    def test_a_persistent_pre_push_failure_still_fails_the_issue(self):
+        env = self.issue_origin()
+        real_sh, pushes = lane.sh, []
+
+        def sh(args, *rest, **kwargs):
+            if args[:2] == ["git", "push"]:
+                pushes.append(args)
+                return SimpleNamespace(returncode=1, stdout="", stderr="Pre-push checks failed. Push aborted.")
+            if args[0] == "gh":
+                return SimpleNamespace(returncode=0, stdout="https://github.com/JovieInc/LogYourBody/pull/9\n", stderr="")
+            return real_sh(args, *rest, **kwargs)
+        spec = {"model": "m", "cmd": ["sh", "-c", "echo fix > fix.txt && git add fix.txt && git commit -qm 'fix: x'"]}
+        with patch.dict(os.environ, env), patch.object(lane, "sh", side_effect=sh), \
+                patch.object(lane, "context_pack", return_value=""):
+            binding = dataclasses.replace(self.binding, install=())
+            receipt = lane.bindings.run(lane, self.host, binding, "codex", spec, issue=self.lyb("LYB-7"))
+        self.assertEqual(receipt["verdict"], "failed", "a real regression still fails: the hook is the gate")
+        self.assertIn("git-push-failed", receipt["reasons"][0])
+        self.assertEqual(len(pushes), lane.bindings.PUSH_ATTEMPTS, "bounded, no unbounded hook re-runs")
+
     def repair_origin(self):
         root = Path(self.tmp.name)
         env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
