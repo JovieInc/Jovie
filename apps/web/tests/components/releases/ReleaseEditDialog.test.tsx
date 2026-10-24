@@ -102,6 +102,7 @@ function createRelease(): ReleaseViewModel {
     profileId: 'profile-1',
     id: 'release-1',
     title: 'Skyline Dreams',
+    status: 'released',
     slug: 'skyline-dreams',
     releaseType: 'single',
     isExplicit: false,

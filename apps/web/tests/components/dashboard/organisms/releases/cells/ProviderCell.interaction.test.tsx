@@ -18,6 +18,7 @@ describe('ProviderCell actions', () => {
     profileId: 'profile-1',
     id: 'release-1',
     title: 'Midnight Signal',
+    status: 'released',
     releaseDate: '2026-01-01',
     artworkUrl: 'https://example.com/art.jpg',
     slug: 'midnight-signal',
@@ -126,6 +127,7 @@ describe('Ion-token feedback on availability surfaces', () => {
       profileId: 'profile-1',
       id: 'release-1',
       title: 'Midnight Signal',
+      status: 'released',
       releaseDate: '2026-01-01',
       artworkUrl: 'https://example.com/art.jpg',
       slug: 'midnight-signal',
@@ -146,12 +148,16 @@ describe('Ion-token feedback on availability surfaces', () => {
       totalTracks: 1,
     };
 
+    const providerConfig = {
+      spotify: { label: 'Spotify', accent: '#1DB954' },
+    } as Parameters<typeof AvailabilityCell>[0]['providerConfig'];
+
     render(
       <TooltipProvider>
         <AvailabilityCell
           release={manualRelease}
           allProviders={['spotify']}
-          providerConfig={{ spotify: { label: 'Spotify', accent: '#1DB954' } }}
+          providerConfig={providerConfig}
           onCopy={onCopy}
         />
       </TooltipProvider>
