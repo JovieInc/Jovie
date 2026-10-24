@@ -5,6 +5,23 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 
 describe('AppShellFrame', () => {
+  // JOV-8974: the Electron shell keeps one gutter on every window edge. The
+  // body's top padding and the titlebar band's top offset must both come from
+  // the shell gap token, never a flush 0 or an invented px literal.
+  it('gives the Electron shell a top gutter equal to the side gutters', () => {
+    const globalsSource = readFileSync(
+      resolve(process.cwd(), 'app/globals.css'),
+      'utf8'
+    );
+
+    expect(globalsSource).toMatch(
+      /\[data-app-shell-body="true"\]\[data-electron-top-gap-owner="titlebar"\] \{[^}]*padding-top:\s*var\(--app-shell-gap\);/s
+    );
+    expect(globalsSource).toMatch(
+      /\[data-electron-titlebar="true"\] \{[^}]*top:\s*var\(--app-shell-gap\);/s
+    );
+  });
+
   it('renders the canonical shell design', () => {
     render(
       <AppShellFrame
