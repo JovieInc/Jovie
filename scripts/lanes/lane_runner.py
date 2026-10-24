@@ -146,7 +146,8 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-ahead-attribution.mjs",
                   "scripts/lib/merge-group-admission.mjs",
-                  "scripts/lib/source-admission-policy.mjs", "scripts/lib/merge-group-member-policy.mjs",
+                  "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs",
+                  "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
                   "scripts/lib/pre-land-changelog.mjs", "scripts/version-fanout-guard.mjs",
@@ -1114,6 +1115,12 @@ DESIGN_LOOP_CONTRACT = [
 
 # JOV-INV-044: one capability/IA contract for every provider and platform.
 # It lives in the task packet, not in an assumed callable Claude skill.
+NO_HISTORY_REWRITE = [
+    "- Never rebase, squash, reset or force-push a PR branch (no `--force`, `--force-with-lease`, `+ref`).",
+    "  Integrate main by merging origin/main into the branch; every push must be a fast-forward of the",
+    "  remote head. If a push is rejected as non-fast-forward, fetch, merge, and push again.",
+]
+
 PLANNING_CONTRACT = [
     "## Capability and IA decisions (shadow qualification)",
     "Read canon/ENGINEERING.md#capability-sourcing-and-ia-integration before new/expanded",
@@ -1230,6 +1237,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "  --no-verify or weaken a check.",
         f"- Push `{branch}` and open ONE draft PR against main whose title contains {issue.identifier}.",
         "  Do not mark it ready or merge it: an independent gate does that after verifying.",
+        *NO_HISTORY_REWRITE,
         f"- Start the PR body with `Refs {issue.identifier}.` and retain",
         f"  `<!-- linear-issue-id:{issue.id} -->` and",
         f"  `<!-- linear-issue-identifier:{issue.identifier} -->`.",
@@ -3285,6 +3293,8 @@ def gate_disposition(pr: dict, held: dict, attempts: dict) -> str | None:
 
 
 def gate_deferral(host: Host, pr: dict) -> str | None:
+    if pr_events.unconfirmed_human_hold(host, pr):
+        return "human-hold-pending"
     held, attempts = held_path(host), host.state / "fix-attempts.json"
     return gate_disposition(pr, json.loads(held.read_text()) if held.exists() else {},
                             json.loads(attempts.read_text()) if attempts.exists() else {})
@@ -4092,6 +4102,7 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
     """One deduped surface: PR comment, terminal disposition, exhausted label. No second queue."""
     head = pr.get("headRefOid") or ""
     number = pr["number"]
+    hold_pending = False
     already = any(isinstance(row, dict) and row.get("pr") == number and row.get("head") == head
                   for row in data.get("surfaced") or [])
     if not already:
@@ -4101,7 +4112,21 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
                                  "head": head, "at": time.time()})
         if reason == "ladder-exhausted" and number not in data["ladderExhausted"]:
             data["ladderExhausted"].append(number)
-    attempts[str(number)] = {**record, "escalated": True}
+    # Only remediation's own structured disposition creates the honoured hold; comment text never
+    # does. Applied once per surfaced head, so a human removing the label releases it for good.
+    if classified.get("cls") == "needs-human-decision":
+        row = next((row for row in data["surfaced"] if isinstance(row, dict) and row.get("pr") == number
+                    and row.get("head") == head), None)
+        if row is not None and not row.get("holdApplied"):
+            if pr_events.add_label(number, pr_events.HUMAN_DECISION_LABEL, sh, prefix=""):
+                row["holdApplied"] = True
+                row.pop("holdPending", None)
+            else:
+                # Not confirmed: stay held in every lanes path and retry on a later pass.
+                row["holdPending"] = True
+                hold_pending = True
+    if not hold_pending:
+        attempts[str(number)] = {**record, "escalated": True}
     pr_events.add_label(number, pr_events.EXHAUSTED, sh)
     prefix = ["fix-exhausted"] if record.get("count", 0) else []
     update_json(held_path(host), lambda held, number=number, head=head, prefix=prefix: held.update(
@@ -4121,6 +4146,22 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
         pass
     if number in data["escalating"]:
         data["escalating"] = [item for item in data["escalating"] if item != number]
+
+
+def contain_history_rewrite(host: Host, pr: dict, after: str) -> dict:
+    """A rewritten head leaves the automatic path: the same needs-human-decision surface every
+    other human gate uses (symphony-surface comment, exhausted label, `tim-hold`), keyed to the
+    rewritten head so green-wake, finalizer and fix paths all refuse it."""
+    classified = {"cls": "needs-human-decision", "subtype": "history-rewrite-detected",
+                  "evidence": [f"history-rewrite-detected: {after[:12]} does not descend from "
+                               f"{pr['headRefOid'][:12]}"], "next_action": "tim-decides"}
+    data = load_escalation(host)
+    _surface_exhausted(host, {**pr, "headRefOid": after}, {}, classified, "history-rewrite-detected",
+                       None, {}, data)
+    save_escalation(host, data)
+    row = next((row for row in data["surfaced"] if isinstance(row, dict) and row.get("pr") == pr["number"]
+                and row.get("head") == after), {})
+    return {"surfaced": True, "holdApplied": bool(row.get("holdApplied")), "holdPending": bool(row.get("holdPending"))}
 
 
 def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
@@ -4469,6 +4510,8 @@ def newest_clean_main(host: Host, pr: dict) -> str | None:
 def partial_main_sync(host: Host, pr: dict) -> str | None:
     """Merge the newest conflict-free main commit into a DIRTY branch on GitHub (the merges
     API: server-side, no checkout, refuses with 409 on any conflict). Returns that commit."""
+    if {label.lower() for label in pr_events.label_names(pr)} & pr_events.HOLD_LABELS:
+        return None  # a held branch is never moved by a main sync
     target = newest_clean_main(host, pr)
     if not target:
         return None
@@ -5481,11 +5524,18 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         "",
         "## Contract",
         "- Fix the root cause on this branch; push to the same branch. Do not open a new PR.",
+        "- Premise rule: when the same check fails twice in a row on this PR, state your",
+        "  assumption and run one falsifying test before any patch. Inspect both failures;",
+        "  record the assumption, exact command and observed result in the PR body under",
+        "  `## Premise check` (Assumption / Falsifying test / Result). A retry is not a falsifier.",
+        "- For bug fixes and CI repairs, retain pre-fix red evidence in `## Red-before-green`:",
+        "  Failing command plus a red-output snippet or Failing run (before fix) URL.",
         f"- Immediately before every install or push, use `gh api graphql` to read PR #{pr['number']} in {REPO_SLUG}:",
         "  request state, headRefOid and isInMergeQueue. The pr view JSON command does not expose queue ownership.",
         "  Continue only while OPEN with isInMergeQueue=false; otherwise stop and preserve local changes, without install or push.",
         "- Repo gates are real requirements (e.g. component-ship-gate needs tests + stories for",
         "  shipped UI components). Never skip, weaken or --no-verify a check.",
+        *NO_HISTORY_REWRITE,
         "- If the failure is unrelated to this PR (broken main, infra), change nothing and end with",
         "  `NOT-SHIPPABLE: <reason>`.",
     ])
@@ -6017,6 +6067,18 @@ class RepairStopped(RuntimeError):
         self.live, self.stage = live, stage
 
 
+def remote_fast_forwarded(worktree: Path, before: str, after: str) -> bool:
+    """True only when the remote branch head `after` descends from the pre-run head `before`.
+
+    A rebase, squash, reset or force-push replaces history, so `before` is not an ancestor.
+    Anything unreadable fails closed: an unproven fast-forward never proceeds to ready/enqueue."""
+    try:
+        sh(["git", "fetch", "-q", "origin", after], cwd=worktree, timeout=120)
+        return sh(["git", "merge-base", "--is-ancestor", before, after], cwd=worktree, timeout=60).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def repair_created_head(worktree: Path, head: str, *, allow_local_progress: bool = False) -> bool:
     """Only accept a new remote head created in this attempt's fresh checkout.
 
@@ -6058,6 +6120,8 @@ def require_fix_target(pr: dict, stage: str, *, worktree: Path | None = None, re
             raise RepairStopped("target-head-superseded", live, stage)
     if repair and remediation.review_authority_ask(live):
         raise RepairStopped("target-review-requires-authority", live, stage)
+    if repair and pr_events.human_holds(live):
+        raise RepairStopped("target-pr-human-hold", live, stage)
     return live
 
 
@@ -6493,6 +6557,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                "startedAt": now_iso()}
     receipt["targetStateReads"] = 1
     try:
+        if pr_events.unconfirmed_human_hold(host, pr):
+            raise RepairStopped("target-pr-human-hold-pending", {**pr, "state": "OPEN"}, "before-execution-claim")
         live = require_fix_target(pr, "before-execution-claim", repair=True)
     except RepairStopped as error:
         live, reason = error.live, str(error)
@@ -6595,6 +6661,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                     return None
                 receipt["targetStateReads"] += 1
                 try:
+                    if pr_events.unconfirmed_human_hold(host, pr):
+                        raise RepairStopped("target-pr-human-hold-pending", {**pr, "state": "OPEN"}, stage)
                     live = require_fix_target(target, stage, worktree=worktree, repair=True)
                 except RepairStopped as error:
                     # Mid-run, one unreadable snapshot (a check finishing between pages, a
@@ -6665,11 +6733,27 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""
             pushed = bool(after) and after != pr["headRefOid"]
+            rewritten = pushed and not remote_fast_forwarded(worktree, pr["headRefOid"], after)
+            if rewritten:
+                # Never rebase, squash, reset or force-push a PR branch. A non-fast-forward head
+                # is not a fix: no ready, no enqueue, no adoption of this head.
+                pushed = False
+                receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
+                               verdict="history-rewrite-detected",
+                               reasons=[f"history-rewrite-detected: {after[:12]} does not descend from "
+                                        f"{pr['headRefOid'][:12]}"],
+                               alert={"kind": "history-rewrite-detected", "pr": pr["number"],
+                                      "before": pr["headRefOid"], "after": after})
+                try:
+                    receipt["containment"] = contain_history_rewrite(host, pr, after)
+                except Exception as error:  # the receipt above still stands; never lose it
+                    receipt["containment"] = {"error": f"{type(error).__name__}: {error}"[:200]}
             if pushed and not repair_created_head(worktree, after):
                 raise RepairStopped("target-head-superseded", {**pr, "state": "OPEN", "headRefOid": after},
                                     "after-remote-read")
-            receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
-                           verdict="fix-pushed" if pushed else "fix-no-change")
+            if not rewritten:
+                receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
+                               verdict="fix-pushed" if pushed else "fix-no-change")
             if pushed:
                 verify_target({**pr, "headRefOid": after}, "before-push-effects")
                 labels = {label.lower() for label in pr_events.label_names(pr)}
