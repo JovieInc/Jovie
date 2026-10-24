@@ -449,6 +449,28 @@ describe('ChatInput', () => {
     );
   });
 
+  it('keeps the slash menu in flow when a recovery alert must stay visible', () => {
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          onPickerOpenChange={vi.fn()}
+          pickerPlacement='flow'
+        />
+      )
+    );
+
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /chat message input/i }),
+      { target: { value: '/' } }
+    );
+
+    const menu = screen.getByTestId('slash-command-menu');
+    const placement = menu.parentElement?.parentElement;
+    expect(placement?.className).toContain('relative');
+    expect(placement?.className).not.toContain('absolute');
+  });
+
   it('inserts selected slash skills at the typed slash location', () => {
     fastRender(withProviders(<ControlledChatInputHarness />));
 

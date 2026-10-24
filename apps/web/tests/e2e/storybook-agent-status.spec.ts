@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 
 const EVIDENCE = join('test-results', 'agent-status-evidence');
 const MATRIX = 'ui-atoms-statusglyph--operation-states';
@@ -38,7 +39,7 @@ for (const theme of ['dark', 'light'] as const) {
       );
       const audit = await new AxeBuilder({ page })
         .include('#storybook-root')
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .options(wcag22AaAxeOptions())
         .analyze();
       expect(audit.violations).toEqual([]);
       await mkdir(EVIDENCE, { recursive: true });

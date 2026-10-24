@@ -207,6 +207,10 @@ describe('ChatThreadMessages collapsed summer failures', () => {
       onShowCollapsedFailures: vi.fn(),
     });
 
+    expect(screen.getByTestId('chat-thread-empty')).toHaveTextContent(
+      'Nothing in this thread yet.'
+    );
+
     expect(
       screen.queryByTestId('chat-collapsed-failures')
     ).not.toBeInTheDocument();

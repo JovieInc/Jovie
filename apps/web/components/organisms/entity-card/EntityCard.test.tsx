@@ -408,6 +408,33 @@ describe('ProfilePacCard landscape states', () => {
     });
   });
 
+  it.each([
+    ['an upcoming release', '2999-01-01', 'Coming soon'],
+    ['a released release', '2020-01-01', 'Listen'],
+    ['a release with no date', null, 'Listen'],
+  ])(
+    'labels the degraded listen action for %s as %s',
+    (_name, releaseDate, label) => {
+      render(
+        <ProfilePacCard
+          artist={pacArtist}
+          release={{
+            title: 'Release',
+            slug: 'release',
+            artworkUrl: '/release.jpg',
+            previewUrl: null,
+            releaseDate,
+          }}
+          assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+          layout='profile-landscape'
+          captureEnabled={false}
+        />
+      );
+
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
+    }
+  );
+
   it('never prompts, submits, or emits capture events when capture is disabled', async () => {
     render(
       <ProfilePacCard
@@ -768,6 +795,25 @@ describe('ProfilePacCard landscape states', () => {
     // Neutral CTA face, not the glass slot.
     expect(listen.firstElementChild).toHaveClass('h-7', 'rounded-full');
     expect(listen.className).not.toContain('profile-glass-pill');
+  });
+
+  it('leaves the featured byline empty when there is no release', () => {
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        presentation='featured'
+        renderMode='preview'
+        captureEnabled={false}
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Tim White' })
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('Tim White')).toHaveLength(1);
+    expect(screen.queryByText('Tim White / Tim White')).toBeNull();
   });
 
   it('keeps the featured capture form stacked and hides the art while prompting', async () => {

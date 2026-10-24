@@ -16,7 +16,7 @@ import { OnboardingDspStep } from '@/features/dashboard/organisms/onboarding/Onb
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding/OnboardingHandleStep';
 import { OnboardingProfileReviewStep } from '@/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep';
 import { ReleasesEmptyState } from '@/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState';
-import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix/ReleasesExperience';
+import { ShellReleasesView } from '@/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import { getDesignStudioItem } from '@/lib/design-studio/registry';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
@@ -143,16 +143,13 @@ function DemoReleasesShowcaseState({
 
   return (
     <DemoAuthShell>
-      <ReleasesExperience
-        releases={
-          state === 'disconnected' ? [] : DEMO_RELEASE_VIEW_MODELS.slice(0, 0)
-        }
+      <ShellReleasesView
+        releases={[]}
         providerConfig={providerConfig}
         primaryProviders={primaryProviderKeys}
+        artistName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
         spotifyConnected={state !== 'disconnected'}
-        spotifyArtistName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
         appleMusicConnected={state !== 'disconnected'}
-        appleMusicArtistName={INTERNAL_DJ_DEMO_PERSONA.profile.displayName}
         allowArtworkDownloads
         initialImporting={state === 'importing'}
         initialTotalCount={state === 'importing' ? 12 : 0}

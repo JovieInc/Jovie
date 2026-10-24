@@ -20,7 +20,11 @@ import type { ProfileCardAccentAssignment } from '@/lib/profile/mode-card-accent
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
-import { ProfilePacCard, type ProfilePacRelease } from './pac/ProfilePacCard';
+import {
+  isPacReleaseUpcoming,
+  ProfilePacCard,
+  type ProfilePacRelease,
+} from './pac/ProfilePacCard';
 import type { PublicRelease } from './releases/types';
 import { usePacEvents } from './usePacEvents';
 
@@ -150,7 +154,15 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
         releaseDate: latestRelease.releaseDate,
       };
     }
-    const newest = releases.find(release => release.slug !== '');
+    // Fallback subject: the newest release fans can already play. An
+    // upcoming release is only featured through the visibility rules above
+    // (countdown), never as an implicit "latest" — that disagreed with the
+    // profile's own "latest release" copy and linked "Listen" to a
+    // coming-soon page.
+    const linkable = releases.filter(release => release.slug !== '');
+    const newest =
+      linkable.find(release => !isPacReleaseUpcoming(release, now)) ??
+      linkable[0];
     if (!newest) return null;
     return {
       title: newest.title,
@@ -160,7 +172,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
       releaseType: newest.releaseType,
       releaseDate: newest.releaseDate,
     };
-  }, [latestRelease, releases, releaseVisibility?.show]);
+  }, [latestRelease, now, releases, releaseVisibility?.show]);
 
   const pacNextShow =
     upcomingTourDates.find(show => show.id === nearbyTourDateId) ??

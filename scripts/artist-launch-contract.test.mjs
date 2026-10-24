@@ -60,6 +60,21 @@ test('maps route groups, parallel auth slots, interception and dynamic segments'
     assert.equal(routePath(`apps/web/app/${source}`), route);
 });
 
+test('keeps self-serve claim entry points in claim scope and funnel reporting internal', () => {
+  const inventory = buildInventory();
+  for (const route of ['/claim', '/claim/start']) {
+    const record = inventory.find(row => row.route === route);
+    assert.equal(record?.surface, 'claim');
+    assert.equal(record?.classification, 'B');
+  }
+  const report = inventory.find(
+    row => row.route === '/api/admin/acquisition/artist-offer-funnel'
+  );
+  assert.equal(report?.surface, 'deferred');
+  assert.equal(report?.classification, 'C');
+  assert.deepEqual(report?.methods, ['GET']);
+});
+
 test('extracts aliased HTTP methods and actions without executing application imports', () => {
   assert.deepEqual(
     exportsOf(

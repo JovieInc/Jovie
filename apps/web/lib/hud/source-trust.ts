@@ -15,10 +15,18 @@ export const HUD_SOURCE_STALE_AFTER_MS = 5 * 60 * 1000;
 
 export type HudSourceFreshnessState = 'fresh' | 'stale' | 'unknown';
 
+/**
+ * Shared freshness primitive: a source observed at `fetchedAtIso` is fresh
+ * while it is younger than its own freshness budget (`staleAfterMs`). Callers
+ * pass a per-source budget that matches the source's update cadence; the
+ * default is the HUD poll cadence. Invalid or future timestamps are unknown.
+ */
 export function getSourceFreshnessState(
-  fetchedAtIso: string,
-  now = Date.now()
+  fetchedAtIso: string | null | undefined,
+  now = Date.now(),
+  staleAfterMs = HUD_SOURCE_STALE_AFTER_MS
 ): HudSourceFreshnessState {
+  if (!fetchedAtIso) return 'unknown';
   const observedAt = Date.parse(fetchedAtIso);
   if (
     !Number.isFinite(now) ||
@@ -27,7 +35,28 @@ export function getSourceFreshnessState(
   ) {
     return 'unknown';
   }
-  return now - observedAt > HUD_SOURCE_STALE_AFTER_MS ? 'stale' : 'fresh';
+  return now - observedAt > staleAfterMs ? 'stale' : 'fresh';
+}
+
+/**
+ * Absolute observation time for metric surfaces ("Observed Oct 21, 3:04 PM
+ * UTC"). Relative labels like "just now" hide when the data was read.
+ */
+export function formatObservedAt(
+  observedAtIso: string | null | undefined
+): string {
+  if (!observedAtIso) return 'Not recorded';
+  const observedAt = Date.parse(observedAtIso);
+  if (!Number.isFinite(observedAt)) return 'Not recorded';
+  return new Date(observedAt).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+  });
 }
 
 export function formatSourceFreshness(

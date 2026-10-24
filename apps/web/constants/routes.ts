@@ -206,6 +206,20 @@ export const APP_ROUTES = {
   PAY: '/pay',
   /** Live DESIGN_READY marketing page — never 410 / reserved-gone. */
   PRODUCT: '/product',
+  /** Cmd+K command palette. Live feature page. */
+  PRODUCT_COMMAND_PALETTE: '/product/command-palette',
+  /** Release date and reveal date fields. Nested under /product so it is not a profile handle. */
+  PRODUCT_RELEASE_SCHEDULING: '/product/release-scheduling',
+  /** Per-service DSP links. Nested under /product so it is not a profile handle. */
+  PRODUCT_DSP_LINKS: '/product/dsp-links',
+  /** Tracked-link builder. Nested under /product so it is not a profile handle. */
+  PRODUCT_UTM_LINKS: '/product/utm-links',
+  /** ISRC field. Nested under /product so it is not a profile handle. */
+  PRODUCT_ISRC: '/product/isrc',
+  /** Pre-save countdown. Nested under /product so it is not a profile handle. */
+  PRODUCT_PRE_SAVE: '/product/pre-save',
+  /** Smart-link click analytics. Live feature page. */
+  PRODUCT_LINK_ANALYTICS: '/product/link-analytics',
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */
   SOLUTIONS_ARTISTS: '/solutions/artists',
   INSTANT_MERCH: '/instant-merch',
@@ -249,6 +263,9 @@ export const APP_ROUTES = {
   WAITLIST_INVITE: '/waitlist/invite',
   /** Anonymous onboarding chat (JOV-2132). Replaces /waitlist as the front door. */
   START: '/start',
+  /** Self-serve $12/month artist profile: find or create, then checkout. */
+  CLAIM: '/claim',
+  CLAIM_START: '/claim/start',
 
   // Billing
   BILLING: '/billing',

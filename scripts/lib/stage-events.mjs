@@ -184,7 +184,9 @@ export function chainStages(
         ? 'completed'
         : next
           ? 'advanced'
-          : (stamp.outcome ?? 'open'),
+          : OUTCOMES.includes(stamp.outcome)
+            ? stamp.outcome
+            : 'open',
       sourceReceipt: stamp.sourceReceipt,
     });
   }
@@ -206,7 +208,9 @@ const seconds = (from, to) => {
 function dwellSamples(events) {
   const out = {};
   for (const event of events) {
-    if (!event.exitedAt || event.outcome === 'completed') continue;
+    // Terminal stages are reported as arrivals by computeStageTimings, so a
+    // dwell sample is kept for every exited stage whatever its outcome.
+    if (!event.exitedAt) continue;
     const value = seconds(event.enteredAt, event.exitedAt);
     if (value === null) continue;
     const key = `${event.entityType}:${event.stage}`;
@@ -253,17 +257,31 @@ function windowStats(samples, nowMs) {
   return out;
 }
 
+/**
+ * Terminal stages have no dwell: report arrivals, and how many arrived
+ * `failed` with the failure rate, so a failing loop is visible at a glance.
+ */
 function arrivals(events, type, stageId, nowMs) {
-  const at = events
+  const rows = events
     .filter(e => e.entityType === type && e.stage === stageId)
-    .map(e => Date.parse(e.enteredAt));
+    .map(e => ({
+      at: Date.parse(e.enteredAt),
+      failed: e.outcome === 'failed',
+    }));
   const out = {};
-  for (const [name, span] of Object.entries(WINDOWS))
+  for (const [name, span] of Object.entries(WINDOWS)) {
+    const inWindow = rows.filter(r => r.at > nowMs - span && r.at <= nowMs);
+    const failed = inWindow.filter(r => r.failed).length;
     out[name] = {
-      n: at.filter(t => t > nowMs - span && t <= nowMs).length,
+      n: inWindow.length,
       p50: null,
       p95: null,
+      failed,
+      failRate: inWindow.length
+        ? Math.round((failed / inWindow.length) * 1000) / 1000
+        : null,
     };
+  }
   return out;
 }
 
@@ -408,5 +426,49 @@ export function buildStageSummary(timings) {
     regressions: timings.regressions,
     slowestP95_7d: stage7d.sort((a, b) => b.p95 - a.p95).slice(0, 5),
     endToEnd7d: endToEnd,
+  };
+}
+
+const packWindow = (w, terminal) => [
+  w?.n ?? 0,
+  w?.p50 ?? null,
+  w?.p95 ?? null,
+  ...(terminal ? [w?.failed ?? null, w?.failRate ?? null] : []),
+];
+const packRegression = r =>
+  r
+    ? [
+        Boolean(r.regressed),
+        r.ratio === null ? null : Math.round(r.ratio * 100) / 100,
+        r.recentP95,
+        r.baselineP95,
+        r.recentN,
+        r.baselineN,
+      ]
+    : null;
+export function compactStageTimings(timings) {
+  const packRows = rows => {
+    const out = {};
+    for (const [id, { source: _source, ...row }] of Object.entries(rows)) {
+      for (const w of timings.windows)
+        row[w] = packWindow(row[w], row.terminal);
+      out[id] = { ...row, regression: packRegression(row.regression) };
+    }
+    return out;
+  };
+  const entities = {};
+  for (const [type, entity] of Object.entries(timings.entities))
+    entities[type] = {
+      stages: packRows(entity.stages),
+      endToEnd: packRows(entity.endToEnd),
+    };
+  return {
+    ...timings,
+    schema: 'jovie-stage-timings-compact/v1',
+    windowFormat: ['n', 'p50', 'p95'],
+    terminalWindowFormat: ['n', 'p50', 'p95', 'failed', 'failRate'],
+    regressionFormat:
+      'regressed ratio recentP95 baselineP95 recentN baselineN'.split(' '),
+    entities,
   };
 }

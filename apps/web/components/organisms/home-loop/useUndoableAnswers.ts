@@ -15,10 +15,28 @@ export interface UndoableAnswerInput {
   readonly commit: () => Promise<void>;
 }
 
+interface PendingAnswer {
+  readonly timer: ReturnType<typeof setTimeout>;
+  readonly label: string;
+  readonly commit: () => Promise<void>;
+  readonly onCommitted?: (id: string) => void;
+}
+
+function failureLabel(error: unknown): string {
+  return error instanceof Error && error.message
+    ? error.message
+    : 'Could not send. Try again.';
+}
+
+function answerToastId(id: string): string {
+  return `home-loop-answer-${id}`;
+}
+
 /**
  * Optimistic answers with an undo window. The answer shows immediately; the
  * commit runs only after the window closes, so Undo never has to reverse a
- * write. A failed commit restores the controls with the error in place.
+ * write. Unmount commits immediately. A failed commit restores the controls
+ * with the error in place, or reports the error in a toast if the canvas is gone.
  */
 export function useUndoableAnswers({
   windowMs = HOME_LOOP_UNDO_WINDOW_MS,
@@ -28,13 +46,26 @@ export function useUndoableAnswers({
   readonly onCommitted?: (id: string) => void;
 } = {}) {
   const [answers, setAnswers] = useState<Record<string, HomeLoopAnswer>>({});
-  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const pending = useRef(new Map<string, PendingAnswer>());
 
   useEffect(() => {
-    const pending = timers.current;
+    const queue = pending.current;
     return () => {
-      for (const timer of pending.values()) clearTimeout(timer);
-      pending.clear();
+      const flushing = [...queue.entries()];
+      queue.clear();
+      for (const [id, item] of flushing) {
+        clearTimeout(item.timer);
+        toast.dismiss(answerToastId(id));
+        void Promise.resolve()
+          .then(() => item.commit())
+          .then(() => {
+            toast.success(item.label);
+            item.onCommitted?.(id);
+          })
+          .catch((error: unknown) => {
+            toast.error(failureLabel(error));
+          });
+      }
     };
   }, []);
 
@@ -49,10 +80,11 @@ export function useUndoableAnswers({
 
   const undo = useCallback(
     (id: string) => {
-      const timer = timers.current.get(id);
-      if (!timer) return;
-      clearTimeout(timer);
-      timers.current.delete(id);
+      const item = pending.current.get(id);
+      if (!item) return;
+      clearTimeout(item.timer);
+      pending.current.delete(id);
+      toast.dismiss(answerToastId(id));
       setAnswer(id, null);
     },
     [setAnswer]
@@ -60,31 +92,27 @@ export function useUndoableAnswers({
 
   const answer = useCallback(
     ({ id, label, commit }: UndoableAnswerInput) => {
-      if (timers.current.has(id)) return;
+      if (pending.current.has(id)) return;
       setAnswer(id, { label, state: 'pending' });
       toast(label, {
-        id: `home-loop-answer-${id}`,
+        id: answerToastId(id),
         duration: windowMs,
         action: { label: 'Undo', onClick: () => undo(id) },
       });
+      const notify = onCommitted;
       const timer = setTimeout(() => {
-        timers.current.delete(id);
-        commit()
+        pending.current.delete(id);
+        void Promise.resolve()
+          .then(() => commit())
           .then(() => {
             setAnswer(id, { label, state: 'sent' });
-            onCommitted?.(id);
+            notify?.(id);
           })
           .catch((error: unknown) => {
-            setAnswer(id, {
-              label:
-                error instanceof Error && error.message
-                  ? error.message
-                  : 'Could not send. Try again.',
-              state: 'failed',
-            });
+            setAnswer(id, { label: failureLabel(error), state: 'failed' });
           });
       }, windowMs);
-      timers.current.set(id, timer);
+      pending.current.set(id, { timer, label, commit, onCommitted: notify });
     },
     [onCommitted, setAnswer, undo, windowMs]
   );

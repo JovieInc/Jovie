@@ -99,7 +99,8 @@ export interface GoldenPathClaim {
   readonly evidence?: ClaimEvidence;
 }
 
-const HOMEPAGE_COPY = 'apps/web/data/homepageIdentityCopy.ts';
+const HOMEPAGE_COPY = 'apps/web/data/homepageCopy.ts';
+const HOMEPAGE_FAN_STATES_COPY = 'apps/web/data/homepageFanStatesCopy.ts';
 const CHECKOUT_CLIENT =
   'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx';
 const PRESENCE_STEPS = 'apps/web/lib/onboarding/presence-build/execute-step.ts';
@@ -111,59 +112,48 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     route: '/',
     source: HOMEPAGE_COPY,
     copy: 'Be found. Be understood.',
-    nature: 'outcome',
-    capabilityIds: ['public-profile', 'agent-readable-profile-summary'],
-    evidence: {
-      class: 'dogfood',
-      proofIds: ['dogfood-tim-human-link-clicks-90d'],
-    },
+    nature: 'capability',
+    capabilityIds: ['artist-profiles', 'public-profile'],
   },
   {
     id: 'homepage.hero.subhead',
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Claim your name. Jovie makes you easy to reach, for people and for agents.',
-    nature: 'outcome',
-    capabilityIds: ['public-profile', 'agent-readable-profile-summary'],
-    evidence: { class: 'dogfood', proofIds: ['dogfood-tim-known-contacts'] },
+    copy: 'A free profile for your music, bio, and links. Your latest release leads, with tour dates and updates one tap away.',
+    nature: 'capability',
+    capabilityIds: [
+      'artist-profiles',
+      'public-profile',
+      'artist-notifications',
+    ],
   },
   {
-    id: 'homepage.hero.artist-profile',
+    id: 'homepage.fan-states.headline',
+    step: 'homepage',
+    route: '/',
+    source: HOMEPAGE_FAN_STATES_COPY,
+    copy: 'Each visit gets the right next step.',
+    nature: 'capability',
+    capabilityIds: ['artist-profiles'],
+  },
+  {
+    id: 'homepage.offer.headline',
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Your music and links, together.',
+    copy: 'Free to claim. Yours to share.',
     nature: 'capability',
     capabilityIds: ['public-profile'],
   },
   {
-    id: 'homepage.presence.headline',
+    id: 'homepage.offer.smart-links',
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_COPY,
-    copy: 'Your presence, resolved.',
-    nature: 'outcome',
-    capabilityIds: ['public-profile'],
-    evidence: { class: 'computed', slot: 'presence-signals' },
-  },
-  {
-    id: 'homepage.presence.next-step',
-    step: 'homepage',
-    route: '/',
-    source: HOMEPAGE_COPY,
-    copy: 'Read the work. Start a conversation. Attend an event or send a payment.',
+    copy: 'Unlimited smart links',
     nature: 'capability',
-    capabilityIds: ['artist-profiles', 'public-ask', 'pay'],
-  },
-  {
-    id: 'homepage.structure.body',
-    step: 'homepage',
-    route: '/',
-    source: HOMEPAGE_COPY,
-    copy: 'One identity. Room for everything you do, and whatever comes next.',
-    nature: 'positioning',
-    capabilityIds: [],
+    capabilityIds: ['smart-links'],
   },
   {
     id: 'claim.banner.ready',
@@ -255,7 +245,7 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'pricing',
     route: '/pricing',
     source: 'apps/web/lib/billing/offer-truth.ts',
-    copy: 'Limited access.',
+    copy: 'Self-serve. Cancel anytime.',
     nature: 'offer',
     capabilityIds: [],
   },

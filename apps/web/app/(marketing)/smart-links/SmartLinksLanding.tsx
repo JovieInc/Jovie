@@ -41,7 +41,7 @@ export function SmartLinksLanding() {
       >
         <MarketingHeroPhoto {...SMART_LINKS_HERO_PHOTO} />
         <MarketingContainer width='page' className='relative z-3'>
-          <div className='grid items-center gap-12 lg:grid-cols-2'>
+          <div className='grid items-start gap-12 lg:grid-cols-2'>
             <div>
               <p className='homepage-section-eyebrow'>SMART LINKS</p>
               <h1

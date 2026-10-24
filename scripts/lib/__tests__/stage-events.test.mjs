@@ -6,6 +6,7 @@ import { checkStageManifest } from '../../stage-manifest-check.mjs';
 import {
   buildStageSummary,
   chainStages,
+  compactStageTimings,
   computeStageTimings,
   parseStageEventFeed,
   regressionFlag,
@@ -140,6 +141,13 @@ describe('stage event contract', () => {
       MANIFEST
     );
     expect(open[0]).toMatchObject({ outcome: 'open', exitedAt: null });
+    const bogus = chainStages(
+      'shipping',
+      'y',
+      [{ stage: 'ready', at: ago(3), sourceReceipt: 'r', outcome: 'shipped' }],
+      MANIFEST
+    );
+    expect(bogus[0].outcome).toBe('open');
   });
 });
 
@@ -157,6 +165,8 @@ describe('stage timings', () => {
       dwell('queued', 60, 100, 'a'),
       dwell('queued', 3 * 1440, 300, 'b'),
       dwell('queued', 20 * 1440, 900, 'c'),
+      dwell('gate-seat', 60, 120, 'a'),
+      dwell('gate', 60, 1716, 'a'),
       event({
         stage: 'verified',
         entityId: 'a',
@@ -172,13 +182,96 @@ describe('stage timings', () => {
     expect(queued['28d']).toEqual({ n: 3, p50: 300, p95: 900 });
     expect(t.entities.shipping.stages.verified).toMatchObject({
       terminal: true,
-      '24h': { n: 1, p50: null, p95: null },
+      '24h': { n: 1, p50: null, p95: null, failed: 0, failRate: 0 },
       regression: null,
     });
+    expect(t.entities.shipping.stages['gate-seat']['24h']).toEqual({
+      n: 1,
+      p50: 120,
+      p95: 120,
+    });
+    expect(t.entities.shipping.stages.gate['24h']).toEqual({
+      n: 1,
+      p50: 1716,
+      p95: 1716,
+    });
     expect(t.coverage).toEqual({
-      stagesTotal: 31,
-      stagesWithData: 2,
-      events: 4,
+      stagesTotal: Object.values(MANIFEST.entities).flatMap(e => e.stages)
+        .length,
+      stagesWithData: 4,
+      events: 6,
+    });
+  });
+
+  it('times outcome receipts independently while verified remains terminal', () => {
+    const events = [
+      event({
+        stage: 'verified',
+        enteredAt: ago(60),
+        exitedAt: ago(60),
+        outcome: 'completed',
+      }),
+      ...['advanced', 'failed', 'abandoned'].map((outcome, index) => ({
+        ...dwell('outcome-receipt', 10, (index + 1) * 60, `JOV-${index + 1}`),
+        outcome,
+      })),
+    ];
+    const parsed = parseStageEventFeed(
+      events.map(e => JSON.stringify(e)).join('\n'),
+      MANIFEST
+    );
+    expect(parsed.rejected).toEqual([]);
+    const timings = computeStageTimings(parsed.events, MANIFEST, { now: NOW });
+    const receipts = timings.entities.shipping.stages['outcome-receipt'];
+    expect(receipts.terminal).toBeUndefined();
+    expect(receipts['24h']).toEqual({ n: 3, p50: 120, p95: 180 });
+    expect(
+      compactStageTimings(timings).entities.shipping.stages['outcome-receipt'][
+        '24h'
+      ]
+    ).toEqual([3, 120, 180]);
+    expect(timings.entities.shipping.stages.verified).toMatchObject({
+      terminal: true,
+      '24h': { n: 1, p50: null, p95: null, failed: 0, failRate: 0 },
+      regression: null,
+    });
+    expect(buildStageSummary(timings).slowestP95_7d).toContainEqual({
+      stage: 'shipping:outcome-receipt',
+      n: 3,
+      p50: 120,
+      p95: 180,
+    });
+  });
+
+  it('reports failures and the failure rate on terminal stages', () => {
+    const outcome = (id, outcome) =>
+      event({
+        entityType: 'summer-turn',
+        stage: 'outcome',
+        entityId: id,
+        enteredAt: ago(30),
+        exitedAt: ago(30),
+        outcome,
+      });
+    const t = computeStageTimings(
+      [
+        outcome('a', 'failed'),
+        outcome('b', 'failed'),
+        outcome('c', 'completed'),
+        outcome('d', 'failed'),
+      ],
+      MANIFEST,
+      { now: NOW }
+    );
+    expect(
+      compactStageTimings(t).entities['summer-turn'].stages.outcome['24h']
+    ).toEqual([4, null, null, 3, 0.75]);
+    expect(t.entities['summer-turn'].stages.outcome['24h']).toEqual({
+      n: 4,
+      p50: null,
+      p95: null,
+      failed: 3,
+      failRate: 0.75,
     });
   });
 

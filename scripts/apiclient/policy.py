@@ -6,6 +6,7 @@ languages read and write one ledger. Pinned by packages/api-client/conformance/p
 from __future__ import annotations
 
 import math
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
 
 from .contract import DEFAULTS, priority_policy
@@ -220,10 +221,44 @@ def backoff_ms(attempt: int, fail: dict, now_ms: int, random: Callable[[], float
     return max(jitter, hinted)
 
 
+def utc_day(now_ms: int) -> str:
+    return datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+
+
+def _next_utc_day(now_ms: int) -> int:
+    day = datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    return int((day + timedelta(days=1)).timestamp() * 1000)
+
+
+def _spent_today(state: dict, now_ms: int) -> float:
+    spend = state.get("spend")
+    return spend["usd"] if spend and spend.get("day") == utc_day(now_ms) else 0
+
+
+def reserve_spend(state: dict, price_usd: float, cap_usd: Optional[float], now_ms: int) -> dict:
+    """Reserve price_usd against today's cap (mirror of reserveSpend). No cap fails closed."""
+    spent = _spent_today(state, now_ms)
+    if price_usd <= 0:
+        return {"ok": True, "spentUsd": spent}
+    if cap_usd is None or spent + price_usd > cap_usd + 1e-9:
+        return {"ok": False, "spentUsd": spent, "capUsd": cap_usd, "retryAt": _next_utc_day(now_ms)}
+    state["spend"] = {"day": utc_day(now_ms), "usd": spent + price_usd}
+    return {"ok": True, "spentUsd": spent + price_usd}
+
+
+def refund_spend(state: dict, price_usd: float, now_ms: int) -> None:
+    """Failed calls are free: give back a reservation made today."""
+    spend = state.get("spend")
+    if price_usd <= 0 or not spend or spend.get("day") != utc_day(now_ms):
+        return
+    spend["usd"] = max(0, spend["usd"] - price_usd)
+
+
 def prune_ledger(ledger: dict, now_ms: int, stale_ms: Optional[int] = None) -> None:
     stale = DEFAULTS["staleCredentialMs"] if stale_ms is None else stale_ms
     for cid, state in list(ledger["credentials"].items()):
         b = state["breaker"]
         still_open = b["state"] != "closed" and b["openUntil"] > now_ms
-        if not still_open and now_ms - state["lastSeenAt"] > stale:
+        spending = _spent_today(state, now_ms) > 0  # today's spend survives idle hours
+        if not still_open and not spending and now_ms - state["lastSeenAt"] > stale:
             del ledger["credentials"][cid]

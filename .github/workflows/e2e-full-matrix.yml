@@ -54,6 +54,10 @@ jobs:
           # from the client bundle. The managed Playwright server sets it;
           # this standalone build must too.
           NEXT_PUBLIC_FEATURE_THEME_SWITCHING: '1'
+          # Cloudflare's documented always-pass Turnstile test site key (same
+          # as ci.yml). Without it the /start widget never renders, so the
+          # controlled-verification specs never reach their provider fixture.
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_IGNORE_ESLINT: '1'
@@ -162,7 +166,12 @@ jobs:
           mkdir -p .next/standalone/apps/web/.next
           cp -r .next/static .next/standalone/apps/web/.next/static
           cp -r public .next/standalone/apps/web/public
-          PORT=3100 HOSTNAME=localhost node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/e2e-full-web.log" 2>&1 &
+          # Next builds request.url from HOSTNAME, so it must be the same host
+          # Playwright browses (BASE_URL). With HOSTNAME=localhost every
+          # absolute redirect jumped 127.0.0.1 -> localhost and dropped
+          # host-only cookies set on the first hop (the pending-claim cookie
+          # in claim-prebuilt.smoke).
+          PORT=3100 HOSTNAME=127.0.0.1 node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/e2e-full-web.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/e2e-full-web.pid"
           for _ in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:3100/api/dev/test-auth/session >/dev/null; then
@@ -193,7 +202,7 @@ jobs:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
           VERCEL_ENV: development
-          HOSTNAME: localhost
+          HOSTNAME: 127.0.0.1
           PORT: '3100'
           BASE_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
@@ -216,6 +225,12 @@ jobs:
           # Honors x-jovie-e2e-llm-failure on the onboarding failure spec only.
           # Requests without that header still use the normal chat path.
           CHAT_LLM_FAILURE_INJECTION: '1'
+          # Cloudflare's always-pass Turnstile test keys (same as ci.yml).
+          # Without the secret, a gated first onboarding message fails closed
+          # with 503 TURNSTILE_NOT_CONFIGURED instead of the 403
+          # TURNSTILE_REQUIRED contract the canary asserts.
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_DISABLE_TOOLBAR: '1'

@@ -12,6 +12,22 @@ function requireProof(condition, reason) {
   if (!condition) throw new Error(reason);
 }
 
+// Name why a gh/unzip call failed without echoing raw output: a spawn error
+// code, or the first stderr line naming a rate limit, HTTP status or timeout.
+// 2026-10-21 15:39Z: a bare "transport failed" left a quota stall
+// indistinguishable from a real evidence fault (controller 39626740948).
+export function transportFailureDetail(result) {
+  if (result.error) return String(result.error.code ?? 'spawn error');
+  const stderr = Buffer.isBuffer(result.stderr)
+    ? result.stderr.toString('utf8')
+    : String(result.stderr ?? '');
+  const line = stderr
+    .split('\n')
+    .map(text => text.trim())
+    .find(text => /rate limit|HTTP \d{3}|timed out/i.test(text));
+  return line ? line.slice(0, 200) : `exit ${result.status}`;
+}
+
 // Reuse only a uniquely authenticated receipt for the deployment currently
 // served by the canonical alias. Never select an arbitrary latest artifact.
 export function resolveCanonicalStagingReceipt({
@@ -107,7 +123,7 @@ export function runCanonicalStagingReceipt(env = process.env) {
     });
     requireProof(
       result.status === 0,
-      'canonical staging evidence transport failed'
+      `canonical staging evidence transport failed (${transportFailureDetail(result)})`
     );
     return result.stdout;
   }

@@ -1064,4 +1064,53 @@ describe('ProfileDesktopSurface', () => {
       'text|release|text'
     );
   });
+
+  it('renders Jovie footer branding in the desktop content scroll (JOV-8777)', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+      />
+    );
+
+    const branding = screen.getByTestId('profile-jovie-branding');
+    expect(
+      within(branding).getByRole('link', { name: /Jovie home/i })
+    ).toHaveAttribute(
+      'href',
+      `/?utm_source=profile&utm_artist=${artist.handle}`
+    );
+  });
+
+  it('omits Jovie footer branding when hideJovieBranding is set (JOV-8777)', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='profile'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        hideJovieBranding
+      />
+    );
+
+    expect(screen.queryByTestId('profile-jovie-branding')).toBeNull();
+  });
 });
