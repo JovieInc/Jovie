@@ -173,6 +173,43 @@ describe('DesktopTitlebar', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('never renders the canonical toggle as a disabled control when the sidebar context is absent', () => {
+    // Streaming shell skeleton and provider-less hosts render the titlebar
+    // outside SidebarProvider. The canonical Electron control must not exist
+    // there as a disabled dead button: a disabled toggle is unfocusable and
+    // inert, and the E2E keyboard contract focuses it as soon as it resolves.
+    render(
+      <TooltipProvider>
+        <DesktopTitlebar />
+        <DesktopReleaseIdentity />
+      </TooltipProvider>
+    );
+
+    expect(
+      screen.queryByTestId('electron-sidebar-toggle')
+    ).not.toBeInTheDocument();
+    // No disabled or aria-disabled rail toggle anywhere in the titlebar.
+    const deadToggles = document.querySelectorAll(
+      '[data-rail-toggle="left"][disabled], [data-rail-toggle="left"][aria-disabled="true"]'
+    );
+    expect(deadToggles).toHaveLength(0);
+    // The placeholder keeps the rail column's geometry without shipping a
+    // focusable control, and it is hidden from the accessibility tree.
+    const placeholder = screen
+      .getByTestId('electron-titlebar-sidebar-cell')
+      .querySelector('.skeleton');
+    expect(placeholder).not.toBeNull();
+    expect(placeholder).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('renders the canonical toggle enabled once the sidebar context is present', () => {
+    renderTitlebar();
+
+    const sidebarToggle = screen.getByTestId('electron-sidebar-toggle');
+    expect(sidebarToggle).not.toHaveAttribute('disabled');
+    expect(sidebarToggle).not.toHaveAttribute('aria-disabled', 'true');
+  });
+
   it('keeps back/forward nav in the sidebar titlebar cell', () => {
     renderTitlebar();
 

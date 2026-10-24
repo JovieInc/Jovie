@@ -27,15 +27,16 @@ class VerifiedAutomergeTest(unittest.TestCase):
         self.failure = False
         self.log = io.StringIO()
         for mock in [patch.dict(os.environ, {"LANES_AUTOMERGE_MAX_PER_HOUR": "30"}),
-                     patch.object(lane, "sh", side_effect=self.shell)]:
+                     patch.object(lane, "gh_call", side_effect=self.shell),
+                     patch.object(lane, "sh", side_effect=lambda cmd, **kw: self.shell(cmd[1:], **kw))]:
             mock.start()
             self.addCleanup(mock.stop)
 
     def shell(self, cmd, **kwargs):
         self.calls.append(cmd)
-        if cmd[:3] == ["gh", "api", "graphql"]:
+        if cmd[:2] == ["api", "graphql"]:
             out = json.dumps({"data": {"repository": {"pullRequest": self.pr}}})
-        elif cmd[:3] == ["gh", "variable", "list"]:
+        elif cmd[:2] == ["variable", "list"]:
             out = json.dumps(self.variables)
         else:
             out = ""
@@ -47,12 +48,12 @@ class VerifiedAutomergeTest(unittest.TestCase):
         lane.arm_verified_automerge(self.host, self.pr, log=self.log)
 
     def merges(self):
-        return [cmd for cmd in self.calls if cmd[:3] == ["gh", "pr", "merge"]]
+        return [cmd for cmd in self.calls if cmd[:2] == ["pr", "merge"]]
 
     def test_arms_once_per_head_and_persists_across_rerun(self):
         self.arm()
         self.arm()
-        self.assertEqual(self.merges(), [["gh", "pr", "merge", "7", "--auto", "--squash",
+        self.assertEqual(self.merges(), [["pr", "merge", "7", "--auto", "--squash",
                          "--match-head-commit", "abc", "--repo", lane.REPO_SLUG]])
         self.pr["headRefOid"] = "def"
         self.arm()
@@ -70,18 +71,18 @@ class VerifiedAutomergeTest(unittest.TestCase):
         claim = SimpleNamespace(lock=SimpleNamespace(held=True), pr=live)
         real_shell = self.shell
         def shell(cmd, **kwargs):
-            if cmd[:3] == ["gh", "pr", "ready"]:
+            if cmd[:2] == ["pr", "ready"]:
                 self.assertEqual(self.merges(), [])
             return real_shell(cmd, **kwargs)
         with patch.object(lane, "successful_gate", return_value={"sensitive": False}), \
                 patch.object(lane, "require_gate_authority", return_value=live), \
                 patch.object(lane, "claimed_elsewhere", return_value=False), \
                 patch.object(lane, "source_publication_authority", return_value=None), \
-                patch.object(lane, "sh", side_effect=shell):
+                patch.object(lane, "gh_call", side_effect=shell):
             self.assertEqual(lane.publish_verified(self.host, live, claim=claim, log=self.log), "landing")
         self.assertEqual(len(self.merges()), 1)
-        self.assertLess(next(i for i, c in enumerate(self.calls) if c[:3] == ["gh", "pr", "ready"]),
-                        next(i for i, c in enumerate(self.calls) if c[:3] == ["gh", "pr", "merge"]))
+        self.assertLess(next(i for i, c in enumerate(self.calls) if c[:2] == ["pr", "ready"]),
+                        next(i for i, c in enumerate(self.calls) if c[:2] == ["pr", "merge"]))
 
     def test_skips_armed_queued_and_every_enroll_hold(self):
         holds = json.loads((lane.HERE.parent / "lib/admission-hold-labels.json").read_text())
@@ -151,17 +152,17 @@ class VerifiedAutomergeTest(unittest.TestCase):
         self.assertEqual(json.loads((self.host.state / "requeue.json").read_text()), {})
 
     def test_nonzero_commands_and_closed_log_never_raise(self):
-        for command in (["gh", "api", "graphql"], ["gh", "variable", "list"], ["gh", "pr", "merge"]):
+        for command in (["api", "graphql"], ["variable", "list"], ["pr", "merge"]):
             with self.subTest(command=command):
                 self.calls.clear()
                 (self.host.state / "automerge.json").unlink(missing_ok=True)
                 real_shell = self.shell
                 def shell(cmd, **kwargs):
                     result = real_shell(cmd, **kwargs)
-                    if cmd[:3] == command:
+                    if cmd[:2] == command:
                         result.returncode = 1
                     return result
-                with patch.object(lane, "sh", side_effect=shell):
+                with patch.object(lane, "gh_call", side_effect=shell):
                     self.arm()
                 self.assertIn("arm-failed" if command[-1] == "merge" else "arm-unavailable",
                               self.log.getvalue())

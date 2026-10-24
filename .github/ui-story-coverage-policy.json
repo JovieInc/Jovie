@@ -134,10 +134,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/auth/ButtonSpinner.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/insights/InsightActions.tsx",
       "linearIssue": "JOV-8847"
     },
@@ -618,23 +614,7 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/shell/ArtworkPlayOverlay.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/DashboardSegmentSkeleton.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/EntityThreadGlyph.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/shell/InlineEditRow.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/LoopBtn.tsx",
       "linearIssue": "JOV-8847"
     },
     {
@@ -650,23 +630,7 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/shell/PlayingBars.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/PriorityGlyph.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/ShellLoader.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/shell/SmartLinkRow.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/shell/TaskStatusIcon.tsx",
       "linearIssue": "JOV-8847"
     },
     {

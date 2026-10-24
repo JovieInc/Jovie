@@ -158,6 +158,9 @@ export function ChatProfileFallback({
         <div className='flex h-full items-center justify-center p-6'>
           <ContentSurfaceCard className='max-w-sm'>
             <div className='flex flex-col items-center gap-3 px-6 py-8 text-center'>
+              <p className='sr-only' role='status'>
+                Loading your profile…
+              </p>
               <div
                 className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none'
                 aria-hidden='true'
@@ -201,6 +204,9 @@ export function ChatProfileFallback({
       <div className='flex h-full items-center justify-center p-6'>
         <ContentSurfaceCard className='max-w-sm'>
           <div className='flex flex-col items-center gap-3 px-6 py-8 text-center'>
+            <p className='sr-only' role='status'>
+              Finishing your dashboard setup…
+            </p>
             <div
               className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none'
               aria-hidden='true'
