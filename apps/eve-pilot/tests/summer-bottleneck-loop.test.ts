@@ -124,6 +124,7 @@ function snapshot(
     ciAudit?: Record<string, unknown> | null;
     existingRepair?: Record<string, unknown> | null;
     taskAdmissions?: Record<string, unknown> | null;
+    bottleneckStatus?: Record<string, unknown> | null;
   } = {}
 ) {
   const source = overrides.sourceVersion ?? SOURCE;
@@ -206,6 +207,9 @@ function snapshot(
       ...(overrides.taskAdmissions === null
         ? {}
         : { taskAdmissions: overrides.taskAdmissions ?? admissions }),
+      ...(overrides.bottleneckStatus
+        ? { bottleneckStatus: overrides.bottleneckStatus }
+        : {}),
       admissions: {},
       ciAudit: {
         schema: 'jovie-ci-bottleneck-audit/v1',
@@ -498,6 +502,68 @@ describe('Summer bottleneck loop', () => {
     ).toBe(false);
   });
 
+  it('accepts the optional bottleneck status for both published statuses', () => {
+    for (const status of [
+      {
+        schema: 'jovie.eve.summer-bottleneck-status/v1',
+        status: 'agentic',
+        metric: 'Median merge-queue wait 6 min',
+        statusLink: 'https://github.com/JovieInc/Jovie/pull/17005',
+      },
+      {
+        schema: 'jovie.eve.summer-bottleneck-status/v1',
+        status: 'needs-you',
+        metric: 'Runner memory 94% sustained',
+        statusLink:
+          'https://linear.app/jovie/issue/JOV-5974/raise-runner-memory',
+        monthlyCostUsd: 24,
+        expectedImpact: 'Adds capacity for two concurrent repairs.',
+      },
+    ]) {
+      const parsed = summerBottleneckSnapshotSchema.safeParse(
+        snapshot({ bottleneckStatus: status })
+      );
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.signals.bottleneckStatus).toEqual(status);
+      }
+    }
+    // Absence stays valid for current senders.
+    expect(summerBottleneckSnapshotSchema.safeParse(snapshot()).success).toBe(
+      true
+    );
+  });
+
+  it('rejects a malformed bottleneck status without altering the event', () => {
+    const valid = {
+      schema: 'jovie.eve.summer-bottleneck-status/v1',
+      status: 'agentic',
+      metric: 'Median merge-queue wait 6 min',
+      statusLink: 'https://github.com/JovieInc/Jovie/pull/17005',
+    } as Record<string, unknown>;
+    for (const bad of [
+      { ...valid, status: 'clear' },
+      { ...valid, statusLink: 'not-a-url' },
+      { ...valid, statusLink: 'javascript:alert(1)' },
+      { ...valid, status: 'needs-you' },
+      {
+        ...valid,
+        status: 'needs-you',
+        monthlyCostUsd: -1,
+        expectedImpact: 'Unblocks repairs.',
+      },
+      { ...valid, monthlyCostUsd: '24' },
+      { ...valid, extraField: true },
+      { ...valid, metric: '   ' },
+    ]) {
+      expect(
+        summerBottleneckSnapshotSchema.safeParse(
+          snapshot({ bottleneckStatus: bad })
+        ).success
+      ).toBe(false);
+    }
+  });
+
   it('deterministically ranks one bottleneck by blocked time, impact, then id', () => {
     const input = snapshot({
       closure: {
@@ -755,6 +821,38 @@ describe('Summer bottleneck loop', () => {
       expect(proof.dispatchToSymphony).not.toHaveBeenCalled();
       expect(proof.observeSymphonyOutcome).not.toHaveBeenCalled();
     }
+  });
+
+  it('ingests a signed snapshot carrying the bottleneck status without changing the dispatch decision', async () => {
+    const proof = harness();
+    const receipt = await ingestSummerBottleneckSnapshot(
+      snapshot({
+        ciAudit: null,
+        release: {
+          blockedSince: '2026-09-02T07:00:00.000Z',
+          productionSha: 'b'.repeat(40),
+          unverifiedMerges: 3,
+        },
+        bottleneckStatus: {
+          schema: 'jovie.eve.summer-bottleneck-status/v1',
+          status: 'agentic',
+          metric: 'Median merge-queue wait 6 min',
+          statusLink: 'https://github.com/JovieInc/Jovie/pull/17005',
+        },
+      }),
+      proof.dependencies
+    );
+
+    expect(receipt).toMatchObject({
+      decision: 'held-host-assignment',
+      selected: { id: 'release-certification-starvation' },
+      executionHold: {
+        kind: 'host-assignment',
+        reason: 'selection-outside-task-admission-allowlist',
+      },
+      terminal: true,
+    });
+    expect(verifySummerBottleneckReceipt(receipt, KEY)).toBe(true);
   });
 
   it('holds a release bottleneck outside the selection-bound CI task policy', async () => {

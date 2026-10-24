@@ -17,6 +17,7 @@ import {
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
+import { chatTranscriptRangeWithPinnedTail } from '@/components/jovie/chat-transcript-range';
 import { AUDIO_FILE_ACCEPT } from '@/lib/audio/constants';
 import {
   CHAT_TRANSCRIPT_ROW_ESTIMATE_PX,
@@ -378,6 +379,9 @@ export function JovieChat({
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => CHAT_TRANSCRIPT_ROW_ESTIMATE_PX,
     overscan: CHAT_TRANSCRIPT_WINDOW.overscanRowCount,
+    // JOV-8481: a window that excludes the last message must still mount the
+    // newest row, or scrollIntoView to the live tail finds no element.
+    rangeExtractor: chatTranscriptRangeWithPinnedTail,
     // The scroll viewport mounts after history resolves; seed from the live
     // scrollTop so a scroll that landed before the offset observer attached
     // isn't replayed as offset 0 (JOV-6702).

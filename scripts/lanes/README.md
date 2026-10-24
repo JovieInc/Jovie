@@ -78,6 +78,14 @@ Legacy common-source-SHA reservations have no owner proof and remain held for
 authoritative reconciliation. Source merge is preparatory and does not repair or
 certify the running coordinator.
 
+PR repair selection captures one qualified bulk inventory outside the global claim lock,
+using the existing per-key cache lock. Current local preservation and attempt state,
+fresh selected-head/foreign-owner checks and atomic charging remain inside. Unknown or
+expired initial repair evidence defers before new-issue fallback; remote-only lanes retain
+their original path. New-issue and sweep reads, brief effects and selected-owner latency
+remain separate lock/continuity work under JOV-8371; this source change does not attest an
+installed release or measured live throughput recovery.
+
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
 running worker. Production deploys are a separate track: only a red main stops shipping.
