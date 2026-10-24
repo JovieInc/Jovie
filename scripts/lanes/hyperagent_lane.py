@@ -120,6 +120,63 @@ def failure(error):
     return "remote-read-unavailable"
 
 
+BUDGET_HIT = re.compile(r"reached its model budget of \$([0-9.]+)", re.I)
+RESUME_MESSAGE = ("The previous turn stopped at its model budget. Continue from your last step, do only the remaining "
+                  "work for this task, and finish with the PR URL and head: FULL_SHA. Do not restart or redo finished work.")
+
+
+def classify_stop(messages):
+    """Why a finished (not running, not awaiting approval) thread stopped without a PR.
+
+    `budget` : the last event is the per-turn model-budget error. Hyperagent's UI shows this as
+               "Waiting for your input"; one bounded resume message answers it.
+    `input`  : the agent ended on its own text with no PR (a question or a blocker in its runtime,
+               e.g. missing integration permission). That needs a human or a re-issued task.
+    `done`   : an assistant message carries a PR URL (handled by the normal gate path)."""
+    rows = [m for m in messages if isinstance(m, dict) and m.get("role") in ("assistant", "error")]
+    if not rows:
+        return "input"
+    last = rows[-1]
+    if last.get("role") == "error" and BUDGET_HIT.search(str(last.get("content"))):
+        return "budget"
+    return "input"
+
+
+def record_input_needed(call, thread, issue, journal_dir, reason, last_text, clock=time.time):
+    """Append a thread that stopped waiting for a human to hyperagent-approvals.jsonl, once per (thread, reason)."""
+    path = Path(journal_dir) / "hyperagent-approvals.jsonl"
+    try:
+        if path.exists() and any((lambda r: r.get("threadId") == thread and r.get("reason") == reason)(json.loads(l))
+                                 for l in path.read_text().splitlines() if l.strip()):
+            return
+        entry = {"at": clock(), "state": "awaiting-input", "reason": reason, "issue": issue, "threadId": thread,
+                 "url": f"https://hyperagent.com/thread/{thread}", "lastMessage": re.sub(r"\s+", " ", last_text or "")[:600]}
+        with path.open("a") as out:
+            out.write(json.dumps(entry) + "\n")
+    except Exception:
+        return
+
+
+def record_approval(call, thread, issue, journal_dir, clock=time.time):
+    """Surface a run that is waiting on an approval as its own state (`awaiting-approval`), once per thread.
+
+    Read-only: it lists pending approvals and appends what each asks for to hyperagent-approvals.jsonl
+    for a human or the lead to review. It never resolves one: clicking approve needs a reviewer, and
+    memory/draft saves cannot be resolved through the API at all (canResolve false)."""
+    path = Path(journal_dir) / "hyperagent-approvals.jsonl"
+    try:
+        if path.exists() and any(json.loads(l).get("threadId") == thread for l in path.read_text().splitlines() if l.strip()):
+            return
+        rows = [r for r in call("list_pending_approvals", {"limit": 50}).get("approvals", []) if r.get("threadId") == thread]
+        entry = {"at": clock(), "state": "awaiting-approval", "issue": issue, "threadId": thread,
+                 "url": f"https://hyperagent.com/thread/{thread}",
+                 "asks": [{k: r.get(k) for k in ("kind", "approvalId", "entity", "canResolve", "expiresAt")} for r in rows]}
+        with path.open("a") as out:
+            out.write(json.dumps(entry) + "\n")
+    except Exception:
+        return  # observability must never change the run's outcome
+
+
 def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
         timeout=1800, clock=time.time, pause=time.sleep, before_dispatch=lambda: None, refresh=None):
     """One existing attempt: create once, read/resume its thread, gate its same PR.
@@ -206,6 +263,7 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
                 if type(payload.get("isRunning")) is not bool or type(payload.get("awaitingApproval")) is not bool:
                     return held("remote-status-unverified", thread)
                 if payload["awaitingApproval"]:
+                    record_approval(call, thread, issue, path.parent, clock)
                     return held("remote-approval-required", thread)
                 if payload["isRunning"]:
                     pause(min(4, max(0, deadline - clock())))
@@ -216,6 +274,16 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
                 text = "\n".join(m["content"] for m in messages if isinstance(m, dict)
                                  and m.get("role") == "assistant" and isinstance(m.get("content"), str))
                 urls = set(re.findall(r"https://github\.com/[^\s/]+/[^\s/]+/pull/\d+", text))
+                if not urls:
+                    stop = classify_stop(messages)
+                    if stop == "budget" and not state.get("resumed"):
+                        # One bounded answer to the model-budget stop; a second stop goes to a human.
+                        before_dispatch()
+                        save(resumed=True)
+                        call("send_message", {"threadId": thread, "message": RESUME_MESSAGE})
+                        continue
+                    record_input_needed(call, thread, issue, path.parent,
+                                        "budget-exhausted-twice" if stop == "budget" else "agent-needs-input", text)
                 if len(urls) != 1:
                     return held("remote-pr-ambiguous" if urls else "remote-pr-missing", thread)
                 url = urls.pop()
