@@ -20,9 +20,17 @@ interface AdminCostRow {
   readonly monthlyUsd: string | number | null;
   readonly observed30dUsd: string | number | null;
   readonly period: string;
+  /** Display label for the billing cadence (e.g. "Monthly", "Usage-based"). */
+  readonly periodLabel?: string;
   readonly notes: string;
   readonly externalUrl?: string | null;
   readonly lastUpdatedLabel: string;
+  /**
+   * Freshness against the row's per-cadence budget. A stale or unknown row is
+   * not an observation of the current window: its amount renders as Unknown
+   * and it does not count as observed. Omitted means fresh (legacy callers).
+   */
+  readonly freshness?: 'fresh' | 'stale' | 'unknown';
 }
 
 interface CostsTableProps {
@@ -30,11 +38,23 @@ interface CostsTableProps {
   readonly lastRefreshedLabel: string;
 }
 
-function observedAmount(value: string | number | null): number | null {
+function parseAmount(value: string | number | null): number | null {
   if (value === null || (typeof value === 'string' && value.trim() === ''))
     return null;
   const amount = Number(value);
   return Number.isFinite(amount) ? amount : null;
+}
+
+/** Unknown is not zero: stale rows never yield an observed amount. */
+function observedCostAmount(row: AdminCostRow): number | null {
+  if ((row.freshness ?? 'fresh') !== 'fresh') return null;
+  return parseAmount(row.observed30dUsd);
+}
+
+function formatPeriod(row: AdminCostRow): string {
+  if (row.periodLabel) return row.periodLabel;
+  const text = row.period.trim().toLowerCase();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : '—';
 }
 
 const columnHelper = createColumnHelper<AdminCostRow>();
@@ -66,8 +86,19 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
         columnHelper.accessor('observed30dUsd', {
           header: '30D Spend (USD)',
           cell: info => {
-            const v = info.getValue();
-            const n = observedAmount(v);
+            const row = info.row.original;
+            const freshness = row.freshness ?? 'fresh';
+            if (freshness !== 'fresh') {
+              return (
+                <span
+                  className='text-tertiary-token'
+                  title={`Last updated ${row.lastUpdatedLabel}. Older than this source's freshness budget, so current spend is unknown.`}
+                >
+                  {freshness === 'stale' ? 'Unknown · stale' : 'Unknown'}
+                </span>
+              );
+            }
+            const n = observedCostAmount(row);
             if (n === null) return 'Not observed';
             return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
           },
@@ -76,19 +107,18 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
         columnHelper.accessor('monthlyUsd', {
           header: 'Est. Monthly',
           cell: info => {
-            const v = info.getValue();
-            const n = Number(v ?? 0);
-            return n > 0
+            const n = parseAmount(info.getValue());
+            return n !== null && n > 0
               ? `$${n.toLocaleString('en-US', { minimumFractionDigits: 0 })}`
-              : 'usage';
+              : 'Not estimated';
           },
           meta: { className: 'tabular-nums' },
         }),
         columnHelper.accessor('period', {
           header: 'Period',
           cell: info => (
-            <span className='text-tertiary-token text-3xs uppercase tracking-wide'>
-              {info.getValue()}
+            <span className='text-tertiary-token text-xs'>
+              {formatPeriod(info.row.original)}
             </span>
           ),
         }),
@@ -122,9 +152,12 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
   );
 
   const observed = items.flatMap(row => {
-    const amount = observedAmount(row.observed30dUsd);
+    const amount = observedCostAmount(row);
     return amount === null ? [] : [amount];
   });
+  const staleCount = items.filter(
+    row => (row.freshness ?? 'fresh') !== 'fresh'
+  ).length;
   const total30d = observed.reduce((sum, amount) => sum + amount, 0);
   const spendLabel =
     observed.length === 0
@@ -138,6 +171,7 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
           <span>
             {items.length} items • {spendLabel} • {observed.length}/
             {items.length} items observed
+            {staleCount > 0 ? ` • ${staleCount} stale` : ''}
           </span>
           <span className='opacity-60'>•</span>
           <span>Last refreshed: {lastRefreshedLabel}</span>

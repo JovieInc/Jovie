@@ -70,6 +70,7 @@ describe('OnboardingProfileRail', () => {
     expect(rail).toHaveTextContent('12.3K Spotify followers');
     expect(rail).not.toHaveTextContent('source: enrichment');
     expect(phonePreview).not.toContainElement(strip);
+    expect(screen.getByText(/12\.3K Spotify followers/)).toBeVisible();
   });
 
   it('renders the inline rail variant at mobile widths', () => {

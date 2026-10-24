@@ -501,6 +501,24 @@ test('parseSyntheticTestResults does not waive a missing robot file without the 
   assert.equal(result.testWarnings.length, 0);
 });
 
+test('parseSyntheticTestResults rejects the old not-implemented robot reason', () => {
+  const result = parseSyntheticTestResults({
+    resultFiles: REQUIRED_SYNTHETIC_FILES,
+    fileSystem: createMemoryFileSystem(passingSyntheticFiles()),
+    robotSkipReason:
+      'synthetic-robot-not-implemented: no onboarding robot runs against production (JOV-7656).',
+  });
+
+  assert.equal(result.testStatus, 'error');
+  assert.equal(result.testWarnings.length, 0);
+  assert.equal(
+    result.failedTests.some(line =>
+      line.includes('onboarding-robot-full: Test results file not found')
+    ),
+    true
+  );
+});
+
 test('parseSyntheticTestResults keeps a logged OTP skip from failing a required suite', () => {
   const reason =
     'synthetic-otp-unavailable: missing E2E_PROD_OTP_CHECK_TOKEN (Tim-only Cloudflare mailbox secrets)';

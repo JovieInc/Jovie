@@ -1,33 +1,24 @@
 #!/usr/bin/env node
+import { createLinearClient } from '../packages/api-client/index.ts';
+
 const key = process.env.LINEAR_API_KEY;
 if (!key) {
   console.error('LINEAR_API_KEY missing');
   process.exit(1);
 }
 const query = `query { issues(filter: { team: { key: { eq: "JOV" } }, state: { name: { in: ["Todo", "Triage", "Backlog"] } } }, first: 40, orderBy: updatedAt) { nodes { identifier title priority priorityLabel branchName labels { nodes { name } } description } } }`;
-let res;
+// Intake polling: shed first when the shared Linear budget runs low
+// (.claude/rules/external-apis.md), so it never starves claims or transitions.
+let data;
 try {
-  res = await fetch('https://api.linear.app/graphql', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: key },
-    body: JSON.stringify({ query }),
-    signal: AbortSignal.timeout(15_000),
+  const linear = createLinearClient({
+    identity: key,
+    authorization: () => key,
   });
+  data = { data: await linear.graphql(query, {}, { priority: 'poll' }) };
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-}
-if (!res.ok) {
-  const body = await res.text();
-  console.error(
-    `Linear API request failed (${res.status} ${res.statusText}): ${body}`
-  );
-  process.exit(1);
-}
-const data = await res.json();
-if (data.errors) {
-  console.error(JSON.stringify(data.errors));
-  process.exit(1);
+  process.exit(error?.exitCode === 75 ? 75 : 1);
 }
 const skip = i => {
   const ls = (i.labels?.nodes ?? []).map(l => l.name.toLowerCase());

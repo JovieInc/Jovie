@@ -62,7 +62,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":6,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":20,"grouping_strategy":"ALLGREEN","max_entries_to_build":10,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -85,9 +85,9 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
   minimumEntriesToMergeWaitTime: number,
 }} */
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
-  checkResponseTimeout: 3600,
-  maximumEntriesToBuild: 6,
-  maximumEntriesToMerge: 5,
+  checkResponseTimeout: 1200,
+  maximumEntriesToBuild: 10,
+  maximumEntriesToMerge: 10,
   mergeMethod: 'SQUASH',
   minimumEntriesToMerge: 1,
   minimumEntriesToMergeWaitTime: 0,
@@ -738,8 +738,8 @@ describe('native live preflight', () => {
             } },
             { type: 'MERGE_QUEUE', parameters: {
               __typename: 'MergeQueueParameters',
-              checkResponseTimeoutMinutes: 60, groupingStrategy: 'ALLGREEN',
-              maxEntriesToBuild: 6, maxEntriesToMerge: 5, mergeMethod: 'SQUASH',
+              checkResponseTimeoutMinutes: 20, groupingStrategy: 'ALLGREEN',
+              maxEntriesToBuild: 10, maxEntriesToMerge: 10, mergeMethod: 'SQUASH',
               minEntriesToMerge: 1, minEntriesToMergeWaitMinutes: 0,
             } },
           ] },
@@ -1072,7 +1072,7 @@ describe('native live preflight', () => {
   });
 
   it.each([
-    1, 2, 6,
+    1, 2, 6, 10,
   ])('allows supported build count %s during rollout and rollback with truthful readback', buildCount => {
     const result = validateNativePreflightEvidence({
       ruleset: VALID_RULESET,
@@ -1088,15 +1088,15 @@ describe('native live preflight', () => {
     expect(result.policyReadback.observed.max_entries_to_build).toBe(
       buildCount
     );
-    expect(result.policyReadback.matched).toBe(buildCount === 6);
+    expect(result.policyReadback.matched).toBe(buildCount === 10);
     expect(result.policyReadback.drift).toEqual(
-      buildCount === 6 ? [] : ['max_entries_to_build']
+      buildCount === 10 ? [] : ['max_entries_to_build']
     );
   });
 
   it.each([
     0,
-    7,
+    11,
     100,
     -1,
     1.5,
@@ -1193,7 +1193,7 @@ describe('native live preflight', () => {
     expect(liveGraphql.policyReadback).toMatchObject({
       matched: true,
       drift: [],
-      observed: { max_entries_to_build: 6 },
+      observed: { max_entries_to_build: 10 },
     });
   });
 
@@ -1206,7 +1206,7 @@ describe('native live preflight', () => {
     expect(result).toMatchObject({ ready: true });
     expect(result.policyReadback).toMatchObject({
       matched: true,
-      observed: { max_entries_to_build: 6 },
+      observed: { max_entries_to_build: 10 },
     });
     const liveConfigCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('MergeQueueLiveConfiguration')
@@ -1217,7 +1217,7 @@ describe('native live preflight', () => {
     expect(queryText(liveConfigCall)).toContain('maximumEntriesToBuild');
   });
 
-  it('accepts the exact old 20-minute timeout during source-first cutover', () => {
+  it('accepts the exact previous 60-minute timeout for rollback', () => {
     const liveUntilCutover = {
       ...VALID_RULESET,
       rules: VALID_RULESET.rules.map(rule =>
@@ -1240,7 +1240,7 @@ describe('native live preflight', () => {
       branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
       liveQueueConfiguration: {
         ...VALID_LIVE_QUEUE_CONFIGURATION,
-        checkResponseTimeout: 1200,
+        checkResponseTimeout: 3600,
         minimumEntriesToMerge: 1,
         minimumEntriesToMergeWaitTime: 0,
       },
@@ -1248,7 +1248,7 @@ describe('native live preflight', () => {
     expect(falseDrift.ok).toBe(true);
     expect(
       falseDrift.policyReadback.observed.check_response_timeout_minutes
-    ).toBe(20);
+    ).toBe(60);
     expect(falseDrift.policyReadback.drift).toEqual([
       'check_response_timeout_minutes',
     ]);
@@ -1272,18 +1272,18 @@ describe('native live preflight', () => {
     });
     expect(actualTimeoutDrift.ok).toBe(false);
     expect(actualTimeoutDrift.errors).toContain(
-      'merge_queue check_response_timeout_minutes must be 60'
+      'merge_queue check_response_timeout_minutes must be 20'
     );
     expect(actualTimeoutDrift.errors).toContain(
       'native queue policy readback drifted: check_response_timeout_minutes'
     );
   });
 
-  it('reads live GraphQL checkResponseTimeout seconds as 60 minutes', async () => {
+  it('reads live GraphQL checkResponseTimeout seconds as 20 minutes', async () => {
     const runner = createNativeRunner({
       liveQueueConfiguration: {
         ...VALID_LIVE_QUEUE_CONFIGURATION,
-        checkResponseTimeout: 3600,
+        checkResponseTimeout: 1200,
       },
     });
     await expect(
@@ -1294,7 +1294,7 @@ describe('native live preflight', () => {
     ).resolves.toMatchObject({
       ready: true,
       policyReadback: {
-        observed: { check_response_timeout_minutes: 60 },
+        observed: { check_response_timeout_minutes: 20 },
       },
     });
   });
@@ -1324,7 +1324,7 @@ describe('native live preflight', () => {
       ready: true,
       policyReadback: {
         matched: true,
-        observed: { max_entries_to_build: 6 },
+        observed: { max_entries_to_build: 10 },
       },
     });
   });

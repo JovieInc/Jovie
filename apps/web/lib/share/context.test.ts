@@ -5,6 +5,7 @@ import {
   buildProfileShareContext,
   buildReleaseShareContext,
 } from './context';
+import { shareStoryPreviewSrc } from './copy';
 
 describe('share context builders', () => {
   it('builds a canonical release share context with tracked metadata', () => {
@@ -74,5 +75,16 @@ describe('share context builders', () => {
     expect(blog.canonicalUrl).toContain('/blog/share-systems');
     expect(profile.canonicalUrl).toContain('/timwhite');
     expect(playlist.canonicalUrl).toContain('/playlists/late-night-selects');
+  });
+
+  it('previews story assets on the same origin so the image optimizer accepts them', () => {
+    expect(
+      shareStoryPreviewSrc(
+        'https://jov.ie/api/share/story/blog?slug=the-suno-playbook-teardown'
+      )
+    ).toBe('/api/share/story/blog?slug=the-suno-playbook-teardown');
+    expect(shareStoryPreviewSrc('https://example.com/artwork.png')).toBe(
+      'https://example.com/artwork.png'
+    );
   });
 });

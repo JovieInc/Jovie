@@ -1191,6 +1191,22 @@ class ClaimCommentTest(unittest.TestCase):
 
 
 class ClaimTest(unittest.TestCase):
+    def test_explicit_queue_inventory_never_refills_and_preserves_input(self):
+        module = fake_lane(Shell())
+        module.open_prs_summary = Mock(side_effect=AssertionError('unexpected inventory refill'))
+        self.assertEqual(events.queued_prs(module, events.FIX_KINDS, inventory=[]), [])
+        rows = [pr(labels=['lane-fix-red', 'lane-fix-green'], labelsComplete=True)]
+        before = json.loads(json.dumps(rows))
+        fixed = events.queued_prs(module, events.FIX_KINDS, inventory=rows)
+        ticked = events.queued_prs(module, ('green',), inventory=rows)
+        fixed[0]['eventKinds'].append('stale')
+        self.assertEqual(ticked[0]['eventKinds'], ['green'])
+        self.assertEqual(rows, before)
+        with self.assertRaisesRegex(RuntimeError, 'event-label-inventory-incomplete'):
+            events.queued_prs(module, events.FIX_KINDS, inventory=[pr(labelsComplete=False)])
+        module.open_prs_summary.assert_not_called()
+        self.assertEqual(module.sh.calls, [])
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.host = SimpleNamespace(state=Path(self.tmp.name))
@@ -1579,6 +1595,36 @@ class GapTest(unittest.TestCase):
         plan = events.reconcile_plan(prs, {"4": {"count": 2, "head": "h"}}, {"claude"}, 2,
                                      events.iso_ts("2033-05-18T03:00:00Z"))
         self.assertEqual(plan["close"], [], "JOV-INV-011 requires explicit duplicate authority")
+
+    def test_reconcile_clears_fix_labels_whose_cause_is_gone(self):
+        # 2026-10-21: #22320 kept lane-fix-red after a superseded run; #22394 kept
+        # lane-fix-conflict/dequeued after Gem resolved the conflict.
+        now = events.iso_ts("2033-05-18T03:00:00Z")
+        names = lambda *kinds: [{"name": f"lane-fix-{kind}"} for kind in kinds]
+        prs = [self.node(1, mergeStateStatus="CLEAN", labels=names("red")),
+               self.node(2, mergeStateStatus="CLEAN", labels=names("conflict", "dequeued")),
+               self.node(3, mergeStateStatus="CLEAN", labels=names("dequeued")),
+               self.node(4, mergeStateStatus="CLEAN", labels=names("conflict", "dequeued") + [{"name": "queue-poison"}]),
+               self.node(5, mergeStateStatus="DIRTY", labels=names("conflict")),
+               self.node(6, mergeStateStatus="BLOCKED", rollup="FAILURE", labels=names("red")),
+               self.node(7, mergeStateStatus="CLEAN", isCrossRepository=True, labels=names("red"))]
+        plan = events.reconcile_plan(prs, {}, set(), 2, now)
+        self.assertEqual(sorted(plan["unlabel"]), [(1, "red"), (2, "conflict"), (2, "dequeued"), (4, "conflict")])
+
+    def test_only_a_failed_latest_run_is_red(self):
+        def reply(*nodes, code=0):
+            body = {"data": {"repository": {"pullRequest": {"commits": {"nodes": [
+                {"commit": {"statusCheckRollup": {"contexts": {"nodes": list(nodes)}}}}]}}}}}
+            return lambda args, **kwargs: SimpleNamespace(returncode=code, stdout=json.dumps(body), stderr="")
+        cancelled = {"name": "Source Validation", "conclusion": "CANCELLED", "completedAt": "2026-10-21T01:20:00Z"}
+        passed = {"name": "Source Validation", "conclusion": "SUCCESS", "completedAt": "2026-10-21T01:30:00Z"}
+        failed_old = {"name": "PR Ready", "conclusion": "FAILURE", "completedAt": "2026-10-21T01:00:00Z"}
+        passed_new = {"name": "PR Ready", "conclusion": "SUCCESS", "completedAt": "2026-10-21T01:40:00Z"}
+        self.assertIs(events.head_red(1, reply(cancelled, passed, failed_old, passed_new)), False)
+        self.assertIs(events.head_red(1, reply(passed, {**failed_old, "completedAt": "2026-10-21T02:00:00Z"})), True)
+        self.assertIs(events.head_red(1, reply({"context": "ci/legacy", "state": "ERROR", "createdAt": "x"})), True)
+        self.assertIsNone(events.head_red(1, reply(passed, code=1)))
+        self.assertIsNone(events.head_red(1, lambda *a, **k: SimpleNamespace(returncode=0, stdout="nope", stderr="")))
 
     def test_reconcile_labels_missed_events_and_names_orphans(self):
         now = events.iso_ts("2033-05-18T03:00:00Z")
@@ -2748,3 +2794,86 @@ class GreenPublicationProofTest(unittest.TestCase):
                     self.assertFalse((host.state/'runs/ledger.jsonl').exists())
                 finally:
                     if claim:claim.lock.release()
+
+
+class WakeFileTest(unittest.TestCase):
+    """JOV-8931: the relay's gem-side wake job writes red-<pr>-<sha>-<attempt>.json
+    wake files atomically; fix-now drains them."""
+
+    def test_write_wake_file_is_atomic_and_well_named(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = events.write_wake_file(Path(tmp), pr=22868, sha="a" * 40,
+                                          run_id=987654, run_attempt=2,
+                                          red_at="2026-10-23T18:27:30Z")
+            self.assertEqual(path.name, f"red-22868-{'a' * 40}-2.json")
+            self.assertEqual(path.parent, Path(tmp) / "wake")
+            data = json.loads(path.read_text())
+            self.assertEqual(data["schema"], "jovie-lane-red-wake/v1")
+            self.assertEqual(data["pr"], 22868)
+            self.assertEqual(data["sha"], "a" * 40)
+            self.assertEqual(data["runId"], 987654)
+            self.assertEqual(data["runAttempt"], 2)
+            self.assertEqual(data["redAt"], "2026-10-23T18:27:30Z")
+            # A dot-prefixed tmp never shows up as a red-*.json wake file.
+            self.assertEqual(list(path.parent.glob("red-*.json")), [path])
+            self.assertEqual(list(path.parent.glob(".*tmp")), [])
+
+    def test_write_wake_file_replaces_whole_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = events.write_wake_file(Path(tmp), pr=1, sha="a" * 40, run_id=1,
+                                           run_attempt=1, red_at="2026-10-23T18:00:00Z")
+            second = events.write_wake_file(Path(tmp), pr=1, sha="a" * 40, run_id=1,
+                                            run_attempt=1, red_at="2026-10-23T18:01:00Z")
+            self.assertEqual(first, second)
+            self.assertEqual(json.loads(second.read_text())["redAt"], "2026-10-23T18:01:00Z")
+
+    def test_wake_cli_writes_one_file_per_red_pr_from_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 987654, "run_attempt": 2, "head_sha": "a" * 40,
+                                      "updated_at": "2026-10-23T18:27:30Z"}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake", "--prs", "22868,22869"]), 0)
+            names = sorted(p.name for p in (state / "wake").glob("red-*.json"))
+            self.assertEqual(names, [f"red-22868-{'a' * 40}-2.json", f"red-22869-{'a' * 40}-2.json"])
+            for name in names:
+                data = json.loads((state / "wake" / name).read_text())
+                self.assertEqual(data["redAt"], "2026-10-23T18:27:30Z")
+                self.assertEqual(data["sha"], "a" * 40)
+
+    def test_wake_cli_without_state_dir_is_a_no_op(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 1, "run_attempt": 1, "head_sha": "a" * 40,
+                                      "updated_at": "2026-10-23T18:27:30Z"}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            env = {"GITHUB_EVENT_PATH": str(event_path), "LANES_EXECUTION_BACKEND": "local-test"}
+            env = {k: v for k, v in os.environ.items() if k != "LANES_STATE"} | env
+            with patch.dict(os.environ, env):
+                self.assertEqual(events.main(["wake", "--prs", "22868"]), 0)
+
+    def test_wake_cli_ignores_non_numeric_prs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 1, "run_attempt": 1, "head_sha": "a" * 40,
+                                      "updated_at": "2026-10-23T18:27:30Z"}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake", "--prs", "22868,bogus"]), 0)
+            names = list((state / "wake").glob("red-*.json"))
+            self.assertEqual([p.name for p in names], [f"red-22868-{'a' * 40}-1.json"])
+
+    def test_wake_cli_writes_nothing_without_workflow_run_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps({"push": {}}))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake", "--prs", "22868"]), 0)
+            self.assertFalse((state / "wake").exists())

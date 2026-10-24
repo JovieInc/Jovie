@@ -28,7 +28,10 @@ describe('ConfirmDialog', () => {
 
     const confirm = screen.getByRole('button', { name: 'Delete Release' });
     expect(confirm).toHaveAttribute('data-destructive', 'true');
-    expect(confirm.className).toContain('bg-error');
+    expect(confirm).toHaveClass(
+      'bg-btn-destructive',
+      'text-btn-destructive-foreground'
+    );
   });
 
   it('closes as cancel when Escape is pressed', () => {

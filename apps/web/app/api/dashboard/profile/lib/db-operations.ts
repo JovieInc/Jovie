@@ -75,6 +75,27 @@ function writableProfileForUser(appUserId: string) {
   );
 }
 
+export async function readWritableProfileUsername(
+  tx: DbOrTransaction,
+  appUserId: string,
+  profileId: string
+): Promise<string | null> {
+  const access = await getExactProfileAccess(tx, appUserId, profileId);
+  if (!access.ok) return null;
+
+  const [profile] = await tx
+    .select({
+      usernameNormalized: creatorProfiles.usernameNormalized,
+    })
+    .from(creatorProfiles)
+    .where(
+      and(eq(creatorProfiles.id, profileId), writableProfileForUser(appUserId))
+    )
+    .limit(1);
+
+  return profile?.usernameNormalized ?? null;
+}
+
 export async function getProfileUpdatePreflight(
   tx: DbOrTransaction,
   appUserId: string,

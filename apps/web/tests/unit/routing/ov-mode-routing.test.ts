@@ -49,7 +49,7 @@ describe('OV mode routing', () => {
         route => route.startsWith(APP_ROUTES.OV) || route === APP_ROUTES.HUD
       )
     ).toBe(true);
-    expect(APP_ROUTES.ADMIN_OPS).toBe(APP_ROUTES.HUD);
+    expect(APP_ROUTES.ADMIN_OPS).toBe(`${APP_ROUTES.OV}/ops`);
   });
 
   it('redirects all legacy admin URLs to the matching OV URL', async () => {

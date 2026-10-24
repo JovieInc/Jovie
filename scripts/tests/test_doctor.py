@@ -12,6 +12,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import types
 import time
 import unittest
 from pathlib import Path
@@ -324,8 +325,20 @@ class JudgeTest(unittest.TestCase):
 
     def test_escalation_alert_names_the_pr_and_class(self):
         alerts = doctor.judge(obs(escalation={"surfaced": [{"pr": 7, "cls": "needs-human-decision"}]}))
-        self.assertIn("#7 needs-human-decision", alerts["escalation-needs-human"])
+        self.assertIn("#7 needs-human-decision", alerts["escalation-surfaced"])
+        self.assertIn("repair-owner", alerts["escalation-surfaced"])  # never Tim by default
         self.assertEqual(doctor.judge(obs(escalation={"surfaced": []})), {})
+
+    def test_escalation_alert_drops_surfaced_prs_that_are_no_longer_open(self):
+        # Gem 2026-10-20: the alert still listed 12 PRs that had merged or closed by 10-13.
+        surfaced = {"surfaced": [{"pr": 20117, "cls": "needs-human-decision"}, {"pr": 21776, "cls": "needs-rebase"}]}
+        sweep = {"counts": {"open": 2}, "dispositions": [{"pr": 21776}, {"pr": 21725}]}
+        alerts = doctor.judge(obs(escalation=surfaced, reconcile=sweep))
+        self.assertIn("#21776", alerts["escalation-surfaced"])
+        self.assertNotIn("#20117", alerts["escalation-surfaced"])
+        self.assertEqual(doctor.judge(obs(escalation={"surfaced": surfaced["surfaced"][:1]}, reconcile=sweep)), {})
+        incomplete = {"counts": {"open": 5}, "dispositions": [{"pr": 21776}]}  # unknown keeps everything
+        self.assertIn("#20117", doctor.judge(obs(escalation=surfaced, reconcile=incomplete))["escalation-surfaced"])
 
     def test_each_rule_names_its_cause(self):
         alerts = doctor.judge(obs(
@@ -348,6 +361,32 @@ class JudgeTest(unittest.TestCase):
                                                     "preserved-target-needs-reconciliation": 17}))
         self.assertIn("40 PR repairs", alerts["repairs-without-work"])
         self.assertIn("target-state-unavailable 23", alerts["repairs-without-work"])
+
+    def test_refunded_no_work_repairs_are_counted_as_requeues_not_spend(self):
+        # Gem 2026-10-23: refunded infra stops never consumed an attempt, so the alert
+        # must say so instead of claiming the budget was burned.
+        alerts = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": 10},
+                                  refundedNoWorkRepairs24h=7))
+        alert = alerts["repairs-without-work"]
+        self.assertIn("3 spent a fix attempt", alert)
+        self.assertIn("7 were refunded and requeued with backoff", alert)
+
+    def test_an_unclean_previous_tick_is_a_visible_alert_with_its_recovery(self):
+        alerts = doctor.judge(obs(tick={"at": "x", "error": None,
+                                        "uncleanPreviousRun": {"pid": 4242, "startedAt": 1.0},
+                                        "uncleanRecovery": {"refundedFixAttempts": ["6"]}}))
+        self.assertIn("lanes-tick-unclean", alerts)
+        self.assertIn("pid 4242", alerts["lanes-tick-unclean"])
+        self.assertIn("1 stranded fix-attempt charge", alerts["lanes-tick-unclean"])
+
+    def test_exhausted_only_delivery_failure_is_still_a_visible_alert(self):
+        # Terminal exhausted rows never retry: they must alert on their own, without a
+        # failed count, or a terminal failure would go silent.
+        alerts = doctor.judge(obs(tick={"remediationEvents": {"deliveryFailed": 0,
+                                                              "deliveryExhausted": 2,
+                                                              "deliveryNextAt": None}}))
+        self.assertIn("remediation-delivery", alerts)
+        self.assertIn("exhausted=2", alerts["remediation-delivery"])
 
     def test_disk_tiers_page_summer_only_below_critical(self):
         self.assertEqual(set(doctor.judge(obs(diskFreePct=7.0))), {"disk-low"})
@@ -432,6 +471,12 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("provider-down:devin", alerts)
         self.assertNotIn("provider-idle:devin", alerts)
 
+    def test_a_missing_linear_app_credential_fails_closed_with_its_own_condition(self):
+        alerts = doctor.judge(obs(linearAppCredential=False))
+        self.assertIn("no personal-key fallback", alerts["linear-app-credential-missing"])
+        for present in (True, None):  # installed, or a fixture/self-test with no host file
+            self.assertNotIn("linear-app-credential-missing", doctor.judge(obs(linearAppCredential=present)))
+
     def test_started_issues_without_a_live_owner_escalate_after_the_grace(self):
         quiet = doctor.judge(obs(ownership={"started": 536, "ownerless": 3, "overGrace": 0}))
         self.assertNotIn("started-without-owner", quiet)  # inside the grace period
@@ -439,6 +484,89 @@ class JudgeTest(unittest.TestCase):
                                            "oldestOwnerlessS": 7200,
                                            "unresolved": {"post-merge-without-merged-evidence": 40}}))
         self.assertIn("40 started JOV issues", loud["started-without-owner"])
+
+    def test_registered_host_local_automations_raise_automation_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            state = home / ".local/state/jovie-lanes"
+            state.mkdir(parents=True)
+            (state / "fresh.json").write_text("{}")
+            stale = state / "stale.json"
+            stale.write_text("{}")
+            now = time.time()
+            os.utime(stale, (now - 3600, now - 3600))
+            rows = [{"schema": "jovie-automation-registry/v1"},
+                    {"id": "gem:fresh", "status": "live", "host": "gem", "maxStalenessMinutes": 15,
+                     "receipt": {"kind": "host-local", "location": "gem:~/.local/state/jovie-lanes/fresh.json"}},
+                    {"id": "gem:stale", "status": "live", "host": "gem", "maxStalenessMinutes": 30,
+                     "receipt": {"kind": "host-local", "location": "gem:~/.local/state/jovie-lanes/stale.json"}},
+                    {"id": "gem:missing", "status": "live", "host": "gem", "maxStalenessMinutes": 10,
+                     "receipt": {"kind": "host-local", "location": "gem:~/.local/state/jovie-lanes/watchdog.log"}},
+                    {"id": "gem:retired", "status": "retired", "host": "gem",
+                     "receipt": {"kind": "host-local", "location": "gem:~/nowhere"}},
+                    {"id": "mac:x", "status": "live", "host": "tims-macbook-pro", "maxStalenessMinutes": 1,
+                     "receipt": {"kind": "host-local", "location": "tims-macbook-pro:~/nowhere"}}]
+            watch = doctor.automation_watch([row for row in rows if row.get("id")], "gem", now, home=home)
+            self.assertEqual(sorted(watch["silent"]), ["gem:missing", "gem:stale"])
+            alerts = doctor.judge(obs(automation=watch, now=now))
+            self.assertIn("60 min old", alerts["automation-silent:gem:stale"])
+            self.assertIn("missing", alerts["automation-silent:gem:missing"])
+            self.assertEqual(doctor.automation_watch(None, "gem", now), {"known": False, "silent": {}})
+            self.assertIn("automation-registry-unreadable",
+                          doctor.judge(obs(automation={"known": False, "silent": {}}, now=now)))
+            self.assertNotIn("automation-registry-unreadable",
+                             doctor.judge(obs(automation={"known": False, "silent": {}, "skipped": True}, now=now)))
+            self.assertNotIn("automation-registry-unreadable", doctor.judge(obs(now=now)))
+
+    def test_the_watched_registry_is_the_one_merged_on_main(self):
+        # The doctor must read the path the registry actually ships at (#22354: canon/).
+        repo = Path(__file__).resolve().parents[2]
+        if not (repo / "canon").is_dir():
+            self.skipTest("staged lanes release trees carry no canon/")
+        self.assertTrue((repo / doctor.AUTOMATION_REGISTRY).is_file(), doctor.AUTOMATION_REGISTRY)
+        rows = doctor.automation_registry(repo, run=lambda *_a, **_k: doctor.subprocess.CompletedProcess(
+            [], 0, (repo / doctor.AUTOMATION_REGISTRY).read_text(), ""))
+        self.assertTrue(rows and any(row["id"] == "gem:lanes-watchdog" for row in rows))
+
+    def test_the_hosted_liveness_check_and_the_doctor_watch_each_other(self):
+        now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
+        recent = {"installed": True, "lastRunAt": "2026-10-20T21:30:00Z"}
+        old = {"installed": True, "lastRunAt": "2026-10-20T20:30:00Z"}
+        self.assertNotIn("automation-liveness-silent", doctor.judge(obs(automationLiveness=recent, now=now)))
+        self.assertIn("90 min ago", doctor.judge(obs(automationLiveness=old, now=now))["automation-liveness-silent"])
+        self.assertIn("never", doctor.judge(obs(automationLiveness={"installed": True, "lastRunAt": None},
+                                                now=now))["automation-liveness-silent"])
+        for unknown in ({"installed": False}, {"installed": None}):  # not merged yet, or unreadable
+            self.assertNotIn("automation-liveness-silent", doctor.judge(obs(automationLiveness=unknown, now=now)))
+
+    def test_liveness_read_distinguishes_missing_workflow_from_unreadable(self):
+        def fake(code, stdout="", stderr=""):
+            return types.SimpleNamespace(REPO_SLUG="JovieInc/Jovie", shared=lambda key, ttl, fetch: fetch(),
+                                         sh=lambda *a, **k: types.SimpleNamespace(returncode=code, stdout=stdout, stderr=stderr))
+        self.assertEqual(doctor.automation_liveness(fake(0, '["2026-10-20T21:30:00Z"]'), 0),
+                         {"installed": True, "lastRunAt": "2026-10-20T21:30:00Z"})
+        self.assertEqual(doctor.automation_liveness(fake(1, stderr="gh: Not Found (HTTP 404)"), 0), {"installed": False})
+        self.assertEqual(doctor.automation_liveness(fake(1, stderr="timeout"), 0), {"installed": None})
+
+    def test_liveness_counts_only_successful_main_runs(self):
+        # Most runs are job-skipped (every 5th Production Continuity Guard run does work).
+        calls = []
+        lane = types.SimpleNamespace(REPO_SLUG="JovieInc/Jovie", shared=lambda key, ttl, fetch: fetch(),
+                                     sh=lambda args, **k: calls.append(args) or types.SimpleNamespace(
+                                         returncode=0, stdout='[""]', stderr=""))
+        self.assertEqual(doctor.automation_liveness(lane, 0), {"installed": True, "lastRunAt": None})
+        self.assertIn("status=success", calls[0][2])
+        self.assertIn("branch=main", calls[0][2])
+        # Installed but never succeeded reads as silent, not alive.
+        now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
+        self.assertIn("automation-liveness-silent", doctor.judge(obs(
+            automationLiveness={"installed": True, "lastRunAt": None}, now=now)))
+
+    def test_a_failed_status_gist_publish_raises_status_feed_stale(self):
+        failed = doctor.judge(obs(), {"statusFeedError": "RuntimeError: status-gist-publish-unconfirmed"})
+        self.assertIn("status-gist-publish-unconfirmed", failed["status-feed-stale"])
+        self.assertNotIn("status-feed-stale", doctor.judge(obs(), {"statusFeed": "https://gist.github.com/x"}))
+        self.assertNotIn("status-feed-stale", doctor.judge(obs(), None))
 
     def test_linear_and_codex_failures_are_their_own_alerts(self):
         self.assertIn("linear-down", doctor.judge(obs(linearError="HTTPError: 429", pool=None)))
@@ -1677,7 +1805,12 @@ class _GistApiFake:
             self.after_write()
             if method == "POST" and self.ambiguous_create:
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
-        files = {name: {"content": content, "truncated": False} for name, content in self.files.items()}
+        files = {name: {"content": content, "truncated": False, "size": len(content.encode("utf-8"))}
+                 for name, content in self.files.items()}
+        if method == "GET" and self.readback_mode == "stage-truncated":
+            files["stage-events.ndjson"].update(content=files["stage-events.ndjson"]["content"][:10], truncated=True)
+        if method == "GET" and self.readback_mode == "stage-short":
+            files["stage-events.ndjson"].update(content="", truncated=True, size=5)
         if method == "GET" and self.readback_mode == "changed":
             files["lanes-status-details.json"]["content"] += "\n"
         if method == "GET" and self.readback_mode == "truncated":
@@ -1722,6 +1855,96 @@ class PublishTest(unittest.TestCase):
                                                 "diagnostic": "x" * 1024} for i in range(row_count)]}],
             },
         }
+
+    def ledger(self, rows):
+        (self.state / "runs").mkdir(exist_ok=True)
+        (self.state / "runs" / "ledger.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows) + "not json\n")
+
+    def test_stage_events_publish_with_the_status_feed_and_only_when_they_change(self):
+        now = time.time()
+        iso = lambda delta: doctor.datetime.fromtimestamp(now - delta, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.ledger([
+            {"runId": "r1", "issue": "JOV-5", "provider": "codex", "startedAt": iso(3600), "endedAt": iso(600),
+             "verdict": "landing", "pr": 22315},
+            {"runId": "r2", "issue": "JOV-6", "provider": "grok", "startedAt": iso(900), "endedAt": iso(300),
+             "verdict": "provider-error"},
+            {"runId": "r3", "kind": "fix-red", "pr": 22301, "headBefore": "0123456789abcdef", "provider": "codex",
+             "startedAt": iso(500), "endedAt": iso(100), "verdict": "fix-no-change"},
+            {"runId": "old", "issue": "JOV-1", "provider": "codex", "startedAt": iso(40 * 86400), "endedAt": iso(29 * 86400)},
+            {"runId": "lyb", "binding": "LYB", "issue": "LYB-1", "provider": "codex", "startedAt": iso(60), "endedAt": iso(30)},
+            {"runId": "adopt", "kind": "adopt", "pr": 1, "provider": "codex", "startedAt": iso(60), "endedAt": iso(30)}])
+        doctor.publish_status(self.host, self.lane, self.feed(1))
+        rows = [json.loads(line) for line in self.api.files["stage-events.ndjson"].splitlines()]
+        self.assertEqual([(r["entityType"], r["entityId"], r["stage"], r["actor"], r["outcome"], r["sourceReceipt"]) for r in rows], [
+            ("shipping", "JovieInc/Jovie#22315", "worker-start", "codex", "advanced", "lanes-ledger:r1"),
+            ("shipping", "JOV-6", "worker-start", "grok", "failed", "lanes-ledger:r2"),
+            ("remediation", "JovieInc/Jovie#22301@0123456789ab", "repair-start", "codex", "failed", "lanes-ledger:r3"),
+            ("shipping", "JovieInc/Jovie#1", "gate-seat", "codex", "abandoned", "lanes-ledger:adopt")])
+        self.assertTrue(all(r["schema"] == "jovie-stage-event/v1" and r["enteredAt"] < r["exitedAt"] for r in rows))
+        writes = self.api.write_count
+        doctor.publish_status(self.host, self.lane, self.feed(1))
+        packet = json.loads((self.state / "lanes-status-publish.json").read_text())
+        self.assertNotIn("stage-events.ndjson", packet["files"], "unchanged rows are not re-uploaded")
+        self.assertEqual(self.api.write_count, writes + 1)
+
+    def test_gate_seat_wait_and_gate_run_are_tracked_stages(self):
+        events = doctor.stage_events.events
+        row = {"runId": "g1", "kind": "adopt", "pr": 22385, "provider": "grok", "gateWaitS": 120,
+               "startedAt": "2026-10-21T06:33:26Z", "endedAt": "2026-10-21T07:04:02Z", "verdict": "landing"}
+        seat, gate = events(row)
+        self.assertEqual((seat["stage"], seat["enteredAt"], seat["exitedAt"], seat["outcome"]),
+                         ("gate-seat", "2026-10-21T06:33:26Z", "2026-10-21T06:35:26Z", "advanced"))
+        self.assertEqual((gate["stage"], gate["enteredAt"], gate["exitedAt"], gate["outcome"], gate["entityId"]),
+                         ("gate", "2026-10-21T06:35:26Z", "2026-10-21T07:04:02Z", "advanced", "JovieInc/Jovie#22385"))
+        self.assertEqual(events({**row, "verdict": "held"})[1]["outcome"], "failed")
+        self.assertEqual(events({**row, "verdict": "gate-deferred"})[1]["outcome"], "abandoned")
+        [deferred] = events({**row, "gateWaitS": None, "verdict": "gate-deferred"})
+        self.assertEqual((deferred["stage"], deferred["exitedAt"], deferred["outcome"]),
+                         ("gate-seat", "2026-10-21T07:04:02Z", "abandoned"))
+        self.assertEqual(events({**row, "gateWaitS": 99999}), [events({**row, "gateWaitS": None})[0]])
+        self.assertEqual(events({**row, "pr": None}), [])
+
+    def test_a_held_sweep_snapshot_raises_an_alert_per_checkout(self):
+        alerts = doctor.judge(obs(sweepSecretHeld=[{"name": "94af-Jovie", "path": "/w/Jovie",
+                                                     "reason": "secret-finding:trufflehog"}]))
+        self.assertIn("secret-finding:trufflehog", alerts["sweep-snapshot-secret:94af-Jovie"])
+        self.assertFalse([key for key in doctor.judge(obs()) if key.startswith("sweep-snapshot-secret:")])
+
+    def test_outcome_verification_is_the_outcome_receipt_stage(self):
+        events = doctor.stage_events.events
+        row = {"runId": "o1", "kind": "outcome-verify", "provider": "codex", "issue": "JOV-7771",
+               "startedAt": "2026-10-21T11:27:54Z", "endedAt": "2026-10-21T12:00:00Z",
+               "verdict": "recorded", "decision": "pass"}
+        [event] = events(row)
+        self.assertEqual((event["entityId"], event["stage"], event["outcome"]),
+                         ("JOV-7771", "outcome-receipt", "advanced"))
+        self.assertEqual(events({**row, "decision": "fail"})[0]["outcome"], "failed")
+        self.assertEqual(events({**row, "verdict": "verifier-failed"})[0]["outcome"], "abandoned")
+        self.assertEqual(events({**row, "issue": "LYB-1"}), [])
+
+    def test_a_truncated_stage_file_is_read_back_by_its_size(self):
+        now = time.time()
+        iso = lambda delta: doctor.datetime.fromtimestamp(now - delta, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.ledger([{"runId": "r1", "issue": "JOV-5", "provider": "codex", "startedAt": iso(60), "endedAt": iso(30)}])
+        self.api.readback_mode = "stage-truncated"
+        self.assertEqual(doctor.publish_status(self.host, self.lane, self.feed(1)), "https://gist.example/abc123")
+        self.ledger([{"runId": "r2", "issue": "JOV-7", "provider": "codex", "startedAt": iso(60), "endedAt": iso(30)}])
+        self.api.readback_mode = "stage-short"
+        with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+            doctor.publish_status(self.host, self.lane, self.feed(1))
+
+    def test_the_stage_file_is_capped_newest_first(self):
+        now = time.time()
+        rows = [{"runId": f"r{i}", "issue": "JOV-5", "provider": "codex",
+                 "startedAt": doctor.datetime.fromtimestamp(now - 3600 + i, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                 "endedAt": doctor.datetime.fromtimestamp(now - 1800 + i, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+                for i in range(50)]
+        self.ledger(rows)
+        with mock.patch.object(doctor.stage_events, "MAX_BYTES", 1000):
+            text = doctor.stage_events.ndjson(self.state / "runs" / "ledger.jsonl", now)
+        self.assertLessEqual(len(text.encode()), 1000)
+        self.assertIn("lanes-ledger:r49", text)
+        self.assertNotIn("lanes-ledger:r0\"", text)
 
     def test_only_the_primary_host_publishes(self):
         saved = doctor.PRIMARY_FLAG
@@ -2486,3 +2709,69 @@ class ProviderPayloadCensusTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RedDispatchAlertTest(unittest.TestCase):
+    """JOV-8931: a relayed red check with no lane claim inside the grace window alerts."""
+
+    NOW = 1_000_000_000.0
+
+    def write_ledger(self, state, rows):
+        ledger = state / "runs/red-dispatch.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        with ledger.open("a") as handle:
+            for row in rows:
+                handle.write(json.dumps(row) + "\n")
+
+    def dispatched_row(self, *, pr=22868, sha="a" * 40, red_epoch=None):
+        return {"schema": "jovie-lane-red-dispatch/v1", "status": "dispatched", "pr": pr,
+                "sha": sha, "runId": 987654, "runAttempt": 2,
+                "redAt": "2026-10-23T18:27:30Z", "redAtEpoch": red_epoch,
+                "dispatchedAt": "2026-10-23T18:28:00Z", "claimAt": None,
+                "provider": "codex", "reason": None}
+
+    def test_summary_flags_dispatch_rows_past_the_grace_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [
+                self.dispatched_row(red_epoch=self.NOW - 60),
+                self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300),
+            ])
+            summary = doctor.red_dispatch_summary(state, self.NOW)
+            self.assertEqual(summary["graceS"], 180)
+            self.assertEqual([row["pr"] for row in summary["unclaimed"]], [1])
+            self.assertEqual(summary["unclaimed"][0]["ageS"], 300)
+
+    def test_summary_clears_once_a_claim_row_lands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [
+                self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300),
+                {"status": "claimed", "pr": 1, "sha": "b" * 40, "claimAt": "2026-10-23T18:30:00Z"},
+            ])
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW)["unclaimed"], [])
+
+    def test_summary_tolerates_missing_or_corrupt_ledger(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW),
+                             {"graceS": 180, "unclaimed": []})
+            (state / "runs").mkdir(parents=True)
+            (state / "runs/red-dispatch.jsonl").write_text("not json\n")
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW)["unclaimed"], [])
+
+    def test_judge_raises_the_alert_with_a_stable_key_per_pr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300)])
+            obs = {"now": self.NOW, "redDispatch": doctor.red_dispatch_summary(state, self.NOW)}
+            alerts = doctor.judge(obs)
+            self.assertIn("red-dispatch-unclaimed:1", alerts)
+            self.assertIn("unclaimed 300s after red_at", alerts["red-dispatch-unclaimed:1"])
+
+    def test_judge_stays_quiet_inside_the_grace_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [self.dispatched_row(red_epoch=self.NOW - 60)])
+            obs = {"now": self.NOW, "redDispatch": doctor.red_dispatch_summary(state, self.NOW)}
+            self.assertFalse(doctor.judge(obs))

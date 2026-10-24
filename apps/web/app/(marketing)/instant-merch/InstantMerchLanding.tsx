@@ -131,7 +131,7 @@ export function InstantMerchLanding() {
               {copy.flow.body}
             </p>
           </div>
-          <div className='mx-auto mt-12 grid max-w-5xl gap-8 md:grid-cols-3'>
+          <div className='mt-12 grid gap-8 md:grid-cols-3'>
             {copy.flow.steps.map((step, index) => (
               <article key={step.title} className='border-t border-subtle pt-5'>
                 <p className='text-xs font-mono text-tertiary-token'>

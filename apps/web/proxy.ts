@@ -125,6 +125,7 @@ const LEGACY_PROFILE_MODE_ALIASES = new Set([
   'tour',
   'shows',
   'events',
+  'contact',
 ]);
 
 function getDuplicateAliasSourceRedirect(
@@ -143,9 +144,9 @@ function getDuplicateAliasSourceRedirect(
   const sources = req.nextUrl.searchParams.getAll('source');
   if (sources.length <= 1) return null;
 
-  // The established redirect helper keeps the first non-empty source. Next's
-  // rewrite matcher otherwise selects the last repeated value, so collapse the
-  // request once at the public boundary before it can become an ISR cache key.
+  // A single source=link|qr is an edge redirect and never gets here. Repeated
+  // sources still collapse to the first non-empty value. Next's rewrite
+  // matcher would otherwise keep the last one and turn it into an ISR key.
   const source = sources.find(value => value.length > 0);
   const canonicalUrl = req.nextUrl.clone();
   canonicalUrl.searchParams.delete('source');
@@ -257,9 +258,16 @@ export const config = {
     // \\. which is a literal dot in the compiled regex. A single \\. in a
     // JS string becomes just . (any char), which would allow paths like
     // /wp-json or /a-css/foo to bypass middleware (JOV-2236).
-    '/((?!_next|monitoring(?:/|$)|\\.well-known|.*\\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!_next|monitoring(?:/|$)|\\.well-known|api/profile-alias-decision(?:/|$)|.*\\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Always run for API routes so the /api/auth/* early-return above and
     // the protected-API redirect logic in handleProxyRequest apply.
-    '/(api|trpc)(.*)',
+    // /api/profile-alias-decision is EXCLUDED: the proxy's alias fast path
+    // (lib/routing/profile-alias-edge.ts) fetches this endpoint same-origin
+    // on every legacy alias hop, and this matcher would run the proxy again
+    // on that fetch — a second Node proxy invocation serialized inside the
+    // alias redirect whenever the CDN-cached decision is not served fresh.
+    // The endpoint is public, visitor-independent routing JSON that reads no
+    // cookies, so it needs none of the proxy's gates (JOV-8338).
+    '/((?!api/profile-alias-decision(?:/|$))(?:api|trpc).*)',
   ],
 };

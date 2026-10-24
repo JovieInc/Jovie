@@ -93,9 +93,16 @@ test('hovering and closing either preview keeps every main-plane frame fixed', a
       probe.raf = requestAnimationFrame(sample);
       return probe;
     });
+    // Since #22207 the left navigation opens only on explicit activation
+    // (no hover preview); the right inspector still previews on hover.
+    // Either way the main plane must not move.
+    const hoverExpanded = side === 'right' ? 'true' : 'false';
     for (let cycle = 0; cycle < 5; cycle++) {
       await control(side).hover();
-      await expect(control(side)).toHaveAttribute('aria-expanded', 'true');
+      await expect(control(side)).toHaveAttribute(
+        'aria-expanded',
+        hoverExpanded
+      );
       await expect(notes).toBeFocused();
       await page.waitForTimeout(120);
       await page.mouse.move(700, 450);

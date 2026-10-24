@@ -74,8 +74,13 @@ auto-link issue IDs inside it.
 
 `founderAsk` (the JOV-7080 packet essentials): `whyNow`, `blocked`,
 `options` (1–6 of `{ id, label, tradeoff }`), `recommendation`,
-`defaultIfSilent` (nullable), and `materialChange` (nullable) — set only to
-re-ask after a denial, stating what materially changed.
+`defaultIfSilent` (nullable), optional `defaultDecision` (`approve` \| `reject`;
+absent means `reject`), and `materialChange` (nullable) — set only to
+re-ask after a denial, stating what materially changed. `budget.deadline` is the
+card's `decideBy`: at it the declared default is recorded (see
+[DECISION_DEFAULT_CONTRACT.md](./DECISION_DEFAULT_CONTRACT.md)). A declared
+default needs `defaultIfSilent`; spend and outbound asks never default to
+`approve`. The field is optional so orders sealed before it keep their digest.
 
 Sealing invariants beyond schema:
 

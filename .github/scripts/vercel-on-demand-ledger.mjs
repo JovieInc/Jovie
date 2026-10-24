@@ -161,6 +161,7 @@ export async function runLedger({
   const project = await vercel(`/v9/projects/${policy.projectId}`, ctx);
   let ledger = null;
   let error = null;
+  let chargesError = null;
   try {
     const team = await vercel(`/v2/teams/${teamId}`, ctx);
     const period = team?.billing?.period;
@@ -173,15 +174,29 @@ export async function runLedger({
       policy.projectId,
       since
     );
-    const jsonl = await vercel(
-      `/v1/billing/charges?from=${new Date(since).toISOString()}&to=${new Date(now).toISOString()}`,
-      { ...ctx, text: true }
-    );
-    const charges = jsonl
-      .split('\n')
-      .filter(Boolean)
-      .map(line => JSON.parse(line));
-    ledger = computeLedger({ deployments, charges, policy, period, now });
+    // Billed charges only cross-check the per-build estimate, which alone
+    // satisfies the policy (minutes x vCPU x price, rounded up). The CI token
+    // cannot read billing (404 on 2026-10-20), so an unreadable charges feed
+    // keeps the estimate instead of disabling on-demand.
+    let charges = [];
+    let billedAvailable = true;
+    try {
+      const jsonl = await vercel(
+        `/v1/billing/charges?from=${new Date(since).toISOString()}&to=${new Date(now).toISOString()}`,
+        { ...ctx, text: true }
+      );
+      charges = jsonl
+        .split('\n')
+        .filter(Boolean)
+        .map(line => JSON.parse(line));
+    } catch (cause) {
+      billedAvailable = false;
+      chargesError = cause.message;
+    }
+    ledger = {
+      ...computeLedger({ deployments, charges, policy, period, now }),
+      billedAvailable,
+    };
   } catch (cause) {
     error = cause.message;
   }
@@ -210,7 +225,7 @@ export async function runLedger({
     }
     changed = true;
   }
-  return { ledger, decision, previous: current, changed, error };
+  return { ledger, decision, previous: current, changed, error, chargesError };
 }
 
 export function renderLedger(result, policy) {
@@ -223,10 +238,15 @@ export function renderLedger(result, policy) {
   ];
   if (ledger) {
     lines.push(
-      `Spend this period: ${usd(ledger.actualUsd)} actual (estimate ${usd(ledger.estimatedUsd)} over ${ledger.builds} builds, billed ${usd(ledger.billedUsd)}), ${usd(ledger.projectedUsd)} projected. Alert ${usd(policy.alertUsd)}, cutoff ${usd(policy.cutoffUsd)}, hard cap ${usd(policy.hardCapUsd)}.`
+      `Spend this period: ${usd(ledger.actualUsd)} actual (estimate ${usd(ledger.estimatedUsd)} over ${ledger.builds} builds, billed ${ledger.billedAvailable === false ? 'unavailable' : usd(ledger.billedUsd)}), ${usd(ledger.projectedUsd)} projected. Alert ${usd(policy.alertUsd)}, cutoff ${usd(policy.cutoffUsd)}, hard cap ${usd(policy.hardCapUsd)}.`
     );
   }
   if (result.error) lines.push(`Spend unknown: ${result.error}.`);
+  if (result.chargesError) {
+    lines.push(
+      `Billed charges unavailable (${result.chargesError}); using the per-build estimate.`
+    );
+  }
   return `${lines.join('\n')}\n`;
 }
 

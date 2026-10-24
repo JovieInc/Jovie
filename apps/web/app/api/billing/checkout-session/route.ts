@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { z } from 'zod';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -11,6 +12,7 @@ import {
   resolveCanonicalPlanId,
 } from '@/lib/entitlements/registry';
 import { captureError } from '@/lib/error-tracking';
+import { extractCheckoutCorrelation } from '@/lib/stripe/checkout-correlation';
 import { stripe } from '@/lib/stripe/client';
 import { getPriceMappingDetails } from '@/lib/stripe/config';
 import {
@@ -102,6 +104,13 @@ export async function GET(request: NextRequest) {
         ? resolvePaidPlan(getPriceMappingDetails(lineItemPriceId)?.plan ?? null)
         : null);
     const needsProfile = plan ? await buyerNeedsProfile(userId) : false;
+    if (plan && !needsProfile) {
+      // Paid and the claimed profile is live: last artist-offer funnel stage.
+      await recordArtistOfferStage(
+        extractCheckoutCorrelation(session.metadata).acquisitionId,
+        'profile-live'
+      );
+    }
 
     return NextResponse.json(
       { plan, priceId: lineItemPriceId, needsProfile },

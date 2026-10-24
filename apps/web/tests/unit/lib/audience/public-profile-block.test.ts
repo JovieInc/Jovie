@@ -1,3 +1,4 @@
+import { addAbortListener } from 'node:events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -180,6 +181,34 @@ describe('public profile audience block helper', () => {
 
     expect(mocks.createFingerprintEdge).not.toHaveBeenCalled();
     expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it('fails open without Postgres when the lookup is aborted during Redis', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const controller = new AbortController();
+    mocks.getRedis.mockImplementation((options?: { signal?: AbortSignal }) => ({
+      get: () =>
+        new Promise((_resolve, reject) => {
+          const signal = options?.signal;
+          if (signal) {
+            addAbortListener(signal, () => reject(signal.reason));
+          }
+        }),
+      set: vi.fn().mockResolvedValue(undefined),
+      del: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    const pending = checkProfileVisitorBlocked(
+      'tim',
+      '1.2.3.4',
+      'Mozilla',
+      controller.signal
+    );
+    setTimeout(() => controller.abort(), 20);
+
+    await expect(pending).resolves.toBe(false);
+    expect(mocks.select).not.toHaveBeenCalled();
+    expect(mocks.createFingerprintEdge).not.toHaveBeenCalled();
   });
 
   it('keeps audience-block telemetry enabled in Vercel preview even when E2E bypass is set', async () => {

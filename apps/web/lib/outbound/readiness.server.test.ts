@@ -44,7 +44,13 @@ describe('getOutboundReadiness', () => {
     ];
     mocks.eligibility.mockResolvedValue({ eligible: false, requirements: [] });
     mocks.queue.mockResolvedValue({
-      counts: { ready: 44, certified: 0, approved: 0 },
+      counts: {
+        ready: 1,
+        needs_evidence: 1,
+        flagged: 0,
+        certified: 0,
+        approved: 0,
+      },
       rows: [{ nextAction: 'build_profile' }, { nextAction: 'review_facts' }],
     });
     mocks.linear.mockResolvedValue({

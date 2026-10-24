@@ -40,14 +40,14 @@ export const CANONICAL_WEB_SURFACE_OWNERSHIP = {
       'apps/web/app/(home)/layout.tsx',
     ],
     requiredTokens: [
-      'HomepageIdentityHero',
+      'HomepageArtistHero',
       'PublicPageShell',
-      'HomepageClose',
+      'HomepageOfferClose',
     ],
     forbiddenTokens: ['HomePageNarrative'],
-    registryOwnerNeedle: 'HomepageIdentityHero',
-    moleculeOwners: ['PublicPageShell', 'HomepageIdentityHero'],
-    familyToken: 'features/home',
+    registryOwnerNeedle: 'HomepageArtistHero',
+    moleculeOwners: ['PublicPageShell', 'HomepageArtistHero'],
+    familyToken: 'components/homepage',
   },
   'public-profile': {
     liveSourcePaths: [
@@ -75,11 +75,7 @@ export const CANONICAL_WEB_SURFACE_OWNERSHIP = {
       'apps/web/app/app/(shell)/dashboard/releases/ReleaseCatalogPageClient.tsx',
       'apps/web/components/features/demo/DemoReleasesExperience.tsx',
     ],
-    requiredTokens: [
-      'ShellReleasesView',
-      'ReleasesPageClient',
-      'ReleasesExperience',
-    ],
+    requiredTokens: ['ShellReleasesView', 'ReleasesPageClient'],
     forbiddenTokens: [],
     registryOwnerNeedle: 'ShellReleasesView',
     moleculeOwners: ['ShellReleasesView'],

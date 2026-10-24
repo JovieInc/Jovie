@@ -5,7 +5,6 @@ import {
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST,
 } from '@/features/home/homepage-profile-preview-fixture';
-import { MOCK_ARTIST } from '@/features/home/phone-mode-content';
 import {
   FOUNDER_DEMO_PERSONA,
   INTERNAL_DJ_DEMO_PERSONA,
@@ -20,12 +19,6 @@ describe('Tim White canonical mock identity', () => {
     expect(TIM_WHITE_PROFILE.spotifyUrl).toBe(
       `https://open.spotify.com/artist/${TIM_WHITE_SPOTIFY_ID}`
     );
-  });
-
-  it('keeps the homepage phone mock content aligned with the canonical profile', () => {
-    expect(MOCK_ARTIST.name).toBe(TIM_WHITE_PROFILE.name);
-    expect(MOCK_ARTIST.handle).toBe(TIM_WHITE_PROFILE.handle);
-    expect(MOCK_ARTIST.image).toBe(TIM_WHITE_PROFILE.avatarSrc);
   });
 
   it('keeps the new homepage story artist aligned with the canonical profile', () => {

@@ -21,12 +21,12 @@ export const runtime = 'nodejs';
 
 export async function GET() {
   try {
-    return await withDbSessionTx(async (tx, clerkUserId) => {
-      // Look up the user's selected profile
+    return await withDbSessionTx(async (tx, appUserId) => {
+      // withDbSessionTx passes users.id. clerk_id is null for Better Auth users.
       const [user] = await tx
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.clerkId, clerkUserId))
+        .where(eq(users.id, appUserId))
         .limit(1);
 
       if (!user) {

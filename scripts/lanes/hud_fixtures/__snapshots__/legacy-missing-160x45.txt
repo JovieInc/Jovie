@@ -1,0 +1,45 @@
+● JOVIE · SYMPHONY · lanes unknown-release on gem · hud≠release · tick never          GitHub not-read-yet (source age unknown) · Linear not read yet · 18:29:30Z
+ CONSTRAINT ? UNKNOWN   evidence · lanes-status unread · the doctor writes it every tick on the primary host
+ PRODUCTION  ? UNKNOWN served build unknown · not-read-yet
+ FLOW 24h    draft ? → prepared ? → queued ? → merged ? → deployed ? → verified ? · merges ?/h · opened ?/h (1h) · claim→merge p50 ?
+ SLOTS       0 running / unknown (codex 0/? · grok 0/?) · gate seats 2
+  ○ codex      vacant ×3 · no codex account available
+  ○ grok       vacant · no worker (timer restarts idle lanes every 5 min) · new issues unknown (doctor unread)
+ ACCOUNTS    ✕ FileNotFoundError: codex
+ PIPELINE    open lane PRs unknown · draft unknown · non-draft unknown · merge queue unknown · not-read-yet (source age unknown) · PR list: not read yet
+ MERGED 24h  ? unknown · not-read-yet (source age unknown)
+ PROMO 8h    ✕ unread
+ OVERLAP     enforce · active 0 · prevented 0 · flags 0 · rebases 0
+ ATTENTION   hold records 0 · failures 0 · no alerts recorded
+  24h verdicts: no runs
+  THROUGHPUT 24h · codex offer 0 start 0 productive 0 PR 0 first-pass n/a repair 0 landed unknown │ grok offer 0 start 0 productive 0 PR 0 first-pass n/a repai…
+ NEW ISSUES  codex · grok  new issues unknown (doctor unread)
+ BACKLOG     ✕ Linear unavailable: not read yet
+ SYSTEM      load ? / 16 cores · mem None% free · disk 41.0% free · runs 24h 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ● running  ○ idle  ✓ ok  ✕ problem   │   sources: lane state + run logs (this host) · runs/ledger · Linear · GitHub · /proc

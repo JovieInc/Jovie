@@ -86,21 +86,23 @@ export async function updateProfileById(
 }
 
 /**
- * Update a profile by user's Clerk ID.
+ * Update a profile for the signed-in app user.
  *
- * @param clerkUserId - The Clerk user ID
+ * The argument is `users.id` from the chat session, despite the historical
+ * function name. Better Auth rows leave `clerk_id` null.
+ *
+ * @param appUserId - App `users.id`
  * @param updates - The fields to update
  * @returns Updated profile or null if not found
  */
 export async function updateProfileByClerkId(
-  clerkUserId: string,
+  appUserId: string,
   updates: ProfileUpdateData
 ): Promise<ProfileData | null> {
-  // First get the user ID from clerk_id
   const [user] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.clerkId, clerkUserId))
+    .where(eq(users.id, appUserId))
     .limit(1);
 
   if (!user) {

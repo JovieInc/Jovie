@@ -105,6 +105,8 @@ apps/docs/scripts/*.test.mjs
 !/docs/FEATURE_REGISTRY.md
 !/scripts/
 /scripts/*
+!/scripts/funnel-judge/
+!/scripts/funnel-judge/trend.jsonl
 !apps/eve-pilot/identities/jovie/instructions.md
 !apps/eve-pilot/identities/summer/instructions.md
 

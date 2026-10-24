@@ -18,6 +18,12 @@ describe('ArtistProfileOpinionatedSection', () => {
     expect(root.tagName).toBe('SECTION');
     expect(root).toHaveAttribute('data-marketing-variant', 'phone-right');
     expect(root).toHaveAttribute('data-marketing-occurrence', 'opinionated');
+    expect(
+      screen.getByTestId('artist-profile-opinionated-profile')
+    ).toHaveClass('marketing-rounded-frame');
+    expect(screen.getByRole('img').closest('figure')).toBe(
+      screen.getByTestId('artist-profile-opinionated-profile')
+    );
   });
 
   it('renders record-owned copy and the selected real capture without borrowed copy', () => {

@@ -115,3 +115,19 @@ PR/issue labels, Linear state) are event-driven. The Gem lanes tick
 default (`docs/PR_FLOW.md`, 2026-06-22 post-mortem); error mode would fight the
 canonical flow. **Re-evaluate when:** integration-branch waves become the
 default again. **Then:** escalate to error mode.
+
+## Gate-weakening detector (JOV-INV-045)
+
+`gate-weakening-detector` is a blocking `prOnly` source guard. On
+`pull_request` it diffs `origin/<base>...HEAD` and fails when that diff loosens
+required checks, branch protection, PR Ready needs, Source Validation steps, or
+source-guard ids; grows a shrink-only baseline or allowlist; loosens a coverage
+or budget threshold; adds a skip, exclusive test, suppression, or ignore entry;
+deletes or empties an invariant test; or raises a CI timeout or retry. Demoting
+a blocking guard to advisory, `continue-on-error`, or `if: false` fails too.
+
+Override is never silent. The PR body needs a `gate-change: <reason>` line and
+the `codeowners-approved` label, which is the CODEOWNER approval record.
+Findings still print. Local run:
+`node scripts/invariants/gate-weakening-detector.mjs --check`. Do not remove it
+from `SOURCE_GUARDS` or mark it advisory.
