@@ -79,9 +79,7 @@ describe('exclusive customer vs OV navigation', () => {
         item => item.label
       )
     ).toEqual(['Home', 'Inbox']);
-    expect(ADMIN_NAV_REGISTRY.some(item => item.id === 'needs_you')).toBe(
-      false
-    );
+    expect(ADMIN_NAV_REGISTRY.map(item => item.id)).not.toContain('needs_you');
     expect(ADMIN_SETTINGS_TOOL_IDS.slice(0, 3)).toEqual([
       'growth',
       'product',
