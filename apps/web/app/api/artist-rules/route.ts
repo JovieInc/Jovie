@@ -9,6 +9,7 @@ import {
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { db } from '@/lib/db';
+import { deferredLaunchRefusal } from '@/lib/launch/launch-enforcement';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,8 @@ async function authorize(creatorProfileId: string) {
 }
 
 export async function GET(request: Request) {
+  const refusal = deferredLaunchRefusal('/api/artist-rules');
+  if (refusal) return refusal;
   const creatorProfileId = new URL(request.url).searchParams.get(
     'creatorProfileId'
   );
@@ -60,6 +63,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const refusal = deferredLaunchRefusal('/api/artist-rules');
+  if (refusal) return refusal;
   const parsed = createSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid rule' }, { status: 400 });
@@ -83,6 +88,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const refusal = deferredLaunchRefusal('/api/artist-rules');
+  if (refusal) return refusal;
   const parsed = revokeSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid rule' }, { status: 400 });
@@ -104,6 +111,8 @@ export async function DELETE(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const refusal = deferredLaunchRefusal('/api/artist-rules');
+  if (refusal) return refusal;
   const parsed = activateSchema.safeParse(
     await request.json().catch(() => null)
   );

@@ -1,5 +1,5 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import {
@@ -11,6 +11,11 @@ import {
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const MANIFEST = 'docs/product/generated/artist-launch-inventory.json';
+/** JOV-8505: runtime projection of the manifest's deferred (C) entry points.
+ * The launch contract is enforced from this snapshot, never re-derived. */
+export const RUNTIME_SNAPSHOT =
+  'apps/web/lib/launch/generated/deferred-launch-entries.json';
+const SNAPSHOT_SCHEMA = 'jovie.deferred-launch-entries/v1';
 const HTTP_METHODS = new Set([
   'DELETE',
   'GET',
@@ -309,11 +314,131 @@ export function validateManifest(manifest, root = ROOT) {
       }
     }
   }
+  errors.push(...auditDeferredControlImports(manifest, root));
   return errors;
 }
 
 export function serializeManifest(manifest) {
   return `${JSON.stringify(manifest, null, 2)}\n`;
+}
+
+/** Deferred (C) entry points the runtime guard must refuse on every channel. */
+export function buildDeferredLaunchSnapshot(manifest) {
+  const handlers = {};
+  const actions = [];
+  const components = [];
+  for (const record of manifest.inventory) {
+    if (record.classification !== 'C') continue;
+    if (record.kind === 'handler') {
+      const methods = (handlers[record.route] ??= []);
+      for (const method of record.methods)
+        if (!methods.includes(method)) methods.push(method);
+    } else if (record.kind === 'action') {
+      actions.push(`${record.source}#${record.export}`);
+    } else if (record.kind === 'component') {
+      components.push(record.source);
+    }
+  }
+  for (const methods of Object.values(handlers)) methods.sort();
+  return {
+    schema: SNAPSHOT_SCHEMA,
+    generatedBy: 'node scripts/artist-launch-contract.mjs --write',
+    handlers,
+    actions: actions.sort(),
+    components: components.sort(),
+  };
+}
+
+export function serializeSnapshot(snapshot) {
+  return `${JSON.stringify(snapshot, null, 2)}\n`;
+}
+
+const MODULE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
+const ALIAS_PREFIXES = [
+  ['@/features/', 'components/features/'],
+  ['@/components/', 'components/'],
+  ['@/atoms/', 'components/atoms/'],
+  ['@/molecules/', 'components/molecules/'],
+  ['@/organisms/', 'components/organisms/'],
+  ['@/app/', 'app/'],
+  ['@/lib/', 'lib/'],
+];
+
+/** Resolve an import specifier to repo-relative module paths without executing app code. */
+function moduleSpecifierCandidates(importer, specifier) {
+  const candidates = new Set();
+  const addWithExtensions = target => {
+    candidates.add(target);
+    for (const extension of MODULE_EXTENSIONS)
+      if (target.endsWith(extension))
+        candidates.add(target.slice(0, -extension.length));
+  };
+  if (specifier.startsWith('.')) {
+    addWithExtensions(
+      posix.normalize(`${posix.dirname(importer)}/${specifier}`)
+    );
+  } else {
+    for (const [prefix, replacement] of ALIAS_PREFIXES) {
+      if (!specifier.startsWith(prefix)) continue;
+      const rest = specifier.slice(prefix.length);
+      addWithExtensions(`apps/web/${replacement}${rest}`);
+      if (prefix === '@/app/') addWithExtensions(`apps/web/app/app/${rest}`);
+    }
+  }
+  return candidates;
+}
+
+/** JOV-8505 transitive affordance audit: a declared deferred editing control
+ * must never be imported by production source — suppression is the launch
+ * contract, so new imports fail the manifest check instead of leaking. */
+export function auditDeferredControlImports(manifest, root = ROOT) {
+  const deferredComponents = manifest.inventory
+    .filter(r => r.kind === 'component' && r.classification === 'C')
+    .map(r => r.source)
+    .sort();
+  if (!deferredComponents.length) return [];
+  const errors = [];
+  const needles = deferredComponents.map(source => ({
+    source,
+    needle: basename(source).replace(/\.[jt]sx?$/, ''),
+  }));
+  const deferredModules = new Set(
+    deferredComponents.map(source => source.replace(/\.[jt]sx?$/, ''))
+  );
+  for (const directory of [
+    'apps/web/app',
+    'apps/web/components',
+    'apps/web/lib',
+  ]) {
+    let entries;
+    try {
+      entries = walk(root, directory);
+    } catch {
+      continue;
+    }
+    for (const file of entries) {
+      if (/\.(test|spec|stories)\./.test(file) || file.includes('__tests__'))
+        continue;
+      if (deferredComponents.includes(file)) continue;
+      const text = readFileSync(resolve(root, file), 'utf8');
+      if (!needles.some(n => text.includes(n.needle))) continue;
+      const ast = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+      for (const statement of ast.statements) {
+        const moduleSpecifier =
+          ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)
+            ? statement.moduleSpecifier
+            : undefined;
+        if (!moduleSpecifier || !ts.isStringLiteral(moduleSpecifier))
+          continue;
+        const specifier = moduleSpecifier.text;
+        for (const candidate of moduleSpecifierCandidates(file, specifier))
+          if (deferredModules.has(candidate))
+            errors.push(`deferred control imported: ${file} -> ${specifier}`);
+      }
+    }
+  }
+  const deduplicated = [...new Set(errors)].sort();
+  return deduplicated;
 }
 
 export function main(args, root = ROOT) {
@@ -326,14 +451,27 @@ export function main(args, root = ROOT) {
   if (errors.length) throw new Error(errors.join('\n'));
   const output = resolve(root, MANIFEST);
   const serialized = serializeManifest(manifest);
+  const snapshotPath = resolve(root, RUNTIME_SNAPSHOT);
+  const snapshotSerialized = serializeSnapshot(
+    buildDeferredLaunchSnapshot(manifest)
+  );
   if (args[0] === '--write') {
     mkdirSync(dirname(output), { recursive: true });
     writeFileSync(output, serialized);
+    mkdirSync(dirname(snapshotPath), { recursive: true });
+    writeFileSync(snapshotPath, snapshotSerialized);
   } else if (
     serializeManifest(JSON.parse(readFileSync(output, 'utf8'))) !== serialized
   )
     throw new Error(
       'launch inventory drift: classify/review new routes and regenerate the manifest'
+    );
+  else if (
+    serializeSnapshot(JSON.parse(readFileSync(snapshotPath, 'utf8'))) !==
+    snapshotSerialized
+  )
+    throw new Error(
+      'deferred launch enforcement snapshot drifted: regenerate with node scripts/artist-launch-contract.mjs --write'
     );
   return `artist launch contract: ${manifest.inventory.length} records; runtime UNVERIFIED`;
 }

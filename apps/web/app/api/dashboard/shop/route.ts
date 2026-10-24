@@ -6,6 +6,9 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import {
+  deferredLaunchRefusal,
+} from '@/lib/launch/launch-enforcement';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { getShopifyUrl, isShopifyDomain } from '@/lib/profile/shop-settings';
@@ -34,6 +37,8 @@ async function getProfileForUser(appUserId: string) {
 }
 
 export async function GET() {
+  const refusal = deferredLaunchRefusal('/api/dashboard/shop');
+  if (refusal) return refusal;
   try {
     return await withDbSession(async appUserId => {
       const profile = await getProfileForUser(appUserId);
@@ -68,6 +73,8 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+  const refusal = deferredLaunchRefusal('/api/dashboard/shop');
+  if (refusal) return refusal;
   try {
     return await withDbSession(async appUserId => {
       const parsedBody = await parseJsonBody<{
