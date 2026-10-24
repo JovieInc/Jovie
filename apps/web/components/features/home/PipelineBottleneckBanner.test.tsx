@@ -37,8 +37,60 @@ describe('PipelineBottleneckBanner', () => {
     expect(screen.getByText('Agentic')).toBeInTheDocument();
     expect(screen.getByText('Agents on it')).toBeInTheDocument();
     expect(
-      screen.getByText(bottleneckFixture().rank1!.oneLine)
+      screen.getByText(
+        'Qualified repairs are waiting for runner capacity. · Queued work 2 with capacity 1'
+      )
     ).toBeInTheDocument();
+  });
+
+  it('links the attacking work when an agentic status publishes a link', () => {
+    mount(bottleneckFixture());
+    const link = screen.getByRole('link', {
+      name: 'Inspect Runner capacity',
+    });
+    expect(link).toHaveAttribute(
+      'href',
+      'https://github.com/JovieInc/Jovie/pull/17005'
+    );
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('links the purchase lane and keeps the metric for needs-you', () => {
+    const loop = contributionFixture();
+    mount(
+      bottleneckFixture({
+        status: 'needs-you',
+        rank1: loop.rank1Override!,
+        cost: loop.cost!,
+        impact: loop.impact!,
+        statusLink: loop.statusLink,
+        metric: loop.metric,
+      })
+    );
+    expect(screen.getByText('Needs you')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Runner memory is limiting concurrent repairs. · Runner memory 94% sustained'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByText('$24/mo · Runner memory')).toBeInTheDocument();
+    expect(screen.getByText(loop.impact!)).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Inspect Runner memory' })
+    ).toHaveAttribute(
+      'href',
+      'https://linear.app/jovie/issue/JOV-5974/raise-runner-memory'
+    );
+    expect(screen.queryByText('Agents on it')).not.toBeInTheDocument();
+  });
+
+  it('omits the metric and link affordance when they are not published', () => {
+    mount(bottleneckFixture({ statusLink: undefined, metric: undefined }));
+    expect(
+      screen.getByText('Qualified repairs are waiting for runner capacity.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('shows an actionable cost and impact for needs-you, including zero-cost credential changes', async () => {

@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
+import { ExternalLink } from 'lucide-react';
 import { useEffect, useReducer } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
@@ -66,6 +67,7 @@ export function PipelineBottleneckBanner({
           <div className='min-w-0 flex-1'>
             <p className='truncate text-app text-primary-token'>
               {data.rank1?.oneLine}
+              {data.metric ? ` · ${data.metric}` : ''}
             </p>
             {needsYou && data.cost ? (
               <>
@@ -81,6 +83,17 @@ export function PipelineBottleneckBanner({
               <p className='text-xs text-secondary-token'>Agents on it</p>
             )}
           </div>
+          {data.statusLink ? (
+            <a
+              href={data.statusLink}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='shrink-0 text-tertiary-token transition-colors hover:text-primary-token'
+              aria-label={`Inspect ${data.rank1?.title ?? 'the bottleneck'}`}
+            >
+              <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
+            </a>
+          ) : null}
         </div>
       </ContentSurfaceCard>
     </div>

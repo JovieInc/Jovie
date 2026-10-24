@@ -8,6 +8,7 @@ export const PIPELINE_CONTRIBUTION_PATH =
 export const PIPELINE_BOTTLENECK_API = '/api/internal/ovie/pipeline-bottleneck';
 
 const text = z.string().trim().min(1);
+const linkUrl = z.url({ protocol: /^https?$/u }).max(2048);
 const rank1Schema = z.object({
   id: text,
   title: text,
@@ -32,6 +33,8 @@ export const pipelineBottleneckSchema = z
     dispatchRef: text.nullable(),
     cost: costSchema.nullable(),
     impact: text.nullable(),
+    statusLink: linkUrl.optional(),
+    metric: text.max(140).optional(),
     sourceDigest: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .superRefine((data, ctx) => {
@@ -59,6 +62,8 @@ export const pipelineBottleneckContributionSchema = z.object({
   status: z.literal('needs-you').optional(),
   cost: costSchema.optional(),
   impact: text.optional(),
+  statusLink: linkUrl.optional(),
+  metric: text.max(140).optional(),
 });
 
 export const mergedPipelineBottleneckSchema =
@@ -127,6 +132,10 @@ export async function mergePipelineBottleneck(
           rank1,
           cost: contribution.cost,
           impact: contribution.impact,
+          // The override replaces the ranked bottleneck, so Summer's link and
+          // metric must not survive attached to the loop's escalation.
+          statusLink: contribution.statusLink,
+          metric: contribution.metric,
           // Never attribute a loop escalation to Summer's unrelated repair owner.
           owner: null,
           dispatchRef: null,
