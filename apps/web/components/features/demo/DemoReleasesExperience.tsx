@@ -1,5 +1,8 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/demo/demo-releases-experience.test.tsx
+
+import { useSearchParams } from 'next/navigation';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import {
   primaryProviderKeys,
@@ -12,6 +15,7 @@ import {
 } from '@/lib/demo-personas';
 import { DemoAuthShell } from './DemoAuthShell';
 import { createDemoReleaseExperienceAdapter } from './demo-release-experience-adapter';
+import { FOUNDER_DEMO_DASHBOARD_DATA } from './mock-dashboard-data';
 import {
   DEMO_RELEASE_SIDEBAR_FIXTURES,
   DEMO_RELEASE_VIEW_MODELS,
@@ -31,23 +35,33 @@ type DemoReleasesExperienceVariant = 'internal-dj' | 'founder';
 export function DemoReleasesExperience({
   dashboardData,
   variant = 'internal-dj',
+  capturePlayer,
 }: {
   readonly dashboardData?: DashboardData;
   readonly variant?: DemoReleasesExperienceVariant;
+  /** Forces the capture-player demo state; production still opts in via the
+   * capturePlayer=1 URL (stories cannot rely on search params in vitest). */
+  readonly capturePlayer?: boolean;
 } = {}) {
-  const persona =
-    variant === 'founder' ? FOUNDER_DEMO_PERSONA : INTERNAL_DJ_DEMO_PERSONA;
-  const releases =
-    variant === 'founder'
-      ? FOUNDER_DEMO_RELEASE_VIEW_MODELS
-      : DEMO_RELEASE_VIEW_MODELS;
-  const sidebarDataByReleaseId =
-    variant === 'founder'
-      ? FOUNDER_DEMO_RELEASE_SIDEBAR_FIXTURES
-      : DEMO_RELEASE_SIDEBAR_FIXTURES;
+  const urlCapturePlayer = useSearchParams().get('capturePlayer') === '1';
+  const captureActive = capturePlayer ?? urlCapturePlayer;
+  const useFounder = variant === 'founder' || captureActive;
+  const persona = useFounder ? FOUNDER_DEMO_PERSONA : INTERNAL_DJ_DEMO_PERSONA;
+  const releases = useFounder
+    ? FOUNDER_DEMO_RELEASE_VIEW_MODELS
+    : DEMO_RELEASE_VIEW_MODELS;
+  const sidebarDataByReleaseId = useFounder
+    ? FOUNDER_DEMO_RELEASE_SIDEBAR_FIXTURES
+    : DEMO_RELEASE_SIDEBAR_FIXTURES;
 
   return (
-    <DemoAuthShell dashboardData={dashboardData} releasesForQuery={releases}>
+    <DemoAuthShell
+      dashboardData={
+        dashboardData ?? (useFounder ? FOUNDER_DEMO_DASHBOARD_DATA : undefined)
+      }
+      releasesForQuery={releases}
+      capturePlayer={captureActive}
+    >
       <ShellReleasesView
         releases={releases}
         providerConfig={providerConfig}

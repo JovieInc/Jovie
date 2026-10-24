@@ -80,6 +80,16 @@ def events(row: dict) -> list[dict]:
     """Every contract row one ledger receipt yields."""
     if not isinstance(row, dict) or row.get("binding") or not row.get("runId") or not row.get("provider"):
         return []
+    if row.get("kind") == "outcome-verify":
+        started, ended = _epoch(row.get("startedAt")), _epoch(row.get("endedAt"))
+        issue = str(row.get("issue") or "")
+        if started is None or ended is None or ended < started or not issue.startswith("JOV-"):
+            return []
+        outcome = ("advanced" if row.get("verdict") == "recorded" and row.get("decision") == "pass"
+                   else "failed" if row.get("verdict") == "recorded" else "abandoned")
+        return [{"schema": SCHEMA, "entityType": "shipping", "entityId": issue, "stage": "outcome-receipt",
+                 "enteredAt": _iso(started), "exitedAt": _iso(ended), "actor": row["provider"],
+                 "outcome": outcome, "sourceReceipt": f"lanes-ledger:{row['runId']}"}]
     if row.get("kind") == "adopt":
         started, ended = _epoch(row.get("startedAt")), _epoch(row.get("endedAt"))
         if started is None or ended is None or ended < started:

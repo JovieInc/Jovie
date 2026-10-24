@@ -44,7 +44,11 @@ test.describe('download page access', () => {
   test('states the iPhone app as text, not a disabled control', async ({
     page,
   }) => {
-    await expect(page.getByRole('status')).toHaveText('Not a public download');
+    // The (marketing) layout renders the sitewide email signup, whose sr-only
+    // success live region is also role='status'. Scope to the iPhone section.
+    await expect(page.locator('#iphone').getByRole('status')).toHaveText(
+      'Not a public download'
+    );
     await expect(page.locator('button[disabled]')).toHaveCount(0);
     await expect(
       page.getByRole('link', { name: 'See iPhone status' })

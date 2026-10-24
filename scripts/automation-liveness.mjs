@@ -385,6 +385,55 @@ async function readMainSha(client, repo, headers, apiUrl, readGitTip) {
   }
 }
 
+/** Read only the oldest missing commit; retry transients through the shared client. */
+async function readUnshippedRange(url, { client, fetchImpl, token }) {
+  const read = async (reader, authToken, maxAttempts) => {
+    try {
+      const response = await reader.request({
+        url,
+        headers: {
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+          ...githubHeaders(authToken),
+        },
+        priority: 'report',
+        conditional: false,
+        maxAttempts,
+        maxWaitMs: TIMEOUT_MS,
+        timeoutMs: TIMEOUT_MS,
+      });
+      if (response.status !== 200)
+        return {
+          ok: false,
+          reason: `http-${response.status}`,
+          publicRecovery: response.status === 403,
+        };
+      return { ok: true, body: response.json() };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: error?.status
+          ? `http-${error.status}`
+          : (error?.failure ?? error?.kind ?? 'unreadable'),
+        publicRecovery:
+          error?.status === 403 || ['shed', 'budget'].includes(error?.kind),
+      };
+    }
+  };
+  const authenticated = await read(client, token, 2);
+  if (authenticated.ok || !token || !authenticated.publicRecovery)
+    return authenticated;
+  // Jovie is public. A denied/exhausted Actions credential must not hide an
+  // otherwise readable range. The public read has its own shared budget and
+  // one attempt; it carries no token and still requires a real comparison.
+  const publicClient = createApiClient({
+    provider: 'github',
+    credential: hashCredential('github', ''),
+    fetch: fetchImpl,
+  });
+  return read(publicClient, '', 1);
+}
+
 /**
  * Production promotion heartbeat, independent of the continuity guard's own
  * verdict: production carrying main is a fresh proof; otherwise the proof is
@@ -419,12 +468,18 @@ export async function observeProductionFreshness(
   const now = new Date(nowMs).toISOString();
   if (live === main)
     return { ok: true, lastProofAt: now, reason: 'production-current' };
-  const compare = await readJson(
+  const compareUrl = `${apiUrl}/repos/${receipt.repo}/compare/${live}...${main}?per_page=1`;
+  const compare = await readUnshippedRange(compareUrl, {
+    client,
     fetchImpl,
-    `${apiUrl}/repos/${receipt.repo}/compare/${live}...${main}`,
-    headers
-  );
-  if (!compare.ok) return { ok: false, reason: 'unshipped-range-unreadable' };
+    token,
+  });
+  if (!compare.ok)
+    return {
+      ok: false,
+      reason: `unshipped-range-${compare.reason}`,
+      url: compareUrl,
+    };
   if (Number(compare.body?.ahead_by) === 0)
     return { ok: true, lastProofAt: now, reason: 'production-current' };
   const oldestCommit = compare.body?.commits?.[0];

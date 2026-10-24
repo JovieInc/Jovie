@@ -189,6 +189,13 @@ vi.mock('@/hooks/useIsAuthenticated', () => ({
 }));
 
 vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
+  // The real useProfileShell (via vi.importActual in the history tests)
+  // reaches the real notifications controller, which reads this query.
+  useNotificationStatusQuery: () => ({
+    data: null,
+    isError: false,
+    isLoading: false,
+  }),
   useUnsubscribeNotificationsMutation: () => ({
     mutate: vi.fn(),
     isPending: false,
@@ -196,6 +203,14 @@ vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useUpdateContentPreferencesMutation: () => ({
     mutate: vi.fn(),
   }),
+}));
+
+// The real useProfileShell's tracking hooks drive react-query mutations;
+// they are inert for the history contract under test.
+vi.mock('@/components/organisms/hooks/useProfileTracking', () => ({
+  useTipPageTracking: () => undefined,
+  useProfileVisitTracking: () => undefined,
+  usePopstateReset: () => undefined,
 }));
 
 vi.mock('@/lib/hooks/useNotifications', () => ({
@@ -981,6 +996,66 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('renders Jovie footer branding on the free public profile (JOV-8777)', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const branding = await screen.findByTestId('profile-jovie-branding');
+    expect(
+      within(branding).getByRole('link', { name: /Jovie home/i })
+    ).toHaveAttribute(
+      'href',
+      `/?utm_source=profile&utm_artist=${mockArtist.handle}`
+    );
+  });
+
+  it('hides Jovie footer branding inside embedded previews (JOV-8777)', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        embeddedPreview
+      />
+    );
+
+    expect(await screen.findByTestId('profile-compact-surface')).toBeVisible();
+    expect(
+      screen.queryByTestId('profile-jovie-branding')
+    ).not.toBeInTheDocument();
+  });
+
+  it('passes hideJovieBranding through to the desktop surface (JOV-8777)', async () => {
+    const restoreViewport = mockViewport('desktop');
+    try {
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockProfileDesktopSurface).toHaveBeenCalled();
+      });
+      const desktopProps = mockProfileDesktopSurface.mock.calls.at(
+        -1
+      )?.[0] as Record<string, unknown>;
+      expect(desktopProps.hideJovieBranding).toBe(false);
+    } finally {
+      restoreViewport();
+    }
+  });
+
   it('renders the compact bottom navigation with four primary icon tabs', async () => {
     render(
       <ProfileCompactTemplate
@@ -1498,6 +1573,7 @@ describe('ProfileCompactTemplate', () => {
       );
     });
     expect(pushStateSpy).not.toHaveBeenCalled();
+    const rendersAfterLanding = mockUseProfileShell.mock.calls.length;
 
     // A client Link (the about drawer's contact links) moves the URL to
     // contact mode; requestedMode is still 'about' until the shell's
@@ -1516,6 +1592,13 @@ describe('ProfileCompactTemplate', () => {
         socialLinks={[]}
         contacts={[]}
       />
+    );
+
+    // A fresh JSX element actually re-rendered the template; an identical
+    // element reference would bail out and prove nothing. The zero-write
+    // assertions below are only meaningful if the history effect re-ran.
+    expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+      rendersAfterLanding
     );
 
     await waitFor(() => {
@@ -1541,6 +1624,10 @@ describe('ProfileCompactTemplate', () => {
         contentPreferences: null,
       },
     }));
+    // The mode-sync rerender must also be real: capture the count before
+    // the flip so the assertion below proves this rerender re-ran the
+    // history effect too.
+    const rendersBeforeModeSync = mockUseProfileShell.mock.calls.length;
     view.rerender(
       <ProfileCompactTemplate
         mode='contact'
@@ -1548,6 +1635,9 @@ describe('ProfileCompactTemplate', () => {
         socialLinks={[]}
         contacts={[]}
       />
+    );
+    expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+      rendersBeforeModeSync
     );
     await waitFor(() => {
       expect(`${window.location.pathname}${window.location.search}`).toBe(
@@ -1615,6 +1705,7 @@ describe('ProfileCompactTemplate', () => {
     });
     pushStateSpy.mockClear();
     replaceStateSpy.mockClear();
+    const rendersAfterLanding = mockUseProfileShell.mock.calls.length;
     try {
       view.rerender(
         <ProfileCompactTemplate
@@ -1623,6 +1714,13 @@ describe('ProfileCompactTemplate', () => {
           socialLinks={[]}
           contacts={[]}
         />
+      );
+
+      // A fresh JSX element actually re-rendered the template; an identical
+      // element reference would bail out and prove nothing. The zero-write
+      // assertions below are only meaningful if the history effect re-ran.
+      expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+        rendersAfterLanding
       );
 
       await waitFor(() => {
@@ -1673,6 +1771,160 @@ describe('ProfileCompactTemplate', () => {
     });
 
     expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
+  });
+
+  it('does not push the profile URL over a claim-funnel navigation', async () => {
+    // Golden Path claim smoke regression: the claim CTA routes to
+    // /{handle}/claim?next=auth and on into /signup while this template is
+    // still mounted through the client transition. The history sync must
+    // not write the stale profile intent back over the router's new URL, or
+    // the click is swallowed and never reaches the auth funnel.
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    window.history.replaceState(null, '', '/test-artist?claim=1');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+
+    try {
+      const view = render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      // The claim-intent landing settles without touching history.
+      await waitFor(() => {
+        expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+          expect.objectContaining({ modeOverride: 'profile' })
+        );
+      });
+      expect(pushStateSpy).not.toHaveBeenCalled();
+      expect(replaceStateSpy).not.toHaveBeenCalled();
+      const rendersAfterLanding = mockUseProfileShell.mock.calls.length;
+
+      // The router moves the URL to the auth funnel during the transition,
+      // exactly as the Next history updater does once the claim route's
+      // redirect has been followed. The push is the navigation under test,
+      // so only writes after it count.
+      act(() => {
+        window.history.pushState(
+          window.history.state,
+          '',
+          '/signup?handle=test-artist'
+        );
+      });
+      pushStateSpy.mockClear();
+      replaceStateSpy.mockClear();
+      view.rerender(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      // A fresh JSX element actually re-rendered the template; an identical
+      // element reference would bail out and prove nothing.
+      expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+        rendersAfterLanding
+      );
+
+      await waitFor(() => {
+        expect(`${window.location.pathname}${window.location.search}`).toBe(
+          '/signup?handle=test-artist'
+        );
+      });
+      expect(pushStateSpy).not.toHaveBeenCalled();
+      expect(replaceStateSpy).not.toHaveBeenCalled();
+    } finally {
+      pushStateSpy.mockRestore();
+      replaceStateSpy.mockRestore();
+    }
+  });
+
+  it('does not revert a foreign navigation after drawer state settles', async () => {
+    // Executed defect on the navigation-pair mechanism (independent
+    // component harness on bcf2ec4f): with Contact open, a client
+    // navigation to /signup?handle=… was still overwritten by /test-artist
+    // once the mode/drawer effects settled — the in-flight guard only
+    // defers the first run after the URL move, and later settling runs see
+    // the foreign href as the last observed one. This case runs the REAL
+    // useProfileShell history subscription, so the navigation re-renders
+    // the template synchronously exactly like the production history patch.
+    const actualShell = await vi.importActual<
+      typeof import('@/components/organisms/profile-shell/useProfileShell')
+    >('@/components/organisms/profile-shell/useProfileShell');
+    mockUseProfileShell.mockImplementation(actualShell.useProfileShell);
+    mockCanonicalProfileDSPs.mockReturnValue([]);
+    window.history.replaceState(null, '', '/test-artist?mode=contact');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+
+    try {
+      // The Contact drawer only opens for an artist with contact channels —
+      // the typed mockContacts fixture supplies one, establishing the real
+      // open-drawer precondition (hasContacts is derived from this prop).
+      render(
+        <ProfileCompactTemplate
+          mode='contact'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={mockContacts}
+        />
+      );
+
+      // The contact deep link settles with the drawer open and no writes.
+      await waitFor(() => {
+        expect(mockProfileUnifiedDrawer).toHaveBeenLastCalledWith(
+          expect.objectContaining({ open: true, view: 'contact' })
+        );
+      });
+      expect(pushStateSpy).not.toHaveBeenCalled();
+      expect(replaceStateSpy).not.toHaveBeenCalled();
+
+      // The claim funnel navigation. The push goes through the shell's
+      // patched history — the spy records it as the one known setup call —
+      // and the real subscription re-renders the template synchronously.
+      act(() => {
+        window.history.pushState(
+          window.history.state,
+          '',
+          '/signup?handle=test-artist'
+        );
+      });
+
+      // Every mode/drawer effect settles: requestedMode falls back to
+      // profile and the drawer closes. None of those runs may write the
+      // profile URL back over the navigation target.
+      await waitFor(() => {
+        expect(mockUseProfileShell).toHaveBeenLastCalledWith(
+          expect.objectContaining({ modeOverride: 'profile' })
+        );
+      });
+      await waitFor(() => {
+        expect(mockProfileUnifiedDrawer).toHaveBeenLastCalledWith(
+          expect.objectContaining({ open: false })
+        );
+      });
+
+      await waitFor(() => {
+        expect(`${window.location.pathname}${window.location.search}`).toBe(
+          '/signup?handle=test-artist'
+        );
+      });
+      // Exactly one history write is known: the simulated navigation above.
+      expect(pushStateSpy).toHaveBeenCalledTimes(1);
+      expect(pushStateSpy.mock.calls[0]?.[2]).toBe(
+        '/signup?handle=test-artist'
+      );
+      expect(replaceStateSpy).not.toHaveBeenCalled();
+    } finally {
+      pushStateSpy.mockRestore();
+      replaceStateSpy.mockRestore();
+    }
   });
 
   it('renders the Music tab when ?mode=listen is in the URL even when releases exist', async () => {

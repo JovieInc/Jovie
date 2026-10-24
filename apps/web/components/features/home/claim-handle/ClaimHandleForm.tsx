@@ -158,7 +158,6 @@ export function ClaimHandleForm({
         className={cn(
           'claim-input-row',
           'system-b-claim-handle-row',
-          'focus-field-inset',
           'relative flex w-full items-center gap-2',
           isAvailable && 'claim-input-row--available'
         )}
@@ -195,9 +194,12 @@ export function ClaimHandleForm({
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
             className={cn(
               'system-b-claim-handle-input',
-              // The field frame owns the single inset ring (.focus-field-inset).
-              // A ring on this input draws a second rectangle inside the row.
-              'min-w-0 flex-1 bg-transparent focus-visible:outline-none',
+              // JOV-INV-019: the shared box-shadow ring is the only focus style
+              // that survives here — outline utilities collapse under
+              // tailwind-merge and the global input reset paints over them.
+              // The locked route-quality focus check reads this input's own
+              // computed styles, so the ring must live on the input itself.
+              'min-w-0 flex-1 bg-transparent focus-ring-themed',
               isHeroLike
                 ? 'placeholder:text-quaternary-token'
                 : 'placeholder:text-tertiary-token'

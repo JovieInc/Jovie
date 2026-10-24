@@ -321,7 +321,7 @@ describe('sitemap', () => {
 
     expect(entries.length).toBeGreaterThan(0);
     expect(artist?.lastModified).toEqual(new Date('2026-01-01'));
-    expect(about?.lastModified).toBeUndefined();
+    expect(about?.lastModified).toEqual(new Date('2026-10-23'));
   });
 
   it('excludes automatic unclaimed structured-credit profiles', async () => {
@@ -371,6 +371,45 @@ describe('sitemap', () => {
 
     expect(urls).toContain('https://jov.ie/claimed-artist');
     expect(urls).not.toContain('https://jov.ie/a_unclaimed');
+  });
+
+  it('removes an unlisted profile and all of its release and track URLs', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock
+      .mockResolvedValueOnce([
+        {
+          username: 'hidden-choice',
+          displayName: 'Hidden Choice',
+          isClaimed: true,
+          updatedAt: new Date('2026-01-01'),
+          settings: { searchable: false },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          username: 'hidden-choice',
+          slug: 'hidden-release',
+          updatedAt: new Date('2026-01-02'),
+          artworkUrl: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          username: 'hidden-choice',
+          slug: 'hidden-track',
+          releaseSlug: 'hidden-release',
+          updatedAt: new Date('2026-01-03'),
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    const {
+      default: sitemap,
+      dynamic,
+      revalidate,
+    } = await import('../../app/sitemap');
+    expect(dynamic).toBe('force-dynamic');
+    expect(revalidate).toBe(0);
+    expect(JSON.stringify(await sitemap())).not.toContain('hidden-choice');
   });
 
   it('excludes synthetic profiles and their content without hiding similar real handles', async () => {

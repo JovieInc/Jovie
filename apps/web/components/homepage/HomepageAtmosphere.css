@@ -1,0 +1,116 @@
+/* ── One Light atmosphere ─────────────────────────────────────────────── */
+/* Extend the shipped hero-light, including its capability gates and scroll
+   canvas. Static light stays behind content: no extra DOM, JS, or animation.
+   The copy side falls to cinematic black before the claim's right edge. */
+.home-viewport--hero-canvas .homepage-hero-canvas__field {
+  isolation: isolate;
+  background:
+    linear-gradient(
+      118deg,
+      transparent 62%,
+      color-mix(in oklab, var(--noir-ion-ion) 10%, transparent) 62.1%,
+      transparent 62.2%
+    ),
+    radial-gradient(
+      ellipse 54% 90% at 108% 12%,
+      color-mix(in oklab, var(--noir-ion-ion) 38%, transparent),
+      transparent 74%
+    ),
+    radial-gradient(
+      ellipse 44% 52% at 92% 60%,
+      color-mix(in oklab, var(--noir-ion-ion) 16%, transparent),
+      transparent 80%
+    ),
+    var(--system-b-cinematic-black);
+}
+
+.home-viewport--hero-canvas .homepage-hero-canvas__field::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 68%,
+    var(--system-b-cinematic-black) 100%
+  );
+}
+
+.home-viewport--hero-canvas .homepage-hero-light {
+  --hero-light-focal-x: 88%;
+  --hero-light-focal-y: 42%;
+  --hero-light-ultra: var(--noir-ion-ion);
+  --hero-light-pulse: var(--noir-ion-ion);
+
+  /* Keep both the CSS poster and live renderer out of the reading zone. */
+  mask-image: linear-gradient(
+    to right,
+    transparent 32%,
+    var(--noir-ion-canvas) 88%
+  );
+}
+
+.home-viewport--hero-canvas .homepage-hero-light__grid {
+  opacity: 0.12;
+}
+
+.home-viewport--hero-canvas .homepage-hero-light__canvas {
+  /* Preserve the renderer's moving luminance, with the underlying Ion field
+     supplying its hue. The shader's secondary hues never enter this section. */
+  mix-blend-mode: luminosity;
+}
+
+.home-viewport--hero-canvas .homepage-artist-section {
+  background-color: var(--system-b-cinematic-black);
+}
+
+.home-viewport--hero-canvas [data-testid="marketing-section-product-gallery"] {
+  background-image: radial-gradient(
+    ellipse 64% 60% at 0% 56%,
+    color-mix(in oklab, var(--noir-ion-ultra) 9%, transparent),
+    transparent 78%
+  );
+}
+
+.home-viewport--hero-canvas [data-testid="marketing-section-cta"] {
+  background-image: radial-gradient(
+    ellipse 48% 90% at 104% 70%,
+    color-mix(in oklab, var(--noir-ion-ion) 13%, transparent),
+    transparent 78%
+  );
+}
+
+@media (max-width: 63.99rem) {
+  .home-viewport--hero-canvas .homepage-hero-canvas__field {
+    /* On a stacked fold, keep the source below and right of the form. */
+    background:
+      radial-gradient(
+        ellipse 95% 54% at 114% 94%,
+        color-mix(in oklab, var(--noir-ion-ion) 30%, transparent),
+        transparent 80%
+      ),
+      var(--system-b-cinematic-black);
+  }
+
+  .home-viewport--hero-canvas .homepage-hero-light {
+    --hero-light-focal-y: 84%;
+
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 42%,
+      var(--noir-ion-canvas) 90%
+    );
+  }
+}
+
+@media (prefers-contrast: more), (forced-colors: active) {
+  .home-viewport--hero-canvas .homepage-hero-canvas__field::after,
+  .home-viewport--hero-canvas .homepage-hero-canvas__field,
+  .home-viewport--hero-canvas .homepage-artist-section {
+    background-image: none;
+  }
+
+  .home-viewport--hero-canvas .homepage-hero-light {
+    visibility: hidden;
+  }
+}
