@@ -115,8 +115,10 @@ export const ServerEnvSchema = z.object({
     .string()
     .regex(/^(?:[1-9]|1\d|20)$/)
     .optional(),
-  /** Opt-in pool-level PostgreSQL statement_timeout in milliseconds. */
+  /** Pool-level PostgreSQL statement_timeout in milliseconds (enforced by default; clamped in code, JOV-8527). */
   DB_STATEMENT_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
+  /** Pool-level acquisition deadline in milliseconds for pool.connect(); clamped in code (JOV-8527). */
+  DB_ACQUISITION_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
 
   // Server or build-time envs (may be undefined locally)
   SPOTIFY_CLIENT_ID: z.string().optional(),
@@ -557,6 +559,7 @@ export const ENV_KEYS = [
   'DATABASE_URL',
   'DB_POOL_MAX',
   'DB_STATEMENT_TIMEOUT_MS',
+  'DB_ACQUISITION_TIMEOUT_MS',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
   'JOVIE_SYSTEM_CLERK_USER_ID',
