@@ -1356,6 +1356,35 @@ jobs:
       # Missing base SHA, range, or evidence blocks. Post-deploy smoke is separate.
       # Inspect JSON has no commit field. Keep it on disk (the builds payload
       # blows the shell limit) and bind its deployment id to build-info.
+      # The job workspace is the candidate SHA. Gate CLIs come from the commit
+      # that supplied this workflow. A candidate older than the CLI otherwise
+      # exits 2 before the gate grades the range.
+      - name: Checkout trusted promotion gate tooling
+        if: ${{ steps.final-current.outputs.is_current == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: promotion-gate-tooling
+          persist-credentials: false
+          fetch-depth: 1
+          sparse-checkout: |
+            scripts/promotion-gate-ci.mjs
+            scripts/promotion-journey-gate.mjs
+            scripts/lib/release-range-risk.mjs
+            scripts/lib/ci-harness.mjs
+            scripts/lib/promotion-journey-evidence.mjs
+            .github/ci-harness/manifest.json
+            packages/api-client/package.json
+            packages/api-client/cache.ts
+            packages/api-client/client.ts
+            packages/api-client/contract.ts
+            packages/api-client/gh.ts
+            packages/api-client/headers.ts
+            packages/api-client/policy.ts
+            packages/api-client/providers.json
+            packages/api-client/store.ts
+          sparse-checkout-cone-mode: false
       - name: Pre-promotion auth/billing journey gate
         id: journey-gate
         if: ${{ steps.final-current.outputs.is_current == 'true' }}
@@ -1369,7 +1398,13 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           gate_dir="$RUNNER_TEMP/journey-gate"
+          gate_tools="$GITHUB_WORKSPACE/promotion-gate-tooling"
           mkdir -p "$gate_dir"
+          if [ ! -f "$gate_tools/scripts/promotion-gate-ci.mjs" ] ||
+            [ ! -f "$gate_tools/scripts/promotion-journey-gate.mjs" ]; then
+            echo "::error::Trusted promotion gate tooling is missing from the workflow ref."
+            exit 1
+          fi
           inspect_file="$gate_dir/inspect.json"
           build_info_file="$gate_dir/build-info.json"
           if ! ./node_modules/.bin/vercel inspect jov.ie --format=json --scope "$VERCEL_ORG_ID" >"$inspect_file"; then
@@ -1382,16 +1417,16 @@ jobs:
             echo "::error::Canonical production build-info is unavailable."
             : >"$build_info_file"
           fi
-          base_sha="$(node scripts/promotion-gate-ci.mjs resolve-base --inspect "$inspect_file" --build-info "$build_info_file")"
-          node scripts/promotion-gate-ci.mjs range --base "$base_sha" --candidate "$CANDIDATE_SHA" --out "$gate_dir/range.json"
-          node scripts/promotion-gate-ci.mjs fetch-evidence --repo "$REPO" --candidate "$CANDIDATE_SHA" --out-dir "$gate_dir/evidence"
+          base_sha="$(node "$gate_tools/scripts/promotion-gate-ci.mjs" resolve-base --inspect "$inspect_file" --build-info "$build_info_file")"
+          node "$gate_tools/scripts/promotion-gate-ci.mjs" range --base "$base_sha" --candidate "$CANDIDATE_SHA" --out "$gate_dir/range.json"
+          node "$gate_tools/scripts/promotion-gate-ci.mjs" fetch-evidence --repo "$REPO" --candidate "$CANDIDATE_SHA" --out-dir "$gate_dir/evidence"
           args=(--range "$gate_dir/range.json" --out "$gate_dir/decision.json")
           while IFS= read -r f; do args+=(--evidence "$f"); done < <(find "$gate_dir/evidence" -name 'journey-evidence-*.json' 2>/dev/null | sort)
           if [ -n "$PROMOTION_JOURNEY_OVERRIDE" ]; then
             printf '%s' "$PROMOTION_JOURNEY_OVERRIDE" > "$gate_dir/override.json"
             args+=(--override "$gate_dir/override.json")
           fi
-          if ! node scripts/promotion-journey-gate.mjs "${args[@]}"; then
+          if ! node "$gate_tools/scripts/promotion-journey-gate.mjs" "${args[@]}"; then
             echo "::error::Promotion blocked by the auth/billing journey gate (see decision above)."
             echo "failure_subtype=journey_gate_blocked" >> "$GITHUB_OUTPUT"
             exit 1

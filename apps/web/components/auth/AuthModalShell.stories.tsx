@@ -24,6 +24,7 @@ const SampleForm = () => (
     <input
       type='email'
       placeholder='you@example.com'
+      aria-label='Email address'
       className='w-full rounded-xl border border-subtle bg-surface-0 px-3 py-2 text-primary-token placeholder:text-tertiary-token'
     />
     <button
@@ -50,4 +51,18 @@ export const WithStatusRow: Story = {
     statusRow: <span>Continuing with “Test prompt”</span>,
     children: <SampleForm />,
   },
+};
+
+/** Native top-layer positioning must escape transformed page containers. */
+export const TransformedAncestor: Story = {
+  ...Default,
+  decorators: [
+    Story => (
+      <div
+        style={{ transform: 'translate(40px, 24px)', width: 240, height: 180 }}
+      >
+        <Story />
+      </div>
+    ),
+  ],
 };

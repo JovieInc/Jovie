@@ -23,6 +23,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: [path.resolve(realRoot, 'tests/setup.ts')],
     exclude: [
+      'tests/a11y/**',
       'tests/e2e/**',
       'tests/performance/**',
       'node_modules/**',

@@ -32,4 +32,33 @@ describe('invalidateProfileCache discovery outputs (JOV-6260)', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/artists');
     expect(revalidatePath).toHaveBeenCalledWith('/newrelease');
   });
+  it('hard-expires old discovery and profile payloads after an owner privacy change', async () => {
+    const { invalidateProfileCache } = await import('./profile');
+    await invalidateProfileCache('newrelease', undefined, {
+      privacyChanged: true,
+    });
+    for (const tag of [
+      'sitemap-catalog',
+      'featured-creators',
+      'artists-directory',
+      'profiles-all',
+      'profile:newrelease',
+    ]) {
+      expect(revalidateTag).toHaveBeenCalledWith(tag, { expire: 0 });
+    }
+    expect(revalidatePath).toHaveBeenCalledWith('/newrelease', 'layout');
+    expect(revalidatePath).toHaveBeenCalledWith('/sitemap.xml');
+    expect(revalidatePath).toHaveBeenCalledWith('/api/featured-creators');
+    expect(revalidateTag).not.toHaveBeenCalledWith(expect.anything(), 'max');
+  });
+  it('hard-expires the old handle and descendants when privacy changes during a rename', async () => {
+    const { invalidateProfileCache } = await import('./profile');
+    await invalidateProfileCache('newartist', 'oldartist', {
+      privacyChanged: true,
+    });
+    expect(revalidateTag).toHaveBeenCalledWith('profile:oldartist', {
+      expire: 0,
+    });
+    expect(revalidatePath).toHaveBeenCalledWith('/oldartist', 'layout');
+  });
 });

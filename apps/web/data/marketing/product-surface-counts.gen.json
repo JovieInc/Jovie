@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    "apps/web/lib/keyboard-shortcuts.ts",
+    "apps/web/lib/commands/registry.ts",
+    "apps/web/lib/utm/presets.ts"
+  ],
+  "keyboardShortcuts": {
+    "publicCatalogCount": 27,
+    "byCategory": {
+      "general": 5,
+      "navigation": 9,
+      "actions": 4,
+      "player": 9
+    },
+    "excludedFromPublicCatalog": [
+      {
+        "id": "switch-workspace",
+        "reason": "Admin-only binding kept outside the public catalog"
+      },
+      {
+        "id": "toggle-founder-door",
+        "reason": "Admin-only binding kept outside the public catalog"
+      }
+    ],
+    "gThenCount": 9,
+    "gThenSequences": [
+      {
+        "id": "nav-dashboard",
+        "keys": "G then D",
+        "firstKey": "g",
+        "secondKey": "d"
+      },
+      {
+        "id": "nav-releases",
+        "keys": "G then R",
+        "firstKey": "g",
+        "secondKey": "r"
+      },
+      {
+        "id": "nav-profile",
+        "keys": "G then P",
+        "firstKey": "g",
+        "secondKey": "p"
+      },
+      {
+        "id": "nav-contacts",
+        "keys": "G then C",
+        "firstKey": "g",
+        "secondKey": "c"
+      },
+      {
+        "id": "nav-links",
+        "keys": "G then K",
+        "firstKey": "g",
+        "secondKey": "k"
+      },
+      {
+        "id": "nav-calendar",
+        "keys": "G then L",
+        "firstKey": "g",
+        "secondKey": "l"
+      },
+      {
+        "id": "nav-tour-dates",
+        "keys": "G then O",
+        "firstKey": "g",
+        "secondKey": "o"
+      },
+      {
+        "id": "nav-chat",
+        "keys": "G then T",
+        "firstKey": "g",
+        "secondKey": "t"
+      },
+      {
+        "id": "nav-settings",
+        "keys": "G then S",
+        "firstKey": "g",
+        "secondKey": "s"
+      }
+    ]
+  },
+  "commands": {
+    "defaultRegistry": {
+      "skill": 6,
+      "nav": 15,
+      "total": 21
+    },
+    "visibleByDefault": {
+      "skill": 6,
+      "nav": 14,
+      "total": 20
+    },
+    "flagGatedNavigation": [
+      {
+        "id": "go-presence",
+        "requiredFlag": "PROFILES_WORKSPACE",
+        "visibleByDefault": false
+      }
+    ],
+    "discoverabilityGatedNavigation": [
+      {
+        "id": "go-youtube",
+        "kind": "nav",
+        "flag": "YOUTUBE_WORKSPACE_NAV"
+      },
+      {
+        "id": "go-jovie-work",
+        "kind": "nav",
+        "flag": "JOVIE_WORK_NAV"
+      }
+    ]
+  },
+  "trackedLinks": {
+    "presetCount": 55,
+    "categoryCount": 5,
+    "categories": [
+      {
+        "id": "social",
+        "label": "Social Media",
+        "presetCount": 18
+      },
+      {
+        "id": "email",
+        "label": "Email & Newsletters",
+        "presetCount": 6
+      },
+      {
+        "id": "paid",
+        "label": "Paid Advertising",
+        "presetCount": 11
+      },
+      {
+        "id": "music",
+        "label": "Music Platforms",
+        "presetCount": 7
+      },
+      {
+        "id": "other",
+        "label": "Other",
+        "presetCount": 13
+      }
+    ]
+  }
+}

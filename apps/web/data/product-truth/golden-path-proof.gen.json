@@ -16,7 +16,7 @@
       "step": "homepage",
       "route": "/",
       "source": "apps/web/data/homepageCopy.ts",
-      "copy": "One profile. For every fan.",
+      "copy": "Be found. Be understood.",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",

@@ -39,4 +39,18 @@ describe('AudienceRowActionsMenu', () => {
     expect(screen.getByRole('menuitem', { name: 'Copy phone' })).toBeTruthy();
     expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
   });
+
+  it('defaults to a modal menu and can render non-modal for catalogs', () => {
+    const { container, rerender } = render(
+      <AudienceRowActionsMenu row={row} open modal={false} />
+    );
+
+    // The `modal` passthrough exists so Storybook catalogs can render the
+    // open menu without Radix `hideOthers` ARIA-hiding the canvas.
+    expect(container.firstChild).not.toBeNull();
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+
+    rerender(<AudienceRowActionsMenu row={row} open />);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
 });

@@ -169,6 +169,16 @@ describe('Claim token route', () => {
     expect(response.headers.get('location')).toBe(
       'http://localhost/e2eclaimartist?claim=1'
     );
+
+    const loopbackResponse = await GET(
+      new NextRequest('http://127.0.0.1:3100/claim/fixture-token', {
+        headers: { host: '127.0.0.1:3100' },
+      }),
+      { params: Promise.resolve({ token: 'fixture-token' }) }
+    );
+    expect(loopbackResponse.headers.get('location')).toBe(
+      'http://127.0.0.1:3100/e2eclaimartist?claim=1'
+    );
     expect(mockIsClaimTokenValid).toHaveBeenCalledWith(
       'e2eclaimartist',
       'fixture-token'

@@ -1,6 +1,6 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
@@ -86,7 +86,7 @@ function rowFor(report, id) {
 }
 
 describe('ls-remote main tip', () => {
-  it('asks git for refs/heads/main and keeps the token out of argv', async () => {
+  it('reads main anonymously without exposing the token or inherited git config', async () => {
     const token = 'actions-token';
     const encoded = Buffer.from(`x-access-token:${token}`).toString('base64');
     // Assigned inside the git callback. An uninitialized let stays
@@ -114,8 +114,79 @@ describe('ls-remote main tip', () => {
     expect(JSON.stringify(seen.args)).not.toContain(token);
     expect(JSON.stringify(seen.args)).not.toContain(encoded);
     expect(seen.env.GIT_CONFIG_VALUE_0).toBe('/dev/null');
-    expect(seen.env.GIT_CONFIG_VALUE_2).toBe(`AUTHORIZATION: basic ${encoded}`);
+    expect(JSON.stringify(seen.env).includes(token)).toBe(false);
+    expect(JSON.stringify(seen.env).includes(encoded)).toBe(false);
+    expect(seen.env.GIT_CONFIG_GLOBAL).toBe('/dev/null');
+    expect(seen.env.GIT_CONFIG_SYSTEM).toBe('/dev/null');
+    expect(seen.env.GIT_CONFIG_NOSYSTEM).toBe('1');
     expect(seen.env.GIT_TERMINAL_PROMPT).toBe('0');
+  });
+
+  it.each(['transport', 'malformed'])(
+    'retries an anonymous %s failure with the token only in the child environment',
+    async failure => {
+      const token = 'actions-token';
+      const gitExec = vi.fn(async (_args, env) => {
+        if (env.GIT_CONFIG_COUNT === '1') {
+          if (failure === 'transport') throw new Error('anonymous failed');
+          return 'nope';
+        }
+        return `${MAIN}\trefs/heads/main\n`;
+      });
+      expect(await lsRemoteMain('JovieInc/Jovie', token, gitExec)).toBe(MAIN);
+      expect(gitExec).toHaveBeenCalledTimes(2);
+      const [args, env] = gitExec.mock.calls[1];
+      expect(JSON.stringify(args)).not.toContain(token);
+      expect(env.GIT_CONFIG_COUNT).toBe('3');
+      expect(env.GIT_CONFIG_VALUE_0).toBe('/dev/null');
+      expect(env.GIT_CONFIG_VALUE_1).toBe('');
+      expect(env.GIT_CONFIG_VALUE_2).toBe(
+        `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`
+      );
+    }
+  );
+
+  it('does not retry an anonymous failure without a token', async () => {
+    const gitExec = vi.fn(async () => {
+      throw new Error('network');
+    });
+    expect(await lsRemoteMain('JovieInc/Jovie', '', gitExec)).toBeNull();
+    expect(gitExec).toHaveBeenCalledTimes(1);
+  });
+
+  it('isolates the anonymous probe from inherited credentials and git config', async () => {
+    const inherited = {
+      HOME: '/tmp/inherited-home',
+      GITHUB_TOKEN: 'inherited-token',
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
+      GIT_CONFIG_VALUE_0: 'AUTHORIZATION: inherited',
+      GIT_CONFIG_PARAMETERS: "'http.extraheader=AUTHORIZATION: inherited'",
+    };
+    const previous = Object.fromEntries(
+      Object.keys(inherited).map(key => [key, process.env[key]])
+    );
+    Object.assign(process.env, inherited);
+    try {
+      const gitExec = vi.fn(
+        async (_args, _env) => `${MAIN}\trefs/heads/main\n`
+      );
+      expect(
+        await lsRemoteMain('JovieInc/Jovie', 'provided-token', gitExec)
+      ).toBe(MAIN);
+      const [, env] = gitExec.mock.calls[0];
+      expect(env.HOME).toBe('/dev/null');
+      expect(env.GITHUB_TOKEN).toBeUndefined();
+      expect(env.GIT_CONFIG_PARAMETERS).toBeUndefined();
+      expect(env.GIT_CONFIG_COUNT).toBe('1');
+      expect(env.GIT_CONFIG_KEY_0).toBe('core.hooksPath');
+      expect(env.GIT_CONFIG_VALUE_0).toBe('/dev/null');
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 
   it('returns null for a bad repo, a bad tip, or a git failure', async () => {
@@ -373,8 +444,210 @@ describe('dead-man liveness', () => {
     });
   });
 
+  describe('unshipped range recovery', () => {
+    beforeEach(() => vi.stubEnv('JOVIE_API_STATE', 'memory'));
+    afterEach(() => vi.unstubAllEnvs());
+
+    it.each([500, 502, 503, 504, { name: 'AbortError' }, new Error('reset')])(
+      'recovers a transient unshipped-range read with a bounded retry (%j)',
+      async failure => {
+        let attempts = 0;
+        const { report } = await runLiveness({
+          registry: only('derived:jovie:production-promotion'),
+          nowMs: NOW,
+          fetchImpl: fakeFetch({
+            'jov.ie/api/health/build-info': { commitSha: LIVE },
+            '/git/ref/heads/main': mainRef(MAIN),
+            [`/compare/${LIVE}...${MAIN}`]: () => {
+              attempts += 1;
+              if (attempts > 1)
+                return {
+                  ahead_by: 2,
+                  commits: [{ commit: { committer: { date: iso(30) } } }],
+                };
+              if (typeof failure === 'number') return failure;
+              throw failure;
+            },
+          }),
+        });
+        expect(
+          rowFor(report, 'derived:jovie:production-promotion')
+        ).toMatchObject({
+          status: 'fresh',
+          reason: '2-commits-unshipped',
+          ageMinutes: 30,
+        });
+        expect(attempts).toBe(2);
+        expect(livenessDecisions(report)).toEqual([]);
+      }
+    );
+
+    it.each([30, 180])(
+      'recovers an authenticated range 403 without hiding %i minutes of lag',
+      async ageMinutes => {
+        const requests = [];
+        const network = fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: LIVE },
+          '/git/ref/heads/main': 403,
+          [`/compare/${LIVE}...${MAIN}`]: () =>
+            requests.length === 1
+              ? 403
+              : {
+                  ahead_by: 2,
+                  commits: [
+                    { commit: { committer: { date: iso(ageMinutes) } } },
+                  ],
+                },
+        });
+        const { report } = await runLiveness({
+          registry: only('derived:jovie:production-promotion'),
+          nowMs: NOW,
+          token: 'test-token',
+          lsRemote: async () => MAIN,
+          fetchImpl: async (url, init) => {
+            if (String(url).includes('/compare/'))
+              requests.push({
+                url: String(url),
+                headers: new Headers(init.headers),
+              });
+            return network(url);
+          },
+        });
+        expect(
+          rowFor(report, 'derived:jovie:production-promotion')
+        ).toMatchObject({
+          status: ageMinutes > 120 ? 'stale' : 'fresh',
+          reason:
+            ageMinutes > 120
+              ? 'silent-for-180m-over-120m'
+              : '2-commits-unshipped',
+          ageMinutes,
+        });
+        expect(requests).toHaveLength(2);
+        expect(requests[0].headers.get('authorization')).toBe(
+          'Bearer test-token'
+        );
+        expect(requests[1].headers.get('authorization')).toBeNull();
+        expect(requests.every(r => r.url.endsWith('?per_page=1'))).toBe(true);
+        expect(livenessDecisions(report).length).toBe(ageMinutes > 120 ? 1 : 0);
+      }
+    );
+    it('uses the public credential budget when main recovery exhausted the Actions budget', async () => {
+      const rangeHeaders = [];
+      const network = fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': new Response(
+          '{"message":"API rate limit exceeded"}',
+          {
+            status: 403,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': String(NOW / 1000 + 3600),
+              'X-RateLimit-Resource': 'core',
+            },
+          }
+        ),
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [{ commit: { committer: { date: iso(30) } } }],
+        },
+      });
+      const { report } = await runLiveness({
+        registry: only('derived:jovie:production-promotion'),
+        nowMs: NOW,
+        token: 'test-token',
+        lsRemote: async () => MAIN,
+        fetchImpl: async (url, init) => {
+          if (String(url).includes('/compare/'))
+            rangeHeaders.push(new Headers(init.headers));
+          return network(url);
+        },
+      });
+      expect(
+        rowFor(report, 'derived:jovie:production-promotion')
+      ).toMatchObject({
+        status: 'fresh',
+        reason: '1-commits-unshipped',
+        ageMinutes: 30,
+      });
+      expect(rangeHeaders).toHaveLength(1);
+      expect(rangeHeaders[0].get('authorization')).toBeNull();
+    });
+
+    it.each([
+      [403, 'http-403'],
+      [429, 'http-429'],
+      [503, 'http-503'],
+      [new Error('reset'), 'transient'],
+      [new Response('not json', { status: 200 }), 'unreadable'],
+    ])(
+      'keeps a failed public recovery red with its diagnostic (%j)',
+      async (failure, reason) => {
+        let attempts = 0;
+        const { report } = await runLiveness({
+          registry: only('derived:jovie:production-promotion'),
+          nowMs: NOW,
+          token: 'test-token',
+          fetchImpl: fakeFetch({
+            'jov.ie/api/health/build-info': { commitSha: LIVE },
+            '/git/ref/heads/main': mainRef(MAIN),
+            [`/compare/${LIVE}...${MAIN}`]: () => {
+              attempts += 1;
+              if (attempts === 1) return 403;
+              if (failure instanceof Error) throw failure;
+              return failure;
+            },
+          }),
+        });
+        expect(
+          rowFor(report, 'derived:jovie:production-promotion')
+        ).toMatchObject({
+          status: 'unknown',
+          reason: `unshipped-range-${reason}`,
+          url: `https://api.github.com/repos/JovieInc/Jovie/compare/${LIVE}...${MAIN}?per_page=1`,
+        });
+        expect(attempts).toBe(2);
+        expect(livenessDecisions(report)[0].action).toBe('red');
+      }
+    );
+
+    it.each([401, 404, 503])(
+      'keeps other authenticated failures red (%i)',
+      async status => {
+        const authorizations = [];
+        const network = fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: LIVE },
+          '/git/ref/heads/main': mainRef(MAIN),
+          [`/compare/${LIVE}...${MAIN}`]: status,
+        });
+        const { report } = await runLiveness({
+          registry: only('derived:jovie:production-promotion'),
+          nowMs: NOW,
+          token: 'test-token',
+          fetchImpl: async (url, init) => {
+            if (String(url).includes('/compare/'))
+              authorizations.push(
+                new Headers(init.headers).get('authorization')
+              );
+            return network(url);
+          },
+        });
+        expect(
+          rowFor(report, 'derived:jovie:production-promotion')
+        ).toMatchObject({
+          status: 'unknown',
+          reason: `unshipped-range-http-${status}`,
+        });
+        expect(authorizations).toEqual(
+          Array(status === 503 ? 2 : 1).fill('Bearer test-token')
+        );
+      }
+    );
+  });
+
   it.each([
-    [503, 'unknown', 'unshipped-range-unreadable'],
+    [503, 'unknown', 'unshipped-range-http-503'],
     [{ ahead_by: 1, commits: [] }, 'unknown', 'unshipped-age-unreadable'],
     [{ ahead_by: 0 }, 'fresh', 'production-current'],
   ])(
@@ -581,6 +854,83 @@ describe('dead-man liveness', () => {
       reason: 'main-ref-unreadable',
     });
     expect(livenessDecisions(report)[0].action).toBe('red');
+  });
+
+  it('ages an unshipped main recovered after a 403 ref read', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': 403,
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [{ commit: { committer: { date: iso(30) } } }],
+        },
+      }),
+      lsRemote: async () => MAIN,
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: '1-commits-unshipped',
+      ageMinutes: 30,
+    });
+  });
+
+  it('ages a 403-recovered main from when its push reached main', async () => {
+    const { report } = await runLiveness({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: LIVE },
+        '/git/ref/heads/main': 403,
+        [`/compare/${LIVE}...${MAIN}`]: {
+          ahead_by: 1,
+          commits: [
+            {
+              sha: MAIN,
+              commit: { committer: { date: iso(141) } },
+            },
+          ],
+        },
+        'event=push': {
+          total_count: 1,
+          workflow_runs: [{ created_at: iso(19), event: 'push' }],
+        },
+      }),
+      lsRemote: async () => MAIN,
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: '1-commits-unshipped',
+      ageMinutes: 19,
+      lastProofAt: iso(19),
+    });
+  });
+
+  it('recovers when the ref client throws HTTP 403', async () => {
+    const { report } = await runLivenessImpl({
+      registry: only('derived:jovie:production-promotion'),
+      nowMs: NOW,
+      fetchImpl: fakeFetch({
+        'jov.ie/api/health/build-info': { commitSha: MAIN },
+      }),
+      githubClient: {
+        provider: 'github',
+        credential: 'test',
+        state: async () => null,
+        request: async () => {
+          const denied = new Error('denied');
+          Object.assign(denied, { status: 403 });
+          throw denied;
+        },
+      },
+      lsRemote: async () => MAIN,
+    });
+    expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
+      status: 'fresh',
+      reason: 'production-current',
+    });
   });
 
   it.each([401, 403, 404, 429, 503])(

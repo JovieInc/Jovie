@@ -53,6 +53,9 @@ POOL_EMPTY_S = 30 * 60
 HUD_STALE_S = 120
 GATE_TIMEOUT_ALERT = 5
 FAILED_RUN_ALERT = 10
+# JOV-8931: a relayed red check must be claimed within this window of red_at.
+RED_DISPATCH_CLAIM_GRACE_S = 180
+RED_DISPATCH_LEDGER_LIMIT = 1024 * 1024
 # Repairs that ended before any agent work: each still spends one of the PR's bounded fix
 # attempts (no refunds, by design), so a run of them exhausts PRs on infrastructure alone.
 NO_WORK_REPAIR_VERDICTS = frozenset({"recovery-handoff", "reconcile-unavailable", "skipped"})
@@ -468,6 +471,9 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "noWorkRepairs24h": dict(Counter(
             (r.get("reasons") or ["?"])[0].split(":", 1)[0] for r in receipts
             if r.get("kind") == "fix-red" and r.get("verdict") in NO_WORK_REPAIR_VERDICTS)),
+        "refundedNoWorkRepairs24h": sum(1 for r in receipts if r.get("kind") == "fix-red"
+                                       and r.get("verdict") in NO_WORK_REPAIR_VERDICTS
+                                       and r.get("attemptRefunded")),
         "lastLandingAge": min(landings) if landings else None, "runs24h": len(receipts),
         "lastWorkAge": min((age_s(r.get("endedAt"), now) for r in receipts if r.get("kind") != "sync-main"), default=None),
         # Per-provider age of the last clean claim-scan exit: proves spawned workers reach the
@@ -508,6 +514,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
+        "redDispatch": red_dispatch_summary(state, now),
         "failedByReason": failed_by_reason(failures),
         "escalation": remediation.escalation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
         "remediation": remediation.remediation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
@@ -515,6 +522,42 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "_receipts24h": receipts, "_allReceipts": all_receipts,
         "_ledgerEvidence": ledger_evidence, "_mergeEvidenceByRepository": merged_projects,
     }
+
+
+def red_dispatch_summary(state: Path, now: float) -> dict:
+    """JOV-8931: relayed red checks with no lane claim inside the grace window.
+    Rows join the CI timing collector (JOV-8933) on (pr, sha, runId, runAttempt)."""
+    rows = []
+    try:
+        raw = (state / "runs/red-dispatch.jsonl").read_text()
+    except OSError:
+        raw = ""
+    if len(raw) <= RED_DISPATCH_LEDGER_LIMIT:
+        for line in raw.splitlines():
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict):
+                rows.append(row)
+    claimed = {(row.get("pr"), row.get("sha"))
+               for row in rows if row.get("status") == "claimed"}
+    unclaimed = []
+    for row in rows:
+        if row.get("status") != "dispatched":
+            continue
+        epoch = row.get("redAtEpoch")
+        pr = row.get("pr")
+        if not isinstance(epoch, (int, float)) or not isinstance(pr, int):
+            continue
+        if (pr, row.get("sha")) in claimed:
+            continue
+        age = now - epoch
+        if age < RED_DISPATCH_CLAIM_GRACE_S:
+            continue
+        unclaimed.append({"pr": pr, "sha": row.get("sha"), "redAt": row.get("redAt"),
+                          "dispatchedAt": row.get("dispatchedAt"), "ageS": age})
+    return {"graceS": RED_DISPATCH_CLAIM_GRACE_S, "unclaimed": unclaimed}
 
 
 def open_pr_numbers() -> set[int] | None:
@@ -803,9 +846,24 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     tick = obs.get("tick") or {}
     if tick.get("error"):
         alerts["tick-error"] = f"last dispatch tick failed: {tick['error'][:140]}"
+    if tick.get("uncleanPreviousRun"):
+        # A run-intent marker survived its own tick: that tick was killed (crash, SIGKILL,
+        # power loss). Its bounded recovery already refunded stranded fix-attempt charges.
+        refunded = len(((tick.get("uncleanRecovery") or {}).get("refundedFixAttempts")) or [])
+        alerts["lanes-tick-unclean"] = (f"the previous lanes tick terminated without a clean receipt "
+                                        f"(pid {tick['uncleanPreviousRun'].get('pid')}); recovery refunded "
+                                        f"{refunded} stranded fix-attempt charge(s); check the host journal for the kill cause")
+    # JOV-8931: the relay's wake path fired, fix-now dispatched, but no lane
+    # agent claimed within the grace window — the fast path is silently down.
+    for row in (obs.get("redDispatch") or {}).get("unclaimed") or []:
+        alerts[f"red-dispatch-unclaimed:{row.get('pr')}"] = (
+            f"PR {row.get('pr')} went red at {row.get('redAt')}, dispatched to the lanes at "
+            f"{row.get('dispatchedAt')}, still unclaimed {int(row.get('ageS') or 0)}s after red_at; "
+            "check gem worker slots and the wake dir")
     delivery = tick.get("remediationEvents") or {}
     delivery_error = tick.get("remediationEventsError")
-    if delivery.get("deliveryFailed"):
+    if delivery.get("deliveryFailed") or delivery.get("deliveryExhausted"):
+        # Terminal exhausted rows are a visible failure, not silence: they never retry.
         alerts["remediation-delivery"] = (
             "remediation action lacks authoritative acknowledgement; "
             f"failed={delivery.get('deliveryFailed', 'unknown')}, "
@@ -973,8 +1031,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     no_work = obs.get("noWorkRepairs24h") or {}
     if sum(no_work.values()) >= NO_WORK_REPAIR_ALERT:
         causes = ", ".join(f"{reason} {count}" for reason, count in sorted(no_work.items(), key=lambda kv: -kv[1])[:3])
-        alerts["repairs-without-work"] = (f"{sum(no_work.values())} PR repairs in 24h spent a fix attempt before any "
-                                          f"agent work ({causes}); infrastructure, not the PRs, is exhausting them")
+        requeued = obs.get("refundedNoWorkRepairs24h") or 0
+        alerts["repairs-without-work"] = (f"{sum(no_work.values())} PR repairs in 24h stopped before any "
+                                          f"agent work ({causes}); {sum(no_work.values()) - requeued} spent a fix "
+                                          f"attempt and {requeued} were refunded and requeued with backoff; "
+                                          "infrastructure, not the PRs, is exhausting them")
     # No design-brief-stale alert: since 2026-10-11 no issue is held for a brief (the
     # claiming run writes it), so a held brief is no longer a condition to watch.
     for row in obs.get("sweepSecretHeld") or []:

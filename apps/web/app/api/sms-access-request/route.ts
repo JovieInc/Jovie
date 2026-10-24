@@ -32,7 +32,7 @@ export async function POST() {
         isPro: users.isPro,
       })
       .from(users)
-      .where(eq(users.clerkId, userId))
+      .where(eq(users.id, userId))
       .limit(1);
 
     if (!user) {

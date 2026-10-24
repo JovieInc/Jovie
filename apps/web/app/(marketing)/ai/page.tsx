@@ -4,14 +4,20 @@ import Link from 'next/link';
 import { MarketingContainer, MarketingHeroPhoto } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
+import { documentTitle } from '@/lib/seo/document-title';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import './ai-page.css';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: 'Jovie AI Operating System',
+  title: documentTitle('Jovie AI Operating System'),
   robots: NOINDEX_ROBOTS,
+  twitter: {
+    site: COMPANY_IDENTITY.xHandle,
+    creator: COMPANY_IDENTITY.xHandle,
+  },
 };
 
 const AI_HERO_INNER_CLASS = 'relative z-3 py-16 sm:py-20 lg:py-24';
@@ -37,10 +43,7 @@ export default function AiPage() {
             <p className='text-sm font-medium tracking-tight text-muted-token'>
               Public Brief
             </p>
-            <h1
-              data-wrap='editorial-title'
-              className='ai-hero-title text-4xl font-semibold leading-tight tracking-tight sm:text-5xl'
-            >
+            <h1 className='ai-hero-title marketing-h1-max-two-lines text-balance text-3xl font-medium leading-tight sm:text-5xl'>
               {/* ui-casing-allow: marketing display headline */}
               The AI operating system behind every Jovie profile
             </h1>

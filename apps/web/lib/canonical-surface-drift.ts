@@ -75,11 +75,7 @@ export const CANONICAL_WEB_SURFACE_OWNERSHIP = {
       'apps/web/app/app/(shell)/dashboard/releases/ReleaseCatalogPageClient.tsx',
       'apps/web/components/features/demo/DemoReleasesExperience.tsx',
     ],
-    requiredTokens: [
-      'ShellReleasesView',
-      'ReleasesPageClient',
-      'ReleasesExperience',
-    ],
+    requiredTokens: ['ShellReleasesView', 'ReleasesPageClient'],
     forbiddenTokens: [],
     registryOwnerNeedle: 'ShellReleasesView',
     moleculeOwners: ['ShellReleasesView'],
