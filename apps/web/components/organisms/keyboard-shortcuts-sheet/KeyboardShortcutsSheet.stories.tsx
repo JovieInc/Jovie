@@ -4,6 +4,7 @@ import {
   DashboardDataContext,
   type DashboardDataContextValue,
 } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { APP_ROUTES } from '@/constants/routes';
 import { FounderDoorProvider } from '@/contexts/FounderDoorContext';
 import {
   KeyboardShortcutsProvider,
@@ -57,4 +58,9 @@ export const Default: Story = {
 
 export const EntitledFounderDoor: Story = {
   render: () => <ShortcutsSheetHarness isAdmin={true} />,
+};
+
+export const OvieNavigation: Story = {
+  render: () => <ShortcutsSheetHarness isAdmin={true} />,
+  parameters: { nextjs: { navigation: { pathname: APP_ROUTES.OV } } },
 };

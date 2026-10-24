@@ -57,13 +57,15 @@ describe('KeyboardShortcutsSheet', () => {
     expect(screen.getByText('Open command menu')).toBeInTheDocument();
   });
 
-  it('advertises workspace lock only in Ovie', () => {
+  it('advertises workspace lock and menu recovery only in Ovie', () => {
     const jovie = renderSheet(true, '/app/chat');
     expect(screen.queryByText('Lock workspace')).not.toBeInTheDocument();
+    expect(screen.queryByText('Focus main menu')).not.toBeInTheDocument();
     jovie.unmount();
 
     renderSheet(true, '/app/ov/ops');
     expect(screen.getByText('Lock workspace')).toBeInTheDocument();
+    expect(screen.getByText('Focus main menu')).toBeInTheDocument();
   });
 });
 

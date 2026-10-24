@@ -6,7 +6,7 @@ import { ArrowLeft, ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -28,9 +28,15 @@ import { RailStagedContent } from '@/components/shell/RailStagedContent';
 import {
   SHELL_RAIL_ALLOCATION,
   SHELL_RAIL_LABEL,
+  SHELL_RAIL_LABEL_OVERLAY,
 } from '@/components/shell/rail-motion';
 import { SidebarInboxLink } from '@/components/shell/SidebarInboxLink';
+import {
+  getSidebarNavIconClassName,
+  getSidebarNavRowClassName,
+} from '@/components/shell/SidebarNavItem';
 import { SIDEBAR_ENTRY_LABEL_INSET_CLASS } from '@/components/shell/sidebar-optical';
+import { Tooltip } from '@/components/shell/Tooltip';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
@@ -41,11 +47,16 @@ import {
 } from '@/features/dashboard/dashboard-nav/config';
 import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
+import { useOvieSidebarNavigation } from '@/hooks/useOvieSidebarNavigation';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
+import {
+  type KeyboardShortcut,
+  OVIE_NAVIGATION_SHORTCUT,
+} from '@/lib/keyboard-shortcuts';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
@@ -76,10 +87,14 @@ function SettingsNavGroup({
   items,
   pathname,
   isItemActive,
+  shortcut,
+  onActivate,
 }: Readonly<{
   items: readonly NavItem[];
   pathname: string;
   isItemActive?: (item: NavItem) => boolean;
+  shortcut?: KeyboardShortcut;
+  onActivate?: () => void;
 }>) {
   return (
     <SidebarMenu>
@@ -88,7 +103,14 @@ function SettingsNavGroup({
           isItemActive?.(item) ??
           (pathname === item.href || pathname.startsWith(`${item.href}/`));
         return (
-          <NavMenuItem key={item.id} item={item} isActive={isActive} calm />
+          <NavMenuItem
+            key={item.id}
+            item={item}
+            isActive={isActive}
+            calm
+            shortcut={shortcut}
+            onActivate={onActivate}
+          />
         );
       })}
     </SidebarMenu>
@@ -105,57 +127,64 @@ const TOOLS_OPEN_KEY = 'ovie.nav.tools-open.v1';
 function OperatorNavGroup({
   section,
   pathname,
+  toolsOpen,
+  onToolsToggle,
+  onHomeActivate,
 }: Readonly<{
   readonly section: OperatorNavSection;
   readonly pathname: string;
+  readonly toolsOpen: boolean;
+  readonly onToolsToggle: () => void;
+  readonly onHomeActivate: () => void;
 }>) {
-  const [stored, setStored] = useState(false);
-  useEffect(() => {
-    if (!section.collapsible) return;
-    try {
-      setStored(globalThis.localStorage?.getItem(TOOLS_OPEN_KEY) === '1');
-    } catch {
-      // Storage is a per-viewer convenience; the group defaults to closed.
-    }
-  }, [section.collapsible]);
+  const id = useId();
+  const { state, isMobile } = useSidebar();
   const isActive = (item: NavItem) =>
     isOperatorNavigationHrefActive(pathname, item.href);
   const holdsActive = section.items.some(isActive);
-  const open = !section.collapsible || stored || holdsActive;
-  const toggle = () => {
-    const next = !stored;
-    setStored(next);
-    try {
-      globalThis.localStorage?.setItem(TOOLS_OPEN_KEY, next ? '1' : '0');
-    } catch {
-      // Ignore unavailable storage.
-    }
-  };
-  const groupId = `ov-nav-${section.id}`;
+  const open = !section.collapsible || toolsOpen || holdsActive;
+  const groupId = `ov-nav-${section.id}-${id}`;
   return (
-    <div data-testid={`ov-nav-section-${section.id}`}>
+    <div
+      data-testid={`ov-nav-section-${section.id}`}
+      className={
+        section.id === 'home'
+          ? 'absolute inset-x-0 top-0 z-10 bg-sidebar'
+          : undefined
+      }
+    >
       {section.label && section.collapsible ? (
-        <button
-          type='button'
-          className={cn(
-            OPERATOR_NAV_GROUP_LABEL,
-            SHELL_RAIL_LABEL,
-            'flex w-full items-center gap-1 text-left hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
-          )}
-          aria-expanded={open}
-          aria-controls={groupId}
-          disabled={holdsActive}
-          onClick={toggle}
-        >
-          <ChevronRight
-            aria-hidden='true'
-            className={cn(
-              'size-3 transition-transform duration-subtle motion-reduce:transition-none',
-              open && 'rotate-90'
-            )}
-          />
-          {section.label}
-        </button>
+        <Tooltip label={section.label} side='right' block>
+          <button
+            type='button'
+            aria-label={section.label}
+            className={getSidebarNavRowClassName({
+              calm: true,
+              collapsed: state === 'closed' && !isMobile,
+            })}
+            aria-expanded={open}
+            aria-controls={groupId}
+            disabled={holdsActive}
+            onClick={onToolsToggle}
+          >
+            <ChevronRight
+              aria-hidden='true'
+              className={cn(
+                getSidebarNavIconClassName({ calm: true }),
+                'transition-transform duration-subtle motion-reduce:transition-none',
+                open && 'rotate-90'
+              )}
+            />
+            <span
+              className={cn(
+                'min-w-0 truncate text-left',
+                SHELL_RAIL_LABEL_OVERLAY
+              )}
+            >
+              {section.label}
+            </span>
+          </button>
+        </Tooltip>
       ) : section.label ? (
         <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_LABEL)}>
           {section.label}
@@ -166,6 +195,10 @@ function OperatorNavGroup({
           items={section.items}
           pathname={pathname}
           isItemActive={isActive}
+          shortcut={
+            section.id === 'home' ? OVIE_NAVIGATION_SHORTCUT : undefined
+          }
+          onActivate={section.id === 'home' ? onHomeActivate : undefined}
         />
       </div>
     </div>
@@ -173,21 +206,40 @@ function OperatorNavGroup({
 }
 
 /** Dedicated operator navigation; customer DashboardNav stays customer-only. */
-function OperatorNavigation({ pathname }: { readonly pathname: string }) {
+function OperatorNavigation({
+  pathname,
+  toolsOpen,
+  onToolsToggle,
+  onHomeActivate,
+}: {
+  readonly pathname: string;
+  readonly toolsOpen: boolean;
+  readonly onToolsToggle: () => void;
+  readonly onHomeActivate: () => void;
+}) {
   return (
-    <div className='flex flex-1 flex-col gap-4 overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-      <nav aria-label='OV Navigation' className='flex flex-col gap-4'>
-        {OPERATOR_NAV_SECTIONS.map(section => (
-          <OperatorNavGroup
-            key={section.id}
-            section={section}
-            pathname={pathname}
-          />
-        ))}
-      </nav>
-      {/* Dynamic list hrefs stay outside the canonical OV landmark so the
+    <div className='relative mt-1 flex min-h-0 flex-1 flex-col pt-(--app-shell-sidebar-row-height)'>
+      {/* Home is anchored to this allocation, outside the scroll boundary. */}
+      <div
+        data-ov-navigation-scroll
+        className='mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+      >
+        <nav aria-label='OV Navigation' className='flex flex-col gap-4'>
+          {OPERATOR_NAV_SECTIONS.map(section => (
+            <OperatorNavGroup
+              key={section.id}
+              section={section}
+              pathname={pathname}
+              toolsOpen={toolsOpen}
+              onToolsToggle={onToolsToggle}
+              onHomeActivate={onHomeActivate}
+            />
+          ))}
+        </nav>
+        {/* Dynamic list hrefs stay outside the canonical OV landmark so the
           registry link set remains exact. */}
-      <OperatorListsNav pathname={pathname} />
+        <OperatorListsNav pathname={pathname} />
+      </div>
     </div>
   );
 }
@@ -433,7 +485,26 @@ export function UnifiedSidebar({
 }: UnifiedSidebarProps) {
   const { identities, isAdmin: canSwitchWorkspaces, user } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
-  const { state: sidebarState } = useSidebar();
+  const { state: sidebarState, setOpen, isMobile } = useSidebar();
+  useOvieSidebarNavigation(section === 'ov');
+  const [toolsOpen, setToolsOpen] = useState(false);
+  useEffect(() => {
+    if (section !== 'ov') return;
+    try {
+      setToolsOpen(globalThis.localStorage?.getItem(TOOLS_OPEN_KEY) === '1');
+    } catch {
+      // Storage is optional; navigation remains usable without it.
+    }
+  }, [section]);
+  const toggleTools = () => {
+    const next = !toolsOpen;
+    setToolsOpen(next);
+    try {
+      globalThis.localStorage?.setItem(TOOLS_OPEN_KEY, next ? '1' : '0');
+    } catch {
+      // Keep the shared in-memory choice when storage is unavailable.
+    }
+  };
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
@@ -486,7 +557,14 @@ export function UnifiedSidebar({
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex min-h-0 flex-1 flex-col'>
             {section === 'ov' ? (
-              <OperatorNavigation pathname={pathname} />
+              <OperatorNavigation
+                pathname={pathname}
+                toolsOpen={toolsOpen}
+                onToolsToggle={toggleTools}
+                onHomeActivate={() => {
+                  if (!isMobile) setOpen(true);
+                }}
+              />
             ) : isInSettings ? (
               <SettingsNavigation pathname={pathname} section={section} />
             ) : sidebarOverride ? (

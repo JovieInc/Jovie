@@ -115,7 +115,7 @@ export function KeyboardShortcutsSheet() {
   const inputRef = useRef<HTMLInputElement>(null);
   const catalogShortcuts = useMemo(
     () =>
-      shortcutsForHelpSheet({ canUseFounderDoor }).filter(
+      shortcutsForHelpSheet({ canUseFounderDoor, isOvieWorkspace }).filter(
         shortcut => isOvieWorkspace || shortcut.id !== 'lock-workspace'
       ),
     [canUseFounderDoor, isOvieWorkspace]
