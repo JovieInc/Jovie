@@ -1,3 +1,4 @@
+import { sourceHostProfile } from './source-host-profile';
 import { createHash, randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -195,7 +196,13 @@ import {
 
 // Separate userData for non-production shells so local, staging, and production
 // sessions coexist without sharing cookies or corrupted renderer state.
-if (APP_ENV === 'staging') {
+const sourceProfile = sourceHostProfile(app.isPackaged, APP_ENV, process.env);
+if (sourceProfile) {
+  app.setPath('userData', sourceProfile.directory);
+  // Playwright injects these; preserve real Electron visibility scheduling.
+  for (const flag of sourceProfile.switchesToRemove)
+    app.commandLine.removeSwitch(flag);
+} else if (APP_ENV === 'staging') {
   app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Staging'));
 } else if (APP_ENV === 'local') {
   app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Local'));
