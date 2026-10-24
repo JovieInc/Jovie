@@ -4,6 +4,7 @@ import argparse
 import os
 from pathlib import Path
 import runpy
+import shutil
 import tempfile
 
 
@@ -28,6 +29,17 @@ def install(prefix: Path) -> Path:
                 staging.replace(library / name)
             finally:
                 staging.unlink(missing_ok=True)
+    # The installed CLI reaches the provider only through the shared client layer, so bundle it
+    # (stdlib-only) with the contract it reads. Layout mirrors the repo: scripts/apiclient and
+    # packages/api-client/providers.json relative to the library root.
+    repo = source.parent.parent
+    bundled = library / "scripts" / "apiclient"
+    bundled.mkdir(parents=True, exist_ok=True)
+    for module in (repo / "scripts" / "apiclient").glob("*.py"):
+        shutil.copyfile(module, bundled / module.name)
+    contract = library / "packages" / "api-client"
+    contract.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(repo / "packages" / "api-client" / "providers.json", contract / "providers.json")
     binary = prefix / "bin" / "hyperagent"
     binary.parent.mkdir(parents=True, exist_ok=True)
     # Replace a legacy executable or symlink atomically, without following it.

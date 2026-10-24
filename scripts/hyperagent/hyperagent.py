@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Live hyperagent.com execute path for Gem/Summer.
+"""Live Hyperagent execute path for Gem/Summer.
 
 Repository-managed; install with python3 scripts/hyperagent/install.py.
 Recovered from installed CLI SHA256 d38a1f8f89d0f1492538da6ba005bdf6a5b55d56f60efdd15b3c2e609ab97a73.
-Talks to https://hyperagent.com/api/mcp with a stored OAuth token (hat_).
+Talks to the Hyperagent /api/mcp endpoint with a stored OAuth token (hat_).
 Eve-the-Hyperagent-agent is retired. Eve is the Vercel framework that runs Summer.
 
 Probe:  hyperagent models --json
@@ -17,21 +17,29 @@ import os
 import re
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from pathlib import Path
 
+# Repo checkout: scripts/hyperagent/ sits next to scripts/apiclient. Installed copy: install.py
+# bundles scripts/apiclient and packages/api-client/providers.json beside this file.
+for _root in (Path(__file__).resolve().parent.parent, Path(__file__).resolve().parent / "scripts"):
+    if (_root / "apiclient").is_dir():
+        sys.path.insert(0, str(_root))
+        break
+from apiclient import ApiClient  # noqa: E402
+from apiclient.contract import provider_spec  # noqa: E402
+
 SCHEMA = "gem-hyperagent-cli/v1"
-MCP_URL = "https://hyperagent.com/api/mcp"
-TOKEN_URL = "https://hyperagent.com/api/oauth/token"
-AUTHORIZE_URL = "https://hyperagent.com/api/oauth/authorize"
-REGISTER_URL = "https://hyperagent.com/api/oauth/register"
-RESOURCE = "https://hyperagent.com/api/mcp"
+BASE_URL = "https://" + provider_spec("hyperagent")["hosts"][0]
+MCP_URL = BASE_URL + "/api/mcp"
+TOKEN_URL = BASE_URL + "/api/oauth/token"
+AUTHORIZE_URL = BASE_URL + "/api/oauth/authorize"
+REGISTER_URL = BASE_URL + "/api/oauth/register"
+RESOURCE = MCP_URL
 SCOPE = "threads:read threads:write approvals:read approvals:write offline_access"
 CLIENT_NAME = "gem-hyperagent-cli"
 PROTOCOL = "2025-03-26"
-THREAD_URL = "https://hyperagent.com/thread/{thread_id}"
+THREAD_URL = BASE_URL + "/thread/{thread_id}"
 EXIT_OK = 0
 EXIT_USAGE = 2
 EXIT_CONFIG = 78
@@ -161,21 +169,15 @@ def refresh_bundle(bundle: dict) -> dict:
     client_id = bundle.get("client_id") or load_json(client_path()).get("client_id")
     if not refresh or not client_id:
         return bundle
-    body = urllib.parse.urlencode(
+    tok = form_post(
+        TOKEN_URL,
         {
             "grant_type": "refresh_token",
             "refresh_token": refresh,
             "client_id": client_id,
             "resource": RESOURCE,
-        }
-    ).encode()
-    req = urllib.request.Request(
-        TOKEN_URL,
-        data=body,
-        headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+        },
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        tok = json.loads(resp.read().decode())
     out = {
         "token_type": tok.get("token_type") or "bearer",
         "scope": tok.get("scope") or bundle.get("scope"),
@@ -209,25 +211,41 @@ def access_token() -> str:
     return token
 
 
-def http_json(url: str, payload: dict | None, headers: dict, timeout: int = 30) -> tuple[int, dict, dict | list | str]:
-    data = None if payload is None else json.dumps(payload).encode()
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST" if data is not None else "GET")
+_CLIENT = None
+
+
+def _client() -> ApiClient:
+    global _CLIENT
+    if _CLIENT is None:
+        _CLIENT = ApiClient("hyperagent", "hyperagent-mcp")
+    return _CLIENT
+
+
+def _request(url: str, method: str, headers: dict, body, timeout: int):
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-            parsed: dict | list | str
-            try:
-                parsed = json.loads(raw) if raw else {}
-            except json.JSONDecodeError:
-                parsed = raw
-            return resp.status, dict(resp.headers.items()), parsed
-    except urllib.error.HTTPError as exc:
-        raw = exc.read().decode("utf-8", errors="replace")
-        try:
-            parsed = json.loads(raw) if raw else {}
-        except json.JSONDecodeError:
-            parsed = {"raw": redact(raw[:2000])}
-        raise RuntimeError(f"HTTP {exc.code} {redact(str(parsed)[:500])}") from exc
+        return _client().request(url, method=method, headers=headers, body=body, timeout_ms=timeout * 1000)
+    except Exception as exc:  # ApiError, BudgetExhaustedError, transport failures
+        raise RuntimeError(f"hyperagent request failed: {type(exc).__name__} {redact(str(exc)[:300])}") from exc
+
+
+def form_post(url: str, fields: dict, timeout: int = 30) -> dict:
+    headers = {"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}
+    res = _request(url, "POST", headers, urllib.parse.urlencode(fields), timeout)
+    if res.status >= 400:
+        raise RuntimeError(f"HTTP {res.status} {redact(res.text[:500])}")
+    return json.loads(res.text) if res.text else {}
+
+
+def http_json(url: str, payload: dict | None, headers: dict, timeout: int = 30) -> tuple[int, dict, dict | list | str]:
+    res = _request(url, "POST" if payload is not None else "GET", headers,
+                   None if payload is None else json.dumps(payload), timeout)
+    try:
+        parsed: dict | list | str = json.loads(res.text) if res.text else {}
+    except json.JSONDecodeError:
+        parsed = {"raw": redact(res.text[:2000])} if res.status >= 400 else res.text
+    if res.status >= 400:
+        raise RuntimeError(f"HTTP {res.status} {redact(str(parsed)[:500])}")
+    return res.status, dict(res.headers), parsed
 
 
 def mcp_headers(token: str) -> dict[str, str]:
@@ -465,7 +483,8 @@ def cmd_login() -> int:
     httpd.server_close()
     if result.get("state") != state or not result.get("code"):
         return die(EXIT_USAGE, f"oauth callback missing code: {result.get('error') or 'no_code'}")
-    body = urllib.parse.urlencode(
+    tok = form_post(
+        TOKEN_URL,
         {
             "grant_type": "authorization_code",
             "code": result["code"],
@@ -473,15 +492,8 @@ def cmd_login() -> int:
             "client_id": client_id,
             "code_verifier": verifier,
             "resource": RESOURCE,
-        }
-    ).encode()
-    req = urllib.request.Request(
-        TOKEN_URL,
-        data=body,
-        headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+        },
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        tok = json.loads(resp.read().decode())
     access = tok.get("access_token") or ""
     if not isinstance(access, str) or not access.startswith("hat_"):
         return die(EXIT_CONFIG, "oauth token was not a Hyperagent hat_ bearer")
@@ -505,7 +517,7 @@ def cmd_login() -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hyperagent",
-        description="Gem/Summer execute wrapper for hyperagent.com MCP (not a probe-only shim).",
+        description="Gem/Summer execute wrapper for the Hyperagent MCP (not a probe-only shim).",
     )
     parser.add_argument("command", nargs="?", help="models | login | execute")
     parser.add_argument("--model", help="Registry model id, e.g. z-ai/glm-5.3-flash")

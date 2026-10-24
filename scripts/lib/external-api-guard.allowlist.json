@@ -24,12 +24,6 @@
       "rule": "provider-host",
       "max": 2,
       "reason": "Research router source: the literal is the url passed to @jovie/api-client ApiClient.request, so the call is budgeted."
-    },
-    {
-      "path": "scripts/hyperagent/hyperagent.py",
-      "rule": "provider-host",
-      "max": 6,
-      "reason": "Standalone Hyperagent MCP/OAuth CLI. install.py copies it to prefix/lib/jovie-hyperagent, and lanes releases ship scripts/lanes only, so apiclient and providers.json are not importable where it runs. Move to scripts/apiclient once lanes releases bundle it; the cap blocks new hosts meanwhile."
     }
   ]
 }

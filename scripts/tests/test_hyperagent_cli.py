@@ -202,7 +202,6 @@ class HyperagentCliTest(unittest.TestCase):
                 self.api["mcp_call"]("list_agents")
 
     def test_token_storage_and_refresh_preserve_existing_scope(self):
-        import urllib.request
         oauth = self.directory / "oauth"
         with patch.dict(os.environ, HYPERAGENT_CONFIG_DIR=str(oauth), HYPERAGENT_MCP_TOKEN=""):
             self.assertEqual(self.api["client_path"](), oauth / "mcp-oauth-client.json")
@@ -217,13 +216,12 @@ class HyperagentCliTest(unittest.TestCase):
             self.assertFalse(self.api["token_expired"](bundle))
             self.assertTrue(self.api["token_expired"]({}))
             self.assertEqual(self.api["refresh_bundle"]({}), {})
-            response = unittest.mock.MagicMock()
-            response.__enter__.return_value.read.return_value = b'{"access_token":"new","expires_in":3600}'
-            with patch.object(urllib.request, "urlopen", return_value=response) as request:
+            request = unittest.mock.Mock(return_value={"access_token": "new", "expires_in": 3600})
+            with patch.dict(self.globals, form_post=request):
                 refreshed = self.api["refresh_bundle"](bundle)
             self.assertEqual(refreshed["scope"], "existing-scope")
             self.assertEqual(self.api["load_json"](token), refreshed)
-            self.assertNotIn(b"scope=", request.call_args.args[0].data)
+            self.assertNotIn("scope", request.call_args.args[1])
             self.assertEqual(token.stat().st_mode & 0o777, 0o600)
             self.api["save_json"](token, {**bundle, "obtained_at": 1, "expires_in": 1})
             with patch.dict(self.globals, refresh_bundle=unittest.mock.Mock(side_effect=RuntimeError("offline"))):
@@ -240,7 +238,6 @@ class HyperagentCliTest(unittest.TestCase):
         import http.server
         import threading
         import urllib.parse
-        import urllib.request
         import webbrowser
         oauth = self.directory / "login"
         server = unittest.mock.Mock()
@@ -257,14 +254,13 @@ class HyperagentCliTest(unittest.TestCase):
             handler.do_GET()
         thread = unittest.mock.Mock()
         thread.join.side_effect = callback
-        response = unittest.mock.MagicMock()
-        response.__enter__.return_value.read.return_value = b'{"access_token":"hat_fixture","scope":"existing-scope"}'
+        token_response = {"access_token": "hat_fixture", "scope": "existing-scope"}
         with patch.dict(os.environ, HYPERAGENT_CONFIG_DIR=str(oauth)), \
-                patch.dict(self.globals, http_json=lambda *a: (200, {}, {"client_id": "client"})), \
+                patch.dict(self.globals, http_json=lambda *a: (200, {}, {"client_id": "client"}),
+                           form_post=lambda *a: token_response), \
                 patch.object(http.server, "HTTPServer", side_effect=make_server), \
                 patch.object(threading, "Thread", return_value=thread), \
-                patch.object(webbrowser, "open", side_effect=lambda url, **kw: browser_urls.append(url)), \
-                patch.object(urllib.request, "urlopen", return_value=response):
+                patch.object(webbrowser, "open", side_effect=lambda url, **kw: browser_urls.append(url)):
             self.assertEqual(self.main(["login"])[0], 0)
         self.assertEqual(json.loads((oauth / "mcp-oauth-client.json").read_text())["scope"], self.api["SCOPE"])
         self.assertEqual(json.loads((oauth / "mcp-oauth.json").read_text())["scope"], "existing-scope")
