@@ -17,6 +17,8 @@ export interface MeshAgentRegistryEntry {
   readonly id: string;
   readonly label: string;
   readonly receiveMode: MeshReceiveMode;
+  /** Real mesh recipient name (MESH_KINDS); null = not pingable via mesh. */
+  readonly meshKind: string | null;
   /** Curated waiting-on-Tim note (e.g. 'Rotation'), when one is known. */
   readonly waitingOnTim?: string;
 }
@@ -33,6 +35,7 @@ export interface MeshAgentSnapshot {
   readonly id: string;
   readonly label: string;
   readonly receiveMode: MeshReceiveMode;
+  readonly meshKind: string | null;
   readonly waitingOnTim: string | null;
   readonly status: MeshAgentStatus;
   readonly lastSentAt: string | null;

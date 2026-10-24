@@ -52,6 +52,7 @@
         "apps/web/app/app/(shell)/admin/lists/[id]/page.tsx",
         "apps/web/app/app/(shell)/admin/lists/page.tsx",
         "apps/web/app/app/(shell)/admin/lists/views/[viewId]/page.tsx",
+        "apps/web/app/app/(shell)/admin/mesh/page.tsx",
         "apps/web/app/app/(shell)/admin/operations/page.tsx",
         "apps/web/app/app/(shell)/admin/ops/page.tsx",
         "apps/web/app/app/(shell)/admin/outbound/page.tsx",

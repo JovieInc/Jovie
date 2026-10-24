@@ -110,7 +110,7 @@ export function MeshAgentRail({
               variant='secondary'
               size='sm'
               onClick={() => agent && onPing(agent.id)}
-              disabled={pingPending || !agent}
+              disabled={pingPending || !agent || !agent.meshKind}
               data-testid='mesh-ping-button'
             >
               <Send className='size-3.5' aria-hidden='true' />

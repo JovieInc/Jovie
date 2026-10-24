@@ -80,12 +80,15 @@ Keep provider tuning out of shared policy.
 CLAUDE.md stays a router. Use Playwright only for repo web QA.
 Message other agents: `jovie mesh send/read`. The Ovie Mesh page
 (`/app/ov/mesh`, JOV-8937) is a read-only roster of mesh agents: server-side
-reads come from the in-repo registry (sender ids only) plus the
-env-configured Summer mesh endpoint (`SUMMER_MESH_ORIGIN`, kept out of Jovie
-config). Its ping button POSTs `/api/admin/mesh/ping` (admin-only) to deliver
-a `jovie.mesh-ping/v1` test message; the abuse cap is 10 pings per agent per
-hour (`MESH_PING_HOURLY_LIMIT` in apps/web/lib/rate-limit/config.ts),
-enforced server-side with 429 beyond.
+reads come from the in-repo registry (sender ids only) plus the Summer mesh
+origin (`JOVIE_MESH_URL`, the CLI's env contract — kept out of Jovie config).
+Its ping button POSTs `/api/admin/mesh/ping` (admin-only), which delivers a
+`jovie.mesh-ping/v1` test message to the real mesh inbox
+(`/summer/v1/mesh/inbox`) using the `JOVIE_MESH_TOKEN` + `_SENDER_ID` +
+`_SENDER_KIND` env credentials. The abuse cap is 10 pings per agent per hour
+(`MESH_PING_HOURLY_LIMIT` in apps/web/lib/rate-limit/config.ts), enforced
+server-side with 429 beyond.
+
 Batch independent reads; serialize dependent edits and state changes. Delegate
 only when authorized and useful; bound scope and require evidence before
 integrating.

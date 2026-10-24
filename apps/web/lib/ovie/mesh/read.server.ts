@@ -13,17 +13,20 @@ import type {
  *
  * Three sources, all read server-side:
  *  1. the in-repo mesh registry (sender ids only — see registry.ts);
- *  2. mailbox records from the env-configured Summer mesh endpoint
- *     (GET `${SUMMER_MESH_ORIGIN}/summer/v1/mesh`);
+ *  2. mailbox records from the env-configured Summer mesh origin
+ *     (GET `${JOVIE_MESH_URL ?? MESH_DEFAULT_URL}/summer/v1/mesh` — a
+ *     mesh-level projection; Jovie holds no per-agent tokens, so it can never
+ *     read agents' own mailboxes directly);
  *  3. the watcher log, carried by the same mesh payload.
  *
- * Jovie owns no Summer configuration beyond this one origin env var, and it
- * is read here only — never added to Jovie's config schema or surfaces.
- * Every source degrades to 'unknown' when unavailable; this module never
+ * Jovie owns no Summer configuration beyond the established JOVIE_MESH_URL
+ * env var, and it is read here only — never added to Jovie's config schema or
+ * surfaces. Sources degrade to 'unknown' when unavailable; this module never
  * throws, and it never forwards token/hash/secret-shaped fields upstream
- * sends (they are dropped by the schema below).
+ * sends (they are stripped per-entry below).
  */
 
+const MESH_DEFAULT_URL = 'https://summer.jov.ie';
 const MESH_FETCH_TIMEOUT_MS = 5_000;
 
 /** A row whose last received message is older than this is 'stale'. */
@@ -35,27 +38,16 @@ const meshMailboxMessageSchema = z.object({
   at: z.string().datetime({ offset: true }).nullable().optional(),
 });
 
-const meshMailboxRecordSchema = z
-  .object({
-    lastSentAt: z.string().datetime({ offset: true }).nullable().optional(),
-    lastReceivedAt: z.string().datetime({ offset: true }).nullable().optional(),
-    recentMessages: z.array(meshMailboxMessageSchema).max(50).optional(),
-  })
-  .strip();
+const meshMailboxRecordSchema = z.object({
+  lastSentAt: z.string().datetime({ offset: true }).nullable().optional(),
+  lastReceivedAt: z.string().datetime({ offset: true }).nullable().optional(),
+  recentMessages: z.array(meshMailboxMessageSchema).optional(),
+});
 
-const meshWatcherEntrySchema = z
-  .object({
-    agentId: z.string().max(64).nullable().optional(),
-    note: z.string().max(500),
-  })
-  .strip();
-
-const meshMailboxPayloadSchema = z
-  .object({
-    mailboxes: z.record(z.string(), meshMailboxRecordSchema).optional(),
-    watcherLog: z.array(meshWatcherEntrySchema).max(500).optional(),
-  })
-  .strip();
+const meshWatcherEntrySchema = z.object({
+  agentId: z.string().max(64).nullable().optional(),
+  note: z.string().max(500),
+});
 
 export interface SummerMeshMailbox {
   readonly mailboxes: Record<
@@ -70,24 +62,78 @@ export interface SummerMeshMailbox {
 }
 
 /**
- * Resolve the Summer mesh origin from the environment. Returns null when
- * unset or unsafe (https only, no embedded credentials).
+ * Resolve the Summer mesh origin from the environment (the CLI's
+ * JOVIE_MESH_URL; same default). Returns null when unsafe (https only, no
+ * embedded credentials, no loopback).
  */
 export function getSummerMeshOrigin(
   environment: NodeJS.ProcessEnv = process.env
 ): string | null {
-  const raw = environment.SUMMER_MESH_ORIGIN?.trim();
-  if (!raw) return null;
+  const raw = environment.JOVIE_MESH_URL?.trim() || MESH_DEFAULT_URL;
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
     return null;
   }
-  if (url.protocol !== 'https:' || url.username || url.password) {
+  const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(
+    url.hostname.toLowerCase()
+  );
+  if (
+    (url.protocol !== 'https:' && !loopback) ||
+    url.username ||
+    url.password ||
+    url.pathname !== '/' ||
+    url.search ||
+    url.hash
+  ) {
     return null;
   }
   return url.origin;
+}
+
+/**
+ * Per-entry tolerant parse: one malformed record skips that entry instead of
+ * failing the whole payload (which would blank every agent row).
+ */
+function parseMailboxPayload(payload: unknown): SummerMeshMailbox | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+  const rawMailboxes = (payload as Record<string, unknown>).mailboxes;
+  const mailboxes: SummerMeshMailbox['mailboxes'] = {};
+  if (
+    rawMailboxes &&
+    typeof rawMailboxes === 'object' &&
+    !Array.isArray(rawMailboxes)
+  ) {
+    for (const [id, record] of Object.entries(
+      rawMailboxes as Record<string, unknown>
+    )) {
+      const parsed = meshMailboxRecordSchema.safeParse(record);
+      if (parsed.success) {
+        mailboxes[id] = {
+          lastSentAt: parsed.data.lastSentAt ?? null,
+          lastReceivedAt: parsed.data.lastReceivedAt ?? null,
+          recentMessages: parsed.data.recentMessages ?? [],
+        };
+      }
+    }
+  }
+  const rawWatcher = (payload as Record<string, unknown>).watcherLog;
+  const watcherLog: SummerMeshMailbox['watcherLog'] = [];
+  if (Array.isArray(rawWatcher)) {
+    for (const entry of rawWatcher) {
+      const parsed = meshWatcherEntrySchema.safeParse(entry);
+      if (parsed.success) {
+        watcherLog.push({
+          agentId: parsed.data.agentId ?? null,
+          note: parsed.data.note,
+        });
+      }
+    }
+  }
+  return { mailboxes, watcherLog };
 }
 
 async function fetchSummerMeshMailbox(
@@ -101,12 +147,7 @@ async function fetchSummerMeshMailbox(
       signal: AbortSignal.timeout(MESH_FETCH_TIMEOUT_MS),
     });
     if (!response.ok) return null;
-    const parsed = meshMailboxPayloadSchema.safeParse(await response.json());
-    if (!parsed.success) return null;
-    return {
-      mailboxes: parsed.data.mailboxes ?? {},
-      watcherLog: parsed.data.watcherLog ?? [],
-    };
+    return parseMailboxPayload(await response.json());
   } catch {
     return null;
   }
@@ -151,11 +192,12 @@ export async function loadMeshRead(options?: {
   }
 
   const agents: MeshAgentSnapshot[] = MESH_AGENT_REGISTRY.map(agent => {
-    const record = mailbox?.mailboxes[agent.id];
+    const record = mailbox?.mailboxes[agent.id] ?? null;
     return {
       id: agent.id,
       label: agent.label,
       receiveMode: agent.receiveMode,
+      meshKind: agent.meshKind,
       waitingOnTim: agent.waitingOnTim ?? null,
       status: mailbox
         ? // Source is available: a missing per-agent record means the agent
@@ -164,7 +206,7 @@ export async function loadMeshRead(options?: {
         : 'unknown',
       lastSentAt: record?.lastSentAt ?? null,
       lastReceivedAt: record?.lastReceivedAt ?? null,
-      recentMessages: record?.recentMessages ?? null,
+      recentMessages: mailbox ? (record?.recentMessages ?? []) : null,
       gaps: mailbox ? (gapsByAgent.get(agent.id) ?? []) : null,
     };
   });

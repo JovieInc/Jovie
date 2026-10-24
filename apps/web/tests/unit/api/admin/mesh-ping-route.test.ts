@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   access: vi.fn(),
   freshAuth: vi.fn(),
   origin: vi.fn(),
+  credentials: vi.fn(),
   sendPing: vi.fn(),
   limit: vi.fn(),
   denialStatus: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock('@/lib/ovie/mesh/read.server', () => ({
   getSummerMeshOrigin: mocks.origin,
 }));
 vi.mock('@/lib/ovie/mesh/ping.server', () => ({
+  meshCredentialsFromEnv: mocks.credentials,
   sendMeshPing: mocks.sendPing,
 }));
 vi.mock('@/lib/auth/cached', () => ({
@@ -43,8 +45,13 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.access.mockResolvedValue(null);
   mocks.freshAuth.mockResolvedValue({ userId: 'founder-1' });
-  mocks.origin.mockReturnValue('https://summer.example');
-  mocks.sendPing.mockResolvedValue({ ok: true });
+  mocks.origin.mockReturnValue('https://summer.jov.ie');
+  mocks.credentials.mockReturnValue({
+    token: 't',
+    senderId: '0f0e0d0c-0b0a-4009-8008-700600500400',
+    senderKind: 'jovie-web',
+  });
+  mocks.sendPing.mockResolvedValue({ ok: true, correlationId: 'mesh-ping-1' });
   mocks.limit.mockResolvedValue({
     success: true,
     limit: 10,
@@ -78,6 +85,12 @@ describe('POST /api/admin/mesh/ping', () => {
     ).toBe(400);
   });
 
+  it('rejects agents that are not mesh recipients', async () => {
+    const response = await POST(post({ agentId: 'mesh-watcher' }));
+    expect(response.status).toBe(400);
+    expect(mocks.limit).not.toHaveBeenCalled();
+  });
+
   it('caps pings at MESH_PING_HOURLY_LIMIT per agent and returns 429 beyond', async () => {
     expect(MESH_PING_HOURLY_LIMIT).toBe(10);
     const response = await POST(post({ agentId: 'lola' }));
@@ -95,20 +108,27 @@ describe('POST /api/admin/mesh/ping', () => {
     expect(mocks.sendPing).not.toHaveBeenCalled();
   });
 
-  it('returns 503 when the mesh endpoint is unconfigured', async () => {
+  it('returns 503 when the mesh endpoint or credentials are unconfigured', async () => {
     mocks.origin.mockReturnValue(null);
-    const response = await POST(post({ agentId: 'summer' }));
-    expect(response.status).toBe(503);
+    expect((await POST(post({ agentId: 'summer' }))).status).toBe(503);
+    mocks.origin.mockReturnValue('https://summer.jov.ie');
+    mocks.credentials.mockReturnValue(null);
+    expect((await POST(post({ agentId: 'summer' }))).status).toBe(503);
     expect(mocks.sendPing).not.toHaveBeenCalled();
   });
 
-  it('delivers the ping through the server-side transport', async () => {
+  it('delivers the ping through the server-side transport with resolved credentials', async () => {
     const response = await POST(post({ agentId: 'aeon' }));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
     expect(mocks.sendPing).toHaveBeenCalledWith({
-      agentId: 'aeon',
-      origin: 'https://summer.example',
+      agentKind: 'aeon',
+      origin: 'https://summer.jov.ie',
+      credentials: {
+        token: 't',
+        senderId: '0f0e0d0c-0b0a-4009-8008-700600500400',
+        senderKind: 'jovie-web',
+      },
     });
   });
 

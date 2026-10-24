@@ -4,6 +4,7 @@ import {
   isMeshAgentId,
   MESH_AGENT_IDS,
   MESH_AGENT_REGISTRY,
+  MESH_KIND_IDS,
 } from './registry';
 
 /**
@@ -38,7 +39,7 @@ describe('mesh agent registry', () => {
       'lola',
       'aeon',
       'stella',
-      'grok-bot',
+      'grokbot',
       'mesh-watcher',
     ]);
     expect(MESH_AGENT_REGISTRY).toHaveLength(8);
@@ -56,15 +57,30 @@ describe('mesh agent registry', () => {
     expect(collectForbiddenStrings(MESH_AGENT_REGISTRY)).toEqual([]);
   });
 
-  it('serializes the registry with only id/label/receiveMode/waitingOnTim keys', () => {
+  it('serializes the registry with only id/label/receiveMode/meshKind/waitingOnTim keys', () => {
     expect(JSON.parse(JSON.stringify(MESH_AGENT_REGISTRY))).toEqual(
       MESH_AGENT_REGISTRY.map(agent => ({
         id: agent.id,
         label: agent.label,
         receiveMode: agent.receiveMode,
+        meshKind: agent.meshKind,
         ...(agent.waitingOnTim ? { waitingOnTim: agent.waitingOnTim } : {}),
       }))
     );
+  });
+
+  it('uses the real mesh recipient kinds and leaves the watcher unpingable', () => {
+    expect(MESH_KIND_IDS).toEqual([
+      'summer',
+      'instinct',
+      'chloe',
+      'lola',
+      'aeon',
+      'stella',
+      'grokbot',
+    ]);
+    expect(getMeshAgent('mesh-watcher')?.meshKind).toBeNull();
+    expect(getMeshAgent('grokbot')?.meshKind).toBe('grokbot');
   });
 
   it('flags the known waiting-on-Tim agents (Lola rotation, Aeon grants)', () => {

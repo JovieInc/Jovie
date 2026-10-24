@@ -29,26 +29,30 @@ function jsonResponse(body: unknown, status = 200): Response {
 const NOW = Date.parse('2026-10-23T19:00:00.000Z');
 
 function envWithOrigin(origin: string | undefined): NodeJS.ProcessEnv {
-  return { ...(origin === undefined ? {} : { SUMMER_MESH_ORIGIN: origin }) };
+  return { ...(origin === undefined ? {} : { JOVIE_MESH_URL: origin }) };
 }
 
 describe('getSummerMeshOrigin', () => {
-  it('accepts an https origin and strips a trailing slash', async () => {
+  it('defaults to the Summer mesh origin and strips a trailing slash from overrides', async () => {
     const { getSummerMeshOrigin } = await import('./read.server');
-    expect(getSummerMeshOrigin(envWithOrigin('https://summer.example/'))).toBe(
-      'https://summer.example'
+    expect(getSummerMeshOrigin(envWithOrigin(undefined))).toBe(
+      'https://summer.jov.ie'
+    );
+    expect(getSummerMeshOrigin(envWithOrigin('https://mesh.example/'))).toBe(
+      'https://mesh.example'
     );
   });
 
-  it('treats unset, http, credential-bearing, and invalid origins as unconfigured', async () => {
+  it('treats http, credential-bearing, pathed, and invalid origins as unconfigured', async () => {
     const { getSummerMeshOrigin } = await import('./read.server');
-    expect(getSummerMeshOrigin(envWithOrigin(undefined))).toBeNull();
-    expect(getSummerMeshOrigin(envWithOrigin(''))).toBeNull();
     expect(
-      getSummerMeshOrigin(envWithOrigin('http://summer.example'))
+      getSummerMeshOrigin(envWithOrigin('http://mesh.example'))
     ).toBeNull();
     expect(
-      getSummerMeshOrigin(envWithOrigin('https://user:pass@summer.example'))
+      getSummerMeshOrigin(envWithOrigin('https://user:pass@mesh.example'))
+    ).toBeNull();
+    expect(
+      getSummerMeshOrigin(envWithOrigin('https://mesh.example/base'))
     ).toBeNull();
     expect(getSummerMeshOrigin(envWithOrigin('not a url'))).toBeNull();
   });
@@ -62,7 +66,8 @@ describe('loadMeshRead', () => {
     fetchImpl = vi.fn();
   });
 
-  it('degrades every row to unknown when the Summer origin is unconfigured', async () => {
+  it('degrades every row to unknown when the read endpoint is unhappy', async () => {
+    fetchImpl.mockResolvedValue(new Response('nope', { status: 404 }));
     const { loadMeshRead } = await import('./read.server');
     const payload = await loadMeshRead({
       environment: envWithOrigin(undefined),
@@ -70,7 +75,10 @@ describe('loadMeshRead', () => {
       now: () => NOW,
     });
 
-    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://summer.jov.ie/summer/v1/mesh',
+      expect.objectContaining({ method: 'GET' })
+    );
     expect(payload.mailboxSource).toBe('unavailable');
     expect(payload.watcherSource).toBe('unavailable');
     expect(payload.agents.every(agent => agent.status === 'unknown')).toBe(
@@ -112,7 +120,7 @@ describe('loadMeshRead', () => {
     );
     const { loadMeshRead } = await import('./read.server');
     const payload = await loadMeshRead({
-      environment: envWithOrigin('https://summer.example'),
+      environment: envWithOrigin('https://mesh.example'),
       fetchImpl: fetchImpl as unknown as typeof fetch,
       now: () => NOW,
     });
@@ -127,7 +135,7 @@ describe('loadMeshRead', () => {
       'lola',
       'aeon',
       'stella',
-      'grok-bot',
+      'grokbot',
       'mesh-watcher',
     ]);
 
@@ -136,14 +144,49 @@ describe('loadMeshRead', () => {
     expect(summer?.status).toBe('live');
     expect(summer?.recentMessages).toHaveLength(1);
 
-    // No mailbox record for an agent still renders a row, silently stale.
+    // No mailbox record for an agent still renders a row, silently stale,
+    // with an empty mailbox rather than a source failure.
     const chloe = payload.agents.find(agent => agent.id === 'chloe');
     expect(chloe?.status).toBe('stale');
     expect(chloe?.lastReceivedAt).toBeNull();
+    expect(chloe?.recentMessages).toEqual([]);
 
     const lola = payload.agents.find(agent => agent.id === 'lola');
     expect(lola?.gaps).toEqual(['Rotation approval pending']);
     expect(lola?.waitingOnTim).toBe('Rotation');
+  });
+
+  it('skips malformed per-agent records without failing the whole payload', async () => {
+    fetchImpl.mockResolvedValue(
+      jsonResponse({
+        mailboxes: {
+          summer: {
+            lastReceivedAt: '2026-10-23T18:30:00.000Z',
+            recentMessages: [],
+          },
+          lola: { lastReceivedAt: 'not-a-timestamp', tokenHash: 'deadbeef' },
+        },
+        watcherLog: [
+          { agentId: 'lola', note: 'Rotation approval pending' },
+          { note: '' },
+          'garbage',
+        ],
+      })
+    );
+    const { loadMeshRead } = await import('./read.server');
+    const payload = await loadMeshRead({
+      environment: envWithOrigin('https://mesh.example'),
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      now: () => NOW,
+    });
+
+    const summer = payload.agents.find(agent => agent.id === 'summer');
+    expect(summer?.status).toBe('live');
+    // Malformed record skipped: lola reads silent-stale, no bait keys pass.
+    const lola = payload.agents.find(agent => agent.id === 'lola');
+    expect(lola?.lastReceivedAt).toBeNull();
+    expect(lola?.status).toBe('stale');
+    expect(lola?.gaps).toEqual(['Rotation approval pending']);
   });
 
   it('marks an agent stale when its last received message is older than the fresh window', async () => {
@@ -161,7 +204,7 @@ describe('loadMeshRead', () => {
     );
     const { loadMeshRead } = await import('./read.server');
     const payload = await loadMeshRead({
-      environment: envWithOrigin('https://summer.example'),
+      environment: envWithOrigin('https://mesh.example'),
       fetchImpl: fetchImpl as unknown as typeof fetch,
       now: () => NOW,
     });
@@ -170,21 +213,15 @@ describe('loadMeshRead', () => {
     );
   });
 
-  it('degrades to unknown when the mesh endpoint is unreachable, unhappy, or malformed', async () => {
+  it('degrades to unknown when the mesh endpoint is unreachable or malformed', async () => {
     const { loadMeshRead } = await import('./read.server');
     const options = {
-      environment: envWithOrigin('https://summer.example'),
+      environment: envWithOrigin('https://mesh.example'),
       fetchImpl: fetchImpl as unknown as typeof fetch,
       now: () => NOW,
     };
 
     fetchImpl.mockRejectedValue(new Error('network down'));
-    await expect(loadMeshRead(options)).resolves.toMatchObject({
-      mailboxSource: 'unavailable',
-      watcherSource: 'unavailable',
-    });
-
-    fetchImpl.mockResolvedValue(new Response('nope', { status: 503 }));
     await expect(loadMeshRead(options)).resolves.toMatchObject({
       mailboxSource: 'unavailable',
       watcherSource: 'unavailable',
@@ -206,7 +243,7 @@ describe('loadMeshRead', () => {
             lastReceivedAt: '2026-10-23T18:30:00.000Z',
             recentMessages: [],
             tokenHash: 'deadbeef',
-            senderToken: 'super-secret',
+            senderToken: 'plainly-not-a-credential-but-stripped-anyway',
           },
         },
         watcherLog: [{ agentId: 'summer', note: 'ok', signingKey: 'k' }],
@@ -214,13 +251,13 @@ describe('loadMeshRead', () => {
     );
     const { loadMeshRead } = await import('./read.server');
     const payload: MeshReadPayload = await loadMeshRead({
-      environment: envWithOrigin('https://summer.example'),
+      environment: envWithOrigin('https://mesh.example'),
       fetchImpl: fetchImpl as unknown as typeof fetch,
       now: () => NOW,
     });
 
     expect(collectForbiddenKeys(payload)).toEqual([]);
     expect(JSON.stringify(payload)).not.toContain('deadbeef');
-    expect(JSON.stringify(payload)).not.toContain('super-secret');
+    expect(JSON.stringify(payload)).not.toContain('stripped-anyway');
   });
 });

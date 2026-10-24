@@ -6,6 +6,7 @@ const MESH_STORY_AGENT: MeshAgentSnapshot = {
   id: 'lola',
   label: 'Lola',
   receiveMode: 'direct',
+  meshKind: 'lola',
   waitingOnTim: 'Rotation',
   status: 'stale',
   lastSentAt: '2026-10-20T12:00:00.000Z',
