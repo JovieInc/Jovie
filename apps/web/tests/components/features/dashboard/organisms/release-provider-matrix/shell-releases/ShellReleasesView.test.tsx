@@ -595,9 +595,7 @@ describe('ShellReleasesView', () => {
     // through the context-menu host wrappers.
     const list = screen.getByRole('list', { name: 'Releases' });
     expect(
-      screen
-        .getByRole('listitem', { name: 'Lost in the Light' })
-        .closest('menu')
+      screen.getByRole('listitem', { name: 'Lost in the Light' }).closest('ul')
     ).toBe(list);
     expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
   });
@@ -612,19 +610,21 @@ describe('ShellReleasesView', () => {
       fakeRelease({ id: '2', title: 'Take Me Over' }),
     ]);
 
-    // axe `list` rule: a ul's direct children must be li (script/template).
-    // The context-menu wrapper is a presentation li, and each carries exactly
-    // one listitem row — the row inside, never a nested second listitem.
+    // axe `list` rule: ul children must carry listitem semantics — a
+    // suppressed wrapper (role=presentation) is rejected exactly like a div,
+    // and any wrapper element breaks the singular listitem set the shell's
+    // keyboard navigation indexes. Each row IS a native li with an implicit
+    // listitem role (no explicit role, no nested rows).
     const list = screen.getByRole('list', { name: 'Releases' });
     const directChildren = [...list.children];
     expect(directChildren.length).toBeGreaterThanOrEqual(2);
     for (const child of directChildren) {
       expect(child.tagName).toBe('LI');
-      expect(child).toHaveAttribute('role', 'presentation');
-      expect(child).toHaveAttribute('data-shell-release-row-context-target');
-      expect(child.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+      expect(child).not.toHaveAttribute('role');
+      expect(child).toHaveAttribute('data-shell-release-row');
+      expect(child.querySelectorAll('[role="listitem"]')).toHaveLength(0);
     }
-    // The listbox contract still resolves exactly one listitem per row.
+    // Every row resolves by role, exactly one listitem per release.
     expect(screen.getAllByRole('listitem')).toHaveLength(directChildren.length);
   });
 

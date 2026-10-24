@@ -45,13 +45,21 @@ function useActiveMobileDrawer(
   isMobile: boolean,
   drawerId: string
 ) {
-  const [isActive, setIsActive] = useState(isOpen && isMobile);
+  // Mobile rails behave as one modal surface. The last opened rail wins
+  // focus ownership, while any previously mounted rail is made inert and
+  // visually closed without requiring each route to duplicate coordination
+  // logic. Superseded-by is state; activation is DERIVED from it plus the
+  // live open/breakpoint inputs, so there is no one-render lag between the
+  // viewport crossing below lg and the rail presenting as the active
+  // mobile drawer — Escape must never fall into that gap with this rail's
+  // document keydown listener unarmed.
+  const [supersededById, setSupersededById] = useState<string | null>(null);
 
   useEffect(() => {
     const handleDrawerOpen = (event: Event) => {
       const openedDrawerId = (event as CustomEvent<string>).detail;
       if (openedDrawerId !== drawerId) {
-        setIsActive(false);
+        setSupersededById(openedDrawerId);
       }
     };
 
@@ -62,11 +70,11 @@ function useActiveMobileDrawer(
 
   useEffect(() => {
     if (!isOpen || !isMobile) {
-      setIsActive(false);
+      setSupersededById(null);
       return;
     }
 
-    setIsActive(true);
+    setSupersededById(null);
     document.dispatchEvent(
       new CustomEvent<string>('jovie:right-drawer-open', {
         detail: drawerId,
@@ -74,7 +82,7 @@ function useActiveMobileDrawer(
     );
   }, [drawerId, isMobile, isOpen]);
 
-  return isActive;
+  return isOpen && isMobile && supersededById === null;
 }
 
 function isRestorableFocusTarget(
