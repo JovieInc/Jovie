@@ -66,8 +66,27 @@ const ALLOWED_PATH_FRAGMENTS = [
  * Detect if className string contains a banned raw focus ring class
  * (not covered by the allowed exceptions).
  */
-function findBannedFocusClasses(classString) {
+// Suppressing the default Tailwind focus-visible ring (applied to every
+// interactive element in the globals.css base layer) without a replacement.
+const FOCUS_VISIBLE_SUPPRESSION_PATTERN =
+  /(?:^|\s)(?:\S*:)?focus-visible:(?:ring-0|shadow-none)!?(?=\s|$)/;
+const FOCUS_VISIBLE_REPLACEMENT_PATTERN =
+  /focus-visible:(?:ring-(?!0\b|offset-|transparent\b)|outline-(?!none\b)|shadow-(?!none\b)|border|bg-|underline|decoration-|text-)|focus-ring|focus-within:/;
+
+function findBannedFocusClasses(classString, isActionElement = false) {
   if (typeof classString !== 'string') return null;
+
+  if (
+    isActionElement &&
+    FOCUS_VISIBLE_SUPPRESSION_PATTERN.test(classString) &&
+    !FOCUS_VISIBLE_REPLACEMENT_PATTERN.test(classString)
+  ) {
+    return {
+      banned: 'focus-visible suppression',
+      message:
+        'Removing the default `focus-visible:ring` (`focus-visible:ring-0` / `focus-visible:shadow-none`) on a button or link without a focus-visible replacement leaves keyboard users without a visible focus indicator. Drop it, or add a `focus-visible:*` replacement.',
+    };
+  }
 
   // Banned: focus:ring-{something} where something is not "0"
   const ringMatch = RAW_FOCUS_RING_PATTERN.exec(classString);
@@ -94,6 +113,28 @@ function findBannedFocusClasses(classString) {
  * Check if a JSX element is interactive (button, a, input, textarea, select,
  * or any element with role="button").
  */
+const ACTION_ELEMENT_NAMES = new Set(['button', 'a', 'Link']);
+const ACTION_ROLES = new Set(['button', 'link', 'tab', 'menuitem', 'switch']);
+
+/** Buttons/links (not text entry), where a focus-visible ring is mandatory. */
+function isActionElement(node) {
+  if (node.type !== 'JSXOpeningElement') return false;
+  if (
+    node.name.type === 'JSXIdentifier' &&
+    ACTION_ELEMENT_NAMES.has(node.name.name)
+  ) {
+    return true;
+  }
+  return node.attributes.some(
+    attr =>
+      attr.type === 'JSXAttribute' &&
+      attr.name?.type === 'JSXIdentifier' &&
+      attr.name.name === 'role' &&
+      attr.value?.type === 'Literal' &&
+      ACTION_ROLES.has(attr.value.value)
+  );
+}
+
 function isInteractiveElement(node) {
   if (node.type !== 'JSXOpeningElement') return false;
 
@@ -170,6 +211,7 @@ function* extractClassStrings(node) {
 }
 
 module.exports = {
+  findBannedFocusClasses,
   meta: {
     type: 'suggestion',
     docs: {
@@ -200,7 +242,10 @@ module.exports = {
 
     return {
       JSXOpeningElement(node) {
-        elementStack.push(isInteractiveElement(node));
+        elementStack.push({
+          interactive: isInteractiveElement(node) || isActionElement(node),
+          action: isActionElement(node),
+        });
       },
 
       'JSXOpeningElement:exit'() {
@@ -218,14 +263,14 @@ module.exports = {
         }
 
         // Only flag when inside an interactive element
-        const isInteractive = elementStack[elementStack.length - 1];
-        if (!isInteractive) return;
+        const current = elementStack[elementStack.length - 1];
+        if (!current?.interactive) return;
 
         // Check all string values we can extract from the className expression
         for (const { node: valueNode, value } of extractClassStrings(
           node.value
         )) {
-          const violation = findBannedFocusClasses(value);
+          const violation = findBannedFocusClasses(value, current.action);
           if (violation) {
             context.report({
               node: valueNode,
