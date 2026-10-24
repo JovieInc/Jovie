@@ -8,12 +8,15 @@ import * as Sentry from '@sentry/nextjs';
 import { Ratelimit } from '@upstash/ratelimit';
 
 import { env } from '@/lib/env-server';
-import { getRedis } from '@/lib/redis';
+import { getRedis, isRedisConfigured } from '@/lib/redis';
 import type { RateLimitConfig } from './types';
 
 const REDIS_FALLBACK_MESSAGE =
   'Rate limiter falling back to in-memory store — Redis unconfigured';
+const REDIS_DEGRADED_MESSAGE =
+  'Rate limiter using in-memory store — Redis configured but temporarily unavailable';
 let hasWarnedRedisFallback = false;
+let hasWarnedRedisDegraded = false;
 
 function warnRedisFallbackOnce(config: RateLimitConfig): void {
   if (hasWarnedRedisFallback) return;
@@ -35,9 +38,30 @@ function warnRedisFallbackOnce(config: RateLimitConfig): void {
   });
 }
 
-/** Test-only helper to reset the process-scoped fallback warning. */
+function warnRedisDegradedOnce(config: RateLimitConfig): void {
+  if (hasWarnedRedisDegraded) return;
+  hasWarnedRedisDegraded = true;
+
+  console.warn(REDIS_DEGRADED_MESSAGE);
+  Sentry.captureMessage(REDIS_DEGRADED_MESSAGE, {
+    level: 'warning',
+    tags: {
+      limiter: config.name,
+      'rate_limit.prefix': config.prefix,
+    },
+    extra: {
+      algorithm: config.algorithm,
+      analytics: config.analytics ?? false,
+      limit: config.limit,
+      window: config.window,
+    },
+  });
+}
+
+/** Test-only helper to reset the process-scoped fallback warnings. */
 export function resetRedisFallbackWarningForTests(): void {
   hasWarnedRedisFallback = false;
+  hasWarnedRedisDegraded = false;
 }
 
 /**
@@ -72,7 +96,16 @@ export function createRedisRateLimiter(
   const redisClient = getRedis();
   if (!redisClient) {
     if (env.NODE_ENV === 'production') {
-      warnRedisFallbackOnce(config);
+      // A null client is two different states: genuinely unconfigured (a
+      // config error) versus configured but transiently unavailable (quota
+      // circuit, init cooldown, cold-start blip). Only the first may carry
+      // the "unconfigured" fingerprint; mislabeling the second sent every
+      // transient outage to the config-error alert (JOV-6743).
+      if (isRedisConfigured()) {
+        warnRedisDegradedOnce(config);
+      } else {
+        warnRedisFallbackOnce(config);
+      }
     }
     return null;
   }

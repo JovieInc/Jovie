@@ -4,12 +4,14 @@ const {
   mockCaptureMessage,
   mockFixedWindow,
   mockGetRedis,
+  mockIsRedisConfigured,
   mockRatelimitConstructor,
   mockSlidingWindow,
 } = vi.hoisted(() => ({
   mockCaptureMessage: vi.fn(),
   mockFixedWindow: vi.fn(),
   mockGetRedis: vi.fn(),
+  mockIsRedisConfigured: vi.fn(),
   mockRatelimitConstructor: vi.fn(),
   mockSlidingWindow: vi.fn(),
 }));
@@ -35,6 +37,7 @@ vi.mock('@/lib/env-server', () => ({ env: mockEnv }));
 
 vi.mock('@/lib/redis', () => ({
   getRedis: mockGetRedis,
+  isRedisConfigured: mockIsRedisConfigured,
 }));
 
 import {
@@ -58,6 +61,7 @@ describe('createRedisRateLimiter', () => {
     mockEnv.NODE_ENV = 'test';
     resetRedisFallbackWarningForTests();
     mockGetRedis.mockReturnValue({});
+    mockIsRedisConfigured.mockReturnValue(false);
     mockFixedWindow.mockReturnValue('fixed-window-limiter');
     mockSlidingWindow.mockReturnValue('sliding-window-limiter');
   });
@@ -103,6 +107,51 @@ describe('createRedisRateLimiter', () => {
           'rate_limit.prefix': 'public:test',
         },
       })
+    );
+    consoleError.mockRestore();
+  });
+
+  it('reports a distinct degraded warning when Redis is configured but temporarily unavailable', () => {
+    mockEnv.NODE_ENV = 'production';
+    mockGetRedis.mockReturnValue(null);
+    mockIsRedisConfigured.mockReturnValue(true);
+    const consoleWarn = vi
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+
+    createRedisRateLimiter(baseConfig);
+    createRedisRateLimiter({ ...baseConfig, name: 'Another Limiter' });
+
+    // Once per process, warning level, and NOT the unconfigured fingerprint
+    expect(consoleWarn).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'Rate limiter using in-memory store — Redis configured but temporarily unavailable',
+      expect.objectContaining({
+        level: 'warning',
+        tags: {
+          limiter: 'Public Test',
+          'rate_limit.prefix': 'public:test',
+        },
+      })
+    );
+    consoleWarn.mockRestore();
+  });
+
+  it('does not report unconfigured when the null client is a transient state', () => {
+    mockEnv.NODE_ENV = 'production';
+    mockGetRedis.mockReturnValue(null);
+    mockIsRedisConfigured.mockReturnValue(true);
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    createRedisRateLimiter(baseConfig);
+
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).not.toHaveBeenCalledWith(
+      'Rate limiter falling back to in-memory store — Redis unconfigured',
+      expect.anything()
     );
     consoleError.mockRestore();
   });

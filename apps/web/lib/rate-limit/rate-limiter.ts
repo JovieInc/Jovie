@@ -104,7 +104,7 @@ export interface RateLimiterOptions {
  */
 export class RateLimiter {
   private readonly config: RateLimitConfig;
-  private readonly redisLimiter: Ratelimit | null;
+  private redisLimiter: Ratelimit | null;
   private readonly memoryLimiter: MemoryRateLimiter;
   private readonly options: Required<RateLimiterOptions>;
   private readonly storeKind: RedisStoreKind;
@@ -144,6 +144,27 @@ export class RateLimiter {
   }
 
   /**
+   * Limiter instances are module-level singletons, so the constructor runs
+   * once per process. If Redis was unresolvable at that moment (quota
+   * circuit, init cooldown, cold-start blip), re-attempt resolution on the
+   * request path instead of pinning the instance to the memory fallback (or
+   * fail-closed unavailability) forever. getRedis() self-throttles retries
+   * (30s init cooldown, quota circuit), so a Redis outage adds no network
+   * traffic between attempts — the retry is a few pure in-process checks.
+   */
+  private resolveRedisLimiter(): Ratelimit | null {
+    if (
+      this.redisLimiter ||
+      !this.options.preferRedis ||
+      this.storeKind === 'memory'
+    ) {
+      return this.redisLimiter;
+    }
+    this.redisLimiter = createRedisRateLimiter(this.config);
+    return this.redisLimiter;
+  }
+
+  /**
    * Check rate limit for an identifier
    * Returns a consistent result regardless of backend
    */
@@ -153,10 +174,13 @@ export class RateLimiter {
       return { ...memoryResult, backend: 'memory' };
     }
 
-    // Try Redis first if available and the shared failure circuit is closed
-    if (this.redisLimiter && !isRedisCircuitOpen()) {
+    // Try Redis first if available and the shared failure circuit is closed.
+    // resolveRedisLimiter() re-attempts construction when the constructor
+    // could not reach Redis (JOV-6743 recovery).
+    const redisLimiter = this.resolveRedisLimiter();
+    if (redisLimiter && !isRedisCircuitOpen()) {
       try {
-        const result = await withTimeout(this.redisLimiter.limit(identifier), {
+        const result = await withTimeout(redisLimiter.limit(identifier), {
           timeoutMs: REDIS_RATE_LIMIT_TIMEOUT_MS,
           context: `rate-limit:${this.config.name}`,
           timeoutMessage: `[RateLimit:${this.config.name}] Redis timeout`,
@@ -258,13 +282,14 @@ export class RateLimiter {
       };
     }
 
-    if (!this.redisLimiter || isRedisCircuitOpen()) {
+    const redisLimiter = this.resolveRedisLimiter();
+    if (!redisLimiter || isRedisCircuitOpen()) {
       return { available: false, backend: 'unavailable' };
     }
 
     try {
       const result = await withTimeout(
-        this.redisLimiter.getRemaining(identifier),
+        redisLimiter.getRemaining(identifier),
         {
           timeoutMs: REDIS_RATE_LIMIT_TIMEOUT_MS,
           context: `rate-limit-read:${this.config.name}`,
