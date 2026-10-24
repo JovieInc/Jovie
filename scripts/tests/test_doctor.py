@@ -2709,3 +2709,69 @@ class ProviderPayloadCensusTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RedDispatchAlertTest(unittest.TestCase):
+    """JOV-8931: a relayed red check with no lane claim inside the grace window alerts."""
+
+    NOW = 1_000_000_000.0
+
+    def write_ledger(self, state, rows):
+        ledger = state / "runs/red-dispatch.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        with ledger.open("a") as handle:
+            for row in rows:
+                handle.write(json.dumps(row) + "\n")
+
+    def dispatched_row(self, *, pr=22868, sha="a" * 40, red_epoch=None):
+        return {"schema": "jovie-lane-red-dispatch/v1", "status": "dispatched", "pr": pr,
+                "sha": sha, "runId": 987654, "runAttempt": 2,
+                "redAt": "2026-10-23T18:27:30Z", "redAtEpoch": red_epoch,
+                "dispatchedAt": "2026-10-23T18:28:00Z", "claimAt": None,
+                "provider": "codex", "reason": None}
+
+    def test_summary_flags_dispatch_rows_past_the_grace_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [
+                self.dispatched_row(red_epoch=self.NOW - 60),
+                self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300),
+            ])
+            summary = doctor.red_dispatch_summary(state, self.NOW)
+            self.assertEqual(summary["graceS"], 180)
+            self.assertEqual([row["pr"] for row in summary["unclaimed"]], [1])
+            self.assertEqual(summary["unclaimed"][0]["ageS"], 300)
+
+    def test_summary_clears_once_a_claim_row_lands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [
+                self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300),
+                {"status": "claimed", "pr": 1, "sha": "b" * 40, "claimAt": "2026-10-23T18:30:00Z"},
+            ])
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW)["unclaimed"], [])
+
+    def test_summary_tolerates_missing_or_corrupt_ledger(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW),
+                             {"graceS": 180, "unclaimed": []})
+            (state / "runs").mkdir(parents=True)
+            (state / "runs/red-dispatch.jsonl").write_text("not json\n")
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW)["unclaimed"], [])
+
+    def test_judge_raises_the_alert_with_a_stable_key_per_pr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300)])
+            obs = {"now": self.NOW, "redDispatch": doctor.red_dispatch_summary(state, self.NOW)}
+            alerts = doctor.judge(obs)
+            self.assertIn("red-dispatch-unclaimed:1", alerts)
+            self.assertIn("unclaimed 300s after red_at", alerts["red-dispatch-unclaimed:1"])
+
+    def test_judge_stays_quiet_inside_the_grace_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [self.dispatched_row(red_epoch=self.NOW - 60)])
+            obs = {"now": self.NOW, "redDispatch": doctor.red_dispatch_summary(state, self.NOW)}
+            self.assertFalse(doctor.judge(obs))

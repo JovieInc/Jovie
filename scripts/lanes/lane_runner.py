@@ -3665,7 +3665,180 @@ def requeue_verified(host: Host, prs: list[dict] | None, *, defer=None) -> dict 
         publish_verified(host, pr)
 
 
-# ---------------------------------------------------------------- fix red first
+# ---------------------------------------------------------------- red wake (JOV-8931)
+
+# The lane-fix-relay labels a red PR within ~40s, but the 5-minute oneshot timer
+# is when a worker can actually start: with every slot busy, a red waits out the
+# tick (#22868: 11 minutes red to claim). The relay's gem-side job drops a wake
+# file; the systemd jovie-lanes-wake.path unit runs fix-now the moment it lands.
+RED_DISPATCH_SCHEMA = "jovie-lane-red-dispatch/v1"
+RED_DISPATCH_HOUR_S = 3600
+WAKE_FILE_MAX_BYTES = 4096
+MAX_WAKE_PER_ACTIVATION = 5
+MAX_RED_DISPATCH_PER_PR_PER_HOUR = 4
+
+
+def iso_epoch(stamp):
+    try:
+        return datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
+def read_red_dispatch_rows(state):
+    """Bounded optional ledger read; a corrupt or oversized ledger reads as empty."""
+    try:
+        rows = maintenance_json(state / "runs/red-dispatch.jsonl", json_lines=True)
+    except ValueError:
+        return []
+    return rows if isinstance(rows, list) else []
+
+
+def append_red_dispatch_row(state, row):
+    path = state / "runs/red-dispatch.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a") as handle:
+        handle.write(json.dumps(row) + "\n")
+
+
+def red_dispatch_claims_this_hour(state, pr, now):
+    """Per-PR abuse cap: how many red wakes this PR spent in the last hour."""
+    return sum(1 for row in read_red_dispatch_rows(state)
+               if row.get("pr") == pr and row.get("status") == "dispatched"
+               and isinstance(row.get("dispatchedEpoch"), (int, float))
+               and 0 <= now - row["dispatchedEpoch"] < RED_DISPATCH_HOUR_S)
+
+
+def free_red_provider(host):
+    """First enabled provider with a free, healthy, in-quota slot — the same
+    admission dispatch's spawn loop applies (disk is checked by the caller)."""
+    for name, spec in load_providers().items():
+        try:
+            if not spec.get("enabled", True):
+                continue
+            slots = host.slots(name, spec.get("slots", 1))
+            if slots <= 0 or cooling(host, name):
+                continue
+            if not quota_pressure(host, name, spec, time.time())["ok"]:
+                continue
+            if not provider_healthy(spec):
+                continue
+            return name
+        except Exception:  # one provider's fault must not block the others
+            continue
+    return None
+
+
+def record_red_row(state, *, status, pr, sha, run_id, run_attempt, red_at,
+                   reason=None, provider=None):
+    """One JSONL row per wake outcome. Timestamps join with the CI timing
+    collector (JOV-8933) on (pr, sha, runId, runAttempt)."""
+    dispatched = status == "dispatched"
+    append_red_dispatch_row(state, {
+        "schema": RED_DISPATCH_SCHEMA,
+        "status": status,
+        "pr": pr,
+        "sha": sha,
+        "runId": run_id,
+        "runAttempt": run_attempt,
+        "redAt": red_at,
+        "redAtEpoch": iso_epoch(red_at),
+        "dispatchedAt": now_iso() if dispatched else None,
+        "dispatchedEpoch": time.time() if dispatched else None,
+        "claimAt": None,
+        "provider": provider,
+        "reason": reason,
+    })
+
+
+def read_wake_file(path):
+    """Bounded, validated wake read. Anything unreadable or oversized is invalid."""
+    try:
+        if path.stat().st_size > WAKE_FILE_MAX_BYTES:
+            return None
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or data.get("schema") != pr_events.WAKE_SCHEMA:
+        return None
+    sha = data.get("sha")
+    if not isinstance(data.get("pr"), int) or not re.fullmatch(r"[0-9a-f]{40}", sha or ""):
+        return None
+    return data
+
+
+def fix_now(host: Host) -> int:
+    """Drain the relay's wake dir immediately instead of waiting for the 5-minute
+    tick. Same admission as dispatch(): disk, then the first provider with a free
+    healthy slot. Dedupe per PR+SHA+attempt via an O_EXCL marker plus the fenced
+    lane claim. No slot -> record no-slot and keep the lane-fix-red label; the
+    5-minute timer remains the fallback."""
+    wake_dir = host.state / "wake"
+    if not wake_dir.is_dir():
+        return 0
+    for path in sorted(wake_dir.glob("red-*.json"))[:MAX_WAKE_PER_ACTIVATION]:
+        marker = path.with_name(path.name + ".claim")
+        try:
+            fd = os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            os.close(fd)
+        except FileExistsError:
+            continue  # an earlier activation already handled this attempt
+        data = read_wake_file(path)
+        if data is None:
+            record_red_row(host.state, status="invalid", pr=None, sha=None,
+                           run_id=None, run_attempt=None, red_at=None, reason=path.name)
+            path.unlink(missing_ok=True)
+            continue
+        pr, sha = data["pr"], data["sha"]
+        run_id = data.get("runId")
+        run_attempt = data.get("runAttempt")
+        red_at = data.get("redAt")
+        try:
+            claimed = pr_events.claim_active(pr, sha, sh, kind="fix")
+        except Exception:
+            claimed = None
+        if claimed:
+            record_red_row(host.state, status="already-claimed", pr=pr, sha=sha,
+                           run_id=run_id, run_attempt=run_attempt, red_at=red_at)
+            path.unlink(missing_ok=True)
+            continue
+        if red_dispatch_claims_this_hour(host.state, pr, time.time()) >= MAX_RED_DISPATCH_PER_PR_PER_HOUR:
+            record_red_row(host.state, status="no-slot", pr=pr, sha=sha, run_id=run_id,
+                           run_attempt=run_attempt, red_at=red_at, reason="hourly-cap")
+            path.unlink(missing_ok=True)
+            continue
+        disk = disk_guard.check(host)
+        if not disk.get("admitted"):
+            record_red_row(host.state, status="no-slot", pr=pr, sha=sha, run_id=run_id,
+                           run_attempt=run_attempt, red_at=red_at,
+                           reason=f"disk:{disk.get('reason', 'unobservable')}")
+            path.unlink(missing_ok=True)
+            continue
+        provider = free_red_provider(host)
+        if provider is None:
+            record_red_row(host.state, status="no-slot", pr=pr, sha=sha, run_id=run_id,
+                           run_attempt=run_attempt, red_at=red_at, reason="no-free-slot")
+            path.unlink(missing_ok=True)
+            continue
+        subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", provider],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True, **lifecycle.spawn_kwargs())
+        record_red_row(host.state, status="dispatched", pr=pr, sha=sha, run_id=run_id,
+                       run_attempt=run_attempt, red_at=red_at, provider=provider)
+        path.unlink(missing_ok=True)
+    return 0
+
+
+def red_dispatch_stamps(number: int, sha: str) -> dict | None:
+    """The dispatched row this claim belongs to, for the claim comment + claim row."""
+    state = lane_state_dir()
+    if state is None:
+        return None
+    row = next((row for row in reversed(read_red_dispatch_rows(state))
+                if row.get("status") == "dispatched"
+                and row.get("pr") == number and row.get("sha") == sha), None)
+    return row
+
 
 # ---------------------------------------------------------------- cross-host claims
 
@@ -3681,8 +3854,30 @@ def claimed_elsewhere(number: int, sha: str, kind: str, now: float | None = None
 
 
 def post_claim(number: int, sha: str, kind: str) -> None:
-    sh(["gh", "pr", "comment", str(number), "--repo", REPO_SLUG, "--body",
-        f"🤖 lane claim kind={kind} sha={sha} host={HOST} at={now_iso()}"])
+    claim_at = now_iso()
+    body = f"🤖 lane claim kind={kind} sha={sha} host={HOST} at={claim_at}"
+    # JOV-8931: a claim for a relayed red check carries the dispatch stamps so
+    # red_at -> claim_at latency is readable straight off the PR.
+    claimed_row = None
+    if kind == "fix":
+        try:
+            row = red_dispatch_stamps(number, sha)
+        except Exception:
+            row = None
+        if row:
+            body += f" red_at={row.get('redAt')} dispatched_at={row.get('dispatchedAt')} claim_at={claim_at}"
+            claimed_row = {"schema": RED_DISPATCH_SCHEMA, "status": "claimed",
+                           "pr": number, "sha": sha, "runId": row.get("runId"),
+                           "runAttempt": row.get("runAttempt"), "redAt": row.get("redAt"),
+                           "redAtEpoch": row.get("redAtEpoch"), "dispatchedAt": row.get("dispatchedAt"),
+                           "dispatchedEpoch": row.get("dispatchedEpoch"), "claimAt": claim_at,
+                           "provider": row.get("provider"), "reason": None}
+    sh(["gh", "pr", "comment", str(number), "--repo", REPO_SLUG, "--body", body])
+    if claimed_row is not None:
+        try:
+            append_red_dispatch_row(lane_state_dir(), claimed_row)
+        except OSError:
+            pass  # the claim comment already posted; the ledger row is best-effort
 
 
 def held_path(host: Host) -> Path:
@@ -9376,6 +9571,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")
+    sub.add_parser("fix-now", help="drain the relay's red wake files immediately (JOV-8931)")
     sub.add_parser("update")
     prove = sub.add_parser("prove-staging", help="prove a staged release tree with this tree's own installer")
     prove.add_argument("staging")
@@ -9456,6 +9652,8 @@ def guarded_main(argv: list[str] | None = None) -> int:
         return update(host)
     if args.command == "worker":
         return worker(host, args.provider)
+    if args.command == "fix-now":
+        return fix_now(host)
     return dispatch(host)
 
 

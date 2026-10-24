@@ -124,6 +124,31 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 UNIT
+  # JOV-8931: the lane-fix relay's gem-side job drops a wake file when a red CI
+  # event lands; this path unit runs `fix-now` the moment one appears, so a
+  # worker starts in seconds instead of waiting for the 5-minute timer.
+  mkdir -p "$state/wake"
+  cat >"$units/jovie-lanes-wake.service" <<UNIT
+[Unit]
+Description=Jovie shipping lanes: fix-now on a relayed red CI event (JOV-8931)
+[Service]
+Type=oneshot
+KillMode=process
+Environment=PATH=$path
+Environment=LANES_STATE=$state
+Environment=LANES_REPO=$repo
+Environment=LANES_LINEAR_ENV=${LANES_LINEAR_ENV:-$HOME/.config/symphony/linear.env}
+ExecStart=/bin/bash -c 'exec python3 $state/current/lane_runner.py fix-now'
+UNIT
+  cat >"$units/jovie-lanes-wake.path" <<UNIT
+[Unit]
+Description=Watch the lane-fix relay's red wake dir (JOV-8931)
+[Path]
+PathChanged=$state/wake
+Unit=jovie-lanes-wake.service
+[Install]
+WantedBy=default.target
+UNIT
   if [ "${LANES_HUD:-0}" = "1" ]; then
     # The console HUD (tty1). Font and sudo setfont mirror the retired Symphony Elixir HUD unit.
     font="$HOME/.local/state/gem-checkin-hud/fonts/hud-symbols.psf"
@@ -161,6 +186,7 @@ UNIT
   systemctl --user daemon-reload
   systemctl --user enable --now jovie-lanes.timer
   systemctl --user enable --now jovie-lanes-watchdog.timer
+  systemctl --user enable --now jovie-lanes-wake.path
   if [ "${LANES_HUD:-0}" = "1" ]; then
     systemctl --user enable jovie-hud.service
     touch "$state/hud.expected"   # the doctor raises hud-stale when the console stops updating

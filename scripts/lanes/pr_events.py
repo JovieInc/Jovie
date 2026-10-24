@@ -2480,6 +2480,73 @@ def bug_report(pr: dict, body: str, host_name: str, attempts: dict) -> str:
     return f"{pr.get('url')}\n\n{body}\n\n```json\n{json.dumps(envelope, indent=1)}\n```"
 
 
+# ---------------------------------------------------------------- red wake (JOV-8931)
+
+WAKE_SCHEMA = "jovie-lane-red-wake/v1"
+
+
+def wake_state_dir() -> Path | None:
+    """Host state dir for the wake writer: mirrors lane_runner.lane_state_dir()
+    without importing it (pr_events never imports lane_runner)."""
+    configured = os.environ.get("LANES_STATE")
+    if configured:
+        return Path(configured)
+    if os.environ.get("LANES_EXECUTION_BACKEND") == "local-test" or os.environ.get("LANES_SELFTEST") == "1":
+        return None
+    return Path.home() / ".local/state/jovie-lanes"
+
+
+def write_wake_file(state, *, pr, sha, run_id, run_attempt, red_at):
+    """Atomic wake file for the gem host's jovie-lanes-wake.path unit. The
+    dot-prefixed tmp name never matches the red-*.json glob fix-now drains, so
+    a concurrent fix-now cannot read a partial write."""
+    path = state / "wake" / f"red-{int(pr)}-{sha}-{int(run_attempt)}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps({
+        "schema": WAKE_SCHEMA,
+        "pr": int(pr),
+        "sha": sha,
+        "runId": run_id,
+        "runAttempt": int(run_attempt),
+        "redAt": red_at,
+        "writtenAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }))
+    os.replace(tmp, path)
+    return path
+
+
+def wake(argv: list[str]) -> int:
+    """Gem-side wake job: for each red PR in --prs, write a wake file from the
+    workflow_run event (red_at = updated_at). Local state only; no secret, no
+    GitHub writes — fix-now (and only fix-now) does everything after that."""
+    prs = []
+    if "--prs" in argv:
+        for token in argv[argv.index("--prs") + 1].split(","):
+            token = token.strip()
+            if token.isdigit():
+                prs.append(int(token))
+    if not prs:
+        print("wake: no red PRs")
+        return 0
+    state = wake_state_dir()
+    if state is None:
+        print("wake: no lane state dir configured; nothing written")
+        return 0
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    payload = json.loads(Path(event_path).read_text()) if event_path and Path(event_path).exists() else {}
+    run = payload.get("workflow_run") or {}
+    sha = run.get("head_sha")
+    if not re.fullmatch(r"[0-9a-f]{40}", sha or ""):
+        print("wake: event carries no pull-request head sha; nothing written")
+        return 0
+    for pr in prs:
+        write_wake_file(state, pr=pr, sha=sha, run_id=run.get("id"),
+                        run_attempt=run.get("run_attempt"), red_at=run.get("updated_at"))
+        print(f"#{pr} woke red")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     command = argv[0] if argv else ""
@@ -2489,6 +2556,8 @@ def main(argv: list[str] | None = None) -> int:
         added = relay(event, payload)
     elif command == "backfill":
         added = label_backlog()
+    elif command == "wake":
+        return wake(argv[1:])
     else:
         print(__doc__, file=sys.stderr)
         return 2
