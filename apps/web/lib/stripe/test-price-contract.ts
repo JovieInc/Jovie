@@ -1,7 +1,7 @@
 import type Stripe from 'stripe';
 import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
-import { getStripePriceIdsFromEnv } from './price-ids';
+import { getStripePriceIdsFromEnv } from './price-id-mapping';
 
 export interface StripeTestEnvironment {
   readonly STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY?: string;

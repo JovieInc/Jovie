@@ -6,7 +6,7 @@
  * correct entitlement tier per ENTITLEMENT_REGISTRY (founding -> pro).
  */
 
-import { LEGACY_STRIPE_PRICE_IDS } from './price-ids';
+import { LEGACY_STRIPE_PRICE_IDS } from './price-id-mapping';
 
 /** Entitlement tier for legacy prices (founding maps to pro per ENTITLEMENT_REGISTRY). */
 export type LegacyEntitlementPlan = 'pro' | 'max';

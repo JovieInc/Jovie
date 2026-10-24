@@ -8,7 +8,7 @@ import {
   isHostWithOptionalPort,
   sessionSecretSchema,
 } from '@/lib/env-configuration-policy';
-import { getStripePriceIdsFromEnv } from '@/lib/stripe/price-ids';
+import { getStripePriceIdsFromEnv } from '@/lib/stripe/price-id-mapping';
 import {
   getActiveSyntheticPrincipal,
   isControlledSyntheticMailbox,
