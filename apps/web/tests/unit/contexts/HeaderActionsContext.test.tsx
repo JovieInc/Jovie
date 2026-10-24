@@ -6,16 +6,14 @@ import {
   waitFor,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { OPEN_HEADER_SEARCH_EVENT } from '@/components/shell/header-search-events';
-import type { HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
 import {
   HeaderActionsProvider,
   useHeaderActions,
   useOptionalHeaderActions,
   useRegisterHeaderActions,
-  useRegisterHeaderSearch,
 } from '@/contexts/HeaderActionsContext';
 
 function HeaderActionsProbe() {
@@ -61,24 +59,6 @@ function SearchProbe() {
       </button>
     </>
   );
-}
-
-function SearchAdapterRegistration({ adapterKey }: { adapterKey: string }) {
-  const adapter = useMemo<HeaderSearchAdapter>(
-    () => ({
-      key: adapterKey,
-      pills: [],
-      onPillsChange: () => {},
-      artistOptions: [],
-      titleOptions: [],
-      albumOptions: [],
-      totalCount: 0,
-      triggerLabel: 'Filter current view',
-    }),
-    [adapterKey]
-  );
-  useRegisterHeaderSearch(adapter);
-  return null;
 }
 
 describe('HeaderActionsContext', () => {
@@ -223,27 +203,5 @@ describe('HeaderActionsContext', () => {
 
     requestFrame.mockRestore();
     cancelFrame.mockRestore();
-  });
-
-  it('keeps global search open while route adapters change', () => {
-    const view = render(
-      <HeaderActionsProvider>
-        <SearchAdapterRegistration adapterKey='releases' />
-        <SearchProbe />
-      </HeaderActionsProvider>
-    );
-    act(() => {
-      globalThis.dispatchEvent(new Event(OPEN_HEADER_SEARCH_EVENT));
-    });
-    expect(screen.getByText('open')).toBeInTheDocument();
-
-    view.rerender(
-      <HeaderActionsProvider>
-        <SearchAdapterRegistration adapterKey='tasks' />
-        <SearchProbe />
-      </HeaderActionsProvider>
-    );
-
-    expect(screen.getByText('open')).toBeInTheDocument();
   });
 });

@@ -140,7 +140,6 @@ import { WorkspacePage } from '@/components/organisms/WorkspacePage';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { RowWaveform } from '@/components/shell/RowWaveform';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -3096,32 +3095,6 @@ export function LibrarySurface({
     effectiveAssets,
   ]);
 
-  const artistOptions = useMemo(
-    () => uniqueSorted(effectiveAssets.map(asset => asset.artist)),
-    [effectiveAssets]
-  );
-  const titleOptions = useMemo(
-    () => uniqueSorted(effectiveAssets.map(asset => asset.title)),
-    [effectiveAssets]
-  );
-  const statusOptions = useMemo(
-    () => uniqueSorted(effectiveAssets.map(asset => asset.status)),
-    [effectiveAssets]
-  );
-  const approvalOptions = useMemo(
-    () =>
-      uniqueSorted(
-        effectiveAssets.map(asset =>
-          formatLibraryApprovalStatus(asset.approvalStatus)
-        )
-      ),
-    [effectiveAssets]
-  );
-  const hasOptions = useMemo(
-    () => uniqueSorted(effectiveAssets.flatMap(asset => asset.assetKinds)),
-    [effectiveAssets]
-  );
-
   const selectedAsset =
     visibleAssets.find(asset => asset.id === selectedId) ?? null;
   const activePreviewAsset =
@@ -3570,50 +3543,6 @@ export function LibrarySurface({
     filters.assetKinds.size +
     filters.providers.size +
     (preset === 'all' ? 0 : 1);
-
-  const headerSearchAdapter = useMemo(
-    () =>
-      effectiveAssets.length === 0
-        ? null
-        : {
-            key: 'library',
-            pills,
-            onPillsChange: setPills,
-            artistOptions,
-            titleOptions,
-            albumOptions: [],
-            statusOptions,
-            approvalOptions,
-            hasOptions,
-            totalCount: effectiveAssets.length,
-            visibleCount: visibleAssets.length,
-            triggerLabel:
-              pills.length > 0
-                ? `Filter Work (${pills.length})`
-                : 'Filter Work',
-            ariaLabel: 'Filter work',
-            placeholder: 'Search work',
-            allowedFields: [
-              'artist',
-              'title',
-              'status',
-              'approval',
-              'has',
-            ] as const,
-          },
-    [
-      approvalOptions,
-      artistOptions,
-      effectiveAssets.length,
-      hasOptions,
-      pills,
-      statusOptions,
-      titleOptions,
-      visibleAssets.length,
-    ]
-  );
-
-  useRegisterHeaderSearch(headerSearchAdapter);
 
   const filterPanel = useMemo(
     () => (

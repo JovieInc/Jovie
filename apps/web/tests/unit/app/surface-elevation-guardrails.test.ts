@@ -314,9 +314,12 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    expect(shellReleasesView).toContain('useRegisterHeaderSearch');
-    expect(shellReleasesView).toContain("key: 'shell-releases'");
-    expect(shellReleasesView).toContain('Filter Releases');
+    // JOV-8792: the header search adapter has no renderer since search moved
+    // to the command palette — registering one renders nothing. Keep views
+    // off the retired registration path.
+    expect(shellReleasesView).not.toContain('useRegisterHeaderSearch');
+    expect(shellReleasesView).not.toContain("key: 'shell-releases'");
+    expect(shellReleasesView).not.toContain('Filter Releases');
     expect(shellReleasesView).not.toMatch(
       /const\s*\[\s*searchOpen\s*,\s*setSearchOpen\s*\]\s*=\s*useState/
     );
@@ -377,9 +380,11 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    expect(librarySurface).toContain('useRegisterHeaderSearch');
-    expect(librarySurface).toContain("key: 'library'");
-    expect(librarySurface).toContain('Filter Work');
+    // JOV-8792: the library keeps its own live filter pills; the retired
+    // header search adapter registration must stay gone.
+    expect(librarySurface).not.toContain('useRegisterHeaderSearch');
+    expect(librarySurface).not.toContain("key: 'library'");
+    expect(librarySurface).not.toContain('Filter Work');
     expect(librarySurface).not.toContain('OPEN_COMMAND_PALETTE_EVENT');
     expect(appShellLayout).toContain('isLibraryShellRoute');
     expect(appShellLayout).toContain('LibraryLoadingState');
@@ -398,9 +403,11 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    expect(tasksPageClient).toContain('useRegisterHeaderSearch');
-    expect(tasksPageClient).toContain("key: 'tasks'");
-    expect(tasksPageClient).toContain('Filter Tasks');
+    // JOV-8792: the header search adapter has no renderer since search moved
+    // to the command palette — registering one renders nothing.
+    expect(tasksPageClient).not.toContain('useRegisterHeaderSearch');
+    expect(tasksPageClient).not.toContain("key: 'tasks'");
+    expect(tasksPageClient).not.toContain('Filter Tasks');
     expect(tasksPageClient).not.toContain('HeaderSearchAction');
     expect(taskWorkspaceHeaderBar).not.toContain('HeaderSearchAction');
   });

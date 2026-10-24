@@ -11,55 +11,15 @@ import {
   useState,
 } from 'react';
 import { OPEN_HEADER_SEARCH_EVENT } from '@/components/shell/header-search-events';
-import type {
-  FilterField,
-  FilterPill,
-} from '@/components/shell/pill-search.types';
 import { isFormElement } from '@/lib/utils/keyboard';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/**
- * Filter adapter a route exposes so the shell header can render a Linear-style
- * pill search for that route's underlying list. Routes own the data and the
- * filter state; the header owns the search-open transition + key handling.
- */
-export interface HeaderSearchAdapter {
-  /** Stable id so the header can reset internal state when a new page mounts. */
-  readonly key: string;
-  readonly pills: readonly FilterPill[];
-  readonly onPillsChange: (next: FilterPill[]) => void;
-  readonly artistOptions: readonly string[];
-  readonly titleOptions: readonly string[];
-  readonly albumOptions: readonly string[];
-  /** Distinct status values surfaced as suggestions. Defaults to release statuses. */
-  readonly statusOptions?: readonly string[];
-  /** Distinct approval status values surfaced as suggestions. */
-  readonly approvalOptions?: readonly string[];
-  /** Distinct "has" values surfaced as suggestions. Defaults to release asset tags. */
-  readonly hasOptions?: readonly string[];
-  /** Total rows the underlying data set has, before filters apply. */
-  readonly totalCount: number;
-  /** Rows visible after filters apply. Defaults to `totalCount` when omitted. */
-  readonly visibleCount?: number;
-  /** Label appearing on the closed trigger ("Search Releases", "Search Tasks"). */
-  readonly triggerLabel: string;
-  /** Aria-label for the open input. */
-  readonly ariaLabel?: string;
-  /** Placeholder shown when no pills are active. */
-  readonly placeholder?: string;
-  /** Restrict the slash-menu / suggestions to a subset of fields. */
-  readonly allowedFields?: readonly FilterField[];
-}
-
 interface HeaderActionsState {
   headerActions: ReactNode;
   headerBadge: ReactNode;
-  headerSearchAdapter: HeaderSearchAdapter | null;
-  isSearchOpen: boolean;
-  /** Main-plane command/search takeover state (JOV-3940). */
   isCommandPaletteOpen: boolean;
   /** Replaces the breadcrumb slot while the command surface is active. */
   commandPaletteHeader: ReactNode;
@@ -68,9 +28,6 @@ interface HeaderActionsState {
 interface HeaderActionsDispatch {
   setHeaderActions: (actions: ReactNode) => void;
   setHeaderBadge: (badge: ReactNode) => void;
-  setHeaderSearchAdapter: (adapter: HeaderSearchAdapter | null) => void;
-  openSearch: () => void;
-  closeSearch: () => void;
   openCommandPalette: () => void;
   closeCommandPalette: () => void;
   setCommandPaletteHeader: (header: ReactNode) => void;
@@ -122,37 +79,11 @@ export function HeaderActionsProvider({
 }: HeaderActionsProviderProps) {
   const [headerActions, setHeaderActions] = useState<ReactNode>(null);
   const [headerBadge, setHeaderBadge] = useState<ReactNode>(null);
-  const [headerSearchAdapter, setHeaderSearchAdapter] =
-    useState<HeaderSearchAdapter | null>(null);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [commandPaletteHeader, setCommandPaletteHeader] =
     useState<ReactNode>(null);
   const priorFocusRef = useRef<HTMLElement | null>(null);
   const focusRestoreFrameRef = useRef<number | null>(null);
-
-  const openSearch = useCallback(() => {
-    if (focusRestoreFrameRef.current !== null) {
-      cancelAnimationFrame(focusRestoreFrameRef.current);
-      focusRestoreFrameRef.current = null;
-    }
-    const activeElement = document.activeElement;
-    priorFocusRef.current =
-      activeElement instanceof HTMLElement ? activeElement : null;
-    setIsSearchOpen(true);
-  }, []);
-  const closeSearch = useCallback(() => {
-    if (focusRestoreFrameRef.current !== null) {
-      cancelAnimationFrame(focusRestoreFrameRef.current);
-    }
-    setIsSearchOpen(false);
-    const priorFocus = priorFocusRef.current;
-    priorFocusRef.current = null;
-    focusRestoreFrameRef.current = requestAnimationFrame(() => {
-      focusRestoreFrameRef.current = null;
-      if (priorFocus?.isConnected) priorFocus.focus();
-    });
-  }, []);
 
   const openCommandPalette = useCallback(() => {
     if (focusRestoreFrameRef.current !== null) {
@@ -162,8 +93,6 @@ export function HeaderActionsProvider({
     const activeElement = document.activeElement;
     priorFocusRef.current =
       activeElement instanceof HTMLElement ? activeElement : null;
-    // The former sidebar popover must never compete with the main-plane surface.
-    setIsSearchOpen(false);
     setIsCommandPaletteOpen(true);
   }, []);
 
@@ -231,19 +160,10 @@ export function HeaderActionsProvider({
     () => ({
       headerActions,
       headerBadge,
-      headerSearchAdapter,
-      isSearchOpen,
       isCommandPaletteOpen,
       commandPaletteHeader,
     }),
-    [
-      commandPaletteHeader,
-      headerActions,
-      headerBadge,
-      headerSearchAdapter,
-      isCommandPaletteOpen,
-      isSearchOpen,
-    ]
+    [commandPaletteHeader, headerActions, headerBadge, isCommandPaletteOpen]
   );
 
   // useState setters are referentially stable, so this memo never recomputes.
@@ -251,14 +171,11 @@ export function HeaderActionsProvider({
     () => ({
       setHeaderActions,
       setHeaderBadge,
-      setHeaderSearchAdapter,
-      openSearch,
-      closeSearch,
       openCommandPalette,
       closeCommandPalette,
       setCommandPaletteHeader,
     }),
-    [closeCommandPalette, closeSearch, openCommandPalette, openSearch]
+    [closeCommandPalette, openCommandPalette]
   );
 
   return (
@@ -323,35 +240,12 @@ export function useOptionalHeaderActions(): HeaderActionsState | null {
 }
 
 /**
- * useRegisterHeaderSearch - Register a route-level filter adapter with the shell header.
- *
- * The shell renders the PillSearch surface itself; the route just declares
- * which fields are filterable and what the underlying data set looks like.
- * The adapter is cleared automatically on unmount, so the header restores
- * breadcrumb-first chrome on navigation.
- *
- * Pass `null` to opt out (e.g. when a route conditionally exposes search).
- */
-export function useRegisterHeaderSearch(
-  adapter: HeaderSearchAdapter | null
-): void {
-  const dispatch = useContext(HeaderActionsDispatchContext);
-  const setAdapter = dispatch?.setHeaderSearchAdapter;
-
-  useEffect(() => {
-    if (!setAdapter) return undefined;
-    setAdapter(adapter);
-    return () => setAdapter(null);
-  }, [adapter, setAdapter]);
-}
-
-/**
  * useRegisterHeaderActions - Register route-owned actions with the shell header.
  *
  * Routes own the action semantics; the shell owns placement, error isolation,
- * and cleanup on navigation. This mirrors `useRegisterHeaderSearch` so shell
- * routes do not each reimplement the same set-on-mount / clear-on-unmount
- * lifecycle.
+ * and cleanup on navigation. This mirrors the retired
+ * `useRegisterHeaderSearch` set-on-mount / clear-on-unmount lifecycle
+ * (JOV-8792 removed that hook — the command palette owns search now).
  */
 export function useRegisterHeaderActions(actions: ReactNode): void {
   const dispatch = useContext(HeaderActionsDispatchContext);

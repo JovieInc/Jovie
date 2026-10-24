@@ -59,13 +59,12 @@ describe('command palette search shell guard', () => {
     const connectorSource = readSource(
       'components/shell/HeaderSearchSurfaceFromContext.tsx'
     );
-    const clientSource = readSource('components/shell/header-search-client.ts');
 
     expect(connectorSource).not.toContain('useReleasesQuery');
     expect(connectorSource).not.toContain('loadReleaseMatrix');
     expect(connectorSource).toContain('openCommandPalette');
-    expect(clientSource).toContain('/api/search/header');
-    expect(clientSource).toContain('signal');
+    // JOV-8792: the retired header search client (and its /api/search/header
+    // consumer) is gone — cmdk owns remote search end to end.
     expect(readSource('components/organisms/CmdKPalette.tsx')).toContain(
       "presentation === 'main'"
     );
