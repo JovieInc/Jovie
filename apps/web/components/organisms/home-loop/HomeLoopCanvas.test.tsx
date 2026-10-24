@@ -57,6 +57,19 @@ function props(
 }
 
 describe('HomeLoopCanvas', () => {
+  it('replaces the overview bands while preserving the existing action workspace', () => {
+    render(
+      <HomeLoopCanvas {...props({ overview: <div>Shipping overview</div> })} />
+    );
+    expect(screen.getByText('Shipping overview')).toBeVisible();
+    expect(screen.queryByTestId('home-loop-pulse')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('home-loop-constraint')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('home-loop-asks-section')).toBeVisible();
+    expect(screen.getAllByTestId('home-loop-kanban-card')).toHaveLength(6);
+  });
+
   it('renders every section populated with named headings and counts', () => {
     render(<HomeLoopCanvas {...props()} />);
 

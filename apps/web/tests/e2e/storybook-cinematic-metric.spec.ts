@@ -60,3 +60,66 @@ for (const viewport of [
     ).toBe(true);
   });
 }
+
+for (const viewport of [
+  { width: 3440, height: 1440 },
+  { width: 1440, height: 900 },
+]) {
+  test(`Home overview keeps data and workspace geometry at ${viewport.width}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.goto(
+      '/iframe.html?id=features-admin-hud-oviehomehero--stable-states&viewMode=story',
+      { waitUntil: 'domcontentloaded' }
+    );
+    const hero = page.getByTestId('ovie-home-hero');
+    const metrics = hero.locator('[data-slot="cinematic-metric"]');
+    const control = page.getByRole('button', { name: 'Next shipping state' });
+    await expect(metrics).toHaveCount(11);
+    const geometry = () =>
+      page
+        .locator(
+          '[data-testid="ovie-home-hero"], [data-slot="cinematic-metric"], [data-testid="hero-following-content"]'
+        )
+        .evaluateAll(nodes =>
+          nodes.map(node => {
+            const r = node.getBoundingClientRect();
+            return { x: r.x, y: r.y, width: r.width, height: r.height };
+          })
+        );
+    const before = await geometry();
+    await control.focus();
+    for (let step = 1; step <= 4; step++) {
+      await page.keyboard.press('Enter');
+      await expect(control).toBeFocused();
+      await expect(hero.getByTestId('ovie-home-metrics')).toHaveAttribute(
+        'aria-busy',
+        'false'
+      );
+      if (step === 2)
+        await expect(
+          hero
+            .getByTestId('home-loop-tile-merges-hour')
+            .getByText('0', { exact: true })
+        ).toBeVisible();
+      if (step === 4)
+        await expect(hero.getByTestId('home-loop-constraint')).toHaveText(
+          'Shipping data could not load.'
+        );
+      expect(await geometry()).toEqual(before);
+    }
+    expect(
+      await metrics
+        .locator('dt')
+        .evaluateAll(nodes =>
+          nodes.every(node => parseFloat(getComputedStyle(node).fontSize) >= 12)
+        )
+    ).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth
+      )
+    ).toBe(true);
+  });
+}

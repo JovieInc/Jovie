@@ -19,7 +19,7 @@ const TONE_DOT: Record<HomeLoopTone, string> = {
   neutral: 'bg-subtle',
 };
 
-const TONE_LABEL: Record<HomeLoopTone, string> = {
+export const HOME_LOOP_TONE_LABELS: Record<HomeLoopTone, string> = {
   good: 'Healthy',
   warn: 'Needs attention',
   bad: 'Problem',
@@ -45,7 +45,9 @@ export function HomeLoopConstraintBanner({
   constraint,
   emptyLabel,
   loading = false,
+  appearance = 'default',
 }: Readonly<{
+  readonly appearance?: 'default' | 'quiet';
   readonly constraint: HomeLoopConstraint | null;
   readonly emptyLabel: string;
   readonly loading?: boolean;
@@ -59,7 +61,11 @@ export function HomeLoopConstraintBanner({
     <div
       role='status'
       aria-live='polite'
-      className='flex min-h-10 items-center gap-2 rounded-lg bg-surface-1 px-3 py-2 text-sm'
+      className={
+        appearance === 'quiet'
+          ? 'flex h-10 items-center gap-2 text-xs'
+          : 'flex min-h-10 items-center gap-2 rounded-lg bg-surface-1 px-3 py-2 text-sm'
+      }
       data-testid='home-loop-constraint'
       data-tone={loading ? 'loading' : (constraint?.tone ?? 'clear')}
     >
@@ -71,11 +77,13 @@ export function HomeLoopConstraintBanner({
             aria-hidden='true'
             className={cn(
               'size-4 shrink-0',
-              constraint
-                ? constraint.tone === 'bad'
-                  ? 'text-error'
-                  : 'text-warning'
-                : 'text-success'
+              appearance === 'quiet'
+                ? 'text-secondary-token'
+                : constraint
+                  ? constraint.tone === 'bad'
+                    ? 'text-error'
+                    : 'text-warning'
+                  : 'text-success'
             )}
           />
           <span
@@ -117,7 +125,7 @@ export function HomeLoopTileCard({
           {tile.label}
         </span>
         <span
-          aria-label={TONE_LABEL[tile.tone]}
+          aria-label={HOME_LOOP_TONE_LABELS[tile.tone]}
           className={cn('size-1.5 shrink-0 rounded-full', TONE_DOT[tile.tone])}
           role='img'
         />
