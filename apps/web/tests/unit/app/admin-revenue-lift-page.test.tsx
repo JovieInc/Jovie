@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import AdminRevenueLiftPage from '@/app/app/(shell)/admin/revenue-lift/page';
 
 const { mockCaptureError, mockLoadRevenueLift, mockRequireAccess } = vi.hoisted(
   () => ({
@@ -38,16 +39,13 @@ vi.mock('@/lib/seo/noindex-metadata', () => ({
 
 describe('AdminRevenueLiftPage', () => {
   it('uses the canonical error state while the shell owns the visible title', async () => {
-    const { default: AdminRevenueLiftPage } = await import(
-      '@/app/app/(shell)/admin/revenue-lift/page'
-    );
     render(await AdminRevenueLiftPage());
 
     expect(screen.getByTestId('admin-revenue-lift-page')).toHaveAttribute(
       'data-page-title',
-      'Revenue Lift'
+      'Revenue lift'
     );
-    expect(screen.queryByRole('heading', { name: 'Revenue Lift' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Revenue lift' })).toBeNull();
     expect(screen.getByTestId('admin-revenue-lift-error')).toHaveTextContent(
       'Could not load revenue-lift metrics.'
     );

@@ -135,7 +135,7 @@ export function HudCompanyMetricCards({
         state={survival.state}
       />
       <CockpitMetricCard
-        label='Week Over Week'
+        label='Week over week'
         value={growth.value}
         subtitle={growthSubtitle(metrics)}
         testId='ovie-core-metric-primary-outcome'
@@ -148,7 +148,7 @@ export function HudCompanyMetricCards({
         testId='hud-metric-shipping'
       />
       <CockpitMetricCard
-        label='Critical Blockers'
+        label='Critical blockers'
         value={blockers.value}
         subtitle={blockers.subtitle}
         testId='hud-metric-blockers'

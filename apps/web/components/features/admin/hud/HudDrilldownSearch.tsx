@@ -36,7 +36,7 @@ export function HudDrilldownSearch({
         <div
           className='flex flex-wrap items-center gap-1'
           role='tablist'
-          aria-label='Drill-down Scope'
+          aria-label='Drill-down scope'
         >
           {HUD_DRILLDOWN_SCOPES.map(option => (
             <Button
@@ -64,7 +64,7 @@ export function HudDrilldownSearch({
               value={query}
               onChange={event => setQuery(event.target.value)}
               placeholder='Filter exceptions'
-              aria-label='Filter Exceptions'
+              aria-label='Filter exceptions'
               data-testid='hud-drilldown-search'
             />
             {exceptions.length === 0 ? (
