@@ -22,6 +22,7 @@ import {
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
+import { normalizeEditableIsrc } from '@/lib/discography/editable-isrc';
 import { validateProviderUrl } from '@/lib/discography/provider-domains';
 import {
   getProviderLink,
@@ -93,7 +94,6 @@ export type { ReleaseProfileContext } from '@/lib/releases/release-types';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
-const EDITABLE_ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 
 function isSpotifyIdUniqueViolation(error: unknown): boolean {
   return isUniqueViolation(error, 'creator_profiles_spotify_id_unique');
@@ -112,20 +112,6 @@ function normalizeEditableUpc(value: string | null | undefined): string | null {
   if (!/^\d+$/u.test(normalized)) {
     throw new Error('UPC must contain only digits');
   }
-  return normalized;
-}
-
-function normalizeEditableIsrc(
-  value: string | null | undefined
-): string | null {
-  const trimmed = value?.trim() ?? '';
-  if (!trimmed) return null;
-
-  const normalized = trimmed.replaceAll(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  if (!EDITABLE_ISRC_REGEX.test(normalized)) {
-    throw new Error('ISRC must be 12 letters and digits');
-  }
-
   return normalized;
 }
 

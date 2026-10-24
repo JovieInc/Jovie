@@ -3,7 +3,8 @@
  *
  * Sequential money-path probe, distinct from generic uptime and the existing
  * auth / public-profile canaries:
- *   signed-out → claim → $12 Pro checkout → activation (step id keeps its
+ *   signed-out → claim (/pricing, /claim, bare /claim/start) → $12 Pro
+ *   checkout → activation (step id keeps its
  *   historical `pro_checkout_199` name for receipt continuity)
  *
  * Shared between:
@@ -41,6 +42,8 @@ export const M2_REVENUE_PATH_ROUTES = {
   signedOut: '/',
   claimPricing: '/pricing',
   claimSignup: '/signup?plan=pro&interval=month',
+  claimEntry: '/claim',
+  claimStart: '/claim/start',
   pricingOptions: '/api/stripe/pricing-options',
   checkout: '/api/stripe/checkout',
   activation: '/billing/success',
@@ -57,6 +60,9 @@ export const M2_CLAIM_FIRST_COPY = 'Claim my free profile';
 /** Pro CTA label from offer truth (self-serve since EVENT: Tim, 2026-10-20). */
 export const M2_CLAIM_PRO_ACCESS_COPY = getPublicPriceClaim('pro').ctaLabel;
 export const M2_CLAIM_PRICE_DISPLAY = `$${M2_PRO_MONTHLY_USD}`;
+/** Self-serve claim entry: artist search plus the $12/mo offer line. */
+export const M2_CLAIM_ENTRY_MARKER = 'claim-artist-search';
+export const M2_CLAIM_ENTRY_PRICE = `${M2_CLAIM_PRICE_DISPLAY}/mo`;
 
 export const M2_ACTIVATION_MARKERS = [
   'Artist Visibility is starting',
@@ -301,6 +307,64 @@ export function evaluateClaimSurface(input: {
   }
   evidence.push('signup?plan=pro');
   return { ok: true, statusCode: input.pricingStatus, evidence };
+}
+
+/**
+ * The /claim entry renders the artist search and the $12/mo offer, and a bare
+ * /claim/start bounces back to /claim (307) without touching any account.
+ */
+export function evaluateClaimEntry(input: {
+  readonly claimStatus: number;
+  readonly claimBody: string;
+  readonly claimStartStatus: number;
+  readonly claimStartLocation: string | null;
+}): M2StepEvaluation {
+  const evidence: string[] = [
+    `claim http ${input.claimStatus}`,
+    `claim/start http ${input.claimStartStatus}`,
+  ];
+  if (!isOkStatus(input.claimStatus) || hasServerError(input.claimBody)) {
+    return {
+      ok: false,
+      statusCode: input.claimStatus,
+      detail: `/claim did not render (HTTP ${input.claimStatus})`,
+      evidence,
+    };
+  }
+  if (!input.claimBody.includes(M2_CLAIM_ENTRY_MARKER)) {
+    return {
+      ok: false,
+      statusCode: input.claimStatus,
+      detail: '/claim is missing the artist search',
+      evidence,
+    };
+  }
+  if (!input.claimBody.includes(M2_CLAIM_ENTRY_PRICE)) {
+    return {
+      ok: false,
+      statusCode: input.claimStatus,
+      detail: `/claim is missing the ${M2_CLAIM_ENTRY_PRICE} offer`,
+      evidence,
+    };
+  }
+  evidence.push(M2_CLAIM_ENTRY_PRICE);
+  let startPath = '';
+  try {
+    startPath = new URL(input.claimStartLocation ?? '', 'https://jov.ie')
+      .pathname;
+  } catch {
+    startPath = '';
+  }
+  if (input.claimStartStatus !== 307 || startPath !== '/claim') {
+    return {
+      ok: false,
+      statusCode: input.claimStartStatus,
+      detail: `Bare /claim/start must 307 to /claim, got HTTP ${input.claimStartStatus} ${input.claimStartLocation ?? ''}`,
+      evidence,
+    };
+  }
+  evidence.push('claim/start → /claim');
+  return { ok: true, statusCode: input.claimStatus, evidence };
 }
 
 export function evaluateProCheckout199(input: {
@@ -557,16 +621,29 @@ export async function runM2RevenuePathCanary(
   });
 
   await record('claim', async () => {
-    const [pricing, signup] = await Promise.all([
+    const [pricing, signup, claim, claimStart] = await Promise.all([
       request(M2_REVENUE_PATH_ROUTES.claimPricing),
       request(M2_REVENUE_PATH_ROUTES.claimSignup),
+      request(M2_REVENUE_PATH_ROUTES.claimEntry),
+      request(M2_REVENUE_PATH_ROUTES.claimStart, { redirect: 'manual' }),
     ]);
-    return evaluateClaimSurface({
+    const surface = evaluateClaimSurface({
       pricingStatus: pricing.status,
       pricingBody: pricing.body,
       signupStatus: signup.status,
       signupBody: signup.body,
     });
+    if (!surface.ok) return surface;
+    const entry = evaluateClaimEntry({
+      claimStatus: claim.status,
+      claimBody: claim.body,
+      claimStartStatus: claimStart.status,
+      claimStartLocation: claimStart.location,
+    });
+    return {
+      ...entry,
+      evidence: [...surface.evidence, ...entry.evidence],
+    };
   });
 
   await record('pro_checkout_199', async () => {

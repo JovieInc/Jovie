@@ -132,16 +132,6 @@ const meta: Meta<typeof DashboardAudienceTable> = {
         { name: 'dark', value: '#0D0E12' },
       ],
     },
-    a11y: {
-      config: {
-        rules: [
-          {
-            id: 'color-contrast',
-            enabled: true,
-          },
-        ],
-      },
-    },
   },
   tags: ['autodocs', 'audience-a11y'],
   decorators: [

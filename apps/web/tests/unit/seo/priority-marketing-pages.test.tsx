@@ -8,6 +8,7 @@ import PricingPage, {
 } from '@/app/(marketing)/pricing/page';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 
 vi.mock(
   '@/components/marketing/artist-profile/ArtistProfileLandingRoute',
@@ -25,7 +26,9 @@ vi.mock('@/components/organisms/PricingRecipeBody', () => ({
 
 describe('priority marketing page crawler contracts', () => {
   it('publishes a usable pricing title and the existing real social image', () => {
-    expect(pricingMetadata.title).toBe(`Pricing | ${APP_NAME}`);
+    expect(applyRootTitleTemplate(pricingMetadata.title)).toBe(
+      `Pricing | ${APP_NAME}`
+    );
     expect(pricingMetadata.openGraph).toMatchObject({
       url: `${BASE_URL}/pricing`,
       images: [{ url: `${BASE_URL}/og/default.png`, width: 1200, height: 630 }],

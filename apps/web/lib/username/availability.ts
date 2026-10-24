@@ -80,11 +80,11 @@ export async function checkUserHasProfile(
   try {
     return await withDbSession(
       async sessionClerkUserId => {
-        // First get the user's database ID from Clerk ID
+        // withDbSession passes users.id. clerk_id is null for Better Auth users.
         const [user] = await db
           .select({ id: users.id })
           .from(users)
-          .where(eq(users.clerkId, sessionClerkUserId))
+          .where(eq(users.id, sessionClerkUserId))
           .limit(1);
 
         if (!user) {

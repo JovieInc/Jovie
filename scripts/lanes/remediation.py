@@ -106,12 +106,21 @@ _NON_CREDENTIAL_STRATEGY = re.compile(
 )
 # Match only the stated assurance, capturing its credential mention. Never
 # erase another mention in the same sentence: it may request a real action.
+# JOV-8810: a model-route repair also says a check could not be verified,
+# that child-environment credentials were stripped, or names screenshot/credential
+# tests. Each alternative captures only that word. A rotate, a vault strip,
+# "credential for tests", and a credential path stay gated.
 _CREDENTIAL_ASSURANCE = re.compile(
     r"\b(?P<passive>credentials?)(?:,\s*(?:and\s+)?OTPs?)?\s+"
     r"(?:are|is|were|was)\s+(?:(?:excluded|omitted|redacted|hashed|stripped|dropped|withheld)"
     r"|not\s+(?:recorded|stored|logged|included|emitted|printed|persisted))\b"
     r"|\bcannot\s+(?:attest|isolate)(?:\s+or\s+(?:attest|isolate))?\s+"
-    r"(?:child\s+tools,\s*)?(?P<boundary>credentials?)\b",
+    r"(?:child\s+tools,\s*)?(?P<boundary>credentials?)\b"
+    r"|\bstrip(?:ped|ping)?\s+(?:(?:raw|metered)\s+)?(?:api\s+)?(?P<removed>credentials?)\s+"
+    r"(?:from|in)\s+(?:child\s+)?environments?\b"
+    r"|\b(?:could\s+not|cannot|can\s+not)\s+be\s+(?:verified|certified)\s+"
+    r"(?:with\s+the\s+available|without)\s+(?P<unavailable>credentials?)\b"
+    r"|\bscreenshot/(?P<testref>credentials?)\s+tests?\b",
     re.IGNORECASE,
 )
 ACTIONABLE_FIX = re.compile(
@@ -363,6 +372,24 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
     # detector the labeled-event path uses names it, so the ask surfaces as
     # tim-decides instead of being routed as prescribed implementation.
     thread_ask = review_authority_ask(pr)
+    if thread_ask:
+        return blocker("needs-human-decision", "changes-requested",
+                       ["current human review requires authority",
+                        f"review evidence carries a {thread_ask} decision"],
+                       "tim-decides")
+
+    if held_here and not _actionable(note):
+        return blocker("needs-human-decision", "hold",
+                       [note[:240] or "human hold without a fix"], "tim-decides")
+    if pr.get("codeownersBlocked") or "codeowners" in labels:
+        return blocker("needs-human-decision", "codeowners",
+                       ["missing required human approval"], "tim-decides")
+
+    # GitHub computes mergeability asynchronously. UNKNOWN is missing evidence,
+    # not a failed repair or a human decision; the next pass reads it again.
+    if merge == "UNKNOWN":
+        return blocker("ready", "awaiting", ["mergeStateStatus=UNKNOWN"], "wait")
+
     if human_review and not held_here and not stop_labels and not thread_ask \
             and not (pr.get("codeownersBlocked") or "codeowners" in labels):
         # Tim 2026-10-15: ordinary requested changes ship through the automated
@@ -379,19 +406,6 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
                            evidence, "apply-prescribed-fix")
         return blocker("fixable-by-model", "review",
                        evidence, "escalate")
-    if thread_ask:
-        return blocker("needs-human-decision", "changes-requested",
-                       ["current human review requires authority",
-                        f"review evidence carries a {thread_ask} decision"],
-                       "tim-decides")
-
-    if held_here and not _actionable(note):
-        return blocker("needs-human-decision", "hold",
-                       [note[:240] or "human hold without a fix"], "tim-decides")
-    if pr.get("codeownersBlocked") or "codeowners" in labels:
-        return blocker("needs-human-decision", "codeowners",
-                       ["missing required human approval"], "tim-decides")
-
     if held_here and _actionable(note):
         return blocker("fixable-by-model", "human-hold",
                        [f"{author}: {note[:400]}".strip(": ")], "apply-prescribed-fix")
@@ -829,6 +843,7 @@ def dossier(pr: dict, classified: dict, record: dict | None = None) -> str:
     if linked.get("identifier") or pr.get("issue"):
         lines.append(f"Linked issue: {linked.get('identifier') or pr.get('issue')}")
     lines.append("Do not reset attempt history. Push to this branch. Do not open a new PR.")
+    lines.append("Never rebase, squash, reset or force-push this branch; merge origin/main and fast-forward push only.")
     return "\n".join(lines)
 
 

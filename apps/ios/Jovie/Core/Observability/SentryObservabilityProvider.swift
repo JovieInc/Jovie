@@ -1,6 +1,16 @@
 import Foundation
 import Sentry
 
+/// Deliberate Sentry app-hang tracking policy (JOV-8646). The SDK reports
+/// "App Hanging" events when the main thread is unresponsive for at least
+/// the configured threshold; the 2000 ms threshold matches the Sentry alert
+/// rule and is locked here so it stays independent of sentry-cocoa option
+/// defaults.
+enum SentryHangTrackingPolicy {
+  static let isTrackingEnabled = true
+  static let timeoutInterval: TimeInterval = 2.0
+}
+
 final class SentryObservabilityProvider: ObservabilityProvider {
   private let dsn: String
   private var didConfigure = false
@@ -24,6 +34,13 @@ final class SentryObservabilityProvider: ObservabilityProvider {
       options.environment = configuration.environment
       options.releaseName = configuration.release
       options.dist = configuration.buildNumber
+      // App-hang tracking policy is locked in SentryHangTrackingPolicy
+      // (JOV-8646): Sentry reports "App Hanging: App hanging for at least
+      // 2000 ms" against this app. sentry-cocoa ships these as defaults; pin
+      // them explicitly so a future SDK major cannot silently drop or retune
+      // the hang signal. Never weaken these values to silence the alert.
+      options.enableAppHangTracking = SentryHangTrackingPolicy.isTrackingEnabled
+      options.appHangTimeoutInterval = SentryHangTrackingPolicy.timeoutInterval
       options.sendDefaultPii = false
       options.enableCaptureFailedRequests = false
       options.beforeSend = { event in

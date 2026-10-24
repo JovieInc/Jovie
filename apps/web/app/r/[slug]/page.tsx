@@ -17,6 +17,7 @@ import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { NextRequest } from 'next/server';
 import { cache } from 'react';
 import { BASE_URL, UNKNOWN_ARTIST } from '@/constants/app';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { isSmartLinkCrawler } from '@/lib/analytics/smart-link-admission';
 import { db } from '@/lib/db';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
@@ -365,8 +366,8 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title,
       description,
-      creator: '@jovieapp',
-      site: '@jovieapp',
+      creator: COMPANY_IDENTITY.xHandle,
+      site: COMPANY_IDENTITY.xHandle,
       images: [
         {
           url: imageUrl,

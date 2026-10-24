@@ -111,7 +111,13 @@ vi.mock('@/components/jovie/components', () => ({
       {children}
     </div>
   ),
-  ChatInput: () => <div data-testid='chat-input' />,
+  ChatInput: ({
+    pickerPlacement,
+  }: {
+    readonly pickerPlacement?: 'flow' | 'overlay';
+  }) => (
+    <div data-testid='chat-input' data-picker-placement={pickerPlacement} />
+  ),
   ChatMessage: ({
     parts,
   }: {
@@ -176,6 +182,9 @@ describe('OnboardingChat empty intro', () => {
     );
 
     expect(screen.getByTestId('onboarding-empty-intro')).toBeTruthy();
+    expect(
+      screen.getByTestId('chat-empty-state-composer-region')
+    ).not.toHaveAttribute('data-align-above');
     expect(screen.getByTestId('onboarding-start-ambient-mark')).toBeTruthy();
     expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
@@ -198,6 +207,9 @@ describe('OnboardingChat empty intro', () => {
     expect(
       screen.getByRole('heading', { name: 'Your first message' })
     ).toBeTruthy();
+    expect(
+      screen.getByTestId('chat-empty-state-composer-region')
+    ).toHaveAttribute('data-align-above', 'top');
     expect(screen.queryByText('Your message is on its way.')).toBeNull();
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
@@ -316,6 +328,32 @@ describe('OnboardingChat empty intro', () => {
       ).toBe(headerOverlay === true);
     }
   );
+
+  it('overlays the slash picker on a blank start and flows it under a paused message', async () => {
+    render(
+      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+    );
+
+    expect(screen.getByTestId('chat-input')).toHaveAttribute(
+      'data-picker-placement',
+      'overlay'
+    );
+
+    chatMocks.errorMetadata = {};
+    act(() => {
+      chatMocks.onError?.(new Error('Network interrupted'));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('onboarding-message-recovery')
+      ).toHaveTextContent('Message paused');
+    });
+    expect(screen.getByTestId('chat-input')).toHaveAttribute(
+      'data-picker-placement',
+      'flow'
+    );
+  });
 
   it('surfaces a turnstile recovery row instead of swallowing the error (JOV-7294)', async () => {
     chatMocks.errorMetadata = { errorCode: 'TURNSTILE_REQUIRED' };

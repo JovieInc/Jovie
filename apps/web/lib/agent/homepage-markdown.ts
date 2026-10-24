@@ -2,7 +2,7 @@ import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
-import { HOMEPAGE_IDENTITY_COPY } from '@/data/homepageIdentityCopy';
+import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 
 function toAbsolutePublicUrl(href: string): string {
@@ -12,68 +12,35 @@ function toAbsolutePublicUrl(href: string): string {
   return `${BASE_URL}${href}`;
 }
 
-function renderIdentitySections(): string {
-  return HOMEPAGE_IDENTITY_COPY.sections
-    .map(section => {
-      const lines = [
-        `## ${section.eyebrow}`,
-        '',
-        `### ${section.headline}`,
-        '',
-        section.body,
-      ];
-      if ('step' in section) {
-        lines.push('', `### ${section.step.headline}`, '', section.step.body);
-      }
-      if ('identity' in section) {
-        lines.push(
-          '',
-          `### ${section.identity.label}`,
-          '',
-          section.identity.title,
-          '',
-          section.identity.handle
-        );
-      }
-      if ('possibilities' in section) {
-        lines.push('', `### ${section.possibilities.label}`, '');
-        for (const item of section.possibilities.items) {
-          lines.push(`- ${item.title}: ${item.detail}`);
-        }
-      }
-      return lines.join('\n');
-    })
-    .join('\n\n');
-}
-
-function renderFaq(): string {
-  const { faq } = HOMEPAGE_IDENTITY_COPY;
+function renderFreeOffer(): string {
+  const { offer } = HOMEPAGE_COPY;
   return [
-    `## ${faq.heading}`,
-    ...faq.items.map(item => `\n### ${item.question}\n\n${item.answer}`),
+    `### ${offer.includedLabel}`,
+    '',
+    ...offer.included.map(item => `- ${item.label}`),
   ].join('\n');
 }
 
 /**
  * Markdown representation of the public homepage for Accept: text/markdown.
- * Projects approved identity copy. The music launch document is a separate surface.
+ * Machine-readable identity stays general (company definition first); the
+ * homepage's artist-profile offer follows as a labeled section. Visual-only
+ * fan-moment copy is not projected here.
  */
 export function buildHomepageMarkdown(): string {
-  const { hero, close } = HOMEPAGE_IDENTITY_COPY;
+  const { hero } = HOMEPAGE_COPY;
 
-  return `# ${hero.headline}
-
-${hero.subhead}
+  return `# ${COMPANY_IDENTITY.headline}
 
 ${COMPANY_IDENTITY.definition}
 
+## Artist profiles
+
+${hero.subhead}
+
 ${hero.claim.action} ${hero.claim.domain}${hero.claim.placeholder}: ${toAbsolutePublicUrl(APP_ROUTES.START)}
 
-${renderIdentitySections()}
-
-${renderFaq()}
-
-## ${close.headline}
+${renderFreeOffer()}
 
 ${buildSiteLlmsGuidance()}
 ## Recovery links

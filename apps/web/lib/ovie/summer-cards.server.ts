@@ -4,6 +4,7 @@ import { and, desc, sql as drizzleSql, eq, like } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { ovieOperatingKv } from '@/lib/db/schema/ovie';
+import { summerCardId, summerCardPayloadDigest } from './summer-card-digest';
 import {
   effectiveSummerCardDeadline,
   SUMMER_CARD_DEFAULT_DECIDER,
@@ -11,8 +12,6 @@ import {
   type SummerCard,
   type SummerCardInput,
   summerCardDecisionContract,
-  summerCardId,
-  summerCardPayloadDigest,
 } from './summer-cards';
 
 /**

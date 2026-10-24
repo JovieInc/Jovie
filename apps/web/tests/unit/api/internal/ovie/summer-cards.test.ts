@@ -41,7 +41,7 @@ const {
   buildHumanServiceOutcomeReceipt,
   evaluateHumanServiceRequest,
 } = await import('@/lib/ovie/human-service-pilot');
-const { summerCardId } = await import('@/lib/ovie/summer-cards');
+const { summerCardId } = await import('@/lib/ovie/summer-card-digest');
 
 const URL_BASE = 'https://jov.ie/api/internal/ovie/summer-cards';
 

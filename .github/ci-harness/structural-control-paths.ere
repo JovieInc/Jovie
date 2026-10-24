@@ -58,3 +58,9 @@
 # skip PRs, so these contracts run here (#18718).
 ^(\.env\.example|\.nvmrc|config/node-runtime-policy\.json|docs/REPO-POLICY\.md|scripts/(ci/|node-runtime-policy\.mjs$|lib/playwright-png\.mjs$)|apps/web/(next\.config\.js|vercel\.json|vitest\.config[^/]*\.mts|playwright[^/]*\.config[^/]*\.ts)$)
 ^scripts/(lib/)?publish-coverage-report(\.test)?\.mjs$
+
+# Codecov and Chromatic config must match the workflows that produce them.
+^codecov\.yml$
+^chromatic\.config\.json$
+^scripts/lib/gate-config-consistency\.mjs$
+^scripts/lib/__tests__/gate-config-consistency\.test\.mjs$

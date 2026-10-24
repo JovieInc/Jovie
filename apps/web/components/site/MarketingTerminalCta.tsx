@@ -106,9 +106,9 @@ const styles = {
   },
   standard: {
     section:
-      'relative isolate overflow-hidden bg-black px-[clamp(1.25rem,2.2vw,2rem)] py-[clamp(5rem,9vw,8rem)] text-(--color-text-tooltip) dark:bg-black',
+      'relative isolate overflow-hidden bg-black py-[clamp(5rem,9vw,8rem)] text-(--color-text-tooltip) dark:bg-black',
     content:
-      'relative z-[2] mx-auto flex w-full max-w-[var(--homepage-section-max,80rem)] flex-col items-center text-center',
+      'public-container relative z-[2] flex flex-col items-center text-center',
     title:
       'font-display max-w-[20ch] text-balance text-[clamp(2rem,3.4vw,3rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)',
     body: 'mt-3 max-w-[44rem] text-balance text-lg leading-[1.45] text-white/[0.5]',

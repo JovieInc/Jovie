@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { describe, expect, it } from 'vitest';
 import {
   filterCriticalErrors,
+  isDestroyedExecutionContext,
   isExpectedError,
   isExpectedWarning,
   isTransientNavigationError,
@@ -42,6 +43,18 @@ describe('smoke-test-utils', () => {
         isExpectedError(
           'Blocked by CORS policy: No Access-Control-Allow-Origin header is present.'
         )
+      ).toBe(false);
+    });
+
+    it('treats Firefox fetch aborts like Chrome net::ERR_* noise', () => {
+      expect(
+        isExpectedError('NetworkError when attempting to fetch resource.')
+      ).toBe(true);
+      expect(isTransientNavigationError(new Error('NS_BINDING_ABORTED'))).toBe(
+        true
+      );
+      expect(
+        isExpectedError('TypeError: Failed to parse the profile payload')
       ).toBe(false);
     });
   });
@@ -121,6 +134,14 @@ describe('smoke-test-utils', () => {
           new Error('expect(locator).toBeVisible() failed')
         )
       ).toBe(false);
+    });
+
+    it('does not treat a destroyed execution context as a page-health redirect', () => {
+      const error = new Error(
+        'page.evaluate: Execution context was destroyed, most likely because of a navigation'
+      );
+      expect(isDestroyedExecutionContext(error)).toBe(true);
+      expect(isTransientNavigationError(error)).toBe(false);
     });
   });
 

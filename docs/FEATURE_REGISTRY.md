@@ -8,6 +8,7 @@ This document is the canonical feature list for Jovie. It is designed for onboar
   - **Shipped**: live and generally available
   - **Shipped (internal v1 default-on)**: live with former rollout gates on by default
   - **In rollout**: live for a subset of users/traffic
+  - **Proposal**: documented roadmap only; no public availability or entitlement
 - **Access model** clarifies whether a feature is free, plan-gated, role-gated, or flag-gated.
 - **Flag / Gate** links to the control mechanism when applicable.
 
@@ -42,6 +43,15 @@ access remain authoritative in the product feature list below.
 | subscription-and-billing-management | Subscription and billing management |
 | account-data-export-and-deletion | Account data export and deletion |
 | support-and-incorrect-data-reporting | Support and incorrect data reporting |
+
+## API roadmap proposals
+
+These proposals are separate from the production feature table. They do not
+create rollout flags, billing entitlements, or admin certification items.
+
+| Feature | Status | Proposed access | Decision gate | Brief |
+|---|---|---|---|---|
+| Agentic API self-serve accounts, usage pricing, and cache reuse | Proposal | Free to start with strict limits; opt-in usage billing | JOV-4875: exact amounts require Tim's approval; metering, delegated payment, and freshness proof before activation | [PM brief](product/api-agentic-self-serve.md); [canonical pricing schema](company/PRICING-STRATEGY.md#api-pricing-schema-proposal-jov-4875) |
 
 ## Product Feature List
 

@@ -78,6 +78,14 @@ Legacy common-source-SHA reservations have no owner proof and remain held for
 authoritative reconciliation. Source merge is preparatory and does not repair or
 certify the running coordinator.
 
+PR repair selection captures one qualified bulk inventory outside the global claim lock,
+using the existing per-key cache lock. Current local preservation and attempt state,
+fresh selected-head/foreign-owner checks and atomic charging remain inside. Unknown or
+expired initial repair evidence defers before new-issue fallback; remote-only lanes retain
+their original path. New-issue and sweep reads, brief effects and selected-owner latency
+remain separate lock/continuity work under JOV-8371; this source change does not attest an
+installed release or measured live throughput recovery.
+
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
 running worker. Production deploys are a separate track: only a red main stops shipping.
@@ -544,6 +552,12 @@ does not retain a removed runtime directory.
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in
 `~/.config/jovie-lanes/github.env` (`GH_TOKEN=...`) gives that host its own API budget.
+Delivery retries are bounded by one knob, `LANES_EVENT_DELIVERY_MAX_ATTEMPTS` (default 3,
+hard-capped at 10): every remediation delivery either gains an authoritative readback or ends
+as a reported `exhausted` row — never silent, never unbounded. A tick that dies mid-run leaves
+a `tick-in-flight.json` marker; the next tick reports `uncleanPreviousRun` and refunds the
+fix-attempt charges stranded with no verdict (and infra-class no-work stops — unreadable
+target, failed checkout — requeue with the capped handoff backoff instead of re-claiming).
 With the Jovie Bot key, every `gh` call (workers, doctor, reconcile, agents) passes the shim's
 shared budget guard: below `JOVIE_GITHUB_FLOOR` (600) GraphQL points, read-only polling exits 75
 until GitHub's reset while writes still go through; the budget is re-read at most once a minute.

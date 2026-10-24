@@ -72,7 +72,10 @@ async function capture(page: Page, testInfo: TestInfo, name: string) {
   await testInfo.attach(name, { path, contentType: 'image/png' });
 }
 
-async function mockWaitlistOnboardingChat(page: Page) {
+async function mockWaitlistOnboardingChat(
+  page: Page,
+  onQualified?: () => void
+) {
   await page.route('**/api/chat', async route => {
     const body = route.request().postDataJSON() as {
       readonly mode?: string;
@@ -80,6 +83,7 @@ async function mockWaitlistOnboardingChat(page: Page) {
     };
     expect(body.mode).toBe('onboarding');
     expect(Array.isArray(body.messages)).toBe(true);
+    onQualified?.();
 
     await route.fulfill({
       status: 200,
@@ -270,7 +274,39 @@ test.describe('local seeded waitlist golden path', () => {
     await capture(page, testInfo, 'golden-path-01-homepage');
 
     const { email, clerkUserId } = await createFreshUser(page, seed);
-    await mockWaitlistOnboardingChat(page);
+    // The chat mock never persists proposeNextStep, and the card does not
+    // render a receipt. Seed the pending row first, then let the claim
+    // handoff navigate to /waitlist where the real heading is rendered.
+    const entryId = await seedQualifiedWaitlistUser({
+      clerkUserId,
+      email,
+    });
+    let claimReady = false;
+    await page.route('**/api/onboarding/claim', async route => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          claimReady
+            ? {
+                claimed: 1,
+                waitlist: {
+                  entryId,
+                  status: 'waitlisted',
+                  outcome: 'pending',
+                },
+              }
+            : { claimed: 0 }
+        ),
+      });
+    });
+    await mockWaitlistOnboardingChat(page, () => {
+      claimReady = true;
+    });
 
     await page.goto('/start', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
@@ -279,15 +315,13 @@ test.describe('local seeded waitlist golden path', () => {
       .locator(COMPOSER_TEXTAREA)
       .fill('Golden Path Artist has a release in three weeks.');
     await page.getByRole('button', { name: 'Send message' }).click();
-    await expect(page.getByText("You're on the list")).toBeVisible({
+    await expect(
+      page.getByRole('heading', { name: "You're on the list" })
+    ).toBeVisible({
       timeout: 30_000,
     });
     await capture(page, testInfo, 'golden-path-03-qualified-waitlisted-chat');
 
-    const entryId = await seedQualifiedWaitlistUser({
-      clerkUserId,
-      email,
-    });
     await expect
       .poll(async () => await readWaitlistState({ clerkUserId, entryId }))
       .toMatchObject({

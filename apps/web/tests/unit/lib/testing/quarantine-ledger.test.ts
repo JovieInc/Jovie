@@ -17,13 +17,15 @@ describe('quarantine ledger', () => {
 
     expect(isQuarantineLedgerValid(parsed)).toBe(true);
 
+    const isActive = (entry: { expiresAt: string }) =>
+      Date.parse(entry.expiresAt) >= Date.now();
     // Count entries dynamically so the test tolerates additions/removals in
     // tests/quarantine.json — only the structural guarantees matter here.
     const expectedUnitCount = parsed.ledger.entries.filter(
-      entry => entry.kind === 'unit'
+      entry => entry.kind === 'unit' && isActive(entry)
     ).length;
     const expectedE2eCount = parsed.ledger.entries.filter(
-      entry => entry.kind === 'e2e'
+      entry => entry.kind === 'e2e' && isActive(entry)
     ).length;
 
     expect(parsed.ledger.entries.length).toBeGreaterThan(0);
@@ -32,12 +34,12 @@ describe('quarantine ledger', () => {
     expect(parsed.unitIssueUrls).toHaveLength(expectedUnitCount);
     expect(parsed.e2eIssueUrls).toHaveLength(expectedE2eCount);
     for (const [index, entry] of parsed.ledger.entries
-      .filter(item => item.kind === 'unit')
+      .filter(item => item.kind === 'unit' && isActive(item))
       .entries()) {
       expect(parsed.unitIssueUrls[index]).toBe(entry.fixIssueUrl);
     }
     for (const [index, entry] of parsed.ledger.entries
-      .filter(item => item.kind === 'e2e')
+      .filter(item => item.kind === 'e2e' && isActive(item))
       .entries()) {
       expect(parsed.e2eIssueUrls[index]).toBe(entry.fixIssueUrl);
     }
@@ -104,6 +106,40 @@ describe('quarantine ledger', () => {
         issue.path.includes('maxRetryAttemptsPerCiRun')
       )
     ).toBe(true);
+  });
+
+  it('does not exclude tests whose quarantine has expired (deliberate red)', () => {
+    const entry = (id: string, kind: 'unit' | 'e2e', expiresAt: string) => ({
+      id,
+      kind,
+      path: `tests/${id}.test.ts`,
+      owner: 'platform',
+      firstSeenAt: '2026-02-01',
+      reproductionCommand: 'pnpm test',
+      fixIssueUrl: 'https://linear.app/jovie/issue/JOV-1',
+      expiresAt,
+    });
+    const parsed = parseQuarantineLedger(
+      {
+        schemaVersion: 1,
+        retryBudget: {
+          unitDefaultRetries: 1,
+          quarantineUnitRetries: 2,
+          e2eDefaultRetries: 0,
+          quarantineE2eRetries: 2,
+          maxRetryAttemptsPerCiRun: 160,
+          unitShardCount: 14,
+        },
+        entries: [
+          entry('expired-unit', 'unit', '2026-09-30'),
+          entry('expired-e2e', 'e2e', '2026-09-30'),
+          entry('active-unit', 'unit', '2099-01-01'),
+        ],
+      },
+      new Date('2026-10-21T00:00:00.000Z')
+    );
+    expect(parsed.unitPaths).toEqual(['tests/active-unit.test.ts']);
+    expect(parsed.e2ePaths).toEqual([]);
   });
 
   it('summarizes active vs expired entries', () => {

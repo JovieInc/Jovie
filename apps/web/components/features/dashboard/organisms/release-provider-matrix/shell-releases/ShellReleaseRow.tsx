@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.test.tsx
+
 import { QueryClientContext } from '@tanstack/react-query';
 import {
   Clock,
@@ -11,6 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import {
+  type ComponentPropsWithoutRef,
   type KeyboardEvent,
   type MouseEvent,
   memo,
@@ -77,8 +80,12 @@ const RELEASE_TYPE_BADGE_LABEL: Record<ReleaseType, string> = {
   other: 'Other',
 };
 export const shellReleaseRowTypography = {
-  title: 'truncate text-app font-caption text-primary-token leading-[1.2]',
-  subtitle: 'truncate text-2xs text-tertiary-token leading-[1.3]',
+  // min-h-6 keeps the title target at the 24px WCAG 2.5.8 floor inside the
+  // dense h-8 row (axe target-size is enabled at WCAG 2.2 AA and cannot be
+  // allowlisted); items-center on the hover link keeps the glyphs centered.
+  titleClassName:
+    'truncate text-app font-caption text-primary-token leading-[1.2] min-h-6',
+  subtitleClassName: 'truncate text-2xs text-tertiary-token leading-[1.3]',
 } as const;
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
@@ -149,7 +156,7 @@ const ArtworkCell = memo(function ArtworkCell({
       <ArtworkThumb
         src={release.artworkUrl ?? ''}
         title={release.title}
-        size={40}
+        size={20}
       />
       {isSyncing ? <AgentPulse className='rounded-sm' /> : null}
       {hasPreview ? (
@@ -235,6 +242,7 @@ const SmartLinkCell = memo(function SmartLinkCell({
   return (
     <Link
       href={smartLinkPath}
+      prefetch={false}
       target='_blank'
       rel='noreferrer'
       onClick={e => e.stopPropagation()}
@@ -290,9 +298,13 @@ const WeeklyStreamsCell = memo(function WeeklyStreamsCell({
  * + type badge + artists (+ inline sync status) + status + drop date +
  * DSP avatar stack + smart link + more menu.
  *
- * The outer `<div>` is the click + keyboard target (parent `<div role="listbox">`)
- * Inner interactive elements (smart link, more-menu) stop propagation so
- * they don't double-fire selection — the standard pattern across shell-v1.
+ * The outer row is a `role="listitem"` inside the parent `role="list"`
+ * (ShellReleasesView). It deliberately is NOT a `role="option"`: an
+ * option's children must be presentational (axe nested-interactive), but
+ * this row legitimately owns per-cell controls (play preview, title hover
+ * link, smart link, actions menu). The row stays the click + keyboard
+ * target; inner interactive elements stop propagation so they don't
+ * double-fire selection — the standard pattern across shell-v1.
  */
 export const ShellReleaseRow = memo(function ShellReleaseRow({
   release,
@@ -301,6 +313,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   actionMenuItems,
   smartLinkLockReason = null,
   syncStatus = null,
+  ...hostProps
 }: {
   readonly release: ReleaseViewModel;
   readonly isSelected: boolean;
@@ -313,7 +326,18 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
    * label. Degrades to nothing when `null` (the common idle case).
    */
   readonly syncStatus?: ShellReleaseSyncStatus;
-}) {
+} & Omit<
+  ComponentPropsWithoutRef<'li'>,
+  | 'children'
+  | 'className'
+  | 'onClick'
+  | 'onKeyDown'
+  | 'onPointerEnter'
+  | 'onFocus'
+  | 'aria-label'
+  | 'role'
+  | 'tabIndex'
+>) {
   const dspItems = useMemo(() => releaseToDspItems(release), [release]);
   const dropMeta = useMemo(
     () => (release.releaseDate ? dropDateMeta(release.releaseDate) : null),
@@ -358,7 +382,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
     status: release.status,
   };
 
-  function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+  function handleKeyDown(e: KeyboardEvent<HTMLLIElement>) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onSelect();
@@ -367,8 +391,14 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
 
   return (
     <ShellListRowFrame
-      role='option'
-      aria-selected={isSelected}
+      as='li'
+      // The row IS the list item (implicit listitem): axe's `list` rule
+      // rejects suppressed-role wrapper children of a ul, and any wrapper
+      // element breaks the singular listitem queries the shell lists rely
+      // on. `listitem` is name-from-author, so keep the explicit accessible
+      // name for role-based queries and screen-reader item navigation.
+      {...hostProps}
+      aria-label={release.title}
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
@@ -378,10 +408,10 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       data-release-id={release.id}
       data-release-active={isActiveTrack ? 'true' : undefined}
       chrome='shell'
-      density='spacious'
+      density='dense'
       isSelected={isSelected}
       interactive
-      className='group/row flex items-center gap-3 px-3'
+      className='group/row flex h-8 items-center gap-2 overflow-hidden px-3'
     >
       <ArtworkCell release={release} isSyncing={syncLabel !== null} />
 
@@ -390,20 +420,33 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
           <EntityHoverLink
             entity={releaseEntity}
             className={cn(
-              shellReleaseRowTypography.title,
+              shellReleaseRowTypography.titleClassName,
               'inline-flex min-w-0 hover:no-underline'
             )}
           >
             {release.title}
           </EntityHoverLink>
           <TypeBadge label={typeLabel} />
-        </div>
-        <div className='mt-0.5 flex min-w-0 items-center'>
-          <span className={shellReleaseRowTypography.subtitle}>
-            {artistLabel}
-          </span>
+          {artistLabel ? (
+            <>
+              <span
+                aria-hidden='true'
+                className='shrink-0 text-2xs text-quaternary-token'
+              >
+                ·
+              </span>
+              <span
+                className={cn(
+                  shellReleaseRowTypography.subtitleClassName,
+                  'min-w-0'
+                )}
+              >
+                {artistLabel}
+              </span>
+            </>
+          ) : null}
           {syncLabel ? (
-            <span className='ml-1 inline-flex shrink-0 items-center text-2xs text-accent-blue'>
+            <span className='inline-flex shrink-0 items-center text-2xs text-accent-blue'>
               <span aria-hidden='true' className='mr-1 text-quaternary-token'>
                 ·
               </span>
