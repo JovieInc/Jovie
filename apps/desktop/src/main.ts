@@ -1577,6 +1577,7 @@ function buildDesktopBootSplashHtml(): string {
   const markCream = SYSTEM_B_DESKTOP_TOKENS.markCream;
   const cornerMarkPx = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkSizePx;
   const cornerMarkOpacity = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkOpacity;
+  const settledMarkPx = SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx;
   const wordmarkDataUrl = desktopBootSplashWordmarkDataUrl;
   return `<!doctype html>
 <html lang="en">
@@ -1598,6 +1599,21 @@ function buildDesktopBootSplashHtml(): string {
       .suffix { font-size: min(38px, 1.7vw); line-height: 1.15; font-weight: 400; letter-spacing: -.8px; }
       .progress { width: min(120px, 5.36vw); height: 2px; overflow: hidden; background: rgba(255,255,255,.2); }
       .progress::before { content: ""; display: block; width: min(44px, 1.96vw); height: 2px; background: var(--mac-ion); }
+      /* splash-b-everywhere-v1: the wordmark appears, then settles down to just the O. Opacity/scale only, so nothing shifts layout. */
+      .stage { display: grid; place-items: center; }
+      .stage > * { grid-area: 1 / 1; }
+      .settled-mark { width: ${settledMarkPx}px; height: ${settledMarkPx}px; color: var(--mac-cream); opacity: 0; animation: splash-o-settle 360ms ease-out 1100ms forwards; }
+      .lockup, .fallback-mark { opacity: 0; animation: splash-wordmark-appear 320ms ease-out forwards, splash-wordmark-settle 360ms ease-in 1100ms forwards; }
+      .progress { animation: splash-progress-out 240ms ease-out 1100ms forwards; }
+      @keyframes splash-wordmark-appear { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes splash-wordmark-settle { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.4); } }
+      @keyframes splash-o-settle { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+      @keyframes splash-progress-out { to { opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) {
+        .lockup, .fallback-mark, .settled-mark, .progress { animation: none; }
+        .lockup, .fallback-mark, .progress { opacity: 0; }
+        .settled-mark { opacity: 1; }
+      }
     </style>
   </head>
   <body>
@@ -1606,7 +1622,7 @@ function buildDesktopBootSplashHtml(): string {
         <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
       </svg>
       <div class="lockup-area" aria-hidden="true">
-        ${wordmarkDataUrl ? `<div class="lockup"><img class="wordmark" src="${wordmarkDataUrl}" alt="" /><span class="suffix">for Mac</span></div>` : `<svg class="fallback-mark" viewBox="0 0 353.68 347.97" aria-hidden="true"><path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/></svg>`}
+        <div class="stage">${wordmarkDataUrl ? `<div class="lockup"><img class="wordmark" src="${wordmarkDataUrl}" alt="" /><span class="suffix">for Mac</span></div>` : `<svg class="fallback-mark" viewBox="0 0 353.68 347.97" aria-hidden="true"><path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/></svg>`}<svg class="settled-mark" viewBox="0 0 353.68 347.97" aria-hidden="true" data-splash-settled="o"><path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/></svg></div>
         <div class="progress"></div>
       </div>
     </main>
