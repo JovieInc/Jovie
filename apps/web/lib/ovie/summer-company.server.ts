@@ -47,9 +47,9 @@ const unavailable = (reason: string): Unavailable => ({
 /**
  * Internal/test account predicates (JOV-6673). Company reads must only count
  * real external customers; `internalAccount` matches team inboxes (jov.ie and
- * the admin domain), seeded QA/E2E patterns (clerk_test tags, e2e/browse/qa/
- * smoke/staging local parts), reserved test domains, and demo placeholders
- * (`*-public`). `externalAccount` treats a null email as external — it is a
+ * the admin domain), explicit provisioning tags and reserved test domains.
+ * External mailbox names alone are not fixture provenance.
+ * `externalAccount` treats a null email as external — it is a
  * user record we cannot classify, not an internal one.
  */
 const internalAccount = () =>
