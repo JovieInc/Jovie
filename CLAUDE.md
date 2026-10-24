@@ -101,13 +101,3 @@ coverage. Skip redundant reruns. Report changes, exact checks, failures, and lim
 local source, hosted CI, native merge queue, deployed build, or observed runtime
 from each other. Preserve the goal and user corrections across compaction; resume
 at the next unfinished step.
-
-## Mac app platform
-
-All Mac app work defaults to SwiftUI. Do not add new Electron, AppKit-only, or other non-SwiftUI Mac surfaces unless Tim explicitly overrides this for that task. The long-term goal is a fully SwiftUI Mac app.
-
-- New native Mac surfaces go in `apps/macos` (for example `apps/macos/MenuMonitor`).
-- `apps/desktop` (Electron) is maintenance-only: fixes and migrations out, not new surfaces.
-- Production runs full screen on an ultrawide monitor. That view, Ovie, is where Tim works, and anything that needs his attention lands there. Design and test Mac layouts at ultrawide full screen first.
-- The IA of that full-screen surface is a perpetual work item: keep improving it and keep refining the components inside it.
-- A perpetual design loop, not a one-time audit, covers the Ovie surface. It reviews the production surface's IA, components and visual design and proposes improvements. It runs on a deterministic gem schedule, not on Grok Bot usage, and has a dead-man check. Findings go to `pipeline-bottleneck/v1`, and design debt is tracked as Linear work items.
