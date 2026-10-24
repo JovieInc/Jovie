@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect } from 'storybook/test';
 import {
   createDashboardQueryClient,
   DashboardStoryProviders,
@@ -64,7 +65,27 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const UnknownConfidence: Story = {};
+export const UnknownConfidence: Story = {
+  play: async ({ canvas, canvasElement }) => {
+    const actions = canvas.getAllByRole('button', {
+      name: /^(Confirm|Reject) .+ match for Uninspected Artist$/,
+    });
+    await expect(actions).toHaveLength(2);
+
+    for (const action of actions) {
+      action.focus();
+      await expect(action).toHaveFocus();
+      const bounds = action.getBoundingClientRect();
+      const hit = canvasElement.ownerDocument.elementFromPoint(
+        bounds.left + bounds.width / 2,
+        bounds.top - 1
+      );
+      // The invisible hit area extends beyond the visible button without
+      // changing the row layout or redirecting input to the popover trigger.
+      await expect(hit?.closest('button')).toBe(action);
+    }
+  },
+};
 
 export const MeasuredZero: Story = {
   parameters: { matches: [measuredZero] },

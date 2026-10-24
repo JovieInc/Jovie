@@ -201,7 +201,7 @@ function SuggestedMatchRow({
               onConfirm();
             }}
             disabled={isLoading}
-            className='relative inline-flex h-7 w-7 items-center before:absolute before:inset-x-0 before:top-1/2 before:h-10 before:-translate-y-1/2 before:content-[""] justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-success focus-visible:bg-surface-2 focus-visible:text-success focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
+            className='relative inline-flex h-7 w-7 items-center before:absolute before:inset-x-0 before:top-1/2 before:h-10 before:-translate-y-1/2 justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-success focus-visible:bg-surface-2 focus-visible:text-success focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
             aria-label={`Confirm ${label} match for ${match.externalArtistName || 'Unknown'}`}
           >
             {isConfirming ? (
@@ -217,7 +217,7 @@ function SuggestedMatchRow({
               onReject();
             }}
             disabled={isLoading}
-            className='relative inline-flex h-7 w-7 items-center before:absolute before:inset-x-0 before:top-1/2 before:h-10 before:-translate-y-1/2 before:content-[""] justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-error focus-visible:bg-surface-2 focus-visible:text-error focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
+            className='relative inline-flex h-7 w-7 items-center before:absolute before:inset-x-0 before:top-1/2 before:h-10 before:-translate-y-1/2 justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-error focus-visible:bg-surface-2 focus-visible:text-error focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
             aria-label={`Reject ${label} match for ${match.externalArtistName || 'Unknown'}`}
           >
             {isRejecting ? (

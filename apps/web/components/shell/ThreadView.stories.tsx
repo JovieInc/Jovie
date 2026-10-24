@@ -8,7 +8,7 @@ const meta = {
     Story => (
       // Give the thread a real viewport so its scroll region does not overflow
       // (an overflowing scroller needs a keyboard entry point).
-      <div className='h-96 w-[44rem] max-w-full'>
+      <div className='h-96 w-176 max-w-full'>
         <Story />
       </div>
     ),
