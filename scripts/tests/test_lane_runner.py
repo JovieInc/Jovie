@@ -11146,6 +11146,11 @@ class HumanHoldEnforcementTest(unittest.TestCase):
                    "state": "OPEN", "isDraft": False, "mergeStateStatus": "CLEAN", "labels": self.HOLD,
                    "isInMergeQueue": False, "isCrossRepository": False}
         self.calls = []
+        # Hermetic: claim ownership is read from GitHub/host state, which differs per machine and
+        # inside a staged release. Every test here states its own claim outcome.
+        claims = patch.object(lane, "claimed_elsewhere", return_value=False)
+        claims.start()
+        self.addCleanup(claims.stop)
 
     def shell(self, routes=None):
         routes = routes or {}
