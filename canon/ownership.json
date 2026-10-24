@@ -76,6 +76,7 @@
     {"id": "workflow:observability-issue", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/observability-issue.yml"},
     {"id": "workflow:postdeploy-probes", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/postdeploy-probes.yml"},
     {"id": "workflow:pr-conflict-handler", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/pr-conflict-handler.yml"},
+    {"id": "workflow:pr-fleet-rules", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-fleet-rules.yml"},
     {"id": "workflow:pr-preparation-canary", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-preparation-canary.yml"},
     {"id": "workflow:pr-review-learn", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pr-review-learn.yml", "note": "Workflow header names Tim as accountable writer; the routine owner is the agent role here."},
     {"id": "workflow:pen-still-diff", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/pen-still-diff.yml"},
