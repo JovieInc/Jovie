@@ -56,6 +56,7 @@
         "/app/settings",
         "/app/settings/account",
         "/api/account/email",
+        "/api/account/early-access",
         "/api/notifications/preferences"
       ],
       "entry": "/app/settings/account",
@@ -63,6 +64,7 @@
       "components": [
         "apps/web/components/features/dashboard/organisms/account-settings/AccountSettingsSection.tsx",
         "apps/web/components/features/dashboard/organisms/account-settings/EmailManagementCard.tsx",
+        "apps/web/components/features/dashboard/organisms/account-settings/EarlyAccessSettingsSection.tsx",
         "apps/web/components/features/dashboard/organisms/account-settings/SessionManagementCard.tsx"
       ],
       "actions": [],
@@ -1070,6 +1072,14 @@
       "route": "/api/account/delete",
       "methods": ["POST"],
       "surface": "privacy",
+      "classification": "A"
+    },
+    {
+      "source": "apps/web/app/api/account/early-access/route.ts",
+      "kind": "handler",
+      "route": "/api/account/early-access",
+      "methods": ["GET", "POST"],
+      "surface": "account",
       "classification": "A"
     },
     {
@@ -7412,6 +7422,12 @@
     },
     {
       "source": "apps/web/components/features/dashboard/organisms/account-settings/AccountSettingsSection.tsx",
+      "kind": "component",
+      "surface": "account",
+      "classification": "A"
+    },
+    {
+      "source": "apps/web/components/features/dashboard/organisms/account-settings/EarlyAccessSettingsSection.tsx",
       "kind": "component",
       "surface": "account",
       "classification": "A"
