@@ -11,11 +11,13 @@ vi.mock('@/lib/stripe/config', () => ({
 
 const mockAssertPrice = vi.hoisted(() => vi.fn());
 const mockAddBreadcrumb = vi.hoisted(() => vi.fn());
+const mockCaptureMessage = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/stripe/price-contract', () => ({
   assertCheckoutPriceContract: mockAssertPrice,
 }));
 vi.mock('@sentry/nextjs', () => ({
   addBreadcrumb: mockAddBreadcrumb,
+  captureMessage: mockCaptureMessage,
   getClient: vi.fn(() => undefined),
 }));
 vi.mock('@/lib/stripe/client', () => ({
@@ -129,6 +131,18 @@ describe('GET /api/stripe/pricing-options', () => {
           reason: 'price_not_found',
         }),
       })
+    );
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'Skipping unavailable Stripe pricing option',
+      {
+        level: 'error',
+        tags: {
+          event: 'stripe_pricing_option_skipped',
+          priceId: 'price_missing',
+          route: '/api/stripe/pricing-options',
+        },
+        fingerprint: ['stripe_pricing_option_skipped', 'price_missing'],
+      }
     );
   });
 });

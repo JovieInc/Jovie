@@ -52,12 +52,21 @@ export async function GET() {
             reason: 'price_not_found',
             route: '/api/stripe/pricing-options',
           } as const;
-          logger.warn('Skipping unavailable Stripe pricing option', context);
+          logger.error('Skipping unavailable Stripe pricing option', context);
           Sentry.addBreadcrumb({
             category: 'stripe.pricing-options',
             message: 'Skipped unavailable Stripe pricing option',
             level: 'warning',
             data: context,
+          });
+          Sentry.captureMessage('Skipping unavailable Stripe pricing option', {
+            level: 'error',
+            tags: {
+              event: context.event,
+              priceId: context.priceId,
+              route: context.route,
+            },
+            fingerprint: [context.event, context.priceId],
           });
           return null;
         }
