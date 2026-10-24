@@ -545,6 +545,9 @@ describe('mutation CLI result semantics', () => {
         'scripts/mutation-diff.mjs',
         'scripts/lib/mutation-diff.mjs',
         'scripts/lib/mutation-score-floor.mjs',
+        'scripts/lib/mutation-floor-intake.mjs',
+        'scripts/lib/linear-issue-intake.mjs',
+        'scripts/lib/linear-cooldown.mjs',
         'scripts/lib/ratchet-core.mjs',
         'scripts/mutation-score-baseline.json',
       ]) {
@@ -711,6 +714,25 @@ describe('mutation CLI result semantics', () => {
     expect(run.stdout).toContain('| `lib/auth/policy.ts` | 100% | 1 | 0 | 1 |');
     expect(run.stdout).toContain('| 1/1 / 1/1 | 100% |');
     expect(run.stdout).not.toContain('Score floor regressions');
+  });
+
+  it('attempts the deduped Linear intake on a floor breach and keeps exit 1 (JOV-8857)', () => {
+    // Hermetic: without a key the intake degrades to a logged no-op and
+    // never reaches the network or changes the exit code.
+    const previousKey = process.env.LINEAR_API_KEY;
+    delete process.env.LINEAR_API_KEY;
+    try {
+      const run = runFixture('below-floor');
+      expect(run.status, run.stderr).toBe(1);
+      expect(run.stdout).toContain(
+        '`lib/auth/policy.ts`: 0% is below floor 1%'
+      );
+      expect(run.stdout).toContain(
+        'Linear intake (lib/auth/policy.ts): failed — missing_linear_api_key'
+      );
+    } finally {
+      if (previousKey !== undefined) process.env.LINEAR_API_KEY = previousKey;
+    }
   });
 
   it('keeps the nearest meaningful transitive suite ahead of broad auth routes under a cap', () => {

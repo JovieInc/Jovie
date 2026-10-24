@@ -26,6 +26,10 @@ import {
   WEB_ROOT,
 } from './lib/mutation-diff.mjs';
 import {
+  buildWorkflowRunUrl,
+  fileMutationFloorIssues,
+} from './lib/mutation-floor-intake.mjs';
+import {
   evaluateMutationScore,
   loadMutationScoreBaseline,
 } from './lib/mutation-score-floor.mjs';
@@ -182,7 +186,7 @@ for (const source of toRun) {
   }
 }
 
-/** @type {{ file: string, score: number | null, floor: number }[]} */
+/** @type {{ file: string, score: number | null, floor: number, valid?: number }[]} */
 const floorFailures = [];
 if (!values['list-only']) {
   for (const result of results) {
@@ -202,7 +206,29 @@ if (!values['list-only']) {
         file: verdict.file,
         score: verdict.score,
         floor: verdict.floor,
+        valid: scored.valid,
       });
+    }
+  }
+  if (floorFailures.length > 0) {
+    // JOV-8857: file one deduped Linear issue per breached file. Filing
+    // failures (including a missing LINEAR_API_KEY) are logged and never
+    // change the exit code, which stays driven by the floor failures.
+    const intake = await fileMutationFloorIssues({
+      failures: floorFailures,
+      runUrl: buildWorkflowRunUrl(process.env),
+      artifactName: process.env.GITHUB_RUN_ID
+        ? `mutation-diff-${process.env.GITHUB_RUN_ID}`
+        : null,
+    });
+    for (const entry of intake.filed) {
+      const where = entry.url ?? entry.identifier ?? entry.reason ?? 'unknown';
+      console.log(
+        `Linear intake (${entry.file}): ${entry.action ?? 'failed'} — ${where}`
+      );
+    }
+    for (const entry of intake.skipped) {
+      console.log(`Linear intake skipped (${entry.file}): ${entry.reason}`);
     }
   }
   const summary = renderSummary({

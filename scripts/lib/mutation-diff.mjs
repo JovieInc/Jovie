@@ -494,7 +494,7 @@ export function scoreMutants(mutants) {
  * @param {{ sources: string[], results: FileResult[], untested: string[], skipped: string[],
  *   errors?: { file: string, reason: string }[], lowScore: number, survivorsPerFile?: number,
  *   floors?: Record<string, { floor?: number }>,
- *   floorFailures?: { file: string, score: number | null, floor: number }[] }} input
+ *   floorFailures?: { file: string, score: number | null, floor: number, valid?: number }[] }} input
  */
 export function renderSummary({
   sources,
