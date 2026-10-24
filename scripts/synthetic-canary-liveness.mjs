@@ -11,6 +11,12 @@ const DAILY = 'Web AI Health (Daily)';
 const DAILY_TITLE = 'Production Synthetic Monitoring (47 7 * * *)';
 const CANARY_TITLE = 'Production Synthetic Monitoring (17 */6 * * *)';
 
+/**
+ * @typedef {{rest: (method: string, path: string, body?: unknown, options?: object) =>
+ * Promise<{status: number, json: () => unknown}>}} WorkflowReader
+ */
+
+/** @param {WorkflowReader} github */
 async function read(github, path) {
   const response = await github.rest('GET', path, undefined, {
     priority: 'poll',
@@ -19,9 +25,14 @@ async function read(github, path) {
     maxWaitMs: 5_000,
   });
   if (response.status !== 200) throw new Error('evidence-unavailable');
-  return response.json();
+  const body = await response.json();
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new Error('invalid-evidence');
+  }
+  return /** @type {Record<string, unknown>} */ (body);
 }
 
+/** @param {{github: WorkflowReader, repo: string, now?: number}} options */
 export async function checkSyntheticCanary({ github, repo, now = Date.now() }) {
   const result = (ok, reason, run) => ({
     ok,
@@ -118,6 +129,7 @@ export async function checkSyntheticCanary({ github, repo, now = Date.now() }) {
   }
 }
 
+/** @param {{env?: NodeJS.ProcessEnv, github?: WorkflowReader, now?: number}} [options] */
 export async function main({
   env = process.env,
   github,

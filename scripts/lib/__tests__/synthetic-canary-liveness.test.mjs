@@ -38,7 +38,7 @@ function githubFor(runs, jobs = { 100: [job()] }) {
   return {
     rest: vi.fn(async (_method, path) => ({
       status: 200,
-      json: () =>
+      json: /** @returns {unknown} */ () =>
         path.includes('/workflows/')
           ? { workflow_runs: runs }
           : {
@@ -147,7 +147,11 @@ describe('synthetic canary dead-man', () => {
           githubFor([daily, run()], {
             101: [
               job('skipped'),
-              { name: 'Web AI Health (Daily)', conclusion },
+              {
+                name: 'Web AI Health (Daily)',
+                status: 'completed',
+                conclusion,
+              },
             ],
             100: [job()],
           })
@@ -162,7 +166,11 @@ describe('synthetic canary dead-man', () => {
         githubFor([run()], {
           100: [
             job('skipped'),
-            { name: 'Web AI Health (Daily)', conclusion: 'success' },
+            {
+              name: 'Web AI Health (Daily)',
+              status: 'completed',
+              conclusion: 'success',
+            },
           ],
         })
       )
@@ -262,6 +270,19 @@ describe('synthetic canary dead-man', () => {
     }
   );
 
+  it.each([null, [], 'invalid'])(
+    'rejects a malformed API body (%s)',
+    async body => {
+      const github = {
+        rest: vi.fn(async () => ({ status: 200, json: () => body })),
+      };
+      expect(await check(github)).toMatchObject({
+        ok: false,
+        reason: 'Synthetic canary evidence unavailable',
+      });
+    }
+  );
+
   it('never copies raw API errors into the alert', async () => {
     const github = {
       rest: vi.fn().mockRejectedValue(new Error('sensitive response body')),
@@ -306,7 +327,11 @@ describe('synthetic canary dead-man', () => {
 
   it('uses the existing GitHub credential without requiring new configuration', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.mocked(createGitHubClient).mockReturnValue(githubFor([run()]));
+    vi.mocked(createGitHubClient).mockReturnValue(
+      /** @type {ReturnType<typeof createGitHubClient>} */ (
+        /** @type {unknown} */ (githubFor([run()]))
+      )
+    );
     expect(await main({ env: { GH_TOKEN: 'test-credential' }, now: NOW })).toBe(
       0
     );
@@ -318,8 +343,14 @@ describe('synthetic canary dead-man', () => {
 });
 
 describe('watchdog wiring', () => {
+  /** @typedef {{name?: string, id?: string, uses?: string, run?: string, if?: string,
+   * env?: Record<string, string>, with?: Record<string, string>, 'continue-on-error'?: boolean}} Step */
+  /** @typedef {{on: {schedule?: unknown, workflow_run: {workflows: string[]}},
+   * jobs: Record<string, {steps: Step[]}>, 'run-name'?: string}} Workflow */
   const load = name =>
-    loadYaml(readFileSync(join(root, '.github/workflows', name), 'utf8'));
+    /** @type {Workflow} */ (
+      loadYaml(readFileSync(join(root, '.github/workflows', name), 'utf8'))
+    );
   const observer = load('automation-liveness.yml');
   const producer = load('synthetic-monitoring.yml');
   const steps = observer.jobs.liveness.steps;
