@@ -20,6 +20,7 @@ import threading
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -8219,6 +8220,8 @@ with patch.object(shipping_origin, "collect", return_value=result) as collect:
                 # Supply only the actual existing pinned dependency route, then
                 # advance the fixture clock past preserved normal backoff.
                 for rel in ["apps/desktop/node_modules", "packages/agent-transport-contracts/node_modules"]:
+                    self.assertTrue((ROOT / rel).is_dir(), f"{rel} missing: run pnpm install; the release "
+                                    "proof compiles the mesh runtime with the checkout's pinned esbuild/zod")
                     (clone / rel).parent.mkdir(parents=True, exist_ok=True)
                     (clone / rel).symlink_to((ROOT / rel).resolve(), target_is_directory=True)
                 # Run the real staged installer/selector, but keep this private
@@ -8298,6 +8301,69 @@ with patch.object(shipping_origin, "collect", return_value=result) as collect:
                     os.environ.pop("LANES_SELFTEST", None)
                 else:
                     os.environ["LANES_SELFTEST"] = old_env
+
+
+class ReleaseImportClosureTest(unittest.TestCase):
+    """A release is staged from scripts/lanes plus RELEASE_EXTRAS only. A shipped .mjs that
+    imports a file outside that set imports fine in the checkout and fails only inside the
+    staged tree, which refuses the update as an opaque "release tests failed" and ejects every
+    merge group behind it (2026-10-24: #22870 made source-admission-policy.mjs import
+    scripts/pr-fleet-rules.mjs without adding it to RELEASE_EXTRAS). Static imports only: the
+    lazy `await import()` branches are guarded at their call sites."""
+    STATIC_IMPORT = re.compile(r"""(?m)(?:\bfrom\s*|^\s*import\s+)['"](\.{1,2}/[^'"]+)['"]""")
+
+    def missing_from_release(self, extras, lanes_sources, root=None):
+        root = Path(root or ROOT)
+        shipped = set(extras)
+        missing = []
+        for rel in sorted({*(e for e in extras if e.endswith((".mjs", ".js"))), *lanes_sources}):
+            base = (root / rel).parent
+            code = re.sub(r"/\*.*?\*/", "", (root / rel).read_text(), flags=re.DOTALL)
+            code = re.sub(r"//.*$", "", code, flags=re.MULTILINE)
+            for target in self.STATIC_IMPORT.findall(code):
+                resolved = Path(os.path.normpath(base / target))
+                try:
+                    resolved = resolved.relative_to(root).as_posix()
+                except ValueError:
+                    missing.append(f"{rel} imports {target}, which resolves outside the repo root")
+                    continue
+                if resolved not in shipped and not resolved.startswith("scripts/lanes/"):
+                    missing.append(f"{rel} imports {resolved}")
+        return missing
+
+    def lanes_sources(self):
+        return [p.relative_to(ROOT).as_posix() for p in (ROOT / "scripts/lanes").glob("*.mjs")]
+
+    def test_every_relative_import_of_a_shipped_module_is_shipped(self):
+        self.assertEqual(self.missing_from_release(lane.RELEASE_EXTRAS, self.lanes_sources()), [],
+                         "add the imported file to RELEASE_EXTRAS in scripts/lanes/lane_runner.py")
+
+    def test_comments_are_ignored_and_escaping_imports_are_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / "scripts").mkdir()
+            (root / "scripts/a.mjs").write_text(
+                "// import x from './missing.mjs'\n/* a\n * from './also-missing.mjs'\n */\n"
+                "import real from './b.mjs';\nimport out from '../../outside.mjs';\n")
+            (root / "scripts/b.mjs").write_text("export default 1;\n")
+            found = self.missing_from_release(["scripts/a.mjs", "scripts/b.mjs"], [], root=root)
+            self.assertEqual(found, ["scripts/a.mjs imports ../../outside.mjs, which resolves outside the repo root"])
+
+    def test_the_closure_check_names_an_unshipped_import(self):
+        extras = [e for e in lane.RELEASE_EXTRAS if e != "scripts/lib/merge-group-member-policy.mjs"]
+        found = self.missing_from_release(extras, self.lanes_sources())
+        self.assertIn("scripts/lib/source-admission-policy.mjs imports scripts/lib/merge-group-member-policy.mjs", found)
+
+
+class SelftestFailureLinesTest(unittest.TestCase):
+    def test_an_import_failure_is_named_not_buried_under_warnings(self):
+        stderr = ("ERROR: test_x (unittest.loader._FailedTest.test_x)\nTraceback (most recent call last):\n"
+                  "ModuleNotFoundError: No module named 'pr_fleet_rules'\n" + "ResourceWarning: unclosed\n" * 40)
+        self.assertIsNone(lane.selftest_retry_ids(stderr), "an import failure is not a retryable method failure")
+        self.assertEqual(lane.selftest_failure_lines(stderr), [
+            "ERROR: test_x (unittest.loader._FailedTest.test_x)",
+            "ModuleNotFoundError: No module named 'pr_fleet_rules'"])
+        self.assertEqual(lane.selftest_failure_lines(b"FAIL: a (m.C.a)\n" * 20), ["FAIL: a (m.C.a)"] * 8)
 
 
 class ManagedMeshArchiveTest(unittest.TestCase):
