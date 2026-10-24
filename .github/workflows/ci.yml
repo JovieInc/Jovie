@@ -6483,13 +6483,18 @@ jobs:
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     if: >-
       !cancelled() &&
-      github.event_name == 'merge_group' &&
       needs.ci-lockfile-preflight.result == 'success' &&
       needs.ci-path-changes.result == 'success' &&
-      needs.ci-path-changes.outputs.run_web == 'true' &&
-      needs.ci-merge-group-workspace.result == 'success' &&
-      needs.ci-merge-group-admission.result == 'success' &&
-      needs.ci-merge-group-admission.outputs.admitted == 'true'
+      (
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.run_web == 'true' &&
+          needs.ci-merge-group-workspace.result == 'success' &&
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        ) ||
+        github.event_name == 'workflow_dispatch'
+      )
     environment: Preview – jovie
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -6504,7 +6509,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
         with:
-          reuse_merge_group_workspace: 'true'
+          reuse_merge_group_workspace: ${{ github.event_name == 'merge_group' && 'true' || 'false' }}
       - uses: ./.github/actions/setup-playwright
       - name: Create isolated journey branch
         id: journey-db
@@ -6513,7 +6518,7 @@ jobs:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           # This job and the manual golden path are event-exclusive. Reuse
           # the registered reaper prefix so interrupted runs remain attributable.
-          branch_name: golden-path-${{ github.run_id }}-${{ github.run_attempt }}
+          branch_name: golden-path-journey-${{ github.run_id }}-${{ github.run_attempt }}
           api_key: ${{ secrets.NEON_API_KEY }}
           expires_in_hours: '1'
       - name: Create empty journey database
@@ -6666,7 +6671,7 @@ jobs:
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: golden-path-${{ github.run_id }}-${{ github.run_attempt }}
+          branch_name: golden-path-journey-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
           protected_branches: main,development,preview,br-main,br-production
