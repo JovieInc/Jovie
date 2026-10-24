@@ -1555,7 +1555,7 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(globalsCss, /--electron-traffic-light-safe-width:\s*calc\(/);
   assert.match(
     globalsCss,
-    /data-electron-fullscreen="true"[\s\S]*--electron-traffic-light-safe-width:\s*calc\(var\(--chrome-traffic-lights-reserve\) \* 0\);/
+    /data-electron-fullscreen="true"[\s\S]*--electron-traffic-light-safe-width:\s*calc\(\s*var\(--chrome-traffic-lights-reserve\)\s*\*\s*0\s*\);/
   );
   assert.match(globalsCss, /--electron-traffic-light-x: 12px;/);
   assert.match(globalsCss, /--electron-traffic-light-y: 15px;/);
@@ -2038,7 +2038,7 @@ test('Linear titlebar keeps native navigation, bounded debounced history and ful
     )?.[1] ?? '';
   assert.match(
     fullScreen,
-    /--electron-traffic-light-safe-width: calc\(var\(--chrome-traffic-lights-reserve\) \* 0\)/
+    /--electron-traffic-light-safe-width: calc\(\s*var\(--chrome-traffic-lights-reserve\)\s*\*\s*0\s*\)/
   );
   assert.doesNotMatch(fullScreen, /--electron-titlebar-(?:height|top-gap): 0/);
 });
