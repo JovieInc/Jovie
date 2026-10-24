@@ -147,6 +147,42 @@ describe('quality-gap-finder', () => {
       assert.equal(gaps[0].mechanical, true);
     });
 
+    it('accepts evidence named web-relative by a --filter @jovie/web vitest run', () => {
+      // pnpm --filter @jovie/web exec vitest names test paths relative to
+      // apps/web (the filter target's cwd), so an invariant citing the same
+      // file repo-relative as apps/web/scripts/x.test.ts IS wired even though
+      // the literal repo-relative string never appears in any CI source.
+      const ciSources = [
+        '"invariants:check": "node scripts/invariants/validate.mjs && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts scripts/design-ci-judge-router.test.ts",',
+      ].join('\n');
+      const gaps = collectInvariantGaps(
+        [
+          invariant('JOV-INV-910', [
+            { path: 'apps/web/scripts/design-ci-judge-router.test.ts' },
+          ]),
+          // Same file, but the only mention has no @jovie/web vitest context:
+          // a bare root-level `node --test scripts/x.test.ts` resolves against
+          // the repo root, not apps/web, so it does not prove the web test
+          // runs. This negative control keeps the relaxation from masking
+          // genuinely unwired evidence.
+          invariant('JOV-INV-911', [
+            { path: 'apps/web/scripts/orphan.test.ts' },
+          ]),
+          invariant('JOV-INV-912', [
+            { path: 'apps/web/scripts/other.test.ts' },
+          ]),
+        ],
+        `${ciSources}\nnode --test scripts/orphan.test.ts\npnpm --filter @jovie/ui exec vitest run scripts/other.test.ts`
+      );
+      assert.deepEqual(
+        gaps.map(gap => gap.key),
+        [
+          'JOV-INV-911:apps/web/scripts/orphan.test.ts',
+          'JOV-INV-912:apps/web/scripts/other.test.ts',
+        ]
+      );
+    });
+
     it('skips evidence owned by another repo', () => {
       const gaps = collectInvariantGaps(
         [
