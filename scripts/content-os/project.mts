@@ -183,6 +183,13 @@ export function validateDraft(draft: Draft, research: Research): void {
         block.claimIds.every(id => claims.has(id)),
       `Invalid spoken block ${block.id}.`
     );
+    const citations = [...block.text.matchAll(/\[(C[0-9]+)\]/g)].map(
+      match => match[1]
+    );
+    requireValue(
+      citations.every(id => claims.has(id) && block.claimIds.includes(id)),
+      `Invalid spoken citation in ${block.id}: inline IDs must resolve and belong to its claim list.`
+    );
   }
   const copy = lintCopy(
     [draft.essay, ...draft.spoken.map(block => block.text)].join('\n\n'),
@@ -209,6 +216,37 @@ export function preserveLocks(draft: Draft, locks: Block[]): Draft {
     spoken: draft.spoken.map(
       block => locks.find(lock => lock.id === block.id) ?? block
     ),
+  };
+}
+
+/** Table-read preparation, never a voice, truth or timing acceptance gate. */
+export function diagnoseSpokenRead(draft: Draft, wordsPerMinute = 150) {
+  requireValue(
+    Number.isFinite(wordsPerMinute) && wordsPerMinute > 0,
+    'A finite positive reading pace is required.'
+  );
+  const count = (value: string) =>
+    value.trim().split(/\s+/u).filter(Boolean).length;
+  const blocks = draft.spoken.map(block => {
+    const text = block.text.replace(/\[C[0-9]+\]/gu, '').trim();
+    return {
+      id: block.id,
+      words: count(text),
+      longestSentenceWords: Math.max(
+        0,
+        ...text.split(/(?<=[.!?])\s+|\n+/u).map(count)
+      ),
+      editorialReferences: (
+        block.text.match(/\[C[0-9]+\]|https?:\/\/\S+/gu) ?? []
+      ).length,
+    };
+  });
+  const totalWords = blocks.reduce((sum, block) => sum + block.words, 0);
+  return {
+    wordsPerMinute,
+    totalWords,
+    estimatedSeconds: Math.ceil((totalWords * 60) / wordsPerMinute),
+    blocks,
   };
 }
 
@@ -438,5 +476,7 @@ export function setLock(
 
 export function renderProject(project: Project): string {
   const { research, review, draft } = project;
-  return `# ${draft.title}\n\nRevision ${project.revision} | ${project.event}\n\n## Question\n${project.plan.question}\n\n## Research/source register\n${research.sources.map(s => `- [${s.id}] [${s.title}](${s.url})\n  Evidence: ${s.evidence}`).join('\n')}\n\n## Claim ledger\n${research.claims.map(c => `- [${c.id}] (${c.kind}, ${c.confidence}) ${c.text} Sources: ${c.sourceIds.join(', ')}. Counterevidence: ${c.counterevidence}`).join('\n')}\n\n## Rejected or revised founder claims\n${research.founderRevisions.join('\n\n')}\n\n## Symmetry test\n${review.symmetryTest.namelessCase}\n\nRule: ${review.symmetryTest.rule}\n\n${review.symmetryTest.result}\n\n## Strongest counterargument\n${review.strongestCounterargument}\n\n## Thesis\nProvisional: ${research.provisionalThesis}\n\nFinal: ${review.thesis}\n\nRevision reason: ${review.revisionReason}\n\n## Essay\n${draft.essay}\n\n## Spoken vlog script\n${draft.spoken.map(b => `[${b.id}${project.locks.some(l => l.id === b.id) ? ' LOCKED' : ''}] ${b.text}\nSources: ${b.claimIds.join(', ') || 'personal reflection'}`).join('\n\n')}\n\n## Natural-day story/B-roll opportunities\n${draft.broll.map(b => `- ${b}`).join('\n')}\n\nCanon: ${project.canonDigest}\n`;
+  const read = diagnoseSpokenRead(draft);
+  const tableRead = `## Table-read diagnostics (advisory)\n${read.totalWords} whitespace-delimited words; about ${read.estimatedSeconds}s at ${read.wordsPerMinute} words/minute before pauses. This estimate is language-dependent. Time a real table read; these counts do not judge voice, claim support or delivery. Citation IDs are editorial metadata.\n\n| Block | Words | Longest sentence (words) | Editorial references |\n| --- | ---: | ---: | ---: |\n${read.blocks.map(block => `| ${block.id} | ${block.words} | ${block.longestSentenceWords} | ${block.editorialReferences} |`).join('\n')}\n\n`;
+  return `# ${draft.title}\n\nRevision ${project.revision} | ${project.event}\n\n## Question\n${project.plan.question}\n\n## Research/source register\n${research.sources.map(s => `- [${s.id}] [${s.title}](${s.url})\n  Evidence: ${s.evidence}`).join('\n')}\n\n## Claim ledger\n${research.claims.map(c => `- [${c.id}] (${c.kind}, ${c.confidence}) ${c.text} Sources: ${c.sourceIds.join(', ')}. Counterevidence: ${c.counterevidence}`).join('\n')}\n\n## Rejected or revised founder claims\n${research.founderRevisions.join('\n\n')}\n\n## Symmetry test\n${review.symmetryTest.namelessCase}\n\nRule: ${review.symmetryTest.rule}\n\n${review.symmetryTest.result}\n\n## Strongest counterargument\n${review.strongestCounterargument}\n\n## Thesis\nProvisional: ${research.provisionalThesis}\n\nFinal: ${review.thesis}\n\nRevision reason: ${review.revisionReason}\n\n## Essay\n${draft.essay}\n\n## Spoken vlog script\n${draft.spoken.map(b => `[${b.id}${project.locks.some(l => l.id === b.id) ? ' LOCKED' : ''}] ${b.text}\nSources: ${b.claimIds.join(', ') || 'personal reflection'}`).join('\n\n')}\n\n${tableRead}## Natural-day story/B-roll opportunities\n${draft.broll.map(b => `- ${b}`).join('\n')}\n\nCanon: ${project.canonDigest}\n`;
 }
