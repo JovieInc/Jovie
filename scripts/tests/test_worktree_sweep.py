@@ -516,6 +516,8 @@ class HostWiringTest(unittest.TestCase):
             (state / "worktree-sweep.json").write_text(json.dumps({"startedAt": 5.0}))
             report = {"removed": [], "backups": ["backup/mac/x-1"], "stripped": [], "kept": 3, "errors": []}
             with patch.object(sweeper, "sweep", return_value=report) as run_sweep, \
+                    patch.object(sweeper, "sweep_standalone", return_value={"removed": []}), \
+                    patch.object(sweeper, "daily_report", return_value="not-due"), \
                     patch.object(sweeper, "default_repos", return_value=[]):
                 self.assertEqual(sweeper.main(["--state", str(state), "--repo", tmp]), 0)
                 run_sweep.assert_called_once()
@@ -526,6 +528,196 @@ class HostWiringTest(unittest.TestCase):
                     fcntl.flock(held, fcntl.LOCK_EX)
                     self.assertEqual(sweeper.main(["--state", str(state), "--repo", tmp]), 0)
                 run_sweep.assert_called_once()  # a held cleanup lock skips the run
+
+
+class StandaloneAndHeadroomTest(unittest.TestCase):
+    """Standalone clones, volume headroom and the daily report (gem disk incident, 2026-10-24)."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.base = Path(tmp.name).resolve()
+        self.home = self.base / "home"
+        self.state = self.base / "state"
+        self.home.mkdir()
+        self.state.mkdir()
+        self.remote = self.base / "remote.git"
+        git(self.base, "init", "-q", "--bare", "-b", "main", str(self.remote))
+        seed = self.base / "seed"
+        git(self.base, "clone", "-q", str(self.remote), str(seed))
+        (seed / "a.txt").write_text("a\n")
+        git(seed, "add", ".")
+        git(seed, "commit", "-qm", "init")
+        git(seed, "push", "-q", "origin", "HEAD:main")
+        self.now = time.time() + 10 * DAY
+
+    def clone(self, rel):
+        path = self.home / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        git(self.base, "clone", "-q", str(self.remote), str(path))
+        return path
+
+    def sweep(self, **kw):
+        return sweeper.sweep_standalone(self.home, self.state, [], [self.base / "never"], run=no_processes,
+                                        now=self.now, **kw)
+
+    def test_clean_published_idle_clone_is_removed_and_logged_first(self):
+        path = self.clone("grok-ship-workspaces/JOV/JOV-1")
+        seen = []
+
+        def remove(target):
+            seen.append((self.state / "disk-reclaim.jsonl").read_text())
+            sweeper.shutil.rmtree(target)
+
+        report = self.sweep(remove=remove)
+        self.assertFalse(path.exists())
+        self.assertEqual(report["removed"], [str(path)])
+        self.assertIn(str(path), seen[0])
+        self.assertGreater(report["freedKiB"], 0)
+
+    def test_each_failed_check_keeps_the_clone(self):
+        dirty = self.clone("grok-wt/dirty")
+        (dirty / "scratch.txt").write_text("untracked work\n")
+        unpushed = self.clone("grok-wt/unpushed")
+        (unpushed / "b.txt").write_text("b\n")
+        git(unpushed, "add", ".")
+        git(unpushed, "commit", "-qm", "local only")
+        stash = self.clone("grok-wt/stash")
+        (stash / "a.txt").write_text("changed\n")
+        git(stash, "stash", "push", "-q")
+        linked = self.clone("grok-wt/linked")
+        git(linked, "worktree", "add", "-q", "-b", "side", str(self.base / "side"), "origin/main")
+        kept = self.clone("grok-wt/marked")
+        (kept / sweeper.KEEP_MARKER).write_text("")
+        referenced = self.clone("grok-wt/ref-me")
+        (self.state / "bindings.json").write_text('{"wt": "ref-me"}')
+        busy = self.clone("grok-wt/busy")
+        report = sweeper.sweep_standalone(
+            self.home, self.state, [], [], now=self.now,
+            run=lambda args, **kw: SimpleNamespace(returncode=0, stdout=f"{busy}\n", stderr="")
+            if args[0] == "ps" else no_processes(args, **kw))
+        for path in (dirty, unpushed, stash, linked, kept, referenced, busy):
+            self.assertTrue(path.exists(), path)
+        self.assertEqual(report["removed"], [])
+        self.assertEqual(set(report["kept"]), {"dirty", "1-unpublished", "stash", "linked-worktrees",
+                                              "keep-marker", "state-referenced", "busy"})
+
+    def test_recent_clone_and_unreadable_process_inventory_keep_everything(self):
+        path = self.clone("wt-fresh")
+        self.assertEqual(self.sweep(idle_s=30 * DAY)["kept"], {"recent": 1})
+        broken = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now, run=lambda *a, **k: (_ for _ in ()).throw(OSError("no ps")))
+        self.assertEqual(broken["errors"], ["process-state-unavailable"])
+        self.assertTrue(path.exists())
+
+    def test_stale_remote_refs_are_fetched_before_judging(self):
+        path = self.clone("codex-worktrees/stale")
+        git(path, "checkout", "-q", "-b", "feature")
+        (path / "f.txt").write_text("f\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "feature")
+        git(path, "push", "-q", "origin", "feature")
+        git(path, "update-ref", "-d", "refs/remotes/origin/feature")  # the clone forgot it was pushed
+        self.assertEqual(self.sweep()["removed"], [str(path)])
+
+    def test_dangling_remote_ref_does_not_block_a_published_clone(self):
+        path = self.clone("codex-worktrees/dangling")
+        (path / ".git/refs/remotes/origin").mkdir(parents=True, exist_ok=True)
+        (path / ".git/refs/remotes/origin/ghost").write_text("1" * 40 + "\n")
+        self.assertIsNone(sweeper.unpublished(path, no_processes))
+
+    def test_squash_merged_branch_counts_as_published(self):
+        path = self.clone("grok-wt/squashed")
+        git(path, "checkout", "-q", "-b", "feature")
+        (path / "f.txt").write_text("f\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "feature")
+        other = self.base / "squasher"
+        git(self.base, "clone", "-q", str(self.remote), str(other))
+        (other / "f.txt").write_text("f\n")  # same change, different commit: a squash merge
+        git(other, "add", ".")
+        git(other, "commit", "-qm", "squash of feature")
+        git(other, "push", "-q", "origin", "HEAD:main")
+        git(path, "checkout", "-q", "main")
+        git(path, "fetch", "-q", "origin")
+        self.assertIsNone(sweeper.unpublished(path, no_processes))
+
+    def test_unlanded_branch_stays_unpublished(self):
+        path = self.clone("grok-wt/open")
+        git(path, "checkout", "-q", "-b", "feature")
+        (path / "g.txt").write_text("g\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "unlanded")
+        self.assertEqual(sweeper.unpublished(path, no_processes), "1-unpublished")
+
+    def test_run_checkout_needs_a_receipt_and_only_the_checkout_goes(self):
+        run = self.state / "runs/owner-x"
+        git(self.base, "clone", "-q", str(self.remote), str(run / "checkout"))
+        (run / "receipt.json").write_text("{}")
+        (self.state / "runs/owner-y").mkdir(parents=True)
+        git(self.base, "clone", "-q", str(self.remote), str(self.state / "runs/owner-y/checkout"))
+        report = self.sweep()
+        self.assertEqual(report["removed"], [str(run / "checkout")])
+        self.assertTrue((run / "receipt.json").exists())
+        self.assertEqual(report["kept"], {"no-receipt": 1})
+
+    def test_candidates_skip_linked_worktrees_and_known_repos(self):
+        repo = self.clone("codex-worktrees/primary")
+        git(repo, "worktree", "add", "-q", "-b", "wt", str(self.home / "codex-worktrees/linked"), "origin/main")
+        names = [p.name for p in sweeper.standalone_candidates(self.home, self.state, [repo])]
+        self.assertEqual(names, [])
+
+    def test_default_roots_cover_the_ship_and_fleet_roots(self):
+        roots = {str(r) for r in sweeper.default_roots(self.home, self.state)}
+        for rel in ("codex-worktrees", "grok-wt", "grok-ship-workspaces", "codex-ship-workspaces", "wt-*"):
+            self.assertIn(str(self.home / rel), roots)
+
+    def test_headroom_levels_and_alarm_events_on_change(self):
+        usage = {Path("/a"): (100, 0, 20), Path("/b"): (100, 0, 25), Path("/c"): (100, 0, 10), Path("/d"): (100, 0, 60)}
+        current = sweeper.headroom(list(usage), usage=lambda p: usage[p])
+        self.assertEqual([v["level"] for v in current["volumes"]], ["warn", "warn", "crit", "ok"])
+        self.assertEqual([a["mount"] for a in current["alarms"]], ["/a", "/b", "/c"])
+        sweeper.publish_headroom(self.state, current, self.now)
+        events = (self.state / "host-alarms.jsonl").read_text().splitlines()
+        self.assertEqual(len(events), 3)
+        sweeper.publish_headroom(self.state, current, self.now + 1)
+        self.assertEqual(len((self.state / "host-alarms.jsonl").read_text().splitlines()), 3)  # no repeat
+        usage[Path("/c")] = (100, 0, 90)
+        sweeper.publish_headroom(self.state, sweeper.headroom(list(usage), usage=lambda p: usage[p]), self.now + 2)
+        self.assertEqual(len((self.state / "host-alarms.jsonl").read_text().splitlines()), 4)  # recovered
+        self.assertEqual(sweeper.headroom([Path("/missing-volume")], usage=lambda p: (_ for _ in ()).throw(OSError()))["volumes"], [])
+
+    def test_volumes_lists_root_srv_mounts_and_state_volume(self):
+        found = sweeper.volumes(self.home, self.state, mounts=[Path("/srv/worktrees")])
+        self.assertIn(Path("/"), found)
+        self.assertIn(Path("/srv/worktrees"), found)
+
+    def test_daily_report_names_top_growers_and_runs_once_a_day(self):
+        grow = self.base / "grow"
+        grow.mkdir()
+        (grow / "blob").write_bytes(b"x" * 4096)
+        self.assertEqual(sweeper.daily_report(self.home, self.state, self.now, targets=[grow]), "written")
+        (grow / "blob2").write_bytes(b"x" * 8 * 2**20)
+        self.assertEqual(sweeper.daily_report(self.home, self.state, self.now + 60, targets=[grow]), "not-due")
+        self.assertEqual(sweeper.daily_report(self.home, self.state, self.now + DAY + 1, targets=[grow]), "written")
+        report = json.loads((self.state / "disk-report.json").read_text())
+        self.assertEqual(report["topGrowers"][0]["path"], str(grow))
+        self.assertGreater(report["topGrowers"][0]["deltaGiB"], 0)
+        self.assertTrue(report["volumes"])
+
+    def test_report_targets_only_lists_existing_paths(self):
+        (self.state / "runs").mkdir()
+        self.assertIn(self.state / "runs", sweeper.report_targets(self.home, self.state))
+
+    def test_linked_worktree_with_keep_marker_is_never_retired(self):
+        repo = self.base / "primary"
+        git(self.base, "clone", "-q", str(self.remote), str(repo))
+        wt = self.home / "codex-worktrees/base-wt"
+        git(repo, "worktree", "add", "-q", "-b", "base-wt", str(wt), "origin/main")
+        (wt / sweeper.KEEP_MARKER).write_text("")
+        report = sweeper.sweep([repo], [self.home / "codex-worktrees"], [], run=no_processes, now=self.now,
+                               prefix="sweep/mac", date="20261003")
+        self.assertTrue(wt.exists())
+        self.assertEqual(report["removed"], [])
 
 
 if __name__ == "__main__":
