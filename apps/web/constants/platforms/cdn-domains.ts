@@ -11,8 +11,6 @@
  * The sync test ensures all consumers stay in sync.
  */
 
-import { ALL_PLATFORMS } from './data';
-
 /**
  * CDN domains for each supported platform.
  *
@@ -21,6 +19,9 @@ import { ALL_PLATFORMS } from './data';
  *
  * Platforms with no known image CDN use an empty array.
  */
+import apiProviders from '@jovie/api-client/providers.json';
+import { ALL_PLATFORMS } from './data';
+
 export const PLATFORM_CDN_DOMAINS: Record<string, readonly string[]> = {
   // ── Music DSPs ──────────────────────────────────────────────
   spotify: ['i.scdn.co', '*.scdn.co', '*.spotifycdn.com'],
@@ -90,6 +91,9 @@ export const INFRASTRUCTURE_MEDIA_DOMAINS: readonly string[] = [
  * (not `img-src` or `media-src`). Only include hosts the browser fetches
  * directly — server-side API calls do not need entries here.
  */
+export const INFRASTRUCTURE_WEBSOCKET_DOMAINS: readonly string[] =
+  apiProviders.providers.elevenlabs.hosts;
+
 export const INFRASTRUCTURE_CONNECT_DOMAINS: readonly string[] = [
   // Vercel dashboard/API (chat surface deployment status, toolbar)
   'vercel.com',
@@ -199,5 +203,7 @@ export function getCspMediaSrcDomains(): string[] {
  * Used by content-security-policy.ts.
  */
 export function getCspConnectSrcDomains(): string[] {
-  return [...new Set(INFRASTRUCTURE_CONNECT_DOMAINS)].map(d => `https://${d}`);
+  return [...new Set(INFRASTRUCTURE_CONNECT_DOMAINS)]
+    .map(d => `https://${d}`)
+    .concat(INFRASTRUCTURE_WEBSOCKET_DOMAINS.map(d => `wss://${d}`));
 }
