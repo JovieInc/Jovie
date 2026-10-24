@@ -626,17 +626,24 @@ describe('typecheck singleflight process integration', () => {
     );
     childProcesses.push(waiter);
     let stderr = '';
-    // Sample once the waiter has announced itself and emitted a heartbeat,
-    // not after a fixed sleep: wrapper cold start (node boot, module load,
-    // git rev-parse) alone can exceed a fixed 160ms budget on a loaded host.
+    // Vitest bounds cold startup. Measure the same five-second heartbeat
+    // deadline after phase=wait, independently of Node/module/git startup.
     const heartbeatSeen = new Promise((resolveSeen, rejectSeen) => {
-      const timer = setTimeout(
-        () =>
-          rejectSeen(new Error(`no waiter heartbeat within 5s:\n${stderr}`)),
-        5_000
-      );
+      let timer;
+      waiter.once('error', rejectSeen);
       waiter.stderr.on('data', chunk => {
         stderr += chunk.toString('utf8');
+        if (!timer && stderr.includes('phase=wait')) {
+          timer = setTimeout(
+            () =>
+              rejectSeen(
+                new Error(
+                  `no waiter heartbeat within 5s of readiness:\n${stderr}`
+                )
+              ),
+            5_000
+          );
+        }
         if (stderr.includes('phase=heartbeat')) {
           clearTimeout(timer);
           resolveSeen();

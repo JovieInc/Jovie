@@ -12,6 +12,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { BASE_URL } from '@/constants/app';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { buildBreadcrumbObject } from '@/lib/constants/schemas';
 import { getProviderConfidence } from '@/lib/discography/audio-qa';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
@@ -382,8 +383,8 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title,
       description,
-      creator: '@jovieapp',
-      site: '@jovieapp',
+      creator: COMPANY_IDENTITY.xHandle,
+      site: COMPANY_IDENTITY.xHandle,
       images: ogImageUrl ? [{ url: ogImageUrl }] : [],
     },
     other: {

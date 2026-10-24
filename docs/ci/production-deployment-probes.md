@@ -5,6 +5,55 @@ emit `Production Verified`. A successful HTTP status alone is not evidence: the
 response must belong to the requested deployment route and the build identity
 must match the exact release commit.
 
+## Bounded Playwright rejection diagnostics
+
+When the existing CI artifact owner sees
+`PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE`, use the diagnostic from a **fresh run**
+to choose the producer class to investigate. The guard emits one line containing
+only the rejected-file total and sorted, nonzero counts from these fixed lists:
+
+| Field | Fixed vocabulary |
+| --- | --- |
+| `file-classes` | `container`, `image`, `json`, `jsonl`, `markdown`, `unknown` |
+| `categories` | `credential-text`, `forbidden-container`, `image-policy`, `inspection-error`, `malformed-structured-text`, `unknown-binary` |
+
+File classes use recognized extensions (case insensitive); arbitrary filename
+text never becomes a label. `unknown` covers unrecognized extensions and failures
+where inspection could not safely attribute a file. Counts describe rejected
+files, not secret occurrences; a pathless inspection failure contributes one
+`inspection-error` and one `unknown`. Zero counts are omitted. The two fields
+are separate totals, not a per-file or per-producer correlation.
+
+Use the fresh failing workflow step and its checked-in command/configuration
+alongside the counts:
+
+- `json` / `jsonl` with `credential-text`: inspect the structured reporter,
+  telemetry normalizer, or performance-report writer for credential-bearing
+  headers, environment values, attachments, or error/stdout serialization.
+- `markdown` with `credential-text`: inspect the Playwright error-context or
+  Markdown report producer for remaining environment-style credential output.
+  Existing known-value redaction still applies to permitted Markdown.
+- `malformed-structured-text`: repair JSON/JSONL serialization or invalid UTF-8
+  in the indicated text classes, using a local synthetic reproduction.
+- `container` / `forbidden-container`: repair the producer/configuration that
+  retained a trace, HTML, HAR, archive, or video; the guard still rejects them.
+- `image` / `image-policy`: inspect the capture producer and its existing
+  decoded-PNG/public-image policy. `unknown` / `unknown-binary` means inspect
+  the producer's output selection; `inspection-error` means inspection could
+  not complete, so check the step's selection and staging configuration.
+
+Reproduce with synthetic inputs, repair the emitting producer, and rerun the
+same guarded step. Rejection still returns nonzero, poisons the producer stage,
+and prevents the safe uploader from publishing rejected output. The counts
+narrow the producer class; they do not establish an exact emitting file.
+Do not download the October 14 guarded artifacts or claim their emitting file
+is known. No historical artifact retrieval is needed for this workflow.
+
+Diagnostics never include artifact contents, paths, derived filenames,
+identities, credential values, or raw exceptions. The legacy
+`PLAYWRIGHT_ARTIFACT_REPORT_PATHS` setting no longer expands rejection output;
+do not enable it for diagnosis. Producer staging and upload policy are unchanged.
+
 ## Fail-closed invariants
 
 1. Protected probes accept only the HTTPS `jovie-*-jovie.vercel.app` project and

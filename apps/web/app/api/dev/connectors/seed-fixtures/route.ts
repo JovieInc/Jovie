@@ -37,15 +37,15 @@ export async function GET(request: Request) {
     searchParams.get('returnTo') ?? APP_ROUTES.SETTINGS_CONNECTORS;
 
   try {
-    const { userId: clerkId } = await getCachedAuth();
-    if (!clerkId) {
+    const { userId: appUserId } = await getCachedAuth();
+    if (!appUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const [dbUser] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.clerkId, clerkId))
+      .where(eq(users.id, appUserId))
       .limit(1);
 
     if (!dbUser) {

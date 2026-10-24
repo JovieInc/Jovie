@@ -19,6 +19,7 @@ export function HomeLoopSection({
   emptyLabel,
   errorLabel,
   notice,
+  noticeHref,
   onRetry,
   skeleton,
   minBodyClassName,
@@ -34,6 +35,8 @@ export function HomeLoopSection({
   readonly errorLabel: string;
   /** Ready-state source warning. Replaces the empty line when the section is empty. */
   readonly notice?: string | null;
+  /** Where the full warning lives (e.g. every unavailable source). */
+  readonly noticeHref?: string;
   readonly onRetry?: () => void;
   readonly skeleton: ReactNode;
   /** Reserved minimum body height, so state changes stay local. */
@@ -98,6 +101,9 @@ export function HomeLoopSection({
             )}
           >
             {notice ?? emptyLabel}
+            {notice && noticeHref ? (
+              <NoticeLink href={noticeHref} testId={testId} />
+            ) : null}
           </p>
         ) : (
           <>
@@ -109,6 +115,9 @@ export function HomeLoopSection({
                 title={notice}
               >
                 {notice}
+                {noticeHref ? (
+                  <NoticeLink href={noticeHref} testId={testId} />
+                ) : null}
               </p>
             ) : null}
             {children}
@@ -116,5 +125,23 @@ export function HomeLoopSection({
         )}
       </div>
     </section>
+  );
+}
+
+function NoticeLink({
+  href,
+  testId,
+}: Readonly<{ readonly href: string; readonly testId: string }>) {
+  return (
+    <>
+      {' '}
+      <a
+        href={href}
+        className='text-secondary-token underline underline-offset-2 hover:text-primary-token'
+        data-testid={`${testId}-notice-link`}
+      >
+        View
+      </a>
+    </>
   );
 }

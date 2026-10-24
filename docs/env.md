@@ -270,6 +270,17 @@ verify presence, not the price's actual Stripe amount, currency, or active statu
 Verify those in Stripe and exercise checkout on the deployed build separately;
 a passing unit test or startup check is not live billing proof.
 
+Golden Path reads this name as a GitHub Actions secret on `JovieInc/Jovie`
+(`environment: Preview – jovie` in `.github/workflows/ci.yml`). The same name
+is also a Vercel env var on project `jovie`. The money-path assertion does not
+read the Vercel value. Job `ci-golden-path` sets
+`FEATURE_STRIPE_TEST_PRICE_CONFIGURED=true` because that secret is the active
+test-mode USD 1200 cents/month price. The code default stays off, so any other
+caller that sees a price outside the contract names the GitHub secret and
+still rejects the price. The contract check stays in force either way. Claim
+checkout dogfood pins `price_1USkjzASl9B9udHvEYkZLYZp`, which satisfies the
+contract on main `134f9390`. Do not copy a value into this doc.
+
 ### `VISIBILITY_AUDIT_PAYMENT_LINK_URL`
 
 Optional public Stripe Payment Link (`https://buy.stripe.com/...`) for the

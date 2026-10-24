@@ -55,7 +55,19 @@ export function trustedRearmRecords(statuses) {
     if (String(status.state ?? '').toLowerCase() !== 'success') continue;
     const login = status.creator?.login;
     const type = status.creator?.type ?? status.creator?.__typename;
-    if (type !== 'Bot' || !['jovie-bot', 'jovie-bot[bot]'].includes(login)) {
+    if (
+      type !== 'Bot' ||
+      ![
+        'jovie-bot[bot]',
+        'jovie-ci-lane[bot]',
+        'jovie-symphony-lane[bot]',
+        'jovie-agents-lane[bot]',
+        'jovie-bot',
+        'jovie-ci-lane',
+        'jovie-symphony-lane',
+        'jovie-agents-lane',
+      ].includes(login)
+    ) {
       continue;
     }
     const match = REARM_DESCRIPTION.exec(String(status.description ?? ''));

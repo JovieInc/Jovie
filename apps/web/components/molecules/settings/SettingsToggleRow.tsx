@@ -27,6 +27,7 @@ export interface InteractiveSettingsToggleRowProps
   readonly checked: boolean;
   readonly onCheckedChange: (checked: boolean) => void;
   readonly disabled?: boolean;
+  readonly busy?: boolean;
   readonly ariaLabel: string;
 }
 
@@ -38,6 +39,7 @@ export interface GatedSettingsToggleRowProps
   readonly checked?: never;
   readonly onCheckedChange?: never;
   readonly disabled?: never;
+  readonly busy?: never;
   readonly ariaLabel?: never;
 }
 
@@ -52,7 +54,7 @@ export function SettingsToggleRow(props: Readonly<SettingsToggleRowProps>) {
   const titleId = `${baseId}-title`;
   const descriptionId = description ? `${baseId}-description` : undefined;
   const isGated = props.gated === true;
-  const isDisabled = isGated ? false : (props.disabled ?? false);
+  const isDisabled = isGated ? false : props.disabled || props.busy || false;
   const rowState = getSettingsRowDataState({
     disabled: isDisabled,
     gated: isGated,
@@ -108,8 +110,10 @@ export function SettingsToggleRow(props: Readonly<SettingsToggleRowProps>) {
         ) : (
           <Switch
             checked={props.checked}
-            onCheckedChange={props.onCheckedChange}
+            onCheckedChange={props.busy ? undefined : props.onCheckedChange}
             disabled={props.disabled ?? false}
+            aria-disabled={props.busy || undefined}
+            aria-busy={props.busy || undefined}
             aria-label={props.ariaLabel}
             aria-labelledby={titleId}
             aria-describedby={descriptionId}

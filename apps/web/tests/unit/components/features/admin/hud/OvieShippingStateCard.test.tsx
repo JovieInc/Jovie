@@ -896,4 +896,41 @@ describe('OvieShippingStateCard', () => {
       'least-recently-used available compatible lease'
     );
   });
+
+  it('never renders filesystem paths from the capacity feed or lanes alerts', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(200, {
+        ...projectionWithCapacityLease,
+        delivery: {
+          ...deliveryWithCapacityLease,
+          lanes: {
+            ...deliveryWithCapacityLease.lanes,
+            alerts: ['runner missing at /home/timwhite/.lanes/bin/runner'],
+            capacity: {
+              ...deliveryWithCapacityLease.lanes.capacity,
+              leases: [
+                {
+                  ...capacityLease,
+                  compatibility: {
+                    ...capacityLease.compatibility,
+                    cli: '/home/timwhite/.npm-global/bin/codex',
+                    harness: 'symphony',
+                  },
+                },
+              ],
+            },
+          },
+        },
+      })
+    );
+    const { container } = render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard />
+      </QueryClientProvider>
+    );
+    await screen.findByRole('link', { name: 'JOV-1234' });
+    expect(container.textContent).toContain('codex+symphony');
+    expect(container.textContent).toContain('runner missing at runner');
+    expect(container.textContent).not.toMatch(/\/home\/|npm-global/);
+  });
 });

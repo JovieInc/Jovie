@@ -132,6 +132,14 @@ test('projects design invariants from the canonical registry', () => {
   const contract = readDesignAgentContract(REPO_ROOT);
   const manifest = buildLlmsDesignManifest({ repoRoot: REPO_ROOT });
   assert.equal(contract.schema, 'jovie.design-agent-contract/v1');
+  for (const id of [
+    'rail-owned-overlay-retention',
+    'tooltip-eligibility',
+    'tooltip-input-and-placement',
+  ]) {
+    assert.ok(contract.invariants.some(invariant => invariant.id === id));
+    assert.ok(manifest.includes('`' + id + '`'));
+  }
   assert.deepEqual(
     findDesignInvariantProjectionViolations(manifest, contract),
     []

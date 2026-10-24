@@ -342,6 +342,7 @@ each plane as separate evidence, never as a reason to repeat the mutation.
 | GitHub native queue and exact-head merge-group checks | Landing without current combined-head proof |
 | `taste-classifier.mjs` | Taste-flagged PRs are routed to LLM review, not held |
 | Risk-tiered triggers | Heavy scans saturating runners on the PR path |
+| gate-weakening detector (JOV-INV-045) | PRs that loosen required checks, shrink-only baselines, budgets, or blocking CI without `gate-change:` plus the `codeowners-approved` label |
 
 ### Runner label policy
 

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -48,13 +50,17 @@ describe('ClaimHandleForm', () => {
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
     expect(input).toHaveAttribute('required');
-    // JOV-INV-019: focus-visible:outline + focus-visible:outline-2 never
-    // actually rendered — tailwind-merge collapses them into one conflict
-    // group and keeps only the last, and outline-width without
-    // outline-style paints nothing regardless. focus-ring-themed is the
-    // shared box-shadow-based ring the rest of the app uses.
+    // JOV-INV-019: the input carries the shared box-shadow ring itself — the
+    // locked route-quality focus check reads the focused control's own
+    // computed styles, so a ring on the field frame is invisible to it.
     expect(input).toHaveClass('focus-ring-themed');
-    expect(input.className).not.toMatch(/focus-visible:outline\b/);
+    const focusCss = readFileSync(
+      resolve(__dirname, '../../app/globals.css'),
+      'utf8'
+    );
+    expect(focusCss).toContain('.focus-ring-themed');
+    expect(focusCss).toContain('--tw-ring-color: var(--color-focus-ring)');
+    expect(focusCss).not.toContain('.focus-field-inset');
 
     // No helper text shown when handle is empty (removed redundant hint)
     const helpText = screen.queryByText(/Your Jovie profile will live at/i);

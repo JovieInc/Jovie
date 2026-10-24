@@ -82,6 +82,22 @@ const contact: EditableContact = {
 };
 
 describe('ContactDetailSidebar', () => {
+  it('labels a contact with no person or company name', () => {
+    render(
+      <ContactDetailSidebar
+        contact={{ ...contact, personName: '', companyName: '' }}
+        isOpen
+        onClose={() => undefined}
+        onUpdate={() => undefined}
+        onSave={() => undefined}
+        onDelete={() => undefined}
+      />
+    );
+
+    expect(screen.getAllByText('Contact').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Untitled contact')).not.toBeInTheDocument();
+  });
+
   it('renders the calm entity header and Info tab content by default', async () => {
     const { container } = render(
       <ContactDetailSidebar

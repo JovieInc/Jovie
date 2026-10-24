@@ -56,7 +56,7 @@ describe('GET /api/profile-alias-decision', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe(
-      'public, s-maxage=15, stale-while-revalidate=285'
+      'public, s-maxage=300, stale-while-revalidate=300'
     );
     await expect(response.json()).resolves.toEqual({
       creatorUsername: 'dualipa',

@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getProfileModeRenderStaticParams } from '@/app/[username]/_lib/profile-static-params';
 import ArtistPage, {
   generateMetadata as generatePublicProfileMetadata,
 } from '@/app/[username]/page';
@@ -9,12 +10,13 @@ import {
   RENDER_FIXTURE_METADATA,
 } from '@/lib/render-fixture-policy';
 
-// Query modes are bounded by next.config.js but discovered on demand. Keep each
-// private destination on the same one-hour ISR cadence as the canonical page.
+// Query modes stay on the canonical page's one-hour ISR cadence. The tipping
+// seed is not in the featured/claimed prerender set, so the pay destination
+// has to be emitted here or the release runner fetches it across regions.
 export const revalidate = 3600;
 
 export function generateStaticParams() {
-  return [];
+  return getProfileModeRenderStaticParams();
 }
 
 interface ProfileModeRenderPageProps {
