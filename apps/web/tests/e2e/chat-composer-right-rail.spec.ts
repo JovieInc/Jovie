@@ -13,9 +13,11 @@
  *   2. Close rail via header toggle → invariants. Reopen + close via the `]`
  *      keyboard shortcut → invariants.
  *   3. In-rail "Copy profile link" action → invariants.
- *   4. Close rail → composer regains full width → type + submit end-to-end.
+ *   4. Close rail → composer width stays stable (the desktop rail is an
+ *      overlay that never narrows the route) → type + submit end-to-end.
  *   5. Sub-lg viewport: mobile overlay branch (`fixed inset-0 z-50` in
- *      RightDrawer) legitimately covers the composer → recovers on close.
+ *      RightDrawer) legitimately covers the composer → Escape closes it and
+ *      the composer recovers.
  *
  * Environment notes:
  * - The chat preview panel is disabled under E2E unless the URL carries
@@ -67,6 +69,20 @@ async function expectRailClosed(page: Page) {
   // The host unmounts the preview rail when the panel closes, and the desktop
   // RightDrawer also collapses to zero width + `invisible` — both count as hidden.
   await expect(page.locator(PROFILE_RAIL)).toBeHidden({ timeout: 15_000 });
+}
+
+/**
+ * The sub-lg sheet is portaled to <body> and slides out with
+ * `translate-x-full`, which Playwright still reports as visible. Its closed
+ * contract is semantic: aria-hidden, inert and no modal flag.
+ */
+async function expectMobileRailClosed(page: Page) {
+  const rail = page.locator(PROFILE_RAIL);
+  await expect(rail).toHaveAttribute('aria-hidden', 'true', {
+    timeout: 15_000,
+  });
+  await expect(rail).toHaveAttribute('inert', '');
+  await expect(rail).not.toHaveAttribute('aria-modal', 'true');
 }
 
 /** Move focus out of any editable surface so the bare `]` shortcut is not typed as text. */
@@ -226,14 +242,15 @@ test.describe('chat composer × right-rail interaction matrix', () => {
     await page.locator(RAIL_TOGGLE).click();
     await expectRailClosed(page);
 
-    // The composer must reclaim horizontal space after close. The composer is
-    // max-width clamped, so the delta is smaller than the full rail width —
-    // assert a strictly positive reclaim rather than a fixed pixel budget.
+    // Since #20813 the desktop right rail is an inspector overlay contained by
+    // the main surface (AppShellRightRail): it never narrows the route, so the
+    // composer keeps the same width while the rail opens and closes. Assert
+    // that stability instead of the retired column reflow.
     await expect
       .poll(async () => (await textarea.boundingBox())?.width ?? 0, {
         timeout: 15_000,
       })
-      .toBeGreaterThan((openBox?.width ?? 0) + 1);
+      .toBeCloseTo(openBox?.width ?? 0, 0);
 
     // Type + submit a message end-to-end: the composer clears on submit and
     // the user message renders in the thread.
@@ -267,12 +284,12 @@ test.describe('chat composer × right-rail interaction matrix', () => {
       })
       .toBe(false);
 
-    // Close via the `]` shortcut (the overlay covers the header toggle).
-    // Focus lives inside the drawer on open — blur first so `]` is not typed
-    // into an editable element.
-    await blurActiveElement(page);
-    await page.keyboard.press(RAIL_SHORTCUT);
-    await expectRailClosed(page);
+    // Close with Escape (the overlay covers the header toggle). Bare shell
+    // shortcuts such as `]` are suppressed while focus is inside a modal
+    // dialog (isShellShortcutSuppressed, JOV-8018), and the overlay's focus
+    // trap keeps focus there, so Escape is the modal's dismissal contract.
+    await page.keyboard.press('Escape');
+    await expectMobileRailClosed(page);
 
     // Body scroll lock must be released along with the overlay.
     await expect

@@ -253,6 +253,29 @@ undraft_if_eligible() {  # undraft_if_eligible <num> [expected-head]
   return 1
 }
 
+read_missed_snapshot() {
+  # gh pr list requests 100 mergeability records per GraphQL page. That query
+  # exceeds GitHub's resource limit on busy repositories. Keep the same 200-PR
+  # discovery bound, but read at most 20 records per call. No partial snapshot
+  # reaches cohort selection if any page fails.
+  local owner="${REPO%%/*}" name="${REPO#*/}"
+  local cursor="" page snapshot='[]' batch
+  for ((batch=0; batch<10; batch++)); do
+    local cursor_args=()
+    [[ -n "$cursor" ]] && cursor_args=(-f endCursor="$cursor")
+    page="$(gh_retry api graphql \
+      -f query='query($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:20,after:$endCursor,states:OPEN,orderBy:{field:CREATED_AT,direction:DESC}){nodes{number isDraft title headRefName baseRefName mergeable mergeStateStatus labels(first:100){nodes{name}}} pageInfo{hasNextPage endCursor}}}}' \
+      -f owner="$owner" -f name="$name" "${cursor_args[@]}" \
+      --jq '.data.repository.pullRequests')" || return 1
+    snapshot="$(jq -c --argjson page "$page" '. + [$page.nodes[] | .labels = .labels.nodes]' <<<"$snapshot")" || return 1
+    if [[ "$(jq -r '.pageInfo.hasNextPage' <<<"$page")" != "true" ]]; then
+      break
+    fi
+    cursor="$(jq -er '.pageInfo.endCursor' <<<"$page")" || return 1
+  done
+  printf '%s\n' "$snapshot"
+}
+
 resolve_head_pr() {  # resolve_head_pr <sha>
   # One REST read of the PRs that own this exact commit, instead of listing
   # every open PR per event (the shared API budget is the bottleneck).
@@ -328,8 +351,7 @@ fi
 
 if [[ "$MISSED_COHORT" =~ ^[1-9][0-9]*$ ]]; then
   echo "=== MISSED COHORT: up to $MISSED_COHORT already-green drafts (offset $RUN_OFFSET) ==="
-  SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-    --json number,isDraft,labels,title,headRefName,baseRefName,mergeable,mergeStateStatus)"
+  SNAP="$(read_missed_snapshot)"
   mapfile -t cohort < <(node "$CLASSIFY_LIB" cohort "$MISSED_COHORT" "$RUN_OFFSET" "${TARGET_PR:-0}" <<<"$SNAP")
   for n in "${cohort[@]}"; do
     [[ -z "$n" ]] && continue

@@ -1,11 +1,10 @@
 // @coverage-via apps/web/tests/unit/home/HomepageCertifiedSections.test.tsx
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   HomepageCertifiedSections,
   HomepageEditorialFeatureSection,
 } from '@/components/homepage/HomepageCertifiedSections';
-import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HOMEPAGE_MEDIA_MAP } from '@/data/homepageMediaMap';
 
 const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: false }));
@@ -123,50 +122,5 @@ describe('HomepageCertifiedSections', () => {
       expect(media.loading).toBe('lazy');
       expect(media.reducedMotionFallback).toContain('static');
     }
-  });
-});
-
-describe('HomepageClose', () => {
-  it('returns to the name search instead of requesting access when gated', () => {
-    gate.WAITLIST_ENABLED = true;
-    render(<HomepageClose />);
-    expect(
-      screen.getByRole('button', { name: 'Find your profile' })
-    ).toHaveAttribute('type', 'button');
-    expect(
-      screen.queryByRole('link', { name: 'Request access' })
-    ).not.toBeInTheDocument();
-  });
-  it('renders the saved closing headline and a single focus-only action', () => {
-    render(<HomepageClose />);
-    const section = screen.getByRole('region', {
-      name: 'Take control of your presence.',
-    });
-    expect(section).toBe(screen.getByTestId('marketing-section-cta'));
-    expect(within(section).getAllByRole('button')).toHaveLength(1);
-    expect(
-      within(section).getByRole('button', { name: 'Find your profile' })
-    ).toHaveAttribute('type', 'button');
-    expect(within(section).queryByRole('combobox')).not.toBeInTheDocument();
-  });
-
-  it('returns focus to the existing name without submitting or clearing it', () => {
-    const submit = vi.fn();
-    render(
-      <>
-        <form onSubmit={submit}>
-          <input
-            id='homepage-claim-handle'
-            aria-label='Name'
-            defaultValue='Beyoncé'
-          />
-        </form>
-        <HomepageClose />
-      </>
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Find your profile' }));
-    expect(screen.getByLabelText('Name')).toHaveFocus();
-    expect(screen.getByLabelText('Name')).toHaveValue('Beyoncé');
-    expect(submit).not.toHaveBeenCalled();
   });
 });

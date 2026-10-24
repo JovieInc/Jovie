@@ -626,7 +626,7 @@ describe('conflict mutation policy', () => {
       triggersCi: true,
       attempt: 1,
       maxAttempts: 2,
-      model: 'openai/gpt-5.6-sol',
+      model: 'zai/glm-5.3',
       label: undefined,
     });
     expect(plan.fxMatrix).toEqual([
@@ -1339,7 +1339,7 @@ describe('conflict workflow contract', () => {
               BASE_REF: 'main',
               COHORT_ID: 'invalid-byte-test',
               FX_AUTO_UPGRADE: '0',
-              FX_MODEL: 'openai/gpt-5.6-sol',
+              FX_MODEL: 'zai/glm-5.3',
               FX_PERMISSION_MODE: 'ask',
               GITHUB_OUTPUT: githubOutput,
               HEAD_REF: 'source',
@@ -1434,7 +1434,7 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
             BASE_REF: 'main',
             COHORT_ID: 'valid-utf8-test',
             FX_AUTO_UPGRADE: '0',
-            FX_MODEL: 'openai/gpt-5.6-sol',
+            FX_MODEL: 'zai/glm-5.3',
             FX_PERMISSION_MODE: 'ask',
             GITHUB_OUTPUT: githubOutput,
             HEAD_REF: 'source',
@@ -1589,7 +1589,11 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
   });
 
   it('binds the stronger FX model and immutable artifact before granting writer authority', () => {
-    expect(WORKFLOW).toMatch(/FX_MODEL:\s*['"]?openai\/gpt-5\.6-sol['"]?/u);
+    expect(WORKFLOW).toMatch(/FX_MODEL:\s*['"]?zai\/glm-5\.3['"]?\s*$/mu);
+    // JOV-7119: no metered openai/anthropic billing on the Gateway key.
+    expect(WORKFLOW).not.toMatch(
+      /(?:FX_MODEL|EXPECTED_MODEL):\s*['"]?(?:openai|anthropic)\//u
+    );
     expect(WORKFLOW).toContain('AI_GATEWAY_API_KEY');
     expect(WORKFLOW).toContain('fx ask');
     expect(WORKFLOW).toContain('jovie-conflict-fx-artifact/v1');
@@ -1606,9 +1610,10 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
       WORKFLOW.indexOf('\n  deliver:')
     );
     expect(fxJob).toContain('AI_GATEWAY_API_KEY');
-    expect(fxJob).toContain('FX_MODEL: openai/gpt-5.6-sol');
+    expect(fxJob).toContain('FX_MODEL: zai/glm-5.3');
     expect(fxJob).not.toContain('actions/create-github-app-token@');
     expect(fxJob).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(fxJob).not.toContain('SYMPHONY_APP_PRIVATE_KEY');
     const preSpendStep = workflowStep(
       'Recheck live PR identity and queue before FX spend'
     );
@@ -1630,6 +1635,7 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     expect(modelStep).not.toMatch(/\b(?:git|gh|pnpm|npm|yarn)\s/u);
     expect(modelStep).not.toMatch(/--(?:auto|yolo)\b/u);
     expect(modelStep).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(modelStep).not.toContain('SYMPHONY_APP_PRIVATE_KEY');
     expect(modelStep).not.toContain('GH_TOKEN');
     for (const runBody of workflowRunBodies()) {
       expect(runBody).not.toMatch(/\$\{\{\s*(?:matrix\.|github\.event)/u);
@@ -1661,9 +1667,9 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
     expect(writerTokenStep).toMatch(
       /if:\s*[^\n]*steps\.prevalidate\.outputs\.(?:trusted|validated|deliverable)[^\n]*==\s*['"]true['"]/u
     );
-    expect(WORKFLOW).toContain('app-id: ${{ vars.JOVIE_BOT_APP_ID }}');
+    expect(WORKFLOW).toContain('app-id: ${{ vars.SYMPHONY_APP_ID }}');
     expect(WORKFLOW).toContain(
-      'private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
+      'private-key: ${{ secrets.SYMPHONY_APP_PRIVATE_KEY }}'
     );
     expect(WORKFLOW).toContain(
       'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
@@ -1698,6 +1704,7 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
       expect(step).not.toContain('git config --global');
     }
     expect(prepare).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(prepare).not.toContain('SYMPHONY_APP_PRIVATE_KEY');
     expect(prepare).not.toContain('GH_TOKEN');
   });
 

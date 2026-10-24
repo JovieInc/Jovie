@@ -1,7 +1,13 @@
 'use client';
 
 import { memo } from 'react';
+import { z } from 'zod';
 import { ExportCSVButton, PageToolbar } from '@/components/organisms/table';
+import {
+  type SubscriberExportRow,
+  subscriberExportRowSchema,
+} from '@/lib/notifications/subscriber-export';
+import type { CSVColumn } from '@/lib/utils/csv';
 import type { AudienceMember } from '@/types';
 import { AudienceFilterDropdown } from './AudienceFilterDropdown';
 import { AudienceHeaderBadge } from './AudienceHeaderBadge';
@@ -12,6 +18,8 @@ import {
 } from './utils/exportAudience';
 
 interface AudienceTableSubheaderProps {
+  readonly mode?: 'members' | 'subscribers';
+  readonly profileId?: string;
   /** Current active view filter */
   readonly view: AudienceView;
   /** Callback when audience view changes */
@@ -36,6 +44,8 @@ interface AudienceTableSubheaderProps {
  * AudienceTableSubheader - Subheader with audience view selector and table actions.
  */
 export const AudienceTableSubheader = memo(function AudienceTableSubheader({
+  mode = 'members',
+  profileId,
   view,
   onViewChange,
   filters,
@@ -49,6 +59,31 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
   const hasData = rows.length > 0;
   const exportTooltipLabel =
     selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export';
+  const getSubscriberData = async (): Promise<SubscriberExportRow[]> => {
+    if (!profileId)
+      throw new Error('Select a profile before exporting subscribers.');
+    const response = await fetch('/api/dashboard/audience/subscribers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId,
+        selectedIds: selectedIds.size ? [...selectedIds] : undefined,
+      }),
+    });
+    const body: unknown = await response.json();
+    if (!response.ok) {
+      const error = z.object({ error: z.string() }).safeParse(body);
+      throw new Error(
+        error.success ? error.data.error : 'Unable to export subscribers.'
+      );
+    }
+    const result = z
+      .object({ rows: z.array(subscriberExportRowSchema) })
+      .safeParse(body);
+    if (!result.success)
+      throw new Error('Unable to prepare subscriber export.');
+    return result.data.rows;
+  };
 
   return (
     <PageToolbar
@@ -67,20 +102,44 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
             onFiltersChange={onFiltersChange}
             iconOnly
           />
-          <ExportCSVButton
-            getData={() => getAudienceForExport(rows, selectedIds)}
-            columns={AUDIENCE_CSV_COLUMNS}
-            filename='audience'
-            label='Export'
-            tooltipLabel={exportTooltipLabel}
-            disabled={!hasData && subscriberCount === 0}
-            variant='ghost'
-            size='sm'
-            chrome='page-toolbar'
-            iconOnly
-          />
+          {mode === 'subscribers' ? (
+            <ExportCSVButton
+              key={profileId ?? 'missing-profile'}
+              getData={getSubscriberData}
+              revalidateBeforeDownload
+              columns={SUBSCRIBER_EXPORT_COLUMNS}
+              filename='subscribers'
+              label='Export'
+              tooltipLabel={exportTooltipLabel}
+              disabled={!profileId || (!hasData && subscriberCount === 0)}
+              variant='ghost'
+              size='sm'
+              chrome='page-toolbar'
+              iconOnly
+            />
+          ) : (
+            <ExportCSVButton
+              getData={() => getAudienceForExport(rows, selectedIds)}
+              columns={AUDIENCE_CSV_COLUMNS}
+              filename='audience'
+              label='Export'
+              tooltipLabel={exportTooltipLabel}
+              disabled={!hasData && subscriberCount === 0}
+              variant='ghost'
+              size='sm'
+              chrome='page-toolbar'
+              iconOnly
+            />
+          )}
         </>
       }
     />
   );
 });
+
+const SUBSCRIBER_EXPORT_COLUMNS: CSVColumn<SubscriberExportRow>[] = [
+  { header: 'Name', accessor: 'name' },
+  { header: 'Email', accessor: 'email' },
+  { header: 'Country', accessor: 'countryCode' },
+  { header: 'Consented At', accessor: 'consentedAt' },
+];

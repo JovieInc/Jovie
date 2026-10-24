@@ -148,6 +148,7 @@ describe('public profile loader behavior (JOV-5778)', () => {
 
     expect(getProfileWithLinksMock).toHaveBeenCalledWith('testartist', {
       skipCache: true,
+      throwOnError: true,
     });
   });
 
@@ -433,6 +434,7 @@ describe('public profile loader behavior (JOV-5778)', () => {
       expect(unstableCacheMock).not.toHaveBeenCalled();
       expect(getProfileWithLinksMock).toHaveBeenCalledWith('testartist', {
         skipCache: true,
+        throwOnError: true,
       });
     });
 
@@ -487,6 +489,7 @@ describe('authoritative reads despite shared cache state', () => {
       'testartist',
       {
         skipCache: true,
+        throwOnError: true,
       }
     );
   });

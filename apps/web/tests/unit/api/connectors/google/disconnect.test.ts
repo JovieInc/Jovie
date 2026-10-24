@@ -39,6 +39,7 @@ vi.mock('drizzle-orm', async importOriginal => {
 
 import { and, eq } from 'drizzle-orm';
 import { GOOGLE_CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
+import { users } from '@/lib/db/schema/auth';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
 
 interface UpdateCall {
@@ -169,6 +170,36 @@ describe('POST /api/connectors/google/disconnect', () => {
       connectorAccounts.provider,
       'google_calendar'
     );
+  });
+
+  it('resolves a Better Auth session id (users.id, null clerkId) and disables both Google rows', async () => {
+    hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'db-user-1' });
+    // Real getUserByIdentity: the legacy clerkId lookup misses, then users.id hits.
+    const limit = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 'db-user-1', clerkId: null }]);
+    hoisted.dbSelectMock.mockReturnValue({
+      from: () => ({ where: () => ({ limit }) }),
+    });
+    const updateCalls = trackUpdates();
+
+    const { POST } = await import(
+      '@/app/api/connectors/google/disconnect/route'
+    );
+    const response = await POST(postRequest({}));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(limit).toHaveBeenCalledTimes(2);
+    expect(eq).toHaveBeenCalledWith(users.clerkId, 'db-user-1');
+    expect(eq).toHaveBeenCalledWith(users.id, 'db-user-1');
+    // Shared bundle semantics: both rows, scoped to the resolved owner only.
+    expect(updateCalls).toHaveLength(2);
+    expect(eq).toHaveBeenCalledWith(connectorAccounts.userId, 'db-user-1');
+    for (const provider of GOOGLE_CONNECTOR_PROVIDERS) {
+      expect(eq).toHaveBeenCalledWith(connectorAccounts.provider, provider);
+    }
   });
 
   it('nulls the encrypted token columns and expiry on every disconnect update', async () => {

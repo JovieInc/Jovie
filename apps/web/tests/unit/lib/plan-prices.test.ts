@@ -40,14 +40,16 @@ describe('PLAN_PRICES', () => {
   });
 
   it('yearly is a discount over 12x monthly', () => {
-    for (const tier of Object.values(PLAN_PRICES)) {
+    // Pro annual is a retired legacy price kept only to resolve existing
+    // subscriptions; the $12 monthly offer has no annual option.
+    for (const tier of [PLAN_PRICES.max]) {
       expect(tier.yearly).toBeLessThan(tier.monthly * 12);
     }
   });
 
-  it('Artist Presence is the $199 monthly public offer', () => {
-    expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(199);
-    expect(PLAN_PRICES.pro.monthly).toBe(199);
+  it('Artist Presence is the $12 monthly public offer', () => {
+    expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(12);
+    expect(PLAN_PRICES.pro.monthly).toBe(12);
     expect(PLAN_PRICES.pro.monthly).toBe(
       ARTIST_VISIBILITY_OFFER.pro.monthlyUsd
     );

@@ -347,9 +347,7 @@ describe('DashboardNav', () => {
     expect(work).toHaveAttribute('aria-current', 'page');
     expect(work).toHaveClass('bg-sidebar-accent-active');
     expect(chatLink).toHaveClass('size-6', 'rounded-md', 'text-sidebar-muted');
-    expect(chatLink.parentElement).toHaveAttribute(
-      'data-sidebar-history-header'
-    );
+    expect(chatLink.parentElement).toHaveAttribute('data-sidebar-search-slot');
     expect(chatLink).not.toHaveClass('bg-sidebar-accent-active');
     expect(chatLink).not.toHaveClass('rounded-full');
     expect(chatLink).not.toHaveClass('bg-foreground');

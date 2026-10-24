@@ -12,6 +12,17 @@ interface GoogleOAuthState {
   readonly ts: number;
 }
 
+/**
+ * A correctly signed state that outlived STATE_MAX_AGE_MS, e.g. a slow or
+ * reopened consent tab. Distinct from a malformed or tampered state.
+ */
+export class GoogleOAuthStateExpiredError extends Error {
+  constructor() {
+    super('Google OAuth state expired');
+    this.name = 'GoogleOAuthStateExpiredError';
+  }
+}
+
 function getStateSecret(): string {
   return (
     env.TRACKING_TOKEN_SECRET ??
@@ -67,7 +78,7 @@ export function verifyGoogleOAuthState(state: string): GoogleOAuthState {
   ) as GoogleOAuthState;
 
   if (Date.now() - parsed.ts > STATE_MAX_AGE_MS) {
-    throw new Error('Google OAuth state expired');
+    throw new GoogleOAuthStateExpiredError();
   }
 
   return parsed;

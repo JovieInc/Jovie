@@ -149,6 +149,21 @@ describe('composeHudForPresentation', () => {
     expect(source).toContain('HudEnvExceptionsPanel');
   });
 
+  it('registers detection coverage in the shared Ovie noise band', () => {
+    const section = composeHudForPresentation('shell').find(
+      entry => entry.id === 'detection-coverage'
+    );
+    expect(section).toMatchObject({
+      band: 'noise',
+      testId: 'hud-detection-coverage',
+      label: 'Detection Coverage',
+    });
+
+    const source = readFileSync(HUD_DASHBOARD_CLIENT, 'utf8');
+    expect(source).toContain("case 'detection-coverage':");
+    expect(source).toContain('HudDetectionCoveragePanel');
+  });
+
   it('routes the legacy cash band through the three-answer CEO overview', () => {
     const source = readFileSync(
       join(

@@ -38,6 +38,7 @@ async function resolvePublicProfile(username: string) {
     decision.action === 'redirect' ? decision.handle : username;
   const profile = await getProfileWithLinks(canonicalUsername, {
     skipCache: true,
+    throwOnError: true,
   });
   return profile && isPublicProfilePublished(profile.isPublic) ? profile : null;
 }

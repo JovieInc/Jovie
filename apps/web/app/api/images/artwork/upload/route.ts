@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
 import {
+  buildDevMockBlobUrl,
   getBlobCommandOptions,
   isBlobStorageConfigured,
 } from '@/lib/blob-config';
@@ -45,10 +46,7 @@ async function uploadArtworkSizes(
         if (env.NODE_ENV === 'production') {
           throw new TypeError('Blob storage not configured');
         }
-        return [
-          sizeKey,
-          `https://blob.vercel-storage.com/${blobPath}`,
-        ] as const;
+        return [sizeKey, buildDevMockBlobUrl(blobPath)] as const;
       }
 
       const blob = await withTimeout(

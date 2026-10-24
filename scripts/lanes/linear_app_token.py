@@ -3,8 +3,9 @@
 Linear quotas are per user: every request by one user shares one budget across API keys,
 so lanes on Tim's key competed with Codex, Summer, MCP and the Linear sync and ran dry
 (2026-10-11). The "Jovie Lanes" app has its own quota. When its client credentials are
-installed (linear-app.env), every lanes Linear call uses one shared app token per host;
-the personal LINEAR_API_KEY is used only when that file is absent.
+installed (linear-app.env), every lanes Linear call uses one shared app token per host.
+Without them lanes Linear access fails closed: there is no personal-key fallback (Tim
+2026-10-20), so a personal key can be revoked without breaking lanes.
 
 The token is minted with HTTP Basic client credentials, cached mode 0600 in the lanes
 state dir with its expiry, and re-minted only near expiry or after Linear rejects it

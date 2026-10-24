@@ -58,7 +58,14 @@ describe('factory section requests', () => {
   });
 
   it('reports an over-budget section but refuses to omit a required story beat', () => {
-    const baseline = resolveComposition(brief('Explain the product'));
+    // A feature-page story: the homepage recipe no longer carries a
+    // feature-split beat (artist-profile homepage, 2026-10-20).
+    const featureBrief = {
+      ...brief('Explain the product'),
+      trafficSource: 'search' as const,
+      intent: 'feature' as const,
+    };
+    const baseline = resolveComposition(featureBrief);
     expect(baseline.sections.map(s => s.sectionId)).toContain('feature-split');
 
     const sectionJobs = [
@@ -82,9 +89,9 @@ describe('factory section requests', () => {
         expect.stringContaining('design-gap:PROPOSED-SECTION-0001'),
       ])
     );
-    expect(() =>
-      resolveComposition(brief('Explain the product'), { sectionJobs })
-    ).toThrow('Incomplete story');
+    expect(() => resolveComposition(featureBrief, { sectionJobs })).toThrow(
+      'Incomplete story'
+    );
   });
 
   it('keeps exactly one hero and requires shadow when the hero job has a gap', () => {
@@ -214,7 +221,12 @@ describe('factory section requests', () => {
       'blog-feed',
     ]);
     expect(report.registryGaps[1]?.evidence).toEqual(
-      expect.arrayContaining([expect.stringContaining('not source-backed')])
+      expect.arrayContaining([
+        expect.stringContaining('no LANDING_PAGE_FAMILIES family lists it'),
+      ])
+    );
+    expect(report.registryGaps[1]?.evidence.join('\n')).not.toContain(
+      'not source-backed'
     );
 
     const seoPage = resolveComposition(

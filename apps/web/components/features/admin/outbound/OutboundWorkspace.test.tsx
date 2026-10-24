@@ -86,7 +86,34 @@ describe('OutboundWorkspace', () => {
     expect(screen.getByText('Ada')).toBeInTheDocument();
     expect(screen.getByText('Bea')).toBeInTheDocument();
     expect(screen.queryByText('Cy')).toBeNull();
-    expect(screen.getAllByText('Profile built 188 days ago')).toHaveLength(2);
+    expect(screen.getAllByText('Released 5 days ago')).toHaveLength(2);
+  });
+
+  it('shows "No trigger" instead of a static attribute and flags non-artists', () => {
+    mockQueue(
+      outboundFixtureQueue([
+        outboundFixtureRow({
+          leadId: 'z',
+          name: 'Curator',
+          handle: 'spotifyplaylistcurator',
+          view: 'ready',
+          whyNow: null,
+          fit: 'unknown',
+          fitBasis: 'presence_only',
+          flags: ['possible_non_artist', 'presence_only_fit'],
+          entityNote: 'Looks like a playlist curator or submission service',
+        }),
+      ])
+    );
+    renderWorkspace();
+    expect(screen.getByText('No trigger')).toBeInTheDocument();
+    expect(screen.getByText('Presence only')).toBeInTheDocument();
+    expect(screen.getByTestId('outbound-flag-non-artist')).toHaveTextContent(
+      'Possible non-artist'
+    );
+    expect(
+      screen.getByTestId('outbound-count-needs_evidence')
+    ).toHaveTextContent('0');
   });
 
   it('shows a retryable error state', () => {

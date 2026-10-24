@@ -122,7 +122,7 @@ export const CRON_KEEP_REASONS = Object.freeze({
   '.github/workflows/golden-path-nightly.yml':
     'external: real auth plus Stripe test mode drift without a repository event, and acquisition eligibility needs Golden Path proof under 48 h old',
   '.github/workflows/m2-revenue-path-canary.yml':
-    'external: production money-path probe (claim, $199 checkout, activation) that can break with no deploy',
+    'external: production money-path probe (claim, $12 checkout, activation) that can break with no deploy',
   '.github/workflows/merge-queue-ruleset-verify.yml':
     'external: a GitHub UI edit to the merge-queue ruleset emits no Actions event',
   '.github/workflows/node-runtime-compatibility.yml':

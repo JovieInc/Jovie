@@ -82,7 +82,7 @@ export function ProductClaimHandleForm({
       aria-busy={checkingAvail || navigating}
     >
       <InputAuraFrame treatment='editorial' className='rounded-full'>
-        <div className='relative flex min-h-12 w-full items-center gap-2 overflow-hidden rounded-full border border-transparent bg-page px-2 py-2 pl-4'>
+        <div className='relative flex min-h-12 w-full items-center gap-2 rounded-full border border-transparent bg-page px-2 py-2 pl-4'>
           <label htmlFor={inputId} className='sr-only'>
             Choose Your Handle
           </label>
@@ -107,11 +107,11 @@ export function ProductClaimHandleForm({
               // JOV-INV-019: tailwind-merge collapses focus-visible:outline
               // and focus-visible:outline-2 into the same conflict group and
               // keeps only the last one, so outline-style never actually
-              // turns on (outline-width without outline-style paints
-              // nothing) — and focus-visible:border-focus had no border
-              // width on this bare input to make a color change visible.
-              // focus-ring-themed is the shared box-shadow-based ring the
-              // rest of the app uses for exactly this reason.
+              // turns on — and the global input reset paints over outline
+              // utilities regardless. focus-ring-themed is the shared
+              // box-shadow-based ring, and the locked route-quality focus
+              // check reads this input's own computed styles, so the ring
+              // must live on the input itself.
               'product-claim-card__handle-input min-w-0 flex-1 bg-transparent text-base text-primary-token focus-ring-themed',
               unavailable && 'text-error'
             )}

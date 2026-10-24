@@ -14,11 +14,12 @@
  */
 
 import { APP_ROUTES } from '@/constants/routes';
+import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
-/** Locked Artist Presence monthly offer. Keep in sync with plan-prices. */
-const PROOF_CLAIM_MONTHLY_USD = 199;
+/** Artist Presence monthly offer, derived from the canonical plan price. */
+const PROOF_CLAIM_MONTHLY_USD = ARTIST_VISIBILITY_OFFER.pro.monthlyUsd;
 
 export const PROOF_CLAIM_CAMPAIGN_KEY = 'proof-to-claim' as const;
 export const PROOF_CLAIM_VARIANT_ID = 'proof-to-claim:m1:v1' as const;

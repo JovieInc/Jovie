@@ -7,6 +7,11 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import {
+  DashboardDataProvider,
+  useDashboardData,
+} from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SettingsSearchabilitySection } from '@/components/features/dashboard/organisms/SettingsSearchabilitySection';
 import type { Artist } from '@/types/db';
 
@@ -32,7 +37,53 @@ function artist(id = 'profile-a', searchable?: boolean): Artist {
 
 beforeEach(() => vi.clearAllMocks());
 
+function PrivacyPageFixture() {
+  const { selectedProfile } = useDashboardData();
+  return selectedProfile ? (
+    <SettingsSearchabilitySection
+      artist={{
+        ...artist(selectedProfile.id),
+        settings: selectedProfile.settings ?? undefined,
+      }}
+    />
+  ) : null;
+}
+
 describe('owner discovery choice', () => {
+  it.each([true, false])(
+    'retains the saved choice after navigating away from an initially %s profile',
+    async initial => {
+      save.mockResolvedValue({});
+      const profile = {
+        id: 'profile-a',
+        settings: { searchable: initial, require_double_opt_in: true },
+      } as unknown as DashboardData['creatorProfiles'][number];
+      const data = {
+        user: { id: 'owner' },
+        creatorProfiles: [profile],
+        selectedProfile: profile,
+      } as DashboardData;
+      const page = (visible: boolean) => (
+        <DashboardDataProvider value={data}>
+          {visible ? <PrivacyPageFixture /> : null}
+        </DashboardDataProvider>
+      );
+      const { rerender } = render(page(true));
+      fireEvent.click(screen.getByRole('switch'));
+      await screen.findByText('Saved');
+      rerender(page(false));
+      rerender(page(true));
+      expect(screen.getByRole('switch')).toHaveAttribute(
+        'aria-checked',
+        String(!initial)
+      );
+      fireEvent.click(screen.getByRole('switch'));
+      expect(save).toHaveBeenLastCalledWith({
+        updates: { settings: { searchable: initial } },
+      });
+    }
+  );
+
   it('preserves the legacy choice and explains direct public sharing for humans and bots', () => {
     render(<SettingsSearchabilitySection artist={artist()} />);
     expect(
@@ -68,7 +119,7 @@ describe('owner discovery choice', () => {
     control.focus();
     fireEvent.click(control);
     expect(control).not.toBeChecked();
-    expect(control).toBeDisabled();
+    expect(control).toHaveAttribute('aria-disabled', 'true');
     expect(status).toHaveAttribute('data-state', 'saving');
     expect(status).toHaveClass('min-h-4');
     expect(save).toHaveBeenCalledWith({
@@ -101,7 +152,7 @@ describe('owner discovery choice', () => {
       name: 'Show in Jovie discovery',
     });
     fireEvent.click(control);
-    await waitFor(() => expect(control).toBeEnabled());
+    await waitFor(() => expect(control).not.toHaveAttribute('aria-busy'));
     expect(control).toBeChecked();
     expect(
       screen.getByText('Could not save discovery preference. Try again.')

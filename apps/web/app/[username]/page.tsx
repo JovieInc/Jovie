@@ -4,9 +4,12 @@ import { Suspense } from 'react';
 import { loadPublicReleaseCredits } from '@/app/[username]/[slug]/_lib/data';
 import { isScreenCertSmartLinkProfileRequest } from '@/app/[username]/[slug]/_lib/screen-cert-fixture';
 
-// The parent layout forces per-request rendering so cached public bodies cannot authorize access.
+// Read current publication for every profile request without changing release-route caching.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 import { AskJovieWidget } from '@/components/features/ask-jovie/AskJovieWidget';
+import { AliasCollisionRecovery } from '@/components/features/profile/AliasCollisionRecovery';
 import type { ProfileMode } from '@/components/features/profile/contracts';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfileClient';
@@ -466,6 +469,7 @@ async function ArtistPageContent({
 
   return (
     <>
+      <AliasCollisionRecovery username={username} />
       {/* JSON-LD Structured Data for SEO — single @graph for all schemas */}
       <script type='application/ld+json'>
         {safeJsonLdStringify(structuredData)}

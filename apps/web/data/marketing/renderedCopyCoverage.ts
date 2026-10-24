@@ -83,8 +83,8 @@ const PRICING_EVIDENCE = {
   freePrice:
     'apps/web/lib/config/plan-prices.ts:ARTIST_VISIBILITY_OFFER.free (priceUsd=0)',
   proPrice:
-    'apps/web/lib/config/plan-prices.ts:ARTIST_VISIBILITY_OFFER.pro.monthlyUsd=199',
-  proAccess: 'apps/web/lib/billing/offer-truth.ts:PRO_LIMITED_ACCESS_TRUTH',
+    'apps/web/lib/config/plan-prices.ts:ARTIST_VISIBILITY_OFFER.pro.monthlyUsd=12',
+  proAccess: 'apps/web/lib/billing/offer-truth.ts:PRO_SELF_SERVE_TRUTH',
   enterprise:
     'apps/web/lib/billing/offer-truth.ts:PUBLIC_CUSTOM_PRICE_LABEL + ARTIST_VISIBILITY_OFFER.enterprise',
 } as const;
@@ -121,7 +121,7 @@ export function pricingPageCopyBrief(): MarketingCopyPageBrief {
     route: '/pricing',
     audience: 'independent artists and teams comparing plans',
     objective:
-      'let the visitor claim a free profile, request Pro access, or contact sales',
+      'let the visitor claim a free profile, claim Pro self-serve, or contact sales',
     claims: [
       {
         id: 'free-forever',
@@ -130,7 +130,7 @@ export function pricingPageCopyBrief(): MarketingCopyPageBrief {
       },
       {
         id: 'pro-price',
-        statement: 'Artist Presence is $199/month with limited access.',
+        statement: 'Artist Presence is $12/month, self-serve.',
         evidence: [PRICING_EVIDENCE.proPrice, PRICING_EVIDENCE.proAccess],
       },
       {
@@ -142,13 +142,12 @@ export function pricingPageCopyBrief(): MarketingCopyPageBrief {
     outcomes: [
       {
         id: 'choose-plan',
-        statement:
-          'The visitor can pick a plan or request the access that fits them.',
+        statement: 'The visitor can pick the plan that fits them.',
       },
     ],
     actions: [
       { id: 'claim-free', statement: 'Claim my free profile.' },
-      { id: 'request-access', statement: 'Request access to Pro.' },
+      { id: 'claim-pro', statement: 'Claim your profile on Pro.' },
       { id: 'contact-sales', statement: 'Contact sales for Enterprise.' },
       { id: 'explore-profiles', statement: 'Explore Jovie Profiles.' },
     ],
@@ -294,7 +293,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-hero-centered-v2',
         controlHeadline: 'Plans and pricing',
         headline: 'Pricing',
-        body: 'Jovie profiles are free forever. Artist Presence is $199/month with limited access.',
+        body: 'Jovie profiles are free forever. Artist Presence is $12/month, self-serve.',
         supportingText: ['Claim my free profile', 'Explore Jovie Profiles'],
         claimIds: ['free-forever', 'pro-price'],
         lineBindings: [
@@ -331,11 +330,11 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-plan-pro-v1',
         controlHeadline: 'Pro plan',
         headline: 'Artist Presence',
-        body: 'Limited access.',
+        body: 'Self-serve. Cancel anytime.',
         supportingText: [
-          'Limited access',
-          '$199/mo',
-          'Request access',
+          'Self-serve',
+          '$12/mo',
+          'Claim your profile',
           'Public Jovie profile and audience capture',
         ],
         claimIds: ['pro-price'],
@@ -344,7 +343,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
           ['body', { claim: 'pro-price' }],
           ['supporting:0', { claim: 'pro-price' }],
           ['supporting:1', { claim: 'pro-price' }],
-          ['supporting:2', { action: 'request-access' }],
+          ['supporting:2', { action: 'claim-pro' }],
           ['supporting:3', { claim: 'pro-price' }],
         ],
       }),
@@ -381,10 +380,10 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-final-v1',
         controlHeadline: 'Pick a plan',
         headline: 'Get Started',
-        body: 'Artist Presence is $199/month with limited access. Request access.',
+        body: 'Artist Presence is $12/month. Claim your profile.',
         supportingText: [
           'Claim my free profile',
-          'Request access',
+          'Claim your profile',
           'Contact sales',
         ],
         claimIds: ['pro-price'],
@@ -392,7 +391,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
           ['headline', { outcome: 'choose-plan' }],
           ['body', { claim: 'pro-price' }],
           ['supporting:0', { action: 'claim-free' }],
-          ['supporting:1', { action: 'request-access' }],
+          ['supporting:1', { action: 'claim-pro' }],
           ['supporting:2', { action: 'contact-sales' }],
         ],
       }),

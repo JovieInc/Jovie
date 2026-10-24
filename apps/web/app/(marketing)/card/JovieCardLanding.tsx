@@ -1,32 +1,25 @@
 import { FaqSection } from '@/components/marketing/FaqSection';
+import { MarketingContainer } from '@/components/marketing/MarketingContainer';
 import { MarketingHero } from '@/components/marketing/MarketingHero';
 import { MarketingPageShell } from '@/components/marketing/MarketingPageShell';
-import { ProductScreenshotFrame } from '@/components/marketing/ProductScreenshotFrame';
-import { JOVIE_CARD_COPY } from '@/data/jovieCardCopy';
+import {
+  JOVIE_CARD_COPY,
+  JOVIE_CARD_HERO_EVIDENCE,
+} from '@/data/jovieCardCopy';
 import { JovieCardInterestCaptureWithAuth } from './JovieCardInterestCapture';
 
-// One visual: the real public profile a scan opens. No placeholder card
-// nested beside the phone.
-function JovieCardPreview() {
+function JovieCardAvailability() {
   return (
-    <figure
-      className='mx-auto flex w-full max-w-xs flex-col items-center'
-      aria-labelledby='card-preview-caption'
-    >
-      <ProductScreenshotFrame
-        scenarioId='public-profile-mobile'
-        device='phone'
-        sizes='(max-width: 640px) 70vw, 280px'
-        className='w-56 sm:w-64'
-        altOverride='Approved demo capture of a Jovie public profile'
-      />
-      <figcaption
-        id='card-preview-caption'
-        className='mt-4 text-balance text-center text-xs text-tertiary-token'
+    <MarketingContainer width='page'>
+      <p
+        data-testid={JOVIE_CARD_HERO_EVIDENCE.testId}
+        data-product-evidence-kind={JOVIE_CARD_HERO_EVIDENCE.kind}
+        data-product-evidence-capability={JOVIE_CARD_HERO_EVIDENCE.capabilityId}
+        className='text-left text-sm leading-relaxed text-secondary-token'
       >
-        {JOVIE_CARD_COPY.publication.label} · A scan opens your profile.
-      </figcaption>
-    </figure>
+        {JOVIE_CARD_COPY.hero.availability}
+      </p>
+    </MarketingContainer>
   );
 }
 
@@ -39,7 +32,8 @@ export function JovieCardLanding() {
           subtitle={JOVIE_CARD_COPY.hero.body}
           headingId='jovie-card-hero-heading'
           testId='marketing-section-hero'
-          sectionVariant='split-screenshot-right'
+          sectionVariant='left-none'
+          align='left'
           headlineMaxLines={3}
           primaryCta={{
             label: JOVIE_CARD_COPY.publication.primaryCta,
@@ -49,8 +43,7 @@ export function JovieCardLanding() {
             label: JOVIE_CARD_COPY.publication.secondaryCta,
             href: '#how-it-works',
           }}
-          logos={false}
-          media={<JovieCardPreview />}
+          logos={<JovieCardAvailability />}
         />
       </div>
 
@@ -70,6 +63,9 @@ export function JovieCardLanding() {
         >
           {JOVIE_CARD_COPY.sections.howItWorks}
         </h2>
+        <p className='mt-5 text-base leading-relaxed text-secondary-token'>
+          {JOVIE_CARD_COPY.sections.howItWorksIntro}
+        </p>
         <ol className='mt-12 grid gap-10 md:grid-cols-3'>
           {JOVIE_CARD_COPY.steps.map((step, index) => (
             <li key={step.title} className='border-t border-subtle pt-6'>

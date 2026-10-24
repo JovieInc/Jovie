@@ -61,12 +61,16 @@ REPAIR_IDLE_S = 2 * 3600            # a session that pushed within this window s
 DRAFT_SLO_S = 48 * 3600
 ATTEMPT_RESET_S = 24 * 3600         # repair attempts at one head may retry after a day
 ACTION_RETRY_S = 3600
+SETUP_RETRY_S = 3600                # a head whose checkout/install failed waits this long, uncharged
 MAX_ACTIONS = 10                    # GitHub writes per maintenance pass
 DEPENDENCY = re.compile(r"(?i)\b(?:depends on|blocked by|waits? (?:on|for)|stacked on)\s+#(\d+)"
                         r"|#(\d+)\s+(?:must|has to|needs to)\s+(?:be merged|merge|land)")
 ENQUEUE_MUTATION = ('mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,'
                     'expectedHeadOid:$head}){mergeQueueEntry{position}}}')
 MERGE_GROUP_LOG_CHARS = 6000        # tail of the failed merge-group jobs' log in a repair prompt
+FETCH_ATTEMPTS = 2                  # one lost ref-lock race retries once (JOV-8902/LYB-226); more is a real fault
+CANNOT_LOCK_REF = "cannot lock ref"
+PUSH_ATTEMPTS = 2                   # the pre-push hook's test suite can flake; one retry, never --no-verify
 
 
 @dataclass(frozen=True)
@@ -338,8 +342,10 @@ def repair_candidate(lane, binding: Binding, prs: list[dict], attempts: dict, bu
         reasons = repair_reasons(lane, binding, pr)
         if not reasons or (pr["number"] not in owned and _age(pr.get("committedAt") or "", now) < REPAIR_IDLE_S):
             continue
-        if _attempt_count(attempts.get(f"{binding.key}#{pr['number']}:{pr['headRefOid']}"), now) \
-                < lane.MAX_FIX_ATTEMPTS and not busy(pr):
+        record = attempts.get(f"{binding.key}#{pr['number']}:{pr['headRefOid']}")
+        if isinstance(record, dict) and now - float(record.get("setupFailedAt") or 0) < SETUP_RETRY_S:
+            continue
+        if _attempt_count(record, now) < lane.MAX_FIX_ATTEMPTS and not busy(pr):
             return {**pr, "repairReasons": reasons}
     return None
 
@@ -559,6 +565,9 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
             receipt = run(lane, host, binding, name, spec, pr=pr)
         finally:
             lease.release()
+        if setup_failed(receipt):
+            lane.update_json(attempts_path, lambda data: refund_setup_failure(
+                data, f"{binding.key}#{pr['number']}:{pr['headRefOid']}", time.time()))
         return receipt.get("verdict")
     if issue is None:
         return None
@@ -576,6 +585,41 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
 
 
 # ---------------------------------------------------------------- runs
+
+def fetch(lane, host, binding: Binding, log, *refs: str) -> None:
+    """Fetch `refs` from the binding's shared clone, one fetch per repo at a time.
+
+    Seats claimed in the same second race the clone's ref lock and die 'cannot lock ref
+    refs/remotes/origin/main' seconds in (JOV-8902/LYB-226). A per-repo flock serializes
+    them and a lost race retries once. The kernel drops the lock if the holder dies and
+    git's own 600s timeout bounds every hold, so the wait cannot outlive the fetch it
+    serializes; a non-ref-lock fault fails immediately."""
+    lock = lane.Locked(host.state / "bindings" / binding.key / "fetch.lock", blocking=True)
+    try:
+        for attempt in range(FETCH_ATTEMPTS):
+            ran = lane.sh(["git", "fetch", "-q", "origin", *refs], cwd=binding.repo, timeout=600, log=log)
+            if not ran.returncode:
+                return
+            if attempt + 1 < FETCH_ATTEMPTS and CANNOT_LOCK_REF in f"{ran.stdout}{ran.stderr}":
+                continue
+            raise RuntimeError("git-fetch-failed")
+    finally:
+        lock.release()
+
+
+def push_with_retry(git, branch: str, attempts: int = PUSH_ATTEMPTS) -> None:
+    """Push an issue branch, retrying a flaky pre-push hook once. The hook gates every
+    attempt (never --no-verify), so a persistent failure - a real regression, not a flake -
+    still fails the run and charges the issue."""
+    last: BaseException = RuntimeError("git-push-failed")
+    for _ in range(attempts):
+        try:
+            git("push", "-q", "-u", "origin", branch)
+            return
+        except RuntimeError as error:
+            last = error
+    raise last
+
 
 def merge_group_evidence(lane, binding: Binding, pr: dict) -> str:
     """The failed merge-group run for this PR (`gh-readonly-queue/main/pr-<n>-*`) and the tail of
@@ -675,12 +719,13 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
             lane.require_disk(host, "binding-checkout")
             worktree.parent.mkdir(parents=True, exist_ok=True)
             if pr is not None:
-                git("fetch", "-q", "origin", "main", branch, cwd=binding.repo)
+                fetch(lane, host, binding, log, "main", branch)
                 git("worktree", "add", "-q", "--detach", str(worktree), pr["headRefOid"], cwd=binding.repo)
             else:
-                git("fetch", "-q", "origin", "main", cwd=binding.repo)
+                fetch(lane, host, binding, log, "main")
                 git("worktree", "add", "-q", "-b", branch, str(worktree), "origin/main", cwd=binding.repo)
-            if binding.install and lane.sh(list(binding.install), cwd=worktree, timeout=1800, log=log).returncode:
+            if binding.install and lane.sh(install_command(binding, pr), cwd=worktree, timeout=1800,
+                                           log=log).returncode:
                 raise RuntimeError("install-failed")
             prompt = render_prompt(binding, branch, issue=issue, pr=pr,
                                    context=lane.context_pack(issue) if issue is not None else
@@ -690,6 +735,7 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
             prompt_file = runs / f"{run_id}.prompt.md"
             prompt_file.write_text(prompt)
             started = time.time()
+            receipt["agentStarted"] = True
             agent = lane.run_agent(lane.template(spec["cmd"], {
                 "prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree),
                 "provider_receipt": str(runs / f"{run_id}.provider.jsonl"), "model": str(spec.get("model"))}),
@@ -714,6 +760,29 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
     return receipt
 
 
+def install_command(binding: Binding, pr: dict | None) -> list[str]:
+    """A repaired PR's lockfile may be stale by design (a Dependabot bump is exactly that):
+    repairs install without the frozen-lockfile check, which only new work keeps."""
+    command = list(binding.install)
+    if pr is not None and "--frozen-lockfile" in command:
+        command[command.index("--frozen-lockfile")] = "--no-frozen-lockfile"
+    return command
+
+
+def setup_failed(receipt: dict) -> bool:
+    """The run failed before any agent started (checkout, install): not a repair attempt."""
+    return receipt.get("verdict") == "failed" and not receipt.get("agentStarted")
+
+
+def refund_setup_failure(attempts: dict, key: str, now: float) -> None:
+    """Return the attempt a setup failure was charged; the head then waits SETUP_RETRY_S
+    instead of retrying (and re-checking out) every worker loop."""
+    record = attempts.get(key)
+    attempts[key] = {"count": max(0, _attempt_count(record, now) - 1),
+                     "at": record.get("at", now) if isinstance(record, dict) else now,
+                     "setupFailedAt": now}
+
+
 def publish(lane, binding: Binding, branch: str, worktree: Path, git, *, issue=None, pr=None) -> dict:
     """Push the agent's commits (never forced) and, for an issue, open its one ready PR.
 
@@ -726,7 +795,7 @@ def publish(lane, binding: Binding, branch: str, worktree: Path, git, *, issue=N
         return result
     if git("rev-list", "--count", "origin/main..HEAD") in ("", "0"):
         return {"verdict": "no-change", "reasons": ["no-commits"]}
-    git("push", "-q", "-u", "origin", branch)
+    push_with_retry(git, branch)
     created = lane.sh(["gh", "pr", "create", "--repo", binding.slug, "--base", "main", "--head", branch,
                        "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
                        "--body", f"Refs {issue.identifier}.\n\n<!-- linear-issue-id:{issue.id} -->\n"
@@ -758,9 +827,13 @@ def cleanup(lane, binding: Binding, worktree: Path, branch: str | None, receipt:
     """Unpublished or uncommitted work is preserved; a clean, pushed checkout is removed."""
     if not worktree.exists():
         return
+    if receipt.get("verdict") != "disk-held":
+        lane.reap_run_processes(worktree, receipt)
     status = lane.sh(["git", "status", "--porcelain", *lane.disk_guard.SOURCE_PATHSPEC], cwd=worktree)
     unpushed = lane.sh(["git", "rev-list", "--count", "HEAD", "--not", "--remotes=origin"], cwd=worktree)
-    if (receipt.get("verdict") == "disk-held" or status.returncode or status.stdout.strip()
+    # No agent ran in a setup failure, so the checkout holds no work worth preserving.
+    if not setup_failed(receipt) and (
+            receipt.get("verdict") == "disk-held" or status.returncode or status.stdout.strip()
             or unpushed.returncode or unpushed.stdout.strip() != "0"):
         lane.preserve_repair(worktree, receipt)
         return

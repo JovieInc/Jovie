@@ -102,6 +102,7 @@ describe('public profile loading boundaries', () => {
     const result = await getProfileAndLinks('TestArtist');
     expect(mocks.profile).toHaveBeenCalledExactlyOnceWith('testartist', {
       skipCache: true,
+      throwOnError: true,
     });
     expect(result).toMatchObject({
       status: 'ok',

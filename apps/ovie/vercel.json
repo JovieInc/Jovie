@@ -3,6 +3,16 @@
   "installCommand": "cd ../.. && corepack pnpm install --frozen-lockfile",
   "buildCommand": "corepack pnpm run build",
   "ignoreCommand": "bash -c 'R=$VERCEL_GIT_COMMIT_REF;if [[ $R == main || $R == production ]]; then exit 1; fi;exit 0'",
+  "git": {
+    "deploymentEnabled": {
+      "backup/**": false,
+      "archive/**": false,
+      "stash/**": false,
+      "gh-readonly-queue/**": false
+    }
+  },
   "outputDirectory": ".next",
-  "github": { "autoAlias": false }
+  "github": {
+    "autoAlias": false
+  }
 }

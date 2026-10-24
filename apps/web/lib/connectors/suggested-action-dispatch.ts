@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { parseBrandDealOpportunity } from './brand-deal-opportunity';
 import { isReportKind } from './opportunity-inbox-report';
+import { isProfileActionKind, parseProfileAction } from './profile-action';
 import { parseSocialReplyDraft } from './social-reply-draft';
 import {
   BRAND_DEAL_OPPORTUNITY_KIND,
@@ -45,6 +46,7 @@ export type SuggestedActionDispatch =
     }
   | { readonly mode: 'workflow-capture' }
   | { readonly mode: 'next-step-only' }
+  | { readonly mode: 'profile-consent' }
   | { readonly mode: 'invalid'; readonly error: string };
 
 function parseCalendarPayload(
@@ -84,6 +86,12 @@ export function resolveSuggestedActionDispatch(input: {
 }): SuggestedActionDispatch {
   if (typeof input.kind !== 'string' || input.kind.trim().length === 0) {
     return { mode: 'invalid', error: 'unsupported-action-kind' };
+  }
+
+  if (isProfileActionKind(input.kind)) {
+    return parseProfileAction(input.kind, input.payload)
+      ? { mode: 'profile-consent' }
+      : { mode: 'invalid', error: 'invalid-profile-action' };
   }
 
   if (

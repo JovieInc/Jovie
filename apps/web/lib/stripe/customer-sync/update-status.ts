@@ -7,6 +7,7 @@
 import 'server-only';
 import { applyBillingUpdateWithAudit } from '@/lib/db/billing-status';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
+import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import { fetchUserBillingDataByIdentity } from './queries';
 import {
   BILLING_FIELDS_STATUS,
@@ -101,6 +102,7 @@ export async function updateUserBillingStatus(
   } = options;
 
   const effectivePlan = plan ?? (isPro ? 'pro' : 'free');
+  let affectedUserId = clerkUserId;
 
   try {
     const userResult = await fetchUserBillingDataByIdentity({
@@ -109,10 +111,17 @@ export async function updateUserBillingStatus(
     });
 
     if (!userResult.success || !userResult.data) {
+      captureRevenueSpineFailure({
+        stage: 'stripe_sync',
+        failureCode: 'billing_unavailable',
+        severity: 'blocked',
+        userId: clerkUserId,
+      });
       return { success: false, error: userResult.error ?? 'User not found' };
     }
 
     const currentUser = userResult.data;
+    affectedUserId = currentUser.id;
 
     // Event ordering: Skip if this event is older than the last processed event
     if (isEventStale(stripeEventTimestamp, currentUser.lastBillingEventAt)) {
@@ -166,7 +175,7 @@ export async function updateUserBillingStatus(
     });
 
     if (!result) {
-      return await retryUpdateWithFreshData(options);
+      return await retryUpdateWithFreshData(options, 0, currentUser.id);
     }
 
     return {
@@ -176,6 +185,12 @@ export async function updateUserBillingStatus(
       reason: result.deduplicated ? 'Stripe event already applied' : undefined,
     };
   } catch (error) {
+    captureRevenueSpineFailure({
+      stage: 'stripe_sync',
+      severity: 'blocked',
+      userId: affectedUserId,
+      error,
+    });
     await captureCriticalError('Error updating user billing status', error, {
       clerkUserId,
       eventType,
@@ -202,7 +217,8 @@ export async function updateUserBillingStatus(
  */
 async function retryUpdateWithFreshData(
   options: UpdateBillingStatusOptions,
-  retryCount = 0
+  retryCount = 0,
+  knownAppUserId = options.clerkUserId
 ): Promise<UpdateBillingStatusResult> {
   const MAX_RETRIES = 3;
   const BASE_DELAY_MS = 50;
@@ -222,6 +238,7 @@ async function retryUpdateWithFreshData(
   } = options;
 
   const effectivePlan = plan ?? (isPro ? 'pro' : 'free');
+  let affectedUserId = knownAppUserId;
 
   try {
     // Add jittered exponential backoff before retry
@@ -240,6 +257,12 @@ async function retryUpdateWithFreshData(
     });
 
     if (!freshUserResult.success || !freshUserResult.data) {
+      captureRevenueSpineFailure({
+        stage: 'stripe_sync',
+        failureCode: 'billing_unavailable',
+        severity: 'blocked',
+        userId: affectedUserId,
+      });
       return {
         success: false,
         error: freshUserResult.error ?? 'User not found on retry',
@@ -247,6 +270,7 @@ async function retryUpdateWithFreshData(
     }
 
     const freshUser = freshUserResult.data;
+    affectedUserId = freshUser.id;
 
     // Re-check event ordering with fresh data
     if (isEventStale(stripeEventTimestamp, freshUser.lastBillingEventAt)) {
@@ -299,9 +323,19 @@ async function retryUpdateWithFreshData(
 
     if (!result) {
       if (retryCount < MAX_RETRIES) {
-        return retryUpdateWithFreshData(options, retryCount + 1);
+        return retryUpdateWithFreshData(
+          options,
+          retryCount + 1,
+          affectedUserId
+        );
       }
 
+      captureRevenueSpineFailure({
+        stage: 'stripe_sync',
+        failureCode: 'concurrent_update',
+        severity: 'blocked',
+        userId: affectedUserId,
+      });
       await captureWarning(
         `Optimistic lock failed after ${MAX_RETRIES + 1} attempts - high contention`,
         undefined,
@@ -320,6 +354,12 @@ async function retryUpdateWithFreshData(
       reason: result.deduplicated ? 'Stripe event already applied' : undefined,
     };
   } catch (error) {
+    captureRevenueSpineFailure({
+      stage: 'stripe_sync',
+      severity: 'blocked',
+      userId: affectedUserId,
+      error,
+    });
     await captureCriticalError('Error retrying billing status update', error, {
       clerkUserId,
       eventType,

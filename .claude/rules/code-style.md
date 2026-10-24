@@ -10,7 +10,7 @@ TypeScript, React/Next.js, server/client boundaries, canonical imports, ESLint r
 
 | Layer | Technology |
 |-------|------------|
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 16.4 (App Router) |
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS v4 |
 | Database | Neon PostgreSQL + Drizzle ORM |
@@ -60,6 +60,7 @@ const slug = title?.replaceAll(' ', '-') ?? '';
 - Functional components with hooks only.
 - Server Components by default, Client Components when needed.
 - Use `'use client'` directive sparingly and intentionally.
+- Cache Components is recommended upstream; JOV-7985 owns the dated migration exception. Node.js routes are supported, so do not recreate that retired blocker. Keep TanStack Query for client-owned state and audit hydration ownership before duplicating RSC data.
 
 ### Component Definition Rules
 
@@ -222,7 +223,7 @@ useQuery({
 
 ## Custom ESLint Rules
 
-21 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
+22 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`; enforced in CI.
 
 | Rule | What It Blocks | Fix |
 |------|---------------|-----|
@@ -247,6 +248,7 @@ useQuery({
 | `no-hardcoded-theme-colors` | Bare `text-black`/`bg-white` or `text-[#hex]` that bypass semantic tokens | Use token utilities (`text-primary-token`) or pair light/dark classes |
 | `no-direct-stripe-client` | Runtime `stripe` imports, `require('stripe')`, or `new Stripe(...)` outside `lib/stripe/` | Import the canonical client from `@/lib/stripe/client` (type-only imports are allowed) |
 | `ui-feel` | Numeral displays without `tabular-nums`, headings without `text-balance`/`text-pretty`, dual-axis sub-40px hit areas, child radius larger than its parent's | Add `tabular-nums` / `text-balance`, size hit areas to 44px (or a `before:`/`after:` hit container), keep child radius ≤ parent |
+| `no-users-clerk-id-lookup` | `eq(users.clerkId, ...)` outside the legacy identity allowlist | Match session ids on `users.id`; keep `clerkId` only for external or legacy ids |
 
 **Run:** `pnpm --filter web lint:eslint` (all rules) or `pnpm --filter web lint:server-boundaries` (boundary rules only).
 

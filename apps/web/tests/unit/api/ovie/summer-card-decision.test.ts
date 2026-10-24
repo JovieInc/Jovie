@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => ({
   resolvePrincipal: vi.fn(),
   decide: vi.fn(),
+  getCard: vi.fn(),
+  decideClaim: vi.fn(),
   captureError: vi.fn(),
 }));
 
@@ -11,7 +13,16 @@ vi.mock('@/lib/ovie/mcp/principal', () => ({
 }));
 vi.mock('@/lib/ovie/summer-cards.server', () => ({
   decideSummerCard: hoisted.decide,
+  getSummerCard: hoisted.getCard,
 }));
+vi.mock('@/lib/claim/claim-verification-review.server', async () => {
+  const prefix = 'claim-verification_';
+  return {
+    decideClaimVerification: hoisted.decideClaim,
+    profileIdFromClaimCardKey: (key: string) =>
+      key.startsWith(prefix) ? key.slice(prefix.length) : null,
+  };
+});
 vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureError,
 }));
@@ -44,6 +55,66 @@ describe('POST /api/ovie/summer-cards/[id]/decision', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.resolvePrincipal.mockResolvedValue(admin);
+    hoisted.getCard.mockResolvedValue({
+      id: CARD_ID,
+      idempotencyKey: 'summer-outbound-123',
+      status: 'pending',
+    });
+  });
+
+  it('never runs claim actions for ordinary Summer cards', async () => {
+    hoisted.decide.mockResolvedValue({
+      outcome: 'decided',
+      card: { id: CARD_ID, status: 'approved' },
+    });
+    const response = await call({ decision: 'approve' });
+    expect(response.status).toBe(200);
+    expect(hoisted.decideClaim).not.toHaveBeenCalled();
+  });
+
+  it('applies a claim-verification decision before closing its card', async () => {
+    const PROFILE = '11111111-2222-4333-8444-555555555555';
+    hoisted.getCard.mockResolvedValue({
+      id: CARD_ID,
+      idempotencyKey: `claim-verification_${PROFILE}`,
+      status: 'pending',
+    });
+    hoisted.decideClaim.mockResolvedValue({
+      outcome: 'decided',
+      record: { status: 'rejected' },
+    });
+    hoisted.decide.mockResolvedValue({
+      outcome: 'decided',
+      card: { id: CARD_ID, status: 'rejected' },
+    });
+
+    const response = await call({ decision: 'reject', comment: 'no proof' });
+
+    expect(response.status).toBe(200);
+    expect(hoisted.decideClaim).toHaveBeenCalledWith({
+      profileId: PROFILE,
+      decision: 'reject',
+      reason: 'no proof',
+      decidedBy: 'founder@jov.ie',
+      fromCard: true,
+    });
+    expect(hoisted.decideClaim.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.decide.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('leaves the claim card pending when the claim decision cannot apply', async () => {
+    hoisted.getCard.mockResolvedValue({
+      id: CARD_ID,
+      idempotencyKey: 'claim-verification_11111111-2222-4333-8444-555555555555',
+      status: 'pending',
+    });
+    hoisted.decideClaim.mockResolvedValue({ outcome: 'identity_conflict' });
+
+    const response = await call({ decision: 'approve' });
+
+    expect(response.status).toBe(409);
+    expect(hoisted.decide).not.toHaveBeenCalled();
   });
 
   it('returns 401 for an unauthenticated caller', async () => {

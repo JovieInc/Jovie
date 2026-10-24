@@ -42,6 +42,44 @@ describe('AppShellFrameDedupe', () => {
     );
   });
 
+  it('drops a hidden shell whose display is overridden and keeps one main landmark', () => {
+    render(
+      <>
+        <AppShellFrameDedupe />
+        <div
+          data-testid='stale-frame'
+          data-app-shell-frame='true'
+          hidden
+          style={{ display: 'flex' }}
+        >
+          <main id='main-content' data-testid='stale-main'>
+            Stale
+          </main>
+        </div>
+        <div data-testid='live-frame' data-app-shell-frame='true' ref={paint}>
+          <main id='main-content' data-testid='live-main'>
+            Live
+          </main>
+        </div>
+      </>
+    );
+
+    expect(screen.getByTestId('stale-frame')).not.toHaveAttribute(
+      'data-app-shell-frame'
+    );
+    expect(screen.getByTestId('stale-main')).not.toHaveAttribute('id');
+    expect(screen.getByTestId('stale-frame')).toHaveTextContent('');
+    expect(screen.getByTestId('live-frame')).toHaveTextContent('Live');
+    expect(screen.getByTestId('live-main')).toHaveAttribute(
+      'id',
+      'main-content'
+    );
+    expect(screen.getByTestId('live-frame')).toHaveAttribute(
+      'data-app-shell-frame',
+      'true'
+    );
+  });
+
   it('drops a display:none duplicate once another frame has a painted box', () => {
     render(
       <>
@@ -244,6 +282,7 @@ describe('AppShellFrameDedupe', () => {
       'Live tasks'
     );
     expect(screen.getByTestId('hidden-only')).toBeInTheDocument();
+    expect(screen.getByTestId('stale-frame')).toHaveTextContent('');
     expect(screen.getByTestId('stale-frame')).not.toHaveAttribute(
       'data-app-shell-frame'
     );
@@ -280,6 +319,97 @@ describe('AppShellFrameDedupe', () => {
       'data-app-shell-frame',
       'true'
     );
+  });
+
+  async function flushMutations() {
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+  }
+
+  it('does not walk shell text when the live chat frame commits a message', async () => {
+    render(
+      <>
+        <AppShellFrameDedupe />
+        <div
+          data-testid='stale-frame'
+          data-app-shell-frame='true'
+          hidden
+          style={{ display: 'flex' }}
+        >
+          <p>Stale assistant paragraph</p>
+        </div>
+        <div data-testid='live-frame' data-app-shell-frame='true' ref={paint}>
+          Live
+        </div>
+      </>
+    );
+    await flushMutations();
+
+    expect(screen.getByTestId('stale-frame')).toHaveTextContent('');
+    const stale = screen.getByTestId('stale-frame');
+    const live = screen.getByTestId('live-frame');
+    const walker = vi.spyOn(document, 'createTreeWalker');
+    const style = vi.spyOn(window, 'getComputedStyle');
+    walker.mockClear();
+    style.mockClear();
+
+    act(() => {
+      live.append('Performance message 1');
+    });
+    await flushMutations();
+
+    expect(
+      walker.mock.calls.some(
+        ([root]) => root === stale || stale.contains(root as Node)
+      )
+    ).toBe(false);
+    expect(
+      style.mock.calls.some(
+        ([node]) =>
+          node === live ||
+          node === stale ||
+          stale.contains(node as Node) ||
+          live.contains(node as Node)
+      )
+    ).toBe(false);
+    expect(screen.getByTestId('live-frame')).toHaveTextContent(
+      'Performance message 1'
+    );
+    expect(screen.getByTestId('stale-frame')).toHaveTextContent('');
+  });
+
+  it('clears text that reappears in a suppressed shell without laying out the live frame', async () => {
+    render(
+      <>
+        <AppShellFrameDedupe />
+        <div
+          data-testid='stale-frame'
+          data-app-shell-frame='true'
+          hidden
+          style={{ display: 'flex' }}
+        >
+          <p>Stale assistant paragraph</p>
+        </div>
+        <div data-testid='live-frame' data-app-shell-frame='true' ref={paint}>
+          Live
+        </div>
+      </>
+    );
+    await flushMutations();
+
+    const style = vi.spyOn(window, 'getComputedStyle');
+    style.mockClear();
+    act(() => {
+      screen.getByTestId('stale-frame').append('Generate album art paragraph');
+    });
+    await flushMutations();
+
+    expect(style).not.toHaveBeenCalled();
+    expect(screen.getByTestId('stale-frame')).toHaveTextContent('');
+    expect(screen.getByTestId('live-frame')).toHaveTextContent('Live');
   });
 
   it('disconnects the shared observer after the last subscriber unmounts', () => {

@@ -328,6 +328,14 @@ export function ChatThreadMessages({
           </Button>
         </div>
       ) : null}
+      {messages.length === 0 && !isStreaming ? (
+        <p
+          data-testid='chat-thread-empty'
+          className={`${CHAT_MESSAGE_CONTENT_SHELL_CLASSNAME} text-sm text-secondary-token`}
+        >
+          Nothing in this thread yet.
+        </p>
+      ) : null}
       {renderVirtualWindow ? (
         <div
           ref={totalSizeRef}

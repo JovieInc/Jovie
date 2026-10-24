@@ -108,57 +108,68 @@ export function AppShellSkeleton({
     );
 
   return (
-    <AppShellFrame
-      placeholder
-      sidebar={resolvedSidebar}
-      header={
-        <header
-          // Shell V1 header sits on the rounded content surface — no border-b,
-          // matches the compact header token used by DashboardHeader so the
-          // Suspense fallback doesn't shift the breadcrumb down a row.
-          className={cn(
-            'flex h-(--app-shell-header-height) shrink-0 items-center gap-2 bg-(--app-shell-content-surface) px-2.5'
-          )}
-        >
-          <div className='skeleton h-4 w-20 rounded' />
-          <div className='skeleton h-4 w-4 rounded opacity-30' />
-          <div className='skeleton h-4 w-28 rounded' />
-        </header>
-      }
-      audioPlayer={audioPlayer}
-      main={
-        mainOverride ?? (
-          <div className='mx-auto flex h-full w-full max-w-5xl p-4 sm:p-6'>
-            <div className='w-full space-y-4 p-1 sm:p-2'>
-              <div className='flex items-center justify-between'>
-                <div className='space-y-2'>
-                  <div className='skeleton h-6 w-52 rounded-md' />
-                  <div className='skeleton h-4 w-72 rounded' />
-                </div>
-                <div className='skeleton h-9 w-28 rounded-md' />
-              </div>
-
-              <div className='space-y-2 rounded-xl bg-surface-0 p-2.5'>
-                <div className='grid grid-cols-[minmax(0,1.4fr)_110px_68px] gap-3 border-b border-subtle/60 pb-2'>
-                  <div className='skeleton h-3 w-24 rounded' />
-                  <div className='skeleton h-3 w-16 rounded' />
-                  <div className='skeleton h-3 w-12 rounded' />
-                </div>
-                {[1, 2, 3, 4, 5].map(row => (
-                  <div
-                    key={`app-shell-row-${row}`}
-                    className='grid grid-cols-[minmax(0,1.4fr)_110px_68px] items-center gap-3 py-1'
-                  >
-                    <div className='skeleton h-4 w-full rounded' />
-                    <div className='skeleton h-4 w-20 rounded' />
-                    <div className='skeleton h-4 w-12 rounded' />
+    <>
+      {/*
+       * Text-legible loading status (JOV-8791): the skeleton is all shapes, so
+       * its text content is empty — screen readers and text-based probes see a
+       * blank page for the whole first-boot load. Announce it (sr-only keeps
+       * the visuals identical).
+       */}
+      <p className='sr-only' role='status'>
+        Loading your workspace…
+      </p>
+      <AppShellFrame
+        placeholder
+        sidebar={resolvedSidebar}
+        header={
+          <header
+            // Shell V1 header sits on the rounded content surface — no border-b,
+            // matches the compact header token used by DashboardHeader so the
+            // Suspense fallback doesn't shift the breadcrumb down a row.
+            className={cn(
+              'flex h-(--app-shell-header-height) shrink-0 items-center gap-2 bg-(--app-shell-content-surface) px-2.5'
+            )}
+          >
+            <div className='skeleton h-4 w-20 rounded' />
+            <div className='skeleton h-4 w-4 rounded opacity-30' />
+            <div className='skeleton h-4 w-28 rounded' />
+          </header>
+        }
+        audioPlayer={audioPlayer}
+        main={
+          mainOverride ?? (
+            <div className='mx-auto flex h-full w-full max-w-5xl p-4 sm:p-6'>
+              <div className='w-full space-y-4 p-1 sm:p-2'>
+                <div className='flex items-center justify-between'>
+                  <div className='space-y-2'>
+                    <div className='skeleton h-6 w-52 rounded-md' />
+                    <div className='skeleton h-4 w-72 rounded' />
                   </div>
-                ))}
+                  <div className='skeleton h-9 w-28 rounded-md' />
+                </div>
+
+                <div className='space-y-2 rounded-xl bg-surface-0 p-2.5'>
+                  <div className='grid grid-cols-[minmax(0,1.4fr)_110px_68px] gap-3 border-b border-subtle/60 pb-2'>
+                    <div className='skeleton h-3 w-24 rounded' />
+                    <div className='skeleton h-3 w-16 rounded' />
+                    <div className='skeleton h-3 w-12 rounded' />
+                  </div>
+                  {[1, 2, 3, 4, 5].map(row => (
+                    <div
+                      key={`app-shell-row-${row}`}
+                      className='grid grid-cols-[minmax(0,1.4fr)_110px_68px] items-center gap-3 py-1'
+                    >
+                      <div className='skeleton h-4 w-full rounded' />
+                      <div className='skeleton h-4 w-20 rounded' />
+                      <div className='skeleton h-4 w-12 rounded' />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        )
-      }
-    />
+          )
+        }
+      />
+    </>
   );
 }

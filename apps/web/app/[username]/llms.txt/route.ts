@@ -93,7 +93,7 @@ function appendAudienceDestinations(
   }
 }
 
-// ISR: match the profile page's 1-hour revalidation window
+// Match the profile page's fresh publication decision on every request.
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 

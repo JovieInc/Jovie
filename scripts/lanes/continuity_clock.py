@@ -46,6 +46,9 @@ class Clock:
     state_file: str
     # Other triggers whose runs also count as a fresh invocation.
     extra_events: frozenset = frozenset()
+    # False: the workflow has no GitHub cron backstop (JOV-INV-042), so this clock is its only
+    # trigger and an empty run history means it has never run and is due, not unobservable.
+    github_cron: bool = True
 
     @property
     def endpoint(self) -> str:
@@ -69,6 +72,10 @@ CLOCKS = (
     # Resolve or reopen autofixed incidents once their 45-minute post-deploy soak elapses.
     Clock("sentryRecurrence", "sentry-autofix-recurrence.yml", "clock_sentry_autofix_recurrence", 3600,
           "sentry-recurrence-clock.json"),
+    # Weekly archive-then-delete of stale remote branches (7,752 on 2026-10-20). A clock event
+    # applies unless client_payload.apply is false; the bot token cannot send workflow_dispatch.
+    Clock("staleBranchSweep", "stale-branch-sweep.yml", "clock_stale_branch_sweep", 7 * 86400,
+          "stale-branch-sweep-clock.json", github_cron=False),
 )
 CONTINUITY = CLOCKS[0]
 
@@ -85,6 +92,8 @@ def observe(run, now: float, clock: Clock = CONTINUITY) -> dict:
     endpoint = clock.endpoint
     data = json.loads(api(run, [endpoint + "/runs?branch=main&per_page=30"]))
     rows = data.get("workflow_runs")
+    if isinstance(rows, list) and not rows and not clock.github_cron and data.get("total_count") == 0:
+        return {"status": "overdue", "runId": None, "ageSeconds": None, "neverRun": True}
     if not isinstance(rows, list) or not rows:
         raise ValueError("workflow-runs-unobservable")
     observations = []

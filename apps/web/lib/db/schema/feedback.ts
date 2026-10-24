@@ -15,6 +15,58 @@ import { chatConversations, chatTurns } from './chat';
 export const feedbackStatusEnumValues = ['pending', 'dismissed'] as const;
 
 /**
+ * Closed-loop classification (JOV-6433). Computed at capture time by the
+ * deterministic classifier in `lib/feedback-classification.ts` — never by
+ * the reporter. `bug_verifiable` rows enter the dedupe → auto-remediation
+ * path; `feature_or_change` rows emit a Summer signal for now/later/never
+ * ranking; `noise` rows are recorded and auto-disposed `never`.
+ */
+export const feedbackClassificationEnumValues = [
+  'bug_verifiable',
+  'feature_or_change',
+  'noise',
+] as const;
+
+export type FeedbackClassification =
+  (typeof feedbackClassificationEnumValues)[number];
+
+/**
+ * Durable outcome for a feedback item (JOV-6433). Distinct from `status`
+ * (admin triage): `status` says whether a human dismissed the row;
+ * `disposition` is the closed-loop decision and is only written together
+ * with a `feedback_decisions` ledger entry.
+ */
+export const feedbackDispositionEnumValues = [
+  'pending',
+  'auto_remediation',
+  'duplicate',
+  'pending_summer',
+  'cert_required',
+  'now',
+  'later',
+  'never',
+] as const;
+
+export type FeedbackDisposition =
+  (typeof feedbackDispositionEnumValues)[number];
+
+/** Decision kinds recorded in the `feedback_decisions` ledger. */
+export const feedbackDecisionEnumValues = [
+  'classified',
+  'auto_ship_bug',
+  'duplicate_of',
+  'duplicate_observed',
+  'summer_signal',
+  'taste_cert_required',
+  'now',
+  'later',
+  'never',
+  'noise',
+] as const;
+
+export type FeedbackDecisionKind = (typeof feedbackDecisionEnumValues)[number];
+
+/**
  * Vote values for in-chat 👍/👎 feedback rows (JOV #11460).
  * Rows without a vote are classic free-text feedback submissions.
  */
@@ -86,6 +138,19 @@ export const feedbackItems = pgTable(
     plan: text('plan'),
     /** 👍 = 'up', 👎 = 'down'. Null on classic feedback rows. */
     vote: text('vote', { enum: feedbackVoteEnumValues }),
+    /** Closed-loop classification (JOV-6433). Null on rows predating it. */
+    classification: text('classification', {
+      enum: feedbackClassificationEnumValues,
+    }),
+    /** Closed-loop outcome (JOV-6433); see `feedback_decisions` ledger. */
+    disposition: text('disposition', { enum: feedbackDispositionEnumValues })
+      .notNull()
+      .default('pending'),
+    /**
+     * Canonical dedupe key (JOV-6433): normalized-message hash. Identical
+     * reports share it; semantic similarity does not merge rows.
+     */
+    fingerprint: text('fingerprint'),
     dismissedAt: timestamp('dismissed_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -107,6 +172,14 @@ export const feedbackItems = pgTable(
     voteModelIdx: index('feedback_items_vote_model_idx')
       .on(table.modelUsed, table.vote)
       .where(drizzleSql`${table.vote} IS NOT NULL`),
+    /** Closed-loop queries: pending dispositions per class. */
+    dispositionIdx: index('feedback_items_disposition_idx').on(
+      table.disposition,
+      table.createdAt
+    ),
+    fingerprintIdx: index('feedback_items_fingerprint_idx')
+      .on(table.fingerprint)
+      .where(drizzleSql`${table.fingerprint} IS NOT NULL`),
     conversationIdx: index('feedback_items_conversation_idx')
       .on(table.conversationId)
       .where(drizzleSql`${table.conversationId} IS NOT NULL`),
@@ -118,3 +191,49 @@ export const selectFeedbackItemSchema = createSelectSchema(feedbackItems);
 
 export type FeedbackItem = typeof feedbackItems.$inferSelect;
 export type NewFeedbackItem = typeof feedbackItems.$inferInsert;
+
+/**
+ * Durable decision ledger (JOV-6433): one append-only row per decision so we
+ * never re-decide without prior context. Every `feedback_items.disposition`
+ * transition is written here first — actor + reason + timestamp are required
+ * for now/later/never. Queryable per item, per kind, or for open
+ * `summer_signal`/`auto_ship_bug` work.
+ */
+export const feedbackDecisions = pgTable(
+  'feedback_decisions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    feedbackItemId: uuid('feedback_item_id')
+      .notNull()
+      .references(() => feedbackItems.id, { onDelete: 'cascade' }),
+    decision: text('decision', { enum: feedbackDecisionEnumValues }).notNull(),
+    reason: text('reason').notNull().default(''),
+    /** Who decided: 'system:classifier', 'summer', admin user id, 'founder'. */
+    actor: text('actor').notNull(),
+    /**
+     * Event payload: classification signals, dedupe target, or the Summer
+     * decision packet (reproducibility, severity, exposure, effort,
+     * confidence — measured facts kept distinct from ROI hypotheses).
+     */
+    payload: jsonb('payload')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    itemCreatedIdx: index('feedback_decisions_item_created_idx').on(
+      table.feedbackItemId,
+      table.createdAt
+    ),
+    decisionIdx: index('feedback_decisions_decision_idx').on(
+      table.decision,
+      table.createdAt
+    ),
+  })
+);
+
+export type FeedbackDecisionRow = typeof feedbackDecisions.$inferSelect;
+export type NewFeedbackDecisionRow = typeof feedbackDecisions.$inferInsert;

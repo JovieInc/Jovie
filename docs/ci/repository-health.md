@@ -75,6 +75,7 @@ File count, checkout/history size, dependency/build complexity, and organization
 | Tracked regular / binary payload | 198 MiB / 96 MiB |
 | Canonical visual baselines | 100 files / 12 MiB |
 | Forbidden tracked outputs | Zero new violations |
+| New repository-root entries | Only names in `scripts/repo-root-allowlist.json` |
 
 The 10,000-file failure is retired, not raised. `scripts/repo-health-baseline.json` records the 10,014 exact-main total, 9,945 old compatibility count, and legacy findings by rule/area. Receipts show the current total and delta. Existing PR-size, generated-placement, payload, binary, and visual gates still fail normally; there is no `continue-on-error`.
 
@@ -148,6 +149,23 @@ files (~8.7 MiB of the unchanged 12 MiB `maxSnapshotBytes` budget). The +10%
 raise restores a small headroom so ordinary new coverage does not trip the
 guard on every landing.
 
+Approved raise (measured 2026-10-21, visual-baseline auto-refresh PR #22501):
+`maxSnapshotFiles` 110 → 121 (+10%, the per-raise cap). Exact `origin/main`
+measured 110 canonical baselines — 100% of the prior budget — so the Admin
+Home pair required by `admin-surface-manifest.ts` (`admin-home-desktop.png`,
+`admin-home-mobile.png`) could not land. Since the 2026-10-10 raise the tree
+gained the four onboarding security-check baselines and
+`modal-signin-tablet.png`, and lost `homepage-mobile.png` (net +4, filling
+the previous headroom). A hash audit found three identical groups
+(`admin-growth-desktop` / `admin-growth-campaigns-desktop` /
+`admin-growth-ingest-desktop`, `pricing-dark` / `pricing-light`, and
+`signin-dark` / `signup-dark`); each filename is still requested by a live
+`toHaveScreenshot`, so deleting one would drop a route or theme tripwire.
+The four wide public-profile baselines are the flag-on
+`PROFILE_DESKTOP_SURFACE_ENABLED` comparisons and the visual-QA coverage
+entry for that surface. No unreferenced file remained. Resulting tree: 112
+files (~8.2 MiB of the unchanged 12 MiB `maxSnapshotBytes` budget).
+
 All must hold: exact-main is at least 90% of an absolute byte budget or two ordinary changes exceed a p99 delta; 30/90-day tree/new-blob, contributor, checkout, and CI measurements are included; Knip, hashes, generated paths, and owners prove no safe removal; increase is at most p99 +25% for deltas or 10% for payloads; tests and rationale change together. Larger changes require a separate decision and Linear issue. A number-only change fails review and never promotes rollout mode.
 
 ### Prune or archive
@@ -155,6 +173,23 @@ All must hold: exact-main is at least 90% of an absolute byte budget or two ordi
 Delete only after an owner, consumer/import search, replacement proof, history, and focused tests show obsolescence. Knip is evidence, not sole authorization. Remove generated output only when regeneration/retrieval and retention are tested. Never delete user work for a budget. History rewriting or LFS migration requires explicit approval, coordinated clone/worktree migration, and at least 25% measured reachable-history savings.
 
 Pruned under this rule (JOV-6671): historical `apps/web/drizzle/migrations/meta/*_snapshot.json` files. Each snapshot is a ~1 MiB full-schema copy; the directory grew to 83 files / ~54 MiB, the single largest tracked cost class, and pushed main to ~99% of the tracked-bytes budget. `drizzle-kit generate` reads only the newest snapshot as its diff base and `drizzle-kit check`/`up` only validate the snapshots that remain; the runtime migrator reads `_journal.json` + `*.sql` and never touches snapshots. Ship now: retain only the newest snapshot (deleted 0000–0116, kept `0117_snapshot.json`), recover ~52.7 MiB, and cap retention at 8 snapshots — enforced by `scripts/repo-hygiene-guard.test.mjs`, which tells the crossing PR to `git rm` the oldest snapshots. Re-evaluate when: a `drizzle-kit` upgrade consumes older snapshots (`up`/`generate` fails citing a missing `*_snapshot.json`) or the diff history is needed for a schema audit. Then: restore from git history (`git checkout <sha> -- <path>`) or regenerate via `drizzle-kit` from the live database.
+
+2026-10-20 hygiene pass: pruned `0117`–`0136` snapshots (16 files, ~16 MiB) back to the 8-snapshot cap after main drifted to 24; the cap test had been failing on main.
+
+### Repository-root allowlist
+
+Stale audit, status, and one-off script files accumulated at the root (`*_AUDIT.md`, `.agent-status.json`, `run-checks.sh`, `test-homepage.*`). The 2026-10-20 pass deleted the dead ones and moved the JOV-2712 hardening bundle to `docs/hardening/`. To stop regrowth, `scripts/repo-root-allowlist.json` lists every tracked top-level file and directory; `scripts/repo-hygiene-guard.mjs` fails any added path whose first segment is not listed, and a guard test keeps the list equal to the tracked root. Put docs under `docs/` or `canon/`, scripts under `scripts/`, and run evidence outside git. Adding a root entry is a reviewed edit to the allowlist; retiring one removes it.
+
+### Stale branch sweep
+
+Remote branches grew to 7,752 by 2026-10-20 because GitHub only auto-deletes merged PR heads. Agent branches with no PR, closed-unmerged heads, and squash-merged heads that got later commits all stayed. `scripts/stale-branch-sweep.mjs` (policy in `scripts/lib/stale-branch-sweep.mjs`) is dry-run by default. With `--apply` it deletes a branch only when nothing can be lost:
+
+- **Contained:** the tip is reachable from `main` and is at least 3 days old.
+- **Archived:** the branch is idle for at least 14 days and has no open PR. Its tip is pushed to `refs/archive/<branch>` and read back at the planned SHA. Only then is the branch deleted, with `--force-with-lease` on that SHA.
+
+The sweep never touches `main`, `gh-readonly-queue/*`, `backup/*` (hostops preservation owned by `scripts/lanes/worktree_sweep.py`), `release/*`, `dependabot/*`, a branch with an open PR, or a branch named in `--keep-file` (for example, one checked out in a local worktree). `refs/archive/*` is not fetched by the default refspec, so archived work costs clones nothing. To restore a branch, run `git push origin refs/archive/<branch>:refs/heads/<branch>`.
+
+GitHub crons are frozen (JOV-INV-042), so `.github/workflows/stale-branch-sweep.yml` has no schedule. The Gem lanes clock fires `repository_dispatch` type `clock_stale_branch_sweep` weekly; that event applies unless `client_payload.apply` is `false`. The automation registry records the cadence. Manual `workflow_dispatch` is a dry-run unless `apply=true`. Each run uploads a `jovie-stale-branch-sweep/v1` receipt.
 
 ### Split a package or repository
 

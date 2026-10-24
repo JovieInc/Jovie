@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getProfileModeRenderStaticParams } from '@/app/[username]/_lib/profile-static-params';
 import ArtistPage, {
   generateMetadata as generatePublicProfileMetadata,
 } from '@/app/[username]/page';
@@ -9,12 +10,12 @@ import {
   RENDER_FIXTURE_METADATA,
 } from '@/lib/render-fixture-policy';
 
-// Query modes are bounded by next.config.js but discovered on demand. Keep each
-// private destination on the same one-hour ISR cadence as the canonical page.
-export const revalidate = 3600;
+// Rewritten profile modes share the canonical page's fresh publication decision.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export function generateStaticParams() {
-  return [];
+  return getProfileModeRenderStaticParams();
 }
 
 interface ProfileModeRenderPageProps {

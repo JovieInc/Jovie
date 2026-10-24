@@ -16,14 +16,14 @@ export const EMOTIONS = /** @type {const} */ ([
 /**
  * ICP personas grounded in canon/POSITIONING.md ("musicians and other
  * creators managing a creative life with real work to move") and the
- * published Pro offer ($199/mo, lib/billing/offer-truth.ts).
+ * published Pro offer ($12/mo, lib/billing/offer-truth.ts).
  */
 export const PERSONAS = [
   {
     id: 'indie-release',
     name: 'Maya',
     brief:
-      'Independent R&B artist, about 5k monthly Spotify listeners, next single out in 3 weeks. Uses a free Linktree. Has a day job, so $199/mo has to visibly pay for itself in streams, fans or bookings.',
+      'Independent R&B artist, about 5k monthly Spotify listeners, next single out in 3 weeks. Uses a free Linktree. Has a day job, so $12/mo has to visibly pay for itself in streams, fans or bookings.',
   },
   {
     id: 'manager',
@@ -64,7 +64,7 @@ CLARITY, "do I know what to do next?": 0 = no idea; 5 = I can guess; 10 = one ob
 FRICTION (inverted, 10 = effortless): count fields, taps, waiting, and anything I must type before seeing value.
 TRUST: 0 = feels like a scam or broken; 5 = neutral; 10 = real, specific, verifiable, professional.
 WOULD CONTINUE: an honest yes/no for a busy person who did not ask for this. A blank or confusing step is a no.
-WOULD PAY $199/month: answer only from what the flow has shown so far, not from what the product might do.`;
+WOULD PAY $12/month: answer only from what the flow has shown so far, not from what the product might do.`;
 
 /** JSON schema handed to `claude -p --json-schema` for each persona run. */
 export function buildJudgeSchema(stepIds, objectionCount = 0) {
@@ -428,7 +428,7 @@ export function evaluatePassBar({
   const payers = primary.filter(verdict => verdict.wouldPay).length;
   if (payers < PASS_BAR.minWouldPay) {
     failures.push(
-      `${payers}/${primary.length} personas would pay $199 (need ${PASS_BAR.minWouldPay})`
+      `${payers}/${primary.length} personas would pay $12 (need ${PASS_BAR.minWouldPay})`
     );
   }
 

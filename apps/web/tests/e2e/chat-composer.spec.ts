@@ -391,12 +391,19 @@ test.describe('Chat composer — Variant F surface morph', () => {
     await expectSurfaceMode(page, 'root');
     await expect(page.locator(SLASH_MENU)).toBeVisible({ timeout: 5_000 });
 
-    // First skill in COMMANDS is `generateAlbumArt` which has a required
-    // `release` slot, so committing it should flip the surface to `entity`.
-    // ArrowDown isn't strictly needed (selectedIndex starts at 0 = first
-    // skill), but we walk through it to exercise the keyboard nav.
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('ArrowUp');
+    // The root menu now leads with the Attachments group (Attach Files,
+    // Upload audio) before Skills. `Generate album art` has a required
+    // `release` slot, so walk the keyboard selection down to it and commit;
+    // that should flip the surface to `entity`.
+    const albumArtSkill = page
+      .locator(SLASH_MENU)
+      .locator('[aria-selected="true"]')
+      .filter({ hasText: 'Generate album art' });
+    for (let step = 0; step < 12; step += 1) {
+      if ((await albumArtSkill.count()) > 0) break;
+      await page.keyboard.press('ArrowDown');
+    }
+    await expect(albumArtSkill).toHaveCount(1);
     await page.keyboard.press('Enter');
 
     // If the skill commits with an entity slot, the surface should flip to
@@ -586,7 +593,10 @@ test.describe('Chat composer — Variant F surface morph', () => {
       });
       await expect(attachButton).toBeVisible();
       await attachButton.click();
-      const attachmentMenu = page.getByRole('menu');
+      // The attach trigger opens a listbox (aria-haspopup='listbox') since
+      // #17531 unified the composer actions.
+      await expect(attachButton).toHaveAttribute('aria-haspopup', 'listbox');
+      const attachmentMenu = page.getByRole('listbox');
       await expect(attachmentMenu).toBeVisible();
       expectBoxInsideViewport(
         await attachmentMenu.boundingBox(),

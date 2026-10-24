@@ -94,7 +94,7 @@ describe('app shell workspaces', () => {
     const ov = contract.workspaces.find(workspace => workspace.id === 'ov');
 
     expect(ov).toMatchObject({
-      href: APP_ROUTES.ADMIN_CHAT,
+      href: APP_ROUTES.OV,
       role: 'secondary',
       access: 'admin',
       selectedAgent: 'summer',

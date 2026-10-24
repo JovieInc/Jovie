@@ -235,7 +235,6 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
   }
 }
 
-// Read current discovery consent; stale cache entries cannot authorize a listing.
 export const getFeaturedCreators = queryFeaturedCreators;
 
 /**
@@ -368,7 +367,6 @@ async function queryCreatorByHandle(
   }
 }
 
-// Read current discovery consent; stale cache entries cannot authorize a listing.
 export const getCreatorByHandle = queryCreatorByHandle;
 
 /**
@@ -428,10 +426,6 @@ async function queryFeaturedCreatorsForSearch(): Promise<VipArtistLookup> {
   return vipLookup;
 }
 
-/**
- * VIP prioritization reads current consent on each search request.
- */
-// Read current discovery consent; stale cache entries cannot authorize a listing.
 export const getFeaturedCreatorsForSearch = queryFeaturedCreatorsForSearch;
 
 /**

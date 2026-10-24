@@ -8,6 +8,7 @@ import PricingPage, {
 } from '@/app/(marketing)/pricing/page';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 
 vi.mock(
   '@/components/marketing/artist-profile/ArtistProfileLandingRoute',
@@ -25,7 +26,9 @@ vi.mock('@/components/organisms/PricingRecipeBody', () => ({
 
 describe('priority marketing page crawler contracts', () => {
   it('publishes a usable pricing title and the existing real social image', () => {
-    expect(pricingMetadata.title).toBe(`Pricing | ${APP_NAME}`);
+    expect(applyRootTitleTemplate(pricingMetadata.title)).toBe(
+      `Pricing | ${APP_NAME}`
+    );
     expect(pricingMetadata.openGraph).toMatchObject({
       url: `${BASE_URL}/pricing`,
       images: [{ url: `${BASE_URL}/og/default.png`, width: 1200, height: 630 }],
@@ -60,7 +63,7 @@ describe('priority marketing page crawler contracts', () => {
     );
   });
 
-  it('keeps the pricing offer schema aligned with limited paid access', () => {
+  it('keeps the pricing offer schema aligned with the self-serve paid offer', () => {
     const { container } = render(<PricingPage />);
     const script = container.querySelector(
       'script[type="application/ld+json"]'
@@ -81,8 +84,8 @@ describe('priority marketing page crawler contracts', () => {
         }),
         expect.objectContaining({
           offers: expect.objectContaining({
-            price: '199',
-            availability: 'https://schema.org/LimitedAvailability',
+            price: '12',
+            availability: 'https://schema.org/InStock',
           }),
         }),
       ])

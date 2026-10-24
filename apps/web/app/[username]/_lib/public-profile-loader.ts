@@ -138,6 +138,7 @@ const fetchProfileAndLinks = async (
     // invalidation. React.cache below only deduplicates within this request.
     const result = await getCreatorProfileWithLinks(username, {
       skipCache: true,
+      throwOnError: true,
     });
 
     if (!result || !isPublicProfilePublished(result.isPublic)) {

@@ -100,7 +100,13 @@ test.describe('Artist Profiles Landing', () => {
     await waitForHydration(page);
   });
 
-  test('hero renders with headline and CTAs', async ({ page }) => {
+  test('hero renders with headline and CTAs', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(
+      page
+        .getByTestId('artist-profile-section-hero')
+        .getByText(ARTIST_PROFILE_COPY.hero.subhead, { exact: true })
+    ).toBeVisible();
     const claimLink = page
       .getByRole('link', {
         name: /claim your profile/i,
@@ -115,6 +121,16 @@ test.describe('Artist Profiles Landing', () => {
     await expect(claimLink).toBeVisible();
     await expect(claimLink).toHaveAttribute('href', /\/start/);
     await expectFullyInViewport(page, claimLink);
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({
+      path: testInfo.outputPath('artist-profiles-desktop-viewport.png'),
+      caret: 'initial',
+    });
+    await page.screenshot({
+      path: testInfo.outputPath('artist-profiles-desktop-full.png'),
+      fullPage: true,
+      caret: 'initial',
+    });
   });
 
   test('final CTA renders with claim form', async ({ page }) => {
@@ -151,8 +167,13 @@ test.describe('Artist Profiles Landing', () => {
     ).toHaveCount(1);
   });
 
-  test('hero stays intact on mobile', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 812 });
+  test('hero stays intact on mobile', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(
+      page
+        .getByTestId('artist-profile-section-hero')
+        .getByText(ARTIST_PROFILE_COPY.hero.subhead, { exact: true })
+    ).toBeVisible();
 
     await expect(
       page.getByRole('heading', {
@@ -168,6 +189,16 @@ test.describe('Artist Profiles Landing', () => {
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
     await expectFullyInViewport(page, claimLink);
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({
+      path: testInfo.outputPath('artist-profiles-mobile-viewport.png'),
+      caret: 'initial',
+    });
+    await page.screenshot({
+      path: testInfo.outputPath('artist-profiles-mobile-full.png'),
+      fullPage: true,
+      caret: 'initial',
+    });
   });
 
   test('keeps mode choices pending before JavaScript attaches their handlers', async ({
@@ -454,7 +485,7 @@ test.describe('Artist Profiles Landing', () => {
 
   test('capture, opinionated decisions, product truth, steps, and FAQ match the plan', async ({
     page,
-  }) => {
+  }, testInfo) => {
     const captureSection = page.getByTestId('artist-profile-section-capture');
     await expect(
       captureSection.getByRole('heading', {
@@ -530,14 +561,41 @@ test.describe('Artist Profiles Landing', () => {
     ).toBeVisible();
     await expect(faqSection.getByRole('button')).toHaveCount(4);
     const firstQuestion = faqSection.getByRole('button', {
-      name: 'How is this different from Linktree?',
+      name: 'Is an Artist Profile free?',
     });
     await expect(firstQuestion).toHaveAttribute('aria-expanded', 'false');
     await firstQuestion.click();
     await expect(firstQuestion).toHaveAttribute('aria-expanded', 'true');
-    await expect(
-      faqSection.getByText(/Jovie is built for music release behavior/i)
-    ).toBeVisible();
+    await expect(faqSection.getByText(/free to claim and edit/i)).toBeVisible();
+
+    for (const viewport of [
+      { name: 'desktop', width: 1440, height: 900 },
+      { name: 'mobile', width: 390, height: 844 },
+    ] as const) {
+      await page.setViewportSize(viewport);
+      for (const item of ARTIST_PROFILE_COPY.faq.items) {
+        const question = faqSection.getByRole('button', {
+          name: item.question,
+          exact: true,
+        });
+        await question.scrollIntoViewIfNeeded();
+        await question.focus();
+        await expect(question).toBeFocused();
+        if ((await question.getAttribute('aria-expanded')) === 'false') {
+          await question.press('Enter');
+        }
+        await expect(question).toHaveAttribute('aria-expanded', 'true');
+        await expect(
+          faqSection.getByText(item.answer, { exact: true })
+        ).toBeVisible();
+      }
+      await expectNoHorizontalOverflow(page);
+      await faqSection.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: testInfo.outputPath(`artist-profiles-${viewport.name}-faq.png`),
+        caret: 'initial',
+      });
+    }
 
     await expectNoHorizontalOverflow(page);
   });

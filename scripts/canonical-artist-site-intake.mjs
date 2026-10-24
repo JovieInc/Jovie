@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // JOV-6572: file one deduped product defect per canonical artist-site failure.
-// A missing certificate is itself a defect. GREEN closes the known keys.
+// A missing certificate is a defect only after the lane ran. A skipped or
+// cancelled producer did not certify; golden-path intake owns that result.
+// GREEN closes the known keys.
 
 import { readFileSync } from 'node:fs';
 import {
@@ -50,8 +52,15 @@ function isGreen(certificate) {
   return certificate?.status === 'GREEN' && certificate?.safeToSend === true;
 }
 
-export function openKeys(certificate) {
-  if (!certificate) return [MISSING_CERTIFICATE_KEY];
+/** The producer ran far enough that a missing certificate is evidence loss. */
+export function laneRan(producerResult) {
+  return producerResult !== 'skipped' && producerResult !== 'cancelled';
+}
+
+export function openKeys(certificate, { producerResult = '' } = {}) {
+  if (!certificate) {
+    return laneRan(producerResult) ? [MISSING_CERTIFICATE_KEY] : [];
+  }
   if (isGreen(certificate)) return [];
   const keys = new Set();
   const integrity = certificate.evidenceIntegrityFailures ?? [];
@@ -112,14 +121,14 @@ None${extras.length > 0 ? `\n${extras.join('\n')}` : ''}`;
 }
 
 export async function reportCanonicalArtistSiteCertification(
-  { certificate, runUrl = '', runId = '' },
+  { certificate, producerResult = '', runUrl = '', runId = '' },
   {
     env = process.env,
     upsert = upsertLinearIssueByTitleFingerprint,
     close = closeLinearIssueByFingerprint,
   } = {}
 ) {
-  const open = openKeys(certificate);
+  const open = openKeys(certificate, { producerResult });
   const closing = certificate
     ? intakeKeys().filter(key => !open.includes(key))
     : [];
@@ -169,14 +178,22 @@ export async function reportCanonicalArtistSiteCertification(
 }
 
 if (process.argv[1]?.endsWith('canonical-artist-site-intake.mjs')) {
+  const producerResult = process.env.PRODUCER_RESULT ?? '';
   const certificate = loadCertificate(process.env.CERT_PATH ?? '');
   reportCanonicalArtistSiteCertification({
     certificate,
+    producerResult,
     runUrl: process.env.RUN_URL,
     runId: process.env.RUN_ID,
   })
     .then(() => {
-      if (!certificate) process.exitCode = 1;
+      if (
+        openKeys(certificate, { producerResult }).includes(
+          MISSING_CERTIFICATE_KEY
+        )
+      ) {
+        process.exitCode = 1;
+      }
     })
     .catch(error => {
       console.error(error instanceof Error ? error.message : String(error));

@@ -208,10 +208,19 @@ class AvailabilityTest(unittest.TestCase):
             "a": {"available": False}, "b": {"available": True}}})})
         with patch.object(lane, "codex_lane_module", return_value=fake):
             self.assertEqual(lane.quota_pressure(self.host, "codex", PROVIDERS["codex"], 0)["pressure"], 0.5)
-        fake.status = staticmethod(lambda now: {"accounts": {"a": {"available": False}}})
+        fake.status = staticmethod(lambda now: {"accounts": {"a": {"available": False,
+                                                                  "exhaustedUntil": "2026-10-20T17:00:00Z"}}})
         with patch.object(lane, "codex_lane_module", return_value=fake):
             self.assertEqual(lane.quota_pressure(self.host, "codex", PROVIDERS["codex"], 0)["why"],
                              "all-accounts-banked")
+        # Gem 2026-10-20: stale identity evidence, not a bank, made both accounts unavailable.
+        fake.status = staticmethod(lambda now: {"accounts": {
+            "a": {"available": False, "exhaustedUntil": None}, "b": {"available": False,
+                                                                  "exhaustedUntil": "2026-10-20T17:00:00Z"}}})
+        with patch.object(lane, "codex_lane_module", return_value=fake):
+            verdict = lane.quota_pressure(self.host, "codex", PROVIDERS["codex"], 0)
+        self.assertFalse(verdict["ok"])
+        self.assertEqual(verdict["why"], "all-accounts-unavailable (1 banked, 1 without fresh capacity evidence)")
         with patch.object(lane, "codex_lane_module", side_effect=OSError):
             self.assertEqual(lane.quota_pressure(self.host, "codex", PROVIDERS["codex"], 0)["why"], "accounts unread")
 

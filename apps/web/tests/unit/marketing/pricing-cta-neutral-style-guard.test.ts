@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const pricingSectionPath = 'components/features/home/PricingSection.tsx';
 const marketingPlansPath =
   'components/features/pricing/MarketingPricingPlans.tsx';
 const globalsPath = 'app/globals.css';
@@ -12,16 +11,6 @@ function readSource(sourcePath: string) {
 }
 
 describe('pricing CTA neutral styling source contract', () => {
-  it('keeps the home pricing conversion action off accent button variants', () => {
-    const source = readSource(pricingSectionPath);
-
-    expect(source).not.toContain("variant='accent'");
-    expect(source).not.toContain('variant="accent"');
-    expect(source).not.toContain('linear-pricing-accent');
-    expect(source).not.toMatch(/rgba?\(113,\s*112,\s*255/);
-    expect(source).toContain("variant='primary'");
-  });
-
   it('keeps reusable marketing pricing cards neutral by default', () => {
     const source = readSource(marketingPlansPath);
 

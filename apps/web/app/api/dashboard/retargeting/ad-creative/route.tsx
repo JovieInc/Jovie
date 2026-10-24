@@ -329,7 +329,7 @@ export async function GET(req: NextRequest) {
   const dimensions = SIZES[size];
 
   try {
-    return await withDbSessionTx(async (tx, clerkUserId) => {
+    return await withDbSessionTx(async (tx, appUserId) => {
       const [profile] = await tx
         .select({
           username: creatorProfiles.username,
@@ -339,7 +339,7 @@ export async function GET(req: NextRequest) {
         })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(eq(users.clerkId, clerkUserId))
+        .where(eq(users.id, appUserId))
         .limit(1);
 
       if (!profile) {

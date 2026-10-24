@@ -394,11 +394,10 @@ export function DashboardNav({
               : () => cancelPendingNavigation(item.id)
           }
           shortcut={shortcut}
-          // Warm the approved customer destinations without a route flash.
-          // Next's automatic mode skips full payloads for dynamic routes;
-          // forcing `true` warms the complete route while preserving the
-          // current-page warm-navigation contract (no loading.tsx flash).
-          prefetch={!isDemo && !isInSettings ? true : undefined}
+          // Full prefetch (`true`) downloads every dynamic destination's RSC
+          // payload on mount and blows the shell persistence request budget.
+          // Click-time navigation still loads the route.
+          prefetch={false}
           onClick={demoUnavailable ? () => handleDemoNavClick(item) : undefined}
           onActivate={
             demoUnavailable
@@ -433,24 +432,8 @@ export function DashboardNav({
     ]
   );
 
-  // The same action changes slots on rail reveal; keep its keyboard focus.
-  const newChatRef = useRef<HTMLAnchorElement | null>(null);
-  const restoreNewChatFocus = useRef(false);
-  const preserveNewChatFocus = useCallback((node: HTMLAnchorElement | null) => {
-    if (!node) {
-      restoreNewChatFocus.current =
-        newChatRef.current === document.activeElement;
-    }
-    newChatRef.current = node;
-    if (node && restoreNewChatFocus.current) {
-      node.focus({ preventScroll: true });
-      restoreNewChatFocus.current = false;
-    }
-  }, []);
-
   const newChatAction = (
     <Link
-      ref={preserveNewChatFocus}
       href={APP_ROUTES.CHAT}
       onClick={event => handleCommandClick(event, chatNavItem)}
       aria-busy={pendingNavigation?.itemId === chatNavItem.id || undefined}
@@ -460,14 +443,14 @@ export function DashboardNav({
           ? 'page'
           : undefined
       }
-      prefetch={!isDemo}
+      prefetch={false}
       aria-label='New Chat'
       data-navigation-item-id={chatNavItem.id}
       data-navigation-pending={
         pendingNavigation?.itemId === chatNavItem.id || undefined
       }
       className={cn(
-        'relative flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-muted transition duration-subtle ease-subtle hover:bg-sidebar-accent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
+        'relative flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-muted transition duration-subtle ease-subtle hover:bg-sidebar-accent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring after:absolute after:-inset-2.5 after:lg:hidden',
         pendingNavigation?.itemId === chatNavItem.id && 'opacity-70'
       )}
     >
@@ -487,7 +470,10 @@ export function DashboardNav({
 
   return (
     <>
-      <nav className='flex flex-1 flex-col' aria-label='Dashboard Navigation'>
+      <nav
+        className='flex min-h-0 flex-1 flex-col overflow-anchor-none overflow-clip'
+        aria-label='Dashboard Navigation'
+      >
         {isInSettings ? (
           <>
             <SidebarCollapsibleGroup
@@ -510,7 +496,7 @@ export function DashboardNav({
             <div
               data-sidebar-search-slot='true'
               className={cn(
-                'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5',
+                'mx-1 flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5 lg:overflow-hidden',
                 // The command slot keeps its vertical allocation while the
                 // surrounding rail narrows; navigation below never moves.
                 'group-data-[collapsible=icon]:mx-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:pr-0'
@@ -535,7 +521,7 @@ export function DashboardNav({
                   <Link
                     href={APP_ROUTES.DASHBOARD}
                     onClick={event => handleCommandClick(event, inboxNavItem)}
-                    prefetch={!isDemo}
+                    prefetch={false}
                     aria-busy={
                       pendingNavigation?.itemId === inboxNavItem.id || undefined
                     }
@@ -578,7 +564,7 @@ export function DashboardNav({
                   </Link>
                 )}
               </RailStagedContent>
-              {threadsVisible ? null : newChatAction}
+              {newChatAction}
             </div>
             <SidebarGroupContent className='pb-2 pt-5'>
               {navSections.map(section => (
@@ -599,7 +585,7 @@ export function DashboardNav({
                 normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
               }
               onThreadContextMenu={onThreadContextMenu}
-              newThreadAction={newChatAction}
+              newThreadAction={false}
               state={
                 conversationsError
                   ? 'error'

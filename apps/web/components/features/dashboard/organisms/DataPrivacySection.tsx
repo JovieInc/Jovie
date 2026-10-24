@@ -18,7 +18,7 @@ export function DataPrivacySection({
 }: {
   readonly artist?: Artist | null;
   readonly onArtistUpdate?: (artist: Artist) => void;
-} = {}) {
+}) {
   const { signOut } = useAuthSafe();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
