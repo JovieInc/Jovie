@@ -16,6 +16,7 @@ import {
   MANIFEST,
   main,
   ROOT,
+  RUNTIME_SNAPSHOT,
   routePath,
   validateManifest,
 } from './artist-launch-contract.mjs';
@@ -47,6 +48,76 @@ test('checked-in launch inventory matches every current App Router entry point',
   assert.deepEqual(manifest.identity.creatorProfile.key, 'creator_profiles.id');
   assert.equal(manifest.identity.claim.table, 'user_profile_claims');
 });
+
+test('deferred launch enforcement snapshot is checked in and manifest-driven', () => {
+  const snapshot = JSON.parse(
+    readFileSync(join(ROOT, RUNTIME_SNAPSHOT), 'utf8')
+  );
+  assert.equal(snapshot.schema, 'jovie.deferred-launch-entries/v1');
+  for (const route of [
+    '/api/dashboard/shop',
+    '/api/dashboard/rider',
+    '/api/artist-rules',
+  ])
+    assert.ok(snapshot.handlers[route], route);
+  assert.ok(Object.keys(snapshot.handlers).length > 400);
+  assert.deepEqual(snapshot.components, [
+    'apps/web/app/app/(shell)/library/ArtistRulesSheet.tsx',
+    'apps/web/app/app/(shell)/settings/profile/SettingsRiderSection.tsx',
+    'apps/web/components/features/dashboard/organisms/SettingsPaySection.tsx',
+    'apps/web/components/features/dashboard/organisms/shopify/ShopifyStoreCard.tsx',
+  ]);
+});
+
+test('regenerates the enforcement snapshot and rejects drift plus transitive control imports', () =>
+  fixture(({ root, write }) => {
+    // Minimal complete policy lets this exercise the actual CLI's parity boundary.
+    for (const surface of SURFACES) {
+      for (const route of surface.routes) {
+        const prefix = `apps/web/app${route === '/' ? '' : route}`;
+        write(
+          `${prefix}/${route.startsWith('/api/') || route.includes('/claim') || route.startsWith('/auth/') ? 'route.ts' : 'page.tsx'}`,
+          'export const GET = () => {};'
+        );
+      }
+      for (const source of surface.components) write(source, 'export {};');
+      const actions = new Map();
+      for (const [source, name] of surface.actions)
+        actions.set(source, [...(actions.get(source) ?? []), name]);
+      for (const [source, names] of actions)
+        write(
+          source,
+          `'use server'; ${names.map(name => `export async function ${name}() {}`).join('\n')}`
+        );
+    }
+    mkdirSync(join(root, 'docs/product'), { recursive: true });
+    assert.match(main(['--write'], root), /runtime UNVERIFIED/);
+
+    const snapshot = JSON.parse(
+      readFileSync(join(root, RUNTIME_SNAPSHOT), 'utf8')
+    );
+    assert.equal(snapshot.schema, 'jovie.deferred-launch-entries/v1');
+    assert.ok(
+      snapshot.components.includes(
+        'apps/web/components/features/dashboard/organisms/SettingsPaySection.tsx'
+      )
+    );
+
+    write(RUNTIME_SNAPSHOT, '{"schema":"jovie.deferred-launch-entries/v1"}\n');
+    assert.throws(
+      () => main(['--check'], root),
+      /deferred launch enforcement snapshot drifted/
+    );
+
+    assert.match(main(['--write'], root), /runtime UNVERIFIED/);
+    write(
+      'apps/web/app/app/new-feature/sneaky.tsx',
+      "import { SettingsPaySection } from '@/features/dashboard/organisms/SettingsPaySection';\n"
+    );
+    assert.throws(() => main(['--check'], root), /deferred control imported/);
+    rmSync(join(root, 'apps/web/app/app/new-feature/sneaky.tsx'));
+    assert.match(main(['--check'], root), /records/);
+  }));
 
 test('maps route groups, parallel auth slots, interception and dynamic segments', () => {
   for (const [source, route] of [

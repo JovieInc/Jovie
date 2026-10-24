@@ -1,10 +1,4 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArtistProfileContent } from './ArtistProfileContent';
 
@@ -57,14 +51,6 @@ vi.mock('@/features/dashboard/organisms/useSettingsContext', () => ({
 
 vi.mock('@/features/dashboard/organisms/settings-profile-section', () => ({
   SettingsProfileSection: () => <div>Profile fields</div>,
-}));
-
-vi.mock('@/features/dashboard/organisms/SettingsPaySection', () => ({
-  SettingsPaySection: () => <div>Pay settings</div>,
-}));
-
-vi.mock('@/app/app/(shell)/library/ArtistRulesSheet', () => ({
-  ArtistRulesSheet: () => <button type='button'>Artist Rules</button>,
 }));
 
 describe('ArtistProfileContent', () => {
@@ -179,99 +165,64 @@ describe('ArtistProfileContent', () => {
       screen.getByRole('status', { name: 'Loading Profile Settings' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Payments' })
-    ).toBeInTheDocument();
+      screen.queryByRole('heading', { name: 'Payments' })
+    ).not.toBeInTheDocument();
     expect(
-      screen
-        .getByRole('status', { name: 'Loading Shop Settings' })
-        .closest('.min-h-52')
-    ).toBeInTheDocument();
+      screen.queryByRole('status', { name: 'Loading Shop Settings' })
+    ).not.toBeInTheDocument();
     expect(
       screen
         .getByRole('status', {
           name: 'Loading Profile Settings',
         })
         .querySelectorAll('[data-state="shimmer"]')
-    ).toHaveLength(16);
+    ).toHaveLength(7);
     expect(screen.getByTestId('mobile-profile-trigger-skeleton')).toHaveClass(
       'min-h-16',
       'lg:hidden'
     );
   });
 
-  it('keeps Shop geometry stable through artist and Shopify loading', async () => {
-    let resolveShop!: (value: { json: () => Promise<unknown> }) => void;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockReturnValue(
-        new Promise(resolve => {
-          resolveShop = resolve;
-        })
-      )
-    );
-
-    const { rerender } = render(<ArtistProfileContent />);
-    const shopRootClassName = screen
-      .getByRole('status', { name: 'Loading Shop Settings' })
-      .closest('.min-h-52')?.className;
-
+  it('hides deferred launch controls from the profile surface', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockReturnValue(new Promise(() => {}) as Promise<Response>);
+    vi.stubGlobal('fetch', fetchMock);
     contextState.artist = {
       id: 'profile-1',
       handle: 'ada',
       name: 'Ada Artist',
       published: true,
     };
-    rerender(<ArtistProfileContent />);
+    render(<ArtistProfileContent />);
 
-    const shopPending = screen.getByRole('status', {
-      name: 'Loading Shop Settings',
-    });
-    expect(shopPending.closest('.min-h-52')).toHaveClass(shopRootClassName!, {
-      exact: true,
-    });
-
-    const publicProfile = screen.getByRole('link', {
-      name: /view as visitor/i,
-    });
-    expect(publicProfile).toHaveAttribute('href', '/ada');
-    expect(
-      document.querySelectorAll('[data-settings-companion-rail="true"]')
-    ).toHaveLength(1);
-    expect(publicProfile).toHaveAttribute('target', '_blank');
+    // B-class launch control still renders.
     expect(screen.getByText('Profile fields')).toBeInTheDocument();
-    expect(screen.getByText('Pay settings')).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Artist Rules' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Artist Rules' })
-    ).toBeInTheDocument();
 
-    await act(async () => {
-      resolveShop({
-        json: vi.fn().mockResolvedValue({ shopifyUrl: null }),
-      });
-    });
-    await waitFor(() => {
+    // Declared deferred (C) controls stay off every discovery and execution
+    // channel: no pay/shop/rider/artist-rules affordance and no request to
+    // their backing API entry points (JOV-8369 launch contract, JOV-8505).
+    expect(screen.queryByText('Pay settings')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Shop' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Artist Rules' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', { name: 'Loading Shop Settings' })
+    ).not.toBeInTheDocument();
+    for (const route of [
+      '/api/dashboard/shop',
+      '/api/dashboard/rider',
+      '/api/artist-rules',
+    ]) {
+      expect(fetchMock).not.toHaveBeenCalledWith(route, expect.anything());
       expect(
-        screen.queryByRole('status', { name: 'Loading Shop Settings' })
-      ).not.toBeInTheDocument();
-    });
-    expect(
-      screen.getByRole('heading', { name: 'Shop' }).closest('.min-h-52')
-    ).toHaveClass(shopRootClassName!, { exact: true });
-
-    const mobileProfileTrigger = screen.getByRole('button', {
-      name: 'Open Links And Music Preview Panel',
-    });
-    expect(mobileProfileTrigger).toHaveClass('min-h-16', 'lg:hidden');
-    expect(mobileProfileTrigger).toHaveAttribute('data-rail-toggle', 'right');
-    expect(mobileProfileTrigger).toHaveAttribute(
-      'aria-controls',
-      'shell-artist-profile-rail'
-    );
-    expect(mobileProfileTrigger).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.click(mobileProfileTrigger);
-    expect(openPreview).toHaveBeenCalledOnce();
+        fetchMock.mock.calls.filter(([url]) => String(url).includes(route))
+      ).toHaveLength(0);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    await act(async () => {});
   });
 });

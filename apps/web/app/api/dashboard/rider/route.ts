@@ -11,6 +11,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { creatorProfileRiders } from '@/lib/db/schema/riders';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { deferredLaunchRefusal } from '@/lib/launch/launch-enforcement';
 import {
   createRiderLinkToken,
   hashRiderPassword,
@@ -87,6 +88,8 @@ async function loadRider(profileId: string) {
 }
 
 export async function GET(request: Request) {
+  const refusal = deferredLaunchRefusal('/api/dashboard/rider');
+  if (refusal) return refusal;
   const profileId = new URL(request.url).searchParams.get('profileId');
   if (!isCanonicalUuid(profileId)) {
     return json({ error: 'A valid profileId is required' }, 400);
@@ -102,6 +105,8 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const refusal = deferredLaunchRefusal('/api/dashboard/rider');
+  if (refusal) return refusal;
   const parsed = riderPutSchema.safeParse(
     await request.json().catch(() => null)
   );

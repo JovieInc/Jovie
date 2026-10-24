@@ -1,0 +1,1743 @@
+{
+  "schema": "jovie.deferred-launch-entries/v1",
+  "generatedBy": "node scripts/artist-launch-contract.mjs --write",
+  "handlers": {
+    "/changelog/feed.json": [
+      "GET"
+    ],
+    "/changelog/feed.xml": [
+      "GET"
+    ],
+    "/changelog/whats-new.json": [
+      "GET"
+    ],
+    "/engineering/feed.json": [
+      "GET"
+    ],
+    "/engineering/feed.xml": [
+      "GET"
+    ],
+    "/[username]/feed.xml": [
+      "GET"
+    ],
+    "/[username]/llms.txt": [
+      "GET"
+    ],
+    "/[username]/s/[platform]": [
+      "GET"
+    ],
+    "/api/acquisition/agent-handoff": [
+      "GET"
+    ],
+    "/api/acquisition/proof-claim": [
+      "POST"
+    ],
+    "/api/acquisition": [
+      "POST"
+    ],
+    "/api/admin/acquisition/artist-offer-funnel": [
+      "GET"
+    ],
+    "/api/admin/acquisition/proof-claim-funnel": [
+      "GET"
+    ],
+    "/api/admin/agent-os/workflows/dry-run": [
+      "POST"
+    ],
+    "/api/admin/agent-os/workflows/runs/[runId]": [
+      "GET"
+    ],
+    "/api/admin/assets": [
+      "GET"
+    ],
+    "/api/admin/batch-ingest": [
+      "POST"
+    ],
+    "/api/admin/campaigns/invites": [
+      "GET"
+    ],
+    "/api/admin/campaigns/settings": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/campaigns/stats": [
+      "GET"
+    ],
+    "/api/admin/claim-verifications/[profileId]/decision": [
+      "POST"
+    ],
+    "/api/admin/claim-verifications": [
+      "GET"
+    ],
+    "/api/admin/contacts": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/creator-avatar": [
+      "POST"
+    ],
+    "/api/admin/creator-ingest/rerun": [
+      "POST"
+    ],
+    "/api/admin/creator-ingest": [
+      "POST"
+    ],
+    "/api/admin/creator-invite/bulk": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/creator-invite/bulk/stats": [
+      "GET"
+    ],
+    "/api/admin/creator-invite": [
+      "POST"
+    ],
+    "/api/admin/creator-social-links": [
+      "GET",
+      "PUT"
+    ],
+    "/api/admin/creators": [
+      "GET"
+    ],
+    "/api/admin/design-lab/proposals/[proposalId]/review": [
+      "POST"
+    ],
+    "/api/admin/design-lab/proposals": [
+      "GET"
+    ],
+    "/api/admin/feature-flags/rollback": [
+      "POST"
+    ],
+    "/api/admin/feature-flags": [
+      "POST"
+    ],
+    "/api/admin/feedback/[id]/dismiss": [
+      "POST"
+    ],
+    "/api/admin/feedback/[id]/disposition": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/feedback": [
+      "GET"
+    ],
+    "/api/admin/fit-scores": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/hud/env-exceptions": [
+      "GET"
+    ],
+    "/api/admin/hud/founder-funnel": [
+      "GET"
+    ],
+    "/api/admin/hud/github-rate-limits": [
+      "GET"
+    ],
+    "/api/admin/hud/ovie-launchers": [
+      "GET"
+    ],
+    "/api/admin/hud/shipper": [
+      "GET"
+    ],
+    "/api/admin/hud/shipping-velocity": [
+      "GET"
+    ],
+    "/api/admin/hud/tim-actions": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/hud/visual-qa/[runId]/[surfaceId]/[kind]": [
+      "GET"
+    ],
+    "/api/admin/hud/visual-qa/[runId]/review": [
+      "POST"
+    ],
+    "/api/admin/hud/visual-qa": [
+      "GET"
+    ],
+    "/api/admin/impersonate": [
+      "DELETE",
+      "GET",
+      "POST"
+    ],
+    "/api/admin/investors/links/[id]": [
+      "DELETE",
+      "PATCH"
+    ],
+    "/api/admin/investors/links": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/investors/settings": [
+      "GET",
+      "PUT"
+    ],
+    "/api/admin/investors/updates": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/leads/[id]/dm-sent": [
+      "PATCH"
+    ],
+    "/api/admin/leads/[id]/refresh-evidence": [
+      "POST"
+    ],
+    "/api/admin/leads/[id]": [
+      "DELETE",
+      "PATCH"
+    ],
+    "/api/admin/leads/[id]/skip": [
+      "PATCH"
+    ],
+    "/api/admin/leads/discover": [
+      "POST"
+    ],
+    "/api/admin/leads/funnel": [
+      "GET"
+    ],
+    "/api/admin/leads/keywords": [
+      "DELETE",
+      "GET",
+      "PATCH",
+      "POST"
+    ],
+    "/api/admin/leads/qualify": [
+      "POST"
+    ],
+    "/api/admin/leads": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/leads/seed": [
+      "POST"
+    ],
+    "/api/admin/leads/settings": [
+      "GET",
+      "PATCH"
+    ],
+    "/api/admin/moderation": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/outbound/readiness": [
+      "GET"
+    ],
+    "/api/admin/outbound": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/outreach/debug": [
+      "GET"
+    ],
+    "/api/admin/outreach": [
+      "GET",
+      "PATCH",
+      "POST"
+    ],
+    "/api/admin/outreach/settings": [
+      "GET"
+    ],
+    "/api/admin/ov-lists/[id]": [
+      "DELETE",
+      "GET",
+      "PATCH"
+    ],
+    "/api/admin/ov-lists/[id]/suggest": [
+      "POST"
+    ],
+    "/api/admin/ov-lists/creators": [
+      "GET"
+    ],
+    "/api/admin/ov-lists": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/ov-lists/views/[viewId]": [
+      "GET"
+    ],
+    "/api/admin/overview": [
+      "GET"
+    ],
+    "/api/admin/re-enrich": [
+      "POST"
+    ],
+    "/api/admin/releases": [
+      "GET"
+    ],
+    "/api/admin/roles": [
+      "DELETE",
+      "POST"
+    ],
+    "/api/admin/screenshots/[filename]": [
+      "GET"
+    ],
+    "/api/admin/set-plan": [
+      "POST"
+    ],
+    "/api/admin/step-up-status": [
+      "GET"
+    ],
+    "/api/admin/test-user/set-plan": [
+      "POST"
+    ],
+    "/api/admin/users": [
+      "GET"
+    ],
+    "/api/admin/visibility-audit": [
+      "GET",
+      "POST"
+    ],
+    "/api/admin/waitlist": [
+      "GET"
+    ],
+    "/api/agents/creator-lookup": [
+      "GET"
+    ],
+    "/api/agents/drafts/[id]": [
+      "GET"
+    ],
+    "/api/agents/drafts": [
+      "POST"
+    ],
+    "/api/agents/feedback": [
+      "POST"
+    ],
+    "/api/agents/profiles": [
+      "POST"
+    ],
+    "/api/analytics/help-center": [
+      "OPTIONS",
+      "POST"
+    ],
+    "/api/analytics/navigation": [
+      "GET",
+      "POST"
+    ],
+    "/api/apple-music/search": [
+      "GET"
+    ],
+    "/api/artist-rules": [
+      "DELETE",
+      "GET",
+      "PATCH",
+      "POST"
+    ],
+    "/api/artist/theme": [
+      "POST"
+    ],
+    "/api/audience/click": [
+      "POST"
+    ],
+    "/api/audience/opt-in": [
+      "GET",
+      "POST"
+    ],
+    "/api/audience/unsubscribe": [
+      "GET"
+    ],
+    "/api/audience/visit-token": [
+      "GET"
+    ],
+    "/api/audience/visit": [
+      "POST"
+    ],
+    "/api/auth/native/exchange": [
+      "POST"
+    ],
+    "/api/auth/native/handback": [
+      "POST"
+    ],
+    "/api/billing/health": [
+      "GET"
+    ],
+    "/api/calendar/[eventId]": [
+      "GET"
+    ],
+    "/api/calendar/profile/[username]": [
+      "GET"
+    ],
+    "/api/canary/waitlist/receipt": [
+      "GET",
+      "POST"
+    ],
+    "/api/canvas/generate": [
+      "GET",
+      "POST"
+    ],
+    "/api/catalog/collaborators/match": [
+      "POST"
+    ],
+    "/api/celebration-card/[username]": [
+      "GET"
+    ],
+    "/api/changelog/subscribe": [
+      "POST"
+    ],
+    "/api/changelog/unsubscribe": [
+      "GET",
+      "POST"
+    ],
+    "/api/changelog/verify": [
+      "GET"
+    ],
+    "/api/chat/album-art/apply": [
+      "POST"
+    ],
+    "/api/chat/album-art/create-release-and-apply": [
+      "POST"
+    ],
+    "/api/chat/audio": [
+      "POST"
+    ],
+    "/api/chat/capabilities": [
+      "GET"
+    ],
+    "/api/chat/confirm-edit": [
+      "POST"
+    ],
+    "/api/chat/confirm-link": [
+      "POST"
+    ],
+    "/api/chat/confirm-merch-action": [
+      "POST"
+    ],
+    "/api/chat/confirm-remove-link": [
+      "POST"
+    ],
+    "/api/chat/conversations/[id]/messages": [
+      "POST"
+    ],
+    "/api/chat/conversations/[id]": [
+      "DELETE",
+      "GET",
+      "PATCH"
+    ],
+    "/api/chat/conversations": [
+      "GET",
+      "POST"
+    ],
+    "/api/chat/feedback": [
+      "POST"
+    ],
+    "/api/chat/files/confirm": [
+      "POST"
+    ],
+    "/api/chat/files/upload-token": [
+      "POST"
+    ],
+    "/api/chat": [
+      "OPTIONS",
+      "POST"
+    ],
+    "/api/chat/usage": [
+      "GET"
+    ],
+    "/api/chatgpt/mcp": [
+      "DELETE",
+      "GET",
+      "POST"
+    ],
+    "/api/connectors/google/authorize": [
+      "GET"
+    ],
+    "/api/connectors/google/callback": [
+      "GET"
+    ],
+    "/api/connectors/google/disconnect": [
+      "POST"
+    ],
+    "/api/connectors/spotify/authorize": [
+      "GET"
+    ],
+    "/api/connectors/spotify/callback": [
+      "GET"
+    ],
+    "/api/connectors/spotify/disconnect": [
+      "POST"
+    ],
+    "/api/connectors/suggested-actions/[id]/approve": [
+      "POST"
+    ],
+    "/api/connectors/suggested-actions/[id]/next-step": [
+      "POST"
+    ],
+    "/api/connectors/suggested-actions/[id]/reject": [
+      "POST"
+    ],
+    "/api/connectors/suggested-actions/[id]/revise": [
+      "POST"
+    ],
+    "/api/connectors/suggested-actions": [
+      "GET"
+    ],
+    "/api/connectors/youtube/authorize": [
+      "GET"
+    ],
+    "/api/connectors/youtube/callback": [
+      "GET"
+    ],
+    "/api/connectors/youtube/disconnect": [
+      "POST"
+    ],
+    "/api/create-tip-intent": [
+      "POST"
+    ],
+    "/api/creator": [
+      "GET"
+    ],
+    "/api/cron/artist-daily-snapshots": [
+      "GET"
+    ],
+    "/api/cron/auth-signup-onboarding-canary": [
+      "GET"
+    ],
+    "/api/cron/billing-reconciliation": [
+      "GET"
+    ],
+    "/api/cron/cleanup-idempotency-keys": [
+      "GET"
+    ],
+    "/api/cron/cleanup-photos": [
+      "GET"
+    ],
+    "/api/cron/cleanup-sms-intents": [
+      "GET"
+    ],
+    "/api/cron/daily-maintenance": [
+      "GET"
+    ],
+    "/api/cron/data-retention": [
+      "GET"
+    ],
+    "/api/cron/frequent": [
+      "GET"
+    ],
+    "/api/cron/generate-insights": [
+      "GET"
+    ],
+    "/api/cron/generate-playlist": [
+      "GET"
+    ],
+    "/api/cron/monitor-metadata-submissions": [
+      "GET"
+    ],
+    "/api/cron/pixel-forwarding": [
+      "GET"
+    ],
+    "/api/cron/process-campaigns": [
+      "GET"
+    ],
+    "/api/cron/process-ingestion-jobs": [
+      "GET"
+    ],
+    "/api/cron/process-merch-fulfillment": [
+      "GET"
+    ],
+    "/api/cron/process-metadata-submissions": [
+      "GET"
+    ],
+    "/api/cron/process-pre-saves": [
+      "GET"
+    ],
+    "/api/cron/process-workflow-runs": [
+      "GET"
+    ],
+    "/api/cron/public-profile-canary": [
+      "GET"
+    ],
+    "/api/cron/purge-pixel-ips": [
+      "GET"
+    ],
+    "/api/cron/schedule-release-notifications": [
+      "GET"
+    ],
+    "/api/cron/send-release-notifications": [
+      "GET"
+    ],
+    "/api/cron/summarize-interviews": [
+      "GET"
+    ],
+    "/api/cron/sync-ai-crawler-analytics": [
+      "GET"
+    ],
+    "/api/cron/voice-pipeline": [
+      "GET"
+    ],
+    "/api/cron/web-ai-health": [
+      "GET"
+    ],
+    "/api/dashboard/activity/recent": [
+      "GET"
+    ],
+    "/api/dashboard/ai-crawlers": [
+      "GET"
+    ],
+    "/api/dashboard/analytics": [
+      "GET"
+    ],
+    "/api/dashboard/approvals/[id]": [
+      "DELETE",
+      "POST"
+    ],
+    "/api/dashboard/audience/members": [
+      "DELETE",
+      "GET"
+    ],
+    "/api/dashboard/audience/source-groups/[id]": [
+      "PATCH"
+    ],
+    "/api/dashboard/audience/source-groups": [
+      "GET",
+      "POST"
+    ],
+    "/api/dashboard/audience/source-links/[id]": [
+      "PATCH"
+    ],
+    "/api/dashboard/audience/source-links": [
+      "GET",
+      "POST"
+    ],
+    "/api/dashboard/audience/subscribers": [
+      "GET",
+      "POST"
+    ],
+    "/api/dashboard/contacts": [
+      "GET"
+    ],
+    "/api/dashboard/earnings": [
+      "GET"
+    ],
+    "/api/dashboard/jovie-work/recent": [
+      "GET"
+    ],
+    "/api/dashboard/monetization-summary": [
+      "GET"
+    ],
+    "/api/dashboard/pixels/health": [
+      "GET"
+    ],
+    "/api/dashboard/pixels": [
+      "DELETE",
+      "GET",
+      "PUT"
+    ],
+    "/api/dashboard/pixels/test-event": [
+      "POST"
+    ],
+    "/api/dashboard/press-photos": [
+      "GET"
+    ],
+    "/api/dashboard/profile/create": [
+      "POST"
+    ],
+    "/api/dashboard/releases/[releaseId]/analytics": [
+      "GET"
+    ],
+    "/api/dashboard/releases/[releaseId]/tracks": [
+      "GET"
+    ],
+    "/api/dashboard/releases/artwork-downloads": [
+      "POST"
+    ],
+    "/api/dashboard/retargeting/ad-creative": [
+      "GET"
+    ],
+    "/api/dashboard/rider": [
+      "GET",
+      "PUT"
+    ],
+    "/api/dashboard/shop": [
+      "GET",
+      "PUT"
+    ],
+    "/api/dashboard/tour-dates/[id]/analytics": [
+      "GET"
+    ],
+    "/api/demo/download": [
+      "GET"
+    ],
+    "/api/deploy/promote": [
+      "POST"
+    ],
+    "/api/deploy/status": [
+      "GET"
+    ],
+    "/api/desktop-updates/release-notes": [
+      "GET"
+    ],
+    "/api/desktop/download": [
+      "GET"
+    ],
+    "/api/dev/clear-session": [
+      "POST"
+    ],
+    "/api/dev/connectors/extract-now": [
+      "POST"
+    ],
+    "/api/dev/connectors/seed-fixtures": [
+      "GET"
+    ],
+    "/api/dev/test-auth/enter": [
+      "GET"
+    ],
+    "/api/dev/test-auth/mobile-callback": [
+      "POST"
+    ],
+    "/api/dev/test-auth/mobile-provider-complete": [
+      "GET"
+    ],
+    "/api/dev/test-auth/session": [
+      "DELETE",
+      "GET",
+      "POST"
+    ],
+    "/api/dev/test-user/set-plan": [
+      "POST"
+    ],
+    "/api/dev/unwaitlist": [
+      "POST"
+    ],
+    "/api/dsp/bio-sync": [
+      "GET",
+      "POST"
+    ],
+    "/api/dsp/catalog-scan/mismatches/[id]": [
+      "PATCH"
+    ],
+    "/api/dsp/catalog-scan/results": [
+      "GET"
+    ],
+    "/api/dsp/catalog-scan": [
+      "POST"
+    ],
+    "/api/dsp/catalog-scan/status": [
+      "GET"
+    ],
+    "/api/dsp/discover": [
+      "POST"
+    ],
+    "/api/dsp/enrichment/status": [
+      "GET"
+    ],
+    "/api/dsp/matches/[id]/confirm": [
+      "POST"
+    ],
+    "/api/dsp/matches/[id]/reject": [
+      "POST"
+    ],
+    "/api/dsp/matches": [
+      "GET"
+    ],
+    "/api/email/track/click": [
+      "GET"
+    ],
+    "/api/email/track/open": [
+      "GET"
+    ],
+    "/api/extension/action-log": [
+      "OPTIONS",
+      "POST"
+    ],
+    "/api/extension/actions/fill-preview": [
+      "OPTIONS",
+      "POST"
+    ],
+    "/api/extension/flags": [
+      "GET",
+      "OPTIONS"
+    ],
+    "/api/extension/session/status": [
+      "GET",
+      "OPTIONS"
+    ],
+    "/api/extension/summary": [
+      "GET",
+      "OPTIONS"
+    ],
+    "/api/featured-creators": [
+      "GET"
+    ],
+    "/api/feedback": [
+      "POST"
+    ],
+    "/api/finance/budget": [
+      "DELETE",
+      "GET",
+      "PUT"
+    ],
+    "/api/growth-access-request": [
+      "POST"
+    ],
+    "/api/handle/check": [
+      "GET"
+    ],
+    "/api/health/auth": [
+      "GET"
+    ],
+    "/api/health/build-info": [
+      "GET"
+    ],
+    "/api/health/comprehensive": [
+      "GET"
+    ],
+    "/api/health/db/performance": [
+      "GET"
+    ],
+    "/api/health/db": [
+      "GET"
+    ],
+    "/api/health/deploy": [
+      "GET"
+    ],
+    "/api/health/env": [
+      "GET"
+    ],
+    "/api/health/homepage": [
+      "GET"
+    ],
+    "/api/health/keys": [
+      "GET"
+    ],
+    "/api/health/redis": [
+      "GET"
+    ],
+    "/api/health": [
+      "GET"
+    ],
+    "/api/hud/ai-ops/dispatch": [
+      "POST"
+    ],
+    "/api/hud/founder-walks": [
+      "POST"
+    ],
+    "/api/hud/hermes-events": [
+      "GET",
+      "POST"
+    ],
+    "/api/hud/kiosk-session": [
+      "GET"
+    ],
+    "/api/hud/metrics": [
+      "GET"
+    ],
+    "/api/hud/shipping-state": [
+      "GET"
+    ],
+    "/api/images/artwork/upload": [
+      "POST"
+    ],
+    "/api/images/convert": [
+      "POST"
+    ],
+    "/api/images/press-photos/[photoId]": [
+      "DELETE"
+    ],
+    "/api/images/status/[id]": [
+      "GET"
+    ],
+    "/api/images/upload": [
+      "POST"
+    ],
+    "/api/inbox/founder-reviews/[id]/media": [
+      "DELETE",
+      "GET"
+    ],
+    "/api/inbox/founder-reviews/[id]/outcome": [
+      "PATCH"
+    ],
+    "/api/inbox/founder-reviews": [
+      "GET",
+      "POST"
+    ],
+    "/api/inbox/founder-reviews/upload-token": [
+      "POST"
+    ],
+    "/api/ingestion/jobs": [
+      "POST"
+    ],
+    "/api/insights/[id]": [
+      "PATCH"
+    ],
+    "/api/insights/generate": [
+      "POST"
+    ],
+    "/api/insights": [
+      "GET"
+    ],
+    "/api/insights/summary": [
+      "GET"
+    ],
+    "/api/internal/ovie/certification-evidence": [
+      "POST"
+    ],
+    "/api/internal/ovie/design-ci-judge-evidence": [
+      "POST"
+    ],
+    "/api/internal/ovie/fleet/events": [
+      "POST"
+    ],
+    "/api/internal/ovie/lyb-mrr": [
+      "GET"
+    ],
+    "/api/internal/ovie/objections/[id]/decision": [
+      "POST"
+    ],
+    "/api/internal/ovie/objections": [
+      "GET"
+    ],
+    "/api/internal/ovie/pipeline-bottleneck/contributions": [
+      "POST"
+    ],
+    "/api/internal/ovie/pipeline-bottleneck": [
+      "GET"
+    ],
+    "/api/internal/ovie/summer-bottleneck": [
+      "POST"
+    ],
+    "/api/internal/ovie/summer-cards": [
+      "GET",
+      "POST"
+    ],
+    "/api/internal/ovie/summer-company/acquisition-eligibility": [
+      "GET"
+    ],
+    "/api/internal/ovie/summer-company/cohorts": [
+      "GET"
+    ],
+    "/api/internal/ovie/summer-company/conversation-insights": [
+      "GET"
+    ],
+    "/api/internal/ovie/summer-company/conversation-insights/run": [
+      "POST"
+    ],
+    "/api/internal/ovie/summer-company/demand-allocation": [
+      "POST"
+    ],
+    "/api/internal/ovie/summer-company/funnel": [
+      "GET"
+    ],
+    "/api/internal/ovie/summer-company/revenue": [
+      "GET"
+    ],
+    "/api/internal/ovie/summer-company/state": [
+      "GET"
+    ],
+    "/api/internal/ovie/summer-shadow": [
+      "GET",
+      "POST"
+    ],
+    "/api/internal/release-communications/merge-events": [
+      "POST"
+    ],
+    "/api/investors/track": [
+      "POST"
+    ],
+    "/api/journey/step": [
+      "POST"
+    ],
+    "/api/library/approval-status": [
+      "GET",
+      "PATCH"
+    ],
+    "/api/library/asset-share/revoke": [
+      "POST"
+    ],
+    "/api/library/asset-share": [
+      "GET",
+      "PATCH",
+      "POST"
+    ],
+    "/api/library/audio/confirm": [
+      "POST"
+    ],
+    "/api/library/audio/snippet": [
+      "GET",
+      "POST"
+    ],
+    "/api/library/audio/upload-token": [
+      "POST"
+    ],
+    "/api/library/documents/[id]/approve": [
+      "POST"
+    ],
+    "/api/library/documents/[id]/claims": [
+      "POST"
+    ],
+    "/api/library/documents/[id]/review": [
+      "POST"
+    ],
+    "/api/library/documents/[id]": [
+      "PATCH"
+    ],
+    "/api/library/documents": [
+      "GET",
+      "POST"
+    ],
+    "/api/library/post-release": [
+      "GET",
+      "PATCH"
+    ],
+    "/api/library/profile-visibility": [
+      "PATCH"
+    ],
+    "/api/library/relationships": [
+      "DELETE",
+      "POST"
+    ],
+    "/api/library/share-drops/[token]/unlock": [
+      "POST"
+    ],
+    "/api/library/share-drops": [
+      "POST"
+    ],
+    "/api/link/[id]": [
+      "DELETE",
+      "GET",
+      "POST",
+      "PUT"
+    ],
+    "/api/max-access-request": [
+      "POST"
+    ],
+    "/api/mcp/[username]": [
+      "GET",
+      "POST"
+    ],
+    "/api/mcp": [
+      "GET",
+      "POST"
+    ],
+    "/api/memory/graph": [
+      "GET"
+    ],
+    "/api/merch/[sku]/availability": [
+      "GET",
+      "OPTIONS"
+    ],
+    "/api/merch/checkout": [
+      "POST"
+    ],
+    "/api/metadata-submissions/approve-send": [
+      "POST"
+    ],
+    "/api/metadata-submissions/draft-correction": [
+      "POST"
+    ],
+    "/api/metadata-submissions/prepare": [
+      "POST"
+    ],
+    "/api/metadata-submissions/providers": [
+      "GET"
+    ],
+    "/api/metadata-submissions/status": [
+      "GET"
+    ],
+    "/api/mobile/v1/audience/highlights": [
+      "GET"
+    ],
+    "/api/mobile/v1/auth/ticket": [
+      "POST"
+    ],
+    "/api/mobile/v1/calendar": [
+      "GET"
+    ],
+    "/api/mobile/v1/chat/conversations/[id]": [
+      "GET"
+    ],
+    "/api/mobile/v1/chat/conversations": [
+      "GET"
+    ],
+    "/api/mobile/v1/chat/turns": [
+      "POST"
+    ],
+    "/api/mobile/v1/eyes-free-capture": [
+      "POST"
+    ],
+    "/api/mobile/v1/inbox": [
+      "GET"
+    ],
+    "/api/mobile/v1/ios-access": [
+      "GET"
+    ],
+    "/api/mobile/v1/me": [
+      "GET"
+    ],
+    "/api/mobile/v1/profile/complete": [
+      "POST"
+    ],
+    "/api/mobile/v1/push-devices": [
+      "DELETE",
+      "PUT"
+    ],
+    "/api/music/mcp": [
+      "DELETE",
+      "GET",
+      "POST"
+    ],
+    "/api/notifications/confirm": [
+      "GET"
+    ],
+    "/api/notifications/sms-intents/[id]/status": [
+      "GET"
+    ],
+    "/api/notifications/sms-intents": [
+      "POST"
+    ],
+    "/api/notifications/status": [
+      "POST"
+    ],
+    "/api/notifications/subscribe": [
+      "POST"
+    ],
+    "/api/notifications/unsubscribe/one-click": [
+      "POST"
+    ],
+    "/api/notifications/unsubscribe": [
+      "POST"
+    ],
+    "/api/notifications/update-birthday": [
+      "PATCH"
+    ],
+    "/api/notifications/update-name": [
+      "PATCH"
+    ],
+    "/api/notifications/verify-email-otp": [
+      "POST"
+    ],
+    "/api/onboarding/conversation": [
+      "GET",
+      "POST"
+    ],
+    "/api/onboarding/discovery": [
+      "GET"
+    ],
+    "/api/onboarding/distribution-event": [
+      "POST"
+    ],
+    "/api/onboarding/intake": [
+      "POST"
+    ],
+    "/api/onboarding/presence-build": [
+      "POST"
+    ],
+    "/api/onboarding/welcome-chat": [
+      "POST"
+    ],
+    "/api/ops/what-shipped": [
+      "GET"
+    ],
+    "/api/ovie/certifications/decisions": [
+      "POST"
+    ],
+    "/api/ovie/certifications/metrics": [
+      "GET"
+    ],
+    "/api/ovie/certifications": [
+      "GET"
+    ],
+    "/api/ovie/dogfooders": [
+      "GET",
+      "POST"
+    ],
+    "/api/ovie/inbox": [
+      "GET"
+    ],
+    "/api/ovie/ingest": [
+      "POST"
+    ],
+    "/api/ovie/landed": [
+      "POST"
+    ],
+    "/api/ovie/mcp": [
+      "GET",
+      "OPTIONS",
+      "POST"
+    ],
+    "/api/ovie/oauth/authorize": [
+      "GET"
+    ],
+    "/api/ovie/oauth/register": [
+      "POST"
+    ],
+    "/api/ovie/oauth": [
+      "GET"
+    ],
+    "/api/ovie/oauth/token": [
+      "POST"
+    ],
+    "/api/ovie/pending": [
+      "GET"
+    ],
+    "/api/ovie/privacy-lock": [
+      "GET",
+      "POST"
+    ],
+    "/api/ovie/summer-cards/[id]/decision": [
+      "POST"
+    ],
+    "/api/ovie/summer-cards/[id]/feedback": [
+      "POST"
+    ],
+    "/api/ovie/summer-cards": [
+      "GET"
+    ],
+    "/api/ovie/summer/history": [
+      "GET"
+    ],
+    "/api/ovie/summer/reconcile": [
+      "GET"
+    ],
+    "/api/ovie/summer": [
+      "GET",
+      "POST"
+    ],
+    "/api/pre-save/apple": [
+      "POST"
+    ],
+    "/api/pre-save/spotify/callback": [
+      "GET"
+    ],
+    "/api/preview-url/refresh": [
+      "GET"
+    ],
+    "/api/profile-alias-decision/[username]/[slug]": [
+      "GET"
+    ],
+    "/api/profile-alias-decision": [
+      "GET"
+    ],
+    "/api/profile-surfaces/[id]/qualification": [
+      "POST"
+    ],
+    "/api/profile-surfaces/[id]/source": [
+      "GET"
+    ],
+    "/api/profile/[username]/ask": [
+      "POST"
+    ],
+    "/api/profile/audience-anon-cookie": [
+      "GET"
+    ],
+    "/api/profile/capture-dismissal": [
+      "GET",
+      "POST"
+    ],
+    "/api/profile/pac-event": [
+      "POST"
+    ],
+    "/api/profile/view": [
+      "POST"
+    ],
+    "/api/promo-downloads/[id]/request-otp": [
+      "POST"
+    ],
+    "/api/promo-downloads/[id]": [
+      "DELETE",
+      "PATCH"
+    ],
+    "/api/promo-downloads/[id]/verify-otp": [
+      "POST"
+    ],
+    "/api/promo-downloads/confirm": [
+      "POST"
+    ],
+    "/api/promo-downloads/upload-token": [
+      "POST"
+    ],
+    "/api/px": [
+      "OPTIONS",
+      "POST"
+    ],
+    "/api/referrals/apply": [
+      "POST"
+    ],
+    "/api/referrals/code": [
+      "GET",
+      "POST"
+    ],
+    "/api/referrals/stats": [
+      "GET"
+    ],
+    "/api/release-autopilot/run": [
+      "POST"
+    ],
+    "/api/release-to-revenue/runs/[runId]/drafts/[draftId]/approve": [
+      "POST"
+    ],
+    "/api/release-to-revenue/runs/[runId]/drafts/[draftId]/reject": [
+      "POST"
+    ],
+    "/api/release-to-revenue/runs/[runId]/drafts": [
+      "GET"
+    ],
+    "/api/report": [
+      "POST"
+    ],
+    "/api/revalidate/featured-creators": [
+      "POST"
+    ],
+    "/api/rider/[username]": [
+      "GET",
+      "POST"
+    ],
+    "/api/search/header": [
+      "GET"
+    ],
+    "/api/sentry-example-api": [
+      "GET"
+    ],
+    "/api/share/proof-brief": [
+      "GET"
+    ],
+    "/api/share/story/blog": [
+      "GET"
+    ],
+    "/api/share/story/playlist": [
+      "GET"
+    ],
+    "/api/share/story/profile": [
+      "GET"
+    ],
+    "/api/share/story/release": [
+      "GET"
+    ],
+    "/api/sms-access-request": [
+      "POST"
+    ],
+    "/api/spotify/fal-analysis": [
+      "GET"
+    ],
+    "/api/spotify/search": [
+      "GET"
+    ],
+    "/api/stripe-connect/disconnect": [
+      "POST"
+    ],
+    "/api/stripe-connect/onboard": [
+      "POST"
+    ],
+    "/api/stripe-connect/return": [
+      "GET"
+    ],
+    "/api/stripe-connect/status": [
+      "GET"
+    ],
+    "/api/stripe/cancel": [
+      "GET",
+      "POST"
+    ],
+    "/api/stripe/checkout": [
+      "GET",
+      "POST"
+    ],
+    "/api/stripe/plan-change/preview": [
+      "GET",
+      "POST"
+    ],
+    "/api/stripe/plan-change": [
+      "DELETE",
+      "GET",
+      "POST"
+    ],
+    "/api/stripe/pricing-options": [
+      "GET"
+    ],
+    "/api/suggestions/avatars/[id]/dismiss": [
+      "POST"
+    ],
+    "/api/suggestions/avatars/[id]/select": [
+      "POST"
+    ],
+    "/api/suggestions/playlist-fallback/[id]/approve": [
+      "POST"
+    ],
+    "/api/suggestions/playlist-fallback/[id]/reject": [
+      "POST"
+    ],
+    "/api/suggestions": [
+      "GET"
+    ],
+    "/api/suggestions/social-links/[id]/approve": [
+      "POST"
+    ],
+    "/api/suggestions/social-links/[id]/reject": [
+      "POST"
+    ],
+    "/api/summer/control": [
+      "POST"
+    ],
+    "/api/tips/create-checkout": [
+      "GET",
+      "POST"
+    ],
+    "/api/track": [
+      "POST"
+    ],
+    "/api/unsubscribe/claim-invites": [
+      "GET",
+      "POST"
+    ],
+    "/api/usage/summary": [
+      "GET"
+    ],
+    "/api/user-interviews": [
+      "POST"
+    ],
+    "/api/v1/[username]": [
+      "GET"
+    ],
+    "/api/v1/actions/[actionId]/invoke": [
+      "POST"
+    ],
+    "/api/v1/actions": [
+      "GET"
+    ],
+    "/api/v1/fleet/[operation]": [
+      "POST"
+    ],
+    "/api/v1/openapi.json": [
+      "GET"
+    ],
+    "/api/v1": [
+      "GET"
+    ],
+    "/api/verification/request": [
+      "POST"
+    ],
+    "/api/version": [
+      "GET"
+    ],
+    "/api/visibility-audit/offer": [
+      "GET"
+    ],
+    "/api/waitlist": [
+      "GET",
+      "POST"
+    ],
+    "/api/wallet/apple/profile-pass": [
+      "GET"
+    ],
+    "/api/wallet/apple/v1/devices/[deviceLibraryIdentifier]/registrations/[passTypeIdentifier]/[serialNumber]": [
+      "DELETE",
+      "POST"
+    ],
+    "/api/wallet/apple/v1/devices/[deviceLibraryIdentifier]/registrations/[passTypeIdentifier]": [
+      "GET"
+    ],
+    "/api/wallet/apple/v1/log": [
+      "POST"
+    ],
+    "/api/wallet/apple/v1/passes/[passTypeIdentifier]/[serialNumber]": [
+      "GET"
+    ],
+    "/api/webhooks/linear": [
+      "POST"
+    ],
+    "/api/webhooks/printful": [
+      "POST"
+    ],
+    "/api/webhooks/resend-inbound": [
+      "POST"
+    ],
+    "/api/webhooks/resend": [
+      "GET",
+      "POST"
+    ],
+    "/api/webhooks/sentry": [
+      "GET",
+      "POST"
+    ],
+    "/api/webhooks/sms": [
+      "POST"
+    ],
+    "/api/webhooks/stripe-connect": [
+      "GET",
+      "POST"
+    ],
+    "/api/webhooks/stripe-merch": [
+      "POST"
+    ],
+    "/api/webhooks/stripe-tips": [
+      "POST"
+    ],
+    "/api/webhooks/voice-pipeline": [
+      "POST"
+    ],
+    "/api/whats-new/dismiss": [
+      "POST"
+    ],
+    "/api/whats-new": [
+      "GET"
+    ],
+    "/api/workflow-captures/[id]/media": [
+      "GET"
+    ],
+    "/api/workflow-captures/[id]": [
+      "GET",
+      "PATCH"
+    ],
+    "/api/workflow-captures/[id]/upload-token": [
+      "POST"
+    ],
+    "/api/workflow-captures": [
+      "POST"
+    ],
+    "/api/wrap-link": [
+      "DELETE",
+      "GET",
+      "POST",
+      "PUT"
+    ],
+    "/api/youtube-library/links/[id]/approve": [
+      "POST"
+    ],
+    "/api/youtube-library/links/[id]/reject": [
+      "POST"
+    ],
+    "/api/youtube-library/sync": [
+      "GET",
+      "POST"
+    ],
+    "/api/youtube-library/videos/[videoId]/link": [
+      "GET",
+      "POST"
+    ],
+    "/api/youtube-library/videos/[videoId]/optimization": [
+      "GET"
+    ],
+    "/api/youtube-thumbnails/preview": [
+      "POST"
+    ],
+    "/app/admin/creators/bulk-feature": [
+      "POST"
+    ],
+    "/app/admin/creators/bulk-refresh": [
+      "POST"
+    ],
+    "/app/admin/creators/bulk-verify": [
+      "POST"
+    ],
+    "/app/admin/creators/delete": [
+      "POST"
+    ],
+    "/app/admin/creators/toggle-featured": [
+      "POST"
+    ],
+    "/app/admin/creators/toggle-marketing": [
+      "POST"
+    ],
+    "/app/admin/creators/toggle-verify": [
+      "POST"
+    ],
+    "/app/admin/users/ban": [
+      "POST"
+    ],
+    "/app/admin/users/delete": [
+      "POST"
+    ],
+    "/app/admin/users/toggle-featured": [
+      "POST"
+    ],
+    "/app/admin/users/toggle-marketing": [
+      "POST"
+    ],
+    "/app/admin/users/toggle-verify": [
+      "POST"
+    ],
+    "/app/admin/users/unban": [
+      "POST"
+    ],
+    "/app/admin/waitlist/approve": [
+      "POST"
+    ],
+    "/app/admin/waitlist/disapprove": [
+      "POST"
+    ],
+    "/app/admin/waitlist/resend-invite": [
+      "POST"
+    ],
+    "/app/admin/waitlist/settings": [
+      "GET",
+      "PATCH"
+    ],
+    "/app/admin/waitlist/update-status": [
+      "POST"
+    ],
+    "/apple-app-site-association": [
+      "GET"
+    ],
+    "/artists/[artistId]": [
+      "GET"
+    ],
+    "/ga-consent-init.js": [
+      "GET"
+    ],
+    "/go/[id]": [
+      "DELETE",
+      "GET",
+      "POST",
+      "PUT"
+    ],
+    "/investor-portal/deck/[...path]": [
+      "GET"
+    ],
+    "/investor-portal/events": [
+      "POST"
+    ],
+    "/llms-full.txt": [
+      "GET"
+    ],
+    "/llms.txt": [
+      "GET"
+    ],
+    "/openapi.json": [
+      "GET"
+    ],
+    "/r/isrc/[isrc]": [
+      "GET"
+    ],
+    "/s/[code]": [
+      "GET"
+    ]
+  },
+  "actions": [
+    "apps/web/app/actions/spotify-playlist.ts#extractPlaylistArtists",
+    "apps/web/app/actions/spotify.ts#checkArtistExists",
+    "apps/web/app/actions/spotify.ts#getArtist",
+    "apps/web/app/actions/spotify.ts#searchArtists",
+    "apps/web/app/actions/spotify.ts#searchArtistsPublic",
+    "apps/web/app/app/(shell)/admin/actions.ts#banUserAction",
+    "apps/web/app/app/(shell)/admin/actions.ts#bulkRerunCreatorIngestionAction",
+    "apps/web/app/app/(shell)/admin/actions.ts#bulkSetCreatorsFeaturedAction",
+    "apps/web/app/app/(shell)/admin/actions.ts#bulkSetCreatorsVerifiedAction",
+    "apps/web/app/app/(shell)/admin/actions.ts#deleteCreatorOrUserAction",
+    "apps/web/app/app/(shell)/admin/actions.ts#rerunCustomerIngestionAction",
+    "apps/web/app/app/(shell)/admin/actions.ts#toggleCreatorFeaturedAction",
+    "apps/web/app/app/(shell)/admin/actions.ts#toggleCreatorMarketingAction",
+    "apps/web/app/app/(shell)/admin/actions.ts#toggleCreatorVerifiedAction",
+    "apps/web/app/app/(shell)/admin/actions.ts#unbanUserAction",
+    "apps/web/app/app/(shell)/admin/actions.ts#updateCreatorAvatarAsAdmin",
+    "apps/web/app/app/(shell)/admin/platform-connections/actions.ts#generateTestPlaylist",
+    "apps/web/app/app/(shell)/admin/platform-connections/actions.ts#setCurrentAdminAsPlaylistSpotifyPublisher",
+    "apps/web/app/app/(shell)/admin/platform-connections/actions.ts#updatePlaylistEngineSettings",
+    "apps/web/app/app/(shell)/admin/playlists/playlist-actions.ts#approvePlaylist",
+    "apps/web/app/app/(shell)/admin/playlists/playlist-actions.ts#rejectPlaylist",
+    "apps/web/app/app/(shell)/dashboard/actions/creator-profile.ts#updateAllowProfilePhotoDownloads",
+    "apps/web/app/app/(shell)/dashboard/actions/creator-profile.ts#updateShowOldReleases",
+    "apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts#getDashboardData",
+    "apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts#getDashboardDataCached",
+    "apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts#getDashboardDataEssential",
+    "apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts#getDashboardDataFresh",
+    "apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts#getDashboardShellData",
+    "apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts#prefetchDashboardData",
+    "apps/web/app/app/(shell)/dashboard/actions/link-clicks.ts#getLinkClicksByPlatform",
+    "apps/web/app/app/(shell)/dashboard/actions/settings.ts#setSidebarCollapsed",
+    "apps/web/app/app/(shell)/dashboard/actions/switch-profile.ts#createAdditionalProfile",
+    "apps/web/app/app/(shell)/dashboard/audience/actions.ts#getAudienceMemberDetails",
+    "apps/web/app/app/(shell)/dashboard/audience/block-actions.ts#blockAudienceMember",
+    "apps/web/app/app/(shell)/dashboard/audience/block-actions.ts#unblockAudienceMember",
+    "apps/web/app/app/(shell)/dashboard/contacts/actions.ts#deleteContact",
+    "apps/web/app/app/(shell)/dashboard/contacts/actions.ts#getProfileContactsForOwner",
+    "apps/web/app/app/(shell)/dashboard/contacts/actions.ts#saveContact",
+    "apps/web/app/app/(shell)/dashboard/presence/actions.ts#addManualDspMatch",
+    "apps/web/app/app/(shell)/dashboard/presence/actions.ts#getUnresolvedMismatchCount",
+    "apps/web/app/app/(shell)/dashboard/presence/actions.ts#loadDspPresence",
+    "apps/web/app/app/(shell)/dashboard/presence/actions.ts#loadDspPresenceForProfile",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#archiveLibraryRelease",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#checkAppleMusicConnection",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#checkAppleMusicConnectionForProfile",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#checkSpotifyConnection",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#checkSpotifyConnectionForProfile",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#connectAppleMusicArtist",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#connectSpotifyArtist",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#createRelease",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#deleteRelease",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#formatReleaseLyrics",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#getSpotifyImportPollSnapshot",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#loadReleaseEntity",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#loadReleaseMatrix",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#loadReleaseMatrixForProfile",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#loadTracksForRelease",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#refreshRelease",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#rescanAppleMusicLinks",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#rescanIsrcLinks",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#resetProviderOverride",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#restoreRelease",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#revertReleaseArtwork",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#saveCanvasStatus",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#savePrimaryIsrc",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#saveProviderOverride",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#saveReleaseLyrics",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#saveReleaseMetadata",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#saveReleaseStatus",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#syncFromSpotify",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#updateAllowArtworkDownloads",
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts#uploadReleaseArtwork",
+    "apps/web/app/app/(shell)/dashboard/releases/catalog-task-actions.ts#addCatalogTaskToRelease",
+    "apps/web/app/app/(shell)/dashboard/releases/catalog-task-actions.ts#getReleaseSelectionExplanation",
+    "apps/web/app/app/(shell)/dashboard/releases/catalog-task-actions.ts#instantiateReleaseTasksFromCatalog",
+    "apps/web/app/app/(shell)/dashboard/releases/catalog-task-actions.ts#listReleaseSkillClusters",
+    "apps/web/app/app/(shell)/dashboard/releases/catalog-task-actions.ts#listReleaseTaskCatalog",
+    "apps/web/app/app/(shell)/dashboard/releases/task-actions.ts#addReleaseTask",
+    "apps/web/app/app/(shell)/dashboard/releases/task-actions.ts#deleteReleaseTask",
+    "apps/web/app/app/(shell)/dashboard/releases/task-actions.ts#getReleaseTaskSummary",
+    "apps/web/app/app/(shell)/dashboard/releases/task-actions.ts#getReleaseTasks",
+    "apps/web/app/app/(shell)/dashboard/releases/task-actions.ts#instantiateReleaseTasks",
+    "apps/web/app/app/(shell)/dashboard/releases/task-actions.ts#recomputeTaskDueDates",
+    "apps/web/app/app/(shell)/dashboard/releases/task-actions.ts#updateReleaseTask",
+    "apps/web/app/app/(shell)/dashboard/requireProfileId.ts#requireProfileId",
+    "apps/web/app/app/(shell)/dashboard/tasks/playbook-actions.ts#startPlaybook",
+    "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts#bulkUpdateTasks",
+    "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts#createTask",
+    "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts#deleteTask",
+    "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts#getTask",
+    "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts#getTaskBoard",
+    "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts#getTaskStats",
+    "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts#getTasks",
+    "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts#moveTask",
+    "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts#updateTask",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts#checkBandsintownConnection",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts#connectBandsintownArtist",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts#createTourDate",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts#deleteTourDate",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts#disconnectBandsintown",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts#loadTourDates",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts#loadUpcomingTourDates",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts#removeBandsintownApiKey",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts#saveBandsintownApiKey",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts#syncFromBandsintown",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts#updateTourDate",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/events-actions.ts#confirmEvent",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/events-actions.ts#confirmEvents",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/events-actions.ts#rejectEvent",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/events-actions.ts#rejectEvents",
+    "apps/web/app/app/(shell)/dashboard/tour-dates/events-actions.ts#undoRejectEvent",
+    "apps/web/app/app/(shell)/library/actions.ts#archiveLibraryMerchCard",
+    "apps/web/app/app/(shell)/library/actions.ts#restoreLibraryMerchCard",
+    "apps/web/app/onboarding/actions/avatar.ts#getSafeUploadUrl",
+    "apps/web/app/onboarding/actions/avatar.ts#handleBackgroundAvatarUpload",
+    "apps/web/app/onboarding/actions/avatar.ts#uploadRemoteAvatar",
+    "apps/web/app/onboarding/actions/connect-spotify.ts#connectOnboardingSpotifyArtist",
+    "apps/web/app/onboarding/actions/enrich-profile.ts#enrichProfileFromDsp",
+    "apps/web/app/onboarding/actions/index.ts#completeOnboarding",
+    "apps/web/app/onboarding/actions/profile-setup.ts#createProfileForExistingUser",
+    "apps/web/app/onboarding/actions/profile-setup.ts#createUserAndProfile",
+    "apps/web/app/onboarding/actions/profile-setup.ts#deactivateOrphanedProfiles",
+    "apps/web/app/onboarding/actions/profile-setup.ts#fetchExistingProfile",
+    "apps/web/app/onboarding/actions/profile-setup.ts#fetchExistingUser",
+    "apps/web/app/onboarding/actions/profile-setup.ts#updateExistingProfile",
+    "apps/web/app/onboarding/actions/update-profile.ts#getProfileAvatarUrl",
+    "apps/web/app/onboarding/actions/update-profile.ts#updateOnboardingProfile",
+    "apps/web/app/onboarding/actions/update-profile.ts#verifyProfileHasAvatar",
+    "apps/web/app/onboarding/actions/upgrade-offer.ts#recordOnboardingUpgradeOfferDecision",
+    "apps/web/app/onboarding/actions/validation.ts#ensureEmailAvailable",
+    "apps/web/app/onboarding/actions/validation.ts#ensureHandleAvailable"
+  ],
+  "components": [
+    "apps/web/app/app/(shell)/library/ArtistRulesSheet.tsx",
+    "apps/web/app/app/(shell)/settings/profile/SettingsRiderSection.tsx",
+    "apps/web/components/features/dashboard/organisms/SettingsPaySection.tsx",
+    "apps/web/components/features/dashboard/organisms/shopify/ShopifyStoreCard.tsx"
+  ]
+}
