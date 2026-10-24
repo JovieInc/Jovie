@@ -451,6 +451,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     held = read_json(state / "held.json", {})
     failures = read_json(state / "failures.json", {})
     idle_exit = read_json(state / "worker-idle.json", {})
+    binding_status = read_json(state / "bindings.json", {})
     disk = shutil.disk_usage("/")
     hud_beat = None
     try:
@@ -480,6 +481,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         # scan, so their exit is 'nothing claimable', not the spawn-exit deadlock.
         "idleExitAge": {name: age_s((row or {}).get("at"), now)
                         for name, row in idle_exit.items() if isinstance(row, dict)},
+        "bindingAges": {key: {"outcome": row.get("outcome"), "age": age_s(row.get("at"), now)}
+                        for key, row in binding_status.items() if isinstance(row, dict)},
         "worktrees": len(list((state / "worktrees").glob("*"))),
         "busy": sum(seats["running"] for seats in capacity_by_provider.values()),
         "leaseAgesComplete": all(row.get("leaseAgesComplete") is True for row in busy_capacity),
@@ -840,6 +843,10 @@ def admission_repair_holds(obs: dict) -> list[str] | None:
 
 # ---------------------------------------------------------------- judgement
 
+BINDING_STUCK_OUTCOMES = frozenset({"github-unreadable", "disk-held", "linear-rate-limited"})
+BINDING_SILENT_S = 2 * 3600
+
+
 def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     """Stable key -> one-line cause. Pure, so every rule has a test."""
     alerts = {}
@@ -927,6 +934,14 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                 continue
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
+    # One repository binding stuck is that binding's alert only (key per binding): it never
+    # reads as, or stops, Jovie or any other binding.
+    for key, row in sorted((obs.get("bindingAges") or {}).items()):
+        if row.get("outcome") in BINDING_STUCK_OUTCOMES:
+            alerts[f"binding-stalled:{key}"] = f"{key} binding pass cannot run: {row['outcome']}; other repos unaffected"
+        elif row.get("age") is not None and row["age"] > BINDING_SILENT_S:
+            alerts[f"binding-silent:{key}"] = (f"{key} binding pass has not run for {int(row['age']) // 60}m; "
+                                               "its reserved seat or provider workers are not reaching it")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
     if obs.get("linearAppCredential") is False:
         alerts["linear-app-credential-missing"] = (

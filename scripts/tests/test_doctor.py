@@ -90,6 +90,22 @@ def factory_observation(**overrides):
     return base
 
 
+class BindingAlertTest(unittest.TestCase):
+    def test_a_stuck_binding_alerts_alone(self):
+        stuck = doctor.judge(obs(bindingAges={"LYB": {"outcome": "disk-held", "age": 60}}))
+        self.assertEqual(list(stuck), ["binding-stalled:LYB"])
+
+    def test_a_silent_binding_alerts_and_a_healthy_one_does_not(self):
+        silent = doctor.judge(obs(bindingAges={"LYB": {"outcome": "none-eligible", "age": 3 * 3600}}))
+        self.assertEqual(list(silent), ["binding-silent:LYB"])
+        self.assertEqual(doctor.judge(obs(bindingAges={"LYB": {"outcome": "none-eligible", "age": 60}})), {})
+
+    def test_a_provider_down_alert_does_not_hide_or_add_binding_alerts(self):
+        down = doctor.judge(obs(tick={"at": "2026-09-26T21:00:00Z", "unhealthy": ["hyperagent"], "error": None},
+                                bindingAges={"LYB": {"outcome": "claimed", "age": 5}}))
+        self.assertEqual(list(down), ["provider-down:hyperagent"])
+
+
 class MutableClock:
     def __init__(self, value):
         self.value = value

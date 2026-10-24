@@ -568,6 +568,11 @@ def _repair_lease(lane, host, binding: Binding, pr: dict):
 def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_only: bool) -> str | None:
     pr = issue = linear = lease = None
     leases = {}
+    # This binding's own checkout volume, not Jovie's: one full drive holds only the repos on it.
+    pct = lane.disk_guard.free_pct(lane.disk_guard.write_path(host, binding.key))
+    if pct is None or pct <= lane.disk_guard.CRITICAL_PCT:
+        record_status(lane, host, binding, worker=name, outcome="disk-held", freePct=pct)
+        return None
 
     def busy(candidate):
         held = _repair_lease(lane, host, binding, candidate)

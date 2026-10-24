@@ -3455,17 +3455,60 @@ class BindingIsolationWorkerTest(unittest.TestCase):
         served.assert_called_once()
         reserved.assert_not_called()
 
-    def test_reserved_pass_runs_the_binding_but_never_on_a_critical_disk(self):
-        with patch.object(lane.disk_guard, "free_pct", return_value=7.4), \
-                patch.object(lane.bindings, "reserve", return_value="pr-opened") as reserve, \
+    def test_reserved_pass_runs_the_binding_and_reexecs(self):
+        with patch.object(lane.bindings, "reserve", return_value="pr-opened") as reserve, \
                 patch.object(lane, "reexec", return_value=0) as reexec:
             lane.reserved_binding_pass(self.host, "codex", self.spec)
         reserve.assert_called_once()
         reexec.assert_called_once()
-        with patch.object(lane.disk_guard, "free_pct", return_value=3.0), \
-                patch.object(lane.bindings, "reserve") as reserve:
+        with patch.object(lane.bindings, "reserve", return_value=None), patch.object(lane, "reexec") as reexec:
             self.assertEqual(lane.reserved_binding_pass(self.host, "codex", self.spec), 0)
-        reserve.assert_not_called()
+        reexec.assert_not_called()
+
+    def test_disk_is_measured_on_the_volume_each_lane_writes_to(self):
+        self.assertEqual(lane.disk_guard.write_path(self.host), self.host.state)  # nothing created yet
+        (self.host.state / "worktrees").mkdir()
+        (self.host.state / "bindings" / "LYB" / "worktrees").mkdir(parents=True)
+        self.assertEqual(lane.disk_guard.write_path(self.host), self.host.state / "worktrees")
+        self.assertEqual(lane.disk_guard.write_path(self.host, "LYB"), self.host.state / "bindings" / "LYB" / "worktrees")
+        seen = []
+        with patch.object(lane.disk_guard, "free_pct", side_effect=lambda path: seen.append(path) or 50.0):
+            lane.disk_guard.check(self.host)
+        self.assertEqual(seen[0], self.host.state / "worktrees")
+
+    def test_a_full_binding_volume_holds_only_that_binding(self):
+        binding = SimpleNamespace(key="LYB", reserved_seats=1, providers=())
+        with patch.object(lane.disk_guard, "free_pct", return_value=3.0), \
+                patch.object(lane.bindings, "record_status") as status, patch.object(lane, "sh") as sh:
+            self.assertIsNone(lane.bindings._work_one(lane, self.host, binding, "codex", self.spec, False))
+        self.assertEqual(status.call_args.kwargs["outcome"], "disk-held")
+        sh.assert_not_called()
+
+    def test_remote_provider_never_waits_on_gem_disk(self):
+        slot = lane.Locked(self.host.state / "slots" / "codex.0.lock", blocking=False)
+        remote = {**self.spec, "repairs": False, "localDisk": False}
+        with patch.object(lane.disk_guard, "check", return_value={"admitted": False, "reason": "disk-critical"}) as check, \
+                patch.object(lane.bindings, "work", return_value=None), \
+                patch.object(lane, "requeue_verified", side_effect=RuntimeError("reached")), \
+                patch.object(lane, "lane_prs", return_value=[]):
+            with self.assertRaises(RuntimeError):
+                lane.worker_with_slot(self.host, "codex", remote, slot)
+        check.assert_not_called()
+        slot.release()
+
+    def test_jovie_volume_denial_still_gives_a_binding_its_pass(self):
+        slot = lane.Locked(self.host.state / "slots" / "codex.0.lock", blocking=False)
+        with patch.object(lane.disk_guard, "check", return_value={"admitted": False, "reason": "disk-critical"}), \
+                patch.object(lane.bindings, "work", return_value="pr-opened") as work, \
+                patch.object(lane, "reexec", return_value=0) as reexec:
+            lane.worker_with_slot(self.host, "codex", self.spec, slot)
+        work.assert_called_once()
+        reexec.assert_called_once()
+        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())["codex"]["reason"], "disk-critical")
+
+    def test_hyperagent_declares_no_local_disk(self):
+        self.assertIs(lane.load_providers()["hyperagent"]["localDisk"], False)
+        self.assertNotIn("localDisk", lane.load_providers()["codex"])
 
     def test_a_binding_fault_in_the_reserved_pass_is_contained(self):
         with patch.object(lane.disk_guard, "free_pct", return_value=50.0), \
