@@ -21,11 +21,11 @@ describe('ContactDeleteConfirmDialog', () => {
     );
 
     expect(
-      screen.queryByRole('heading', { name: 'Delete Contact' })
+      screen.queryByRole('heading', { name: 'Delete contact' })
     ).not.toBeInTheDocument();
   });
 
-  it('renders the Title Case delete confirm from the staged contact', async () => {
+  it('renders the sentence case delete confirm from the staged contact', async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
     const onCancel = vi.fn();
@@ -39,7 +39,7 @@ describe('ContactDeleteConfirmDialog', () => {
     );
 
     expect(
-      screen.getByRole('heading', { name: 'Delete Contact' })
+      screen.getByRole('heading', { name: 'Delete contact' })
     ).toBeVisible();
     expect(
       screen.getByText(

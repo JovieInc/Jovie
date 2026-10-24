@@ -23,8 +23,8 @@ const PRIMARY_ACTION_COPY: Record<
 > = {
   connect: { label: 'Connect', icon: Link2 },
   reconnect: { label: 'Reconnect', icon: RefreshCw },
-  review: { label: 'Review Connection', icon: Eye },
-  upgrade: { label: 'Upgrade Monitoring', icon: CircleDollarSign },
+  review: { label: 'Review connection', icon: Eye },
+  upgrade: { label: 'Upgrade monitoring', icon: CircleDollarSign },
 };
 
 /**
@@ -38,11 +38,11 @@ export function buildConnectionActions(
   primaryAction: ConnectionPrimaryAction,
   callbacks: BuildConnectionActionsCallbacks
 ): ContextMenuItemType[] {
-  const entityLabel = row.rowType === 'connector' ? 'Connection' : 'Profile';
+  const entityLabel = row.rowType === 'connector' ? 'connection' : 'profile';
   const items: ContextMenuItemType[] = [
     {
       id: 'view-details',
-      label: 'View Details',
+      label: 'View details',
       icon: <Eye className='h-3.5 w-3.5' aria-hidden />,
       onClick: () => callbacks.onViewDetails(row),
     },
@@ -59,7 +59,7 @@ export function buildConnectionActions(
     const Icon = action.icon;
     const actionLabel =
       primaryAction === 'review' && row.rowType === 'surface'
-        ? 'Review Profile'
+        ? 'Review profile'
         : action.label;
     items.push(
       { type: 'separator' },

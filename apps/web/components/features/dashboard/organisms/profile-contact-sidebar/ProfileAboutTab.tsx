@@ -100,7 +100,7 @@ function EditableBio({
         variant='ghost'
         size='sm'
         type='button'
-        aria-label='Edit Bio'
+        aria-label='Edit bio'
         onClick={() => {
           setDraft(value ?? '');
           setEditing(true);
@@ -315,11 +315,11 @@ function PressPhotosSection({
   return (
     <DrawerSection className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
       <div className='flex items-center justify-between gap-3'>
-        <DrawerSectionHeading>Press Photos</DrawerSectionHeading>
+        <DrawerSectionHeading>Press photos</DrawerSectionHeading>
         <div className='flex items-center gap-1.5'>
           {draftPhotos.length > 0 && (
             <Badge variant='outline' className='text-3xs tabular-nums'>
-              {draftPhotos.length}Awaiting Approval
+              {draftPhotos.length}Awaiting approval
             </Badge>
           )}
           <Badge variant='secondary' className='text-3xs tabular-nums'>
@@ -354,7 +354,7 @@ function PressPhotosSection({
               onClick={handleApproveAll}
               className='mt-1.5 text-2xs font-medium text-accent hover:underline'
             >
-              Approve All
+              Approve all
             </Button>
           )}
         </div>
@@ -398,7 +398,7 @@ function PressPhotosSection({
                     onClick={() => handleDelete(photo.id)}
                     disabled={deletingPhotoId === photo.id}
                     className='absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white dark:text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
-                    aria-label='Delete Imported Photo'
+                    aria-label='Delete imported photo'
                   >
                     {deletingPhotoId === photo.id ? (
                       <LoaderCircle className='h-3 w-3 animate-spin' />
@@ -416,7 +416,7 @@ function PressPhotosSection({
                     onClick={() => handleApprove(photo.id)}
                     disabled={approvingPhotoId === photo.id}
                     className='absolute right-2 bottom-2 left-2 flex items-center justify-center gap-1 rounded-lg bg-white/90 py-1 text-2xs font-medium text-black dark:text-white transition hover:bg-white disabled:cursor-wait disabled:opacity-70'
-                    aria-label='Approve Press Photo For Public Profile'
+                    aria-label='Approve press photo for public profile'
                   >
                     {approvingPhotoId === photo.id ? (
                       <LoaderCircle className='h-3 w-3 animate-spin' />
@@ -464,7 +464,7 @@ function PressPhotosSection({
                     onClick={() => handleDelete(photo.id)}
                     disabled={deletingPhotoId === photo.id}
                     className='absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white dark:text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
-                    aria-label='Delete Imported Photo'
+                    aria-label='Delete imported photo'
                   >
                     {deletingPhotoId === photo.id ? (
                       <LoaderCircle className='h-3 w-3 animate-spin' />
@@ -507,7 +507,7 @@ function PressPhotosSection({
                     onClick={() => handleDelete(photo.id)}
                     disabled={deletingPhotoId === photo.id}
                     className='absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white dark:text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
-                    aria-label='Delete Press Photo'
+                    aria-label='Delete press photo'
                   >
                     {deletingPhotoId === photo.id ? (
                       <LoaderCircle className='h-3.5 w-3.5 animate-spin' />
@@ -664,7 +664,7 @@ export function ProfileAboutTab({
 
             {Boolean(activeSinceYear) && (
               <div className='space-y-1' data-testid='active-since'>
-                <DetailLabel>Active Since</DetailLabel>
+                <DetailLabel>Active since</DetailLabel>
                 <div className='flex items-center gap-2 text-xs text-secondary-token'>
                   <Calendar
                     className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
@@ -764,18 +764,18 @@ export function ProfileAboutTab({
         className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
       >
         <DrawerAsyncToggle
-          label='Photo Downloads'
+          label='Photo downloads'
           ariaLabel='Allow profile photo downloads on public pages'
           checked={allowPhotoDownloads}
           onToggle={updateAllowProfilePhotoDownloads}
           successMessage={on =>
             on
-              ? 'Photo Downloads enabled for visitors'
-              : 'Photo Downloads disabled'
+              ? 'Photo downloads enabled for visitors'
+              : 'Photo downloads disabled'
           }
         />
         <DrawerAsyncToggle
-          label='Show Releases Older Than 90 Days'
+          label='Show releases older than 90 days'
           ariaLabel='Keep showing releases older than 90 days on your public profile'
           checked={showOldReleases}
           onToggle={updateShowOldReleases}

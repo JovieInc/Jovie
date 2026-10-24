@@ -29,7 +29,7 @@ const AUDIENCE_COLUMN_HEADERS = [
   'State',
   'Alerts',
   'Engagement',
-  'Last Seen',
+  'Last seen',
   'Action',
 ] as const;
 

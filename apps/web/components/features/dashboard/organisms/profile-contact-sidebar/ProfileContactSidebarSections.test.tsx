@@ -52,7 +52,7 @@ describe('ProfileBentoView', () => {
     );
 
     expect(
-      screen.getByRole('link', { name: 'Manage In Identity' })
+      screen.getByRole('link', { name: 'Manage in identity' })
     ).toHaveAttribute('href', APP_ROUTES.PRESENCE);
   });
 
@@ -67,7 +67,7 @@ describe('ProfileBentoView', () => {
       />
     );
 
-    const button = screen.getByRole('button', { name: 'Manage In Identity' });
+    const button = screen.getByRole('button', { name: 'Manage in identity' });
     button.click();
     expect(onManageConnections).toHaveBeenCalledExactlyOnceWith(
       APP_ROUTES.PRESENCE
@@ -82,9 +82,9 @@ describe('ProfileBentoView', () => {
       />
     );
     expect(
-      screen.getByRole('link', { name: 'Manage Profile' })
+      screen.getByRole('link', { name: 'Manage profile' })
     ).toHaveAttribute('href', `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`);
-    expect(screen.queryByText('Manage In Identity')).not.toBeInTheDocument();
+    expect(screen.queryByText('Manage in identity')).not.toBeInTheDocument();
   });
 });
 

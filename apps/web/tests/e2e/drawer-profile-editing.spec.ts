@@ -213,7 +213,7 @@ test.describe('Profile drawer — tab rendering', () => {
       'Test user already has the maximum press photos'
     );
 
-    await expect(page.getByText('Press Photos')).toBeVisible({
+    await expect(page.getByText('Press photos')).toBeVisible({
       timeout: 30_000,
     });
 

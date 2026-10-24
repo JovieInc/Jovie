@@ -83,7 +83,7 @@ describe('useDashboardAudienceTable selection', () => {
     act(() => result.current.selectRows(rows));
 
     const copy = result.current.bulkActions.find(
-      action => action.label === 'Copy Emails'
+      action => action.label === 'Copy emails'
     );
     await act(async () => {
       copy?.onClick();
@@ -98,8 +98,8 @@ describe('useDashboardAudienceTable selection', () => {
     const { result } = renderAudienceHook();
 
     expect(result.current.bulkActions.map(action => action.label)).toEqual([
-      'Copy Emails',
-      'Clear Selection',
+      'Copy emails',
+      'Clear selection',
     ]);
   });
 });

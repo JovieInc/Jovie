@@ -124,7 +124,7 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
     }),
     memberColumnHelper.accessor('lastSeenAt', {
       id: 'last',
-      header: 'Last Seen',
+      header: 'Last seen',
       cell: ({ row }) => (
         <AudienceLastCell lastSeenAt={row.original.lastSeenAt} />
       ),

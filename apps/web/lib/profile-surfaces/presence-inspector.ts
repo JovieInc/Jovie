@@ -67,7 +67,7 @@ export function derivePresenceInspector(
   providerAvailable = true
 ): PresenceInspectorModel {
   const status = getConnectionStatus(row, providerAvailable);
-  const searchUnavailable = status.label === 'Search Unavailable';
+  const searchUnavailable = status.label === 'Search unavailable';
   const needsIdentityDecision =
     row.rowType === 'surface' &&
     (row.qualificationStatus === 'suggested' ||

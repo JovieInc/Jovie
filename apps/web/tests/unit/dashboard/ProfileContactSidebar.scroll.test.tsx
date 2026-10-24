@@ -157,7 +157,7 @@ describe('ProfileContactSidebar scroll contract', () => {
       screen.getByTestId('profile-smart-link-control')
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Manage In Identity' })
+      screen.getByRole('button', { name: 'Manage in identity' })
     ).toBeInTheDocument();
     expect(screen.queryByText('Your Live Profile')).toBeNull();
   });
@@ -173,8 +173,8 @@ describe('ProfileContactSidebar scroll contract', () => {
   );
 
   it.each([
-    [true, 'Manage In Identity', APP_ROUTES.PRESENCE],
-    [false, 'Manage Profile', `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`],
+    [true, 'Manage in identity', APP_ROUTES.PRESENCE],
+    [false, 'Manage profile', `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`],
   ] as const)(
     'hands management off and closes the rail with Identity=%s',
     (enabled, label, destination) => {

@@ -75,13 +75,13 @@ describe('CreateIdentityDialog', () => {
     renderDialog();
 
     expect(
-      screen.getByRole('heading', { name: 'Add Artist Identity' })
+      screen.getByRole('heading', { name: 'Add artist identity' })
     ).toBeInTheDocument();
 
-    const submit = screen.getByRole('button', { name: 'Create Identity' });
+    const submit = screen.getByRole('button', { name: 'Create identity' });
     expect(submit).toBeDisabled();
 
-    await user.type(screen.getByLabelText('Display Name'), 'Second Act');
+    await user.type(screen.getByLabelText('Display name'), 'Second Act');
     expect(submit).toBeDisabled();
 
     await user.type(screen.getByLabelText('Username'), 'second act');
@@ -93,9 +93,9 @@ describe('CreateIdentityDialog', () => {
     const user = userEvent.setup();
     renderDialog();
 
-    await user.type(screen.getByLabelText('Display Name'), '  Second Act  ');
+    await user.type(screen.getByLabelText('Display name'), '  Second Act  ');
     await user.type(screen.getByLabelText('Username'), 'secondact');
-    await user.click(screen.getByRole('button', { name: 'Create Identity' }));
+    await user.click(screen.getByRole('button', { name: 'Create identity' }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -125,9 +125,9 @@ describe('CreateIdentityDialog', () => {
     });
     renderDialog();
 
-    await user.type(screen.getByLabelText('Display Name'), 'Second Act');
+    await user.type(screen.getByLabelText('Display name'), 'Second Act');
     await user.type(screen.getByLabelText('Username'), 'taken');
-    await user.click(screen.getByRole('button', { name: 'Create Identity' }));
+    await user.click(screen.getByRole('button', { name: 'Create identity' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Username is taken');
@@ -141,9 +141,9 @@ describe('CreateIdentityDialog', () => {
     fetchMock.mockRejectedValue(new Error('network down'));
     renderDialog();
 
-    await user.type(screen.getByLabelText('Display Name'), 'Second Act');
+    await user.type(screen.getByLabelText('Display name'), 'Second Act');
     await user.type(screen.getByLabelText('Username'), 'secondact');
-    await user.click(screen.getByRole('button', { name: 'Create Identity' }));
+    await user.click(screen.getByRole('button', { name: 'Create identity' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(
