@@ -2,22 +2,26 @@
 
 import { Button, IconButton } from '@jovie/ui';
 import {
+  AtSign,
   Camera,
   Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  Music,
+  User,
   X,
 } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ProfileSuggestion } from '@/app/api/suggestions/route';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
-
 import type { UseSuggestedProfilesReturn } from '../hooks/useSuggestedProfiles';
+import { PROFILE_NUDGE_IDS } from '../hooks/useSuggestedProfiles';
 
 // ============================================================================
 // Platform icon mapping (provider_id -> SocialIcon platform name)
@@ -259,6 +263,92 @@ function ProfileReadyCard({
   );
 }
 
+const NUDGE_ICON_BY_ID: Record<string, typeof Camera> = {
+  [PROFILE_NUDGE_IDS.photo]: Camera,
+  [PROFILE_NUDGE_IDS.name]: User,
+  [PROFILE_NUDGE_IDS.handle]: AtSign,
+  [PROFILE_NUDGE_IDS.music]: Music,
+};
+
+/** Missing-essential nudge (JOV-8137): quiet card with one link CTA. */
+function NudgeCard({
+  suggestion,
+  onDismiss,
+  direction,
+  heading,
+  currentIndex,
+  total,
+  onPrev,
+  onNext,
+  isActioning,
+}: {
+  readonly suggestion: ProfileSuggestion;
+  readonly onDismiss: () => void;
+  readonly direction: SlideDirection;
+  readonly heading: string;
+  readonly currentIndex: number;
+  readonly total: number;
+  readonly onPrev: () => void;
+  readonly onNext: () => void;
+  readonly isActioning: boolean;
+}) {
+  const NudgeIcon = NUDGE_ICON_BY_ID[suggestion.id] ?? Camera;
+
+  return (
+    <div
+      className={cn(
+        'system-b-suggested-profile-card',
+        direction === 'left' && 'animate-slide-out-left',
+        direction === 'right' && 'animate-slide-out-right'
+      )}
+    >
+      <CarouselCardHeader
+        heading={heading}
+        currentIndex={currentIndex}
+        total={total}
+        onPrev={onPrev}
+        onNext={onNext}
+        isActioning={isActioning}
+      />
+      <div className='p-4'>
+        <div className='mb-4 flex items-center gap-2.5'>
+          <div className='system-b-suggested-profile-icon-shell'>
+            <NudgeIcon className='h-4 w-4 text-secondary-token' aria-hidden />
+          </div>
+          <div className='min-w-0 flex-1'>
+            <p className='truncate text-sm font-medium text-primary-token'>
+              {suggestion.title}
+            </p>
+            {suggestion.subtitle ? (
+              <p className='truncate text-xs text-tertiary-token'>
+                {suggestion.subtitle}
+              </p>
+            ) : null}
+          </div>
+          <IconButton
+            type='button'
+            variant='ghost'
+            size='xs'
+            onClick={onDismiss}
+            disabled={isActioning}
+            className='shrink-0'
+            ariaLabel='Dismiss'
+          >
+            <X className='h-3.5 w-3.5' />
+          </IconButton>
+        </div>
+
+        <Link
+          href={suggestion.externalUrl ?? '/app/settings/profile'}
+          className='system-b-suggested-profile-primary-link'
+        >
+          Continue setup
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function SuggestionCard({
   suggestion,
   onConfirm,
@@ -489,6 +579,8 @@ export function SuggestedProfilesCarousel({
   let heading: string;
   if (current.type === 'profile_ready') {
     heading = 'Welcome';
+  } else if (current.type === 'profile_nudge') {
+    heading = 'Finish your profile';
   } else if (current.type === 'avatar') {
     heading = 'Choose your profile photo';
   } else if (current.type === 'playlist_fallback') {
@@ -506,6 +598,19 @@ export function SuggestedProfilesCarousel({
           displayName={displayName}
           username={username}
           avatarUrl={avatarUrl}
+          onDismiss={handleReject}
+          direction={slideDirection}
+          heading={heading}
+          currentIndex={currentIndex}
+          total={total}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          isActioning={isActioning}
+        />
+      ) : current.type === 'profile_nudge' ? (
+        <NudgeCard
+          key={current.id}
+          suggestion={current}
           onDismiss={handleReject}
           direction={slideDirection}
           heading={heading}
