@@ -7,11 +7,15 @@ async function loadPolicy() {
 }
 
 describe('theme route policy with THEME_SWITCHING off (default)', () => {
-  it.each(['/', '/pricing', '/app', '/app/settings', '/blog/entry', '/tim'])(
+  it('supports the locked homepage footer without a feature flag', async () => {
+    const { isThemeRoute } = await loadPolicy();
+    expect(isThemeRoute('/')).toBe(true);
+  });
+  it.each(['/pricing', '/app', '/app/settings', '/blog/entry', '/tim'])(
     'forces dark on %s',
     async pathname => {
       const { isThemeRoute, THEME_ROUTE_POLICY } = await loadPolicy();
-      expect(THEME_ROUTE_POLICY).toEqual({ exact: [], prefixes: [] });
+      expect(THEME_ROUTE_POLICY).toEqual({ exact: ['/'], prefixes: [] });
       expect(isThemeRoute(pathname)).toBe(false);
     }
   );
