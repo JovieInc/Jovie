@@ -67,6 +67,7 @@ import workstreams  # noqa: E402  (shared workstream rank + duplicate identity)
 import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-7704)
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
+from apiclient import run_gh  # noqa: E402  (budgeted gh through the shared ledger)
 import outcome_lane  # noqa: E402
 import yc_corpus  # noqa: E402
 import credentials_spend  # noqa: E402
@@ -137,7 +138,7 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py"]
+              "scripts/tests/test_linear_sync.py", "scripts/lanes/test_lane_automerge.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
@@ -146,7 +147,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
                   "scripts/lib/merge-group-ahead-attribution.mjs",
                   "scripts/lib/merge-group-admission.mjs",
-                  "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs",
+                  "scripts/lib/admission-hold-labels.json", "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs",
                   "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
@@ -3526,6 +3527,85 @@ def source_publication_authority(pr: dict, *, before_ready: bool, log=None) -> s
         return "held:source-admission-unavailable"
 
 
+def gh_call(args: list[str], *, log=None):
+    """Budgeted gh (apiclient ledger) shaped like `sh` results; exit 75 means deferred."""
+    out = run_gh(args, log=(lambda line: log.write(line + "\n")) if log else None)
+    return subprocess.CompletedProcess(args, out["code"], out["stdout"], out["stderr"])
+
+
+def arm_verified_automerge(host: Host, pr: dict, *, log=None) -> None:
+    """Best-effort merge intent; reserve durably before invoking gh, even on failure."""
+    reason = "unavailable"
+    try:
+        cap = int(os.environ.get("LANES_AUTOMERGE_MAX_PER_HOUR", "30"))
+        if cap <= 0:
+            reason = "disabled"
+            return
+        owner, name = REPO_SLUG.split("/")
+        query = """query($owner:String!,$name:String!,$number:Int!){
+          repository(owner:$owner,name:$name){pullRequest(number:$number){
+            number headRefOid headRefName title body state isDraft autoMergeRequest{enabledAt}
+            isInMergeQueue labels(first:100){nodes{name} pageInfo{hasNextPage}}
+          }}}"""
+        result = gh_call(["api", "graphql", "-f", f"query={query}", "-f", f"owner={owner}",
+                         "-f", f"name={name}", "-F", f"number={pr['number']}"], log=log)
+        data = json.loads(result.stdout)
+        if result.returncode or data.get("errors"):
+            raise ValueError("live PR unavailable")
+        live = data["data"]["repository"]["pullRequest"]
+        if (live["number"] != pr["number"] or live["headRefOid"] != pr["headRefOid"]
+                or live["state"] != "OPEN" or live["isDraft"] is not False):
+            reason = "head-or-ready-changed"
+            return
+        if live["autoMergeRequest"] is not None or live["isInMergeQueue"] is True:
+            reason = "already-armed-or-queued"
+            return
+        if live["isInMergeQueue"] is not False or live["labels"]["pageInfo"]["hasNextPage"] is not False:
+            raise ValueError("incomplete live PR")
+        holds = json.loads((HERE.parent / "lib/admission-hold-labels.json").read_text())
+        blocking = set(holds["stopHoldLabels"] + holds["machineBlockLabels"] + [holds["queuePoisonLabel"]])
+        if blocking & {row["name"].lower() for row in live["labels"]["nodes"]}:
+            reason = "hold-label"
+            return
+        if not re.search(r"\b(?:JOV|LYB)-[0-9]+\b", "\n".join(
+                live.get(field) or "" for field in ("headRefName", "title", "body")), re.I):
+            reason = "no-linear-key"
+            return
+        variables = gh_call(["variable", "list", "--repo", REPO_SLUG, "--json", "name,value"], log=log)
+        if variables.returncode:
+            raise ValueError("queue freeze unavailable")
+        if any(row["name"] == "QUEUE_FREEZE" and row["value"] == "1"
+               for row in json.loads(variables.stdout)):
+            reason = "queue-freeze"
+            return
+        reserved = False
+        def reserve(data):
+            nonlocal reserved, reason
+            attempts = data.setdefault("attempts", {})
+            key = f"{pr['number']}:{pr['headRefOid']}"
+            now = time.time()
+            if key in attempts:
+                reason = "already-attempted"
+            elif sum(stamp > now - 3600 for stamp in attempts.values()) >= cap:
+                reason = "hourly-cap"
+            else:
+                attempts[key] = now
+                reserved = True
+        update_json(host.state / "automerge.json", reserve)
+        if not reserved:
+            return
+        armed = gh_call(["pr", "merge", str(pr["number"]), "--auto", "--squash",
+                        "--match-head-commit", pr["headRefOid"], "--repo", REPO_SLUG], log=log)
+        reason = "armed" if armed.returncode == 0 else f"arm-failed:exit-{armed.returncode}"
+    except Exception as error:
+        reason = f"arm-unavailable:{type(error).__name__}:{error}"
+    finally:
+        try:
+            print(f"automerge pr={pr['number']} head={pr['headRefOid']} {reason}", file=log or sys.stderr)
+        except (OSError, ValueError):
+            pass  # A closed publication log must not turn merge intent into a failure.
+
+
 def publish_verified(host: Host, pr: dict, *, claim: GateClaim | None = None, log=None) -> str:
     """One receipt consumer for gate completion and fallback publication; never runs a gate."""
     owned = claim is None
@@ -3554,9 +3634,9 @@ def publish_verified(host: Host, pr: dict, *, claim: GateClaim | None = None, lo
             ready = sh(["gh", "pr", "ready", str(pr["number"]), "--repo", REPO_SLUG], log=log)
             if ready.returncode:
                 return "held:ready-failed"
-        # Merge Queue Green Enroll is the sole queue writer (2026-10-13): it admits this head
-        # on the ready_for_review wake or its push-to-main sweep, behind the same hold labels.
-        # Lanes never arm auto-merge or enqueue; an armed PR keeps enqueuing through a freeze.
+        # Enroll remains a queue writer unchanged; lanes arm once per verified ready head.
+        # Tim approved 2026-10-23 8:02 PM PT (JOV-8939).
+        arm_verified_automerge(host, live, log=log)
         clear_requeue(host, pr["number"], pr["headRefOid"])
         return "landing"
     except (RepairStopped, PublicationRevoked) as error:
