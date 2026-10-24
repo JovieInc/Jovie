@@ -298,7 +298,7 @@ class CurrentLoginTest(Isolated):
             self.assertTrue(codex.reconcile(1_000_000, 0)["reconciled"])
         calls.assert_called_once_with('current-login', [
             ('account/read', {'refreshToken': False}), ('account/rateLimits/read', None),
-            ('model/list', {'limit': 100, 'includeHidden': False})], lease_handle=ANY)
+            ('model/list', {'limit': 100, 'includeHidden': False})], timeout=codex.CURRENT_METADATA_TIMEOUT_S, lease_handle=ANY)
         value = codex.read_state()['current-login']['capacityLease']
         self.assertEqual(value['usableCapacityRemaining']['primary']['remainingPercent'], 50)
         self.assertEqual(value['compatibility']['models'], ['gpt-6.1-sol'])
@@ -1673,3 +1673,36 @@ class LaunchIdentityTest(Isolated):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class CurrentMetadataRetryTest(unittest.TestCase):
+    def test_retries_timeouts_with_backoff_and_longer_budget(self):
+        budgets, sleeps = [], []
+        def fake(name, calls, timeout=15, *, lease_handle=None):
+            budgets.append(timeout)
+            if len(budgets) < 3:
+                raise TimeoutError("account/read: app-server response unavailable")
+            return [{"account": {}}, {"rateLimits": {}}, {"data": []}]
+        with patch.object(codex, "app_server_calls", fake):
+            snap = codex.current_subscription_snapshot("current-login", sleep=sleeps.append)
+        self.assertEqual(snap["models"], {"data": []})
+        self.assertEqual(budgets, [codex.CURRENT_METADATA_TIMEOUT_S] * 3)
+        self.assertGreater(codex.CURRENT_METADATA_TIMEOUT_S, 15)
+        self.assertEqual(sleeps, [2.0, 6.0])
+
+    def test_gives_up_after_bounded_attempts(self):
+        n = []
+        def fake(*a, **k):
+            n.append(1); raise TimeoutError("x")
+        with patch.object(codex, "app_server_calls", fake), self.assertRaises(TimeoutError):
+            codex.current_subscription_snapshot("current-login", sleep=lambda s: None)
+        self.assertEqual(len(n), codex.CURRENT_METADATA_ATTEMPTS)
+
+    def test_does_not_retry_non_timeouts(self):
+        n = []
+        def fake(*a, **k):
+            n.append(1); raise RuntimeError("account/read: app-server error")
+        with patch.object(codex, "app_server_calls", fake), self.assertRaises(RuntimeError):
+            codex.current_subscription_snapshot("current-login", sleep=lambda s: None)
+        self.assertEqual(n, [1])
