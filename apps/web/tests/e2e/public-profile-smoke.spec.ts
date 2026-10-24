@@ -205,6 +205,39 @@ test('legacy release slugs still resolve to a live release page', async ({
   }
 });
 
+// Fan follow/subscribe is the last step of the artist golden path. Production
+// must not email real or synthetic addresses on every monitor run, so the probe
+// proves the form renders and that the subscribe route validates and answers
+// (400 for a malformed address) instead of failing with a 5xx or timing out.
+test('fan subscribe form renders and the subscribe route validates input', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const canaryHandle = process.env.SMOKE_CANARY_HANDLE ?? 'authqaprod';
+  const response = await page.goto(`/${canaryHandle}?mode=subscribe`, {
+    waitUntil: 'domcontentloaded',
+  });
+  expect(response?.status(), `/${canaryHandle}?mode=subscribe`).toBe(200);
+  await expect(
+    page.locator('input[type="email"]').first(),
+    'Subscribe mode has no email input'
+  ).toBeVisible({ timeout: 10_000 });
+
+  const invalid = await page.request.post('/api/notifications/subscribe', {
+    data: {
+      artistId: '00000000-0000-0000-0000-000000000000',
+      channel: 'email',
+      email: 'not-an-email',
+    },
+  });
+  expect(
+    invalid.status(),
+    'Subscribe route must reject a malformed email with a 4xx'
+  ).toBeGreaterThanOrEqual(400);
+  expect(invalid.status()).toBeLessThan(500);
+  expect(invalid.headers()['content-type'] ?? '').toContain('application/json');
+});
+
 test.describe('public profile document semantics @regression', () => {
   test.skip(!hasDatabase, 'Profile document semantics require a real database');
 
