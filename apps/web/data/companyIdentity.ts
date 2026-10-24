@@ -6,8 +6,10 @@
  * as a nav/taxonomy registry (JOV-4491) or a homepage taste rewrite (JOV-5861).
  *
  * The homepage page body sells the artist profile (EVENT 2026-10-20) from
- * `homepageCopy.ts`; its metadata description and structured data still read
- * this general identity. `homepageHeadline` is the auth brand-panel line.
+ * `homepageCopy.ts`; the homepage WebSite and SoftwareApplication JSON-LD
+ * speak with the approved artist-profile launch (JOV-8565). Its page
+ * metadata description and the Organization schema still read this general
+ * identity. `homepageHeadline` is the auth brand-panel line.
  * General copy stays generic (Tim, 2026-10-22): do not put a segment list back
  * into support, definition, audiences, or knowsAbout.
  */
