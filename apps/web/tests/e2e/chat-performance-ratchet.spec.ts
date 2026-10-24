@@ -488,15 +488,19 @@ async function exchangeChatRoundTrip(
   return readChatProbe(page);
 }
 
+function skipWithoutChatAuthBypass(): void {
+  test.skip(
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
+  );
+}
+
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test('chat route stays within the deploy-gating responsiveness budget', async ({
   page,
 }, testInfo) => {
-  test.skip(
-    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
-  );
+  skipWithoutChatAuthBypass();
   test.setTimeout(300_000);
   await page.setViewportSize({ width: 1280, height: 480 });
 
@@ -617,10 +621,7 @@ for (const messageCount of [200, 2000] as const) {
   test(`persisted ${messageCount}-message transcript scrolls without dropped frames during history loading and streaming`, async ({
     page,
   }, testInfo) => {
-    test.skip(
-      process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-      'Requires E2E_USE_TEST_AUTH_BYPASS=1'
-    );
+    skipWithoutChatAuthBypass();
     test.setTimeout(300_000);
     await page.setViewportSize({ width: 1280, height: 480 });
     const backend = await installScrollBackend(page, messageCount);
