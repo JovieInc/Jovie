@@ -412,16 +412,11 @@ def label_names(pr: dict) -> list[str]:
     return [label.get("name", "") if isinstance(label, dict) else str(label) for label in pr.get("labels") or []]
 
 
-def add_label(number: int, kind: str, sh=run) -> bool:
-    """The issues API creates a missing label, so the queue needs no setup."""
+def add_label(number: int, kind: str, sh=run, *, prefix: str = PREFIX) -> bool:
+    """The issues API creates a missing label, so the queue needs no setup. `prefix=""` applies
+    an exact label name (the human-decision hold)."""
     return sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels",
-               "-f", f"labels[]={PREFIX}{kind}"]).returncode == 0
-
-
-def apply_label(number: int, name: str, sh=run) -> bool:
-    """Apply one exact label through the same issues API write as `add_label`."""
-    return sh(["gh", "api", "-X", "POST", f"repos/{REPO}/issues/{number}/labels",
-               "-f", f"labels[]={name}"]).returncode == 0
+               "-f", f"labels[]={prefix}{kind}"]).returncode == 0
 
 
 def human_holds(pr: dict | None) -> list[str]:

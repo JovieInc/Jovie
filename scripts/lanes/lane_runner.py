@@ -4114,7 +4114,7 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
         row = next((row for row in data["surfaced"] if isinstance(row, dict) and row.get("pr") == number
                     and row.get("head") == head), None)
         if row is not None and not row.get("holdApplied") \
-                and pr_events.apply_label(number, pr_events.HUMAN_DECISION_LABEL, sh):
+                and pr_events.add_label(number, pr_events.HUMAN_DECISION_LABEL, sh, prefix=""):
             row["holdApplied"] = True
     attempts[str(number)] = {**record, "escalated": True}
     pr_events.add_label(number, pr_events.EXHAUSTED, sh)

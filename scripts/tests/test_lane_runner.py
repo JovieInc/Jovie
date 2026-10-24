@@ -13995,9 +13995,10 @@ class PendingRungDispositionTest(unittest.TestCase):
                 lane.escalate_exhausted(host, [pr], linear)
                 lane.escalate_exhausted(host, [pr], linear)
             # One deduped comment, then the honoured human-decision hold, each exactly once.
-            self.assertEqual(transport.call_count, 2)
-            self.assertEqual(transport.call_args_list[0].args[0][:3], ["gh", "pr", "comment"])
-            self.assertIn("labels[]=tim-hold", transport.call_args_list[1].args[0])
+            self.assertEqual(transport.call_count, 1)
+            self.assertEqual(transport.call_args.args[0][:3], ["gh", "pr", "comment"])
+            holds = [c for c in label.call_args_list if c.kwargs.get("prefix") == ""]
+            self.assertEqual([c.args[1] for c in holds], ["tim-hold"])
             self.assertTrue(json.loads(path.read_text())["7"]["escalated"])
             self.assertEqual(linear.moves, [("issue7", "Backlog")])
             self.assertEqual(len(linear.comments), 1)
