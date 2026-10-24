@@ -121,3 +121,19 @@ describe('PlaylistDetailContent', () => {
     );
   });
 });
+
+describe('PlaylistDetailContent contrast (JOV-8873)', () => {
+  it('raises secondary copy to white/60 and underlines the curator link', () => {
+    render(
+      <PlaylistDetailContent
+        playlist={PLAYLIST_DETAIL_STORY_PLAYLIST}
+        tracks={PLAYLIST_DETAIL_STORY_TRACKS}
+      />
+    );
+    expect(screen.getByText(/Curated by/)).toHaveClass('text-white/60');
+    expect(screen.getByRole('link', { name: 'Jovie' })).toHaveClass('underline');
+    expect(
+      screen.getByRole('link', { name: 'Discover More Playlists' })
+    ).toHaveClass('text-white/60');
+  });
+});

@@ -56,6 +56,17 @@ vi.mock('@jovie/ui', async () => {
         {children}
       </div>
     ),
+    DropdownMenuItem: ({
+      children,
+      disabled,
+    }: {
+      children: ReactNode;
+      disabled?: boolean;
+    }) => (
+      <div role='menuitem' aria-disabled={disabled ? 'true' : undefined}>
+        {children}
+      </div>
+    ),
     DropdownMenuSeparator: (props: HTMLAttributes<HTMLHRElement>) => (
       <hr {...props} />
     ),
@@ -157,5 +168,29 @@ describe('TableFilterDropdown', () => {
 
     expect(screen.getByText('No options found')).toBeInTheDocument();
     expect(screen.queryByText('Todo')).not.toBeInTheDocument();
+  });
+});
+
+describe('TableFilterDropdown a11y (JOV-8873)', () => {
+  it('renders the empty state as a disabled menu item', () => {
+    render(
+      <TooltipProvider>
+        <TableFilterDropdown categories={[]} emptyMessage='No filters yet' />
+      </TooltipProvider>
+    );
+    const item = screen.getByRole('menuitem');
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(item).toHaveTextContent('No filters yet');
+  });
+
+  it('keeps the trigger interactive while the menu is closed', () => {
+    render(
+      <TooltipProvider>
+        <TableFilterDropdown categories={[]} />
+      </TooltipProvider>
+    );
+    expect(screen.getByRole('button', { name: 'Filter' })).not.toHaveAttribute(
+      'inert'
+    );
   });
 });
