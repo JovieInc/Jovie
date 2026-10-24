@@ -1,3 +1,5 @@
+'use client';
+
 import '../styles/system-b-app.css';
 import { useTheme } from 'next-themes';
 import { type ReactNode, useEffect, useRef } from 'react';
@@ -43,19 +45,63 @@ export function RenderedFamily({
   owner,
   interactive,
   keyboardTargetSelector,
+  targetSelector,
+  surfaceToken = '--color-bg-base',
   children,
 }: {
   name: string;
   owner: string;
   interactive: boolean;
   keyboardTargetSelector?: string;
+  targetSelector?: string;
+  surfaceToken?: string;
   children: ReactNode;
 }) {
   const { resolvedTheme } = useTheme();
+  useEffect(() => {
+    if (!targetSelector) return;
+    const marked = new Set<HTMLElement>();
+    const mark = () => {
+      const root = document.querySelector<HTMLElement>(targetSelector);
+      const content = root?.firstElementChild;
+      if (!root || !(content instanceof HTMLElement)) return;
+      for (const [key, value] of Object.entries(
+        family(name, owner, resolvedTheme ?? '', surfaceToken)
+      ))
+        root.setAttribute(key, value);
+      for (const [key, value] of Object.entries(
+        variant(interactive, '--radius-none', keyboardTargetSelector)
+      ))
+        content.setAttribute(key, value);
+      marked.add(root);
+      marked.add(content);
+    };
+    mark();
+    const observer = new MutationObserver(mark);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      for (const element of marked)
+        for (const attribute of [...element.attributes])
+          if (attribute.name.startsWith('data-jovie-eval-'))
+            element.removeAttribute(attribute.name);
+    };
+  }, [
+    targetSelector,
+    name,
+    owner,
+    resolvedTheme,
+    surfaceToken,
+    interactive,
+    keyboardTargetSelector,
+  ]);
+  // A selected live surface already owns layout (and may portal to body).
+  // Extra wrapper blocks would break its ancestor height allocation.
+  if (targetSelector) return children;
   return (
     <div
       className='w-full min-w-0 bg-base'
-      {...family(name, owner, resolvedTheme ?? '', '--color-bg-base')}
+      {...family(name, owner, resolvedTheme ?? '', surfaceToken)}
     >
       <div {...variant(interactive, '--radius-none', keyboardTargetSelector)}>
         {children}

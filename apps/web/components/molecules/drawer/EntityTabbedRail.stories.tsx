@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
+import { RenderedFamily } from '@/.storybook/rendered-family';
+import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { DrawerEntityAvatar } from './DrawerEntityAvatar';
 import { EntityHeader } from './EntityHeader';
 import { EntityTabbedRail } from './EntityTabbedRail';
@@ -14,8 +16,29 @@ const meta = {
   title: 'Molecules/Drawer/EntityTabbedRail',
   component: EntityTabbedRail,
   parameters: { layout: 'fullscreen' },
+  decorators: [
+    (Story, context) => (
+      <RenderedFamily
+        name='EntityTabbedRail'
+        owner='EntityTabbedRail'
+        interactive={!context.args.isEmpty}
+        targetSelector='[data-testid="entity-tabbed-rail-story"]'
+        surfaceToken='--app-shell-content-surface'
+      >
+        <Story />
+      </RenderedFamily>
+    ),
+    Story => (
+      <main className='relative h-screen w-full bg-surface-0'>
+        <AppShellRightRail>
+          <Story />
+        </AppShellRightRail>
+      </main>
+    ),
+  ],
   args: {
     isOpen: true,
+    testId: 'entity-tabbed-rail-story',
     ariaLabel: 'Visitor details',
     activeTab: 'details',
     onTabChange: fn(),

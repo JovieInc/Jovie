@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { createPortal } from 'react-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { RenderedFamily } from './rendered-family';
 
@@ -11,6 +12,46 @@ vi.mock('@/components/organisms/sidebar', () => ({
 }));
 
 describe('RenderedFamily keyboard target contract', () => {
+  it('measures the actual portal instead of certifying its empty story wrapper', async () => {
+    const story = (opened: boolean) => (
+      <RenderedFamily
+        name='portal-fixture'
+        owner='portal-fixture.tsx'
+        interactive
+        targetSelector='[data-testid="portal-rail"]'
+        surfaceToken='--app-shell-content-surface'
+      >
+        {opened &&
+          createPortal(
+            <aside data-testid='portal-rail'>
+              <div>
+                <button type='button'>Close rail</button>
+              </div>
+            </aside>,
+            document.body
+          )}
+      </RenderedFamily>
+    );
+    const { container, rerender, unmount } = render(story(false));
+    rerender(story(true));
+    const rail = screen.getByTestId('portal-rail');
+    await waitFor(() =>
+      expect(rail).toHaveAttribute('data-jovie-eval-family', 'portal-fixture')
+    );
+    expect(container.querySelector('[data-jovie-eval-family]')).toBeNull();
+    expect(rail).toHaveAttribute(
+      'data-jovie-eval-surface-token',
+      '--app-shell-content-surface'
+    );
+    const variant = rail.querySelector('[data-jovie-eval-variant]');
+    expect(variant).toContainElement(
+      screen.getByRole('button', { name: 'Close rail' })
+    );
+    unmount();
+    expect(rail).not.toHaveAttribute('data-jovie-eval-family');
+    expect(variant).not.toHaveAttribute('data-jovie-eval-variant');
+  });
+
   it('declares the intended control within the current family and variant', () => {
     const { container } = render(
       <RenderedFamily
