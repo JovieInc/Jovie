@@ -781,21 +781,15 @@ exit 0
     expect(refused.slept).toBe('');
   });
 
-  it('announces a GitHub API hold even when the caller discards stderr', () => {
+  it('announces a GitHub API hold on stderr and in the step summary', () => {
     const script = new URL(
       '../../../.github/scripts/gh-api-hold.sh',
       import.meta.url
     );
     /**
-     * @param {{resetOffset: number, budget: number, firstError: string, rateOut?: string, label?: string}} options
+     * @param {{resetOffset: number | null, firstError: string, label?: string, rateJq?: boolean}} options
      */
-    const runVisible = ({
-      resetOffset,
-      budget,
-      firstError,
-      rateOut,
-      label,
-    }) => {
+    const runVisible = ({ resetOffset, firstError, label }) => {
       const root = mkdtempSync(join(tmpdir(), 'gh-api-hold-vis-'));
       try {
         const calls = join(root, 'calls');
@@ -804,15 +798,15 @@ exit 0
         writeFileSync(slept, '');
         const summary = join(root, 'summary.md');
         writeFileSync(summary, '');
-        const reset = Math.floor(Date.now() / 1000) + resetOffset;
         writeFileSync(
           join(root, 'sleep'),
           `#!/bin/sh\nprintf '%s\\n' "$1" >> "${slept}"\nexit 0\n`
         );
         chmodSync(join(root, 'sleep'), 0o755);
-        const rate = rateOut
-          ? rateOut.replace('RESET', String(reset))
-          : String(reset);
+        const reset =
+          resetOffset === null
+            ? ''
+            : String(Math.floor(Date.now() / 1000) + resetOffset);
         writeFileSync(
           join(root, 'gh'),
           `#!/bin/sh
@@ -820,7 +814,7 @@ n="$(cat "${calls}")"
 n=$((n + 1))
 printf '%s' "$n" > "${calls}"
 case "$*" in
-  *rate_limit*) printf '%s\\n' '${rate}'; exit 0 ;;
+  *rate_limit*) [ -n "${reset}" ] && printf '%s\\n' '${reset}'; exit 0 ;;
 esac
 if [ "$n" -eq 1 ]; then
   printf '%s\\n' '${firstError}' >&2
@@ -837,20 +831,15 @@ exit 0
           PATH: `${root}${delimiter}${process.env.PATH}`,
           GH_TOKEN: 'ghs_SECRETTOKENVALUE123',
           GITHUB_STEP_SUMMARY: summary,
-          GH_API_HOLD_ANNOTATION_ROOT_PID: String(process.pid),
+          GH_API_HOLD_BUDGET_SECONDS: '30',
         };
-        env.GH_API_HOLD_BUDGET_SECONDS = String(budget);
         if (label) env.GH_API_HOLD_LABEL = label;
-        // Mirror release-lineage-gate.sh: the hold script's stderr goes to
-        // /dev/null. The wrapping subshell keeps a real stderr pipe, as on the
-        // Actions runner (/proc cannot reopen socketpairs); read via stdout.
         const result = spawnSync(
           'bash',
           [
-            '-c',
-            '( bash "$1" api "repos/JovieInc/Jovie/actions/runs/1/jobs?per_page=100" 2>/dev/null; echo "rc=$?" ) 2>&1 | cat',
-            'x',
             script.pathname,
+            'api',
+            'repos/JovieInc/Jovie/actions/runs/1/jobs?per_page=100',
           ],
           { encoding: 'utf8', timeout: 10_000, env }
         );
@@ -865,21 +854,18 @@ exit 0
       }
     };
 
-    const withFields = runVisible({
+    const held = runVisible({
       resetOffset: 4,
-      budget: 30,
       firstError:
-        'gh: API rate limit exceeded for installation (HTTP 403)\nx-ratelimit-resource: core',
-      rateOut: 'RESET 15000 0',
-      label: 'cross-prove',
+        'gh: API rate limit exceeded for installation (HTTP 403)\nx-ratelimit-resource: core\nx-ratelimit-limit: 15000\nx-ratelimit-remaining: 0',
+      label: 'cross-prove: step=1',
     });
-    expect(withFields.stdout).toContain('rc=0');
-    expect(withFields.calls).toBeGreaterThan(1);
-    expect(Number(withFields.slept)).toBeGreaterThanOrEqual(4);
-    expect(Number(withFields.slept)).toBeLessThanOrEqual(6);
-    for (const channel of [withFields.stdout, withFields.summary]) {
+    expect(held.status).toBe(0);
+    expect(held.calls).toBeGreaterThan(1);
+    expect(Number(held.slept)).toBeGreaterThanOrEqual(4);
+    for (const channel of [held.stderr, held.summary]) {
       expect(channel).toContain('GitHub API hold');
-      expect(channel).toContain('label=cross-prove');
+      expect(channel).toContain('label=cross-prove_ step_1');
       expect(channel).toContain('http=403');
       expect(channel).toMatch(/wait_s=[4-6] /);
       expect(channel).toMatch(/reset_epoch=\d{10}/);
@@ -892,34 +878,40 @@ exit 0
       expect(channel).not.toContain('ghs_SECRETTOKENVALUE123');
       expect(channel).not.toContain('per_page=100');
     }
-    expect(withFields.stdout).toContain('::notice title=GitHub API hold::');
+    expect(held.stderr).toContain('::notice title=GitHub API hold::');
 
-    // Quota fields absent: still announced, fields omitted.
     const sparse = runVisible({
       resetOffset: 4,
-      budget: 30,
       firstError: 'API rate limit exceeded for installation',
     });
-    expect(sparse.stdout).toContain('rc=0');
-    expect(sparse.stdout).toContain('::notice title=GitHub API hold::');
-    expect(sparse.stdout).toContain('http=unknown');
-    expect(sparse.stdout).toContain(
+    expect(sparse.status).toBe(0);
+    expect(sparse.stderr).toContain('http=unknown');
+    expect(sparse.stderr).toContain(
       'bucket=core bucket_source=rate_limit.resources.core'
     );
-    expect(sparse.stdout).not.toContain('limit=');
-    expect(sparse.stdout).not.toContain('remaining=');
-    expect(sparse.summary).toContain('GitHub API hold');
+    expect(sparse.stderr).not.toContain('limit=');
+    expect(sparse.stderr).not.toContain('remaining=');
 
-    // Refused holds keep their exit code, no sleep, same call count.
+    // Missing reset refuses exactly as before: no hold, no notice, no sleep.
+    const noReset = runVisible({
+      resetOffset: null,
+      firstError: 'API rate limit exceeded for installation (HTTP 403)',
+    });
+    expect(noReset.status).toBe(1);
+    expect(noReset.stderr).toContain('had no x-ratelimit-reset');
+    expect(noReset.stderr).not.toContain('GitHub API hold');
+    expect(noReset.slept).toBe('');
+    expect(noReset.calls).toBe(2);
+    expect(noReset.summary).toBe('');
+
     const refused = runVisible({
       resetOffset: 100_000,
-      budget: 30,
       firstError: 'API rate limit exceeded for installation',
     });
-    expect(refused.stdout).toContain('rc=1');
+    expect(refused.status).toBe(1);
     expect(refused.slept).toBe('');
     expect(refused.calls).toBe(2);
-    expect(refused.stdout).not.toContain('GitHub API hold');
+    expect(refused.stderr).not.toContain('GitHub API hold');
     expect(refused.summary).toBe('');
   });
 });
