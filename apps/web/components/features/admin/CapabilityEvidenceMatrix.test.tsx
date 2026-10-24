@@ -1,16 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { CapabilityEvidenceRecord } from '@/lib/admin/capability-evidence-model';
 
-vi.mock('@/components/molecules/ContentSurfaceCard', () => ({
-  ContentSurfaceCard: ({
-    children,
-    ...rest
-  }: { readonly children: ReactNode } & Record<string, unknown>) => (
-    <section {...rest}>{children}</section>
-  ),
-}));
 vi.mock('@/components/molecules/ContentMetricRow', () => ({
   ContentMetricRow: ({
     label,
@@ -69,6 +61,27 @@ const record = (
 });
 
 describe('CapabilityEvidenceMatrix', () => {
+  it('discloses the capability identity and full evidence from its summary', async () => {
+    const { CapabilityEvidenceMatrix } = await import(
+      './CapabilityEvidenceMatrix'
+    );
+    render(
+      <CapabilityEvidenceMatrix
+        record={record()}
+        summary='Configured state, observed exposure, and outcomes'
+      />
+    );
+    expect(screen.queryByText('Public profile pages')).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: /^Customer Experience ·/ })
+    );
+    expect(screen.getByText('Public profile pages')).toBeVisible();
+    expect(
+      screen.getByText(/feature.profile.public-profile-pages/)
+    ).toHaveTextContent('Fan opens a public artist profile and taps a link.');
+    expect(screen.getByTestId('capability-evidence-rows')).toBeVisible();
+  });
+
   it('shows failed reads without presenting missing observations as zero', async () => {
     const { CapabilityEvidenceMatrix } = await import(
       './CapabilityEvidenceMatrix'

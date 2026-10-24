@@ -5,6 +5,7 @@ import {
   type ElementType,
   forwardRef,
 } from 'react';
+import { DisclosureRow } from '@/components/molecules/inspector/DisclosureRow';
 import { cn } from '@/lib/utils';
 
 const contentSurfaceCardVariants = cva(
@@ -31,13 +32,14 @@ export interface ContentSurfaceCardProps
     VariantProps<typeof contentSurfaceCardVariants> {
   readonly children?: ComponentPropsWithoutRef<'div'>['children'];
   readonly as?: ElementType;
+  readonly disclosure?: { readonly label: string; readonly summary: string };
 }
 
 export const ContentSurfaceCard = forwardRef<
   HTMLElement,
   ContentSurfaceCardProps
 >(function ContentSurfaceCard(
-  { children, as: Component = 'div', surface, className, ...props },
+  { children, disclosure, as: Component = 'div', surface, className, ...props },
   ref
 ) {
   return (
@@ -47,7 +49,13 @@ export const ContentSurfaceCard = forwardRef<
       className={cn(contentSurfaceCardVariants({ surface }), className)}
     >
       <Component ref={ref} {...props}>
-        {children}
+        {disclosure ? (
+          <DisclosureRow label={`${disclosure.label} · ${disclosure.summary}`}>
+            {children}
+          </DisclosureRow>
+        ) : (
+          children
+        )}
       </Component>
     </Card>
   );

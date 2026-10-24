@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 const requireCurrentAdminPageAccess = vi.fn();
 const loadCapabilityEvidence = vi.fn();
@@ -8,21 +9,30 @@ const loadCapabilityEvidence = vi.fn();
 vi.mock('@/lib/admin/page-access', () => ({ requireCurrentAdminPageAccess }));
 vi.mock('@/lib/admin/capability-evidence', () => ({ loadCapabilityEvidence }));
 vi.mock('@/components/features/admin/CapabilityEvidenceMatrix', () => ({
-  CapabilityEvidenceMatrix: ({ record }: { readonly record: unknown }) => (
-    <div data-testid='capability-evidence-matrix'>{JSON.stringify(record)}</div>
+  CapabilityEvidenceMatrix: ({
+    record,
+    summary,
+  }: {
+    readonly record: unknown;
+    readonly summary: string;
+  }) => (
+    <ContentSurfaceCard disclosure={{ label: 'Customer Experience', summary }}>
+      <div data-testid='capability-evidence-matrix'>
+        {JSON.stringify(record)}
+      </div>
+    </ContentSurfaceCard>
   ),
 }));
 vi.mock('@/components/features/admin/hud/OvieShippingStateCard', () => ({
-  OvieShippingStateCard: () => <div>Shipping state</div>,
+  OvieShippingStateCard: ({ summary }: { readonly summary: string }) => (
+    <ContentSurfaceCard disclosure={{ label: 'Shipping', summary }}>
+      <div>Shipping state</div>
+    </ContentSurfaceCard>
+  ),
 }));
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   AdminPage: ({ children }: { readonly children: ReactNode }) => (
     <main>{children}</main>
-  ),
-}));
-vi.mock('@/components/molecules/ContentSurfaceCard', () => ({
-  ContentSurfaceCard: ({ children }: { readonly children: ReactNode }) => (
-    <section>{children}</section>
   ),
 }));
 
@@ -39,6 +49,26 @@ describe('founder product page', () => {
 
     render(await ProductPage());
 
+    expect(
+      screen.queryByRole('list', { name: 'Product Delivery Lifecycle' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('capability-evidence-matrix')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/version distribution is not observed/i)
+    ).not.toBeInTheDocument();
+    for (const name of [
+      'Delivery Lifecycle',
+      'Shipping',
+      'Customer Experience',
+      'Evidence Gaps',
+    ]) {
+      fireEvent.click(
+        screen.getByRole('button', { name: new RegExp(`^${name}`) })
+      );
+    }
+
     expect(requireCurrentAdminPageAccess).toHaveBeenCalledOnce();
     expect(loadCapabilityEvidence).toHaveBeenCalledOnce();
     expect(
@@ -49,7 +79,11 @@ describe('founder product page', () => {
     expect(screen.getByTestId('capability-evidence-matrix')).toHaveTextContent(
       'public-profile-pages'
     );
-    expect(screen.getByText('Evidence Gaps')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: 'Evidence Gaps · Two observations still need instrumentation',
+      })
+    ).toHaveAttribute('aria-expanded', 'true');
     expect(
       screen.getByText(/version distribution is not observed/i)
     ).toBeInTheDocument();

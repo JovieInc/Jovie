@@ -35,32 +35,45 @@ export default async function ProductPage() {
       description='What customers are actually experiencing, from intent through healthy production observation.'
       testId='founder-product-page'
     >
-      <ol
-        className='flex min-h-11 items-center gap-1 overflow-x-auto text-2xs text-secondary-token'
-        aria-label='Product Delivery Lifecycle'
+      <ContentSurfaceCard
+        disclosure={{
+          label: 'Delivery Lifecycle',
+          summary: 'From intent to healthy observation',
+        }}
       >
-        {lifecycle.map((stage, index) => (
-          <li key={stage} className='flex shrink-0 items-center gap-1'>
-            <span className='rounded-(--radius-sm) border border-subtle px-2 py-1'>
-              {stage}
-            </span>
-            {index < lifecycle.length - 1 ? (
-              <span aria-hidden='true'>→</span>
-            ) : null}
-          </li>
-        ))}
-      </ol>
+        <ol
+          className='flex min-h-11 items-center gap-1 overflow-x-auto text-2xs text-secondary-token'
+          aria-label='Product Delivery Lifecycle'
+        >
+          {lifecycle.map((stage, index) => (
+            <li key={stage} className='flex shrink-0 items-center gap-1'>
+              <span className='rounded-(--radius-sm) border border-subtle px-2 py-1'>
+                {stage}
+              </span>
+              {index < lifecycle.length - 1 ? (
+                <span aria-hidden='true'>→</span>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      </ContentSurfaceCard>
 
-      <OvieShippingStateCard />
+      <OvieShippingStateCard summary='Build, deployment, and verification evidence' />
 
-      <CapabilityEvidenceMatrix record={capabilityEvidence} />
+      <CapabilityEvidenceMatrix
+        record={capabilityEvidence}
+        summary='Configured state, observed exposure, and outcomes'
+      />
 
-      <ContentSurfaceCard surface='details'>
+      <ContentSurfaceCard
+        surface='details'
+        disclosure={{
+          label: 'Evidence Gaps',
+          summary: 'Two observations still need instrumentation',
+        }}
+      >
         <div className='space-y-3 p-3'>
           <div>
-            <h2 className='line-clamp-2 text-app font-semibold text-primary-token'>
-              Evidence Gaps
-            </h2>
             <p className='text-2xs text-tertiary-token'>
               Unknown is not treated as shipped. These observations need
               instrumentation.

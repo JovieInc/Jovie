@@ -333,14 +333,17 @@ function ShippingStateBody({
 
 export function OvieShippingStateCard({
   kioskToken = null,
+  summary,
 }: Readonly<{
   readonly kioskToken?: string | null;
+  readonly summary?: string;
 }>) {
   const { view, isPending } = useOvieShippingStateQuery(kioskToken);
 
   return (
     <ContentSurfaceCard
       surface='details'
+      disclosure={summary ? { label: 'Shipping', summary } : undefined}
       data-testid='hud-shipper-status-panel'
       data-ovie-shipping-state='true'
       data-truth={view.truth}

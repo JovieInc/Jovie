@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type {
   HomeLoopAsk,
   HomeLoopConstraint,
@@ -25,6 +26,10 @@ export type { HomeLoopCopy } from '@/lib/home-loop/contract';
 
 export interface HomeLoopCanvasProps {
   readonly copy: HomeLoopCopy;
+  /** Editorial summaries supplied by the Ovie overview owner. */
+  readonly sectionSummaries?: Readonly<
+    Record<'asks' | 'inFlight' | 'done', string>
+  >;
   readonly stages: readonly string[];
   readonly constraint: HomeLoopConstraint | null;
   readonly pulse: readonly HomeLoopTile[];
@@ -70,6 +75,7 @@ export interface HomeLoopCanvasProps {
  */
 export function HomeLoopCanvas({
   copy,
+  sectionSummaries,
   stages,
   constraint,
   pulse,
@@ -97,16 +103,8 @@ export function HomeLoopCanvas({
   const openAsks = asks.filter(
     ask => !answers[ask.id] || answers[ask.id]?.state === 'failed'
   ).length;
-  return (
-    <div
-      className='@container flex w-full flex-col gap-3 lg:h-full lg:min-h-0'
-      data-testid='home-loop-canvas'
-    >
-      <HomeLoopConstraintBanner
-        constraint={loopStatus === 'ready' ? constraint : null}
-        emptyLabel={copy.constraintClear}
-        loading={loopStatus === 'loading'}
-      />
+  const pulseContent = (
+    <>
       <HomeLoopPulse tiles={pulse} loading={loopStatus === 'loading'} />
       {strip ? (
         <HomeLoopStageStrip
@@ -116,15 +114,53 @@ export function HomeLoopCanvas({
           emptyLabel={copy.latencyEmpty ?? 'Not measured'}
         />
       ) : null}
+    </>
+  );
+  return (
+    <div
+      className={
+        sectionSummaries
+          ? '@container flex w-full flex-col gap-3 overflow-y-auto lg:h-full lg:min-h-0'
+          : '@container flex w-full flex-col gap-3 lg:h-full lg:min-h-0'
+      }
+      data-testid='home-loop-canvas'
+    >
+      <HomeLoopConstraintBanner
+        constraint={loopStatus === 'ready' ? constraint : null}
+        emptyLabel={copy.constraintClear}
+        loading={loopStatus === 'loading'}
+      />
+      {sectionSummaries ? (
+        <ContentSurfaceCard
+          disclosure={{
+            label: 'Shipping Pulse',
+            summary:
+              loopStatus === 'loading'
+                ? 'Loading shipping…'
+                : loopStatus === 'error'
+                  ? copy.inFlightError
+                  : (constraint?.text ?? copy.constraintClear),
+          }}
+        >
+          {pulseContent}
+        </ContentSurfaceCard>
+      ) : (
+        pulseContent
+      )}
       {answer ? (
         <div className='max-h-1/2 shrink-0 overflow-y-auto'>{answer}</div>
       ) : null}
       <div
-        className='grid grid-cols-1 gap-4 @4xl:grid-cols-12 lg:min-h-0 lg:flex-1 lg:grid-rows-1'
+        className={
+          sectionSummaries
+            ? 'flex flex-col gap-3'
+            : 'grid grid-cols-1 gap-4 @4xl:grid-cols-12 lg:min-h-0 lg:flex-1 lg:grid-rows-1'
+        }
         data-testid='home-loop-main'
       >
         <HomeLoopSection
           title={copy.asksTitle}
+          summary={sectionSummaries?.asks}
           count={openAsks}
           status={asksStatus}
           isEmpty={asks.length === 0}
@@ -149,9 +185,16 @@ export function HomeLoopCanvas({
             onFeedback={onFeedback}
           />
         </HomeLoopSection>
-        <div className='flex min-h-0 flex-col gap-4 @4xl:col-span-8 @7xl:col-span-9 @7xl:flex-row'>
+        <div
+          className={
+            sectionSummaries
+              ? 'flex min-h-0 flex-col gap-3'
+              : 'flex min-h-0 flex-col gap-4 @4xl:col-span-8 @7xl:col-span-9 @7xl:flex-row'
+          }
+        >
           <HomeLoopSection
             title={copy.inFlightTitle}
+            summary={sectionSummaries?.inFlight}
             count={rows.length}
             status={inFlightOverride ? 'ready' : loopStatus}
             isEmpty={!inFlightOverride && rows.length === 0}
@@ -173,6 +216,7 @@ export function HomeLoopCanvas({
           </HomeLoopSection>
           <HomeLoopSection
             title={copy.doneTitle}
+            summary={sectionSummaries?.done}
             count={done.length}
             status={loopStatus}
             isEmpty={done.length === 0 && !doneSummary}
@@ -181,7 +225,11 @@ export function HomeLoopCanvas({
             onRetry={onRetryLoop}
             skeleton={<HomeLoopDoneChips items={[]} summary={null} />}
             minBodyClassName='flex min-h-0 flex-1 flex-col'
-            className='h-28 shrink-0 @7xl:h-auto @7xl:w-1/4'
+            className={
+              sectionSummaries
+                ? 'min-h-0 w-full'
+                : 'h-28 shrink-0 @7xl:h-auto @7xl:w-1/4'
+            }
             testId='home-loop-done-section'
           >
             <HomeLoopDoneChips items={done} summary={doneSummary} fit />
