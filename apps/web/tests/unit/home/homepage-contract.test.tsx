@@ -4,7 +4,7 @@
 // manifest, copy truth sources, the one primary action, product imagery, and
 // tokenized styles. Changing the page means changing its typed records, not
 // rewriting a dozen source-string guards.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -245,6 +245,50 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     const component = read('components/homepage/HomepageArtistProfile.tsx');
     // Rendered text comes from props/copy, not JSX literals.
     expect(component).not.toMatch(/>\s*[A-Z][a-z]+(?: [a-z]+){2,}[.!]?\s*</);
+  });
+
+  it('reconciles homepage fragment anchors with the ids the page renders', async () => {
+    const { container } = await renderHomePage();
+    const renderedIds = new Set(
+      [...container.querySelectorAll('[id]')].map(element => element.id)
+    );
+
+    // Every `/#fragment` href in app/components navigates to the homepage
+    // root with an anchor, so the fragment must name an id the homepage
+    // actually renders. A renamed claim input (e.g. the old `handle-input`)
+    // otherwise silently dead-ends every dependent CTA at the top of `/`.
+    const anchors = new Set<string>();
+    const collectAnchors = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) {
+          if (entry.name === '__tests__' || entry.name === 'node_modules') {
+            continue;
+          }
+          collectAnchors(path);
+        } else if (
+          /\.(ts|tsx)$/.test(entry.name) &&
+          !/(\.test\.|\.spec\.|\.stories\.)/.test(entry.name)
+        ) {
+          for (const match of read(path).matchAll(
+            /['"`]\/#([A-Za-z0-9][A-Za-z0-9_-]*)['"`]/g
+          )) {
+            anchors.add(match[1]);
+          }
+        }
+      }
+    };
+    collectAnchors('app');
+    collectAnchors('components');
+
+    expect(
+      anchors.size,
+      `no homepage fragment anchors found — the guard scan went stale: ${[
+        ...anchors,
+      ].join(', ')}`
+    ).toBeGreaterThan(0);
+    const missing = [...anchors].filter(id => !renderedIds.has(id));
+    expect(missing).toEqual([]);
   });
 
   it('keeps the homepage stylesheets on tokens', () => {
