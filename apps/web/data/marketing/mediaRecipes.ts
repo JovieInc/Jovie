@@ -164,7 +164,7 @@ export const DARK_GLASS_MEDIA_RECIPE = {
   id: 'dark-glass',
   kind: 'surface',
   source: {
-    css: 'apps/web/components/site/MarketingHeader.css',
+    css: 'apps/web/styles/primitives/glass.css',
     penContractId:
       MARKETING_MEDIA_RECIPE_FOUNDER_LOCK.darkGlassPen.headerContractId,
     masterId: MARKETING_MEDIA_RECIPE_FOUNDER_LOCK.darkGlassPen.masterId,
@@ -190,9 +190,9 @@ export const DARK_GLASS_MEDIA_RECIPE = {
   material: {
     shell: 'color-mix(in oklab, var(--noir-ion-shell) 82%, transparent)',
     shellScrolled:
-      'color-mix(in oklab, var(--noir-ion-shell) 90%, transparent)',
+      'color-mix(in oklab, var(--noir-ion-shell) 82%, transparent)',
     shellMixPercent: 82,
-    scrolledShellMixPercent: 90,
+    scrolledShellMixPercent: 82,
     shellToken: '--noir-ion-shell',
     darkShellHex: '#07080A',
     darkCanvasHex: '#030406',
@@ -200,9 +200,12 @@ export const DARK_GLASS_MEDIA_RECIPE = {
     borderStrongToken: '--noir-ion-border-default',
     textToken: '--noir-ion-text-primary',
     mutedToken: '--noir-ion-text-muted',
-    blurPx: 20,
-    saturatePercent: 165,
-    backdropFilter: 'blur(20px) saturate(165%)',
+    tintToken: '--noir-ion-ion',
+    tintPercent: 3,
+    insetHighlight: '1px',
+    blurPx: 8,
+    saturatePercent: 100,
+    backdropFilter: 'blur(8px)',
   },
   never: [
     'HeaderNav.css fallback glass (2.72rem / rgba(12,13,15,0.74) / no blur at rest)',
@@ -221,8 +224,8 @@ export const COMPACT_GLASS_MEDIA_RECIPE = {
   id: 'compact-glass',
   kind: 'surface',
   source: {
-    css: 'apps/web/components/marketing/artist-profile/captureShared.css',
-    selector: '.artist-profile-audience-pill',
+    css: 'apps/web/styles/primitives/glass.css',
+    selector: '.ds-glass',
     issueId: 'JOV-6246',
   },
   geometry: {
@@ -231,23 +234,15 @@ export const COMPACT_GLASS_MEDIA_RECIPE = {
     radius: '9999px',
   },
   material: {
-    shell:
-      'color-mix(in oklab, var(--system-b-cinematic-black) 82%, transparent)',
-    washTop:
-      'color-mix(in oklab, var(--color-text-primary-token) 4%, transparent)',
-    washBottom:
-      'color-mix(in oklab, var(--color-text-primary-token) 1.5%, transparent)',
-    text: 'color-mix(in oklab, var(--color-text-primary-token) 92%, transparent)',
-    insetHighlight:
-      'color-mix(in oklab, var(--color-text-primary-token) 5%, transparent)',
-    insetShadow:
-      'color-mix(in oklab, var(--system-b-cinematic-black) 18%, transparent)',
-    dropShadow: '0 10px 24px',
-    blurPx: 14,
-    backdropFilter: 'blur(14px)',
+    shell: 'color-mix(in oklab, var(--noir-ion-shell) 82%, transparent)',
+    tintToken: '--noir-ion-ion',
+    tintPercent: 3,
+    insetHighlight: '1px',
+    blurPx: 8,
+    backdropFilter: 'blur(8px)',
     fontSizePx: 12.5,
-    shellToken: '--system-b-cinematic-black',
-    shellHex: '#06070A',
+    shellToken: '--noir-ion-shell',
+    shellHex: '#07080A',
   },
   never: [
     'A second compact glass mix or a different blur',
@@ -371,7 +366,7 @@ export const MARKETING_MEDIA_RECIPE_ACCENTS: Readonly<
   Record<MarketingMediaRecipeId, MarketingMediaAccentReference>
 > = {
   'dark-glass': { token: '--noir-ion-shell', hex: '#07080A' },
-  'compact-glass': { token: '--system-b-cinematic-black', hex: '#06070A' },
+  'compact-glass': { token: '--noir-ion-shell', hex: '#07080A' },
   'soft-editorial-background': {
     token: '--system-b-text-primary',
     hex: '#F7F8F8',

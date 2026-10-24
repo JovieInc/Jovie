@@ -107,9 +107,9 @@ export function CompactGlassCaptureDemo({
 
   return (
     <CompactGlassModule label={label} className={cn('w-full', className)}>
-      <div className='compact-glass-module__demo'>
+      <div className='compact-capture-module__demo'>
         <CaptureActionPill capture={capture} phase={phase} />
-        <div className='compact-glass-module__controls'>
+        <div className='compact-capture-module__controls'>
           <Button variant='ghost' size='sm' onClick={replay}>
             {phase === 'idle' ? (
               <Play className='h-4 w-4' strokeWidth={1.9} aria-hidden='true' />
@@ -128,7 +128,7 @@ export function CompactGlassCaptureDemo({
             </Button>
           ) : null}
         </div>
-        <p className='compact-glass-module__status' aria-live='polite'>
+        <p className='compact-capture-module__status' aria-live='polite'>
           {status}
         </p>
       </div>

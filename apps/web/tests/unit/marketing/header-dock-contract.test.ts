@@ -13,6 +13,7 @@ function cssRule(source: string, selector: string): string {
 }
 
 const headerCss = readWebSource('components/site/MarketingHeader.css');
+const glassCss = readWebSource('styles/primitives/glass.css');
 const headerNavCss = readWebSource('components/organisms/HeaderNav.css');
 const homeCss = readWebSource('app/(home)/home.css');
 
@@ -20,10 +21,11 @@ describe('docked marketing header (Tim direction 2026-09-26)', () => {
   it('has no glass at rest and fades a flat noir glass layer in on scroll', () => {
     const layer = cssRule(headerCss, '.header-nav--docked::before');
     expect(layer).toContain('opacity: 0');
-    expect(layer).toContain('backdrop-filter: blur(20px) saturate(165%)');
-    expect(layer).toContain('background: var(--marketing-dock-glass)');
+    expect(glassCss).toContain('.header-nav--docked::before');
+    expect(glassCss).toContain('backdrop-filter: blur(8px)');
+    expect(layer).not.toContain('backdrop-filter');
     expect(layer).toContain(
-      'border-bottom: var(--space-px) solid var(--marketing-dock-rim)'
+      'border-bottom: var(--space-px) solid var(--noir-ion-border-subtle)'
     );
     expect(layer).not.toContain('box-shadow');
     // Only opacity animates, on tokens (160ms ease-out), so the bar never
@@ -34,18 +36,18 @@ describe('docked marketing header (Tim direction 2026-09-26)', () => {
     expect(headerCss).toMatch(
       /\.header-nav--docked\[data-scrolled="true"\]::before,[\s\S]*?\{\s*opacity: 1;/
     );
-    expect(headerCss).toContain('var(--noir-ion-shell) 82%');
+    expect(glassCss).toContain('var(--noir-ion-shell) 82%');
   });
 
   it('falls back to solid chrome for reduced motion, transparency, contrast, and forced colors', () => {
     expect(headerCss).toMatch(
       /@media \(prefers-reduced-motion: reduce\) \{\s*\.header-nav--docked::before \{\s*transition: none;/
     );
-    expect(headerCss).toMatch(
-      /@media \(prefers-reduced-transparency: reduce\), \(prefers-contrast: more\) \{\s*\.header-nav--docked::before \{[^}]*background: var\(--noir-ion-shell\);[^}]*backdrop-filter: none;/
+    expect(glassCss).toMatch(
+      /@media \(prefers-reduced-transparency: reduce\), \(prefers-contrast: more\) \{\s*\.ds-glass,\s*\.header-nav--docked::before \{[^}]*background: var\(--noir-ion-shell\);[^}]*backdrop-filter: none;/
     );
-    expect(headerCss).toMatch(
-      /@media \(forced-colors: active\) \{\s*\.header-nav--docked::before \{[^}]*background: Canvas;/
+    expect(glassCss).toMatch(
+      /@media \(forced-colors: active\) \{\s*\.ds-glass,\s*\.header-nav--docked::before \{[^}]*background: Canvas;/
     );
   });
 

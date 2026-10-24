@@ -1080,7 +1080,7 @@ const LANES = [
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
-      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
+      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:marketing-glass && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
       ' && ' +
       MARKETING_CERTIFICATION_COMMAND +
       ' && ' +
@@ -2656,6 +2656,7 @@ export async function runStructural(opts = {}) {
     'pnpm tailwind:check',
     'pnpm --filter=@jovie/web run lint:no-native-dialogs',
     'pnpm --filter=@jovie/web run lint:seo',
+    'pnpm --filter=@jovie/web run lint:marketing-glass',
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
     'pnpm design:shared-ui-visual-arbitrary:check',
     // JOV-INV-036: no new raw global-layer z-index values in web source.

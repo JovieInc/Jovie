@@ -97,16 +97,8 @@
 }
 
 .ap-monetization__nav-btn {
-  border: 1px solid
-    color-mix(in oklab, var(--color-text-primary-token) 10%, transparent);
-  background: color-mix(
-    in oklab,
-    var(--system-b-cinematic-black) 62%,
-    transparent
-  );
-  color: var(--color-text-primary-token);
-  box-shadow: 0 18px 44px
-    color-mix(in oklab, var(--system-b-cinematic-black) 28%, transparent);
+  border: 1px solid var(--noir-ion-border-subtle);
+  color: var(--noir-ion-text-primary);
 }
 
 .ap-monetization__nav-btn:hover:not(:disabled) {

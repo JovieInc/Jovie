@@ -292,6 +292,7 @@ jobs:
           test "$web_types_status" -eq 0 || exit "$web_types_status"
           pnpm biome:check
           ESLINT_CHANGED_BASE="origin/${{ github.base_ref }}" pnpm --filter @jovie/web run lint:eslint:changed
+          pnpm --filter @jovie/web run lint:marketing-glass
           pnpm --filter @jovie/web run lint:motion-css
           pnpm component-ship-gate
           pnpm screen-registration-gate

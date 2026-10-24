@@ -135,7 +135,7 @@ export function MarketingSnapRail({
         onClick={() => {
           scrollByDirection('prev');
         }}
-        className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors disabled:cursor-default disabled:opacity-35'
+        className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full ds-glass transition-colors disabled:cursor-default disabled:opacity-35'
       >
         <ChevronLeft className='h-4 w-4' aria-hidden='true' />
       </button>
@@ -147,7 +147,7 @@ export function MarketingSnapRail({
         onClick={() => {
           scrollByDirection('next');
         }}
-        className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors disabled:cursor-default disabled:opacity-35'
+        className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full ds-glass transition-colors disabled:cursor-default disabled:opacity-35'
       >
         <ChevronRight className='h-4 w-4' aria-hidden='true' />
       </button>

@@ -153,14 +153,14 @@ unless linked below.
 | `@jovie/no-hardcoded-theme-colors` | `error` | L | Yes | None (no grandfathered count) |
 | `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
 | `arbitrary-radius` | `error` | S + G | Yes | 14 occurrences; 8 files |
-| `arbitrary-values` | `error` | G + I | Yes | 2169 |
+| `arbitrary-values` | `error` | G + I | Yes | 2167 |
 | `component-family` | `error` | G | Yes | button=37; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
 | `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
 | `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
 | `deprecated-button-alias` | `error` | G | Yes | 91 |
 | `linear-namespace` | `error` | G + I | Yes | 700 |
 | `shadcn/no-restyle` | `error` | L + G | Yes | 217 files; 3105 messages (grandfathered) |
-| `source-identity` | `error` | I | Yes | 2057 |
+| `source-identity` | `error` | I | Yes | 2055 |
 | `spacing-scale (conservative)` | `error` | S + G | Yes | 590; armed=true; marketing=46; packages/ui=11; web-other=290; web-shell=243 |
 | `spacing-scale (strict)` | `warn` | S + G | No | 2190; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=837 |
 | `touch-target` | `error` | D | Yes | 153 |
@@ -225,6 +225,20 @@ Read [the canonical foundation decisions](docs/design-system/DETAILS.md#ds_found
 ## Borders & Radius
 
 Read [the borders & radius reference](docs/design-system/DETAILS.md#borders--radius) when changing this area.
+
+## Marketing glass
+
+Use `ds-glass` from `apps/web/styles/primitives/glass.css` for translucent
+marketing surfaces. It owns the restrained 8px blur, 3% Noir Ion tint, and
+1px inner highlight, including solid accessibility fallbacks. Consumers own
+geometry and interaction states; do not add reflections or white washes.
+The docked header uses the same primitive on its existing scroll-state layer.
+
+`pnpm --filter @jovie/web lint:marketing-glass` blocks raw backdrop effects,
+inline filters, and independent glass classes in marketing routes, homepage,
+marketing/site components, and HeaderNav. It runs in web lint, Source Validation,
+and the structural CI lane. The separately owned `homepage/hero-light` subtree
+is explicitly excluded from this migration and guard. Footer files are scanned.
 
 ## Shadows
 
