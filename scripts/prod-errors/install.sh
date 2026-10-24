@@ -53,8 +53,8 @@ Description=Jovie prod-errors: Sentry webhook receiver (127.0.0.1:8788; expose v
 Environment=PATH=$path
 Environment=PROD_ERRORS_STATE=$state
 ExecStart=/bin/bash $base/run.sh receive --port 8788
-Restart=always
-RestartSec=10
+Restart=on-failure
+RestartSec=300
 MemoryMax=256M
 [Install]
 WantedBy=default.target
