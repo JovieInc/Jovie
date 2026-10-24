@@ -27,7 +27,9 @@ export function navigationHistoryItems(
     .getAllEntries()
     .slice(0, WINDOW_HISTORY_LIMIT)
     .map<MenuItemConstructorOptions>((entry, index) => ({
-      label: entry.title || new URL(entry.url).pathname || 'Page',
+      label:
+        entry.title ||
+        (entry.url === 'about:blank' ? 'Page' : new URL(entry.url).pathname),
       type: 'checkbox',
       checked: index === history.getActiveIndex(),
       click: () => {

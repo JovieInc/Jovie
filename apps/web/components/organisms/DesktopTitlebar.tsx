@@ -14,6 +14,7 @@ import {
   type DesktopBuildIdentity,
   observeDesktopFullScreen,
   showDesktopHistory,
+  supportsDesktopHistory,
   useDesktopBuildIdentity,
   useDesktopNavigation,
   useIsElectronRuntime,
@@ -255,6 +256,7 @@ export function DesktopTitlebar() {
               variant='ghost'
               size='sm'
               aria-label='History'
+              disabled={!supportsDesktopHistory()}
               data-testid='electron-nav-history'
               onClick={showDesktopHistory}
             >

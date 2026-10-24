@@ -20,6 +20,7 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
   }),
   observeDesktopFullScreen: () => () => undefined,
   showDesktopHistory: actions.history,
+  supportsDesktopHistory: () => true,
 }));
 
 function mount(open = true) {

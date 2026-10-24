@@ -901,6 +901,10 @@ export function useDesktopNavigation(): DesktopNavState {
   };
 }
 
+export function supportsDesktopHistory(): boolean {
+  return typeof getRawElectronAPI()?.showHistory === 'function';
+}
+
 /** Native history owns both the bounded entries and their navigation targets. */
 export function showDesktopHistory(): void {
   const showHistory = getRawElectronAPI()?.showHistory;

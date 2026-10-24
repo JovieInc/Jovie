@@ -70,10 +70,38 @@ describe('DesktopTitlebar', () => {
     electronRuntimeMock.isElectronRuntime = true;
     Reflect.deleteProperty(window, 'electronAPI');
     document.documentElement.removeAttribute('data-desktop-channel');
+    document.documentElement.removeAttribute('data-electron-fullscreen');
     document.documentElement.removeAttribute('data-desktop-version');
     document.documentElement.removeAttribute('data-desktop-source-revision');
     document.documentElement.removeAttribute('data-desktop-built-at');
   });
+
+  it.each([true, false])(
+    'reflects the native full-screen snapshot %s on the shell',
+    async fullScreen => {
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: {
+          platform: 'darwin',
+          electronVersion: '44.0.0',
+          onUpdateAvailable: vi.fn(),
+          onUpdateDownloaded: vi.fn(),
+          installUpdateAndRestart: vi.fn(),
+          goBack: vi.fn(),
+          goForward: vi.fn(),
+          onNavStateChanged: vi.fn(),
+          getFullScreenState: vi.fn().mockResolvedValue(fullScreen),
+          onFullScreenChanged: vi.fn(() => () => undefined),
+        },
+      });
+      renderTitlebar();
+      await waitFor(() =>
+        expect(document.documentElement.dataset.electronFullscreen).toBe(
+          String(fullScreen)
+        )
+      );
+    }
+  );
 
   it('keeps the sidebar toggle outside the window drag region', () => {
     renderTitlebar();
@@ -95,6 +123,7 @@ describe('DesktopTitlebar', () => {
   it('keeps the native history action outside window drag strips', () => {
     renderTitlebar();
     const history = screen.getByRole('button', { name: 'History' });
+    expect(history).toBeDisabled(); // Older shells cannot open the native menu.
     expect(history.closest('[data-electron-drag-region="true"]')).toBeNull();
     expect(screen.getByTestId('electron-nav-pill')).toContainElement(history);
   });

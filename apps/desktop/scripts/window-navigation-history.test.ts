@@ -61,6 +61,15 @@ describe('per-window titlebar history', () => {
     click();
     expect(goToIndex).toHaveBeenCalledWith(1);
   });
+  it('uses page titles and a safe fallback for untitled blank pages', () => {
+    const { history, entries } = historyFixture(2);
+    entries[0].url = 'about:blank';
+    entries[1].title = 'Calendar';
+    expect(navigationHistoryItems(history).map(item => item.label)).toEqual([
+      'Calendar',
+      'Page',
+    ]);
+  });
   it('does not follow a stale entry after history changes', () => {
     const { history, entries, goToIndex } = historyFixture(3);
     const menu = navigationHistoryItems(history);

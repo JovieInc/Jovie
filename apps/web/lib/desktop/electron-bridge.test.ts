@@ -24,6 +24,7 @@ import {
   observeDesktopVisualActivity,
   reportDesktopWorkState,
   showDesktopHistory,
+  supportsDesktopHistory,
   useDesktopBuildIdentity,
 } from './electron-bridge';
 
@@ -919,12 +920,14 @@ describe('native titlebar history', () => {
   it('opens the installed native history owner', () => {
     const showHistory = vi.fn().mockResolvedValue(undefined);
     setElectronAPI({ showHistory });
+    expect(supportsDesktopHistory()).toBe(true);
     showDesktopHistory();
     expect(showHistory).toHaveBeenCalledTimes(1);
   });
   it('remains safe in browser tabs and older shells', () => {
     expect(() => showDesktopHistory()).not.toThrow();
     setElectronAPI({});
+    expect(supportsDesktopHistory()).toBe(false);
     expect(() => showDesktopHistory()).not.toThrow();
   });
 });
