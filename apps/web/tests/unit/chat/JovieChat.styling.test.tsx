@@ -467,6 +467,11 @@ describe('JovieChat styling regressions', () => {
     expect(jovieChatSource).toContain('CHAT_TRANSCRIPT_WINDOW');
     expect(jovieChatSource).toContain('virtualizeAfterMessageCount');
     expect(jovieChatSource).toContain('overscanRowCount');
+    // JOV-8481: the virtual window must always mount the newest message, so a
+    // stale window can never strand scrollIntoView to the live tail.
+    expect(jovieChatSource).toContain(
+      'rangeExtractor: chatTranscriptRangeWithPinnedTail'
+    );
     // The virtualizer owner stays out of React Compiler memoization, or the
     // window freezes on its first rows and the thread renders blank (JOV-6702).
     expect(jovieChatSource).toMatch(
