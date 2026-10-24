@@ -236,7 +236,7 @@ The docked header uses the same primitive on its existing scroll-state layer.
 
 `pnpm --filter @jovie/web lint:marketing-glass` blocks raw backdrop effects,
 inline filters, and independent glass classes in marketing routes, homepage,
-marketing/site components, and HeaderNav. It runs in web lint, Source Validation,
+marketing/site and legacy `features/home` components, and HeaderNav. It runs in web lint, Source Validation,
 and the structural CI lane. The separately owned `homepage/hero-light` subtree
 is explicitly excluded from this migration and guard. Footer files are scanned.
 

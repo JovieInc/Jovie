@@ -58,6 +58,8 @@ describe('marketing glass boundary', () => {
         `
       // backdrop-filter and glass-card are forbidden
       const variant = 'dark-glass';
+      const surfaces = [{ id: 'compact-glass', label: 'Compact Glass' }];
+      function pick(id) { switch (id) { case 'compact-glass': return 'ds-glass'; } }
       export const Card = () => <div className={cn('ds-glass', 'rounded-xl')} data-variant={variant} />;
     `
       )
@@ -79,6 +81,7 @@ describe('marketing glass boundary', () => {
       'app/(marketing)/pricing/page.tsx',
       'app/(home)/home.css',
       'components/homepage/Card.tsx',
+      'components/features/home/Card.tsx',
       'components/site/MarketingFooter.tsx',
       'components/organisms/HeaderNav.tsx',
     ])

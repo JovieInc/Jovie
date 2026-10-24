@@ -10,6 +10,7 @@ export const SCAN_ROOTS = [
   'app/(home)',
   'app/(marketing)',
   'components/homepage',
+  'components/features/home',
   'components/marketing',
   'components/site',
   'components/organisms/HeaderNav.css',
@@ -82,8 +83,23 @@ export function findViolations(path, source) {
         ts.isTemplateTail(node);
       if (isText || ts.isIdentifier(node)) {
         const value = node.text;
-        const recipeId = value === 'dark-glass' || value === 'marketing-glass';
-        let recipeContext = ts.isLiteralTypeNode(node.parent);
+        const recipeId = [
+          'dark-glass',
+          'marketing-glass',
+          'compact-glass',
+        ].includes(value);
+        // Human labels and registered route/recipe IDs are not class names.
+        if (
+          isText &&
+          ts.isPropertyAssignment(node.parent) &&
+          node.parent.name.getText(ast) === 'label'
+        )
+          return;
+        let recipeContext =
+          ts.isLiteralTypeNode(node.parent) ||
+          ts.isCaseClause(node.parent) ||
+          (ts.isPropertyAssignment(node.parent) &&
+            node.parent.name.getText(ast) === 'id');
         let owner = node.parent;
         while (recipeId && owner && !ts.isSourceFile(owner)) {
           if (
