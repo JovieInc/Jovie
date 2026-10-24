@@ -84,3 +84,19 @@ describe('AvatarCell', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 });
+
+describe('AvatarCell link affordance (JOV-8873)', () => {
+  it('underlines the profile link so it is distinguishable without color', () => {
+    render(
+      <AvatarCell
+        profileId='creator'
+        username='artist'
+        displayName='An Artist'
+        avatarUrl={null}
+      />
+    );
+    expect(screen.getByRole('link', { name: '@artist' })).toHaveClass(
+      'underline'
+    );
+  });
+});

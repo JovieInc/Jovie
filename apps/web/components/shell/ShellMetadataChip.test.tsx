@@ -61,3 +61,14 @@ describe('JOV-6773 red drift', () => {
     expect(source).not.toMatch(/\bred-\d/);
   });
 });
+
+describe('ShellMetadataChip contrast (JOV-8873)', () => {
+  it('uses the AA error text token for the danger tone', () => {
+    const { container } = render(
+      <ShellMetadataChip tone='danger'>Overdue</ShellMetadataChip>
+    );
+    const chip = container.firstElementChild as HTMLElement;
+    expect(chip).toHaveClass('text-error-text');
+    expect(chip.className).not.toContain('text-error/90');
+  });
+});

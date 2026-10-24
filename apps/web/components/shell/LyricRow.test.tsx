@@ -81,3 +81,12 @@ describe('Ion accent polish (glm/lyrics-player)', () => {
     expect(button.className).toContain('focus-visible:ring-ring/55');
   });
 });
+
+describe('LyricRow contrast (JOV-8873)', () => {
+  it('renders inactive lines with the secondary token at full opacity', () => {
+    render(<LyricRow {...baseProps} />);
+    const button = screen.getByText('You were humming a tune I forgot');
+    expect(button).toHaveClass('text-secondary-token');
+    expect(button).not.toHaveClass('opacity-60');
+  });
+});

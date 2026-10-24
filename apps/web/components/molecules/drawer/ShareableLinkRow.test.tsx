@@ -52,3 +52,19 @@ describe('ShareableLinkRow', () => {
     expect(screen.getByTestId('row')).toHaveClass('h-8');
   });
 });
+
+describe('ShareableLinkRow target size (JOV-8873)', () => {
+  it('gives compact-density action buttons a 24px target', () => {
+    render(
+      <ShareableLinkRow
+        url='https://jov.ie/tim'
+        density='compact'
+        onOpen={() => undefined}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Open link' })).toHaveClass(
+      'h-6',
+      'w-6'
+    );
+  });
+});
