@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
 
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -57,6 +58,7 @@ import {
   type KeyboardShortcut,
   OVIE_NAVIGATION_SHORTCUT,
 } from '@/lib/keyboard-shortcuts';
+import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
@@ -89,12 +91,14 @@ function SettingsNavGroup({
   isItemActive,
   shortcut,
   onActivate,
+  onPrefetch,
 }: Readonly<{
   items: readonly NavItem[];
   pathname: string;
   isItemActive?: (item: NavItem) => boolean;
   shortcut?: KeyboardShortcut;
   onActivate?: () => void;
+  onPrefetch?: (item: NavItem) => void;
 }>) {
   return (
     <SidebarMenu>
@@ -110,6 +114,7 @@ function SettingsNavGroup({
             calm
             shortcut={shortcut}
             onActivate={onActivate}
+            onPrefetch={onPrefetch ? () => onPrefetch(item) : undefined}
           />
         );
       })}
@@ -139,6 +144,12 @@ function OperatorNavGroup({
 }>) {
   const id = useId();
   const { state, isMobile } = useSidebar();
+  const queryClient = useQueryClient();
+  const prefetchShipping = (item: NavItem) => {
+    if (item.href === APP_ROUTES.ADMIN_SHIPPING) {
+      void queryClient.prefetchQuery(shippingStateQueryOptions);
+    }
+  };
   const isActive = (item: NavItem) =>
     isOperatorNavigationHrefActive(pathname, item.href);
   const holdsActive = section.items.some(isActive);
@@ -199,6 +210,7 @@ function OperatorNavGroup({
             section.id === 'home' ? OVIE_NAVIGATION_SHORTCUT : undefined
           }
           onActivate={section.id === 'home' ? onHomeActivate : undefined}
+          onPrefetch={prefetchShipping}
         />
       </div>
     </div>
