@@ -173,7 +173,7 @@ describe('GET /api/stripe/pricing-options', () => {
       }
     );
   });
-  it('keeps the Stripe route on the Node.js runtime', async () => {
+  it('keeps the Stripe route on its required server runtime', async () => {
     const route = await import('@/app/api/stripe/pricing-options/route');
     expect(route.runtime).toBe('nodejs');
   });
