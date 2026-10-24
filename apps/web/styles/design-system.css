@@ -280,7 +280,9 @@
     var(--system-b-radius-card) -
     var(--space-1)
   );
-  --system-b-radius-overlay: var(--radius-xl);
+  /* JOV-8976 spec rev: L4 overlays (popovers, tooltips, menus) use the small
+     radius token instead of xl — quiet corners, consistent with tooltips. */
+  --system-b-radius-overlay: var(--radius-sm);
   --system-b-radius-overlay-inner: calc(
     var(--system-b-radius-overlay) -
     var(--space-1)
