@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -494,7 +496,7 @@ function fixture() {
     complete: true,
     pr: {
       number: 7,
-      title: 'fix(automation): preserve commissioning acceptance',
+      title: 'feat(automation): preserve commissioning acceptance',
       body: /** @type {string | null} */ ('Refs JOV-7300.'),
       state: 'open',
       draft: false,
@@ -1058,7 +1060,12 @@ function sourceValidationWorkflow() {
   return load(readFileSync('.github/workflows/source-validation.yml', 'utf8'));
 }
 
-function runProofReuse({ runs, ghFails = false, sha = 'a'.repeat(40) }) {
+function runProofReuse({
+  runs,
+  ghFails = false,
+  sha = 'a'.repeat(40),
+  quota = '5000',
+}) {
   const step = sourceValidationWorkflow().jobs.deterministic.steps.find(
     candidate => candidate.id === 'reuse'
   );
@@ -1066,22 +1073,35 @@ function runProofReuse({ runs, ghFails = false, sha = 'a'.repeat(40) }) {
   try {
     const bin = join(root, 'bin');
     mkdirSync(bin);
+    cpSync(
+      'packages/api-client',
+      join(root, '.source-validation-client/packages/api-client'),
+      { recursive: true }
+    );
+    writeFileSync(join(root, 'quota'), quota);
+    for (const [name, script] of Object.entries({
+      sleep: `printf '%s\\n' "$*" >> "${root}/sleep.log"`,
+    }))
+      writeFileSync(join(bin, name), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
     writeFileSync(
       join(root, 'runs.json'),
       JSON.stringify({ workflow_runs: runs })
     );
     writeFileSync(
       join(bin, 'gh'),
-      `#!/bin/sh\nprintf '%s\\n' "$*" >> "${root}/gh.log"\n${ghFails ? 'exit 1' : `cat "${root}/runs.json"`}\n`,
+      `#!/bin/sh\nprintf '%s\\n' "$*" >> "${root}/gh.log"\n${ghFails ? 'exit 1' : `case "$*" in *rate_limit*) cat "${root}/quota" ;; *) cat "${root}/runs.json" ;; esac`}\n`,
       { mode: 0o755 }
     );
     const output = join(root, 'output');
     writeFileSync(output, '');
     const result = spawnSync('bash', ['-c', step.run], {
+      cwd: root,
       encoding: 'utf8',
       env: {
         PATH: `${bin}:${process.env.PATH}`,
         GITHUB_OUTPUT: output,
+        GITHUB_STEP_SUMMARY: join(root, 'summary'),
+        JOVIE_API_STATE_DIR: join(root, 'state'),
         GH_TOKEN: 'test',
         HEAD_SHA: sha,
         HEAD_REF: 'agent/jov-1',
@@ -1098,6 +1118,13 @@ function runProofReuse({ runs, ghFails = false, sha = 'a'.repeat(40) }) {
       stderr: result.stderr,
       output: readFileSync(output, 'utf8'),
       ghLog,
+      budgeted: existsSync(join(root, 'state/api-ledger/github.json')),
+      sleeps: existsSync(join(root, 'sleep.log'))
+        ? readFileSync(join(root, 'sleep.log'), 'utf8')
+        : '',
+      summary: existsSync(join(root, 'summary'))
+        ? readFileSync(join(root, 'summary'), 'utf8')
+        : '',
     };
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -1127,6 +1154,32 @@ test('a metadata-only edit reuses the newest green exact-head proof', () => {
     result.ghLog,
     /head_sha=a{40}&event=pull_request&status=completed/
   );
+});
+
+test('low quota uses shared admission and immediately runs full validation without a lookup', () => {
+  for (const quota of ['0', '10', '49']) {
+    const result = runProofReuse({ runs: [proofRun(400, 'success')], quota });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      result.budgeted,
+      true,
+      'preflight must record shared-client admission'
+    );
+    assert.equal(result.output, 'reuse=false\nproof_run=\n');
+    assert.equal(result.sleeps, '');
+    assert.doesNotMatch(result.ghLog, /actions\/workflows/);
+    assert.match(result.summary, /proof reuse skipped, full validation runs/);
+  }
+});
+
+test('healthy or unreadable quota never bypasses exact-head proof selection', () => {
+  for (const quota of ['50', '5000', 'unreadable', 'null', '10+bad']) {
+    const result = runProofReuse({ runs: [proofRun(400, 'failure')], quota });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.output, 'reuse=false\nproof_run=\n');
+    assert.equal(result.sleeps, '');
+    assert.match(result.ghLog, /actions\/workflows/);
+  }
 });
 
 test('a red, foreign, or unreadable predecessor runs the full source contract', () => {
@@ -1167,7 +1220,16 @@ test('a red, foreign, or unreadable predecessor runs the full source contract', 
 test('reuse skips every proof step except body-dependent and exact-head evidence', () => {
   const workflow = sourceValidationWorkflow();
   const gate = "steps.reuse.outputs.reuse != 'true'";
-  const reuseStep = workflow.jobs.deterministic.steps[0];
+  const [client, runtime, reuseStep] = workflow.jobs.deterministic.steps;
+  assert.equal(client.with.ref, '${{ github.event.pull_request.base.sha }}');
+  assert.equal(client.with['persist-credentials'], false);
+  assert.match(client.with['sparse-checkout'], /packages\/api-client/);
+  assert.equal(
+    runtime.with['node-version-file'],
+    '.source-validation-client/.nvmrc'
+  );
+  assert.equal(client.if, reuseStep.if);
+  assert.equal(runtime.if, reuseStep.if);
   assert.equal(reuseStep.id, 'reuse');
   // Base retargets change the compared tree, so they never reuse a proof.
   assert.equal(
@@ -1175,7 +1237,9 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     "${{ github.event.action == 'edited' && !github.event.changes.base }}"
   );
   for (const job of ['security', 'migration', 'coverage', 'unit']) {
-    const [first, ...rest] = workflow.jobs[job].steps;
+    const [jobClient, jobRuntime, first, ...rest] = workflow.jobs[job].steps;
+    assert.deepEqual(jobClient, client, job);
+    assert.deepEqual(jobRuntime, runtime, job);
     assert.equal(first.id, 'reuse', job);
     assert.ok(workflow.jobs[job].permissions.actions === 'read', job);
     // Coverage's route-budget build and the unit lanes narrow further to the
@@ -1193,6 +1257,7 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     // The disk-read guards run on every edit and can launch Chromium, so
     // their browser setup must run whenever they do (#21956, 2026-10-20).
     'Setup Playwright (Chromium)',
+    'Enforce PR fleet rules',
     'Validate disk-read source contracts from trusted base',
     'Validate customer changelog decision from trusted base',
     'Measure actual installed source dependency graph',
@@ -1523,4 +1588,29 @@ test('UI-path axe gate blocks PR Ready and stays quiet for non-UI diffs', () => 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('fleet metadata rules block native auto-merge admission until evidence is supplied', () => {
+  const input = fixture();
+  input.pr.title = 'fix(automation): repair gate';
+  const result = evaluateSourceAdmission(input);
+  assert.equal(result.allowed, false);
+  assert.ok(result.blockers.some(x => x.startsWith('red-before-green:')));
+  input.pr.body =
+    '## Red-before-green\nFailing command: `node --test scripts/fix.test.mjs`\nFailing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123';
+  assert.equal(evaluateSourceAdmission(input).allowed, true);
+  input.files = [{ filename: 'apps/web/lib/auth/session.ts' }];
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.some(x =>
+      x.startsWith('locked-areas:')
+    )
+  );
+  input.pr.body += '\n## Locked areas\nGBrain: jovie-auth';
+  assert.equal(evaluateSourceAdmission(input).allowed, true);
+  input.pr.body += '\n## Done receipt\nProduction verified.';
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.some(x =>
+      x.startsWith('done-receipt:')
+    )
+  );
 });

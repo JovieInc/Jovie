@@ -17,10 +17,20 @@ import {
   WRITER_PROMOTION_HOLD_LABELS,
 } from './writer-owned-pr-promotion.mjs';
 
-export const TRUSTED_BOT_AUTHORS = Object.freeze(['jovie-bot[bot]']);
+export const TRUSTED_BOT_AUTHORS = Object.freeze([
+  'jovie-bot[bot]',
+  'jovie-ci-lane[bot]',
+  'jovie-symphony-lane[bot]',
+  'jovie-agents-lane[bot]',
+]);
 export const FX_WRITER_NAME = 'jovie-fx[bot]';
 export const FX_WRITER_EMAIL = 'jovie-fx[bot]@users.noreply.github.com';
-export const FX_APP_LOGINS = Object.freeze(['jovie-bot[bot]']);
+export const FX_APP_LOGINS = Object.freeze([
+  'jovie-bot[bot]',
+  'jovie-ci-lane[bot]',
+  'jovie-symphony-lane[bot]',
+  'jovie-agents-lane[bot]',
+]);
 export const FX_SOURCE_HEAD_TRAILER = 'FX-Source-Head';
 export const TRUSTED_FX_WORKFLOW_PATH =
   '.github/workflows/rolling-ci-dispatch.yml';
