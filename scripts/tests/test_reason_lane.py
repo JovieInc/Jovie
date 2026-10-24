@@ -990,6 +990,47 @@ class OutcomeLaneTest(unittest.TestCase):
         long = outcome.judge(verdict(*[item("fail", "x" * 500) for _ in range(10)]), "JOV-7771", SHA)
         self.assertLessEqual(len(outcome.receipt_note(long)), outcome.NOTE_LIMIT)
 
+    def test_unobservable_items_are_residual_not_failures_but_need_a_proven_majority(self):
+        item = lambda status, criterion="c", evidence="apps/web/x.ts:1 shows the fix in place": {
+            "criterion": criterion, "status": status, "evidence": evidence}
+        verdict = lambda *items: {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": list(items)}
+        mixed = outcome.judge(verdict(item("pass"), item("pass"), item("unverifiable", "signed-in page", "redirects to /signin")),
+                              "JOV-7771", SHA)
+        self.assertEqual((mixed["status"], mixed["reason"]), ("pass", "verified-with-residual"))
+        note = outcome.receipt_note(mixed)
+        self.assertIn("2 of 3 acceptance items verified", note)
+        self.assertIn("residual (unverifiable): signed-in page", note)
+        taste = outcome.judge(verdict(item("pass"), item("pass"), item("needs-authority", "Founder accepts the casing taste", "Tim decides")),
+                              "JOV-7771", SHA)
+        self.assertEqual(taste["status"], "pass", "taste is covered by the founder-taste receipt")
+        outbound = outcome.judge(verdict(item("pass"), item("pass"), item("needs-authority", "Send the announcement email", "outbound")),
+                                 "JOV-7771", SHA)
+        self.assertEqual(outbound["status"], "fail", "a human or outbound action is still a failed acceptance")
+        thin = outcome.judge(verdict(item("pass"), item("unverifiable"), item("unverifiable")), "JOV-7771", SHA)
+        self.assertEqual((thin["status"], thin["reason"]), ("fail", "too-little-verified"))
+        contradicted = outcome.judge(verdict(item("pass"), item("pass"), item("fail")), "JOV-7771", SHA)
+        self.assertEqual(contradicted["status"], "fail")
+
+    def test_verifier_gets_node24_dependencies_and_the_binding_rules(self):
+        with tempfile.TemporaryDirectory() as home, patch.object(outcome.Path, "home", return_value=Path(home)):
+            for version in ("v22.23.2", "v24.15.0", "v24.22.1", "v24.9.0"):
+                (Path(home) / ".nvm/versions/node" / version / "bin").mkdir(parents=True)
+            self.assertTrue(outcome.node24_path().endswith("v24.22.1/bin"))
+            seen = []
+            def run(args, **kw):
+                seen.append((args, kw))
+                return subprocess.CompletedProcess(args, 0, "", "")
+            self.assertIsNone(outcome.prepare_tree(Path(home), run=run))
+            self.assertEqual(seen[0][0][:3], ["pnpm", "install", "--frozen-lockfile"])
+            self.assertTrue(seen[0][1]["env"]["PATH"].startswith(outcome.node24_path()))
+            failing = lambda args, **kw: subprocess.CompletedProcess(args, 1, "", "ERR_PNPM_NO_OFFLINE_TARBALL")
+            self.assertIn("ERR_PNPM_NO_OFFLINE_TARBALL", outcome.prepare_tree(Path(home), run=failing))
+        text = outcome.prompt(outcome_issue(), {"sha": SHA, "manifest": {}})
+        for needle in ("is an ancestor of that build", "counts as those tests having run", "`unverifiable` (not `fail`)",
+                       "Node 24 is first on PATH"):
+            self.assertIn(needle, text)
+        self.assertIn("NOT installed (boom)", outcome.prompt(outcome_issue(), {"sha": SHA, "manifest": {}}, "NOT installed (boom)"))
+
     def drain(self, verdict, *, authorization="Bearer app", receipt_rc=0, manifest_extra=None, per_day=None):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
