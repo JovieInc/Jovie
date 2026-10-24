@@ -77,7 +77,8 @@ function AuthShellInner({
   const hideTopHeader = isInSettings || isLyricsRoute;
   const showCustomerMobileTabs =
     showMobileTabs && section !== 'ov' && section !== 'admin';
-  const hasMobileBottomNav = section === 'ov' || showCustomerMobileTabs;
+  const hasMobileBottomNav =
+    !isElectron && (section === 'ov' || showCustomerMobileTabs);
 
   // Memoize the sidebar so it doesn't re-render on breadcrumb/header changes.
   // The sidebar only depends on `section` — it shouldn't remount when
