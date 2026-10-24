@@ -345,6 +345,29 @@ export function readCiSources(repoRoot = DEFAULT_ROOT) {
     .join('\n');
 }
 
+/**
+ * `pnpm --filter @jovie/web exec vitest run <paths>` names test paths relative
+ * to apps/web (the filter target's cwd), not the repo root. An invariant may
+ * therefore cite its evidence repo-relative (apps/web/scripts/x.test.ts) while
+ * the only CI mention is web-relative — the literal repo-relative string never
+ * appears in any CI source even though the test runs in CI. Recognize that
+ * context so such evidence is not mis-reported as unwired: a line qualifies
+ * only when it both runs vitest filtered to the web package and names the
+ * web-relative path. A bare `node --test scripts/x.test.mjs` at the repo root
+ * resolves against the repo root, so it never qualifies.
+ */
+const WEB_PACKAGE_VITEST_RUN = /--filter[= ](?:@jovie\/web|web)\b[^\n]*vitest/;
+
+export function runsInWebPackageVitest(ciSources, relPath) {
+  const webRelative = relPath.replace(/^apps\/web\//, '');
+  if (webRelative === relPath) return false;
+  return ciSources
+    .split('\n')
+    .some(
+      line => WEB_PACKAGE_VITEST_RUN.test(line) && line.includes(webRelative)
+    );
+}
+
 /** Invariants whose enforcing test no CI command runs, or has no test. */
 export function collectInvariantGaps(
   invariants,
@@ -386,6 +409,7 @@ export function collectInvariantGaps(
       if (ciSources.includes(path)) continue;
       // A directory glob (`scripts/verification/*.test.mjs`) may run it.
       if (ciSources.includes(`${dirname(path)}/*`)) continue;
+      if (runsInWebPackageVitest(ciSources, path)) continue;
       if (runnerPrefixes.some(prefix => path.startsWith(prefix))) continue;
       if (/\/tests\/e2e\/|\/tests\/unit\//.test(path)) continue;
       out.push(
