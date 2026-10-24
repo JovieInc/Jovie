@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
+import { PipelineBottleneckBanner } from '@/components/features/home/PipelineBottleneckBanner';
 import { OpportunityInboxPageClient } from '@/components/features/opportunity-inbox/OpportunityInboxPageClient';
 import { APP_ROUTES } from '@/constants/routes';
+import { checkIsAdmin } from '@/lib/admin/middleware';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import {
   loadOpportunityInboxData,
@@ -75,6 +77,7 @@ export async function OpportunityInboxRoute({
     route: APP_ROUTES.DASHBOARD,
   });
 
+  const adminPromise = checkIsAdmin();
   const profileRailSeedPromise = resolveProfileRailSeed(clerkUserId);
   const inboxPromise = loadOpportunityInboxData(clerkUserId);
   const profileRailSeed = await profileRailSeedPromise;
@@ -86,10 +89,11 @@ export async function OpportunityInboxRoute({
     ? loadOpportunityInboxTourDateSections(profileRailSeed.profileId)
     : Promise.resolve(undefined);
 
-  const [baseInbox, initialLinks, tourDates] = await Promise.all([
+  const [baseInbox, initialLinks, tourDates, isAdmin] = await Promise.all([
     inboxPromise,
     initialLinksPromise,
     tourDatesPromise,
+    adminPromise,
   ]);
 
   if (!baseInbox) {
@@ -121,13 +125,20 @@ export async function OpportunityInboxRoute({
     : [];
 
   return (
-    <OpportunityInboxPageClient
-      key={`${clerkUserId}:${profileRailSeed.profileId ?? 'no-profile'}`}
-      inbox={inbox}
-      profileId={profileRailSeed.profileId}
-      initialView={initialView}
-      initialLinks={initialLinks}
-      connectedDSPs={connectedDSPs}
-    />
+    <>
+      {isAdmin ? (
+        <div className='h-24 shrink-0 px-6 py-2'>
+          <PipelineBottleneckBanner isAdmin={isAdmin} />
+        </div>
+      ) : null}
+      <OpportunityInboxPageClient
+        key={`${clerkUserId}:${profileRailSeed.profileId ?? 'no-profile'}`}
+        inbox={inbox}
+        profileId={profileRailSeed.profileId}
+        initialView={initialView}
+        initialLinks={initialLinks}
+        connectedDSPs={connectedDSPs}
+      />
+    </>
   );
 }

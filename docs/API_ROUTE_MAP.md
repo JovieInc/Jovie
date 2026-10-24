@@ -42,6 +42,7 @@ sibling deployments, machine publishers, or source-repository automation.
 | `/api/hud/hermes-events` | GET, POST | HUD auth (GET); `HERMES_HUD_API_KEY` bearer (POST) | Hermes laptop publisher writes Agent OS events; HUD clients read the current feed |
 | `/api/ovie/certifications/metrics` | GET | Ovie principal + Summer control | Ovie/Summer clients use the shared certification and receipt-backed product-quality projection |
 | `/api/ovie/ingest` | POST | Ovie principal + Summer control | Ovie/Summer clients submit durable operating-store dumps through the shared Ovie route projection |
+| `/api/internal/ovie/pipeline-bottleneck/contributions` | POST | `cron` | Hourly loop publishes a validated `pipeline-bottleneck-contribution/v1` (maximum 16 KiB) to `summer-bottleneck/contributions/hourly-loop.json` |
 | `/api/internal/ovie/lyb-mrr` | GET | `CRON_SECRET` + trusted origin | Ovie and Summer company tools read the LogYourBody RevenueCat MRR record |
 | `/api/internal/release-communications/merge-events` | POST | HMAC `x-jovie-signature-256` | Source-repository merge automation submits verified release events |
 
@@ -49,6 +50,7 @@ sibling deployments, machine publishers, or source-repository automation.
 
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
+| `/api/internal/ovie/pipeline-bottleneck` | GET | `admin` via `requireAdmin`, including Ovie privacy | Home/HUD projection of `summer-bottleneck/current.json` plus the hourly-loop contribution; no-store, null for unknown/stale Summer |
 | `/api/admin/batch-ingest` | POST | `admin` | Batch ingest creator profiles |
 | `/api/admin/campaigns/invites` | GET, POST | `admin` | Campaign invite management |
 | `/api/admin/campaigns/settings` | GET, PUT | `admin` | Campaign settings |

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, userEvent, within } from 'storybook/test';
 import {
   PageToolbar,
   PageToolbarActionButton,
@@ -43,6 +44,27 @@ export const Default: Story = {
       </>
     ),
     'data-testid': 'page-toolbar-story',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const action = canvas.getByRole('button', { name: 'Display options' });
+    const bounds = action.getBoundingClientRect().toJSON();
+
+    await userEvent.hover(action);
+    await expect(action.getBoundingClientRect().toJSON()).toEqual(bounds);
+    await userEvent.unhover(action);
+
+    await userEvent.click(canvas.getByRole('button', { name: 'All' }));
+    await userEvent.tab();
+    await userEvent.tab();
+
+    await expect(action).toHaveFocus();
+    await expect(action.matches(':focus-visible')).toBe(true);
+    await expect(getComputedStyle(action).boxShadow).not.toBe('none');
+    await expect(action.getBoundingClientRect().toJSON()).toEqual(bounds);
+    await expect(
+      canvas.getByRole('button', { name: 'Disabled action' })
+    ).toBeDisabled();
   },
 };
 
