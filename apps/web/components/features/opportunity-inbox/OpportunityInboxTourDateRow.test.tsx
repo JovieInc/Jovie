@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { OpportunityInboxTourDateItem } from '@/lib/connectors/opportunity-inbox-types';
 import { OpportunityInboxTourDateRow } from './OpportunityInboxTourDateRow';
 
@@ -21,7 +21,13 @@ function tourDate(
 
 describe('OpportunityInboxTourDateRow', () => {
   it('renders the title and metadata line for a pending item', () => {
-    render(<OpportunityInboxTourDateRow item={tourDate()} />);
+    render(
+      <OpportunityInboxTourDateRow
+        item={tourDate()}
+        onConfirm={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
     expect(screen.getByText('The Troubadour, Los Angeles')).toBeInTheDocument();
     expect(
       screen.getByText(/The Troubadour, Los Angeles, CA/)
@@ -38,7 +44,11 @@ describe('OpportunityInboxTourDateRow', () => {
   // design-system tokens — never the loud accent-orange.
   it('renders the pending status dot and confirm ring in the neutral token', () => {
     const { container } = render(
-      <OpportunityInboxTourDateRow item={tourDate()} />
+      <OpportunityInboxTourDateRow
+        item={tourDate()}
+        onConfirm={vi.fn()}
+        onReject={vi.fn()}
+      />
     );
     const row = container.firstElementChild as HTMLElement;
     expect(row).toHaveAttribute('data-status', 'pending');
@@ -56,7 +66,11 @@ describe('OpportunityInboxTourDateRow', () => {
 
   it('renders the confirmed state with a persistent ring and no dismiss', () => {
     render(
-      <OpportunityInboxTourDateRow item={tourDate({ status: 'confirmed' })} />
+      <OpportunityInboxTourDateRow
+        item={tourDate({ status: 'confirmed' })}
+        onConfirm={vi.fn()}
+        onReject={vi.fn()}
+      />
     );
     expect(screen.getByRole('button', { name: 'Confirmed' })).toHaveAttribute(
       'style',
@@ -69,7 +83,11 @@ describe('OpportunityInboxTourDateRow', () => {
 
   it('renders the rejected state without action chrome', () => {
     render(
-      <OpportunityInboxTourDateRow item={tourDate({ status: 'rejected' })} />
+      <OpportunityInboxTourDateRow
+        item={tourDate({ status: 'rejected' })}
+        onConfirm={vi.fn()}
+        onReject={vi.fn()}
+      />
     );
     expect(
       screen.queryByRole('button', { name: 'Confirm Tour Date' })
