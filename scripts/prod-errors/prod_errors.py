@@ -27,6 +27,11 @@ from pathlib import Path
 
 SCHEMA = "jovie-prod-errors/v1"
 OWNER = "Jovie Owner (798b223e)"
+
+
+class MissingConfig(RuntimeError):
+    """A watcher lacks required env vars. Fail fast, record ONE clear
+    'missing config: <VARS>' heartbeat/status -- never crash-loop or file duplicates."""
 STATE = Path(os.environ.get("PROD_ERRORS_STATE", Path.home() / ".local/state/jovie-prod-errors"))
 SENTRY_API = os.environ.get("SENTRY_API", "https://sentry.io/api/0")
 LINEAR_API = "https://api.linear.app/graphql"
@@ -157,7 +162,7 @@ def install_seed(state: Path, at: float) -> float:
         return at
 
 
-def watcher_health(state: Path = STATE, at: float | None = None) -> dict:
+def watcher_health(state: Path = STATE, at: float | None = None, probe: dict | None = None) -> dict:
     at = at or now()
     out = {}
     seed = install_seed(state, at)
@@ -171,9 +176,14 @@ def watcher_health(state: Path = STATE, at: float | None = None) -> dict:
         age = at - float(hb.get("lastRunAt") or 0)
         runs = hb.get("runs") or []
         streak = len(runs) >= ERROR_STREAK and not any(r["ok"] for r in runs[-ERROR_STREAK:])
+        last = runs[-1] if runs else {}
         status = "stale" if age > 2 * interval else "erroring" if streak else "ok"
+        if not last.get("ok", False) and str(last.get("detail", "")).startswith("missing config:"):
+            status = "missing-config"  # latest state names the exact env vars; overrides stale/erroring
+        elif status == "ok" and probe is not None and probe.get(name) is False:
+            status = "down"  # failed liveness probe on an otherwise-fresh heartbeat
         out[name] = {"status": status, "ageS": int(age), "interval": interval,
-                     "lastDetail": (runs[-1]["detail"] if runs else "")}
+                     "lastDetail": (last.get("detail", "") if runs else "")}
     return out
 
 
@@ -192,11 +202,12 @@ class Http:
 
 class Sentry:
     def __init__(self, http: Http):
-        self.http, self.org = http, os.environ.get("SENTRY_ORG", "")
-        token = os.environ.get("SENTRY_AUTH_TOKEN", "")
-        if not (token and self.org):
-            raise RuntimeError("SENTRY_AUTH_TOKEN/SENTRY_ORG missing from env file")
-        self.h = {"Authorization": f"Bearer {token}"}
+        self.http = http
+        missing = [v for v in ("SENTRY_AUTH_TOKEN", "SENTRY_ORG") if not os.environ.get(v)]
+        if missing:
+            raise MissingConfig("missing config: " + ", ".join(missing))
+        self.org = os.environ["SENTRY_ORG"]
+        self.h = {"Authorization": f"Bearer {os.environ['SENTRY_AUTH_TOKEN']}"}
 
     def top_issues(self) -> list[dict]:
         q = urllib.parse.urlencode({"query": "is:unresolved", "statsPeriod": "24h", "sort": "user",
@@ -230,7 +241,7 @@ class Linear:
         self.http = http
         key = os.environ.get("LINEAR_API_KEY", "")
         if not key:
-            raise RuntimeError("LINEAR_API_KEY missing from env file")
+            raise MissingConfig("missing config: LINEAR_API_KEY")
         self.h = {"Authorization": key}
         self.team = os.environ.get("PROD_ERRORS_LINEAR_TEAM", "JOV")
         self._labels: dict[str, str] = {}
@@ -482,21 +493,34 @@ def ci_main(linear: Linear, state: Path = STATE) -> dict:
 
 
 def deadman(linear: Linear | None, state: Path = STATE, port: int = 8788) -> dict:
-    try:  # the receiver heartbeats on its own health GET
+    probe_ok = True
+    try:  # liveness, not interval: a failed /health GET is direct evidence the receiver is down
         urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=5).read()
     except Exception:
-        pass
-    health = watcher_health(state)
+        probe_ok = False
+    health = watcher_health(state, probe={"receiver": probe_ok})
     ledger = read_json(state / "ledger.json", {})
     for e in ledger.values():
         if e.get("synthetic") and e["status"] != "closed" and now() - e["openedAt"] > 3 * 86400:
             health["synthetic-loop"] = {"status": "stuck", "sentryId": e["sentryId"]}
-    # One aggregated alert per dead-man run (deduped by alert()'s label fingerprint), so an
-    # install burst or a shared outage files a single issue, not one per watcher.
-    unhealthy = [f"{name} is {h['status']}" for name, h in sorted(health.items())
-                 if h["status"] not in ("ok", "pending-first-run")]
-    if unhealthy:
-        alert("dead-man", "watchers unhealthy: " + ", ".join(unhealthy), False, linear, state)
+    # ONE issue per watcher per unhealthy episode: recovery clears the watcher's gate, a watcher
+    # that stays unhealthy is never re-filed, and newly unhealthy ones batch into ONE alert.
+    seen_alerts = read_json(state / "deadman-alerts.json", {})
+    newly = []
+    for name, h in sorted(health.items()):
+        if h["status"] in ("ok", "pending-first-run"):
+            seen_alerts.pop(name, None)
+            continue
+        if name in seen_alerts:
+            continue
+        seen_alerts[name] = h["status"]
+        text = f"{name} is {h['status']}"
+        if h["status"] == "missing-config":
+            text += f": {h.get('lastDetail', '')}. Fix the env file, then restart the unit."
+        newly.append(text)
+    if newly:
+        alert("dead-man", "watchers unhealthy: " + ", ".join(newly), False, linear, state)
+    write_json(state / "deadman-alerts.json", seen_alerts)
     write_bottleneck(ledger, state)
     return health
 
@@ -505,7 +529,7 @@ def synthetic(http: Http, state: Path = STATE) -> str:
     dsn = os.environ.get("SENTRY_SYNTHETIC_DSN", "")
     m = re.match(r"https://([^@]+)@([^/]+)/(\d+)", dsn)
     if not m:
-        raise RuntimeError("SENTRY_SYNTHETIC_DSN missing from env file")
+        raise MissingConfig("missing config: SENTRY_SYNTHETIC_DSN")
     key, host, project = m.groups()
     tag = uuid.uuid4().hex[:8]
     http.call("POST", f"https://{host}/api/{project}/store/?sentry_key={key}&sentry_version=7", {},
@@ -524,7 +548,12 @@ def receive(port: int, state: Path = STATE) -> None:
     from http.server import BaseHTTPRequestHandler, HTTPServer
     secret = os.environ.get("SENTRY_WEBHOOK_SECRET", "")
     if not secret:
-        raise RuntimeError("SENTRY_WEBHOOK_SECRET missing from env file")
+        # Fail fast WITHOUT crash-looping: record the config status, exit clean. systemd's
+        # Restart=on-failure stays quiet; the dead-man files the ONE missing-config issue.
+        detail = "missing config: SENTRY_WEBHOOK_SECRET"
+        heartbeat("receiver", False, detail, state)
+        print(json.dumps({"ok": False, "cmd": "receive", "error": detail}), file=sys.stderr)
+        return
 
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):
@@ -550,7 +579,9 @@ def receive(port: int, state: Path = STATE) -> None:
             self.send_response(202)
             self.end_headers()
 
-    HTTPServer(("127.0.0.1", port), H).serve_forever()
+    server = HTTPServer(("127.0.0.1", port), H)  # bind fails here if the port is taken
+    heartbeat("receiver", True, "listening", state)  # startup heartbeat
+    server.serve_forever()
 
 
 def main(argv=None) -> int:
@@ -583,6 +614,11 @@ def main(argv=None) -> int:
             result = synthetic(http)
         heartbeat(watcher, True, json.dumps(result)[:300])
         print(json.dumps({"ok": True, "cmd": a.cmd, "result": result}))
+        return 0
+    except MissingConfig as exc:  # fail fast: record ONE clear config status, exit clean (no crash-loop)
+        if watcher:
+            heartbeat(watcher, False, str(exc))
+        print(json.dumps({"ok": False, "cmd": a.cmd, "error": str(exc)}), file=sys.stderr)
         return 0
     except Exception as exc:  # heartbeat the failure; dead-man counts streaks
         detail = f"{type(exc).__name__}: {str(exc)[:200]}"

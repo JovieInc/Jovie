@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import time
 import unittest
@@ -165,6 +166,58 @@ class LoopTest(unittest.TestCase):
         pe.heartbeat("synthetic", True, "sent", self.dir)
         self.assertEqual(pe.watcher_health(self.dir, time.time() + 8 * 86400)["synthetic"]["status"], "ok")
         self.assertEqual(pe.watcher_health(self.dir, time.time() + 15 * 86400)["synthetic"]["status"], "stale")
+
+    def test_receiver_missing_config_is_one_visible_issue_without_duplicates(self):
+        # The gem receiver crash-looped on a missing webhook secret. New behavior: the failed
+        # start records ONE 'missing config: <VARS>' status, the dead-man files ONE issue that
+        # names the vars, repeated runs do not re-file, and recovery clears the gate.
+        pe.heartbeat("receiver", False, "missing config: SENTRY_WEBHOOK_SECRET", self.dir)
+        self.assertEqual(pe.watcher_health(self.dir)["receiver"]["status"], "missing-config")
+        pe.deadman(self.l, self.dir)
+        pe.deadman(self.l, self.dir)
+        self.assertEqual(len(self.l.created), 1)
+        self.assertIn("missing config: SENTRY_WEBHOOK_SECRET", self.l.created[0]["title"])
+        self.assertIn("missing config: SENTRY_WEBHOOK_SECRET", self.l.created[0]["body"])
+        self.assertIn("restart the unit", self.l.created[0]["body"])
+        pe.heartbeat("receiver", True, "listening", self.dir)
+        self.assertEqual(pe.watcher_health(self.dir)["receiver"]["status"], "ok")
+
+    def test_sweep_missing_config_overrides_stale_and_error_streak(self):
+        # A sweep failing on missing env must read as config, not crash noise, forever (the
+        # service keeps failing until Tim fixes the env file) -- one clear status + one issue.
+        pe.heartbeat("sentry-sweep", False, "missing config: SENTRY_AUTH_TOKEN, SENTRY_ORG", self.dir)
+        pe.heartbeat("sentry-sweep", False, "missing config: SENTRY_AUTH_TOKEN, SENTRY_ORG", self.dir)
+        pe.heartbeat("sentry-sweep", False, "missing config: SENTRY_AUTH_TOKEN, SENTRY_ORG", self.dir)
+        h = pe.watcher_health(self.dir, time.time() + 4 * 1800)
+        self.assertEqual(h["sentry-sweep"]["status"], "missing-config")
+        pe.deadman(self.l, self.dir)
+        pe.deadman(self.l, self.dir)
+        self.assertEqual(len(self.l.created), 1)
+        self.assertIn("SENTRY_AUTH_TOKEN", self.l.created[0]["body"])
+
+    def test_sentry_and_linear_constructors_name_missing_vars(self):
+        for v in ("SENTRY_AUTH_TOKEN", "SENTRY_ORG", "LINEAR_API_KEY"):
+            os.environ.pop(v, None)
+        with self.assertRaises(pe.MissingConfig) as ctx:
+            pe.Sentry(pe.Http())
+        self.assertEqual(str(ctx.exception), "missing config: SENTRY_AUTH_TOKEN, SENTRY_ORG")
+        with self.assertRaises(pe.MissingConfig) as ctx:
+            pe.Linear(pe.Http())
+        self.assertEqual(str(ctx.exception), "missing config: LINEAR_API_KEY")
+
+    def test_receive_missing_config_fails_clean_no_crash_loop(self):
+        os.environ.pop("SENTRY_WEBHOOK_SECRET", None)
+        pe.receive(8799, self.dir)  # must return cleanly (exit 0), never raise
+        self.assertEqual(pe.watcher_health(self.dir)["receiver"]["status"], "missing-config")
+        hb = pe.read_json(self.dir / "heartbeats" / "receiver.json", {})
+        self.assertEqual(hb["runs"][-1]["detail"], "missing config: SENTRY_WEBHOOK_SECRET")
+
+    def test_receiver_liveness_probe_down(self):
+        # Judged on process liveness, not just interval: a failed /health probe on a fresh
+        # heartbeat means the receiver is down NOW, not in 2x-interval time.
+        pe.heartbeat("receiver", True, "listening", self.dir)
+        self.assertEqual(pe.watcher_health(self.dir, probe={"receiver": True})["receiver"]["status"], "ok")
+        self.assertEqual(pe.watcher_health(self.dir, probe={"receiver": False})["receiver"]["status"], "down")
 
     def test_bottleneck_fragment(self):
         pe.handle_issue(self.issue(userCount=30), self.ledger, self.s, self.l, [], self.t, self.dir)

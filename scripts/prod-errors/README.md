@@ -10,8 +10,12 @@ Timers: `sweep` (30 min: Sentry sweep, webhook inbox, claims, post-deploy verifi
 `deadman` (15 min: stale or erroring heartbeats, stuck synthetic), `synthetic` (weekly test error).
 Dead-man heartbeats are graced: a watcher that has never run stays `pending-first-run` until one
 full 2x-interval window after install (`installed_at`), and each watcher is judged on its own
-cadence (the receiver at the 15-min poke, the synthetic weekly). Unhealthy watchers file ONE
-deduplicated aggregated alert per run, never one issue per watcher.
+cadence (the receiver on process liveness via the 15-min `/health` probe plus its startup
+heartbeat, the synthetic weekly). A watcher missing env config fails fast with ONE
+`missing config: <VARS>` status and a single deduplicated issue per watcher per unhealthy episode
+(no crash-loop, no duplicates; fix the env file and restart the unit). Recovery clears the
+dead-man gate. Staleness is never disabled: past the grace window, or 2x the interval since the
+last heartbeat, the dead-man still pages.
 
 Rules: golden-path flows (checkout, auth, onboarding, public profile/track pages, navigation) trigger
 at any count; others at `PROD_ERRORS_USER_THRESHOLD` (25) users. One Linear issue per Sentry ID
