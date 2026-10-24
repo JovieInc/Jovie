@@ -18,6 +18,7 @@ import {
 import { CHAT_TRANSCRIPT_WINDOW } from '@/lib/chat/transcript-window';
 import { UX_LATENCY_STORAGE_KEY } from '@/lib/monitoring/interaction-latency';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
+import { selectInteractionHotPaths } from '@/scripts/performance-interaction-manifest';
 import {
   buildInteractionLatencyReport,
   type InteractionLatencySample,
@@ -588,7 +589,12 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
     ...sample,
     droppedFrameCount,
   }));
-  const report = buildInteractionLatencyReport({ samples: completeSamples });
+  const report = buildInteractionLatencyReport({
+    samples: completeSamples,
+    scenarios: selectInteractionHotPaths({
+      scenarioIds: ['chat-message-round-trip'],
+    }),
+  });
 
   await testInfo.attach('chat-performance-report.json', {
     body: JSON.stringify(report, null, 2),
