@@ -130,6 +130,9 @@ function runGate({
   // Queued successors with staging evidence: { sha, staging: 'deployed' |
   // 'superseded' | 'not_applicable' | 'failure' | 'missing' | 'no-artifact' }.
   successors = /** @type {{sha: string, staging: string}[]} */ ([]),
+  // Route gh through the real gh-api-hold.sh (stub gh behind it). `reset` is
+  // the rate_limit core reset offset in seconds, or null for a missing reset.
+  hold = /** @type {{reset: number | null} | undefined} */ (undefined),
 } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'lineage-gate-'));
   tempRoots.push(root);
@@ -193,6 +196,9 @@ function runGate({
   extraRoutes[
     'repos/JovieInc/Jovie/actions/workflows/staging-controller.yml/runs?branch=main&event=workflow_run&per_page=50'
   ] = JSON.stringify({ workflow_runs: stagingRuns });
+  if (hold && hold.reset !== null) {
+    extraRoutes.rate_limit = String(Math.floor(Date.now() / 1000) + hold.reset);
+  }
   writeFileSync(join(root, 'routes.json'), JSON.stringify(extraRoutes));
   if (compareHttpError) {
     writeFileSync(
@@ -255,6 +261,21 @@ esac
 `
   );
   chmodSync(join(bin, 'gh'), 0o755);
+  const sleepLog = join(root, 'sleep.log');
+  const summary = join(root, 'summary.md');
+  if (hold) {
+    writeFileSync(summary, '');
+    writeFileSync(
+      join(bin, 'sleep'),
+      `#!/bin/sh\nprintf '%s\\n' "$1" >> "${sleepLog}"\nexit 0\n`
+    );
+    chmodSync(join(bin, 'sleep'), 0o755);
+    writeFileSync(
+      join(bin, 'holdgh'),
+      `#!/bin/sh\nGH_API_HOLD_BIN="${join(bin, 'gh')}" exec bash "${resolve(REPO_ROOT, '.github/scripts/gh-api-hold.sh')}" "$@"\n`
+    );
+    chmodSync(join(bin, 'holdgh'), 0o755);
+  }
   writeFileSync(
     join(bin, 'curl'),
     buildInfoFails
@@ -296,12 +317,23 @@ esac
       LINEAGE_PROVE_WITH_GIT: gitLineage ? '1' : '0',
       PRODUCTION_STARVATION_SECONDS: String(starvationSeconds),
       REPOSITORY: 'JovieInc/Jovie',
+      ...(hold
+        ? {
+            GH_CLI: join(bin, 'holdgh'),
+            GH_TOKEN: 'ghs_SECRETTOKENVALUE123',
+            GITHUB_STEP_SUMMARY: summary,
+            GH_API_HOLD_BUDGET_SECONDS: '30',
+          }
+        : {}),
     },
   });
   const countPath = join(root, 'compare-count');
   return {
     result,
     decision: result.stdout.trim(),
+    holdSleep:
+      hold && existsSync(sleepLog) ? readFileSync(sleepLog, 'utf8') : '',
+    summary: hold ? readFileSync(summary, 'utf8') : '',
     outputs: parseOutputs(output),
     compareAttempts: existsSync(countPath)
       ? Number(readFileSync(countPath, 'utf8'))
@@ -310,6 +342,71 @@ esac
 }
 
 describe('release lineage gate', () => {
+  it('surfaces a GitHub API hold through the gate even though gh stderr is captured', () => {
+    const held = runGate({
+      main: NEWER_SHA,
+      lineageStatus: 'ahead',
+      lineageFailTimes: 1,
+      lineageFailureText:
+        'gh: API rate limit exceeded for installation ID 1. (HTTP 403)',
+      hold: { reset: 4 },
+    });
+    expect(held.result.status, held.result.stderr).toBe(0);
+    // Gate stdout and outputs are the same as without a hold.
+    const plain = runGate({ main: NEWER_SHA, lineageStatus: 'ahead' });
+    expect(held.decision).toBe(plain.decision);
+    expect(held.outputs).toMatchObject({ gate_decision: 'proceed' });
+    expect(held.compareAttempts).toBe(2);
+    expect(Number(held.holdSleep.trim())).toBeGreaterThanOrEqual(4);
+    expect(held.result.stderr).toContain('::notice title=GitHub API hold::');
+    expect(held.result.stderr).toMatch(/wait_s=[4-6] /);
+    expect(held.result.stderr).toMatch(/reset_epoch=\d{10}/);
+    expect(held.result.stderr).toContain('http=403');
+    expect(held.result.stderr).toContain('bucket=core');
+    expect(held.result.stderr).toContain('Holding');
+    expect(held.summary).toContain('GitHub API hold');
+    for (const text of [held.result.stderr, held.result.stdout, held.summary]) {
+      expect(text).not.toContain('ghs_SECRETTOKENVALUE123');
+      expect(text).not.toContain('per_page');
+    }
+  });
+
+  it('re-prints only exact hold lines, not look-alikes with extra content', () => {
+    const run = runGate({
+      main: NEWER_SHA,
+      lineageStatus: 'ahead',
+      lineageFailTimes: 1,
+      lineageFailureText: [
+        '::warning::Holding 5s for the GitHub rate limit reset.',
+        '::warning::Holding 5s for the GitHub rate limit reset. TRAILING-JUNK-1',
+        '::notice title=GitHub API hold::label=x http=403 wait_s=5 reset_epoch=1 reset_iso=2026-10-24T10:00:00Z bucket=core bucket_source=a TRAILING-JUNK-2',
+        '::notice title=GitHub API hold::label=x http=403 wait_s=5 reset_epoch=1 reset_iso=2026-10-24T10:00:00Z bucket=core bucket_source=a limit=1 remaining=0',
+      ].join('\n'),
+    });
+    expect(run.result.status, run.result.stderr).toBe(0);
+    expect(run.result.stderr).toContain(
+      '::warning::Holding 5s for the GitHub rate limit reset.\n'
+    );
+    expect(run.result.stderr).toContain('limit=1 remaining=0');
+    expect(run.result.stderr).not.toContain('TRAILING-JUNK');
+  });
+
+  it('keeps a hold with a missing reset fatal and silent', () => {
+    const run = runGate({
+      main: NEWER_SHA,
+      lineageStatus: 'ahead',
+      lineageFailTimes: 1,
+      lineageFailureText:
+        'gh: API rate limit exceeded for installation ID 1. (HTTP 403)',
+      hold: { reset: null },
+    });
+    expect(run.holdSleep).toBe('');
+    expect(run.result.stderr).not.toContain('::notice title=GitHub API hold');
+    expect(run.summary).toBe('');
+    // The first compare was refused by the hold script, so the gate's own
+    // retry made the second attempt, as it always did.
+    expect(run.compareAttempts).toBe(2);
+  });
   it('proceeds when main still equals the generation', () => {
     const run = runGate({ main: EXPECTED_SHA });
     expect(run.result.status, run.result.stderr).toBe(0);
