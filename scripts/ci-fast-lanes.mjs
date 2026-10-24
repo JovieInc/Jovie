@@ -562,7 +562,7 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */
 export const LANES_PYTEST_FILES = Object.freeze(
-  'scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
+  'scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
     ' '
   )
 );
@@ -813,6 +813,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/stryker-babel-compatibility.test.mjs',
   'scripts/lib/__tests__/mutation-diff.test.mjs',
   'scripts/lib/__tests__/mutation-score-floor.test.mjs',
+  'scripts/lib/__tests__/mutation-floor-intake.test.mjs',
   'scripts/lib/__tests__/knip-web-tooling.test.mjs',
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
   'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
@@ -826,6 +827,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/brand-construction.test.mjs',
   'scripts/lib/__tests__/changelog-parser.test.mjs',
   'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+  'scripts/lib/__tests__/guardrail-inputs.test.mjs',
   'scripts/lib/__tests__/vitest-orphan-inventory.test.mjs',
   'scripts/lib/__tests__/gate-config-consistency.test.mjs',
   'scripts/lib/__tests__/claim-dogfood-report.test.mjs',
@@ -1986,12 +1988,43 @@ function runScriptsTypecheck() {
   return shell('pnpm run typecheck:scripts');
 }
 
+/** Operations-lane node:test files run by Guardrails (single source of truth). */
+export const GUARDRAIL_OPERATIONS_TESTS = Object.freeze([
+  'scripts/cleanup-stale-dev.test.mjs',
+  'scripts/desktop-release-guard.test.mjs',
+  'scripts/desktop-installed-apps-audit.test.mjs',
+  'scripts/dev-web-fast.test.mjs',
+  'scripts/ios-guardrail-rollout-audit.test.mjs',
+  'scripts/version-fanout-guard.test.mjs',
+  'scripts/version-stamp.test.mjs',
+  'scripts/agent/preflight.test.mjs',
+  'scripts/agent/pen-save-receipt.test.mjs',
+  'scripts/agent/pen-live-canvas-persist.test.mjs',
+  'scripts/agent/pen-cold-readback.test.mjs',
+  'scripts/agent/pen-par/pen-par.test.mjs',
+  'scripts/skill-governance-guard.test.mjs',
+  'scripts/skill-catalog.test.mjs',
+  'scripts/agent-web-contract.test.mjs',
+  'scripts/dev-loop-contract.test.mjs',
+]);
+
+/**
+ * Guardrails mode for a diff: "full" (product lane on), "inputs" (only repo
+ * files the guardrail checks read changed, so run the operations checks), or
+ * "skip" (JOV-5288: Symphony/Summer-exclusive or unrelated diffs).
+ */
+export function guardrailsMode({ event = '', lanes }) {
+  if (event === 'workflow_dispatch' || lanes.runJovieProduct) return 'full';
+  return lanes.runGuardrailInputs ? 'inputs' : 'skip';
+}
+
 function runGuardrails() {
   // Exclusive Symphony/Summer diffs must not wait on Jovie product guardrails
   // (JOV-5288). Product-lane selection still slices remaining work when the
   // product lane is on.
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+  const mode = guardrailsMode({ event, lanes: repoLanes() });
+  if (mode === 'skip') {
     return {
       code: 0,
       output: 'Guardrails skipped (no Jovie product files changed)\n',
@@ -2001,6 +2034,9 @@ function runGuardrails() {
   const base = process.env.GITHUB_BASE_REF || 'main';
   const originBase = `origin/${base}`;
   const selected = selectedProductLanes();
+  // Input-only diffs (docs/rules the checks read) run just the operations
+  // checks that read them; every input flows through that lane.
+  if (mode === 'inputs') selected.add('operations');
   const parts = [
     ...(selected.has('mac')
       ? [
@@ -2020,7 +2056,7 @@ function runGuardrails() {
           // Exercise retention executables and subprocess coverage before other guards.
           'node --test --test-timeout=45000 --experimental-test-coverage --test-coverage-include="scripts/*retention.mjs" --test-coverage-lines=75 --test-coverage-functions=70 --test-coverage-branches=75 scripts/local-runtime-retention.test.mjs scripts/generated-artifact-retention.test.mjs scripts/cleanup-safety.test.mjs scripts/setup-cache-cleanup.test.mjs',
           'pnpm design:logo-assets:check',
-          'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs scripts/agent/pen-save-receipt.test.mjs scripts/agent/pen-live-canvas-persist.test.mjs scripts/agent/pen-cold-readback.test.mjs scripts/agent/pen-par/pen-par.test.mjs scripts/skill-governance-guard.test.mjs scripts/skill-catalog.test.mjs scripts/agent-web-contract.test.mjs scripts/dev-loop-contract.test.mjs',
+          `node --test ${GUARDRAIL_OPERATIONS_TESTS.join(' ')}`,
         ]
       : []),
     ...(selected.has('web')

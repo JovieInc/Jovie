@@ -20,10 +20,12 @@ describe('DspQuietRow', () => {
       'https://open.spotify.com/album/take-me-over'
     );
     expect(row.className).toContain('hover:bg-surface-1');
-    expect(row.querySelector('[data-slot="hover-reveal"]')).toHaveClass(
+    expect(row).toHaveAccessibleName('Spotify');
+    expect(row.querySelector('svg')).toHaveClass(
+      'shrink-0',
       'opacity-0',
-      'group-focus-within:opacity-100',
-      'shrink-0'
+      'group-hover:opacity-100',
+      'group-focus-within:opacity-100'
     );
     expect(screen.queryByText('Not found')).not.toBeInTheDocument();
     expect(screen.queryByText('Missing')).not.toBeInTheDocument();
