@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -63,6 +69,7 @@ describe('AuthModalShell', () => {
   });
 
   afterEach(() => {
+    cleanup();
     document.body.style.removeProperty('overflow');
     document.body.style.removeProperty('overscroll-behavior');
     document.documentElement.style.removeProperty('overflow');
@@ -76,7 +83,7 @@ describe('AuthModalShell', () => {
   });
 
   it('renders the intercepted auth modal as a single auth surface', () => {
-    const { container } = render(
+    const { baseElement: container } = render(
       <AuthModalShell
         ariaLabel='Create your Jovie account'
         statusRow={<span>Continuing with “Test prompt”</span>}
@@ -115,7 +122,7 @@ describe('AuthModalShell', () => {
   });
 
   it('paints the modal surface with the defined bg-base theme token', () => {
-    const { container } = render(
+    const { baseElement: container } = render(
       <AuthModalShell ariaLabel='Create your Jovie account'>
         <div>Modal auth form</div>
       </AuthModalShell>
@@ -124,13 +131,13 @@ describe('AuthModalShell', () => {
     const shell = container.querySelector('[data-auth-modal-shell]');
     // bg-background has no --color-background token and emits no CSS, which
     // left the modal without a page background.
-    expect(shell).toHaveClass('bg-base', 'sm:bg-(--color-bg-base)/96');
+    expect(shell).toHaveClass('bg-base', 'sm:bg-base');
     expect(shell).not.toHaveClass('bg-background');
     expect(shell).not.toHaveClass('sm:bg-background/96');
   });
 
   it('dismisses through router.back when the backdrop is clicked', () => {
-    const { container } = render(
+    const { baseElement: container } = render(
       <AuthModalShell ariaLabel='Create your Jovie account'>
         <div>Modal auth form</div>
       </AuthModalShell>
@@ -261,7 +268,7 @@ describe('AuthModalShell', () => {
   it('keeps Escape dismissal separate from destination navigation', () => {
     // Escape/backdrop are modal-DISMISSAL (history pop of the intercepted
     // route) and must never navigate to the back destination.
-    const { container } = render(
+    const { baseElement: container } = render(
       <AuthModalShell backDestination='/start'>
         <div>body</div>
       </AuthModalShell>
@@ -327,7 +334,7 @@ describe('AuthModalShell', () => {
   });
 
   it('isolates background focus with the shared modal boundary and restores focus on close', async () => {
-    const { container } = render(<AuthModalBoundaryHarness />);
+    const { baseElement: container } = render(<AuthModalBoundaryHarness />);
     const trigger = screen.getByRole('button', { name: 'Open auth modal' });
     trigger.focus();
 
@@ -341,8 +348,8 @@ describe('AuthModalShell', () => {
 
     const backButton = screen.getByLabelText('Back to homepage');
     await waitFor(() => expect(backButton).toHaveFocus());
-    expect(trigger).toHaveAttribute('inert');
-    expect(trigger).toHaveAttribute('aria-hidden', 'true');
+    expect(trigger.closest('[inert]')).not.toBeNull();
+    expect(trigger.closest('[aria-hidden="true"]')).not.toBeNull();
 
     trigger.focus();
     await waitFor(() => expect(backButton).toHaveFocus());
