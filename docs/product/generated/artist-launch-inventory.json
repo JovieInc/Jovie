@@ -718,6 +718,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/product/command-palette/page.tsx",
+      "kind": "page",
+      "route": "/product/command-palette",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/product/dsp-links/page.tsx",
       "kind": "page",
       "route": "/product/dsp-links",
@@ -745,6 +753,14 @@
       "source": "apps/web/app/(marketing)/product/page.tsx",
       "kind": "page",
       "route": "/product",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/pre-save/page.tsx",
+      "kind": "page",
+      "route": "/product/pre-save",
       "methods": [],
       "surface": "deferred",
       "classification": "C"
@@ -3260,6 +3276,22 @@
       "source": "apps/web/app/api/internal/ovie/objections/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/objections",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/pipeline-bottleneck/contributions/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/pipeline-bottleneck/contributions",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/pipeline-bottleneck/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/pipeline-bottleneck",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"

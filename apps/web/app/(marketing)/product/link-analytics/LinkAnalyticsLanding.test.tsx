@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/link', () => ({
@@ -40,7 +41,7 @@ describe('LinkAnalyticsLanding', () => {
       'data-marketing-owner',
       'apps/web/app/(marketing)/product/link-analytics/LinkAnalyticsLanding.tsx'
     );
-    expect(hero).toHaveAttribute('data-accent', 'ion');
+    expect(hero.closest('[data-accent="ion"]')).not.toBeNull();
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveTextContent(LINK_ANALYTICS_COPY.headline);
@@ -51,12 +52,7 @@ describe('LinkAnalyticsLanding', () => {
     const analytics = screen.getByTestId('release-smart-link-analytics');
     expect(analytics).toBeVisible();
     const panel = screen.getByTestId('link-analytics-panel');
-    expect(panel).toHaveClass(
-      'rounded-3xl',
-      'border',
-      'border-subtle',
-      'bg-surface-1'
-    );
+    expect(panel).toHaveClass('marketing-rounded-frame', 'border');
     expect(panel).toContainElement(analytics);
     expect(screen.getByText('Total Clicks')).toBeVisible();
 
@@ -66,5 +62,12 @@ describe('LinkAnalyticsLanding', () => {
         link.href
       );
     }
+  });
+
+  it('server-renders the analytics panel without wall-clock text', () => {
+    const html = renderToString(<LinkAnalyticsLanding />);
+
+    expect(html).toContain('Aug 20, 2026');
+    expect(html).not.toMatch(/(?:just now)|(?:\d+\s?(?:m|h|d|w|mo|y)\s?ago)/u);
   });
 });

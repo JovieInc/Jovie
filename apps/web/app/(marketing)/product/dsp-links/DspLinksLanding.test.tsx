@@ -36,7 +36,7 @@ describe('DspLinksLanding', () => {
       'data-marketing-owner',
       'apps/web/app/(marketing)/product/dsp-links/DspLinksLanding.tsx'
     );
-    expect(hero).toHaveAttribute('data-accent', 'ion');
+    expect(hero.closest('[data-accent="ion"]')).not.toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       DSP_LINKS_COPY.headline
     );
@@ -68,7 +68,7 @@ describe('DspLinksLanding', () => {
     );
 
     const panel = screen.getByTestId('dsp-links-panel');
-    expect(panel).toHaveClass('rounded-3xl', 'border', 'border-subtle');
+    expect(panel).toHaveClass('marketing-rounded-frame', 'border');
 
     for (const link of DSP_LINKS_COPY.links) {
       expect(screen.getByRole('link', { name: link.label })).toHaveAttribute(

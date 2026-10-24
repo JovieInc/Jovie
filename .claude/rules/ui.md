@@ -286,6 +286,10 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
   is `.marketing-rounded-frame` (`--system-b-radius-panel` / `--radius-3xl`).
   Exempt only the full-bleed hero start (it rounds as it zooms out), logos,
   icons, SVG marks, and already-round avatars. See MKT-D17.
+- Marketing and public pages have one boxed width (`.public-container`, via
+  `MarketingContainer` or `Container`) and one full-bleed override (`bleed`).
+  Header, hero, sections and footer share it. No other page `max-w-*`, no
+  container padding of your own. See MKT-D18.
 
 ### No Duplicate Page Titles (Breadcrumb + Toolbar)
 

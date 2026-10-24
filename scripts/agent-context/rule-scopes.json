@@ -103,7 +103,7 @@
       "apps/ios/Packages/JovieKit/**",
       "docs/macos/**"
     ],
-    "bodySha256": "d1f70045679136a6f2e7c273318e1d606163d570cdedb03094c7934d8b83ebd5"
+    "bodySha256": "bfabfbafb0ea988e669fba7b3ea3b4c62810855ea3f977a112746271a8ba77ab"
   },
   {
     "file": ".claude/rules/motion.md",
@@ -146,7 +146,7 @@
       ".github/**",
       "scripts/**"
     ],
-    "bodySha256": "2f5b5b01bd34142deb0a9a71784152ebe60d1be2c18e56bb7cd6aaa44a68d3fa"
+    "bodySha256": "8fc3a2864799b7d08f7512eeda0c5ec7a074e6b2f1c283ab750fc50d60b77e30"
   },
   {
     "file": ".claude/rules/swarm.md",
@@ -166,7 +166,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "07808bc5df7c7a6f5ffbaba2c2547ca58d6223b47f976708a4abe960a754dea3"
+    "bodySha256": "a3607894c34105c8152b296e3a26cfbdd01d8d9b4db61841119849217ba3ef9c"
   },
   {
     "file": ".claude/rules/ui.md",
@@ -177,6 +177,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "d658f8e48f3cd948d64e2676b020486b9c945618bbb163d09d0a6614da590bf2"
+    "bodySha256": "4fb1c3b50414a6a0ebaf685ded81166aae40b945f7a18adcfd61e6ca889172b9"
   }
 ]

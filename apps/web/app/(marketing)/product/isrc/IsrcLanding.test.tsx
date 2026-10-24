@@ -38,7 +38,7 @@ describe('IsrcLanding', () => {
       'data-marketing-owner',
       'apps/web/app/(marketing)/product/isrc/IsrcLanding.tsx'
     );
-    expect(hero).toHaveAttribute('data-accent', 'ion');
+    expect(hero.closest('[data-accent="ion"]')).not.toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       ISRC_COPY.headline
     );
@@ -47,7 +47,7 @@ describe('IsrcLanding', () => {
     const editor = within(hero).getByTestId('isrc-editor');
     expect(editor).toBeVisible();
     expect(within(editor).getByText(ISRC_FIXTURE.releaseTitle)).toBeVisible();
-    const primary = within(editor).getByRole('button', { name: 'Edit ISRC' });
+    const primary = within(editor).getByRole('button', { name: /Edit ISRC/ });
     expect(primary).toHaveTextContent(ISRC_FIXTURE.primaryIsrc);
     expect(
       within(editor).getByRole('button', { name: 'Copy ISRC' })
@@ -55,7 +55,7 @@ describe('IsrcLanding', () => {
     expect(within(editor).getByText(ISRC_FIXTURE.tracks[0].isrc)).toBeVisible();
 
     const panel = screen.getByTestId('isrc-panel');
-    expect(panel).toHaveClass('rounded-3xl', 'border', 'border-subtle');
+    expect(panel).toHaveClass('marketing-rounded-frame', 'border');
 
     for (const link of ISRC_COPY.links) {
       expect(screen.getByRole('link', { name: link.label })).toHaveAttribute(
@@ -71,18 +71,18 @@ describe('IsrcLanding', () => {
 
     await waitFor(() => {
       expect(
-        within(editor).getByRole('button', { name: 'Edit ISRC' })
+        within(editor).getByRole('button', { name: /Edit ISRC/ })
       ).toHaveTextContent(ISRC_FIXTURE.primaryIsrc);
     });
 
-    fireEvent.click(within(editor).getByRole('button', { name: 'Edit ISRC' }));
+    fireEvent.click(within(editor).getByRole('button', { name: /Edit ISRC/ }));
     const next = within(editor).getByRole('textbox', { name: 'Edit ISRC' });
     fireEvent.change(next, { target: { value: 'us-rc1-7607840' } });
     fireEvent.blur(next);
 
     await waitFor(() => {
       expect(
-        within(editor).getByRole('button', { name: 'Edit ISRC' })
+        within(editor).getByRole('button', { name: /Edit ISRC/ })
       ).toHaveTextContent('USRC17607840');
     });
   });

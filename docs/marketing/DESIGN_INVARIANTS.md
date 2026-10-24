@@ -357,3 +357,33 @@ another task supplies no design requirement or action authority here.
   baseline or recorded exceptions. FS-009 checks new lines; parent clipping
   stays on the full-source check.
 - **Change/exception:** do not weaken the check. Fix the corner.
+
+## MKT-D18 — One boxed width, one full-bleed override
+
+- **Scope:** every marketing and public page: header, hero, sections, card
+  rails, and footer (`app/(marketing)`, `app/(home)`, `components/marketing`,
+  `components/homepage`, `components/site`, the marketing feature folders,
+  and `HeaderNav`).
+- **Requirement:** one boxed content width and one full-bleed override, nothing
+  else. The box is `.public-container`: `--ds-public-content-max` (1298px) with
+  the `--ds-public-gutter` steps (24, 32, 40px). Reach it through
+  `MarketingContainer` or `Container`, or use the class in CSS. The override is
+  `bleed` (`.public-container--bleed`): edge to edge, no box, no gutter. The box is
+  the content edge (no inner padding; the gutter is the viewport margin below
+  1298px), so header, hero, sections, and footer content start at the same x
+  at every width. A reading measure (a cap of 48rem or less, or in `ch`) is
+  typography inside the box, not a container. A container never sets its own
+  horizontal padding, because the gutter is part of the token.
+- **Founder evidence/status:** requirement; Tim White, 2026-10-23 10:26 AM PT:
+  "one set of boxed width, one full width override, that's it. having
+  multiple widths is a huge component of why our pages don't look designed."
+  Ship enabled. No feature flag.
+- **Enforcement:** `scripts/invariants/art-direction/container-width.mjs`.
+  PR Ready guard `marketing-container-width` fails a page-wide `max-w-*`
+  (wider than 48rem), the `container` class, a second width token such as
+  `--homepage-section-max`, a CSS `max-width` or `width` wider than 48rem, and
+  container padding set outside the token. A hit that is not already on
+  `origin/main` fails. Fixing a hit shrinks the set. There is no exception file.
+- **Change/exception:** do not add a width. Use the box or `bleed`. A true
+  non-container (a menu flyout, a phone frame) takes a
+  `container-width-allow: <reason>` comment on the line or the line above.
