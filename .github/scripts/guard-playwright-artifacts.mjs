@@ -743,9 +743,12 @@ function report(findings) {
       .filter(([, count]) => count > 0)
       .map(([name, count]) => name + ':' + count)
       .join(',');
-  console.error(
-    `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked ${findings.length} unsafe or unverifiable Playwright artifact file(s); categories=${counts(categories)}; file-classes=${counts(classes)}`
-  );
+  const line = `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked ${findings.length} unsafe or unverifiable Playwright artifact file(s); categories=${counts(categories)}; file-classes=${counts(classes)}`;
+  console.error(line);
+  // In Actions the identical counts-only line is also emitted as a step
+  // error annotation, so a fresh failing step is diagnosable from check
+  // annotations without admin job-log access (run 39820205877 class).
+  if (process.env.GITHUB_ACTIONS === 'true') console.error('::error::' + line);
 }
 
 function maskValues(values) {

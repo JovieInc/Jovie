@@ -538,7 +538,27 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
     firstCreateWindow > preloadAwait,
     'wordmark preload must resolve before the first createWindow'
   );
-  assert.doesNotMatch(splashFn, /@keyframes|animation:|translateX\(/);
+  // splash-b-everywhere-v1 (2026-09-02): the wordmark appears, then settles to
+  // just the O. Motion is opacity/scale only (no layout shift), no sunburst.
+  assert.doesNotMatch(
+    splashFn,
+    /translateX\(|translateY\(|sunburst|conic-gradient|repeating-/
+  );
+  const keyframes = [...splashFn.matchAll(/@keyframes [\w-]+ \{([^\n]*)\}/g)];
+  assert.ok(keyframes.length >= 2, 'wordmark-to-O keyframes must exist');
+  for (const [, body] of keyframes) {
+    assert.doesNotMatch(
+      body,
+      /\b(width|height|top|left|right|bottom|margin|padding|inset|font-size)\s*:/
+    );
+  }
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.splashMarkSizePx/);
+  assert.match(splashFn, /class="settled-mark"/);
+  assert.match(splashFn, /data-splash-settled="o"/);
+  assert.match(
+    splashFn,
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?animation: none;[\s\S]*?\.settled-mark \{ opacity: 1; \}/
+  );
   assert.doesNotMatch(splashFn, /180px/);
   assert.doesNotMatch(splashFn, /<h1>/);
   assert.doesNotMatch(splashFn, /Loading Jovie/);
@@ -548,7 +568,7 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
   assert.doesNotMatch(mainSource, /height:\s*180px/);
 });
 
-test('Mac cinematic splash renders the static final lockup', async () => {
+test('Mac cinematic splash renders the wordmark lockup that settles to the 32px cream O', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
   const splashFn = mainSource.match(
     /function buildDesktopBootSplashHtml\(\): string \{[\s\S]*?\n\}/
@@ -587,6 +607,7 @@ test('Mac cinematic splash renders the static final lockup', async () => {
     macCornerMarkOpacity: 0.35,
     macCinematicCanvas: '#030407',
     markCream: '#F5F4F0',
+    splashMarkSizePx: 32,
   };
   const context = {
     app: { isPackaged: true },
@@ -617,8 +638,16 @@ test('Mac cinematic splash renders the static final lockup', async () => {
   assert.match(html, /data-desktop-splash="cinematic"/);
   assert.match(html, /opacity: 0\.35/);
   assert.match(html, /width: min\(40px, 1\.786vw\)/);
-  assert.doesNotMatch(html, /@keyframes|animation:|translateX\(/);
+  assert.doesNotMatch(html, /translateX\(|sunburst|conic-gradient/);
   assert.match(html, /class="suffix">for Mac<\/span>/);
+  // Settled state: the 32px cream O on the empty field.
+  assert.match(
+    html,
+    /\.settled-mark \{ width: 32px; height: 32px; color: var\(--mac-cream\)/
+  );
+  assert.match(html, /--mac-cream: #F5F4F0/);
+  assert.match(html, /<svg class="settled-mark"[^>]*data-splash-settled="o"/);
+  assert.doesNotMatch(html, /<h1>|Loading Jovie|180px/);
   assert.match(html, /data:image\/svg\+xml;base64/);
   assert.ok(
     html.includes(
