@@ -9,7 +9,9 @@
 // (pr_number, head_sha, run_id, run_attempt) with the red-check collector
 // (JOV-8934). This module intentionally has NO red_at / claim_at fields.
 //
-// Pure Node, zero dependencies. Abuse caps live in CAPS below.
+// All GitHub calls go through the client layer (runGh from
+// packages/api-client), priority `report`, per .claude/rules/external-apis.md.
+// Pure Node, zero npm dependencies. Abuse caps live in CAPS below.
 
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -261,16 +263,9 @@ export function isCollectableRun(run) {
 
 // ---------------------------------------------------------------------------
 // CLI (thin): --write-data / --prune. Runs inside GitHub Actions with
-// GITHUB_TOKEN. All writes go through the git-data REST API (no persisted git
-// credentials), matching the repo convention that every checkout disables
-// persisted credentials.
+// GITHUB_TOKEN. All calls go through packages/api-client runGh (the gh binary
+// is used only by the client layer; this module never spawns it directly).
 // ---------------------------------------------------------------------------
-
-function requireToken() {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) throw new Error('GITHUB_TOKEN is required');
-  return token;
-}
 
 function repoCoords() {
   const slug = process.env.GITHUB_REPOSITORY;
@@ -280,52 +275,69 @@ function repoCoords() {
   return { owner, repo };
 }
 
-/** @param {{ token: string, owner: string, repo: string }} auth
- *  @param {string} method
- *  @param {string} path
- *  @param {any} [body] */
-async function api(auth, method, path, body) {
+/**
+ * GitHub API through the client layer (packages/api-client runGh -> gh api).
+ * `path` may contain the literal {owner}/{repo} placeholders, expanded from
+ * GITHUB_REPOSITORY. Priority `report`: the collector runs on the clock and
+ * must never starve merge/fix traffic.
+ * @param {{ owner: string, repo: string }} coords
+ * @param {string} method
+ * @param {string} path
+ * @param {any} [body]
+ */
+async function ghApi(coords, method, path, body) {
+  const { runGh } = await import('../../packages/api-client/gh.ts');
   const resolved = path
-    .replace('{owner}', auth.owner)
-    .replace('{repo}', auth.repo);
-  const response = await fetch(`https://api.github.com${resolved}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${auth.token}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'jovie-ci-timing-collector',
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await response.text();
-  const json = text ? JSON.parse(text) : null;
-  if (!response.ok) {
-    throw new Error(
-      `GitHub API ${method} ${resolved} -> ${response.status}: ${text.slice(0, 300)}`
-    );
+    .replace('{owner}', coords.owner)
+    .replace('{repo}', coords.repo);
+  const args = ['api'];
+  if (method !== 'GET') args.push('-X', method);
+  let cleanup = null;
+  if (body !== undefined) {
+    const { mkdtempSync, writeFileSync: wf, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'ci-timing-'));
+    const file = join(dir, 'body.json');
+    wf(file, JSON.stringify(body));
+    args.push('--input', file);
+    cleanup = () => rmSync(dir, { recursive: true, force: true });
   }
-  return json;
+  try {
+    const result = await runGh(args, { priority: 'report' });
+    if (result.deferred) throw new RateLimitDeferredError(result.stderr);
+    if (result.code !== 0) {
+      throw new Error(
+        `API call ${resolved} -> ${result.code}: ${result.stderr.slice(0, 300)}`
+      );
+    }
+    return result.stdout ? JSON.parse(result.stdout) : null;
+  } finally {
+    if (cleanup) cleanup();
+  }
 }
+
+/** Raised when the client layer deferred the call on a rate limit. */
+class RateLimitDeferredError extends Error {}
 
 /**
  * One no-parent-change data-branch commit via the git-data REST API.
  * Creates the branch (from an empty tree) when it does not exist yet.
- * @param {{ token: string, owner: string, repo: string }} auth
+ * @param {{ owner: string, repo: string }} coords
  * @param {Array<{ path: string, content: string }>} files
  */
-async function commitDataFiles(auth, files) {
+async function commitDataFiles(coords, files) {
   const branch = CAPS.dataBranch;
 
   let parentCommit = null;
   try {
-    const ref = await api(
-      auth,
+    const ref = await ghApi(
+      coords,
       'GET',
       `/repos/{owner}/{repo}/git/ref/heads/${branch}`
     );
-    parentCommit = await api(
-      auth,
+    parentCommit = await ghApi(
+      coords,
       'GET',
       `/repos/{owner}/{repo}/git/commits/${ref.object.sha}`
     );
@@ -335,10 +347,15 @@ async function commitDataFiles(auth, files) {
 
   const treeEntries = [];
   for (const file of files) {
-    const blob = await api(auth, 'POST', `/repos/{owner}/{repo}/git/blobs`, {
-      content: file.content,
-      encoding: 'utf-8',
-    });
+    const blob = await ghApi(
+      coords,
+      'POST',
+      `/repos/{owner}/{repo}/git/blobs`,
+      {
+        content: file.content,
+        encoding: 'utf-8',
+      }
+    );
     treeEntries.push({
       path: file.path,
       mode: '100644',
@@ -347,23 +364,33 @@ async function commitDataFiles(auth, files) {
     });
   }
 
-  const tree = await api(auth, 'POST', `/repos/{owner}/{repo}/git/trees`, {
+  const tree = await ghApi(coords, 'POST', `/repos/{owner}/{repo}/git/trees`, {
     base_tree: parentCommit ? parentCommit.tree.sha : undefined,
     tree: treeEntries,
   });
 
-  const commit = await api(auth, 'POST', `/repos/{owner}/{repo}/git/commits`, {
-    message: `ci-timing: collect ${files.length} run file(s)`,
-    tree: tree.sha,
-    parents: parentCommit ? [parentCommit.sha] : [],
-  });
+  const commit = await ghApi(
+    coords,
+    'POST',
+    `/repos/{owner}/{repo}/git/commits`,
+    {
+      message: `ci-timing: collect ${files.length} run file(s)`,
+      tree: tree.sha,
+      parents: parentCommit ? [parentCommit.sha] : [],
+    }
+  );
 
   if (parentCommit) {
-    await api(auth, 'PATCH', `/repos/{owner}/{repo}/git/refs/heads/${branch}`, {
-      sha: commit.sha,
-    });
+    await ghApi(
+      coords,
+      'PATCH',
+      `/repos/{owner}/{repo}/git/refs/heads/${branch}`,
+      {
+        sha: commit.sha,
+      }
+    );
   } else {
-    await api(auth, 'POST', `/repos/{owner}/{repo}/git/refs`, {
+    await ghApi(coords, 'POST', `/repos/{owner}/{repo}/git/refs`, {
       ref: `refs/heads/${branch}`,
       sha: commit.sha,
     });
@@ -379,7 +406,7 @@ function eventPayload() {
 }
 
 async function modeWriteData() {
-  const auth = { token: requireToken(), ...repoCoords() };
+  const coords = repoCoords();
   const triggerRun = eventPayload().workflow_run;
 
   // Overlap backfill: the collector's concurrency group is latest-wins, so a
@@ -388,8 +415,8 @@ async function modeWriteData() {
   const windowStart = new Date(
     Date.now() - CAPS.backfillWindowMinutes * 60_000
   ).toISOString();
-  const recent = await api(
-    auth,
+  const recent = await ghApi(
+    coords,
     'GET',
     `/repos/{owner}/{repo}/actions/runs?status=completed&created=>=${encodeURIComponent(windowStart)}&per_page=${CAPS.jobsPerPage}`
   );
@@ -406,7 +433,7 @@ async function modeWriteData() {
   for (const run of [...runsById.values()].slice(0, CAPS.maxBackfillRuns)) {
     const { rows, truncated } = await collectRunRows({
       run,
-      fetchJson: path => api(auth, 'GET', path),
+      fetchJson: path => ghApi(coords, 'GET', path),
       collectedAt: new Date().toISOString(),
     });
     if (rows.length === 0) continue;
@@ -423,24 +450,24 @@ async function modeWriteData() {
     console.log('ci-timing-collector: nothing to collect');
     return;
   }
-  const sha = await commitDataFiles(auth, files);
+  const sha = await commitDataFiles(coords, files);
   console.log(
     `ci-timing-collector: wrote ${files.length} file(s), ${truncatedRuns} truncated run(s), head ${sha}`
   );
 }
 
 async function modePrune() {
-  const auth = { token: requireToken(), ...repoCoords() };
+  const coords = repoCoords();
   const branch = CAPS.dataBranch;
   let head;
   try {
-    const ref = await api(
-      auth,
+    const ref = await ghApi(
+      coords,
       'GET',
       `/repos/{owner}/{repo}/git/ref/heads/${branch}`
     );
-    head = await api(
-      auth,
+    head = await ghApi(
+      coords,
       'GET',
       `/repos/{owner}/{repo}/git/commits/${ref.object.sha}`
     );
@@ -452,8 +479,8 @@ async function modePrune() {
     throw error;
   }
 
-  const tree = await api(
-    auth,
+  const tree = await ghApi(
+    coords,
     'GET',
     `/repos/{owner}/{repo}/git/trees/${head.tree.sha}?recursive=1`
   );
@@ -482,18 +509,33 @@ async function modePrune() {
       type: 'blob',
       sha: entry.sha,
     }));
-  const newTree = await api(auth, 'POST', `/repos/{owner}/{repo}/git/trees`, {
-    base_tree: head.tree.sha,
-    tree: kept,
-  });
-  const commit = await api(auth, 'POST', `/repos/{owner}/{repo}/git/commits`, {
-    message: `ci-timing: prune ${stale.length} file(s) older than ${CAPS.retentionDays}d`,
-    tree: newTree.sha,
-    parents: [head.sha],
-  });
-  await api(auth, 'PATCH', `/repos/{owner}/{repo}/git/refs/heads/${branch}`, {
-    sha: commit.sha,
-  });
+  const newTree = await ghApi(
+    coords,
+    'POST',
+    `/repos/{owner}/{repo}/git/trees`,
+    {
+      base_tree: head.tree.sha,
+      tree: kept,
+    }
+  );
+  const commit = await ghApi(
+    coords,
+    'POST',
+    `/repos/{owner}/{repo}/git/commits`,
+    {
+      message: `ci-timing: prune ${stale.length} file(s) older than ${CAPS.retentionDays}d`,
+      tree: newTree.sha,
+      parents: [head.sha],
+    }
+  );
+  await ghApi(
+    coords,
+    'PATCH',
+    `/repos/{owner}/{repo}/git/refs/heads/${branch}`,
+    {
+      sha: commit.sha,
+    }
+  );
   console.log(`ci-timing-collector: pruned ${stale.length} file(s)`);
 }
 
@@ -508,6 +550,12 @@ export async function main(argv) {
 
 if (process.argv[1] && process.argv[1].endsWith('ci-timing-collector.mjs')) {
   main(process.argv.slice(2)).catch(error => {
+    if (error instanceof RateLimitDeferredError) {
+      console.log(
+        '::warning::ci-timing-collector deferred on GitHub rate limit; not a verdict. The next collected event re-runs the overlap window.'
+      );
+      return;
+    }
     console.error(error);
     process.exitCode = 1;
   });
