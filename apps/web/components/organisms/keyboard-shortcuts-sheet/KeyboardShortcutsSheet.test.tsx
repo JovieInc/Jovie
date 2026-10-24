@@ -57,13 +57,26 @@ describe('KeyboardShortcutsSheet', () => {
     expect(screen.getByText('Open command menu')).toBeInTheDocument();
   });
 
-  it('advertises workspace lock only in Ovie', () => {
+  it('advertises workspace lock and menu recovery only in Ovie', () => {
     const jovie = renderSheet(true, '/app/chat');
     expect(screen.queryByText('Lock workspace')).not.toBeInTheDocument();
+    expect(screen.queryByText('Focus main menu')).not.toBeInTheDocument();
     jovie.unmount();
 
     renderSheet(true, '/app/ov/ops');
     expect(screen.getByText('Lock workspace')).toBeInTheDocument();
+    expect(screen.getByText('Focus main menu')).toBeInTheDocument();
+  });
+
+  it('lets keyboard users reach the scrollable shortcut list', async () => {
+    const user = userEvent.setup();
+    renderSheet(true, '/app/ov');
+    const list = screen.getByRole('region', { name: 'Shortcuts' });
+    const search = within(list).getByRole('textbox', {
+      name: 'Search Shortcuts',
+    });
+    await user.click(search);
+    expect(search).toHaveFocus();
   });
 });
 

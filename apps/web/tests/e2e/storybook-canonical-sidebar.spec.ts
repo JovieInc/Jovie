@@ -579,5 +579,179 @@ test.describe('touch sidebar controls', () => {
     await expect(name).toBeFocused();
     await name.fill('Tour collaborators');
     await page.screenshot({ path: testInfo.outputPath('touch-new-list.png') });
+    await name.press('Escape');
+    await expect(
+      page.getByRole('button', { name: 'New List', exact: true })
+    ).toBeFocused();
+    await page.keyboard.press('Alt+Shift+H');
+    await expect(
+      page.getByRole('link', { name: 'Home', exact: true })
+    ).toBeFocused();
   });
+});
+
+for (const theme of ['dark', 'light']) {
+  test(`Ovie main menu stays reachable on ultrawide in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 3440, height: 1440 });
+    await page.emulateMedia({
+      reducedMotion: theme === 'light' ? 'reduce' : 'no-preference',
+    });
+    await page.addInitScript(
+      value => localStorage.setItem('jovie-theme-storybook', value),
+      theme
+    );
+    await page.goto(
+      '/iframe.html?id=organisms-unifiedsidebar--operator-shell&viewMode=story',
+      { waitUntil: 'domcontentloaded' }
+    );
+    const home = page.getByRole('link', { name: 'Home', exact: true });
+    const tools = page.getByRole('button', { name: 'Tools', exact: true });
+    await expect(home).toBeVisible({ timeout: 60_000 });
+    await page.screenshot({
+      path: testInfo.outputPath(`ovie-menu-${theme}-expanded.png`),
+    });
+    await page.locator('#shell-left-rail').screenshot({
+      path: testInfo.outputPath(`ovie-sidebar-${theme}-expanded.png`),
+    });
+    await expect(
+      page.getByRole('link', { name: 'Collab list', exact: true })
+    ).toBeVisible();
+    const labelStarts = await page.locator('#shell-left-rail').evaluate(rail =>
+      [
+        'button[aria-label="New List"] span',
+        'a[aria-label="Collab list"] span',
+      ].map(selector => {
+        const label = rail.querySelector(selector);
+        if (!label) throw new Error('Missing list label');
+        const range = document.createRange();
+        range.selectNodeContents(label);
+        return range.getBoundingClientRect().x;
+      })
+    );
+    expect(Math.abs(labelStarts[0] - labelStarts[1])).toBeLessThanOrEqual(1);
+    const before = await home.boundingBox();
+    const main = page.getByRole('main');
+    const footer = page.locator('#shell-left-rail [data-sidebar="footer"]');
+    const mainBefore = await main.boundingBox();
+    const footerBefore = await footer.boundingBox();
+    await page
+      .getByRole('button', { name: 'Collapse sidebar', exact: true })
+      .click();
+    await expect(page.locator('#shell-left-rail')).toHaveAttribute(
+      'data-rail-phase',
+      'closed'
+    );
+    expect((await main.boundingBox())?.y).toBe(mainBefore!.y);
+    expect((await main.boundingBox())?.height).toBe(mainBefore!.height);
+    expect(await footer.boundingBox()).toMatchObject({
+      y: footerBefore!.y,
+      height: footerBefore!.height,
+    });
+    await page.locator('#shell-left-rail').screenshot({
+      path: testInfo.outputPath(`ovie-sidebar-${theme}-collapsed.png`),
+    });
+    await expect(tools).toBeVisible();
+    await tools.click();
+    await expect(tools).toHaveAttribute('aria-expanded', 'true');
+    await expect(home).toBeVisible();
+    await page.keyboard.press('Alt+Shift+H');
+    await expect(home).toBeFocused();
+    await expect(page.locator('#shell-left-rail')).toHaveAttribute(
+      'data-state',
+      'open'
+    );
+    await expect(page.locator('#shell-left-rail')).toHaveAttribute(
+      'data-rail-phase',
+      'open'
+    );
+    await expect
+      .poll(async () => (await home.boundingBox())?.y)
+      .toBe(before!.y);
+    const scroller = page.locator('[data-ov-navigation-scroll]');
+    await expect(scroller).toBeVisible();
+    // Force overflow with existing real nav rows at a short viewport.
+    await page.setViewportSize({ width: 3440, height: 420 });
+    const pinned = await home.boundingBox();
+    await scroller.evaluate(element => {
+      element.scrollTop = element.scrollHeight;
+    });
+    expect((await home.boundingBox())?.y).toBe(pinned!.y);
+    await expect(home).toBeInViewport();
+    await home.click({ trial: true });
+    await page.screenshot({
+      path: testInfo.outputPath(`ovie-menu-${theme}-scrolled.png`),
+    });
+  });
+}
+
+test('Ovie shortcuts keep keyboard scrolling inside the list', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 450 });
+  await page.goto(
+    '/iframe.html?id=organisms-keyboardshortcutssheet--ovie-navigation&viewMode=story',
+    { waitUntil: 'domcontentloaded' }
+  );
+  const dialog = page.getByRole('dialog', { name: 'Keyboard Shortcuts' });
+  await expect(dialog).toBeVisible({ timeout: 60_000 });
+  expect(
+    await dialog.evaluate(
+      element => element.scrollHeight - element.clientHeight
+    )
+  ).toBeLessThanOrEqual(1);
+  const list = dialog.getByRole('region', { name: 'Shortcuts' });
+  const search = list.getByRole('textbox', { name: 'Search Shortcuts' });
+  await search.focus();
+  await expect(search).toBeFocused();
+  await page.keyboard.press('PageDown');
+  await expect
+    .poll(() => list.evaluate(element => element.scrollTop))
+    .toBeGreaterThan(0);
+  await expect(
+    dialog.getByRole('button', { name: 'Close', exact: true })
+  ).toBeInViewport();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+});
+
+test('Ovie Tools preference survives mobile drawer to desktop resize', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto(
+    '/iframe.html?id=organisms-unifiedsidebar--operator-shell&viewMode=story',
+    { waitUntil: 'domcontentloaded' }
+  );
+  await expect(page.locator('[data-sidebar-brand-row]')).toBeAttached({
+    timeout: 60_000,
+  });
+  await page.keyboard.press('Alt+Shift+H');
+  const mobile = page.locator('#shell-left-rail[data-mobile="true"]');
+  await expect(mobile).toBeVisible({ timeout: 60_000 });
+  const controls = await page
+    .getByRole('button', { name: 'Tools', exact: true, includeHidden: true })
+    .evaluateAll(elements =>
+      elements.map(element => element.getAttribute('aria-controls'))
+    );
+  expect(controls).toHaveLength(2);
+  expect(controls.every(Boolean)).toBe(true);
+  expect(new Set(controls).size).toBe(controls.length);
+  const tools = mobile.getByRole('button', { name: 'Tools', exact: true });
+  await tools.click();
+  await expect(tools).toHaveAttribute('aria-expanded', 'true');
+  await page.keyboard.press('Alt+Shift+H');
+  await expect(
+    mobile.getByRole('link', { name: 'Home', exact: true })
+  ).toBeFocused();
+  await page.setViewportSize({ width: 3440, height: 1440 });
+  await expect(
+    page.getByRole('button', { name: 'Tools', exact: true })
+  ).toHaveAttribute('aria-expanded', 'true');
+  await expect(
+    page.getByRole('link', { name: 'Home', exact: true })
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 900 });
+  await expect(mobile).toHaveCount(0);
 });

@@ -20,23 +20,31 @@ export function isFormElement(target: EventTarget | null): boolean {
 }
 
 /** Shell shortcuts yield to focused editors, transient surfaces and media controls. */
-export function isShellShortcutSuppressed(event: KeyboardEvent): boolean {
+export function isShellShortcutSuppressed(
+  event: KeyboardEvent,
+  allowedDialog?: Element | null
+): boolean {
   return (
     event.defaultPrevented ||
     event.repeat ||
     event.isComposing ||
     // Some IMEs report the final composing key only through the legacy code.
     event.keyCode === 229 ||
-    [event.target, ...event.composedPath()].some(
-      target =>
-        isFormElement(target) ||
-        (target instanceof Element &&
-          Boolean(
-            target.closest(
-              'dialog[open], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [role="textbox"], [role="searchbox"], [role="combobox"], [role="slider"], [role="spinbutton"], [role="tablist"], [role="tree"], [role="grid"], audio, video, [inert], [hidden], [aria-hidden="true"]'
-            )
-          ))
-    )
+    [event.target, ...event.composedPath()].some(target => {
+      if (isFormElement(target)) return true;
+      if (!(target instanceof Element)) return false;
+      const boundary = target.closest(
+        'dialog[open], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [role="textbox"], [role="searchbox"], [role="combobox"], [role="slider"], [role="spinbutton"], [role="tablist"], [role="tree"], [role="grid"], audio, video, [inert], [hidden], [aria-hidden="true"]'
+      );
+      // Only the explicitly owned drawer may handle its recovery action.
+      // Nested menus/editors/dialogs still suppress shell shortcuts.
+      return (
+        boundary !== null &&
+        (boundary !== allowedDialog ||
+          !boundary.matches('dialog[open], [role="dialog"]') ||
+          boundary.matches('[inert], [hidden], [aria-hidden="true"]'))
+      );
+    })
   );
 }
 

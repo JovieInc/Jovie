@@ -4,7 +4,7 @@ import { Input } from '@jovie/ui';
 import { List, ListFilter, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type KeyboardEvent, useState } from 'react';
+import { type KeyboardEvent, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { OPERATOR_NAV_GROUP_LABEL } from '@/components/organisms/operator-navigation';
 import {
@@ -71,7 +71,12 @@ function NavRow({
             className={getSidebarNavIconClassName({ calm: true, active })}
             aria-hidden='true'
           />
-          <span className={cn('min-w-0 truncate', SHELL_RAIL_LABEL_OVERLAY)}>
+          <span
+            className={cn(
+              'min-w-0 truncate text-start',
+              SHELL_RAIL_LABEL_OVERLAY
+            )}
+          >
             {label}
           </span>
         </Link>
@@ -95,13 +100,22 @@ function NewListRow() {
   const router = useRouter();
   const { state, isMobile, setOpen } = useSidebar();
   const create = useCreateOvieListMutation();
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
+
+  const cancelEditing = () => {
+    setName('');
+    setEditing(false);
+    requestAnimationFrame(() =>
+      triggerRef.current?.focus({ preventScroll: true })
+    );
+  };
 
   const submit = () => {
     const trimmed = name.trim();
     if (!trimmed) {
-      setEditing(false);
+      cancelEditing();
       return;
     }
     create.mutate(trimmed, {
@@ -120,8 +134,7 @@ function NewListRow() {
       submit();
     } else if (event.key === 'Escape') {
       event.preventDefault();
-      setName('');
-      setEditing(false);
+      cancelEditing();
     }
   };
 
@@ -150,6 +163,7 @@ function NewListRow() {
       <Tooltip label='New List' side='right' block>
         <button
           type='button'
+          ref={triggerRef}
           aria-label='New List'
           onClick={() => {
             if (state === 'closed' && !isMobile) setOpen(true);
@@ -165,7 +179,12 @@ function NewListRow() {
             className={getSidebarNavIconClassName({ calm: true })}
             aria-hidden='true'
           />
-          <span className={cn('min-w-0 truncate', SHELL_RAIL_LABEL_OVERLAY)}>
+          <span
+            className={cn(
+              'min-w-0 truncate text-start',
+              SHELL_RAIL_LABEL_OVERLAY
+            )}
+          >
             New List
           </span>
         </button>

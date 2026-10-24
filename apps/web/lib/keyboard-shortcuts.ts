@@ -36,6 +36,7 @@ export const GLYPH_OPT = String.fromCodePoint(0x2325);
 export const GLYPH_SHIFT = String.fromCodePoint(0x21e7);
 export const GLYPH_ARROW_RIGHT = String.fromCodePoint(0x2192);
 export const WORKSPACE_SWITCH_KEY = 'w';
+export const OVIE_NAVIGATION_KEY = 'h';
 export const WORKSPACE_SWITCH_SHORTCUT_KEY = 'Alt+Shift+w';
 export const FOUNDER_DOOR_SHORTCUT_KEY = 'Meta+o';
 
@@ -121,6 +122,18 @@ export const FOUNDER_DOOR_SHORTCUT: KeyboardShortcut = {
   icon: Repeat2,
   shortcutKey: FOUNDER_DOOR_SHORTCUT_KEY,
   decision: { status: 'required', binding: 'useGlobalShortcutActions' },
+};
+
+/** Ovie-only recovery; reuses the existing Home row rather than adding chrome. */
+export const OVIE_NAVIGATION_SHORTCUT: KeyboardShortcut = {
+  id: 'focus-ovie-navigation',
+  label: 'Focus main menu',
+  keys: `${GLYPH_OPT} ${GLYPH_SHIFT} H`,
+  description: 'Open the sidebar and return to its top-level menu',
+  category: 'navigation',
+  icon: Home,
+  shortcutKey: `Alt+Shift+${OVIE_NAVIGATION_KEY}`,
+  decision: { status: 'required', binding: 'useOvieSidebarNavigation' },
 };
 
 /** Project existing navigation actions; routes, names, and hints have one owner. */
@@ -376,9 +389,13 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
 
 export function shortcutsForHelpSheet(options: {
   readonly canUseFounderDoor: boolean;
+  readonly isOvieWorkspace?: boolean;
 }): readonly KeyboardShortcut[] {
-  if (!options.canUseFounderDoor) return KEYBOARD_SHORTCUTS;
-  return [...KEYBOARD_SHORTCUTS, FOUNDER_DOOR_SHORTCUT];
+  return [
+    ...KEYBOARD_SHORTCUTS,
+    ...(options.canUseFounderDoor ? [FOUNDER_DOOR_SHORTCUT] : []),
+    ...(options.isOvieWorkspace ? [OVIE_NAVIGATION_SHORTCUT] : []),
+  ];
 }
 
 /**

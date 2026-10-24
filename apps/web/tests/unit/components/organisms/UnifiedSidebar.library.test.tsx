@@ -761,6 +761,56 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
+  it('yields menu recovery to typing, consumed events, and other overlays', () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.OV,
+      section: 'ov',
+      sidebarDefaultOpen: false,
+    });
+    const rail = document.getElementById('shell-left-rail');
+    const editor = document.createElement('input');
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    document.body.append(editor, dialog);
+    const chord = { key: 'H', code: 'KeyH', altKey: true, shiftKey: true };
+    fireEvent.keyDown(editor, chord);
+    fireEvent.keyDown(dialog, chord);
+    fireEvent.keyDown(document.body, { ...chord, ctrlKey: true });
+    fireEvent.keyDown(document.body, { ...chord, metaKey: true });
+    fireEvent.keyDown(document.body, { ...chord, repeat: true });
+    fireEvent.keyDown(document.body, { ...chord, isComposing: true });
+    const consumed = new KeyboardEvent('keydown', {
+      ...chord,
+      bubbles: true,
+      cancelable: true,
+    });
+    consumed.preventDefault();
+    fireEvent(document.body, consumed);
+    expect(rail).toHaveAttribute('data-state', 'closed');
+    editor.remove();
+    dialog.remove();
+  });
+
+  it('opens the collapsed Ovie main menu and focuses Home in one shortcut', async () => {
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.ADMIN_OPS,
+      section: 'ov',
+      sidebarDefaultOpen: false,
+    });
+    const rail = document.getElementById('shell-left-rail');
+    expect(rail).toHaveAttribute('data-state', 'closed');
+    fireEvent.keyDown(document.body, {
+      key: 'H',
+      code: 'KeyH',
+      altKey: true,
+      shiftKey: true,
+    });
+    await waitFor(() => expect(rail).toHaveAttribute('data-state', 'open'));
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Home' })).toHaveFocus()
+    );
+  });
+
   it('renders founder lists in the Ovie sidebar outside the canonical landmark', async () => {
     renderUnifiedSidebar({ pathname: APP_ROUTES.ADMIN_OPS, section: 'ov' });
     const operatorNavigation = screen.getByRole('navigation', {

@@ -4,6 +4,7 @@ import {
   getRovingFocusIndex,
   handleActivationKeyDown,
   isFormElement,
+  isShellShortcutSuppressed,
 } from './keyboard';
 
 describe('handleActivationKeyDown', () => {
@@ -181,5 +182,33 @@ describe('getRovingFocusIndex', () => {
     expect(getRovingFocusIndex('ArrowRight', 0, 0)).toBeNull();
     expect(getRovingFocusIndex('ArrowRight', -1, 3)).toBeNull();
     expect(getRovingFocusIndex('ArrowRight', 3, 3)).toBeNull();
+  });
+});
+
+describe('shell shortcut dialog ownership', () => {
+  it('allows the owning drawer while preserving editor and nested overlay boundaries', () => {
+    const drawer = document.createElement('div');
+    drawer.setAttribute('role', 'dialog');
+    const home = document.createElement('a');
+    const input = document.createElement('input');
+    const nestedMenu = document.createElement('div');
+    nestedMenu.setAttribute('role', 'menu');
+    drawer.append(home, input, nestedMenu);
+    document.body.append(drawer);
+    const eventFor = (target: HTMLElement) => {
+      const event = new KeyboardEvent('keydown', { key: 'H', bubbles: true });
+      target.dispatchEvent(event);
+      return event;
+    };
+    expect(isShellShortcutSuppressed(eventFor(home))).toBe(true);
+    expect(isShellShortcutSuppressed(eventFor(home), drawer)).toBe(false);
+    expect(isShellShortcutSuppressed(eventFor(input), drawer)).toBe(true);
+    expect(isShellShortcutSuppressed(eventFor(nestedMenu), drawer)).toBe(true);
+    expect(isShellShortcutSuppressed(eventFor(nestedMenu), nestedMenu)).toBe(
+      true
+    );
+    drawer.hidden = true;
+    expect(isShellShortcutSuppressed(eventFor(home), drawer)).toBe(true);
+    drawer.remove();
   });
 });

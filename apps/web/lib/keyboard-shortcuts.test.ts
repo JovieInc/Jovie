@@ -12,6 +12,31 @@ import {
 } from './keyboard-shortcuts';
 
 describe('keyboard-shortcuts definitions', () => {
+  it('advertises Ovie menu recovery only in Ovie and reserves its chord', () => {
+    const ovieShortcuts = shortcutsForHelpSheet({
+      canUseFounderDoor: true,
+      isOvieWorkspace: true,
+    });
+    const recovery = ovieShortcuts.find(
+      shortcut => shortcut.id === 'focus-ovie-navigation'
+    );
+    expect(recovery?.shortcutKey).toBe('Alt+Shift+h');
+    expect(
+      shortcutsForHelpSheet({ canUseFounderDoor: true }).some(
+        shortcut => shortcut.id === 'focus-ovie-navigation'
+      )
+    ).toBe(false);
+    const chords = [...ovieShortcuts, WORKSPACE_SWITCH_SHORTCUT]
+      .filter(
+        shortcut =>
+          shortcut.shortcutKey &&
+          shortcut.scope !== 'player' &&
+          shortcut.scope !== 'overlay'
+      )
+      .map(shortcut => shortcut.shortcutKey!.toLowerCase());
+    expect(new Set(chords).size).toBe(chords.length);
+  });
+
   it('has unique ids', () => {
     const ids = KEYBOARD_SHORTCUTS.map(s => s.id);
     expect(new Set(ids).size).toBe(ids.length);
