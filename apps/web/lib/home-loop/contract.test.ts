@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatCountdown,
+  formatDurationSeconds,
   HOME_LOOP_NOT_MEASURED,
   type HomeLoopTile,
   rememberTiles,
@@ -46,5 +48,38 @@ describe('home loop tile history', () => {
     expect(
       rememberTiles(memory, [{ ...tile('streams', null), was: null }])
     ).toEqual(memory);
+  });
+});
+
+describe('formatDurationSeconds', () => {
+  it.each([
+    [42, '42s'],
+    [495, '8m'],
+    [15147, '4.2h'],
+    [86400, '24h'],
+    [201933, '2.3d'],
+  ])('formats %s seconds as %s', (value, expected) => {
+    expect(formatDurationSeconds(value)).toBe(expected);
+  });
+
+  it('never turns unknown into zero', () => {
+    expect(formatDurationSeconds(null)).toBe(HOME_LOOP_NOT_MEASURED);
+    expect(formatDurationSeconds(-1)).toBe(HOME_LOOP_NOT_MEASURED);
+  });
+});
+
+describe('formatCountdown', () => {
+  const now = Date.parse('2026-10-20T12:00:00.000Z');
+  it.each([
+    ['2026-10-20T12:30:00.000Z', 'in 30m'],
+    ['2026-10-20T17:00:00.000Z', 'in 5h'],
+    ['2026-10-23T12:00:00.000Z', 'in 3d'],
+    ['2026-10-20T11:00:00.000Z', 'now'],
+  ])('formats %s as %s', (deadline, expected) => {
+    expect(formatCountdown(deadline, now)).toBe(expected);
+  });
+
+  it('returns null for an unparseable deadline', () => {
+    expect(formatCountdown('soon', now)).toBeNull();
   });
 });

@@ -23,10 +23,11 @@ const ADMIN_LOADING_ROUTE = join(
 const ADMIN_NAV = join(TEST_DIR, '../../../constants/admin-navigation.ts');
 
 describe('admin overview shell normalization (JOV-5256)', () => {
-  it('folds the overview index into canonical Ops at /hud', () => {
+  it('renders Ovie Home at the overview index (founder decision 2026-10-20)', () => {
     const source = readFileSync(ADMIN_OVERVIEW_ROUTE, 'utf8');
 
-    expect(source).toContain('redirect(APP_ROUTES.HUD)');
+    expect(source).toContain("import AdminChatPage from './chat/page'");
+    expect(source).toContain('await requireCurrentAdminPageAccess();');
     expect(source).not.toContain('<AdminPage');
     expect(source).not.toContain("testId='admin-overview-page'");
   });
@@ -81,9 +82,7 @@ describe('admin nav IA copy (JOV-2098)', () => {
   it('describes non-overlapping workspace purposes', () => {
     const source = readFileSync(ADMIN_NAV, 'utf8');
 
-    expect(source).toContain(
-      'Company pulse, ranked signals, health, and freshness'
-    );
+    expect(source).toContain('What matters now, shipping, and the composer');
     expect(source).toContain(
       'Visited through expanded, with people behind every stage'
     );
@@ -93,7 +92,8 @@ describe('admin nav IA copy (JOV-2098)', () => {
     expect(source).toContain(
       'Autonomous execution outcomes, exceptions, costs, and queues'
     );
-    expect(source).toContain(
+    // Needs You folded into Home's asks (Tim 2026-10-21: one Home).
+    expect(source).not.toContain(
       'Founder judgments that automation cannot safely make'
     );
     expect(source).not.toContain(

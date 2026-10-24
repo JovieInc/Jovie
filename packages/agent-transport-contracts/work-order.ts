@@ -105,6 +105,12 @@ export const WorkOrderSchema = z.strictObject({
         .max(6),
       recommendation: z.string().trim().min(1).max(500),
       defaultIfSilent: z.string().trim().min(1).max(300).nullable(),
+      /**
+       * What the ask records at `budget.deadline` if the founder is silent
+       * (default-plus-deadline contract). Absent: `reject`, so silence never
+       * acts. Optional so orders sealed before it keep their digest.
+       */
+      defaultDecision: z.enum(['approve', 'reject']).optional(),
       /** Set only to re-ask after a denial; states what materially changed. */
       materialChange: text.nullable(),
     })
@@ -190,6 +196,16 @@ export function sealWorkOrder(input: unknown): SealedWorkOrder {
     order.requiredCapabilities.some(c => order.forbiddenActions.includes(c))
   ) {
     throw new Error('work order forbids a capability it requires');
+  }
+  const ask = order.founderAsk;
+  if (ask?.defaultDecision && !ask.defaultIfSilent) {
+    throw new Error('a declared default must say what happens if silent');
+  }
+  if (
+    ask?.defaultDecision === 'approve' &&
+    order.requiredCapabilities.some(c => c === 'spend' || c === 'outbound')
+  ) {
+    throw new Error('spend and outbound asks never approve by default');
   }
   const sealed = createHash('sha256')
     .update(`${WORK_ORDER_SCHEMA}\0${canonical(order)}`)

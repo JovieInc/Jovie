@@ -62,6 +62,7 @@ export interface RevenueSpineFailure {
 
 const ERROR_CODES: Readonly<Record<string, RevenueSpineFailureCode>> = {
   '23505': 'unique_conflict',
+  '25P03': 'timeout',
   '40001': 'concurrent_update',
   '40P01': 'concurrent_update',
   '42501': 'permission_denied',

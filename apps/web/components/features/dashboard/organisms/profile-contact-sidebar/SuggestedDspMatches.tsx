@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/SuggestedDspMatches.test.tsx
+
 import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { Check, ExternalLink, Loader2, X } from 'lucide-react';
 import Image from 'next/image';
@@ -125,9 +127,7 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
 function SectionHeading({ count }: { readonly count: number }) {
   return (
     <div className='flex items-center gap-2 px-2'>
-      <span className='text-2xs font-book uppercase tracking-widest text-tertiary-token'>
-        Suggested
-      </span>
+      <span className='text-2xs font-book text-tertiary-token'>Suggested</span>
       {count > 0 && (
         <span className='inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-surface-1 px-1 text-3xs font-caption text-tertiary-token'>
           {count}

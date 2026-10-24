@@ -10,7 +10,7 @@ const meta: Meta<typeof Section> = {
   argTypes: {
     containerSize: {
       control: 'select',
-      options: ['sm', 'md', 'lg', 'xl', 'full'],
+      options: ['page', 'bleed'],
     },
     padding: {
       control: 'select',
@@ -41,7 +41,7 @@ const SampleContent = () => (
 export const Default: Story = {
   args: {
     padding: 'lg',
-    containerSize: 'lg',
+    containerSize: 'page',
     children: <SampleContent />,
   },
 };
@@ -49,7 +49,7 @@ export const Default: Story = {
 export const WithGridBackground: Story = {
   args: {
     padding: 'lg',
-    containerSize: 'lg',
+    containerSize: 'page',
     withGridBg: true,
     children: <SampleContent />,
   },
@@ -58,7 +58,7 @@ export const WithGridBackground: Story = {
 export const WithBorder: Story = {
   args: {
     padding: 'lg',
-    containerSize: 'lg',
+    containerSize: 'page',
     withBorder: true,
     children: <SampleContent />,
   },
@@ -67,7 +67,7 @@ export const WithBorder: Story = {
 export const SmallPadding: Story = {
   args: {
     padding: 'sm',
-    containerSize: 'md',
+    containerSize: 'page',
     children: <SampleContent />,
   },
 };
@@ -75,7 +75,7 @@ export const SmallPadding: Story = {
 export const ExtraLargePadding: Story = {
   args: {
     padding: 'xl',
-    containerSize: 'xl',
+    containerSize: 'page',
     children: <SampleContent />,
   },
 };
@@ -83,13 +83,13 @@ export const ExtraLargePadding: Story = {
 export const StackedSections: Story = {
   render: () => (
     <div>
-      <Section padding='lg' containerSize='lg'>
+      <Section padding='lg' containerSize='page'>
         <div className='text-center'>
           <h2 className='text-3xl font-bold mb-4'>First Section</h2>
           <p className='text-secondary'>Content for the first section.</p>
         </div>
       </Section>
-      <Section padding='lg' containerSize='lg' withBorder withGridBg>
+      <Section padding='lg' containerSize='page' withBorder withGridBg>
         <div className='text-center'>
           <h2 className='text-3xl font-bold mb-4'>Second Section</h2>
           <p className='text-secondary'>
@@ -97,7 +97,7 @@ export const StackedSections: Story = {
           </p>
         </div>
       </Section>
-      <Section padding='lg' containerSize='lg' withBorder>
+      <Section padding='lg' containerSize='page' withBorder>
         <div className='text-center'>
           <h2 className='text-3xl font-bold mb-4'>Third Section</h2>
           <p className='text-secondary'>Content for the third section.</p>

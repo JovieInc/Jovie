@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
 const mocks = vi.hoisted(() => ({
+  checkIsAdmin: vi.fn(),
   pendingFailure: null as null | (() => void),
   getCanonicalProfileDSPs: vi.fn(),
   getDashboardShellData: vi.fn(),
@@ -14,6 +15,11 @@ const mocks = vi.hoisted(() => ({
   redirect: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`);
   }),
+}));
+
+vi.mock('@/lib/admin/middleware', () => ({ checkIsAdmin: mocks.checkIsAdmin }));
+vi.mock('@/components/features/home/PipelineBottleneckBanner', () => ({
+  PipelineBottleneckBanner: () => <div data-testid='pipeline-banner' />,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -125,6 +131,7 @@ async function flushPromises() {
 describe('OpportunityInboxRoute', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.checkIsAdmin.mockResolvedValue(false);
     mocks.pendingFailure = null;
     mocks.loadAuthenticatedAppShellUserId.mockResolvedValue('user-1');
     mocks.getDashboardShellData.mockResolvedValue({
@@ -135,6 +142,14 @@ describe('OpportunityInboxRoute', () => {
     mocks.getProfileSocialLinks.mockResolvedValue([{ id: 'link-1' }]);
     mocks.loadOpportunityInboxTourDateSections.mockResolvedValue(TOUR_DATES);
     mocks.getCanonicalProfileDSPs.mockReturnValue([{ id: 'spotify' }]);
+  });
+
+  it('mounts the banner only for admins', async () => {
+    const view = render(await OpportunityInboxRoute());
+    expect(screen.queryByTestId('pipeline-banner')).not.toBeInTheDocument();
+    mocks.checkIsAdmin.mockResolvedValue(true);
+    view.rerender(await OpportunityInboxRoute());
+    expect(screen.getByTestId('pipeline-banner')).toBeInTheDocument();
   });
 
   it('does not restore a previous account card when its pending mutation fails after an identity switch', async () => {

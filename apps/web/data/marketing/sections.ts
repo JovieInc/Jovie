@@ -1514,6 +1514,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         'content-prose',
         'pricing',
         'blog-feed',
+        // Real product states are value proof (homepage, EVENT 2026-10-20).
+        'product-gallery',
       ],
     ],
     contentBudgets: [

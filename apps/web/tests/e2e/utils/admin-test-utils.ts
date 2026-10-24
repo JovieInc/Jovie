@@ -161,6 +161,14 @@ interface WaitForAdminNavOptions {
 }
 
 /**
+ * The Ovie operator rail (UnifiedSidebar `OV Navigation` landmark). It renders
+ * only inside the Ovie workspace; the customer shell never shows it.
+ */
+export function operatorNavigation(page: Page) {
+  return page.getByRole('navigation', { name: 'OV Navigation' });
+}
+
+/**
  * Wait for admin nav to become visible with retries.
  * Returns true if admin nav is visible, false if user doesn't have admin access.
  */
@@ -171,7 +179,7 @@ export async function waitForAdminNav(
   const maxAttempts = options?.maxAttempts ?? 5;
   const delayMs = options?.delayMs ?? 1000;
 
-  const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
+  const adminNavSection = operatorNavigation(page);
 
   await page.waitForLoadState('domcontentloaded').catch(() => {});
   // Wait for client-side JS to settle by checking document readiness

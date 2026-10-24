@@ -110,7 +110,7 @@ describe('DashboardNav route warming', () => {
     ).toBeInTheDocument();
   });
 
-  it('fully prefetches every canonical dynamic customer route', () => {
+  it('does not full-prefetch customer routes on mount', () => {
     renderDashboardNav({
       renderFn: render,
       appFlags: { PROFILES_WORKSPACE: true },
@@ -119,13 +119,13 @@ describe('DashboardNav route warming', () => {
     for (const label of ['New Chat', 'Identity', 'Work', 'Audience']) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
         'data-prefetch',
-        'true'
+        'false'
       );
     }
     const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
     expect(homeLinks).toHaveLength(2);
     for (const link of homeLinks) {
-      expect(link).toHaveAttribute('data-prefetch', 'true');
+      expect(link).toHaveAttribute('data-prefetch', 'false');
     }
     for (const label of ['Library', 'Links', 'Contacts', 'Calendar', 'Tasks']) {
       expect(
@@ -311,6 +311,17 @@ describe('DashboardNav route warming', () => {
     const newChatAction = screen.getByRole('link', { name: 'New Chat' });
     expect(newChatAction).toBeInTheDocument();
     expect(newChatAction).toHaveAttribute('aria-label', 'New Chat');
+    expect(newChatAction.className).toContain('focus-visible:ring-inset');
+    expect(newChatAction.closest('nav')?.className).not.toContain(
+      'transform-gpu'
+    );
+    expect(newChatAction.closest('nav')?.className).toContain('overflow-clip');
+    expect(newChatAction.closest('nav')?.className).toContain(
+      'overflow-anchor-none'
+    );
+    expect(
+      newChatAction.closest('[data-sidebar-search-slot]')?.className
+    ).toContain('lg:overflow-hidden');
 
     const nav = container.querySelector('nav');
     expect(nav).not.toBeNull();

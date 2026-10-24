@@ -33,3 +33,17 @@ it('keeps the real mock-home subject in an inert preview instead of enabling fan
     })
   );
 });
+
+it('rounds reference captures while keeping the preview inert', () => {
+  render(
+    <HomeProfileShowcase stateId='mock-home' referenceImageSrc='/preview.png' />
+  );
+
+  const image = screen.getByAltText('Tim White mock home review');
+  expect(image).toHaveClass('marketing-rounded-frame');
+  expect(image).toHaveAttribute('width', '853');
+  expect(screen.getByTestId('homepage-phone-state-mock-home')).toHaveAttribute(
+    'inert'
+  );
+  expect(screen.queryByTestId('mounted-preview')).not.toBeInTheDocument();
+});

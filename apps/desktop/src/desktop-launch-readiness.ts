@@ -29,9 +29,12 @@ export function trustedReadinessSender(sender: ReadinessSender): boolean {
     const url = new URL(sender.frame.url);
     return (
       url.origin === sender.appOrigin &&
-      ['/app/chat', '/app/ov/chat'].some(
-        route => url.pathname === route || url.pathname.startsWith(`${route}/`)
-      )
+      // Ovie Home (`/app/ov`, exact) hosts the shared composer too.
+      (url.pathname === '/app/ov' ||
+        ['/app/chat', '/app/ov/chat'].some(
+          route =>
+            url.pathname === route || url.pathname.startsWith(`${route}/`)
+        ))
     );
   } catch {
     return false;

@@ -22,6 +22,7 @@ import {
   UnpublishedEntityAlertsFallback,
 } from '@/components/features/alerts/UnpublishedEntityAlerts';
 import { BASE_URL } from '@/constants/app';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import {
   MysteryReleasePage,
   ScheduledReleasePage,
@@ -772,8 +773,8 @@ export async function generateMetadata({
       card: ogImage ? 'summary_large_image' : 'summary',
       title: ogTitle,
       description,
-      creator: '@jovieapp',
-      site: '@jovieapp',
+      creator: COMPANY_IDENTITY.xHandle,
+      site: COMPANY_IDENTITY.xHandle,
       ...(ogImage && {
         images: [
           {

@@ -229,6 +229,24 @@ export function shouldUseEssentialShellData(pathname: string | null): boolean {
   return isLightweightShellRoute(pathname);
 }
 
+/**
+ * Profile settings is an essential-shell route, so the shared shell would
+ * otherwise leave the companion rail closed. Account → Back changes the rail
+ * scope and the closed reset wins unless this surface defaults open again.
+ * Chat stays closed (JOV-7150).
+ */
+export function shouldDefaultOpenShellPreview(
+  pathname: string | null,
+  useEssentialShell: boolean
+): boolean {
+  if (!useEssentialShell) return true;
+  if (!pathname) return false;
+  return (
+    pathname === APP_ROUTES.SETTINGS_PROFILE ||
+    pathname.startsWith(`${APP_ROUTES.SETTINGS_PROFILE}/`)
+  );
+}
+
 export function shouldRedirectToOnboarding(pathname: string | null): boolean {
   return (
     isChatShellRoute(pathname) ||

@@ -32,7 +32,8 @@ import {
  *
  * Baseline: touch-target-ratchet.baseline.json (repo root of apps/web).
  * CLI: `pnpm --filter web run lint:touch-target -- [--list|--update]`.
- * Runtime complement: axe `target-size` via the Storybook+axe gate (#12008).
+ * Rendered 24px measurement is axe `target-size` via `wcag22AaAxeOptions()`,
+ * proved by `tests/a11y/rendered-gate.spec.ts`. This file stays the 44px source ratchet.
  */
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

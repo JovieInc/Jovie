@@ -266,6 +266,40 @@ describe('POST /api/agents/profiles', () => {
     expect(res.headers.get('Cache-Control')).toContain('no-store');
   });
 
+  it.each([false, null, 'false'])(
+    'never discovers or replaces an owner-unlisted profile (%s)',
+    searchable => {
+      hoisted.selectRows = [
+        [
+          {
+            username: 'unlisted_fixture',
+            isPublic: true,
+            isClaimed: true,
+            settings: { searchable },
+          },
+        ],
+      ];
+      return post({ url: SPOTIFY_URL }).then(async res => {
+        expect(res.status).toBe(404);
+        expect(await res.text()).not.toContain('unlisted_fixture');
+        expect(hoisted.ingest).not.toHaveBeenCalled();
+      });
+    }
+  );
+
+  it('does not serialize a newly unlisted ingestion result', async () => {
+    hoisted.selectRows = [
+      [],
+      [{ isPublic: true, isClaimed: false, settings: { searchable: false } }],
+    ];
+    hoisted.ingest.mockResolvedValue(
+      Response.json({ profile: { username: 'unlisted_new_fixture' } })
+    );
+    const res = await post({ url: SPOTIFY_URL });
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toContain('unlisted_new_fixture');
+  });
+
   it('omits the claim URL for a claimed profile', async () => {
     hoisted.selectRows = [
       [{ username: 'radiohead', isClaimed: true, isPublic: true }],

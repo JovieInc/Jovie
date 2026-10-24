@@ -375,7 +375,11 @@ def sweep_retired_workspaces(host, run, now: float, report: dict, roots=None,
                 report["actions"].append(f"stripped unverifiable workspace {path}")
                 continue
             if info["dirty"] or info["unpushed"] != "0":
-                saved = worktree_sweep.backup(path, info, run, prefix, date)
+                try:
+                    saved = worktree_sweep.backup(path, info, run, prefix, date)
+                except worktree_sweep.SnapshotHeld as held:
+                    report["actions"].append(f"kept workspace {path}: snapshot held ({held.reason})")
+                    continue
                 if not saved:
                     worktree_sweep.strip_build_dirs(path)
                     report["actions"].append(f"stripped workspace {path}: backup failed")

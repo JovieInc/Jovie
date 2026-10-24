@@ -223,7 +223,7 @@ function missingFieldArtifactRows(params: {
 
 export async function getSubmissionRequestForUser(
   requestId: string,
-  clerkUserId: string
+  appUserId: string
 ) {
   const [request] = await db
     .select({
@@ -247,10 +247,7 @@ export async function getSubmissionRequestForUser(
       eq(users.activeProfileId, metadataSubmissionRequests.creatorProfileId)
     )
     .where(
-      and(
-        eq(metadataSubmissionRequests.id, requestId),
-        eq(users.clerkId, clerkUserId)
-      )
+      and(eq(metadataSubmissionRequests.id, requestId), eq(users.id, appUserId))
     )
     .limit(1);
 

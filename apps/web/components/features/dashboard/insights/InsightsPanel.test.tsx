@@ -77,7 +77,7 @@ describe('InsightsPanelView', () => {
     const emptyState = screen.getByTestId('insights-empty-state');
     expect(emptyState.tagName).toBe('OUTPUT');
     expect(emptyState.querySelector('svg')).toBeNull();
-    expect(screen.getByText('No Insights Yet')).toHaveClass('text-2xl');
+    expect(screen.getByText('No Insights Yet')).toHaveClass('text-sm');
   });
 
   it('renders the canonical recoverable error state', () => {

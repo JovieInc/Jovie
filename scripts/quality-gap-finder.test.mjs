@@ -147,6 +147,26 @@ describe('quality-gap-finder', () => {
       assert.equal(gaps[0].mechanical, true);
     });
 
+    it('skips web evidence the invariants lane cites apps/web-relatively', () => {
+      const gaps = collectInvariantGaps(
+        [
+          invariant('JOV-INV-040', [
+            {
+              path: 'apps/web/lib/agent-os/design-ci-judge-certification.test.ts',
+            },
+          ]),
+          invariant('JOV-INV-906', [
+            { path: 'apps/web/lib/agent-os/unwired.test.ts' },
+          ]),
+        ],
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/agent-os/design-ci-judge-certification.test.ts'
+      );
+      assert.deepEqual(
+        gaps.map(gap => gap.key),
+        ['JOV-INV-906:apps/web/lib/agent-os/unwired.test.ts']
+      );
+    });
+
     it('skips evidence owned by another repo', () => {
       const gaps = collectInvariantGaps(
         [
@@ -811,29 +831,26 @@ describe('quality-gap-finder', () => {
           log: () => {},
           fetchImpl: async (_url, init) => {
             incompleteCalls.push(String(init?.body ?? ''));
-            return {
-              ok: true,
-              json: async () => ({
-                data: {
-                  issues: {
-                    nodes: [
-                      {
-                        id: 'issue-9',
-                        identifier: 'JOV-9',
-                        description: 'product fix only',
-                        labels: { nodes: [{ name: 'escaped-defect' }] },
-                        comments: { nodes: [] },
-                        team: {
-                          states: {
-                            nodes: [{ id: 'done-id', name: 'Done' }],
-                          },
+            return Response.json({
+              data: {
+                issues: {
+                  nodes: [
+                    {
+                      id: 'issue-9',
+                      identifier: 'JOV-9',
+                      description: 'product fix only',
+                      labels: { nodes: [{ name: 'escaped-defect' }] },
+                      comments: { nodes: [] },
+                      team: {
+                        states: {
+                          nodes: [{ id: 'done-id', name: 'Done' }],
                         },
                       },
-                    ],
-                  },
+                    },
+                  ],
                 },
-              }),
-            };
+              },
+            });
           },
         }),
         /Refusing to mark JOV-9 Done/
@@ -853,36 +870,30 @@ describe('quality-gap-finder', () => {
           const body = String(init?.body ?? '');
           completeCalls.push(body);
           if (body.includes('issueUpdate')) {
-            return {
-              ok: true,
-              json: async () => ({
-                data: { issueUpdate: { success: true } },
-              }),
-            };
+            return Response.json({
+              data: { issueUpdate: { success: true } },
+            });
           }
-          return {
-            ok: true,
-            json: async () => ({
-              data: {
-                issues: {
-                  nodes: [
-                    {
-                      id: 'issue-9',
-                      identifier: 'JOV-9',
-                      description: escapedDefectEvidence(),
-                      labels: { nodes: [{ name: 'escaped-defect' }] },
-                      comments: { nodes: [] },
-                      team: {
-                        states: {
-                          nodes: [{ id: 'done-id', name: 'Done' }],
-                        },
+          return Response.json({
+            data: {
+              issues: {
+                nodes: [
+                  {
+                    id: 'issue-9',
+                    identifier: 'JOV-9',
+                    description: escapedDefectEvidence(),
+                    labels: { nodes: [{ name: 'escaped-defect' }] },
+                    comments: { nodes: [] },
+                    team: {
+                      states: {
+                        nodes: [{ id: 'done-id', name: 'Done' }],
                       },
                     },
-                  ],
-                },
+                  },
+                ],
               },
-            }),
-          };
+            },
+          });
         },
       });
       assert.deepEqual(transitioned, { identifier: 'JOV-9', state: 'Done' });

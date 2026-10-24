@@ -50,7 +50,7 @@ export function PricingRecipeBody({
           sectionOwner='apps/web/components/organisms/PricingRecipeBody.tsx'
           headline='Pricing'
           logos={false}
-          subtitle={`Jovie profiles are free forever. Artist Presence is ${proMonthlyPrice} with limited access.`}
+          subtitle={`Jovie profiles are free forever. ${proClaim.displayName} is ${proMonthlyPrice}, self-serve.`}
           primaryCta={{
             label: freeClaim.ctaLabel,
             href: freeClaim.ctaHref,

@@ -2,6 +2,7 @@ import {
   APP_ROUTES,
   buildSpotifyCatalogConnectionRoute,
 } from '@/constants/routes';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import {
   rankSocialInboxDrafts,
   type SocialInboxRankingPreferences,
@@ -83,7 +84,7 @@ function primaryActionLabelFor(
 
 function titleFromPayload(payload: unknown, category?: string): string {
   const fallback =
-    category === 'report' ? 'Experiment result' : 'Untitled suggestion';
+    category === 'report' ? 'Experiment result' : COPY_FALLBACKS.suggestion;
   if (!payload || typeof payload !== 'object') {
     return fallback;
   }

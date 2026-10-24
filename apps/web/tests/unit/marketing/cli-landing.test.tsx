@@ -189,8 +189,8 @@ describe('CLI landing page', () => {
       item => item.question === 'Which Node.js version does it need?'
     );
 
-    expect(packageJson.engines?.node).toBe('>=24.21.0');
-    expect(nodeFaq?.answer).toContain('Node.js 24.21.0');
+    expect(packageJson.engines?.node).toBe('>=24.22.1');
+    expect(nodeFaq?.answer).toContain('Node.js 24.22.1');
     expect(nodeFaq?.answer).toContain('including Node 26');
     expect(nodeFaq?.answer).toContain('published package engines field');
   });

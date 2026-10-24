@@ -38,6 +38,9 @@ async function gotoWithRetry(
       const message = error instanceof Error ? error.message : String(error);
       const isTransient =
         message.includes('ERR_ABORTED') ||
+        // Firefox reports an interrupted navigation (client redirect) as
+        // NS_BINDING_ABORTED, Chromium as net::ERR_ABORTED.
+        message.includes('NS_BINDING_ABORTED') ||
         message.includes('frame was detached') ||
         message.includes('ERR_CONNECTION_RESET') ||
         message.includes('Timeout');
@@ -141,7 +144,18 @@ test.describe('API failure resilience', () => {
     );
     test.setTimeout(120_000);
 
+    // Legacy audience endpoints (visit/click/opt-in) and the current audience
+    // list data endpoint (/api/dashboard/audience/** used by
+    // useAudienceInfiniteQuery) both fail — the page must show error UI, not
+    // a blank surface (JOV-8791).
     await page.route('**/api/audience/**', route => {
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Service unavailable' }),
+      });
+    });
+    await page.route('**/api/dashboard/audience/**', route => {
       route.fulfill({
         status: 500,
         contentType: 'application/json',
@@ -258,8 +272,12 @@ test.describe('Rapid navigation resilience', () => {
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes('Timeout') || msg.includes('net::ERR_')) {
-          continue; // transient under load — skip
+        if (
+          msg.includes('Timeout') ||
+          msg.includes('net::ERR_') ||
+          msg.includes('NS_BINDING_ABORTED')
+        ) {
+          continue; // transient under load or interrupted by a redirect
         }
         failures.push(`${path}: ${msg}`);
         continue;
@@ -313,7 +331,7 @@ test.describe('Auth expiry resilience', () => {
     await ensureSignedInUser(page);
 
     // Verify we're authenticated
-    const dashResponse = await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+    const dashResponse = await gotoWithRetry(page, APP_ROUTES.CHAT, {
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });
@@ -323,14 +341,17 @@ test.describe('Auth expiry resilience', () => {
       return;
     }
 
-    // Simulate session expiry by clearing Clerk cookies
+    // Simulate session expiry by clearing the Better Auth session cookies
+    // (better-auth.*, __Secure-better-auth.*, __Host-better-auth.*). The old
+    // Clerk names (__session/__client) no longer exist, so clearing them left
+    // the session intact.
     await page.context().clearCookies({
-      name: /^__(session|client|clerk)/,
+      name: /^(__Secure-|__Host-)?better-auth\./,
     });
 
     // Navigate to a protected route — should redirect gracefully
     try {
-      await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+      await gotoWithRetry(page, APP_ROUTES.CHAT, {
         waitUntil: 'domcontentloaded',
         timeout: 60_000,
       });
