@@ -1064,7 +1064,7 @@ function runProofReuse({
   runs,
   ghFails = false,
   sha = 'a'.repeat(40),
-  quota = '5000 1700000300',
+  quota = '5000',
 }) {
   const step = sourceValidationWorkflow().jobs.deterministic.steps.find(
     candidate => candidate.id === 'reuse'
@@ -1080,7 +1080,6 @@ function runProofReuse({
     );
     writeFileSync(join(root, 'quota'), quota);
     for (const [name, script] of Object.entries({
-      date: 'printf "1700000000\\n"',
       sleep: `printf '%s\\n' "$*" >> "${root}/sleep.log"`,
     }))
       writeFileSync(join(bin, name), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
@@ -1157,29 +1156,15 @@ test('a metadata-only edit reuses the newest green exact-head proof', () => {
   );
 });
 
-test('quota preflight uses the shared client and waits only for a near reset', () => {
-  const result = runProofReuse({
-    runs: [proofRun(400, 'success')],
-    quota: '10 1700000300',
-  });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(
-    result.budgeted,
-    true,
-    'preflight must record shared-client admission'
-  );
-  assert.equal(result.sleeps, '300\n');
-  assert.equal(result.output, 'reuse=true\nproof_run=400\n');
-  assert.match(result.summary, /waited 300s/);
-});
-
-test('low quota with a distant or expired reset runs full validation without a lookup', () => {
-  for (const reset of ['1700000901', '1700000000']) {
-    const result = runProofReuse({
-      runs: [proofRun(400, 'success')],
-      quota: `10 ${reset}`,
-    });
+test('low quota uses shared admission and immediately runs full validation without a lookup', () => {
+  for (const quota of ['0', '10', '49']) {
+    const result = runProofReuse({ runs: [proofRun(400, 'success')], quota });
     assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      result.budgeted,
+      true,
+      'preflight must record shared-client admission'
+    );
     assert.equal(result.output, 'reuse=false\nproof_run=\n');
     assert.equal(result.sleeps, '');
     assert.doesNotMatch(result.ghLog, /actions\/workflows/);
@@ -1188,12 +1173,7 @@ test('low quota with a distant or expired reset runs full validation without a l
 });
 
 test('healthy or unreadable quota never bypasses exact-head proof selection', () => {
-  for (const quota of [
-    '50 1700000300',
-    'unreadable',
-    '10 null',
-    '10 1700000000+bad',
-  ]) {
+  for (const quota of ['50', '5000', 'unreadable', 'null', '10+bad']) {
     const result = runProofReuse({ runs: [proofRun(400, 'failure')], quota });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.output, 'reuse=false\nproof_run=\n');
