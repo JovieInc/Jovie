@@ -124,7 +124,7 @@ class MergeEvidenceTest(unittest.TestCase):
     def test_initial_remote_state_does_not_claim_zero_merges(self):
         sample = model(github=hud.Remote(None).github)
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertIn("MERGED 24h  ? unknown", text)
         self.assertIn("not-read-yet", text)
         self.assertNotIn("total 0 in 24h", text)
         self.assertIn("landed unknown", text)
@@ -141,7 +141,7 @@ class MergeEvidenceTest(unittest.TestCase):
         sample = model()
         sample["github"]["mergedWindow"] = {"complete": False, "reason": "unstable_snapshot"}
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertIn("MERGED 24h  ? unknown", text)
         self.assertNotIn("total 2 in 24h", text)
         self.assertNotIn("#18671", text)
 
@@ -150,7 +150,7 @@ class MergeEvidenceTest(unittest.TestCase):
         sample["github"]["errors"]["merged"] = "merged-pr-evidence:unstable_snapshot"
         sample["github"]["merged24h"] = []
         text = "\n".join(plain(line) for line in hud.render(sample, width=200))
-        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertIn("MERGED 24h  ? unknown", text)
         self.assertNotIn("total 0 in 24h", text)
         self.assertIn("landed unknown", text)
 
@@ -220,7 +220,7 @@ class MergeEvidenceTest(unittest.TestCase):
         self.assertIn("stale", hud.github_source_error(result, "merged", later))
         with mock.patch.object(hud, "utcnow", return_value=later):
             text = "\n".join(plain(row) for row in hud.render(model(github=result), 200, 45))
-        self.assertIn("RECENTLY MERGED · unknown", text)
+        self.assertIn("MERGED 24h  ? unknown", text)
         self.assertNotIn("total 0 in 24h", text)
 
     def test_truncated_queue_is_unknown_not_partial_membership(self):
@@ -425,7 +425,7 @@ class PipelineAccuracyTest(unittest.TestCase):
                 self.assertIn("merge queue unknown", text)
                 self.assertNotIn("#18724", text)
                 self.assertNotIn("in queue", text)
-                self.assertIn("RECENTLY MERGED · unknown", text)
+                self.assertIn("MERGED 24h  ? unknown", text)
 
     def test_failed_queue_read_does_not_reuse_cached_membership(self):
         value = self.sample(queued=True)
@@ -505,9 +505,9 @@ class RenderTest(unittest.TestCase):
     def test_running_and_vacant_slots_are_truthful(self):
         text = "\n".join(plain(line) for line in hud.render(model(), 160, 45))
         self.assertIn("1 running / 3 (devin 1/2 · codex 0/1)", text)
-        self.assertIn("JOV-6544   Audio browsing: verify and close intent prefetch", text)
+        self.assertRegex(text, r"JOV-6544  +issue +agent +\S+ +Audio browsing: verify and close intent prefetch")
         self.assertIn("worker polling · new issues unknown (doctor unread)", text)
-        self.assertIn("codex  vacant · no worker", text)
+        self.assertIn("codex      vacant · no worker", text)
         self.assertIn("✓ alpha 48% left · reset 10m · banked 2", text)
         self.assertIn("✕ beta 0% left · reset 1h30m · banked 1 · retry 1h30m", text)
         self.assertIn("● gamma 90% left · reset 2h00m · banked 0 · leased", text)
@@ -531,7 +531,7 @@ class RenderTest(unittest.TestCase):
                         "forecast": {"projectedUnused": None}, "route": {"selectedJob": "JOV-9"},
                         "freshness": {"status": "stale"}}]}
         text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
-        self.assertIn("CAPACITY HORIZON", text)
+        self.assertIn(" CAPACITY ", text)
         self.assertIn("alpha ? · banked ? · natural reset ? · drain ? @ ? · unused ? · coverage ? · UNKNOWN · selection unknown · stale", text)
         self.assertIn("show-only", text)
 
@@ -558,7 +558,7 @@ class RenderTest(unittest.TestCase):
                 with self.subTest(key=key, stamp=stamp), mock.patch.object(hud, "utcnow", return_value=now):
                     target[key] = stamp
                     text = "\n".join(plain(line) for line in hud.render(value, 200, 45))
-                    self.assertIn("CAPACITY HORIZON  unknown", text)
+                    self.assertIn("CAPACITY    unknown", text)
                     self.assertNotIn("alpha 48%", text)
                     self.assertNotIn("NORMAL", text)
             target[key] = now.isoformat()
@@ -626,7 +626,7 @@ class RenderTest(unittest.TestCase):
         self.assertIn("THROUGHPUT 24h · codex offer 0", text)
         self.assertIn("devin offer 1 start 1 productive 1 PR 1 first-pass 100%", text)
         self.assertIn("disk 3.1% free", text)
-        self.assertIn("FILE OVERLAP  enforce · active 1 · prevented 2 · flags 3 · rebases 1", text)
+        self.assertIn("OVERLAP     enforce · active 1 · prevented 2 · flags 3 · rebases 1", text)
         self.assertIn("pr:#20141 → pr:#20166 stack scripts/lanes/lane_runner.py", text)
 
     def test_failed_sources_render_their_reason_never_a_blank(self):
@@ -642,7 +642,7 @@ class RenderTest(unittest.TestCase):
         self.assertIn("new issues unknown (doctor unread)", text)
         self.assertIn("FileNotFoundError: codex", text)
         self.assertIn("no alerts recorded", text)
-        self.assertNotIn("CAPACITY HORIZON", text, "a broken codex lane is not an unknown capacity horizon")
+        self.assertNotIn(" CAPACITY ", text, "a broken codex lane is not an unknown capacity horizon")
         self.assertIn("CONSTRAINT ? UNKNOWN   evidence · lanes-status unread", text)
 
     def test_stale_remote_reads_are_flagged_in_the_header(self):
@@ -663,7 +663,7 @@ class RenderTest(unittest.TestCase):
             "rejectedByProvider": {"devin": {"excluded-label:type:epic": 5, "sensitive-text": 3}}})
         text = "\n".join(plain(line) for line in hud.render(value, 160, 45))
         self.assertIn("new issues 0 · eligible 0/8 · PRs 0/8 within-budget · excluded-label:type:epic 5, sensitive-text 3", text)
-        self.assertIn("NEW ISSUES devin", text)
+        self.assertIn("NEW ISSUES  devin", text)
         self.assertNotIn("pool 87", text)
         # An unrelated direct Linear read failure does not invalidate the fresh receipt.
         value["linear"] = {"ok": False, "error": "HTTP 429"}
@@ -1198,7 +1198,7 @@ class PromotionTest(unittest.TestCase):
         self.assertIn("first-pass 74% · ejected→back p75 365m (2 waiting) · open→enqueue p75 106.7m", text)
         self.assertIn("opens/h 12.6 vs merges/h 7.3 · CLEAN not queued 6 · keys >1 PR 10", text)
         self.assertIn("queue entries/merge 2.2", text)
-        self.assertIn("PROMOTION 8h  unread", plain(hud.promotion_line(None)))
+        self.assertIn("PROMO 8h    ✕ unread", plain(hud.promotion_line(None)))
         self.assertIn("boom", plain(hud.promotion_line({"error": "boom"})))
 
     def test_model_runs_the_script_once_per_interval_and_reports_failures(self):
@@ -1563,6 +1563,22 @@ class FrameSnapshotTest(unittest.TestCase):
                     path.parent.mkdir(exist_ok=True)
                     path.write_text(text)
                 self.assertEqual(text, path.read_text())
+
+    def test_legacy_frames_match_snapshots(self):
+        """tty1 runs the legacy layout; pin its whole frame so display changes are reviewed."""
+        update = bool(hud.os.environ.get("HUD_UPDATE_SNAPSHOTS"))
+        for name in FIXTURE_NAMES:
+            for width, height in SNAPSHOT_SIZES:
+                value, now = fixture(name)
+                frame = hud.render(value, width, height, now=now)
+                with self.subTest(fixture=name, size=f"{width}x{height}"):
+                    self.assertEqual(len(frame), height)
+                    self.assertTrue(all(hud.visible(row) == width for row in frame))
+                    text = "\n".join(plain(row).rstrip() for row in frame) + "\n"
+                    path = FIXTURES / "__snapshots__" / f"legacy-{name}-{width}x{height}.txt"
+                    if update:
+                        path.write_text(text)
+                    self.assertEqual(text, path.read_text())
 
     def test_every_frame_fills_the_grid_with_console_font_glyphs_only(self):
         for name, width, height, frame in self.frames():
