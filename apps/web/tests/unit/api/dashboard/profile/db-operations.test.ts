@@ -153,7 +153,7 @@ describe('updateProfileRecords exact-profile CAS', () => {
       profileId: 'profile-a',
       dbProfileUpdates: {
         location: 'Austin, TX',
-        settings: { hometown: 'Tulsa, OK' },
+        settings: { hometown: 'Tulsa, OK', searchable: false },
       },
       usernameUpdate: undefined,
       expectedVersion: 1,
@@ -163,7 +163,11 @@ describe('updateProfileRecords exact-profile CAS', () => {
     expect(result).not.toBeInstanceOf(NextResponse);
     expect(updates[0]?.values).toMatchObject({
       location: 'Austin, TX',
-      settings: { hide_branding: false, hometown: 'Tulsa, OK' },
+      settings: {
+        hide_branding: false,
+        hometown: 'Tulsa, OK',
+        searchable: false,
+      },
     });
     const conditions = (predicates[0] as { conditions: unknown[] }).conditions;
     expect(conditions.slice(0, 2)).toEqual([

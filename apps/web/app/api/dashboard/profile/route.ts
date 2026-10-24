@@ -211,6 +211,9 @@ export async function PUT(req: Request) {
         updatedProfile,
         oldUsernameNormalized,
         clerkUserId: appUserId,
+        privacyChanged:
+          parsedUpdates.isPublic !== undefined ||
+          parsedUpdates.settings?.searchable !== undefined,
       }),
     ]);
 

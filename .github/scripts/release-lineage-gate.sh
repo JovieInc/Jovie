@@ -62,19 +62,34 @@ emit() {
 # successor_skip_reason. Production Controller run names are
 # "Production Controller <staging run name>"; staging run names are
 # "<sha> from CI <id> attempt <n>".
+# gh-api-hold.sh announces a rate-limit hold on stderr. These call sites used
+# to discard stderr, hiding multi-minute holds. Re-print only the hold
+# notices (prefix filter; never the rest of gh's stderr).
+emit_hold_notices() {
+  [ -s "$1" ] || return 0
+  grep -E -e '^::warning::Holding [0-9]+s for the GitHub rate limit reset\.$' \
+    -e '^::notice title=GitHub API hold::label=[A-Za-z0-9 ._/@-]* http=[a-z0-9]+ wait_s=[0-9]+ reset_epoch=[0-9]+ reset_iso=[0-9A-Za-z:-]+ bucket=[A-Za-z_]+ bucket_source=[A-Za-z_.-]+( limit=[0-9]+)?( remaining=[0-9]+)?$' \
+    "$1" >&2 || true
+}
+
 successor_scan_limit="${SUCCESSOR_SCAN_LIMIT:-10}"
 successor_skip_reason=""
 successor_shippable() {
-  local title="$1" staging_title staging_run staging_id staging_attempt artifact_id outcome zip
+  local title="$1" staging_title staging_run staging_id staging_attempt artifact_id outcome zip hold_err
   successor_skip_reason=""
   [[ "$title" =~ ^Production\ Controller\ ([0-9a-f]{40})\ from\ CI\ [1-9][0-9]*\ attempt\ [1-9][0-9]*$ ]] || return 0
   local successor_sha="${BASH_REMATCH[1]}"
   staging_title="${title#Production Controller }"
   if [ -z "$staging_runs_json" ]; then
-    staging_runs_json="$("$gh_cli" api "repos/$repository/actions/workflows/staging-controller.yml/runs?branch=main&event=workflow_run&per_page=50" 2>/dev/null)" || {
+    hold_err="$(mktemp)"
+    staging_runs_json="$("$gh_cli" api "repos/$repository/actions/workflows/staging-controller.yml/runs?branch=main&event=workflow_run&per_page=50" 2>"$hold_err")" || {
+      emit_hold_notices "$hold_err"
+      rm -f "$hold_err"
       staging_runs_json='{"workflow_runs":[]}'
       return 0
     }
+    emit_hold_notices "$hold_err"
+    rm -f "$hold_err"
   fi
   staging_run="$(jq -c --arg title "$staging_title" '
     [(.workflow_runs // [])[] | select(.display_title == $title and .status == "completed")]
@@ -88,20 +103,26 @@ successor_shippable() {
   staging_id="$(jq -r '.id' <<<"$staging_run")"
   staging_attempt="$(jq -r '.run_attempt' <<<"$staging_run")"
   [[ "$staging_id" =~ ^[1-9][0-9]*$ && "$staging_attempt" =~ ^[1-9][0-9]*$ ]] || return 0
-  artifact_id="$("$gh_cli" api "repos/$repository/actions/runs/$staging_id/artifacts?per_page=100" 2>/dev/null |
+  hold_err="$(mktemp)"
+  artifact_id="$("$gh_cli" api "repos/$repository/actions/runs/$staging_id/artifacts?per_page=100" 2>"$hold_err" |
     jq -r --arg name "staging-completion-$staging_attempt" '
       [(.artifacts // [])[] | select(.name == $name and .expired == false)]
       | if length == 1 then .[0].id else empty end
     ' 2>/dev/null || true)"
+  emit_hold_notices "$hold_err"
+  rm -f "$hold_err"
   [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] || return 0
   zip="$(mktemp)"
-  if "$gh_cli" api "repos/$repository/actions/artifacts/$artifact_id/zip" >"$zip" 2>/dev/null; then
+  hold_err="$(mktemp)"
+  if "$gh_cli" api "repos/$repository/actions/artifacts/$artifact_id/zip" >"$zip" 2>"$hold_err"; then
+    emit_hold_notices "$hold_err"
     outcome="$(unzip -p "$zip" staging-completion.json 2>/dev/null |
       jq -r --arg sha "$successor_sha" 'if .sha == $sha then .outcome else empty end' 2>/dev/null || true)"
   else
+    emit_hold_notices "$hold_err"
     outcome=""
   fi
-  rm -f "$zip"
+  rm -f "$zip" "$hold_err"
   if [ "$outcome" = superseded ]; then
     successor_skip_reason="staging $staging_id finished superseded"
     return 1
@@ -156,6 +177,7 @@ gh_retry() {
     gh_retry_http=""
     gh_retry_message=""
     text="$("$gh_cli" "$@" 2>"$err")" || gh_retry_status=$?
+    emit_hold_notices "$err"
     if [ "$gh_retry_status" -eq 0 ]; then
       rm -f "$err"
       printf '%s\n' "$text"
