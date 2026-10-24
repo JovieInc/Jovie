@@ -327,6 +327,23 @@ describe('ProfileCompactSurface', () => {
     expect(screen.queryByTestId('profile-proof-claim-bar')).toBeNull();
   });
 
+  it('renders Jovie footer branding on the free public profile (JOV-8777)', () => {
+    renderSurface();
+
+    const branding = screen.getByTestId('profile-jovie-branding');
+    const link = within(branding).getByRole('link', { name: /Jovie home/i });
+    expect(link).toHaveAttribute(
+      'href',
+      `/?utm_source=profile&utm_artist=${artist.handle}`
+    );
+  });
+
+  it('omits Jovie footer branding when hideJovieBranding is set (JOV-8777)', () => {
+    renderSurface({ hideJovieBranding: true });
+
+    expect(screen.queryByTestId('profile-jovie-branding')).toBeNull();
+  });
+
   it('hides the bottom tab bar in static previews so it cannot cover clipped content (JOV-7192)', () => {
     renderSurface({ renderMode: 'preview', presentation: 'embedded' });
 
