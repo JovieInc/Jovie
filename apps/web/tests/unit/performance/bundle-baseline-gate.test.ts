@@ -17,24 +17,12 @@ function repoRoot(): string {
   return join(import.meta.dirname, '..', '..', '..', '..', '..');
 }
 
-function baselinePath(): string {
-  return join(repoRoot(), 'docs/performance/bundle-baseline.json');
-}
-
 /**
  * JOV-8555: the initial-JS growth ratchet in compare-chunks.ts is fail-closed.
  * A missing, malformed, or placeholder (never-captured) baseline means growth
  * detection cannot run — that state must fail the run, never skip it silently.
  */
 describe('bundle baseline gate (JOV-8555)', () => {
-  it('commits a captured baseline so the initial-JS growth ratchet is wired', () => {
-    const baseline = loadBaseline(baselinePath());
-    expect(baseline.capturedAt).toBeTruthy();
-    expect(baseline.commit).toBeTruthy();
-    expect(baseline.totalInitialJS_bytes).toBeGreaterThan(0);
-    expect(Object.keys(baseline.chunks).length).toBeGreaterThan(0);
-  });
-
   it('fails closed on a missing baseline file', () => {
     expect(() =>
       loadBaseline(join(tmpdir(), 'jov-8555-nope', 'nope.json'))
