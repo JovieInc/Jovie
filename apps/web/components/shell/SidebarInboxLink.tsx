@@ -39,7 +39,7 @@ export function SidebarInboxLink({
           <span
             data-runtime-update={hasRuntimeUpdate || undefined}
             aria-hidden='true'
-            className='absolute right-1 top-1 size-1.5 rounded-full bg-accent'
+            className='absolute bottom-1 right-1 size-1.5 rounded-full bg-accent'
           />
         ) : null}
       </Link>
