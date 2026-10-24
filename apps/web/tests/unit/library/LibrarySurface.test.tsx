@@ -1844,6 +1844,28 @@ describe('LibrarySurface', () => {
     }
   });
 
+  it('renders full artist values and the EP type label in table rows (JOV-8963)', () => {
+    const longBilling =
+      'A Really Long Collaborative Artist Billing That Must Stay Visible';
+    renderLibrary([
+      buildAsset({
+        artist: longBilling,
+        releaseType: 'ep',
+      }),
+    ]);
+    fireEvent.click(screen.getByRole('radio', { name: 'Table View' }));
+
+    const row = screen.getByTestId('library-catalog-row-release-1');
+    // The artist column shows the whole value on one line instead of
+    // truncating it.
+    const artistCell = within(row).getByTitle(longBilling);
+    expect(artistCell.textContent).toBe(longBilling);
+    expect(artistCell.className).toContain('whitespace-nowrap');
+    expect(artistCell.className).not.toContain('truncate');
+    // EP is the data label, never title-cased to "Ep".
+    expect(within(row).getByTitle('EP').textContent).toBe('EP');
+  });
+
   it('keeps asset-type tabs and smart filters working in table mode (JOV-4846)', () => {
     renderLibrary([
       buildAsset(),
@@ -2101,7 +2123,7 @@ describe('LibrarySurface', () => {
       /^Album · 2026$/u
     );
     expect(screen.getByTestId('library-card-meta-release-2')).toHaveTextContent(
-      /^Ep$/u
+      /^EP$/u
     );
   });
 
