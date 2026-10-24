@@ -151,7 +151,7 @@ surfaces:
     last_reviewed: 2026-05-10
 
   - id: public-profile-isr
-    surface: Public profile ISR rendering
+    surface: Public profile publication and rendering
     glob: apps/web/app/[username]/**
     key_ranges: []
     blast_radius: 4
@@ -163,10 +163,11 @@ surfaces:
     last_incident: null
     lessons_ref: null
     notes: >-
-      1h revalidate with cache-tag invalidation. SSR/ISR rendering must not
-      crash on minimal/maximal profile shapes. Visual regression already covers
+      Fresh publication per request; shared cached successes cannot authorize
+      profile disclosure after withdrawal or storage failure (JOV-8629).
+      Rendering must handle minimal/maximal profile shapes. Visual regression already covers
       public/[username] light/dark/mobile in tests/e2e/visual-regression.spec.ts.
-    last_reviewed: 2026-05-10
+    last_reviewed: 2026-10-24
 
   - id: claim-onboarding
     surface: Onboarding & profile claim flow
