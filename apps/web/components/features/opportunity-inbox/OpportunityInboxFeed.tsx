@@ -146,6 +146,7 @@ export function OpportunityInboxFeed({
                 id={card.id}
                 state={mapCardState(card.status)}
                 title={card.title}
+                entity={card.entity}
                 metadata={card.why}
                 hideDot={false}
                 primaryActionLabel={

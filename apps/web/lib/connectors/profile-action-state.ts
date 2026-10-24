@@ -97,6 +97,7 @@ export async function loadProfileActionState(input: {
   const [profile] = await db
     .select({
       id: creatorProfiles.id,
+      displayName: creatorProfiles.displayName,
       bio: creatorProfiles.bio,
       avatarUrl: creatorProfiles.avatarUrl,
       username: creatorProfiles.username,
@@ -200,6 +201,12 @@ export async function loadProfileActionState(input: {
       order by ${socialLinks.id}), '[]'::jsonb) from ${socialLinks}
       where ${socialLinks.creatorProfileId} = ${profile.id}) = ${JSON.stringify(linkRows)}::jsonb`;
   return {
+    entity: {
+      kind: 'profile' as const,
+      id: profile.id,
+      label: profile.displayName?.trim() || profile.username,
+      ...(profile.avatarUrl ? { imageUrl: profile.avatarUrl } : {}),
+    },
     target,
     values,
     canonicalRevision,

@@ -12,6 +12,38 @@ describe('OpportunityRow', () => {
     onDismiss: vi.fn(),
   };
 
+  it.each(['artist', 'release', 'track', 'profile'] as const)(
+    'renders a shared %s identity and preserves the opportunity action target',
+    kind => {
+      const onPrimaryAction = vi.fn();
+      render(
+        <OpportunityRow
+          {...baseProps}
+          onPrimaryAction={onPrimaryAction}
+          entity={{ kind, id: 'entity-1', label: 'A Long Entity Name' }}
+        />
+      );
+      expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
+        'A Long Entity Name'
+      );
+      expect(
+        screen
+          .getByTestId('entity-header')
+          .querySelector('[data-entity-header-thumbnail-variant]')
+      ).toHaveAttribute(
+        'data-entity-header-thumbnail-variant',
+        kind === 'artist' || kind === 'profile' ? 'person' : 'artwork'
+      );
+      fireEvent.click(screen.getByLabelText('Plan Opportunity'));
+      expect(onPrimaryAction).toHaveBeenCalledWith('row-1');
+    }
+  );
+
+  it('does not invent identity for a row without entity context', () => {
+    render(<OpportunityRow {...baseProps} />);
+    expect(screen.queryByTestId('entity-header')).not.toBeInTheDocument();
+  });
+
   it('renders title and metadata', () => {
     render(<OpportunityRow {...baseProps} />);
     expect(

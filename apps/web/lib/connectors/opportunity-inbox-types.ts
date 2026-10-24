@@ -80,10 +80,19 @@ export interface OpportunityInboxReportData {
   readonly nextStep: OpportunityInboxReportNextStep | null;
 }
 
+/** Source-owned entity context; display only, never an action target. */
+export interface OpportunityInboxEntity {
+  readonly kind: 'artist' | 'release' | 'track' | 'profile';
+  readonly id: string;
+  readonly label: string;
+  readonly imageUrl?: string;
+}
+
 export interface OpportunityInboxCardViewModel {
   readonly id: string;
   /** Persisted suggested_action kind, used for durable founder-review binding. */
   readonly sourceKind?: string;
+  readonly entity?: OpportunityInboxEntity;
   readonly signalType: OpportunitySignalType;
   readonly typeLabel: string;
   readonly createdAt: string;

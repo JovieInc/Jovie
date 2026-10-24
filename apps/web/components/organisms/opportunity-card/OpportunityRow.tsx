@@ -1,6 +1,10 @@
 'use client';
 
 import { type TouchEvent as ReactTouchEvent, useCallback, useRef } from 'react';
+import {
+  EntityHeader,
+  EntityHeaderThumbnail,
+} from '@/components/molecules/drawer/EntityHeader';
 import { cn } from '@/lib/utils';
 import type { OpportunityRowProps, OpportunityRowState } from './types';
 
@@ -64,6 +68,7 @@ export function OpportunityRow({
   id,
   state,
   title,
+  entity,
   metadata,
   hideDot = false,
   onPrimaryAction,
@@ -149,6 +154,25 @@ export function OpportunityRow({
 
         {/* Type column — two lines */}
         <div className='flex min-w-0 flex-1 flex-col gap-0.5'>
+          {entity ? (
+            <EntityHeader
+              title={entity.label}
+              titleLineClamp={1}
+              thumbnail={
+                <EntityHeaderThumbnail
+                  variant={
+                    entity.kind === 'artist' || entity.kind === 'profile'
+                      ? 'person'
+                      : 'artwork'
+                  }
+                  src={entity.imageUrl}
+                  name={entity.label}
+                  alt=''
+                  size={28}
+                />
+              }
+            />
+          ) : null}
           {/* Line 1: Title — 13px semi-bold (--text-app) */}
           <span
             className={cn(

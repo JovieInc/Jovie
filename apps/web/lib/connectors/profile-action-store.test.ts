@@ -7,6 +7,7 @@ import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { db } from '@/lib/db';
 import type { NewSuggestedAction } from '@/lib/db/schema/connectors';
 import { unknownArtistProfileContract } from './artist-profile-contract';
+import { mapSuggestedActionToInboxCard } from './opportunity-inbox-mapper';
 import {
   parseProfileAction,
   profileActionPayloadSchema,
@@ -128,6 +129,7 @@ let account = {
 };
 let profile = {
   id: PROFILE,
+  displayName: null as string | null,
   bio: 'Canonical bio',
   avatarUrl: null,
   username: 'artist',
@@ -254,6 +256,7 @@ beforeEach(() => {
   manifest = readyManifest();
   profile = {
     id: PROFILE,
+    displayName: null,
     bio: 'Canonical bio',
     avatarUrl: null,
     username: 'artist',
@@ -284,6 +287,20 @@ beforeEach(() => {
 });
 
 describe('exact-revision profile proposals and consent', () => {
+  it('uses the canonical display name for Inbox identity independently of proposed values', async () => {
+    profile.displayName = 'Canonical Artist';
+    const saved = await proposal();
+    expect(
+      mapSuggestedActionToInboxCard({
+        id: saved.id,
+        kind: saved.kind,
+        payload: saved.payload,
+        rationale: 'Review Profile',
+        createdAt: new Date('2026-10-24T00:00:00Z'),
+      }).entity
+    ).toEqual({ kind: 'profile', id: PROFILE, label: 'Canonical Artist' });
+  });
+
   it.each([PROFILE_ACCEPT_OBSERVATION_KIND, PROFILE_WRITE_DESTINATION_KIND])(
     'persists a validated %s preview and consent without dispatching side effects',
     async kind => {
@@ -294,6 +311,20 @@ describe('exact-revision profile proposals and consent', () => {
         sourceRefs: ['fixture:source'],
         status: 'pending',
         sideEffects: [],
+      });
+      expect(
+        mapSuggestedActionToInboxCard({
+          id: saved.id,
+          kind: saved.kind,
+          payload: saved.payload,
+          rationale: 'Review Profile',
+          createdAt: new Date('2026-10-24T00:00:00Z'),
+        }).entity
+      ).toEqual({
+        kind: 'profile',
+        id: PROFILE,
+        label: profile.username,
+        ...(profile.avatarUrl ? { imageUrl: profile.avatarUrl } : {}),
       });
       expect(saved.payload.proposal).toMatchObject({
         target: {

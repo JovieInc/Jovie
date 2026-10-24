@@ -128,3 +128,20 @@ export const Loading: Story = {
     </div>
   ),
 };
+
+/** Shared identity context for the four entity kinds, including missing media. */
+export const EntityContext: Story = {
+  ...Default,
+  args: {
+    ...Default.args,
+    cards: (['artist', 'release', 'track', 'profile'] as const).map(kind => ({
+      ...baseCard,
+      id: `entity-${kind}`,
+      entity: {
+        kind,
+        id: `${kind}-1`,
+        label: `${kind[0].toUpperCase()}${kind.slice(1)} Name`,
+      },
+    })),
+  },
+};
