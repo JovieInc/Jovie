@@ -1,21 +1,64 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { withDashboardProviders } from '@/.storybook/dashboard-fixtures';
+import { useEffect } from 'react';
+import { expect, waitFor } from 'storybook/test';
+import {
+  DashboardStoryProviders,
+  DEFAULT_DASHBOARD_DATA,
+} from '@/.storybook/dashboard-fixtures';
 import { withSignedInSession } from '@/.storybook/signed-in-session';
-import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import {
+  PreviewPanelProvider,
+  usePreviewPanelState,
+} from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { PreviewDataHydrator } from '../PreviewDataHydrator';
 import { ProfileContactSidebar } from './ProfileContactSidebar';
+
+const profileFixture = DEFAULT_DASHBOARD_DATA.selectedProfile;
+if (!profileFixture)
+  throw new Error('The dashboard profile fixture is required.');
+const dashboardData = {
+  ...DEFAULT_DASHBOARD_DATA,
+  selectedProfile: {
+    ...profileFixture,
+    username: 'sashawaves',
+    usernameNormalized: 'sashawaves',
+    displayName: 'Sasha Waves',
+  },
+};
+
+/** Exercise an explicitly opened rail; defaultOpen only opens on desktop. */
+function OpenProfileRail() {
+  const { open } = usePreviewPanelState();
+  useEffect(() => open(), [open]);
+  return null;
+}
 
 const meta = {
   title: 'Dashboard/ProfileContactSidebar',
   component: ProfileContactSidebar,
   parameters: { layout: 'fullscreen' },
-  decorators: [withDashboardProviders, withSignedInSession],
+  play: async ({ canvasElement }) => {
+    await waitFor(() => {
+      expect(
+        canvasElement.ownerDocument.getElementById('shell-artist-profile-rail')
+      ).toHaveAttribute('aria-hidden', 'false');
+    });
+  },
+  decorators: [
+    Story => (
+      <DashboardStoryProviders dashboardData={dashboardData}>
+        <Story />
+      </DashboardStoryProviders>
+    ),
+    withSignedInSession,
+  ],
 } satisfies Meta<typeof ProfileContactSidebar>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Loading: Story = {
   render: () => (
     <PreviewPanelProvider defaultOpen>
+      <OpenProfileRail />
       <ProfileContactSidebar />
     </PreviewPanelProvider>
   ),
@@ -23,6 +66,7 @@ export const Loading: Story = {
 export const Hydrated: Story = {
   render: () => (
     <PreviewPanelProvider defaultOpen>
+      <OpenProfileRail />
       <PreviewDataHydrator initialLinks={[]} connectedDSPs={[]} />
       <ProfileContactSidebar />
     </PreviewPanelProvider>

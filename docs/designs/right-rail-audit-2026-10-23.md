@@ -1,7 +1,7 @@
 # Web right-rail and table IA audit — 2026-10-23
 
 Scope: Jovie web product, including operator/admin surfaces and every table family.
-Source baseline: `664d6de81` (`origin/main` at inspection). No Linear issue — ad-hoc.
+Source baseline: `664d6de81` (`origin/main` at inspection). Started as no Linear issue — ad-hoc; publication attribution is now [JOV-8943](https://linear.app/jovie/issue/JOV-8943).
 This is a source inventory plus the bounded rendered verification recorded below;
 uninspected runtime states are not certified by source inspection.
 
@@ -197,4 +197,25 @@ Remaining product items are tracked in [JOV-8920](https://linear.app/jovie/issue
 - Biome lint: all 8 touched code/test files passed; no fixes applied.
 - ESLint: all 8 touched code/test files passed with `--max-warnings=0`.
 - `git diff --check` and `python3 scripts/repository_docs.py` passed.
-- Coverage, final committed-diff component qualification, full web typecheck, and rendered baseline/candidate evidence are pending. The pre-commit component-gate result with no changed committed components is not a qualification receipt for this change.
+- Exact CI coverage planner/runner: 100 files passed, 1 existing skipped; 956 tests passed, 7 existing skipped. Changed-line check: **105/105, 100%**, against the unchanged 60% floor. Scoped source coverage: 77.32% lines, 65.99% branches, 73.55% functions.
+- Full web typecheck passed on the implementation commit. The earlier concurrent run had loaded the pre-implementation interface; the final incremental check validated the committed source.
+- Rendered source comparison at 3440×1440: release width stays 344px and profile width stays 360px; no horizontal page overflow. Release outer body changes from `overflow-y:auto` to child-owned scrolling; the same fixture detail scroller gains height from 610px to 1126px. Identity/tab controls stay outside it.
+- Keyboard Tab/Enter selected Links and Music. Explicitly opened candidate rails present visible `role=dialog`, `aria-modal=true` sheets at 390×844. Desktop-only default-open behavior is not a mobile-open action.
+- Final strict committed-diff component qualification is pending. The earlier no-change/advisory gate result is not cited as rendered qualification.
+
+### Rendered evidence
+
+Actual product components with canonical Storybook providers and fixture data,
+not production customer records. Baseline source is `664d6de81`; candidate
+source is `1cf10bf1e`. Dark theme and reduced motion; this is bounded component
+evidence, not certification of every route, theme or table state.
+
+| Entity | 3440×1440 baseline | 3440×1440 candidate | 390×844 opened sheet |
+| --- | --- | --- | --- |
+| Release | [Before](../screenshots/right-rail-audit-2026-10-23/release-baseline-3440.png) | [After](../screenshots/right-rail-audit-2026-10-23/release-candidate-3440.png) | [Compact](../screenshots/right-rail-audit-2026-10-23/release-candidate-390.png) |
+| Profile editor | [Before](../screenshots/right-rail-audit-2026-10-23/profile-baseline-3440.png) | [After](../screenshots/right-rail-audit-2026-10-23/profile-candidate-3440.png) | [Compact](../screenshots/right-rail-audit-2026-10-23/profile-candidate-390.png) |
+
+P4.1 includes a specific existing gap: legacy scroll/wrap `DrawerTabs` exposes
+button tabs that support Tab/Enter but do not implement Arrow/Home/End navigation.
+`InspectorTabs` has its own roving-keyboard contract. This PR preserves those
+behaviors; full keyboard convergence remains in the tracked follow-up.
