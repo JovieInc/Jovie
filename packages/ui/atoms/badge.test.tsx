@@ -406,3 +406,15 @@ describe('Badge deliberate-red drift fixtures', () => {
     expect(readSource(fixtureSourcePath)).toContain('data-deliberate-red');
   });
 });
+
+describe('Badge status text contrast (JOV-8873)', () => {
+  it.each([
+    ['destructive', 'text-error-text'],
+    ['success', 'text-success-text'],
+    ['warning', 'text-warning-text'],
+    ['error', 'text-error-text'],
+  ] as const)('renders %s with the AA text token', (variant, token) => {
+    render(<Badge variant={variant}>Status</Badge>);
+    expect(screen.getByText('Status')).toHaveClass(token);
+  });
+});

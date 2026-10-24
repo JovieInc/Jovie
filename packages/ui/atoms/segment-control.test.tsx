@@ -798,3 +798,19 @@ describe('SegmentControl', () => {
     });
   });
 });
+
+describe('SegmentControl linear-pill active fill (JOV-8873)', () => {
+  it('keeps the active pill trigger transparent so the indicator owns the fill', () => {
+    render(
+      <SegmentControl
+        value='links'
+        onValueChange={vi.fn()}
+        options={defaultOptions}
+        variant='linear-pill'
+      />
+    );
+    expect(screen.getByRole('tab', { name: 'Links', selected: true })).toHaveClass(
+      'data-[state=active]:bg-transparent'
+    );
+  });
+});

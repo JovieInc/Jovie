@@ -17,6 +17,7 @@ import {
   PageToolbarTabButton,
   TABLE_TOOLBAR_SHELL_CLASS,
 } from '@/components/organisms/table/molecules/PageToolbar';
+import * as pageToolbarClasses from '@/components/molecules/page-toolbar-classes';
 import { findPageToolbarPrimaryCtaViolations } from '../../app/app-ia-static-guard';
 
 type MockButtonProps = ComponentProps<'button'> & {
@@ -347,5 +348,14 @@ describe('PageToolbar primary CTA guard', () => {
     ];
 
     expect(findPageToolbarPrimaryCtaViolations(files)).toEqual([]);
+  });
+});
+
+describe('PageToolbar class re-exports (JOV-8873)', () => {
+  it('re-exports the shared molecule toolbar classes unchanged', () => {
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toBe(
+      pageToolbarClasses.PAGE_TOOLBAR_ACTION_BUTTON_CLASS
+    );
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('h-7');
   });
 });
