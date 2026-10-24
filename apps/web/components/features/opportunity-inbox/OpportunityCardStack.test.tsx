@@ -18,7 +18,7 @@ const CARDS = [
   {
     id: 'card-2',
     signalType: 'new_song' as const,
-    typeLabel: 'New Song',
+    typeLabel: 'New song',
     createdAt: '2026-06-27T10:00:00.000Z',
     title: 'New single detected',
     why: 'Spotify catalog signal.',
@@ -31,11 +31,11 @@ const CARDS = [
 const YOUTUBE_THUMBNAIL_CARD = {
   id: 'yt-card-1',
   signalType: 'other' as const,
-  typeLabel: 'YouTube Thumbnail',
+  typeLabel: 'YouTube thumbnail',
   createdAt: '2026-09-01T12:00:00.000Z',
   title: 'Review thumbnail for The Last Time',
   why: 'Candidate staged for a native Studio experiment; approval records intent only.',
-  primaryActionLabel: 'Approve Candidate',
+  primaryActionLabel: 'Approve candidate',
   status: 'pending' as const,
   category: 'youtube_thumbnail' as const,
   youtubeThumbnail: {
@@ -72,7 +72,7 @@ describe('OpportunityCardStack', () => {
       />
     );
     const control = screen.getByRole('button', {
-      name: 'Review Current Opportunity',
+      name: 'Review current opportunity',
     });
     expect(control).toBeDisabled();
     fireEvent.keyDown(control, { key: 'ArrowRight' });
@@ -98,7 +98,7 @@ describe('OpportunityCardStack', () => {
         />
       );
       const control = screen.getByRole('button', {
-        name: 'Review Current Opportunity',
+        name: 'Review current opportunity',
       });
       control.focus();
       expect(fireEvent.keyDown(control, { key: 'ArrowRight', ...input })).toBe(
@@ -128,7 +128,7 @@ describe('OpportunityCardStack', () => {
     );
 
     const keyboardControl = screen.getByRole('button', {
-      name: 'Review Current Opportunity',
+      name: 'Review current opportunity',
     });
     keyboardControl.focus();
 
@@ -182,7 +182,7 @@ describe('OpportunityCardStack', () => {
       );
 
       const keyboardControl = screen.getByRole('button', {
-        name: 'Review Current Opportunity',
+        name: 'Review current opportunity',
       });
 
       expect(
@@ -207,7 +207,7 @@ describe('OpportunityCardStack', () => {
     );
 
     const keyboardControl = screen.getByRole('button', {
-      name: 'Review Current Opportunity',
+      name: 'Review current opportunity',
     });
 
     expect(fireEvent.keyDown(keyboardControl, { key: 'ArrowRight' })).toBe(
@@ -230,7 +230,7 @@ describe('OpportunityCardStack', () => {
 
     expect(
       fireEvent.keyDown(
-        screen.getByRole('button', { name: 'Review Current Opportunity' }),
+        screen.getByRole('button', { name: 'Review current opportunity' }),
         { key: 'ArrowRight', repeat: true }
       )
     ).toBe(true);
@@ -253,7 +253,7 @@ describe('OpportunityCardStack', () => {
 
     await user.click(screen.getByRole('button', { name: 'Review pitch' }));
     await user.click(
-      screen.getByRole('button', { name: 'Dismiss Opportunity' })
+      screen.getByRole('button', { name: 'Dismiss opportunity' })
     );
 
     expect(onAccept).toHaveBeenCalledWith('card-1');
@@ -288,7 +288,7 @@ describe('OpportunityCardStack', () => {
       />
     );
     const keyboardControl = screen.getByRole('button', {
-      name: 'Review Current Opportunity',
+      name: 'Review current opportunity',
     });
     keyboardControl.focus();
 
@@ -322,7 +322,7 @@ describe('OpportunityCardStack', () => {
       screen.getByTestId('opportunity-inbox-youtube-thumbnail-yt-card-1')
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Approve Candidate' }));
+    await user.click(screen.getByRole('button', { name: 'Approve candidate' }));
     await user.click(screen.getByRole('button', { name: 'Reject' }));
 
     expect(onAccept).toHaveBeenCalledWith('yt-card-1');

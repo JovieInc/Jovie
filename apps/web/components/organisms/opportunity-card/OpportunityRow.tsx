@@ -204,7 +204,7 @@ export function OpportunityRow({
               aria-label={
                 showCheckmark
                   ? 'Planned'
-                  : (namedPrimaryAction ?? 'Plan Opportunity')
+                  : (namedPrimaryAction ?? 'Plan opportunity')
               }
             >
               {showCheckmark ? (
@@ -236,7 +236,7 @@ export function OpportunityRow({
                 )}
                 onClick={handleDismiss}
                 disabled={isBusy}
-                aria-label='Dismiss Opportunity'
+                aria-label='Dismiss opportunity'
               >
                 &times;
               </button>

@@ -23,7 +23,7 @@ test.describe('Opportunity Inbox', () => {
       timeout: 30_000,
     });
     await expect(
-      page.getByRole('button', { name: 'Needs You', exact: true })
+      page.getByRole('button', { name: 'Needs you', exact: true })
     ).toBeVisible();
 
     const feed = page.getByTestId('opportunity-inbox-feed');

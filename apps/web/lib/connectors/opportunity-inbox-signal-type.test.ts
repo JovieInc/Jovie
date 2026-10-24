@@ -147,13 +147,13 @@ describe('isOpportunitySignalType', () => {
 });
 
 describe('OPPORTUNITY_SIGNAL_TYPE_META', () => {
-  it('provides Title Case labels for every type', () => {
-    expect(OPPORTUNITY_SIGNAL_TYPE_META.new_song.label).toBe('New Song');
-    expect(OPPORTUNITY_SIGNAL_TYPE_META.new_event.label).toBe('New Event');
+  it('provides sentence case labels for every type', () => {
+    expect(OPPORTUNITY_SIGNAL_TYPE_META.new_song.label).toBe('New song');
+    expect(OPPORTUNITY_SIGNAL_TYPE_META.new_event.label).toBe('New event');
     expect(OPPORTUNITY_SIGNAL_TYPE_META.new_profile_match.label).toBe(
-      'Profile Match'
+      'Profile match'
     );
-    expect(OPPORTUNITY_SIGNAL_TYPE_META.brand_deal.label).toBe('Brand Deal');
+    expect(OPPORTUNITY_SIGNAL_TYPE_META.brand_deal.label).toBe('Brand deal');
     expect(OPPORTUNITY_SIGNAL_TYPE_META.other.label).toBe('Suggestion');
   });
 });

@@ -104,7 +104,7 @@ export function OpportunityInboxFeed({
     <section
       className={cn('system-b-opportunity-inbox-feed', className)}
       data-testid='opportunity-inbox-feed'
-      aria-label='Opportunity Inbox Feed'
+      aria-label='Opportunity inbox feed'
     >
       <div className='system-b-opportunity-inbox-section-label'>Today</div>
       <div className='system-b-opportunity-inbox-feed-list'>

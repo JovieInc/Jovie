@@ -6,11 +6,11 @@ import { OpportunityInboxYoutubeThumbnailCard } from './OpportunityInboxYoutubeT
 const card = {
   id: 'candidate-1',
   signalType: 'other' as const,
-  typeLabel: 'YouTube Thumbnail',
+  typeLabel: 'YouTube thumbnail',
   createdAt: '2026-09-01T12:00:00.000Z',
   title: 'Review thumbnail for A song',
   why: 'Approval records intent; publication remains blocked.',
-  primaryActionLabel: 'Approve Candidate',
+  primaryActionLabel: 'Approve candidate',
   status: 'pending' as const,
   category: 'youtube_thumbnail' as const,
   youtubeThumbnail: {
@@ -55,7 +55,7 @@ describe('OpportunityInboxYoutubeThumbnailCard', () => {
     expect(screen.getByText(/API snapshot/)).toBeInTheDocument();
     expect(screen.getByText(/Video video-1/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Approve Candidate' }));
+    await user.click(screen.getByRole('button', { name: 'Approve candidate' }));
     await user.click(screen.getByRole('button', { name: 'Reject' }));
     expect(onApprove).toHaveBeenCalledWith('candidate-1');
     expect(onReject).toHaveBeenCalledWith('candidate-1');

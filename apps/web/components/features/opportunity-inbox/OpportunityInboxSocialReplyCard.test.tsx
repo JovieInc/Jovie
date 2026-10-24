@@ -8,17 +8,17 @@ const CARD: OpportunityInboxCardViewModel = {
   id: 'reply-1',
   sourceKind: 'social_reply.draft',
   signalType: 'fan_reply',
-  typeLabel: 'Fan Reply',
+  typeLabel: 'Fan reply',
   createdAt: '2026-09-30T10:00:00.000Z',
   title: 'Reply to Maya on Instagram',
   why: 'Drafted from your saved tone profile.',
-  primaryActionLabel: 'Approve Reply',
+  primaryActionLabel: 'Approve reply',
   status: 'pending',
   category: 'social_reply',
   socialReply: {
     platform: 'Instagram',
     authorLabel: '@maya.wav',
-    typeLabel: 'Collab Request',
+    typeLabel: 'Collab request',
     inboundText: 'Loved the new track — would you be down to collab?',
     draftedText: 'Thank you so much! Dropping you a DM about collab windows.',
     sourceUrl: 'https://instagram.com/p/abc123',
@@ -50,7 +50,7 @@ describe('OpportunityInboxSocialReplyCard', () => {
       'opportunity-inbox-card-reply-1'
     );
     expect(screen.getByText('Reply to Maya on Instagram')).toBeInTheDocument();
-    expect(screen.getByText('Collab Request')).toBeInTheDocument();
+    expect(screen.getByText('Collab request')).toBeInTheDocument();
     expect(screen.getByText('Instagram')).toBeInTheDocument();
     expect(
       screen.getByTestId('social-reply-inbound-reply-1')
@@ -72,7 +72,7 @@ describe('OpportunityInboxSocialReplyCard', () => {
     const onDismiss = vi.fn();
     renderCard({ onApprove, onDismiss });
 
-    await user.click(screen.getByRole('button', { name: /Approve Reply/ }));
+    await user.click(screen.getByRole('button', { name: /Approve reply/ }));
     await user.click(screen.getByRole('button', { name: 'Dismiss' }));
 
     expect(onApprove).toHaveBeenCalledWith('reply-1');
@@ -115,7 +115,7 @@ describe('OpportunityInboxSocialReplyCard', () => {
 
     expect(
       screen.getByTestId('social-reply-execution-ambiguous')
-    ).toHaveTextContent('Needs Review');
+    ).toHaveTextContent('Needs review');
   });
 
   it('shows the draft revision counter after a revise loop', () => {

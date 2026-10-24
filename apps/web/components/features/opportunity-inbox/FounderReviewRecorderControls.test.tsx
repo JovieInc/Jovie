@@ -98,7 +98,7 @@ describe('FounderReviewRecorderControls', () => {
     const { onStart } = renderControls();
 
     expect(screen.getByText(/Mic off/)).toBeVisible();
-    const startButton = screen.getByRole('button', { name: 'Start Session' });
+    const startButton = screen.getByRole('button', { name: 'Start session' });
     await user.click(startButton);
     expect(onStart).toHaveBeenCalledOnce();
   });
@@ -114,7 +114,7 @@ describe('FounderReviewRecorderControls', () => {
     expect(
       screen.getByText(/Approve this one before the weekend drop/)
     ).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Stop And Save' }));
+    await user.click(screen.getByRole('button', { name: 'Stop and save' }));
     expect(onStop).toHaveBeenCalledOnce();
   });
 
@@ -182,7 +182,7 @@ describe('FounderReviewRecorderControls', () => {
         recording: { ...RECEIPT.recording, mediaAvailable: true },
       },
     });
-    await user.click(screen.getByRole('button', { name: /Delete Audio/ }));
+    await user.click(screen.getByRole('button', { name: /Delete audio/ }));
     expect(onDeleteAudio).toHaveBeenCalledOnce();
     expect(screen.getByText(/private audio retained/)).toBeVisible();
   });
@@ -213,10 +213,10 @@ describe('FounderReviewRecorderControls', () => {
     expect(
       screen.getByText(/Saved · Refresh a weak YouTube thumbnail/)
     ).toBeVisible();
-    expect(screen.queryByRole('button', { name: /Delete Audio/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Delete audio/ })).toBeNull();
   });
 
-  it('swaps the decision row for Save Brain Dump on founder-note targets', () => {
+  it('swaps the decision row for Save brain dump on founder-note targets', () => {
     renderControls({
       target: {
         type: 'founder-note',
@@ -228,7 +228,7 @@ describe('FounderReviewRecorderControls', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: 'Save Brain Dump' })
+      screen.getByRole('button', { name: 'Save brain dump' })
     ).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reject' })).toBeNull();

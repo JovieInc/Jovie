@@ -49,11 +49,11 @@ const YOUTUBE_CARD: OpportunityInboxCardViewModel = {
   id: 'yt-feed-1',
   sourceKind: 'youtube.thumbnail_candidate',
   signalType: 'other',
-  typeLabel: 'YouTube Thumbnail',
+  typeLabel: 'YouTube thumbnail',
   createdAt: '2026-09-01T12:00:00.000Z',
   title: 'Review thumbnail for A song',
   why: 'YouTube API snapshot captured 2026-09-01T12:00:00.000Z.',
-  primaryActionLabel: 'Approve Candidate',
+  primaryActionLabel: 'Approve candidate',
   status: 'pending',
   category: 'youtube_thumbnail',
   youtubeThumbnail: {
@@ -78,17 +78,17 @@ const SOCIAL_REPLY_CARD: OpportunityInboxCardViewModel = {
   id: 'reply-1',
   sourceKind: 'social_reply.draft',
   signalType: 'fan_reply',
-  typeLabel: 'Fan Reply',
+  typeLabel: 'Fan reply',
   createdAt: '2026-09-30T10:00:00.000Z',
   title: 'Reply to Maya on Instagram',
   why: 'Drafted from your saved tone profile.',
-  primaryActionLabel: 'Approve Reply',
+  primaryActionLabel: 'Approve reply',
   status: 'pending',
   category: 'social_reply',
   socialReply: {
     platform: 'Instagram',
     authorLabel: '@maya.wav',
-    typeLabel: 'Collab Request',
+    typeLabel: 'Collab request',
     inboundText: 'Loved the new track — would you be down to collab?',
     draftedText: 'Thank you so much! Dropping you a DM about collab windows.',
     sourceUrl: 'https://instagram.com/p/abc123',
@@ -172,10 +172,10 @@ describe('OpportunityInboxFeed workflow handoffs', () => {
       screen.getByTestId('opportunity-inbox-youtube-thumbnail-yt-feed-1')
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Approve Candidate' })
+      screen.getByRole('button', { name: 'Approve candidate' })
     ).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Approve Candidate' }));
+    await user.click(screen.getByRole('button', { name: 'Approve candidate' }));
     await user.click(screen.getByRole('button', { name: 'Reject' }));
 
     expect(onApprove).toHaveBeenCalledWith('yt-feed-1');
@@ -208,7 +208,7 @@ describe('OpportunityInboxFeed workflow handoffs', () => {
         screen.getByTestId('social-reply-draft-reply-1')
       ).toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: /Approve Reply/ }));
+      await user.click(screen.getByRole('button', { name: /Approve reply/ }));
       await user.click(screen.getByRole('button', { name: 'Dismiss' }));
       await user.click(screen.getByRole('button', { name: 'Revise' }));
       await user.type(

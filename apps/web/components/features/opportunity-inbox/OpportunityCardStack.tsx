@@ -100,7 +100,7 @@ export function OpportunityCardStack({
     <section
       className={cn('relative', className)}
       data-testid='opportunity-card-stack'
-      aria-label='Opportunity Card Stack'
+      aria-label='Opportunity card stack'
     >
       <Button
         type='button'
@@ -113,7 +113,7 @@ export function OpportunityCardStack({
         onClick={() => onOpen(topCard.id)}
         onKeyDown={handleKeyDown}
       >
-        Review Current Opportunity
+        Review current opportunity
       </Button>
       <div className='system-b-opportunity-inbox-section-label'>Today</div>
 

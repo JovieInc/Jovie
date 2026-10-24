@@ -30,9 +30,9 @@ export interface WorkflowCaptureInboxCardProps {
 }
 
 function phaseLabel(phase: CapturePhase): string {
-  if (phase === 'recording') return 'Stop Recording';
+  if (phase === 'recording') return 'Stop recording';
   if (phase === 'uploading') return 'Uploading…';
-  if (phase === 'review') return 'Send Recording';
+  if (phase === 'review') return 'Send recording';
   if (phase === 'sending') return 'Sending…';
   if (phase === 'deleting') return 'Deleting…';
   return 'Record';
@@ -161,7 +161,7 @@ export function WorkflowCaptureInboxCard({
               rel='noreferrer'
               className='text-secondary-token underline'
             >
-              Open Workflow
+              Open workflow
             </a>
           ) : null}
           {phase === 'review' ? (
@@ -171,7 +171,7 @@ export function WorkflowCaptureInboxCard({
               rel='noreferrer'
               className='text-secondary-token underline'
             >
-              Review Recording
+              Review recording
             </a>
           ) : null}
         </span>
