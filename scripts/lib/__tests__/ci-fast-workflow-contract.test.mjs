@@ -353,7 +353,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(28);
+    expect(LANES_PYTEST_FILES).toHaveLength(29);
+    expect(LANES_PYTEST_FILES).toContain(
+      'scripts/tests/test_provider_economics.py'
+    );
     expect(whole).toContain('scripts/tests/test_model_radar.py');
     expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
     expect(new Set(shards.map(shard => shard.data)).size).toBe(4);

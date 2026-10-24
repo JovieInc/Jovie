@@ -1120,6 +1120,7 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     'lane_runner',
     'qualification_guard',
     'pr_events',
+    'provider_economics',
     'remediation',
     'reason_lane',
     'doctor',

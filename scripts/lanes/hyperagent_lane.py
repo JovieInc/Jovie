@@ -135,8 +135,12 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
         proof, _reason = refresh(current, clock())
         return {**current, "verifiedRemote": proof} if proof else current
     spec = fresh(spec)
+    notice = None
+    def explained(result):
+        return {**result, **({"economicsExplanation": notice} if notice else {})}
     held = lambda reason, thread=None: {"verdict": "remote-held", "reasons": [reason],
-                                       "remoteThreadId": thread, "next_action": "reconcile-existing-remote-attempt"}
+                                       "remoteThreadId": thread, "next_action": "reconcile-existing-remote-attempt",
+                                       **({"economicsExplanation": notice} if notice else {})}
     if not verified(spec, clock()):
         return held("remote-preflight-unverified")
     proof = spec["verifiedRemote"]
@@ -168,8 +172,13 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
             os.fsync(journal.fileno())
 
         thread = state.get("threadId")
+        if not state.get("spendEvidenceNoted"):
+            # One fixed explanation per existing attempt. No billing/account
+            # probes, OAuth errors, balances, cap-as-cost or replacement work.
+            notice = "hyperagent-spend-unavailable: authorized thread output has no attributable usage; cash and credits unknown"
+            save(spendEvidenceNoted=True)
         if state.get("result"):
-            return state["result"]
+            return explained(state["result"])
         if state.get("gateIntent"):
             return held("remote-gate-outcome-unknown", thread)
         if state.get("intent") and not thread:
@@ -237,7 +246,7 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
                 result = {**gate(pr), "remoteThreadId": thread, "remoteAgentId": proof["agentId"],
                           "modelSettingsProof": proof["model"]}
                 save(result=result)
-                return result
+                return explained(result)
             return held("remote-running-timeout", thread)
         except Exception as error:
             return held(failure(error), thread)

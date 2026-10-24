@@ -89,9 +89,22 @@ class HyperagentLaneTest(unittest.TestCase):
         self.assertNotIn("private-fixture", self.path.read_text())
 
     def test_duplicate_completion_does_not_regate_or_create(self):
-        self.assertEqual(self.run_remote(), self.run_remote())
+        first, second = self.run_remote(), self.run_remote()
+        self.assertIn("cash and credits unknown", first.pop("economicsExplanation"))
+        self.assertNotIn("economicsExplanation", second)
+        self.assertEqual(first, second)
         self.assertEqual(len(self.gates), 1)
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+
+    def test_legacy_completed_journal_emits_unavailable_spend_once(self):
+        self.run_remote()
+        state = json.loads(self.path.read_text().splitlines()[-1])
+        del state["spendEvidenceNoted"]
+        self.path.write_text(json.dumps(state) + "\n")
+        first, second = self.run_remote(), self.run_remote()
+        self.assertIn("economicsExplanation", first)
+        self.assertNotIn("economicsExplanation", second)
+        self.assertEqual(len(self.gates), 1)
 
     def test_restart_resumes_known_thread_without_send_or_create(self):
         self.payload["awaitingApproval"] = True
@@ -101,6 +114,19 @@ class HyperagentLaneTest(unittest.TestCase):
         self.assertEqual(result["pr"], 7)
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
         self.assertFalse(any(n == "send_message" for n, _ in self.calls))
+
+    def test_unavailable_spend_explained_once_without_treating_cap_or_balance_as_usage(self):
+        self.payload["awaitingApproval"] = True
+        first = self.run_remote()
+        before = json.loads(self.path.read_text().splitlines()[-1])
+        second = self.run_remote()
+        self.assertIn("hyperagent-spend-unavailable", first["economicsExplanation"])
+        self.assertNotIn("economicsExplanation", second)
+        self.assertEqual(first["remoteThreadId"], second["remoteThreadId"])
+        self.assertEqual(before["binding"]["attempt"], "attempt-1")
+        self.assertTrue(before["spendEvidenceNoted"])
+        self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
+        self.assertFalse(any("billing" in n or "usage" in n for n, _ in self.calls))
 
     def test_oauth_expiry_is_redacted_and_preserves_existing_thread(self):
         self.payload["awaitingApproval"] = True

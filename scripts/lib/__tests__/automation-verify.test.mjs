@@ -30,6 +30,18 @@ import {
 } from '../../run-affected-tests.mjs';
 import { classifyBlogContentChanges } from '../blog-content-ci.mjs';
 
+it('routes provider economics through the unchanged lane coverage gates', () => {
+  const plan = buildAffectedTestPlan([
+    'scripts/lanes/provider_economics.py',
+    'scripts/tests/test_provider_economics.py',
+  ]);
+  expect(plan.lanePythonCoverage).toBe(true);
+  const commands = STRUCTURAL_PYTHON_REGRESSION_COMMANDS.join('\n');
+  expect(commands).toContain('scripts/tests/test_provider_economics.py');
+  expect(commands).toContain('provider_economics.py" --fail-under=95');
+  expect(commands).toContain('hyperagent_lane.py" --fail-under=95');
+});
+
 const SERVICE_CENSUS_QUALIFICATION_INPUTS = [
   'scripts/lanes/service_census.py',
   'scripts/lanes/worktree_sweep.py',
