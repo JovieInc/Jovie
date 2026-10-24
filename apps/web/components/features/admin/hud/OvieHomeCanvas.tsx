@@ -30,11 +30,12 @@ import {
 } from '@/lib/ovie/home/shipping-home';
 import { inboxDecisionRequest, type OvieInbox } from '@/lib/ovie/inbox';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
+import { OvieHomeHero } from './OvieHomeHero';
 import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 import { useOvieHomeReadyTiming } from './useOvieHomeReadyTiming';
 
-const OVIE_HOME_COPY: HomeLoopCopy = {
+export const OVIE_HOME_COPY: HomeLoopCopy = {
   constraintClear: 'Nothing is blocking shipping',
   asksTitle: 'Blocked On You',
   asksEmpty: 'Nothing needs your decision.',
@@ -292,6 +293,16 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
 
   return (
     <HomeLoopCanvas
+      overview={
+        <OvieHomeHero
+          copy={OVIE_HOME_COPY}
+          constraint={constraint}
+          tiles={home?.pulse ?? []}
+          status={loopStatus}
+          strip={strip?.items ?? []}
+          coverage={strip?.coverage ?? null}
+        />
+      }
       answer={answerPanel}
       inFlightOverride={inFlightOverride}
       copy={OVIE_HOME_COPY}

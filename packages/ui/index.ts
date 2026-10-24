@@ -102,6 +102,12 @@ export {
 // Checkbox
 export type { CheckboxProps } from './atoms/checkbox';
 export { Checkbox } from './atoms/checkbox';
+export {
+  CinematicMetric,
+  type CinematicMetricDensity,
+  type CinematicMetricProps,
+  CinematicMetricSkeleton,
+} from './atoms/cinematic-metric';
 // Close Button
 export type { CloseButtonIconProps } from './atoms/close-button';
 export {

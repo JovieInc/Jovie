@@ -925,7 +925,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(surfaces).toContain('--workers=2');
   });
 
-  it('runs destructive Button contrast proof through the guarded Storybook matrix', () => {
+  it('runs metric geometry and destructive Button contrast through the guarded Storybook matrix', () => {
     const surfaces = jobBlock(
       'ci-storybook-surfaces',
       'ci-cross-product-integration'
@@ -936,6 +936,9 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(invocation).not.toBeNull();
     const selected =
       invocation[1].match(/tests\/e2e\/storybook-[a-z0-9-]+\.spec\.ts/g) ?? [];
+    const metric = 'tests/e2e/storybook-cinematic-metric.spec.ts';
+    expect(selected.filter(path => path === metric)).toHaveLength(1);
+    expect(existsSync(resolve(REPO_ROOT, 'apps/web', metric))).toBe(true);
     const contrast = 'tests/e2e/storybook-destructive-button.spec.ts';
     expect(selected.filter(path => path === contrast)).toHaveLength(1);
     expect(existsSync(resolve(REPO_ROOT, 'apps/web', contrast))).toBe(true);

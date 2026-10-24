@@ -24,3 +24,5 @@ export const Measured: Story = {};
 export const NotPublished: Story = {
   args: { items: [], coverage: 'Stage events not published yet' },
 };
+
+export const Quiet: Story = { args: { appearance: 'quiet' } };

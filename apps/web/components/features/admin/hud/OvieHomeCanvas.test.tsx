@@ -195,6 +195,21 @@ describe('OvieHomeCanvas', () => {
     vi.unstubAllGlobals();
   });
 
+  it('does not claim clear shipping when its authoritative read is unauthorized', () => {
+    const data = snapshot();
+    shipping.data = {
+      ...data,
+      view: { ...data.view, connection: 'unauthorized' },
+    };
+    renderCanvas();
+    expect(screen.getByTestId('home-loop-constraint')).toHaveTextContent(
+      'Shipping data could not load.'
+    );
+    expect(screen.getByTestId('home-loop-constraint')).not.toHaveTextContent(
+      'Nothing is blocking shipping'
+    );
+  });
+
   it('renders the company loop from shipping state and the inbox', async () => {
     renderCanvas();
     expect(

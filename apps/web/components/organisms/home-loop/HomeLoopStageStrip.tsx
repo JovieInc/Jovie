@@ -18,9 +18,11 @@ const VALUE_TONE: Record<HomeLoopStripItem['tone'], string> = {
 export function HomeLoopStageStrip({
   title,
   items,
+  appearance = 'default',
   coverage,
   emptyLabel,
 }: Readonly<{
+  readonly appearance?: 'default' | 'quiet';
   readonly title: string;
   readonly items: readonly HomeLoopStripItem[];
   readonly coverage?: string | null;
@@ -47,9 +49,20 @@ export function HomeLoopStageStrip({
           >
             {`${item.label} `}
             <span
-              className={cn('font-medium tabular-nums', VALUE_TONE[item.tone])}
+              className={cn(
+                'font-medium tabular-nums',
+                appearance === 'quiet'
+                  ? 'text-primary-token'
+                  : VALUE_TONE[item.tone]
+              )}
             >
               {item.value}
+              {appearance === 'quiet' && item.tone === 'warn'
+                ? ' · Needs attention'
+                : null}
+              {appearance === 'quiet' && item.tone === 'bad'
+                ? ' · Problem'
+                : null}
             </span>
           </span>
         ))

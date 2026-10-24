@@ -661,6 +661,22 @@
   --color-skeleton-shimmer: rgba(255, 255, 255, 0.11);
 }
 
+/* Ovie consumes the canonical Noir Ion ramp instead of a second near-identical
+   graphite palette. Home, dashboards, shell chrome, and composer share one
+   content tone; cards retain their existing borders and geometry. */
+.dark [data-app-shell-workspace="ov"],
+[data-app-shell-workspace="ov"].dark {
+  --app-shell-content-surface: var(--noir-ion-card);
+  --color-bg-surface-0: var(--noir-ion-shell);
+  --color-bg-surface-1: var(--noir-ion-card);
+  --color-bg-surface-2: var(--noir-ion-elevated);
+  --color-bg-surface-3: var(--noir-ion-floating);
+  --color-bg-elevated: var(--noir-ion-elevated);
+  --color-bg-tooltip: var(--noir-ion-floating);
+  --color-bg-input: var(--noir-ion-card);
+  --color-skeleton-base: var(--noir-ion-elevated);
+}
+
 /* A selected row mode owns the same geometry during loading and after data arrives. */
 [data-table-row-mode] tbody > .system-b-table-row-height {
   height: var(--table-row-height);
