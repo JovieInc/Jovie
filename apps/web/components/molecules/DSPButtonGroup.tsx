@@ -32,7 +32,7 @@ export function DSPButtonGroup({
   if (!dsps?.length) {
     return (
       <div className={`text-center py-8 ${className}`}>
-        <p className='text-tertiary-token text-sm'>
+        <p className='text-secondary-token text-sm'>
           No streaming platforms available
         </p>
       </div>
@@ -56,7 +56,7 @@ export function DSPButtonGroup({
         />
       ))}
       {showPreferenceNotice && (
-        <p className='text-xs text-tertiary-token text-center'>
+        <p className='text-xs text-secondary-token text-center'>
           {preferenceNoticeText}
         </p>
       )}

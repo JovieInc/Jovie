@@ -1,6 +1,11 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
+/**
+ * DataCard — compact row card with optional status badge.
+ *
+ * @coverage-via apps/web/tests/unit/DataCard.test.tsx
+ */
 interface DataCardProps {
   readonly title: string;
   readonly subtitle?: string;
@@ -24,9 +29,9 @@ export function DataCard({
 }: DataCardProps) {
   const badgeClasses = {
     default: 'bg-surface-hover text-secondary',
-    success: 'bg-success-subtle text-success-text',
-    warning: 'bg-warning-subtle text-warning-text',
-    error: 'bg-error-subtle text-error-text',
+    success: 'bg-success-subtle text-success',
+    warning: 'bg-warning-subtle text-warning',
+    error: 'bg-error-subtle text-primary-token',
   };
 
   return (

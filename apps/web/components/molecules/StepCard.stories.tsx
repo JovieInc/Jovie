@@ -154,7 +154,7 @@ export const AllSteps: Story = {
 
 export const InHowItWorksSection: Story = {
   render: () => (
-    <div className='max-w-6xl p-8 bg-gray-50 dark:bg-gray-900 rounded-lg'>
+    <div className='max-w-6xl p-8 bg-surface-1 rounded-lg'>
       <div className='text-center mb-12'>
         <h2 className='text-4xl font-bold mb-4'>How It Works</h2>
         <p className='text-secondary-token'>

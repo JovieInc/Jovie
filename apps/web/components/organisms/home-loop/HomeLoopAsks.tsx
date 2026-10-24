@@ -44,8 +44,10 @@ function DefaultLine({ ask }: Readonly<{ readonly ask: HomeLoopAsk }>) {
   const countdown = formatCountdown(fallback.deadline, now);
   const verb = fallback.decision === 'approve' ? 'Approves' : 'Rejects';
   return (
+    // text-secondary-token: the answered card dims to opacity-75, where the
+    // tertiary token falls below WCAG AA contrast (axe color-contrast).
     <p
-      className='flex flex-wrap items-baseline gap-x-1.5 text-xs text-tertiary-token'
+      className='flex flex-wrap items-baseline gap-x-1.5 text-xs text-secondary-token'
       data-testid='home-loop-ask-default'
     >
       <span>
@@ -78,7 +80,7 @@ function EvidenceLine({ ask }: Readonly<{ readonly ask: HomeLoopAsk }>) {
   if (isAskEvidenceMissing(ask))
     return (
       <p
-        className='text-xs text-warning-text'
+        className='text-xs text-warning'
         data-testid='home-loop-ask-evidence-missing'
       >
         Evidence missing
@@ -219,7 +221,7 @@ function AskCard({
   const card = (
     <li
       ref={cardRef}
-      className={cn(CARD_FRAME, 'shrink-0', answered && 'opacity-80')}
+      className={cn(CARD_FRAME, 'shrink-0', answered && 'opacity-75')}
       data-answer-state={answer?.state ?? 'open'}
       data-fit-item
       data-testid='home-loop-ask'
@@ -232,8 +234,8 @@ function AskCard({
                 className={cn(
                   'mr-1.5 inline-flex rounded-full px-1.5 align-middle text-2xs font-semibold tabular-nums',
                   ask.escalation.level === 2
-                    ? 'bg-error-subtle text-error-text'
-                    : 'bg-warning-subtle text-warning-text'
+                    ? 'bg-error-subtle text-error'
+                    : 'bg-warning-subtle text-warning'
                 )}
                 data-testid='home-loop-ask-escalation'
               >
@@ -288,10 +290,12 @@ function AskCard({
           className={cn(ACTION_SLOT, 'text-xs text-secondary-token')}
           role='status'
         >
-          <Check aria-hidden='true' className='size-3.5 text-success-text' />
+          <Check aria-hidden='true' className='size-3.5 text-success' />
           <span className='truncate'>{answer.label}</span>
           {answer.state === 'pending' ? (
-            <span className='text-tertiary-token'>Sending</span>
+            // Secondary, not tertiary: stays above WCAG AA inside the dimmed
+            // (opacity-75) answered card (axe color-contrast).
+            <span className='text-secondary-token'>Sending</span>
           ) : null}
           {answer.state === 'sent' && ask.canFeedback && onFeedback ? (
             <Button
@@ -357,7 +361,7 @@ function AskCard({
             </form>
           ) : null}
           {answer?.state === 'failed' ? (
-            <span className='text-xs text-error-text' role='alert'>
+            <span className='text-xs text-error' role='alert'>
               {answer.label}
             </span>
           ) : null}

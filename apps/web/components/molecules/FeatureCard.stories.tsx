@@ -177,9 +177,14 @@ export const AllAccents: Story = {
 
 export const InBenefitsSection: Story = {
   render: () => (
-    <div className='max-w-6xl p-8 bg-gray-50 dark:bg-gray-900 rounded-lg'>
+    <div className='max-w-6xl p-8 bg-surface-1 rounded-lg'>
       <div className='text-center mb-12'>
-        <h2 className='text-4xl font-bold mb-4'>Benefits Section</h2>
+        {/* Semantic tokens: the previous raw grays left the h2 inheriting the
+            canvas default color, which failed contrast on the dark section
+            (axe color-contrast). */}
+        <h2 className='text-4xl font-bold mb-4 text-primary-token'>
+          Benefits Section
+        </h2>
         <p className='text-secondary-token'>
           See how feature cards work together in a benefits section
         </p>

@@ -75,7 +75,9 @@ export const AvatarCell = React.memo(function AvatarCell({
   ) : (
     <Link
       href={`/${username}`}
-      className='underline transition-colors hover:text-primary-token'
+      // Link sits inside a block of text — WCAG 2.4.4/1.4.1 (axe
+      // link-in-text-block) requires a non-color cue: underline it.
+      className='underline underline-offset-2 transition-colors hover:text-primary-token'
       onClick={event => event.stopPropagation()}
     >
       @{username}

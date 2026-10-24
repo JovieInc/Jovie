@@ -78,13 +78,13 @@ export const InContext: Story = {
       />
       <div className='space-y-2'>
         <label
-          htmlFor='error-banner-display-name'
+          htmlFor='error-banner-story-display-name'
           className='text-sm font-medium'
         >
           Display Name
         </label>
         <input
-          id='error-banner-display-name'
+          id='error-banner-story-display-name'
           type='text'
           className='w-full px-3 py-2 border border-subtle rounded-lg'
           defaultValue='John Doe'

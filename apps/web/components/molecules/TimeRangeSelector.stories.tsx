@@ -67,7 +67,7 @@ export const AnalyticsTabs: Story = {
 export const RetentionDisabled: Story = {
   name: 'Retention disabled',
   render: () => (
-    <>
+    <div className='grid gap-3'>
       <TimeRangeSelector
         value='7d'
         onValueChange={fn()}
@@ -81,10 +81,13 @@ export const RetentionDisabled: Story = {
         id='analytics-retention-panel'
         role='tabpanel'
         aria-labelledby='analytics-retention-tab-7d'
-        className='sr-only'
+        className='min-h-20 rounded-lg border border-subtle bg-surface-0 p-3 text-sm'
       >
-        Audience trend for 7 days
+        <p className='font-medium'>Retention window</p>
+        <p className='mt-1 text-secondary-token'>
+          Ranges beyond the plan retention limit stay disabled.
+        </p>
       </div>
-    </>
+    </div>
   ),
 };

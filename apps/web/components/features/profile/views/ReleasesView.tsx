@@ -191,7 +191,9 @@ export function ReleasesView({
                     </span>
                   ) : null}
                 </div>
-                <p className='truncate text-2xs font-medium tracking-tight text-white/50'>
+                {/* white/42 falls under WCAG AA on dark profile surfaces; white/64
+                    (already used by the Video badge above) clears 4.5:1. */}
+                <p className='truncate text-2xs font-medium tracking-tight text-white/64'>
                   {meta}
                 </p>
               </div>

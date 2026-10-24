@@ -9,14 +9,13 @@ const meta = {
     layout: 'centered',
   },
   decorators: [
-    (Story, context) => (
+    Story => (
       <div className='w-full max-w-sm text-primary-token'>
-        <Story />
-        <div
-          id='audience-details'
-          hidden={!context.args.isOpen}
-          className='sr-only'
-        >
+        {Story()}
+        {/* axe aria-valid-attr-value: aria-controls must reference an existing
+            element while aria-expanded is true, so render the region the
+            story's heading controls. */}
+        <div id='audience-details' className='px-2.5 py-2 text-secondary-token'>
           Audience details content
         </div>
       </div>

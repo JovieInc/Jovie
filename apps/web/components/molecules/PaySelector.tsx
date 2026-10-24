@@ -1,0 +1,382 @@
+'use client';
+
+import { Button } from '@jovie/ui';
+import { ChevronDown, PencilLine } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AmountSelector } from '@/components/atoms/AmountSelector';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
+import {
+  normalizeQuantity,
+  USD_AMOUNT_CONTRACT,
+} from '@/lib/presentation/quantity';
+import { cn } from '@/lib/utils';
+import { formatDollarAmount } from '@/lib/utils/format-number';
+
+type PaySelectorPresentation = 'default' | 'drawer';
+
+export interface PaymentMethodCapability {
+  readonly id: 'apple-pay' | 'venmo';
+  readonly label: string;
+  readonly availability: 'eligible' | 'available' | 'unavailable';
+}
+
+interface PaySelectorProps {
+  readonly amounts?: number[];
+  readonly onContinue: (amount: number) => void;
+  readonly isLoading?: boolean;
+  readonly className?: string;
+  readonly paymentLabel?: string;
+  /**
+   * A provider is only rendered when the caller has proven eligibility. The
+   * public profile currently supplies Venmo as the truthful fallback.
+   */
+  readonly paymentMethod?: PaymentMethodCapability;
+  readonly presentation?: PaySelectorPresentation;
+  readonly primaryLabel?: string;
+  readonly otherPaymentOptionsLabel?: string;
+  readonly showOtherPaymentOptions?: boolean;
+  readonly screenReaderDescription?: string;
+}
+
+function formatAmountForScreenReader(amount: number): string {
+  return formatDollarAmount(amount);
+}
+
+function sanitizeCurrencyInput(value: string): string {
+  const cleaned = value.replace(/[^\d.]/g, '');
+  const [whole = '', ...fractionParts] = cleaned.split('.');
+  const fraction = fractionParts.join('').slice(0, 2);
+  return fraction.length > 0 ? `${whole}.${fraction}` : whole;
+}
+
+function parseCustomAmount(value: string): number | null {
+  if (value.trim().length === 0) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return normalizeQuantity(parsed, USD_AMOUNT_CONTRACT);
+}
+
+export function PaySelector({
+  amounts = [5, 10, 20],
+  onContinue,
+  isLoading = false,
+  className = '',
+  paymentLabel,
+  paymentMethod,
+  presentation = 'default',
+  primaryLabel = 'Continue',
+  otherPaymentOptionsLabel = 'Other payment methods',
+  showOtherPaymentOptions = false,
+  screenReaderDescription,
+}: PaySelectorProps) {
+  const defaultIdx = Math.floor(Math.max(0, amounts.length - 1) / 2);
+  const [selectedIdx, setSelectedIdx] = useState<number>(defaultIdx);
+  const [customMode, setCustomMode] = useState(false);
+  const [customAmount, setCustomAmount] = useState(
+    String(amounts[defaultIdx] ?? 0)
+  );
+  const [showOtherOptions, setShowOtherOptions] = useState(
+    presentation === 'drawer' && showOtherPaymentOptions
+  );
+  const statusRef = useRef<HTMLDivElement>(null);
+  const customInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedAmount = useMemo(() => {
+    if (!customMode) {
+      return amounts[selectedIdx] ?? amounts[defaultIdx] ?? 0;
+    }
+
+    return parseCustomAmount(customAmount) ?? 0;
+  }, [amounts, customAmount, customMode, defaultIdx, selectedIdx]);
+
+  const canContinue = selectedAmount > 0;
+  const resolvedMethod =
+    paymentMethod ??
+    (paymentLabel === 'Venmo'
+      ? {
+          id: 'venmo' as const,
+          label: paymentLabel,
+          availability: 'available' as const,
+        }
+      : undefined);
+  const isMethodAvailable = resolvedMethod?.availability !== 'unavailable';
+  const paymentActionLabel = resolvedMethod
+    ? `Pay ${formatAmountForScreenReader(selectedAmount)} with ${resolvedMethod.label}`
+    : `${primaryLabel} with ${formatAmountForScreenReader(selectedAmount)}`;
+  // The CTA accessible name must match its visible text (WCAG 2.5.3), so the
+  // loading label and the aria-label share one source of truth.
+  const paymentActionCtaLabel = isLoading
+    ? `Opening ${resolvedMethod?.label ?? 'payment'}…`
+    : paymentActionLabel;
+
+  const handleContinue = useCallback(() => {
+    if (!canContinue) {
+      return;
+    }
+
+    onContinue(selectedAmount);
+  }, [canContinue, onContinue, selectedAmount]);
+
+  const handleAmountSelect = useCallback(
+    (idx: number) => {
+      setSelectedIdx(idx);
+      setCustomMode(false);
+      const nextAmount = amounts[idx] ?? amounts[defaultIdx] ?? 0;
+      setCustomAmount(String(nextAmount));
+    },
+    [amounts, defaultIdx]
+  );
+
+  const handleCustomToggle = useCallback(() => {
+    setCustomMode(current => !current);
+    setCustomAmount(currentAmount => {
+      if (currentAmount.trim().length > 0) {
+        return currentAmount;
+      }
+
+      return String(amounts[selectedIdx] ?? amounts[defaultIdx] ?? 0);
+    });
+  }, [amounts, defaultIdx, selectedIdx]);
+
+  useEffect(() => {
+    if (customMode) {
+      customInputRef.current?.focus();
+      customInputRef.current?.select();
+    }
+  }, [customMode]);
+
+  useEffect(() => {
+    if (statusRef.current) {
+      statusRef.current.textContent = `${formatAmountForScreenReader(
+        selectedAmount
+      )} selected`;
+    }
+  }, [selectedAmount]);
+
+  if (presentation === 'drawer') {
+    return (
+      <div
+        className={cn('w-full space-y-4.5', className)}
+        data-presentation='drawer'
+        data-test='pay-selector'
+      >
+        <h3 id='pay-selector-heading' className='sr-only'>
+          Select Amount
+        </h3>
+        {screenReaderDescription ? (
+          <p className='sr-only'>{screenReaderDescription}</p>
+        ) : null}
+
+        <div className='sr-only' aria-live='polite' ref={statusRef}></div>
+
+        <div className='space-y-4'>
+          <div
+            className='min-h-32 w-full'
+            data-testid='pay-selector-amount-slot'
+          >
+            <div className='min-h-12'>
+              {customMode ? (
+                <div className='flex min-h-12 items-center'>
+                  <label className='w-full'>
+                    <span className='sr-only'>Custom Amount</span>
+                    <div className='flex h-12 items-center rounded-full border border-white/12 bg-white/[0.03] px-4 text-white dark:text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'>
+                      <span className='mr-2 text-mid font-medium tracking-[-0.04em] text-tertiary-token'>
+                        $
+                      </span>
+                      <input
+                        ref={customInputRef}
+                        type='text'
+                        inputMode='decimal'
+                        value={customAmount}
+                        onChange={event => {
+                          setCustomAmount(
+                            sanitizeCurrencyInput(event.currentTarget.value)
+                          );
+                        }}
+                        placeholder='0.00'
+                        className='h-full w-full bg-transparent text-mid font-semibold tracking-[-0.03em] text-primary-token outline-none placeholder:text-tertiary-token'
+                        aria-label='Custom Amount'
+                      />
+                    </div>
+                  </label>
+                </div>
+              ) : (
+                <fieldset
+                  className='m-0 grid grid-cols-3 gap-2 border-0 p-0'
+                  aria-label='Amount Options'
+                >
+                  {amounts.map((amount, idx) => {
+                    const isSelected = idx === selectedIdx;
+                    return (
+                      <AmountSelector
+                        key={amount}
+                        amount={amount}
+                        isSelected={isSelected}
+                        onClick={handleAmountSelect}
+                        index={idx}
+                        className={
+                          isSelected
+                            ? undefined
+                            : 'border-white/12 bg-white/[0.04] hover:border-white/18 hover:bg-white/[0.07]'
+                        }
+                        ariaLabel={`Select ${formatAmountForScreenReader(amount)} payment amount`}
+                      />
+                    );
+                  })}
+                </fieldset>
+              )}
+            </div>
+          </div>
+
+          <SmartLinkProviderButton
+            label={paymentActionCtaLabel}
+            ariaLabel={paymentActionCtaLabel}
+            primary
+            onClick={handleContinue}
+            disabled={isLoading || !canContinue || !isMethodAvailable}
+            icon={
+              resolvedMethod?.id === 'venmo' ? (
+                <SocialIcon
+                  platform='venmo'
+                  size={20}
+                  className='shrink-0'
+                  aria-hidden
+                />
+              ) : null
+            }
+          />
+
+          <Button
+            type='button'
+            variant='ghost'
+            onClick={handleCustomToggle}
+            className='inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-4 text-app font-medium tracking-[-0.015em] text-secondary-token transition-[border-color,background-color,color] duration-subtle hover:border-white/16 hover:bg-white/[0.05] hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+            aria-pressed={customMode}
+            aria-controls='pay-selector-heading'
+          >
+            <span>Custom Amount</span>
+            <PencilLine className='h-3.5 w-3.5' />
+          </Button>
+
+          {showOtherPaymentOptions && paymentLabel ? (
+            <div className='space-y-3.5'>
+              <Button
+                type='button'
+                variant='ghost'
+                onClick={() => setShowOtherOptions(open => !open)}
+                className='flex h-auto w-full items-center gap-3.5 text-app font-medium tracking-[-0.015em] text-tertiary-token transition-colors duration-subtle hover:bg-transparent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                aria-expanded={showOtherOptions}
+              >
+                <span className='h-px flex-1 bg-white/8' />
+                <span>{otherPaymentOptionsLabel}</span>
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 shrink-0 transition-transform duration-subtle',
+                    showOtherOptions && 'rotate-180'
+                  )}
+                />
+                <span className='h-px flex-1 bg-white/8' />
+              </Button>
+
+              <div
+                className={cn(
+                  'overflow-hidden transition-[max-height,opacity] duration-subtle',
+                  showOtherOptions
+                    ? 'max-h-24 opacity-100'
+                    : 'max-h-0 opacity-0'
+                )}
+              >
+                {showOtherOptions ? (
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    onClick={handleContinue}
+                    disabled={isLoading || !canContinue}
+                    className='flex h-12 w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-5 text-sm font-medium tracking-[-0.015em] text-white dark:text-white transition-[border-color,background-color,opacity] duration-subtle hover:border-white/16 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50'
+                    aria-label={`Continue with ${paymentLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
+                  >
+                    {paymentLabel === 'Venmo' ? (
+                      <SocialIcon
+                        platform='venmo'
+                        size={20}
+                        className='shrink-0'
+                        aria-hidden
+                      />
+                    ) : null}
+                    <span>{`Continue with ${paymentLabel}`}</span>
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  let continueLabel = `Continue with ${formatAmountForScreenReader(
+    selectedAmount
+  )}`;
+  if (isLoading) {
+    continueLabel = 'Processing...';
+  } else if (resolvedMethod) {
+    continueLabel = paymentActionLabel;
+  }
+
+  return (
+    <div className={`space-y-5 ${className}`} data-test='pay-selector'>
+      <h3 id='pay-selector-heading' className='sr-only'>
+        Select Amount
+      </h3>
+      {screenReaderDescription ? (
+        <p className='sr-only'>{screenReaderDescription}</p>
+      ) : null}
+
+      <div className='sr-only' aria-live='polite' ref={statusRef}></div>
+
+      <p className='text-app font-semibold tracking-[-0.015em] text-secondary-token'>
+        Choose Amount
+      </p>
+
+      <fieldset
+        className='grid grid-cols-3 gap-3 border-0 p-0 m-0'
+        aria-label='Amount Options'
+      >
+        {amounts.map((amount, idx) => (
+          <AmountSelector
+            key={amount}
+            amount={amount}
+            isSelected={idx === selectedIdx}
+            onClick={handleAmountSelect}
+            index={idx}
+          />
+        ))}
+      </fieldset>
+
+      <Button
+        onClick={handleContinue}
+        className='mt-4 flex w-full items-center justify-center gap-2.5 rounded-full border border-white/8 text-mid font-semibold tracking-[-0.015em] text-btn-primary-foreground shadow-none transition-[opacity,border-color] duration-subtle hover:border-white/14'
+        size='lg'
+        disabled={isLoading || !canContinue || !isMethodAvailable}
+        variant='primary'
+      >
+        {resolvedMethod?.id === 'venmo' ? (
+          <SocialIcon
+            platform='venmo'
+            size={20}
+            className='shrink-0'
+            aria-hidden
+          />
+        ) : null}
+        {continueLabel}
+      </Button>
+    </div>
+  );
+}

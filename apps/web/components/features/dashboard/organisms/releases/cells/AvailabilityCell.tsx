@@ -205,11 +205,14 @@ export const AvailabilityCell = memo(function AvailabilityCell({
       <PopoverTrigger asChild>
         <button
           type='button'
-          aria-label='Show Provider Availability Details'
           aria-haspopup='listbox'
           aria-expanded={open}
           className='inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-subtle bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] px-1.5 py-1 text-xs font-normal tracking-tight text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:border-(--color-accent) focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--color-accent)'
         >
+          {/* No aria-label on this trigger: it shadowed the rail's visible
+              count text (WCAG 2.5.3 label-in-name). The sr-only prefix leads
+              the accessible name instead. */}
+          <span className='sr-only'>Show provider availability details:</span>
           <CompactLinkRail
             items={compactProviders.map(providerKey => ({
               id: providerKey,

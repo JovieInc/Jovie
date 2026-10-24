@@ -79,7 +79,11 @@ export const LyricRow = React.memo(function LyricRow({
             'transition-[color,opacity,transform] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
             isActive
               ? 'text-primary-token text-3xl leading-tight font-display opacity-100'
-              : 'text-secondary-token text-xl leading-snug font-display hover:text-primary-token'
+              : // No opacity fade on the resting line: at opacity-60 the
+                // tertiary token drops below WCAG AA contrast (axe
+                // color-contrast). The quieter tertiary color alone carries
+                // the inactive read; hover still brightens to secondary.
+                'text-tertiary-token text-xl leading-snug font-display hover:text-secondary-token'
           )}
         >
           {line.text}

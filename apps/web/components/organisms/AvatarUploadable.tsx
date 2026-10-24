@@ -197,9 +197,12 @@ export const AvatarUploadable = React.memo(
             aria-busy={isUploading || undefined}
             disabled={!isInteractive}
           >
-            {isInteractive && (
-              <span className='sr-only'>{uploadButtonLabel} </span>
-            )}
+            {/* No aria-label: the avatar's alt/fallback text is visible content
+                and an aria-label would shadow it (WCAG 2.5.3 label-in-name).
+                The sr-only prefix leads the accessible name instead. */}
+            {isInteractive ? (
+              <span className='sr-only'>{uploadButtonLabel}</span>
+            ) : null}
             <Avatar
               src={previewUrl ?? src}
               className={cn(

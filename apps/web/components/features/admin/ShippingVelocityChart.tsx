@@ -311,7 +311,9 @@ export function ShippingVelocityChart({
               type='button'
               variant='ghost'
               onClick={() => handleLineClick('merged')}
-              className='h-auto flex items-center gap-1 opacity-80 transition-opacity hover:opacity-100 hover:bg-transparent'
+              // No resting opacity on the label: text at 80% opacity fell
+              // below WCAG AA contrast (axe color-contrast).
+              className='h-auto flex items-center gap-1 hover:bg-transparent'
               aria-label='Toggle Merged Series Spotlight'
               aria-pressed={spotlight === 'merged'}
             >
@@ -325,7 +327,7 @@ export function ShippingVelocityChart({
               type='button'
               variant='ghost'
               onClick={() => handleLineClick('opened')}
-              className='h-auto flex items-center gap-1 opacity-80 transition-opacity hover:opacity-100 hover:bg-transparent'
+              className='h-auto flex items-center gap-1 hover:bg-transparent'
               aria-label='Toggle Opened Series Spotlight'
               aria-pressed={spotlight === 'opened'}
             >
@@ -339,14 +341,18 @@ export function ShippingVelocityChart({
               type='button'
               variant='ghost'
               onClick={() => setShowClosed(prev => !prev)}
-              className='h-auto flex items-center gap-1 transition-opacity hover:opacity-100 hover:bg-transparent'
-              style={{ opacity: showClosed ? 1 : 0.8 }}
+              className='h-auto flex items-center gap-1 hover:bg-transparent'
               aria-label='Toggle Closed Series Visibility'
               aria-pressed={showClosed}
             >
+              {/* Dim the swatch, never the text: label text at 40% opacity
+                  failed WCAG AA contrast (axe color-contrast). */}
               <span
-                className='block h-1 w-3 rounded-full'
-                style={{ backgroundColor: SERIES_COLORS.closed }}
+                className='block h-1 w-3 rounded-full transition-opacity'
+                style={{
+                  backgroundColor: SERIES_COLORS.closed,
+                  opacity: showClosed ? 1 : 0.4,
+                }}
               />
               <span className='text-3xs text-tertiary-token'>Closed</span>
             </Button>
@@ -429,8 +435,11 @@ export function ShippingVelocityChart({
                 />
               ) : null}
             </div>
+            {/* No role='img' here: it must not wrap the interactive
+                <details> disclosure below (children of role=img are
+                presentational — axe nested-interactive). The canvas inside
+                carries the img role. */}
             <figure
-              role='img'
               aria-labelledby={titleId}
               aria-describedby={summaryId}
               data-testid='shipping-velocity-figure'

@@ -87,7 +87,7 @@ export function OperatorBanner({
       data-testid='operator-banner'
       role='alert'
       aria-live='polite'
-      className={`fixed inset-x-0 top-0 z-9999 bg-surface-2 px-4 py-2 text-primary-token shadow-lg ${OPERATOR_BANNER_HEIGHT_CLASS}`}
+      className={`fixed inset-x-0 top-0 z-9999 bg-amber-500 px-4 py-2 text-amber-950 shadow-lg ${OPERATOR_BANNER_HEIGHT_CLASS}`}
     >
       <div className='mx-auto flex max-w-7xl items-center gap-3'>
         <AlertTriangle className='size-5 shrink-0' aria-hidden='true' />
@@ -96,7 +96,10 @@ export function OperatorBanner({
           <span className='truncate'>
             {envIssues.slice(0, 2).join('; ')}
             {envIssues.length > 2 && (
-              <span className='ml-1 text-secondary-token'>
+              // amber-800 on the amber-500 banner measured ~3.3:1 — below WCAG
+              // AA; amber-950 matches the banner's primary ink (axe
+              // color-contrast).
+              <span className='ml-1 text-amber-950'>
                 +{envIssues.length - 2} more
               </span>
             )}
@@ -106,7 +109,7 @@ export function OperatorBanner({
           type='button'
           variant='ghost'
           onClick={handleDismiss}
-          className='h-auto w-auto rounded p-1 text-primary-token transition-colors hover:bg-surface-3'
+          className='h-auto w-auto rounded p-1 text-amber-950 transition-colors hover:bg-amber-600/20'
           aria-label='Dismiss Environment Warning'
         >
           <X className='size-3.5' />

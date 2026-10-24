@@ -120,13 +120,14 @@ export function DspAvatarStack({
     >
       <button
         aria-describedby={popoverId}
-        aria-label={`View DSP Distribution Details: ${visible
-          .filter(dsp => !dsp.iconPath)
-          .map(dsp => dsp.glyph)
-          .join('')}${others > 0 ? ` +${others}` : ''}`}
         className='inline-flex items-center gap-1.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--system-b-bg-page)'
         type='button'
       >
+        {/* No aria-label: it shadowed the visible glyphs / "+N" text (WCAG
+            2.5.3 label-in-name). The sr-only prefix comes first so the
+            accessible name starts with the action and still contains the
+            visible content. */}
+        <span className='sr-only'>View DSP distribution details</span>
         <span className='inline-flex items-center'>
           {visible.map((dsp, index) => (
             <span

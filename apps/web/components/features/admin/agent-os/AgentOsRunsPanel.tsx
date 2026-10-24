@@ -222,6 +222,10 @@ function AgentOsBoardCard({
           aria-pressed={isSelected}
           className='min-w-0 h-auto flex-1 justify-start rounded-md text-left hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
         >
+          {/* No aria-label: it shadowed the visible title/source/progress
+              text (WCAG 2.5.3 label-in-name). The sr-only prefix keeps the
+              control's purpose first in the accessible name. */}
+          <span className='sr-only'>Select run:</span>
           <p className='line-clamp-2 text-app font-[560] leading-5 text-primary-token'>
             {artifact.title}
           </p>
@@ -297,6 +301,7 @@ function AgentOsBoard({
                   onStatusFilterChange(statusFilter === status ? null : status)
                 }
                 aria-pressed={statusFilter === status}
+                aria-label={`Filter by ${RUN_STATUS_LABEL[status]} (${laneRows.length})`}
                 className={cn(
                   'h-auto rounded px-1 text-2xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
                   statusFilter === status
@@ -304,9 +309,6 @@ function AgentOsBoard({
                     : 'text-tertiary-token hover:bg-surface-0 hover:text-secondary-token'
                 )}
               >
-                <span className='sr-only'>
-                  Filter by {RUN_STATUS_LABEL[status]}
-                </span>{' '}
                 {laneRows.length}
               </Button>
             </div>

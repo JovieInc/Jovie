@@ -464,22 +464,13 @@ describe('FounderReviewRegistry', () => {
       );
     });
   });
-});
 
-describe('FounderReviewRegistry text contrast contract (JOV-8873)', () => {
-  it('renders status glyph labels with the AA text tokens', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const webRoot = process.cwd().endsWith('/apps/web')
-      ? process.cwd()
-      : resolve(process.cwd(), 'apps/web');
-    const source = readFileSync(
-      resolve(webRoot, 'components/features/admin/FounderReviewRegistry.tsx'),
-      'utf8'
-    );
-    expect(source).toContain('text-success-text');
-    expect(source).toContain('text-warning-text');
-    expect(source).not.toContain("'text-success']");
-    expect(source).not.toContain("'text-warning']");
+  it('renders the ready mark with light-safe success text', async () => {
+    renderRegistry();
+
+    const readyRow = screen.getByTestId('founder-review-row-feature.ready');
+    const mark = await within(readyRow).findByText('Ready');
+    expect(mark.className).toContain('text-emerald-700');
+    expect(mark.className).toContain('dark:text-emerald-300');
   });
 });

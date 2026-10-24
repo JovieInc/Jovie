@@ -64,11 +64,9 @@ export function HeaderSearchSurfaceFromContext({
             ),
         className
       )}
-      aria-label={
-        compact
-          ? 'Search Jovie'
-          : `${calm ? 'Search chats' : 'Search'} ⌘K — Search Jovie`
-      }
+      // No aria-label: it shadowed the visible "Search"/"⌘K" text (WCAG
+      // 2.5.3 label-in-name). The sr-only prefix comes first so the name
+      // still leads with the action in compact (icon-only) mode.
     >
       <Icon
         name='Search'
@@ -76,6 +74,7 @@ export function HeaderSearchSurfaceFromContext({
         aria-hidden='true'
         strokeWidth={2.25}
       />
+      <span className='sr-only'>Search Jovie</span>
       {compact ? null : (
         <>
           <span className='min-w-0 flex-1 truncate'>

@@ -176,7 +176,7 @@ describe('TrackRow', () => {
     // Accessible name is computed from the visible content with an sr-only
     // prefix, so the name always contains the visible text (WCAG 2.5.3).
     const detailsButton = screen.getByRole('button', {
-      name: /^Open details for 1\.\s*Open Skies$/,
+      name: 'Open details for 1. Open Skies',
     });
     expect(detailsButton).toHaveTextContent('1.');
     expect(detailsButton).toHaveTextContent('Open Skies');

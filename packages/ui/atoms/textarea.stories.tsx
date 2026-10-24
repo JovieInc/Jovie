@@ -24,7 +24,7 @@ export const Disabled: Story = {
     disabled: true,
     defaultValue: 'Read only',
     id: 'ta-disabled',
-    'aria-label': 'Release notes',
+    label: 'Read-only notes',
   },
 };
 
@@ -72,7 +72,7 @@ export const Sizes: Story = {
 export const LongContent: Story = {
   args: {
     id: 'ta-long',
-    'aria-label': 'Bio',
+    label: 'Bio',
     defaultValue: Array.from(
       { length: 8 },
       (_, i) => `Line ${i + 1} of bio content.`

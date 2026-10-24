@@ -427,8 +427,10 @@ export function PillSearch({
           size='sm'
           onClick={onClose}
           className='system-b-pill-search-close h-auto shrink-0'
-          aria-label='Close Search — Esc'
         >
+          {/* Accessible name must contain the visible "Esc" text (WCAG 2.5.3
+              label-in-name): sr-only prefix instead of a shadowing aria-label. */}
+          <span className='sr-only'>Close search</span>
           Esc
         </Button>
       </div>

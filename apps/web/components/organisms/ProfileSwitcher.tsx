@@ -74,7 +74,7 @@ export function IdentitySwitcher() {
               'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
             )}
           >
-            <span className='sr-only'>Switch Identity: </span>
+            <span className='sr-only'>Switch identity: </span>
             <Avatar
               src={activeIdentity?.avatarUrl}
               alt={activeIdentity?.displayName ?? ''}

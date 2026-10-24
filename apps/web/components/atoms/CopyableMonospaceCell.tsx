@@ -71,7 +71,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
       )}
       title={`Copy ${label}`}
     >
-      <span className='sr-only'>Copy {label}:</span>{' '}
+      <span className='sr-only'>Copy {label}: </span>
       <span
         className='truncate'
         style={{ maxWidth: `${maxWidth}px` }}
