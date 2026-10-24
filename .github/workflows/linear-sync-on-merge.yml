@@ -83,6 +83,7 @@ jobs:
             scripts/invariants/screen-audit.mjs
             scripts/invariants/screen-certification.mjs
             scripts/invariants/screen-decision-routing.mjs
+            scripts/invariants/screen-event-routing.mjs
             scripts/invariants/browser-owned-input.mjs
             scripts/invariants/browser-owned-input-matrix.json
             scripts/invariants/product-reference-coherence.mjs
@@ -100,6 +101,8 @@ jobs:
             packages/api-client/policy.ts
             packages/api-client/providers.json
             packages/api-client/store.ts
+            packages/agent-transport-contracts/work-order.ts
+            packages/agent-transport-contracts/work-order-adapters.ts
           sparse-checkout-cone-mode: false
 
       - name: Set up pinned Node.js
