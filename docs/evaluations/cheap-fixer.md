@@ -42,4 +42,3 @@ Per attempt (scripts/cheap-fixer/cheap-fixer.mjs), exits at the first failed gat
 11. Never executes PR code. Logs and file text are untrusted; the prompt says so, and the guards plus Jev are the backstop.
 
 Measurement (receipt `jovie-cheap-fixer-receipt/v1`, uploaded every run): `stages.red` (run updated_at) to `start`, `logs`, `claimed`, `model`, `guards`, `jev`, `pushed` ISO stamps, `durationMs`, per-model token usage and USD, outcome, class, matched signature, failed jobs. Derived: time-to-first-fix = pushed - red; success = new head goes green and is not reverted (join to check suites on `pushedSha`); cost per fixed PR = sum costUsd of runs ending `pushed` plus Jev cost / count; lanes load avoided = fixed PRs whose `lane-fix-red` clears with no lane claim. `scripts/cheap-fixer/report` (follow-up) will join receipts to outcomes.
-
