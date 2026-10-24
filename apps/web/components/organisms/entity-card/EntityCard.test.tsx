@@ -10,6 +10,33 @@ import type { Artist } from '@/types/db';
 import { EntityCard } from './EntityCard';
 import type { EntityCardModel } from './types';
 
+it('renders text-only evidence without an invented image or artwork placeholder', () => {
+  const { container } = render(
+    <EntityCard
+      media='none'
+      model={{
+        id: 'source',
+        kind: 'person',
+        imageAlt: '',
+        title: 'Fixture Artist',
+        meta: '9.9K followers',
+        interactive: true,
+        cta: {
+          label: 'Open Source',
+          href: 'https://example.com/artist',
+          external: true,
+        },
+      }}
+    />
+  );
+  expect(screen.getByRole('heading', { name: 'Fixture Artist' })).toBeVisible();
+  expect(screen.getByRole('link', { name: 'Open Source' })).toHaveAttribute(
+    'rel',
+    'noopener noreferrer'
+  );
+  expect(container.querySelector('img, .aspect-square')).toBeNull();
+});
+
 const mockUseTrackAudioPlayer = vi.hoisted(() => vi.fn());
 const mockPacEmit = vi.hoisted(() => vi.fn());
 const mockGetCaptureDismissalStatus = vi.hoisted(() => vi.fn());

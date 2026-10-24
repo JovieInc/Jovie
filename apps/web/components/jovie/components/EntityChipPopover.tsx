@@ -1,6 +1,15 @@
 'use client';
 
-import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+  SheetTrigger,
+} from '@jovie/ui';
 import {
   type CSSProperties,
   type KeyboardEvent,
@@ -19,14 +28,23 @@ import {
   chatEntityMentionToEntityCard,
   EntityCard,
 } from '@/components/organisms/entity-card';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
+import {
+  type EnrichedFact,
+  projectPublicEnrichedFacts,
+} from '@/lib/profile-facts/enrichment';
 import { cn } from '@/lib/utils';
 import { EntityChip, type EntityChipTone } from './EntityChip';
 import { ENTITY_KIND_ACCENT_VAR } from './entity-accent';
+import { SourceFactCard } from './SourceFactCard';
 
 const HOVER_OPEN_DELAY_MS = 200;
 const HOVER_CLOSE_DELAY_MS = 120;
+// Coordination belongs to the existing entity overlay owner, across transcripts/rails.
+let activeInspection: { owner: object; close: () => void } | null = null;
+let lastInspectionAt = 0;
 
 const KIND_PREFIX: Record<EntityKind, string> = {
   release: 'Release',
@@ -41,6 +59,7 @@ interface EntityChipPopoverProps {
   readonly label: string;
   /** Current scoped read-model data. Missing/mismatched data hides historical labels and actions. */
   readonly entity?: EntityRef;
+  readonly sourceFact?: EnrichedFact;
   /** The presentational EntityChip rendered as the trigger. */
   readonly children: ReactNode;
   readonly tone?: EntityChipTone;
@@ -63,14 +82,35 @@ export function EntityChipPopover({
   kind,
   id,
   entity: candidate,
+  sourceFact: candidateFact,
   children,
   tone = 'onDark',
 }: EntityChipPopoverProps) {
   // A caller cannot attach another object's metadata or capability to this id.
   const entity =
     candidate?.kind === kind && candidate.id === id ? candidate : undefined;
-  const label = entity?.label ?? 'Unavailable reference';
+  const sourceFact = useMemo(
+    () =>
+      candidateFact && candidateFact.id === id
+        ? projectPublicEnrichedFacts(
+            [candidateFact],
+            candidateFact.subject.id
+          )[0]
+        : undefined,
+    [candidateFact, id]
+  );
+  const label = sourceFact
+    ? 'Inspect source'
+    : (entity?.label ?? 'Unavailable reference');
+  const mobile = useMediaQuery('(max-width: 639px)');
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const inspectionOwner = useRef({});
+  const contentRef = useRef<HTMLDivElement>(null);
+  const suppressFocus = useRef(false);
+  const pointerDown = useRef(false);
+  const restoreFocus = useRef(false);
+  const openedByHover = useRef(false);
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -107,17 +147,47 @@ export function EntityChipPopover({
     return clearTimers;
   }, [clearTimers]);
 
+  const closeInspection = useCallback(() => {
+    clearTimers();
+    if (activeInspection?.owner === inspectionOwner.current)
+      activeInspection = null;
+    setOpen(false);
+  }, [clearTimers]);
+  const openInspection = useCallback(() => {
+    clearTimers();
+    activeInspection?.close();
+    activeInspection = {
+      owner: inspectionOwner.current,
+      close: closeInspection,
+    };
+    lastInspectionAt = Date.now();
+    setOpen(true);
+  }, [clearTimers, closeInspection]);
+  useEffect(
+    () => () => {
+      if (activeInspection?.owner === inspectionOwner.current)
+        activeInspection = null;
+    },
+    [closeInspection]
+  );
+
   const handlePointerEnter = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       // Pointer-aware devices only — touch fires synthetic mouse events but
       // we want tap to use the click path, not the hover path.
-      if (event.pointerType !== 'mouse') return;
+      if (event.pointerType !== 'mouse' || mobile) return;
       clearTimers();
-      openTimerRef.current = setTimeout(() => {
-        setOpen(true);
-      }, HOVER_OPEN_DELAY_MS);
+      openTimerRef.current = setTimeout(
+        () => {
+          openedByHover.current = true;
+          openInspection();
+        },
+        activeInspection || Date.now() - lastInspectionAt < 300
+          ? 0
+          : HOVER_OPEN_DELAY_MS
+      );
     },
-    [clearTimers]
+    [clearTimers, openInspection, mobile]
   );
 
   const handlePointerLeave = useCallback(
@@ -125,10 +195,14 @@ export function EntityChipPopover({
       if (event.pointerType !== 'mouse') return;
       clearTimers();
       closeTimerRef.current = setTimeout(() => {
-        setOpen(false);
+        if (
+          !contentRef.current?.contains(document.activeElement) &&
+          document.activeElement !== triggerRef.current
+        )
+          closeInspection();
       }, HOVER_CLOSE_DELAY_MS);
     },
-    [clearTimers]
+    [clearTimers, closeInspection]
   );
 
   const handleKeyDown = useCallback(
@@ -137,17 +211,26 @@ export function EntityChipPopover({
       // also need to cancel hover timers so they don't compete with intent.
       if (event.key === 'Enter' || event.key === ' ') {
         clearTimers();
+        if (open) {
+          event.preventDefault();
+          contentRef.current?.querySelector<HTMLElement>('a, button')?.focus();
+        }
       }
     },
-    [clearTimers]
+    [clearTimers, open]
   );
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
       clearTimers();
-      setOpen(next);
+      if (next) openInspection();
+      else {
+        if (activeInspection?.owner === inspectionOwner.current)
+          activeInspection = null;
+        setOpen(false);
+      }
     },
-    [clearTimers]
+    [clearTimers, openInspection]
   );
 
   const handleOpenEntityPanel = useCallback(() => {
@@ -169,21 +252,73 @@ export function EntityChipPopover({
     setOpen(false);
   }, [entityPanel, previewPanel]);
 
+  const Root = mobile ? Sheet : Popover;
+  const Trigger = mobile ? SheetTrigger : PopoverTrigger;
+  const body = sourceFact ? (
+    <SourceFactCard fact={sourceFact} />
+  ) : (
+    <EntityChipPopoverBody
+      kind={kind}
+      id={id}
+      label={label}
+      entity={entity}
+      canOpen={canOpenEntityPanel}
+      onOpenEntity={handleOpenEntityPanel}
+      canOpenProfilePreview={canOpenProfilePreview}
+      onOpenProfilePreview={handleOpenProfilePreview}
+    />
+  );
+  const handleCloseAutoFocus = (event: Event) => {
+    event.preventDefault();
+    if (restoreFocus.current) {
+      suppressFocus.current = true;
+      triggerRef.current?.focus({ preventScroll: true });
+      suppressFocus.current = false;
+      restoreFocus.current = false;
+    }
+  };
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
+    <Root open={open} onOpenChange={handleOpenChange}>
+      <Trigger asChild>
         <button
+          ref={triggerRef}
+          onClickCapture={event => {
+            if (open && openedByHover.current) event.preventDefault();
+            openedByHover.current = false;
+            clearTimers();
+          }}
           type='button'
           aria-haspopup='dialog'
           aria-expanded={open}
-          aria-label={`${KIND_PREFIX[kind]}: ${label}`}
+          aria-label={
+            sourceFact
+              ? `Inspect source: ${sourceFact.subject.displayName ?? 'Reference'}`
+              : `${KIND_PREFIX[kind]}: ${label}`
+          }
+          onPointerDown={() => {
+            pointerDown.current = true;
+          }}
+          onPointerUp={() => {
+            pointerDown.current = false;
+          }}
+          onPointerCancel={() => {
+            pointerDown.current = false;
+          }}
+          onFocus={() => {
+            if (!mobile && !pointerDown.current && !suppressFocus.current)
+              openInspection();
+          }}
+          onBlur={event => {
+            if (!mobile && !contentRef.current?.contains(event.relatedTarget))
+              handleOpenChange(false);
+          }}
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
           onKeyDown={handleKeyDown}
           className='system-b-entity-chip-trigger focus-ring'
           data-testid='entity-chip-popover-trigger'
         >
-          {entity ? (
+          {entity || sourceFact ? (
             children
           ) : (
             <EntityChip
@@ -193,43 +328,69 @@ export function EntityChipPopover({
             />
           )}
         </button>
-      </PopoverTrigger>
-      <PopoverContent
-        className='w-68'
-        size='bare'
-        side='top'
-        sideOffset={6}
-        align='start'
-        testId='entity-chip-popover-content'
-        data-entity-kind={kind}
-        style={
-          {
-            '--jovie-entity-accent': `var(${ENTITY_KIND_ACCENT_VAR[kind]})`,
-          } as CSSProperties
-        }
-        onPointerEnter={() => {
-          // Keep the popover open while the cursor is over its content.
-          clearTimers();
-        }}
-        onPointerLeave={event => {
-          if (event.pointerType !== 'mouse') return;
-          closeTimerRef.current = setTimeout(() => {
-            setOpen(false);
-          }, HOVER_CLOSE_DELAY_MS);
-        }}
-      >
-        <EntityChipPopoverBody
-          kind={kind}
-          id={id}
-          label={label}
-          entity={entity}
-          canOpen={canOpenEntityPanel}
-          onOpenEntity={handleOpenEntityPanel}
-          canOpenProfilePreview={canOpenProfilePreview}
-          onOpenProfilePreview={handleOpenProfilePreview}
-        />
-      </PopoverContent>
-    </Popover>
+      </Trigger>
+      {mobile ? (
+        <SheetContent
+          side='bottom'
+          ref={contentRef}
+          testId='entity-chip-source-sheet'
+          onEscapeKeyDown={() => {
+            restoreFocus.current = true;
+          }}
+          onCloseAutoFocus={event => {
+            restoreFocus.current = true;
+            handleCloseAutoFocus(event);
+          }}
+        >
+          <SheetTitle>{sourceFact ? 'Source details' : label}</SheetTitle>
+          <SheetDescription className='sr-only'>
+            Inspect evidence or open the source.
+          </SheetDescription>
+          {body}
+        </SheetContent>
+      ) : (
+        <PopoverContent
+          ref={contentRef}
+          aria-label={sourceFact ? 'Source details' : label}
+          onOpenAutoFocus={event => event.preventDefault()}
+          onCloseAutoFocus={handleCloseAutoFocus}
+          onEscapeKeyDown={() => {
+            restoreFocus.current = true;
+          }}
+          onFocusOutside={event => {
+            if (event.target === triggerRef.current) event.preventDefault();
+          }}
+          className='w-68'
+          size='bare'
+          side='top'
+          sideOffset={6}
+          align='start'
+          testId='entity-chip-popover-content'
+          data-entity-kind={kind}
+          style={
+            {
+              '--jovie-entity-accent': `var(${ENTITY_KIND_ACCENT_VAR[kind]})`,
+            } as CSSProperties
+          }
+          onPointerEnter={() => {
+            // Keep the popover open while the cursor is over its content.
+            clearTimers();
+          }}
+          onPointerLeave={event => {
+            if (event.pointerType !== 'mouse') return;
+            closeTimerRef.current = setTimeout(() => {
+              if (
+                !contentRef.current?.contains(document.activeElement) &&
+                document.activeElement !== triggerRef.current
+              )
+                closeInspection();
+            }, HOVER_CLOSE_DELAY_MS);
+          }}
+        >
+          {body}
+        </PopoverContent>
+      )}
+    </Root>
   );
 }
 

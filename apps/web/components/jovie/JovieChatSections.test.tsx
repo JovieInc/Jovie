@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatInput } from '@/components/jovie/components/ChatInput';
 import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
 import { CHAT_EMPTY_SAMPLE_STORAGE_KEY } from './chat-empty-starters';
+import { sourceFixture } from './components/source-evidence.fixtures';
 import {
   type ComposerDraft,
   createComposerDraft,
@@ -25,8 +26,16 @@ import {
 
 vi.mock('@/components/jovie/components', async importOriginal => ({
   ...(await importOriginal<typeof import('@/components/jovie/components')>()),
-  ChatMessage: ({ id }: { id: string }) => (
-    <div data-testid='thread-row'>{id}</div>
+  ChatMessage: ({
+    id,
+    sourceFacts,
+  }: {
+    id: string;
+    sourceFacts?: readonly unknown[];
+  }) => (
+    <div data-testid='thread-row' data-source-count={sourceFacts?.length}>
+      {id}
+    </div>
   ),
 }));
 
@@ -172,15 +181,17 @@ describe('ChatInlineError', () => {
 });
 
 function renderThreadMessages({
+  messages = [],
   collapsedFailureCount = 0,
   onShowCollapsedFailures,
 }: {
+  readonly messages?: ComponentProps<typeof ChatThreadMessages>['messages'];
   readonly collapsedFailureCount?: number;
   readonly onShowCollapsedFailures?: () => void;
 } = {}) {
   return render(
     <ChatThreadMessages
-      messages={[]}
+      messages={messages}
       shouldVirtualizeMessages={false}
       virtualizer={{} as Virtualizer<HTMLDivElement, Element>}
       virtualizedMessageViewportHeight={0}
@@ -201,6 +212,30 @@ function renderThreadMessages({
 }
 
 describe('ChatThreadMessages collapsed summer failures', () => {
+  it('forwards public tool evidence to the assistant transcript', () => {
+    renderThreadMessages({
+      messages: [
+        {
+          id: 'sourced',
+          role: 'assistant',
+          parts: [
+            {
+              type: 'dynamic-tool',
+              toolName: 'fixtureEvidence',
+              toolCallId: 'evidence',
+              state: 'output-available',
+              input: {},
+              output: { enrichedFacts: [sourceFixture()] },
+            },
+          ],
+        },
+      ],
+    });
+    expect(screen.getByTestId('thread-row')).toHaveAttribute(
+      'data-source-count',
+      '1'
+    );
+  });
   it('hides the control when there are no collapsed failures', () => {
     renderThreadMessages({
       collapsedFailureCount: 0,

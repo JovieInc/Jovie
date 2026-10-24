@@ -22,13 +22,16 @@ vi.mock('./ChatMarkdown', () => ({
 describe('AssistantMessageText', () => {
   it('delegates plain assistant copy to ChatMarkdown', () => {
     fastRender(
-      <AssistantMessageText content='Here is a plain assistant reply.' />
+      <AssistantMessageText content='Here is a plain assistant reply. (source: enrichment)' />
     );
 
     expect(screen.getByTestId('chat-markdown')).toHaveTextContent(
       'Here is a plain assistant reply.'
     );
     expect(screen.queryByTestId('entity-mention-span')).toBeNull();
+    expect(screen.getByTestId('chat-markdown')).not.toHaveTextContent(
+      'source: enrichment'
+    );
   });
 
   it('renders entity wire tokens as subdued mention spans with hover cards', async () => {
