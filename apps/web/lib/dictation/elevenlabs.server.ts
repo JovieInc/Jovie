@@ -1,5 +1,6 @@
 import 'server-only';
 import { createApiClient } from '@jovie/api-client';
+import apiProviders from '@jovie/api-client/providers.json';
 import { env } from '@/lib/env-server';
 
 /** No raw provider errors, headers, credentials or token bodies reach logs. */
@@ -14,7 +15,10 @@ export async function mintDictationToken(): Promise<string> {
     log: () => {},
   });
   const response = await client.request({
-    url: 'https://api.elevenlabs.io/v1/single-use-token/realtime_scribe',
+    url: new URL(
+      '/v1/single-use-token/realtime_scribe',
+      `https://${apiProviders.providers.elevenlabs.hosts[0]}`
+    ).href,
     method: 'POST',
     timeoutMs: 8000,
     maxAttempts: 1,
