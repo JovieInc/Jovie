@@ -117,6 +117,8 @@ export {
   type Tip,
   tips,
 } from './analytics';
+// Auth & Users
+export { apiKeys } from './api-keys';
 // Artist daily public-metric snapshots (append-only)
 export {
   ARTIST_DAILY_SNAPSHOT_SOURCES,
@@ -134,7 +136,6 @@ export {
   type NewIngestAuditLog,
   selectIngestAuditLogSchema,
 } from './audit';
-// Auth & Users
 export {
   insertUserSchema,
   type NewUser,

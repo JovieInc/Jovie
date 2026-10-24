@@ -14,7 +14,7 @@ import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsAppearanceSection } from '@/features/dashboard/organisms/SettingsAppearanceSection';
 import { SettingsNotificationsSection } from '@/features/dashboard/organisms/SettingsNotificationsSection';
 import { useSessionSafe, useUserSafe } from '@/hooks/useJovieAuth';
-
+import { ApiKeysCard } from './ApiKeysCard';
 import { SessionManagementCard } from './SessionManagementCard';
 
 function AccountIdentitySummary() {
@@ -107,6 +107,11 @@ export function AccountSettingsSection({
       {isSignedIn ? (
         <SettingsPanel title='Active Sessions'>
           <SessionManagementCard activeSessionId={session?.id} />
+        </SettingsPanel>
+      ) : null}
+      {isSignedIn && session?.userId ? (
+        <SettingsPanel>
+          <ApiKeysCard userId={session.userId} />
         </SettingsPanel>
       ) : null}
       <SettingsAppearanceSection />

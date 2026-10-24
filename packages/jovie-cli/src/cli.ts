@@ -73,6 +73,7 @@ export interface CliDependencies {
   readonly stderr?: CliOutput;
   readonly stdin?: NodeJS.ReadableStream;
   readonly homeDir?: string;
+  readonly apiKey?: string;
   readonly workerToken?: string;
   readonly mesh?: MeshDependencies;
   /** Whole-request deadline; tests shorten it to exercise hangs quickly. */
@@ -163,6 +164,7 @@ Options:
   -v, --version          Show the installed CLI version
 
 Environment:
+  JOVIE_API_KEY          Optional account API key for product requests
   JOVIE_TIMEOUT_MS       Request deadline in ms, retries included (default 30000)
 
 Examples:
@@ -405,6 +407,7 @@ async function execute(
     },
     {
       baseUrl,
+      apiKey: dependencies.apiKey ?? process.env.JOVIE_API_KEY,
       workerToken: dependencies.workerToken ?? process.env.JOVIE_WORKER_TOKEN,
       fetchImpl: dependencies.fetchImpl,
       timeoutMs: dependencies.timeoutMs ?? timeoutFromEnv(),
@@ -480,6 +483,7 @@ export async function runCli(
         throw new UsageError('Unsupported option for mcp.');
       await serveMcp((dependencies.stdin ?? process.stdin) as never, stdout, {
         version: CLI_VERSION,
+        apiKey: dependencies.apiKey ?? process.env.JOVIE_API_KEY,
         workerToken: dependencies.workerToken ?? process.env.JOVIE_WORKER_TOKEN,
         baseUrl: normalizeBaseUrl(values.baseUrl),
         timeoutMs: dependencies.timeoutMs ?? timeoutFromEnv(),

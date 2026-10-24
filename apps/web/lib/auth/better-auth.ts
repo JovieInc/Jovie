@@ -18,6 +18,7 @@ import {
 } from 'better-auth/plugins';
 import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { db } from '@/lib/db';
+import { apiKeys } from '@/lib/db/schema/api-keys';
 import {
   baAccounts,
   baJwks,
@@ -39,6 +40,7 @@ import { captureError } from '@/lib/error-tracking';
 import { getAccountMetricCohort } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
 import { adminPasskeyStepUp } from './admin-passkey-step-up';
+import { agentApiKeyPlugin } from './api-key-plugin';
 import { generateAppleClientSecret } from './apple-client-secret';
 import { sendEmailOtp } from './email-otp-sender';
 import { mcpDynamicClientRegistrationOptions } from './mcp-dynamic-registration';
@@ -287,6 +289,7 @@ function buildSocialProviders(): NonNullable<
 function buildPlugins() {
   const googleOneTapClientId = publicEnv.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   return [
+    agentApiKeyPlugin(),
     emailOTP({
       expiresIn: 600,
       allowedAttempts: 5,
@@ -357,6 +360,7 @@ export const auth = betterAuth({
     // default staying false (plan eng row 32).
     transaction: false,
     schema: {
+      apikey: apiKeys,
       user: baUsers,
       session: baSessions,
       account: baAccounts,

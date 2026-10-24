@@ -2,6 +2,7 @@ import { asc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { BASE_URL } from '@/constants/app';
+import { authenticateAgentApiKey } from '@/lib/auth/agent-api-key';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
@@ -12,9 +13,11 @@ import { ingestSocialPlatformUrl } from '@/lib/ingestion/flows/social-platform-i
 import { fetchSpotifyArtistData } from '@/lib/ingestion/flows/spotify-integration';
 import { isPublicProfileDiscoveryEligible } from '@/lib/profile/public-profile-indexing-policy';
 import {
+  agentProfileCreateAuthenticatedLimiter,
   agentProfileCreateLimiter,
   createRateLimitHeaders,
   getClientIP,
+  publicArtistApiLimiter,
 } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
@@ -72,7 +75,7 @@ function profilePayload(profile: {
 }
 
 /**
- * Anonymous agent profile creation: `POST /api/agents/profiles {"url": "<spotify artist url>"}`.
+ * Agent profile creation (optional API key): `POST /api/agents/profiles {"url": "<spotify artist url>"}`.
  *
  * Returns the existing profile untouched when one already holds the Spotify
  * artist ID; otherwise creates an unclaimed profile the human can claim.
@@ -87,7 +90,41 @@ export async function POST(request: Request) {
     );
   }
 
-  const rateLimit = await agentProfileCreateLimiter.limit(getClientIP(request));
+  // Bound the credential oracle before its indexed DB lookup, including
+  // invalid keys. Keep this separate from both creation budgets.
+  if (request.headers.has('authorization')) {
+    const verificationLimit = await publicArtistApiLimiter.limit(
+      `agent-api-key:${getClientIP(request)}`
+    );
+    if (!verificationLimit.success)
+      return fail(
+        verificationLimit.unavailable ? 503 : 429,
+        verificationLimit.unavailable
+          ? 'TEMPORARILY_UNAVAILABLE'
+          : 'RATE_LIMITED',
+        'API key verification is temporarily limited. Try again shortly.',
+        createRateLimitHeaders(verificationLimit)
+      );
+  }
+
+  let actor: Awaited<ReturnType<typeof authenticateAgentApiKey>>;
+  try {
+    actor = await authenticateAgentApiKey(request);
+  } catch {
+    return fail(
+      503,
+      'TEMPORARILY_UNAVAILABLE',
+      'Authentication is temporarily unavailable.',
+      {
+        'Retry-After': RETRY_AFTER_SERVICE,
+      }
+    );
+  }
+  if (!actor.ok)
+    return fail(401, 'UNAUTHORIZED', 'Invalid or expired API key.');
+  const rateLimit = actor.userId
+    ? await agentProfileCreateAuthenticatedLimiter.limit(actor.userId)
+    : await agentProfileCreateLimiter.limit(getClientIP(request));
   if (!rateLimit.success) {
     return rateLimit.unavailable
       ? fail(503, 'TEMPORARILY_UNAVAILABLE', 'Try again shortly.', {
@@ -96,7 +133,7 @@ export async function POST(request: Request) {
       : fail(
           429,
           'RATE_LIMITED',
-          'Too many profile creations from this address.',
+          'Too many profile creations.',
           createRateLimitHeaders(rateLimit)
         );
   }
@@ -169,6 +206,7 @@ export async function POST(request: Request) {
 
     const ingested = await ingestSocialPlatformUrl(url, {
       allocateNewHandleOnCollision: true,
+      ...(actor.userId ? { createdByUserId: actor.userId } : {}),
     });
     const body = (await ingested.json().catch(() => null)) as {
       profile?: { username?: string };

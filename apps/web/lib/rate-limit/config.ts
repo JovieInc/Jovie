@@ -455,6 +455,18 @@ export const RATE_LIMITERS = {
     requireRedis: true,
   } satisfies RateLimitConfig,
 
+  /** Authenticated agent creation: one budget across every key on an account. */
+  agentProfileCreateAuthenticated: {
+    name: 'Authenticated Agent Profile Create',
+    limit: 100,
+    window: '1 h',
+    prefix: 'agent:profile-create:account',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'authenticated',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
   /**
    * Anonymous creator extraction (GET /api/agents/creator-lookup): 60 per hour
    * per IP. Each request performs one bounded fetch to a supported platform.

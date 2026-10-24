@@ -1,3 +1,4 @@
+import { apiKeyClient } from '@better-auth/api-key/client';
 import { oauthProviderClient } from '@better-auth/oauth-provider/client';
 import { passkeyClient } from '@better-auth/passkey/client';
 import { emailOTPClient, oneTapClient } from 'better-auth/client/plugins';
@@ -59,6 +60,7 @@ export const authClient = createAuthClient({
       ? absolutePublicUrl(process.env.NEXT_PUBLIC_BETTER_AUTH_URL)
       : undefined,
   plugins: [
+    apiKeyClient(),
     emailOTPClient(),
     // Admin step-up factor (JOV-4806).
     passkeyClient(),
