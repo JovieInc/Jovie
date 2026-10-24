@@ -24,6 +24,7 @@ import {
   Share2,
   UserRound,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -99,10 +100,7 @@ import {
 } from '@/lib/queries';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
-import {
-  AddConnectionRail,
-  type ConnectionIntakeCandidate,
-} from './AddConnectionRail';
+import type { ConnectionIntakeCandidate } from './AddConnectionRail';
 import { buildConnectionActions } from './connection-actions';
 import type {
   PresenceSignal,
@@ -112,6 +110,10 @@ import type {
 } from './data';
 import { PresenceIdentityPhoto } from './PresenceIdentityPhoto';
 import { PresenceLockAffordance } from './PresenceLockAffordance';
+
+const AddConnectionRail = dynamic(() =>
+  import('./AddConnectionRail').then(module => module.AddConnectionRail)
+);
 
 function combineSourceIdentityQueries(
   results: readonly UseQueryResult<SourceIdentity>[]

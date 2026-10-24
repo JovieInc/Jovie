@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { cleanScrapedDisplayName } from './scraped-display-name';
+import {
+  cleanScrapedDisplayName,
+  hasScrapedTitleChrome,
+} from './scraped-display-name';
 
 describe('cleanScrapedDisplayName', () => {
   it.each([
@@ -35,5 +38,27 @@ describe('cleanScrapedDisplayName', () => {
     expect(cleanScrapedDisplayName('')).toBeNull();
     expect(cleanScrapedDisplayName(null)).toBeNull();
     expect(cleanScrapedDisplayName('@')).toBeNull();
+  });
+});
+
+describe('hasScrapedTitleChrome', () => {
+  it('detects page-title chrome', () => {
+    expect(
+      hasScrapedTitleChrome('Mega Ran | Instagram, Facebook, Twitch')
+    ).toBe(true);
+    expect(
+      hasScrapedTitleChrome('ninadevitry - Listen on YouTube, Spotify')
+    ).toBe(true);
+    expect(
+      hasScrapedTitleChrome('ODESZA Tour Dates, Tickets & Merch Links')
+    ).toBe(true);
+  });
+
+  it('does not flag real names or empty input', () => {
+    expect(hasScrapedTitleChrome('A-ha')).toBe(false);
+    expect(hasScrapedTitleChrome('Jay-Z')).toBe(false);
+    expect(hasScrapedTitleChrome('DJ Shadow')).toBe(false);
+    expect(hasScrapedTitleChrome('')).toBe(false);
+    expect(hasScrapedTitleChrome(null)).toBe(false);
   });
 });

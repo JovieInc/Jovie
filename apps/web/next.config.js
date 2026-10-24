@@ -506,9 +506,9 @@ const nextConfig = {
         source: '/app/admin/ingest',
         destination: '/app/ov/growth?view=ingest',
       },
-      // Needs You folded into Ovie Home's asks (Tim 2026-10-21: one Home).
-      { source: '/app/ov/needs-you', destination: '/app/ov' },
-      { source: '/app/admin/needs-you', destination: '/app/ov' },
+      // Keep legacy Needs You links opening the canonical Inbox.
+      { source: '/app/ov/needs-you', destination: '/app/ov/inbox' },
+      { source: '/app/admin/needs-you', destination: '/app/ov/inbox' },
       {
         source: '/app/admin/:path*',
         destination: '/app/ov/:path*',
