@@ -553,6 +553,9 @@ export function useJovieChatController({
     error: existingConversationError,
     isError: isConversationQueryError,
     isLoading: isLoadingConversation,
+    hasOlderMessages,
+    isFetchingOlderMessages,
+    loadOlderMessages,
   } = useChatConversationQuery({
     conversationId: activeConversationId,
     enabled: chatMode === 'ov' || !!activeConversationId,
@@ -1717,6 +1720,9 @@ export function useJovieChatController({
     activeConversationId,
     /** Auto-generated or user-set conversation title (null if not yet generated) */
     conversationTitle,
+    hasOlderMessages,
+    isFetchingOlderMessages,
+    loadOlderMessages,
     // Refs
     inputRef,
     // Handlers

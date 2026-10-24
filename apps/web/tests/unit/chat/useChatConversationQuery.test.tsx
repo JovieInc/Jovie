@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -69,7 +69,7 @@ describe('useChatConversationQuery', () => {
     expect(result.current.data?.conversation.id).toBe('conv-1');
     expect(result.current.data?.conversation.title).toBe('Test Conversation');
     expect(mockFetch).toHaveBeenCalledWith(
-      '/api/chat/conversations/conv-1',
+      '/api/chat/conversations/conv-1?limit=40',
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
@@ -186,4 +186,118 @@ describe('useChatConversationQuery', () => {
 
     vi.useRealTimers();
   });
+});
+
+it('loads older pages through before while keeping chronological history', async () => {
+  queryClient.clear();
+  mockFetch.mockReset();
+  const message = (id: string, createdAt: string) => ({
+    ...mockConversationResponse.messages[0],
+    id,
+    createdAt,
+  });
+  const newer = message('newer', '2026-07-23T00:01:00.000Z');
+  const older = message('older', '2026-07-23T00:00:00.000Z');
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      ...mockConversationResponse,
+      messages: [newer],
+      hasMore: true,
+    }),
+  });
+  const { result } = renderHook(
+    () => useChatConversationQuery({ conversationId: 'paged' }),
+    { wrapper: TestWrapper }
+  );
+  await waitFor(() => expect(result.current.hasOlderMessages).toBe(true));
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      ...mockConversationResponse,
+      messages: [older],
+      hasMore: false,
+    }),
+  });
+  await act(async () => {
+    await result.current.loadOlderMessages();
+  });
+  expect(mockFetch).toHaveBeenLastCalledWith(
+    '/api/chat/conversations/paged?limit=40&before=2026-07-23T00%3A01%3A00.000Z',
+    expect.objectContaining({ signal: expect.any(AbortSignal) })
+  );
+  await waitFor(() =>
+    expect(result.current.data?.messages.map(row => row.id)).toEqual([
+      'older',
+      'newer',
+    ])
+  );
+  expect(result.current.hasOlderMessages).toBe(false);
+});
+
+it('preserves loaded history after a page failure and allows retry', async () => {
+  queryClient.clear();
+  mockFetch.mockReset();
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ ...mockConversationResponse, hasMore: true }),
+  });
+  const { result } = renderHook(
+    () => useChatConversationQuery({ conversationId: 'retry' }),
+    { wrapper: TestWrapper }
+  );
+  await waitFor(() => expect(result.current.hasOlderMessages).toBe(true));
+  mockFetch.mockResolvedValueOnce(
+    new Response(JSON.stringify({ error: 'Temporarily unavailable' }), {
+      status: 503,
+    })
+  );
+  await act(async () => {
+    await result.current.loadOlderMessages();
+  });
+  await waitFor(() => expect(result.current.isFetchNextPageError).toBe(true));
+  expect(result.current.data?.messages).toEqual(
+    mockConversationResponse.messages
+  );
+  expect(result.current.hasOlderMessages).toBe(true);
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      ...mockConversationResponse,
+      messages: [],
+      hasMore: false,
+    }),
+  });
+  await act(async () => {
+    await result.current.loadOlderMessages();
+  });
+  await waitFor(() => expect(result.current.hasOlderMessages).toBe(false));
+  expect(result.current.data?.messages).toEqual(
+    mockConversationResponse.messages
+  );
+});
+
+it('does not offer the previous conversation cursor while a new conversation loads', async () => {
+  queryClient.clear();
+  mockFetch.mockReset();
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ ...mockConversationResponse, hasMore: true }),
+  });
+  const { result, rerender } = renderHook(
+    ({ id }) => useChatConversationQuery({ conversationId: id }),
+    { initialProps: { id: 'first' }, wrapper: TestWrapper }
+  );
+  await waitFor(() => expect(result.current.hasOlderMessages).toBe(true));
+  mockFetch.mockImplementationOnce(
+    (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () =>
+          reject(new DOMException('Aborted', 'AbortError'))
+        );
+      })
+  );
+  rerender({ id: 'second' });
+  await waitFor(() => expect(result.current.isPlaceholderData).toBe(true));
+  expect(result.current.hasOlderMessages).toBe(false);
 });

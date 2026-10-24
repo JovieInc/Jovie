@@ -133,6 +133,9 @@ export function JovieChat({
     showCollapsedSummerFailures,
     isLoadingConversation,
     conversationTitle,
+    hasOlderMessages,
+    isFetchingOlderMessages,
+    loadOlderMessages,
     status,
     activeConversationId,
     inputRef,
@@ -376,6 +379,9 @@ export function JovieChat({
   // Virtualizer
   const virtualizer = useVirtualizer({
     count: messages.length,
+    // The installed virtualizer preserves the visible keyed row on prepend.
+    getItemKey: index => messages[index].id,
+    anchorTo: 'end',
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => CHAT_TRANSCRIPT_ROW_ESTIMATE_PX,
     overscan: CHAT_TRANSCRIPT_WINDOW.overscanRowCount,
@@ -389,6 +395,27 @@ export function JovieChat({
     measureElement: el =>
       measureChatTranscriptRow(el, scrollContainerRef.current),
   });
+  useEffect(() => {
+    const viewport = scrollContainerRef.current;
+    if (!viewport || !hasOlderMessages || isFetchingOlderMessages) return;
+    let previousTop = viewport.scrollTop;
+    const onScroll = () => {
+      const nextTop = viewport.scrollTop;
+      if (nextTop < previousTop && nextTop < viewport.clientHeight) {
+        void loadOlderMessages({ cancelRefetch: false });
+      }
+      previousTop = nextTop;
+    };
+    viewport.addEventListener('scroll', onScroll, { passive: true });
+    return () => viewport.removeEventListener('scroll', onScroll);
+  }, [
+    hasOlderMessages,
+    isFetchingOlderMessages,
+    loadOlderMessages,
+    scrollContainerRef,
+    isLoadingConversation,
+  ]);
+
   const shouldVirtualizeMessages = messages.length > VIRTUALIZATION_THRESHOLD;
   const [virtualizedMinHeight, setVirtualizedMinHeight] = useState(0);
 
