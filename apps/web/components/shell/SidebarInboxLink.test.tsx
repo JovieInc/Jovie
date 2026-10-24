@@ -33,8 +33,18 @@ describe('central Inbox bell', () => {
     const link = screen.getByRole('link', {
       name: 'Inbox — Items Need Attention',
     });
+    expect(link.querySelector('svg')).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)'
+    );
+    expect(link).toHaveClass('size-7', 'items-center', 'justify-center');
     expect(link).toHaveAttribute('href', '/app');
     expect(link).toHaveAttribute('data-prefetch', 'false');
+    expect(link.querySelector('span')).toHaveClass(
+      'absolute',
+      'bottom-1',
+      'right-1'
+    );
+    expect(link.querySelector('span')).not.toHaveClass('top-1');
     await userEvent.tab();
     expect(link).toHaveFocus();
     expect(link).toHaveAttribute('data-inbox-attention', 'available');
@@ -52,6 +62,14 @@ describe('central Inbox bell', () => {
       });
       // The Inbox itself renders the update card, so the dot stays honest.
       expect(link.querySelector('[data-runtime-update]')).not.toBeNull();
+      expect(link.querySelector('[data-runtime-update]')).toHaveClass(
+        'absolute',
+        'bottom-1',
+        'right-1'
+      );
+      expect(link.querySelector('[data-runtime-update]')).not.toHaveClass(
+        'top-1'
+      );
     } finally {
       runtimeUpdate.available = false;
     }
@@ -69,6 +87,9 @@ describe('central Inbox bell', () => {
         name: 'Inbox — Items Need Attention; App Update Available',
       });
       expect(link.querySelectorAll('[data-runtime-update]')).toHaveLength(1);
+      expect(link.querySelector('[data-runtime-update]')).toHaveClass(
+        'bottom-1'
+      );
     } finally {
       runtimeUpdate.available = false;
     }
@@ -112,6 +133,8 @@ describe('central Inbox bell', () => {
     ],
   ])('keeps the destination available for %s', (availability, name) => {
     render(<SidebarInboxLink availability={availability} />);
-    expect(screen.getByRole('link', { name })).toHaveAttribute('href', '/app');
+    const link = screen.getByRole('link', { name });
+    expect(link).toHaveAttribute('href', '/app');
+    expect(link.querySelector('span')).toBeNull();
   });
 });

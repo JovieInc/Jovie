@@ -13,6 +13,17 @@ async function openHeader(page: Page, width: number) {
   await page.goto('/artist-profiles');
   await expect(page.locator(headerSelector)).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
+  // Wait for the scroll observer to hydrate before instrumenting controls.
+  await page.evaluate(() => window.scrollTo(0, 240));
+  await expect(page.getByTestId('header-nav')).toHaveAttribute(
+    'data-scrolled',
+    'true'
+  );
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(page.getByTestId('header-nav')).not.toHaveAttribute(
+    'data-scrolled',
+    'true'
+  );
 }
 
 async function assertHeadingClear(page: Page) {
@@ -160,7 +171,10 @@ test('marketing header targets activate their own action and feedback follows ra
     await assertTargets(page);
     await assertHeadingClear(page);
   }
-  await page.screenshot({ path: test.info().outputPath('header-normal.png') });
+  await page.screenshot({
+    caret: 'initial',
+    path: test.info().outputPath('header-normal.png'),
+  });
   await openHeader(page, 390);
   await expect(page.getByTestId('header-nav')).toBeVisible();
   const shell = await page
@@ -170,7 +184,10 @@ test('marketing header targets activate their own action and feedback follows ra
   expect(
     (shell?.x ?? -1) >= 0 && (shell?.x ?? 0) + (shell?.width ?? 0) <= 390
   ).toBe(true);
-  await page.screenshot({ path: test.info().outputPath('header-mobile.png') });
+  await page.screenshot({
+    caret: 'initial',
+    path: test.info().outputPath('header-mobile.png'),
+  });
 });
 
 test('marketing header contains growing controls without overlapping targets', async ({
@@ -213,7 +230,10 @@ test('marketing header contains growing controls without overlapping targets', a
     );
     await assertTargets(page);
     await assertHeadingClear(page);
-    await page.screenshot({ path: testInfo.outputPath('header-font64.png') });
+    await page.screenshot({
+      caret: 'initial',
+      path: testInfo.outputPath('header-font64.png'),
+    });
   } finally {
     await enlargedBrowser.close();
   }
@@ -254,3 +274,78 @@ test('marketing header docks flush over the hero and fades its glass in on scrol
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(header).not.toHaveAttribute('data-scrolled', 'true');
 });
+
+for (const route of ['/', '/artist-profiles']) {
+  for (const width of [1440, 390]) {
+    test(`sticky marketing header stays inside the public box at ${width}px on ${route}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.goto(route);
+      const header = page.getByTestId('header-nav');
+      await expect(header).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      // The scroll attribute is a client-owned hydration receipt.
+      await page.evaluate(() => window.scrollTo(0, 240));
+      await expect(header).toHaveAttribute('data-scrolled', 'true');
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await expect(header).not.toHaveAttribute('data-scrolled', 'true');
+
+      const readGeometry = () =>
+        header.evaluate(element => {
+          const rect = element.getBoundingClientRect();
+          const nav = element.querySelector('nav');
+          if (!nav) throw new Error('Missing primary navigation');
+          const navRect = nav.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const rim = getComputedStyle(element, '::before');
+          return {
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            navLeft: navRect.left,
+            navRight: navRect.right,
+            viewport: document.documentElement.clientWidth,
+            maxWidth: Number.parseFloat(
+              style.getPropertyValue('--ds-public-content-max')
+            ),
+            position: style.position,
+            border: style.borderBottomWidth,
+            rimWidth: Number.parseFloat(rim.width),
+            rimBorder: Number.parseFloat(rim.borderBottomWidth),
+            rimOpacity: Number.parseFloat(rim.opacity),
+          };
+        });
+
+      await expect.poll(async () => (await readGeometry()).rimOpacity).toBe(0);
+      const before = await readGeometry();
+      await page.evaluate(() => window.scrollTo(0, 240));
+      await expect(header).toHaveAttribute('data-scrolled', 'true');
+      await expect.poll(async () => (await readGeometry()).rimOpacity).toBe(1);
+      const after = await readGeometry();
+
+      for (const geometry of [before, after]) {
+        expect(geometry.position).toBe('fixed');
+        expect(geometry.top).toBe(0);
+        expect(geometry.left).toBeGreaterThan(0);
+        expect(geometry.right).toBeLessThan(geometry.viewport);
+        expect(geometry.width).toBeLessThanOrEqual(geometry.maxWidth);
+        expect(geometry.left).toBeCloseTo(
+          geometry.viewport - geometry.right,
+          0
+        );
+        expect(geometry.navLeft).toBeCloseTo(geometry.left, 0);
+        expect(geometry.navRight).toBeCloseTo(geometry.right, 0);
+        // No outer border; the only separator is the contained glass rim.
+        expect(geometry.border).toBe('0px');
+        expect(geometry.rimWidth).toBeCloseTo(geometry.width, 0);
+        expect(geometry.rimBorder).toBeGreaterThan(0);
+        expect(geometry.rimWidth).toBeLessThan(geometry.viewport);
+      }
+      expect(after.height).toBe(before.height);
+      expect(after.width).toBe(before.width);
+    });
+  }
+}

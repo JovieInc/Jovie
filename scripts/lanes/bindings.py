@@ -68,6 +68,9 @@ DEPENDENCY = re.compile(r"(?i)\b(?:depends on|blocked by|waits? (?:on|for)|stack
 ENQUEUE_MUTATION = ('mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,'
                     'expectedHeadOid:$head}){mergeQueueEntry{position}}}')
 MERGE_GROUP_LOG_CHARS = 6000        # tail of the failed merge-group jobs' log in a repair prompt
+FETCH_ATTEMPTS = 2                  # one lost ref-lock race retries once (JOV-8902/LYB-226); more is a real fault
+CANNOT_LOCK_REF = "cannot lock ref"
+PUSH_ATTEMPTS = 2                   # the pre-push hook's test suite can flake; one retry, never --no-verify
 
 
 @dataclass(frozen=True)
@@ -583,6 +586,41 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
 
 # ---------------------------------------------------------------- runs
 
+def fetch(lane, host, binding: Binding, log, *refs: str) -> None:
+    """Fetch `refs` from the binding's shared clone, one fetch per repo at a time.
+
+    Seats claimed in the same second race the clone's ref lock and die 'cannot lock ref
+    refs/remotes/origin/main' seconds in (JOV-8902/LYB-226). A per-repo flock serializes
+    them and a lost race retries once. The kernel drops the lock if the holder dies and
+    git's own 600s timeout bounds every hold, so the wait cannot outlive the fetch it
+    serializes; a non-ref-lock fault fails immediately."""
+    lock = lane.Locked(host.state / "bindings" / binding.key / "fetch.lock", blocking=True)
+    try:
+        for attempt in range(FETCH_ATTEMPTS):
+            ran = lane.sh(["git", "fetch", "-q", "origin", *refs], cwd=binding.repo, timeout=600, log=log)
+            if not ran.returncode:
+                return
+            if attempt + 1 < FETCH_ATTEMPTS and CANNOT_LOCK_REF in f"{ran.stdout}{ran.stderr}":
+                continue
+            raise RuntimeError("git-fetch-failed")
+    finally:
+        lock.release()
+
+
+def push_with_retry(git, branch: str, attempts: int = PUSH_ATTEMPTS) -> None:
+    """Push an issue branch, retrying a flaky pre-push hook once. The hook gates every
+    attempt (never --no-verify), so a persistent failure - a real regression, not a flake -
+    still fails the run and charges the issue."""
+    last: BaseException = RuntimeError("git-push-failed")
+    for _ in range(attempts):
+        try:
+            git("push", "-q", "-u", "origin", branch)
+            return
+        except RuntimeError as error:
+            last = error
+    raise last
+
+
 def merge_group_evidence(lane, binding: Binding, pr: dict) -> str:
     """The failed merge-group run for this PR (`gh-readonly-queue/main/pr-<n>-*`) and the tail of
     its failed jobs' log, read once when the repair starts. Empty when none is readable."""
@@ -681,10 +719,10 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
             lane.require_disk(host, "binding-checkout")
             worktree.parent.mkdir(parents=True, exist_ok=True)
             if pr is not None:
-                git("fetch", "-q", "origin", "main", branch, cwd=binding.repo)
+                fetch(lane, host, binding, log, "main", branch)
                 git("worktree", "add", "-q", "--detach", str(worktree), pr["headRefOid"], cwd=binding.repo)
             else:
-                git("fetch", "-q", "origin", "main", cwd=binding.repo)
+                fetch(lane, host, binding, log, "main")
                 git("worktree", "add", "-q", "-b", branch, str(worktree), "origin/main", cwd=binding.repo)
             if binding.install and lane.sh(install_command(binding, pr), cwd=worktree, timeout=1800,
                                            log=log).returncode:
@@ -757,7 +795,7 @@ def publish(lane, binding: Binding, branch: str, worktree: Path, git, *, issue=N
         return result
     if git("rev-list", "--count", "origin/main..HEAD") in ("", "0"):
         return {"verdict": "no-change", "reasons": ["no-commits"]}
-    git("push", "-q", "-u", "origin", branch)
+    push_with_retry(git, branch)
     created = lane.sh(["gh", "pr", "create", "--repo", binding.slug, "--base", "main", "--head", branch,
                        "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
                        "--body", f"Refs {issue.identifier}.\n\n<!-- linear-issue-id:{issue.id} -->\n"
