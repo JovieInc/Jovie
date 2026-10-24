@@ -1,6 +1,6 @@
 {
   "schema": "jovie.feedback-guards/v1",
-  "reviewedOn": "2026-10-17",
+  "reviewedOn": "2026-10-21",
   "lessons": [
     {
       "fingerprint": "`captureWarning(message, context)` files Linear as `Error: {json}`",
@@ -494,9 +494,9 @@
         },
         {
           "kind": "test",
-          "path": "apps/web/tests/unit/ci/deploy-workflow.test.ts",
-          "anchor": "binds the exact project deployment before cookie-only canary and auth smoke",
-          "reason": "Checks exact deployment binding and canonical protected probe ownership."
+          "path": "apps/web/tests/unit/ci/canary-health-gate.test.ts",
+          "anchor": "binds the exact deployment, then probes it cookie-only without redirects",
+          "reason": "Executes the shipped canary shell against a modeled preview and checks the exact deployment URL, bounded cookie-only requests and no redirects."
         },
         {
           "kind": "test",

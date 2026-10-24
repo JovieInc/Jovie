@@ -17,6 +17,7 @@ the release it started with and the next issue runs on the new one.
 from __future__ import annotations
 
 import argparse
+import copy
 from contextlib import contextmanager, nullcontext
 import fcntl
 import hashlib
@@ -126,6 +127,7 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
+              "scripts/tests/test_git_housekeeping.py",
               "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
               "scripts/tests/test_worktree_pool.py",
@@ -1234,6 +1236,11 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "  Do not use closing keywords for issue links: native Linear merge automation",
         "  cannot inspect commissioning acceptance. The repository merge sync closes",
         "  normal implementation issues and retains commissioning/parent work.",
+        "- Include exactly one customer changelog decision block in the PR body (see",
+        "  docs/CHANGELOG_PUBLICATION.md). Default to internal:",
+        "  `<!-- customer-changelog/v1 {\"releaseWorthy\":false} -->`. When the change is",
+        "  customer-visible, replace it with a customer outcome block (issueId, outcomeKey,",
+        "  releaseWorthy:true, section, outcome text, availability, evidence).",
         "- If the issue is not code-shippable or already fixed, open no PR and end with a",
         "  line `NOT-SHIPPABLE: <reason>`.",
         "- You are unattended: nobody will answer a question. Never stop to ask; choose the",
@@ -3659,7 +3666,180 @@ def requeue_verified(host: Host, prs: list[dict] | None, *, defer=None) -> dict 
         publish_verified(host, pr)
 
 
-# ---------------------------------------------------------------- fix red first
+# ---------------------------------------------------------------- red wake (JOV-8931)
+
+# The lane-fix-relay labels a red PR within ~40s, but the 5-minute oneshot timer
+# is when a worker can actually start: with every slot busy, a red waits out the
+# tick (#22868: 11 minutes red to claim). The relay's gem-side job drops a wake
+# file; the systemd jovie-lanes-wake.path unit runs fix-now the moment it lands.
+RED_DISPATCH_SCHEMA = "jovie-lane-red-dispatch/v1"
+RED_DISPATCH_HOUR_S = 3600
+WAKE_FILE_MAX_BYTES = 4096
+MAX_WAKE_PER_ACTIVATION = 5
+MAX_RED_DISPATCH_PER_PR_PER_HOUR = 4
+
+
+def iso_epoch(stamp):
+    try:
+        return datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
+def read_red_dispatch_rows(state):
+    """Bounded optional ledger read; a corrupt or oversized ledger reads as empty."""
+    try:
+        rows = maintenance_json(state / "runs/red-dispatch.jsonl", json_lines=True)
+    except ValueError:
+        return []
+    return rows if isinstance(rows, list) else []
+
+
+def append_red_dispatch_row(state, row):
+    path = state / "runs/red-dispatch.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a") as handle:
+        handle.write(json.dumps(row) + "\n")
+
+
+def red_dispatch_claims_this_hour(state, pr, now):
+    """Per-PR abuse cap: how many red wakes this PR spent in the last hour."""
+    return sum(1 for row in read_red_dispatch_rows(state)
+               if row.get("pr") == pr and row.get("status") == "dispatched"
+               and isinstance(row.get("dispatchedEpoch"), (int, float))
+               and 0 <= now - row["dispatchedEpoch"] < RED_DISPATCH_HOUR_S)
+
+
+def free_red_provider(host):
+    """First enabled provider with a free, healthy, in-quota slot — the same
+    admission dispatch's spawn loop applies (disk is checked by the caller)."""
+    for name, spec in load_providers().items():
+        try:
+            if not spec.get("enabled", True):
+                continue
+            slots = host.slots(name, spec.get("slots", 1))
+            if slots <= 0 or cooling(host, name):
+                continue
+            if not quota_pressure(host, name, spec, time.time())["ok"]:
+                continue
+            if not provider_healthy(spec):
+                continue
+            return name
+        except Exception:  # one provider's fault must not block the others
+            continue
+    return None
+
+
+def record_red_row(state, *, status, pr, sha, run_id, run_attempt, red_at,
+                   reason=None, provider=None):
+    """One JSONL row per wake outcome. Timestamps join with the CI timing
+    collector (JOV-8933) on (pr, sha, runId, runAttempt)."""
+    dispatched = status == "dispatched"
+    append_red_dispatch_row(state, {
+        "schema": RED_DISPATCH_SCHEMA,
+        "status": status,
+        "pr": pr,
+        "sha": sha,
+        "runId": run_id,
+        "runAttempt": run_attempt,
+        "redAt": red_at,
+        "redAtEpoch": iso_epoch(red_at),
+        "dispatchedAt": now_iso() if dispatched else None,
+        "dispatchedEpoch": time.time() if dispatched else None,
+        "claimAt": None,
+        "provider": provider,
+        "reason": reason,
+    })
+
+
+def read_wake_file(path):
+    """Bounded, validated wake read. Anything unreadable or oversized is invalid."""
+    try:
+        if path.stat().st_size > WAKE_FILE_MAX_BYTES:
+            return None
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or data.get("schema") != pr_events.WAKE_SCHEMA:
+        return None
+    sha = data.get("sha")
+    if not isinstance(data.get("pr"), int) or not re.fullmatch(r"[0-9a-f]{40}", sha or ""):
+        return None
+    return data
+
+
+def fix_now(host: Host) -> int:
+    """Drain the relay's wake dir immediately instead of waiting for the 5-minute
+    tick. Same admission as dispatch(): disk, then the first provider with a free
+    healthy slot. Dedupe per PR+SHA+attempt via an O_EXCL marker plus the fenced
+    lane claim. No slot -> record no-slot and keep the lane-fix-red label; the
+    5-minute timer remains the fallback."""
+    wake_dir = host.state / "wake"
+    if not wake_dir.is_dir():
+        return 0
+    for path in sorted(wake_dir.glob("red-*.json"))[:MAX_WAKE_PER_ACTIVATION]:
+        marker = path.with_name(path.name + ".claim")
+        try:
+            fd = os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            os.close(fd)
+        except FileExistsError:
+            continue  # an earlier activation already handled this attempt
+        data = read_wake_file(path)
+        if data is None:
+            record_red_row(host.state, status="invalid", pr=None, sha=None,
+                           run_id=None, run_attempt=None, red_at=None, reason=path.name)
+            path.unlink(missing_ok=True)
+            continue
+        pr, sha = data["pr"], data["sha"]
+        run_id = data.get("runId")
+        run_attempt = data.get("runAttempt")
+        red_at = data.get("redAt")
+        try:
+            claimed = pr_events.claim_active(pr, sha, sh, kind="fix")
+        except Exception:
+            claimed = None
+        if claimed:
+            record_red_row(host.state, status="already-claimed", pr=pr, sha=sha,
+                           run_id=run_id, run_attempt=run_attempt, red_at=red_at)
+            path.unlink(missing_ok=True)
+            continue
+        if red_dispatch_claims_this_hour(host.state, pr, time.time()) >= MAX_RED_DISPATCH_PER_PR_PER_HOUR:
+            record_red_row(host.state, status="no-slot", pr=pr, sha=sha, run_id=run_id,
+                           run_attempt=run_attempt, red_at=red_at, reason="hourly-cap")
+            path.unlink(missing_ok=True)
+            continue
+        disk = disk_guard.check(host)
+        if not disk.get("admitted"):
+            record_red_row(host.state, status="no-slot", pr=pr, sha=sha, run_id=run_id,
+                           run_attempt=run_attempt, red_at=red_at,
+                           reason=f"disk:{disk.get('reason', 'unobservable')}")
+            path.unlink(missing_ok=True)
+            continue
+        provider = free_red_provider(host)
+        if provider is None:
+            record_red_row(host.state, status="no-slot", pr=pr, sha=sha, run_id=run_id,
+                           run_attempt=run_attempt, red_at=red_at, reason="no-free-slot")
+            path.unlink(missing_ok=True)
+            continue
+        subprocess.Popen([sys.executable, str(Path(__file__)), "worker", "--provider", provider],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True, **lifecycle.spawn_kwargs())
+        record_red_row(host.state, status="dispatched", pr=pr, sha=sha, run_id=run_id,
+                       run_attempt=run_attempt, red_at=red_at, provider=provider)
+        path.unlink(missing_ok=True)
+    return 0
+
+
+def red_dispatch_stamps(number: int, sha: str) -> dict | None:
+    """The dispatched row this claim belongs to, for the claim comment + claim row."""
+    state = lane_state_dir()
+    if state is None:
+        return None
+    row = next((row for row in reversed(read_red_dispatch_rows(state))
+                if row.get("status") == "dispatched"
+                and row.get("pr") == number and row.get("sha") == sha), None)
+    return row
+
 
 # ---------------------------------------------------------------- cross-host claims
 
@@ -3675,8 +3855,30 @@ def claimed_elsewhere(number: int, sha: str, kind: str, now: float | None = None
 
 
 def post_claim(number: int, sha: str, kind: str) -> None:
-    sh(["gh", "pr", "comment", str(number), "--repo", REPO_SLUG, "--body",
-        f"🤖 lane claim kind={kind} sha={sha} host={HOST} at={now_iso()}"])
+    claim_at = now_iso()
+    body = f"🤖 lane claim kind={kind} sha={sha} host={HOST} at={claim_at}"
+    # JOV-8931: a claim for a relayed red check carries the dispatch stamps so
+    # red_at -> claim_at latency is readable straight off the PR.
+    claimed_row = None
+    if kind == "fix":
+        try:
+            row = red_dispatch_stamps(number, sha)
+        except Exception:
+            row = None
+        if row:
+            body += f" red_at={row.get('redAt')} dispatched_at={row.get('dispatchedAt')} claim_at={claim_at}"
+            claimed_row = {"schema": RED_DISPATCH_SCHEMA, "status": "claimed",
+                           "pr": number, "sha": sha, "runId": row.get("runId"),
+                           "runAttempt": row.get("runAttempt"), "redAt": row.get("redAt"),
+                           "redAtEpoch": row.get("redAtEpoch"), "dispatchedAt": row.get("dispatchedAt"),
+                           "dispatchedEpoch": row.get("dispatchedEpoch"), "claimAt": claim_at,
+                           "provider": row.get("provider"), "reason": None}
+    sh(["gh", "pr", "comment", str(number), "--repo", REPO_SLUG, "--body", body])
+    if claimed_row is not None:
+        try:
+            append_red_dispatch_row(lane_state_dir(), claimed_row)
+        except OSError:
+            pass  # the claim comment already posted; the ledger row is best-effort
 
 
 def held_path(host: Host) -> Path:
@@ -6639,9 +6841,11 @@ def _adopt_pr(host: Host, name: str, pr: dict, claim: GateClaim, *, sensitive: b
     return receipt
 
 
-def lane_prs(name: str, providers: dict | None = None, fields: str = "") -> list[dict]:
+def lane_prs(name: str, providers: dict | None = None, fields: str = "", *, inventory: list[dict] | None = None) -> list[dict]:
     """This lane's open PRs (its recognized run branches), plus the orphaned PRs of disabled lanes:
     nobody else will fix or gate those, and any enabled lane can."""
+    if fields and inventory is not None:
+        raise ValueError("supplied-inventory-fields")
     providers = load_providers() if providers is None else providers
     names = [name] + [other for other, spec in providers.items()
                       if (not spec.get("enabled", True) or spec.get("repairs") is False) and other != name]
@@ -6652,7 +6856,7 @@ def lane_prs(name: str, providers: dict | None = None, fields: str = "") -> list
                          "--limit", "200", "--json", fields])
             candidates = json.loads(listed.stdout or "[]")
         else:
-            candidates = open_prs_summary()
+            candidates = inventory if inventory is not None else open_prs_summary()
         prs += [pr for pr in candidates if (owned := LANE_BRANCH.match(pr["headRefName"]))
                 and owned.group("lane") == owner]
     return prs
@@ -6664,10 +6868,10 @@ PR_FIELDS = "number,title,url,isDraft,headRefName,headRefOid,statusCheckRollup,m
 LIGHT_PR_FIELDS = "number,url,state,isDraft,headRefName,headRefOid,mergeStateStatus,labels"
 
 
-def repo_prs() -> list[dict]:
+def repo_prs(*, inventory: list[dict] | None = None) -> list[dict]:
     """Every open, non-draft PR whose branch lives in this repo (forks cannot be pushed to).
     Tim: no open PR should ever need his action; the fix loop owns them all."""
-    ready = [pr for pr in open_prs_summary() if not pr.get("isDraft") and not pr.get("isCrossRepository")]
+    ready = [pr for pr in (inventory if inventory is not None else open_prs_summary()) if not pr.get("isDraft") and not pr.get("isCrossRepository")]
     # No top-N window: an old red PR outside the 60 most recently updated was never repaired.
     return sorted(ready, key=lambda pr: pr.get("updatedAt") or "", reverse=True)
 
@@ -6721,7 +6925,7 @@ def shared(key: str, ttl: float, fetch, *, validate=None):
         return value
 
 
-def open_prs_summary() -> list[dict]:
+def open_prs_summary(*, capture: list[dict] | None = None) -> list[dict]:
     """Every open PR with its aggregate check state, in a few cheap GraphQL pages, cached for a
     minute. Per-check rollups over dozens of PRs 504 or trip GitHub's secondary rate limit
     (2026-09-27: devin had 43 red PRs and saw none of them, so it idled over budget). The
@@ -6729,10 +6933,14 @@ def open_prs_summary() -> list[dict]:
     the single PR a worker claims. Empty when GitHub cannot be read."""
     now = time.time()
     if now - _SUMMARY["at"] < SUMMARY_TTL_S:
+        if capture is not None:
+            capture.append(copy.deepcopy(_SUMMARY))
         return _SUMMARY["prs"]
     prs = shared("open-prs-labels-v2", SUMMARY_TTL_S, lambda: pr_events.open_prs_state(THIS))
     if prs is None:
         _SUMMARY["readable"] = False
+        if capture is not None:
+            capture.append({"at": now, "sourceAt": None, "prs": [], "readable": False})
         return []
     source_at = now
     if os.environ.get("LANES_EXECUTION_BACKEND") != "local-test":
@@ -6749,8 +6957,45 @@ def open_prs_summary() -> list[dict]:
             "name": "rollup", "synthetic": True,
             "status": "COMPLETED" if rollup in ("SUCCESS", "FAILURE", "ERROR") else "PENDING",
             "conclusion": {"SUCCESS": "SUCCESS", "FAILURE": "FAILURE", "ERROR": "FAILURE"}.get(rollup)}]
-    _SUMMARY.update(at=now, sourceAt=source_at, prs=prs, readable=True)
+    record = dict(at=now, sourceAt=source_at, prs=prs, readable=True)
+    _SUMMARY.update(record)
+    if capture is not None:
+        capture.append(copy.deepcopy(record))
     return prs
+
+
+class RepairInventoryHold(Exception):
+    """The initial repair census cannot qualify this pass; exit after releasing claim.lock."""
+
+
+def capture_repair_inventory(name: str) -> dict:
+    """Copy one summary invocation's rows and provenance outside global claim.lock."""
+    identity = {"repository": REPO_SLUG, "provider": name,
+                "cacheKey": "open-prs-labels-v2", "cacheRoot": str(SHARED_CACHE_DIR)}
+    paired = []
+    try:
+        returned = copy.deepcopy(open_prs_summary(capture=paired))
+        summary = paired[0] if len(paired) == 1 else {}
+        same = isinstance(returned, list) and isinstance(summary, dict) and returned == summary.get("prs")
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, subprocess.SubprocessError):
+        returned, summary, same = [], {"sourceAt": None, "readable": False, "prs": []}, False
+    return {**identity, "summary": summary, "prs": returned, "sameCallRows": same}
+
+
+def repair_inventory_valid(receipt: dict, name: str) -> bool:
+    """The initial repair selection uses this copied pair, never later global metadata."""
+    if not isinstance(receipt, dict) or not isinstance(receipt.get("summary"), dict):
+        return False
+    summary = receipt["summary"]
+    stamp = summary.get("sourceAt")
+    return (receipt.get("repository") == REPO_SLUG and receipt.get("provider") == name
+            and receipt.get("cacheKey") == "open-prs-labels-v2"
+            and receipt.get("cacheRoot") == str(SHARED_CACHE_DIR)
+            and receipt.get("sameCallRows") is True and isinstance(receipt.get("prs"), list)
+            and receipt["prs"] == summary.get("prs") and summary.get("readable") is True
+            and all(isinstance(pr, dict) and pr.get("labelsComplete") is True for pr in receipt["prs"])
+            and type(stamp) in (int, float) and math.isfinite(stamp)
+            and 0 <= time.time() - stamp < CLAIM_SCAN_TTL_S)
 
 
 def overlap_prs_summary() -> list[dict] | None:
@@ -6797,28 +7042,30 @@ def with_checks(pr: dict) -> dict:
         return pr
 
 
-def reclaimable_drafts() -> list[dict]:
+def reclaimable_drafts(*, inventory: list[dict] | None = None) -> list[dict]:
     """Abandoned drafts the lanes reclaim (Tim, 2026-10-10/11): any same-repo non-lane draft
     past the age floor with no commit for 48h, red or conflicting, and not held."""
     now = time.time()
-    return [pr for pr in open_prs_summary() if not pr.get("isCrossRepository")
+    return [pr for pr in (inventory if inventory is not None else open_prs_summary()) if not pr.get("isCrossRepository")
             and pr_events.abandoned_agent_draft(pr, now)
             and not {label["name"].lower() for label in pr.get("labels", [])} & pr_events.HOLD_LABELS]
 
 
-def fix_candidates(name: str) -> list[dict]:
+def fix_candidates(name: str, *, inventory: list[dict] | None = None) -> list[dict]:
     """Lane PRs (all lanes), every other open non-draft PR and reclaimed abandoned drafts,
     de-duplicated by number.
 
-    Cached with the rest of the claim scan: N idle workers share one read per minute."""
+    Default callers share one cached read per minute; supplied rows project without a refill."""
     def fetch():
         seen, merged = set(), []
-        for pr in lane_prs(name) + repo_prs() + reclaimable_drafts():
+        for pr in (lane_prs(name) + repo_prs() + reclaimable_drafts() if inventory is None else
+                   lane_prs(name, inventory=inventory) + repo_prs(inventory=inventory)
+                   + reclaimable_drafts(inventory=inventory)):
             if pr["number"] not in seen:
                 seen.add(pr["number"])
                 merged.append(pr)
         return merged
-    return shared(f"claim-fix-candidates-{_cache_token(name)}", CLAIM_SCAN_TTL_S, fetch) or []
+    return fetch() if inventory is not None else shared(f"claim-fix-candidates-{_cache_token(name)}", CLAIM_SCAN_TTL_S, fetch) or []
 
 
 ISSUE_MARKER = re.compile(r"linear-issue-id:\s*(JOV-\d+)", re.IGNORECASE)
@@ -7397,7 +7644,7 @@ def maintenance_preserved(state: Path) -> set[int]:
 
 
 def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates: list[dict],
-                              events: list[dict], selected: set[int], *,
+                              events: list[dict], selected: set[int], *, summary: dict | None = None,
                               routing_context=REPAIR_ROUTING_UNSET) -> None:
     """Under claim.lock: a pre-claim demand hint from the scan already performed.
 
@@ -7405,8 +7652,9 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
     the exact target and enforces remote ownership, provider and integrity gates.
     Unknown is never an empty pool. A selected unit is running, not pending work.
     """
+    summary = _SUMMARY if summary is None else summary
     now, pending_count = time.time(), None
-    source_at = _SUMMARY.get("sourceAt")
+    source_at = summary.get("sourceAt")
     dispositions, unknown_reasons, eligible_kinds = {}, {}, {}
     ordinary_pending = None
 
@@ -7416,7 +7664,7 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
     def unknown(reason):
         unknown_reasons[reason] = unknown_reasons.get(reason, 0) + 1
     try:
-        if not _SUMMARY["readable"] or type(source_at) not in (int, float) \
+        if not summary["readable"] or type(source_at) not in (int, float) \
                 or not 0 <= now - source_at <= MAINTENANCE_DEMAND_MAX_AGE_S:
             raise ValueError("maintenance-inventory-unknown")
         snapshots = {}
@@ -7435,7 +7683,7 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
         # Withhold it from this cheap demand hint; never touch or qualify that work.
         preserved = maintenance_preserved(host.state)
         eligible, unknown_rows = set(), 0
-        rung_rows = [pr for pr in _SUMMARY["prs"]
+        rung_rows = [pr for pr in summary["prs"]
                      if isinstance(record := attempts.get(str(pr["number"])), dict)
                      and isinstance(pending := record.get("pendingEscalation"), dict)
                      and pending.get("lane") == name]
@@ -7444,7 +7692,7 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
             raise ValueError("maintenance-revocations-unknown")
         revoked = {row.get("branch") for row in revocations if row.get("schema") == PUBLICATION_REVOCATION_SCHEMA}
         rows = {pr["number"]: pr for pr in best_per_issue([*prs, *candidates, *events, *rung_rows])}
-        current = {pr["number"]: pr for pr in _SUMMARY["prs"]}
+        current = {pr["number"]: pr for pr in summary["prs"]}
         event_rows = {pr["number"]: pr for pr in events}
         adopt_numbers = {pr["number"] for pr in prs}
         for number, candidate in rows.items():
@@ -7552,8 +7800,8 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
         ordinary_pending = sum(kind != "escalation" for kind in eligible_kinds.values()) if not unknown_rows else None
         if eligible:
             pending_count = len(eligible)
-        elif not unknown_rows and _SUMMARY["readable"] and 0 <= now - _SUMMARY["at"] <= MAINTENANCE_DEMAND_MAX_AGE_S \
-                and not _SUMMARY["prs"] and not rows:
+        elif not unknown_rows and summary["readable"] and 0 <= now - summary["at"] <= MAINTENANCE_DEMAND_MAX_AGE_S \
+                and not summary["prs"] and not rows:
             # A complete empty repository inventory proves no PR maintenance.
             pending_count = 0
     except Exception as error:
@@ -7615,25 +7863,27 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     # Publication can await canonical policy and native queue reads. Keep those
     # outside the global claim lock, then refresh inventory for ordinary admission.
     requeue_verified(host, lane_prs(name))
+    repair_inventory = capture_repair_inventory(name) if spec.get("repairs") is not False else None
+    scan_summary = repair_inventory["summary"] if repair_inventory is not None else _SUMMARY
     # Scope-only evidence is optional. Never fetch it while holding claim.lock or
     # let an unavailable witness displace repair/adopt/labeled priority.
     try:
         target_files = pr_events.capture_target_file_witnesses(
-            THIS, _SUMMARY.get("prs", []), _SUMMARY.get("sourceAt"))
+            THIS, scan_summary.get("prs", []), scan_summary.get("sourceAt"))
     except Exception:
         target_files = {}  # Optional scope evidence cannot strand an authorized repair.
     # Pin the already complete scan before waiting for claim.lock. A later
     # mutable summary is not provenance for cross-provider draft scope.
-    rung_inventory = json.loads(json.dumps({key: _SUMMARY.get(key)
+    rung_inventory = json.loads(json.dumps({key: scan_summary.get(key)
                                            for key in ("readable", "sourceAt", "prs")}))
     routing_needed = spec.get("repairs") is not False and repair_routing_needed(host, rung_inventory)
     routing_providers = load_providers() if routing_needed else {}
     routing_context = capture_repair_routing(host, routing_providers, rung_inventory) if routing_needed else None
     claim = Locked(host.state / "claim.lock", blocking=True)
-    # The claim lock serializes the scan, so the shared cache fill happens once. A rate
-    # limit skips the API for every worker until the cooldown file expires.
+    # Bulk repair inventory fills under its per-key lock outside this global lock.
+    # Current local filters and selected-head/owner/claim arbitration remain serialized.
     red = adopt = issue = route_decision = None
-    rate_limited = inventory_unknown = False
+    rate_limited = inventory_unknown = repair_inventory_held = False
     routing_refresh_reason = None
     local = False
     candidates: list[dict] = []
@@ -7643,14 +7893,16 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         # A remote-only lane (Hyperagent) cannot repair a local checkout: it only claims issues,
         # and the local lanes repair its PRs like any orphan (`repairs: false`).
         local = spec.get("repairs") is not False
-        candidates = [pr for pr in fix_candidates(name) if not pr_recovery_held(host, pr)] if local else []
+        if local and not repair_inventory_valid(repair_inventory, name):
+            raise RepairInventoryHold()
+        candidates = [pr for pr in fix_candidates(name, inventory=repair_inventory["prs"]) if not pr_recovery_held(host, pr)] if local else []
         # Reclaimed abandoned drafts (the only non-lane drafts among the fix candidates) are
         # gated and readied like this lane's own drafts. Derived from the one cached scan so
         # no extra inventory read happens per worker pass.
-        lane_owned = [pr for pr in lane_prs(name) if not pr_recovery_held(host, pr)] if local else []
+        lane_owned = [pr for pr in lane_prs(name, inventory=repair_inventory["prs"]) if not pr_recovery_held(host, pr)] if local else []
         owned_numbers = {pr["number"] for pr in lane_owned}
         prs = lane_owned + [pr for pr in candidates if pr.get("isDraft") and pr["number"] not in owned_numbers]
-        events = [pr for pr in pr_events.queued_prs(THIS, pr_events.FIX_KINDS)
+        events = [pr for pr in pr_events.queued_prs(THIS, pr_events.FIX_KINDS, inventory=repair_inventory["prs"])
                   if not pr_recovery_held(host, pr)] if local else []
         source_at = rung_inventory.get("sourceAt")
         rung_inventory_valid = (rung_inventory.get("readable") is True
@@ -7675,7 +7927,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             selected = {red["number"]} if red else {adopt.pr["number"]} if adopt else set()
             try:
                 record_maintenance_demand(host, name, prs, candidates, events, selected,
-                                          routing_context=routing_context)
+                                          summary=repair_inventory["summary"], routing_context=routing_context)
             except Exception:
                 pass  # Demand telemetry cannot prevent this selected repair.
         # Existing-PR admission uses fresh GitHub/attempt authority. Do not make
@@ -7754,6 +8006,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                 break
         if red is None and adopt is None and issue is None:
             pr_events.cleanup_one_event(host, THIS, events)
+    except RepairInventoryHold:
+        repair_inventory_held = True
     except LaneInventoryUnknown:
         issue = None
         inventory_unknown = red is None and adopt is None
@@ -7763,6 +8017,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         rate_limited = red is None and adopt is None
     finally:
         claim.release()
+    if repair_inventory_held:
+        record_idle_exit(host, name, "repair-inventory-unknown-or-stale")
+        slot.release()
+        return 0
     # Every local pass, including one that just claimed a repair. An idle-only sync
     # never ran while the fleet stayed busy, so exhausted heads sat behind main
     # (JOV-8536). After the lock: the sync must not block the next claim.
@@ -9320,6 +9578,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")
+    sub.add_parser("fix-now", help="drain the relay's red wake files immediately (JOV-8931)")
     sub.add_parser("update")
     prove = sub.add_parser("prove-staging", help="prove a staged release tree with this tree's own installer")
     prove.add_argument("staging")
@@ -9400,6 +9659,8 @@ def guarded_main(argv: list[str] | None = None) -> int:
         return update(host)
     if args.command == "worker":
         return worker(host, args.provider)
+    if args.command == "fix-now":
+        return fix_now(host)
     return dispatch(host)
 
 

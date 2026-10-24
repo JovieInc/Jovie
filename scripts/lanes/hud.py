@@ -1188,7 +1188,9 @@ def render(model: dict, width: int = 160, height: int = 45,
     queued = {e["number"]: e for e in queue.get("entries", [])}
     counts = (f"open lane PRs {len(open_prs)} · draft {sum(1 for p in open_prs if p['draft'])} · non-draft {sum(1 for p in open_prs if not p['draft'])}"
               if open_known else "open lane PRs unknown · draft unknown · non-draft unknown")
-    head = f"{counts} · merge queue {queue.get('depth', rgb(RED, "unknown · " + (queue_error or "unread")))}"
+    # Nested same-quote f-string expressions need PEP 701 (3.12); the host
+    # qualifies on its ambient python3 (3.9), which must still parse this file.
+    head = f"{counts} · merge queue {queue.get('depth', rgb(RED, 'unknown · ' + (queue_error or 'unread')))}"
     if open_known:
         stamp = (github.get("readAt") or {}).get("open") or github.get("fetchedAt")
         head += " · PR read " + age(stamp, now)
