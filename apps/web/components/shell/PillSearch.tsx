@@ -427,7 +427,7 @@ export function PillSearch({
           size='sm'
           onClick={onClose}
           className='system-b-pill-search-close h-auto shrink-0'
-          aria-label='Close Search'
+          aria-label='Close search'
         >
           Esc
         </Button>
@@ -550,7 +550,7 @@ function PillChip({
         size='icon'
         onClick={onRemove}
         className='system-b-pill-search-chip-remove h-auto w-auto'
-        aria-label='Remove Filter'
+        aria-label='Remove filter'
       >
         <X aria-hidden='true' className='system-b-pill-search-remove-icon' />
       </Button>

@@ -78,7 +78,7 @@ export function useUserMenuActions({
   );
 
   const upgradeLabel = useMemo(
-    () => `Get Verified — ${formatVerifiedPriceLabel(selectedPrice)}`,
+    () => `Get verified — ${formatVerifiedPriceLabel(selectedPrice)}`,
     [selectedPrice]
   );
 

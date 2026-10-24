@@ -106,7 +106,7 @@ export function ContextMenuOverlay({
     <div className='fixed inset-0 z-[110]'>
       <button
         type='button'
-        aria-label='Close Menu'
+        aria-label='Close menu'
         tabIndex={-1}
         className='absolute inset-0 cursor-default'
         onClick={onClose}

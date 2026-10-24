@@ -101,7 +101,7 @@ export const OnUnlocked: Story = {
       canvas.getByRole('button', { name: 'Turn off Ovie privacy lock' })
     ).toBeInTheDocument();
     await expect(
-      canvas.getByRole('button', { name: 'Lock Ovie Now' })
+      canvas.getByRole('button', { name: 'Lock Ovie now' })
     ).toBeInTheDocument();
   },
 };

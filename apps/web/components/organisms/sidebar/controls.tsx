@@ -36,7 +36,7 @@ export const SidebarTrigger = React.forwardRef<
       {...props}
     >
       <Icon name='PanelLeft' className='h-3 w-3' strokeWidth={2.25} />
-      <span className='sr-only'>Toggle Sidebar</span>
+      <span className='sr-only'>Toggle sidebar</span>
     </Button>
   );
 });
@@ -64,12 +64,12 @@ export const SidebarRail = React.forwardRef<
     <button
       ref={ref}
       data-sidebar='rail'
-      aria-label='Toggle Sidebar'
+      aria-label='Toggle sidebar'
       aria-expanded={state === 'open'}
       aria-pressed={state === 'open'}
       type='button'
       onClick={toggleSidebar}
-      title='Toggle Sidebar'
+      title='Toggle sidebar'
       className={cn(
         'absolute inset-y-0 z-20 max-sm:hidden w-4 -translate-x-1/2 transition-[transform] duration-fast ease-interactive after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 after:transition-colors after:duration-fast after:ease-interactive hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex',
         'focus-visible:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/35',
