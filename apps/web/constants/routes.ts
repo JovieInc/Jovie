@@ -129,6 +129,8 @@ export const APP_ROUTES = {
   ADMIN_LEADS: '/app/ov/leads',
   /** Founder creator lists + smart views (Ovie only). */
   ADMIN_LISTS: '/app/ov/lists',
+  /** Read-only agent mesh roster (Ovie only, JOV-8937). */
+  ADMIN_MESH: '/app/ov/mesh',
   ADMIN_OUTREACH: '/app/ov/outreach',
   ADMIN_OUTREACH_EMAIL: '/app/ov/outreach/email',
   ADMIN_OUTREACH_DM: '/app/ov/outreach/dm',

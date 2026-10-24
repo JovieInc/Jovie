@@ -332,6 +332,7 @@ web.admin-agent-runs|web|admin-agent-runs|apps/web/app/app/(shell)/admin/agent-r
 web.admin-ops-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/ops/page.tsx|desktop,mobile
 web.admin-yc-metrics-redirect|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/growth/yc-metrics/page.tsx|desktop,mobile
 web.ov-lists|web|ovie-lists|apps/web/app/app/(shell)/admin/lists/|desktop,mobile
+web.ov-mesh|web|ovie-lists|apps/web/app/app/(shell)/admin/mesh/|desktop,mobile
 web.admin-screenshots|web|admin-screenshots|apps/web/app/app/(shell)/admin/screenshots/|desktop,mobile
 web.admin-share-studio|web|admin-share-studio|apps/web/app/app/(shell)/admin/share-studio/page.tsx|desktop,mobile
 web.admin-wiki|web|admin-wiki|apps/web/app/app/(shell)/admin/wiki/|desktop,mobile

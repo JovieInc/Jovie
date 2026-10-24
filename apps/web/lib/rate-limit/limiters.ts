@@ -277,6 +277,12 @@ export const adminOutreachLimiter = createRateLimiter(
   RATE_LIMITERS.adminOutreach
 );
 
+/**
+ * Ovie mesh ping rate limiter (JOV-8937)
+ * Limit: MESH_PING_HOURLY_LIMIT per agent per hour, Redis-backed
+ */
+export const meshPingLimiter = createRateLimiter(RATE_LIMITERS.meshPing);
+
 // ============================================================================
 // Tracking & Analytics
 // ============================================================================
@@ -1307,6 +1313,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     adminFitScores: adminFitScoresLimiter,
     adminCreatorIngest: adminCreatorIngestLimiter,
     adminOutreach: adminOutreachLimiter,
+    meshPing: meshPingLimiter,
     deployPromote: deployPromoteLimiter,
     dspDiscovery: dspDiscoveryLimiter,
     isrcRescan: isrcRescanLimiter,

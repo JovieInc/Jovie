@@ -46,3 +46,8 @@ scripts/fetch-current-artist-images.ts
 # JOV-7495 public work link test: URI-detector bait for a userinfo origin
 # (https://user:…@example.com/) asserting that such links are rejected.
 apps/web/lib/agent/public-work-links.test.ts
+# JOV-8937 mesh read redaction test: URI-detector bait for a credentialed
+# https origin (https://user:...@summer.example) plus fake token/hash FIELD
+# names with non-credential values, asserting the mesh read payload strips
+# upstream secret-shaped keys. Same class as the public-work-links precedent.
+apps/web/lib/ovie/mesh/read.server.test.ts
