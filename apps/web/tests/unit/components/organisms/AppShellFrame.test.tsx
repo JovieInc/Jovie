@@ -5,6 +5,20 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 
 describe('AppShellFrame', () => {
+  it('keeps the Electron-only flush rule out of browser shell layout', () => {
+    const globalsSource = readFileSync(
+      resolve(process.cwd(), 'app/globals.css'),
+      'utf8'
+    );
+
+    expect(globalsSource).toMatch(
+      /html\[data-desktop-runtime="electron"\][\s\S]*?\[data-app-shell-body="true"\]\[data-electron-top-gap-owner="titlebar"\][\s\S]*?padding-right:\s*0;[\s\S]*?padding-bottom:\s*0;/
+    );
+    expect(globalsSource).toMatch(
+      /html\[data-desktop-runtime="electron"\][\s\S]*?\[data-app-shell-main-column="true"\][\s\S]*?> #main-content[\s\S]*?border-radius:\s*var\(--app-shell-radius\) 0 0 0;/
+    );
+  });
+
   it('renders the canonical shell design', () => {
     render(
       <AppShellFrame

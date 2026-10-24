@@ -199,6 +199,23 @@ html[data-desktop-runtime="electron"]
   background: transparent;
 }
 
+/* JOV-8941: Electron's native window owns the right and bottom edge. Keep the
+   shared browser shell inset everywhere else, but let the main panel meet the
+   window frame instead of reading as a floating card on those edges. */
+html[data-desktop-runtime="electron"]
+[data-app-shell-body="true"][data-electron-top-gap-owner="titlebar"] {
+  padding-right: 0;
+  padding-bottom: 0;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-app-shell-main-column="true"]
+  > #main-content {
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: var(--app-shell-radius) 0 0 0;
+}
+
 /* JOV-7207: reserve only the window controls' overlap into the header row,
    measured in the header's own coordinate system. The header already begins
    inside the shell gap + collapsed icon rail + gap, so adding the full root
