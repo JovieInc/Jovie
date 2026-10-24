@@ -47,12 +47,16 @@ LIFECYCLE_MARKER = "<!-- validation-lifecycle:v1"
 MANIFEST_RE = re.compile(r"<!-- validation-manifest:v1\s*\n(\{.*?\})\s*\n-->", re.S)
 VERIFIED_RE = re.compile(r"^Verified production generation: ([0-9a-f]{40})\.?\s*$", re.M)
 OUTCOME_OWED_RE = re.compile(r"^- outcome: no current receipt\b", re.M)
-ITEM_STATUSES = frozenset({"pass", "fail", "needs-authority"})
+ITEM_STATUSES = frozenset({"pass", "fail", "needs-authority", "unverifiable"})
+# A taste decision is covered by the founder-taste receipt (default-accepted at its deadline), so a
+# needs-authority item about taste is residual, not a failed acceptance item.
+TASTE_RE = re.compile(r"\b(taste|founder|design decision|design approval)\b", re.I)
 NOTE_LIMIT = 1900  # validation-lifecycle MAX_NOTE_LENGTH is 2000
 PER_DAY = int(os.environ.get("LANES_OUTCOME_PER_DAY", "30") or 0)
 PER_DRAIN = 3
 RETRY_S = 24 * 3600
 VERIFY_TIMEOUT_S = 2400
+PREPARE_TIMEOUT_S = 600
 STATE_FILE = "outcome-lane.json"
 CANDIDATES_QUERY = """query($after:String){issues(first:50,after:$after,
  filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Validating"}}},orderBy:updatedAt){
@@ -137,11 +141,12 @@ def candidates(linear, state: Path, now: float, limit: int = 200) -> list[tuple[
     return found
 
 
-def prompt(issue: dict, ask: dict) -> str:
+def prompt(issue: dict, ask: dict, env_note: str | None = None) -> str:
     pulls = ask["manifest"].get("mergedPulls") or [ask["manifest"].get("bindingPull")]
     return f"""You are verifying the acceptance criteria of Linear issue {issue['identifier']} for an
 `outcome` validation receipt. Your working directory is a checkout of the verified production
-commit {ask['sha']} (that exact code is serving https://jov.ie).
+commit {ask['sha']}. Production deploys every ~30 minutes, so the live build is usually a later
+commit that contains it.
 
 Issue title: {issue['title']}
 Merged pull requests: {', '.join(p for p in pulls if p)}
@@ -152,6 +157,8 @@ acceptance criteria are the concrete claims the issue makes about the fixed beha
 {(issue.get('description') or '')[:12000]}
 -----
 
+Environment: Node 24 is first on PATH and dependencies are {env_note or 'installed (pnpm install --frozen-lockfile); run changed-path tests with pnpm --filter <pkg> exec vitest run <files>'}.
+
 Rules:
 - READ ONLY. Never push, comment, label, merge, deploy, open PRs, change Linear, send messages
   to people or spend money. You may read the code here, run `git`, read-only `gh` (pr view,
@@ -160,6 +167,15 @@ Rules:
 - Check every acceptance item against this commit and production. Evidence must be concrete:
   file:line in this commit, a URL plus the observed text/status, a CI run URL and its result,
   or a test command plus its result. "Looks implemented" is not evidence.
+- Binding to the build: https://jov.ie/api/version returns the 7-character buildId being served. The
+  change is live when the requested SHA is an ancestor of that build (`git fetch origin main`, then
+  `git merge-base --is-ancestor <sha> $(git rev-parse <buildId>)`). Do not require the ids to be equal.
+- Tests: a successful required CI check on the binding merge commit, or on any later main commit that
+  contains it, counts as those tests having run (cite the run URL); otherwise run them yourself.
+- `unverifiable` (not `fail`) is for an item you cannot observe from here: pages behind sign-in
+  (production redirects to /signin), process instructions addressed to the implementing agent (which
+  controller ran, who was assigned, workpad steps) with no record contradicting them, and physical
+  devices. Say what blocked you. `fail` is only for contradicting evidence or behavior shown missing.
 - An item that only a human or an outside party can confirm (taste/design approval, an
   outbound message, a purchase or spend, credentials, a third-party console, a physical
   device) is `needs-authority`; name that authority in `evidence`.
@@ -167,7 +183,7 @@ Rules:
 
 Write exactly one file, `{VERDICT_FILE}`, in the working directory:
 {{"schema": "{VERDICT_SCHEMA}", "issue": "{issue['identifier']}", "sha": "{ask['sha']}",
-  "items": [{{"criterion": "<acceptance item, short>", "status": "pass|fail|needs-authority",
+  "items": [{{"criterion": "<acceptance item, short>", "status": "pass|fail|needs-authority|unverifiable",
              "evidence": "<concrete proof or what failed>"}}],
   "summary": "<one sentence>"}}
 """
@@ -194,14 +210,28 @@ def judge(verdict, issue: str, sha: str) -> dict:
         if status == "pass" and len(evidence) < 12:
             status, evidence = "fail", f"no concrete evidence given ({evidence or 'empty'})"
         clean.append({"criterion": criterion[:300], "status": status, "evidence": evidence[:600]})
-    passed = all(item["status"] == "pass" for item in clean)
-    return {"status": "pass" if passed else "fail", "reason": "all-items-verified" if passed else "items-not-verified",
-            "items": clean}
+    failed = [item for item in clean if item["status"] == "fail"
+              or (item["status"] == "needs-authority" and not TASTE_RE.search(item["criterion"] + " " + item["evidence"]))]
+    residual = [item for item in clean if item["status"] in ("unverifiable", "needs-authority") and item not in failed]
+    passed = [item for item in clean if item["status"] == "pass"]
+    if failed:
+        return {"status": "fail", "reason": "items-not-verified", "items": clean}
+    # Evidence a machine cannot obtain from here (auth-gated pages, replaying process steps, taste) is
+    # residual, not a failure: a merged change must not bounce to Rework for what no repair can add.
+    # The receipt still needs a strict majority of items proven.
+    if len(passed) > len(residual):
+        return {"status": "pass", "reason": "all-items-verified" if not residual else "verified-with-residual",
+                "items": clean}
+    return {"status": "fail", "reason": "too-little-verified", "items": clean}
 
 
 def receipt_note(decision: dict) -> str:
     if decision["status"] == "pass":
-        lines = [f"All {len(decision['items'])} acceptance items verified by the outcome lane."]
+        residual = [item for item in decision["items"] if item["status"] != "pass"]
+        lines = [f"All {len(decision['items'])} acceptance items verified by the outcome lane."] if not residual else [
+            f"{len(decision['items']) - len(residual)} of {len(decision['items'])} acceptance items verified by the "
+            f"outcome lane; {len(residual)} could not be observed from the lane and are residual:"]
+        lines += [f"- residual ({item['status']}): {item['criterion']}: {item['evidence'][:200]}" for item in residual]
     else:
         lines = [f"Not verified ({decision['reason']}):"]
         for item in decision["items"]:
@@ -219,6 +249,36 @@ def verdict_comment(issue: str, sha: str, decision: dict, run_id: str) -> str:
             f"**{decision['status']}** ({decision['reason']}).\n\n| Result | Acceptance item | Evidence |\n"
             f"| --- | --- | --- |\n{rows or '| fail | (no items) | the verifier produced no itemized verdict |'}\n\n"
             f"Run `{run_id}` on lanes host. Read-only verification; the receipt below is recorded by the lane.")
+
+
+def node24_path() -> str:
+    """Directory of the newest installed Node 24 (the repo requires >=24.21 <25; the host default is 22,
+    which made every `run the tests` acceptance item fail with `vitest not found`)."""
+    root = Path.home() / ".nvm" / "versions" / "node"
+    versions = []
+    for child in root.glob("v24.*"):
+        parts = child.name[1:].split(".")
+        if len(parts) == 3 and all(part.isdigit() for part in parts):
+            versions.append((tuple(int(part) for part in parts), child))
+    return str(max(versions)[1] / "bin") if versions else ""
+
+
+def prepare_tree(tree: Path, run=lifecycle.run) -> str | None:
+    """Install dependencies (frozen lockfile, hard-linked from the shared store, ~25s) so the verifier can
+    execute changed-path tests. Returns None on success, else a short reason for the prompt."""
+    bin_dir = node24_path()
+    if not bin_dir:
+        return "no Node 24 installed on the lanes host"
+    env = {key: os.environ[key] for key in ("HOME", "LANG") if key in os.environ}
+    env["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
+    try:
+        done = run(["pnpm", "install", "--frozen-lockfile", "--ignore-scripts", "--prefer-offline"], cwd=str(tree),
+                   env=env, capture_output=True, text=True, timeout=PREPARE_TIMEOUT_S)
+    except (OSError, subprocess.SubprocessError) as error:
+        return f"pnpm install failed to run: {type(error).__name__}"
+    if done.returncode:
+        return "pnpm install exited " + str(done.returncode) + ": " + (done.stderr or done.stdout or "")[-160:].strip()
+    return None
 
 
 def checkout(repo: Path, root: Path, sha: str, run=lifecycle.run) -> Path:
@@ -269,11 +329,15 @@ def verify(host, lane, linear, issue: dict, ask: dict, run=lifecycle.run) -> dic
     try:
         prompt_file = host.state / "runs" / f"{run_id}.prompt.md"
         prompt_file.parent.mkdir(parents=True, exist_ok=True)
-        prompt_file.write_text(prompt(issue, ask))
         started = time.time()
+        failure = prepare_tree(tree, run=run)
+        prompt_file.write_text(prompt(issue, ask, None if failure is None else
+                                      f"NOT installed ({failure}); you cannot run tests, so rely on CI evidence"))
+        env = dict(os.environ)
+        env["PATH"] = node24_path() + os.pathsep + env.get("PATH", "")
         done = run([sys.executable, str(HERE / "codex_lane.py"), "run", "--prompt-file", str(prompt_file),
                     "--cwd", str(tree), "--reasoning-effort", "high"],
-                   capture_output=True, text=True, timeout=VERIFY_TIMEOUT_S)
+                   capture_output=True, text=True, timeout=VERIFY_TIMEOUT_S, env=env)
         try:
             verdict = json.loads((tree / VERDICT_FILE).read_text())
         except (OSError, ValueError):

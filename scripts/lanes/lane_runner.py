@@ -68,6 +68,7 @@ import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
 import outcome_lane  # noqa: E402
+import taste_default  # noqa: E402
 import yc_corpus  # noqa: E402
 import credentials_spend  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
@@ -8493,6 +8494,11 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                            {"status": "not-owner", "owner": owner})
     except (Exception, SystemExit) as error:  # outcome verification never takes dispatch down
         tick["outcomeError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        tick["tasteDefault"] = (taste_default.tick(host, THIS) if HOST == owner else
+                                {"status": "not-owner", "owner": owner})
+    except (Exception, SystemExit) as error:  # taste defaults never take dispatch down
+        tick["tasteDefaultError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         if not os.environ.get("LANES_SELFTEST"):  # a release self-test never writes to Linear
             teams = ["JOV", *(binding.key for binding in bindings.extra_bindings(THIS))]
