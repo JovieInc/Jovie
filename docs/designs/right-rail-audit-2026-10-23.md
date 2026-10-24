@@ -50,7 +50,7 @@ unit fixtures and experimental pages are separated from product surfaces.
 
 | Entity / source | Current composition and finding | Priority / this PR |
 | --- | --- | --- |
-| Profile preview and edit — `components/features/dashboard/organisms/profile-contact-sidebar/ProfileContactSidebar.tsx`, `ProfileContactSidebarSections.tsx` | Preview is already a compact real entity; identity scrolls with summary, unlike pinned edit identity. Edit repeats tabbed layout locally. Skeleton and summary retain their current explicit mobile dismissal. | P1.1 edit covered; P1.2 preview pending |
+| Profile preview and edit — `components/features/dashboard/organisms/profile-contact-sidebar/ProfileContactSidebar.tsx`, `ProfileContactSidebarSections.tsx` | Preview is already a compact real entity; identity scrolls with summary, unlike pinned edit identity. Edit repeats tabbed layout locally. Loading needs visible desktop dismissal; summary retains its explicit mobile dismissal. | P1.1 edit/loading covered; P1.2 preview pending |
 | Release — `components/organisms/release-sidebar/ReleaseSidebar.tsx` | Pinned identity plus analytics; outer shell scroll wraps another scrolling tab card. Default width 344 differs from shared 360; preserve explicit width in this small change. | P1.1 covered: shared tabbed layout removes outer scroll; width policy pending P1.3 |
 | Track — `components/organisms/release-sidebar/TrackSidebar.tsx`, `TrackDetailPanel.tsx` | `InspectorShell`, semantic tabs, internal scroll, source/confidence detail and back-to-release action. Retain richer inspector behavior; detail panel is nested content, not another rail owner. | P1.3, P3.2 |
 | Contact — `components/features/dashboard/organisms/contacts-table/ContactDetailSidebar.tsx` | `EntityTabbedRail`; pinned identity, flat fields and territories. Debounced edits flush on close. Reference composition for ordinary entities. | Reference; P4.1 |
@@ -128,7 +128,7 @@ are not production product tables. Keep these distinctions when measuring drift.
    **Covered in this PR.** Extend the existing owner only for stable id, width,
    keyboard-handler and inline-tab-action passthrough. Remove the release's
    nested outer scrollbar and local tabbed compositions from both entities.
-   Identity and tab controls remain pinned; only details scroll.
+   Identity and tab controls remain pinned; only details scroll. Loading also exposes the existing Close action on desktop and compact screens through the canonical button primitive.
 2. **P1.2 — Finish regular-entity profile-preview parity.** Keep the existing
    compact entity preview; move its identity/dismissal into the shared pinned
    header contract and align skeleton/summary/edit geometry. Do not restore a
@@ -194,14 +194,16 @@ Remaining product items are tracked in [JOV-8920](https://linear.app/jovie/issue
 
 - Pre-fix command: `pnpm --filter @jovie/web exec vitest run components/molecules/drawer/EntityTabbedRail.test.tsx tests/components/organisms/release-sidebar/ReleaseSidebar-links.interaction.test.tsx --reporter=dot`. Result: 24 passed, 2 failed. The new action was absent and release details still reported shell-owned scrolling.
 - Post-fix six-file focused run: 61 passed; the read-only profile summary test exceeded its unchanged 5000ms deadline under severe host memory pressure. Its unchanged file then passed all 5 tests with `pnpm --filter @jovie/web exec vitest run tests/unit/dashboard/ProfileContactSidebar.scroll.test.tsx --config=vitest.config.mts --maxWorkers=1 --reporter=verbose`. Release action parity, profile optimistic saves/recovery, and shared-shell behavior assertions are retained.
-- Biome lint: all 8 touched code/test files passed; no fixes applied.
-- ESLint: all 8 touched code/test files passed with `--max-warnings=0`.
+- Biome check/format passed across `apps/web`; touched-file checks pass. Ten existing warnings remain outside this change; no baseline or rule was edited.
+- ESLint: all 13 touched code/test/story files passed with `--no-ignore --max-warnings=0`, including the Storybook helper. Its client directive is now explicit.
 - `git diff --check` and `python3 scripts/repository_docs.py` passed.
-- Exact CI coverage planner/runner: 100 files passed, 1 existing skipped; 956 tests passed, 7 existing skipped. Changed-line check: **105/105, 100%**, against the unchanged 60% floor. Scoped source coverage: 77.32% lines, 65.99% branches, 73.55% functions.
-- Full web typecheck passed on the implementation commit. The earlier concurrent run had loaded the pre-implementation interface; the final incremental check validated the committed source.
+- Final exact CI coverage planner/runner on rebased source `7ac67863f`, base `2314f5e84`: 101 files passed, 1 existing skipped; **959 tests passed**, 7 existing skipped. Changed-line check: **155/155, 100%**, against the unchanged 60% floor. Scoped source coverage: 74.60% lines, 63.61% branches, 71.96% functions (includes unchanged helper branches). An initial repeat hit the unchanged Library keyboard test's 5000ms deadline; that test passed in isolation at the same deadline, then this full selector passed unchanged.
+- Full web typecheck passed after the loading-dismissal change. Story typecheck passed after rebase with the same 4 existing baselined errors and no new errors; no baseline changed.
 - Rendered source comparison at 3440×1440: release width stays 344px and profile width stays 360px; no horizontal page overflow. Release outer body changes from `overflow-y:auto` to child-owned scrolling; the same fixture detail scroller gains height from 610px to 1126px. Identity/tab controls stay outside it.
 - Keyboard Tab/Enter selected Links and Music. Explicitly opened candidate rails present visible `role=dialog`, `aria-modal=true` sheets at 390×844. Desktop-only default-open behavior is not a mobile-open action.
-- Final strict committed-diff component qualification is pending. The earlier no-change/advisory gate result is not cited as rendered qualification.
+- Strict component gate passed: `pnpm component-ship-gate --diff-base=origin/main --require-rendered --storybook-url=http://127.0.0.1:6019`. Matching tests/stories, source-blind certification and live rendered evaluation pass. All 7 canonical stories pass at 1280×900 and 390×844, with zoom/overflow, keyboard and WCAG checks on actual rail DOM. Story fixtures use `AppShellRightRail` in a viewport-height frame and an explicit profile open action; the evaluator and all thresholds are unchanged. The separate live-Storybook certification stage is not selected by existing policy; it is not claimed here.
+
+- Additional red-before-green: loading dismissal failed first (1 failed, 22 unselected), then all 23 profile mutation/state tests passed. The portal helper regression failed first (1 failed, 2 passed), then all 3 passed. The helper now marks actual portal DOM without adding layout wrappers; canonical stories declare one real keyboard target. A compact fixture probe showed 0 story-root children despite a visible portal; the real shell host fixes that fixture contract.
 
 ### Rendered evidence
 

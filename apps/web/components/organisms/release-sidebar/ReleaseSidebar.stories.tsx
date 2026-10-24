@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { RenderedFamily } from '@/.storybook/rendered-family';
+import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import type { ProviderKey } from '@/lib/discography/types';
 import { ReleaseSidebar } from './ReleaseSidebar';
 import type { Release } from './types';
@@ -63,7 +64,9 @@ const meta = {
     ),
     Story => (
       <div className='relative h-screen w-full bg-surface-0'>
-        <Story />
+        <AppShellRightRail>
+          <Story />
+        </AppShellRightRail>
       </div>
     ),
   ],

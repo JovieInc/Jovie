@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
 import { RenderedFamily } from '@/.storybook/rendered-family';
+import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { DrawerEntityAvatar } from './DrawerEntityAvatar';
 import { EntityHeader } from './EntityHeader';
 import { EntityTabbedRail } from './EntityTabbedRail';
@@ -26,6 +27,13 @@ const meta = {
       >
         <Story />
       </RenderedFamily>
+    ),
+    Story => (
+      <main className='relative h-screen w-full bg-surface-0'>
+        <AppShellRightRail>
+          <Story />
+        </AppShellRightRail>
+      </main>
     ),
   ],
   args: {
