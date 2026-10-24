@@ -38,8 +38,6 @@ const TELEMETRY_BUDGETS_PATH = join(
   '../../docs/performance/telemetry-budgets.json'
 );
 
-// Initial JS budget (bytes) — fail CI if total exceeds this
-const DEFAULT_INITIAL_JS_BUDGET_KB = 250;
 const GROWTH_THRESHOLD_PERCENT = 10;
 
 /**
@@ -102,7 +100,7 @@ interface Baseline {
   chunks: Record<string, number>;
 }
 
-interface BuildManifest {
+export interface BuildManifest {
   pages: Record<string, string[]>;
   polyfillFiles?: string[];
   ampDevFiles?: string[];
@@ -282,6 +280,160 @@ export function reportTelemetryBudget(
   return result;
 }
 
+/**
+ * Per-route initial-JS budgets (JOV-8561). docs/performance/route-budgets.json
+ * declares a per-surface initialJS_gzip_kb (marketing 150, public 180,
+ * dashboard 250, admin 300). Every build-manifest page is charged the chunks
+ * it ships and checked against its OWN surface budget — replacing the former
+ * site-wide Math.max(admin) ceiling that let marketing/public pages grow to
+ * the admin limit without failing.
+ */
+export interface RouteInitialJsBudgets {
+  readonly surfaces: Readonly<Record<string, number>>;
+}
+
+export interface RouteBudgetResult {
+  readonly page: string;
+  readonly surface: string;
+  readonly rawBytes: number;
+  readonly estimatedGzipBytes: number;
+  readonly budgetKB: number | null;
+}
+
+export interface RouteBudgetEvaluation {
+  readonly results: readonly RouteBudgetResult[];
+  readonly violations: readonly string[];
+  readonly passed: boolean;
+}
+
+export function loadRouteInitialJsBudgets(
+  budgetsPath: string = ROUTE_BUDGETS_PATH
+): RouteInitialJsBudgets {
+  if (!existsSync(budgetsPath)) {
+    throw new TypeError(
+      `Route budget file is missing: ${budgetsPath}. The gate is fail-closed — commit docs/performance/route-budgets.json instead of skipping the check.`
+    );
+  }
+
+  const parsed = JSON.parse(readFileSync(budgetsPath, 'utf-8')) as {
+    routes?: unknown;
+  };
+  const routes = parsed.routes as
+    | Record<string, { budgets?: Record<string, unknown> }>
+    | undefined;
+  if (!routes || Object.keys(routes).length === 0) {
+    throw new TypeError(
+      `Route budget file is malformed: ${budgetsPath} must define a non-empty routes object.`
+    );
+  }
+
+  const surfaces: Record<string, number> = {};
+  const problems: string[] = [];
+  for (const [surface, spec] of Object.entries(routes)) {
+    const kb = spec?.budgets?.initialJS_gzip_kb;
+    if (typeof kb !== 'number' || !Number.isFinite(kb) || kb <= 0) {
+      problems.push(
+        `${surface}.budgets.initialJS_gzip_kb must be a positive number`
+      );
+      continue;
+    }
+    surfaces[surface] = kb;
+  }
+  if (problems.length > 0) {
+    throw new TypeError(
+      `Route budget file is malformed: ${budgetsPath} — ${problems.join('; ')}.`
+    );
+  }
+
+  return { surfaces };
+}
+
+/**
+ * Classify a build-manifest page key into a route-budgets.json surface.
+ * Precedence mirrors the declared examples: /app/admin* is admin, other /app
+ * routes are dashboard, public-profile shapes (/r/*, a leading dynamic
+ * segment, or a single-segment slug route) are public, everything else is
+ * marketing. Unmatched pages default to marketing — the tightest declared
+ * budget — so an unmapped route can never ride a looser ceiling.
+ */
+export function classifyRouteSurface(page: string): string {
+  if (page.startsWith('/app/admin')) return 'admin';
+  if (page.startsWith('/app')) return 'dashboard';
+  if (
+    page.startsWith('/r/') ||
+    page.startsWith('/[') ||
+    /^\/[a-z0-9-]+$/i.test(page)
+  ) {
+    return 'public';
+  }
+  return 'marketing';
+}
+
+/**
+ * Evaluate every build-manifest page against its surface's initialJS_gzip_kb
+ * budget. Sizes are uncompressed bytes; budgets are gzip, compared via the
+ * same gzip ≈ 30% of uncompressed estimate the pre-JOV-8561 aggregate check
+ * used. A page whose surface declares no budget is a fail-closed violation.
+ */
+export function evaluateRouteBudgets(
+  manifest: BuildManifest,
+  budgets: RouteInitialJsBudgets,
+  getChunkSizeFn: (chunkPath: string) => number = getFileSize
+): RouteBudgetEvaluation {
+  const results: RouteBudgetResult[] = [];
+  const violations: string[] = [];
+  const rootFiles = manifest.rootMainFiles ?? [];
+
+  for (const page of Object.keys(manifest.pages).sort()) {
+    // Framework pseudo-pages (/_app, /_error, ...) have no surface of their
+    // own; their chunks ship on every real page via rootMainFiles.
+    if (page.startsWith('/_')) continue;
+
+    const files = new Set<string>();
+    for (const file of rootFiles) {
+      files.add(file);
+    }
+    for (const file of manifest.pages[page] ?? []) {
+      if (file.endsWith('.js')) {
+        files.add(file);
+      }
+    }
+
+    let rawBytes = 0;
+    for (const file of files) {
+      rawBytes += getChunkSizeFn(file);
+    }
+    const estimatedGzipBytes = rawBytes * 0.3;
+    const surface = classifyRouteSurface(page);
+    const budgetKB = budgets.surfaces[surface] ?? null;
+    results.push({
+      page,
+      surface,
+      rawBytes,
+      estimatedGzipBytes,
+      budgetKB,
+    });
+
+    if (budgetKB === null) {
+      violations.push(
+        `route ${page} maps to surface '${surface}' which declares no initialJS_gzip_kb budget (fail-closed)`
+      );
+      continue;
+    }
+    if (estimatedGzipBytes > budgetKB * 1024) {
+      violations.push(
+        `route ${page} (${surface}) estimated initial JS gzip ${formatBytes(estimatedGzipBytes)} > ${formatBytes(budgetKB * 1024)} budget`
+      );
+    }
+  }
+
+  return {
+    results,
+    violations,
+    passed: violations.length === 0,
+  };
+}
+
 function collectChunkSizes(manifest: BuildManifest): Record<string, number> {
   const chunks: Record<string, number> = {};
 
@@ -375,36 +527,27 @@ function compare(): void {
     baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf-8'));
   }
 
-  // Load route budgets
-  let budgetKB = DEFAULT_INITIAL_JS_BUDGET_KB;
-  if (existsSync(ROUTE_BUDGETS_PATH)) {
-    try {
-      const routeBudgets = JSON.parse(
-        readFileSync(ROUTE_BUDGETS_PATH, 'utf-8')
-      );
-      // Use the highest budget (admin) as the overall threshold
-      budgetKB = Math.max(
-        ...Object.values(
-          routeBudgets.routes as Record<
-            string,
-            { budgets: { initialJS_gzip_kb: number } }
-          >
-        ).map(r => r.budgets.initialJS_gzip_kb)
-      );
-    } catch {
-      // Use default
-    }
-  }
-
-  const budgetBytes = budgetKB * 1024;
   let hasFailure = false;
+
+  // Load per-route initialJS budgets (JOV-8561). Fail-closed: a missing or
+  // malformed budget file is itself a failure, never a skip.
+  let routeBudgets: RouteInitialJsBudgets | null = null;
+  try {
+    routeBudgets = loadRouteInitialJsBudgets();
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.log(`\n❌ ROUTE BUDGET GATE UNAVAILABLE: ${reason}`);
+    hasFailure = true;
+  }
 
   console.log('## Bundle Size Report\n');
   console.log(`| Metric | Value |`);
   console.log(`|--------|-------|`);
   console.log(`| Total JS | ${formatBytes(currentTotal)} |`);
   console.log(`| Chunks | ${Object.keys(currentChunks).length} |`);
-  console.log(`| Budget | ${formatBytes(budgetBytes)} |`);
+  console.log(
+    `| Budget | per-route initialJS_gzip_kb (docs/performance/route-budgets.json) |`
+  );
 
   if (baseline && baseline.totalInitialJS_bytes > 0) {
     const delta = currentTotal - baseline.totalInitialJS_bytes;
@@ -483,18 +626,40 @@ function compare(): void {
     console.log(`| vs Baseline | No baseline captured yet |`);
   }
 
-  // Budget check
-  // Note: currentTotal is uncompressed; budget is gzip. Rough estimate: gzip ≈ 30% of uncompressed.
-  const estimatedGzip = currentTotal * 0.3;
-  if (estimatedGzip > budgetBytes) {
-    console.log(
-      `\n❌ BUDGET EXCEEDED: Estimated gzip size ${formatBytes(estimatedGzip)} > ${formatBytes(budgetBytes)} budget`
-    );
-    hasFailure = true;
-  } else {
-    console.log(
-      `\n✅ Within budget: ~${formatBytes(estimatedGzip)} gzip < ${formatBytes(budgetBytes)}`
-    );
+  // Per-route initial-JS budget check (JOV-8561). Sizes are uncompressed;
+  // budgets are gzip, estimated at ≈ 30% of uncompressed (the same convention
+  // the former site-wide Math.max(admin) aggregate check used).
+  if (routeBudgets) {
+    const evaluation = evaluateRouteBudgets(manifest, routeBudgets);
+    console.log(`\n### Per-route initial JS budgets (JOV-8561)\n`);
+    console.log(`| Route | Surface | Est. gzip | Budget |`);
+    console.log(`|-------|---------|-----------|--------|`);
+    // Report is bounded: the worst (largest) page per surface — violations
+    // are printed in full below regardless of count.
+    const worstBySurface = new Map<string, RouteBudgetResult>();
+    for (const row of evaluation.results) {
+      const worst = worstBySurface.get(row.surface);
+      if (!worst || row.estimatedGzipBytes > worst.estimatedGzipBytes) {
+        worstBySurface.set(row.surface, row);
+      }
+    }
+    for (const row of [...worstBySurface.values()].sort((a, b) =>
+      a.surface.localeCompare(b.surface)
+    )) {
+      const budgetLabel =
+        row.budgetKB === null ? 'none' : formatBytes(row.budgetKB * 1024);
+      console.log(
+        `| ${row.page} | ${row.surface} | ${formatBytes(row.estimatedGzipBytes)} | ${budgetLabel} |`
+      );
+    }
+    for (const violation of evaluation.violations) {
+      console.log(`\n❌ ROUTE BUDGET EXCEEDED: ${violation}`);
+    }
+    if (evaluation.passed) {
+      console.log(`\n✅ All routes within their initialJS_gzip_kb budgets.`);
+    } else {
+      hasFailure = true;
+    }
   }
 
   // Telemetry contribution budgets (JOV-6585): explicit compressed and
