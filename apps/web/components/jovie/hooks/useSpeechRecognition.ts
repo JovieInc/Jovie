@@ -6,8 +6,6 @@ import {
   resumePlaybackAfterInterruption,
 } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
-  createWebSpeechTranscriber,
-  joinDictationText,
   type Transcriber,
   type TranscriberErrorCode,
 } from '@/lib/chat/transcriber';
@@ -16,6 +14,9 @@ import {
   isElectronRuntime,
   useDesktopDictationStatus,
 } from '@/lib/desktop/electron-bridge';
+import { createAdaptiveTranscriber } from '@/lib/dictation/adaptive-transcriber';
+import { createElevenLabsStreamProvider } from '@/lib/dictation/elevenlabs-stream';
+import { createWebSpeechProvider } from '@/lib/dictation/web-speech';
 
 interface UseSpeechRecognitionOptions {
   /** Called with the accumulated transcript as the user speaks */
@@ -47,15 +48,6 @@ interface UseSpeechRecognitionReturn {
   /** Toggle listening on/off */
   toggle: () => void;
 }
-
-/**
- * Chrome/Safari end a "continuous" recognition session on their own
- * (silence windows, transient network blips, the ~60s server cap). While
- * the user still intends to dictate we restart transparently and fold the
- * finished session into the running transcript. Bounded so a misbehaving
- * engine cannot spin forever.
- */
-const MAX_AUTO_RESTARTS = 8;
 
 type ListeningIntent = 'idle' | 'listening' | 'stopping';
 
@@ -89,19 +81,14 @@ export function useSpeechRecognition({
   // hydrated <button> slot at the trailing edge of the input row and
   // tears the entire send-button subtree (Radix Tooltip + Mic icon).
   const [isSupported, setIsSupported] = useState(false);
-  // Electron exposes webkitSpeechRecognition but Chromium's speech backend
-  // needs Google API keys the shell cannot ship, so every start() fails with
-  // 'network'. Once observed, treat dictation as unavailable for the session
-  // and point at system dictation instead of a misleading network error.
+  // Set only after the adaptive ladder is exhausted or an account cap is reached.
   const [runtimeUnsupported, setRuntimeUnsupported] = useState(false);
   // Effect-driven so SSR and the first client render agree on the hint.
   const [isElectron, setIsElectron] = useState(false);
   const transcriberRef = useRef<Transcriber | null>(null);
   const onTranscriptRef = useRef(onTranscript);
   const intentRef = useRef<ListeningIntent>('idle');
-  const committedRef = useRef('');
-  const currentSessionRef = useRef('');
-  const restartCountRef = useRef(0);
+  const fallbackRef = useRef(false);
   const browserWindow = globalThis.window ?? undefined;
 
   useEffect(() => {
@@ -120,46 +107,36 @@ export function useSpeechRecognition({
 
   useEffect(() => {
     if (!browserWindow) return;
-    const transcriber = createWebSpeechTranscriber(
+    const transcriber = createAdaptiveTranscriber(
       {
         onTranscript: text => {
           if (intentRef.current === 'idle') return;
-          currentSessionRef.current = text;
-          onTranscriptRef.current(
-            joinDictationText(committedRef.current, text)
-          );
+          onTranscriptRef.current(text);
         },
         onError: code => {
           intentRef.current = 'idle';
           setIsListening(false);
-          if (code === 'network' && isElectronRuntime()) {
-            setRuntimeUnsupported(true);
-          } else {
-            setError(code);
-          }
+          if (!fallbackRef.current) setError(code);
           // Release interruption hold if capture failed mid-session.
           resumePlaybackAfterInterruption();
         },
         onEnd: () => {
-          if (
-            intentRef.current === 'listening' &&
-            restartCountRef.current < MAX_AUTO_RESTARTS
-          ) {
-            // Engine ended on its own while the user still wants to dictate:
-            // bank this session's text and start a fresh one.
-            restartCountRef.current += 1;
-            committedRef.current = joinDictationText(
-              committedRef.current,
-              currentSessionRef.current
-            );
-            currentSessionRef.current = '';
-            transcriberRef.current?.start();
-            return;
-          }
           settle();
         },
       },
-      { lang, browserWindow }
+      {
+        lang,
+        browserWindow,
+        runtime: isElectronRuntime() ? 'electron' : 'web',
+        providers: [
+          createElevenLabsStreamProvider(),
+          createWebSpeechProvider({ lang, browserWindow }),
+        ],
+        onFallback: () => {
+          fallbackRef.current = true;
+          setRuntimeUnsupported(true);
+        },
+      }
     );
     transcriberRef.current = transcriber;
     setIsSupported(
@@ -191,9 +168,7 @@ export function useSpeechRecognition({
     if (!transcriber?.isSupported || intentRef.current === 'listening') return;
     setError(null);
     intentRef.current = 'listening';
-    committedRef.current = '';
-    currentSessionRef.current = '';
-    restartCountRef.current = 0;
+    fallbackRef.current = false;
     // Single-active media: pause global playback while capturing voice.
     // Stay paused after stop (JOV-3683 default — no auto-resume).
     pausePlaybackForInterruption();
