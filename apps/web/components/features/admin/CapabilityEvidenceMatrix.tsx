@@ -32,7 +32,11 @@ function formatDeployment(record: CapabilityEvidenceRecord): string {
 
 export function CapabilityEvidenceMatrix({
   record,
-}: Readonly<{ readonly record: CapabilityEvidenceRecord }>) {
+  summary,
+}: Readonly<{
+  readonly record: CapabilityEvidenceRecord;
+  readonly summary?: string;
+}>) {
   const stage = deriveCapabilityStage(record);
   const { certification, deployment } = record;
   const commitUrl = deployment.commitSha
@@ -43,6 +47,9 @@ export function CapabilityEvidenceMatrix({
   return (
     <ContentSurfaceCard
       surface='details'
+      disclosure={
+        summary ? { label: 'Customer Experience', summary } : undefined
+      }
       data-testid='capability-evidence-matrix'
       data-stage={stage}
       data-capability={record.capabilityId}

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, userEvent, within } from 'storybook/test';
 import { ContentSurfaceCard } from './ContentSurfaceCard';
 
 const meta = {
@@ -65,4 +66,30 @@ export const SemanticAndInteractive: Story = {
       </ContentSurfaceCard>
     </div>
   ),
+};
+
+export const EditorialDisclosure: Story = {
+  args: {
+    className: '',
+    disclosure: {
+      label: 'Evidence Gaps',
+      summary: 'Two observations still need instrumentation',
+    },
+    children: <p>Running-client evidence stays unknown until observed.</p>,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toggle = canvas.getByRole('button', { name: /Evidence Gaps ·/ });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(toggle);
+    await expect(
+      canvas.getByText('Running-client evidence stays unknown until observed.')
+    ).toBeVisible();
+    await userEvent.click(toggle);
+    await expect(
+      canvas.queryByText(
+        'Running-client evidence stays unknown until observed.'
+      )
+    ).not.toBeInTheDocument();
+  },
 };

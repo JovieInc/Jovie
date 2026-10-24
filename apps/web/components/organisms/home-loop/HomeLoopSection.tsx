@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import type { ReactNode } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
 
 export type HomeLoopSectionStatus = 'loading' | 'error' | 'ready';
@@ -13,6 +14,7 @@ export type HomeLoopSectionStatus = 'loading' | 'error' | 'ready';
  */
 export function HomeLoopSection({
   title,
+  summary,
   count,
   status,
   isEmpty,
@@ -28,6 +30,7 @@ export function HomeLoopSection({
   testId,
 }: Readonly<{
   readonly title: string;
+  readonly summary?: string;
   readonly count?: number | null;
   readonly status: HomeLoopSectionStatus;
   readonly isEmpty: boolean;
@@ -46,9 +49,10 @@ export function HomeLoopSection({
   readonly testId: string;
 }>) {
   const headingId = `${testId}-heading`;
-  return (
+  const body = (
     <section
-      aria-labelledby={headingId}
+      aria-labelledby={summary ? undefined : headingId}
+      aria-label={summary ? title : undefined}
       aria-busy={status === 'loading'}
       className={cn('flex min-w-0 flex-col gap-2', className)}
       data-state={
@@ -56,20 +60,22 @@ export function HomeLoopSection({
       }
       data-testid={testId}
     >
-      <h2
-        id={headingId}
-        className='flex items-center gap-2 text-balance text-xs font-medium text-secondary-token'
-      >
-        {title}
-        {status === 'ready' && count != null && count > 0 ? (
-          <span
-            className='rounded-full bg-surface-2 px-1.5 text-2xs font-semibold tabular-nums text-primary-token'
-            data-testid={`${testId}-count`}
-          >
-            {count}
-          </span>
-        ) : null}
-      </h2>
+      {!summary ? (
+        <h2
+          id={headingId}
+          className='flex items-center gap-2 text-balance text-xs font-medium text-secondary-token'
+        >
+          {title}
+          {status === 'ready' && count != null && count > 0 ? (
+            <span
+              className='rounded-full bg-surface-2 px-1.5 text-2xs font-semibold tabular-nums text-primary-token'
+              data-testid={`${testId}-count`}
+            >
+              {count}
+            </span>
+          ) : null}
+        </h2>
+      ) : null}
       <div className={cn('min-w-0', minBodyClassName)}>
         {status === 'loading' ? (
           skeleton
@@ -125,6 +131,16 @@ export function HomeLoopSection({
         )}
       </div>
     </section>
+  );
+  return summary ? (
+    <ContentSurfaceCard
+      surface='details'
+      disclosure={{ label: title, summary }}
+    >
+      {body}
+    </ContentSurfaceCard>
+  ) : (
+    body
   );
 }
 

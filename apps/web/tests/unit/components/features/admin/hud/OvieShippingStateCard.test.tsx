@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
@@ -277,6 +283,28 @@ function metricValue(label: string): string | null {
 }
 
 describe('OvieShippingStateCard', () => {
+  it('keeps delivery evidence behind the editorial summary until expanded', () => {
+    fetchMock.mockReturnValue(new Promise(() => {}));
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard summary='Build, deployment, and verification evidence' />
+      </QueryClientProvider>
+    );
+    expect(
+      screen.queryByTestId('hud-delivery-metrics')
+    ).not.toBeInTheDocument();
+    const toggle = screen.getByRole('button', {
+      name: 'Shipping · Build, deployment, and verification evidence',
+    });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(screen.getByTestId('hud-delivery-metrics')).toBeVisible();
+    fireEvent.click(toggle);
+    expect(
+      screen.queryByTestId('hud-delivery-metrics')
+    ).not.toBeInTheDocument();
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     resetHudShippingStateForTests();

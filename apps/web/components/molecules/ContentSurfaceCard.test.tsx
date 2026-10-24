@@ -6,6 +6,28 @@ import { describe, expect, it } from 'vitest';
 import { ContentSurfaceCard } from './ContentSurfaceCard';
 
 describe('ContentSurfaceCard', () => {
+  it('preserves the article root and ref while details are disclosed', async () => {
+    const user = userEvent.setup();
+    const ref = createRef<HTMLElement>();
+    render(
+      <ContentSurfaceCard
+        as='article'
+        ref={ref}
+        data-testid='editorial-card'
+        disclosure={{ label: 'Shipping', summary: 'Three items in flight' }}
+      >
+        <p>Deployment evidence</p>
+      </ContentSurfaceCard>
+    );
+    expect(ref.current).toBe(screen.getByTestId('editorial-card'));
+    expect(ref.current?.tagName).toBe('ARTICLE');
+    expect(screen.queryByText('Deployment evidence')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Shipping ·/ }));
+    expect(ref.current).toContainElement(
+      screen.getByText('Deployment evidence')
+    );
+  });
+
   it('renders children', () => {
     render(<ContentSurfaceCard data-testid='card'>Hello</ContentSurfaceCard>);
     expect(screen.getByTestId('card')).toHaveTextContent('Hello');
