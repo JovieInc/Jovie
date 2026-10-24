@@ -306,10 +306,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/releases/cells/AvailabilityCell.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/releases/cells/PopularityCell.tsx",
       "linearIssue": "JOV-8847"
     },
