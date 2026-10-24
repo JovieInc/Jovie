@@ -1,0 +1,132 @@
+#!/usr/bin/env tsx
+/**
+ * JOVIE-WEB-W3 backfill: repair release credits whose stored Spotify artist
+ * id conflicts with the release's Spotify artist list for the same name.
+ *
+ * Dry run by default (prints counts only). Pass --apply to write.
+ * Idempotent: repaired rows no longer match the conflict query.
+ * Non-destructive: previous ids are kept in metadata.creditBackfill.
+ */
+import { sql } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import {
+  type CreditConflictRow,
+  planCreditSpotifyIdRepairs,
+  summarizeRepairs,
+} from '@/lib/discography/credit-spotify-id-backfill';
+
+const APPLY = process.argv.includes('--apply');
+const SOURCE = 'jovie-web-w3-credit-spotify-id';
+
+async function loadConflicts(): Promise<CreditConflictRow[]> {
+  const result = await db.execute(sql`
+    WITH provider AS (
+      SELECT r.id AS release_id,
+             btrim(sa->>'name') AS name,
+             sa->>'id' AS spotify_id
+      FROM discog_releases r,
+           jsonb_array_elements(
+             CASE WHEN jsonb_typeof(r.metadata->'spotifyArtists') = 'array'
+                  THEN r.metadata->'spotifyArtists' ELSE '[]'::jsonb END
+           ) sa
+      WHERE coalesce(sa->>'id', '') <> ''
+    )
+    SELECT ra.id AS release_artist_id,
+           ra.release_id,
+           a.id AS artist_id,
+           a.name AS artist_name,
+           a.spotify_id AS stored_spotify_id,
+           p.spotify_id AS provider_spotify_id,
+           owner.id AS owner_artist_id,
+           EXISTS (
+             SELECT 1 FROM release_artists ra2
+             WHERE ra2.release_id = ra.release_id
+               AND ra2.artist_id = owner.id
+               AND ra2.role = ra.role
+           ) AS owner_already_credited,
+           (a.is_auto_created AND a.creator_profile_id IS NULL)
+             AS artist_is_unclaimed_auto_created
+    FROM release_artists ra
+    JOIN artists a ON a.id = ra.artist_id
+    JOIN provider p
+      ON p.release_id = ra.release_id
+     AND lower(regexp_replace(btrim(coalesce(ra.credit_name, a.name)), '\\s+', ' ', 'g'))
+       = lower(regexp_replace(p.name, '\\s+', ' ', 'g'))
+    LEFT JOIN artists owner ON owner.spotify_id = p.spotify_id
+    WHERE ra.role = 'main_artist'
+      AND a.spotify_id IS NOT NULL
+      AND a.spotify_id <> p.spotify_id
+    ORDER BY ra.release_id, ra.position
+  `);
+  return (result.rows as Record<string, unknown>[]).map(row => ({
+    releaseArtistId: String(row.release_artist_id),
+    releaseId: String(row.release_id),
+    artistId: String(row.artist_id),
+    artistName: String(row.artist_name),
+    storedSpotifyId: (row.stored_spotify_id as string | null) ?? null,
+    providerSpotifyId: String(row.provider_spotify_id),
+    ownerArtistId: (row.owner_artist_id as string | null) ?? null,
+    ownerAlreadyCredited: Boolean(row.owner_already_credited),
+    artistIsUnclaimedAutoCreated: Boolean(row.artist_is_unclaimed_auto_created),
+  }));
+}
+
+async function main() {
+  const conflicts = await loadConflicts();
+  const repairs = planCreditSpotifyIdRepairs(conflicts);
+  const releases = new Set(conflicts.map(row => row.releaseId)).size;
+  console.log(
+    JSON.stringify(
+      {
+        mode: APPLY ? 'apply' : 'dry-run',
+        conflictingCredits: conflicts.length,
+        releasesAffected: releases,
+        plan: summarizeRepairs(repairs),
+      },
+      null,
+      2
+    )
+  );
+  if (!APPLY) return;
+
+  let applied = 0;
+  await db.transaction(async tx => {
+    for (const repair of repairs) {
+      if (repair.kind === 'repoint_credit') {
+        const res = await tx.execute(sql`
+          UPDATE release_artists
+          SET artist_id = ${repair.toArtistId},
+              metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
+                'creditBackfill', jsonb_build_object(
+                  'source', ${SOURCE}, 'previousArtistId', ${repair.fromArtistId}::text,
+                  'at', now()))
+          WHERE id = ${repair.releaseArtistId}
+            AND artist_id = ${repair.fromArtistId}
+        `);
+        applied += res.rowCount ?? 0;
+      } else if (repair.kind === 'set_artist_spotify_id') {
+        const res = await tx.execute(sql`
+          UPDATE artists
+          SET spotify_id = ${repair.toSpotifyId},
+              updated_at = now(),
+              metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
+                'creditBackfill', jsonb_build_object(
+                  'source', ${SOURCE}, 'previousSpotifyId', ${repair.fromSpotifyId}::text,
+                  'at', now()))
+          WHERE id = ${repair.artistId}
+            AND spotify_id IS NOT DISTINCT FROM ${repair.fromSpotifyId}
+            AND NOT EXISTS (SELECT 1 FROM artists WHERE spotify_id = ${repair.toSpotifyId})
+        `);
+        applied += res.rowCount ?? 0;
+      }
+    }
+  });
+  console.log(JSON.stringify({ appliedRows: applied }));
+}
+
+void main()
+  .then(() => process.exit(0))
+  .catch(error => {
+    console.error('Credit Spotify id backfill failed:', error);
+    process.exit(1);
+  });

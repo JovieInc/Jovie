@@ -45,9 +45,18 @@ export interface CreditProviderMismatch {
   readonly skippedFeaturedNames: readonly string[];
 }
 
+/** Same display name, different provider id: collapsed to one credit. */
+export interface CreditProviderIdConflict {
+  readonly provider: string;
+  readonly name: string;
+  readonly storedProviderId: string | null;
+  readonly providerId: string | null;
+}
+
 export interface ReconciledPrimaryCredits {
   readonly primaryArtists: CanonicalReleaseCredit[];
   readonly mismatch: CreditProviderMismatch | null;
+  readonly idConflicts?: readonly CreditProviderIdConflict[];
 }
 
 export interface CanonicalContributorPayload extends ReconciledPrimaryCredits {
@@ -368,6 +377,7 @@ export function reconcilePrimaryArtists(input: {
   }
 
   const added: CanonicalReleaseCredit[] = [];
+  const idConflicts: CreditProviderIdConflict[] = [];
   const skippedFeaturedNames: string[] = [];
   let nextPosition =
     storedPrimaries.reduce(
@@ -393,13 +403,23 @@ export function reconcilePrimaryArtists(input: {
       continue;
     }
 
-    if (
-      storedPrimaries.some(
-        credit =>
-          canMatchProviderByName(credit, providerArtist) &&
-          namesEquivalent(credit.name, providerArtist.name)
-      )
-    ) {
+    const sameNamePrimary = storedPrimaries.find(credit =>
+      namesEquivalent(credit.name, providerArtist.name)
+    );
+    if (sameNamePrimary) {
+      // Never render a duplicate name. An id conflict is a data-quality
+      // signal (fixed by the credit backfill), not a second artist.
+      if (!canMatchProviderByName(sameNamePrimary, providerArtist)) {
+        idConflicts.push({
+          provider: providerArtist.provider,
+          name: providerArtist.name,
+          storedProviderId: storedProviderIdFor(
+            sameNamePrimary,
+            providerArtist.provider
+          ),
+          providerId: providerArtist.id,
+        });
+      }
       continue;
     }
 
@@ -444,7 +464,26 @@ export function reconcilePrimaryArtists(input: {
             skippedFeaturedNames,
           }
         : null,
+    idConflicts,
   };
+}
+
+function storedProviderIdFor(
+  credit: CanonicalReleaseCredit,
+  provider: string
+): string | null {
+  switch (provider) {
+    case 'spotify':
+      return credit.spotifyId ?? null;
+    case 'apple_music':
+      return credit.appleMusicId ?? null;
+    case 'musicbrainz':
+      return credit.musicbrainzId ?? null;
+    case 'deezer':
+      return credit.deezerId ?? null;
+    default:
+      return null;
+  }
 }
 
 export function serializeContributorCredits(
@@ -506,6 +545,7 @@ export function materializeContributorCreditPayload(input: {
     credits: [...reconciled.primaryArtists, ...nonPrimaryCredits],
     primaryArtists: serializeContributorCredits(reconciled.primaryArtists),
     mismatch: reconciled.mismatch,
+    idConflicts: reconciled.idConflicts ?? [],
   };
 }
 
@@ -517,6 +557,7 @@ export function materializeReleaseCreditPayload(input: {
   return {
     primaryArtists: reconciled.primaryArtists,
     mismatch: reconciled.mismatch,
+    idConflicts: reconciled.idConflicts ?? [],
   };
 }
 
