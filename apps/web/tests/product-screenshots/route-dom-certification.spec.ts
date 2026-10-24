@@ -168,6 +168,36 @@ async function expectDeliberateRed(
 }
 
 test.describe('Route DOM detector deliberate-red fixtures', () => {
+  test('rejects visible stray text before the first h1', async ({ page }) => {
+    for (const stray of [
+      'Find yourself',
+      '<p>Find yourself</p>',
+      '<div><span>Find yourself</span></div>',
+    ]) {
+      await page.setContent(
+        `<header>Navigation</header><main>${stray}<section><h1>Link analytics</h1></section></main>`
+      );
+      const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+      expect(snapshot.findings.map(finding => finding.kind)).toContain(
+        'stray-before-h1'
+      );
+    }
+  });
+
+  test('accepts hidden contract markers and approved breadcrumbs before h1', async ({
+    page,
+  }) => {
+    await page.setContent(
+      '<header>Navigation</header><main><div hidden><a>Find yourself</a></div><nav aria-label="Breadcrumb"><a>Product</a></nav><section><h1>Link analytics</h1></section></main>'
+    );
+    const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+    expect(
+      snapshot.findings.filter(
+        finding => String(finding.kind) === 'stray-before-h1'
+      )
+    ).toEqual([]);
+  });
+
   // JOV-7710 / AM-017: one semantic level reads as one material.
   const plane = (inner: string) =>
     `<main id="main-content" style="width:1000px;height:600px;background:rgb(16,17,20)">${inner}</main>`;

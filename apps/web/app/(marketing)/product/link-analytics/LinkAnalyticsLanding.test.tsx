@@ -28,6 +28,21 @@ import { LINK_ANALYTICS_COPY } from '@/data/linkAnalyticsCopy';
 import { LinkAnalyticsLanding } from './LinkAnalyticsLanding';
 
 describe('LinkAnalyticsLanding', () => {
+  it('shows a dated demo with a time series, complete providers, and recent clicks', () => {
+    render(<LinkAnalyticsLanding />);
+    expect(screen.getByRole('button', { name: '7 days' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '30 days' })).toBeVisible();
+    expect(
+      screen.getByRole('img', { name: /clicks over time/i })
+    ).toBeVisible();
+    expect(screen.getByText('Apple Music')).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Recent clicks' })
+    ).toBeVisible();
+    expect(screen.getByText(/Oct 23, 2026/)).toBeVisible();
+    expect(screen.getByRole('heading', { name: /UTM.*ISRC/ })).toBeVisible();
+  });
+
   it('renders the live analytics panel in the hero', () => {
     render(<LinkAnalyticsLanding />);
 
