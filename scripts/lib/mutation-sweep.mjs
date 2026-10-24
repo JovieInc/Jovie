@@ -46,8 +46,8 @@ export function normalizeState(raw) {
 }
 
 /**
- * Next modules to score. Priority: never scored, then changed since the last
- * scored blob, then errored (retried after a day), then oldest first.
+ * Next modules to score. Priority: changed since the last scored blob (a stale
+ * score is worth more than a first one), then never scored, then errored (retried after a day), then oldest first.
  * Unchanged modules are only re-scored after `staleDays`, because a score is a
  * pure function of source + tests and tests change slowly.
  * @param {ReturnType<typeof emptyState>} state
@@ -64,8 +64,8 @@ export function pickBatch(
   for (const candidate of candidates) {
     const known = state.modules[candidate.file];
     let rank;
-    if (!known) rank = 0;
-    else if (known.blob !== candidate.blob) rank = 1;
+    if (!known) rank = 1;
+    else if (known.blob !== candidate.blob) rank = 0;
     else if (known.status === 'error') {
       if (now - Date.parse(known.at) < dayMs) continue;
       rank = 2;

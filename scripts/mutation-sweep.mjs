@@ -65,6 +65,7 @@ const { values } = parseArgs({
     files: { type: 'string' },
     sha: { type: 'string' },
     summary: { type: 'string' },
+    'github-output': { type: 'string' },
     'propose-baseline': { type: 'string' },
     'file-issues': { type: 'boolean', default: false },
     'list-only': { type: 'boolean', default: false },
@@ -245,6 +246,16 @@ console.log(
   `${candidates.length} candidate modules; ${Object.keys(state.modules).length} scored; batch=${batch.length}`
 );
 for (const file of batch) console.log(`  next: ${file}`);
+/** Modules still eligible after this batch; the workflow chains while > 0. */
+const remainingAfter = () =>
+  pickBatch(state, pool, { max: Number.POSITIVE_INFINITY }).length;
+const writeOutputs = (/** @type {number} */ scoredNow) => {
+  if (!values['github-output']) return;
+  appendFileSync(
+    values['github-output'],
+    `remaining=${remainingAfter()}\nscored=${scoredNow}\n`
+  );
+};
 const persist = () => {
   mkdirSync(dirname(statePath), { recursive: true });
   writeFileSync(`${statePath}.tmp`, `${JSON.stringify(state, null, 1)}\n`);
@@ -252,6 +263,7 @@ const persist = () => {
 };
 if (values['list-only'] || batch.length === 0) {
   if (!values['list-only'] && statePath) persist();
+  writeOutputs(0);
   process.exit(0);
 }
 
@@ -395,6 +407,7 @@ for (const file of batch) {
   rmSync(join(webRoot, '.stryker-tmp'), { recursive: true, force: true });
 }
 
+writeOutputs(batch.length);
 const scored = Object.values(state.modules).filter(m => m.status === 'scored');
 const summary = [
   '## Mutation sweep',

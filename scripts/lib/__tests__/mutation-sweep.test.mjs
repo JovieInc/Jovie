@@ -59,7 +59,7 @@ describe('pickBatch', () => {
     durationMs: 1,
   });
 
-  it('ranks never-scored, then changed, then retry-after-error, then stale', () => {
+  it('ranks changed, then never-scored, then retry-after-error, then stale', () => {
     const state = emptyState();
     state.modules['changed.ts'] = scored('old', 2);
     state.modules['fresh.ts'] = scored('b1', 2);
@@ -81,7 +81,7 @@ describe('pickBatch', () => {
       ].map(f => cand(f)),
       { max: 10, now: NOW }
     );
-    expect(picked).toEqual(['new.ts', 'changed.ts', 'err-old.ts', 'stale.ts']);
+    expect(picked).toEqual(['changed.ts', 'new.ts', 'err-old.ts', 'stale.ts']);
   });
 
   it('honors max and prefers modules with a same-named test', () => {
@@ -106,9 +106,8 @@ describe('survivors', () => {
       'Survived',
     ]);
     expect(survivors[0].context).toContain('2:   const flag = true;');
-    expect(survivors[0].original).toBe(
-      'flag'.length ? survivors[0].original : ''
-    );
+    // Stryker locations are 1-based lines and columns: this slice is `true`.
+    expect(survivors.find(s => s.status === 'Survived')?.original).toBe('true');
   });
 
   it('fingerprints survive line drift but not a changed mutation', () => {
