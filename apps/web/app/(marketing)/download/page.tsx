@@ -141,7 +141,7 @@ export default function DownloadPage() {
                   </p>
                   <h1
                     id='download-hero-heading'
-                    className='mt-5 min-h-18 text-balance text-4xl font-bold leading-none tracking-normal text-(--system-b-text-primary) line-clamp-2 sm:min-h-30 sm:text-6xl'
+                    className='mt-5 min-h-18 text-balance text-4xl font-bold leading-none tracking-normal text-(--system-b-text-primary) line-clamp-2 sm:min-h-30 sm:text-6xl lg:text-5xl xl:text-6xl'
                   >
                     {DOWNLOAD_COPY.headline}
                   </h1>

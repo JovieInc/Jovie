@@ -38,7 +38,7 @@ export function YoutubeThumbnailsLanding() {
             <h1
               id='youtube-thumbnails-hero-heading'
               data-testid='youtube-thumbnails-hero-heading'
-              className='marketing-h1-linear mt-5 max-w-3xl text-primary-token line-clamp-2'
+              className='marketing-h1-linear youtube-thumbnails-hero-title mt-5 max-w-3xl text-primary-token line-clamp-2'
             >
               {copy.hero.title}
             </h1>
