@@ -116,13 +116,28 @@ export function aggregateContinuity(observations, { now = new Date() } = {}) {
   if (!Array.isArray(observations) || observations.length === 0) {
     throw new Error('continuity aggregation requires at least one observation');
   }
-  const unhealthy = observations.filter(item => item.healthy !== true);
+  // Unknown required evidence is never healthy (JOV-7694: "Unknown required
+  // evidence behaves as RED"). `healthy: false` is a verified failure;
+  // anything other than strict true/false is unknown and keeps the rollup
+  // non-healthy. A verified failure always outranks unknown.
+  const unhealthy = observations.filter(item => item.healthy === false);
+  const unknown = observations.filter(
+    item => item.healthy !== true && item.healthy !== false
+  );
+  const status =
+    unhealthy.length > 0
+      ? 'unhealthy'
+      : unknown.length > 0
+        ? 'unknown'
+        : 'healthy';
   return {
     schema: CONTINUITY_SCHEMA,
     observedAt: new Date(now).toISOString(),
-    status: unhealthy.length === 0 ? 'healthy' : 'unhealthy',
+    status,
     targets: observations,
     affectedTargets: unhealthy.map(item => item.id),
+    unknownTargets: unknown.map(item => item.id),
+    unknownReasons: unknown.map(item => item.reason ?? 'unknown'),
     incidentClasses: [...new Set(unhealthy.map(item => item.incidentClass))],
     requiresFounderNotification: unhealthy.length > 0,
     // A stale production is a release-pipeline failure, not a provider
@@ -143,9 +158,11 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/;
 /**
  * Production freshness: how long has main carried commits that production
  * lacks? Reads the live SHA from build-info and the unshipped range from the
- * GitHub compare API. Fails open (healthy with a reason) when either source is
- * unreadable so a GitHub hiccup never pages; runtime outages are already
- * reported by the jovie-production target.
+ * GitHub compare API. When either source is unreadable the result is
+ * `healthy: null` (unknown) with a reason, never healthy: absence of evidence
+ * is not evidence of freshness (JOV-7694, JOV-7674). An unknown does not page
+ * or file by itself, but it cannot report healthy or resolve an incident.
+ * Runtime outages are reported by the jovie-production target.
  */
 export async function observeProductionFreshness({
   buildInfoUrl = DEFAULT_TARGETS[0].url,
@@ -170,6 +187,9 @@ export async function observeProductionFreshness({
     oldestUnshippedAt: null,
     unshippedAgeSeconds: 0,
   };
+  const unknownResult = extra => ({ ...base, ...extra, healthy: null });
+  // Not configured is an absent probe (the CLI only passes `freshness` when
+  // GITHUB_REPOSITORY is set), not an unreadable source, so it stays healthy.
   if (!/^[^/]+\/[^/]+$/.test(repository ?? '')) {
     return { ...base, reason: 'repository-not-configured' };
   }
@@ -197,7 +217,7 @@ export async function observeProductionFreshness({
   const buildInfo = await readJson(buildInfoUrl);
   const liveSha = buildInfo?.commitSha;
   if (!SHA_PATTERN.test(liveSha ?? '')) {
-    return { ...base, reason: 'live-sha-unreadable' };
+    return unknownResult({ reason: 'live-sha-unreadable' });
   }
   const githubHeaders = token ? { Authorization: `Bearer ${token}` } : {};
   const head = await readJson(
@@ -206,7 +226,7 @@ export async function observeProductionFreshness({
   );
   const mainSha = head?.sha;
   if (!SHA_PATTERN.test(mainSha ?? '')) {
-    return { ...base, liveSha, reason: 'main-sha-unreadable' };
+    return unknownResult({ liveSha, reason: 'main-sha-unreadable' });
   }
   if (mainSha === liveSha) {
     return { ...base, liveSha, mainSha, reason: 'production-current' };
@@ -218,20 +238,23 @@ export async function observeProductionFreshness({
   const unshippedCommits = Number(compare?.ahead_by);
   const oldestUnshippedAt = compare?.commits?.[0]?.commit?.committer?.date;
   if (!Number.isInteger(unshippedCommits) || unshippedCommits < 0) {
-    return { ...base, liveSha, mainSha, reason: 'unshipped-range-unreadable' };
+    return unknownResult({
+      liveSha,
+      mainSha,
+      reason: 'unshipped-range-unreadable',
+    });
   }
   if (unshippedCommits === 0) {
     return { ...base, liveSha, mainSha, reason: 'production-current' };
   }
   const oldestEpoch = Date.parse(oldestUnshippedAt ?? '');
   if (!Number.isFinite(oldestEpoch)) {
-    return {
-      ...base,
+    return unknownResult({
       liveSha,
       mainSha,
       unshippedCommits,
       reason: 'unshipped-age-unreadable',
-    };
+    });
   }
   const unshippedAgeSeconds = Math.max(
     0,
@@ -390,6 +413,9 @@ export function continuityIncidentKey(result) {
     );
   }
   if (result.status === 'healthy') return 'production-continuity:healthy';
+  if (result.status === 'unknown') {
+    return `production-continuity:unknown:${result.unknownTargets.join(',')}`;
+  }
   return `production-continuity:${result.affectedTargets.join(',')}:${result.incidentClasses.join(',')}`;
 }
 
@@ -547,6 +573,8 @@ export async function runCli({
         `status=${result.status}`,
         `affected_targets=${result.affectedTargets.join(',')}`,
         `incident_classes=${result.incidentClasses.join(',')}`,
+        `unknown_targets=${result.unknownTargets.join(',')}`,
+        `unknown_reasons=${result.unknownReasons.join(',')}`,
         `incident_key=${incidentKey}`,
         `requires_agent_ingress=${result.requiresAgentIngress}`,
       ].join('\n') + '\n',
