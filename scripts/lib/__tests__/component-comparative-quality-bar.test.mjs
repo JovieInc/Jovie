@@ -121,6 +121,15 @@ describe('component comparative quality bar', () => {
       baselineId: 'atom.select',
     });
     expect(
+      inventory.find(
+        item => item.sourcePath === 'packages/ui/atoms/hover-reveal.tsx'
+      )
+    ).toMatchObject({
+      root: 'packages/ui/atoms',
+      layer: 'atom',
+      comparisonStatus: 'pending-comparison',
+    });
+    expect(
       inventory.some(item => item.comparisonStatus === 'pending-comparison')
     ).toBe(true);
     expect(

@@ -43,6 +43,7 @@ describe('ToolbarFilterSuggestions', () => {
 
     const row = screen.getByTestId('suggestions');
     expect(row.className).toContain('opacity-0');
+    expect(row).toHaveAttribute('data-slot', 'hover-reveal');
     expect(row.className).toContain('group-hover/toolbar-filters:opacity-100');
     expect(row.className).toContain(
       'group-focus-within/toolbar-filters:opacity-100'
@@ -65,6 +66,7 @@ describe('ToolbarFilterSuggestions', () => {
     const row = screen.getByTestId('suggestions');
     expect(row).toHaveAttribute('aria-hidden', 'true');
     expect(row.className).toContain('pointer-events-none');
+    expect(row).toHaveClass('!opacity-0');
     // Still mounted (reserves layout space) — only opacity/interactivity
     // change. `aria-hidden` on the ancestor removes it from the default
     // accessibility-tree query, so opt into the inaccessible node with

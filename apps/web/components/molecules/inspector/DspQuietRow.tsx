@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, HoverReveal } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -49,10 +49,12 @@ export function DspQuietRow({
         <span className='min-w-0 flex-1 truncate text-xs text-primary-token'>
           {label}
         </span>
-        <ExternalLink
-          className='h-3 w-3 shrink-0 text-tertiary-token'
-          aria-hidden='true'
-        />
+        <HoverReveal asChild>
+          <ExternalLink
+            className='h-3 w-3 shrink-0 text-tertiary-token'
+            aria-hidden='true'
+          />
+        </HoverReveal>
       </a>
     );
   }

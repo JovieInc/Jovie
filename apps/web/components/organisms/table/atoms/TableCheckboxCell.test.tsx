@@ -23,7 +23,13 @@ describe('TableCheckboxCell', () => {
       </table>
     );
 
-    await user.click(screen.getByRole('checkbox', { name: 'Select row 2' }));
+    const checkbox = screen.getByRole('checkbox', { name: 'Select row 2' });
+    expect(checkbox.parentElement).toHaveClass(
+      'opacity-0',
+      'group-focus-within:opacity-100'
+    );
+    expect(screen.getByText('2')).toHaveClass('group-focus-within:opacity-0');
+    await user.click(checkbox);
     expect(onChange).toHaveBeenCalledWith(true);
   });
 
@@ -48,7 +54,13 @@ describe('TableCheckboxCell', () => {
       </table>
     );
 
-    await user.click(screen.getByRole('checkbox', { name: 'Select row 3' }));
+    const checkbox = screen.getByRole('checkbox', { name: 'Select row 3' });
+    expect(checkbox.parentElement).toHaveClass(
+      'opacity-0',
+      'group-focus-within:opacity-100'
+    );
+    expect(screen.getByText('3')).toHaveClass('group-focus-within:opacity-0');
+    await user.click(checkbox);
     expect(onToggleSelect).toHaveBeenCalled();
   });
 
