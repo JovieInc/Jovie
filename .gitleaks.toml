@@ -8,6 +8,10 @@
 [extend]
 # Use the default gitleaks config as a base
 # See: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+# JOV-8895: without useDefault = true, gitleaks loads ONLY the custom rules
+# below — the default ruleset (AWS, GitHub, Stripe, Slack, OpenAI, private
+# keys, ...) never runs.
+useDefault = true
 
 # =============================================================================
 # Path Allowlists
