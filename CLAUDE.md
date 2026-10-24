@@ -93,6 +93,10 @@ and required checks. Auth/payment edits use CI + Migration Guard, not an extra
 human merge gate. Sensitive surfaces: proxy, migrations, billing, entitlements,
 onboarding, canonical tokens, and generated files.
 
+Secondary controls use `HoverReveal`: opacity reserves space; hover/focus
+reveals; focus/active/selection/open menus retain. Keep keyboard access and
+interaction tests. [Invariant](docs/design-system/INVARIANTS.md).
+
 ## Verification and completion
 
 Use the real runner and selector for changed behavior. Add meaningful regression

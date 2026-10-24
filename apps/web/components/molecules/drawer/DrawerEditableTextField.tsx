@@ -1,6 +1,6 @@
 'use client';
 
-import { Input } from '@jovie/ui';
+import { HoverReveal, Input } from '@jovie/ui';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import React, {
@@ -183,7 +183,7 @@ export const DrawerEditableTextField = React.memo(
     const displayValue = value || emptyLabel;
 
     return (
-      <div className={cn('flex min-w-0 items-center gap-1.5', className)}>
+      <div className={cn('group flex min-w-0 items-center gap-1.5', className)}>
         <div className='min-w-0 flex-1'>
           {isEditing && editable ? (
             <Input
@@ -265,7 +265,8 @@ export const DrawerEditableTextField = React.memo(
         </div>
 
         {actionSlotIds.length > 0 ? (
-          <div
+          <HoverReveal
+            engaged={isSuccess}
             data-slot='drawer-editable-text-field-actions'
             className='flex shrink-0 items-center gap-0.5'
             aria-hidden={isEditing ? 'true' : undefined}
@@ -328,7 +329,7 @@ export const DrawerEditableTextField = React.memo(
                     </DrawerInlineIconButton>
                   )
                 )}
-          </div>
+          </HoverReveal>
         ) : null}
       </div>
     );

@@ -12,6 +12,10 @@ describe('DrawerPropertyRow', () => {
     );
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(screen.getByText('Status')).toBeInTheDocument();
+    expect(screen.getByText('Status').parentElement).toHaveClass('group');
+    expect(screen.getByText('Status').parentElement).toContainElement(
+      screen.getByText('Ready')
+    );
     expect(screen.getByText('Ready')).toBeInTheDocument();
 
     rerender(

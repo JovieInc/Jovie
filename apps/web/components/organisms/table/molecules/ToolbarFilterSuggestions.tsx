@@ -1,7 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/components/table/ToolbarFilterSuggestions.test.tsx
-import { Button } from '@jovie/ui';
+import { Button, HoverReveal } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -41,30 +41,31 @@ export function ToolbarFilterSuggestions({
   if (suggestions.length === 0) return null;
 
   return (
-    <div
-      data-testid={testId}
-      aria-hidden={hidden || undefined}
-      className={cn(
-        'flex min-w-0 items-center gap-1 overflow-hidden opacity-0 transition-opacity duration-subtle ease-subtle motion-reduce:transition-none',
-        'group-hover/toolbar-filters:opacity-100 group-focus-within/toolbar-filters:opacity-100',
-        hidden && '!opacity-0 pointer-events-none',
-        className
-      )}
-    >
-      {suggestions.map(suggestion => (
-        <Button
-          key={suggestion.id}
-          type='button'
-          variant='ghost'
-          size='sm'
-          tabIndex={hidden ? -1 : 0}
-          onClick={suggestion.onSelect}
-          aria-label={suggestion.ariaLabel}
-          className='shrink-0 whitespace-nowrap'
-        >
-          {suggestion.label}
-        </Button>
-      ))}
-    </div>
+    <HoverReveal asChild group='toolbar-filters'>
+      <div
+        data-testid={testId}
+        aria-hidden={hidden || undefined}
+        className={cn(
+          'flex min-w-0 items-center gap-1 overflow-hidden',
+          hidden && '!opacity-0 pointer-events-none',
+          className
+        )}
+      >
+        {suggestions.map(suggestion => (
+          <Button
+            key={suggestion.id}
+            type='button'
+            variant='ghost'
+            size='sm'
+            tabIndex={hidden ? -1 : 0}
+            onClick={suggestion.onSelect}
+            aria-label={suggestion.ariaLabel}
+            className='shrink-0 whitespace-nowrap'
+          >
+            {suggestion.label}
+          </Button>
+        ))}
+      </div>
+    </HoverReveal>
   );
 }
