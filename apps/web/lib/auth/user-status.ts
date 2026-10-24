@@ -28,15 +28,12 @@ export interface ExistingUserData {
 export function determineUserStatus(
   waitlistEntryId: string | undefined,
   existingUserData: ExistingUserData | undefined,
-  waitlistGateEnabled: boolean
+  _waitlistGateEnabled: boolean
 ): UserLifecycleStatus {
   if (!waitlistEntryId) {
-    // When waitlist is disabled, skip waitlist states — treat as approved
-    if (!waitlistGateEnabled) {
-      const hasClaimedProfile = !!existingUserData?.profileId; // joined via activeProfileId = claimed
-      if (!hasClaimedProfile) {
-        return 'waitlist_approved';
-      }
+    // JOV-5884: disabling the launch gate never admits a new signup.
+    // Preserve an existing claimed profile, otherwise interview first.
+    if (existingUserData?.profileId) {
       return existingUserData.onboardingComplete
         ? 'active'
         : 'onboarding_incomplete';

@@ -42,7 +42,7 @@ export function checkOnboardingPromptContract(prompt: string) {
       'Keep source provenance in the inspectable reference chip'
     ),
     gatesAccessThroughNextStepDecision: includesAll(
-      'Use `proposeNextStep` once identity and a useful signal are known',
+      'Use `proposeNextStep` once identity and past behavior are known',
       'Only its server result decides instant_access, waitlist, or needs_more_info',
       'never promise instant access or extend access policy to a new role'
     ),
@@ -97,7 +97,7 @@ export function checkOnboardingPromptContract(prompt: string) {
     preservesToolPrerequisites: includesAll(
       'use `searchSpotifyArtist` when identity is missing',
       'After `confirmSpotifyArtist` completes successfully',
-      'Use `proposeNextStep` once identity and a useful signal are known',
+      'Use `proposeNextStep` once identity and past behavior are known',
       'instant_access: use `proposeCheckout` only if the current result allows it'
     ),
   };

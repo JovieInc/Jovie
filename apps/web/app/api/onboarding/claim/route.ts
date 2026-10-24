@@ -4,6 +4,7 @@ import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { isWaitlistApprovedUserStatus } from '@/lib/auth/canonical-user-state';
 import { getDbUser } from '@/lib/auth/session';
 import { decodeToolEvents } from '@/lib/chat/tool-events';
+import { YOUTUBE_ARTIST_ACCESS_RATIONALE } from '@/lib/chat/tools/onboarding-access-eval';
 import { db } from '@/lib/db';
 import {
   chatAuditLog,
@@ -106,7 +107,10 @@ function deriveTerminalDecisionKind(
     if (output?.action !== 'propose_next_step') continue;
     const decision = isRecord(output.decision) ? output.decision : null;
     return decision?.kind === 'instant_access' || decision?.kind === 'waitlist'
-      ? decision.kind
+      ? decision.kind === 'instant_access' &&
+        decision.rationale !== YOUTUBE_ARTIST_ACCESS_RATIONALE
+        ? 'waitlist'
+        : decision.kind
       : null;
   }
   return null;
@@ -114,7 +118,9 @@ function deriveTerminalDecisionKind(
 
 async function createWaitlistReceipt(params: {
   readonly appUserId: string;
+  readonly conversationId: string;
   readonly messageRows: readonly { toolCalls: unknown }[];
+  readonly admitYoutubeArtist?: boolean;
 }): Promise<WaitlistAccessRequestResult> {
   const currentUser = await getCachedCurrentUser();
   const emailRaw = currentUser?.primaryEmailAddress?.emailAddress;
@@ -150,6 +156,8 @@ async function createWaitlistReceipt(params: {
     }),
     data: waitlistData,
     source: 'onboarding_chat_claim',
+    conversationId: params.conversationId,
+    admitYoutubeArtist: params.admitYoutubeArtist,
   });
 }
 
@@ -163,7 +171,9 @@ async function loadConversationMessageRows(conversationId: string) {
 
 async function createWaitlistReceiptOrThrow(params: {
   readonly appUserId: string;
+  readonly conversationId: string;
   readonly messageRows: readonly { toolCalls: unknown }[];
+  readonly admitYoutubeArtist?: boolean;
 }) {
   try {
     return await createWaitlistReceipt(params);
@@ -194,10 +204,11 @@ async function resolveClaimHandoff(params: {
   readonly conversationId: string;
   readonly messageRows: readonly { toolCalls: unknown }[];
   readonly mustWaitlist: boolean;
+  readonly admitYoutubeArtist?: boolean;
   readonly ipAddress: string | null;
   readonly userAgent: string | null;
 }): Promise<ClaimHandoff> {
-  if (!params.mustWaitlist) {
+  if (!params.mustWaitlist && !params.admitYoutubeArtist) {
     return {
       profile: await materializeClaimedOnboardingProfile({
         userId: params.appUserId,
@@ -214,7 +225,9 @@ async function resolveClaimHandoff(params: {
   try {
     waitlist = await createWaitlistReceiptOrThrow({
       appUserId: params.appUserId,
+      conversationId: params.conversationId,
       messageRows: params.messageRows,
+      admitYoutubeArtist: params.admitYoutubeArtist,
     });
   } catch (error) {
     if (error instanceof WaitlistIntakeRequiredError) {
@@ -407,7 +420,9 @@ export async function POST(req: Request) {
         );
         const terminalKind = deriveTerminalDecisionKind(messageRows);
         const mustWaitlist =
-          !alreadyApproved && (accessControlled || terminalKind === 'waitlist');
+          !alreadyApproved &&
+          (terminalKind === 'waitlist' ||
+            (accessControlled && terminalKind !== 'instant_access'));
         if (mustWaitlist && !hasDurablePublicArtistIdentity(messageRows)) {
           return NextResponse.json({
             claimed: 0,
@@ -425,6 +440,8 @@ export async function POST(req: Request) {
               conversationId: alreadyClaimed.id,
               messageRows,
               mustWaitlist,
+              admitYoutubeArtist:
+                !alreadyApproved && terminalKind === 'instant_access',
               ipAddress,
               userAgent,
             })
@@ -454,7 +471,9 @@ export async function POST(req: Request) {
       const messageRows = await loadConversationMessageRows(primary.id);
       const terminalKind = deriveTerminalDecisionKind(messageRows);
       const mustWaitlist =
-        !alreadyApproved && (accessControlled || terminalKind === 'waitlist');
+        !alreadyApproved &&
+        (terminalKind === 'waitlist' ||
+          (accessControlled && terminalKind !== 'instant_access'));
 
       // Do not consume the anonymous transcript until a public artist
       // identity exists. The same /start conversation retries after the next
@@ -522,6 +541,8 @@ export async function POST(req: Request) {
               conversationId: primary.id,
               messageRows,
               mustWaitlist,
+              admitYoutubeArtist:
+                !alreadyApproved && terminalKind === 'instant_access',
               ipAddress,
               userAgent,
             })
@@ -549,6 +570,8 @@ export async function POST(req: Request) {
             conversationId: primary.id,
             messageRows,
             mustWaitlist,
+            admitYoutubeArtist:
+              !alreadyApproved && terminalKind === 'instant_access',
             ipAddress,
             userAgent,
           })

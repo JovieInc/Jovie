@@ -338,7 +338,7 @@ export const TOOL_SCHEMAS = {
 
   recordInterviewSignal: {
     description:
-      'Silently record qualifying signal you learned this turn. Use whenever the visitor reveals their release stage, audience size band, what tool they currently use, or any objection / hesitation they raised. No UI surface — this is for analytics + later proposeNextStep scoring. Always pass at least one field; never call this with an empty signal.',
+      'Silently record qualifying signal you learned this turn. Use whenever the visitor reveals past behavior (pastBehavior), artist role (isMusicArtist), YouTube channel URL (youtubeChannelUrl), release stage, current tool, or an objection. No UI surface — this is for analytics + later proposeNextStep scoring. Always pass at least one field; never call this with an empty signal.',
     inputSchema: interviewSignalSchema,
   },
 

@@ -2,10 +2,7 @@ import 'server-only';
 import { type ToolSet, tool, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
-import {
-  type AccessDecision,
-  decideOnboardingAccess,
-} from '@/lib/chat/tools/onboarding-access-eval';
+import { type AccessDecision } from '@/lib/chat/tools/onboarding-access-eval';
 import {
   type InterviewSignal,
   interviewSignalSchema,
@@ -27,6 +24,7 @@ import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { buildSpotifyArtistUrl, getSpotifyArtist } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
+import { decideYouTubeOnboardingAccess } from './onboarding-youtube-access';
 
 /**
  * Onboarding tool execute closures.
@@ -549,7 +547,7 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       execute: async () => {
         // JOV-7144: the single access gate shared with the scripted fallback.
         // The DB-backed controlled-access gate stays authoritative inside it.
-        const decision = decideOnboardingAccess({
+        const decision = await decideYouTubeOnboardingAccess({
           accessControlled: state.accessControlled,
           spotifyArtistId: state.spotifyArtistId,
           publicProfileUrl: state.publicProfileUrl,

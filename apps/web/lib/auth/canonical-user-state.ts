@@ -134,11 +134,8 @@ export function resolveCanonicalState(
       : CanonicalUserState.NEEDS_WAITLIST_SUBMISSION;
   }
 
-  // Waitlist gate is enabled and user is not approved
-  if (
-    input.waitlistGateEnabled &&
-    !isWaitlistApprovedUserStatus(input.userStatus)
-  ) {
+  // Admission comes from the interview or explicit approval, never a toggle.
+  if (!isWaitlistApprovedUserStatus(input.userStatus)) {
     // User hasn't submitted yet
     return CanonicalUserState.NEEDS_WAITLIST_SUBMISSION;
   }

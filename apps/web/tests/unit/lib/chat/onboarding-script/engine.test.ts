@@ -340,19 +340,18 @@ describe('decideFallbackTurn', () => {
     expect(turn.guardedStep).toBe('contact');
   });
 
-  it('routes to instant access after widget confirms + real audience signal', async () => {
+  it('waitlists Spotify-only artists after the interview with no checkout', async () => {
     const turn = await decide([
       ...baseThroughArtist(),
       assistant('Handle locked.', [HANDLE_CONFIRMED, SOCIAL_ATTACHED]),
       user('around 20k on instagram'),
     ]);
-    // High Spotify followers already clear the bar once handle+social complete.
-    expect(turn.line.stepId).toBe('instant_access');
+    expect(turn.line.stepId).toBe('waitlist');
     const actions = turn.toolEvents.map(event => event.output.action);
     const nextStep = actions.indexOf('propose_next_step');
     const checkout = actions.indexOf('propose_checkout');
     expect(nextStep).toBeGreaterThanOrEqual(0);
-    expect(checkout).toBe(nextStep + 1);
+    expect(checkout).toBe(-1);
   });
 
   it('waitlists strong signals while controlled access is enabled', async () => {
@@ -603,5 +602,39 @@ describe('confirmSelectedArtist (JOV-7134, LLM path)', () => {
     state.spotifyArtistId = PICKED;
     expect(await confirmSelectedArtist([picked(PICKED)], state)).toBeNull();
     expect(hoisted.getSpotifyArtistMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('non-artist interview during scripted recovery', () => {
+  it('asks for past behavior after a public profile and waitlists the answer', async () => {
+    const messages = [user('My portfolio is https://averychen.design')];
+    const asked = await decide(messages);
+    expect(asked.line.stepId).toBe('ask_audience');
+    expect(
+      asked.toolEvents.find(event => event.toolName === 'proposeNextStep')
+        ?.output
+    ).toMatchObject({ decision: { kind: 'needs_more_info' } });
+    const answered = [
+      ...messages,
+      assistant(asked.text, asked.toolEvents),
+      user(
+        'I shared my last project through my portfolio and emailed clients.'
+      ),
+    ];
+    const result = await decide(answered);
+    expect(
+      result.toolEvents.find(event => event.toolName === 'proposeNextStep')
+        ?.output
+    ).toMatchObject({ decision: { kind: 'waitlist' } });
+    expect(
+      result.toolEvents.find(
+        event => event.toolName === 'recordInterviewSignal'
+      )?.output
+    ).toMatchObject({
+      signal: {
+        pastBehavior:
+          'I shared my last project through my portfolio and emailed clients.',
+      },
+    });
   });
 });

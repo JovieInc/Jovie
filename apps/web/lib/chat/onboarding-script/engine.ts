@@ -5,15 +5,14 @@ import {
   buildPostSelectionWritingBrief,
   type PostSelectionWritingBriefResult,
 } from '@/lib/chat/post-selection-writing-brief';
-import {
-  type AccessDecision,
-  decideOnboardingAccess,
-} from '@/lib/chat/tools/onboarding-access-eval';
+import type { AccessDecision } from '@/lib/chat/tools/onboarding-access-eval';
 import type { AudienceBand } from '@/lib/chat/tools/onboarding-signals';
 import {
   buildConfirmSpotifyArtistOutput,
   type OnboardingTurnState,
 } from '@/lib/chat/tools/onboarding-tool-impls';
+import { decideYouTubeOnboardingAccess } from '@/lib/chat/tools/onboarding-youtube-access';
+import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import { loadScriptBank, pickFromBank } from './line-source';
 import { renderLine, type ScriptLine, type ScriptStepId } from './script';
 import {
@@ -295,18 +294,18 @@ function proposeNextStepEvent(decision: AccessDecision): FallbackToolEvent {
   };
 }
 
-function decideAccess(
+async function decideAccess(
   state: OnboardingTurnState,
   extraBand: AudienceBand | null,
   options?: { readonly forceTurnCap?: boolean }
-): AccessDecision {
+): Promise<AccessDecision> {
   // Incomplete acks must not force waitlist via turn cap — freeze turnCount
   // under the force threshold unless we have real signal this turn.
   const turnCount =
     options?.forceTurnCap === false
       ? Math.min(state.turnCount, 2)
       : state.turnCount;
-  return decideOnboardingAccess({
+  return decideYouTubeOnboardingAccess({
     accessControlled: state.accessControlled,
     spotifyArtistId: state.spotifyArtistId,
     publicProfileUrl: state.publicProfileUrl,
@@ -343,14 +342,14 @@ function socialAttachedEventFromLatest(
   return { url: event.url ?? '' };
 }
 
-function decisionTurn(
+async function decisionTurn(
   input: Readonly<{
     uiMessages: readonly UIMessage[];
     state: OnboardingTurnState;
   }>,
   existingDecisionKind: string | null,
   pick: (stepId: ScriptStepId) => ScriptLine
-): FallbackTurn {
+): Promise<FallbackTurn> {
   const { uiMessages, state } = input;
 
   // Terminal decision already made — point back at the card.
@@ -414,7 +413,28 @@ function decisionTurn(
   }
 
   // Only apply turn-cap force when we have a real (non-ack) reply.
-  const decision = decideAccess(state, parsedBand, {
+  const pastBehavior = latestText.trim().slice(0, 2000);
+  const youtubeChannelUrl = latestText.match(
+    /https?:\/\/(?:www\.|m\.)?youtube\.com\/[^\s]+/i
+  )?.[0];
+  const interviewSignal = {
+    pastBehavior,
+    ...(youtubeChannelUrl ? { youtubeChannelUrl } : {}),
+  };
+  const interviewState = {
+    ...state,
+    signals: [...state.signals, interviewSignal],
+  };
+  events.push({
+    toolName: 'recordInterviewSignal',
+    input: interviewSignal,
+    output: {
+      action: 'signal_recorded',
+      signal: interviewSignal,
+      summary: 'Past behavior saved.',
+    },
+  });
+  const decision = await decideAccess(interviewState, parsedBand, {
     forceTurnCap: Boolean(parsedBand) || latestText.trim().length >= 8,
   });
   if (decision.kind === 'instant_access') {
@@ -530,6 +550,66 @@ export async function decideFallbackTurn(
       ],
       guardedStep: 'artist_select',
     };
+  }
+
+  // Public profiles use the same interview when the model is unavailable.
+  if (!state.spotifyArtistId && state.publicProfileUrl) {
+    const priorDecision = findLatestToolOutput(uiMessages, 'propose_next_step');
+    if (
+      !state.signals.some(
+        signal => signal.pastBehavior || signal.currentTool
+      ) &&
+      !priorDecision
+    ) {
+      const line = pick('ask_audience');
+      return {
+        line,
+        text: renderLine(line, {}),
+        toolEvents: [
+          proposeNextStepEvent({
+            kind: 'needs_more_info',
+            rationale: 'past_behavior_required',
+            score: 10,
+          }),
+        ],
+        guardedStep: 'contact',
+      };
+    }
+    const kind =
+      isRecord(priorDecision?.decision) &&
+      typeof priorDecision.decision.kind === 'string'
+        ? priorDecision.decision.kind
+        : null;
+    return decisionTurn(input, kind, pick);
+  }
+  if (!state.spotifyArtistId && latest) {
+    const url = messageText(latest).match(/https?:\/\/[^\s]+/i)?.[0];
+    const parsed = url ? parseSocialLinkInput(url) : null;
+    if (parsed?.ok) {
+      const line = pick('ask_audience');
+      return {
+        line,
+        text: renderLine(line, {}),
+        toolEvents: [
+          {
+            toolName: 'proposeSocialLink',
+            input: { url: parsed.url },
+            output: {
+              action: 'propose_social_link',
+              url: parsed.url,
+              parseOk: true,
+              summary: 'Public profile saved.',
+            },
+          },
+          proposeNextStepEvent({
+            kind: 'needs_more_info',
+            rationale: 'past_behavior_required',
+            score: 10,
+          }),
+        ],
+        guardedStep: 'contact',
+      };
+    }
   }
 
   // No artist yet: greet on the very first turn, otherwise open the picker.

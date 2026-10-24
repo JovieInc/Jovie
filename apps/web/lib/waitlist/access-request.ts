@@ -33,7 +33,6 @@ import {
   evaluateWaitlistQualification,
   type QualificationDecision,
 } from '@/lib/waitlist/qualification';
-import { getWaitlistSettings } from '@/lib/waitlist/settings';
 import {
   hashEmailForWaitlist,
   isUnqualifiedSignupEntry,
@@ -66,10 +65,14 @@ export interface WaitlistAccessRequestInput {
   readonly fullName: string;
   readonly data: WaitlistRequestPayload;
   readonly source?: string;
+  /** Owned interview transcript retained with this request. */
+  readonly conversationId?: string;
+  /** Only the claim route may set this after a durable server ICP decision. */
+  readonly admitYoutubeArtist?: boolean;
   /**
    * Free-text answers from the qualifying onboarding interview. When
-   * provided, they are scored deterministically and can admit a gate-on
-   * signup (`qualified_interview_signal`).
+   * provided, they are scored for research; only the server YouTube
+   * interview decision or an explicit approval admits a visitor.
    */
   readonly interviewResponses?: InterviewResponses;
   /** Validated by the authenticated intake route for the exact canary email. */
@@ -117,6 +120,7 @@ function buildEntryValues(params: {
   readonly email: string;
   readonly fullName: string;
   readonly source: string;
+  readonly conversationId?: string;
 }) {
   const { data, email, fullName, source } = params;
   const { platform, normalizedUrl } = detectPlatformFromUrl(
@@ -142,7 +146,12 @@ function buildEntryValues(params: {
     selectedPlan: data.selectedPlan ?? null,
     source,
     canonical: true,
-    qualificationInputs: buildQualificationInputs(data),
+    qualificationInputs: {
+      ...buildQualificationInputs(data),
+      ...(params.conversationId
+        ? { conversationId: params.conversationId }
+        : {}),
+    },
     updatedAt: new Date(),
     // Store a useful fallback in existing fields without inventing launch scoring.
     primarySocialFollowerCount: null,
@@ -262,6 +271,7 @@ async function decideAccess(params: {
   readonly email: string;
   readonly data: WaitlistRequestPayload;
   readonly interviewResponses?: InterviewResponses;
+  readonly admitYoutubeArtist?: boolean;
 }): Promise<{
   readonly outcome: WaitlistAccessOutcome;
   readonly approval: WaitlistApprovalResult | null;
@@ -276,19 +286,32 @@ async function decideAccess(params: {
     nextStatus: 'waitlist_pending',
   });
 
-  const settings = await getWaitlistSettings(params.tx);
-  const mode = settings.gateEnabled ? 'waitlist_enabled' : 'open_signup';
+  // JOV-5884: a request is a receipt, not self-serve admission. The
+  // server interview decision or an explicit approval owns access.
+  const mode = params.admitYoutubeArtist ? 'open_signup' : 'hard_closed';
   const interview = params.interviewResponses
     ? scoreOnboardingInterview({
         payload: params.data,
         responses: params.interviewResponses,
       })
     : null;
-  const qualification = evaluateWaitlistQualification({
+  const evaluated = evaluateWaitlistQualification({
     email: params.email,
     payload: params.data,
     config: { mode, interview },
   });
+
+  const qualification: QualificationDecision =
+    params.admitYoutubeArtist && evaluated.status === 'approved'
+      ? {
+          ...evaluated,
+          reasonCode: 'qualified_interview_signal',
+          details: {
+            ...evaluated.details,
+            admissionSource: 'youtube_artist_interview',
+          },
+        }
+      : evaluated;
 
   if (qualification.status === 'blocked') {
     return {
@@ -459,9 +482,16 @@ export async function submitWaitlistAccessRequest(
           email: normalizedEmail,
           fullName: input.fullName,
           source: input.source ?? 'waitlist_form',
+          conversationId: input.conversationId,
         });
 
-        if (existing && !isUnqualifiedSignupEntry(existing)) {
+        if (
+          existing &&
+          !isUnqualifiedSignupEntry(existing) &&
+          !(
+            input.admitYoutubeArtist && isWaitlistPendingStatus(existing.status)
+          )
+        ) {
           return handleExistingEntryResubmission({
             tx,
             existing,
@@ -525,6 +555,7 @@ export async function submitWaitlistAccessRequest(
           email: normalizedEmail,
           data: input.data,
           interviewResponses: input.interviewResponses,
+          admitYoutubeArtist: input.admitYoutubeArtist,
         });
 
         const nextStatus = decision.qualification.status;

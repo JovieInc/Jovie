@@ -74,7 +74,6 @@ describe('waitlist receipt reload', () => {
     expect(mocks.reservedHandle).toHaveBeenCalledWith('entry_1');
     expect(receipt.props.reservedHandle).toBe('coolartist');
     expect(receipt.props.email).toBe('test@example.com');
-    // Anyone waiting can buy Pro now; payment admits them (JOV-7701).
-    expect(receipt.props.proCheckoutPriceId).toBe('price_pro_monthly');
+    expect(receipt.props.proCheckoutPriceId).toBeUndefined();
   });
 });

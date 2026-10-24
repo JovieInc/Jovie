@@ -13,6 +13,8 @@ import {
   openFirstTouchEnvelope,
 } from '@/lib/acquisition/first-touch-envelope';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { isWaitlistApprovedUserStatus } from '@/lib/auth/canonical-user-state';
+import { getDbUser } from '@/lib/auth/session';
 import {
   CLAIM_FLOW_COOKIE,
   claimStateHref,
@@ -166,6 +168,13 @@ export async function POST(request: NextRequest) {
     const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) return jsonError('Unauthorized', 401);
     affectedUserId = userId;
+    const appUser = await getDbUser(userId);
+    if (!isWaitlistApprovedUserStatus(appUser?.userStatus)) {
+      return jsonError(
+        'Complete the interview and wait for access before starting checkout',
+        403
+      );
+    }
 
     const parsedBody = await parseJsonBody<{
       humanConfirmed?: unknown;

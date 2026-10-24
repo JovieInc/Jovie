@@ -17,10 +17,10 @@ import storyMeta, {
 } from './WaitlistSuccessView.stories';
 
 describe('WaitlistSuccessView', () => {
-  it('forwards the Pro price so a waiting visitor can buy now (JOV-7701)', () => {
-    render(<WaitlistSuccessView proCheckoutPriceId='price_pro_monthly' />);
+  it('keeps a waiting visitor on their receipt without a paid shortcut', () => {
+    render(<WaitlistSuccessView />);
 
-    expect(screen.getByTestId('waitlist-start-pro-checkout')).toBeVisible();
+    expect(screen.queryByTestId('waitlist-start-pro-checkout')).toBeNull();
   });
 
   it('does not show a saved-request confirmation for an orphaned pending account', () => {
@@ -64,7 +64,7 @@ describe('WaitlistSuccessView', () => {
     ).toBeVisible();
     expect(
       screen.getByText(
-        "jov.ie/tim is yours. Your name and profile are reserved, and we'll email you the moment your spot opens."
+        'jov.ie/tim is yours. Your name and profile are reserved. Return to /start when your segment opens.'
       )
     ).toBeVisible();
     expect(screen.queryByText(/Request saved\./)).toBeNull();
@@ -134,9 +134,7 @@ describe('WaitlistSuccessView', () => {
     );
     expect(routeSource).toContain('<WaitlistRouteWithContract>');
     expect(routeSource).toContain('email={authResult.context.email}');
-    expect(routeSource).toContain(
-      'proCheckoutPriceId = PRICING.pro.monthly.priceId'
-    );
+    expect(routeSource).not.toContain('proCheckoutPriceId');
     expect(routeSource).toContain('getWaitlistRouteRedirect');
     expect(routeSource).not.toContain('notFound()');
     expect(routeSource).not.toContain('WaitlistIntakeChat');

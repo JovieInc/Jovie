@@ -260,6 +260,77 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps a completed non-ICP interview waiting with gate off and retains its transcript reference', async () => {
+    getWaitlistSettings.mockResolvedValue({ gateEnabled: false });
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+    const result = await submitWaitlistAccessRequest({
+      ...baseInput,
+      conversationId: 'conv-interview',
+      interviewResponses: {
+        currentWorkflow: 'Artist releasing a single',
+        biggestBlocker: 'The last release took days to coordinate.',
+        launchGoal: 'Release my album',
+      },
+    });
+    expect(result.status).toBe('waitlisted');
+    expect(userRow?.userStatus).toBe('waitlist_pending');
+    expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
+    expect(insertedEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          vals: expect.objectContaining({
+            qualificationInputs: expect.objectContaining({
+              conversationId: 'conv-interview',
+            }),
+          }),
+        }),
+      ])
+    );
+  });
+
+  it.each(['signup', 'onboarding_chat_claim'])(
+    'approves verified YouTube artists from an existing %s receipt',
+    async source => {
+      findLatestEntryByEmail.mockReturnValueOnce([
+        {
+          id: 'entry-icp',
+          status: 'waitlisted',
+          source,
+          waitlistedAt: new Date(),
+        },
+      ]);
+      approveWaitlistEntryInTx.mockImplementation(async () => {
+        if (userRow) userRow.userStatus = 'waitlist_approved';
+        return {
+          outcome: 'approved',
+          entryId: 'entry-icp',
+          profileId: null,
+          email: baseInput.email,
+          fullName: 'Artist',
+          clerkId: null,
+        };
+      });
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      const result = await submitWaitlistAccessRequest({
+        ...baseInput,
+        conversationId: 'conv-icp',
+        admitYoutubeArtist: true,
+      });
+      expect(result).toMatchObject({ status: 'approved', outcome: 'accepted' });
+      expect(userRow?.userStatus).toBe('waitlist_approved');
+      expect(approveWaitlistEntryInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        expect.objectContaining({ reason: 'qualified_interview_signal' })
+      );
+      expect(finalizeWaitlistApproval).toHaveBeenCalledOnce();
+    }
+  );
+
   it('qualifies an unqualified sign-up entry instead of treating it as a resubmission', async () => {
     userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
     findLatestEntryByEmail.mockReturnValueOnce([

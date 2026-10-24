@@ -605,7 +605,7 @@ describe('Waitlist API', { timeout: 20_000 }, () => {
       expect(pendingUpsert).toBeUndefined();
     });
 
-    it('does not send invite email when open signup approval succeeds', async () => {
+    it('keeps direct requests waitlisted with the gate off even if the client asks for admission', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_auto' });
       mockCurrentUser.mockResolvedValue({
         emailAddresses: [{ id: 'e1', emailAddress: 'auto@example.com' }],
@@ -650,7 +650,7 @@ describe('Waitlist API', { timeout: 20_000 }, () => {
         autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
       });
 
-      // Open signup approval succeeds — approveWaitlistEntryInTx returns approved outcome
+      // Approval would succeed if called; a direct request must never invoke it.
       mockApproveWaitlistEntryInTx.mockResolvedValue({
         outcome: 'approved',
         profileId: 'profile_auto',
@@ -686,6 +686,7 @@ describe('Waitlist API', { timeout: 20_000 }, () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           primaryGoal: 'streams',
+          admitYoutubeArtist: true,
           primarySocialUrl: 'https://instagram.com/autouser',
         }),
       });
@@ -694,11 +695,12 @@ describe('Waitlist API', { timeout: 20_000 }, () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.status).toBe('approved');
-      expect(mockFinalizeWaitlistApproval).toHaveBeenCalled();
+      expect(data.status).toBe('waitlisted');
+      expect(mockFinalizeWaitlistApproval).not.toHaveBeenCalled();
+      expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
       expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
 
-      // Open-signup approvals should NOT get the "off the waitlist" email
+      // A pending request must not get an access invitation.
       expect(mockSendNotification).not.toHaveBeenCalled();
       expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
     });
