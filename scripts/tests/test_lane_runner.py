@@ -8220,8 +8220,12 @@ class RequeueTest(unittest.TestCase):
                     path.write_text(json.dumps({"5": "head-A"})); lane.requeue_verified(host, [])
                     self.assertEqual(json.loads(path.read_text()), {"5": "head-A"} if live is None else {})
                     if live == pr:
-                        self.assertEqual([call.args[0] for call in command.call_args_list if call.args[0][0] == "gh"], [
-                            ["gh", "pr", "ready", "5", "--repo", lane.REPO_SLUG]])
+                        github_calls = [call.args[0] for call in command.call_args_list if call.args[0][0] == "gh"]
+                        self.assertEqual(len(github_calls), 2)
+                        self.assertEqual(github_calls[0], ["gh", "pr", "ready", "5", "--repo", lane.REPO_SLUG])
+                        self.assertEqual(github_calls[1][:3], ["gh", "api", "graphql"])
+                        self.assertIn("autoMergeRequest{enabledAt}", github_calls[1][4])
+                        self.assertIn("number=5", github_calls[1])
                     else: command.assert_not_called()
             lane.revoke_publication(host, branch=pr["headRefName"], reason="run-stopped")
             with patch.object(lane, "reconcile_fix_target", return_value=pr), patch.object(lane, "sh") as command:
@@ -10359,7 +10363,11 @@ class TerminalPublicationTest(unittest.TestCase):
         self.assertEqual(self.calls, [])
         self.proof(gate_proof("abc", sensitive=True))
         self.assertEqual(lane.publish_verified(self.host, self.pr), "landing")
-        self.assertEqual([c for c in self.calls if c[0] == "gh"], [])
+        github_calls = [c for c in self.calls if c[0] == "gh"]
+        self.assertEqual(len(github_calls), 1)
+        self.assertEqual(github_calls[0][:3], ["gh", "api", "graphql"])
+        self.assertIn("autoMergeRequest{enabledAt}", github_calls[0][4])
+        self.assertIn("number=7", github_calls[0])
 
     def test_failed_ready_retains_intent_and_never_enqueues(self):
         self.proof()

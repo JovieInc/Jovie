@@ -1377,8 +1377,11 @@ class TickTest(unittest.TestCase):
         shell = Shell()
         outcome = events.ready_green(self.host, fake_lane(shell), pr(draft=True, merge="CLEAN"), {}, NOW)
         self.assertEqual(outcome, "landing")
-        self.assertEqual([call[:3] for call in shell.calls if call[0] == "gh"],
-                         [["gh", "pr", "ready"]])
+        github_calls = [call for call in shell.calls if call[0] == "gh"]
+        self.assertEqual([call[:3] for call in github_calls],
+                         [["gh", "pr", "ready"], ["gh", "api", "graphql"]])
+        self.assertIn("autoMergeRequest{enabledAt}", github_calls[1][4])
+        self.assertIn("number=5", github_calls[1])
         ledger = [json.loads(line) for line in (self.host.state / "runs/ledger.jsonl").read_text().splitlines()]
         self.assertEqual((ledger[0]["kind"], ledger[0]["verdict"]), ("ready-green", "landing"))
 
