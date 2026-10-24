@@ -8312,13 +8312,21 @@ class ReleaseImportClosureTest(unittest.TestCase):
     lazy `await import()` branches are guarded at their call sites."""
     STATIC_IMPORT = re.compile(r"""(?m)(?:\bfrom\s*|^\s*import\s+)['"](\.{1,2}/[^'"]+)['"]""")
 
-    def missing_from_release(self, extras, lanes_sources):
+    def missing_from_release(self, extras, lanes_sources, root=None):
+        root = Path(root or ROOT)
         shipped = set(extras)
         missing = []
         for rel in sorted({*(e for e in extras if e.endswith((".mjs", ".js"))), *lanes_sources}):
-            base = (ROOT / rel).parent
-            for target in self.STATIC_IMPORT.findall((ROOT / rel).read_text()):
-                resolved = Path(os.path.normpath(base / target)).relative_to(ROOT).as_posix()
+            base = (root / rel).parent
+            code = re.sub(r"/\*.*?\*/", "", (root / rel).read_text(), flags=re.DOTALL)
+            code = re.sub(r"//.*$", "", code, flags=re.MULTILINE)
+            for target in self.STATIC_IMPORT.findall(code):
+                resolved = Path(os.path.normpath(base / target))
+                try:
+                    resolved = resolved.relative_to(root).as_posix()
+                except ValueError:
+                    missing.append(f"{rel} imports {target}, which resolves outside the repo root")
+                    continue
                 if resolved not in shipped and not resolved.startswith("scripts/lanes/"):
                     missing.append(f"{rel} imports {resolved}")
         return missing
@@ -8329,6 +8337,17 @@ class ReleaseImportClosureTest(unittest.TestCase):
     def test_every_relative_import_of_a_shipped_module_is_shipped(self):
         self.assertEqual(self.missing_from_release(lane.RELEASE_EXTRAS, self.lanes_sources()), [],
                          "add the imported file to RELEASE_EXTRAS in scripts/lanes/lane_runner.py")
+
+    def test_comments_are_ignored_and_escaping_imports_are_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / "scripts").mkdir()
+            (root / "scripts/a.mjs").write_text(
+                "// import x from './missing.mjs'\n/* a\n * from './also-missing.mjs'\n */\n"
+                "import real from './b.mjs';\nimport out from '../../outside.mjs';\n")
+            (root / "scripts/b.mjs").write_text("export default 1;\n")
+            found = self.missing_from_release(["scripts/a.mjs", "scripts/b.mjs"], [], root=root)
+            self.assertEqual(found, ["scripts/a.mjs imports ../../outside.mjs, which resolves outside the repo root"])
 
     def test_the_closure_check_names_an_unshipped_import(self):
         extras = [e for e in lane.RELEASE_EXTRAS if e != "scripts/lib/merge-group-member-policy.mjs"]
