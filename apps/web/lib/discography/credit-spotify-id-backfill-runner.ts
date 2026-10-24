@@ -4,7 +4,7 @@
  * name. Idempotent (repaired rows stop matching; updates are compare-and-set)
  * and non-destructive (previous ids kept in metadata.creditBackfill).
  */
-import { sql } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   type CreditConflictRow,
   planCreditSpotifyIdRepairs,
@@ -13,16 +13,15 @@ import {
 
 const SOURCE = 'jovie-web-w3-credit-spotify-id';
 
-type SqlQuery = ReturnType<typeof sql>;
+type SqlQuery = ReturnType<typeof drizzleSql>;
 
 export interface BackfillDb {
   execute(query: SqlQuery): Promise<{
     rows: Record<string, unknown>[];
     rowCount?: number | null;
   }>;
-  transaction<T>(
-    fn: (tx: Pick<BackfillDb, 'execute'>) => Promise<T>
-  ): Promise<T>;
+  /** Runs one short atomic write; wired to runAtomicDbOperation in production. */
+  atomic<T>(fn: (tx: Pick<BackfillDb, 'execute'>) => Promise<T>): Promise<T>;
 }
 
 export function toConflictRow(row: Record<string, unknown>): CreditConflictRow {
@@ -40,7 +39,7 @@ export function toConflictRow(row: Record<string, unknown>): CreditConflictRow {
 }
 
 async function loadConflicts(db: BackfillDb): Promise<CreditConflictRow[]> {
-  const result = await db.execute(sql`
+  const result = await db.execute(drizzleSql`
     WITH provider AS (
       SELECT r.id AS release_id,
              btrim(sa->>'name') AS name,
@@ -109,10 +108,12 @@ export async function runCreditSpotifyIdBackfill(
   if (!APPLY) return report;
 
   let applied = 0;
-  await db.transaction(async tx => {
-    for (const repair of repairs) {
+  // One atomic compare-and-set write per repair: each is idempotent, so a
+  // partial run is safe to re-run and no single transaction outlives its timeout.
+  for (const repair of repairs) {
+    await db.atomic(async tx => {
       if (repair.kind === 'repoint_credit') {
-        const res = await tx.execute(sql`
+        const res = await tx.execute(drizzleSql`
           UPDATE release_artists
           SET artist_id = ${repair.toArtistId},
               metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
@@ -124,7 +125,7 @@ export async function runCreditSpotifyIdBackfill(
         `);
         applied += res.rowCount ?? 0;
       } else if (repair.kind === 'set_artist_spotify_id') {
-        const res = await tx.execute(sql`
+        const res = await tx.execute(drizzleSql`
           UPDATE artists
           SET spotify_id = ${repair.toSpotifyId},
               updated_at = now(),
@@ -138,7 +139,7 @@ export async function runCreditSpotifyIdBackfill(
         `);
         applied += res.rowCount ?? 0;
       }
-    }
-  });
+    });
+  }
   return { ...report, appliedRows: applied };
 }

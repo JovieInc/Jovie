@@ -33,7 +33,7 @@ function fakeDb(rows: Record<string, unknown>[]) {
   const writes = vi.fn(async () => ({ rows: [], rowCount: 1 }));
   const db: BackfillDb = {
     execute: vi.fn(async () => ({ rows })),
-    transaction: async fn => fn({ execute: writes }),
+    atomic: async fn => fn({ execute: writes }),
   };
   return { db, writes };
 }
