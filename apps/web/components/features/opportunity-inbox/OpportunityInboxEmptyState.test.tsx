@@ -17,6 +17,12 @@ describe('OpportunityInboxEmptyState', () => {
       'default'
     );
     expect(screen.getByText('Your Inbox Is Clear')).toBeVisible();
+    // One line means one line: the old supporting sentence and any second
+    // block stay gone.
+    expect(
+      screen.queryByText('Jovie is watching for the next opportunity.')
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link')).toHaveLength(1);
   });
 
   it('never renders a setup-step card or a Connect Spotify CTA (JOV-8967)', () => {
