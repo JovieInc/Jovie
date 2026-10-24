@@ -21,7 +21,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request_review' &&
       github.event.pull_request.base.ref == 'main' &&
-      github.event.review.user.login == 'jovie-bot[bot]'
+      contains(fromJSON('["jovie-bot[bot]", "jovie-ci-lane[bot]", "jovie-symphony-lane[bot]", "jovie-agents-lane[bot]"]'), github.event.review.user.login)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
