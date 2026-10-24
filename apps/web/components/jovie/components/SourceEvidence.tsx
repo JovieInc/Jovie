@@ -3,47 +3,26 @@
 import {
   Children,
   cloneElement,
-  createContext,
   isValidElement,
   type ReactElement,
   type ReactNode,
   useContext,
-  useMemo,
+  useEffect,
+  useState,
 } from 'react';
 import type { Components } from 'streamdown';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
-import {
-  projectPublicEnrichedFacts,
-  publicSourceUrl,
-} from '@/lib/profile-facts/enrichment';
-import { sourceFactLabel, sourceMetricLabels } from '../source-facts';
+import { SourceEvidenceContext } from '../source-evidence-context';
+import { sourceFactLabel, sourceMetricLabels } from '../source-fact-labels';
 import { EntityChipPopover } from './EntityChipPopover';
 import { EntityMentionSpan } from './EntityMentionSpan';
 
-const SourceEvidenceContext = createContext<readonly EnrichedFact[]>([]);
+export { SourceEvidenceProvider } from '../source-evidence-context';
+
 // Streamdown accepts both intrinsic HTML props and custom-element records.
 type SourceMarkdownProps =
   | { readonly children?: unknown; readonly href?: unknown }
   | Record<string, unknown>;
-
-export function SourceEvidenceProvider({
-  facts,
-  children,
-}: {
-  readonly facts: readonly EnrichedFact[];
-  readonly children: ReactNode;
-}) {
-  const publicFacts = useMemo(
-    () =>
-      facts[0] ? projectPublicEnrichedFacts(facts, facts[0].subject.id) : [],
-    [facts]
-  );
-  return (
-    <SourceEvidenceContext.Provider value={publicFacts}>
-      {children}
-    </SourceEvidenceContext.Provider>
-  );
-}
 
 function SourceMention({
   fact,
@@ -141,7 +120,16 @@ function SourceAnchor({
 }: SourceMarkdownProps): ReactElement {
   const href = typeof rawHref === 'string' ? rawHref : undefined;
   const facts = useContext(SourceEvidenceContext);
-  const safe = publicSourceUrl(href ?? null);
+  const [safe, setSafe] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    void import('@/lib/profile-facts/enrichment').then(module => {
+      if (!cancelled) setSafe(module.publicSourceUrl(href ?? null));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [href]);
   const fact = safe
     ? facts.find(candidate =>
         candidate.sourceRefs.some(

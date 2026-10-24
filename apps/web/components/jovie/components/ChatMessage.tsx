@@ -10,6 +10,7 @@ import { useClipboard } from '@/hooks/useClipboard';
 import { copyMarkdownToClipboard } from '@/lib/chat/copy-markdown';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { cn } from '@/lib/utils';
+import { SourceEvidenceProvider } from '../source-evidence-context';
 import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
@@ -18,7 +19,6 @@ import { ChatFeedbackControl } from './ChatFeedbackControl';
 import { ChatStepLimitAffordance } from './ChatStepLimitAffordance';
 import { FileAttachmentChip } from './FileAttachmentChip';
 import { ImageAttachmentChip } from './ImageAttachmentChip';
-import { SourceEvidenceProvider } from './SourceEvidence';
 import { TokenizedText } from './TokenizedText';
 
 interface ChatMessageProps {

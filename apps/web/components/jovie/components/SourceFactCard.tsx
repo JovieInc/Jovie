@@ -9,7 +9,7 @@ import {
   type EnrichedFact,
   publicSourceUrl,
 } from '@/lib/profile-facts/enrichment';
-import { sourceFactLabel } from '../source-facts';
+import { sourceFactLabel } from '../source-fact-labels';
 
 function sourceKind(fact: EnrichedFact): {
   label: string;

@@ -1,5 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
@@ -10,6 +10,17 @@ import { ChatMessage } from './ChatMessage';
 import { SourceEvidenceProvider } from './SourceEvidence';
 import { SourceFactCard } from './SourceFactCard';
 import { sourceFixture } from './source-evidence.fixtures';
+
+async function settleSourceEvidence() {
+  await waitFor(() => {
+    expect(
+      document.querySelector('[data-source-markdown="ready"]')
+    ).toBeTruthy();
+    expect(
+      document.querySelector('[data-source-evidence="ready"]')
+    ).toBeTruthy();
+  });
+}
 
 function renderEvidence(
   facts: readonly EnrichedFact[],
@@ -23,7 +34,7 @@ function renderEvidence(
 }
 
 describe('inline typed source evidence', () => {
-  it('mounts receipt-backed sources through the canonical chat message', () => {
+  it('mounts receipt-backed sources through the canonical chat message', async () => {
     const messageProps = { id: 'receipt', role: 'assistant' as const };
     fastRender(
       <TooltipProvider>
@@ -34,18 +45,18 @@ describe('inline typed source evidence', () => {
         />
       </TooltipProvider>
     );
-    expect(screen.getByTestId('entity-chip-popover-trigger')).toHaveTextContent(
-      '9.9K followers'
-    );
+    expect(
+      await screen.findByTestId('entity-chip-popover-trigger')
+    ).toHaveTextContent('9.9K followers');
   });
-  it('keeps inline markdown fragments inline with inspectable evidence', () => {
+  it('keeps inline markdown fragments inline with inspectable evidence', async () => {
     fastRender(
       <SourceEvidenceProvider facts={[sourceFixture()]}>
         <ChatMarkdown content='9.9K followers' inline />
       </SourceEvidenceProvider>
     );
     expect(
-      screen.getByTestId('entity-chip-popover-trigger').closest('p')
+      (await screen.findByTestId('entity-chip-popover-trigger')).closest('p')
     ).toBeNull();
   });
   it.each([
@@ -83,9 +94,11 @@ describe('inline typed source evidence', () => {
       [sourceFixture()],
       '**9.9K followers** and [Invented identity](https://open.spotify.com/artist/fixture).'
     );
-    expect(screen.getAllByTestId('entity-chip-popover-trigger')).toHaveLength(
-      2
-    );
+    await waitFor(() => {
+      expect(screen.getAllByTestId('entity-chip-popover-trigger')).toHaveLength(
+        2
+      );
+    });
     expect(screen.queryByText('Invented identity')).toBeNull();
     await user.click(screen.getAllByTestId('entity-chip-popover-trigger')[0]);
     expect(await screen.findByTestId('source-fact-card')).toHaveTextContent(
@@ -95,8 +108,9 @@ describe('inline typed source evidence', () => {
 
   it.each(['unknown', 'contradicted', 'inaccessible'] as const)(
     'does not present %s metrics as a claim',
-    status => {
+    async status => {
       renderEvidence([sourceFixture({ status })]);
+      await settleSourceEvidence();
       expect(screen.queryByTestId('entity-chip-popover-trigger')).toBeNull();
     }
   );
@@ -104,6 +118,7 @@ describe('inline typed source evidence', () => {
   it('inspects a metric on focus, preserves focus, and dismisses with Escape', async () => {
     const user = userEvent.setup();
     renderEvidence([sourceFixture()]);
+    await settleSourceEvidence();
     expect(screen.queryByText(/source: enrichment/)).toBeNull();
     await user.tab();
     const trigger = screen.getByTestId('entity-chip-popover-trigger');
@@ -141,7 +156,7 @@ describe('inline typed source evidence', () => {
         ],
       }),
     ]);
-    await user.click(screen.getByTestId('entity-chip-popover-trigger'));
+    await user.click(await screen.findByTestId('entity-chip-popover-trigger'));
     expect(await screen.findByTestId('source-fact-card')).toHaveTextContent(
       'Indirect enrichment · catalog'
     );
@@ -150,31 +165,35 @@ describe('inline typed source evidence', () => {
     );
   });
 
-  it('does not create false sources from restricted, unavailable or ambiguous numbers', () => {
+  it('does not create false sources from restricted, unavailable or ambiguous numbers', async () => {
     renderEvidence([sourceFixture({ permission: 'private' })]);
+    await settleSourceEvidence();
     expect(screen.queryByTestId('entity-chip-popover-trigger')).toBeNull();
     expect(screen.queryByText('Fixture Artist')).toBeNull();
   });
 
-  it('preserves plain prose, code, and links without typed evidence', () => {
+  it('preserves plain prose, code, and links without typed evidence', async () => {
     renderEvidence(
       [],
       '42 guesses, `9.9K followers`, and [ordinary website](https://example.com).'
     );
+    await settleSourceEvidence();
     expect(screen.queryByTestId('entity-chip-popover-trigger')).toBeNull();
     expect(
       screen.getByRole('link', { name: 'ordinary website' })
     ).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
-  it('recognizes exact compact and full Spotify counts without confusing other numbers', () => {
+  it('recognizes exact compact and full Spotify counts without confusing other numbers', async () => {
     renderEvidence(
       [sourceFixture()],
       '9.9K Spotify followers, 9,900 followers, and 9,900 Spotify followers. 19.9K followers stay plain.'
     );
-    expect(screen.getAllByTestId('entity-chip-popover-trigger')).toHaveLength(
-      3
-    );
+    await waitFor(() => {
+      expect(screen.getAllByTestId('entity-chip-popover-trigger')).toHaveLength(
+        3
+      );
+    });
   });
 
   it('uses an unavailable fallback for unknown evidence and recovers on a new receipt', async () => {
@@ -185,7 +204,7 @@ describe('inline typed source evidence', () => {
       [sourceFixture({ value: null, status: 'unknown' })],
       content
     );
-    await user.click(screen.getByTestId('entity-chip-popover-trigger'));
+    await user.click(await screen.findByTestId('entity-chip-popover-trigger'));
     expect(await screen.findByTestId('source-fact-card')).toHaveTextContent(
       'Source unavailable'
     );
@@ -194,9 +213,11 @@ describe('inline typed source evidence', () => {
         <AssistantMessageText content={content} />
       </SourceEvidenceProvider>
     );
-    expect(await screen.findByTestId('source-fact-card')).toHaveTextContent(
-      '9.9K followers'
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId('source-fact-card')).toHaveTextContent(
+        '9.9K followers'
+      );
+    });
   });
 
   it('switches adjacent sources without leaving an orphaned card', async () => {
@@ -205,6 +226,11 @@ describe('inline typed source evidence', () => {
       [sourceFixture()],
       '[Artist](https://open.spotify.com/artist/fixture) has 9.9K followers.'
     );
+    await waitFor(() => {
+      expect(screen.getAllByTestId('entity-chip-popover-trigger')).toHaveLength(
+        2
+      );
+    });
     const triggers = screen.getAllByTestId('entity-chip-popover-trigger');
     await user.hover(triggers[0]);
     await screen.findByTestId('source-fact-card');

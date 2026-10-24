@@ -31,14 +31,11 @@ import {
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
-import {
-  type EnrichedFact,
-  projectPublicEnrichedFacts,
-} from '@/lib/profile-facts/enrichment';
+import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { cn } from '@/lib/utils';
 import { EntityChip, type EntityChipTone } from './EntityChip';
 import { ENTITY_KIND_ACCENT_VAR } from './entity-accent';
-import { SourceFactCard } from './SourceFactCard';
+import { useProjectedSourceFact } from './useProjectedSourceFact';
 
 const HOVER_OPEN_DELAY_MS = 200;
 const HOVER_CLOSE_DELAY_MS = 120;
@@ -89,15 +86,9 @@ export function EntityChipPopover({
   // A caller cannot attach another object's metadata or capability to this id.
   const entity =
     candidate?.kind === kind && candidate.id === id ? candidate : undefined;
-  const sourceFact = useMemo(
-    () =>
-      candidateFact && candidateFact.id === id
-        ? projectPublicEnrichedFacts(
-            [candidateFact],
-            candidateFact.subject.id
-          )[0]
-        : undefined,
-    [candidateFact, id]
+  const { sourceFact, pending, SourceFactCardView } = useProjectedSourceFact(
+    candidateFact,
+    id
   );
   const label = sourceFact
     ? 'Inspect source'
@@ -255,7 +246,9 @@ export function EntityChipPopover({
   const Root = mobile ? Sheet : Popover;
   const Trigger = mobile ? SheetTrigger : PopoverTrigger;
   const body = sourceFact ? (
-    <SourceFactCard fact={sourceFact} />
+    SourceFactCardView ? (
+      <SourceFactCardView fact={sourceFact} />
+    ) : null
   ) : (
     <EntityChipPopoverBody
       kind={kind}
@@ -318,7 +311,7 @@ export function EntityChipPopover({
           className='system-b-entity-chip-trigger focus-ring'
           data-testid='entity-chip-popover-trigger'
         >
-          {entity || sourceFact ? (
+          {entity || sourceFact || pending ? (
             children
           ) : (
             <EntityChip

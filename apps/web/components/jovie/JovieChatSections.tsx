@@ -2,8 +2,15 @@
 
 import { Button } from '@jovie/ui';
 import type { Virtualizer } from '@tanstack/react-virtual';
-import { memo, type ReactNode, type RefCallback } from 'react';
+import {
+  memo,
+  type ReactNode,
+  type RefCallback,
+  useEffect,
+  useState,
+} from 'react';
 import { useDesktopChatWorkState } from '@/lib/desktop/chat-work-state';
+import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { composerPlaceholderForChatMode } from './chat-composer-copy';
 import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
@@ -31,7 +38,6 @@ import { ChatUsageAlert } from './components/ChatUsageAlert';
 import type { PendingAudio } from './hooks/useChatAudioAttachments';
 import type { PendingFile } from './hooks/useChatFileAttachments';
 import { type ComposerDraft, useComposerDraft } from './hooks/useComposerDraft';
-import { sourceFactsByMessage } from './source-facts';
 import type { ChatError, MessagePart } from './types';
 
 interface ChatComposerSurfaceProps {
@@ -285,7 +291,18 @@ export function ChatThreadMessages({
     messages.length > 0 &&
     virtualizedMinHeight > 0;
   const renderVirtualWindow = shouldVirtualizeMessages && !virtualizerStuck;
-  const sourceFacts = sourceFactsByMessage(messages);
+  const [sourceFacts, setSourceFacts] = useState<
+    ReadonlyMap<string, readonly EnrichedFact[]>
+  >(() => new Map());
+  useEffect(() => {
+    let cancelled = false;
+    void import('./source-facts').then(module => {
+      if (!cancelled) setSourceFacts(module.sourceFactsByMessage(messages));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [messages]);
   const renderMessage = (message: ChatThreadMessage, index: number) => {
     const isThinking =
       message.role === 'assistant' && message.status === 'pending';

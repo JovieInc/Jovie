@@ -1,7 +1,13 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Virtualizer } from '@tanstack/react-virtual';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatInput } from '@/components/jovie/components/ChatInput';
@@ -212,7 +218,7 @@ function renderThreadMessages({
 }
 
 describe('ChatThreadMessages collapsed summer failures', () => {
-  it('forwards public tool evidence to the assistant transcript', () => {
+  it('forwards public tool evidence to the assistant transcript', async () => {
     renderThreadMessages({
       messages: [
         {
@@ -231,10 +237,12 @@ describe('ChatThreadMessages collapsed summer failures', () => {
         },
       ],
     });
-    expect(screen.getByTestId('thread-row')).toHaveAttribute(
-      'data-source-count',
-      '1'
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId('thread-row')).toHaveAttribute(
+        'data-source-count',
+        '1'
+      );
+    });
   });
   it('hides the control when there are no collapsed failures', () => {
     renderThreadMessages({
