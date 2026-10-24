@@ -25,6 +25,10 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from apiclient import LINEAR_API_URL, ApiClient, LinearClient, LinearGraphQLError, run_gh  # noqa: E402
+from apiclient.contract import provider_spec  # noqa: E402
+
 SCHEMA = "jovie-prod-errors/v1"
 OWNER = "Jovie Owner (798b223e)"
 
@@ -33,8 +37,9 @@ class MissingConfig(RuntimeError):
     """A watcher lacks required env vars. Fail fast, record ONE clear
     'missing config: <VARS>' heartbeat/status -- never crash-loop or file duplicates."""
 STATE = Path(os.environ.get("PROD_ERRORS_STATE", Path.home() / ".local/state/jovie-prod-errors"))
-SENTRY_API = os.environ.get("SENTRY_API", "https://sentry.io/api/0")
-LINEAR_API = "https://api.linear.app/graphql"
+# Hosts come from the shared provider contract; every call goes through scripts/apiclient.
+SENTRY_API = os.environ.get("SENTRY_API", f"https://{provider_spec('sentry')['hosts'][0]}/api/0")
+LINEAR_API = LINEAR_API_URL
 REPO = os.environ.get("PROD_ERRORS_REPO", "JovieInc/Jovie")
 USER_THRESHOLD = int(os.environ.get("PROD_ERRORS_USER_THRESHOLD", "25"))
 CLAIM_S = int(os.environ.get("PROD_ERRORS_CLAIM_S", str(4 * 3600)))
@@ -209,19 +214,28 @@ class Sentry:
         if missing:
             raise MissingConfig("missing config: " + ", ".join(missing))
         self.org = os.environ["SENTRY_ORG"]
-        self.h = {"Authorization": f"Bearer {os.environ['SENTRY_AUTH_TOKEN']}"}
+        token = os.environ["SENTRY_AUTH_TOKEN"]
+        self.client = ApiClient("sentry", token,
+                                authorize=lambda h: h.update({"Authorization": f"Bearer {token}"}))
+
+    def _call(self, method: str, url: str, body=None):
+        res = self.client.request(url, method=method,
+                                  headers={"Content-Type": "application/json"}, body=body)
+        if res.status >= 400:
+            raise RuntimeError(f"sentry: HTTP {res.status} for {method} {urllib.parse.urlsplit(url).path}")
+        return res.json() if res.text else {}
 
     def top_issues(self) -> list[dict]:
         q = urllib.parse.urlencode({"query": "is:unresolved", "statsPeriod": "24h", "sort": "user",
                                     "limit": 100, "project": -1, "environment": []}, doseq=True)
-        return self.http.call("GET", f"{SENTRY_API}/organizations/{self.org}/issues/?{q}", self.h)
+        return self._call("GET", f"{SENTRY_API}/organizations/{self.org}/issues/?{q}")
 
     def issue(self, iid: str) -> dict:
-        return self.http.call("GET", f"{SENTRY_API}/organizations/{self.org}/issues/{iid}/", self.h)
+        return self._call("GET", f"{SENTRY_API}/organizations/{self.org}/issues/{iid}/")
 
     def latest_trace(self, iid: str) -> str:
         try:
-            ev = self.http.call("GET", f"{SENTRY_API}/organizations/{self.org}/issues/{iid}/events/latest/", self.h)
+            ev = self._call("GET", f"{SENTRY_API}/organizations/{self.org}/issues/{iid}/events/latest/")
         except Exception:
             return ""
         lines = []
@@ -235,7 +249,7 @@ class Sentry:
         return "\n".join(lines)[:6000]
 
     def resolve(self, iid: str) -> None:
-        self.http.call("PUT", f"{SENTRY_API}/organizations/{self.org}/issues/{iid}/", self.h, {"status": "resolved"})
+        self._call("PUT", f"{SENTRY_API}/organizations/{self.org}/issues/{iid}/", {"status": "resolved"})
 
 
 class Linear:
@@ -244,15 +258,15 @@ class Linear:
         key = os.environ.get("LINEAR_API_KEY", "")
         if not key:
             raise MissingConfig("missing config: LINEAR_API_KEY")
-        self.h = {"Authorization": key}
+        self.client = LinearClient(key, lambda rejected=None: key)
         self.team = os.environ.get("PROD_ERRORS_LINEAR_TEAM", "JOV")
         self._labels: dict[str, str] = {}
 
     def gql(self, query: str, variables: dict) -> dict:
-        r = self.http.call("POST", LINEAR_API, self.h, {"query": query, "variables": variables})
-        if r.get("errors"):
-            raise RuntimeError(f"linear: {r['errors'][0].get('message')}")
-        return r["data"]
+        try:
+            return self.client.graphql(query, variables)
+        except LinearGraphQLError as e:
+            raise RuntimeError(f"linear: {(e.errors or [{}])[0].get('message')}") from e
 
     def team_id(self) -> str:
         d = self.gql("query($k:String!){teams(filter:{key:{eq:$k}}){nodes{id}}}", {"k": self.team})
@@ -293,8 +307,11 @@ class Linear:
 
 
 def gh_json(args: list[str]):
-    out = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=60, check=True).stdout
-    return json.loads(out or "null")
+    res = run_gh(args)
+    if res["code"] != 0:
+        kind = "deferred" if res.get("deferred") else f"exit {res['code']}"
+        raise RuntimeError(f"gh {' '.join(args[:2])} failed ({kind}): {res['stderr'][:300]}")
+    return json.loads(res["stdout"] or "null")
 
 
 def alert(kind: str, text: str, siren: bool = False, linear: Linear | None = None, state: Path = STATE) -> None:
