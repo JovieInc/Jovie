@@ -6879,6 +6879,11 @@ MAINTENANCE_DEMAND_MAX_AGE_S = 3 * SUMMARY_TTL_S
 # One claim scan per minute for every idle worker on the host. The 500-issue Linear
 # pagination runs only as this cache's fill, never as an uncached read.
 CLAIM_SCAN_TTL_S = 60
+# Size ceiling for the open-PR inventory cache read that certifies repair provenance only.
+# The inventory carries every open PR with body and files, about 10 KB per PR (1.6 MB for 154
+# PRs on 2026-10-24), so 16 MiB covers more than 1,000 open PRs. The generic 1 MiB default of
+# maintenance_json made a healthy backlog read as unknown and idled every repair worker.
+REPAIR_INVENTORY_MAX_BYTES = 16 * 1024 * 1024
 SHARED_CACHE_DIR = Path(os.environ.get("LANES_STATE", Path.home() / ".local/state/jovie-lanes")) / "cache"
 
 
@@ -6919,6 +6924,20 @@ def shared(key: str, ttl: float, fetch, *, validate=None):
         return value
 
 
+def _inventory_unreadable(path, error) -> dict:
+    """Why the inventory cache could not certify provenance. Oversize is distinguishable from
+    stale or corrupt so a growing backlog is not mistaken for a missing census."""
+    if isinstance(error, ValueError) and str(error) in ("maintenance-state-not-bounded-regular-file",
+                                                         "maintenance-state-too-large"):
+        try:
+            info = os.lstat(path)
+        except OSError:
+            return {"sourceAtReason": "inventory-unreadable"}
+        if stat.S_ISREG(info.st_mode) and info.st_size > REPAIR_INVENTORY_MAX_BYTES:
+            return {"sourceAtReason": "inventory-oversize", "sourceAtBytes": info.st_size}
+    return {"sourceAtReason": "inventory-unreadable"}
+
+
 def open_prs_summary(*, capture: list[dict] | None = None) -> list[dict]:
     """Every open PR with its aggregate check state, in a few cheap GraphQL pages, cached for a
     minute. Per-check rollups over dozens of PRs 504 or trip GitHub's secondary rate limit
@@ -6937,21 +6956,28 @@ def open_prs_summary(*, capture: list[dict] | None = None) -> list[dict]:
             capture.append({"at": now, "sourceAt": None, "prs": [], "readable": False})
         return []
     source_at = now
+    source_why: dict = {}
     if os.environ.get("LANES_EXECUTION_BACKEND") != "local-test":
+        inventory_path = SHARED_CACHE_DIR / "open-prs-labels-v2.json"
         try:
-            cached = maintenance_json(SHARED_CACHE_DIR / "open-prs-labels-v2.json")
+            cached = maintenance_json(inventory_path, limit=REPAIR_INVENTORY_MAX_BYTES)
             # shared() releases its lock before returning. A later cache refill
             # can certify these rows only if the exact returned value still agrees.
             source_at = cached["at"] if cached["value"] == prs else None
-        except (OSError, ValueError, KeyError, TypeError):
+            if source_at is None:
+                source_why = {"sourceAtReason": "inventory-mismatch"}
+        except (OSError, ValueError, KeyError, TypeError) as error:
             source_at = None
+            source_why = _inventory_unreadable(inventory_path, error)
     for pr in prs:
         rollup = pr.get("rollup")
         pr["statusCheckRollup"] = [] if rollup is None else [{
             "name": "rollup", "synthetic": True,
             "status": "COMPLETED" if rollup in ("SUCCESS", "FAILURE", "ERROR") else "PENDING",
             "conclusion": {"SUCCESS": "SUCCESS", "FAILURE": "FAILURE", "ERROR": "FAILURE"}.get(rollup)}]
-    record = dict(at=now, sourceAt=source_at, prs=prs, readable=True)
+    record = dict(at=now, sourceAt=source_at, prs=prs, readable=True, **source_why)
+    _SUMMARY.pop("sourceAtReason", None)
+    _SUMMARY.pop("sourceAtBytes", None)
     _SUMMARY.update(record)
     if capture is not None:
         capture.append(copy.deepcopy(record))
@@ -8012,7 +8038,14 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     finally:
         claim.release()
     if repair_inventory_held:
-        record_idle_exit(host, name, "repair-inventory-unknown-or-stale")
+        held_summary = repair_inventory.get("summary") if isinstance(repair_inventory, dict) else None
+        held_summary = held_summary if isinstance(held_summary, dict) else {}
+        if held_summary.get("sourceAtReason") == "inventory-oversize":
+            print(f"repair inventory cache is {held_summary.get('sourceAtBytes')} bytes, over the "
+                  f"{REPAIR_INVENTORY_MAX_BYTES} byte limit", file=sys.stderr)
+            record_idle_exit(host, name, "repair-inventory-oversize")
+        else:
+            record_idle_exit(host, name, "repair-inventory-unknown-or-stale")
         slot.release()
         return 0
     # Every local pass, including one that just claimed a repair. An idle-only sync
