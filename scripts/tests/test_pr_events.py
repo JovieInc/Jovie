@@ -2778,3 +2778,86 @@ class GreenPublicationProofTest(unittest.TestCase):
                     self.assertFalse((host.state/'runs/ledger.jsonl').exists())
                 finally:
                     if claim:claim.lock.release()
+
+
+class WakeFileTest(unittest.TestCase):
+    """JOV-8931: the relay's gem-side wake job writes red-<pr>-<sha>-<attempt>.json
+    wake files atomically; fix-now drains them."""
+
+    def test_write_wake_file_is_atomic_and_well_named(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = events.write_wake_file(Path(tmp), pr=22868, sha="a" * 40,
+                                          run_id=987654, run_attempt=2,
+                                          red_at="2026-10-23T18:27:30Z")
+            self.assertEqual(path.name, f"red-22868-{'a' * 40}-2.json")
+            self.assertEqual(path.parent, Path(tmp) / "wake")
+            data = json.loads(path.read_text())
+            self.assertEqual(data["schema"], "jovie-lane-red-wake/v1")
+            self.assertEqual(data["pr"], 22868)
+            self.assertEqual(data["sha"], "a" * 40)
+            self.assertEqual(data["runId"], 987654)
+            self.assertEqual(data["runAttempt"], 2)
+            self.assertEqual(data["redAt"], "2026-10-23T18:27:30Z")
+            # A dot-prefixed tmp never shows up as a red-*.json wake file.
+            self.assertEqual(list(path.parent.glob("red-*.json")), [path])
+            self.assertEqual(list(path.parent.glob(".*tmp")), [])
+
+    def test_write_wake_file_replaces_whole_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = events.write_wake_file(Path(tmp), pr=1, sha="a" * 40, run_id=1,
+                                           run_attempt=1, red_at="2026-10-23T18:00:00Z")
+            second = events.write_wake_file(Path(tmp), pr=1, sha="a" * 40, run_id=1,
+                                            run_attempt=1, red_at="2026-10-23T18:01:00Z")
+            self.assertEqual(first, second)
+            self.assertEqual(json.loads(second.read_text())["redAt"], "2026-10-23T18:01:00Z")
+
+    def test_wake_cli_writes_one_file_per_red_pr_from_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 987654, "run_attempt": 2, "head_sha": "a" * 40,
+                                      "updated_at": "2026-10-23T18:27:30Z"}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake", "--prs", "22868,22869"]), 0)
+            names = sorted(p.name for p in (state / "wake").glob("red-*.json"))
+            self.assertEqual(names, [f"red-22868-{'a' * 40}-2.json", f"red-22869-{'a' * 40}-2.json"])
+            for name in names:
+                data = json.loads((state / "wake" / name).read_text())
+                self.assertEqual(data["redAt"], "2026-10-23T18:27:30Z")
+                self.assertEqual(data["sha"], "a" * 40)
+
+    def test_wake_cli_without_state_dir_is_a_no_op(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 1, "run_attempt": 1, "head_sha": "a" * 40,
+                                      "updated_at": "2026-10-23T18:27:30Z"}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            env = {"GITHUB_EVENT_PATH": str(event_path), "LANES_EXECUTION_BACKEND": "local-test"}
+            env = {k: v for k, v in os.environ.items() if k != "LANES_STATE"} | env
+            with patch.dict(os.environ, env):
+                self.assertEqual(events.main(["wake", "--prs", "22868"]), 0)
+
+    def test_wake_cli_ignores_non_numeric_prs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 1, "run_attempt": 1, "head_sha": "a" * 40,
+                                      "updated_at": "2026-10-23T18:27:30Z"}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake", "--prs", "22868,bogus"]), 0)
+            names = list((state / "wake").glob("red-*.json"))
+            self.assertEqual([p.name for p in names], [f"red-22868-{'a' * 40}-1.json"])
+
+    def test_wake_cli_writes_nothing_without_workflow_run_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps({"push": {}}))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake", "--prs", "22868"]), 0)
+            self.assertFalse((state / "wake").exists())
