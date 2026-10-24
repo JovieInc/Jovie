@@ -750,6 +750,11 @@ class PromptTest(unittest.TestCase):
                 self.assertIn("linear-issue-identifier:JOV-42", prompt)
                 self.assertIn("normal implementation", prompt)
 
+    def test_prompt_defaults_pr_body_to_internal_changelog_decision(self):
+        prompt = lane.render_prompt(issue("JOV-42"), "codex/jov-42-x", "")
+        self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', prompt)
+        self.assertIn("docs/CHANGELOG_PUBLICATION.md", prompt)
+
     def test_contract_forbids_interactive_skill_workflows(self):
         prompt = lane.render_prompt(issue(), "codex/jov-1", "")
         self.assertIn("Never stop to ask", prompt)
