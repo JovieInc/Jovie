@@ -15,6 +15,7 @@
  *   `executeWithTimeout` to SET statement_timeout on that client before the query.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql } from 'drizzle-orm';
 import type { DbOrTransaction } from './client/types';
 
@@ -92,6 +93,14 @@ function assertPositiveTimeoutMs(timeoutMs: number): number {
  * Uses parameterized `set_config` instead of `SET statement_timeout = $1`.
  * PostgreSQL rejects bind parameters on SET, which surfaced in production as
  * "Failed query: SET statement_timeout = $1".
+ *
+ * Best-effort (JOV-8761): this is a guard, not a business statement. When it
+ * fails — most often because an earlier statement already aborted the
+ * surrounding transaction (25P02) — throwing from here surfaces in Sentry as
+ * "Failed query: SELECT set_config('statement_timeout', $1, true)" and masks
+ * the real first error (or fails an otherwise-fine read). Log the failure as
+ * a breadcrumb and let the guarded statement report its own, more actionable
+ * error.
  */
 export async function setStatementTimeout(
   db: DbOrTransaction,
@@ -99,9 +108,20 @@ export async function setStatementTimeout(
 ): Promise<void> {
   const safeMs = assertPositiveTimeoutMs(timeoutMs);
 
-  await db.execute(
-    drizzleSql`SELECT set_config('statement_timeout', ${String(safeMs)}, true)`
-  );
+  try {
+    await db.execute(
+      drizzleSql`SELECT set_config('statement_timeout', ${String(safeMs)}, true)`
+    );
+  } catch (error) {
+    Sentry.addBreadcrumb({
+      category: 'database',
+      level: 'error',
+      message: `[statement_timeout_guard] set_config failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      data: { timeoutMs: safeMs },
+    });
+  }
 }
 
 /**
