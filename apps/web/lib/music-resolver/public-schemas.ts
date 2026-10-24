@@ -80,3 +80,33 @@ export const musicResolveOutputSchema = z
     artistMetadata: artistMetadataSchema.optional(),
   })
   .strict();
+
+/** Shared resolve failures; HTTP status and MCP framing are transport concerns. */
+export const musicResolveFailureSchema = z.strictObject({
+  error: z.strictObject({
+    code: z.enum([
+      'BODY_TIMEOUT',
+      'CANCELLED',
+      'FORBIDDEN',
+      'INVALID_BODY',
+      'INVALID_INPUT',
+      'PAYLOAD_TOO_LARGE',
+      'RATE_LIMITED',
+      'RATE_LIMIT_UNAVAILABLE',
+      'UNSUPPORTED_MEDIA_TYPE',
+      'UPSTREAM_FAILURE',
+      'UPSTREAM_TIMEOUT',
+    ]),
+    retryable: z.boolean(),
+  }),
+});
+
+export const musicResolveResultSchema = z.union([
+  musicResolveOutputSchema,
+  musicResolveFailureSchema,
+]);
+
+export type MusicResolveInput = z.input<typeof musicResolveSchema>;
+export type MusicResolveOutput = z.infer<typeof musicResolveOutputSchema>;
+export type MusicResolveFailure = z.infer<typeof musicResolveFailureSchema>;
+export type MusicResolveResult = z.infer<typeof musicResolveResultSchema>;
