@@ -887,16 +887,27 @@ def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:
                 if linear.state_of(issue["id"]) != "Todo":
                     attempted.add(issue["identifier"])
                     continue  # another host took it; a cached queue must not spin on it
-                linear.move(issue["id"], "In Progress")
+                # The run lease is this process's live ownership of the started issue.
+                lease = _ownership().acquire_run_lease(host.state, issue["id"], issue["identifier"], "reason")
+                linear.move(issue["id"], "In Progress", owner="reason-run-lease")
             finally:
                 claim.release()
             attempted.add(issue["identifier"])  # a retried job waits for the next drain
-            record = one_job(linear, issue, config, host.state, run=run)
+            try:
+                record = one_job(linear, issue, config, host.state, run=run)
+            finally:
+                if lease is not None:
+                    lease.close()
             done.append({"job": issue["identifier"], "confidence": record["confidence"]})
     except lane.LinearRateLimited as error:
         return {"status": "linear-rate-limited", "resetAt": error.reset_at, "done": done}
     finally:
         lock.release()
+
+
+def _ownership():
+    import ownership  # sibling module of the release; imported late for fixture lanes
+    return ownership
 
 
 def tick(host, lane, linear_factory, config: dict | None = None, spawn=subprocess.Popen) -> dict:
@@ -937,8 +948,13 @@ def guarded_main(argv: list[str] | None = None) -> int:
     team, number = args.identifier.upper().split("-")
     node = linear.gql('query($t:String!,$n:Float!){issues(first:1,filter:{team:{key:{eq:$t}},number:{eq:$n}})'
                       '{nodes{id identifier title description}}}', {"t": team, "n": float(number)})["issues"]["nodes"][0]
-    linear.move(node["id"], "In Progress")
-    print(json.dumps(one_job(linear, node, config, host.state), indent=1))
+    lease = _ownership().acquire_run_lease(host.state, node["id"], node["identifier"], "reason")
+    linear.move(node["id"], "In Progress", owner="reason-run-lease")
+    try:
+        print(json.dumps(one_job(linear, node, config, host.state), indent=1))
+    finally:
+        if lease is not None:
+            lease.close()
     return 0
 
 

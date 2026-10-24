@@ -59,8 +59,9 @@ permanent check:
 6. **Doc claims vs reality** — the custom ESLint rule count claimed in
    `.claude/rules/code-style.md` must equal the distinct `@jovie/` rule keys
    configured in `apps/web/eslint.config.js`.
-7. **Stale completion docs** — `DESIGN_COMPLETE.md` must carry a superseded
-   banner rather than contradict live tests.
+7. **Stale completion docs** — `DESIGN_COMPLETE.md` was retired from the repo
+   root (2026-10-20; git history preserves it). If it ever returns it must
+   carry a superseded banner rather than contradict live tests.
 8. **Design-invariant projection** — `JOV-INV-019` in
    `canon/invariants.jsonl` is the only executable list of design-agent
    invariants. The generated LLM manifest, design authority guard, and this

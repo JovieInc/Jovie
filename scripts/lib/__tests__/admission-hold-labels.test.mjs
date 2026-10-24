@@ -169,12 +169,35 @@ const invokedScripts = (path, source, root) =>
       ),
     ].map(m => normalize(join(dirname(path), m[1]))),
   ].filter(ref => !/__tests__|\/tests\/|\.test\./.test(ref));
+/**
+ * The token-scope catalog names mutations so the scanner can recognize them.
+ * It is data, not a call. A copy that claims to be executable is still a writer.
+ * @param {string} filePath
+ * @param {string} source
+ */
+const isTokenScopeCallCatalog = (filePath, source) => {
+  if (
+    !filePath.replaceAll('\\', '/').endsWith('workflow-token-scope-calls.json')
+  )
+    return false;
+  try {
+    const data = JSON.parse(source);
+    return (
+      data?.executable === false && data?.kind === 'token-scope-call-catalog'
+    );
+  } catch {
+    return false;
+  }
+};
+
 /** @returns {string[] | null} the call chain that reaches a queue write */
 const queueWriteChain = (path, root = '.', seen = new Set(), chain = []) => {
   if (seen.has(path) || chain.length > 4 || !existsSync(path)) return null;
   seen.add(path);
-  const source = uncommented(readFileSync(path, 'utf8'));
-  if (QUEUE_WRITE.test(source)) return [...chain, path];
+  const raw = readFileSync(path, 'utf8');
+  const source = uncommented(raw);
+  if (!isTokenScopeCallCatalog(path, raw) && QUEUE_WRITE.test(source))
+    return [...chain, path];
   for (const ref of invokedScripts(path, source, root)) {
     const hit = queueWriteChain(ref, root, seen, [...chain, path]);
     if (hit) return hit;
@@ -225,6 +248,54 @@ test('the queue-writer scan follows invoked scripts but not mentions', () => {
     ]);
     assert.equal(queueWriteChain(at('note.yml'), dir), null);
     assert.equal(queueWriteChain(at('off.yml'), dir), null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a real enqueue call outside green enroll is still a writer', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'queue-writer-real-'));
+  try {
+    mkdirSync(join(dir, 'scripts', 'lib'), { recursive: true });
+    const at = name => join(dir, name);
+    writeFileSync(
+      at('scripts/enqueue.mjs'),
+      'const q = `mutation { enqueuePullRequest(input:{}) { x } }`;\n'
+    );
+    writeFileSync(at('other.yml'), 'run: node scripts/enqueue.mjs\n');
+    assert.deepEqual(queueWriteChain(at('other.yml'), dir), [
+      at('other.yml'),
+      at('scripts/enqueue.mjs'),
+    ]);
+
+    const catalog = {
+      kind: 'token-scope-call-catalog',
+      executable: false,
+      graphql: { enqueuePullRequest: { all: { contents: 'write' } } },
+    };
+    writeFileSync(
+      at('scripts/lib/workflow-token-scope-calls.json'),
+      `${JSON.stringify(catalog)}\n`
+    );
+    writeFileSync(
+      at('scripts/scan.mjs'),
+      'import { readFileSync } from "node:fs";\nreadFileSync(new URL("./lib/workflow-token-scope-calls.json", import.meta.url));\n'
+    );
+    writeFileSync(at('scan.yml'), 'run: node scripts/scan.mjs\n');
+    assert.equal(queueWriteChain(at('scan.yml'), dir), null);
+    assert.equal(
+      queueWriteChain(at('scripts/lib/workflow-token-scope-calls.json'), dir),
+      null
+    );
+
+    writeFileSync(
+      at('scripts/lib/workflow-token-scope-calls.json'),
+      `${JSON.stringify({ ...catalog, executable: true })}\n`
+    );
+    assert.deepEqual(
+      queueWriteChain(at('scripts/lib/workflow-token-scope-calls.json'), dir),
+      [at('scripts/lib/workflow-token-scope-calls.json')]
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

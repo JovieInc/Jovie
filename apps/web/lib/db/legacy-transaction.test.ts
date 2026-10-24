@@ -9,13 +9,17 @@ vi.mock('server-only', () => ({}));
 
 vi.mock('@/lib/db', () => ({
   db: { transaction: transactionMock },
+  applyRlsTransactionUser: vi.fn(),
 }));
 
 vi.mock('./client/logging', () => ({
   logDbError: logDbErrorMock,
 }));
 
-import { runLegacyDbTransaction } from './legacy-transaction';
+import {
+  runAtomicDbOperation,
+  runLegacyDbTransaction,
+} from './legacy-transaction';
 
 describe('runLegacyDbTransaction', () => {
   beforeEach(() => {
@@ -78,5 +82,34 @@ describe('runLegacyDbTransaction', () => {
       })
     ).resolves.toBe('saved');
     expect(logDbErrorMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('atomic retry boundary', () => {
+  it('does not replay an ambiguous commit or a no-retry operation', async () => {
+    const failure = new Error('connection lost during COMMIT');
+    transactionMock.mockReset().mockImplementation(async fn => {
+      await fn({ execute: vi.fn() });
+      throw failure;
+    });
+    await expect(
+      runAtomicDbOperation(async () => 'written', {
+        actorId: 'trusted-user',
+        retry: 'serialization',
+      })
+    ).rejects.toBe(failure);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    transactionMock
+      .mockReset()
+      .mockRejectedValue(
+        Object.assign(new Error('aborted'), { code: '40001' })
+      );
+    await expect(
+      runAtomicDbOperation(async () => 'unused', {
+        actorId: 'trusted-user',
+        retry: 'never',
+      })
+    ).rejects.toThrow('aborted');
+    expect(transactionMock).toHaveBeenCalledTimes(1);
   });
 });

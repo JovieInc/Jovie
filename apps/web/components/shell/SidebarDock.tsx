@@ -16,7 +16,9 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
+import { banner } from '@/components/feedback/banner-store';
 import { APP_ROUTES } from '@/constants/routes';
 import type { DesktopUpdateViewState } from '@/lib/desktop/desktop-updates';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
@@ -97,6 +99,48 @@ export function SidebarDock({
   const showUpdate = Boolean(
     updateLabel && (!updateId || dismissedUpdate !== updateId)
   );
+  const activeNotice = useSyncExternalStore(
+    banner.subscribe,
+    banner.getActiveBanner,
+    () => null
+  );
+  const noticePrefix = `sidebar:${userId}:`;
+  useEffect(() => {
+    const id = `${noticePrefix}update`;
+    if (showUpdate && !collapsed && updateLabel)
+      banner.show({
+        id,
+        title: updateLabel,
+        priority: update?.state === 'error' ? 1000 : 300,
+        placement: 'sidebar',
+      });
+    return () => banner.dismiss(id);
+  }, [noticePrefix, showUpdate, collapsed, updateLabel, update?.state]);
+  useEffect(() => {
+    const id = `${noticePrefix}release`;
+    if (showRelease && !collapsed)
+      banner.show({
+        id,
+        title: "What's new",
+        priority: 100,
+        placement: 'sidebar',
+      });
+    return () => banner.dismiss(id);
+  }, [noticePrefix, showRelease, collapsed]);
+  const hasInstall = Boolean(install);
+  useEffect(() => {
+    const id = `${noticePrefix}install`;
+    if (hasInstall && !collapsed)
+      banner.show({
+        id,
+        title: 'Install Jovie',
+        priority: 0,
+        placement: 'sidebar',
+      });
+    return () => banner.dismiss(id);
+  }, [noticePrefix, hasInstall, collapsed]);
+  const selected = (kind: string) =>
+    activeNotice?.id === `${noticePrefix}${kind}`;
   const showAudio = Boolean(audio?.track.trackTitle || audio?.track.artworkUrl);
   const audioLabel = audio
     ? `${audio.isPlaying ? 'Playing' : 'Paused'}: ${audio.track.trackTitle ?? 'Audio'}`
@@ -208,7 +252,7 @@ export function SidebarDock({
         aria-label='Sidebar Dock'
         className='flex shrink-0 flex-col gap-1 overflow-visible px-2'
       >
-        {!collapsed && showUpdate ? (
+        {!collapsed && showUpdate && selected('update') ? (
           <section
             data-dock-card='update'
             aria-label='App Update'
@@ -257,7 +301,7 @@ export function SidebarDock({
             ) : null}
           </section>
         ) : null}
-        {!collapsed && showRelease && release ? (
+        {!collapsed && showRelease && release && selected('release') ? (
           <section
             data-dock-card='whats-new'
             aria-label="What's New"
@@ -265,6 +309,7 @@ export function SidebarDock({
           >
             <Link
               href={APP_ROUTES.CHANGELOG}
+              prefetch={false}
               onClick={markSeen}
               className='min-w-0 flex-1 rounded-sm text-xs text-primary-token focus-ring-themed'
             >
@@ -302,7 +347,7 @@ export function SidebarDock({
             />
           </div>
         ) : null}
-        {!collapsed && install ? (
+        {!collapsed && install && selected('install') ? (
           <div data-dock-card='install'>
             <InstallBanner
               open

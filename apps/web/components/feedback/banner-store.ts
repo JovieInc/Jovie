@@ -42,6 +42,10 @@ export interface BannerItem {
    * default — prefer toasts for anything ephemeral.
    */
   durationMs?: number;
+  /** Higher priority preempts without discarding queued actionable notices. */
+  priority?: number;
+  /** Existing feature surfaces can consume the same single selected notice. */
+  placement?: 'viewport' | 'sidebar' | 'modal';
 }
 
 export interface BannerInput extends Omit<BannerItem, 'id' | 'variant'> {
@@ -54,8 +58,35 @@ let banners: readonly BannerItem[] = [];
 const listeners = new Set<() => void>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 let counter = 0;
+let active: BannerItem | null = null;
+const PRIORITY: Record<BannerVariant, number> = {
+  error: 1000,
+  warning: 900,
+  info: 800,
+  success: 700,
+};
 
 function emit(): void {
+  const next = banners.reduce<BannerItem | null>(
+    (selected, item) =>
+      !selected ||
+      (item.priority ?? PRIORITY[item.variant]) >
+        (selected.priority ?? PRIORITY[selected.variant])
+        ? item
+        : selected,
+    null
+  );
+  if (next !== active) {
+    if (active) clearTimer(active.id);
+    active = next;
+    if (active?.durationMs && Number.isFinite(active.durationMs)) {
+      const id = active.id;
+      timers.set(
+        id,
+        setTimeout(() => dismiss(id), active.durationMs)
+      );
+    }
+  }
   for (const listener of listeners) {
     listener();
   }
@@ -74,13 +105,11 @@ function show(input: BannerInput): string {
   const id = input.id ?? `banner-${counter}`;
   const item: BannerItem = { variant: 'info', ...input, id };
   clearTimer(id);
-  banners = [...banners.filter(existing => existing.id !== id), item];
-  if (item.durationMs && Number.isFinite(item.durationMs)) {
-    timers.set(
-      id,
-      setTimeout(() => dismiss(id), item.durationMs)
-    );
-  }
+  const index = banners.findIndex(existing => existing.id === id);
+  banners =
+    index < 0
+      ? [...banners, item]
+      : banners.map(existing => (existing.id === id ? item : existing));
   emit();
   return id;
 }
@@ -121,4 +150,5 @@ export const banner = {
   },
   /** Stable snapshot of active banners (for useSyncExternalStore). */
   getBanners: (): readonly BannerItem[] => banners,
+  getActiveBanner: (): BannerItem | null => active,
 };

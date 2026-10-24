@@ -3,6 +3,7 @@ import {
   buildProductionSignupEmail,
   cleanupProductionSyntheticSignup,
   fillOtpCode,
+  syntheticOtpUnavailableReason,
   tagProductionSyntheticSignup,
   validateProductionSignupCanaryConfig,
   waitForProductionSignupOtp,
@@ -175,6 +176,9 @@ test.describe('Synthetic Monitoring - Legacy OTP Signup (JOV-2446 cutover)', () 
     page,
   }) => {
     test.setTimeout(240_000);
+
+    const otpSkipReason = syntheticOtpUnavailableReason(process.env);
+    test.skip(otpSkipReason !== null, otpSkipReason ?? '');
 
     const config = validateProductionSignupCanaryConfig(process.env);
     if (!config.ok) {

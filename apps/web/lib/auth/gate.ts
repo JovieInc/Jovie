@@ -14,6 +14,7 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
+import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import { normalizeEmail } from '@/lib/utils/email';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import {
@@ -729,7 +730,15 @@ async function resolveUserStateInternal(
   const [waitlistGateEnabled, lookupResult] = await Promise.all([
     readWaitlistGateEnabledForAuthGate(),
     loadAuthGateRecord(clerkUserId, email),
-  ]);
+  ]).catch(error => {
+    captureRevenueSpineFailure({
+      stage: 'returning_access',
+      severity: 'blocked',
+      userId: knownClerkUserId,
+      error,
+    });
+    throw error;
+  });
   if (lookupResult && 'state' in lookupResult) {
     return lookupResult;
   }

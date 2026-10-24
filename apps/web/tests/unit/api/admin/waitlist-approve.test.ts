@@ -27,8 +27,8 @@ vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
 }));
 
-vi.mock('@/lib/ingestion/session', () => ({
-  withSystemIngestionSession: mockWithSystemIngestionSession,
+vi.mock('@/lib/db/legacy-transaction', () => ({
+  runAtomicDbOperation: mockWithSystemIngestionSession,
 }));
 
 vi.mock('@/lib/waitlist/approval', () => ({
@@ -166,7 +166,12 @@ describe('Admin Waitlist Approve API', () => {
     );
     expect(mockWithSystemIngestionSession).toHaveBeenCalledWith(
       expect.any(Function),
-      { isolationLevel: 'serializable' }
+      {
+        actorId: 'admin_123',
+        system: true,
+        retry: 'serialization',
+        isolationLevel: 'serializable',
+      }
     );
   });
 

@@ -902,6 +902,19 @@ function encodePathParts(value) {
   return value.split('/').map(encodeURIComponent).join('/');
 }
 
+// One admission run polls the same git ref and check-runs while a group waits.
+// GitHub does not count an authorized 304 toward the primary rate limit.
+const conditionalGetCache = new Map();
+
+export function clearAdmissionConditionalGetCache() {
+  conditionalGetCache.clear();
+}
+
+function headerValue(headers, name) {
+  if (!headers || typeof headers.get !== 'function') return null;
+  return headers.get(name);
+}
+
 async function githubRequest(
   path,
   {
@@ -920,15 +933,19 @@ async function githubRequest(
   }
 
   const apiUrl = env.GITHUB_API_URL || 'https://api.github.com';
+  const requestUrl = `${apiUrl}${path}`;
+  const conditional = method === 'GET' && body === undefined;
+  const cached = conditional ? conditionalGetCache.get(requestUrl) : undefined;
   let response;
   try {
-    response = await fetchImpl(`${apiUrl}${path}`, {
+    response = await fetchImpl(requestUrl, {
       cache: 'no-store',
       method,
       headers: {
         Accept: 'application/vnd.github+json',
         Authorization: `Bearer ${token}`,
         'Cache-Control': 'no-cache',
+        ...(cached?.etag ? { 'If-None-Match': cached.etag } : {}),
         ...(body ? { 'Content-Type': 'application/json' } : {}),
         'X-GitHub-Api-Version': '2022-11-28',
       },
@@ -943,6 +960,16 @@ async function githubRequest(
         error instanceof Error ? error.message : String(error)
       }`
     );
+  }
+
+  if (response.status === 304) {
+    if (!cached) {
+      throw new MergeGroupAdmissionError(
+        `GitHub API 304 for ${path} without a stored body`,
+        { path, status: 304 }
+      );
+    }
+    return { data: structuredClone(cached.data), link: cached.link };
   }
 
   const text = await response.text();
@@ -983,7 +1010,16 @@ async function githubRequest(
     }
     throw error;
   }
-  return { data, link: response.headers.get('link') };
+  const link = headerValue(response.headers, 'link');
+  const etag = headerValue(response.headers, 'etag');
+  if (conditional && etag) {
+    conditionalGetCache.set(requestUrl, {
+      data: structuredClone(data),
+      etag,
+      link,
+    });
+  }
+  return { data, link };
 }
 
 async function githubGraphqlRequest(query, variables, options) {

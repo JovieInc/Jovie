@@ -105,6 +105,20 @@ describe('measureWebVitals observation evidence', () => {
     cleanedUp();
   });
 
+  it('records LCP and FCP when layout-shift is unsupported', async () => {
+    Observer.supportedEntryTypes = types.filter(
+      item => item !== 'layout-shift'
+    );
+    const result = measure();
+    paints();
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(result).resolves.toEqual({ lcp: 321, fcp: 123 });
+    expect(Observer.instances.map(item => item.type)).not.toContain(
+      'layout-shift'
+    );
+    cleanedUp();
+  });
+
   it.each(types)(
     'rejects unsupported %s rather than inventing zero',
     async type => {

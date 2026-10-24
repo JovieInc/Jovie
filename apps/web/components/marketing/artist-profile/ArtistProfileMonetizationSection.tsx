@@ -217,7 +217,7 @@ export function ArtistProfileMonetizationSection({
       penContractId={MARKETING_PEN_CONTRACT_IDS.section.monetization}
     >
       <div>
-        <div className='ap-monetization__header mx-auto px-5 sm:px-6 lg:px-0'>
+        <div className='ap-monetization__header public-container'>
           <div className='max-w-136'>
             {/* ui-casing-allow: marketing display headline */}
             <h2 className={`${SHELL_H2_CLASS} line-clamp-2`}>

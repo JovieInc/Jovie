@@ -20,6 +20,7 @@ import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
+import { getDeepErrorMessage, unwrapPgError } from '@/lib/db/errors';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import {
   dashboardQuery,
@@ -183,7 +184,6 @@ interface SocialLinkExistenceQueryOptions {
   context: string;
   operation: string;
   profileId: string;
-  queryLabel: string;
   userId: string;
 }
 
@@ -213,6 +213,15 @@ const BIO_LINK_ACTIVATION_EVENT_TYPES = [
 
 type BioLinkActivationEventType =
   (typeof BIO_LINK_ACTIVATION_EVENT_TYPES)[number];
+
+function isIdleTransactionTermination(error: unknown): boolean {
+  const { code } = unwrapPgError(error);
+  return code
+    ? code === '25P03'
+    : /terminating connection due to idle-in-transaction timeout/i.test(
+        getDeepErrorMessage(error)
+      );
+}
 
 async function buildBioLinkActivation(
   clerkUserId: string,
@@ -270,7 +279,8 @@ async function buildBioLinkActivation(
       maxRetries: 1,
       baseDelayMs: DB_CONFIG.retryDelay,
       isRetryable: error =>
-        isRetryableError(error) && !isPostgresTimeoutError(error),
+        isIdleTransactionTermination(error) ||
+        (isRetryableError(error) && !isPostgresTimeoutError(error)),
     }
   ).catch((error: unknown) => {
     // The transaction wrapper has completed rollback/release before a
@@ -329,20 +339,20 @@ async function buildBioLinkActivation(
 }
 
 async function fetchSocialLinkExistence(
-  tx: DbOrTransaction,
-  {
-    context,
-    operation,
-    profileId,
-    queryLabel,
-    userId,
-  }: SocialLinkExistenceQueryOptions
+  clerkUserId: string,
+  { context, operation, profileId, userId }: SocialLinkExistenceQueryOptions
 ): Promise<{ hasLinks: boolean; hasMusicLinks: boolean }> {
-  return dashboardQuery(
+  // Bound retry admission, including cleanup, without replaying sibling reads.
+  const retryDeadline = performance.now() + QUERY_TIMEOUTS.dashboard;
+  return executeWithRetry(
     () =>
-      tx
-        .select({
-          hasLinks: drizzleSql<boolean>`
+      withDbSessionTx(
+        async tx => {
+          // Await PostgreSQL cancellation before rollback/release or recovery.
+          await setStatementTimeout(tx, QUERY_TIMEOUTS.dashboard);
+          return tx
+            .select({
+              hasLinks: drizzleSql<boolean>`
             exists (
               select 1
               from ${socialLinks}
@@ -353,7 +363,7 @@ async function fetchSocialLinkExistence(
               )}
             )
           `,
-          hasMusicLinks: drizzleSql<boolean>`
+              hasMusicLinks: drizzleSql<boolean>`
             exists (
               select 1
               from ${socialLinks}
@@ -368,14 +378,24 @@ async function fetchSocialLinkExistence(
               )}
             )
           `,
-        })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1),
-    queryLabel
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+        },
+        { clerkUserId }
+      ),
+    {
+      maxRetries: 1,
+      baseDelayMs: 0,
+      isRetryable: error =>
+        isIdleTransactionTermination(error) &&
+        performance.now() < retryDeadline,
+    }
   )
     .then(result => mapSocialLinkExistence(result?.[0]))
     .catch((error: unknown) => {
+      // Cleanup has finished before tolerated failures become fallback data.
       const migrationResult = handleMigrationErrors(error, {
         userId,
         operation,
@@ -899,6 +919,38 @@ async function fetchDashboardBaseWithSession(
   };
 }
 
+/** Retry only this pure read after an idle-terminated setup has closed. */
+async function fetchAvatarQualityWithSession(
+  clerkUserId: string,
+  profileId: string
+): Promise<AvatarQuality> {
+  // This bounds retry admission, not connection acquisition or setup duration.
+  const retryDeadline = performance.now() + QUERY_TIMEOUTS.dashboard;
+  const read = () =>
+    withDbSessionTx(
+      async tx => {
+        // Wait for PostgreSQL cancellation; do not race SQL with a JS timer.
+        await setStatementTimeout(tx, QUERY_TIMEOUTS.api);
+        return getAvatarQualityForProfile(profileId, tx);
+      },
+      { clerkUserId }
+    );
+
+  try {
+    return await read();
+  } catch (error) {
+    if (
+      !isIdleTransactionTermination(error) ||
+      performance.now() >= retryDeadline
+    )
+      throw error;
+
+    // The first wrapper has completed rollback/release. RLS reporting remains
+    // intact; only this side-effect-free avatar read gets one fresh attempt.
+    return read();
+  }
+}
+
 /**
  * Full dashboard data fetch. Calls the base fetch for user/profiles/settings,
  * then augments with slow supplementary queries (links, avatar, tipping).
@@ -945,21 +997,16 @@ async function fetchDashboardCoreWithSession(
     // Supplementary reads stay sequential — parallel dispatch would just
     // queue on the pool while starting all timeout timers simultaneously —
     // but each is isolated in its own transaction (see the docstring above).
-    const linkCounts = await withDbSessionTx(
-      async tx =>
-        fetchSocialLinkExistence(tx, {
-          context: 'dashboard_data_settled',
-          operation: 'social_links_existence',
-          profileId: selected.id,
-          queryLabel: 'Social links existence query',
-          userId,
-        }),
-      { clerkUserId }
-    );
+    const linkCounts = await fetchSocialLinkExistence(clerkUserId, {
+      context: 'dashboard_data_settled',
+      operation: 'social_links_existence',
+      profileId: selected.id,
+      userId,
+    });
 
-    const avatarQuality = await withDbSessionTx(
-      async tx => getAvatarQualityForProfile(selected.id, tx),
-      { clerkUserId }
+    const avatarQuality = await fetchAvatarQualityWithSession(
+      clerkUserId,
+      selected.id
     ).catch((error: unknown) => {
       Sentry.captureException(error, {
         level: 'warning',

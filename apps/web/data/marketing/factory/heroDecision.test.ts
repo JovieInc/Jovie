@@ -188,6 +188,17 @@ describe('hero code bindings', () => {
 });
 
 describe('route hero audit', () => {
+  it('keeps the planned Card announcement on the existing informational hero', () => {
+    const card = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/card')!;
+    const intent = HERO_ROUTE_INTENTS.find(entry => entry.url === '/card')!;
+    const decision = selectHeroDecision(intent.input);
+    expect(card.productEvidence?.kind).toBe('planned-description');
+    expect(decision).toMatchObject({ variant: 'left-content', penId: 'WQe2p' });
+    expect(
+      auditHeroRoutes(activeHeroBindings()).find(row => row.url === '/card')
+    ).toMatchObject({ observedCodeVariant: 'left-none', mismatch: null });
+  });
+
   it('declares a hero job for every active route that renders a hero', () => {
     const intentUrls = HERO_ROUTE_INTENTS.map(intent => intent.url).sort();
     expect(intentUrls).toEqual([...activeHeroBindings().keys()].sort());
@@ -215,7 +226,7 @@ describe('route hero audit', () => {
         "/artist-profiles": "unlocked-code-variant: centered-phone -> split-link-claim",
         "/blog": "ok: left-content",
         "/blog/category/*": "ok: left-content",
-        "/card": "ok: f-layout-desktop-screenshot",
+        "/card": "ok: left-content",
         "/cli": "unlocked-code-variant: centered-none -> npm-copy",
         "/compare/*": "ok: left-content",
         "/download": "ok: f-layout-desktop-screenshot",
@@ -224,6 +235,13 @@ describe('route hero audit', () => {
         "/pay": "ok: split-link-claim",
         "/pricing": "unlocked-code-variant: centered-none -> left-buttons",
         "/product": "ok: split-link-claim",
+        "/product/command-palette": "ok: f-layout-desktop-screenshot",
+        "/product/dsp-links": "ok: f-layout-desktop-screenshot",
+        "/product/isrc": "ok: f-layout-desktop-screenshot",
+        "/product/link-analytics": "ok: f-layout-desktop-screenshot",
+        "/product/pre-save": "ok: f-layout-desktop-screenshot",
+        "/product/release-scheduling": "ok: f-layout-desktop-screenshot",
+        "/product/utm-links": "ok: f-layout-desktop-screenshot",
         "/smart-links": "ok: f-layout-desktop-screenshot",
         "/solutions/*": "unlocked-code-variant: centered-phone -> split-link-claim",
         "/support": "ok: left-content",

@@ -59,8 +59,9 @@ self.addEventListener('fetch', event => {
 
     // Auth/OAuth callbacks must reach the network. Serving offline.html here
     // breaks desktop login when a stale service worker controls Electron.
+    // Return without respondWith so an aborted fetch stays a browser fetch.
+    // respondWith(fetch) turns that rejection into a ServiceWorker error.
     if (isAuthNavigationPath(requestUrl.pathname)) {
-      event.respondWith(fetch(event.request));
       return;
     }
 
@@ -87,6 +88,10 @@ self.addEventListener('fetch', event => {
     );
     return;
   }
-  // Pass-through for all other requests (no aggressive caching)
-  event.respondWith(fetch(event.request));
+  // Chunks, RSC payloads, and images are not navigations. Leaving them
+  // unintercepted lets the browser abort them without a console error.
+  // Firefox reports respondWith(fetch(event.request)) on an aborted request
+  // as "A ServiceWorker intercepted the request and encountered an unexpected
+  // error", which fails the dashboard health sweeps and can drop the cookie
+  // banner's dynamic import.
 });

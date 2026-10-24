@@ -45,6 +45,10 @@ LEASE_WAIT_S = int(os.environ.get("CODEX_LEASE_WAIT_S", 1800))
 LEASE_POLL_S = float(os.environ.get("CODEX_LEASE_POLL_S", 15))
 LEDGER_SCHEMA = "jovie.capacity-lease/v1"
 LEDGER_CADENCE_S = 3600
+# Subscription-pool identity evidence is refreshed this long before it lapses; a failed
+# refresh is retried after SUBSCRIPTION_RETRY_S (inside one 5-minute tick), never hot-looped.
+SUBSCRIPTION_REFRESH_LEAD_S = 900
+SUBSCRIPTION_RETRY_S = 240
 EVIDENCE_MAX_AGE_S = 2 * 3600
 AUTH = re.compile(r"not logged in|login required|unauthori[sz]ed|invalid.*(token|credential)|\b401\b", re.I)
 # "Try again at 3:15 PM", "try again in 2 hours 5 minutes", "resets at 2026-09-27T01:00:00Z"
@@ -664,9 +668,27 @@ CURRENT_METADATA_CALLS = [("account/read", {"refreshToken": False}),
                           ("model/list", {"limit": 100, "includeHidden": False})]
 
 
-def current_subscription_snapshot(name: str, *, lease_handle=None) -> dict:
-    account, rates, models = app_server_calls(name, CURRENT_METADATA_CALLS, lease_handle=lease_handle)
-    return {"account": account, "rateLimits": rates, "models": models}
+# Gem 2026-10-23: the 15s app-server budget timed out under host load (load ~14),
+# leaving the hourly identity proof to lapse. Give the read-only metadata session
+# a longer budget and retry transient timeouts with backoff; a final failure still
+# keeps the previous observation (never certifies new capacity).
+CURRENT_METADATA_TIMEOUT_S = float(os.environ.get("CODEX_METADATA_TIMEOUT_S", "45"))
+CURRENT_METADATA_ATTEMPTS = 3
+CURRENT_METADATA_BACKOFF_S = (2.0, 6.0)
+
+
+def current_subscription_snapshot(name: str, *, lease_handle=None, sleep=time.sleep) -> dict:
+    for attempt in range(CURRENT_METADATA_ATTEMPTS):
+        try:
+            account, rates, models = app_server_calls(name, CURRENT_METADATA_CALLS,
+                                                      timeout=CURRENT_METADATA_TIMEOUT_S,
+                                                      lease_handle=lease_handle)
+            return {"account": account, "rateLimits": rates, "models": models}
+        except TimeoutError:
+            if attempt + 1 >= CURRENT_METADATA_ATTEMPTS:
+                raise
+            sleep(CURRENT_METADATA_BACKOFF_S[min(attempt, len(CURRENT_METADATA_BACKOFF_S) - 1)])
+    raise TimeoutError("unreachable")
 
 
 def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> dict:
@@ -686,6 +708,15 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
             # the reset, retaining the normal failure throttle on later calls.
             if any(type(row.get("resetsAt")) in (int, float) and last < row["resetsAt"] <= now
                    for row in capacity.values()):
+                return True
+            # available() trusts identity evidence for LEDGER_CADENCE_S. Refresh it
+            # before it lapses, and retry a failed refresh on the short interval, so
+            # one metadata timeout cannot hold a healthy account unavailable for a
+            # whole cadence (Gem 2026-10-20: both accounts lapsed, codex idled).
+            verified = (state.get(name) or {}).get("subscriptionIdentityVerifiedAt")
+            if (if_due and now - last >= SUBSCRIPTION_RETRY_S
+                    and (type(verified) not in (int, float)
+                         or now - verified >= LEDGER_CADENCE_S - SUBSCRIPTION_REFRESH_LEAD_S)):
                 return True
         return not (ledger.get("authMode") == os.environ.get("CODEX_LANE_AUTH_MODE") and if_due
                     and type(last) in (int, float) and 0 <= now - last < if_due)

@@ -10,6 +10,7 @@ import {
 } from '@/lib/a11y-gates/contrast-engine';
 import { contrastRatio } from '@/lib/utils/color';
 import {
+  buildSmartLinkReportHref,
   SmartLinkArtworkCard,
   SmartLinkPoweredByFooter,
 } from './SmartLinkPagePrimitives';
@@ -92,9 +93,18 @@ describe('SmartLinkPoweredByFooter', () => {
       '/'
     );
 
-    rerender(
-      <SmartLinkPoweredByFooter reportHref='/report?type=smart_link&target=abc' />
+    rerender(<SmartLinkPoweredByFooter reportTarget='/tim/never-say-a-word' />);
+    expect(link).toHaveAttribute(
+      'href',
+      '/report?type=smart_link&target=%2Ftim%2Fnever-say-a-word'
     );
-    expect(link).toHaveAttribute('href', '/report?type=smart_link&target=abc');
+  });
+
+  it('builds an unambiguous report target and ignores blank targets', () => {
+    expect(buildSmartLinkReportHref('/tim/never-say-a-word')).toBe(
+      '/report?type=smart_link&target=%2Ftim%2Fnever-say-a-word'
+    );
+    expect(buildSmartLinkReportHref('  ')).toBe('/report?type=smart_link');
+    expect(buildSmartLinkReportHref(null)).toBe('/report?type=smart_link');
   });
 });

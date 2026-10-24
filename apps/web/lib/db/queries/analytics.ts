@@ -1,9 +1,11 @@
 import {
   and,
+  desc,
   sql as drizzleSql,
   eq,
   getTableName,
   gte,
+  inArray,
   isNotNull,
   isNull,
   lte,
@@ -679,6 +681,73 @@ export async function listConsentedSmsRecipientPhones(
   return rows
     .map(row => row.phone)
     .filter((phone): phone is string => Boolean(phone));
+}
+
+/** Export candidates on the caller's authorized RLS transaction; retain revoked
+ * duplicates so consent chronology is resolved before exporting any email. */
+export async function listEmailSubscriberExportCandidates(
+  tx: DbOrTransaction,
+  profileId: string,
+  selectedIds?: string[]
+) {
+  // Resolve selected identities within this profile, then load their latest
+  // state including revoked duplicates before intersecting immutable IDs.
+  const selected = selectedIds
+    ? await tx
+        .select({ email: notificationSubscriptions.email })
+        .from(notificationSubscriptions)
+        .where(
+          and(
+            eq(notificationSubscriptions.creatorProfileId, profileId),
+            eq(notificationSubscriptions.channel, 'email'),
+            inArray(notificationSubscriptions.id, selectedIds)
+          )
+        )
+    : null;
+  const selectedEmails = selected
+    ? [
+        ...new Set(
+          selected.flatMap(row =>
+            row.email ? [row.email.trim().toLowerCase()] : []
+          )
+        ),
+      ]
+    : null;
+  if (selectedEmails?.length === 0) {
+    return [];
+  }
+  return tx
+    .select({
+      id: notificationSubscriptions.id,
+      email: notificationSubscriptions.email,
+      name: notificationSubscriptions.name,
+      countryCode: notificationSubscriptions.countryCode,
+      channel: notificationSubscriptions.channel,
+      createdAt: notificationSubscriptions.createdAt,
+      confirmedAt: notificationSubscriptions.confirmedAt,
+      unsubscribedAt: notificationSubscriptions.unsubscribedAt,
+      artistEmailOptInAt: notificationSubscriptions.artistEmailOptInAt,
+      artistEmailOptOutAt: notificationSubscriptions.artistEmailOptOutAt,
+    })
+    .from(notificationSubscriptions)
+    .where(
+      and(
+        eq(notificationSubscriptions.creatorProfileId, profileId),
+        eq(notificationSubscriptions.channel, 'email'),
+        isNotNull(notificationSubscriptions.email),
+        selectedEmails
+          ? inArray(
+              drizzleSql`lower(trim(${notificationSubscriptions.email}))`,
+              selectedEmails
+            )
+          : undefined
+      )
+    )
+    .orderBy(
+      desc(notificationSubscriptions.createdAt),
+      desc(notificationSubscriptions.id)
+    )
+    .limit(10001);
 }
 
 /** Canonical profile_views across public claimed profiles, excluding internal accounts.

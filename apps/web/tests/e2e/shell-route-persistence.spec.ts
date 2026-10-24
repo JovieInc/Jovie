@@ -304,6 +304,33 @@ async function resolveChatConversationPathWithRetry(
   throw lastError;
 }
 
+async function openLibraryReleasesView(page: Page): Promise<void> {
+  // Releases has no sidebar row: it is a Work view reached through
+  // /app/releases -> /app/library?view=releases. Rewriting a Work link's DOM
+  // href does not change next/link's client navigation target, so use the
+  // shell command palette, which navigates client-side like a user would.
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('Meta+k');
+  const paletteInput = page
+    .locator('input[aria-label="Command Palette Search"]')
+    .filter({ visible: true })
+    .first();
+  await expect(paletteInput).toBeVisible({ timeout: 15_000 });
+  await paletteInput.fill('Releases');
+  await expect(page.locator('[data-cmdk-item]').first()).toBeVisible({
+    timeout: 10_000,
+  });
+  await Promise.all([
+    page.waitForURL(
+      url =>
+        url.pathname === '/app/library' &&
+        url.searchParams.get('view') === 'releases',
+      { timeout: 60_000, waitUntil: 'commit' }
+    ),
+    page.keyboard.press('Enter'),
+  ]);
+}
+
 async function clickFirstVisibleAppLink(
   page: Page,
   hrefs: readonly string[],
@@ -410,11 +437,7 @@ test('app shell persists across core app routes without duplicate request bursts
   const baselineLoadCount = await readDocumentLoadCount(page);
   await attachReleasesOverlayProbe(page);
 
-  await clickFirstVisibleAppLink(
-    page,
-    [APP_ROUTES.DASHBOARD_RELEASES, APP_ROUTES.RELEASES],
-    [APP_ROUTES.DASHBOARD_RELEASES, APP_ROUTES.RELEASES]
-  );
+  await openLibraryReleasesView(page);
   await expectRouteContent(page, 'releases');
   const currentShellRemounts = await detectKnownShellPersistenceGap(
     page,

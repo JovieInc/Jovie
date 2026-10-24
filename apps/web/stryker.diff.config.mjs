@@ -7,12 +7,18 @@ if (!testFiles) {
   throw new Error('STRYKER_TEST_FILES must list the tests to run per mutant');
 }
 
+// File paths can include shell metacharacters such as app/(shell).
+const quotedTestFiles = testFiles
+  .split(/\s+/u)
+  .map(file => `'${file.replaceAll("'", "'\\''")}'`)
+  .join(' ');
+
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
   packageManager: 'pnpm',
   testRunner: 'command',
   commandRunner: {
-    command: `node ./node_modules/vitest/vitest.mjs run --config vitest.config.fast.mts --bail 1 --reporter dot ${testFiles}`,
+    command: `node ./node_modules/vitest/vitest.mjs run --config vitest.config.fast.mts --bail 1 --passWithNoTests=false --reporter dot ${quotedTestFiles}`,
   },
   coverageAnalysis: 'off',
   disableTypeChecks: false,
@@ -23,7 +29,8 @@ export default {
   jsonReporter: {
     fileName: process.env.STRYKER_REPORT_FILE ?? 'reports/mutation/diff.json',
   },
-  // Advisory lane: scores are reported, never enforced here.
+  // break stays null. scripts/mutation-diff.mjs enforces per-file floors
+  // after it reads this report. A Stryker break here would hide the report.
   thresholds: { high: 80, low: 60, break: null },
   concurrency: process.env.CI ? 4 : 2,
   timeoutMS: 60_000,

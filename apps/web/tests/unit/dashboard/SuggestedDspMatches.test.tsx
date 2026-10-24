@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { primaryNavigation } from '@/components/features/dashboard/dashboard-nav/config';
+import { SuggestedDspMatches } from '@/components/features/dashboard/organisms/profile-contact-sidebar/SuggestedDspMatches';
 import { APP_ROUTES } from '@/constants/routes';
-import { SuggestedDspMatches } from '@/features/dashboard/organisms/profile-contact-sidebar/SuggestedDspMatches';
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -166,6 +166,8 @@ describe('SuggestedDspMatches', () => {
     render(<SuggestedDspMatches profileId='profile-1' />);
 
     expect(screen.getByText('Suggested')).toBeInTheDocument();
+    // Linear-scale section label: quiet Title Case, no all-caps eyebrow treatment.
+    expect(screen.getByText('Suggested').className).not.toContain('uppercase');
     // Name appears in both row and popover content
     expect(screen.getAllByText('Test Artist').length).toBeGreaterThanOrEqual(1);
     expect(

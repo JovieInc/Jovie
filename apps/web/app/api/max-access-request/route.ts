@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         growthAccessRequestedAt: users.growthAccessRequestedAt,
       })
       .from(users)
-      .where(eq(users.clerkId, userId))
+      .where(eq(users.id, userId))
       .limit(1);
 
     if (!user) {
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
         growthAccessReason: reason,
         updatedAt: new Date(),
       })
-      .where(eq(users.clerkId, userId));
+      .where(eq(users.id, userId));
 
     // Send Slack notification (fire and forget)
     notifySlackGrowthRequest(

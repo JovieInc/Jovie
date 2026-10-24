@@ -4,7 +4,7 @@ This document describes the synthetic monitoring setup for Jovie's production fr
 
 ## Overview
 
-Synthetic monitoring runs automated tests against production to make sure a real new visitor can enter the product. The scheduled workflow uses Doppler `prd` secrets, runs Playwright against `https://jov.ie`, and alerts Slack when any blocking check fails.
+Synthetic monitoring runs automated tests against production to make sure a real new visitor can enter the product. The scheduled workflow reads the GitHub secrets listed below first and uses Doppler `jovie-web/prd` only when that GitHub value is empty. It runs Playwright against `https://jov.ie` and alerts Slack when any blocking check fails.
 
 The production suite is split by responsibility:
 
@@ -12,7 +12,7 @@ The production suite is split by responsibility:
 - `synthetic-auth-ui.spec.ts` validates that Google/Apple SSO buttons, the intentional email/identifier auth surface, and provider handoff initiation are healthy.
 - `synthetic-golden-path.spec.ts` validates the public front-door signup journey.
 - `synthetic-production-waitlist.spec.ts` reuses one reserved production email-OTP identity, proves the waitlist traversal and scoped durable receipt, and never deletes production identity data.
-- `onboarding-robot.full.spec.ts` validates app behavior after Clerk authentication: profile creation, dashboard load, public profile load, welcome-chat continuity, and exact cleanup.
+- `onboarding-robot.full.spec.ts` validates app behavior after authentication outside production. The production synthetic does not run it.
 - `public-profile-smoke.spec.ts` validates the public profile rendering baseline.
 - `/api/cron/web-ai-health` runs one tiny real production Gateway turn for web chat, insights, pitches, titles, and packaging. Its daily workflow receipt classifies forbidden-model, empty-stream, placeholder-saved, and request failures without retaining model output.
 
@@ -31,7 +31,7 @@ The primary test covers the complete front-door journey:
 
 ### Onboarding Robot
 
-The onboarding robot is a QA sentinel for the shipped onboarding path, not an activation optimizer. It does not automate Google or Apple provider UI. Production runs create a scoped synthetic Clerk user, authenticate with a Clerk sign-in token, complete `/onboarding`, and clean up only the exact robot user from that run.
+The onboarding robot is a QA sentinel for the shipped onboarding path, not an activation optimizer. It does not automate Google or Apple provider UI. Non-production runs create a scoped synthetic user, complete `/onboarding`, and clean up only the exact robot user from that run. The production synthetic does not run this spec: production has no auth bypass, and `/api/dev/test-auth/session` stays blocked.
 
 Production robot runs do not clear broad onboarding rate-limit keys. Rate-limit clearing remains limited to non-production/local recovery paths.
 
@@ -43,7 +43,7 @@ Coverage:
 4. **Dashboard load** - verifies `/app` loads and emits `dashboard_loaded`.
 5. **Public profile load** - verifies `/<handle>` returns a successful response and no not-found/error copy.
 6. **Welcome-chat continuity** - verifies `/api/onboarding/welcome-chat` returns an app chat route.
-7. **Scoped cleanup** - removes only the exact robot user, generated handle/profile, and matching Clerk user id.
+7. **Scoped cleanup** - removes only the exact robot user, generated handle/profile, and the id for that run. Local runs use a Clerk `user_` id. Production runs use exactly `ba_robot_<run-id>`.
 
 The fast PR smoke, `onboarding-robot.smoke.spec.ts`, runs separately through the desktop smoke manifest and only verifies anonymous `/start` chat health plus event emission.
 
@@ -51,7 +51,7 @@ The fast PR smoke, `onboarding-robot.smoke.spec.ts`, runs separately through the
 
 This required suite reuses exactly `<base-local>+jovie-prod-waitlist-canary@<domain>`. Before authentication it verifies a read-only production preflight receipt. It then completes real email OTP, submits the waitlist intake, renders the confirmation view, and requires a run-bound receipt proving identity linkage, session, waitlist persistence, analytics, and zero communication jobs. The identity is intentionally retained for the next run. No workflow step receives `DATABASE_URL`, and the suite contains no cleanup or deletion path. This is service evidence only; it does not prove a deployment SHA.
 
-The workflow parser treats a missing, empty, or skipped result as failure. The suite is double-gated by `E2E_SYNTHETIC_MODE=true` and `E2E_PROD_WAITLIST_CANARY_ENABLED=true`.
+The workflow parser treats a missing or empty required result as failure. A skip is also a failure unless the test annotation contains `synthetic-otp-unavailable`, which is the logged reason used when Tim-only Cloudflare mailbox secrets are absent. That skip is a warning, not a pass. The preflight receipt check still runs and is required. The suite is double-gated by `E2E_SYNTHETIC_MODE=true` and `E2E_PROD_WAITLIST_CANARY_ENABLED=true`.
 
 ### Web AI Health
 
@@ -177,7 +177,7 @@ VERCEL_ORG_ID=...
 VERCEL_PROJECT_ID=...
 ```
 
-The onboarding robot additionally requires `E2E_PROD_SIGNUP_EMAIL_BASE`, `CLERK_SECRET_KEY`, and `DATABASE_URL`. It does not require mailbox OTP settings because it signs in with a Clerk sign-in token instead of driving provider UI.
+Non-production onboarding robot runs additionally require `E2E_PROD_SIGNUP_EMAIL_BASE`, `CLERK_SECRET_KEY`, and `DATABASE_URL`. They do not require mailbox OTP settings because they sign in with a Clerk sign-in token instead of driving provider UI. The production synthetic does not run this spec.
 
 Preferred no-inbox provider:
 
@@ -207,11 +207,37 @@ The endpoint should return `404` or `204` while no fresh code is available, or
 { "text": "Your verification code is 123456." }
 ```
 
-### GitHub Secrets
+### GitHub secrets this workflow reads
 
-The workflow reads application, database, and mailbox secrets through `DOPPLER_TOKEN_PRD`. The production waitlist canary uses `--only-secrets` with fallback disabled, so it receives only its six named mailbox and receipt values and never receives `DATABASE_URL`. Web AI health similarly receives only `CRON_SECRET`; the model calls use the deployed production app's Gateway identity. Do not duplicate Turnstile or mailbox values as standalone GitHub repo secrets.
+`synthetic-monitoring.yml` references these `secrets.*` names and no others. Values are masked and are never printed. Doppler is not a second copy of a non-empty GitHub value.
 
-Those six Doppler `jovie-web/prd` names are absent today. See [Current production blocker](#current-production-blocker-october-2-2026). Adding them is an operational decision; this document does not store secret values.
+GitHub first, then Doppler `jovie-web/prd` when the GitHub value is empty:
+
+| Secret | Required for a green deep run |
+| --- | --- |
+| `CRON_SECRET` | Yes. Web AI health, limiter store, and authenticated billing health. |
+| `E2E_PROD_MAILBOX_PROVIDER` | Only for the OTP traversal. |
+| `E2E_PROD_OTP_CHECK_ORIGIN` | No. Tim-only. Absent secrets skip OTP steps with `synthetic-otp-unavailable`. |
+| `E2E_PROD_OTP_CHECK_TOKEN` | No. Tim-only. Same skip. |
+| `E2E_PROD_OTP_CHECK_URL` | No. Tim-only. Same skip. |
+| `E2E_PROD_SIGNUP_EMAIL_BASE` | Yes. Waitlist preflight. |
+| `PRODUCTION_WAITLIST_CANARY_READ_TOKEN` | Yes. Bearer for `GET /api/canary/waitlist/receipt?mode=preflight`. |
+
+GitHub only:
+
+| Secret | Use |
+| --- | --- |
+| `DOPPLER_TOKEN_PRD` | Doppler fallback credential. It is removed from the waitlist canary process. |
+| `LINEAR_API_KEY` | Failure and recovery intake. |
+| `SLACK_WEBHOOK_URL` | Alert and summary delivery. |
+
+`github.token` is the built-in Actions token used for run lookup. It is not a mirrored secret.
+
+The waitlist canary process receives only the resolved allowlist above. It does not receive `DATABASE_URL`. Other Playwright steps use `doppler run --preserve-env`, so a non-empty GitHub value wins and Doppler still supplies secrets that are unset. The production onboarding robot step does not run and does not read those credentials. Turnstile and the rest of the Doppler config stay there. Do not add those names as new GitHub secrets for this workflow.
+
+Web AI health, the limiter probe, and authenticated billing health read `CRON_SECRET` the same way. The model calls use the deployed production app's Gateway identity.
+
+This document does not store secret values.
 
 ## GitHub Actions Workflow
 
@@ -234,39 +260,23 @@ The synthetic monitoring runs automatically via GitHub Actions:
 3. **Daily Success Summary**: Sent to `#monitoring` at 9 PM PST
 4. **Web AI Failure**: High-priority Linear bug signal with per-surface cause and Gateway allowlist attribution
 
-### Current production blocker (October 2, 2026)
+### Secret source (JOV-6813)
 
-JOV-4855 is correct: the deep synthetic job fails because production canary secrets are missing. This is a secret-provisioning gap, not a product assertion bug. Adding the secrets is Tim's call. Do not paper over it by skipping the canary, loosening the result parser, or adding workflow retries.
+JOV-7237 caps the Doppler `jovie-web/prd` sync at 100 secrets, so the canary values cannot be added there. The workflow no longer uses `doppler run --only-secrets … --no-fallback` for that set. Each name is taken from the GitHub secret of the same name when it is non-empty, and from Doppler only otherwise.
 
 `Production Synthetic Tests` runs on `17 */6 * * *` and on `workflow_dispatch`. The daily `47 7 * * *` run is Web AI health only, so a green workflow conclusion on that cron does not exercise the waitlist canary.
 
-The waitlist step runs:
+`E2E_PROD_OTP_CHECK_ORIGIN`, `E2E_PROD_OTP_CHECK_TOKEN`, and `E2E_PROD_OTP_CHECK_URL` are Tim-only and may be absent. When any of them is empty after resolution:
 
-```bash
-doppler run --project jovie-web --config prd \
-  --only-secrets=E2E_PROD_SIGNUP_EMAIL_BASE,E2E_PROD_MAILBOX_PROVIDER,E2E_PROD_OTP_CHECK_ORIGIN,E2E_PROD_OTP_CHECK_TOKEN,E2E_PROD_OTP_CHECK_URL,PRODUCTION_WAITLIST_CANARY_READ_TOKEN \
-  --no-fallback -- …
-```
+- The legacy OTP step logs `::warning title=Tim-only OTP secrets absent::` with the missing names and does not run Playwright. The parser does not require its results file for that run.
+- The waitlist OTP traversal calls `test.skip` with `synthetic-otp-unavailable`. The parser records that annotation as a warning and does not fail the job for it.
+- The waitlist preflight, signup readiness, SEO/AEO ratchet, Layer A auth UI, golden path, and public profile smoke still run. They do not read the OTP secrets. The production onboarding robot does not run.
 
-On [run 37071206285](https://github.com/JovieInc/Jovie/actions/runs/37071206285) (2026-10-02T22:13Z) Doppler exited 1 with:
+A missing preflight result, a preflight failure, or any other required skip still fails the job. An OTP skip without that annotation is not a pass.
 
-```text
-Doppler Error: the following secrets you are trying to include do not exist in your config:
-- E2E_PROD_SIGNUP_EMAIL_BASE
-- E2E_PROD_MAILBOX_PROVIDER
-- E2E_PROD_OTP_CHECK_ORIGIN
-- E2E_PROD_OTP_CHECK_TOKEN
-- E2E_PROD_OTP_CHECK_URL
-- PRODUCTION_WAITLIST_CANARY_READ_TOKEN
-```
+On [run 37071206285](https://github.com/JovieInc/Jovie/actions/runs/37071206285) (2026-10-02T22:13Z) the old `--no-fallback` invocation exited before Playwright because those names were absent from Doppler. Playwright never started, so `apps/web/test-results/synthetic-production-waitlist-results.json` was never written, and the parser treated that missing required file as `error`. The same six names were missing on [run 36431588956](https://github.com/JovieInc/Jovie/actions/runs/36431588956) (2026-09-28). That history is the provisioning evidence for moving the names to GitHub. It is not the current command. Signup readiness, the SEO/AEO ratchet, Layer A auth UI, the golden path, public profile smoke, and limiter store health passed on that run. The Slack step posted the missing-file and skipped-onboarding text.
 
-Playwright never starts, so `apps/web/test-results/synthetic-production-waitlist-results.json` is never written. The parser treats that missing required file as `error` and fails the job. The same six names were missing on [run 36431588956](https://github.com/JovieInc/Jovie/actions/runs/36431588956) (2026-09-28).
-
-The onboarding robot on the same run skips with annotation `Clerk testing setup was not successful`. Production robot auth is enabled only when `E2E_SYNTHETIC_MODE=true` and `E2E_PROD_SIGNUP_EMAIL_BASE` is set. The full `doppler run` for that step also lacked the email base, so the required skip is the same missing secret. The parser counts that required skip as a failure.
-
-`workers/canary-otp/README.md` already records the provisioning order and that the Doppler GitHub sync 100-secret cap (JOV-7237) blocks adding these values. JOV-6813 still requires a passing scheduled run. A `workflow_dispatch` from this checkout would stay red until `jovie-web/prd` contains the six names. Five consecutive green deep runs were not produced.
-
-Signup readiness, the SEO/AEO ratchet, Layer A auth UI, the golden path, public profile smoke, and limiter store health passed on run 37071206285. The Slack step on that run posted the missing-file and skipped-onboarding text. Recurrence filing for the fingerprinted Linear issue is a separate intake change and is unchanged here.
+The onboarding robot on that run skipped with `Clerk testing setup was not successful`, and the parser counted the skip as a failure. JOV-6813 keeps the robot out of the production synthetic. While JOV-8809 is open, the workflow logs `::warning title=Onboarding robot skipped::` with `synthetic-robot-auth-unavailable: production has no auth bypass for the onboarding robot (JOV-8809).` The former JOV-7656 step that failed every run now warns and exits 0. The parser records that warning and does not treat the missing robot results file as a silent pass. A robot result that is present and fails, or that skips without `synthetic-robot-auth-unavailable`, still fails the job. Every other suite still fails on a real error, a missing results file, or any other required skip. This does not add a production auth bypass or unblock `/api/dev/test-auth/session`. The robot step does not read `E2E_PROD_SIGNUP_EMAIL_BASE` or `PRODUCTION_WAITLIST_CANARY_READ_TOKEN`.
 
 ## Synthetic Account Management
 
@@ -276,7 +286,7 @@ Signup readiness, the SEO/AEO ratchet, Layer A auth UI, the golden path, public 
 - That retained Better Auth identity and its waitlist receipt are never deleted by synthetic monitoring
 - The canary reasserts the supported waitlist traversal idempotently and records a run-bound, redacted durable receipt
 - Onboarding robot accounts use the `+onboarding-robot-<run-id>` suffix and Clerk public metadata `role=synthetic_onboarding_robot`
-- Onboarding robot cleanup requires an exact robot email, Clerk `user_` id, `or-` run id, and generated `jor...` handle before touching the database or Clerk
+- Onboarding robot cleanup requires an exact robot email, an `or-` run id, and a generated `jor...` handle. The id must be a Clerk `user_` id or exactly `ba_robot_<run-id>` for that same run. Any other id, including a real Better Auth `ba:<uuid>` or UUID, is refused before the database is touched.
 
 ### Production Considerations
 

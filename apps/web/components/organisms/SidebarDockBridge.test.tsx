@@ -76,12 +76,13 @@ beforeEach(() => {
   mocks.track.trackTitle = null;
 });
 
-it('loads the newest canonical release on web and connects updater and audio actions', async () => {
+it('queues the newest release behind the updater while preserving audio actions', async () => {
   mocks.update = { state: 'ready', version: '2' };
   mocks.track.activeTrackId = 'track';
   mocks.track.trackTitle = 'Never Say A Word';
-  render(<SidebarDockBridge {...props} />);
-  expect(await screen.findByRole('link')).toHaveAttribute('href', '/changelog');
+  const { rerender } = render(<SidebarDockBridge {...props} />);
+  await waitFor(() => expect(fetchFeed).toHaveBeenCalledOnce());
+  expect(screen.queryByRole('link')).toBeNull();
   expect(fetchFeed).toHaveBeenCalledWith(
     WHATS_NEW_PATH,
     expect.objectContaining({ signal: expect.any(AbortSignal) })
@@ -95,6 +96,12 @@ it('loads the newest canonical release on web and connects updater and audio act
   });
   fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
   expect(mocks.stop).toHaveBeenCalledOnce();
+  mocks.update = { state: 'unsupported' };
+  rerender(<SidebarDockBridge {...props} />);
+  expect(await screen.findByRole('link')).toHaveAttribute('href', '/changelog');
+  expect(
+    screen.queryByRole('button', { name: 'Restart to update' })
+  ).toBeNull();
 });
 
 it.each([null, { version: 2 }])(
@@ -132,9 +139,13 @@ function installEvent() {
 describe('PWA install within the shared dock', () => {
   it('persists dismissal through the existing PWA store across remounts', async () => {
     const first = render(<SidebarDockBridge {...props} />);
+    await screen.findByRole('link');
     act(() => {
       window.dispatchEvent(installEvent());
     });
+    expect(screen.queryByRole('button', { name: 'Install' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: "Dismiss what's new" }));
+    await screen.findByRole('button', { name: 'Install' });
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss Prompt' }));
     expect(localStorage.getItem('jv_pwa_dismissed')).toBeTruthy();
     first.unmount();
@@ -147,11 +158,14 @@ describe('PWA install within the shared dock', () => {
 
   it('invokes the browser install prompt and removes the installed card', async () => {
     render(<SidebarDockBridge {...props} />);
+    await screen.findByRole('link');
     const event = installEvent();
     act(() => {
       window.dispatchEvent(event);
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Install' }));
+    expect(screen.queryByRole('button', { name: 'Install' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: "Dismiss what's new" }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Install' }));
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Install' })).toBeNull()
     );

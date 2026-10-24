@@ -1,10 +1,27 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 
 describe('AppShellFrame', () => {
+  // JOV-8974: the Electron shell keeps one gutter on every window edge. The
+  // body's top padding and the titlebar band's top offset must both come from
+  // the shell gap token, never a flush 0 or an invented px literal.
+  it('gives the Electron shell a top gutter equal to the side gutters', () => {
+    const globalsSource = readFileSync(
+      resolve(process.cwd(), 'app/globals.css'),
+      'utf8'
+    );
+
+    expect(globalsSource).toMatch(
+      /\[data-app-shell-body="true"\]\[data-electron-top-gap-owner="titlebar"\] \{[^}]*padding-top:\s*var\(--app-shell-gap\);/s
+    );
+    expect(globalsSource).toMatch(
+      /\[data-electron-titlebar="true"\] \{[^}]*top:\s*var\(--app-shell-gap\);/s
+    );
+  });
+
   it('renders the canonical shell design', () => {
     render(
       <AppShellFrame
@@ -66,6 +83,21 @@ describe('AppShellFrame', () => {
     const headers = screen.getAllByText('Header');
     expect(headers).toHaveLength(1);
     expect(mainContent).toContainElement(headers[0] as HTMLElement);
+  });
+
+  it('drops the route inset when content is flush', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        main={<div>Main Content</div>}
+        flushContent
+      />
+    );
+
+    const mainContent = screen.getByRole('main');
+    expect(
+      mainContent.querySelector('[data-app-shell-content-inset]')
+    ).not.toHaveClass('p-(--app-shell-content-inset)');
   });
 
   it('keeps the header and route on the same token-owned paint plane', () => {
@@ -193,6 +225,80 @@ describe('AppShellFrame', () => {
     expect(
       mainContent.closest('[data-app-shell-placeholder="true"]')
     ).toBeTruthy();
+  });
+
+  it('drops the frame attribute from a hidden duplicate shell', () => {
+    render(
+      <>
+        <div
+          data-app-shell-frame='true'
+          data-testid='stale-shell-frame'
+          style={{ display: 'none' }}
+        />
+        <AppShellFrame
+          sidebar={<aside>Sidebar</aside>}
+          header={<header>Header</header>}
+          main={<div>Main Content</div>}
+        />
+      </>
+    );
+
+    expect(screen.getByTestId('stale-shell-frame')).not.toHaveAttribute(
+      'data-app-shell-frame'
+    );
+    expect(document.querySelectorAll('[data-app-shell-frame]')).toHaveLength(1);
+  });
+
+  it('drops duplicate workspace test ids from a hidden shell when a painted copy remains', () => {
+    const rect = (width: number, height: number): DOMRect =>
+      ({
+        width,
+        height,
+        top: 0,
+        left: 0,
+        bottom: height,
+        right: width,
+        x: 0,
+        y: 0,
+        toJSON() {
+          return {};
+        },
+      }) as DOMRect;
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function mockRect(this: HTMLElement) {
+        return this.closest('[data-hidden-shell]')
+          ? rect(0, 0)
+          : rect(800, 600);
+      });
+
+    render(
+      <>
+        <div
+          data-app-shell-frame='true'
+          data-hidden-shell='true'
+          data-testid='stale-shell-frame'
+          style={{ display: 'none' }}
+        >
+          <section data-testid='tasks-workspace'>Hidden tasks</section>
+        </div>
+        <AppShellFrame
+          sidebar={<aside>Sidebar</aside>}
+          header={<header>Header</header>}
+          main={<section data-testid='tasks-workspace'>Live tasks</section>}
+        />
+      </>
+    );
+
+    expect(screen.getAllByTestId('tasks-workspace')).toHaveLength(1);
+    expect(screen.getByTestId('tasks-workspace')).toHaveTextContent(
+      'Live tasks'
+    );
+    expect(screen.getByTestId('stale-shell-frame')).toBeInTheDocument();
+    expect(screen.getByTestId('stale-shell-frame')).not.toHaveAttribute(
+      'data-app-shell-frame'
+    );
+    rectSpy.mockRestore();
   });
 
   it('fills sidebar mount height so footer mt-auto can pin Settings (JOV-3960)', () => {

@@ -19,9 +19,9 @@ import {
   spendIntentRequestSchema,
   spendOutcomeRequestSchema,
 } from '@/lib/ovie/spend-preflight';
+import { summerCardId } from '@/lib/ovie/summer-card-digest';
 import {
   SUMMER_CARD_MAX_BODY_BYTES,
-  summerCardId,
   summerCardInputSchema,
   summerCardListQuerySchema,
 } from '@/lib/ovie/summer-cards';
@@ -234,6 +234,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const query = summerCardListQuerySchema.safeParse({
     status: params.get('status') ?? undefined,
     since: params.get('since') ?? undefined,
+    feedbackSince: params.get('feedbackSince') ?? undefined,
     limit: params.get('limit') ?? undefined,
   });
   if (!query.success) {

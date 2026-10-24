@@ -7,7 +7,9 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from 'react';
+import { banner } from '@/components/feedback/banner-store';
 import {
   type DesktopUpdateViewState,
   useDesktopUpdate,
@@ -57,17 +59,34 @@ export function DesktopUpdateProvider({
 }) {
   const update = useDesktopUpdate();
   const [open, setOpen] = useState(false);
+  const [modalPriority, setModalPriority] = useState(400);
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(
     readDismissedVersion
   );
 
+  const activeNotice = useSyncExternalStore(
+    banner.subscribe,
+    banner.getActiveBanner,
+    () => null
+  );
   const state = update.state;
+  useEffect(() => {
+    if (open && state.state !== 'unsupported')
+      banner.show({
+        id: 'desktop-update-modal',
+        title: 'Update Jovie',
+        priority: modalPriority,
+        placement: 'modal',
+      });
+    return () => banner.dismiss('desktop-update-modal');
+  }, [open, state.state, modalPriority]);
   const availableVersion = state.state === 'available' ? state.version : null;
 
   // Auto-open once per version. "Later" (and Esc) record the version so the
   // modal does not reopen until a newer version becomes available.
   useEffect(() => {
     if (availableVersion && availableVersion !== dismissedVersion) {
+      setModalPriority(400);
       setOpen(true);
     }
   }, [availableVersion, dismissedVersion]);
@@ -81,7 +100,15 @@ export function DesktopUpdateProvider({
   };
 
   const value = useMemo<DesktopUpdateContextValue>(
-    () => ({ state, openModal: () => setOpen(true) }),
+    () => ({
+      state,
+      openModal: () => {
+        // Explicit recovery yields the user's requested details; passive update
+        // announcements still wait behind permission/error notices.
+        setModalPriority(1100);
+        setOpen(true);
+      },
+    }),
     [state]
   );
 
@@ -90,7 +117,7 @@ export function DesktopUpdateProvider({
       {children}
       {state.state !== 'unsupported' ? (
         <DesktopUpdateModal
-          open={open}
+          open={open && activeNotice?.id === 'desktop-update-modal'}
           state={state}
           onDownload={update.download}
           onInstall={update.install}

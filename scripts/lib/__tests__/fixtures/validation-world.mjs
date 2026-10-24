@@ -96,6 +96,7 @@ export function createWorld(overrides = {}) {
         title: 'Profiles: editorial card replaces the carousel',
         description: '',
         state: 'In Review',
+        updatedAt: '2026-10-03T12:00:00Z',
         labels: [],
         children: [],
         attachments: ['https://github.com/JovieInc/Jovie/pull/101'],
@@ -227,6 +228,7 @@ export function createWorld(overrides = {}) {
         data: {
           issue: issue && {
             id: issue.id,
+            updatedAt: issue.updatedAt,
             state: { id: `state-${issue.state}`, name: issue.state },
           },
         },
@@ -240,6 +242,7 @@ export function createWorld(overrides = {}) {
         id: issue.id,
         identifier: issue.identifier,
         title: issue.title,
+        updatedAt: issue.updatedAt,
         description: issue.description,
         state,
         labels: { nodes: issue.labels.map(name => ({ name })) },
@@ -265,6 +268,10 @@ export function createWorld(overrides = {}) {
                 : null,
           })),
           pageInfo: { hasNextPage: false },
+        },
+        inverseRelations: {
+          nodes: issue.inverseRelations ?? [],
+          pageInfo: { hasNextPage: false, endCursor: null },
         },
         attachments: { nodes: issue.attachments.map(url => ({ url })) },
         history: {
@@ -414,6 +421,7 @@ export function snapshotFor(world, identifier) {
     id: issue.id,
     identifier: issue.identifier,
     title: issue.title,
+    updatedAt: issue.updatedAt,
     description: issue.description,
     labels: [...issue.labels],
     state: STATES.find(entry => entry.name === issue.state),

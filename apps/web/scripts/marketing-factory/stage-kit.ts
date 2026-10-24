@@ -128,6 +128,42 @@ interface JudgeReply {
   readonly unsupportedClaims?: readonly string[];
 }
 
+/** A reported unsupported claim vetoes the verdict and must reach retry feedback. */
+function normalizeJudgeReply(reply: JudgeReply): JudgeReply {
+  const claims = reply.unsupportedClaims;
+  const malformed =
+    !Array.isArray(claims) ||
+    claims.some(
+      claim => typeof claim !== 'string' || claim.trim().length === 0
+    );
+  const findings = Array.isArray(claims)
+    ? [
+        ...new Set(
+          claims
+            .filter(
+              (claim): claim is string =>
+                typeof claim === 'string' && claim.trim().length > 0
+            )
+            .map(claim => claim.trim())
+        ),
+      ]
+    : [];
+  return {
+    ...reply,
+    verdict: malformed || findings.length > 0 ? 'fail' : reply.verdict,
+    critique: [
+      reply.critique ?? [],
+      ...findings.map(claim => `Unsupported claim: ${claim}`),
+      ...(malformed
+        ? [
+            'Judge reply unsupportedClaims must be an array of non-empty strings',
+          ]
+        : []),
+    ].flat(),
+    unsupportedClaims: findings,
+  };
+}
+
 export async function judge(
   ctx: StageContext,
   input: {
@@ -171,9 +207,11 @@ export async function judge(
         const raw = await transport({ model, system, prompt });
         return {
           model,
-          reply: JSON.parse(
-            raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)
-          ) as JudgeReply,
+          reply: normalizeJudgeReply(
+            JSON.parse(
+              raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)
+            ) as JudgeReply
+          ),
         };
       } catch (error) {
         return {

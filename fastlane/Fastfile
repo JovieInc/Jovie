@@ -26,9 +26,23 @@ end
 def verify_release_sha_is_current_main!
   if env_present?("TESTFLIGHT_LEASE_PATH")
     guard = require_env!("TESTFLIGHT_GUARD_PATH")
-    _, status = Open3.capture2e("node", guard, "upload")
-    UI.user_error!("TestFlight certified release lease failed final validation") unless status.success?
-    return
+    # The archive step holds GitHub reads for 600s. Fastlane does not inherit
+    # that budget unless it is passed into this process.
+    output, status = Open3.capture2e(
+      {
+        "GH_API_HOLD_BUDGET_SECONDS" => ENV.fetch("GH_API_HOLD_BUDGET_SECONDS", "600")
+      },
+      "node",
+      guard,
+      "upload"
+    )
+    if status.success?
+      return
+    end
+    detail = output.to_s.strip
+    message = "TestFlight certified release lease failed final validation"
+    message = "#{message}\n#{detail}" unless detail.empty?
+    UI.user_error!(message)
   end
   release_sha = require_env!("RELEASE_SHA")
   repository = require_env!("GITHUB_REPOSITORY")

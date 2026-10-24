@@ -208,7 +208,7 @@ doppler run --project jovie-web --config prd -- \
   pnpm --filter=@jovie/web run check:signup-readiness -- --target=prd
 ```
 
-The production synthetic signup canary also requires these `prd` secrets:
+The production synthetic workflow reads the GitHub secret names in `docs/SYNTHETIC_MONITORING.md` first. Doppler `prd` is only the fallback when that GitHub value is empty. The OTP mailbox names may be absent. Historical Doppler names for the signup canary:
 
 ```bash
 E2E_PROD_SIGNUP_EMAIL_BASE

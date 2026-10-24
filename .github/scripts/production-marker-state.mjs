@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -909,25 +916,76 @@ function withProducerActivationEvidence(args, result) {
     : result;
 }
 
-function run(command, args, options = {}) {
+function spawnFailure(command, args, result) {
+  const stderr = Buffer.isBuffer(result.stderr)
+    ? result.stderr.toString('utf8')
+    : result.stderr;
+  throw new Error(
+    `${command} ${args.join(' ')} failed: ${stderr || 'unknown error'}`
+  );
+}
+
+function runText(command, args) {
   const result = spawnSync(command, args, {
-    encoding: options.binary ? undefined : 'utf8',
+    encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
-    ...options,
   });
-  if (result.status !== 0) {
-    const stderr = Buffer.isBuffer(result.stderr)
-      ? result.stderr.toString('utf8')
-      : result.stderr;
-    throw new Error(
-      `${command} ${args.join(' ')} failed: ${stderr || 'unknown error'}`
-    );
+  if (result.status !== 0) spawnFailure(command, args, result);
+  if (typeof result.stdout !== 'string') {
+    throw new Error(`${command} ${args.join(' ')} returned no text`);
   }
   return result.stdout;
 }
 
+function runZip(command, args) {
+  // gh 2.102 treats every GH_FORCE_TTY value, including 0, as a terminal and
+  // refuses application/zip. A pipe is not a sufficient substitute: write the
+  // body to a file and drop the variable.
+  const env = { ...process.env };
+  delete env.GH_FORCE_TTY;
+  const file = join(
+    tmpdir(),
+    `jovie-gh-zip-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.bin`
+  );
+  const fd = openSync(file, 'w');
+  let result;
+  try {
+    result = spawnSync(command, args, {
+      env,
+      maxBuffer: 32 * 1024 * 1024,
+      stdio: ['ignore', fd, 'pipe'],
+    });
+  } finally {
+    closeSync(fd);
+  }
+  let stdout = Buffer.alloc(0);
+  try {
+    stdout = readFileSync(file);
+    // Reader doubles return the body on stdout and do not write the fd.
+    if (
+      stdout.length === 0 &&
+      result?.stdout != null &&
+      result.stdout.length > 0
+    ) {
+      stdout = Buffer.isBuffer(result.stdout)
+        ? result.stdout
+        : Buffer.from(String(result.stdout));
+    }
+  } finally {
+    rmSync(file, { force: true });
+  }
+  if (!result || result.status !== 0) {
+    spawnFailure(
+      command,
+      args,
+      result ?? { status: 1, stderr: 'spawn failed' }
+    );
+  }
+  return stdout;
+}
+
 function ghJson(endpoint) {
-  return JSON.parse(run('gh', ['api', endpoint]));
+  return JSON.parse(runText('gh', ['api', endpoint]));
 }
 
 function normalizeArtifacts(payload, expectedName) {
@@ -957,13 +1015,14 @@ function downloadJsonArtifact(
   const directory = mkdtempSync(join(tmpdir(), 'jovie-production-marker-'));
   const archive = join(directory, 'artifact.zip');
   try {
-    const body = run(
-      'gh',
-      ['api', `repos/${repo}/actions/artifacts/${artifactId}/zip`],
-      { binary: true }
-    );
+    const body = runZip('gh', [
+      'api',
+      `repos/${repo}/actions/artifacts/${artifactId}/zip`,
+    ]);
     writeFileSync(archive, body);
-    const entries = run('unzip', ['-Z1', archive]).split('\n').filter(Boolean);
+    const entries = runText('unzip', ['-Z1', archive])
+      .split('\n')
+      .filter(Boolean);
     const allowedEntries = new Set([expectedFile, ...optionalFiles]);
     const uniqueEntries = new Set(entries);
     if (
@@ -975,7 +1034,7 @@ function downloadJsonArtifact(
         `Artifact ${artifactId} does not contain one ${expectedFile} with only allowed companion files`
       );
     }
-    return JSON.parse(run('unzip', ['-p', archive, expectedFile]));
+    return JSON.parse(runText('unzip', ['-p', archive, expectedFile]));
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }
@@ -1198,6 +1257,47 @@ function inspectOnline(args) {
   return withProducerActivationEvidence(args, result);
 }
 
+function annotationDetail(result) {
+  if (!result?.detail || result.detail === result.reason) return '';
+  return String(result.detail).replace(/\s+/g, ' ').slice(0, 500);
+}
+
+// Release-base admission stays here so the authorize run block stays under
+// GitHub's 21000-character expression cap. verified and a foreign `none`
+// may proceed; every other state fails closed with the classifier reason.
+export function admitReleaseBase(result, deployedSha, releaseSha) {
+  if (result?.state === 'verified') {
+    if (!/^dpl_[A-Za-z0-9]+$/.test(String(result.deploymentId ?? ''))) {
+      return {
+        ok: false,
+        errors: ['Canonical production marker lacks an exact deployment ID.'],
+      };
+    }
+    return { ok: true, errors: [] };
+  }
+  if (result?.state === 'none') {
+    if (deployedSha === releaseSha) {
+      return {
+        ok: false,
+        errors: [
+          'Current production cannot bootstrap its own missing verified marker.',
+        ],
+      };
+    }
+    return {
+      ok: true,
+      errors: [],
+      warning: `Bootstrapping the release range from exact canonical live SHA ${deployedSha}; the new target still requires the full production path and its own durable marker.`,
+    };
+  }
+  const errors = [
+    `Canonical production marker state is not admissible as a release base (${result?.state}: ${result?.reason}).`,
+  ];
+  const detail = annotationDetail(result);
+  if (detail) errors.push(detail);
+  return { ok: false, errors };
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   let result;
@@ -1214,6 +1314,22 @@ function main() {
         error instanceof Error ? error.message : String(error)
       );
     }
+  }
+  const detail = annotationDetail(result);
+  process.stderr.write(
+    `production-marker-state ${result.state} ${result.reason}${detail ? ` ${detail}` : ''}\n`
+  );
+  if (args['release-base']) {
+    const admission = admitReleaseBase(result, args.sha, args['release-base']);
+    if (admission.warning) {
+      process.stderr.write(`::warning::${admission.warning}\n`);
+    }
+    for (const error of admission.errors) {
+      process.stderr.write(`::error::${error}\n`);
+    }
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+    if (!admission.ok) process.exitCode = 1;
+    return;
   }
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }

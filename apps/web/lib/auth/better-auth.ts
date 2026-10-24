@@ -40,6 +40,7 @@ import { getAccountMetricCohort } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
 import { adminPasskeyStepUp } from './admin-passkey-step-up';
 import { generateAppleClientSecret } from './apple-client-secret';
+import { sendEmailOtp } from './email-otp-sender';
 import { mcpDynamicClientRegistrationOptions } from './mcp-dynamic-registration';
 import { mcpOAuthRedirectGuard } from './mcp-redirect-guard';
 import { oauthProviderErrorReturn } from './oauth-provider-error-return';
@@ -293,42 +294,8 @@ function buildPlugins() {
       // (`generateOTP(...) || defaultOTPGenerator(...)` at 1.6.23).
       generateOTP: ({ email }) =>
         isDeterministicTestOtpEmail(email) ? DETERMINISTIC_TEST_OTP : '',
-      sendVerificationOTP: async ({ email, type, otp }) => {
-        if (isDeterministicTestOtpEmail(email)) {
-          // Deterministic E2E path: specs type 424242, nothing is sent.
-          return;
-        }
-        // Real Resend sender (plan decision 8, client-flip commit ⑦).
-        // Lazy import to avoid pulling the email stack into the auth module's
-        // hot path when the OTP hook is never called.
-        try {
-          const { sendEmail } = await import('@/lib/email/send');
-          const {
-            getAuthOtpHtml,
-            getAuthOtpFromEmail,
-            getAuthOtpSubject,
-            getAuthOtpText,
-          } = await import('@/lib/email/templates/auth-otp');
-          await sendEmail({
-            to: email,
-            from: getAuthOtpFromEmail(),
-            subject: getAuthOtpSubject(),
-            text: getAuthOtpText({ otpCode: otp }),
-            html: getAuthOtpHtml({ otpCode: otp }),
-          });
-        } catch (error) {
-          // Never throw from the OTP hook — a Resend failure should surface
-          // to the user via the form's aria-live error state, not crash the
-          // BA callback. The caller (EmailCodeAuthForm) sees a generic
-          // "Could not send the code" error.
-          await captureError('Email OTP send failed', error, {
-            email: email.replace(/@.*/, '@[redacted]'),
-            type,
-            operation: 'sendVerificationOTP',
-          });
-          throw error;
-        }
-      },
+      // Outcome logging + fail-closed send: see email-otp-sender.ts.
+      sendVerificationOTP: sendEmailOtp,
     }),
     ...(googleOneTapClientId
       ? [oneTap({ clientId: googleOneTapClientId })]
@@ -363,7 +330,15 @@ function buildPlugins() {
       storeToken: 'hashed',
     }),
     // Admin second factor (JOV-4806): Touch ID / platform passkeys.
-    passkey({ rpName: 'Jovie', rpID: resolvePasskeyRpId(env) }),
+    // publicEnv carries the loopback origin. The server env proxy drops
+    // NEXT_PUBLIC_* keys, which would leave rpID stuck on localhost.
+    passkey({
+      rpName: 'Jovie',
+      rpID: resolvePasskeyRpId({
+        VERCEL_ENV: env.VERCEL_ENV,
+        NEXT_PUBLIC_APP_URL: publicEnv.NEXT_PUBLIC_APP_URL,
+      }),
+    }),
     adminPasskeyStepUp(),
     // nextCookies MUST stay last so Set-Cookie propagates through Next.js
     // server actions (better-auth docs + plan).

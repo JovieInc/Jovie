@@ -79,12 +79,26 @@ async function assertPageHealth(
           );
         })
       : failedResponses;
+  // A declared not-found document logs its own 404. That is the contract,
+  // not an extra failed resource.
+  const unexpectedConsoleErrors =
+    target.expected === 'not-found'
+      ? consoleErrors.filter(
+          entry =>
+            !entry.includes(
+              'Failed to load resource: the server responded with a status of 404'
+            )
+        )
+      : consoleErrors;
   expect(
     unexpectedFailedResponses,
     `${target.glob} has unexpected same-origin 4xx/5xx`
   ).toEqual([]);
   expect(failedRequests, `${target.glob} has failed requests`).toEqual([]);
-  expect(consoleErrors, `${target.glob} emitted console errors`).toEqual([]);
+  expect(
+    unexpectedConsoleErrors,
+    `${target.glob} emitted console errors`
+  ).toEqual([]);
   expect(pageErrors, `${target.glob} threw runtime exceptions`).toEqual([]);
   if (target.expected === 'redirect') return;
 

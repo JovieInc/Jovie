@@ -66,11 +66,11 @@ for (const theme of ['dark', 'light']) {
       'Today'
     );
     await expect(
-      nav.locator('[data-sidebar-history-header] [aria-label="New Chat"]')
+      nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
     ).toHaveCount(1);
     await expect(
       nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
-    ).toHaveCount(0);
+    ).toHaveCount(1);
     await expect(
       nav.getByRole('button', { name: 'Filter Unread Chats' })
     ).toHaveCount(0);
@@ -285,6 +285,65 @@ for (const product of [
         const collapsed = await readSidebarAnchors(page);
         captures.push(collapsed);
         expectStableSidebar(expanded, collapsed);
+        if (cycle === 0 && product.endsWith('operator')) {
+          const groups = page.getByTestId('operator-lists-nav');
+          for (const name of ['Collab list', 'Press', 'Favorites']) {
+            const link = groups.getByRole('link', { name, exact: true });
+            await expect(link).toBeVisible();
+            await expect(link).toHaveAttribute('href', /\/app\/ov\/lists\//);
+          }
+          const geometry = await page.evaluate(() => {
+            const reference = document
+              .querySelector('[data-navigation-item-id] svg')!
+              .getBoundingClientRect();
+            return Array.from(
+              document.querySelectorAll(
+                '[data-testid="operator-lists-nav"] a, [data-testid="operator-lists-nav"] button'
+              )
+            ).map(element => {
+              const box = element.getBoundingClientRect();
+              const icon = element
+                .querySelector('svg')!
+                .getBoundingClientRect();
+              return {
+                label: element.getAttribute('aria-label'),
+                center: icon.x + icon.width / 2,
+                reference: reference.x + reference.width / 2,
+                referenceWidth: reference.width,
+                contained: icon.x >= box.x && icon.right <= box.right,
+                width: icon.width,
+                height: box.height,
+              };
+            });
+          });
+          expect(geometry).toHaveLength(4);
+          for (const row of geometry) {
+            expect(
+              Math.abs(row.center - row.reference),
+              row.label!
+            ).toBeLessThanOrEqual(1);
+            expect(row.contained, row.label!).toBe(true);
+            expect(row.width).toBe(row.referenceWidth);
+            expect(row.height).toBe(28);
+          }
+          const navigationScrollTop = await nav.evaluate(
+            element => element.parentElement!.scrollTop
+          );
+          const favorite = groups.getByRole('link', {
+            name: 'Favorites',
+            exact: true,
+          });
+          await favorite.hover();
+          await expect(page.getByRole('tooltip')).toContainText('Favorites');
+          await expect(
+            page.getByRole('button', { name: 'Expand sidebar', exact: true })
+          ).toHaveAttribute('aria-expanded', 'false');
+          // Tooltip intent scrolls the lower group into view. Restore the
+          // captured viewport before comparing the original motion anchors.
+          await nav.evaluate((element, scrollTop) => {
+            element.parentElement!.scrollTop = scrollTop;
+          }, navigationScrollTop);
+        }
         const opening = await readSidebarAnchors(page, 'Expand sidebar');
         captures.push(opening);
         expectStableSidebar(expanded, opening);
@@ -354,7 +413,7 @@ for (const history of ['composed-history', 'composed-empty-history']) {
       });
       const expanded = await readSidebarAnchors(page);
       const headingAction = nav.locator(
-        '[data-sidebar-history-header] [aria-label="New Chat"]'
+        '[data-sidebar-search-slot] [aria-label="New Chat"]'
       );
       await expect(headingAction).toHaveCount(1);
       await expect(create).toHaveCount(1);
@@ -423,21 +482,27 @@ for (const history of ['composed-history', 'composed-empty-history']) {
       await page
         .getByRole('button', { name: 'Expand sidebar', exact: true })
         .hover();
-      const pin = page.getByRole('button', {
-        name: 'Pin sidebar',
+      const toggle = page.getByRole('button', {
+        name: 'Expand sidebar',
         exact: true,
       });
-      await expect(pin).toBeVisible();
+      const beforeHover = await toggle.boundingBox();
+      await toggle.hover();
       await create.hover();
-      await expect(pin).toBeVisible();
-      await create.focus();
-      await expect(create).toBeFocused();
-      await expect(headingAction).toHaveCount(1);
+      await toggle.focus();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      expect(await toggle.boundingBox()).toEqual(beforeHover);
       await expect(create).toHaveCount(1);
+      await expect(headingAction).toHaveCount(1);
+      await toggle.click();
+      await expect(
+        page.getByRole('button', { name: 'Collapse sidebar', exact: true })
+      ).toHaveAttribute('aria-pressed', 'true');
       expectStableSidebar(expanded, await readSidebarAnchors(page));
-      await page.screenshot({
-        path: testInfo.outputPath(`${history}-${theme}-preview.png`),
-      });
+      await page
+        .getByRole('button', { name: 'Collapse sidebar', exact: true })
+        .click();
       await draft.focus();
       await page.mouse.move(900, 600);
       await expect(
@@ -464,7 +529,7 @@ test('mobile history keeps direct creation access in a short drawer', async ({
   await expect(create).toHaveCount(1);
   await expect(create).toHaveAttribute('href', '/app/chat');
   await expect(
-    nav.locator('[data-sidebar-history-header] [aria-label="New Chat"]')
+    nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
   ).toHaveCount(1);
   await create.focus();
   await expect(create).toBeFocused();
@@ -483,5 +548,36 @@ test('mobile history keeps direct creation access in a short drawer', async ({
   expect(target).toBeGreaterThanOrEqual(44);
   await page.screenshot({
     path: testInfo.outputPath('mobile-history-short.png'),
+  });
+});
+
+test.describe('touch sidebar controls', () => {
+  test.use({ hasTouch: true });
+  test('tap opens a collapsed sidebar and reveals list creation', async ({
+    page,
+  }, testInfo) => {
+    await page.goto(
+      '/iframe.html?id=organisms-unifiedsidebar--admin-operator&viewMode=story'
+    );
+    const close = page.getByRole('button', {
+      name: 'Collapse sidebar',
+      exact: true,
+    });
+    await expect(close).toBeVisible({ timeout: 60_000 });
+    await close.tap();
+    const open = page.getByRole('button', {
+      name: 'Expand sidebar',
+      exact: true,
+    });
+    await expect(open).toHaveAttribute('aria-pressed', 'false');
+    await open.tap();
+    await expect(close).toHaveAttribute('aria-pressed', 'true');
+    await close.tap();
+    await page.getByRole('button', { name: 'New List', exact: true }).tap();
+    await expect(close).toHaveAttribute('aria-pressed', 'true');
+    const name = page.getByRole('textbox', { name: 'New List Name' });
+    await expect(name).toBeFocused();
+    await name.fill('Tour collaborators');
+    await page.screenshot({ path: testInfo.outputPath('touch-new-list.png') });
   });
 });

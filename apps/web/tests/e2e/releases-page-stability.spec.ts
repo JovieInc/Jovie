@@ -38,7 +38,9 @@ test('releases page stays stable during background query invalidation', async ({
 
   // Auth and navigate to releases
   await page.goto(BYPASS_URL, { waitUntil: 'domcontentloaded' });
-  await page.waitForURL(/\/app\/dashboard\/releases/, { timeout: 60_000 });
+  await page.waitForURL(/\/app\/library\?[^#]*\bview=releases\b/, {
+    timeout: 60_000,
+  });
 
   // Wait for the releases view to be fully rendered (no skeleton).
   await expect(page.locator('[data-testid="releases-loading"]')).toHaveCount(

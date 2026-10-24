@@ -66,6 +66,10 @@ export const accent = {
 // BUTTON COLORS
 // ============================================
 export const buttons = {
+  destructive: {
+    bg: 'var(--color-btn-destructive-bg)',
+    fg: 'var(--color-btn-destructive-fg)',
+  },
   primary: {
     bg: 'var(--color-btn-primary-bg)',
     fg: 'var(--color-btn-primary-fg)',

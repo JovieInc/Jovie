@@ -44,7 +44,7 @@ The `infra-guardrails-check.sh` hook blocks new `app/api/cron/*/route.ts` files 
 
 ## External API Call Budget Awareness
 
-**Every external API call has a cost.** Agents MUST consider API call volume before writing code that interacts with third-party services.
+**Every external API call has a cost.** Agents MUST consider API call volume before writing code that interacts with third-party services. The call itself goes through the shared client: [external-apis.md](external-apis.md).
 
 | Rule | Rationale |
 |------|-----------|

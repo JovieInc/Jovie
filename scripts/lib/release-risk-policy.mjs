@@ -2,9 +2,10 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { gradeReleaseRange, maxLevel } from './release-range-risk.mjs';
 
 export const RELEASE_RISK_POLICY_VERSION =
-  'jovie.release-risk-policy/2026-10-03.1';
+  'jovie.release-risk-policy/2026-10-21.1';
 const LANES = ['not_applicable', 'low', 'medium', 'high'];
 const WEIGHT = Object.fromEntries(LANES.map((lane, index) => [lane, index]));
 const TARGET = { not_applicable: 0, low: 300, medium: 900, high: 1800 };
@@ -60,6 +61,26 @@ export function buildReleaseRiskReceipt(input) {
   if (Number.isNaN(Date.parse(mergeAt))) throw new Error('invalid mergeAt');
 
   const risk = normalizeRisk(input.riskReceipt, lineageSha);
+  // The lane is graded over the COMPLETE deployed..candidate range, never the
+  // tip receipt alone. A missing range artifact is unknown, and unknown is high.
+  const rangeRisk =
+    input.rangeRisk ??
+    gradeReleaseRange({
+      baseDeployedSha: null,
+      candidateSha: lineageSha,
+      paths: null,
+    });
+  if (rangeRisk.candidateSha !== lineageSha)
+    throw new Error('rangeRisk is not bound to the exact lineage SHA');
+  if (risk.risk_level !== 'unknown') {
+    risk.risk_level = maxLevel(risk.risk_level, rangeRisk.level);
+  }
+  risk.requires_smoke ||= rangeRisk.requiresSmoke;
+  risk.requires_preview ||= rangeRisk.requiresPreview;
+  risk.blocks_unattended ||= rangeRisk.blocksUnattended;
+  risk.matched_rule_ids = [
+    ...new Set([...risk.matched_rule_ids, ...rangeRisk.matchedRuleIds]),
+  ];
   let originalLane = deployableWeb ? risk.risk_level : 'not_applicable';
   if (originalLane === 'unknown') originalLane = 'high';
   let selectedLane = originalLane;
@@ -93,6 +114,7 @@ export function buildReleaseRiskReceipt(input) {
     policyVersion: RELEASE_RISK_POLICY_VERSION,
     lineageSha,
     riskInputs: [risk],
+    rangeRisk,
     originalClassification: { ...risk, selectedLane: originalLane },
     override: overrideReceipt,
     selectedLane,
@@ -114,6 +136,7 @@ export function buildReleaseRiskReceipt(input) {
   };
   const ovie = {
     riskInputs: receipt.riskInputs,
+    rangeRisk,
     policyVersion: receipt.policyVersion,
     selectedLane,
     requiredProof,
@@ -194,10 +217,26 @@ function runCli(args) {
   if (command !== 'plan') throw new Error('expected plan or measure');
   const release = JSON.parse(readFileSync(arg(args, 'release'), 'utf8'));
   const range = JSON.parse(readFileSync(arg(args, 'range'), 'utf8'));
+  const rangeRisk = gradeReleaseRange({
+    baseDeployedSha: range.deployedSha,
+    candidateSha: range.currentSha,
+    paths:
+      range.deployedSha === range.currentSha
+        ? []
+        : (range.cumulativeChangedPaths ?? null),
+  });
+  if (args.includes('--range-risk-out'))
+    writeFileSync(
+      arg(args, 'range-risk-out'),
+      `${JSON.stringify(rangeRisk, null, 2)}\n`
+    );
   const receipt = buildReleaseRiskReceipt({
+    rangeRisk,
     lineageSha: range.currentSha,
     riskReceipt: release.actualResults?.riskReceipt,
-    deployableWeb: range.selectedLanes.includes('web'),
+    // The planner also requires Web to bind an operations/native-only main
+    // head to production. Product-lane selection alone loses that requirement.
+    deployableWeb: range.runWeb,
     mergeAt: arg(args, 'merge-at'),
   });
   writeFileSync(out, `${JSON.stringify(receipt, null, 2)}\n`);

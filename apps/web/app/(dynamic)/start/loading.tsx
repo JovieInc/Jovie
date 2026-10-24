@@ -1,5 +1,6 @@
 import { Skeleton } from '@jovie/ui';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
+import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
 
 /**
  * /start loading skeleton — mirrors the resolved anonymous onboarding empty
@@ -22,8 +23,11 @@ export default function StartLoading() {
       aria-live='polite'
       data-testid='start-loading-skeleton'
     >
+      <h1 className='sr-only'>{ONBOARDING_ENTRY_TITLE}</h1>
       <AppShellFrame
+        placeholder
         sidebar={null}
+        flushContent
         containerClassName='[color-scheme:dark]'
         contentClassName='overflow-hidden!'
         main={
@@ -40,37 +44,16 @@ export default function StartLoading() {
                     data-testid='start-loading-intro'
                   >
                     <div className='system-b-start-loading-intro-message'>
-                      <Skeleton
-                        className='system-b-start-loading-intro-line'
-                        rounded='full'
-                      />
-                      <Skeleton
-                        className='system-b-start-loading-intro-line'
-                        rounded='full'
-                      />
+                      <Skeleton rounded='full' />
+                      <Skeleton rounded='full' />
                     </div>
                     <div className='system-b-start-loading-intro-pills'>
-                      <Skeleton
-                        className='system-b-start-loading-intro-pill'
-                        rounded='full'
-                      />
-                      <Skeleton
-                        className='system-b-start-loading-intro-pill'
-                        rounded='full'
-                      />
-                      <Skeleton
-                        className='system-b-start-loading-intro-pill'
-                        rounded='full'
-                      />
-                      <Skeleton
-                        className='system-b-start-loading-intro-pill'
-                        rounded='full'
-                      />
+                      <Skeleton rounded='full' />
+                      <Skeleton rounded='full' />
+                      <Skeleton rounded='full' />
+                      <Skeleton rounded='full' />
                     </div>
-                    <Skeleton
-                      className='system-b-start-loading-intro-footer'
-                      rounded='full'
-                    />
+                    <Skeleton rounded='full' />
                   </div>
 
                   <div
@@ -84,20 +67,11 @@ export default function StartLoading() {
                       >
                         <div className='system-b-start-loading-composer-row'>
                           <div className='system-b-start-loading-copy-slot'>
-                            <Skeleton
-                              className='system-b-start-loading-title-skeleton'
-                              rounded='full'
-                            />
+                            <Skeleton rounded='full' />
                           </div>
                           <div className='system-b-start-loading-actions'>
-                            <Skeleton
-                              className='system-b-start-loading-action-skeleton'
-                              rounded='full'
-                            />
-                            <Skeleton
-                              className='system-b-start-loading-action-skeleton'
-                              rounded='full'
-                            />
+                            <Skeleton rounded='full' />
+                            <Skeleton rounded='full' />
                           </div>
                         </div>
                       </div>

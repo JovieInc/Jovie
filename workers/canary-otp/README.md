@@ -58,12 +58,15 @@ Sources:
    `signup+jovie-prod-waitlist-canary@canary.jov.ie` to invoke this Worker.
    Cloudflare subdomains do not support catch-all rules. Do not route other
    addresses or production user mail.
-4. Set Doppler `jovie-web/prd` values from actual deployed resources:
+4. Mirror the deployed values into the GitHub Actions secrets named in
+   `docs/SYNTHETIC_MONITORING.md`. The workflow reads those names first and
+   uses Doppler `jovie-web/prd` only when the GitHub value is empty:
    `E2E_PROD_SIGNUP_EMAIL_BASE=signup@canary.jov.ie`,
    `E2E_PROD_MAILBOX_PROVIDER=cloudflare-email-routing`,
    `E2E_PROD_OTP_CHECK_ORIGIN`, `E2E_PROD_OTP_CHECK_URL=<origin>/latest`,
    `E2E_PROD_OTP_CHECK_TOKEN`, and a distinct
-   `PRODUCTION_WAITLIST_CANARY_READ_TOKEN`.
+   `PRODUCTION_WAITLIST_CANARY_READ_TOKEN`. The three `E2E_PROD_OTP_CHECK_*`
+   names are optional; the preflight does not need them.
 5. Configure the matching signup base and receipt read token on Vercel production
    through the existing release process. Verify deployed preflight identity.
 6. Run the existing production-waitlist synthetic and retain its authenticated
@@ -71,9 +74,11 @@ Sources:
    canary identity. Never supply `DATABASE_URL` or delete a production account.
    JOV-6813 still requires a passing scheduled run for closure.
 
-The Doppler GitHub sync's 100-secret cap (JOV-7237) currently blocks adding these
-values. Source, tests and a Worker deployment do not clear that constraint or
-prove a working canary. No credentials or real namespace IDs belong in Git.
+The Doppler GitHub sync's 100-secret cap (JOV-7237) still blocks adding these
+names to `jovie-web/prd`. Put them in the GitHub secrets listed by
+`docs/SYNTHETIC_MONITORING.md` instead of waiting for Doppler capacity. Source,
+tests, and a Worker deployment do not prove a working canary. No credentials
+or real namespace IDs belong in Git.
 
 ## Checks and cost
 

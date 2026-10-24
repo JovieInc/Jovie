@@ -45,6 +45,11 @@ const hoisted = vi.hoisted(() => {
   const finalizePostOnboardingMock = vi.fn();
   const cookiesSetMock = vi.fn();
   const cookiesMock = vi.fn().mockResolvedValue({ set: cookiesSetMock });
+  const getClaimVerificationReachMock = vi.fn().mockResolvedValue(null);
+  const requestClaimVerificationMock = vi.fn().mockResolvedValue(undefined);
+  const getCurrentUserEntitlementsMock = vi
+    .fn()
+    .mockResolvedValue({ isPro: false, isTrialing: false });
 
   const selectMock = vi.fn(() => {
     const result = selectResults.shift() ?? [];
@@ -93,6 +98,9 @@ const hoisted = vi.hoisted(() => {
     cookiesMock,
     cookiesSetMock,
     executeMock,
+    getClaimVerificationReachMock,
+    requestClaimVerificationMock,
+    getCurrentUserEntitlementsMock,
     updateMock,
     updateSetArgs,
     withDbSessionTxMock,
@@ -139,6 +147,15 @@ vi.mock('@/lib/cache/profile', () => ({
 vi.mock('@/lib/claim/context', () => ({
   clearPendingClaimContext: hoisted.clearPendingClaimContextMock,
   readPendingClaimContext: hoisted.readPendingClaimContextMock,
+}));
+
+vi.mock('@/lib/claim/claim-verification.server', () => ({
+  getClaimVerificationReach: hoisted.getClaimVerificationReachMock,
+  requestClaimVerification: hoisted.requestClaimVerificationMock,
+}));
+
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: hoisted.getCurrentUserEntitlementsMock,
 }));
 
 vi.mock('@/lib/claim/finalize', () => ({
@@ -256,6 +273,103 @@ describe('connectOnboardingSpotifyArtist', () => {
     hoisted.getCachedAuthMock.mockResolvedValue({ userId: 'clerk_123' });
     hoisted.isBlacklistedSpotifyIdMock.mockReturnValue(false);
     hoisted.readPendingClaimContextMock.mockResolvedValue(null);
+    hoisted.getClaimVerificationReachMock.mockResolvedValue(null);
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
+      isPro: false,
+      isTrialing: false,
+    });
+  });
+
+  it('holds a high-reach artist for verification instead of linking it', async () => {
+    queueOwnedProfile();
+    hoisted.selectResults.push([]); // no other exact-ID profile
+    hoisted.getClaimVerificationReachMock.mockResolvedValue(2_400_000);
+    hoisted.cookiesMock.mockResolvedValueOnce({
+      get: vi.fn().mockReturnValue({ value: 'journey-1' }),
+      set: hoisted.cookiesSetMock,
+    });
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+    const result = await connectOnboardingSpotifyArtist({
+      artistName: 'Famous Artist',
+      profileId: 'profile_123',
+      spotifyArtistId: 'famous_spotify_id',
+      spotifyArtistUrl: 'https://open.spotify.com/artist/famous_spotify_id',
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      verificationPending: true,
+      importing: false,
+      imported: 0,
+    });
+    expect(result.message).toContain('Verification in progress');
+    expect(hoisted.requestClaimVerificationMock).toHaveBeenCalledWith({
+      profileId: 'profile_123',
+      spotifyArtistId: 'famous_spotify_id',
+      artistName: 'Famous Artist',
+      reach: 2_400_000,
+      paid: false,
+      acquisitionId: 'journey-1',
+    });
+    // Nothing attributes the artist: no identity write, claim or import.
+    expect(hoisted.updateSetArgs).toHaveLength(0);
+    expect(hoisted.withDbSessionTxMock).not.toHaveBeenCalled();
+    expect(hoisted.claimPrebuiltProfileForUserMock).not.toHaveBeenCalled();
+    expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
+  });
+
+  it('queues a paying subscriber straight to pending verification', async () => {
+    queueOwnedProfile();
+    hoisted.selectResults.push([]);
+    hoisted.getClaimVerificationReachMock.mockResolvedValue(80_000);
+    hoisted.getCurrentUserEntitlementsMock.mockResolvedValue({
+      isPro: true,
+      isTrialing: false,
+    });
+    hoisted.cookiesMock.mockResolvedValueOnce({
+      get: vi.fn().mockReturnValue(undefined),
+      set: hoisted.cookiesSetMock,
+    });
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+    await connectOnboardingSpotifyArtist({
+      artistName: 'Rising Artist',
+      profileId: 'profile_123',
+      spotifyArtistId: 'rising_spotify_id',
+      spotifyArtistUrl: '',
+    });
+
+    expect(hoisted.requestClaimVerificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ paid: true, acquisitionId: undefined })
+    );
+  });
+
+  it('keeps the already-claimed answer for a claimed high-reach artist', async () => {
+    queueOwnedProfile();
+    hoisted.selectResults.push([
+      { id: 'other_profile', isClaimed: true, settings: {} },
+    ]);
+    hoisted.getClaimVerificationReachMock.mockResolvedValue(2_400_000);
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+    const result = await connectOnboardingSpotifyArtist({
+      artistName: 'Famous Artist',
+      profileId: 'profile_123',
+      spotifyArtistId: 'famous_spotify_id',
+      spotifyArtistUrl: '',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.verificationPending).toBeUndefined();
+    expect(hoisted.getClaimVerificationReachMock).not.toHaveBeenCalled();
+    expect(hoisted.requestClaimVerificationMock).not.toHaveBeenCalled();
   });
 
   it('waits for inline import and enrichment before succeeding', async () => {

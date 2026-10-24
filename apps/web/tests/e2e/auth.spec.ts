@@ -216,7 +216,7 @@ test.describe('Auth', () => {
     }
   });
 
-  test('signin and signup navigation stays on the canonical routes and preserves redirect_url', async ({
+  test('signup sign-in navigation preserves redirect_url and uses canonical login recovery', async ({
     browser,
   }, testInfo) => {
     const page = await createFreshAuthPage(browser);
@@ -226,37 +226,44 @@ test.describe('Auth', () => {
     try {
       await openAuthPage(
         page,
+        `${APP_ROUTES.SIGNUP}?redirect_url=${encodeURIComponent(redirectUrl)}`
+      );
+      const signup = page.locator('[data-auth-shell-mode="sign-up"]');
+      await expect(signup).toHaveCount(1);
+      await expect(signup).toHaveAttribute('data-auth-shell-hydrated', 'true');
+      const signinLink = signup
+        .locator('[data-auth-mode-switch]')
+        .getByRole('link', { name: 'Sign in', exact: true });
+      await expect(signinLink).toHaveCount(1);
+      await expect(signinLink).toBeVisible();
+      await expect(signinLink).toHaveAttribute(
+        'href',
         `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(redirectUrl)}`
       );
-
-      if (await isAuthUnavailable(page)) {
-        await assertNoCriticalErrors(getContext(), testInfo);
-        return;
-      }
-
-      await page
-        .getByRole('link', { name: /request access|sign up|create account/i })
-        .click();
-      await expect(page).toHaveURL(
-        url =>
-          url.pathname === APP_ROUTES.SIGNUP &&
-          url.searchParams.get('redirect_url') === redirectUrl,
-        {
-          timeout: SMOKE_TIMEOUTS.NAVIGATION,
-        }
-      );
-      await expectClerkAuthUi(page);
-
-      await page.getByRole('link', { name: /sign in|log in/i }).click();
+      await signinLink.focus();
+      await page.keyboard.press('Enter');
       await expect(page).toHaveURL(
         url =>
           url.pathname === APP_ROUTES.SIGNIN &&
           url.searchParams.get('redirect_url') === redirectUrl,
-        {
-          timeout: SMOKE_TIMEOUTS.NAVIGATION,
-        }
+        { timeout: SMOKE_TIMEOUTS.NAVIGATION }
       );
-      await expectClerkAuthUi(page);
+      await expect(page.locator('[data-auth-shell]')).toHaveCount(1);
+      await expect(page.locator('[data-auth-shell-mode]')).toHaveCount(1);
+      await expect(
+        page.locator('[data-auth-shell-mode="sign-up"]')
+      ).toHaveCount(0);
+      await expect(
+        page.locator('[data-auth-shell-compact="true"]')
+      ).toHaveCount(0);
+      const signin = page.locator('[data-auth-shell-mode="sign-in"]');
+      await expect(signin).toHaveCount(1);
+      await expect(signin).toHaveAttribute('data-auth-shell-hydrated', 'true');
+      await expect(
+        signin
+          .locator('[data-auth-mode-switch]')
+          .getByRole('link', { name: 'Trouble signing in?', exact: true })
+      ).toHaveAttribute('href', APP_ROUTES.SUPPORT);
       await assertNoCriticalErrors(getContext(), testInfo);
     } finally {
       cleanup();
@@ -270,8 +277,8 @@ test.describe('Auth', () => {
  *
  * Covers:
  * - /sign-up page contains signup copy, signup form, link to /sign-in
- * - /sign-in page contains sign-in copy, sign-in form, link to /sign-up
- * - Signup ↔ signin cross-links work
+ * - /signin exposes email entry and the canonical support recovery link
+ * - Signup → signin preserves return context; signin → support remains reachable
  * - Public CTAs with data-cta-sign-up="true" navigate to /signup or a dialog[data-auth-mode="sign-up"]
  */
 test.describe('Auth pages: content and CTA routing (JOV-2065, JOV-2066)', () => {
@@ -327,7 +334,7 @@ test.describe('Auth pages: content and CTA routing (JOV-2065, JOV-2066)', () => 
     }
   });
 
-  test('/signin page contains sign-in copy and a link back to /signup', async ({
+  test('/signin page contains email entry and a canonical recovery link', async ({
     browser,
   }, testInfo) => {
     const page = await createFreshAuthPage(browser);
@@ -335,37 +342,27 @@ test.describe('Auth pages: content and CTA routing (JOV-2065, JOV-2066)', () => 
 
     try {
       await openAuthPage(page, APP_ROUTES.SIGNIN);
-
       await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNIN, {
         timeout: SMOKE_TIMEOUTS.NAVIGATION,
       });
-
-      // Signin page must contain sign-in-oriented copy
-      const bodyText = await page.locator('body').textContent();
-      if (await isAuthUnavailable(page)) {
-        expect(bodyText).toContain('temporarily unavailable');
-        await assertNoCriticalErrors(getContext(), testInfo);
-        return;
-      }
-
-      const hasSigninCopy =
-        (bodyText ?? '').toLowerCase().includes('sign in') ||
-        (bodyText ?? '').toLowerCase().includes('log in') ||
-        (bodyText ?? '').toLowerCase().includes('continue') ||
-        (bodyText ?? '').toLowerCase().includes('welcome');
-      expect(
-        hasSigninCopy,
-        'Signin page must contain sign-in-oriented copy'
-      ).toBe(true);
-
-      // Must have a cross-link to /signup — Clerk renders a "Sign up" link in its footer
-      const signupLink = page
-        .getByRole('link', { name: /request access|sign up|create account/i })
-        .first();
-      await expect(signupLink).toBeVisible({
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      const signin = page.locator('[data-auth-shell-mode="sign-in"]');
+      await expect(signin).toHaveCount(1);
+      await expect(signin).toHaveAttribute('data-auth-shell-hydrated', 'true');
+      await expect(
+        signin.getByRole('heading', { name: 'Log in to Jovie', exact: true })
+      ).toBeVisible();
+      await expect(
+        signin.getByRole('textbox', { name: 'Email', exact: true })
+      ).toBeEditable();
+      const modeSwitch = signin.locator('[data-auth-mode-switch]');
+      const recovery = modeSwitch.getByRole('link', {
+        name: 'Trouble signing in?',
+        exact: true,
       });
-
+      await expect(recovery).toHaveCount(1);
+      await expect(recovery).toBeVisible();
+      await expect(recovery).toHaveAttribute('href', APP_ROUTES.SUPPORT);
+      await expect(modeSwitch.locator('a[href^="/signup"]')).toHaveCount(0);
       await assertNoCriticalErrors(getContext(), testInfo);
     } finally {
       cleanup();
@@ -385,21 +382,36 @@ test.describe('Auth pages: content and CTA routing (JOV-2065, JOV-2066)', () => 
         page,
         `${APP_ROUTES.SIGNUP}?redirect_url=${encodeURIComponent(redirectUrl)}`
       );
-
-      if (await isAuthUnavailable(page)) {
-        await assertNoCriticalErrors(getContext(), testInfo);
-        return;
-      }
-
-      // Click the sign-in cross-link
-      await page
-        .getByRole('link', { name: /sign in|log in/i })
-        .first()
-        .click();
-      await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNIN, {
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
-      });
-
+      const signup = page.locator('[data-auth-shell-mode="sign-up"]');
+      await expect(signup).toHaveCount(1);
+      await expect(signup).toHaveAttribute('data-auth-shell-hydrated', 'true');
+      const signinLink = signup
+        .locator('[data-auth-mode-switch]')
+        .getByRole('link', { name: 'Sign in', exact: true });
+      await expect(signinLink).toHaveCount(1);
+      await expect(signinLink).toBeVisible();
+      await expect(signinLink).toHaveAttribute(
+        'href',
+        `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(redirectUrl)}`
+      );
+      await signinLink.click();
+      await expect(page).toHaveURL(
+        url =>
+          url.pathname === APP_ROUTES.SIGNIN &&
+          url.searchParams.get('redirect_url') === redirectUrl,
+        { timeout: SMOKE_TIMEOUTS.NAVIGATION }
+      );
+      await expect(page.locator('[data-auth-shell]')).toHaveCount(1);
+      await expect(page.locator('[data-auth-shell-mode]')).toHaveCount(1);
+      await expect(
+        page.locator('[data-auth-shell-mode="sign-up"]')
+      ).toHaveCount(0);
+      await expect(
+        page.locator('[data-auth-shell-compact="true"]')
+      ).toHaveCount(0);
+      const signin = page.locator('[data-auth-shell-mode="sign-in"]');
+      await expect(signin).toHaveCount(1);
+      await expect(signin).toHaveAttribute('data-auth-shell-hydrated', 'true');
       await assertNoCriticalErrors(getContext(), testInfo);
     } finally {
       cleanup();
@@ -407,7 +419,7 @@ test.describe('Auth pages: content and CTA routing (JOV-2065, JOV-2066)', () => 
     }
   });
 
-  test('signin → signup cross-link navigates to /signup', async ({
+  test('signin → support recovery navigates to /support', async ({
     browser,
   }, testInfo) => {
     const page = await createFreshAuthPage(browser);
@@ -415,21 +427,20 @@ test.describe('Auth pages: content and CTA routing (JOV-2065, JOV-2066)', () => 
 
     try {
       await openAuthPage(page, APP_ROUTES.SIGNIN);
-
-      if (await isAuthUnavailable(page)) {
-        await assertNoCriticalErrors(getContext(), testInfo);
-        return;
-      }
-
-      // Click the sign-up cross-link
-      await page
-        .getByRole('link', { name: /request access|sign up|create account/i })
-        .first()
-        .click();
-      await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNUP, {
+      const signin = page.locator('[data-auth-shell-mode="sign-in"]');
+      await expect(signin).toHaveCount(1);
+      await expect(signin).toHaveAttribute('data-auth-shell-hydrated', 'true');
+      const recovery = signin
+        .locator('[data-auth-mode-switch]')
+        .getByRole('link', { name: 'Trouble signing in?', exact: true });
+      await expect(recovery).toHaveCount(1);
+      await expect(recovery).toBeVisible();
+      await expect(recovery).toHaveAttribute('href', APP_ROUTES.SUPPORT);
+      await recovery.focus();
+      await page.keyboard.press('Enter');
+      await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SUPPORT, {
         timeout: SMOKE_TIMEOUTS.NAVIGATION,
       });
-
       await assertNoCriticalErrors(getContext(), testInfo);
     } finally {
       cleanup();

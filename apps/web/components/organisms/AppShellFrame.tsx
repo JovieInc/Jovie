@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { memo } from 'react';
+import { AppShellFrameDedupe } from '@/components/organisms/AppShellFrameDedupe';
 import { DesktopTitlebar } from '@/components/organisms/DesktopTitlebar';
 import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { OverlayInteractionGuard } from '@/components/shell/OverlayInteractionGuard';
@@ -35,6 +36,11 @@ export interface AppShellFrameProps {
    * attribute, or a still-mounted fallback collides with the resolved shell.
    */
   readonly placeholder?: boolean;
+  /**
+   * Drop the route inset. Onboarding measures the chat panel against
+   * `#main-content`; the 8px inset on each side is a 16px width gap.
+   */
+  readonly flushContent?: boolean;
 }
 
 /**
@@ -66,6 +72,7 @@ export const AppShellFrame = memo(function AppShellFrame({
   composerFocusActive = false,
   chatAmbientGradient = false,
   placeholder = false,
+  flushContent = false,
 }: Readonly<AppShellFrameProps>) {
   return (
     <div
@@ -79,6 +86,7 @@ export const AppShellFrame = memo(function AppShellFrame({
         containerClassName
       )}
     >
+      {placeholder ? null : <AppShellFrameDedupe />}
       <DesktopTitlebar />
       <div
         data-app-shell-body='true'
@@ -168,7 +176,10 @@ export const AppShellFrame = memo(function AppShellFrame({
                 >
                   <div
                     data-app-shell-content-inset='true'
-                    className='flex min-h-0 min-w-0 flex-1 overflow-hidden p-(--app-shell-content-inset)'
+                    className={cn(
+                      'flex min-h-0 min-w-0 flex-1 overflow-hidden',
+                      flushContent ? null : 'p-(--app-shell-content-inset)'
+                    )}
                   >
                     <div
                       data-testid='app-shell-scroll'

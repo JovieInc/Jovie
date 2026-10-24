@@ -828,7 +828,13 @@ export function uiAssuranceReport(matrix) {
  * every UI row the changed paths invalidate, with its required targets.
  */
 export function uiEvidenceRequirements(matrix, changedPaths = []) {
-  const hits = new Set(invalidatedRows(matrix, changedPaths));
+  // Tests still invalidate matrix/detector evidence through invalidatedRows,
+  // but owe no rendered-product receipt. Stories and fixtures remain in scope.
+  const runtimePaths = changedPaths.filter(
+    path =>
+      typeof path !== 'string' || !/\.(?:test|spec)\.[cm]?[jt]sx?$/iu.test(path)
+  );
+  const hits = new Set(invalidatedRows(matrix, runtimePaths));
   return (matrix?.rows ?? [])
     .filter(row => isUiRow(row) && hits.has(row.id))
     .map(row => {

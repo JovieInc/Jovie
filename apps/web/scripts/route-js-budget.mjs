@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Per-route initial client JS budget for authed /app routes.
+ * Per-route initial client JS budgets for Next.js app routes.
  *
  * Reads a finished `next build` (.next): for each /app page, the initial JS
  * is the root main files plus every chunk in the page's client-reference
@@ -10,18 +10,28 @@
  * Budgets live in route-js-budgets.json: a default for every /app route plus
  * per-route ceilings for routes that are heavier today. They are a ratchet,
  * set just above measured sizes, so any regression fails. Lower them when a
- * route gets lighter; raise one only with a measured reason in the PR.
+ * route gets lighter; raises require an unexpired design-exception-registry
+ * override for that exact key. Public routes use first-load app-build manifests
+ * (or client-reference fallback), tighter marketing ceilings, and measured
+ * downward-only baselines for existing over-target routes.
  *
  * Usage: node scripts/route-js-budget.mjs [--next-dir .next] [--budgets file] [--json]
  */
+import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { gzipSync } from 'node:zlib';
+import { exceptionMetadataIssues } from '../../../scripts/design-exception-registry.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(SCRIPT_DIR, '../..');
 const MANIFEST_NAME = 'page_client-reference-manifest.js';
+export const BUDGET_RELATIVE = 'apps/web/scripts/route-js-budgets.json';
+export const HEADROOM_KB = 16;
+export const BASELINE_HEADROOM_RATIO = 0.02;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** @param {string} key */
 export function routeFromManifestKey(key) {
@@ -30,6 +40,20 @@ export function routeFromManifestKey(key) {
     .replace(/\/\([^/)]+\)/g, '')
     .replace(/\/@[^/]+/g, '');
   return route === '' ? '/' : route;
+}
+
+export function isAuthedAppRoute(route) {
+  return route === '/app' || route.startsWith('/app/');
+}
+
+export function isMarketingRoute(route, patterns) {
+  return patterns.some(pattern => {
+    if (pattern.endsWith('/*')) {
+      const prefix = pattern.slice(0, -2);
+      return route === prefix || route.startsWith(`${prefix}/`);
+    }
+    return route === pattern;
+  });
 }
 
 function findManifests(dir, out = []) {
@@ -61,7 +85,10 @@ function readClientManifest(path) {
  * @param {string} nextDir
  * @returns {{ route: string, files: Set<string> }[]}
  */
-function collectRouteFiles(nextDir) {
+function collectRouteFiles(
+  nextDir,
+  root = join(nextDir, 'server', 'app', 'app')
+) {
   const buildManifest = JSON.parse(
     readFileSync(join(nextDir, 'build-manifest.json'), 'utf8')
   );
@@ -69,7 +96,7 @@ function collectRouteFiles(nextDir) {
     ...(buildManifest.rootMainFiles ?? []),
     ...(buildManifest.polyfillFiles ?? []),
   ];
-  return findManifests(join(nextDir, 'server', 'app', 'app')).map(path => {
+  return findManifests(root).map(path => {
     const [key, manifest] = readClientManifest(path);
     const files = new Set(rootFiles);
     for (const chunks of Object.values(manifest.entryJSFiles ?? {})) {
@@ -83,7 +110,10 @@ function collectRouteFiles(nextDir) {
  * @param {string} nextDir
  * @returns {RouteJsMeasurement[]}
  */
-export function measureRouteJs(nextDir) {
+export function measureRouteJs(
+  nextDir,
+  routeFiles = collectRouteFiles(nextDir)
+) {
   const gzipCache = new Map();
   const gzipBytes = file => {
     if (!gzipCache.has(file)) {
@@ -93,7 +123,7 @@ export function measureRouteJs(nextDir) {
     return gzipCache.get(file);
   };
 
-  return collectRouteFiles(nextDir)
+  return routeFiles
     .map(({ route, files }) => {
       let bytes = 0;
       for (const file of files) bytes += gzipBytes(file);
@@ -167,6 +197,265 @@ export function checkBudgets(measurements, budgets) {
   return { rows, violations, staleBudgets };
 }
 
+function rememberRoute(routes, route, files) {
+  if (!route || route.startsWith('/_')) return;
+  const set = routes.get(route) ?? new Set();
+  routes.set(route, set);
+  for (const file of files) {
+    if (typeof file === 'string' && file.endsWith('.js')) set.add(file);
+  }
+}
+
+export function collectFirstLoadFiles(nextDir) {
+  const buildManifest = JSON.parse(
+    readFileSync(join(nextDir, 'build-manifest.json'), 'utf8')
+  );
+  const shared = [
+    ...(buildManifest.rootMainFiles ?? []),
+    ...(buildManifest.polyfillFiles ?? []),
+  ];
+  /** @type {Map<string, Set<string>>} */
+  const routes = new Map();
+  const appManifestPath = join(nextDir, 'app-build-manifest.json');
+  if (existsSync(appManifestPath)) {
+    const pages = JSON.parse(readFileSync(appManifestPath, 'utf8')).pages;
+    if (!pages || typeof pages !== 'object' || Array.isArray(pages)) {
+      throw new Error(`${appManifestPath} is missing pages`);
+    }
+    for (const [key, files] of Object.entries(pages)) {
+      if (!Array.isArray(files)) {
+        throw new Error(`app-build-manifest pages[${key}] is not a file list`);
+      }
+      rememberRoute(routes, routeFromManifestKey(key), [...shared, ...files]);
+    }
+  } else {
+    for (const { route, files } of collectRouteFiles(
+      nextDir,
+      join(nextDir, 'server', 'app')
+    )) {
+      if (!isAuthedAppRoute(route)) rememberRoute(routes, route, files);
+    }
+  }
+  return [...routes.entries()].map(([route, files]) => ({ route, files }));
+}
+
+export function measureFirstLoadJs(nextDir) {
+  return measureRouteJs(nextDir, collectFirstLoadFiles(nextDir));
+}
+
+export function resolveFirstLoadTarget(route, firstLoad) {
+  if (firstLoad.routes && Object.hasOwn(firstLoad.routes, route)) {
+    return firstLoad.routes[route];
+  }
+  if (isMarketingRoute(route, firstLoad.marketingRoutes ?? [])) {
+    return firstLoad.marketingMaxGzipKb;
+  }
+  return firstLoad.defaultMaxGzipKb;
+}
+
+export function checkFirstLoadBudgets(measurements, firstLoad) {
+  const routes = Object.fromEntries(
+    measurements.map(({ route }) => [
+      route,
+      isKb(firstLoad.baselines?.[route])
+        ? firstLoad.baselines[route]
+        : resolveFirstLoadTarget(route, firstLoad),
+    ])
+  );
+  const result = checkBudgets(measurements, { routes });
+  const withTarget = row => ({
+    ...row,
+    targetKb: resolveFirstLoadTarget(row.route, firstLoad),
+  });
+  return {
+    rows: result.rows.map(withTarget),
+    violations: result.violations.map(withTarget),
+    staleBudgets: missingExplicitRoutes(measurements, {
+      routes: firstLoad.routes,
+    }),
+  };
+}
+
+function isKb(value) {
+  return Number.isInteger(value) && value > 0;
+}
+
+export function validateBudgetShape(budgets) {
+  const first = budgets?.firstLoad;
+  if (!first) return ['firstLoad budgets are required'];
+  const errors = [];
+  if (first.headroomKb !== HEADROOM_KB)
+    errors.push(`firstLoad.headroomKb must stay ${HEADROOM_KB}`);
+  if (
+    ![
+      first.marketingMaxGzipKb,
+      first.defaultMaxGzipKb,
+      budgets.defaultMaxGzipKb,
+    ].every(isKb)
+  ) {
+    return [...errors, 'budget ceilings must be positive integers'];
+  }
+  if (
+    first.marketingMaxGzipKb >=
+    Math.min(first.defaultMaxGzipKb, budgets.defaultMaxGzipKb)
+  ) {
+    errors.push('marketingMaxGzipKb must be tighter than both defaults');
+  }
+  const patterns = first.marketingRoutes;
+  if (!Array.isArray(patterns) || !patterns.includes('/')) {
+    return [...errors, 'marketingRoutes must include the homepage'];
+  }
+  for (const pattern of patterns) {
+    if (!pattern.includes('*') && !isKb(first.routes?.[pattern]))
+      errors.push(`marketing route ${pattern} needs an explicit budget`);
+  }
+  for (const [kind, values] of Object.entries({
+    routes: first.routes,
+    baselines: first.baselines,
+  })) {
+    for (const [route, kb] of Object.entries(values ?? {})) {
+      if (!isKb(kb)) errors.push(`${route} ${kind} must be positive integers`);
+      else if (kind === 'baselines') {
+        if (route.includes('*'))
+          errors.push(`${route} baseline must name one measured route`);
+      } else if (
+        isMarketingRoute(route, patterns) !==
+        kb <= first.marketingMaxGzipKb
+      ) {
+        errors.push(
+          `${route} must respect its marketing or non-marketing ceiling`
+        );
+      }
+    }
+  }
+  return errors;
+}
+
+function budgetNumbers(budgets) {
+  return [
+    ['', budgets],
+    ['firstLoad.', budgets?.firstLoad],
+  ].flatMap(([prefix, section]) =>
+    Object.entries(section ?? {}).flatMap(([key, value]) => {
+      if (key === 'routes' || key === 'baselines') {
+        return Object.entries(value ?? {}).map(([route, kb]) => [
+          `${prefix}${key}.${route}`,
+          kb,
+        ]);
+      }
+      return ['defaultMaxGzipKb', 'marketingMaxGzipKb', 'headroomKb'].includes(
+        key
+      ) && typeof value === 'number'
+        ? [[`${prefix}${key}`, value]]
+        : [];
+    })
+  );
+}
+
+export function gateWeakeningOverrideApplies(entry, now = new Date()) {
+  if (!entry || typeof entry !== 'object') return false;
+  if (exceptionMetadataIssues(entry, 'raise').length > 0) return false;
+  const expiresOn = /** @type {{ expiresOn?: string }} */ (entry).expiresOn;
+  if (ISO_DATE.test(expiresOn ?? '')) {
+    const expiry = Date.parse(`${expiresOn}T23:59:59.999Z`);
+    if (expiry < now.getTime()) return false;
+  }
+  return true;
+}
+
+// New keys inherit their section ceiling; new sections establish the initial ratchet.
+function ancestorCeiling(key, ancestor, previous) {
+  if (previous.has(key)) return previous.get(key);
+  if (key.startsWith('routes.') && isKb(ancestor?.defaultMaxGzipKb))
+    return ancestor.defaultMaxGzipKb;
+  const match = /^firstLoad\.(routes|baselines)\.(.+)$/.exec(key);
+  const first = ancestor?.firstLoad;
+  if (!match || !isKb(first?.defaultMaxGzipKb)) return;
+  if (match[1] === 'baselines' && !first.baselines) return;
+  return isMarketingRoute(match[2], first.marketingRoutes ?? [])
+    ? first.marketingMaxGzipKb
+    : first.defaultMaxGzipKb;
+}
+
+export function grownBudgetNumbers(budgets, ancestor, now = new Date()) {
+  if (!ancestor) return [];
+  const previous = new Map(budgetNumbers(ancestor));
+  return budgetNumbers(budgets).flatMap(([key, next]) => {
+    const prev = ancestorCeiling(key, ancestor, previous);
+    return prev !== undefined &&
+      next > prev &&
+      !gateWeakeningOverrideApplies(budgets.raises?.[key], now)
+      ? [`${key} grew ${prev} -> ${next}`]
+      : [];
+  });
+}
+
+export function missingExplicitRoutes(measurements, firstLoad) {
+  const measured = new Set(measurements.map(row => row.route));
+  const named = new Set([
+    ...Object.keys(firstLoad?.routes ?? {}),
+    ...Object.keys(firstLoad?.baselines ?? {}),
+  ]);
+  return [...named].filter(
+    route => !route.includes('*') && !measured.has(route)
+  );
+}
+
+export function evaluateBudgets({
+  appRows,
+  firstRows,
+  budgets,
+  ancestor,
+  now = new Date(),
+}) {
+  const shape = validateBudgetShape(budgets);
+  const growth = grownBudgetNumbers(budgets, ancestor, now);
+  const app = checkBudgets(appRows, budgets);
+  const publicRows = firstRows.filter(row => !isAuthedAppRoute(row.route));
+  const first = checkFirstLoadBudgets(publicRows, budgets.firstLoad ?? {});
+  const missing = missingExplicitRoutes(publicRows, budgets.firstLoad);
+  const ok = [shape, growth, app.violations, first.violations, missing].every(
+    errors => errors.length === 0
+  );
+  return { shape, growth, app, first, missing, ok };
+}
+
+function git(repoRoot, args) {
+  return spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8' });
+}
+
+export function readBudgetAncestor(repoRoot = REPO_ROOT, options = {}) {
+  const spawn = options.spawn ?? git;
+  const available = () =>
+    spawn(repoRoot, ['rev-parse', '--verify', 'origin/main']).status === 0;
+  if (
+    !available() &&
+    (options.fetch === false ||
+      spawn(repoRoot, ['fetch', '--no-tags', '--depth=1', 'origin', 'main'])
+        .status !== 0 ||
+      !available())
+  ) {
+    return {
+      ok: false,
+      error:
+        'origin/main is not available; the bundle budget cannot prove it only shrinks',
+    };
+  }
+  const spec = `origin/main:${BUDGET_RELATIVE}`;
+  if (spawn(repoRoot, ['cat-file', '-e', spec]).status !== 0)
+    return { ok: true, ancestor: null };
+  const show = spawn(repoRoot, ['show', spec]);
+  if (show.status !== 0) return { ok: false, error: `unable to read ${spec}` };
+  try {
+    return { ok: true, ancestor: JSON.parse(show.stdout) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `ancestor budget is not valid JSON: ${error.message}`,
+    };
+  }
+}
+
 function parseArgs(argv) {
   const options = {
     nextDir: resolve(SCRIPT_DIR, '..', '.next'),
@@ -183,44 +472,56 @@ function parseArgs(argv) {
   return options;
 }
 
+function printRows(rows) {
+  for (const row of rows) {
+    const mark = row.ok ? 'ok  ' : 'OVER';
+    console.log(
+      `${mark} ${String(row.gzipKb).padStart(5)} / ${String(row.budgetKb).padStart(5)} KB gz  ${row.route}`
+    );
+  }
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const budgets = JSON.parse(readFileSync(options.budgetsPath, 'utf8'));
-  const measurements = measureRouteJs(options.nextDir);
-  if (measurements.length === 0) {
-    console.error(`No /app client manifests under ${options.nextDir}`);
-    process.exit(1);
+  const ancestor = readBudgetAncestor(REPO_ROOT);
+  if (!ancestor.ok) throw new Error(ancestor.error);
+  const appRows = measureRouteJs(options.nextDir);
+  if (!appRows.length)
+    throw new Error(`No /app client manifests under ${options.nextDir}`);
+  const result = evaluateBudgets({
+    appRows,
+    firstRows: measureFirstLoadJs(options.nextDir),
+    budgets,
+    ancestor: ancestor.ancestor,
+  });
+  if (options.json) console.log(JSON.stringify(result, null, 2));
+  else {
+    printRows(result.app.rows);
+    printRows(result.first.rows);
   }
-  const result = checkBudgets(measurements, budgets);
-
-  if (options.json) {
-    console.log(JSON.stringify(result, null, 2));
-  } else {
-    for (const row of result.rows) {
-      const mark = row.ok ? 'ok  ' : 'OVER';
-      console.log(
-        `${mark} ${String(row.gzipKb).padStart(5)} / ${String(row.budgetKb).padStart(5)} KB gz  ${row.route}`
-      );
-    }
-  }
-  for (const route of result.staleBudgets) {
-    console.log(
-      `::warning::route-js-budgets.json has no matching route: ${route}`
+  for (const error of [...result.shape, ...result.growth])
+    console.error(`::error::${error}`);
+  for (const route of result.missing)
+    console.error(
+      `::error::${route} has a first-load budget but was not in the build manifest`
     );
-  }
-  for (const row of result.violations) {
+  for (const route of result.app.staleBudgets)
     console.log(
-      `::error::${row.route} ships ${row.gzipKb} KB gzip initial JS; budget is ${row.budgetKb} KB. ` +
-        'Dynamic-import heavy client code, or raise the budget with a measured reason.'
+      `::warning::route-js-budgets.json has no matching /app route: ${route}`
+    );
+  for (const row of [...result.app.violations, ...result.first.violations]) {
+    console.error(
+      `::error::${row.route} ships ${row.gzipKb} KB gzip first-load JS; budget is ${row.budgetKb} KB. Split heavy client code; do not raise budgets or baselines.`
     );
   }
   const forbidden = findForbiddenClientCode(options.nextDir);
   for (const hit of forbidden) {
-    console.log(
+    console.error(
       `::error::${hit.file} ships forbidden client code (${hit.id}) in ${hit.routes.length} /app routes, e.g. ${hit.routes[0]}. ${hit.fix}`
     );
   }
-  process.exit(result.violations.length > 0 || forbidden.length > 0 ? 1 : 0);
+  process.exit(result.ok && forbidden.length === 0 ? 0 : 1);
 }
 
 if (

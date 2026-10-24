@@ -28,8 +28,27 @@ vi.mock('@/hooks/useJovieAuth', () => ({
   JovieAuthDefaultsProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid='jovie-auth-defaults'>{children}</div>
   ),
-  JovieAuthValuesProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid='jovie-auth-values'>{children}</div>
+  JovieAuthValuesProvider: ({
+    children,
+    initialUser,
+  }: {
+    children: React.ReactNode;
+    initialUser?: {
+      id?: string;
+      email?: string;
+      name?: string;
+      username?: string | null;
+    } | null;
+  }) => (
+    <div
+      data-testid='jovie-auth-values'
+      data-initial-user-id={initialUser?.id ?? ''}
+      data-initial-user-email={initialUser?.email ?? ''}
+      data-initial-user-name={initialUser?.name ?? ''}
+      data-initial-user-username={initialUser?.username ?? ''}
+    >
+      {children}
+    </div>
   ),
 }));
 
@@ -193,10 +212,32 @@ describe('ClientProviders composition', () => {
         </ClientProviders>
       );
 
-      expect(screen.getByTestId('jovie-auth-values')).toBeInTheDocument();
+      const values = screen.getByTestId('jovie-auth-values');
+      expect(values).toBeInTheDocument();
+      expect(values).toHaveAttribute('data-initial-user-id', 'test-user-id');
+      expect(values).toHaveAttribute(
+        'data-initial-user-email',
+        'test@example.com'
+      );
+      expect(values).toHaveAttribute('data-initial-user-name', 'Test User');
+      expect(values).toHaveAttribute('data-initial-user-username', 'testuser');
       expect(
         screen.queryByTestId('jovie-auth-defaults')
       ).not.toBeInTheDocument();
+    });
+
+    it('passes a null initial user when no bootstrap session is present', () => {
+      render(
+        <ClientProviders>
+          <TestChild />
+        </ClientProviders>
+      );
+
+      const values = screen.getByTestId('jovie-auth-values');
+      expect(values).toHaveAttribute('data-initial-user-id', '');
+      expect(values).toHaveAttribute('data-initial-user-email', '');
+      expect(values).toHaveAttribute('data-initial-user-name', '');
+      expect(values).toHaveAttribute('data-initial-user-username', '');
     });
   });
 });

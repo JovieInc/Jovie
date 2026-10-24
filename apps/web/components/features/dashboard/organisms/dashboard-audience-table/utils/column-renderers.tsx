@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/dashboard/audience-table/column-renderers-platforms.test.tsx
 'use client';
 
 import { Bell, Eye } from 'lucide-react';
@@ -304,13 +305,13 @@ function buildUserSubtitleParts(
     parts.push({
       key: 'intent',
       text: 'High',
-      className: 'font-caption text-emerald-600 dark:text-emerald-400',
+      className: 'font-caption text-success',
     });
   } else if (hiddenMetadataColumns.engagement && m.intentLevel === 'medium') {
     parts.push({
       key: 'intent',
       text: 'Medium',
-      className: 'font-caption text-amber-600 dark:text-amber-400',
+      className: 'font-caption text-secondary-token',
     });
   }
 

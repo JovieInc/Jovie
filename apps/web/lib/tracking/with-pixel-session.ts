@@ -44,7 +44,7 @@ export async function withPixelSession(
       );
     }
 
-    return await withDbSessionTx(async (tx, clerkUserId) => {
+    return await withDbSessionTx(async (tx, appUserId) => {
       const [userProfile] = await tx
         .select({
           profileId: creatorProfiles.id,
@@ -52,7 +52,7 @@ export async function withPixelSession(
         })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(eq(users.clerkId, clerkUserId))
+        .where(eq(users.id, appUserId))
         .limit(1);
 
       if (!userProfile) {

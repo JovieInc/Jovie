@@ -19,6 +19,7 @@ import {
   buildPromotionBlocker,
   buildWriterProofReceipt,
   evaluateWriterPromotion,
+  extractLatestWriterProofReceipt,
   renderPromotionBlockerComment,
 } from '../writer-owned-pr-promotion.mjs';
 
@@ -31,7 +32,8 @@ const head = 'a'.repeat(40);
  * initialState?: string, mergedAtRead?: number, ticketEvidence?: string,
  * runs?: number, mergedOnUndo?: boolean, viewerLogin?: unknown, writerLogin?: string,
  * graphqlErrors?: unknown, unreadableState?: boolean,
- * missingPullRequest?: boolean, missingViewer?: boolean, readyFails?: boolean
+ * missingPullRequest?: boolean, missingViewer?: boolean, readyFails?: boolean,
+ * dropProof?: boolean
  * }} [options]
  */
 function scenario({
@@ -51,6 +53,7 @@ function scenario({
   missingPullRequest = false,
   missingViewer = false,
   readyFails = false,
+  dropProof = false,
 } = {}) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'writer-promotion-')));
   try {
@@ -112,7 +115,7 @@ if(args[0]==='api' && args[1]==='graphql'){
  const parsed=spawnSync('jq',['-ce',filter],{encoding:'utf8',input:JSON.stringify(response)});
  fs.writeSync(1,parsed.stdout||'');fs.writeSync(2,parsed.stderr||'');process.exit(parsed.status??1);
 }
-if(args[0]==='pr'&&args[1]==='edit')state.body=args[args.indexOf('--body')+1];
+if(args[0]==='pr'&&args[1]==='edit'&&!${dropProof})state.body=args[args.indexOf('--body')+1];
 if(args[0]==='pr'&&args[1]==='ready'){
  if(${mergedOnUndo}&&args.includes('--undo')){state.state='MERGED';fs.writeFileSync(path,JSON.stringify(state));console.error('PR already merged');process.exit(1);}
  state.draft=args.includes('--undo');fs.writeFileSync(path,JSON.stringify(state));
@@ -165,7 +168,12 @@ fs.writeFileSync(path,JSON.stringify(state));
     const comment = existsSync(join(dir, 'comment'))
       ? readFileSync(join(dir, 'comment'), 'utf8')
       : '';
-    return { ...result, calls, comment };
+    return {
+      ...result,
+      calls,
+      comment,
+      state: JSON.parse(readFileSync(join(dir, 'state'), 'utf8')),
+    };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -184,7 +192,15 @@ test('ready completes promotion without arming, including ready restart', () => 
     assert.doesNotMatch(r.calls, /native-intent|"merge"|enqueuePullRequest/);
     assert.doesNotMatch(r.calls, /--undo|--disable-auto|dequeuePullRequest/);
     assert.equal(r.calls.split('"ready"').length - 1, restart ? 0 : 1);
+    assert.equal(extractLatestWriterProofReceipt(r.state.body)?.headSha, head);
   }
+});
+
+test('readiness alone cannot stand in for persisted author proof', () => {
+  const r = scenario({ restart: true, dropProof: true });
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /persisted-proof/);
+  assert.doesNotMatch(r.calls, /"ready"/);
 });
 
 test('a failed ready compensates once only on same head', () => {
@@ -194,10 +210,13 @@ test('a failed ready compensates once only on same head', () => {
   assert.match(r.comment, /"verified": true/);
 });
 
-test('head movement before compensation prevents all risky effects', () => {
+test('head movement after proof attachment prevents readiness and compensation', () => {
   const r = scenario({ readyFails: true, moved: true });
   assert.equal(r.status, 2, r.stderr);
-  assert.doesNotMatch(r.calls, /--undo|--disable-auto|dequeuePullRequest/);
+  assert.doesNotMatch(
+    r.calls,
+    /"ready"|--undo|--disable-auto|dequeuePullRequest/
+  );
   assert.match(r.comment, /"verified": false/);
 });
 
@@ -340,7 +359,7 @@ test('already merged with missing ticket evidence remains an owned acceptance fa
 });
 
 test('merge before compensation preserves failure without attempting a draft conversion', () => {
-  const r = scenario({ readyFails: true, mergedAtRead: 2 });
+  const r = scenario({ readyFails: true, mergedAtRead: 3 });
   assert.equal(r.status, 2, r.stderr);
   assert.doesNotMatch(r.calls, /--undo|--disable-auto|dequeuePullRequest/);
   assert.match(r.comment, /"sourceDisposition": "merged"/);

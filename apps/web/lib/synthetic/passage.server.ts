@@ -1,10 +1,10 @@
 import 'server-only';
 import { env } from '@/lib/env-server';
 import { checkGateForUser } from '@/lib/flags/server';
-import { normalizeEmail } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
 import {
   getActiveSyntheticPrincipal,
+  isControlledSyntheticMailbox,
   isSyntheticPrincipalEmail,
   type SyntheticPrincipal,
   type SyntheticPrincipalScenario,
@@ -33,6 +33,8 @@ import {
  * `revoked` (deploy), or rotate the mailbox base / revoke the actor's
  * sessions.
  */
+export { isControlledSyntheticMailbox } from './principals';
+
 export const SYNTHETIC_PASSAGE_GATE = 'synthetic_principal_passage';
 
 export interface SyntheticPassageSession {
@@ -41,26 +43,6 @@ export interface SyntheticPassageSession {
     readonly email?: string | null;
     readonly emailVerified?: boolean | null;
   };
-}
-
-function mailboxOf(email: string): string | null {
-  const normalized = normalizeEmail(email);
-  const atIndex = normalized.lastIndexOf('@');
-  if (atIndex <= 0 || atIndex === normalized.length - 1) return null;
-  const local = normalized.slice(0, atIndex).split('+')[0];
-  return local ? `${local}@${normalized.slice(atIndex + 1)}` : null;
-}
-
-/** True when the email's mailbox is exactly the configured canary base. */
-export function isControlledSyntheticMailbox(
-  email: string,
-  mailboxBase: string | undefined
-): boolean {
-  if (!mailboxBase?.trim()) return false;
-  const base = mailboxOf(mailboxBase);
-  // The configured base must itself be untagged.
-  if (!base || base !== normalizeEmail(mailboxBase)) return false;
-  return mailboxOf(email) === base;
 }
 
 export async function resolveSyntheticPassage(

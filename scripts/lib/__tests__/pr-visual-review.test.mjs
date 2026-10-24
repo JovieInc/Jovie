@@ -37,6 +37,31 @@ import {
 } from '../sonar-check-selection.mjs';
 
 describe('bounded PR visual review contract', () => {
+  it.each([
+    'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
+    'apps/web/app/(marketing)/card/page.tsx',
+    'apps/web/app/(marketing)/card/JovieCardInterestCapture.tsx',
+    'apps/web/data/jovieCardCopy.ts',
+  ])('captures the actual Card route for %s', file => {
+    expect(routeChangedFiles([file])).toEqual({
+      shouldReview: true,
+      routes: ['/card'],
+      reason: 'ui-change',
+      review_status: 'advisory',
+    });
+  });
+
+  it('does not confuse unrelated card components with the Card route', () => {
+    expect(
+      routeChangedFiles([
+        'apps/web/components/molecules/ContentSurfaceCard.tsx',
+      ]).routes
+    ).toEqual(['/']);
+    expect(
+      routeChangedFiles(['apps/web/data/jovieCardCopy.ts.backup']).shouldReview
+    ).toBe(false);
+  });
+
   it('routes UI changes only to deterministic public surfaces', () => {
     expect(
       routeChangedFiles([

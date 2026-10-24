@@ -112,6 +112,21 @@ after that transition. An unreadable episode boundary holds the state with an
 actionable history-read explanation. Founder taste orders also bind to this
 episode, so a delayed prior decision cannot satisfy or strand the new request.
 
+### Literal observation metadata in issue descriptions
+
+Keep the existing `sentry-observation:v1` HTML comment and its JSON inside a
+fenced `text` code block when registering an observation in an issue description.
+Linear normalizes bare description Markdown, including bracket escaping and
+issue links, which can corrupt the stored JSON even when the write succeeds.
+The fence preserves the existing schema; do not relax or unescape the parser.
+
+After writing, read the raw server description and run the maintained
+`inspectObservationIssue` against complete current comments/history. Verify the
+exact plan, binding, episode, incident denominator and full window before calling
+it enrolled. A trimmed newline outside the fence is formatting, not a changed
+plan. Enrollment schedules the existing producer; it does not prove coverage or
+permit a passing receipt before every required observation is satisfied.
+
 ### Symphony-dispatched work
 
 When Linear-backed Symphony dispatches work, it must hold the Linear lease and record the `In Progress` transition before implementation begins. If your session was started by Symphony, verify that receipt and do not create or consult a GitHub Issue as fallback intake.

@@ -418,4 +418,83 @@ describe('UI assurance matrix (JOV-7713)', () => {
     assert.ok(row.targets.includes('macos-electron'));
     assert.deepEqual(uiEvidenceRequirements(matrix, ['docs/README.md']), []);
   });
+
+  it('does not demand rendered UI receipts for the exact JOV-8322 test-only trigger', () => {
+    const matrix = healthy();
+    const paths = [
+      'apps/web/app/api/dsp/bio-sync/route.test.ts',
+      'apps/web/components/features/visibility-audit/VisibilityAuditReportView.test.tsx',
+      'apps/web/lib/connectors/artist-profile-contract.test.ts',
+      'apps/web/lib/connectors/dsp-profile-catalog.test.ts',
+      'apps/web/lib/connectors/dsp-profile-catalog.ts',
+      'apps/web/lib/connectors/profile-writes/service.test.ts',
+      'apps/web/lib/connectors/registry.ts',
+      'apps/web/lib/dsp-bio-sync/api-method.test.ts',
+      'apps/web/lib/dsp-bio-sync/blocked-providers.test.ts',
+      'apps/web/lib/dsp-bio-sync/providers.ts',
+      'apps/web/lib/visibility-audit/__snapshots__/assemble.test.ts.snap',
+      'apps/web/lib/visibility-audit/assemble.test.ts',
+      'apps/web/lib/visibility-audit/render-markdown.ts',
+    ];
+    assert.deepEqual(uiEvidenceRequirements(matrix, paths), []);
+    for (const row of ['AM-020', 'AM-021', 'AM-023'])
+      assert.ok(invalidatedRows(matrix, paths).includes(row));
+  });
+
+  it('keeps test artifacts out of product receipts without suppressing detector invalidation', () => {
+    const matrix = healthy();
+    for (const suffix of [
+      'test.tsx',
+      'spec.tsx',
+      'test.ts',
+      'spec.mts',
+      'test.cts',
+      'spec.jsx',
+      'test.js',
+      'spec.mjs',
+      'test.cjs',
+    ]) {
+      const path = `apps/web/components/Proof.${suffix}`;
+      assert.deepEqual(uiEvidenceRequirements(matrix, [path]), [], path);
+      assert.ok(invalidatedRows(matrix, [path]).includes('AM-021'), path);
+    }
+  });
+
+  it('retains exact-build requirements for actual source and mixed source/test changes', () => {
+    const matrix = healthy();
+    const source =
+      'apps/web/components/features/visibility-audit/VisibilityAuditReportView.tsx';
+    const owed = uiEvidenceRequirements(matrix, [source]);
+    assert.deepEqual(
+      owed.map(row => row.row),
+      ['AM-020', 'AM-021', 'AM-023']
+    );
+    assert.deepEqual(
+      uiEvidenceRequirements(matrix, [
+        `${source.slice(0, -4)}.test.tsx`,
+        source,
+      ]),
+      owed
+    );
+    assert.ok(
+      owed.every(
+        row =>
+          row.targets.includes('web-desktop') &&
+          row.targets.includes('web-mobile')
+      )
+    );
+  });
+
+  it('preserves stories, render fixtures and unreadable-path failures', () => {
+    const matrix = healthy();
+    for (const path of [
+      'apps/web/components/Proof.stories.tsx',
+      'apps/web/components/Proof.fixture.tsx',
+      'apps/web/components/__fixtures__/Proof.tsx',
+      'apps/web/components/Proof.spec-helper.tsx',
+    ])
+      assert.ok(uiEvidenceRequirements(matrix, [path]).length > 0, path);
+    assert.throws(() => uiEvidenceRequirements(matrix, [null]), TypeError);
+    assert.throws(() => uiEvidenceRequirements(matrix, null), TypeError);
+  });
 });

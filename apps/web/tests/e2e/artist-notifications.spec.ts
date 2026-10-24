@@ -40,14 +40,14 @@ test.describe('Artist Notifications Landing', () => {
       })
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: /start pro trial/i }).first()
+      page.getByRole('link', { name: /start artist presence trial/i }).first()
     ).toBeVisible();
   });
 
   test('shared sections render with notifications-specific copy', async ({
     page,
   }) => {
-    await expect(page.getByTestId('homepage-trust')).toBeVisible();
+    await expect(page.getByTestId('homepage-trust')).toHaveCount(0);
     await expect(
       page.getByText('Trusted by artists and teams releasing on')
     ).toHaveCount(0);

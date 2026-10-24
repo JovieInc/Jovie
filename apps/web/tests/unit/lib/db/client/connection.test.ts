@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
-
+import { atomicDbContext } from '@/lib/db/atomic-context';
 import {
   classifyDatabaseEndpoint,
   db,
   evaluateFleetConnectionBudget,
+  getDb,
+  resolveAcquisitionTimeoutMs,
   resolvePoolConfig,
   resolvePoolMax,
   resolveStatementTimeoutMs,
@@ -17,6 +19,7 @@ const mutableEnv = process.env as Record<string, string | undefined>;
 const originalNodeEnv = mutableEnv.NODE_ENV;
 const originalVitest = mutableEnv.VITEST;
 const originalStatementTimeout = mutableEnv.DB_STATEMENT_TIMEOUT_MS;
+const originalAcquisitionTimeout = mutableEnv.DB_ACQUISITION_TIMEOUT_MS;
 const originalPoolMax = mutableEnv.DB_POOL_MAX;
 
 describe('db proxy', () => {
@@ -40,6 +43,12 @@ describe('db proxy', () => {
       mutableEnv.DB_STATEMENT_TIMEOUT_MS = originalStatementTimeout;
     }
 
+    if (originalAcquisitionTimeout === undefined) {
+      delete mutableEnv.DB_ACQUISITION_TIMEOUT_MS;
+    } else {
+      mutableEnv.DB_ACQUISITION_TIMEOUT_MS = originalAcquisitionTimeout;
+    }
+
     if (originalPoolMax === undefined) {
       delete mutableEnv.DB_POOL_MAX;
     } else {
@@ -60,6 +69,18 @@ describe('db proxy', () => {
       .readMarker;
 
     expect(readMarker()).toBe('expected-context');
+  });
+
+  it('rejects direct, indirect, and captured global methods inside atomic work', () => {
+    setInternalDb({ select: () => 'ordinary read' } as unknown as DbType);
+    const captured = db.select;
+    expect(captured()).toBe('ordinary read');
+    atomicDbContext.run({ actorId: 'trusted-user' }, () => {
+      expect(() => db.select()).toThrow('transaction handle');
+      expect(() => captured()).toThrow('transaction handle');
+      expect(() => getDb()).toThrow('transaction handle');
+    });
+    expect(db.select()).toBe('ordinary read');
   });
 
   it('uses a single pooled connection in test env', () => {
@@ -153,12 +174,13 @@ describe('db proxy', () => {
     expect(unknown.missing).toContain('poolerBackendLimit');
   });
 
-  it('omits statement_timeout when DB_STATEMENT_TIMEOUT_MS is unset', () => {
+  it('enforces the default statement deadline when DB_STATEMENT_TIMEOUT_MS is unset', () => {
     delete mutableEnv.DB_STATEMENT_TIMEOUT_MS;
 
     const config = resolvePoolConfig('postgres://localhost:5432/dev');
 
-    expect(config.statement_timeout).toBeUndefined();
+    expect(config.statement_timeout).toBe(8000);
+    expect(resolveStatementTimeoutMs()).toBe(8000);
   });
 
   it('applies statement_timeout when DB_STATEMENT_TIMEOUT_MS is set', () => {
@@ -169,13 +191,49 @@ describe('db proxy', () => {
     expect(config.statement_timeout).toBe(15_000);
   });
 
-  it('ignores invalid DB_STATEMENT_TIMEOUT_MS values', () => {
+  it('never lets invalid DB_STATEMENT_TIMEOUT_MS values disable the deadline', () => {
     mutableEnv.DB_STATEMENT_TIMEOUT_MS = 'not-a-number';
 
-    expect(resolveStatementTimeoutMs()).toBeUndefined();
+    expect(resolveStatementTimeoutMs()).toBe(8000);
     expect(
       resolvePoolConfig('postgres://localhost:5432/dev').statement_timeout
-    ).toBeUndefined();
+    ).toBe(8000);
+  });
+
+  it('caps oversized DB_STATEMENT_TIMEOUT_MS values at the enforced maximum', () => {
+    mutableEnv.DB_STATEMENT_TIMEOUT_MS = '300000';
+
+    expect(resolveStatementTimeoutMs()).toBe(30_000);
+  });
+
+  it('keeps a nonzero floor for DB_STATEMENT_TIMEOUT_MS', () => {
+    mutableEnv.DB_STATEMENT_TIMEOUT_MS = '250';
+
+    expect(resolveStatementTimeoutMs()).toBe(1000);
+  });
+
+  it('defaults and caps the acquisition deadline', () => {
+    delete mutableEnv.DB_ACQUISITION_TIMEOUT_MS;
+    expect(resolveAcquisitionTimeoutMs()).toBe(15_000);
+
+    mutableEnv.DB_ACQUISITION_TIMEOUT_MS = 'not-a-number';
+    expect(resolveAcquisitionTimeoutMs()).toBe(15_000);
+
+    mutableEnv.DB_ACQUISITION_TIMEOUT_MS = '300000';
+    expect(resolveAcquisitionTimeoutMs()).toBe(30_000);
+
+    mutableEnv.DB_ACQUISITION_TIMEOUT_MS = '250';
+    expect(resolveAcquisitionTimeoutMs()).toBe(1000);
+  });
+
+  it('always carries bounded acquisition and statement deadlines in pool config', () => {
+    delete mutableEnv.DB_ACQUISITION_TIMEOUT_MS;
+    delete mutableEnv.DB_STATEMENT_TIMEOUT_MS;
+
+    const config = resolvePoolConfig('postgres://localhost:5432/dev');
+
+    expect(config.connectionTimeoutMillis).toBe(15_000);
+    expect(config.statement_timeout).toBe(8000);
   });
   it('returns non-function properties unchanged', () => {
     const mockDb = {

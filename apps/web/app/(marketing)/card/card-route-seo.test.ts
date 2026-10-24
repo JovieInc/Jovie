@@ -43,12 +43,20 @@ describe('/card marketing route', () => {
 
   it('keeps canonical, social, and coming-soon metadata on the same route', () => {
     expect(metadata.alternates?.canonical).toBe('https://jov.ie/card');
-    expect(metadata.description).toContain('coming to Apple Wallet');
+    expect(metadata.title).toEqual({
+      absolute: expect.stringMatching(/planned.*Apple Wallet/i),
+    });
+    expect(metadata.description).toContain('planned Apple Wallet');
+    expect(metadata.description).toContain('Passes are not available yet.');
     expect(metadata.openGraph).toMatchObject({
       type: 'website',
       url: 'https://jov.ie/card',
+      description: metadata.description,
     });
-    expect(metadata.twitter).toMatchObject({ card: 'summary_large_image' });
+    expect(metadata.twitter).toMatchObject({
+      card: 'summary_large_image',
+      description: metadata.description,
+    });
     expect(metadata.robots).toBeUndefined();
   });
 });

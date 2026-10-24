@@ -1,0 +1,9 @@
+{
+  "kind": "token-scope-call-catalog",
+  "executable": false,
+  "cliEnqueueKey": "enqueuePullRequest",
+  "graphql": {
+    "enqueuePullRequest": { "all": { "contents": "write" } }
+  },
+  "acknowledgements": []
+}

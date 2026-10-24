@@ -343,6 +343,110 @@ describe('factory:run content stages', () => {
 });
 
 describe('stage retries', () => {
+  const unsupportedOutcome = 'Double your income in seven days';
+  const dryOutcomes = brief.dry?.outcomes as {
+    outcomes: { statement: string }[];
+  };
+
+  function outcomeProviders(fixOnFeedback: boolean, generated: string[]) {
+    return dryProviders(brief, {
+      async generate(request) {
+        generated.push(request.stage);
+        if (request.stage !== 'outcomes') {
+          return { status: 'ok', value: brief.dry?.[request.stage] };
+        }
+        const fixed =
+          fixOnFeedback &&
+          request.feedback.some(finding =>
+            finding.includes(unsupportedOutcome)
+          );
+        return {
+          status: 'ok',
+          value: {
+            ...dryOutcomes,
+            outcomes: dryOutcomes.outcomes.map((outcome, index) =>
+              index === 0 && !fixed
+                ? { ...outcome, statement: unsupportedOutcome }
+                : outcome
+            ),
+          },
+        };
+      },
+      transport: fixtureTransport(({ prompt }) =>
+        prompt.includes(unsupportedOutcome)
+          ? JSON.stringify({
+              score: 0.9,
+              verdict: 'pass',
+              critique: [],
+              unsupportedClaims: [unsupportedOutcome],
+            })
+          : FIXTURE_PASS_VERDICT
+      ),
+    });
+  }
+
+  it('stops an unsupported outcome before narrative even when judges say pass', async () => {
+    const generated: string[] = [];
+    const manifest = await run({
+      providers: outcomeProviders(false, generated),
+    });
+
+    expect(manifest).toMatchObject({ status: 'failed', stoppedAt: 'outcomes' });
+    const first = record('03-outcomes.attempt-1.json');
+    expect(first.artifact).toMatchObject({
+      outcomes: expect.arrayContaining([
+        expect.objectContaining({ statement: unsupportedOutcome }),
+      ]),
+    });
+    expect(first.receipt.invariantsFailed).not.toContain('artifact-schema');
+    expect(first.receipt.invariantsFailed).not.toContain(
+      'outcome-claims-resolve'
+    );
+    expect(first.receipt.invariantsFailed).not.toContain('data-points-sourced');
+    expect(first.receipt).toMatchObject({
+      passed: false,
+      evaluators: expect.arrayContaining([
+        expect.objectContaining({ verdict: 'fail' }),
+      ]),
+    });
+    expect(record('03-outcomes.attempt-2.json').feedbackIn).toEqual(
+      expect.arrayContaining([expect.stringContaining(unsupportedOutcome)])
+    );
+    expect(
+      manifest.attempts.filter(file => file.includes('-outcomes.'))
+    ).toHaveLength(3);
+    expect(generated).not.toContain('narrative');
+    expect(existsSync(join(runDir(), '04-narrative.attempt-1.json'))).toBe(
+      false
+    );
+  });
+
+  it('retries an unsupported outcome with its finding and admits the correction', async () => {
+    const generated: string[] = [];
+    const manifest = await run({
+      providers: outcomeProviders(true, generated),
+    });
+
+    expect(manifest).toMatchObject({
+      status: 'incomplete',
+      stoppedAt: 'media-decision',
+    });
+    expect(record('03-outcomes.attempt-1.json').receipt.passed).toBe(false);
+    expect(record('03-outcomes.attempt-2.json').feedbackIn).toEqual(
+      expect.arrayContaining([expect.stringContaining(unsupportedOutcome)])
+    );
+    const corrected = record('03-outcomes.attempt-2.json');
+    expect(corrected.receipt.passed).toBe(true);
+    expect(corrected.artifact).toMatchObject({
+      outcomes: dryOutcomes.outcomes,
+    });
+    expect(
+      manifest.chain.find(link => link.stage === 'outcomes')?.attempt
+    ).toBe(2);
+    expect(generated).toContain('narrative');
+    expect(verifyFactoryRun(runDir())).toEqual([]);
+  });
+
   it('feeds failures into the next attempt and passes once fixed', async () => {
     const manifest = await run({
       providers: copyProviders({ fixOnFeedback: true }),
@@ -433,6 +537,7 @@ describe('harness rules', () => {
             score: 0.2,
             verdict: prompt.includes('"outcomes"') ? 'revise' : 'pass',
             critique: ['name the outcome'],
+            unsupportedClaims: [],
           })
         ),
       }),

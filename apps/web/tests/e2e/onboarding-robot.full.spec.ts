@@ -23,6 +23,7 @@ import {
   type OnboardingRobotUser,
   readOnboardingRobotState,
   shouldUseProductionRobotAuth,
+  syntheticRobotAuthUnavailableReason,
   waitForOnboardingRobotEvents,
 } from './helpers/onboarding-robot';
 import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
@@ -34,6 +35,11 @@ test.describe('Onboarding Robot Full Synthetic', () => {
     page,
   }, testInfo) => {
     test.setTimeout(420_000);
+
+    const productionSkip = syntheticRobotAuthUnavailableReason(process.env);
+    if (productionSkip) {
+      test.skip(true, productionSkip);
+    }
 
     if (!hasRealEnv()) {
       test.skip(true, 'Real Clerk/DB env vars not configured');

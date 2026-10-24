@@ -27,6 +27,12 @@ export const FounderMorningWalkCard = dynamic(() =>
   )
 );
 
+export const HudDetectionCoveragePanel = dynamic(() =>
+  import('@/components/features/admin/hud/HudDetectionCoveragePanel').then(
+    module => module.HudDetectionCoveragePanel
+  )
+);
+
 export const HudDrilldownSearch = dynamic(() =>
   import('@/components/features/admin/hud/HudDrilldownSearch').then(
     module => module.HudDrilldownSearch

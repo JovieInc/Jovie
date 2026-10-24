@@ -23,6 +23,10 @@ const productionController = readFileSync(
   resolve(testDir, '../../../.github/workflows/production-controller.yml'),
   'utf8'
 );
+const productionMarkerState = readFileSync(
+  resolve(testDir, '../../../.github/scripts/production-marker-state.mjs'),
+  'utf8'
+);
 
 function receipt({
   headSha,
@@ -583,8 +587,12 @@ describe('production lane range', () => {
     expect(productionController).toContain(
       '--deployed-marker-state "${deployed_marker_state:-verified}"'
     );
-    expect(productionController).toContain(
+    expect(productionController).toContain('--release-base "$EXPECTED_SHA"');
+    expect(productionMarkerState).toContain(
       'Bootstrapping the release range from exact canonical live SHA'
+    );
+    expect(productionMarkerState).toContain(
+      'Canonical production marker state is not admissible as a release base (${result?.state}: ${result?.reason}).'
     );
     expect(productionController).toContain(
       'if $lanes == "none" then [] else ($lanes | split(",")) end'

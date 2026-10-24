@@ -366,6 +366,37 @@ describe('validation sync: receipts', () => {
     expect(world.issues['JOV-1'].state).toBe('Done');
   });
 
+  it('ignores a prior-window failure created after a racing reopen, then consumes current proof', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'Validating';
+    issue.history = [
+      {
+        createdAt: '2026-10-03T13:00:00Z',
+        fromState: { type: 'completed' },
+        toState: { type: 'started' },
+      },
+    ];
+    issue.comments.push(
+      receiptComment(
+        'JOV-1',
+        { status: 'fail', episodeStartedAt: null },
+        '2026-10-03T13:00:01Z'
+      )
+    );
+    await evaluate(world, fetchImpl);
+    expect(issue.state).toBe('Validating');
+    issue.comments.push(
+      receiptComment(
+        'JOV-1',
+        { episodeStartedAt: '2026-10-03T13:00:00Z' },
+        '2026-10-03T13:01:00Z'
+      )
+    );
+    await evaluate(world, fetchImpl);
+    expect(issue.state).toBe('Done');
+  });
+
   it('routes a required failure to Rework and requires fresh evidence after the fix merges', async () => {
     const { world, fetchImpl } = createWorld();
     world.issues['JOV-1'].description = 'validation-required: outcome';

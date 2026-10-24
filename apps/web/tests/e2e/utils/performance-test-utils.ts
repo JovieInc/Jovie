@@ -180,7 +180,8 @@ export async function measureWebVitals(
   return page.evaluate(() => {
     const METRIC_TIMEOUT_MS = 100;
     const TOTAL_TIMEOUT_MS = 10000;
-    const types = ['largest-contentful-paint', 'paint', 'layout-shift'];
+    const requiredTypes = ['largest-contentful-paint', 'paint'];
+    const layoutShiftType = 'layout-shift';
 
     return new Promise<PerformanceMetrics['vitals']>((resolve, reject) => {
       const vitals: PerformanceMetrics['vitals'] = {};
@@ -191,6 +192,7 @@ export async function measureWebVitals(
       let settled = false;
       let observationElapsed = false;
       let clsValue = 0;
+      let observeLayoutShift = false;
       let windowTimer: ReturnType<typeof setTimeout> | undefined;
       let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -232,7 +234,9 @@ export async function measureWebVitals(
           return;
         settled = true;
         cleanup();
-        resolve({ ...vitals, cls: clsValue });
+        resolve(
+          observeLayoutShift ? { ...vitals, cls: clsValue } : { ...vitals }
+        );
       }
 
       function observe(
@@ -250,40 +254,42 @@ export async function measureWebVitals(
       }
 
       try {
+        const supported = PerformanceObserver.supportedEntryTypes ?? [];
         if (
           typeof PerformanceObserver === 'undefined' ||
-          !types.every(type =>
-            PerformanceObserver.supportedEntryTypes?.includes(type)
-          )
+          !requiredTypes.every(type => supported.includes(type))
         ) {
           fail('unsupported observer capability');
           return;
         }
-        observe(types[0], entries => {
+        observeLayoutShift = supported.includes(layoutShiftType);
+        observe(requiredTypes[0], entries => {
           const lastEntry = entries.at(-1);
           if (lastEntry && validValue('lcp', lastEntry.startTime)) {
             vitals.lcp = lastEntry.startTime;
           }
         });
-        observe(types[1], entries => {
+        observe(requiredTypes[1], entries => {
           const entry = entries.find(
             item => item.name === 'first-contentful-paint'
           );
           if (entry && validValue('fcp', entry.startTime))
             vitals.fcp = entry.startTime;
         });
-        observe(types[2], entries => {
-          for (const entry of entries) {
-            const shift = entry as PerformanceEntry & {
-              value?: number;
-              hadRecentInput?: boolean;
-            };
-            if (shift.hadRecentInput) continue;
-            if (!validValue('cls', shift.value)) return;
-            clsValue += shift.value;
-            if (!validValue('cls', clsValue)) return;
-          }
-        });
+        if (observeLayoutShift) {
+          observe(layoutShiftType, entries => {
+            for (const entry of entries) {
+              const shift = entry as PerformanceEntry & {
+                value?: number;
+                hadRecentInput?: boolean;
+              };
+              if (shift.hadRecentInput) continue;
+              if (!validValue('cls', shift.value)) return;
+              clsValue += shift.value;
+              if (!validValue('cls', clsValue)) return;
+            }
+          });
+        }
 
         const timing = performance.getEntriesByType('navigation')[0] as
           | PerformanceNavigationTiming

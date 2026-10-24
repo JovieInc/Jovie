@@ -54,9 +54,11 @@
   .profilePhoto {
   opacity: 1;
 }
+/* Initials sit on surface-2 in text-secondary. 0.35 composites that pair
+   below WCAG AA (measured ~1.89:1). Real photos stay dimmed at 0.65. */
 .profilePhoto[data-photo-kind="missing"],
 .profilePhoto[data-photo-kind="generic"] {
-  opacity: 0.35;
+  opacity: 1;
 }
 @media (prefers-reduced-motion: reduce) {
   .profilePhoto {

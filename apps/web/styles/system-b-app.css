@@ -47,6 +47,7 @@
 @source "../components/features/tracking";
 @source "../components/features/ui";
 @source "../components/jovie";
+@source "../components/organisms/home-loop";
 @source "../components/onboarding";
 @source "../components/canonical";
 @source "../components/design-studio";
@@ -2182,7 +2183,9 @@
 
 :where(.system-b-shell-dropdown-filter-clear) {
   display: inline-flex;
-  height: var(--space-4);
+  /* WCAG 2.5.8 / axe `target-size`: the clear control needs a ≥24px hit
+     area (was --space-4 = 16px). */
+  height: var(--space-6);
   align-items: center;
   border: 0;
   border-radius: var(--radius-sm);
@@ -3308,7 +3311,8 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: var(--radius-sm);
+  /* Concentric with .system-b-picker-row: row radius minus row block padding. */
+  border-radius: calc(var(--radius-2xl) - var(--space-1) - var(--space-1-5));
   background: var(--system-b-bg-surface-2);
   color: var(--color-text-secondary-token);
   box-shadow: inset 0 0 0 1px
@@ -3392,9 +3396,11 @@
   display: flex;
   width: 100%;
   align-items: center;
-  gap: var(--space-2);
-  border-radius: var(--radius-lg);
-  padding: var(--space-1-5) calc(var(--space-2) + var(--space-0-5));
+  gap: var(--space-2-5);
+  /* Concentric with the picker shell (radius-2xl) inset by the list's p-1. */
+  border-radius: calc(var(--radius-2xl) - var(--space-1));
+  /* space-3 + list p-1 puts row content on the same 16px column as section labels and the header. */
+  padding: var(--space-1-5) var(--space-3);
   text-align: left;
   outline: none;
   transition: var(--transition-colors);
@@ -3631,11 +3637,11 @@
 :where(.system-b-slash-header) {
   display: flex;
   align-items: center;
-  gap: 10px;
-  border-bottom: 1px solid color-mix(in oklab, white 5.5%, transparent);
+  gap: var(--space-2-5);
+  border-bottom: 1px solid var(--system-b-app-frame-seam);
   color: var(--color-text-primary-token);
   font-size: var(--text-app);
-  padding: var(--space-4) 18px var(--space-3);
+  padding: var(--space-3) var(--space-4);
 }
 
 :where(.system-b-slash-header-token) {
@@ -3647,26 +3653,33 @@
 
 :where(.system-b-slash-header-token-entity) {
   gap: var(--space-1-5);
-  border: 1px solid color-mix(in oklab, white 10%, transparent);
+  border: 1px solid
+    color-mix(in oklab, var(--color-text-primary-token) 10%, transparent);
   border-radius: var(--radius-sm);
-  background: color-mix(in oklab, white 5%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 5%,
+    transparent
+  );
   font-size: var(--text-2xs);
   letter-spacing: 0.04em;
-  padding: 2px var(--space-2);
+  padding: var(--space-0-5) var(--space-2);
   text-transform: uppercase;
-  box-shadow: inset 0 0.5px 0 color-mix(in oklab, white 4%, transparent);
 }
 
 :where(.system-b-slash-header-token-root) {
-  height: 21px;
+  height: var(--space-5);
   border-radius: var(--radius-xs);
-  background: color-mix(in oklab, white 6%, transparent);
-  font-size: 12.5px;
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 6%,
+    transparent
+  );
+  font-size: var(--text-xs);
   line-height: 1;
   padding-inline: var(--space-1-5);
-  box-shadow:
-    inset 0 0.5px 0 color-mix(in oklab, white 6%, transparent),
-    inset 0 0 0 0.5px color-mix(in oklab, white 4%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--color-text-primary-token) 5%, transparent);
 }
 
 :where(.system-b-suggested-profile-card) {
@@ -4936,9 +4949,11 @@
   --sidebar-border: 0 0 0 / 0.06;
   /* Maps to --app-shell-sidebar-border-rgb */
   --sidebar-ring: 124 58 237;
-  --sidebar-muted: 112 116 124;
+  /* 98 104 114 = --color-text-tertiary-on-light: 12px group labels on the
+     247 248 248 sidebar need WCAG AA 4.5:1 (112 116 124 measured 4.4). */
+  --sidebar-muted: 98 104 114;
   /* Maps to --app-shell-sidebar-muted-rgb */
-  --sidebar-muted-foreground: 112 116 124;
+  --sidebar-muted-foreground: 98 104 114;
   --sidebar-surface: 247 248 248;
   /* Matches sidebar background */
   --sidebar-surface-hover: 242 243 245;
@@ -5147,12 +5162,12 @@
   gap: var(--space-2);
 }
 
-:where(.system-b-start-loading-intro-line) {
+:where(.system-b-start-loading-intro-message) > * {
   width: 72%;
   height: var(--space-4);
 }
 
-:where(.system-b-start-loading-intro-line:last-child) {
+:where(.system-b-start-loading-intro-message) > *:last-child {
   width: 46%;
 }
 
@@ -5162,29 +5177,29 @@
   overflow: hidden;
 }
 
-:where(.system-b-start-loading-intro-pill) {
+:where(.system-b-start-loading-intro-pills) > * {
   height: var(--space-8);
   flex-shrink: 0;
   border-radius: var(--system-b-radius-pill);
 }
 
-:where(.system-b-start-loading-intro-pill:nth-child(1)) {
+:where(.system-b-start-loading-intro-pills) > *:nth-child(1) {
   width: calc(var(--space-24) + var(--space-20));
 }
 
-:where(.system-b-start-loading-intro-pill:nth-child(2)) {
+:where(.system-b-start-loading-intro-pills) > *:nth-child(2) {
   width: calc(var(--space-24) + var(--space-10));
 }
 
-:where(.system-b-start-loading-intro-pill:nth-child(3)) {
+:where(.system-b-start-loading-intro-pills) > *:nth-child(3) {
   width: calc(var(--space-24) + var(--space-16));
 }
 
-:where(.system-b-start-loading-intro-pill:nth-child(4)) {
+:where(.system-b-start-loading-intro-pills) > *:nth-child(4) {
   width: calc(var(--space-24) + var(--space-20));
 }
 
-:where(.system-b-start-loading-intro-footer) {
+:where(.system-b-start-loading-intro) > :last-child {
   width: calc(var(--space-24) + var(--space-24));
   height: var(--space-3);
   margin-inline: auto;
@@ -5229,7 +5244,7 @@
   padding-inline: var(--space-3);
 }
 
-:where(.system-b-start-loading-title-skeleton) {
+:where(.system-b-start-loading-copy-slot) > * {
   width: min(58%, calc(var(--space-24) * 2));
   height: var(--space-5);
 }
@@ -5241,7 +5256,7 @@
   gap: var(--space-2);
 }
 
-:where(.system-b-start-loading-action-skeleton) {
+:where(.system-b-start-loading-actions) > * {
   width: calc(var(--space-8) + var(--space-1));
   height: calc(var(--space-8) + var(--space-1));
 }

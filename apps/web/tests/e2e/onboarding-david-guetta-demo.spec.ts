@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, renameSync, rmSync } from 'node:fs';
 import type { Page, TestInfo } from '@playwright/test';
+import { onboardingDemoRecordingOptions } from './onboarding-demo-recording';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
 
@@ -460,10 +461,7 @@ test('records David Guetta Spotify-first onboarding demo', async ({
   const context = await browser.newContext({
     storageState: { cookies: [], origins: [] },
     viewport: { width: 1280, height: 720 },
-    recordVideo: {
-      dir: 'test-results',
-      size: { width: 1280, height: 720 },
-    },
+    ...onboardingDemoRecordingOptions(Boolean(process.env.CI)),
   });
   const page = await context.newPage();
   await suppressDevToolbar(page);
@@ -515,7 +513,18 @@ test('records David Guetta Spotify-first onboarding demo', async ({
   await expect(
     sideRail.getByTestId('onboarding-profile-compact-surface')
   ).toBeVisible();
-  await expect(sideRail.getByText('David Guetta')).toHaveCount(1);
+  await expect(sideRail.getByTestId('profile-identity-link')).toHaveCount(1);
+  await expect(sideRail.getByTestId('profile-identity-link')).toHaveText(
+    'David Guetta'
+  );
+  await expect(
+    sideRail.getByRole('heading', {
+      name: 'Profile Highlights From David Guetta',
+    })
+  ).toHaveCount(1);
+  await expect(
+    sideRail.getByRole('heading', { name: 'David Guetta', exact: true })
+  ).toHaveCount(1);
   await expect(
     sideRail.getByTestId('onboarding-dsp-match-strip')
   ).toBeVisible();

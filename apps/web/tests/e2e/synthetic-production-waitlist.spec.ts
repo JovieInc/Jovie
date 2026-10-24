@@ -8,42 +8,68 @@ import {
   productionWaitlistPreflightReceiptSchema,
 } from '@/lib/canaries/production-waitlist';
 import { PRODUCTION_WAITLIST_CANARY_STORAGE_KEY } from '@/lib/canaries/production-waitlist-client';
-import { waitForProductionSignupOtp } from './utils/production-signup-canary';
+import {
+  syntheticOtpUnavailableReason,
+  waitForProductionSignupOtp,
+} from './utils/production-signup-canary';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const REQUIRED_ENV = [
+const PREFLIGHT_ENV = [
   'BASE_URL',
   'E2E_ENVIRONMENT',
+  'E2E_PROD_SIGNUP_EMAIL_BASE',
+  'PLAYWRIGHT_TEST_BASE_URL',
+  'PRODUCTION_WAITLIST_CANARY_READ_TOKEN',
+] as const;
+
+const OTP_ENV = [
   'E2E_PROD_MAILBOX_PROVIDER',
   'E2E_PROD_OTP_CHECK_ORIGIN',
   'E2E_PROD_OTP_CHECK_TOKEN',
   'E2E_PROD_OTP_CHECK_URL',
-  'E2E_PROD_SIGNUP_EMAIL_BASE',
-  'PLAYWRIGHT_TEST_BASE_URL',
-  'PRODUCTION_WAITLIST_CANARY_READ_TOKEN',
   'SYNTHETIC_RUN_ID',
 ] as const;
 
-function validateConfig(env: NodeJS.ProcessEnv): void {
-  const missing = REQUIRED_ENV.filter(key => !env[key]?.trim());
-  if (missing.length > 0) {
-    throw new Error(
-      `Production waitlist canary missing: ${missing.join(', ')}`
-    );
-  }
+function assertProductionTarget(env: NodeJS.ProcessEnv): void {
   if (env.E2E_ENVIRONMENT !== 'production') {
     throw new Error('E2E_ENVIRONMENT must be production');
-  }
-  if (env.E2E_PROD_MAILBOX_PROVIDER !== 'cloudflare-email-routing') {
-    throw new Error(
-      'Production waitlist canary requires Cloudflare Email Routing'
-    );
   }
   for (const key of ['BASE_URL', 'PLAYWRIGHT_TEST_BASE_URL'] as const) {
     if (new URL(env[key]!).href !== 'https://jov.ie/') {
       throw new Error(`${key} must target exactly https://jov.ie`);
     }
+  }
+  if ((env.PRODUCTION_WAITLIST_CANARY_READ_TOKEN?.length ?? 0) < 32) {
+    throw new Error('Canary read token must be at least 32 characters');
+  }
+  buildProductionWaitlistCanaryEmail(env.E2E_PROD_SIGNUP_EMAIL_BASE!);
+}
+
+function validatePreflightConfig(env: NodeJS.ProcessEnv): void {
+  const missing = PREFLIGHT_ENV.filter(key => !env[key]?.trim());
+  if (missing.length > 0) {
+    throw new Error(
+      `Production waitlist preflight missing: ${missing.join(', ')}`
+    );
+  }
+  assertProductionTarget(env);
+}
+
+function validateOtpConfig(env: NodeJS.ProcessEnv): void {
+  const missing = [...PREFLIGHT_ENV, ...OTP_ENV].filter(
+    key => !env[key]?.trim()
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `Production waitlist canary missing: ${missing.join(', ')}`
+    );
+  }
+  assertProductionTarget(env);
+  if (env.E2E_PROD_MAILBOX_PROVIDER !== 'cloudflare-email-routing') {
+    throw new Error(
+      'Production waitlist canary requires Cloudflare Email Routing'
+    );
   }
   const otpOrigin = new URL(env.E2E_PROD_OTP_CHECK_ORIGIN!);
   const otpUrl = new URL(env.E2E_PROD_OTP_CHECK_URL!);
@@ -57,10 +83,6 @@ function validateConfig(env: NodeJS.ProcessEnv): void {
   ) {
     throw new Error('OTP endpoint must use the configured exact HTTPS origin');
   }
-  if ((env.PRODUCTION_WAITLIST_CANARY_READ_TOKEN?.length ?? 0) < 32) {
-    throw new Error('Canary read token must be at least 32 characters');
-  }
-  buildProductionWaitlistCanaryEmail(env.E2E_PROD_SIGNUP_EMAIL_BASE!);
   parseProductionWaitlistCanaryRunId(env.SYNTHETIC_RUN_ID);
 }
 
@@ -87,8 +109,26 @@ test.describe('Synthetic Monitoring - production waitlist', () => {
     );
   });
 
+  test('reads the production waitlist preflight receipt', async () => {
+    validatePreflightConfig(process.env);
+    const email = buildProductionWaitlistCanaryEmail(
+      process.env.E2E_PROD_SIGNUP_EMAIL_BASE!
+    );
+    const preflight = productionWaitlistPreflightReceiptSchema.parse(
+      await readReceipt(
+        process.env,
+        new URL('/api/canary/waitlist/receipt?mode=preflight', 'https://jov.ie')
+      )
+    );
+    expect(preflight.emailSha256).toBe(
+      hashProductionWaitlistCanaryEmail(email)
+    );
+  });
+
   test('retains identity and proves waitlist suppression', async ({ page }) => {
-    validateConfig(process.env);
+    const otpSkipReason = syntheticOtpUnavailableReason(process.env);
+    test.skip(otpSkipReason !== null, otpSkipReason ?? '');
+    validateOtpConfig(process.env);
     const runId = parseProductionWaitlistCanaryRunId(
       process.env.SYNTHETIC_RUN_ID
     )!;
