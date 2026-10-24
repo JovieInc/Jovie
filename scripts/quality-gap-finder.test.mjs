@@ -147,6 +147,26 @@ describe('quality-gap-finder', () => {
       assert.equal(gaps[0].mechanical, true);
     });
 
+    it('skips web evidence the invariants lane cites apps/web-relatively', () => {
+      const gaps = collectInvariantGaps(
+        [
+          invariant('JOV-INV-040', [
+            {
+              path: 'apps/web/lib/agent-os/design-ci-judge-certification.test.ts',
+            },
+          ]),
+          invariant('JOV-INV-906', [
+            { path: 'apps/web/lib/agent-os/unwired.test.ts' },
+          ]),
+        ],
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/agent-os/design-ci-judge-certification.test.ts'
+      );
+      assert.deepEqual(
+        gaps.map(gap => gap.key),
+        ['JOV-INV-906:apps/web/lib/agent-os/unwired.test.ts']
+      );
+    });
+
     it('skips evidence owned by another repo', () => {
       const gaps = collectInvariantGaps(
         [

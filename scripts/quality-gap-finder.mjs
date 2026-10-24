@@ -384,6 +384,11 @@ export function collectInvariantGaps(
     );
     for (const path of localPaths) {
       if (ciSources.includes(path)) continue;
+      // Package scripts that run a web package (`pnpm --filter @jovie/web
+      // exec vitest run ...` in `invariants:check`) execute from the package
+      // root, so they cite web evidence apps/web-relatively (`lib/x.test.ts`).
+      const webRelative = path.replace(/^apps\/web\//, '');
+      if (webRelative !== path && ciSources.includes(webRelative)) continue;
       // A directory glob (`scripts/verification/*.test.mjs`) may run it.
       if (ciSources.includes(`${dirname(path)}/*`)) continue;
       if (runnerPrefixes.some(prefix => path.startsWith(prefix))) continue;
