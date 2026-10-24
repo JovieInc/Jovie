@@ -256,7 +256,7 @@ describe('GET /api/stripe/pricing-options', () => {
       'a non-string message that could otherwise be coerced into a match',
       {
         type: 'StripeInvalidRequestError',
-        message: { toString: () => 'No such price: price_missing' },
+        message: { toString: (): string => 'No such price: price_missing' },
       },
     ],
     ['a null rejection', null],
