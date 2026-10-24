@@ -1,13 +1,13 @@
 {
-  "schema": "jovie-marketing-media-recipe/v2",
-  "version": "approved-chrome-v2",
+  "schema": "jovie-marketing-media-recipe/v3",
+  "version": "registered-media-v3",
   "visualStandard": "newer-hero / premium bar",
   "bloomDecisionRef": "gbrain:design/jovie-newer-hero-bloom-b-founder-locked-2026-09-17",
   "approvedRecipeIds": [
-    "dark-glass",
     "compact-glass",
-    "soft-editorial-background",
-    "flowing-accent"
+    "dark-glass",
+    "flowing-accent",
+    "soft-editorial-background"
   ],
   "darkGlass": {
     "penContractId": "GTcgO",
@@ -72,8 +72,16 @@
   "sourceMatrix": {
     "dark-glass": ["real-capture", "registered-live-presentation"],
     "compact-glass": ["real-capture", "registered-live-presentation"],
-    "soft-editorial-background": ["real-capture", "generated-artwork"],
-    "flowing-accent": ["real-capture", "generated-artwork"]
+    "soft-editorial-background": [
+      "real-capture",
+      "registered-live-presentation",
+      "generated-artwork"
+    ],
+    "flowing-accent": [
+      "real-capture",
+      "registered-live-presentation",
+      "generated-artwork"
+    ]
   },
   "accents": {
     "dark-glass": {

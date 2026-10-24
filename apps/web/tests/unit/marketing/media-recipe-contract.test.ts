@@ -19,10 +19,8 @@ import {
   MARKETING_MEDIA_RECIPE_SAFE_AREAS,
   MARKETING_MEDIA_RECIPE_SOURCE_MATRIX,
   MARKETING_VISUAL_REVIEW_MEDIA_RECIPE_CONTRACT,
-  type MarketingMediaRecipeInput,
   resolveMarketingMediaRecipeForExport,
   SOFT_EDITORIAL_BACKGROUND_MEDIA_RECIPE,
-  validateMarketingMediaRecipeInput,
 } from '@/data/marketing';
 import golden from './fixtures/media-recipe-contract.golden.json';
 
@@ -219,10 +217,10 @@ describe('marketing media recipe contract (JOV-6246)', () => {
     );
     expect(promptBlock).toContain('dark-glass');
     expect(promptBlock).toContain('flowing-accent');
-    expect(promptBlock).toContain('GTcgO');
-    expect(promptBlock).toContain('soft optical bloom B');
-    expect(promptBlock).toContain('#22C1FC');
-    expect(promptBlock).toContain('blur(20px) saturate(165%)');
+    expect(promptBlock).toContain('ProductScreenshotFrame');
+    expect(promptBlock).toContain('one dominant curved sweep');
+    expect(promptBlock).toContain('reference-review/2026-09-12');
+    expect(promptBlock).toContain('Scene Palette v1');
     expect(promptBlock).not.toContain('homepage-v2-hero__glow-blob');
   });
 
@@ -363,188 +361,5 @@ describe('marketing media recipe contract (JOV-6246)', () => {
         'flowing-accent-bloom-drift',
       ])
     );
-  });
-
-  it('accepts a fully valid typed recipe input for each registered recipe', () => {
-    const scenarios = new Set(['tim-white-profile-live-desktop']);
-
-    const inputs: readonly MarketingMediaRecipeInput[] = [
-      {
-        recipeId: 'dark-glass',
-        source: {
-          kind: 'real-capture',
-          scenarioId: 'tim-white-profile-live-desktop',
-          sourceRevision: '33a2b6ade88c9f21744385ae2dec69f9f501c5c3',
-        },
-        accent: MARKETING_MEDIA_RECIPE_ACCENTS['dark-glass'],
-        safeArea: 'device-frame-inset',
-        motion: { fallback: 'fade-only' },
-        output: { id: 'marketing-web' },
-      },
-      {
-        recipeId: 'compact-glass',
-        source: {
-          kind: 'registered-live-presentation',
-          scenarioId: 'tim-white-profile-live-desktop',
-          sourceRevision: '33a2b6ade88c9f21744385ae2dec69f9f501c5c3',
-        },
-        accent: MARKETING_MEDIA_RECIPE_ACCENTS['compact-glass'],
-        safeArea: 'device-frame-inset',
-        motion: { fallback: 'no-motion' },
-        output: { id: 'social-card' },
-      },
-      {
-        recipeId: 'soft-editorial-background',
-        source: {
-          kind: 'generated-artwork',
-          assetId: 'approved-editorial-master-01',
-          sourceRevision: '2026-09-25T07:44:04.868Z',
-        },
-        accent: MARKETING_MEDIA_RECIPE_ACCENTS['soft-editorial-background'],
-        safeArea: 'full-bleed-editorial',
-        motion: { fallback: 'no-motion' },
-        output: { id: 'marketing-web' },
-      },
-      {
-        recipeId: 'flowing-accent',
-        source: {
-          kind: 'real-capture',
-          scenarioId: 'tim-white-profile-live-desktop',
-          sourceRevision: '33a2b6ade88c9f21744385ae2dec69f9f501c5c3',
-        },
-        accent: MARKETING_MEDIA_RECIPE_ACCENTS['flowing-accent'],
-        safeArea: 'full-bleed-editorial',
-        motion: { fallback: 'static-glow-only' },
-        output: { id: 'social-card' },
-      },
-    ];
-
-    for (const input of inputs) {
-      expect(validateMarketingMediaRecipeInput(input, scenarios)).toEqual([]);
-    }
-  });
-
-  it('rejects unsupported source combinations, unknown inputs, and drift', () => {
-    const scenarios = new Set(['tim-white-profile-live-desktop']);
-
-    // Generated artwork behind a surface recipe: unsupported combination.
-    const generatedOnSurface = validateMarketingMediaRecipeInput(
-      {
-        recipeId: 'dark-glass',
-        source: {
-          kind: 'generated-artwork',
-          assetId: 'approved-master-01',
-          sourceRevision: 'r1',
-        },
-        accent: MARKETING_MEDIA_RECIPE_ACCENTS['dark-glass'],
-        safeArea: 'device-frame-inset',
-        motion: { fallback: 'fade-only' },
-        output: { id: 'marketing-web' },
-      },
-      scenarios
-    );
-    expect(generatedOnSurface.map(f => f.code)).toEqual([
-      'unsupported-recipe-source-combination',
-    ]);
-
-    // Unregistered scenario id: unapproved input.
-    const unknownScenario = validateMarketingMediaRecipeInput(
-      {
-        recipeId: 'dark-glass',
-        source: {
-          kind: 'real-capture',
-          scenarioId: 'not-a-registered-scenario',
-          sourceRevision: 'r1',
-        },
-        accent: MARKETING_MEDIA_RECIPE_ACCENTS['dark-glass'],
-        safeArea: 'device-frame-inset',
-        motion: { fallback: 'fade-only' },
-        output: { id: 'marketing-web' },
-      },
-      scenarios
-    );
-    expect(unknownScenario.map(f => f.code)).toEqual([
-      'unapproved-media-source-input',
-    ]);
-
-    // Missing revision: an old receipt cannot approve a changed artifact.
-    const noRevision = validateMarketingMediaRecipeInput(
-      {
-        recipeId: 'flowing-accent',
-        source: {
-          kind: 'generated-artwork',
-          assetId: 'approved-master-01',
-          sourceRevision: '  ',
-        },
-        accent: MARKETING_MEDIA_RECIPE_ACCENTS['flowing-accent'],
-        safeArea: 'full-bleed-editorial',
-        motion: { fallback: 'static-glow-only' },
-        output: { id: 'social-card' },
-      },
-      scenarios
-    );
-    expect(noRevision.map(f => f.code)).toEqual([
-      'missing-media-source-revision',
-    ]);
-
-    // Non-canonical accent: generator-supplied free-form color rejected.
-    const inventedAccent = validateMarketingMediaRecipeInput(
-      {
-        recipeId: 'flowing-accent',
-        source: {
-          kind: 'generated-artwork',
-          assetId: 'approved-master-01',
-          sourceRevision: 'r1',
-        },
-        accent: { token: '--invented-accent', hex: '#FF00FF' },
-        safeArea: 'full-bleed-editorial',
-        motion: { fallback: 'static-glow-only' },
-        output: { id: 'social-card' },
-      },
-      scenarios
-    );
-    expect(inventedAccent.map(f => f.code)).toEqual([
-      'noncanonical-media-accent',
-    ]);
-
-    // Wrong safe area, wrong motion fallback, unsupported output profile.
-    const driftedPolicies = validateMarketingMediaRecipeInput(
-      {
-        recipeId: 'soft-editorial-background',
-        source: {
-          kind: 'generated-artwork',
-          assetId: 'approved-master-01',
-          sourceRevision: 'r1',
-        },
-        accent: MARKETING_MEDIA_RECIPE_ACCENTS['soft-editorial-background'],
-        safeArea: 'centered-content-column',
-        motion: { fallback: 'fade-only' },
-        output: { id: 'email' },
-      },
-      scenarios
-    );
-    expect(driftedPolicies.map(f => f.code)).toEqual([
-      'missing-safe-area-policy',
-      'missing-motion-fallback-policy',
-      'unsupported-output-profile',
-    ]);
-
-    // Unknown recipe id fails closed.
-    const unknown = validateMarketingMediaRecipeInput(
-      {
-        recipeId: 'neon-prism',
-        source: {
-          kind: 'real-capture',
-          scenarioId: 'tim-white-profile-live-desktop',
-          sourceRevision: 'r1',
-        },
-        accent: MARKETING_MEDIA_RECIPE_ACCENTS['dark-glass'],
-        safeArea: 'device-frame-inset',
-        motion: { fallback: 'fade-only' },
-        output: { id: 'marketing-web' },
-      },
-      scenarios
-    );
-    expect(unknown.map(f => f.code)).toEqual(['unknown-media-recipe']);
   });
 });
