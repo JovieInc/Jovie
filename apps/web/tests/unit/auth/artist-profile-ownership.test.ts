@@ -125,13 +125,15 @@ describe('artist profile ownership on PostgreSQL fixtures', () => {
         const type =
           column.getSQLType() === 'uuid'
             ? 'uuid'
-            : ({
-                boolean: 'boolean',
-                number: 'integer',
-                date: 'timestamp',
-                json: 'jsonb',
-                array: 'text[]',
-              }[column.dataType] ?? 'text');
+            : ((
+                {
+                  boolean: 'boolean',
+                  number: 'integer',
+                  date: 'timestamp',
+                  json: 'jsonb',
+                  array: 'text[]',
+                } as Record<string, string>
+              )[column.dataType] ?? 'text');
         return `"${column.name}" ${type}${column.name === 'id' ? ' PRIMARY KEY DEFAULT gen_random_uuid()' : ''}`;
       });
       await execute(`CREATE TABLE "${config.name}" (${columns.join(',')})`);
@@ -216,9 +218,15 @@ describe('artist profile ownership on PostgreSQL fixtures', () => {
         id: accountA,
         name: 'Casey Account',
         email: 'casey@example.com',
+        userStatus: 'active' as const,
         activeProfileId: legacy,
       },
-      { id: accountB, name: 'Morgan Account', email: 'morgan@example.com' },
+      {
+        id: accountB,
+        name: 'Morgan Account',
+        email: 'morgan@example.com',
+        userStatus: 'active' as const,
+      },
     ]);
     const now = new Date();
     await db.insert(creatorProfiles).values(
@@ -427,7 +435,11 @@ describe('artist profile ownership on PostgreSQL fixtures', () => {
 
   it('returns an empty owner state without editing another account profile', async () => {
     const emptyAccount = randomUUID();
-    await db.insert(users).values({ id: emptyAccount, name: 'Empty Account' });
+    await db.insert(users).values({
+      id: emptyAccount,
+      name: 'Empty Account',
+      userStatus: 'active',
+    });
     mocks.actor = emptyAccount;
     expect(
       await runAtomicDbOperation(tx => getProfileByClerkId(emptyAccount, tx), {
