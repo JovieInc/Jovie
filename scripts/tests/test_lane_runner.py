@@ -8338,6 +8338,36 @@ class ReleaseImportClosureTest(unittest.TestCase):
         self.assertEqual(self.missing_from_release(lane.RELEASE_EXTRAS, self.lanes_sources()), [],
                          "add the imported file to RELEASE_EXTRAS in scripts/lanes/lane_runner.py")
 
+    def test_shipped_source_admission_executes_fleet_rules_without_the_checkout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            staging = Path(tmp).resolve()
+            for relative in lane.RELEASE_EXTRAS:
+                target = staging / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / relative, target)
+            module = (staging / "scripts/lib/source-admission-policy.mjs").as_uri()
+            driver = f"""
+import assert from 'node:assert/strict';
+import {{ evaluateSourceAdmission }} from {json.dumps(module)};
+const head = 'a'.repeat(40);
+const evidence = {{
+    repository: 'JovieInc/Jovie', expectedHead: head, complete: true,
+    pr: {{ number: 1, title: 'feat: example', body: '', state: 'open', draft: false,
+           head: {{ sha: head, ref: 'fleet/example', repo: {{ fork: false }} }},
+           base: {{ ref: 'main' }}, labels: [], changed_files: 1 }},
+    files: [{{ filename: 'scripts/example.mjs' }}], reviews: [], statuses: []
+}};
+assert.equal(evaluateSourceAdmission(evidence).allowed, true);
+evidence.pr.title = 'fix: example';
+const result = evaluateSourceAdmission(evidence);
+assert.equal(result.allowed, false);
+assert.equal(result.blockers.length, 1);
+assert.match(result.blockers[0], /^red-before-green:/);
+"""
+            result = subprocess.run(["node", "--input-type=module", "-e", driver],
+                                    cwd=staging, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_comments_are_ignored_and_escaping_imports_are_reported(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
@@ -11260,8 +11290,10 @@ class HumanHoldEnforcementTest(unittest.TestCase):
     # Rule 3: lanes never remove the hold; a human removing it is the release.
     def test_lanes_never_remove_the_human_decision_hold(self):
         pr = {**self.pr, "labels": self.HOLD + [{"name": "hold"}, {"name": "queue-poison"}]}
-        self.assertEqual(lane.pr_events.auto_unhold_labels(pr), ["hold", "queue-poison"])
+        self.assertEqual(lane.pr_events.auto_unhold_labels(pr), [])
         self.assertEqual(lane.pr_events.auto_unhold_labels({**self.pr, "labels": self.HOLD}), [])
+        bot = {**self.pr, "labels": [{"name": "hold"}, {"name": "queue-poison"}]}
+        self.assertEqual(lane.pr_events.auto_unhold_labels(bot), ["hold", "queue-poison"])
         with patch.object(lane.pr_events, "hold_context") as read:
             self.assertIsNone(lane.pr_events.stale_hold(7, self.pr, 2e9, lambda *a, **k: None))
             read.assert_not_called()
@@ -11351,10 +11383,100 @@ class HumanHoldEnforcementTest(unittest.TestCase):
                                             "before": "h1", "after": "h2"})
         requeue.assert_not_called()
         self.assertFalse([c for c in self.calls if c[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"])
-                          or "DELETE" in c or "POST" in c])
+                          or "DELETE" in c])
+        # The only write is the containment: the surface comment and the honoured hold.
+        self.assertEqual([c for c in self.calls if "POST" in c],
+                         [["gh", "api", "-X", "POST", "repos/JovieInc/Jovie/issues/7/labels", "-f", "labels[]=tim-hold"],
+                          ["gh", "api", "-X", "POST", "repos/JovieInc/Jovie/issues/7/labels", "-f", "labels[]=lane-fix-exhausted"]])
         attempts = json.loads((self.host.state / "fix-attempts.json").read_text()) \
             if (self.host.state / "fix-attempts.json").exists() else {}
         self.assertNotEqual((attempts.get("7") or {}).get("pushed"), True)
+
+    def test_a_detected_rewrite_is_contained_through_the_surface_channel_and_every_path_refuses(self):
+        receipt, requeue = self.run_fix(ancestor_code=1)
+        self.assertEqual(receipt["containment"], {"surfaced": True, "holdApplied": True, "holdPending": False})
+        comments = [c for c in self.calls if c[:3] == ["gh", "pr", "comment"]]
+        self.assertEqual(len(comments), 1)
+        body = comments[0][-1]
+        self.assertIn("history-rewrite-detected", body)
+        self.assertIn("Decision needed: tim-decides", body)
+        self.assertIn("symphony-surface pr=7 head=h2", body)
+        data = json.loads((self.host.state / "escalation.json").read_text())
+        self.assertEqual([(r["pr"], r["head"], r["cls"], r["holdApplied"]) for r in data["surfaced"]],
+                         [(7, "h2", "needs-human-decision", True)])
+        # GitHub now shows the label on the rewritten head: dispatch, fix, sync, ready refuse it.
+        held = {**self.pr, "headRefOid": "h2", "labels": self.HOLD}
+        self.assertEqual(lane.gate_deferral(self.host, held), "existing-pr-hold")
+        self.assertEqual(lane.pr_events.maintenance_hold(self.host, lane, held, 1.0, terminal_ok=True), "tim-hold")
+        with patch.object(lane, "reconcile_fix_target", return_value=held), self.assertRaises(lane.RepairStopped):
+            lane.require_fix_target(held, "before-execution-claim", repair=True)
+        draft = {**held, "isDraft": True}
+        (self.host.state / "verified.json").write_text(json.dumps({"7:h2": gate_proof("h2")}))
+        with patch.object(lane, "sh", side_effect=self.shell()), \
+                patch.object(lane, "reconcile_fix_target", side_effect=lambda _: dict(draft)):
+            self.assertEqual(lane.publish_verified(self.host, draft), "held:existing-pr-hold")
+        self.assertFalse(lane.pr_events.in_scope(draft, "green", set(), 1.0))
+        requeue.assert_not_called()
+
+    def surface(self, label_code, data):
+        classified = {"cls": "needs-human-decision", "subtype": "hold", "evidence": ["x"], "next_action": "tim-decides"}
+        attempts = {}
+        with patch.object(lane, "sh", side_effect=self.shell({("gh", "api", "-X", "POST"): (label_code, "")})):
+            lane._surface_exhausted(self.host, {**self.pr, "labels": []}, {}, classified, "needs-human-decision",
+                                    None, attempts, data)
+        return attempts
+
+    def test_a_failed_hold_write_is_not_escalated_stays_held_and_retries(self):
+        data = {"surfaced": [], "ladderExhausted": [], "escalating": []}
+        unlabeled = {**self.pr, "labels": []}
+        attempts = self.surface(1, data)
+        row = data["surfaced"][0]
+        self.assertTrue(row["holdPending"])
+        self.assertNotIn("holdApplied", row)
+        self.assertEqual(attempts, {}, "the surface is not marked escalated without a confirmed label")
+        lane.save_escalation(self.host, data)
+        # Meanwhile every mutation path treats the PR as held.
+        self.assertEqual(lane.gate_deferral(self.host, unlabeled), "human-hold-pending")
+        self.assertEqual(lane.pr_events.maintenance_hold(self.host, lane, unlabeled, 1.0), "human-hold-pending")
+        self.assertEqual(lane.pr_events.maintenance_hold(self.host, lane, unlabeled, 1.0, terminal_ok=True),
+                         "human-hold-pending")
+        with patch.object(lane, "sh", side_effect=self.shell()), \
+                patch.object(lane, "reconcile_fix_target", side_effect=lambda p: {**p, "state": "OPEN"}), \
+                patch.object(lane, "run_agent") as agent, patch.object(lane.disk_guard, "free_pct", return_value=50.0):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, unlabeled)
+        self.assertEqual(receipt["reasons"], ["target-pr-human-hold-pending"])
+        agent.assert_not_called()
+        # A later pass retries the write (no second comment) and the pending hold clears.
+        data = lane.load_escalation(self.host)
+        before = len([c for c in self.calls if c[:3] == ["gh", "pr", "comment"]])
+        attempts = self.surface(0, data)
+        self.assertTrue(data["surfaced"][0]["holdApplied"])
+        self.assertNotIn("holdPending", data["surfaced"][0])
+        self.assertTrue(attempts["7"]["escalated"])
+        self.assertEqual(len([c for c in self.calls if c[:3] == ["gh", "pr", "comment"]]), before)
+        lane.save_escalation(self.host, data)
+        self.assertFalse(lane.pr_events.unconfirmed_human_hold(self.host, unlabeled))
+
+    def test_a_pending_hold_belongs_to_its_head_only(self):
+        data = {"surfaced": [], "ladderExhausted": [], "escalating": []}
+        self.surface(1, data)
+        lane.save_escalation(self.host, data)
+        self.assertTrue(lane.pr_events.unconfirmed_human_hold(self.host, self.pr))
+        self.assertFalse(lane.pr_events.unconfirmed_human_hold(self.host, {**self.pr, "headRefOid": "h9"}))
+        self.assertFalse(lane.pr_events.unconfirmed_human_hold(self.host, {**self.pr, "number": 8}))
+
+    def test_every_human_hold_label_blocks_stale_lifting_and_bot_hold_stays_liftable(self):
+        for label in sorted(lane.pr_events.HUMAN_HOLD_LABELS):
+            pr = {**self.pr, "mergeStateStatus": "CLEAN", "labels": [{"name": label}, {"name": "hold"}, {"name": "queue-poison"}]}
+            with self.subTest(label=label), patch.object(lane.pr_events, "hold_context") as read:
+                self.assertIsNone(lane.pr_events.stale_hold(7, pr, 2e9, lambda *a, **k: None))
+                read.assert_not_called()
+                self.assertEqual(lane.pr_events.auto_unhold_labels(pr), [])
+        bot = {**self.pr, "labels": [{"name": "hold"}, {"name": "queue-poison"}]}
+        self.assertEqual(lane.pr_events.auto_unhold_labels(bot), ["hold", "queue-poison"])
+        with patch.object(lane.pr_events, "hold_context", return_value={"events": [], "notes": []}) as read:
+            self.assertIsNone(lane.pr_events.stale_hold(7, bot, 2e9, lambda *a, **k: None))
+            read.assert_called_once()
 
     def test_a_fast_forward_agent_push_still_proceeds(self):
         receipt, requeue = self.run_fix(ancestor_code=0)
