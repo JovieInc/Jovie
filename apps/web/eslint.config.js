@@ -235,7 +235,7 @@ const baseConfig = {
     '@jovie/no-raw-focus-ring': 'error',
     '@jovie/no-ad-hoc-currency': 'error',
     '@jovie/chat-tool-schema-strict': 'error',
-    // DESIGN.md text casing — Title Case labels, sentence case body/toasts/tooltips
+    // DESIGN.md text casing — sentence case labels, sentence case body/toasts/tooltips
     '@jovie/canonical-ui-label-casing': 'error',
     // Contrast guardrail — bare text-black/bg-white without dark: counterpart (JOV-11038)
     // error at author time; contrast-ratchet counts legacy debt in CI (JOV-3572)

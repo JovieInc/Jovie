@@ -121,3 +121,22 @@ describe('run', () => {
     );
   });
 });
+
+describe('casing baseline gate', () => {
+  it('rejects baseline growth even when no TypeScript changes', () => {
+    const spawn = vi
+      .fn()
+      .mockReturnValueOnce({
+        status: 0,
+        stdout:
+          'apps/web/eslint-rules/canonical-ui-label-casing.baseline.json\n',
+      })
+      .mockReturnValueOnce({ status: 1 });
+    expect(run({ spawn, log: () => {} })).toBe(1);
+    expect(spawn).toHaveBeenLastCalledWith(
+      'node',
+      ['scripts/lint-ui-label-casing-baseline.mjs', 'origin/main'],
+      expect.objectContaining({ stdio: 'inherit' })
+    );
+  });
+});

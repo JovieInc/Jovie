@@ -12,7 +12,7 @@ const captionAtomFiles = [
   'LyricsList.tsx',
 ] as const;
 
-describe('shell caption Title Case contract (JOV-5293)', () => {
+describe('shell caption sentence case contract (JOV-5293)', () => {
   it('keeps SHELL_CAPTION_CLASSNAME on tracking-normal without tracked caps', () => {
     const source = readFileSync(
       path.join(shellDir, 'shell-caption.ts'),

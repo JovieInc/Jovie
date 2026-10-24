@@ -45,6 +45,19 @@ export function run({
     return 1;
   }
 
+  if (
+    diff.stdout
+      .split('\n')
+      .includes('apps/web/eslint-rules/canonical-ui-label-casing.baseline.json')
+  ) {
+    const casing = spawn(
+      'node',
+      ['scripts/lint-ui-label-casing-baseline.mjs', baseRef],
+      { cwd: webRoot, stdio: 'inherit' }
+    );
+    if (casing.status !== 0) return casing.status ?? 1;
+  }
+
   const files = changedWebFiles(diff.stdout, { exists });
 
   if (files.length === 0) {
