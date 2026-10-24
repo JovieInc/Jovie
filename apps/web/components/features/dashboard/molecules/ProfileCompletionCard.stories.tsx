@@ -49,11 +49,11 @@ const mockDashboardData: DashboardData = {
         href: APP_ROUTES.SETTINGS_PROFILE,
       },
       {
-        id: 'email',
-        label: 'Add your account email',
+        id: 'handle',
+        label: 'Claim your handle',
         description:
-          'Email keeps your account recoverable and mission-critical.',
-        href: APP_ROUTES.DASHBOARD_EARNINGS,
+          'Your jov.ie handle is how fans find and share your profile.',
+        href: APP_ROUTES.SETTINGS_PROFILE,
       },
     ],
     profileIsLive: true,
