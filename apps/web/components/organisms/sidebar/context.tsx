@@ -12,6 +12,7 @@ import {
   SIDEBAR_KEYBOARD_SHORTCUT,
   useSidebarKeyboardShortcut,
 } from '@/hooks/useSidebarKeyboardShortcut';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { cn } from '@/lib/utils';
 
 export {
@@ -40,13 +41,20 @@ export const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
-    const isMobile = useBreakpointDown('lg');
+    const isMobileViewport = useBreakpointDown('lg');
+    const isElectron = useIsElectronRuntime();
+    // Electron always keeps desktop navigation semantics. At compact window
+    // sizes the desktop rail is pinned to its icon width instead of becoming
+    // a mobile sheet, which also keeps the native window controls aligned.
+    const isElectronCompact = isElectron && isMobileViewport;
+    const isMobile = isMobileViewport && !isElectron;
     const [openMobile, setOpenMobile] = React.useState(false);
-    const { open, setOpen } = useSidebarCookieState({
+    const { open: persistedOpen, setOpen } = useSidebarCookieState({
       defaultOpen,
       open: openProp,
       onOpenChange: setOpenProp,
     });
+    const open = isElectronCompact ? false : persistedOpen;
 
     useRailToggleFocusContinuity('left', open);
 

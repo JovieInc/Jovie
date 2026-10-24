@@ -546,3 +546,62 @@ test('settings shell keeps compact, 200% zoom, keyboard, and collapsed-sidebar c
     geometry?.titlebarRight ?? Number.POSITIVE_INFINITY
   );
 });
+
+test('compact Electron windows keep the icon rail and fully visible composer controls', async ({
+  page,
+}) => {
+  test.skip(
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
+  );
+  test.setTimeout(180_000);
+
+  await page.setViewportSize({ width: 800, height: 600 });
+  await installElectronRuntime(page);
+  await gotoShellRoute(page, APP_ROUTES.CHAT);
+  await waitForSettledShell(page);
+
+  await expect(
+    page.locator('[data-testid="app-shell-mobile-bottom-surface"]')
+  ).toBeHidden();
+  await expect(page.locator('[data-rail-preview-region="left"]')).toBeVisible();
+  await expect(page.locator('[data-electron-titlebar="true"]')).toHaveAttribute(
+    'data-electron-collapsed-rail',
+    'icon'
+  );
+
+  const composer = page.getByTestId('chat-composer-surface');
+  await expect(composer).toBeVisible({ timeout: 30_000 });
+  const controls = composer.locator(
+    'button[aria-label="Send message"], [data-testid="dictation-toggle"]'
+  );
+  await expect(controls).toHaveCount(2);
+
+  const geometry = await page.evaluate(() => {
+    const composer = document.querySelector<HTMLElement>(
+      '[data-testid="chat-composer-surface"]'
+    );
+    const buttons = Array.from(
+      composer?.querySelectorAll<HTMLElement>(
+        'button[aria-label="Send message"], [data-testid="dictation-toggle"]'
+      ) ?? []
+    );
+    if (!composer || buttons.length !== 2) return null;
+    const composerBox = composer.getBoundingClientRect();
+    return {
+      composerRight: composerBox.right,
+      buttons: buttons.map(button => {
+        const box = button.getBoundingClientRect();
+        return { left: box.left, right: box.right, bottom: box.bottom };
+      }),
+    };
+  });
+
+  expect(geometry).not.toBeNull();
+  expect(geometry?.composerRight ?? 0).toBeLessThanOrEqual(800);
+  for (const button of geometry?.buttons ?? []) {
+    expect(button.left).toBeGreaterThanOrEqual(0);
+    expect(button.right).toBeLessThanOrEqual(800);
+    expect(button.bottom).toBeLessThanOrEqual(600);
+  }
+});

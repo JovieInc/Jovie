@@ -4,12 +4,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SidebarProvider, useSidebar } from './context';
 
 const viewport = vi.hoisted(() => ({ mobile: true }));
+const runtime = vi.hoisted(() => ({ electron: false }));
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => viewport.mobile,
+}));
+vi.mock('@/lib/desktop/electron-bridge', () => ({
+  useIsElectronRuntime: () => runtime.electron,
 }));
 
 afterEach(() => {
   document.cookie = 'sidebar:state=; path=/; max-age=0';
+  runtime.electron = false;
 });
 
 function Controls() {
@@ -122,5 +127,37 @@ describe('explicit sidebar activation', () => {
     expect(control).toHaveAttribute('data-desktop-open', 'false');
     fireEvent.click(control);
     expect(control).toHaveAttribute('data-mobile-open', 'false');
+  });
+});
+
+describe('Electron compact shell', () => {
+  it('uses the collapsed desktop rail below lg instead of mobile navigation', () => {
+    viewport.mobile = true;
+    runtime.electron = true;
+    render(
+      <SidebarProvider defaultOpen>
+        <Controls />
+      </SidebarProvider>
+    );
+
+    const control = screen.getByRole('button');
+    expect(control).toHaveAttribute('data-mobile-open', 'false');
+    expect(control).toHaveAttribute('data-desktop-open', 'false');
+    expect(control).toHaveAttribute('data-state', 'closed');
+  });
+
+  it('restores the persisted desktop rail when the Electron window is wide', () => {
+    viewport.mobile = false;
+    runtime.electron = true;
+    render(
+      <SidebarProvider defaultOpen>
+        <Controls />
+      </SidebarProvider>
+    );
+
+    const control = screen.getByRole('button');
+    expect(control).toHaveAttribute('data-mobile-open', 'false');
+    expect(control).toHaveAttribute('data-desktop-open', 'true');
+    expect(control).toHaveAttribute('data-state', 'open');
   });
 });

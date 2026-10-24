@@ -152,6 +152,22 @@ html[data-desktop-runtime="electron"] [data-app-shell-frame="true"] {
   box-sizing: border-box;
 }
 
+/* Electron windows keep desktop shell geometry below the browser's lg
+   breakpoint. Compact windows use the icon rail, never the mobile sheet. */
+html[data-desktop-runtime="electron"] [data-app-shell-body="true"] {
+  gap: var(--app-shell-gap);
+  padding: var(--app-shell-gap);
+}
+
+html[data-desktop-runtime="electron"] [data-rail-preview-region="left"] {
+  display: flex;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-testid="app-shell-mobile-bottom-surface"] {
+  display: none;
+}
+
 /* The page header and window controls share one top row. */
 html[data-desktop-runtime="electron"]
 [data-app-shell-body="true"][data-electron-top-gap-owner="titlebar"] {
