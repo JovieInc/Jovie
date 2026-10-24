@@ -14,6 +14,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/auth';
 import {
   smokeNavigateWithRetry,
@@ -104,7 +105,7 @@ test.describe('Chat /app/chat axe audit', () => {
   }) => {
     const results = await new AxeBuilder({ page })
       .include(CHAT_CONTENT)
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .options(wcag22AaAxeOptions())
       .analyze();
 
     const { blocking, informational } = partitionByImpact(
@@ -140,7 +141,7 @@ test.describe('Chat /app/chat axe audit', () => {
 
     const results = await new AxeBuilder({ page })
       .include(CHAT_CONTENT)
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .options(wcag22AaAxeOptions())
       .analyze();
 
     const { blocking, informational } = partitionByImpact(

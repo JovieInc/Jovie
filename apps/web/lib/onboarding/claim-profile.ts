@@ -3,6 +3,11 @@ import 'server-only';
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { requiresClaimVerification } from '@/lib/claim/claim-verification';
+import {
+  getClaimVerificationReach,
+  requestClaimVerification,
+} from '@/lib/claim/claim-verification.server';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { users } from '@/lib/db/schema/auth';
@@ -134,6 +139,39 @@ function buildOnboardingSettings(
       selectedSpotifyArtistName: state.artist?.name ?? null,
       socialLinks: [...state.socialLinks],
       interviewSignalCount: state.interviewSignals.length,
+    },
+  };
+}
+
+interface HeldClaimVerification {
+  readonly spotifyArtistId: string;
+  readonly artistName: string | null;
+  readonly reach: number;
+}
+
+/**
+ * Claim integrity: a high-reach artist from the transcript is not attached to
+ * the new profile. The profile materializes from the handle alone and the
+ * artist becomes a verification request (lib/claim/claim-verification.ts).
+ */
+async function holdHighReachArtistForVerification(
+  state: ClaimedOnboardingState
+): Promise<{
+  readonly state: ClaimedOnboardingState;
+  readonly verification: HeldClaimVerification | null;
+}> {
+  const artist = state.artist;
+  if (!artist) return { state, verification: null };
+  const reach = requiresClaimVerification(artist.followers)
+    ? artist.followers
+    : await getClaimVerificationReach(artist.id);
+  if (reach === null) return { state, verification: null };
+  return {
+    state: { ...state, artist: null },
+    verification: {
+      spotifyArtistId: artist.id,
+      artistName: artist.name ?? null,
+      reach,
     },
   };
 }
@@ -485,7 +523,9 @@ async function materializeProfile({
     .where(eq(chatMessages.conversationId, conversationId))
     .orderBy(chatMessages.createdAt);
 
-  const state = deriveClaimedOnboardingStateFromMessageRows(messageRows);
+  const { state, verification } = await holdHighReachArtistForVerification(
+    deriveClaimedOnboardingStateFromMessageRows(messageRows)
+  );
   if (!hasMaterializableState(state)) {
     return { profileId: null, handle: null, status: 'skipped' };
   }
@@ -502,6 +542,17 @@ async function materializeProfile({
       reserved,
       waitlistEntryId,
     });
+
+  if (verification) {
+    await requestClaimVerification({
+      profileId,
+      spotifyArtistId: verification.spotifyArtistId,
+      artistName: verification.artistName,
+      reach: verification.reach,
+      paid: false,
+      now,
+    });
+  }
 
   // A reserved (waitlist-pending) profile only holds the handle. Publishing
   // ownership signals — activeProfileId and the owner claim row — happens on

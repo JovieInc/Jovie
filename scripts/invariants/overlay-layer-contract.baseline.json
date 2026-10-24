@@ -10,7 +10,7 @@
     "packages/ui"
   ],
   "localStackingMax": 30,
-  "totalFindings": 79,
+  "totalFindings": 73,
   "files": {
     "apps/web/app/exp/component-checker/ComponentCheckerClient.tsx": {
       "z-50": 1
@@ -97,12 +97,6 @@
     "apps/web/components/features/home/AuthRedirectHandler.tsx": {
       "z-50": 1
     },
-    "apps/web/components/features/home/AutomaticReleaseSmartlinksSection.tsx": {
-      "z-[2]": 1
-    },
-    "apps/web/components/features/home/FloatingClaimBar.tsx": {
-      "z-50": 1
-    },
     "apps/web/components/features/home/HeroSpotifySearch.tsx": {
       "z-50": 1
     },
@@ -124,18 +118,11 @@
     "apps/web/components/feedback/BannerViewport.tsx": {
       "z-50": 1
     },
-    "apps/web/components/homepage/HomepageIntent.tsx": {
-      "z-[1]": 2
-    },
     "apps/web/components/jovie/components/ChatInput.tsx": {
       "z-[80]": 2
     },
     "apps/web/components/jovie/components/TeleprompterShowcaseInterstitial.tsx": {
       "z-50": 1
-    },
-    "apps/web/components/marketing/HomeComposerHero.tsx": {
-      "z-[1]": 1,
-      "z-[2]": 1
     },
     "apps/web/components/molecules/MobileNav.tsx": {
       "z-[100]": 1,

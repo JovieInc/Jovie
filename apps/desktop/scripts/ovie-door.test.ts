@@ -52,16 +52,16 @@ test('production packaged Mac keeps staging out of the Ovie door', () => {
   expect(packagedDesktopAppId('staging')).toBe(STAGING_DESKTOP_APP_ID);
 });
 
-test('operator talk and ops stay distinct from customer Jovie chat', () => {
+test('both operator doors open Ovie Home, distinct from customer Jovie chat', () => {
   expect(ovieOperatorDoorRoutes()).toEqual({
     talk: OVIE_OPERATOR_TALK_ROUTE,
     ops: OVIE_OPERATOR_OPS_ROUTE,
     opsSearch: OVIE_OPERATOR_OPS_SEARCH,
     customerJovie: CUSTOMER_JOVIE_ENTRY_ROUTE,
   });
-  expect(OVIE_OPERATOR_TALK_ROUTE).toBe('/app/ov/chat');
-  expect(OVIE_OPERATOR_OPS_ROUTE).toBe('/hud');
-  expect(ovieOperatorOpsHref()).toBe('/hud?ovie=mac');
+  expect(OVIE_OPERATOR_TALK_ROUTE).toBe('/app/ov');
+  expect(OVIE_OPERATOR_OPS_ROUTE).toBe('/app/ov');
+  expect(ovieOperatorOpsHref()).toBe('/app/ov?ovie=mac');
   expect(CUSTOMER_JOVIE_ENTRY_ROUTE).toBe('/app/chat');
 });
 

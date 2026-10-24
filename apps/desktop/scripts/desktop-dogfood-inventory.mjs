@@ -218,7 +218,7 @@ const operatorRoutes = [
   ['hud', 'Founder HUD', '/hud'],
   ['wiki', 'HUD wiki', '/hud/wiki'],
   ['home', 'Ovie home', '/app/ov'],
-  ['chat', 'Ovie chat', '/app/ov/chat'],
+  ['chat', 'Ovie Home', '/app/ov'],
   ['product', 'Product', '/app/ov/product'],
   ['operations', 'Operations', '/app/ov/operations'],
   ['needs-you', 'Needs You', '/app/ov/needs-you'],

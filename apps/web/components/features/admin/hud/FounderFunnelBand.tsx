@@ -33,7 +33,37 @@ const FUNNEL_BODY_CLASS = 'min-h-20';
 
 function formatPercent(rate: number | null): string {
   if (rate === null) return '\u2014';
+  // Never round a non-zero conversion down to "0.0%".
+  if (rate > 0 && rate < 0.0005) return '<0.1%';
   return `${(rate * 100).toFixed(1)}%`;
+}
+
+const RANGE_WINDOW_LABEL: Record<FounderFunnelTimeRange, string> = {
+  '7d': 'Cohort entered in last 7d', // ui-casing-allow: compact window label
+  '30d': 'Cohort entered in last 30d', // ui-casing-allow: compact window label
+  all: 'All time',
+};
+
+/**
+ * Window and population behind every funnel count, so Growth numbers are
+ * never compared against differently-scoped counts (People, Lifecycle).
+ */
+export function founderFunnelScopeLabel(range: FounderFunnelTimeRange): string {
+  return `${RANGE_WINDOW_LABEL[range]} · accounts excl. internal/test · chats anonymous`;
+}
+
+/** Footer copy for a stage tile; only the first stage is top of funnel. */
+export function founderFunnelStageFooter(
+  stage: FounderFunnelStage,
+  index: number,
+  isBiggestLeak: boolean
+): string {
+  if (index === 0) return 'Top of funnel';
+  if (stage.dropOff === null) return 'No entrants from previous step';
+  if (isBiggestLeak) {
+    return `Biggest drop-off · −${stage.dropOff.toLocaleString('en-US')}`;
+  }
+  return `−${stage.dropOff.toLocaleString('en-US')} lost`;
 }
 
 async function fetchFounderFunnel(
@@ -105,9 +135,11 @@ function StageConnector({
 
 function FunnelStageTile({
   stage,
+  index,
   isBiggestLeak,
 }: Readonly<{
   readonly stage: FounderFunnelStage;
+  readonly index: number;
   readonly isBiggestLeak: boolean;
 }>) {
   const content = (
@@ -124,11 +156,7 @@ function FunnelStageTile({
           isBiggestLeak ? 'font-medium text-error' : 'text-tertiary-token'
         )}
       >
-        {isBiggestLeak && stage.dropOff !== null
-          ? `Biggest drop-off · −${stage.dropOff.toLocaleString('en-US')}`
-          : stage.dropOff === null
-            ? 'Top of funnel'
-            : `−${stage.dropOff.toLocaleString('en-US')} lost`}
+        {founderFunnelStageFooter(stage, index, isBiggestLeak)}
       </p>
       {!stage.identifiable ? (
         <p className='mt-0.5 text-2xs text-tertiary-token'>
@@ -197,6 +225,7 @@ function FunnelFlow({
             ) : null}
             <FunnelStageTile
               stage={displayedStage}
+              index={i}
               isBiggestLeak={isBiggestLeak}
             />
           </li>
@@ -336,6 +365,12 @@ export function FounderFunnelBand({
           <FunnelFlowSkeleton />
         ) : showFunnel && funnel ? (
           <>
+            <p
+              className='mb-2 text-2xs text-tertiary-token'
+              data-testid='founder-funnel-scope'
+            >
+              {founderFunnelScopeLabel(funnel.timeRange)}
+            </p>
             <FunnelFlow
               funnel={funnel}
               urlSearchParams={growth?.urlSearchParams}

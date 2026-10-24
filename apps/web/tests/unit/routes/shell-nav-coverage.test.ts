@@ -28,6 +28,7 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/chats': 'Canonical chat index reached from the sidebar link',
   '/app/chat': 'New Chat utility and contextual Identity link editor',
   '/app/chat/[id]': 'Thread detail is reached from chat history',
+  '/app/ov/chat': 'Deep-link alias that renders Ovie Home (/app/ov)',
   '/app/library': 'Canonical Work surface with stable library route ownership',
   '/app/links':
     'Contextual smart-link workspace reached from Cmd-K and the G then K shortcut, plus the legacy /app/dashboard/links redirect. Desktop rail placement stays founder-locked',

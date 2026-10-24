@@ -1,18 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import type { ContextMenuItemType } from '@/components/organisms/table';
 import type { ReleaseViewModel } from '@/lib/discography/types';
-import { buildReleaseActions } from './release-actions';
+import {
+  type BuildReleaseActionsOptions,
+  buildReleaseActions,
+} from './release-actions';
 
 /**
  * buildReleaseActions is a pure builder with no rendered output of its own;
  * it's shared by the ellipsis menu and the row right-click context menu.
  * This story documents its output shape.
  */
-function MenuItemsPreview({
-  items,
-}: {
-  readonly items: ContextMenuItemType[];
-}) {
+function ReleaseActions(options: BuildReleaseActionsOptions) {
+  const items = buildReleaseActions(options);
   return (
     <ul className='w-64 rounded-lg border border-subtle bg-surface-1 p-1 text-app'>
       {items.map((item, index) =>
@@ -67,38 +66,30 @@ const release: ReleaseViewModel = {
 
 const meta = {
   title: 'Dashboard/Organisms/Releases/release-actions',
+  component: ReleaseActions,
+  args: {
+    release,
+    onEdit: () => {},
+    onCopy: async () => {},
+  },
   parameters: {
     layout: 'padded',
   },
-} satisfies Meta<typeof MenuItemsPreview>;
+} satisfies Meta<typeof ReleaseActions>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const FullMenu: Story = {
-  render: () => (
-    <MenuItemsPreview
-      items={buildReleaseActions({
-        release,
-        onEdit: () => {},
-        onCopy: async () => {},
-        onDelete: () => {},
-        onChangeStatus: () => {},
-      })}
-    />
-  ),
+  args: {
+    onDelete: () => {},
+    onChangeStatus: () => {},
+  },
 };
 
 export const SmartLinkLocked: Story = {
-  render: () => (
-    <MenuItemsPreview
-      items={buildReleaseActions({
-        release,
-        onEdit: () => {},
-        onCopy: async () => {},
-        isSmartLinkLocked: () => true,
-        getSmartLinkLockReason: () => 'cap',
-      })}
-    />
-  ),
+  args: {
+    isSmartLinkLocked: () => true,
+    getSmartLinkLockReason: () => 'cap',
+  },
 };

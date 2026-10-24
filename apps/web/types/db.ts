@@ -144,6 +144,7 @@ export interface CreatorProfile {
 }
 
 export interface ArtistSettings extends Record<string, unknown> {
+  searchable?: boolean;
   exclude_self_from_analytics?: boolean;
   hometown?: string | null;
   heroRoleLabel?: string | null;

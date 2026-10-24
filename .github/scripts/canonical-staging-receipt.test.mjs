@@ -13,6 +13,7 @@ import { test } from 'node:test';
 import {
   resolveCanonicalStagingReceipt,
   runCanonicalStagingReceipt,
+  transportFailureDetail,
 } from './canonical-staging-receipt.mjs';
 
 const repository = 'JovieInc/Jovie';
@@ -401,7 +402,7 @@ function cliFixture() {
   writeFileSync(join(root, 'routes.json'), JSON.stringify(f.routes));
   writeFileSync(
     join(root, 'gh'),
-    `#!/usr/bin/env node\nconst fs=require('node:fs');const route=process.argv[3];if(process.env.TEST_TRANSPORT_FAILURE)process.exit(9);if(route.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'evidence.zip'))}));else{const row=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'routes.json'))},'utf8'))[route];if(!row)process.exit(8);process.stdout.write(JSON.stringify(row));}\n`
+    `#!/usr/bin/env node\nconst fs=require('node:fs');const route=process.argv[3];if(process.env.TEST_TRANSPORT_FAILURE==='rate'){process.stderr.write('gh: API rate limit exceeded for installation ID 1. (HTTP 403)\\n');process.exit(1);}if(process.env.TEST_TRANSPORT_FAILURE)process.exit(9);if(route.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'evidence.zip'))}));else{const row=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'routes.json'))},'utf8'))[route];if(!row)process.exit(8);process.stdout.write(JSON.stringify(row));}\n`
   );
   chmodSync(join(root, 'gh'), 0o755);
   return {
@@ -439,6 +440,39 @@ test('CLI reads actual ZIP data, returns only the bound ID and cleans temporary 
       assert.equal(failure.status, 1);
       assert.equal(failure.stdout, '');
     }
+  } finally {
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+test('transport failures name their cause: rate limit, exit code, or spawn error', () => {
+  const f = cliFixture();
+  try {
+    assert.throws(
+      () =>
+        runCanonicalStagingReceipt({
+          ...f.env,
+          TEST_TRANSPORT_FAILURE: 'rate',
+        }),
+      /transport failed \(gh: API rate limit exceeded for installation ID 1\. \(HTTP 403\)\)/
+    );
+    assert.throws(
+      () =>
+        runCanonicalStagingReceipt({ ...f.env, TEST_TRANSPORT_FAILURE: '1' }),
+      /transport failed \(exit 9\)/
+    );
+    assert.throws(
+      () => runCanonicalStagingReceipt({ ...f.env, PATH: f.root + '-missing' }),
+      /transport failed \(ENOENT\)/
+    );
+    assert.equal(
+      transportFailureDetail({
+        status: 1,
+        stderr: Buffer.from('HTTP 502: Bad Gateway'),
+      }),
+      'HTTP 502: Bad Gateway'
+    );
+    assert.equal(transportFailureDetail({ status: 2 }), 'exit 2');
+    assert.equal(transportFailureDetail({ error: {} }), 'spawn error');
   } finally {
     rmSync(f.root, { recursive: true, force: true });
   }

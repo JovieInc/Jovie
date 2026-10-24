@@ -1,6 +1,14 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react';
 import type { ElementType, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { connectOnboardingSpotifyArtist } from '@/app/onboarding/actions/connect-spotify';
+import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
 import { OnboardingCheckoutClient } from '@/app/onboarding/checkout/OnboardingCheckoutClient';
 import { OnboardingV2Form } from '@/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form';
 import type { ArtistSearchState } from '@/lib/queries/useArtistSearchQuery';
@@ -567,6 +575,47 @@ describe('Onboarding screen performance budgets', () => {
     expect(
       screen.getByRole('button', { name: /Continue/i })
     ).toBeInTheDocument();
+  });
+
+  it('shows verification in progress for a high-reach artist and skips enrichment', async () => {
+    vi.mocked(connectOnboardingSpotifyArtist).mockResolvedValueOnce({
+      success: false,
+      verificationPending: true,
+      importing: false,
+      imported: 0,
+      artistName: 'Famous Artist',
+      message:
+        'Verification in progress. Famous Artist has a large audience, so we confirm ownership before linking the artist to your profile.',
+    });
+    mockArtistSearch.results = [
+      {
+        followers: 2_400_000,
+        id: 'famous-result',
+        imageUrl: null,
+        name: 'Famous Artist',
+        popularity: 90,
+        url: 'https://open.spotify.com/artist/famous-result',
+      },
+    ];
+    mockArtistSearch.state = 'success';
+
+    render(
+      <OnboardingV2Form
+        initialDisplayName='Perf Budget'
+        initialHandle='perf-budget'
+        initialProfileId='profile-performance'
+        initialResumeStep='spotify'
+        isHydrated
+        userEmail='perf@example.com'
+        userId='user-performance'
+      />
+    );
+
+    fireEvent.click(screen.getByText('Famous Artist').closest('button')!);
+
+    await screen.findByRole('heading', { name: 'Verification in progress' });
+    expect(screen.getByRole('button', { name: /Continue/i })).toBeEnabled();
+    expect(vi.mocked(enrichProfileFromDsp)).not.toHaveBeenCalled();
   });
 
   it('shows error state when Spotify import fails', async () => {

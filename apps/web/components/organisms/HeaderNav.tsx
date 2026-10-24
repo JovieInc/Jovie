@@ -367,7 +367,7 @@ function getNavContainerVariantClass({
   isMarketingGlass: boolean;
 }>) {
   if (isMarketingGlass) {
-    return 'marketing-glass-header__shell';
+    return 'public-container marketing-glass-header__shell';
   }
 
   if (containerSize === 'homepage') {
@@ -658,7 +658,7 @@ export function HeaderNav({
         {/* Linear-style full-width content container */}
         <nav
           className={cn(
-            'mx-auto w-full px-5 sm:px-6',
+            !isMarketingGlass && 'mx-auto w-full px-5 sm:px-6',
             getNavContainerVariantClass({
               containerSize: _containerSize,
               isMarketingGlass,

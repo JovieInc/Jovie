@@ -14,7 +14,6 @@
  *   - GITHUB_REPOSITORY: owner/repo (or passed as args)
  */
 
-const https = require('https');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -39,36 +38,40 @@ const UNIT_FLAKY_ARTIFACT_PATTERN = 'unit-flaky-*';
 const UNIT_FLAKY_REPORT_SUFFIX = '.flaky.json';
 
 /**
- * Make GitHub API request
+ * GitHub reads go through the shared client (.claude/rules/external-apis.md)
+ * at `report` priority: the report sheds itself while the token's bucket is
+ * under its reserve instead of competing with merge-group admission, and it
+ * honors Retry-After / reset headers. Immutable run evidence is already
+ * cached per (run id, attempt) below.
  */
-function githubRequest(path, token) {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: 'api.github.com',
-      path: path,
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'User-Agent': 'Jovie-Test-Flakiness-Analyzer',
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-    };
+const githubClients = new Map();
 
-    https
-      .get(options, res => {
-        let data = '';
-        res.on('data', chunk => (data += chunk));
-        res.on('end', () => {
-          if (res.statusCode !== 200) {
-            reject(new Error(`GitHub API error: ${res.statusCode} ${data}`));
-          } else {
-            resolve(JSON.parse(data));
-          }
-        });
+async function githubRequest(path, token) {
+  if (!githubClients.has(token)) {
+    const { pathToFileURL } = require('node:url');
+    const api = await import(
+      pathToFileURL(require.resolve('../../packages/api-client/index.ts')).href
+    );
+    githubClients.set(
+      token,
+      api.createGitHubClient({
+        token,
+        // Installation tokens rotate per wake; ETags and budget stay keyed to the repo.
+        credential: `github-report:${process.env.GITHUB_REPOSITORY ?? 'local'}`,
+        // One job, one process: the ledger only needs to live for this wake.
+        store: new api.MemoryLedgerStore(),
+        fetch: (input, init) => globalThis.fetch(input, init),
       })
-      .on('error', reject);
+    );
+  }
+  const response = await githubClients.get(token).rest('GET', path, undefined, {
+    priority: 'report',
+    headers: { 'user-agent': 'Jovie-Test-Flakiness-Analyzer' },
   });
+  if (response.status !== 200) {
+    throw new Error(`GitHub API error: ${response.status} ${response.text}`);
+  }
+  return response.json();
 }
 
 /**
@@ -1277,6 +1280,14 @@ async function main() {
       `   Retry rate: ${((runsWithRetries / totalRuns) * 100).toFixed(1)}%`
     );
   } catch (error) {
+    // A shed or deferred report is infrastructure, not a verdict: run evidence
+    // stays cached and the next wake catches up.
+    if (error?.exitCode === 75) {
+      console.log(
+        `::warning::github-quota-deferred: flakiness report skipped this wake (${error.message})`
+      );
+      return;
+    }
     console.error(`❌ Error: ${error.message}`);
     process.exit(1);
   }

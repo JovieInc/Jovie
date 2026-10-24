@@ -77,6 +77,9 @@ jobs:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           VERCEL_READONLY_TOKEN: ${{ secrets.VERCEL_READONLY_TOKEN }}
           SUMMER_PIN_CHECK_VERCEL_TOKEN: ${{ secrets.SUMMER_PIN_CHECK_VERCEL_TOKEN }}
+          # Credentials/spend registry live reads: Gateway credit balance only.
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          CREDENTIALS_RUN_RECEIPT: ${{ runner.temp }}/credentials-spend-run.json
           DRY_RUN: ${{ steps.mode.outputs.dry_run }}
           EVENT_NAME: ${{ github.event_name }}
           SCHEDULE: ${{ github.event.schedule }}
@@ -98,7 +101,18 @@ jobs:
             run_mode summer-config
             run_mode vercel
             run_mode domains
+            run_mode credentials
           fi
+
+      # Measure-everything: each credentials/spend run's stage timestamps.
+      - name: Upload credentials run record
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: credentials-spend-run
+          path: ${{ runner.temp }}/credentials-spend-run.json
+          if-no-files-found: ignore
+          retention-days: 90
 
       # JOV-7713: nightly full-inventory screen audit. Composes the latest
       # main Product Screenshots receipts (route DOM + screen proofs) over

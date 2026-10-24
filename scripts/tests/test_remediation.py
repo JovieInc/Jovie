@@ -50,6 +50,23 @@ def providers():
 
 
 class ClassifierFixtureTest(unittest.TestCase):
+    def test_unknown_merge_state_waits_without_spending_or_surfacing(self):
+        for rollup in (checks(), checks(conclusion="FAILURE"),
+                       checks(status="IN_PROGRESS", conclusion=""), []):
+            for review in (None, "CHANGES_REQUESTED"):
+                with self.subTest(checks=rollup, review=review):
+                    target = pr(mergeStateStatus="UNKNOWN", statusCheckRollup=rollup,
+                                reviewDecision=review)
+                    record = {"sha": HEAD, "count": 2, "lane": "devin"}
+                    classified = remediation.classify_blocker(target, attempts=record)
+                    self.assertEqual((classified["cls"], classified["subtype"]),
+                                     ("ready", "awaiting"))
+                    self.assertIn("mergeStateStatus=UNKNOWN", classified["evidence"])
+                    plan = remediation.plan_ladder(classified, record, providers(), NOW, HEAD,
+                        healthy=lambda *_: self.fail("unknown merge state queried a model provider"))
+                    self.assertEqual((plan["action"], plan["reason"]), ("wait", "awaiting"))
+                    self.assertEqual(record, {"sha": HEAD, "count": 2, "lane": "devin"})
+
     def test_stuck_pr_fixtures(self):
         ready = pr(number=20079, statusCheckRollup=checks(39))
         self.assertEqual(remediation.classify_blocker(ready, {"sha": "ed4d35e", "reason": "fix-exhausted"})["cls"], "ready")
@@ -414,6 +431,41 @@ class RouterLadderTest(unittest.TestCase):
             with self.subTest(body=body):
                 self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"],
                                  "needs-human-decision")
+
+    def test_engineering_credential_removal_is_not_a_founder_gate(self):
+        """PR #22473 (JOV-8810) exhausted on model-route hygiene. Stripping API
+        credentials from a child environment, naming credential tests, and
+        recording that verification had no credentials is engineering evidence.
+        A rotate, pricing, or credential-path change in the same text still gates."""
+        phrases = (
+            "Cursor's successor could not be verified with the available credentials.",
+            "strip raw API credentials from child environments.",
+            "The same new screenshot/credential tests on isolated copies.",
+            "strip metered credentials in child environments.",
+            "Live quality cannot be certified without credentials.",
+        )
+        body = " ".join(phrases)
+        red = {"statusCheckRollup": [
+            {"name": "Design gate", "status": "COMPLETED", "conclusion": "FAILURE",
+             "excerpt": "API rate limit exceeded"}]}
+        classified = remediation.classify_blocker(pr(
+            number=22473, isDraft=True, mergeStateStatus="UNSTABLE", body=body,
+            labels=[{"name": "lane-fix-green"}, {"name": "lane-fix-exhausted"}], **red))
+        self.assertEqual(classified["cls"], "fixable-by-model")
+        self.assertNotIn("strategy/pricing/credential/taste content", classified["evidence"])
+        green = remediation.classify_blocker(pr(
+            number=22473, isDraft=True, mergeStateStatus="UNSTABLE", body=body))
+        self.assertEqual((green["cls"], green["subtype"]), ("ready", "draft"))
+        for extra in (
+            {"body": body + " Rotate the production credential."},
+            {"body": body + " Please update pricing."},
+            {"body": "strip raw API credentials from child environments and update pricing."},
+            {"body": body, "files": ["scripts/credential-store.py"]},
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(
+                    remediation.classify_blocker(pr(number=22473, **red, **extra))["cls"],
+                    "needs-human-decision")
 
     def test_direct_permission_asks_cover_github_token_and_app_scopes(self):
         for text in (

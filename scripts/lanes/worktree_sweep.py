@@ -47,9 +47,15 @@ BUILD_DIRS = frozenset({"node_modules", ".next", ".turbo", "test-results", ".bui
                         ".pnpm-store", ".pnpm-store-private"})
 # Retired Elixir workspaces used this private store. Keep its cache bytes out of backups.
 LEGACY_PRIVATE_STORE = ".symphony/package-cache/pnpm-store"
+# Generated outputs and archive blobs never belong in a snapshot: JovieInc/Jovie is public and
+# refs/jovie-preserved/* is fetchable. On 2026-10-09 an `add -A` snapshot carried 1.3 GB of
+# outputs/ tarballs and builds (48 scanner hits, the weekly full scan red since 10-12).
+ARCHIVE_GLOBS = ("*.tar.gz", "*.tgz", "*.tar", "*.tar.bz2", "*.tar.xz", "*.zip", "*.7z")
 EXCLUDE = [f":(exclude,glob)**/{name}/**" for name in sorted(BUILD_DIRS)] + [f":(exclude){PRESERVED_REPAIR}",
                                                                           ":(exclude).codex-last-message.txt",
-                                                                          f":(exclude){LEGACY_PRIVATE_STORE}"]
+                                                                          f":(exclude){LEGACY_PRIVATE_STORE}",
+                                                                          ":(exclude,glob)outputs/**"] + [
+    f":(exclude,glob)**/{pattern}" for pattern in ARCHIVE_GLOBS]
 
 
 def default_roots(home: Path, state: Path) -> list[Path]:
@@ -154,9 +160,67 @@ def sweep_prefix() -> str:
     return "sweep/mac" if sys.platform == "darwin" else f"sweep/{os.uname().nodename.split('.')[0]}"
 
 
+class SnapshotHeld(RuntimeError):
+    """The snapshot must not be published (secret finding, or the scan could not prove it
+    clean). Callers keep the checkout exactly as it is: no strip, no removal."""
+
+    def __init__(self, name: str, reason: str):
+        super().__init__(f"{name}: {reason}")
+        self.name, self.reason = name, reason
+
+
+SCAN_TIMEOUT_S = 600
+TRUFFLEHOG_FINDINGS = 183  # trufflehog --fail exit code when it found results
+
+
+def scanner(name: str) -> str | None:
+    found = shutil.which(name)
+    if found:
+        return found
+    local = Path.home() / ".local/bin" / name
+    return str(local) if local.is_file() and os.access(local, os.X_OK) else None
+
+
+def scan_snapshot(path: Path, run, remote: str, sha: str) -> str | None:
+    """None only when gitleaks and trufflehog both prove base..sha clean. Fail closed:
+    a missing scanner, unknown base or scanner error is a reason to hold."""
+    trufflehog, gitleaks = scanner("trufflehog"), scanner("gitleaks")
+    if not trufflehog or not gitleaks:
+        return "scan-unavailable"
+    base = None
+    for candidate in (f"refs/remotes/{remote}/HEAD", f"refs/remotes/{remote}/main"):
+        found = git(path, run, "merge-base", sha, candidate)
+        if found.returncode == 0 and found.stdout.strip():
+            base = found.stdout.strip()
+            break
+    if base is None:
+        return "scan-base-unknown"
+    if base == sha:
+        return None
+    # trufflehog --branch takes a commit SHA or short branch name: a full ref path
+    # (refs/...) silently scans nothing and exits 0 (probed on Gem, trufflehog 3.95.5).
+    try:
+        truffle = run([trufflehog, "git", f"file://{path}", "--branch", sha, "--since-commit", base,
+                       "--no-verification", "--fail", "--no-update", "--json"],
+                      capture_output=True, text=True, timeout=SCAN_TIMEOUT_S)
+        leaks = run([gitleaks, "git", str(path), "--log-opts", f"{base}..{sha}", "--no-banner",
+                     "--redact", "--exit-code", "1"],
+                    capture_output=True, text=True, timeout=SCAN_TIMEOUT_S)
+    except (OSError, subprocess.SubprocessError) as error:
+        return f"scan-failed:{type(error).__name__}"
+    if truffle.returncode == TRUFFLEHOG_FINDINGS:
+        return "secret-finding:trufflehog"
+    if leaks.returncode == 1:
+        return "secret-finding:gitleaks"
+    if truffle.returncode != 0 or leaks.returncode != 0:
+        return f"scan-failed:trufflehog={truffle.returncode},gitleaks={leaks.returncode}"
+    return None
+
+
 def backup(path: Path, info: dict, run, prefix: str, date: str) -> str | None:
     """Snapshot the checkout (tracked + untracked, minus build output) to
-    refs/jovie-preserved/<prefix>/<name>-<date>; returns that full ref."""
+    refs/jovie-preserved/<prefix>/<name>-<date>; returns that full ref. Raises SnapshotHeld
+    when the snapshot is not proven secret-free (the ref is public)."""
     head = git(path, run, "rev-parse", "HEAD").stdout.strip()
     if not head or not info["remote"]:
         return None
@@ -182,6 +246,8 @@ def backup(path: Path, info: dict, run, prefix: str, date: str) -> str | None:
         finally:
             index.unlink(missing_ok=True)
     name = path.name if path.name not in {"Jovie", "LogYourBody"} else f"{path.parent.name}-{path.name}"
+    if held := scan_snapshot(path, run, info["remote"], sha):
+        raise SnapshotHeld(name, held)
     ref = f"{PRESERVED_REF}{prefix}/{re.sub(r'[^A-Za-z0-9._-]', '-', name)}-{date}"
     pushed = git(path, run, "push", "--force", "-q", info["remote"], f"{sha}:{ref}", timeout=900)
     return ref if pushed.returncode == 0 else None
@@ -248,7 +314,14 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
         report["kept"] += 1
         return
     if info["dirty"] or info["unpushed"] != "0":
-        saved = backup(path, info, run, prefix, date)
+        try:
+            saved = backup(path, info, run, prefix, date)
+        except SnapshotHeld as held:
+            # Keep the checkout untouched (no strip): the doctor raises sweep-snapshot-secret.
+            report["kept"] += 1
+            report.setdefault("secretHeld", []).append({"name": held.name, "path": str(path),
+                                                        "reason": held.reason})
+            return
         if not saved:
             strip_build_dirs(path)
             report["stripped"].append(str(path))

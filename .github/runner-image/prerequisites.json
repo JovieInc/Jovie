@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "nodeMajor": 24,
-  "nodeMinimum": "24.21.0",
+  "nodeMinimum": "24.22.1",
   "pnpmVersion": "9.15.9",
   "pnpmStorePath": "/opt/jovie-pnpm-store",
   "installedTreeRoot": "/opt/jovie-installed-tree",

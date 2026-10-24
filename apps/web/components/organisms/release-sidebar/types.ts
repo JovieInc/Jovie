@@ -4,6 +4,7 @@
  * Type definitions for the ReleaseSidebar component.
  */
 
+import type { ReleaseActionCapabilities } from '@/features/dashboard/organisms/releases/release-actions';
 import type {
   ProviderKey,
   ProviderLink,
@@ -57,7 +58,7 @@ export interface ReleaseSidebarActionError {
   readonly onRetry: () => void;
 }
 
-export interface ReleaseSidebarProps {
+export interface ReleaseSidebarProps extends ReleaseActionCapabilities {
   readonly release: Release | null;
   readonly mode: ReleaseSidebarMode;
   readonly isOpen: boolean;

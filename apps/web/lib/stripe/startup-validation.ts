@@ -1,8 +1,15 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { env } from '@/lib/env-server';
+import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 import { getActivePriceIds, validateStripeConfig } from '@/lib/stripe/config';
+import { getStripePriceIds } from './price-ids';
+
+/** Startup copy for a missing Artist Visibility price. Amount comes from the offer. */
+function missingArtistVisibilityPriceIssue(): string {
+  const { displayName, monthlyUsd } = ARTIST_VISIBILITY_OFFER.pro;
+  return `No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the ${displayName} $${monthlyUsd}/month USD recurring price ID.`;
+}
 
 /**
  * Issue fingerprint of the last fatal startup alert emitted in this process.
@@ -37,7 +44,7 @@ export function validateStripeBillingConfig(): {
   // A later call in the same process must still see a price that was restored
   // after that import, then clear the dedupe key on the healthy result.
   const activePriceIds = getActivePriceIds();
-  const visibilityPriceId = env.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY;
+  const visibilityPriceId = getStripePriceIds().artistVisibilityProMonthly;
   const configuredPriceIds =
     activePriceIds.length > 0
       ? activePriceIds
@@ -45,9 +52,7 @@ export function validateStripeBillingConfig(): {
         ? [visibilityPriceId]
         : [];
   if (configuredPriceIds.length === 0) {
-    issues.push(
-      'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Presence $199/month USD recurring price ID.'
-    );
+    issues.push(missingArtistVisibilityPriceIssue());
   }
 
   if (issues.length > 0) {

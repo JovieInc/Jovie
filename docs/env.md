@@ -257,9 +257,11 @@ refund events; separate from subscription and tip webhook secrets.
 ### `STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY`
 
 Required for new Artist Visibility Pro checkout. Set this to a distinct, active
-Stripe recurring price ID (`price_...`) for **USD 19900 cents every month** in the
-same Stripe account and mode as `STRIPE_SECRET_KEY`. Do not reuse an older Pro
-price ID or change existing subscribers' prices. Free profile and audience
+Stripe recurring price ID (`price_...`) for **USD 1200 cents every month** in the
+same Stripe account and mode as `STRIPE_SECRET_KEY`, with metadata
+`offer=artist_visibility_pro` and `decision=tim-2026-10-20-artist-profile-12`.
+Do not reuse an older Pro price ID or change existing subscribers' prices; the
+retired $199 prices are mapped as legacy in `lib/stripe/legacy-prices.ts`. Free profile and audience
 capture remain free; Enterprise contact sales goes to `support@jov.ie`.
 
 Provision the value through the supported Doppler/deployment environment path
@@ -268,11 +270,22 @@ verify presence, not the price's actual Stripe amount, currency, or active statu
 Verify those in Stripe and exercise checkout on the deployed build separately;
 a passing unit test or startup check is not live billing proof.
 
+Golden Path reads this name as a GitHub Actions secret on `JovieInc/Jovie`
+(`environment: Preview – jovie` in `.github/workflows/ci.yml`). The same name
+is also a Vercel env var on project `jovie`. The money-path assertion does not
+read the Vercel value. Job `ci-golden-path` sets
+`FEATURE_STRIPE_TEST_PRICE_CONFIGURED=true` because that secret is the active
+test-mode USD 1200 cents/month price. The code default stays off, so any other
+caller that sees a price outside the contract names the GitHub secret and
+still rejects the price. The contract check stays in force either way. Claim
+checkout dogfood pins `price_1USkjzASl9B9udHvEYkZLYZp`, which satisfies the
+contract on main `134f9390`. Do not copy a value into this doc.
+
 ### `VISIBILITY_AUDIT_PAYMENT_LINK_URL`
 
 Optional public Stripe Payment Link (`https://buy.stripe.com/...`) for the
-one-off Digital Footprint & Visibility Audit. The price is $199 and is credited
-toward the first month of Artist Visibility Pro. This is not a secret and it is
+one-off Digital Footprint & Visibility Audit. The price is $199, a one-time
+purchase separate from the $12/month Artist Visibility Pro subscription. This is not a secret and it is
 not a Stripe price or product ID — do not create Stripe objects for it in app
 code.
 

@@ -1,5 +1,9 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import {
+  disabledRuleIds,
+  wcag22AaAxeOptions,
+} from '@/lib/a11y-gates/wcag-standard.cjs';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/auth';
 import { assertFastPageLoad } from './utils/performance-assertions';
 import {
@@ -118,8 +122,9 @@ function collectSameOriginApiFailures(
 }
 
 async function assertAccessible(page: import('@playwright/test').Page) {
+  // Quarantine lives in a11y-allowlist.json (releases-dashboard, JOV-8781).
   const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .options(wcag22AaAxeOptions(disabledRuleIds('releases-dashboard')))
     .analyze();
 
   expect(results.violations).toEqual([]);

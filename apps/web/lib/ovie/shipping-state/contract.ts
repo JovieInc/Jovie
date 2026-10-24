@@ -354,12 +354,45 @@ export type StageTiming = {
   readonly n: number;
 };
 
+/** One end-to-end pipeline span over 7 days (seconds; null = unknown). */
+export type PipelineTiming = {
+  readonly pipeline: string;
+  readonly p50: number | null;
+  readonly p95: number | null;
+  readonly n: number;
+  readonly regressed: boolean;
+};
+
 export type StageSummary = {
   readonly at: string;
   readonly stagesTotal: number | null;
   readonly stagesWithData: number | null;
   readonly regressions: readonly string[];
   readonly slowestP95: readonly StageTiming[];
+  /** End-to-end spans (pr-open to merged, merged to verified, ...). */
+  readonly endToEnd7d?: readonly PipelineTiming[];
+};
+
+/**
+ * Flow health from the lanes feed (`prs`, `slo`, `admission`, `ownership`).
+ * Every field is null when the feed does not publish it, never zero.
+ */
+export type DeliveryFlow = {
+  readonly openPrs: number | null;
+  readonly redPrs: number | null;
+  readonly dirtyPrs: number | null;
+  readonly cleanNotQueued: number | null;
+  readonly exhaustedPrs: number | null;
+  readonly mergesPerHour: number | null;
+  /** 0..1 share of merge-queue entries ejected. */
+  readonly queueEjectionRate: number | null;
+  readonly queueWaitP95Seconds: number | null;
+  readonly productionLagP95Seconds: number | null;
+  readonly eligiblePool: number | null;
+  readonly candidatePool: number | null;
+  readonly ownerless: number | null;
+  readonly regressions: readonly string[];
+  readonly at: string | null;
 };
 
 export type DeliveryMergedPullRequest = {
@@ -388,6 +421,7 @@ export type DeliveryLanes = {
    * does not publish it.
    */
   readonly stageSummary?: StageSummary | null;
+  readonly flow?: DeliveryFlow | null;
   readonly publishedAt: string | null;
   /** The feed's own `at` is older than the lanes semantic window. */
   readonly stale: boolean;

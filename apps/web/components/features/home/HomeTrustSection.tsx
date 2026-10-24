@@ -138,16 +138,14 @@ export function HomeTrustSection({
       className={cn(
         isInlineStrip
           ? 'system-b-mounted-home-trust-strip'
-          : 'relative z-[1] mx-auto w-full px-5 sm:px-6 lg:px-0',
+          : 'relative z-[1] w-full',
         className
       )}
       aria-label={accessibleLabel}
     >
       <div
         className={cn(
-          isInlineStrip
-            ? 'homepage-trust-strip-inner'
-            : 'mx-auto max-w-linear-content',
+          isInlineStrip ? 'homepage-trust-strip-inner' : 'public-container',
           innerBoxClass
         )}
       >
