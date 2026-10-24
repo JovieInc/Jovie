@@ -189,7 +189,23 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
 
   const navBeforeFilter = await desktopNav.boundingBox();
   await desktopNav.getByRole('link', { name: 'New Chat' }).focus();
-  expect(await desktopNav.boundingBox()).toEqual(navBeforeFilter);
+  // Focus must not move the nav's box by a layout-relevant amount. Firefox
+  // reports the same box with device-pixel rounding deltas under half a CSS
+  // pixel (e.g. x 7.93 -> 8), so pin the intent — no visible shift — with a
+  // subpixel tolerance instead of exact deep equality.
+  const navAfterFilter = await desktopNav.boundingBox();
+  expect(Math.abs(navAfterFilter.x - navBeforeFilter.x)).toBeLessThanOrEqual(
+    0.5
+  );
+  expect(Math.abs(navAfterFilter.y - navBeforeFilter.y)).toBeLessThanOrEqual(
+    0.5
+  );
+  expect(
+    Math.abs(navAfterFilter.width - navBeforeFilter.width)
+  ).toBeLessThanOrEqual(0.5);
+  expect(
+    Math.abs(navAfterFilter.height - navBeforeFilter.height)
+  ).toBeLessThanOrEqual(0.5);
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
     path: testInfo.outputPath('canonical-customer-shell-1440x900.png'),

@@ -208,11 +208,12 @@ const DEFAULT_TEST_RELEASE_ARTWORK_URL = '/android-chrome-512x512.png';
 
 /**
  * Deterministic public track-preview fixture (F6, docs/qa/public-profile-stories.md).
- * The repo has no sample-audio fixture host (unit tests use example.com
- * mocks), so this uses a stable, publicly reachable SoundHelix sample mp3.
+ * A same-origin silent WAV: external audio hosts are blocked by the
+ * production media-src CSP (the releases chaos spec caught SoundHelix), so
+ * the fixture stays local — the audio player needs a playable URL, not
+ * sound.
  */
-const E2E_TRACK_PREVIEW_URL =
-  'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+const E2E_TRACK_PREVIEW_URL = '/test-fixtures/e2e-track-silence.wav';
 
 const REQUIRED_PUBLIC_QA_PROVIDERS = [
   {
