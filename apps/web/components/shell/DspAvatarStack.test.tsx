@@ -65,6 +65,23 @@ describe('DspAvatarStack', () => {
     );
   });
 
+  it('names the DSP trigger from its content (WCAG 2.5.3 label-in-name, JOV-8781)', () => {
+    // axe label-content-name-mismatch (WCAG 2.5.3 Label in Name): a control
+    // with visible text must have an accessible name that CONTAINS that
+    // text. The old aria-label omitted the rendered '+2' overflow chip, so
+    // the release-list axe scan failed. Naming from content — the sr-only
+    // label plus the visible chip — cannot diverge (the TasksPageClient
+    // WCAG 2.5.3 pattern). Decorative glyphs stay out of the name.
+    render(<DspAvatarStack dsps={ITEMS} />);
+
+    const trigger = screen.getByRole('button', {
+      name: /View DSP Distribution Details/,
+    });
+    expect(trigger).not.toHaveAttribute('aria-label');
+    expect(trigger).not.toHaveAttribute('aria-labelledby');
+    expect(trigger).toHaveAccessibleName('View DSP Distribution Details +2');
+  });
+
   it('exposes the popover to keyboard focus without changing layout', () => {
     render(<DspAvatarStack dsps={ITEMS} />);
 
