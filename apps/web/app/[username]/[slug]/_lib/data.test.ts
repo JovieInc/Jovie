@@ -25,7 +25,6 @@ vi.mock('@/lib/error-tracking', () => ({ captureWarning: mocks.warning }));
 
 import {
   checkPromoDownloads,
-  findSupersededReleaseSlug,
   getContentBySlug,
   getCreatorByUsername,
   getCreatorPlan,
@@ -496,57 +495,6 @@ describe('public release supporting contracts', () => {
     await expect(
       getUnpublishedReleasePresence('profile-1', 'error', { onError: 'throw' })
     ).rejects.toThrow('strict error');
-  });
-
-  describe('findSupersededReleaseSlug', () => {
-    const take = (slug: string, title = 'Take Me Over') => ({ slug, title });
-
-    it('returns the single published same-title suffixed sibling when no live release owns the base slug', async () => {
-      queries([], [take('take-me-over-2')]);
-      expect(await findSupersededReleaseSlug('p1', 'take-me-over')).toEqual({
-        currentSlug: 'take-me-over-2',
-      });
-      // Eligibility (published, not deleted) is enforced in SQL.
-      const sibling = new PgDialect().sqlToQuery(predicates.at(-1) as SQL);
-      expect(sibling.sql).toContain('"deleted_at" is null');
-    });
-
-    it('does not redirect when a live (placeholder/draft) release owns the base slug', async () => {
-      queries([{ id: 'placeholder' }], [take('seaside-heights-3')]);
-      expect(
-        await findSupersededReleaseSlug('p1', 'seaside-heights')
-      ).toBeNull();
-    });
-
-    it('does not redirect when more than one same-title candidate exists', async () => {
-      queries([], [take('take-me-over-2'), take('take-me-over-3')]);
-      expect(await findSupersededReleaseSlug('p1', 'take-me-over')).toBeNull();
-    });
-
-    it('ignores different titles, remixes, and non-numeric suffixes', async () => {
-      queries(
-        [],
-        [
-          take(
-            'take-me-over-austin-leeds-remix',
-            'Take Me Over - Austin Leeds Remix'
-          ),
-          take('take-me-over-2', 'Take Me Over (Austin Leeds Remix)'),
-          take('take-me-over-live', 'Take Me Over'),
-        ]
-      );
-      expect(await findSupersededReleaseSlug('p1', 'take-me-over')).toBeNull();
-    });
-
-    it('returns null for no candidates, unsafe slugs, and errors (throwing on request)', async () => {
-      queries([], [], new Error('owner down'), [], new Error('strict'), []);
-      expect(await findSupersededReleaseSlug('p1', 'absent')).toBeNull();
-      expect(await findSupersededReleaseSlug('p1', 'bad%slug')).toBeNull();
-      expect(await findSupersededReleaseSlug('p1', 'boom')).toBeNull();
-      await expect(
-        findSupersededReleaseSlug('p1', 'boom', { onError: 'throw' })
-      ).rejects.toThrow();
-    });
   });
 
   it('fails closed for creator entitlements and promo downloads', async () => {

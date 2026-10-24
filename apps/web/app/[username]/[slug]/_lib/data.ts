@@ -5,14 +5,7 @@
  * Used by both the main smart link page and the /sounds page.
  */
 
-import {
-  and,
-  sql as drizzleSql,
-  eq,
-  isNotNull,
-  isNull,
-  like,
-} from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNotNull, isNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { sanitizeCacheTags } from '@/lib/cache/tags';
@@ -38,7 +31,6 @@ import {
   parseProviderAlbumArtists,
   shouldReportCreditProviderMismatch,
 } from '@/lib/discography/release-credits';
-import { generateBaseSlug } from '@/lib/discography/slug';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
@@ -930,77 +922,6 @@ export async function getUnpublishedReleasePresence(
         helper: 'getUnpublishedReleasePresence',
         route: '/[username]/[slug]',
         slug,
-      },
-      'public-smart-link'
-    );
-    if (options.onError === 'throw') throw error;
-    return null;
-  }
-}
-
-/**
- * Resolve a superseded base slug to the artist's one published release.
- *
- * Import-time collisions suffix later releases (`take-me-over` becomes
- * `take-me-over-2`) while links already published elsewhere keep the base
- * slug. Identity cannot be known generically, so this is deliberately
- * conservative. It returns a slug only when ALL hold:
- *  - no non-deleted release of the creator owns `baseSlug` (a placeholder or
- *    draft owner means the slug is claimed; never shadow it);
- *  - exactly ONE publish-eligible release has slug `{baseSlug}-N`;
- *  - that release's title normalizes to exactly `baseSlug` (so remixes and
- *    differently-titled versions never match).
- * Two or more candidates are ambiguous (could be different recordings), so no
- * redirect is made.
- */
-export async function findSupersededReleaseSlug(
-  creatorProfileId: string,
-  baseSlug: string,
-  options: { readonly onError?: 'return-null' | 'throw' } = {}
-): Promise<{ readonly currentSlug: string } | null> {
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(baseSlug)) return null;
-  try {
-    const [owner, siblings] = await Promise.all([
-      db
-        .select({ id: discogReleases.id })
-        .from(discogReleases)
-        .where(
-          and(
-            eq(discogReleases.creatorProfileId, creatorProfileId),
-            eq(discogReleases.slug, baseSlug),
-            isNull(discogReleases.deletedAt)
-          )
-        )
-        .limit(1),
-      db
-        .select({ slug: discogReleases.slug, title: discogReleases.title })
-        .from(discogReleases)
-        .where(
-          and(
-            eq(discogReleases.creatorProfileId, creatorProfileId),
-            like(discogReleases.slug, `${baseSlug}-%`),
-            publicReleaseEligibilitySqlPredicate()
-          )
-        )
-        .limit(20),
-    ]);
-    if (owner.length > 0) return null;
-
-    const suffixed = new RegExp(`^${baseSlug}-\\d+$`);
-    const candidates = siblings.filter(
-      row => suffixed.test(row.slug) && generateBaseSlug(row.title) === baseSlug
-    );
-    const [only] = candidates;
-    return candidates.length === 1 && only ? { currentSlug: only.slug } : null;
-  } catch (error) {
-    logger.error(
-      'Failed superseded release slug lookup',
-      {
-        baseSlug,
-        creatorProfileId,
-        error,
-        helper: 'findSupersededReleaseSlug',
-        route: '/[username]/[slug]',
       },
       'public-smart-link'
     );
