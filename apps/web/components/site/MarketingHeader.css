@@ -40,6 +40,18 @@
     transparent
   );
   --marketing-dock-rim: var(--noir-ion-border-subtle);
+  /* Keep both the sticky bar and its glass rim inside the public box. */
+  width: min(
+    calc(100% - var(--ds-public-gutter) * 2),
+    var(--ds-public-content-max)
+  ) !important;
+  margin-inline: auto;
+  border: 0 !important;
+}
+
+.header-nav--docked > nav {
+  /* The header owns the gutter; do not apply it a second time to its row. */
+  width: 100% !important;
 }
 
 .header-nav--docked::before {
