@@ -248,6 +248,7 @@ export const APP_ROUTES = {
   SIGNUP_HYPHEN_SSO_CALLBACK: '/sign-up/sso-callback',
   /** Central auth handoff for web, iOS, and Electron clients. */
   AUTH_START: '/auth/start',
+  IDENTITY: '/identity',
   AUTH_CALLBACK: '/auth/callback',
   /** Legacy native callback alias retained for older client builds. */
   LEGACY_APP_AUTH_CALLBACK: '/app/auth/callback',

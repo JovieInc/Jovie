@@ -4,8 +4,11 @@ import { Button } from '@jovie/ui';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { AuthAppleIcon } from '@/components/features/auth/atoms';
+import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout } from '@/features/auth';
 import { authClient } from '@/lib/auth/client';
+
+const APPLE_START_ERROR = 'Apple sign in could not be started. Try again.';
 
 export function IdentityPageClient() {
   const searchParams = useSearchParams();
@@ -14,7 +17,9 @@ export function IdentityPageClient() {
     ? 'LogYourBody'
     : 'your account';
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() =>
+    searchParams.has('error') ? APPLE_START_ERROR : null
+  );
   const oauthAttemptRef = useRef(0);
 
   useEffect(() => {
@@ -35,17 +40,28 @@ export function IdentityPageClient() {
     setPending(true);
     setError(null);
     try {
-      const result = await authClient.signIn.social({ provider: 'apple' });
+      // Keep provider errors on this surface, preserving any signed client
+      // authorization query. The server validates/resumes that query. Never
+      // use the downstream redirect_uri as an unvalidated browser callback.
+      const returnParams = new URLSearchParams(searchParams.toString());
+      returnParams.delete('error');
+      returnParams.delete('error_description');
+      const query = returnParams.toString();
+      const result = await authClient.signIn.social({
+        provider: 'apple',
+        callbackURL: APP_ROUTES.HOME,
+        errorCallbackURL: `${APP_ROUTES.IDENTITY}${query ? `?${query}` : ''}`,
+      });
       if (result.error) {
         if (oauthAttemptRef.current !== attempt) return;
 
-        setError('Apple sign in could not be started. Try again.');
+        setError(APPLE_START_ERROR);
         setPending(false);
       }
     } catch {
       if (oauthAttemptRef.current !== attempt) return;
 
-      setError('Apple sign in could not be started. Try again.');
+      setError(APPLE_START_ERROR);
       setPending(false);
     }
   }
