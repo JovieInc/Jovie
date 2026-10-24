@@ -1,3 +1,4 @@
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { act, fireEvent, render } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -18,10 +19,18 @@ import { VIRTUALIZATION_INITIAL_VIEWPORT_PX } from './useTableVirtualization';
  * 2026-10-12, while every render count passed.)
  */
 
+// Observe the real virtualizer's retained DOM references; no virtual behavior is mocked.
+vi.mock('@tanstack/react-virtual', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@tanstack/react-virtual')>();
+  return { ...actual, useVirtualizer: vi.fn(actual.useVirtualizer) };
+});
+
 const ROW_COUNT = 10_000;
 const VIEWPORT_PX = 640;
 const OVERSCAN = 5;
 const ROW_PX = TABLE_ROW_MODES.dense.rowHeight;
+let viewportHeight = VIEWPORT_PX;
 
 type PerfRow = { id: string; name: string };
 
@@ -52,8 +61,8 @@ function bodyRows(container: HTMLElement) {
 // jsdom has no layout. TanStack virtual-core <= 3.19.4 measured the scroll
 // element with offsetWidth/offsetHeight; 3.19.6 (react-virtual 3.14.21) reads
 // clientWidth/clientHeight. Stub both so the viewport is known whichever the
-// library reads; otherwise it sees a 0px viewport, yields no rows, and the body
-// falls back to all 10k (#22280 merge group, 2026-10-20).
+// library reads. A zero-height viewport has its own regression case below;
+// the ordinary scroll/keyboard fixture needs a measured window.
 const LAYOUT_PROPS = [
   'offsetHeight',
   'offsetWidth',
@@ -79,7 +88,7 @@ describe('UnifiedTable perf budget (10k rows)', () => {
       Object.defineProperty(HTMLElement.prototype, prop, {
         configurable: true,
         get(this: HTMLElement) {
-          return this.tagName === 'TR' ? ROW_PX : VIEWPORT_PX;
+          return this.tagName === 'TR' ? ROW_PX : viewportHeight;
         },
       });
     }
@@ -184,5 +193,68 @@ describe('UnifiedTable perf budget (10k rows)', () => {
     expect(entered).toBeGreaterThan(0);
     expect(after.length).toBeLessThanOrEqual(maxWindowRows(VIEWPORT_PX));
     expect(cellRenders).toBeLessThanOrEqual(entered + COLUMN_SNAP_STAGGER_CAP);
+  });
+
+  it('does not mount the dataset when a hidden viewport measures zero', () => {
+    viewportHeight = 0;
+    cellRenders = 0;
+    try {
+      const { container, unmount } = render(
+        <UnifiedTable
+          data={data}
+          columns={columns}
+          rowMode='dense'
+          getRowId={row => row.id}
+        />
+      );
+      expect(bodyRows(container).length).toBeLessThanOrEqual(
+        maxWindowRows(VIRTUALIZATION_INITIAL_VIEWPORT_PX)
+      );
+      expect(cellRenders).toBeLessThanOrEqual(
+        maxWindowRows(VIRTUALIZATION_INITIAL_VIEWPORT_PX)
+      );
+      unmount();
+    } finally {
+      viewportHeight = VIEWPORT_PX;
+    }
+  });
+
+  it('bounds retained row elements across scrolling and rapid dataset changes', () => {
+    const props = {
+      columns,
+      rowMode: 'dense' as const,
+      overscan: OVERSCAN,
+      getRowId: (row: PerfRow) => row.id,
+    };
+    const { container, rerender, unmount } = render(
+      <UnifiedTable {...props} data={data} />
+    );
+    const scroller = container.firstElementChild as HTMLElement;
+    const table = container.querySelector('table');
+    const virtualizer = vi.mocked(useVirtualizer).mock.results.at(-1)!.value;
+    for (let step = 1; step <= 20; step += 1) {
+      act(() => {
+        scroller.scrollTop = ROW_PX * step * 100;
+        fireEvent.scroll(scroller);
+      });
+      // TanStack prunes detached elements on the next ref cleanup. Allow one
+      // retiring window during React's commit, but never the visited dataset.
+      expect(virtualizer.elementsCache.size).toBeLessThanOrEqual(
+        maxWindowRows(VIEWPORT_PX) * 2
+      );
+    }
+    for (let step = 0; step < 10; step += 1) {
+      const filtered = step % 2 === 0 ? data.slice(0, 25) : data;
+      rerender(<UnifiedTable {...props} data={filtered} />);
+      expect(container.firstElementChild).toBe(scroller);
+      expect(container.querySelector('table')).toBe(table);
+      expect(bodyRows(container).length).toBeLessThanOrEqual(
+        maxWindowRows(VIEWPORT_PX)
+      );
+      expect(virtualizer.elementsCache.size).toBeLessThanOrEqual(
+        maxWindowRows(VIEWPORT_PX) * 2
+      );
+    }
+    unmount();
   });
 });

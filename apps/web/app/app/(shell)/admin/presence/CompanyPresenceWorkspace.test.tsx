@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PresenceStatusBadge } from '@/components/features/presence/PresenceStatusParts';
+import { TABLE_ROW_MODES } from '@/components/organisms/table/table.styles';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -14,7 +15,11 @@ import type {
   CompanyPresenceData,
   CompanyPresencePage,
 } from '@/lib/ovie/company-presence/model';
-import { getCompanyPageStatus } from '@/lib/ovie/company-presence/model';
+import {
+  getCompanyPageStatus,
+  sortCompanyPresencePages,
+} from '@/lib/ovie/company-presence/model';
+import { mockTableViewport } from '@/tests/utils/table-viewport';
 import { CompanyPresenceWorkspace } from './CompanyPresenceWorkspace';
 
 vi.mock('next/navigation', () => ({
@@ -79,9 +84,23 @@ function renderWorkspace(data: CompanyPresenceData) {
   );
 }
 
+function revealPricingPage() {
+  // Pricing is outside the first virtual window in the full page inventory.
+  const index = sortCompanyPresencePages(unconfiguredData.pages).findIndex(
+    page => page.path === '/pricing'
+  );
+  expect(index).toBeGreaterThanOrEqual(0);
+  fireEvent.scroll(screen.getByRole('table').parentElement!, {
+    target: { scrollTop: index * TABLE_ROW_MODES['two-line'].rowHeight },
+  });
+  return screen.getByText('/pricing');
+}
+
 function lastPanel() {
   return vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
 }
+
+mockTableViewport();
 
 describe('CompanyPresenceWorkspace', () => {
   it('removes responsive columns from the table schema rather than only hiding cells', () => {
@@ -105,7 +124,7 @@ describe('CompanyPresenceWorkspace', () => {
     expect(
       screen.getByTestId('company-presence-workspace')
     ).toBeInTheDocument();
-    const pricingRow = screen.getByText('/pricing').closest('tr');
+    const pricingRow = revealPricingPage().closest('tr');
     expect(pricingRow).not.toBeNull();
     const row = within(pricingRow as HTMLElement);
     expect(
@@ -186,7 +205,7 @@ describe('CompanyPresenceWorkspace', () => {
     renderWorkspace(unconfiguredData);
     expect(lastPanel()).toBeNull();
 
-    fireEvent.click(screen.getByText('/pricing'));
+    fireEvent.click(revealPricingPage());
     const panel = lastPanel();
     expect(panel).not.toBeNull();
 

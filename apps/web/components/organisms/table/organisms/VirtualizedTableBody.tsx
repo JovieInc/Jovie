@@ -215,11 +215,10 @@ export function VirtualizedTableBody<TData extends RowData>({
 }: VirtualizedTableBodyProps<TData>) {
   'use no memo';
   // Row identity is stable across visibility changes; read fresh visible cells.
-  // Determine which items to iterate over.
-  // Fall back to non-virtualized rendering if virtualizer hasn't produced items yet
-  // (can happen when the scroll container hasn't been measured by ResizeObserver).
-  const useVirtual = shouldVirtualize && (virtualRows?.length ?? 0) > 0;
-  const items = useVirtual ? virtualRows! : rows;
+  // A hidden/unmeasured viewport may have no virtual items. Keep that window
+  // empty instead of mounting the entire dataset; initialRect handles SSR.
+  const useVirtual = shouldVirtualize;
+  const items = useVirtual ? (virtualRows ?? []) : rows;
 
   return (
     // Virtualized rows stay in normal table flow between the top and bottom

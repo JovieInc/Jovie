@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import type { EmailSignatureInput } from '@/lib/email-signature/build-signature';
+import { mockTableViewport } from '@/tests/utils/table-viewport';
 import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
 
 const signatureDialogInput = vi.fn();
@@ -78,6 +79,8 @@ function view(
     </QueryClientProvider>
   );
 }
+
+mockTableViewport();
 
 describe('creator query isolation', () => {
   it.each([false, true])(
