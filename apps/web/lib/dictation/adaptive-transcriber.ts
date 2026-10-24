@@ -61,6 +61,8 @@ export function createAdaptiveTranscriber(
   let committed = new Map<string, string>();
   let stopping = false;
   let stopRequested = false;
+  let needsBatchRecovery = false;
+  let attachedProviderId: string | null = null;
   let recording: DictationRecording | null = null;
   let recordedBlob: Blob | null = null;
   let recordingResult: Promise<Blob> | null = null;
@@ -80,6 +82,7 @@ export function createAdaptiveTranscriber(
     controller?.abort();
     stream?.abort();
     stream = null;
+    attachedProviderId = null;
   };
   const finish = () => {
     generation++;
@@ -123,6 +126,12 @@ export function createAdaptiveTranscriber(
         terminal(code);
         return;
       }
+      if (
+        recording &&
+        provider.capabilities.streaming &&
+        provider.id !== 'web-speech'
+      )
+        needsBatchRecovery = true;
       if (stopRequested) {
         const batchIndex = providers.findIndex(
           (candidate, position) =>
@@ -254,6 +263,7 @@ export function createAdaptiveTranscriber(
         return;
       }
       stream = opened;
+      attachedProviderId = provider.id;
       unsubscribe = opened.subscribe(event => {
         if (session !== generation) return;
         if (event.type === 'speech') options.activeTts?.()?.cancel();
@@ -304,6 +314,18 @@ export function createAdaptiveTranscriber(
       };
       void recordingResult.then(stopTracks, stopTracks);
     }
+    if (needsBatchRecovery && stream && attachedProviderId !== 'web-speech') {
+      const batchIndex = providers.findIndex(
+        provider => provider.capabilities.batch
+      );
+      if (batchIndex >= 0) {
+        detach();
+        stopping = false;
+        attempt = 0;
+        void open(batchIndex, ++generation);
+        return;
+      }
+    }
     if (batchStop) batchStop();
     else if (stream) {
       stream.commit();
@@ -329,6 +351,7 @@ export function createAdaptiveTranscriber(
       cancel();
       stopping = false;
       stopRequested = false;
+      needsBatchRecovery = false;
       attempt = 0;
       committed = new Map();
       recordedBlob = null;

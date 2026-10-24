@@ -41,7 +41,9 @@ server-measured audio ledger to settle reservations without undercounting.
 ## Batch recovery
 
 MediaRecorder retains the shared microphone locally throughout streaming and its
-single reconnect. On batch fallback, stopping capture transcribes that complete
+single reconnect. If streaming was interrupted, stop reconciles the complete
+recording through batch even when reconnect succeeded, recovering the connection
+gap and uncommitted speech. On batch fallback, stopping capture transcribes that complete
 recording and replaces the streamed text once. Cancellation aborts upload and
 invalidates late callbacks. Successful streaming discards the local buffer.
 

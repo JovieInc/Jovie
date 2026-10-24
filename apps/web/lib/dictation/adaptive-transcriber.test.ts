@@ -293,4 +293,31 @@ describe('adaptive dictation', () => {
       expect.any(AbortSignal)
     );
   });
+  it('recovers the reconnect gap from the full recording even when streaming reconnect succeeds', async () => {
+    const audio = new Blob(['complete audio including reconnect gap']);
+    const s = setup({
+      createRecording: () => ({ stop: async () => audio, abort() {} }),
+    });
+    s.second.instance.capabilities.batch = true;
+    s.second.instance.openStream = undefined;
+    s.second.instance.transcribe = vi.fn(
+      async () => 'Hello recovered words world'
+    );
+    s.transcriber.start();
+    await flush();
+    s.first.emit({ type: 'partial', text: 'Hello' });
+    s.first.emit({ type: 'error', code: 'network' });
+    await flush();
+    expect(s.first.instance.openStream).toHaveBeenCalledTimes(2);
+    s.first.emit({ type: 'partial', text: 'world' });
+    s.transcriber.stop();
+    await flush();
+    expect(s.second.instance.transcribe).toHaveBeenCalledWith(
+      audio,
+      expect.any(AbortSignal)
+    );
+    expect(s.onTranscript).toHaveBeenLastCalledWith(
+      'Hello recovered words world'
+    );
+  });
 });
