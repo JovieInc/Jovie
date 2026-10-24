@@ -278,7 +278,9 @@ test('desktop window enters the authenticated chat shell instead of the web root
     /await shell\.openExternal\(parsed\.toString\(\)\);/
   );
   assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_X = 20;/);
-  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 17;/);
+  // JOV-8974: 17px native + one app-shell gap (8px) — the lights ride the
+  // titlebar band down below the window's top gutter.
+  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 25;/);
   assert.match(
     mainSource,
     /const MACOS_TRAFFIC_LIGHT_POSITION = \{\s*x: MACOS_TRAFFIC_LIGHT_X,\s*y: MACOS_TRAFFIC_LIGHT_Y,\s*\} as const;/
@@ -1793,7 +1795,17 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     /--electron-traffic-light-safe-width:\s*\d+px;/
   );
   assert.match(globalsCss, /--electron-traffic-light-x: 20px;/);
-  assert.match(globalsCss, /--electron-traffic-light-y: 17px;/);
+  assert.match(globalsCss, /--electron-traffic-light-y: 25px;/);
+  // JOV-8974: the shell keeps one gutter on every edge. The body's top
+  // padding and the titlebar band's top offset both use the shell gap.
+  assert.match(
+    globalsCss,
+    /\[data-app-shell-body="true"\]\[data-electron-top-gap-owner="titlebar"\] \{[^}]*padding-top:\s*var\(--app-shell-gap\);/s
+  );
+  assert.match(
+    globalsCss,
+    /\[data-electron-titlebar="true"\] \{[^}]*top:\s*var\(--app-shell-gap\);/s
+  );
   assert.match(
     globalsCss,
     /--electron-sidebar-width: var\(--app-shell-sidebar-width\);/
@@ -1891,6 +1903,13 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
     titlebarHeight >= y + controlDiameter,
     `titlebar height (${titlebarHeight}px) must contain y=${y}px + traffic-light height`
   );
+
+  // JOV-8974: the CSS mirror of the native light position must track
+  // MACOS_TRAFFIC_LIGHT_Y — the band and the lights sit one shell gap down.
+  const cssLightY = Number(
+    globalsCss.match(/--electron-traffic-light-y:\s*(\d+)px;/)?.[1]
+  );
+  assert.equal(cssLightY, y);
 
   // Main-content clearance comes from the header-inset path: the shared top
   // row reserves the fixed control-row width so chrome never overlaps the

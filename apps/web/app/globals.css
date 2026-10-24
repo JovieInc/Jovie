@@ -114,7 +114,9 @@ html[data-desktop-runtime="electron"] {
   --electron-titlebar-height: 40px;
   --electron-controls-width: 200px;
   --electron-traffic-light-x: 20px;
-  --electron-traffic-light-y: 17px;
+  /* JOV-8974: the titlebar band sits one shell gap below the window top, so
+     the native lights ride down with it (MACOS_TRAFFIC_LIGHT_Y + gap). */
+  --electron-traffic-light-y: 25px;
   --electron-traffic-light-control-size: 14px;
   --electron-traffic-light-clearance: 8px;
   /* Content origin is the shell gap (titlebar padding-left). The reserve
@@ -153,15 +155,19 @@ html[data-desktop-runtime="electron"] [data-app-shell-frame="true"] {
 }
 
 /* The page header and window controls share one top row. */
+/* JOV-8974: the shell keeps one gutter on every window edge. The top gap
+   equals the sides (--app-shell-gap), so the titlebar band and the shared
+   header row start one shell gap below the window top. */
 html[data-desktop-runtime="electron"]
 [data-app-shell-body="true"][data-electron-top-gap-owner="titlebar"] {
-  padding-top: 0;
+  padding-top: var(--app-shell-gap);
   transition-property: gap, padding-right, padding-bottom, padding-left;
 }
 
 html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   position: absolute;
-  top: 0;
+  /* Sit inside the top gutter instead of flush with the window edge. */
+  top: var(--app-shell-gap);
   left: 0;
   /* Drag lives on sibling strips, not this ancestor. Chromium reports
      focus as inactive at 200% zoom when a no-drag control sits inside a

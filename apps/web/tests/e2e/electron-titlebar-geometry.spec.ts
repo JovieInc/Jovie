@@ -234,7 +234,9 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
   expect(tokens.titlebarHeight).toBe(40);
   expect(tokens.trafficLightSafeWidth).toBe(70);
   expect(tokens.trafficLightX).toBe(20);
-  expect(tokens.trafficLightY).toBe(17);
+  // JOV-8974: the titlebar band sits one shell gap below the window top, so
+  // the native lights ride down with it (native y 17 + the top gutter).
+  expect(tokens.trafficLightY).toBe(17 + (tokens.shellGap ?? 0));
   expect(tokens.collapsedSidebarWidth).toBe(52);
 
   if (tokens.sidebarWidth !== null && tokens.sidebarWidth > 0) {
@@ -372,6 +374,7 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const settingsColumnBox = settingsColumn?.getBoundingClientRect();
       return {
         bodyPaddingTop: Number.parseFloat(getComputedStyle(body).paddingTop),
+        bodyPaddingLeft: Number.parseFloat(getComputedStyle(body).paddingLeft),
         titlebarTop: titlebarBox.top,
         titlebarBottom: titlebarBox.bottom,
         bodyTop: bodyBox.top,
@@ -393,19 +396,28 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
     expect(geometry, `${route} exposes shell geometry`).not.toBeNull();
     expect(
       geometry?.bodyPaddingTop,
-      `${route} has no second top-gap owner`
-    ).toBe(0);
+      `${route} body top gutter equals the side gutters (JOV-8974)`
+    ).toBe(geometry?.bodyPaddingLeft);
     expect(
-      Math.abs((geometry?.titlebarTop ?? 0) - (geometry?.bodyTop ?? 0)),
-      `${route} body shares the titlebar top edge`
+      Math.abs(
+        (geometry?.titlebarTop ?? 0) -
+          ((geometry?.bodyTop ?? 0) + (geometry?.bodyPaddingTop ?? 0))
+      ),
+      `${route} titlebar band sits at the top gutter edge`
     ).toBeLessThanOrEqual(1);
     expect(
-      Math.abs((geometry?.sidebarTop ?? 0) - (geometry?.bodyTop ?? 0)),
-      `${route} sidebar aligns to the body grid`
+      Math.abs(
+        (geometry?.sidebarTop ?? 0) -
+          ((geometry?.bodyTop ?? 0) + (geometry?.bodyPaddingTop ?? 0))
+      ),
+      `${route} sidebar aligns to the body content grid`
     ).toBeLessThanOrEqual(1);
     expect(
-      Math.abs((geometry?.mainPlaneTop ?? 0) - (geometry?.bodyTop ?? 0)),
-      `${route} main plane aligns to the body grid`
+      Math.abs(
+        (geometry?.mainPlaneTop ?? 0) -
+          ((geometry?.bodyTop ?? 0) + (geometry?.bodyPaddingTop ?? 0))
+      ),
+      `${route} main plane aligns to the body content grid`
     ).toBeLessThanOrEqual(1);
 
     if (route.startsWith(APP_ROUTES.SETTINGS)) {
