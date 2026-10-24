@@ -1,7 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -86,10 +86,10 @@ export function DashboardNav({
     [profilesWorkspaceEnabled]
   );
   const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
-  const homeAttentionLabel = inboxNavItem.name;
-  const homeAttentionName = hasRuntimeUpdate
-    ? `${homeAttentionLabel} — App Update Available`
-    : homeAttentionLabel;
+  const inboxAttentionLabel = inboxNavItem.name;
+  const inboxAttentionName = hasRuntimeUpdate
+    ? `${inboxAttentionLabel} — App Update Available`
+    : inboxAttentionLabel;
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -519,13 +519,13 @@ export function DashboardNav({
                 ) : null}
                 {headerOwnsInbox ? null : (
                   <Link
-                    href={APP_ROUTES.DASHBOARD}
+                    href={inboxNavItem.href}
                     onClick={event => handleCommandClick(event, inboxNavItem)}
                     prefetch={false}
                     aria-busy={
                       pendingNavigation?.itemId === inboxNavItem.id || undefined
                     }
-                    aria-label={homeAttentionName}
+                    aria-label={inboxAttentionName}
                     data-inbox-attention={
                       hasRuntimeUpdate
                         ? 'available'
@@ -541,7 +541,7 @@ export function DashboardNav({
                         'bg-sidebar-accent-active text-primary-token'
                     )}
                   >
-                    <Bell
+                    <inboxNavItem.icon
                       className='size-(--app-shell-sidebar-icon-size)'
                       aria-hidden='true'
                     />

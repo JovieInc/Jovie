@@ -32,6 +32,23 @@ beforeEach(() => {
 });
 
 describe('shell alias redirects', () => {
+  it('redirects legacy Inbox view links while leaving Home at /app', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const config = nextConfigModule.default ?? nextConfigModule;
+    const redirects = await config.redirects();
+    expect(
+      redirects.filter(
+        (rule: RedirectRule) => rule.source === APP_ROUTES.DASHBOARD
+      )
+    ).toEqual([
+      {
+        source: APP_ROUTES.DASHBOARD,
+        has: [{ type: 'query', key: 'view' }],
+        destination: APP_ROUTES.INBOX,
+        permanent: false,
+      },
+    ]);
+  });
   it('redirects the legacy appearance alias to Account without a page stub', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;

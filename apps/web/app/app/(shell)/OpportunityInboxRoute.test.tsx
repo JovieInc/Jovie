@@ -285,13 +285,23 @@ describe('OpportunityInboxRoute', () => {
     expect(client).toHaveAttribute('data-pending-tour-date-count', '1');
   });
 
-  it('redirects missing app users to sign in with the inbox return target', async () => {
-    mocks.loadOpportunityInboxData.mockResolvedValue(null);
+  it.each([APP_ROUTES.DASHBOARD, APP_ROUTES.INBOX])(
+    'preserves %s as the authentication return destination',
+    async route => {
+      mocks.loadOpportunityInboxData.mockResolvedValue(null);
+      await expect(OpportunityInboxRoute({ route })).rejects.toThrow(
+        `REDIRECT:${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(route)}`
+      );
+      expect(mocks.loadAuthenticatedAppShellUserId).toHaveBeenCalledWith({
+        route,
+      });
+    }
+  );
 
-    await expect(OpportunityInboxRoute()).rejects.toThrow(
-      `REDIRECT:${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(
-        APP_ROUTES.DASHBOARD
-      )}`
-    );
+  it('defaults authentication to the permanent Inbox destination', async () => {
+    await OpportunityInboxRoute();
+    expect(mocks.loadAuthenticatedAppShellUserId).toHaveBeenCalledWith({
+      route: APP_ROUTES.INBOX,
+    });
   });
 });

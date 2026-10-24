@@ -444,6 +444,7 @@
         "apps/web/app/app/(shell)/dashboard/tour-dates/page.tsx",
         "apps/web/app/app/(shell)/earnings/page.tsx",
         "apps/web/app/app/(shell)/feature-flags/page.tsx",
+        "apps/web/app/app/(shell)/inbox/page.tsx",
         "apps/web/app/app/(shell)/insights/page.tsx",
         "apps/web/app/app/(shell)/jovie-work/page.tsx",
         "apps/web/app/app/(shell)/library/page.tsx",
@@ -681,6 +682,13 @@
       "to": "holdout",
       "at": "2026-10-23T18:26:27.418Z",
       "evidence": "PR #22804 re-registers the command palette product page after merging main including pre-save. Original branch observation: 2026-10-23T12:30:00Z; previous repair registration: 2026-10-23T16:58:51Z. Source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/app/(shell)/inbox/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-24T05:39:00Z",
+      "evidence": "JOV-8966 registers the dedicated Inbox route using the existing app-shell composition. Source registration only, not rendered certification."
     }
   ]
 }

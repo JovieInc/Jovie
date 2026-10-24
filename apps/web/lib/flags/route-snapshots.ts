@@ -5,7 +5,6 @@ import type { AppFlagName } from './contracts';
 
 const SHELL_CHROME_FLAG_NAMES = [
   'STRIPE_CONNECT_ENABLED',
-  'INBOX_HOME',
   'YOUTUBE_WORKSPACE_NAV',
   'JOVIE_WORK_NAV',
   // Identity is a primary-rail href. The client must see the resolved flag

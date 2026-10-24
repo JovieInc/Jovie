@@ -294,6 +294,7 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/dashboard/tour-dates/page.tsx',
   'apps/web/app/app/(shell)/earnings/page.tsx',
   'apps/web/app/app/(shell)/feature-flags/page.tsx',
+  'apps/web/app/app/(shell)/inbox/page.tsx',
   'apps/web/app/app/(shell)/insights/page.tsx',
   'apps/web/app/app/(shell)/jovie-work/page.tsx',
   'apps/web/app/app/(shell)/library/page.tsx',
@@ -438,8 +439,8 @@ const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
     redirectTo: '/app/settings/contacts',
   },
   'apps/web/app/app/(shell)/jovie-work/page.tsx': {
-    conceptId: '/app',
-    redirectTo: '/app?view=done',
+    conceptId: '/app/inbox',
+    redirectTo: '/app/inbox?view=done',
   },
   'apps/web/app/app/(shell)/feature-flags/page.tsx': {
     conceptId: '/app/admin/features',
