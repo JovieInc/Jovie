@@ -1,3 +1,5 @@
+'use client';
+
 import '../styles/system-b-app.css';
 import { useTheme } from 'next-themes';
 import { type ReactNode, useEffect, useRef } from 'react';
@@ -93,16 +95,15 @@ export function RenderedFamily({
     interactive,
     keyboardTargetSelector,
   ]);
+  // A selected live surface already owns layout (and may portal to body).
+  // Extra wrapper blocks would break its ancestor height allocation.
+  if (targetSelector) return children;
   return (
     <div
       className='w-full min-w-0 bg-base'
-      {...(!targetSelector &&
-        family(name, owner, resolvedTheme ?? '', surfaceToken))}
+      {...family(name, owner, resolvedTheme ?? '', surfaceToken)}
     >
-      <div
-        {...(!targetSelector &&
-          variant(interactive, '--radius-none', keyboardTargetSelector))}
-      >
+      <div {...variant(interactive, '--radius-none', keyboardTargetSelector)}>
         {children}
       </div>
     </div>

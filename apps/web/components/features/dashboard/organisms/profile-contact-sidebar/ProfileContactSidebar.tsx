@@ -1,6 +1,6 @@
 'use client';
-import { Button } from '@jovie/ui';
-import { Plus } from 'lucide-react';
+import { Button, IconButton } from '@jovie/ui';
+import { Plus, X } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   useCallback,
@@ -1177,8 +1177,16 @@ export function ProfileContactSidebar() {
         data-testid='profile-contact-sidebar-skeleton'
         workspaceSurface='raised'
         headerMode='minimal'
-        hideMinimalHeaderBar
-        showMobileDismissal
+        headerActions={
+          <IconButton
+            variant='ghost'
+            size='sm'
+            ariaLabel='Close'
+            onClick={close}
+          >
+            <X aria-hidden='true' />
+          </IconButton>
+        }
         contentBleed
       >
         {emailSignatureModal}

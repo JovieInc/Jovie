@@ -69,6 +69,7 @@ const mockState = vi.hoisted(() => ({
   useRealProfileMutation: false,
   selectedProfileId: 'profile-1',
   previewReady: true,
+  close: vi.fn(),
   routerPush: vi.fn(),
   routerReplace: vi.fn(),
   searchParams: new URLSearchParams(),
@@ -103,7 +104,7 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', async () => {
   const React = await vi.importActual<typeof import('react')>('react');
   return {
-    usePreviewPanelState: () => ({ isOpen: true, close: vi.fn() }),
+    usePreviewPanelState: () => ({ isOpen: true, close: mockState.close }),
     usePreviewPanelData: () => {
       const [previewData, setPreviewData] = React.useState(() =>
         mockState.previewReady
@@ -147,12 +148,14 @@ vi.mock('@/components/molecules/drawer', async () => ({
     .MockEntityTabbedRail,
   EntitySidebarShell: ({
     children,
+    headerActions,
     'data-testid': testId,
     id,
     onClose,
     showMobileDismissal = false,
   }: {
     children: React.ReactNode;
+    headerActions?: React.ReactNode;
     id?: string;
     onClose?: () => void;
     showMobileDismissal?: boolean;
@@ -164,6 +167,7 @@ vi.mock('@/components/molecules/drawer', async () => ({
       data-close-handler={onClose ? 'present' : 'none'}
       data-mobile-dismissal={String(showMobileDismissal)}
     >
+      {headerActions}
       {children}
     </aside>
   ),
@@ -486,6 +490,7 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     mockState.useRealProfileMutation = false;
     mockState.selectedProfileId = 'profile-1';
     mockState.previewReady = true;
+    mockState.close.mockReset();
     mockState.searchParams = new URLSearchParams();
     vi.unstubAllGlobals();
   });
@@ -546,7 +551,9 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     const rail = screen.getByTestId('profile-contact-sidebar-skeleton');
     expect(rail).toHaveAttribute('id', 'shell-artist-profile-rail');
     expect(rail).toHaveAttribute('data-close-handler', 'present');
-    expect(rail).toHaveAttribute('data-mobile-dismissal', 'true');
+    const dismiss = within(rail).getByRole('button', { name: 'Close' });
+    fireEvent.click(dismiss);
+    expect(mockState.close).toHaveBeenCalledOnce();
     expect(
       screen.getByTestId('profile-contact-sidebar-skeleton')
     ).toBeInTheDocument();

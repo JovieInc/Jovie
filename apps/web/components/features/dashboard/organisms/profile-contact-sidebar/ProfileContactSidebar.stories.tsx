@@ -11,6 +11,7 @@ import {
   PreviewPanelProvider,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { PreviewDataHydrator } from '../PreviewDataHydrator';
 import { ProfileContactSidebar } from './ProfileContactSidebar';
 
@@ -50,12 +51,24 @@ const meta = {
       <RenderedFamily
         name='ProfileContactSidebar'
         owner='ProfileContactSidebar'
-        interactive={context.name !== 'Loading'}
+        interactive
+        keyboardTargetSelector={
+          context.name === 'Loading'
+            ? 'button[aria-label="Close"]'
+            : 'button[aria-label="Copy profile link"]'
+        }
         targetSelector='#shell-artist-profile-rail'
         surfaceToken='--app-shell-content-surface'
       >
         <Story />
       </RenderedFamily>
+    ),
+    Story => (
+      <main className='relative h-screen w-full bg-surface-0'>
+        <AppShellRightRail>
+          <Story />
+        </AppShellRightRail>
+      </main>
     ),
     Story => (
       <DashboardStoryProviders dashboardData={dashboardData}>
@@ -69,7 +82,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const Loading: Story = {
   render: () => (
-    <PreviewPanelProvider defaultOpen>
+    <PreviewPanelProvider>
       <OpenProfileRail />
       <ProfileContactSidebar />
     </PreviewPanelProvider>
@@ -77,7 +90,7 @@ export const Loading: Story = {
 };
 export const Hydrated: Story = {
   render: () => (
-    <PreviewPanelProvider defaultOpen>
+    <PreviewPanelProvider>
       <OpenProfileRail />
       <PreviewDataHydrator initialLinks={[]} connectedDSPs={[]} />
       <ProfileContactSidebar />

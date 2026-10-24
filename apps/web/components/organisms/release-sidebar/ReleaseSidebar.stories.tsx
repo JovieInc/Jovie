@@ -50,6 +50,11 @@ const meta = {
         name='ReleaseSidebar'
         owner='ReleaseSidebar'
         interactive={Boolean(context.args.release)}
+        keyboardTargetSelector={
+          context.args.release
+            ? '[role="tab"][aria-selected="true"]'
+            : undefined
+        }
         targetSelector='[data-testid="release-sidebar"]'
         surfaceToken='--app-shell-content-surface'
       >
