@@ -196,8 +196,8 @@
     },
     ".claude/rules/macos.md": {
       "owner": "@itstimwhite",
-      "claim": "Current Mac owners and planned Swift-native direction follow the stack receipt and accepted ADR; no native parity is certified.",
-      "documentSha256": "3e478342371997f9537a7194222b21221735e6ea564eee3651fb3dd9319945f9",
+      "claim": "Current Mac owners and planned Swift-native direction follow the stack receipt and accepted ADR; no native parity is certified. New surfaces default to SwiftUI, Electron stays maintenance-only, and the production ultrawide Ovie surface stays under a perpetual design loop.",
+      "documentSha256": "81e758d169e66a1235c43e67ca33e634d9bbdb711a8abcd8d013f50aff91abe7",
       "sources": [
         {
           "path": "docs/macos/swift-control-invariants.md",
@@ -260,8 +260,8 @@
     },
     ".claude/rules/security.md": {
       "owner": "@itstimwhite",
-      "claim": "CSP provider domains are consumed by the existing CSP implementation.",
-      "documentSha256": "192c9a31384046b11edfe63e9cf94e6fd0dd4d788770ac65774b7275a204dace",
+      "claim": "CSP provider domains are consumed by the existing CSP implementation. Every capability, quota, rate, or resource carries a documented, server-enforced, single-setting abuse limit.",
+      "documentSha256": "6dc09197a4bfec7315d92811565eff8f3b71079cca303470cd64e321fbd6897a",
       "sources": [
         {
           "path": "apps/web/lib/security/content-security-policy.ts",
