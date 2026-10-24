@@ -687,6 +687,89 @@ def dig(value, *keys, default=None):
     return default if value is None else value
 
 
+TARGET_TITLES = "hud-target-titles.json"
+TARGET_ALERTS = "hud-target-alerts.jsonl"
+TARGET_TTL_S = 300
+TARGET_PR = re.compile(r"^PR(\d+)$")
+
+
+def fetch_target_titles(numbers: list[int], cache: Path | None, now: float | None = None,
+                        fetch=None) -> tuple[dict, str | None]:
+    """Titles and states for running PR targets the lane-branch inventory cannot see (a fix
+    run on a screenshots/ or ci/ branch). One batched GraphQL read, cached TARGET_TTL_S."""
+    now = time.time() if now is None else now
+    try:
+        stored = json.loads(cache.read_text()) if cache and cache.exists() else {}
+    except (OSError, ValueError):
+        stored = {}
+    entries = stored.get("prs", {}) if isinstance(stored, dict) else {}
+    stale = [n for n in numbers if str(n) not in entries or now - float(entries[str(n)].get("at", 0)) > TARGET_TTL_S]
+    error = None
+    if stale:
+        owner, name = lane.REPO_SLUG.split("/", 1)
+        fields = " ".join(f"p{n}: pullRequest(number: {int(n)}) {{ title state }}" for n in stale)
+        query = f'query {{ repository(owner: "{owner}", name: "{name}") {{ {fields} }} }}'
+        try:
+            data = (fetch or gh_json)(["api", "graphql", "-f", f"query={query}"])
+            repo = ((data or {}).get("data") or {}).get("repository") or {}
+            for n in stale:
+                pr = repo.get(f"p{n}")
+                if pr:
+                    entries[str(n)] = {"title": pr.get("title") or "", "state": pr.get("state") or "", "at": now}
+        except Exception as exc:  # a failed read is shown, never guessed
+            error = f"{type(exc).__name__}: {exc}"[:100]
+        if cache:
+            try:
+                stored = {"prs": entries, "alerted": stored.get("alerted", {}) if isinstance(stored, dict) else {}}
+                cache.write_text(json.dumps(stored, sort_keys=True))
+            except OSError:
+                pass
+    return {f"PR{n}": entries[str(n)] for n in numbers if str(n) in entries}, error
+
+
+def record_closed_target_alerts(targets: dict, cache: Path | None, log: Path | None) -> list[str]:
+    """One alert per running lane whose PR is closed or merged; the lane is never touched."""
+    if not cache or not log:
+        return []
+    try:
+        stored = json.loads(cache.read_text()) if cache.exists() else {}
+    except (OSError, ValueError):
+        stored = {}
+    alerted = stored.setdefault("alerted", {})
+    fresh = []
+    for target, info in targets.items():
+        state = info.get("state")
+        if state in ("CLOSED", "MERGED") and alerted.get(target) != state:
+            alerted[target] = state
+            fresh.append(target)
+            try:
+                with log.open("a") as out:
+                    out.write(json.dumps({"at": utcnow().isoformat(), "target": target, "state": state,
+                                          "title": info.get("title", "")}) + "\n")
+            except OSError:
+                pass
+    if fresh:
+        try:
+            cache.write_text(json.dumps(stored, sort_keys=True))
+        except OSError:
+            pass
+    return fresh
+
+
+def lane_title(titles: dict, github: dict, target: str, now: datetime) -> str:
+    if title := titles.get(target):
+        return title
+    info = (github.get("targets") or {}).get(target)
+    if info:
+        if info.get("state") in ("CLOSED", "MERGED"):
+            return f"CLOSED/MERGED · {info.get('title', '')}"
+        return info.get("title") or "untitled PR"
+    error = github.get("errors", {}).get("targets") or github_source_error(github, "open", now)
+    if error and TARGET_PR.match(target or ""):
+        return f"GitHub read failed: {error}"
+    return "title not in current GitHub/Linear read"
+
+
 def github_source_error(github: dict, source: str, now: datetime) -> str | None:
     """A quota read or refresh attempt cannot renew an older source's truth."""
     if error := github.get("errors", {}).get(source):
@@ -1128,7 +1211,7 @@ def worker_rows(f: dict, width: int) -> list[str]:
         mine = [w for w in workers if w["provider"] == name]
         for worker in (w for w in mine if w.get("run")):
             run = worker["run"]
-            title = f["titles"].get(run["target"]) or "title not in current GitHub/Linear read"
+            title = lane_title(f["titles"], f["github"], run["target"], now)
             kind = {"issue": "issue", "adopt": "gate", "fix": "fix-red"}.get(run["kind"], run["kind"])
             elapsed = since(run["startedAt"], now)
             rows.append(titled(paint("ok", "● ") + f"{name:<10} {run['target']:<9} {kind:<7} {run.get('phase', '?'):<13} "
@@ -1727,6 +1810,15 @@ def build_model(host, remote: Remote | None = None) -> dict:
     local = local_model(host)
     targets = [w["run"]["target"] for w in local["workers"] if w["run"]]
     github = remote.github if remote else github_model()
+    if not remote:
+        known = {f"PR{pr['number']}" for pr in github.get("open") or []}
+        missing = sorted({int(m.group(1)) for t in targets if t not in known and (m := TARGET_PR.match(t or ""))})
+        if missing:
+            cache = host.state / TARGET_TITLES
+            github["targets"], error = fetch_target_titles(missing, cache)
+            if error:
+                github.setdefault("errors", {})["targets"] = error
+            record_closed_target_alerts(github["targets"], cache, host.state / TARGET_ALERTS)
     model = {"local": local,
              "linear": remote.linear if remote else linear_model(host.linear_env, targets),
              "github": github,

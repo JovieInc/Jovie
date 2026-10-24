@@ -1142,6 +1142,57 @@ hud.main()
                 execute.assert_not_called()
 
 
+
+class LaneTargetTitleTest(unittest.TestCase):
+    """A fix run on a non-lane branch (screenshots/, ci/) still shows its real PR title."""
+
+    def rows(self, value, now):
+        return [plain(row) for row in hud.render(value, 215, 45, now=now)]
+
+    def test_live_fixture_non_lane_target_shows_fetched_title(self):
+        value, now = fixture("live")
+        value["github"]["open"] = [pr for pr in value["github"].get("open", []) if pr["number"] != 21774]
+        value["github"]["targets"] = {"PR21774": {"title": "chore: update product screenshots", "state": "OPEN"}}
+        text = "\n".join(self.rows(value, now))
+        self.assertIn("chore: update", text)  # clipped to the worker column
+        self.assertNotIn("title not in current", text)
+
+    def test_live_fixture_closed_target_is_marked(self):
+        value, now = fixture("live")
+        value["github"]["open"] = [pr for pr in value["github"].get("open", []) if pr["number"] != 21774]
+        value["github"]["targets"] = {"PR21774": {"title": "old work", "state": "MERGED"}}
+        self.assertIn("CLOSED/MERG", "\n".join(self.rows(value, now)))
+
+    def test_degraded_fixture_names_the_read_failure(self):
+        value, now = fixture("degraded")
+        self.assertIn("GitHub read", "\n".join(self.rows(value, now)))
+
+    def test_fetch_is_batched_cached_and_alerts_once(self):
+        calls = []
+
+        def fake(args):
+            calls.append(args)
+            return {"data": {"repository": {"p5": {"title": "five", "state": "MERGED"},
+                                            "p6": {"title": "six", "state": "OPEN"}}}}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache, log = Path(tmp) / "titles.json", Path(tmp) / "alerts.jsonl"
+            got, error = hud.fetch_target_titles([5, 6], cache, now=1000.0, fetch=fake)
+            self.assertIsNone(error)
+            self.assertEqual(got["PR6"]["title"], "six")
+            hud.fetch_target_titles([5, 6], cache, now=1100.0, fetch=fake)
+            self.assertEqual(len(calls), 1)  # one batched read, then the 5-minute cache
+            self.assertEqual(hud.record_closed_target_alerts(got, cache, log), ["PR5"])
+            self.assertEqual(hud.record_closed_target_alerts(got, cache, log), [])
+            self.assertEqual(len(log.read_text().splitlines()), 1)
+
+    def test_fetch_failure_is_reported_not_guessed(self):
+        def boom(args):
+            raise RuntimeError("HTTP 502")
+        got, error = hud.fetch_target_titles([7], None, now=10_000.0, fetch=boom)
+        self.assertEqual(got, {})
+        self.assertIn("HTTP 502", error)
+
 if __name__ == "__main__":
     unittest.main()
 

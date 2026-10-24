@@ -208,7 +208,12 @@ export function evaluateSourceAdmission({
     }
     if (
       status.creator.type !== 'Bot' ||
-      status.creator.login !== 'jovie-bot[bot]'
+      ![
+        'jovie-bot[bot]',
+        'jovie-ci-lane[bot]',
+        'jovie-symphony-lane[bot]',
+        'jovie-agents-lane[bot]',
+      ].includes(status.creator.login)
     )
       continue;
     if (
