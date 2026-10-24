@@ -308,17 +308,9 @@ export function RightDrawer({
   );
   useRailFocusReturn(asideRef, !isOpen, 'right', mobileTriggerRef);
 
-  // Handle keyboard events at the document level when drawer is open.
-  // The listener stays armed for every open drawer — including the render
-  // window right after the viewport crosses below lg, where the mobile
-  // activation render has not landed yet (isActiveMobileDrawer still false)
-  // and dropping the key here would silently swallow Escape. Superseded
-  // mobile drawers do not steal the key instead: the Escape branch defers
-  // through hasOpenModalDialog, so whichever rail is the live modal dialog
-  // owns the dismissal. Non-Escape keys remain gated on the drawer holding
-  // focus below.
+  // Handle keyboard events at the document level when drawer is open
   useEffect(() => {
-    if (!isOpen || !onKeyDown) return;
+    if (!isOpen || !onKeyDown || (isMobile && !isActiveMobileDrawer)) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -341,7 +333,7 @@ export function RightDrawer({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onKeyDown]);
+  }, [isActiveMobileDrawer, isMobile, isOpen, onKeyDown]);
 
   const hasContextMenu =
     contextMenuItems != null && contextMenuItems.length > 0;
