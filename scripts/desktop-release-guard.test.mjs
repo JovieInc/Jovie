@@ -42,6 +42,10 @@ const desktopRequire = createRequire(
 const { notarizeReleaseDmg } = desktopRequire(
   './scripts/notarize-release-dmg.cjs'
 );
+const desktopProductionBuilder = readFileSync(
+  new URL('../apps/desktop/electron-builder.yml', import.meta.url),
+  'utf8'
+);
 const desktopWorkflow = readFileSync(
   new URL('../.github/workflows/desktop-release.yml', import.meta.url),
   'utf8'
@@ -51,6 +55,10 @@ const productionMarkerRecoveryWorkflow = readFileSync(
     '../.github/workflows/production-marker-recovery.yml',
     import.meta.url
   ),
+  'utf8'
+);
+const desktopReleaseAssets = readFileSync(
+  new URL('./desktop-release-assets.mjs', import.meta.url),
   'utf8'
 );
 
@@ -2277,6 +2285,93 @@ test('automatic desktop publishing stamps production-impacting source before rel
   // authoritative (docs/ci/CI_RELEASE_INCIDENTS.md). The stamp step must not
   // re-add the retired label after `gh pr create`.
   assert.doesNotMatch(stamp, /gh pr edit [^\n]*--add-label "merge-queue"/);
+});
+
+test('production desktop publication remains independently proven', () => {
+  const build = job(desktopWorkflow, 'build');
+  const productionPackage = step(build, 'Package production desktop app');
+  const productionVerify = step(
+    build,
+    'Verify production desktop artifact set'
+  );
+  const publish = step(build, 'Publish production desktop release');
+  const marker = job(desktopWorkflow, 'record-production-publish');
+
+  assertPatterns(build, [
+    /needs: \[authorize-release\]/,
+    /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
+    /package:production/,
+    /JOVIE_RELEASE_DMG: 'true'/,
+    /desktop-release-assets\.mjs upload-and-publish/,
+    /dist\/latest-mac\.yml/,
+  ]);
+  assertPatterns(publish, [
+    /\.github\/scripts\/resolve-main-sha\.sh/,
+    /desktop-release-assets\.mjs upload-and-publish/,
+    /--dist "apps\/desktop\/dist"/,
+  ]);
+  assertPatterns(productionPackage, [
+    /JOVIE_DESKTOP_SOURCE_REVISION: \$\{\{ env\.RELEASE_SHA \}\}/,
+    /JOVIE_RELEASE_DMG: 'true'/,
+    /package:production/,
+  ]);
+  assertPatterns(productionVerify, [
+    /if:.*env\.ENVIRONMENT == 'production'/,
+    /codesign --verify --deep --strict "\$production_app"/,
+    /spctl --assess --type execute --verbose=2 "\$production_app"/,
+    /xcrun stapler validate "\$production_app"/,
+    /codesign --verify --verbose=2 "\$production_dmg"/,
+    /xcrun stapler validate "\$production_dmg"/,
+    /spctl --assess --type open --context context:primary-signature/,
+  ]);
+  assert.match(
+    desktopProductionBuilder,
+    /^artifactBuildCompleted: scripts\/notarize-release-dmg\.cjs$/m
+  );
+  assert.doesNotMatch(
+    build,
+    /- name: Notarize and staple staging desktop image/
+  );
+  assert.ok(
+    publish.indexOf('resolve-main-sha.sh') <
+      publish.indexOf('desktop-release-assets.mjs upload-and-publish')
+  );
+  assert.ok(
+    build.indexOf('Prepare private production draft') <
+      build.indexOf('Package production desktop app')
+  );
+  assert.ok(
+    build.indexOf('- name: Package production desktop app') <
+      build.indexOf('- name: Verify production desktop artifact set')
+  );
+  assert.ok(
+    build.indexOf('- name: Verify production desktop artifact set') <
+      build.indexOf('- name: Publish production desktop release')
+  );
+  assert.doesNotMatch(build, /Upload production desktop publish marker/);
+  assertPatterns(marker, [
+    /needs: \[authorize-release, build, wait-for-deferred-desktop-quota, rebuild-deferred-desktop\]/,
+    /runs-on: ubuntu-latest/,
+    /actions: read/,
+    /contents: read/,
+    /Verify exact published release assets/,
+    /Cross-prove exact production publisher/,
+    /WORKFLOW_SHA: \$\{\{ github\.sha \}\}/,
+    /publisherJobId/,
+    /Upload production desktop publish marker/,
+    /overwrite: true/,
+    /retention-days: 90/,
+  ]);
+  assert.ok(
+    marker.indexOf('Verify exact published release assets') <
+      marker.indexOf('Cross-prove exact production publisher')
+  );
+  assert.doesNotMatch(marker, /contents: write|electron-builder publish/);
+  assert.doesNotMatch(
+    desktopWorkflow,
+    /electron-builder publish|--publish always/
+  );
+  assert.match(desktopReleaseAssets, /releases\?per_page=100/);
 });
 
 test('desktop installation quota defer is visible and retried once', async t => {
