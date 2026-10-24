@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { ProfileMockup } from './ProfileMockup';
+import { ProfileMockup, type ProfileMockupProps } from './ProfileMockup';
 
 const meta = {
   title: 'Features/Home/ProfileMockup',
@@ -15,7 +15,7 @@ const meta = {
 } satisfies Meta<typeof ProfileMockup>;
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<ProfileMockupProps>;
 
 export const Default: Story = {};
 export const LongName: Story = {
