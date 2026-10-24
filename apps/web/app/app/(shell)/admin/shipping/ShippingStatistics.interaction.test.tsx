@@ -66,7 +66,7 @@ describe('ShippingStatistics interactions', () => {
     );
     await screen.findByText(/Observed .*Stale or partial/);
     await act(async () => {
-      fireEvent(globalThis, new Event('resize'));
+      fireEvent(globalThis.window, new Event('resize'));
       focusManager.setFocused(false);
       focusManager.setFocused(true);
     });

@@ -227,8 +227,8 @@ describe('ShippingStatistics states', () => {
           configurable: true,
           value: width,
         });
-        fireEvent(globalThis, new Event('resize'));
-        fireEvent(globalThis, new Event('focus'));
+        fireEvent(globalThis.window, new Event('resize'));
+        fireEvent(globalThis.window, new Event('focus'));
       }
     });
     view.unmount();
