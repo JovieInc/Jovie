@@ -18,7 +18,12 @@ export const maxDuration = 60;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const VELOCITY_CACHE_MAX_AGE_MS = 2 * 60 * 1000;
 const VELOCITY_CACHE_STALE_MAX_AGE_MS = 10 * 60 * 1000;
+const VELOCITY_REFRESH_COOLDOWN_MS = VELOCITY_CACHE_STALE_MAX_AGE_MS;
 const velocityInFlight = new Map<string, Promise<ShippingVelocityResponse>>();
+const velocityRefreshCooldowns = new Map<
+  string,
+  { untilMs: number; message: string }
+>();
 
 type ValidRange = '7d' | '30d' | '1y';
 
@@ -106,6 +111,32 @@ class GitHubScanBudgetError extends Error {
     super(`GitHub GraphQL ${resource} budget exceeded`);
     this.name = 'GitHubScanBudgetError';
   }
+}
+
+/**
+ * Expected refresh failures (scan exhaustion, rate limit, timeout) cannot
+ * succeed again until GitHub's data or limits move. Re-running a scan that
+ * cannot fit its page budget on every expired-cache poll burns the shared
+ * GitHub GraphQL budget (JOV-8743), so record a cooldown: serve the degraded
+ * observation immediately and re-attempt at most once per window.
+ */
+function recordRefreshCooldown(cacheKey: string, message: string): void {
+  velocityRefreshCooldowns.set(cacheKey, {
+    untilMs: Date.now() + VELOCITY_REFRESH_COOLDOWN_MS,
+    message,
+  });
+}
+
+function activeRefreshCooldown(
+  cacheKey: string
+): { readonly message: string } | null {
+  const cooldown = velocityRefreshCooldowns.get(cacheKey);
+  if (!cooldown) return null;
+  if (cooldown.untilMs <= Date.now()) {
+    velocityRefreshCooldowns.delete(cacheKey);
+    return null;
+  }
+  return cooldown;
 }
 
 function rateLimitResetAtIso(response: Response): string | null {
@@ -548,6 +579,30 @@ export async function GET(request: Request): Promise<Response> {
 
     let computation = velocityInFlight.get(cacheKey);
     if (!computation) {
+      const cooldown = activeRefreshCooldown(cacheKey);
+      if (cooldown) {
+        if (cached && cached.response.observation !== 'not_configured') {
+          return NextResponse.json(
+            normalizeVelocityResponse({
+              ...cached.response,
+              observation: 'stale',
+              errorMessage: cooldown.message,
+            }),
+            { status: 200, headers: NO_STORE_HEADERS }
+          );
+        }
+        const unavailable: ShippingVelocityResponse = {
+          data: [],
+          range,
+          cachedAt: new Date().toISOString(),
+          observation: 'unavailable',
+          errorMessage: cooldown.message,
+        };
+        return NextResponse.json(unavailable, {
+          status: 200,
+          headers: NO_STORE_HEADERS,
+        });
+      }
       computation = computeVelocity(
         token,
         owner,
@@ -570,6 +625,9 @@ export async function GET(request: Request): Promise<Response> {
       result = await computation;
     } catch (error) {
       const expectedErrorMessage = expectedRefreshErrorMessage(error);
+      if (expectedErrorMessage) {
+        recordRefreshCooldown(cacheKey, expectedErrorMessage);
+      }
       if (cached?.response.observation !== undefined) {
         const stale = normalizeVelocityResponse({
           ...cached.response,

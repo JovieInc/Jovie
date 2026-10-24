@@ -1,7 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { LoadingSkeleton } from '@jovie/ui/atoms/skeleton';
+import { Button, LoadingSkeleton } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, GitPullRequest } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -16,10 +15,8 @@ import {
 } from '@/components/molecules/drawer';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
-import {
-  parseShippingCockpitProjection,
-  type ShippingCockpitProjection,
-} from '@/lib/ovie/shipping-state/client';
+import { type ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
+import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 
@@ -428,27 +425,7 @@ export function ShippingMatrix() {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
-  const query = useQuery({
-    queryKey: ['ovie', 'shipping-state'],
-    queryFn: async ({ signal }) => {
-      const response = await fetch('/api/hud/shipping-state', {
-        signal,
-        cache: 'no-store',
-      });
-      if (!response.ok) {
-        throw new Error(
-          `Shipping observation unavailable (${response.status})`
-        );
-      }
-      const data = parseShippingCockpitProjection(await response.json());
-      if (!data) throw new Error('Shipping receipt could not be validated');
-      return data;
-    },
-    staleTime: 0,
-    gcTime: 60 * 1000,
-    retry: false,
-    refetchOnWindowFocus: true,
-  });
+  const query = useQuery(shippingStateQueryOptions);
   const [selectedId, setSelectedId] = useState<MatrixRow['id'] | null>(null);
   const feed = query.data?.operationalTasks;
   const rows = feed ? buildMatrixRows(feed, now) : [];
@@ -495,7 +472,10 @@ export function ShippingMatrix() {
             {query.isFetching ? 'Refreshing' : 'Refresh'}
           </Button>
         </div>
-        <div className='overflow-x-auto'>
+        <div
+          className='h-64 overflow-auto'
+          data-testid='shipping-matrix-viewport'
+        >
           <table
             className='w-full text-left text-xs tabular-nums'
             aria-labelledby='shipping-matrix-title'
@@ -515,23 +495,31 @@ export function ShippingMatrix() {
             </thead>
             <tbody>
               {query.isPending ? (
-                <tr
-                  aria-label='Loading In-flight Work'
-                  className='border-t border-subtle'
-                >
-                  {SHIPPING_COLUMNS.map(column => (
-                    <td key={column} className='p-2'>
-                      <LoadingSkeleton announce={false} />
-                      {column === 'Work' ? (
+                ['first', 'second', 'third', 'fourth', 'fifth'].map(row => (
+                  <tr
+                    key={`loading-${row}`}
+                    className='border-t border-subtle'
+                    aria-busy='true'
+                  >
+                    {[
+                      'work',
+                      'stage',
+                      'checks',
+                      'queue',
+                      'owner',
+                      'age',
+                      'transition',
+                    ].map(column => (
+                      <td key={`loading-${column}`} className='p-2'>
                         <LoadingSkeleton
+                          height='h-4'
+                          width='w-full'
                           announce={false}
-                          height='h-3'
-                          width='w-24'
                         />
-                      ) : null}
-                    </td>
-                  ))}
-                </tr>
+                      </td>
+                    ))}
+                  </tr>
+                ))
               ) : rows.length === 0 ? (
                 <tr className='border-t border-subtle'>
                   <td

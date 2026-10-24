@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'vitest';
@@ -143,5 +149,59 @@ test('CLI fails the exact head and the head merged into a moved base', () => {
     assert.match(noTool.stdout, /could not be evaluated/);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the workflow load guard runs from a trusted-base extraction (JOV-8840)', () => {
+  // Source Validation's deterministic contract step extracts this script from
+  // the trusted base into a temp guard root and runs it against the PR-head
+  // checkout (JOV-8840): a main-only guard must work with any cwd, because an
+  // older PR head's checkout does not contain the script at all. Before the
+  // extraction the step died with MODULE_NOT_FOUND on every pre-#22394 head.
+  const root = mkdtempSync(join(tmpdir(), 'workflow-budget-checkout-'));
+  const guardRoot = mkdtempSync(join(tmpdir(), 'workflow-budget-guard-'));
+  const guard = join(guardRoot, 'scripts', 'workflow-expression-budget.mjs');
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  const write = text => {
+    mkdirSync(join(root, '.github/workflows'), { recursive: true });
+    writeFileSync(join(root, '.github/workflows/ci.yml'), text);
+  };
+  const run = (...args) =>
+    spawnSync(process.execPath, [guard, ...args], {
+      cwd: root,
+      encoding: 'utf8',
+      // The guard root has no node_modules up-tree, so js-yaml resolves
+      // through NODE_PATH exactly as it does in a workspace checkout.
+      env: { ...process.env, NODE_PATH: resolve('node_modules') },
+    });
+  try {
+    mkdirSync(join(guardRoot, 'scripts'), { recursive: true });
+    copyFileSync(SCRIPT, guard);
+    git('init', '--quiet', '--initial-branch=main');
+    git('config', 'user.name', 'Budget test');
+    git('config', 'user.email', 'budget@example.invalid');
+    write(workflow(detectScript(20_600)));
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'clean checkout');
+    assert.equal(
+      run('--ref', 'HEAD').status,
+      0,
+      'an extracted guard measures a clean checkout'
+    );
+    assert.equal(
+      run('--ref', 'HEAD', '--merge-with', 'HEAD').status,
+      0,
+      'an extracted guard measures the merged tree'
+    );
+    git('checkout', '--quiet', '-b', 'over');
+    write(workflow(detectScript(21_052)));
+    git('commit', '--quiet', '-am', 'over budget');
+    const over = run('--ref', 'HEAD');
+    assert.equal(over.status, 1, over.stdout + over.stderr);
+    assert.match(over.stdout, /::error file=\.github\/workflows\/ci\.yml/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(guardRoot, { recursive: true, force: true });
   }
 });

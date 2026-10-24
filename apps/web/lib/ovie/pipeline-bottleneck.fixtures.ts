@@ -19,6 +19,8 @@ export function bottleneckFixture(
     dispatchRef: 'repair:runner-capacity',
     cost: null,
     impact: null,
+    statusLink: 'https://github.com/JovieInc/Jovie/pull/17005',
+    metric: 'Queued work 2 with capacity 1',
     sourceDigest: 'a'.repeat(64),
     metrics: {},
     ...overrides,
@@ -40,6 +42,8 @@ export function contributionFixture(
     },
     cost: { item: 'Runner memory', monthlyUsd: 24 },
     impact: 'Adds capacity for two concurrent repairs.',
+    statusLink: 'https://linear.app/jovie/issue/JOV-5974/raise-runner-memory',
+    metric: 'Runner memory 94% sustained',
     ...overrides,
   };
 }
