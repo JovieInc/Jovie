@@ -17,11 +17,11 @@ export function OpportunityInboxEmptyState({
 }: OpportunityInboxEmptyStateProps) {
   const primaryCard = actionCards?.[0];
   const ctaHref = primaryCard?.href ?? APP_ROUTES.CHAT;
-  const ctaLabel = primaryCard?.actionLabel ?? 'Start A Chat';
+  const ctaLabel = primaryCard?.actionLabel ?? 'Start a chat';
 
   return (
     <EmptyState
-      heading='Your Inbox Is Clear'
+      heading='Your inbox is clear'
       description='Jovie is watching for the next opportunity.'
       action={{ href: ctaHref, label: ctaLabel }}
       presentation='workspace'

@@ -74,7 +74,7 @@ describe('WorkflowCaptureInboxCard', () => {
       '[&_button:first-of-type]:min-w-32'
     );
     expect(screen.getByText(/Never record passwords/)).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Open Workflow' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open workflow' })).toHaveAttribute(
       'href',
       'https://studio.youtube.com'
     );
@@ -96,7 +96,7 @@ describe('WorkflowCaptureInboxCard', () => {
       'workflow_capture'
     );
 
-    await user.click(screen.getByRole('button', { name: 'Stop Recording' }));
+    await user.click(screen.getByRole('button', { name: 'Stop recording' }));
     await waitFor(() =>
       expect(hoisted.upload).toHaveBeenCalledWith(
         'capture-1',
@@ -104,10 +104,10 @@ describe('WorkflowCaptureInboxCard', () => {
       )
     );
     expect(
-      screen.getByRole('link', { name: 'Review Recording' })
+      screen.getByRole('link', { name: 'Review recording' })
     ).toHaveAttribute('href', '/api/workflow-captures/capture-1/media');
 
-    await user.click(screen.getByRole('button', { name: 'Send Recording' }));
+    await user.click(screen.getByRole('button', { name: 'Send recording' }));
     await waitFor(() => {
       expect(hoisted.mutate).toHaveBeenCalledWith('capture-1', {
         action: 'mark-ready',
@@ -134,7 +134,7 @@ describe('WorkflowCaptureInboxCard', () => {
     );
 
     await user.click(
-      screen.getByRole('button', { name: 'Dismiss Opportunity' })
+      screen.getByRole('button', { name: 'Dismiss opportunity' })
     );
 
     await waitFor(() => {

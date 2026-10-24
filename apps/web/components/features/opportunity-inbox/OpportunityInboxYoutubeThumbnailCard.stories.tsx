@@ -23,11 +23,11 @@ const youtubeThumbnail = {
 const card = {
   id: 'candidate-1',
   signalType: 'other' as const,
-  typeLabel: 'YouTube Thumbnail',
+  typeLabel: 'YouTube thumbnail',
   createdAt: '2026-09-01T12:00:00.000Z',
   title: 'Review thumbnail for The Last Time',
   why: 'YouTube API snapshot captured Sep 1, 2026. Approval records intent; publication stays blocked pending a native Studio experiment and provider readback.',
-  primaryActionLabel: 'Approve Candidate',
+  primaryActionLabel: 'Approve candidate',
   status: 'pending' as const,
   category: 'youtube_thumbnail' as const,
   youtubeThumbnail,

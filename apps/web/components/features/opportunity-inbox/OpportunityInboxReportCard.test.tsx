@@ -69,7 +69,7 @@ describe('OpportunityInboxReportCard', () => {
       screen.queryByTestId('opportunity-inbox-report-breakdown')
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Show Breakdown/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Show breakdown/ }));
 
     expect(
       screen.getByTestId('opportunity-inbox-report-breakdown')

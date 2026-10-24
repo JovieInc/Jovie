@@ -142,7 +142,7 @@ export function OpportunityInboxCard({
             selectedRating === 'positive' &&
               'border-subtle bg-surface-1 text-primary-token'
           )}
-          aria-label='Mark Suggestion Helpful'
+          aria-label='Mark suggestion helpful'
           disabled={isBusy}
           onClick={() => submitFeedback('positive')}
         >
@@ -157,7 +157,7 @@ export function OpportunityInboxCard({
             selectedRating === 'negative' &&
               'border-subtle bg-surface-1 text-primary-token'
           )}
-          aria-label='Mark Suggestion Not Helpful'
+          aria-label='Mark suggestion not helpful'
           disabled={isBusy}
           onClick={() => submitFeedback('negative')}
         >
@@ -173,7 +173,7 @@ export function OpportunityInboxCard({
           )}
           aria-expanded={commentOpen}
           aria-controls={commentFieldId}
-          aria-label='Add Comment For Jovie'
+          aria-label='Add comment for Jovie'
           disabled={isBusy}
           onClick={() => setCommentOpen(open => !open)}
         >

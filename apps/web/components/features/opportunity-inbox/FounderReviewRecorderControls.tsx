@@ -45,7 +45,7 @@ function RecorderHeader({
   onStop,
 }: RecorderHeaderProps) {
   const sessionLabel = sessionActive ? 'Recording' : 'Mic off';
-  const buttonLabel = sessionActive ? 'Stop And Save' : 'Start Session';
+  const buttonLabel = sessionActive ? 'Stop and save' : 'Start session';
   const buttonAction = sessionActive ? onStop : onStart;
   const buttonVariant = sessionActive ? 'secondary' : 'primary';
   return (
@@ -59,7 +59,7 @@ function RecorderHeader({
         />
         <div>
           <p className='text-sm font-medium text-primary-token'>
-            Founder Review
+            Founder review
           </p>
           <p className='text-2xs text-tertiary-token'>
             {sessionLabel} · ⌘/Ctrl Shift M
@@ -124,7 +124,7 @@ function RecorderStatus({
           disabled={saving}
           onClick={onDeleteAudio}
         >
-          <Trash2 className='mr-1.5 size-3.5' /> Delete Audio
+          <Trash2 className='mr-1.5 size-3.5' /> Delete audio
         </Button>
       ) : null}
     </div>
@@ -158,7 +158,7 @@ function RecorderActions({
         disabled={saving || noteIsEmpty}
         onClick={onSaveNote}
       >
-        {saving ? 'Saving…' : 'Save Brain Dump'}
+        {saving ? 'Saving…' : 'Save brain dump'}
       </Button>
     );
   }
@@ -173,7 +173,7 @@ function RecorderActions({
         Reject
       </Button>
       <Button type='button' disabled={saving} onClick={onApprove}>
-        {saving ? 'Saving Decision…' : 'Approve'}
+        {saving ? 'Saving decision…' : 'Approve'}
       </Button>
     </>
   );
@@ -204,7 +204,7 @@ export function FounderReviewRecorderControls({
   return (
     <section
       className={cn('border-subtle border-t pt-4', className)}
-      aria-label='Founder Review Recording'
+      aria-label='Founder review recording'
       data-testid='founder-review-recorder'
     >
       <RecorderHeader
@@ -216,7 +216,7 @@ export function FounderReviewRecorderControls({
 
       <div className='mt-4 min-h-20'>
         <p className='mb-1 text-2xs font-medium text-tertiary-token'>
-          Live Transcript
+          Live transcript
         </p>
         <p
           className='line-clamp-3 text-sm text-secondary-token'

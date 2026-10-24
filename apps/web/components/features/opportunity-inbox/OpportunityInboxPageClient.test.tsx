@@ -217,11 +217,11 @@ describe('OpportunityInboxPageClient', () => {
         profileId='creator-profile'
       />
     );
-    expect(screen.getByRole('button', { name: 'Needs You' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Needs you' })).toHaveAttribute(
       'aria-pressed',
       'true'
     );
-    await user.click(screen.getByRole('button', { name: 'Done For You' }));
+    await user.click(screen.getByRole('button', { name: 'Done for you' }));
     expect(screen.getByTestId('completed-work')).toHaveAttribute(
       'data-profile',
       'creator-profile'
@@ -231,10 +231,10 @@ describe('OpportunityInboxPageClient', () => {
       'true'
     );
     expect(
-      screen.queryByRole('link', { name: 'Start A Chat' })
+      screen.queryByRole('link', { name: 'Start a chat' })
     ).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Needs You' }));
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Needs you' }));
+    expect(screen.getByRole('link', { name: 'Start a chat' })).toBeVisible();
   });
 
   it('restores the route-selected view when navigating back or opening a deep link', () => {
@@ -259,7 +259,7 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
     expect(screen.queryByTestId('completed-work')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Needs You' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Needs you' })).toHaveAttribute(
       'aria-pressed',
       'true'
     );
@@ -269,8 +269,8 @@ describe('OpportunityInboxPageClient', () => {
     render(
       <OpportunityInboxPageClient inbox={{ cards: [], emptyActionCards: [] }} />
     );
-    expect(screen.queryByText('Your Inbox Is Clear')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Try Again' })).toBeVisible();
+    expect(screen.queryByText('Your inbox is clear')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
   });
 
   it('preserves known dates while suggestions are unavailable and retries the existing route', async () => {
@@ -290,8 +290,8 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
     expect(screen.getByText('Saint Andrews Hall')).toBeVisible();
-    expect(screen.queryByText('Your Inbox Is Clear')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+    expect(screen.queryByText('Your inbox is clear')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(refreshMock).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Saint Andrews Hall')).toBeVisible();
   });
@@ -302,7 +302,7 @@ describe('OpportunityInboxPageClient', () => {
         {
           id: 'release-1',
           signalType: 'new_song',
-          typeLabel: 'New Song',
+          typeLabel: 'New song',
           createdAt: '2026-10-02T12:00:00Z',
           title: 'Review Your Release',
           why: 'A new song is ready to review.',
@@ -326,7 +326,7 @@ describe('OpportunityInboxPageClient', () => {
     const songFilter = screen.getByTestId('opportunity-inbox-filter-new_song');
     await userEvent.click(songFilter);
     expect(screen.getByText('Review Your Release')).toBeVisible();
-    await userEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(refreshMock).toHaveBeenCalledTimes(1);
     rerender(
       <OpportunityInboxPageClient
@@ -381,7 +381,7 @@ describe('OpportunityInboxPageClient', () => {
     );
     expect(screen.queryByText('Inbox Clear')).not.toBeInTheDocument();
     expect(screen.queryByText('Start A Brain Dump')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Try Again' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
   });
 
   it('shows runtime notifications in Inbox instead of a caught-up state', () => {
@@ -490,7 +490,7 @@ describe('OpportunityInboxPageClient', () => {
               id: 'brand-deal-1',
               sourceKind: 'test.suggestion',
               signalType: 'brand_deal',
-              typeLabel: 'Brand Deal',
+              typeLabel: 'Brand deal',
               createdAt: '2026-07-29T10:00:00.000Z',
               title: 'Example Brand creator-performance pilot',
               why: '$7.5k-$12.5k · Backstage · verified · score 82.4',
@@ -502,7 +502,7 @@ describe('OpportunityInboxPageClient', () => {
               id: 'song-1',
               sourceKind: 'test.suggestion',
               signalType: 'new_song',
-              typeLabel: 'New Song',
+              typeLabel: 'New song',
               createdAt: '2026-07-29T09:00:00.000Z',
               title: 'New single detected',
               why: 'Native Spotify signal.',
@@ -555,7 +555,7 @@ describe('OpportunityInboxPageClient', () => {
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Inbox' })).toBeNull();
-    expect(screen.getByText('Your Inbox Is Clear')).toBeInTheDocument();
+    expect(screen.getByText('Your inbox is clear')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Connect Spotify' })
     ).toHaveAttribute('href', '/app/dashboard/releases?connect=spotify');
@@ -570,7 +570,7 @@ describe('OpportunityInboxPageClient', () => {
               id: 'song-1',
               sourceKind: 'test.suggestion',
               signalType: 'new_song' as const,
-              typeLabel: 'New Song',
+              typeLabel: 'New song',
               createdAt: '2026-06-28T10:00:00.000Z',
               title: 'New single detected on Spotify',
               why: 'Fresh release found on your catalog.',
@@ -582,7 +582,7 @@ describe('OpportunityInboxPageClient', () => {
               id: 'event-1',
               sourceKind: 'test.suggestion',
               signalType: 'new_event' as const,
-              typeLabel: 'New Event',
+              typeLabel: 'New event',
               createdAt: '2026-06-28T10:00:00.000Z',
               title: 'Detroit listeners up 340% — book a show',
               why: 'Promoter email matched your Detroit growth spike.',
@@ -632,7 +632,7 @@ describe('OpportunityInboxPageClient', () => {
               id: 'song-1',
               sourceKind: 'test.suggestion',
               signalType: 'new_song' as const,
-              typeLabel: 'New Song',
+              typeLabel: 'New song',
               createdAt: '2026-06-28T10:00:00.000Z',
               title: 'New single detected on Spotify',
               why: 'Fresh release found on your catalog.',
@@ -644,7 +644,7 @@ describe('OpportunityInboxPageClient', () => {
               id: 'event-1',
               sourceKind: 'test.suggestion',
               signalType: 'new_event' as const,
-              typeLabel: 'New Event',
+              typeLabel: 'New event',
               createdAt: '2026-06-28T10:00:00.000Z',
               title: 'Detroit listeners up 340% — book a show',
               why: 'Promoter email matched your Detroit growth spike.',
@@ -661,8 +661,8 @@ describe('OpportunityInboxPageClient', () => {
 
     const all = screen.getByRole('button', { name: 'All' });
     const newSong = screen.getByRole('button', { name: 'Songs' });
-    const brandDeals = screen.getByRole('button', { name: 'Brand Deals' });
-    const fanReplies = screen.getByRole('button', { name: 'Fan Replies' });
+    const brandDeals = screen.getByRole('button', { name: 'Brand deals' });
+    const fanReplies = screen.getByRole('button', { name: 'Fan replies' });
 
     all.focus();
     await user.keyboard('{ArrowRight}');
@@ -799,7 +799,7 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Plan Opportunity/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Plan opportunity/ }));
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
@@ -817,7 +817,7 @@ describe('OpportunityInboxPageClient', () => {
               id: 'song-1',
               sourceKind: 'test.suggestion',
               signalType: 'new_song' as const,
-              typeLabel: 'New Song',
+              typeLabel: 'New song',
               createdAt: '2026-06-28T10:00:00.000Z',
               title: 'New single detected',
               why: 'Fresh release found on your catalog.',
@@ -829,7 +829,7 @@ describe('OpportunityInboxPageClient', () => {
               id: 'event-1',
               sourceKind: 'test.suggestion',
               signalType: 'new_event' as const,
-              typeLabel: 'New Event',
+              typeLabel: 'New event',
               createdAt: '2026-06-28T10:00:00.000Z',
               title: 'Detroit listeners up 340%',
               why: 'Promoter email matched your Detroit growth spike.',
@@ -846,7 +846,7 @@ describe('OpportunityInboxPageClient', () => {
 
     const songs = screen.getByRole('button', { name: 'Songs' });
     await user.click(songs);
-    screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
+    screen.getByRole('button', { name: 'Review current opportunity' }).focus();
 
     await user.keyboard('{ArrowRight}');
 
@@ -895,13 +895,13 @@ describe('OpportunityInboxPageClient', () => {
       );
 
       screen
-        .getByRole('button', { name: 'Review Current Opportunity' })
+        .getByRole('button', { name: 'Review current opportunity' })
         .focus();
       await user.keyboard('{ArrowRight}');
 
       expect(
         screen.getByRole(hasUpdate ? 'button' : 'link', {
-          name: hasUpdate ? 'Restart Jovie To Update' : 'Start A Chat',
+          name: hasUpdate ? 'Restart Jovie To Update' : 'Start a chat',
         })
       ).toHaveFocus();
     }
@@ -957,7 +957,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+    expect(screen.getByRole('link', { name: 'Start a chat' })).toHaveFocus();
   });
 
   it('does not restore stack focus after a failed report next step', async () => {
@@ -1051,7 +1051,7 @@ describe('OpportunityInboxPageClient', () => {
       );
 
       screen
-        .getByRole('button', { name: 'Review Current Opportunity' })
+        .getByRole('button', { name: 'Review current opportunity' })
         .focus();
       await user.keyboard(key);
       const songs = screen.getByRole('button', { name: 'Songs' });
@@ -1095,9 +1095,9 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
+    screen.getByRole('button', { name: 'Review current opportunity' }).focus();
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+    expect(screen.getByRole('link', { name: 'Start a chat' })).toHaveFocus();
 
     act(() => {
       rejectAction?.();
@@ -1105,7 +1105,7 @@ describe('OpportunityInboxPageClient', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByRole('button', { name: 'Review Current Opportunity' })
+        screen.getByRole('button', { name: 'Review current opportunity' })
       ).toHaveFocus()
     );
   });
@@ -1140,7 +1140,7 @@ describe('OpportunityInboxPageClient', () => {
       screen.queryByTestId('opportunity-inbox-empty-state')
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Confirm Tour Date/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm tour date/ }));
 
     expect(
       screen.queryByTestId('opportunity-inbox-tour-date-review')
@@ -1173,7 +1173,7 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reject Tour Date' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reject tour date' }));
 
     const rejectedSection = screen.getByTestId(
       'opportunity-inbox-rejected-tour-dates'
@@ -1181,7 +1181,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(rejectedSection).toBeInTheDocument();
     // Hidden by default: the details disclosure starts collapsed.
     expect(rejectedSection).not.toHaveAttribute('open');
-    expect(screen.getByText('Rejected Tour Dates (1)')).toBeInTheDocument();
+    expect(screen.getByText('Rejected tour dates (1)')).toBeInTheDocument();
   });
 
   it('restores a rejected tour date via undo', () => {
@@ -1231,6 +1231,6 @@ describe('creator-only empty home', () => {
       />
     );
     expect(screen.queryByText('Start A Brain Dump')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Start a chat' })).toBeVisible();
   });
 });
