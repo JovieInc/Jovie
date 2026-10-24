@@ -258,7 +258,8 @@ class Linear:
 
     def label(self, team_id: str, name: str) -> str:
         if name not in self._labels:
-            d = self.gql("query($n:String!){issueLabels(filter:{name:{eq:$n}}){nodes{id}}}", {"n": name})
+            d = self.gql("query($n:String!,$t:ID){issueLabels(filter:{name:{eq:$n},or:[{team:{id:{eq:$t}}},"
+                         "{team:{null:true}}]}){nodes{id}}}", {"n": name, "t": team_id})
             nodes = d["issueLabels"]["nodes"]
             self._labels[name] = nodes[0]["id"] if nodes else self.gql(
                 "mutation($t:String!,$n:String!){issueLabelCreate(input:{teamId:$t,name:$n}){issueLabel{id}}}",
