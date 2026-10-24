@@ -1,0 +1,39 @@
+name: PR Fleet Rules
+on:
+  pull_request:
+    types: [opened, edited, synchronize, labeled, unlabeled, reopened]
+  merge_group:
+    types: [checks_requested]
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  # Serialize metadata revisions for a PR; groups have independent exact-head keys.
+  group: pr-fleet-rules-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.ref }}
+  cancel-in-progress: false
+jobs:
+  fleet:
+    name: PR Fleet Rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Test fleet policy with coverage
+        run: node --test --experimental-test-coverage --test-coverage-include=scripts/pr-fleet-rules.mjs --test-coverage-lines=95 --test-coverage-functions=100 --test-coverage-branches=90 scripts/pr-fleet-rules.test.mjs
+      - name: Blast-radius warning (never blocks)
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/pr-fleet-rules.mjs --warnings-only || true
+          exit 0
+      - name: Enforce receipts, red-before-green and locked areas
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/pr-fleet-rules.mjs

@@ -5,7 +5,7 @@ name: Source Validation
 # removal-trigger: Remove the lookup when body-dependent decisions leave Source Validation or GitHub stops re-running pull_request workflows on metadata-only edits.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
     branches: [main, 'integration/**']
 permissions:
   contents: read
@@ -71,6 +71,11 @@ jobs:
           filter: blob:none
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+      # Body/label-dependent policy always runs, including exact-head proof reuse.
+      - name: Enforce PR fleet rules
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/pr-fleet-rules.mjs
       - name: Validate performance policy source bindings
         run: node scripts/invariants/performance-factory.mjs
       - name: Measure actual installed source dependency graph

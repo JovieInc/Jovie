@@ -29,6 +29,7 @@ import {
   FX_BACKSTOP_FAILURES,
   fxBackstopRoute,
 } from '../lib/rolling-ci-handoff.mjs';
+import { validateDoneReceipt } from '../pr-fleet-rules.mjs';
 import {
   classifyAndOpenFromDelivery,
   DELIVERY_WORKFLOW_FAILURES,
@@ -790,6 +791,10 @@ export function transitionDeliveryReceipt(
       );
     }
   }
+  const mergeGroupRun =
+    transition.mergeGroupRun ?? receipt.event?.evidence?.mergeGroupRun;
+  const doneErrors = validateDoneReceipt({ ...receipt, stage, mergeGroupRun });
+  if (doneErrors.length) throw new Error(doneErrors.join('; '));
   return {
     ...receipt,
     policy: receipt.policy || {
@@ -812,6 +817,7 @@ export function transitionDeliveryReceipt(
       event: nonEmpty(transition.event) || 'state-transition',
       failure: transition.failure || null,
       deployedSha: exactSha(transition.deployedSha),
+      ...(mergeGroupRun ? { mergeGroupRun } : {}),
     },
   };
 }
@@ -913,6 +919,8 @@ export async function persistDeliveryOutcome(
     loopRecords = null,
   } = {}
 ) {
+  const doneErrors = validateDoneReceipt(receipt);
+  if (doneErrors.length) throw new Error(doneErrors.join('; '));
   const receiptDestination = receiptPath(stateDir, receipt);
   const task = repairTaskForReceipt(receipt);
   const taskDestination = task
