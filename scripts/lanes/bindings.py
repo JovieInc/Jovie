@@ -85,6 +85,7 @@ class Binding:
     providers: tuple[str, ...] = ()
     install: tuple[str, ...] = ()
     review_state: str = "In Review"
+    min_todo: int = 0             # Todo depth to hold regardless of seats (Backlog refill floor)
 
     def branch_pattern(self) -> re.Pattern:
         return re.compile(rf"^(?P<lane>[a-z0-9-]+)/(?P<issue>{self.key.lower()}-\d+)-\d{{8}}")
@@ -128,7 +129,8 @@ def extra_bindings(lane, policy: dict | None = None, env=None, hostname: str | N
             tuple(str(x).lower() for x in row.get("excludedLabels") or ()),
             None if row.get("concurrency") is None else max(1, int(row["concurrency"])),
             tuple(row.get("providers") or ()),
-            tuple(row.get("install") or ()), str(row.get("reviewState") or "In Review")))
+            tuple(row.get("install") or ()), str(row.get("reviewState") or "In Review"),
+            max(0, int(row.get("minTodo") or 0))))
     return active
 
 
