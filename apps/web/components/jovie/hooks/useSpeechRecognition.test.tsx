@@ -20,6 +20,7 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
   getElectronAPI: () => ({ platform: 'darwin' }),
   isElectronRuntime: () => state.electron,
   useDesktopDictationStatus: () => ({
+    supported: true,
     webSpeechFallbackAllowed: !state.electron,
   }),
 }));
@@ -87,6 +88,35 @@ describe('composer adaptive dictation', () => {
     act(() => state.callbacks?.onError?.('not-allowed'));
     expect(result.current.error).toBe('not-allowed');
     expect(result.current.isSupported).toBe(true);
+    expect(result.current.unavailableHint).toBeNull();
+  });
+  it('offers streaming in Electron and shows macOS guidance only after the complete ladder is exhausted', () => {
+    state.electron = true;
+    const { result } = renderHook(() =>
+      useSpeechRecognition({ onTranscript() {} })
+    );
+    expect(result.current.isSupported).toBe(true);
+    expect(result.current.unavailableHint).toBeNull();
+    expect(state.options?.runtime).toBe('electron');
+    act(() => result.current.start());
+    expect(result.current.unavailableHint).toBeNull();
+    act(() => {
+      state.options?.onFallback?.('dictation_cap_reached');
+      state.callbacks?.onError?.('network');
+      state.callbacks?.onEnd?.();
+    });
+    expect(result.current.isSupported).toBe(false);
+    expect(result.current.unavailableHint).toContain('macOS dictation');
+    expect(result.current.error).toBeNull();
+  });
+  it('keeps Electron permission errors on the permission path, without a system hint', () => {
+    state.electron = true;
+    const { result } = renderHook(() =>
+      useSpeechRecognition({ onTranscript() {} })
+    );
+    act(() => result.current.start());
+    act(() => state.callbacks?.onError?.('not-allowed'));
+    expect(result.current.error).toBe('not-allowed');
     expect(result.current.unavailableHint).toBeNull();
   });
 });

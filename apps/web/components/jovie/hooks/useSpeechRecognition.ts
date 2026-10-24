@@ -143,7 +143,7 @@ export function useSpeechRecognition({
     transcriberRef.current = transcriber;
     setIsSupported(
       transcriber.isSupported &&
-        desktopDictationStatus.webSpeechFallbackAllowed &&
+        desktopDictationStatus.supported &&
         !runtimeUnsupported
     );
 
@@ -155,7 +155,7 @@ export function useSpeechRecognition({
     };
   }, [
     browserWindow,
-    desktopDictationStatus.webSpeechFallbackAllowed,
+    desktopDictationStatus.supported,
     lang,
     runtimeUnsupported,
     settle,

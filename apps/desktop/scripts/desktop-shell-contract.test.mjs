@@ -646,7 +646,7 @@ const FORBIDDEN_MAC_ENTITLEMENTS = [
   'com.apple.security.cs.disable-library-validation',
 ];
 
-test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags)', async () => {
+test('desktop macOS entitlements avoid sandbox-weakening flags', async () => {
   for (const fileName of [
     'entitlements.mac.plist',
     'entitlements.mac.inherit.plist',
@@ -992,11 +992,50 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /ipcMain\.handle\(\s*DICTATION_STATUS_CHANNEL,/);
   assert.match(mainSource, /function getDesktopDictationStatus\(\)/);
   assert.match(mainSource, /nativeAvailable: false/);
-  // Web Speech recognition is non-functional inside Electron (no Google
-  // speech keys → 'network' error on every start), so the shell must never
-  // advertise it as an allowed fallback; the renderer points at OS dictation.
+  // Server STT owns capture; browser speech stays forbidden in Electron.
   assert.doesNotMatch(mainSource, /webSpeechFallbackAllowed: true/);
-  assert.match(mainSource, /use-(macos-)?system-dictation/);
+  const statusSource = mainSource.match(
+    /function getDesktopDictationStatus\(\): DesktopDictationStatus \{[\s\S]*?\n\}/
+  )?.[0];
+  assert.ok(statusSource, 'desktop dictation status function must exist');
+  assert.match(statusSource, /supported: true/);
+  assert.match(statusSource, /preferredMode: 'stream'/);
+  assert.match(statusSource, /browserSpeech: false/);
+  assert.match(statusSource, /getMediaAccessStatus\('microphone'\)/);
+  assert.match(
+    preloadSource,
+    /const DICTATION_STATUS_CHANNEL = 'dictation-status'/
+  );
+  for (const micPermission of [
+    'granted',
+    'denied',
+    'restricted',
+    'not-determined',
+    'unknown',
+  ]) {
+    const compiled = ts.transpileModule(statusSource, {
+      compilerOptions: { target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const status = runInNewContext(`${compiled}; getDesktopDictationStatus()`, {
+      process: { platform: 'darwin' },
+      systemPreferences: {
+        getMediaAccessStatus: permission => {
+          assert.equal(permission, 'microphone');
+          return micPermission;
+        },
+      },
+    });
+    assert.deepEqual(JSON.parse(JSON.stringify(status)), {
+      ok: true,
+      supported: true,
+      preferredMode: 'stream',
+      micPermission,
+      browserSpeech: false,
+      nativeAvailable: false,
+      webSpeechFallbackAllowed: false,
+      mode: 'stream',
+    });
+  }
   assert.match(mainSource, /shouldGrantTrustedAudioPermission/);
   assert.match(mainSource, /shouldGrantTrustedAudioPermissionCheck/);
   assert.match(mainSource, /backgroundThrottling: false/);
@@ -1972,4 +2011,27 @@ test('auth handoff uses compact outer bounds and stays inside the active work ar
     /screen\.getDisplayMatching\(mainWindow\.getBounds\(\)\)/
   );
   assert.doesNotMatch(mainSource, /const AUTH_HANDOFF_WINDOW_BOUNDS/);
+});
+
+test('packaged composer dictation declares microphone purpose and hardened-runtime audio input', async () => {
+  for (const file of [
+    'electron-builder.yml',
+    'electron-builder.staging.yml',
+    'electron-builder.local.yml',
+  ]) {
+    const config = await readFile(join(desktopRoot, file), 'utf8');
+    assert.match(config, /NSMicrophoneUsageDescription:\s+\S+/);
+  }
+  for (const file of [
+    'entitlements.mac.plist',
+    'entitlements.mac.production.plist',
+    'entitlements.mac.staging.plist',
+    'entitlements.mac.inherit.plist',
+  ]) {
+    const plist = await readFile(join(desktopRoot, 'build', file), 'utf8');
+    assert.match(
+      plist,
+      /<key>com\.apple\.security\.device\.audio-input<\/key>\s*<true\/>/
+    );
+  }
 });

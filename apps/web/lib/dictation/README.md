@@ -58,3 +58,17 @@ No audio or transcript is persisted by this feature in Jovie.
 
 Batch API checked 2026-10-24:
 https://elevenlabs.io/docs/api-reference/speech-to-text/convert
+
+## Electron
+
+The existing `dictation-status` IPC and preload probe report `supported: true`,
+`preferredMode: 'stream'`, the current microphone permission, and
+`browserSpeech: false`. The renderer uses server streaming/batch providers even
+though browser speech is forbidden. macOS system-dictation guidance appears only
+when the available provider ladder is exhausted or an account cap is reached;
+permission denial remains a permission error.
+
+Trusted main-window media permission checks remain in the shell. Packaged macOS
+channels declare a microphone usage description and hardened-runtime audio-input
+entitlements, including helper inheritance. Source contracts verify this packaging
+configuration; they are not evidence of an installed, signed app's TCC behavior.
