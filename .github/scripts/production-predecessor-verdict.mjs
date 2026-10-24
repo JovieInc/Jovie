@@ -79,6 +79,31 @@ export function decideVerdict(markerResult, { predecessorSha, releaseSha }) {
   };
 }
 
+// The marker is written only when Production Verified finishes, so a
+// generation that is live but still verifying classifies `none/no_marker`,
+// indistinguishable from a foreign bootstrap. An earlier Production Controller
+// run that has not completed owns that generation: its verdict is PENDING.
+// While the controller lease serializes releases no earlier run is active
+// when a later one reaches the gate, so this is a no-op today.
+export function earlierActiveRuns(runs, currentRunId) {
+  const current = Number(currentRunId);
+  if (!Number.isSafeInteger(current) || current <= 0) return [];
+  return (runs ?? []).filter(
+    run => Number(run?.id) < current && run?.status !== 'completed'
+  );
+}
+
+export function applyInFlightOverride(marker, activeRuns) {
+  if (marker?.state === 'none' && activeRuns.length > 0) {
+    return {
+      state: 'pending',
+      reason: 'earlier_controller_run_active',
+      detail: activeRuns.map(run => run.id).join(','),
+    };
+  }
+  return marker;
+}
+
 export async function waitForVerdict({
   readMarker,
   predecessorSha,
@@ -145,7 +170,18 @@ function resolveControllerWorkflowId(repo) {
   return String(workflow.id);
 }
 
-function readMarkerOnline({ repo, predecessorSha, workflowId }) {
+function readActiveRuns({ repo, currentRunId }) {
+  if (!currentRunId) return [];
+  const runs = JSON.parse(
+    gh([
+      'api',
+      `repos/${repo}/actions/workflows/production-controller.yml/runs?per_page=50&branch=main`,
+    ])
+  ).workflow_runs;
+  return earlierActiveRuns(runs, currentRunId);
+}
+
+function readMarkerOnline({ repo, predecessorSha, workflowId, currentRunId }) {
   const run = spawnSync(
     process.execPath,
     [
@@ -161,7 +197,11 @@ function readMarkerOnline({ repo, predecessorSha, workflowId }) {
   );
   // The classifier prints one JSON object on stdout; its exit code is not the
   // verdict, so parse stdout and let decideVerdict judge the state.
-  return JSON.parse(run.stdout.trim().split('\n').pop() ?? '');
+  const marker = JSON.parse(run.stdout.trim().split('\n').pop() ?? '');
+  return applyInFlightOverride(
+    marker,
+    marker?.state === 'none' ? readActiveRuns({ repo, currentRunId }) : []
+  );
 }
 
 async function main() {
@@ -179,6 +219,7 @@ async function main() {
           repo,
           predecessorSha: args['predecessor-sha'],
           workflowId,
+          currentRunId: args['current-run-id'] ?? process.env.GITHUB_RUN_ID,
         }),
       predecessorSha: args['predecessor-sha'],
       releaseSha: args['release-sha'],

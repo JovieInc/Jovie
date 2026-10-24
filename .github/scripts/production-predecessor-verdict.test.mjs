@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
+  applyInFlightOverride,
   decideVerdict,
   EXIT,
+  earlierActiveRuns,
   exitCodeFor,
   waitForVerdict,
 } from './production-predecessor-verdict.mjs';
@@ -210,4 +212,36 @@ test('the controller passes the authorized deployed SHA as predecessor', () => {
     controller,
     /predecessor_sha: \$\{\{ needs\.authorize-production\.outputs\.deployed_sha \}\}/
   );
+});
+
+test('a live generation still verifying (no marker, earlier run active) is PENDING, not a bootstrap', () => {
+  const runs = [
+    { id: 90, status: 'in_progress' },
+    { id: 95, status: 'completed' },
+    { id: 120, status: 'queued' },
+  ];
+  const active = earlierActiveRuns(runs, 100);
+  assert.deepEqual(
+    active.map(r => r.id),
+    [90]
+  );
+  const marker = applyInFlightOverride(
+    { state: 'none', reason: 'no_marker' },
+    active
+  );
+  assert.equal(decideVerdict(marker, ctx).verdict, 'PENDING');
+  // No earlier active run: the foreign bootstrap stays admissible.
+  assert.equal(
+    decideVerdict(
+      applyInFlightOverride(
+        { state: 'none', reason: 'no_marker' },
+        earlierActiveRuns(runs, 90)
+      ),
+      ctx
+    ).verdict,
+    'PASS'
+  );
+  // Only `none` is overridden; a verified marker is never downgraded.
+  assert.equal(applyInFlightOverride(verified, active), verified);
+  assert.deepEqual(earlierActiveRuns(runs, undefined), []);
 });
