@@ -8,7 +8,7 @@
  * Provides consistent backdrop styling across all overlay components.
  */
 export const overlayStyles = {
-  base: 'fixed inset-0 z-modal bg-black/52',
+  base: 'fixed inset-0 z-modal bg-(--elev-5-scrim)',
   animation:
     'data-[state=open]:animate-in data-[state=closed]:animate-out ' +
     'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ' +

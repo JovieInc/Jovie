@@ -216,9 +216,7 @@ describe('Tooltip', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
       expect(content.className).toContain('z-tooltip');
-      expect(content.className).toContain(
-        'rounded-(--system-b-radius-overlay)'
-      );
+      expect(content.className).toContain('rounded-(--radius-sm)');
       expect(content.className).toContain('text-xs');
     });
 
@@ -231,16 +229,14 @@ describe('Tooltip', () => {
       expect(content.className).toContain('shadow-sm');
     });
 
-    it('keeps compact labels on the shared rounded-rectangle contract', () => {
+    it('keeps compact labels on the small-radius tooltip contract (JOV-8976)', () => {
       render(
         <TestTooltip open={true} contentVariant='compact'>
           Save
         </TestTooltip>
       );
       const content = screen.getByTestId('tooltip-content');
-      expect(content.className).toContain(
-        'rounded-(--system-b-radius-overlay)'
-      );
+      expect(content.className).toContain('rounded-(--radius-sm)');
       expect(content.className).toContain('whitespace-normal');
       expect(content.className).not.toContain('whitespace-nowrap');
       expect(content.className).not.toContain('rounded-full');
@@ -250,16 +246,14 @@ describe('Tooltip', () => {
       );
     });
 
-    it('uses the shared rounded rectangle for wrapped content', () => {
+    it('uses the small radius token for wrapped content', () => {
       render(
         <TestTooltip open={true} contentVariant='rich'>
           A clear two-line explanation that must wrap safely in the overlay.
         </TestTooltip>
       );
       const content = screen.getByTestId('tooltip-content');
-      expect(content.className).toContain(
-        'rounded-(--system-b-radius-overlay)'
-      );
+      expect(content.className).toContain('rounded-(--radius-sm)');
       expect(content.className).toContain('max-w-56');
       expect(content.className).toContain('break-words');
     });

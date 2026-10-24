@@ -6,8 +6,8 @@ import * as React from 'react';
 import {
   DROPDOWN_TRANSITIONS,
   OVERLAY_COLLISION_PADDING,
-  OVERLAY_CONTENT_RADIUS,
   OVERLAY_SIDE_OFFSET,
+  TOOLTIP_CONTENT_RADIUS,
   TOOLTIP_SURFACE_BASE,
   TOOLTIP_SURFACE_DANGER,
 } from '../lib/dropdown-styles';
@@ -75,8 +75,8 @@ interface TooltipContentProps
   /**
    * `compact` is reserved for an author-confirmed, single-line label. It fits
    * on one line when space allows and wraps at narrow viewport edges. Both
-   * variants use the shared rounded-rectangle
-   * surface; `rich` is the default for content that may wrap or contain
+   * variants use the shared small-radius tooltip surface (L4, JOV-8976);
+   * `rich` is the default for content that may wrap or contain
    * structured children.
    */
   readonly contentVariant?: 'compact' | 'rich';
@@ -141,12 +141,13 @@ const TooltipContent = React.forwardRef<
           ...style,
         }}
         className={cn(
-          // Every overlay shares the same tokenized rounded rectangle. The
-          // content contract describes intent; short labels stay on one line
-          // when space allows, and long labels wrap without clipping.
+          // Tooltips are L4 overlays but read quiet: the small radius token,
+          // not the shared overlay radius (JOV-8976 spec rev). The content
+          // contract describes intent; short labels stay on one line when
+          // space allows, and long labels wrap without clipping.
           'z-tooltip flex items-center gap-2 max-w-56 break-words whitespace-normal px-2 py-1 text-xs font-normal leading-normal tracking-tight',
           tone === 'danger' ? TOOLTIP_SURFACE_DANGER : TOOLTIP_SURFACE_BASE,
-          OVERLAY_CONTENT_RADIUS,
+          TOOLTIP_CONTENT_RADIUS,
           // Pure opacity reveal (fade only) — subtract decorative zoom + slide-ins.
           // Matches parallel support work on shell Tooltip / Dsp for visual parity.
           // No layout shift; cursor-near friendly.

@@ -141,8 +141,10 @@ export const AppShellFrame = memo(function AppShellFrame({
                   // The header and route column live on this one raised plane.
                   // Do not use a translucent recessed well here: it makes the
                   // frame, header, and content read as unrelated backgrounds.
-                  // Founder lock 2026-09-25: one rounded, borderless, clipped
-                  // panel — no border, soft elevation only.
+                  // JOV-8976 (supersedes the 2025-09-25 no-border lock): one
+                  // rounded, clipped panel carrying the full L2 elevation —
+                  // surface + 1px border + soft shadow via --elev-2-shadow
+                  // (through the --app-shell-shadow alias).
                   'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)',
                   'lg:rounded-(--app-shell-radius) lg:bg-(--app-shell-content-surface) lg:shadow-(--app-shell-shadow)'
                 )}

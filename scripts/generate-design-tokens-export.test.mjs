@@ -28,3 +28,30 @@ test('export documents Noir Ion as the generated projection', () => {
   assert.equal(doc.color['surface.surface1'].$value, '#131417');
   assert.match(doc.$description, /generate-design-tokens-export\.mjs/);
 });
+
+test('elevation ladder exports resolved per level (JOV-8976)', () => {
+  const doc = JSON.parse(generate());
+  // L0 window background is the flat plane; L5 = modal + scrim.
+  assert.deepEqual(Object.keys(doc.elevation), ['0', '1', '2', '3', '4', '5']);
+  assert.equal(doc.elevation['0'].surface.$value, '#07080a');
+  assert.equal(doc.elevation['0'].shadow.$value, 'none');
+  assert.equal(doc.elevation['1'].surface.$value, 'rgb(7 8 10)');
+  assert.equal(doc.elevation['2'].surface.$value, '#131417');
+  assert.equal(doc.elevation['2'].border.$value, 'rgba(168, 176, 195, 0.12)');
+  assert.equal(
+    doc.elevation['2'].shadow.$value,
+    '0 0 0 1px rgba(168, 176, 195, 0.12), 0 14px 36px rgba(0, 0, 0, 0.22)'
+  );
+  assert.equal(doc.elevation['5'].surface.$value, '#1a1b1e');
+  assert.equal(doc.elevation['5'].scrim.$value, 'rgba(0, 0, 0, 0.52)');
+  for (const level of ['1', '2', '3', '4', '5']) {
+    assert.equal(doc.elevation[level].shadow.$type, 'shadow');
+    assert.match(doc.elevation[level].shadow.$value, /^0 0 0 1px /);
+  }
+  for (const level of ['0', '1', '2', '3', '4', '5']) {
+    for (const part of ['surface', 'border']) {
+      assert.equal(doc.elevation[level][part].$type, 'color');
+      assert.doesNotMatch(doc.elevation[level][part].$value, /var\(/);
+    }
+  }
+});
