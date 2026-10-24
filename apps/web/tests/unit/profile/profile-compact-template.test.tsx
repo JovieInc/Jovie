@@ -1513,6 +1513,7 @@ describe('ProfileCompactTemplate', () => {
       );
     });
     expect(pushStateSpy).not.toHaveBeenCalled();
+    const rendersAfterLanding = mockUseProfileShell.mock.calls.length;
 
     // A client Link (the about drawer's contact links) moves the URL to
     // contact mode; requestedMode is still 'about' until the shell's
@@ -1531,6 +1532,13 @@ describe('ProfileCompactTemplate', () => {
         socialLinks={[]}
         contacts={[]}
       />
+    );
+
+    // A fresh JSX element actually re-rendered the template; an identical
+    // element reference would bail out and prove nothing. The zero-write
+    // assertions below are only meaningful if the history effect re-ran.
+    expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+      rendersAfterLanding
     );
 
     await waitFor(() => {
@@ -1556,6 +1564,10 @@ describe('ProfileCompactTemplate', () => {
         contentPreferences: null,
       },
     }));
+    // The mode-sync rerender must also be real: capture the count before
+    // the flip so the assertion below proves this rerender re-ran the
+    // history effect too.
+    const rendersBeforeModeSync = mockUseProfileShell.mock.calls.length;
     view.rerender(
       <ProfileCompactTemplate
         mode='contact'
@@ -1563,6 +1575,9 @@ describe('ProfileCompactTemplate', () => {
         socialLinks={[]}
         contacts={[]}
       />
+    );
+    expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+      rendersBeforeModeSync
     );
     await waitFor(() => {
       expect(`${window.location.pathname}${window.location.search}`).toBe(
@@ -1630,6 +1645,7 @@ describe('ProfileCompactTemplate', () => {
     });
     pushStateSpy.mockClear();
     replaceStateSpy.mockClear();
+    const rendersAfterLanding = mockUseProfileShell.mock.calls.length;
     try {
       view.rerender(
         <ProfileCompactTemplate
@@ -1638,6 +1654,13 @@ describe('ProfileCompactTemplate', () => {
           socialLinks={[]}
           contacts={[]}
         />
+      );
+
+      // A fresh JSX element actually re-rendered the template; an identical
+      // element reference would bail out and prove nothing. The zero-write
+      // assertions below are only meaningful if the history effect re-ran.
+      expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+        rendersAfterLanding
       );
 
       await waitFor(() => {
