@@ -68,6 +68,13 @@ Company domain canon: [index](canon/README.md). API/cron/webhook maps:
 [AI_AGENT_GUIDE](docs/AI_AGENT_GUIDE.md). Codex: [CODEX](CODEX.md).
 <!-- doc-freshness:scoped-rules-count:21 -->
 
+## Account limits
+
+Early-access opt-in/out changes are capped at 5 per authenticated account per
+day. The single source of truth is
+`apps/web/lib/early-access/constants.ts` (`EARLY_ACCESS_TOGGLE_LIMIT_PER_DAY`),
+and the API enforces it server-side with the account key.
+
 ## Tools and workflow
 
 Use repo-root `pnpm` / `pnpm turbo`; pins in `.nvmrc` and `package.json` are

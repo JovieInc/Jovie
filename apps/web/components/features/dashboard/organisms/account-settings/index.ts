@@ -6,6 +6,7 @@
 
 export { AccountSettingsSection } from './AccountSettingsSection';
 export { ConnectedAccountsCard } from './ConnectedAccountsCard';
+export { EarlyAccessSettingsSection } from './EarlyAccessSettingsSection';
 export { EmailManagementCard } from './EmailManagementCard';
 export { SessionManagementCard } from './SessionManagementCard';
 

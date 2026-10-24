@@ -14,7 +14,7 @@ import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsAppearanceSection } from '@/features/dashboard/organisms/SettingsAppearanceSection';
 import { SettingsNotificationsSection } from '@/features/dashboard/organisms/SettingsNotificationsSection';
 import { useSessionSafe, useUserSafe } from '@/hooks/useJovieAuth';
-
+import { EarlyAccessSettingsSection } from './EarlyAccessSettingsSection';
 import { SessionManagementCard } from './SessionManagementCard';
 
 function AccountIdentitySummary() {
@@ -111,6 +111,7 @@ export function AccountSettingsSection({
       ) : null}
       <SettingsAppearanceSection />
       <SettingsNotificationsSection isGrowth={isGrowth} />
+      <EarlyAccessSettingsSection />
     </div>
   );
 }
