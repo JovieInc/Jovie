@@ -2945,12 +2945,51 @@ function buildUpdateMenuItem(): MenuItemConstructorOptions {
   };
 }
 
+function focusedAppWindow(): BrowserWindow | null {
+  const win = BrowserWindow.getFocusedWindow();
+  return win && !win.isDestroyed() ? win : null;
+}
+
+function openFocusedWindowInBrowser(): void {
+  const url = focusedAppWindow()?.webContents.getURL();
+  if (url && url === publicProfilePreviewWindow?.webContents.getURL()) {
+    void openPublicProfileInBrowser(url);
+  }
+}
+
+function buildGoMenu(): MenuItemConstructorOptions[] {
+  return [
+    {
+      label: 'Back',
+      accelerator: 'CommandOrControl+[',
+      click: () => {
+        const win = focusedAppWindow();
+        if (win?.webContents.canGoBack()) win.webContents.goBack();
+      },
+    },
+    {
+      label: 'Forward',
+      accelerator: 'CommandOrControl+]',
+      click: () => {
+        const win = focusedAppWindow();
+        if (win?.webContents.canGoForward()) win.webContents.goForward();
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'New Message',
+      accelerator: 'CommandOrControl+N',
+      click: () => handleTrayAction('new-message'),
+    },
+  ];
+}
+
 function buildViewMenu(): MenuItemConstructorOptions[] {
   const viewMenu: MenuItemConstructorOptions[] = [];
 
+  viewMenu.push({ role: 'reload' });
   if (ENABLE_DEVTOOLS) {
     viewMenu.push(
-      { role: 'reload' },
       { role: 'forceReload' },
       { role: 'toggleDevTools' },
       { type: 'separator' }
@@ -2973,6 +3012,7 @@ function buildApplicationMenu(): Menu {
   const template: MenuItemConstructorOptions[] = [
     { role: 'editMenu' },
     { label: 'View', submenu: viewMenu },
+    { label: 'Go', submenu: buildGoMenu() },
     { role: 'windowMenu' },
   ];
 
@@ -3008,10 +3048,7 @@ function buildApplicationMenu(): Menu {
         submenu: [
           {
             label: 'Open in Browser',
-            click: () => {
-              const url = publicProfilePreviewWindow?.webContents.getURL();
-              if (url) void openPublicProfileInBrowser(url);
-            },
+            click: openFocusedWindowInBrowser,
           },
           { role: 'close', accelerator: 'Command+W' },
         ],
@@ -3023,10 +3060,7 @@ function buildApplicationMenu(): Menu {
       submenu: [
         {
           label: 'Open in Browser',
-          click: () => {
-            const url = publicProfilePreviewWindow?.webContents.getURL();
-            if (url) void openPublicProfileInBrowser(url);
-          },
+          click: openFocusedWindowInBrowser,
         },
         {
           label: 'Preferences…',
