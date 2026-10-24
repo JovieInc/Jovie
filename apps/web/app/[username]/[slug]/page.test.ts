@@ -283,7 +283,7 @@ describe('superseded base slug route resolution', () => {
     hoisted.getUnpublishedReleasePresence.mockResolvedValue(null);
   });
 
-  async function render(slug: string) {
+  async function loadPage(slug: string) {
     const { default: Page } = await import('./page');
     return Page({ params: Promise.resolve({ username: 'tim', slug }) });
   }
@@ -293,7 +293,7 @@ describe('superseded base slug route resolution', () => {
       type: 'release',
       currentSlug: 'take-me-over-2',
     });
-    await expect(render('take-me-over')).rejects.toThrow(
+    await expect(loadPage('take-me-over')).rejects.toThrow(
       'permanentRedirect:/tim/take-me-over-2'
     );
     // Default call: superseded fallback is on for the public content route.
@@ -304,7 +304,7 @@ describe('superseded base slug route resolution', () => {
   });
 
   it('falls through to the placeholder lookup / 404 when the resolver declines (seaside-heights, multi-candidate)', async () => {
-    await expect(render('seaside-heights')).rejects.toThrow('notFound');
+    await expect(loadPage('seaside-heights')).rejects.toThrow('notFound');
     expect(hoisted.getUnpublishedReleasePresence).toHaveBeenCalledWith(
       'creator-1',
       'seaside-heights'
