@@ -107,6 +107,16 @@ describe('component comparative quality bar', () => {
     );
     expect(new Set(sources).size).toBe(inventory.length);
     expect(
+      inventory.find(
+        item => item.sourcePath === 'packages/ui/atoms/cinematic-metric.tsx'
+      )
+    ).toMatchObject({
+      root: 'packages/ui/atoms',
+      layer: 'atom',
+      comparisonStatus: 'pending-comparison',
+      baselineId: null,
+    });
+    expect(
       inventory.every(item =>
         ['rubric-enrolled', 'pending-comparison'].includes(
           item.comparisonStatus
