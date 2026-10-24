@@ -40,3 +40,14 @@ export const BinaryDownload: Story = {
     prefetch: false,
   },
 };
+
+// The changelog terminal CTA anchors into the homepage hero claim input
+// (JOV-8798). Keep this story in lockstep with that id: the homepage
+// contract guard fails if any /#fragment anchor stops resolving on '/'.
+export const ChangelogClaimAnchor: Story = {
+  args: {
+    title: 'Take control of your presence.',
+    ctaLabel: 'Find your profile',
+    ctaHref: '/#homepage-claim-handle',
+  },
+};
