@@ -549,10 +549,10 @@ function StatusCell({
   providerAvailable,
 }: Readonly<{ row: ProfileWorkspaceRow; providerAvailable: boolean }>) {
   const status = getConnectionStatus(row, providerAvailable);
-  if (status.label !== 'Search Unavailable')
+  if (status.label !== 'Search unavailable')
     return <PresenceStatusBadge status={status} />;
   return (
-    <span role='img' aria-label='Monitoring Unknown: Search Unavailable'>
+    <span role='img' aria-label='Monitoring unknown: search unavailable'>
       <PresenceStatusBadge
         status={{
           ...status,
@@ -725,7 +725,7 @@ function ConnectionRail({
                       },
                       {
                         id: 'rank',
-                        label: 'Search Rank',
+                        label: 'Search rank',
                         value:
                           row.rowType === 'surface' &&
                           row.monitoringState !== 'locked'
@@ -760,12 +760,12 @@ function ConnectionRail({
                 return (
                   <DrawerSection
                     key={section.key}
-                    title='Source Identity'
+                    title='Source identity'
                     sectionKind='facts'
                   >
                     <p className='text-xs text-secondary-token'>
                       {sourceLoading
-                        ? 'Checking Public Profile…'
+                        ? 'Checking public profile…'
                         : sourceIdentity?.status === 'unsupported'
                           ? 'Automatic inspection is unavailable for this source. Open the profile to compare.'
                           : sourceIdentity?.status === 'available'
@@ -787,7 +787,7 @@ function ConnectionRail({
                         disabled={sourceLoading}
                         onClick={onRetrySource}
                       >
-                        Retry Source
+                        Retry source
                       </Button>
                     ) : null}
                   </DrawerSection>
@@ -840,7 +840,7 @@ function ConnectionRail({
                           <ExternalLink className='h-3.5 w-3.5' />{' '}
                           {primaryAction === 'review' &&
                           row.rowType === 'surface'
-                            ? 'Inspect Source'
+                            ? 'Inspect source'
                             : 'Open'}
                         </Link>
                       </Button>
@@ -893,7 +893,7 @@ function ConnectionRail({
                         label='Monitoring'
                         value={MONITORING_LABELS[row.monitoringState]}
                       />
-                      <RailMetric label='Search Rank' value='—' />
+                      <RailMetric label='Search rank' value='—' />
                     </div>
                   </DrawerSection>
                 ) : null;
@@ -963,7 +963,7 @@ function IdentityConfirmationSection({
   };
 
   return (
-    <DrawerSection title='Identity Check' sectionKind='details'>
+    <DrawerSection title='Identity check' sectionKind='details'>
       <div className='space-y-3 px-1'>
         <div className='space-y-1'>
           <p className='text-sm font-medium text-primary-token'>Is this you?</p>
@@ -1060,7 +1060,7 @@ function PresenceSignalSection({
 function SuggestedConnectionsLoading() {
   return (
     <div aria-busy='true' aria-live='polite' className='min-h-55'>
-      <span className='sr-only'>Loading Suggested Connections</span>
+      <span className='sr-only'>Loading suggested connections</span>
       <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1'>
         {SUGGESTED_CONNECTION_SKELETON_IDS.map(id => (
           <div
@@ -1107,7 +1107,7 @@ function SuggestedConnectionsState({
               className={PRESENCE_BUTTON_DESKTOP_DENSITY}
               onClick={onRetry}
             >
-              <RefreshCw className='h-3.5 w-3.5' aria-hidden /> Try Again
+              <RefreshCw className='h-3.5 w-3.5' aria-hidden /> Try again
             </Button>
           ) : undefined
         }
@@ -1233,14 +1233,14 @@ function SuggestedConnectionsReview({
     <section
       ref={regionRef}
       tabIndex={-1}
-      aria-label='Suggested Connections'
+      aria-label='Suggested connections'
       className='min-h-55 min-w-0 px-3 py-3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/50'
       data-testid='suggested-connections-review'
     >
       {isLoading ? <SuggestedConnectionsLoading /> : null}
       {isError && groups.length === 0 ? (
         <SuggestedConnectionsState
-          heading="Couldn't Load Suggestions"
+          heading="Couldn't load suggestions"
           description='Suggestions could not be retrieved. Try again.'
           onRetry={onRetry}
           testId='suggested-connections-error-state'
@@ -1248,14 +1248,14 @@ function SuggestedConnectionsReview({
       ) : null}
       {!isLoading && !isError && groups.length === 0 ? (
         <SuggestedConnectionsState
-          heading='No Suggested Connections'
+          heading='No suggested connections'
           description='Detected public identities will appear here for review.'
           testId='suggested-connections-empty-state'
         />
       ) : null}
       {!isLoading && groups.length > 0 ? (
         <ul
-          aria-label='Suggested Connection Review Queue'
+          aria-label='Suggested connection review queue'
           className='min-w-0 overflow-hidden rounded-lg border border-subtle bg-surface-1'
         >
           {groups.map(group => (
@@ -1592,10 +1592,10 @@ function ProfilesWorkspaceContent({
     () => (
       <DashboardHeaderActionGroup>
         <DashboardHeaderActionButton
-          ariaLabel='Add Profile Or Site'
+          ariaLabel='Add profile or site'
           onClick={handleAddConnection}
           icon={<Plus className='h-3.5 w-3.5' />}
-          label='Add Profile'
+          label='Add profile'
           hideLabelOnMobile
         />
       </DashboardHeaderActionGroup>
@@ -1701,7 +1701,7 @@ function ProfilesWorkspaceContent({
       ),
       columnHelper.display({
         id: 'rank',
-        header: 'Search Rank',
+        header: 'Search rank',
         size: 72,
         meta: { className: 'max-lg:hidden' },
         cell: context => <RankCell row={context.row.original} />,
@@ -1853,11 +1853,11 @@ function ProfilesWorkspaceContent({
       >
         <EmptyState
           icon={<UserRound className='h-5 w-5' aria-hidden />}
-          heading='No Identity Selected'
+          heading='No identity selected'
           description='Set up an identity to manage its presence.'
           presentation='workspace'
           action={{
-            label: 'Set Up Identity',
+            label: 'Set up identity',
             href: APP_ROUTES.SETTINGS_PROFILE,
           }}
           testId='profiles-workspace-empty-state'
@@ -1890,8 +1890,8 @@ function ProfilesWorkspaceContent({
               onClick={() => setShowSuggestions(value => !value)}
             >
               {showSuggestions
-                ? 'Close Suggestions'
-                : `Review Suggestions (${connectionSuggestions.length})`}
+                ? 'Close suggestions'
+                : `Review suggestions (${connectionSuggestions.length})`}
             </Button>
           }
         />
@@ -1942,7 +1942,7 @@ function ProfilesWorkspaceContent({
         }
         emptyState={
           <TableEmptyState
-            heading='No Profiles Yet'
+            heading='No profiles yet'
             description='Add a profile or website to get started.'
           />
         }

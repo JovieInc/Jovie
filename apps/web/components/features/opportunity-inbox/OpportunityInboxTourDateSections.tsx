@@ -45,10 +45,10 @@ export function OpportunityInboxConfirmedTourDates({
     <section
       className='system-b-opportunity-inbox-feed'
       data-testid='opportunity-inbox-confirmed-tour-dates'
-      aria-label='Confirmed Tour Dates'
+      aria-label='Confirmed tour dates'
     >
       <div className='system-b-opportunity-inbox-section-label'>
-        Confirmed Tour Dates
+        Confirmed tour dates
       </div>
       <ul className='m-0 list-none p-0'>
         {items.map(item => (
@@ -84,7 +84,7 @@ export function OpportunityInboxRejectedTourDates({
       data-testid='opportunity-inbox-rejected-tour-dates'
     >
       <summary className='system-b-opportunity-inbox-section-label cursor-pointer list-none select-none'>
-        Rejected Tour Dates ({items.length})
+        Rejected tour dates ({items.length})
       </summary>
       <ul className='m-0 list-none p-0'>
         {items.map(item => (

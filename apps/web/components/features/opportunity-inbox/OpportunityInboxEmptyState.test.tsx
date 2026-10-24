@@ -24,7 +24,7 @@ describe('OpportunityInboxEmptyState', () => {
 
     const emptyState = screen.getByTestId('opportunity-inbox-empty-state');
     expect(emptyState).toHaveClass('flex-1', 'items-center', 'justify-center');
-    expect(screen.getByText('Your Inbox Is Clear')).toHaveClass(
+    expect(screen.getByText('Your inbox is clear')).toHaveClass(
       'text-sm',
       'font-semibold',
       'tracking-tight'
@@ -37,7 +37,7 @@ describe('OpportunityInboxEmptyState', () => {
   it('keeps the chat fallback when no catalog action is available', () => {
     render(<OpportunityInboxEmptyState />);
 
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Start a chat' })).toHaveAttribute(
       'href',
       '/app/chat'
     );
@@ -46,6 +46,6 @@ describe('OpportunityInboxEmptyState', () => {
   it('keeps the empty creator home free of founder capture', () => {
     render(<OpportunityInboxEmptyState />);
     expect(screen.queryByTestId('founder-recorder')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Start a chat' })).toBeVisible();
   });
 });

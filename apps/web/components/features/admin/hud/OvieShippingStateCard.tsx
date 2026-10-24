@@ -20,7 +20,7 @@ import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 
 const TRUTH_LABEL: Record<ShippingStateView['truth'], string> = {
   fresh: 'Fresh',
-  stale: 'Connected Stale',
+  stale: 'Connected stale',
   disconnected: 'Disconnected',
   unavailable: 'Unavailable',
   unauthorized: 'Unauthorized',
@@ -237,10 +237,10 @@ function ShippingStateBody({
   const { delivery } = view;
   const byRepo = delivery.merges.byRepo;
   const rows = [
-    ['Lanes Running', formatLanes(delivery.lanes)],
-    ['Merge Queue', formatCount(delivery.mergeQueueDepth)],
-    ['Merged Today', formatCount(delivery.merges.today)],
-    ['In Flight', formatCount(delivery.inFlight)],
+    ['Lanes running', formatLanes(delivery.lanes)],
+    ['Merge queue', formatCount(delivery.mergeQueueDepth)],
+    ['Merged today', formatCount(delivery.merges.today)],
+    ['In flight', formatCount(delivery.inFlight)],
     [
       'Jovie / LYB / Summer',
       [byRepo.Jovie, byRepo.LogYourBody, byRepo['summer-config']]
@@ -251,8 +251,8 @@ function ShippingStateBody({
     ['Certified HEAD', formatCertifiedHead(delivery.certifiedHead)],
     ['Staging', formatProduction(delivery.staging)],
     ['Production', formatProduction(delivery.production)],
-    ['Behind Main', formatCount(delivery.production.behindMain)],
-    ['CI Green', formatMeaning(view.ciGreen)],
+    ['Behind main', formatCount(delivery.production.behindMain)],
+    ['CI green', formatMeaning(view.ciGreen)],
     [
       'Summer',
       delivery.summer.availability
@@ -353,7 +353,7 @@ export function OvieShippingStateCard({
       data-flags={[...view.flags].join(',')}
       role='status'
       aria-live='polite'
-      aria-label='Ubuntu Shipping State'
+      aria-label='Ubuntu shipping state'
     >
       <div
         className='min-h-40 space-y-3 p-3'

@@ -147,6 +147,12 @@
   "overrides": [
     {
       "includes": [
+        "apps/web/eslint-rules/canonical-ui-label-casing.baseline.json"
+      ],
+      "formatter": { "enabled": false }
+    },
+    {
+      "includes": [
         "scripts/invariants/copy-leak/config.json",
         "scripts/invariants/copy-leak/positive-fixtures.json"
       ],

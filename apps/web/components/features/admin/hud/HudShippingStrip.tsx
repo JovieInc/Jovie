@@ -88,11 +88,12 @@ export function HudShippingStrip({
           value={count(delivery.mergeQueueDepth.value)}
           tone={queueTone}
         />
-        <Chip label='In Flight' value={count(delivery.inFlight.value)} />
+        <Chip label='In flight' value={count(delivery.inFlight.value)} />
+        {/* ui-casing-allow: CI is an acronym. */}
         <Chip label='CI' value={ciLabel(view)} tone={ciTone} />
-        <Chip label='Merged 7 Days' value={mergeRate(view)} />
+        <Chip label='Merged 7 days' value={mergeRate(view)} />
         <Chip
-          label='Behind Main'
+          label='Behind main'
           value={count(delivery.production.behindMain.value)}
         />
         <a

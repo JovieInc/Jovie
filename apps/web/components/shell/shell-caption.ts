@@ -2,7 +2,7 @@
  * Shared caption typography for product shell atoms (Stat, ColumnLabel,
  * PerformanceCard title, CuesPanel, LyricsList).
  *
- * DESIGN.md Text Casing + `.claude/rules/ui.md` No AI-Slop: Title Case
+ * DESIGN.md Text Casing + `.claude/rules/ui.md` No AI-Slop: sentence case
  * labels with tracking-normal. Do not add tracked-caps eyebrows here —
  * the shell-caption style-guard fails closed on that pattern.
  */

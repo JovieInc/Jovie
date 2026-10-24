@@ -173,7 +173,7 @@ function HudHealthMetricCards({
         valueClassName={secondaryValueClass}
       />
       <ContentMetricCard
-        label='Flaky Quarantine'
+        label='Flaky quarantine'
         value={metrics.testing.quarantine.activeCount.toLocaleString('en-US')}
         subtitle={formatTestingQuarantineSubtitle(metrics.testing.quarantine)}
         className='p-3'
@@ -292,7 +292,7 @@ function DeploymentActionsMenu({
           type='button'
           variant='ghost'
           size='icon'
-          aria-label='Deployment Actions'
+          aria-label='Deployment actions'
           className='flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tertiary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:bg-surface-1 focus-visible:outline-none'
         >
           <MoreHorizontal className='h-3.5 w-3.5' aria-hidden='true' />
@@ -479,7 +479,7 @@ function AiOpsItemRow({
             variant='ghost'
             size='sm'
             onClick={onUndismiss}
-            aria-label='Restore Item'
+            aria-label='Restore item'
             className='rounded px-1 py-0.5 text-2xs text-tertiary-token hover:text-primary-token'
           >
             Undo
@@ -490,7 +490,7 @@ function AiOpsItemRow({
             variant='ghost'
             size='icon'
             onClick={onDismiss}
-            aria-label='Dismiss Item'
+            aria-label='Dismiss item'
             className='rounded p-0.5 text-tertiary-token hover:text-primary-token'
           >
             <X className='h-3.5 w-3.5' aria-hidden='true' />
@@ -622,7 +622,7 @@ function HermesDispatchControls({
           ) : (
             <Rocket className='h-4 w-4' aria-hidden='true' />
           )}
-          Dispatch Worker
+          Dispatch worker
         </Button>
         <Button
           type='button'
@@ -632,7 +632,7 @@ function HermesDispatchControls({
           disabled={isDispatching}
           className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 text-app font-semibold text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
         >
-          Dry Run
+          Dry run
         </Button>
       </div>
       {message ? (
@@ -973,7 +973,8 @@ export function HudDashboardClient({
                     <QRCode
                       data={hudUrl ?? ''}
                       size={196}
-                      label='HUD Link'
+                      // ui-casing-allow: HUD is an acronym.
+                      label='HUD link'
                       className='rounded-lg bg-white dark:bg-white'
                     />
                   </div>

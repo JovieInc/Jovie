@@ -181,7 +181,7 @@ const MobileCardList = memo(function MobileCardList({
             loading={isFetchingNextPage}
             onClick={() => onLoadMore?.()}
           >
-            Load More Members
+            Load more members
           </Button>
         </div>
       ) : null}
@@ -525,7 +525,7 @@ export const DashboardAudienceTableUnified = memo(
         {
           type: 'action',
           id: 'copy-source-link',
-          label: 'Copy Link',
+          label: 'Copy link',
           icon: Copy,
           onClick: async () => {
             await handleSourceLinkAction('copy');
@@ -534,7 +534,7 @@ export const DashboardAudienceTableUnified = memo(
         {
           type: 'action',
           id: 'open-source-link',
-          label: 'Open Link',
+          label: 'Open link',
           icon: ExternalLink,
           onClick: async () => {
             await handleSourceLinkAction('open');
@@ -543,7 +543,7 @@ export const DashboardAudienceTableUnified = memo(
         {
           type: 'action',
           id: 'download-source-qr',
-          label: 'Download QR Code',
+          label: 'Download QR code',
           icon: Download,
           onClick: async () => {
             await handleSourceLinkAction('download');
@@ -670,7 +670,7 @@ export const DashboardAudienceTableUnified = memo(
       [selectedIds, openMenuRowId]
     );
 
-    const emptyStateHeading = 'Grow Your Audience';
+    const emptyStateHeading = 'Grow your audience';
     const emptyStateDescription =
       'Share your profile link on social media to invite visitors. Most creators get their first audience member by sharing on X or IG bio.';
     const emptyStatePrimaryAction = profileUrl
@@ -681,11 +681,11 @@ export const DashboardAudienceTableUnified = memo(
           },
         }
       : {
-          label: 'Open Profile Settings',
+          label: 'Open profile settings',
           href: APP_ROUTES.SETTINGS_PROFILE,
         };
     const emptyStateSecondaryAction = {
-      label: 'Learn About Audience',
+      label: 'Learn about audience',
       href: '/support',
     };
 
@@ -808,7 +808,7 @@ export const DashboardAudienceTableUnified = memo(
                 type='button'
                 variant='ghost'
                 size='icon'
-                aria-label='Source Link Actions'
+                aria-label='Source link actions'
                 title='Source link'
                 className={DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS}
               >

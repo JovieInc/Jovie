@@ -58,7 +58,7 @@ describe('OpportunityInboxCard', () => {
     fireEvent.click(screen.getByRole('button', { name: /Review pitch/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'Mark Suggestion Helpful' })
+      screen.getByRole('button', { name: 'Mark suggestion helpful' })
     );
 
     expect(onApprove).toHaveBeenCalledWith('card-1');
@@ -69,14 +69,14 @@ describe('OpportunityInboxCard', () => {
   it('renders the fan_reply signal visual', () => {
     render(
       <OpportunityInboxCard
-        card={{ ...CARD, signalType: 'fan_reply', typeLabel: 'Fan Reply' }}
+        card={{ ...CARD, signalType: 'fan_reply', typeLabel: 'Fan reply' }}
         onApprove={vi.fn()}
         onDismiss={vi.fn()}
         onFeedback={vi.fn()}
       />
     );
 
-    expect(screen.getByText('Fan Reply')).toBeInTheDocument();
+    expect(screen.getByText('Fan reply')).toBeInTheDocument();
     expect(
       screen.getByTestId('opportunity-inbox-signal-icon-fan_reply')
     ).toBeInTheDocument();

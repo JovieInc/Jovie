@@ -4,7 +4,7 @@ import { InlinePalette, type PaletteSection } from './SharedCommandPalette';
 const sections: readonly PaletteSection[] = [
   {
     id: 'go-to',
-    label: 'Go To',
+    label: 'Go to',
     items: [
       {
         kind: 'nav',

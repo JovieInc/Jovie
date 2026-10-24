@@ -51,8 +51,8 @@ const adapter: HeaderSearchAdapter = {
   hasOptions: ['Canvas', 'Spotify URL'],
   totalCount: 12,
   visibleCount: 8,
-  triggerLabel: 'Search Releases',
-  ariaLabel: 'Filter Search Releases',
+  triggerLabel: 'Search releases',
+  ariaLabel: 'Filter search releases',
   placeholder: 'Filter releases',
   allowedFields: ['artist', 'title', 'album', 'status', 'approval', 'has'],
 };

@@ -148,7 +148,7 @@ describe('ContactDetailSidebar', () => {
         .querySelector('[data-testid="drawer-card-action-bar"]')
     ).not.toBeInTheDocument();
     expect(screen.queryByText('Contact')).not.toBeInTheDocument();
-    expect(screen.getByText('Contact Info')).toBeInTheDocument();
+    expect(screen.getByText('Contact info')).toBeInTheDocument();
     expect(screen.getByText('Role')).toBeInTheDocument();
     expect(
       container.querySelectorAll('[data-surface-variant="card"]')
@@ -158,7 +158,7 @@ describe('ContactDetailSidebar', () => {
       'flat'
     );
     expect(screen.getByText('Role')).not.toHaveClass('uppercase');
-    expect(screen.getByRole('combobox', { name: 'Contact Type' })).toHaveClass(
+    expect(screen.getByRole('combobox', { name: 'Contact type' })).toHaveClass(
       'rounded-full',
       'bg-surface-1'
     );

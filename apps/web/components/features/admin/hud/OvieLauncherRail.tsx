@@ -328,7 +328,7 @@ export function OvieLauncherRail({
               value={query}
               onChange={event => setQuery(event.target.value)}
               placeholder='Search tools'
-              aria-label='Search All Tools'
+              aria-label='Search all tools'
               data-testid='ovie-launcher-search'
             />
             <AllToolsList controls={filteredAll} />

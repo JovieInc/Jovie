@@ -71,7 +71,7 @@ export function FounderReviewStack({
 
   return (
     <section
-      aria-label='Founder Opportunity Review'
+      aria-label='Founder opportunity review'
       data-testid='founder-review-stack'
     >
       <Button
@@ -84,10 +84,10 @@ export function FounderReviewStack({
         onClick={() => onOpen?.(card.id)}
         onKeyDown={handleKeyDown}
       >
-        Review Current Opportunity
+        Review current opportunity
       </Button>
       <div className='mb-3 flex items-center justify-between gap-3 text-xs text-tertiary-token'>
-        <span>Founder Queue</span>
+        <span>Founder queue</span>
         <span aria-live='polite'>1 of {cards.length}</span>
       </div>
       {isYoutubeThumbnail && card.youtubeThumbnail ? (

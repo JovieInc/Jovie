@@ -235,7 +235,7 @@ describe('FounderReviewRecorder', () => {
     }
 
     render(<Harness />);
-    await user.click(screen.getByRole('button', { name: 'Start Session' }));
+    await user.click(screen.getByRole('button', { name: 'Start session' }));
     expect(screen.getByText(/^Recording ·/)).toBeVisible();
     act(() => {
       transcriberCallbacks[0]?.onTranscript('First thought.');
@@ -269,7 +269,7 @@ describe('FounderReviewRecorder', () => {
     });
     render(<FounderReviewRecorder target={TARGET} />);
 
-    await user.click(screen.getByRole('button', { name: 'Start Session' }));
+    await user.click(screen.getByRole('button', { name: 'Start session' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Microphone access is off'
@@ -295,7 +295,7 @@ describe('FounderReviewRecorder', () => {
     });
     render(<FounderReviewRecorder target={TARGET} />);
 
-    const start = screen.getByRole('button', { name: 'Start Session' });
+    const start = screen.getByRole('button', { name: 'Start session' });
     fireEvent.click(start);
     fireEvent.click(start);
 
@@ -373,7 +373,7 @@ describe('FounderReviewRecorder', () => {
     });
     render(<FounderReviewRecorder target={TARGET} onApprove={vi.fn()} />);
 
-    await user.click(screen.getByRole('button', { name: 'Start Session' }));
+    await user.click(screen.getByRole('button', { name: 'Start session' }));
     act(() => callbacks?.onError?.('not-allowed'));
     await user.click(screen.getByRole('button', { name: 'Approve' }));
 

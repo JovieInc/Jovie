@@ -73,7 +73,7 @@ export function getAudienceDisplayName(
     return name;
   }
 
-  return isAudienceMemberAnonymous(member) ? 'Anonymous Fan' : 'Fan';
+  return isAudienceMemberAnonymous(member) ? 'Anonymous fan' : 'Fan';
 }
 
 /** Whether the artist can message this fan through a known channel. */

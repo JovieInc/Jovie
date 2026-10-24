@@ -257,17 +257,17 @@ function cockpitWithTask(title: string) {
 }
 
 const LABELS = [
-  'Lanes Running',
-  'Merge Queue',
-  'Merged Today',
-  'In Flight',
+  'Lanes running',
+  'Merge queue',
+  'Merged today',
+  'In flight',
   'Jovie / LYB / Summer',
   'Merged 7d',
   'Certified HEAD',
   'Staging',
   'Production',
-  'Behind Main',
-  'CI Green',
+  'Behind main',
+  'CI green',
   'Summer',
 ] as const;
 
@@ -293,7 +293,7 @@ describe('OvieShippingStateCard', () => {
     const panel = () => screen.getByTestId('hud-shipper-status-panel');
 
     expect(panel()).toHaveAttribute('data-truth', 'unknown');
-    expect(panel()).toHaveAttribute('aria-label', 'Ubuntu Shipping State');
+    expect(panel()).toHaveAttribute('aria-label', 'Ubuntu shipping state');
     expect(
       screen.getByTestId('hud-shipper-status-geometry').className
     ).toContain('min-h-40');
@@ -307,17 +307,17 @@ describe('OvieShippingStateCard', () => {
     expect(panel()).toHaveAttribute('data-entity', 'ovie.shipping-state');
     expect(panel()).toHaveAttribute('data-revision', 'rev-4');
     expect(panel()).toHaveAttribute('data-correlation', 'corr-4');
-    expect(metricValue('Lanes Running')).toBe('7/9');
-    expect(metricValue('Merge Queue')).toBe('2');
-    expect(metricValue('Merged Today')).toBe('292');
-    expect(metricValue('In Flight')).toBe('0');
+    expect(metricValue('Lanes running')).toBe('7/9');
+    expect(metricValue('Merge queue')).toBe('2');
+    expect(metricValue('Merged today')).toBe('292');
+    expect(metricValue('In flight')).toBe('0');
     expect(metricValue('Jovie / LYB / Summer')).toBe('189 / 17 / 26');
     expect(metricValue('Merged 7d')).toBe('862 (+283% WoW)');
     expect(metricValue('Certified HEAD')).toBe('c3e74e0');
     expect(metricValue('Staging')).toBe('26.9.16 a1b2c3d');
     expect(metricValue('Production')).toBe('26.9.15 ee7401f');
-    expect(metricValue('Behind Main')).toBe('54');
-    expect(metricValue('CI Green')).toBe('Yes');
+    expect(metricValue('Behind main')).toBe('54');
+    expect(metricValue('CI green')).toBe('Yes');
     expect(metricValue('Summer')).toBe('Up');
     expect(
       screen.getByText(
@@ -369,13 +369,13 @@ describe('OvieShippingStateCard', () => {
     await waitFor(() => {
       expect(panel()).toHaveAttribute('data-truth', 'degraded');
     });
-    expect(metricValue('Merged Today')).toBe('n/a');
+    expect(metricValue('Merged today')).toBe('n/a');
     expect(metricValue('Jovie / LYB / Summer')).toBe('n/a / n/a / n/a');
     expect(metricValue('Merged 7d')).toBe('n/a');
     expect(metricValue('Summer')).toBe('n/a');
-    expect(metricValue('Lanes Running')).toBe('7/9 stale');
-    expect(metricValue('Merge Queue')).toBe('2');
-    expect(metricValue('Behind Main')).toBe('54');
+    expect(metricValue('Lanes running')).toBe('7/9 stale');
+    expect(metricValue('Merge queue')).toBe('2');
+    expect(metricValue('Behind main')).toBe('54');
     expect(screen.getByText('GitHub GraphQL returned 502')).toBeTruthy();
   });
 
@@ -395,8 +395,8 @@ describe('OvieShippingStateCard', () => {
       );
     });
     expect(screen.queryByText('0')).toBeNull();
-    expect(metricValue('Merged Today')).toBe('n/a');
-    expect(metricValue('Lanes Running')).toBe('n/a');
+    expect(metricValue('Merged today')).toBe('n/a');
+    expect(metricValue('Lanes running')).toBe('n/a');
   });
 
   it('ages a connected projection to stale at its deadline without another read', async () => {
@@ -467,7 +467,7 @@ describe('OvieShippingStateCard', () => {
     );
     expect(panel).toHaveAttribute('data-connection', 'disconnected');
     expect(screen.getByText('Shipping-state request timed out')).toBeTruthy();
-    expect(metricValue('Merged Today')).toBe('n/a');
+    expect(metricValue('Merged today')).toBe('n/a');
     expect(screen.queryByText('0')).toBeNull();
   });
 
@@ -691,7 +691,7 @@ describe('OvieShippingStateCard', () => {
       expect(panel()).toHaveAttribute('data-revision', 'rev-token-b');
     });
     expect(panel()).toHaveAttribute('data-correlation', 'corr-token-b');
-    expect(metricValue('Merge Queue')).toBe('7');
+    expect(metricValue('Merge queue')).toBe('7');
   });
 
   it('ignores an aborted old-token response before applying a new token projection', async () => {

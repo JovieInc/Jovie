@@ -4,13 +4,22 @@
  * Shared casing validators for canonical UI label linting.
  *
  * Rules mirror DESIGN.md → Text Casing and .claude/rules/ui.md:
- * - Title Case for labels, headings, buttons, nav, column headers, badges
+ * - Sentence case for labels, headings, buttons, nav, column headers, badges
  * - Sentence case for body text, descriptions, tooltips, toasts
  * - Never ALL CAPS (except approved abbreviations)
  * - Never lowercase the first word of a visible label
  */
 
 const ABBREVIATIONS = new Set([
+  'EP',
+  'LP',
+  'ISRC',
+  'UPC',
+  'UPC/EAN',
+  'DSP',
+  'PRO',
+  'BMI',
+  'ASCAP',
   'AI',
   'API',
   'CSV',
@@ -34,6 +43,10 @@ const ABBREVIATIONS = new Set([
 
 /** Brand or product words that keep internal capitalization. */
 const BRAND_WORDS = new Set([
+  'Ovie',
+  'Stripe',
+  'Mac',
+  'macOS',
   'Apple',
   'Clerk',
   'GitHub',
@@ -43,7 +56,6 @@ const BRAND_WORDS = new Set([
   'Linear',
   'Linear.app',
   'LinkedIn',
-  'Music',
   'SoundCloud',
   'Spotify',
   'TikTok',
@@ -55,8 +67,8 @@ const BRAND_WORDS = new Set([
 
 const ALLOWLIST_COMMENT_PATTERN = /ui-casing-allow:/i;
 
-/** JSX components whose child text should be Title Case. */
-const TITLE_CASE_COMPONENTS = new Set([
+/** JSX components whose child text should be sentence case. */
+const LABEL_COMPONENTS = new Set([
   'AlertTitle',
   'Badge',
   'BreadcrumbPage',
@@ -85,14 +97,14 @@ const SENTENCE_CASE_COMPONENTS = new Set([
 
 const HEADING_ELEMENTS = new Set(['h1', 'h2', 'h3', 'h4']);
 
-/** JSX props that carry Title Case UI labels. */
-const TITLE_CASE_PROPS = new Set(['aria-label', 'label']);
+/** JSX props that carry sentence-case UI labels. */
+const LABEL_PROPS = new Set(['aria-label', 'label']);
 
 /** JSX props that carry sentence-case body copy. */
 const SENTENCE_CASE_PROPS = new Set(['description', 'placeholder']);
 
 /** Object literal keys for config arrays (nav items, table columns, etc.). */
-const TITLE_CASE_OBJECT_KEYS = new Set(['header', 'label']);
+const LABEL_OBJECT_KEYS = new Set(['header', 'label']);
 
 /** Object literal keys for sentence-case copy in config objects. */
 const SENTENCE_CASE_OBJECT_KEYS = new Set(['description']);
@@ -144,32 +156,17 @@ function stripEdgePunctuation(word) {
 }
 
 /**
- * @param {string} value
- * @returns {string[]}
- */
-function getWords(value) {
-  return normalizeText(value)
-    .split(' ')
-    .map(stripEdgePunctuation)
-    .filter(Boolean);
-}
-
-/**
  * @param {string} word
  */
 function isAbbreviation(word) {
-  if (!word) return false;
-  if (ABBREVIATIONS.has(word)) return true;
-  return (
-    word.length >= 2 && word === word.toUpperCase() && /^[A-Z0-9]+$/.test(word)
-  );
+  return ABBREVIATIONS.has(word);
 }
 
 /**
  * @param {string} word
  */
 function isBrandWord(word) {
-  return BRAND_WORDS.has(word);
+  return BRAND_WORDS.has(word.replace(/[’']s$/, ''));
 }
 
 /**
@@ -188,108 +185,35 @@ function shouldSkipLiteral(value) {
   return false;
 }
 
-/**
- * @param {string} word
- */
-function toCanonicalWord(word) {
-  const leading = word.match(/^[^A-Za-z0-9]*/)?.[0] ?? '';
-  const trailing = word.match(/[^A-Za-z0-9]*$/)?.[0] ?? '';
-  const core = word.slice(leading.length, word.length - trailing.length);
-  if (!core) return word;
-  if (isAbbreviation(core) || isBrandWord(core)) return word;
-  return `${leading}${core.charAt(0).toUpperCase()}${core.slice(1).toLowerCase()}${trailing}`;
+function toCanonicalSentenceCase(value) {
+  let sentenceStart = true;
+  return normalizeText(value)
+    .split(' ')
+    .map((raw, index, tokens) => {
+      const word = stripEdgePunctuation(raw);
+      const proper =
+        /^I(?:[’'](?:m|ve|ll|d))?$/.test(word) ||
+        isAbbreviation(word) ||
+        isBrandWord(word) ||
+        (word === 'Music' &&
+          stripEdgePunctuation(tokens[index - 1] ?? '') === 'Apple');
+      const core = proper
+        ? word
+        : sentenceStart
+          ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+          : word.toLowerCase();
+      const result = word ? raw.replace(word, core) : raw;
+      if (word) sentenceStart = /[.!?][)"'\]]*$/.test(raw);
+      return result;
+    })
+    .join(' ');
 }
 
-/**
- * @param {string} value
- */
-function toCanonicalTitleCase(value) {
-  return normalizeText(value).split(' ').map(toCanonicalWord).join(' ');
-}
-
-/**
- * @param {string} value
- */
-function isAllCapsPhrase(value) {
-  const words = getWords(value);
-  if (words.length === 0) return false;
-  if (words.length === 1 && isAbbreviation(words[0])) return false;
-  return words.every(
-    word => word === word.toUpperCase() && /^[A-Z]{2,}$/.test(word)
-  );
-}
-
-/**
- * @param {string} value
- */
-function isTitleCase(value) {
-  if (shouldSkipLiteral(value)) return true;
-
-  const trimmed = normalizeText(value);
-  if (trimmed.charAt(0) !== trimmed.charAt(0).toUpperCase()) return false;
-  if (isAllCapsPhrase(trimmed)) return false;
-
-  const words = getWords(trimmed);
-  for (const word of words) {
-    if (!/[A-Za-z]/.test(word)) continue;
-    if (isAbbreviation(word) || isBrandWord(word)) continue;
-    // Hyphenated compounds keep segments after the first lowercase, matching
-    // toCanonicalWord ("Follow-up", not "Follow-Up") — without the hyphen
-    // branch the canonical form itself could never satisfy the check.
-    if (!/^[A-Z][a-z0-9'&]*(?:-[a-z0-9'&]+)*$/.test(word)) return false;
-  }
-
-  return trimmed === toCanonicalTitleCase(trimmed);
-}
-
-/**
- * @param {string} value
- */
 function isSentenceCase(value) {
-  if (shouldSkipLiteral(value)) return true;
-
-  const trimmed = normalizeText(value);
-  const words = getWords(trimmed);
-  const firstWord = words[0] ?? '';
-  const startsWithBrandWord =
-    isBrandWord(firstWord) ||
-    (firstWord.length > 1 &&
-      firstWord.startsWith('i') &&
-      /[A-Z]/.test(firstWord[1]));
-
-  if (
-    trimmed.charAt(0) !== trimmed.charAt(0).toUpperCase() &&
-    !startsWithBrandWord
-  ) {
-    return false;
-  }
-  if (isAllCapsPhrase(trimmed)) return false;
-
-  // Walk raw (un-stripped) tokens so sentence boundaries are respected: a
-  // capitalized word is legitimate when it starts a new sentence (the previous
-  // token ended with sentence-terminating punctuation). Without this, valid
-  // multi-sentence copy ("...your career. Smart links...") false-positives.
-  const rawWords = trimmed.split(' ');
-  let prevEndsSentence = true;
-  for (const raw of rawWords) {
-    const word = stripEdgePunctuation(raw);
-    const endsSentence = /[.!?:][)"'\]]*$/.test(raw);
-    if (!word) {
-      if (endsSentence) prevEndsSentence = true;
-      continue;
-    }
-    if (
-      !prevEndsSentence &&
-      !isAbbreviation(word) &&
-      !isBrandWord(word) &&
-      /^[A-Z][a-z]/.test(word)
-    ) {
-      return false;
-    }
-    prevEndsSentence = endsSentence;
-  }
-
-  return true;
+  return (
+    shouldSkipLiteral(value) ||
+    normalizeText(value) === toCanonicalSentenceCase(value)
+  );
 }
 
 /**
@@ -417,18 +341,17 @@ module.exports = {
   SENTENCE_CASE_COMPONENTS,
   SENTENCE_CASE_OBJECT_KEYS,
   SENTENCE_CASE_PROPS,
-  TITLE_CASE_COMPONENTS,
-  TITLE_CASE_OBJECT_KEYS,
-  TITLE_CASE_PROPS,
+  LABEL_COMPONENTS,
+  LABEL_OBJECT_KEYS,
+  LABEL_PROPS,
   getJsxAttributeName,
   getJsxElementName,
   getStringFromJsxAttributeValue,
   getStringLiteralValue,
   hasAllowlistComment,
   isSentenceCase,
-  isTitleCase,
+  toCanonicalSentenceCase,
   isToastCall,
   isUiScopedFile,
   shouldSkipLiteral,
-  toCanonicalTitleCase,
 };

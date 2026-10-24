@@ -22,9 +22,9 @@ export default async function OperationsPage() {
     >
       <HudSystemHealthStrip metrics={metrics} presentation='page' />
       <OperationalTasksPanel presentation='page' />
-      <nav aria-label='Related Operations'>
+      <nav aria-label='Related operations'>
         <h2 className='line-clamp-2 text-app font-semibold text-primary-token'>
-          Inspect The Operating System
+          Inspect the operating system
         </h2>
         <div className='mt-2 flex flex-wrap gap-3 text-2xs font-medium'>
           <a

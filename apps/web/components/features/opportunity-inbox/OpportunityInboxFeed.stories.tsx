@@ -70,10 +70,10 @@ export const YoutubeThumbnailCandidate: Story = {
         ...baseCard,
         id: 'yt-feed-1',
         sourceKind: 'youtube.thumbnail_candidate',
-        typeLabel: 'YouTube Thumbnail',
+        typeLabel: 'YouTube thumbnail',
         title: 'Review thumbnail for The Last Time',
         why: 'YouTube API snapshot captured Sep 1, 2026. Approval records intent; publication stays blocked pending a native Studio experiment and provider readback.',
-        primaryActionLabel: 'Approve Candidate',
+        primaryActionLabel: 'Approve candidate',
         category: 'youtube_thumbnail',
         youtubeThumbnail: {
           channelId: 'UC90tJdD38139ytPUdEZVl1A',

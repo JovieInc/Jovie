@@ -94,7 +94,7 @@ function RangeSelector({
       value={value}
       onValueChange={onChange}
       options={RANGE_OPTIONS}
-      aria-label='Funnel Time Range'
+      aria-label='Funnel time range'
     />
   );
 }

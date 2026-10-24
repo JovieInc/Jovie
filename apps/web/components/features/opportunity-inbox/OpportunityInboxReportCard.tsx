@@ -118,7 +118,7 @@ export function OpportunityInboxReportCard({
             aria-controls={breakdownId}
             onClick={() => setExpanded(open => !open)}
           >
-            {expanded ? 'Hide Breakdown' : 'Show Breakdown'}
+            {expanded ? 'Hide breakdown' : 'Show breakdown'}
             <ChevronDown
               aria-hidden='true'
               className={cn(

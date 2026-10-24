@@ -263,14 +263,14 @@ test('keeps page identity and review status readable at narrow widths', async ({
     suggestions: expect.any(Array),
   });
   await page
-    .getByRole('button', { name: /^Review Suggestions \(\d+\)$/ })
+    .getByRole('button', { name: /^Review suggestions \(\d+\)$/ })
     .click();
   await expect(page.getByTestId('suggested-connections-review')).toBeVisible();
   await expect(
     page.getByTestId('suggested-connections-error-state')
   ).toHaveCount(0);
   await page
-    .getByRole('button', { name: 'Close Suggestions', exact: true })
+    .getByRole('button', { name: 'Close suggestions', exact: true })
     .click();
   const workspace = page.getByTestId('profiles-workspace');
   for (const width of [320, 390, 1280]) {

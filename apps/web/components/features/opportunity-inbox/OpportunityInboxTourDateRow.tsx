@@ -165,7 +165,7 @@ export function OpportunityInboxTourDateRow({
               }}
               onClick={handleConfirm}
               disabled={isBusy || !isActionable}
-              aria-label={isPersistent ? 'Confirmed' : 'Confirm Tour Date'}
+              aria-label={isPersistent ? 'Confirmed' : 'Confirm tour date'}
             >
               ✓
             </button>
@@ -186,7 +186,7 @@ export function OpportunityInboxTourDateRow({
                 )}
                 onClick={handleReject}
                 disabled={isBusy}
-                aria-label='Reject Tour Date'
+                aria-label='Reject tour date'
               >
                 &times;
               </button>

@@ -57,19 +57,19 @@ const PRIMARY_ACTION_LABEL_BY_KIND: Readonly<Record<string, string>> = {
   'calendar.create_event': 'Add to calendar',
   'brand_deal.opportunity': 'Approve buyer',
   [WORKFLOW_CAPTURE_REQUEST_KIND]: 'Record',
-  [SOCIAL_REPLY_DRAFT_KIND]: 'Approve Reply',
+  [SOCIAL_REPLY_DRAFT_KIND]: 'Approve reply',
 };
 
 const SOCIAL_REPLY_TYPE_LABEL_BY_AUTHOR_KIND: Readonly<
   Record<SocialReplyAuthorKind, string>
 > = {
-  fan: 'Fan Reply',
-  collab: 'Collab Request',
-  booking: 'Booking Inquiry',
-  sponsorship: 'Sponsorship Offer',
+  fan: 'Fan reply',
+  collab: 'Collab request',
+  booking: 'Booking inquiry',
+  sponsorship: 'Sponsorship offer',
   press: 'Press',
   playlist: 'Playlist',
-  anonymous: 'Fan Reply',
+  anonymous: 'Fan reply',
 };
 
 function primaryActionLabelFor(
@@ -176,8 +176,8 @@ export function mapSuggestedActionToInboxCard(
   let typeLabel: string;
   if (category === 'report') typeLabel = 'Report';
   else if (category === 'workflow_capture') typeLabel = 'Workflow';
-  else if (category === 'youtube_thumbnail') typeLabel = 'YouTube Thumbnail';
-  else if (category === 'brand_deal') typeLabel = 'Brand Deal';
+  else if (category === 'youtube_thumbnail') typeLabel = 'YouTube thumbnail';
+  else if (category === 'brand_deal') typeLabel = 'Brand deal';
   else if (socialReply) {
     typeLabel = SOCIAL_REPLY_TYPE_LABEL_BY_AUTHOR_KIND[socialReply.authorKind];
   } else typeLabel = OPPORTUNITY_SIGNAL_TYPE_META[signalType].label;
@@ -199,10 +199,10 @@ export function mapSuggestedActionToInboxCard(
     title,
     why,
     primaryActionLabel:
-      (youtubeThumbnail ? 'Approve Candidate' : report?.nextStep?.label) ??
+      (youtubeThumbnail ? 'Approve candidate' : report?.nextStep?.label) ??
       (workflowCaptureResult.success &&
       workflowCaptureResult.data.state === 'uploaded_needs_review'
-        ? 'Send Recording'
+        ? 'Send recording'
         : primaryActionLabelFor(row.kind, category)),
     status: 'pending',
     category,

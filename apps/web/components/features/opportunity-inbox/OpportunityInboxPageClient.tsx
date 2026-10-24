@@ -497,7 +497,7 @@ export function OpportunityInboxPageClient({
           <div
             className='mb-4 flex min-h-7 items-center gap-1'
             role='toolbar'
-            aria-label='Inbox View'
+            aria-label='Inbox view'
           >
             <Button
               size='sm'
@@ -505,7 +505,7 @@ export function OpportunityInboxPageClient({
               aria-pressed={inboxView === 'needs'}
               onClick={() => selectInboxView('needs')}
             >
-              Needs You
+              Needs you
             </Button>
             <Button
               size='sm'
@@ -513,7 +513,7 @@ export function OpportunityInboxPageClient({
               aria-pressed={inboxView === 'done'}
               onClick={() => selectInboxView('done')}
             >
-              Done For You
+              Done for you
             </Button>
           </div>
           <div className='mb-4' data-testid='opportunity-inbox-notes'>
@@ -552,10 +552,10 @@ export function OpportunityInboxPageClient({
               <section
                 className='system-b-opportunity-inbox-feed'
                 data-testid='opportunity-inbox-tour-date-review'
-                aria-label='Tour Dates To Review'
+                aria-label='Tour dates to review'
               >
                 <div className='system-b-opportunity-inbox-section-label'>
-                  Tour Dates To Review
+                  Tour dates to review
                 </div>
                 <div className='system-b-opportunity-inbox-feed-list'>
                   {pendingTourDates.map(item => (
@@ -575,7 +575,7 @@ export function OpportunityInboxPageClient({
               <div
                 className='mb-4 flex flex-wrap items-center gap-1.5'
                 role='toolbar'
-                aria-label='Filter Signals By Type'
+                aria-label='Filter signals by type'
                 data-testid='opportunity-inbox-signal-filters'
               >
                 {SIGNAL_TYPE_FILTERS.map((filter, index) => {
@@ -664,8 +664,8 @@ export function OpportunityInboxPageClient({
                 <ErrorBanner
                   title={
                     hasReviewableItems
-                      ? 'Some Opportunities Couldn’t Be Checked'
-                      : 'Your Inbox Couldn’t Be Checked'
+                      ? 'Some opportunities couldn’t be checked'
+                      : 'Your inbox couldn’t be checked'
                   }
                   description={
                     isRefreshing
@@ -676,7 +676,7 @@ export function OpportunityInboxPageClient({
                   }
                   actions={[
                     {
-                      label: 'Try Again',
+                      label: 'Try again',
                       onClick: () => {
                         if (isRefreshing) return;
                         retryFocusRecoveryRef.current = true;

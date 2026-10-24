@@ -320,7 +320,7 @@ export function AddConnectionRail({
   };
 
   const title =
-    view === 'profile' ? 'Add Public Profile' : 'Add Profile Or Site';
+    view === 'profile' ? 'Add public profile' : 'Add profile or site';
   let suggestionDescription = 'No suggested profiles are waiting for review.';
   if (suggestionsLoading) {
     suggestionDescription = 'Checking saved suggestions.';
@@ -332,7 +332,7 @@ export function AddConnectionRail({
   return (
     <EntitySidebarShell
       isOpen
-      ariaLabel='Add Profile Or Site'
+      ariaLabel='Add profile or site'
       scrollStrategy='shell'
       workspaceSurface='raised'
       headerMode='minimal'
@@ -349,7 +349,7 @@ export function AddConnectionRail({
               if (intake.candidate) onReviewCandidate(intake.candidate);
             }}
           >
-            Review Profile
+            Review profile
           </Button>
         ) : undefined
       }
@@ -392,13 +392,13 @@ export function AddConnectionRail({
         <DrawerSection sectionKind='details' surface='plain' className='py-1'>
           <ChoiceRow
             icon={<Link2 className='h-4 w-4' aria-hidden />}
-            title='Add Public Profile'
+            title='Add public profile'
             description='Add an artist profile, website, or public page for monitoring.'
             onClick={() => setView('profile')}
           />
           <ChoiceRow
             icon={<ReviewIcon />}
-            title='Review Suggestions'
+            title='Review suggestions'
             description={suggestionDescription}
             onClick={onReviewSuggestions}
           />
@@ -415,7 +415,7 @@ export function AddConnectionRail({
         >
           <div className='flex min-h-72 flex-1 flex-col gap-3 px-3 pb-2'>
             <Input
-              aria-label='Public Profile URL'
+              aria-label='Public profile URL'
               aria-controls={
                 intake.suggestions.length > 0
                   ? 'connection-intake-suggestions'
@@ -464,7 +464,7 @@ export function AddConnectionRail({
                 <div
                   id='connection-intake-suggestions'
                   role='listbox'
-                  aria-label='Suggested Profile Destinations'
+                  aria-label='Suggested profile destinations'
                   className='flex flex-wrap gap-1.5 sm:flex-col sm:gap-1'
                 >
                   {intake.suggestions.map((suggestion, index) => (

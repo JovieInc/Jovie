@@ -23,7 +23,8 @@ function createAdapter(
     albumOptions: ['Channel Orange'],
     totalCount: 12,
     visibleCount: 8,
-    triggerLabel: 'Search Releases',
+    triggerLabel: 'Search releases',
+    ariaLabel: 'Filter search releases',
     ...overrides,
   };
 }
@@ -104,7 +105,7 @@ describe('HeaderSearchSurface', () => {
     ).toBeVisible();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Filter Current View' })
+      screen.getByRole('button', { name: 'Filter current view' })
     ).toBeVisible();
   });
 
@@ -161,10 +162,10 @@ describe('HeaderSearchSurface', () => {
     );
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Filter Current View' })
+      screen.getByRole('button', { name: 'Filter current view' })
     );
 
-    expect(screen.getByLabelText('Filter Search Releases')).toBeVisible();
+    expect(screen.getByLabelText('Filter search releases')).toBeVisible();
   });
 
   it('renders typed groups with deterministic links and keyboard selection', () => {
@@ -219,7 +220,7 @@ describe('HeaderSearchSurface', () => {
     expect(screen.getByRole('group', { name: 'Threads' })).toBeVisible();
     expect(screen.getByRole('group', { name: 'Entities' })).toBeVisible();
     expect(screen.getByRole('group', { name: 'Work' })).toBeVisible();
-    expect(screen.getByRole('group', { name: 'Current View' })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Current view' })).toBeVisible();
     for (const heading of [
       screen.getByText('Threads'),
       screen.getByText('Entities'),

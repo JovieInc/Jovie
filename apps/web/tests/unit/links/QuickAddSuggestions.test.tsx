@@ -239,8 +239,8 @@ describe('QuickAddSuggestions', () => {
         />
       );
 
-      // Spotify Artist should be first in music order
-      const spotifyArtistPill = screen.getByText('Spotify Artist');
+      // Spotify artist should be first in music order
+      const spotifyArtistPill = screen.getByText('Spotify artist');
       fireEvent.click(spotifyArtistPill);
 
       expect(mockOnPlatformSelect).toHaveBeenCalledWith(

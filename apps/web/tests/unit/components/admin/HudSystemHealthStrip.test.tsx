@@ -20,13 +20,13 @@ describe('HudSystemHealthStrip gbrain pill', () => {
   it('uses the page plane for standalone system health', () => {
     render(<HudSystemHealthStrip metrics={metrics()} presentation='page' />);
     expect(
-      screen.getByRole('region', { name: 'System Health' }).className
+      screen.getByRole('region', { name: 'System health' }).className
     ).not.toContain('bg-surface');
   });
 
-  it('shows No Signal when gbrain is not configured', () => {
+  it('shows No signal when gbrain is not configured', () => {
     render(<HudSystemHealthStrip metrics={metrics()} />);
-    expect(screen.getByText('No Signal')).toBeInTheDocument();
+    expect(screen.getByText('No signal')).toBeInTheDocument();
   });
 
   it('shows OK with the version when gbrain is healthy', () => {

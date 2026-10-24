@@ -132,7 +132,7 @@ describe('OviePrivacyLockControl', () => {
       screen.getByRole('button', { name: 'Turn off Ovie privacy lock' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Lock Ovie Now' })
+      screen.getByRole('button', { name: 'Lock Ovie now' })
     ).toBeInTheDocument();
   });
 });

@@ -10,7 +10,7 @@ import {
   loadAdminPlatformConnectionsData,
 } from './platform-connections-data';
 
-export const metadata: Metadata = { title: 'Platform Connections — Admin' };
+export const metadata: Metadata = { title: 'Platform connections — Admin' };
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +48,7 @@ export default async function AdminPlatformConnectionsPage({
 
   return (
     <AdminPage
-      title='Platform Connections'
+      title='Platform connections'
       description='Manage internal publisher connections and playlist generation controls.'
       tabs={{
         param: 'tab',

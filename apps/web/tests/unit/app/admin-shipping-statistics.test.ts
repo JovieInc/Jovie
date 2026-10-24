@@ -106,7 +106,7 @@ describe('pipelineRows', () => {
       { label: 'Running', value: 3, state: 'fresh' },
       { label: 'Retrying', value: 0, state: 'fresh' },
       { label: 'Blocked', value: 2, state: 'fresh' },
-      { label: 'Open Pull Requests', value: 7, state: 'fresh' },
+      { label: 'Open pull requests', value: 7, state: 'fresh' },
       { label: 'Native merge queue', value: 0, state: 'fresh' },
     ]);
   });

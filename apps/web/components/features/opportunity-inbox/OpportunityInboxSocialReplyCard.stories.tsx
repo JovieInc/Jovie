@@ -6,7 +6,7 @@ import { OpportunityInboxSocialReplyCard } from './OpportunityInboxSocialReplyCa
 const socialReply = {
   platform: 'Instagram',
   authorLabel: '@maya.wav',
-  typeLabel: 'Collab Request',
+  typeLabel: 'Collab request',
   inboundText: 'Loved the new track — would you be down to collab on a remix?',
   draftedText:
     'Thank you so much! I love what you did on "Ghostline" — dropping you a DM about collab windows this month.',
@@ -19,11 +19,11 @@ const card: OpportunityInboxCardViewModel = {
   id: 'reply-1',
   sourceKind: 'social_reply.draft',
   signalType: 'fan_reply',
-  typeLabel: 'Fan Reply',
+  typeLabel: 'Fan reply',
   createdAt: '2026-09-30T10:00:00.000Z',
   title: 'Reply to Maya on Instagram',
   why: 'Inbound collab request drafted from your saved tone profile. Nothing sends until you approve.',
-  primaryActionLabel: 'Approve Reply',
+  primaryActionLabel: 'Approve reply',
   status: 'pending',
   category: 'social_reply',
   socialReply,

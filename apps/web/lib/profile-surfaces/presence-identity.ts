@@ -369,13 +369,13 @@ export function getPresenceObservation(
   if (!subject.lastObservedAt && subject.rank == null) {
     return {
       status: 'pending',
-      label: 'Not Measured',
+      label: 'Not measured',
       detail: 'No monitoring run has completed yet.',
     };
   }
   return {
     status: 'measured',
-    label: subject.rank === null ? 'Not Ranked' : 'Measured',
+    label: subject.rank === null ? 'Not ranked' : 'Measured',
     detail:
       subject.rank === null
         ? 'Checked, and this page was not in the measured results.'
@@ -389,9 +389,9 @@ export function formatPresenceRank(
 ): string {
   if (status === 'plan-restricted') return 'Restricted';
   if (status === 'unavailable') return 'Unavailable';
-  if (status === 'pending') return 'Not Measured';
+  if (status === 'pending') return 'Not measured';
   if (status === 'stale') return rank === null ? 'Stale' : `#${rank}`;
-  if (rank === null) return 'Not Ranked';
+  if (rank === null) return 'Not ranked';
   return `#${rank}`;
 }
 
