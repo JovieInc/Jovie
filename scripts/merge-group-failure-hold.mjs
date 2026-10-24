@@ -1319,9 +1319,23 @@ function instructionContractEvidence(repository, run, jobs, baseSha) {
   }
 }
 
-function ciFastRemainingLog(repository, jobs) {
+// The current log is only consumed for a failing `ci-fast (remaining)` job.
+// The ahead log is also read when that job SUCCEEDED (JOV-8760): an ahead run
+// that failed in another job still proves, through its successful structural
+// timings table, that this group's failing commands passed on the base —
+// skipping the successful log left every such group waiting unattributed.
+function ciFastRemainingLog(
+  repository,
+  jobs,
+  { includeSuccessful = false } = {}
+) {
   const job = jobs.find(item => item?.name === CI_FAST_REMAINING_JOB);
-  if (!job || job.conclusion !== 'failure' || !Number.isSafeInteger(job.id))
+  const accepted = includeSuccessful ? ['failure', 'success'] : ['failure'];
+  if (
+    !job ||
+    !accepted.includes(job.conclusion) ||
+    !Number.isSafeInteger(job.id)
+  )
     return null;
   return gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]);
 }
@@ -1348,7 +1362,9 @@ function withAheadAttribution(repository, jobs, aheadGroup) {
         aheadJobs,
         aheadConclusion: aheadGroup.aheadConclusion,
         currentCiFastLog: ciFastRemainingLog(repository, jobs),
-        aheadCiFastLog: ciFastRemainingLog(repository, aheadJobs),
+        aheadCiFastLog: ciFastRemainingLog(repository, aheadJobs, {
+          includeSuccessful: true,
+        }),
       }),
     };
   } catch {
