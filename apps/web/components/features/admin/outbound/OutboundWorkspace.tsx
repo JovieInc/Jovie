@@ -1,10 +1,11 @@
 'use client';
 
 import { Button, Checkbox } from '@jovie/ui';
-import { AlertTriangle, RefreshCw, Send } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { Avatar } from '@/components/molecules/Avatar';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -525,16 +526,9 @@ export function OutboundWorkspace() {
       action={{ label: 'Retry', onClick: () => void query.refetch() }}
     />
   ) : (
-    <TableEmptyState
-      icon={<Send className='h-5 w-5' aria-hidden='true' />}
+    <EmptyState
+      presentation='quiet'
       heading={`Nobody in ${OUTBOUND_VIEW_LABELS[view]}`}
-      description={
-        view === 'replied'
-          ? 'Reply capture is not wired to a provider yet, so replies cannot land here.'
-          : view === 'ready'
-            ? 'Nobody has every required piece of evidence yet. Check Needs evidence.'
-            : 'People move here as you certify, approve, and send.'
-      }
     />
   );
 
@@ -647,6 +641,10 @@ export function OutboundWorkspace() {
               columns={columns}
               isLoading={query.isLoading}
               skeletonRows={10}
+              skeletonColumnConfig={[
+                { variant: 'text' },
+                { variant: 'person' },
+              ]}
               minWidth='440px'
               getRowId={row => row.leadId}
               getRowClassName={getRowClassName}

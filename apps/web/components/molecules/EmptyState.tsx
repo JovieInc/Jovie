@@ -73,8 +73,10 @@ interface EmptyStateBaseProps {
    * Presentation tuned for empty workspaces that own the remaining canvas.
    * Keeps the canonical anatomy while strengthening type hierarchy and
    * removing spacing reserved for actions when none are present.
+   * Quiet uses the home empty-state anatomy: one centered body-text line and
+   * at most one structured action, without an icon, card, or supporting copy.
    */
-  readonly presentation?: 'default' | 'workspace';
+  readonly presentation?: 'default' | 'workspace' | 'quiet';
   readonly className?: string;
   readonly testId?: string;
 }
@@ -168,7 +170,10 @@ export function EmptyState({
   const descriptionId = React.useId();
   const styles = variantStyles[variant] ?? variantStyles.default;
   const buttonSize = size === 'sm' ? 'sm' : 'default';
-  const hasActions = Boolean(actionSlot || action || secondaryAction);
+  const hasActions =
+    presentation === 'quiet'
+      ? Boolean(action)
+      : Boolean(actionSlot || action || secondaryAction);
   const isWorkspacePresentation = presentation === 'workspace';
 
   const renderPrimaryAction = (): React.ReactNode => {
@@ -255,15 +260,19 @@ export function EmptyState({
     );
   };
 
+  // Quiet work surfaces share the home state's single-line anatomy.
+  const isQuiet = presentation === 'quiet';
+  const Heading = isQuiet ? 'p' : 'h3';
+
   const content = (
     <>
-      {icon && (
+      {!isQuiet && icon && (
         <div className={cn('mb-3', styles.iconWrapper)} aria-hidden='true'>
           {icon}
         </div>
       )}
 
-      <h3
+      <Heading
         id={headingId}
         className={cn(
           'mb-1 text-app font-caption',
@@ -273,9 +282,9 @@ export function EmptyState({
         )}
       >
         {heading}
-      </h3>
+      </Heading>
 
-      {description && (
+      {!isQuiet && description && (
         <p
           id={descriptionId}
           className={cn(
@@ -296,9 +305,9 @@ export function EmptyState({
             isWorkspacePresentation ? 'items-start' : 'items-center'
           )}
         >
-          {actionSlot}
+          {!isQuiet && actionSlot}
           {renderPrimaryAction()}
-          {renderSecondaryAction()}
+          {!isQuiet && renderSecondaryAction()}
         </div>
       )}
     </>
@@ -307,7 +316,7 @@ export function EmptyState({
   return (
     <output
       aria-labelledby={headingId}
-      aria-describedby={description ? descriptionId : undefined}
+      aria-describedby={!isQuiet && description ? descriptionId : undefined}
       data-content-state={variant === 'error' ? 'error' : 'empty'}
       data-empty-state-presentation={presentation}
       data-testid={testId}

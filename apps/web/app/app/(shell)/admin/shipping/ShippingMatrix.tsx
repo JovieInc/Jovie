@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { LoadingSkeleton } from '@jovie/ui/atoms/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, GitPullRequest } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -13,6 +14,7 @@ import {
   EntityHeader,
   EntityHeaderThumbnail,
 } from '@/components/molecules/drawer';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import {
   parseShippingCockpitProjection,
@@ -20,6 +22,16 @@ import {
 } from '@/lib/ovie/shipping-state/client';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
+
+const SHIPPING_COLUMNS = [
+  'Work',
+  'Stage',
+  'Checks',
+  'Queue',
+  'Owner',
+  'Age',
+  'Last transition',
+] as const;
 
 type TaskFeed = ShippingCockpitProjection['operationalTasks'];
 type Task = TaskFeed['tasks'][number];
@@ -490,15 +502,7 @@ export function ShippingMatrix() {
           >
             <thead>
               <tr className='text-2xs text-tertiary-token'>
-                {[
-                  'Work',
-                  'Stage',
-                  'Checks',
-                  'Queue',
-                  'Owner',
-                  'Age',
-                  'Last transition',
-                ].map(label => (
+                {SHIPPING_COLUMNS.map(label => (
                   <th
                     key={label}
                     scope='col'
@@ -510,13 +514,34 @@ export function ShippingMatrix() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && !query.isPending ? (
+              {query.isPending ? (
+                <tr
+                  aria-label='Loading In-flight Work'
+                  className='border-t border-subtle'
+                >
+                  {SHIPPING_COLUMNS.map(column => (
+                    <td key={column} className='p-2'>
+                      <LoadingSkeleton announce={false} />
+                      {column === 'Work' ? (
+                        <LoadingSkeleton
+                          announce={false}
+                          height='h-3'
+                          width='w-24'
+                        />
+                      ) : null}
+                    </td>
+                  ))}
+                </tr>
+              ) : rows.length === 0 ? (
                 <tr className='border-t border-subtle'>
                   <td
                     colSpan={7}
                     className='p-6 text-center text-secondary-token'
                   >
-                    {emptyMatrixMessage(query.isError, feed)}
+                    <EmptyState
+                      presentation='quiet'
+                      heading={emptyMatrixMessage(query.isError, feed)}
+                    />
                   </td>
                 </tr>
               ) : (

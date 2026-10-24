@@ -55,3 +55,10 @@ export const DisabledAction: Story = {
     />
   ),
 };
+
+export const Quiet: Story = {
+  args: {
+    heading: 'No pending founder decisions.',
+    presentation: 'quiet',
+  },
+};

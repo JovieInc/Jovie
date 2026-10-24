@@ -346,12 +346,26 @@ describe('ShippingMatrix rendering (JOV-6893)', () => {
     renderMatrix();
 
     expect(screen.getByText('Loading in-flight work…')).toBeInTheDocument();
+    const table = screen.getByRole('table');
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers).toHaveLength(7);
+    const loadingRow = screen.getByRole('row', {
+      name: 'Loading In-flight Work',
+    });
+    expect(loadingRow.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(
+      8
+    );
     await act(async () => {
       resolveFetch?.(jsonResponse(projection([])));
     });
     expect(
       await screen.findByText('No open lane pull requests.')
     ).toBeInTheDocument();
+    expect(screen.getByRole('table')).toBe(table);
+    expect(screen.getAllByRole('columnheader')).toEqual(headers);
+    expect(
+      screen.queryByRole('row', { name: 'Loading In-flight Work' })
+    ).toBeNull();
   });
 
   it('reports observation errors and refreshes successfully', async () => {
