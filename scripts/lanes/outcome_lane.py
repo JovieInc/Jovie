@@ -121,6 +121,9 @@ def spent_today(state: dict, now: float) -> int:
     return sum(1 for row in state.values() if isinstance(row, dict) and str(row.get("day")) == day)
 
 
+LAST_SCAN = {"seen": 0}  # Validating issues the last candidates() pass scanned (cap: `limit`)
+
+
 def candidates(linear, state: Path, now: float, limit: int = 200) -> list[tuple[dict, dict]]:
     found, after, seen = [], None, 0
     records = read_state(state)
@@ -134,6 +137,7 @@ def candidates(linear, state: Path, now: float, limit: int = 200) -> list[tuple[
         if not page["pageInfo"]["hasNextPage"]:
             break
         after = page["pageInfo"]["endCursor"]
+    LAST_SCAN["seen"] = seen
     return found
 
 
@@ -323,7 +327,7 @@ def write_queue(state: Path, status: str, queue: list, now: float, spent: int) -
     when it stays old while the daily budget is exhausted or this file stops refreshing."""
     owed = [ask.get("at") for _, ask in queue if ask.get("at")]
     row = {"at": now, "status": status, "queued": len(queue), "oldestOwedAt": min(owed) if owed else None,
-           "spentToday": spent, "perDay": PER_DAY}
+           "spentToday": spent, "perDay": PER_DAY, "scanned": LAST_SCAN["seen"]}
     try:
         tmp = state / (QUEUE_FILE + ".tmp")
         tmp.write_text(json.dumps(row))

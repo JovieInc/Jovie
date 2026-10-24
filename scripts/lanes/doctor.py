@@ -37,6 +37,7 @@ import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
 import remediation  # noqa: E402
 import shipping_attribution  # noqa: E402  (company merge provenance report)
 import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage collector)
+import throughput_sentinel  # noqa: E402  (no-progress alarms, idle-reason counts, growth bounds)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -502,6 +503,10 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "fileOverlap": file_overlap.doctor_view(state),
         **automation_observation(host, lane, now),
         "outcomeQueue": read_json(state / "outcome-queue.json", {}),
+        "sentinel": throughput_sentinel.observe(
+            state, now, receipts,
+            {"inventoryBytes": getattr(lane, "REPAIR_INVENTORY_MAX_BYTES", 16 * 1024 * 1024)},
+            run=lifecycle.run, fetch_remote=not os.environ.get("LANES_SELFTEST")),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
         "linearAppCredential": _linear_app_credential(lane),
@@ -945,6 +950,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["automation-registry-unreadable"] = (
             f"origin/main:{AUTOMATION_REGISTRY} is unreadable ({watched.get('error') or 'missing or not JSONL'}); "
             "no Gem host-local automation receipt is being watched")
+    alerts.update(throughput_sentinel.judge(obs))
     # Closed loop, last hop: Validating issues owing an `outcome` receipt wait on the outcome
     # lane. Its daily budget exhausted (or the drain gone silent) with owed receipts older than
     # OUTCOME_OWED_MAX_S used to stall in silence for the rest of the UTC day.
@@ -1723,6 +1729,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
             "shippingAttribution": attribution,
+            "sentinel": {key: (obs.get("sentinel") or {}).get(key) for key in
+                         ("pushes1h", "idleExits1h", "releaseFlow", "growth")},
             "mergeThroughput": obs.get("mergeThroughput"),
             "mergeThroughputError": obs.get("mergeThroughputError"),
             "mergedWindow": obs.get("mergedWindow"),
