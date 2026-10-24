@@ -1115,7 +1115,7 @@ export function ProfileCompactTemplate({
                 viewerCountryCode={resolvedViewerCountryCode}
                 visitorAssignmentResolved={visitorAssignmentResolved}
                 merchCards={merchCards}
-                hideJovieBranding={hideJovieBranding}
+                hideJovieBranding={hideJovieBranding || embeddedPreview}
                 hideMoreMenu={hideMoreMenu}
                 allowFanCapture={allowFanCapture}
                 allowSignedInEscape={!embeddedPreview}
@@ -1198,6 +1198,7 @@ export function ProfileCompactTemplate({
                   setRequestedMode(nextMode);
                 }}
                 onAlertsModalClose={() => setRequestedMode('profile')}
+                hideJovieBranding={hideJovieBranding || embeddedPreview}
                 onDrawerOpenChange={handleDrawerOpenChange}
                 onDrawerViewChange={handleDrawerViewChange}
                 onOpenMenu={() => openDrawerMode('menu')}
