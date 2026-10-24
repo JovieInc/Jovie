@@ -1,0 +1,105 @@
+# APPLY STEP (JOV-8933): move this file to .github/workflows/ci-timing-collector.yml and commit.
+# The automation integration token lacks the GitHub 'workflows' permission, so the
+# activate commit must come from an owner with that permission. Content is final.
+# After the move, the collector starts on the next workflow_run completion.
+name: CI Timing Collector
+# clock-class: skip-if-unchanged (scheduled prune only; collection is event-driven)
+# accountable-writer: TimWhite
+# capability-gap: per-job-attempt CI timing rows (queued_at / started_at /
+#   completed_at / conclusion, one row per run_id + run_attempt + job) and
+#   merge-queue enter / start / end / merge timestamps + queue depth are not
+#   queryable anywhere; this records them as NDJSON under data/ on the
+#   ci-timing-data branch.
+# removal-trigger: remove when CI timing rows are served by a durable store.
+# Linear: JOV-8933 (this collector). Red-check dispatch with red_at / claim_at
+#   stamps is JOV-8934 and is intentionally NOT implemented here; rows are
+#   joinable on (pr_number, head_sha, run_id, run_attempt).
+
+on:
+  workflow_run:
+    types:
+      - completed
+  schedule:
+    # Daily retention prune, offset from other scheduled suites.
+    - cron: '40 7 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'write-data or prune (default: write-data)'
+        required: false
+        default: 'write-data'
+
+permissions:
+  contents: write
+  actions: read
+  pull-requests: read
+
+# Latest pending collection wins; dropped events are recovered by the
+# collector's overlap backfill window. Never cancel in progress: cancelling
+# would drop rows mid-collection.
+concurrency:
+  group: ci-timing-collector
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    name: Collect job-attempt rows
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.mode == 'write-data' ||
+      github.event_name == 'workflow_run' && github.event.workflow_run.path != '.github/workflows/ci-timing-collector.yml'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout trusted collector script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lib/ci-timing-collector.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.23.2'
+
+      - name: Collect timing rows
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/lib/ci-timing-collector.mjs --write-data
+
+  prune:
+    name: Prune past retention
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' && inputs.mode == 'prune'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout trusted collector script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/lib/ci-timing-collector.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Skip unchanged scheduled run
+        id: unchanged
+        uses: ./.github/actions/skip-if-unchanged
+        with:
+          workflow: ci-timing-collector.yml
+
+      - name: Setup Node.js
+        if: steps.unchanged.outputs.skip != 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.23.2'
+
+      - name: Prune data past retention
+        if: steps.unchanged.outputs.skip != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/lib/ci-timing-collector.mjs --prune
