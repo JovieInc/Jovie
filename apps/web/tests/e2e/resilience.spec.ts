@@ -70,9 +70,7 @@ test.describe('Slow network resilience', () => {
     await ensureSignedInUser(page);
   });
 
-  // JOV-8791: no visible loading/error state; spec also targets a stale
-  // audience endpoint. Re-enable with the fix.
-  test.fixme('dashboard profile page shows content or loading state under API delay', async ({
+  test('dashboard profile page shows content or loading state under API delay', async ({
     page,
   }) => {
     test.skip(
@@ -137,9 +135,7 @@ test.describe('API failure resilience', () => {
     await ensureSignedInUser(page);
   });
 
-  // JOV-8791: no visible loading/error state; spec also targets a stale
-  // audience endpoint. Re-enable with the fix.
-  test.fixme('audience page shows error UI (not blank) when audience API returns 500', async ({
+  test('audience page shows error UI (not blank) when audience API returns 500', async ({
     page,
   }) => {
     test.skip(
@@ -148,7 +144,18 @@ test.describe('API failure resilience', () => {
     );
     test.setTimeout(120_000);
 
+    // Legacy audience endpoints (visit/click/opt-in) and the current audience
+    // list data endpoint (/api/dashboard/audience/** used by
+    // useAudienceInfiniteQuery) both fail — the page must show error UI, not
+    // a blank surface (JOV-8791).
     await page.route('**/api/audience/**', route => {
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Service unavailable' }),
+      });
+    });
+    await page.route('**/api/dashboard/audience/**', route => {
       route.fulfill({
         status: 500,
         contentType: 'application/json',
