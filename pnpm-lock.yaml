@@ -25599,8 +25599,6 @@ snapshots:
   bluebird@3.7.2: {}
 
   body-parser@1.20.9:
-    transitivePeerDependencies:
-      - supports-color
     dependencies:
       bytes: 3.1.2
       content-type: 1.0.5
@@ -25614,10 +25612,10 @@ snapshots:
       raw-body: 2.5.3
       type-is: 1.6.18
       unpipe: 1.0.0
-
-  body-parser@2.4.0:
     transitivePeerDependencies:
       - supports-color
+
+  body-parser@2.4.0:
     dependencies:
       bytes: 3.1.2
       content-type: 2.1.0
@@ -25628,6 +25626,8 @@ snapshots:
       qs: 6.16.1
       raw-body: 3.0.2
       type-is: 2.1.0
+    transitivePeerDependencies:
+      - supports-color
 
   boolean@3.2.0:
     optional: true

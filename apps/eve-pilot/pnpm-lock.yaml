@@ -4489,8 +4489,6 @@ snapshots:
     optional: true
 
   body-parser@2.4.0:
-    transitivePeerDependencies:
-      - supports-color
     dependencies:
       bytes: 3.1.2
       content-type: 2.1.0
@@ -4501,6 +4499,8 @@ snapshots:
       qs: 6.16.1
       raw-body: 3.0.2
       type-is: 2.1.0
+    transitivePeerDependencies:
+      - supports-color
 
   brace-expansion@1.1.21:
     dependencies:
