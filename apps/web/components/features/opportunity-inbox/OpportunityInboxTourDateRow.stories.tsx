@@ -40,5 +40,7 @@ export const Confirmed: Story = {
       providerLabel: 'Bandsintown',
       status: 'confirmed',
     },
+    onConfirm: () => undefined,
+    onReject: () => undefined,
   },
 };
