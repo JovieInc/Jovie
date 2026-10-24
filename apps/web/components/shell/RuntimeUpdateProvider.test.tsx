@@ -13,6 +13,7 @@ import { useDesktopUpdateContext } from '@/components/organisms/desktop-update/D
 import { APP_ROUTES } from '@/constants/routes';
 import { renderDashboardNav } from '@/tests/utils/dashboard-nav-test-support';
 import { RuntimeUpdateProvider } from './RuntimeUpdateProvider';
+import { RuntimeUpdateToast } from './RuntimeUpdateToast';
 
 const state = vi.hoisted(() => ({
   desktop: true,
@@ -178,9 +179,16 @@ describe('runtime update toast', () => {
     state.available = true;
     state.downloaded = true;
     renderRTL(
-      <RuntimeUpdateProvider>
+      <>
         <Toaster />
-      </RuntimeUpdateProvider>
+        <RuntimeUpdateToast
+          available
+          busy={false}
+          title='Restart Jovie To Update'
+          description='Install the available update when you are ready.'
+          apply={state.install}
+        />
+      </>
     );
     expect(
       await screen.findByRole('button', { name: 'Restart Jovie To Update' })
