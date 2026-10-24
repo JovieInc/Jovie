@@ -29,10 +29,8 @@ vi.mock('@/components/features/waitlist/WaitlistPublicLanding', () => ({
 vi.mock('@/components/features/waitlist/WaitlistSuccessView', () => ({
   WaitlistSuccessView: () => null,
 }));
-vi.mock('@/lib/stripe/price-ids', () => ({
-  getStripePriceIds: () => ({
-    artistVisibilityProMonthly: 'price_pro_monthly',
-  }),
+vi.mock('@/lib/config/pricing', () => ({
+  PRICING: { pro: { monthly: { priceId: 'price_pro_monthly' } } },
 }));
 vi.mock('@/components/site/MarketingPageContractMarkers', () => ({
   MarketingPageContractMarkers: () => null,
