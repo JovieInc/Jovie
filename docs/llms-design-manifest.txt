@@ -30,22 +30,25 @@
 
 ## Canonical Invariants
 
-- `no-serif-product-source` — Product source uses Inter and Satoshi only; serif media requires an exact approved exception.
-- `text-button-28-visible-44-target` — Text Button size names share one equivalent 28px visible control, typography, and padding inside a 44px minimum hit target.
-- `marketing-o-mark-32` — The marketing O-mark is visibly 32px and control-aligned.
-- `semantic-accent-only` — Accent color communicates semantic state or a named data category, never decoration.
-- `decorative-icons-unboxed` — Decorative icons and emoji have no border, ring, circle, or badge plate.
-- `single-component-family` — One canonical component family owns a concept across customer and operator targets, including state, motion, focus and interaction logic; target adapters supply authorized data, destinations and permissions. Separate implementations require a documented behavior the owner cannot express. Supported states are variants consumed as instances.
-- `semantic-entity-identity` — Entity identity uses one primary shared media treatment: people are circular, releases are square and uncropped, events use calendar treatment. Shared owners handle loading, missing/broken media, accessible labels and source-backed verification. Layout and density are supported variants; provider connection or provenance never implies Jovie verification.
-- `founder-review-canonical-only` — Founder review contains canonical masters and intentional variants, without receipts, duplicates, or filler.
-- `pen-source-identity-boundary` — Pen is proposal/review evidence until source identity and required persistence receipts pass.
-- `logo-visible-bounds-normalization` — Logos normalize visible non-transparent ink through the shared asset registry, never route-local crop or scale CSS.
-- `do-not-fuck-with-art` — Never crop album art. Use object-fit: contain, not cover. No gradient, overlay, play button, or chrome on album art, merch, or a face except optional mostly-transparent glass play/pause.
-- `hero-art-one-shot` — A hero image is composed for its final layout: it reserves the headline, subcopy, header controls and product zones, and depth falls off optically from that focal plane like a wide-aperture 85mm portrait, never as a blur mask or a linear sharp-to-blur gradient.
 - `background-never-focal` — Backgrounds are abstract light, atmosphere, restrained geometry, light leaks or low-detail texture. No literal spheres, glass balls, rings, props, stage lights, particle fields, visualizers, genre tropes, or texture that reads as a recognizable material. If the eye reaches the background before the copy or product, it fails.
-- `text-aware-contrast` — Every text and control over imagery, including header Log in and the primary CTA, passes contrast in the rendered composition; the art direction reserves that contrast instead of a post-hoc overlay.
-- `product-page-shows-product` — Every product page demonstrates the real product UI, callouts never overlap unintentionally, and no section below the hero ships as unstyled text.
+- `decorative-icons-unboxed` — Decorative icons and emoji have no border, ring, circle, or badge plate.
+- `do-not-fuck-with-art` — Never crop album art. Use object-fit: contain, not cover. No gradient, overlay, play button, or chrome on album art, merch, or a face except optional mostly-transparent glass play/pause.
+- `founder-review-canonical-only` — Founder review contains canonical masters and intentional variants, without receipts, duplicates, or filler.
+- `hero-art-one-shot` — A hero image is composed for its final layout: it reserves the headline, subcopy, header controls and product zones, and depth falls off optically from that focal plane like a wide-aperture 85mm portrait, never as a blur mask or a linear sharp-to-blur gradient.
+- `logo-visible-bounds-normalization` — Logos normalize visible non-transparent ink through the shared asset registry, never route-local crop or scale CSS.
+- `marketing-o-mark-32` — The marketing O-mark is visibly 32px and control-aligned.
+- `no-serif-product-source` — Product source uses Inter and Satoshi only; serif media requires an exact approved exception.
 - `one-hero-per-story` — A page has one hero; adjacent sections never restate the same introduction.
+- `pen-source-identity-boundary` — Pen is proposal/review evidence until source identity and required persistence receipts pass.
+- `product-page-shows-product` — Every product page demonstrates the real product UI, callouts never overlap unintentionally, and no section below the hero ships as unstyled text.
+- `rail-owned-overlay-retention` — Open interactive overlays belong to their rail through open ARIA control relationships, including nested portals. Retain rail presentation until dismissal or detachment, release afterward, ignore unrelated/opposite portals, and preserve persistent pin intent.
+- `semantic-accent-only` — Accent color communicates semantic state or a named data category, never decoration.
+- `semantic-entity-identity` — Entity identity uses one primary shared media treatment: people are circular, releases are square and uncropped, events use calendar treatment. Shared owners handle loading, missing/broken media, accessible labels and source-backed verification. Layout and density are supported variants; provider connection or provenance never implies Jovie verification.
+- `single-component-family` — One canonical component family owns a concept across customer and operator targets, including state, motion, focus and interaction logic; target adapters supply authorized data, destinations and permissions. Separate implementations require a documented behavior the owner cannot express. Supported states are variants consumed as instances.
+- `text-aware-contrast` — Every text and control over imagery, including header Log in and the primary CTA, passes contrast in the rendered composition; the art direction reserves that contrast instead of a post-hoc overlay.
+- `text-button-28-visible-44-target` — Text Button size names share one equivalent 28px visible control, typography, and padding inside a 44px minimum hit target.
+- `tooltip-eligibility` — Tooltips supply hidden labels, actionable explanations or shortcuts, never duplicate a readable row title. Measure rendered title clipping and recheck container, font, title and typography changes; close ineligible hints without stale reappearance.
+- `tooltip-input-and-placement` — Mouse and hardware-keyboard hints remain available on hybrid devices. Actual touch activates first without a stuck hint; essential coarse/no-hover actions remain visible. List hints use bottom/start placement, sidebar hints retain their seam, and existing warm traversal and timing remain unchanged.
 - `virtual-model-passport` — A marketing character ID is a defined person, not a prompt. Its passport fixes height, proportions, body type, hair, eyes, facial geometry and identifying traits. Casting boards use neutral comp-card framing and reject street or editorial selection; full-body views never crop heads. Selection passes premium aspirational quality and ICP resonance independently, then checks mouth, face, hair, build and presence for sibling duplication. An approved persona brief precedes generation. Character, wardrobe, environment, props, activity, camera, light, shadow and reflections form one physically coherent, aspirational commercial world; realistic never means average. Group scenes prioritize ICP fit and non-sensitive individuality without demographic tokenism or repeated high-signal styling. Models never name or resemble real people.
 
 ## Canonical Tailwind Utilities
@@ -59,7 +62,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (282 contract tokens; 544 total in CSS)
+## Design Tokens (285 contract tokens; 547 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -113,6 +116,8 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--color-border-focus`: #11afff
 - `--color-border-strong`: oklch(0% 0 0 / 15%)
 - `--color-border-subtle`: oklch(0% 0 0 / 5%)
+- `--color-btn-destructive-bg`: var(--color-error)
+- `--color-btn-destructive-fg`: var(--system-b-cinematic-black)
 - `--color-btn-primary-bg`: oklch(10% 0 0)
 - `--color-btn-primary-fg`: oklch(100% 0 0)
 - `--color-btn-primary-hover`: oklch(20% 0 0)
@@ -134,6 +139,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--color-text-primary-token`: #f7f8f8
 - `--color-text-quaternary-token`: #62666d
 - `--color-text-secondary-token`: #d0d6e0
+- `--color-text-tertiary-on-light`: #626872
 - `--color-text-tertiary-token`: #8a8f98
 - `--color-text-tooltip`: #ffffff
 - `--color-warning`: var(--color-accent-orange)
@@ -439,7 +445,7 @@ Import from `@jovie/ui` — do not recreate local atom copies.
 
 These are the production review surfaces. Match their token usage and component families.
 
-- **Homepage** (`homepage`) — Primary marketing homepage and current live review surface. — family: `features/home`
+- **Homepage** (`homepage`) — Primary marketing homepage and current live review surface. — family: `components/homepage`
 - **Public Profile** (`public-profile`) — Canonical public artist profile surface rendered from StaticArtistPage and ProfileCompactTemplate. — family: `features/profile`
 - **Release Landing** (`release-landing`) — Canonical smart-link release destination sharing the public shell direction. — family: `features/release`
 - **Dashboard Releases** (`dashboard-releases`) — Canonical authenticated releases workspace and current dashboard review/capture surface. — family: `features/dashboard/organisms/release-provider-matrix`

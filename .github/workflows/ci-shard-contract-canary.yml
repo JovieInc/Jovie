@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Coalesce pushes to the same PR; only the newest head needs this canary.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   contract-adapter:
     name: CI shard contract / Jovie adapter proof

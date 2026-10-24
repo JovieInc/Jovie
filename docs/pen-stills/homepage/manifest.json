@@ -1,0 +1,69 @@
+{
+  "schema": "pen-still-manifest/v1",
+  "surface": "homepage",
+  "primaryMode": "dark",
+  "penFile": {
+    "name": "Jovie Homepage Profiles Claim — review copy 2026-10-01.pen",
+    "sha256": null,
+    "note": "The live Pen file is on the design machine and is not in this repo. Fill sha256 when canonical stills are exported."
+  },
+  "frames": [
+    {
+      "sectionId": "hero",
+      "penNodeId": "pending-canonical-hero",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/homepage/hero.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "active",
+      "route": "/",
+      "story": "homepage--hero",
+      "sectionSelector": "[data-pen-section='hero']",
+      "mockupSelector": "[data-pen-mockup]"
+    },
+    {
+      "sectionId": "hero",
+      "penNodeId": "pending-canonical-hero",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/homepage/hero.dark.390.png",
+      "viewport": 390,
+      "mode": "dark",
+      "status": "active",
+      "route": "/",
+      "story": "homepage--hero",
+      "sectionSelector": "[data-pen-section='hero']",
+      "mockupSelector": "[data-pen-mockup]"
+    },
+    {
+      "sectionId": "hero",
+      "penNodeId": "pending-canonical-hero",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/homepage/hero.light.1440.png",
+      "viewport": 1440,
+      "mode": "light",
+      "status": "active",
+      "route": "/",
+      "story": "homepage--hero",
+      "sectionSelector": "[data-pen-section='hero']",
+      "mockupSelector": "[data-pen-mockup]"
+    },
+    {
+      "sectionId": "parked-exploration",
+      "penNodeId": "parked-example",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/homepage/parked.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "parked"
+    },
+    {
+      "sectionId": "taste-fork",
+      "penNodeId": "fork-example",
+      "fileHash": null,
+      "stillPath": "docs/pen-stills/homepage/fork.dark.1440.png",
+      "viewport": 1440,
+      "mode": "dark",
+      "status": "fork"
+    }
+  ]
+}

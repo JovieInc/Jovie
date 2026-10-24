@@ -16,8 +16,9 @@ import {
 } from '../../../scripts/marketing-eyebrow-caps';
 
 /**
- * Warn-only ratchet for all-caps eyebrows on marketing routes.
- * Growth prints a warning. It does not fail CI and does not arm a new gate.
+ * Blocking ratchet for all-caps eyebrows on marketing routes.
+ * The live count must equal the baseline. Growth fails. Shrink fails until
+ * the baseline count is lowered in the same change.
  */
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -28,33 +29,28 @@ interface EyebrowCapsBaseline {
   readonly count: number;
 }
 
-describe('marketing eyebrow caps ratchet (warn-only)', () => {
+describe('marketing eyebrow caps ratchet', () => {
   const baseline = JSON.parse(
     readFileSync(BASELINE_PATH, 'utf8')
   ) as EyebrowCapsBaseline;
   const measured = measureMarketingEyebrowCaps();
 
-  it('stays warn-only and records the current marketing inventory', () => {
-    expect(baseline.armed).toBe(false);
+  it('matches the recorded count for marketing eyebrows', () => {
+    expect([
+      'apps/web/app/(marketing)',
+      'apps/web/app/(home)',
+      'apps/web/components/marketing',
+    ]).toEqual([
+      'apps/web/app/(marketing)',
+      'apps/web/app/(home)',
+      'apps/web/components/marketing',
+    ]);
+    expect(baseline.armed).toBe(true);
     const status = evaluateWarnOnlyCount(measured.count, baseline.count);
-    if (status === 'regression') {
-      console.warn(
-        `[marketing-eyebrow-caps] grew ${baseline.count} -> ${measured.count} (warn-only)\n` +
-          measured.hits
-            .slice(0, 12)
-            .map(hit => `  ${hit.file}:${hit.line} ${hit.kind}`)
-            .join('\n')
-      );
-    }
-    if (status === 'shrink') {
-      console.warn(
-        `[marketing-eyebrow-caps] shrank ${baseline.count} -> ${measured.count}. ` +
-          'Lower count in marketing-eyebrow-caps.baseline.json when you remove hits.'
-      );
-    }
     expect(
-      status === 'ok' || status === 'regression' || status === 'shrink'
-    ).toBe(true);
+      status,
+      measured.hits.map(hit => `${hit.file}:${hit.line}`).join('\n')
+    ).toBe('ok');
   });
 });
 

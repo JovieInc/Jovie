@@ -53,6 +53,11 @@ interface EmailCodeAuthFormProps {
    * it transitions back to `'email'`.
    */
   readonly onOtpStepChange?: (active: boolean) => void;
+  /**
+   * Full-page shells read left-aligned and tight; overlay captures keep
+   * their centered presentation.
+   */
+  readonly align?: 'left' | 'center';
 }
 
 // ============================================================================
@@ -124,6 +129,7 @@ export function EmailCodeAuthForm({
   redirectUrl,
   initialEmailAddress,
   onOtpStepChange,
+  align = 'center',
 }: EmailCodeAuthFormProps) {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
   // Match SSR on the first client pass. Better Auth can expose a cached
@@ -351,10 +357,14 @@ export function EmailCodeAuthForm({
         role='alert'
         aria-live='assertive'
       >
-        <p className='text-center text-app text-primary-token'>
+        <p
+          className={`text-app text-primary-token ${align === 'left' ? 'text-left' : 'text-center'}`}
+        >
           Too many incorrect attempts.
         </p>
-        <p className='text-center text-app text-secondary-token'>
+        <p
+          className={`text-app text-secondary-token ${align === 'left' ? 'text-left' : 'text-center'}`}
+        >
           Request a new code to try again.
         </p>
         <Button
@@ -376,13 +386,16 @@ export function EmailCodeAuthForm({
         onSubmit={handleCodeSubmit}
         className='flex flex-col gap-3'
       >
-        <p className='text-center text-app text-secondary-token'>
+        <p
+          className={`text-app text-secondary-token ${align === 'left' ? 'text-left' : 'text-center'}`}
+        >
           Enter the code sent to{' '}
           <span className='break-all font-medium text-primary-token'>
             {emailAddress.trim()}
           </span>
         </p>
         <OtpInput
+          size='hero'
           value={code}
           onChange={setCode}
           onComplete={verifyCode}
@@ -399,7 +412,9 @@ export function EmailCodeAuthForm({
         >
           {isPending ? 'Verifying…' : 'Verify Code'}
         </Button>
-        <div className='grid grid-cols-2 items-stretch gap-3 text-center'>
+        <div
+          className={`grid grid-cols-2 items-stretch gap-3 ${align === 'left' ? 'text-left' : 'text-center'}`}
+        >
           <button
             type='button'
             onClick={handleBackToEmail}

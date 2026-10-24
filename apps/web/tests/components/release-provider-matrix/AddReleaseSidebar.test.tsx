@@ -335,7 +335,7 @@ describe('AddReleaseSidebar', () => {
       screen.getByTestId('drawer-card-action-bar')
     );
     expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
-      'Untitled'
+      'Release'
     );
     expect(screen.getByTestId('entity-header-subtitle')).toHaveTextContent(
       'Test Artist'

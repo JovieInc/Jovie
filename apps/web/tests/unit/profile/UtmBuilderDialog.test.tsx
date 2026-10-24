@@ -64,4 +64,32 @@ describe('UtmBuilderDialog', () => {
       screen.queryByText(/add a source .* to create your tracking link/i)
     ).not.toBeInTheDocument();
   });
+
+  it('renders filled fields inline when embedded', () => {
+    render(
+      <UtmBuilderDialog
+        embedded
+        open
+        baseUrl='https://jov.ie/you'
+        initialValues={{
+          utm_source: 'newsletter',
+          utm_medium: 'email',
+          utm_campaign: 'spring-drop',
+          utm_content: 'header',
+        }}
+      />
+    );
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('utm-builder')).toBeInTheDocument();
+    expect(screen.getByLabelText(/source/i)).toHaveValue('newsletter');
+    expect(
+      screen.getByText(
+        'https://jov.ie/you?utm_source=newsletter&utm_medium=email&utm_campaign=spring-drop&utm_content=header'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/add a source .* to create your tracking link/i)
+    ).not.toBeInTheDocument();
+  });
 });

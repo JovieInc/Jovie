@@ -62,6 +62,31 @@ test('each rule fires on its deliberate-red line and passes its neighbour', () =
   }
 });
 
+test('FS-009 requires a marketing radius token and leaves parent clipping to the ratchet', () => {
+  const file = 'apps/web/components/marketing/MarketingSurfaceCard.tsx';
+  const hit = (text, nearby = '') =>
+    checkLine(file, 1, text, nearby).some(item => item.id === 'FS-009');
+  /** @type {Array<[string, boolean]>} */
+  const cases = [
+    ["className='rounded-[1.1rem]'", true],
+    ['border-radius: 1.45rem;', true],
+    ['border-radius: 0;', true],
+    ["className='rounded-none'", true],
+    ["className='marketing-rounded-frame'", false],
+    ["className='rounded-xl'", false],
+    ['border-radius: var(--radius-xl);', false],
+    ["className='rounded-[inherit]'", false],
+    ["<Image className='object-cover' />", false],
+  ];
+  for (const [line, red] of cases) assert.equal(hit(line), red, line);
+  assert.equal(hit('border-radius: 0;', '.homepage-editorial-hero {'), false);
+  assert.equal(ids("className='rounded-[1.1rem]'").includes('FS-009'), false);
+  assert.equal(
+    hit('border-radius: 0; // frontend-skill-allow FS-009: full-bleed start'),
+    false
+  );
+});
+
 test('comments, legal marks, token definitions and reasoned opt-outs do not fire', () => {
   assert.deepEqual(ids('// never transition-all here (DESIGN.md)'), []);
   assert.deepEqual(ids('<div // native <select> not suitable'), []);

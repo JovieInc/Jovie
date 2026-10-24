@@ -2,8 +2,9 @@ import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 
 /**
- * Homepage copy (EVENT 2026-10-20, Tim: the homepage sells the artist
- * profile and its offer). Every visible line is either written here against
+ * Homepage copy. The visible headline is locked to the company identity
+ * line (Tim, 2026-10-22). The rest of the page still sells the artist
+ * profile and its offer (EVENT 2026-10-20). Every visible line is either written here against
  * a shipped capability or reused from a claim-backed source:
  *
  * - Fan-state lines live in `homepageFanStatesCopy.ts` and reuse
@@ -23,10 +24,10 @@ export const HOMEPAGE_COPY = {
   seo: {
     // General enough for the company-identity invariant: no artist-only
     // definition in metadata. The description stays on COMPANY_IDENTITY.
-    title: 'Jovie | One profile. For every fan.',
+    title: 'Jovie | Be found. Be understood.',
   },
   hero: {
-    headline: 'One profile. For every fan.',
+    headline: 'Be found. Be understood.',
     subhead:
       'A free profile for your music, bio, and links. Your latest release leads, with tour dates and updates one tap away.',
     claim: {

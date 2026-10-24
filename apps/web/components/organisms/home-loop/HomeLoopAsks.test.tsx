@@ -101,3 +101,23 @@ describe('HomeLoopAsks review evidence', () => {
     ).toBeNull();
   });
 });
+
+describe('HomeLoopAsks answered card dim', () => {
+  it('dims the answered card at the AA floor so 12px meta text keeps 4.5:1', () => {
+    const ask = reviewAsk();
+    render(
+      <HomeLoopAsks
+        asks={[ask]}
+        answers={{ [ask.id]: { label: 'Approved', state: 'sent' } }}
+        onApprove={vi.fn()}
+        onReply={vi.fn()}
+      />
+    );
+    const card = screen.getByTestId('home-loop-ask');
+    // 0.70 dropped the tertiary/secondary meta composites to ~4.0:1 on the
+    // storybook canvas; 0.75 is the documented AA floor for the muted token
+    // composited over the shell canvas (design-system.css noir-ion-text-muted).
+    expect(card).toHaveClass('opacity-75');
+    expect(card).not.toHaveClass('opacity-70');
+  });
+});
