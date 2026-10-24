@@ -702,50 +702,48 @@ function configuredPaths() {
   return paths.length ? paths : DEFAULT_PATHS;
 }
 
-// Reporting has a fixed vocabulary and never interpolates artifact-derived
-// names or exception messages, including when legacy callers request paths.
-function findingFileClass(path) {
-  const extension = typeof path === 'string' ? extname(path).toLowerCase() : '';
-  if (FORBIDDEN.has(extension)) return 'container';
-  if (IMAGES.has(extension)) return 'image';
-  if (extension === '.json') return 'json';
-  if (extension === '.jsonl') return 'jsonl';
-  if (extension === '.md') return 'markdown';
-  return 'unknown';
-}
-
 function report(findings) {
-  const categories = {
-    'credential-text': 0,
-    'forbidden-container': 0,
-    'image-policy': 0,
-    'inspection-error': 0,
-    'malformed-structured-text': 0,
-    'unknown-binary': 0,
-  };
-  const classes = {
-    container: 0,
-    image: 0,
-    json: 0,
-    jsonl: 0,
-    markdown: 0,
-    unknown: 0,
-  };
-  for (const finding of findings) {
-    const category = Object.hasOwn(categories, finding.category)
-      ? finding.category
-      : 'inspection-error';
-    categories[category]++;
-    classes[findingFileClass(finding.path)]++;
+  const counts = new Map();
+  for (const { category } of findings)
+    counts.set(category, (counts.get(category) ?? 0) + 1);
+  const categories = [...counts]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([category, count]) => category + ':' + count)
+    .join(',');
+  let diagnostic = '';
+  if (process.env.PLAYWRIGHT_ARTIFACT_REPORT_PATHS === 'true') {
+    const workspace = canonicalRoot();
+    const paths = findings
+      .filter(finding => typeof finding.path === 'string')
+      .map(finding => {
+        const candidate = resolve(finding.path);
+        if (!isInside(workspace, candidate)) return null;
+        const relativePath = relative(workspace, candidate).replace(/\\/g, '/');
+        if (!relativePath || /[\r\n]/.test(relativePath)) return null;
+        const safePath = redactSecretValues(relativePath)
+          .split('/')
+          .map(segment =>
+            segment.includes('[redacted]') ||
+            /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(segment) ||
+            /[A-Za-z0-9_-]{32,}/.test(segment)
+              ? '[sensitive]'
+              : segment
+          )
+          .join('/')
+          .slice(0, 512);
+        return `${finding.category}:${JSON.stringify(safePath)}`;
+      })
+      .filter(Boolean);
+    if (paths.length > 0) diagnostic = `; files=${paths.join(',')}`;
   }
-  const counts = values =>
-    Object.entries(values)
-      .filter(([, count]) => count > 0)
-      .map(([name, count]) => name + ':' + count)
-      .join(',');
-  console.error(
-    `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked ${findings.length} unsafe or unverifiable Playwright artifact file(s); categories=${counts(categories)}; file-classes=${counts(classes)}`
-  );
+  // The counts-only diagnostic must stay readable without admin job-log
+  // access, so in Actions it is also emitted as a step error annotation.
+  // The files= expansion (opt-in) remains log-only: rejection diagnostics
+  // never include artifact paths (docs/ci/production-deployment-probes.md).
+  const summary = `blocked ${findings.length} unsafe or unverifiable Playwright artifact file(s); categories=${categories}`;
+  console.error(`PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: ${summary}${diagnostic}`);
+  if (process.env.GITHUB_ACTIONS === 'true')
+    console.error(`::error::PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: ${summary}`);
 }
 
 function maskValues(values) {
