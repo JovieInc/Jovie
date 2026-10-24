@@ -135,9 +135,9 @@ export function aggregateContinuity(observations, { now = new Date() } = {}) {
 
 export const FRESHNESS_TARGET_ID = 'jovie-production-freshness';
 export const FRESHNESS_INCIDENT_CLASS = 'production-stale';
-// Twice the controller's own starvation bound (release-lineage-gate.sh), so
-// this only fires once the in-band guard has already failed to ship.
-export const DEFAULT_STALE_AFTER_SECONDS = 7200;
+// 90 minutes (Tim 2026-10-24, throughput sentinel): a merged SHA that production
+// has not reached by then is a stall, not a slow release (plain release ~22 min).
+export const DEFAULT_STALE_AFTER_SECONDS = 5400;
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 
 /**

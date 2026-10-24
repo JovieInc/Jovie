@@ -37,6 +37,7 @@ import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
 import remediation  # noqa: E402
 import shipping_attribution  # noqa: E402  (company merge provenance report)
 import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage collector)
+import throughput_sentinel  # noqa: E402  (no-progress alarms, idle-reason counts, growth bounds)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -198,6 +199,8 @@ def _linear_app_credential(lane) -> bool | None:
 # Reading a path that is not on main must alert, never read as "nothing silent" (2026-10-21:
 # the doctor watched ops/automation/registry.jsonl, which never existed, so no row was checked).
 AUTOMATION_REGISTRY = "canon/automation-registry.jsonl"
+OUTCOME_OWED_MAX_S = 24 * 3600
+OUTCOME_QUEUE_SILENT_S = 2 * 3600
 AUTOMATION_LIVENESS_WORKFLOW = "automation-liveness.yml"
 AUTOMATION_LIVENESS_MAX_S = 60 * 60
 AUTOMATION_LIVENESS_TTL_S = 600
@@ -499,6 +502,11 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "designGate": design_census,
         "fileOverlap": file_overlap.doctor_view(state),
         **automation_observation(host, lane, now),
+        "outcomeQueue": read_json(state / "outcome-queue.json", {}),
+        "sentinel": throughput_sentinel.observe(
+            state, now, receipts,
+            {"inventoryBytes": getattr(lane, "REPAIR_INVENTORY_MAX_BYTES", 16 * 1024 * 1024)},
+            run=lifecycle.run, fetch_remote=not os.environ.get("LANES_SELFTEST")),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
         "linearAppCredential": _linear_app_credential(lane),
@@ -942,6 +950,25 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["automation-registry-unreadable"] = (
             f"origin/main:{AUTOMATION_REGISTRY} is unreadable ({watched.get('error') or 'missing or not JSONL'}); "
             "no Gem host-local automation receipt is being watched")
+    alerts.update(throughput_sentinel.judge(obs))
+    # Closed loop, last hop: Validating issues owing an `outcome` receipt wait on the outcome
+    # lane. Its daily budget exhausted (or the drain gone silent) with owed receipts older than
+    # OUTCOME_OWED_MAX_S used to stall in silence for the rest of the UTC day.
+    queue = obs.get("outcomeQueue") or {}
+    if queue.get("queued"):
+        oldest = _iso_epoch(queue.get("oldestOwedAt"))
+        refreshed = queue.get("at") if isinstance(queue.get("at"), (int, float)) else None
+        owed_age = None if oldest is None else obs["now"] - oldest
+        silent = refreshed is None or obs["now"] - refreshed > OUTCOME_QUEUE_SILENT_S
+        if owed_age is not None and owed_age > OUTCOME_OWED_MAX_S and (
+                queue.get("status") == "budget-exhausted" or silent):
+            cause = (f"daily budget exhausted ({queue.get('spentToday')}/{queue.get('perDay')}; LANES_OUTCOME_PER_DAY)"
+                     if queue.get("status") == "budget-exhausted" and not silent else
+                     "outcome drain has not run for "
+                     + ("ever" if refreshed is None else f"{round((obs['now'] - refreshed) / 60)} min"))
+            alerts["outcome-lane-stalled"] = (
+                f"{queue['queued']} Validating issue(s) owe an outcome receipt, oldest {round(owed_age / 3600)}h; {cause}; "
+                "owner gem-lanes (scripts/lanes/outcome_lane.py)")
     liveness = obs.get("automationLiveness") or {}
     if liveness.get("installed"):
         last = _iso_epoch(liveness.get("lastRunAt"))
@@ -1702,6 +1729,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
             "shippingAttribution": attribution,
+            "sentinel": {key: (obs.get("sentinel") or {}).get(key) for key in
+                         ("pushes1h", "idleExits1h", "releaseFlow", "growth")},
             "mergeThroughput": obs.get("mergeThroughput"),
             "mergeThroughputError": obs.get("mergeThroughputError"),
             "mergedWindow": obs.get("mergedWindow"),

@@ -365,7 +365,17 @@ describe('production freshness', () => {
     const fresh = await observe({ oldestAt: '2026-09-13T15:00:00Z' });
     assert.equal(fresh.healthy, true);
     assert.equal(fresh.incidentClass, null);
-    assert.match(fresh.reason, /^unshipped-for-2292s-within-7200s$/);
+    assert.match(fresh.reason, /^unshipped-for-2292s-within-5400s$/);
+  });
+
+  it('treats 90 minutes as the production freshness bound', async () => {
+    const within = await observe({ oldestAt: '2026-09-13T14:10:00Z' });
+    assert.equal(within.healthy, true);
+    assert.match(within.reason, /^unshipped-for-5292s-within-5400s$/);
+    const over = await observe({ oldestAt: '2026-09-13T14:07:00Z' });
+    assert.equal(over.healthy, false);
+    assert.equal(over.incidentClass, FRESHNESS_INCIDENT_CLASS);
+    assert.equal(over.unshippedAgeSeconds, 5472);
   });
 
   it('is healthy when production already carries main', async () => {
