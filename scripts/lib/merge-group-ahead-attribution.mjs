@@ -12,7 +12,10 @@
 // Evidence is positive only. The structural lane is fail-fast, so a command
 // missing from the ahead run's failures proves nothing: it must appear as `pass`
 // in the ahead run's structural timings table. A lane skipped by fail-fast is
-// not evidence; a lane skipped because its inputs were not selected is.
+// not evidence; a lane skipped because its inputs were not selected is. When
+// the ahead run failed in another job and its `ci-fast (remaining)` job
+// succeeded, that job's timings table is the strongest form of the same
+// evidence — every command passed (JOV-8760).
 
 export const AGGREGATE_JOBS = Object.freeze(
   new Set(['ci-fast', 'Product Lane Receipt', 'PR Ready'])
