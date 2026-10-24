@@ -69,20 +69,20 @@ describe('Coming soon placeholder only for upcoming releases', () => {
     hoisted.findRedirectByOldSlug.mockResolvedValue(null);
   });
 
-  async function render(slug: string) {
+  async function loadPage(slug: string) {
     const { default: Page } = await import('./page');
     return Page({ params: Promise.resolve({ username: 'tim', slug }) });
   }
 
   it('returns a real 404 when the unpublished row is not upcoming (presence null)', async () => {
     hoisted.getUnpublishedReleasePresence.mockResolvedValue(null);
-    await expect(render('seaside-heights')).rejects.toThrow('notFound');
+    await expect(loadPage('seaside-heights')).rejects.toThrow('notFound');
   });
 
   it('keeps the alerts placeholder for a genuinely upcoming release', async () => {
     hoisted.getUnpublishedReleasePresence.mockResolvedValue({
       title: 'Next Single',
     });
-    await expect(render('next-single')).resolves.toBeTruthy();
+    await expect(loadPage('next-single')).resolves.toBeTruthy();
   });
 });
