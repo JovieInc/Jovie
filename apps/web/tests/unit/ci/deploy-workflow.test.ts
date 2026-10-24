@@ -3252,7 +3252,7 @@ describe('CI E2E smoke workflow', () => {
     expect(authHelper).toContain("page.getByLabel('Email')");
     expect(authHelper).toContain("'Send sign-in code'");
     expect(authHelper).toContain("name: 'Change email'");
-    expect(authHelper).toContain("name: 'Resend Verification Code'");
+    expect(authHelper).toContain("name: 'Resend verification code'");
     const routeFetchIndex = authHelper.indexOf(
       'response = await route.fetch()'
     );

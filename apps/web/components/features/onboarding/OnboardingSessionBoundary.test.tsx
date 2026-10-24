@@ -225,7 +225,7 @@ describe('onboarding identity boundary', () => {
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce(snapshot());
     render(<OnboardingSessionBoundary sessionLabel='pending' />);
-    const retry = await screen.findByRole('button', { name: 'Try Again' });
+    const retry = await screen.findByRole('button', { name: 'Try again' });
     expect(mocks.shell).not.toHaveBeenCalled();
     fireEvent.click(retry);
     await screen.findByText('Saved artist progress');

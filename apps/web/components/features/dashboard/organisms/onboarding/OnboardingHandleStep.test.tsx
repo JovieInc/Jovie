@@ -39,7 +39,7 @@ describe('OnboardingHandleStep keyboard focus', () => {
     const { onSubmit } = renderStep();
     const user = userEvent.setup();
     await user.tab();
-    const input = screen.getByRole('textbox', { name: 'Claim Your Handle' });
+    const input = screen.getByRole('textbox', { name: 'Claim your handle' });
     expect(input).toHaveFocus();
     expect(input).toHaveClass('focus-ring-themed');
 
@@ -58,7 +58,7 @@ describe('OnboardingHandleStep keyboard focus', () => {
     });
     const user = userEvent.setup();
     await user.tab();
-    const input = screen.getByRole('textbox', { name: 'Claim Your Handle' });
+    const input = screen.getByRole('textbox', { name: 'Claim your handle' });
     expect(input).toHaveFocus();
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveClass('focus-ring-themed');

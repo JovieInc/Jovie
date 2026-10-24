@@ -58,7 +58,7 @@ function AuthBrandFrame({
 }>) {
   return (
     <section
-      aria-label='Product Preview'
+      aria-label='Product preview'
       className='absolute inset-0 flex flex-col'
     >
       <div aria-hidden='true' className='absolute inset-0 overflow-hidden'>

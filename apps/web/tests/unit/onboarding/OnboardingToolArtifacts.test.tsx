@@ -279,19 +279,19 @@ describe('onboarding tool artifacts', () => {
 
     expect(screen.getByText('@validartist')).toBeDefined();
     expect(screen.getByText('is available')).toBeDefined();
-    expect(screen.getByLabelText('Edit Proposed Handle')).toHaveValue(
+    expect(screen.getByLabelText('Edit proposed handle')).toHaveValue(
       'validartist'
     );
     expect(screen.getByText('jov.ie/validartist')).toBeDefined();
     expect(screen.queryByText('checkHandle')).toBeNull();
 
-    fireEvent.change(screen.getByLabelText('Edit Proposed Handle'), {
+    fireEvent.change(screen.getByLabelText('Edit proposed handle'), {
       target: { value: 'test' },
     });
 
     expect(onHandleCandidateChange).toHaveBeenLastCalledWith('test');
 
-    fireEvent.change(screen.getByLabelText('Edit Proposed Handle'), {
+    fireEvent.change(screen.getByLabelText('Edit proposed handle'), {
       target: { value: '' },
     });
 
@@ -328,7 +328,7 @@ describe('onboarding tool artifacts', () => {
     expect(alert.className).not.toMatch(/\bred-\d/);
   });
 
-  it('emits Confirm Handle widget event when the CTA is pressed', () => {
+  it('emits Confirm handle widget event when the CTA is pressed', () => {
     mocks.handleAvailability.data = { available: true };
     const onConfirmHandle = vi.fn();
 
@@ -340,10 +340,10 @@ describe('onboarding tool artifacts', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm Handle' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm handle' }));
     expect(onConfirmHandle).toHaveBeenCalledWith('validartist');
     expect(
-      screen.getByRole('button', { name: 'Handle Confirmed' })
+      screen.getByRole('button', { name: 'Handle confirmed' })
     ).toBeDefined();
   });
 
@@ -358,8 +358,8 @@ describe('onboarding tool artifacts', () => {
 
     expect(screen.getByText('Handle confirmed')).toBeDefined();
     expect(screen.getByText('@validartist')).toBeDefined();
-    expect(screen.queryByLabelText('Edit Proposed Handle')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Confirm Handle' })).toBeNull();
+    expect(screen.queryByLabelText('Edit proposed handle')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Confirm handle' })).toBeNull();
     expect(screen.queryByTestId('onboarding-confirm-handle')).toBeNull();
   });
 
@@ -376,12 +376,12 @@ describe('onboarding tool artifacts', () => {
     );
 
     expect(screen.getByText('Social account attached')).toBeDefined();
-    expect(screen.queryByLabelText('Social Profile URL')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Attach Account' })).toBeNull();
+    expect(screen.queryByLabelText('Social profile URL')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Attach account' })).toBeNull();
     expect(screen.queryByTestId('onboarding-attach-account')).toBeNull();
   });
 
-  it('renders proposed social links with Attach Account CTA', () => {
+  it('renders proposed social links with Attach account CTA', () => {
     const onAttachAccount = vi.fn();
     fastRender(
       <OnboardingSocialLinkCard
@@ -399,14 +399,14 @@ describe('onboarding tool artifacts', () => {
       screen.getByDisplayValue('https://instagram.com/testartist')
     ).toBeDefined();
     expect(screen.queryByText('proposeSocialLink')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Attach Account' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Attach account' }));
     // Canonical parse normalizes to full Instagram profile URL with path.
     expect(onAttachAccount).toHaveBeenCalledWith(
       'https://www.instagram.com/testartist/'
     );
   });
 
-  it('disables Attach Account for bare instagram.com host without path', () => {
+  it('disables Attach account for bare instagram.com host without path', () => {
     const onAttachAccount = vi.fn();
     fastRender(
       <OnboardingSocialLinkCard
@@ -419,14 +419,14 @@ describe('onboarding tool artifacts', () => {
       />
     );
 
-    const button = screen.getByRole('button', { name: 'Attach Account' });
+    const button = screen.getByRole('button', { name: 'Attach account' });
     expect(button).toHaveProperty('disabled', true);
     fireEvent.click(button);
     expect(onAttachAccount).not.toHaveBeenCalled();
     expect(screen.getByText(/Add the account path/i)).toBeDefined();
   });
 
-  it('offers None of These when artist results are present', () => {
+  it('offers None of these when artist results are present', () => {
     mocks.artistSearch.results = [
       {
         id: 'artist-1',
@@ -446,7 +446,7 @@ describe('onboarding tool artifacts', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'None of These' }));
+    fireEvent.click(screen.getByRole('button', { name: 'None of these' }));
     expect(onNoneOfThese).toHaveBeenCalled();
   });
 

@@ -112,7 +112,7 @@ export function OnboardingHandleStep({
               id='handle-input'
               ref={inputRef}
               name='username'
-              aria-label='Claim Your Handle'
+              aria-label='Claim your handle'
               type='text'
               value={handleInput}
               onChange={e =>

@@ -171,7 +171,7 @@ export function OnboardingChatEmptyIntro({
               onClick={onTryAnotherName}
               data-testid='onboarding-entry-try-another-name'
             >
-              Try Another Name
+              Try another name
             </Button>
           ) : null}
         </div>

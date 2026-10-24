@@ -242,8 +242,9 @@ function NativeCompleteContent() {
     return (
       <main className='grid min-h-dvh place-items-center bg-base px-6 text-white dark:text-white [color-scheme:dark]'>
         <section className='w-full max-w-sm px-6 py-7 text-center'>
+          {/* ui-casing-allow: Touch ID is the Apple feature name */}
           <h1 className='text-xl font-semibold leading-7'>
-            Sign In With Touch ID Next Time?
+            Sign in with Touch ID next time?
           </h1>
           <p
             className='mt-3 min-h-10 text-sm leading-5 text-white/64'
@@ -262,7 +263,8 @@ function NativeCompleteContent() {
               disabled={enrollState === 'working'}
               onClick={turnOnTouchId}
             >
-              Turn On Touch ID
+              {/* ui-casing-allow: Touch ID is the Apple feature name */}
+              Turn on Touch ID
             </Button>
             <Button
               type='button'
@@ -272,7 +274,7 @@ function NativeCompleteContent() {
               disabled={enrollState === 'working'}
               onClick={skipTouchId}
             >
-              Not Now
+              Not now
             </Button>
           </div>
         </section>

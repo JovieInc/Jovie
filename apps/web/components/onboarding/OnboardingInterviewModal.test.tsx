@@ -101,7 +101,7 @@ describe('OnboardingInterviewModal submission recovery', () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByRole('dialog', { name: 'Quick Interview' })
+        screen.queryByRole('dialog', { name: 'Quick interview' })
       ).toBeNull();
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -117,11 +117,11 @@ describe('OnboardingInterviewModal submission recovery', () => {
       target: { value: 'A partial answer.' },
     });
 
-    await user.click(screen.getByRole('button', { name: 'End Interview' }));
+    await user.click(screen.getByRole('button', { name: 'End interview' }));
 
     await waitFor(() => {
       expect(
-        screen.queryByRole('dialog', { name: 'Quick Interview' })
+        screen.queryByRole('dialog', { name: 'Quick interview' })
       ).toBeNull();
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -147,7 +147,7 @@ describe('OnboardingInterviewModal submission recovery', () => {
 
       expect(await screen.findByRole('alert')).toBeTruthy();
       expect(
-        screen.getByRole('dialog', { name: 'Quick Interview' })
+        screen.getByRole('dialog', { name: 'Quick interview' })
       ).toBeTruthy();
       const retryButton = screen.getByRole('button', {
         name: 'Retry interview submission',
@@ -181,7 +181,7 @@ describe('OnboardingInterviewModal submission recovery', () => {
     expect(fetchMock.mock.calls[1]?.[1]?.body).toBe(originalBody);
     await waitFor(() => {
       expect(
-        screen.queryByRole('dialog', { name: 'Quick Interview' })
+        screen.queryByRole('dialog', { name: 'Quick interview' })
       ).toBeNull();
     });
     expect(window.sessionStorage.getItem(SESSION_KEY)).toBe('1');
@@ -196,7 +196,7 @@ describe('OnboardingInterviewModal submission recovery', () => {
       target: { value: 'A partial answer.' },
     });
 
-    await user.click(screen.getByRole('button', { name: 'End Interview' }));
+    await user.click(screen.getByRole('button', { name: 'End interview' }));
     expect(await screen.findByRole('alert')).toBeTruthy();
     const exitButton = screen.getByRole('button', {
       name: 'Exit without sending',
@@ -206,7 +206,7 @@ describe('OnboardingInterviewModal submission recovery', () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByRole('dialog', { name: 'Quick Interview' })
+        screen.queryByRole('dialog', { name: 'Quick interview' })
       ).toBeNull();
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -218,11 +218,11 @@ describe('OnboardingInterviewModal submission recovery', () => {
     const fetchMock = mockFetch();
     renderInterview();
 
-    await user.click(screen.getByRole('button', { name: 'End Interview' }));
+    await user.click(screen.getByRole('button', { name: 'End interview' }));
 
     await waitFor(() => {
       expect(
-        screen.queryByRole('dialog', { name: 'Quick Interview' })
+        screen.queryByRole('dialog', { name: 'Quick interview' })
       ).toBeNull();
     });
     expect(fetchMock).not.toHaveBeenCalled();

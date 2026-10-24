@@ -86,7 +86,7 @@ describe('AuthLayout', () => {
 
   it('provides a focusable form container without owning the route landmark', () => {
     const { container } = render(
-      <AuthLayout formTitle='Sign In'>
+      <AuthLayout formTitle='Sign in'>
         <div>Auth form body</div>
       </AuthLayout>
     );
@@ -106,7 +106,7 @@ describe('AuthLayout', () => {
     render(
       await AuthRouteLayout({
         children: (
-          <AuthLayout formTitle='Sign In'>
+          <AuthLayout formTitle='Sign in'>
             <div>Auth form body</div>
           </AuthLayout>
         ),
@@ -151,7 +151,7 @@ describe('AuthLayout', () => {
 
   it('keeps the homepage logo link available when the split rail is shown', async () => {
     render(
-      <AuthLayout formTitle='Sign In' layoutVariant='split'>
+      <AuthLayout formTitle='Sign in' layoutVariant='split'>
         <div>Auth form body</div>
       </AuthLayout>
     );
@@ -168,7 +168,7 @@ describe('AuthLayout', () => {
   it('keeps the footer prompt opt-in through the auth shell contract', async () => {
     render(
       <AuthLayout
-        formTitle='Sign In'
+        formTitle='Sign in'
         footerPrompt='Need an account?'
         footerLinkText='Join now'
         footerLinkHref='/signup'
@@ -187,7 +187,7 @@ describe('AuthLayout', () => {
 
   it('renders the logout menu trigger only when enabled', async () => {
     const { rerender } = render(
-      <AuthLayout formTitle='Sign In'>
+      <AuthLayout formTitle='Sign in'>
         <div>Auth form body</div>
       </AuthLayout>
     );
@@ -197,7 +197,7 @@ describe('AuthLayout', () => {
     ).not.toBeInTheDocument();
 
     rerender(
-      <AuthLayout formTitle='Sign In' showLogoutButton>
+      <AuthLayout formTitle='Sign in' showLogoutButton>
         <div>Auth form body</div>
       </AuthLayout>
     );
@@ -210,7 +210,7 @@ describe('AuthLayout', () => {
 
   it('keeps the split auth rail mounted when the split layout variant is used', async () => {
     render(
-      <AuthLayout formTitle='Sign In' layoutVariant='split'>
+      <AuthLayout formTitle='Sign in' layoutVariant='split'>
         <div>Auth form body</div>
       </AuthLayout>
     );
@@ -228,7 +228,7 @@ describe('AuthLayout', () => {
 
   it('keeps legal disclosure in document flow so it cannot overlay Need help', async () => {
     const { container } = render(
-      <AuthLayout formTitle='Sign In' layoutVariant='split'>
+      <AuthLayout formTitle='Sign in' layoutVariant='split'>
         <p data-auth-legal-copy>Legal disclosure</p>
       </AuthLayout>
     );
@@ -241,7 +241,7 @@ describe('AuthLayout', () => {
 
   it('keeps splash-B chrome free of film grain and editorial cards', async () => {
     const { container } = render(
-      <AuthLayout formTitle='Sign In' chrome='splash-b'>
+      <AuthLayout formTitle='Sign in' chrome='splash-b'>
         <div>Auth form body</div>
       </AuthLayout>
     );
@@ -256,7 +256,7 @@ describe('AuthLayout', () => {
 
   it('keeps default stack placement distinct from centered stack placement', async () => {
     const { container, rerender } = render(
-      <AuthLayout formTitle='Sign In' layoutVariant='stack'>
+      <AuthLayout formTitle='Sign in' layoutVariant='stack'>
         <div>Auth form body</div>
       </AuthLayout>
     );
@@ -272,7 +272,7 @@ describe('AuthLayout', () => {
 
     rerender(
       <AuthLayout
-        formTitle='Sign In'
+        formTitle='Sign in'
         layoutVariant='stack'
         contentPlacement='center'
       >
@@ -288,7 +288,7 @@ describe('AuthLayout', () => {
   it('reserves the splash-B logo slot while the mobile keyboard is visible', async () => {
     keyboardVisible = true;
     const { container } = render(
-      <AuthLayout formTitle='Sign In' chrome='splash-b'>
+      <AuthLayout formTitle='Sign in' chrome='splash-b'>
         <div>Auth form body</div>
       </AuthLayout>
     );
@@ -306,7 +306,7 @@ describe('AuthLayout', () => {
   it('marks the shell when the mobile keyboard is visible', async () => {
     keyboardVisible = true;
     const { container } = render(
-      <AuthLayout formTitle='Sign In'>
+      <AuthLayout formTitle='Sign in'>
         <div>Auth form body</div>
       </AuthLayout>
     );
@@ -323,7 +323,7 @@ describe('AuthLayout', () => {
     keyboardVisible = true;
     render(
       <AuthLayout
-        formTitle='Sign In'
+        formTitle='Sign in'
         layoutVariant='split'
         footerPrompt='Need an account?'
         footerLinkText='Join now'
@@ -336,7 +336,7 @@ describe('AuthLayout', () => {
     const logoLink = screen.getByLabelText('Go to homepage');
     expect(logoLink).toHaveAttribute('tabIndex', '-1');
     const hiddenTitle = document.querySelector('h1');
-    expect(hiddenTitle).toHaveTextContent('Sign In');
+    expect(hiddenTitle).toHaveTextContent('Sign in');
     expect(hiddenTitle).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByText('Need an account?')).not.toBeInTheDocument();
     expect(screen.getByText('Auth form body')).toBeVisible();

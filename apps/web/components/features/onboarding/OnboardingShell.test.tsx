@@ -124,8 +124,8 @@ describe('OnboardingShell status', () => {
       'data-flush-content',
       'true'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Start Over' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Log Out' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start over' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
     expect(restart).toHaveBeenCalledOnce();
     expect(logout).toHaveBeenCalledOnce();
     rerender(
@@ -137,8 +137,8 @@ describe('OnboardingShell status', () => {
         controlsDisabled
       />
     );
-    expect(screen.getByRole('button', { name: 'Start Over' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Log Out' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Start over' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Log out' })).toBeDisabled();
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
   });
   beforeEach(() => {
@@ -187,7 +187,7 @@ describe('OnboardingShell status', () => {
     const alert = screen.getByText(/This artist already has a Jovie profile/);
     expect(alert).toHaveAttribute('role', 'alert');
     expect(alert).toHaveTextContent('Sign in with the original account');
-    fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Profile conflict' }));
     expect(
       screen.getByRole('link', { name: 'Sign in with original account' })
     ).toHaveAttribute('href', '/signin');
@@ -215,10 +215,10 @@ describe('OnboardingShell status', () => {
     const header = screen.getByTestId('onboarding-sign-in-header');
     const slot = screen.getByTestId('onboarding-identity-recovery-slot');
     expect(slot).toContainElement(header);
-    fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Switch Account' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Profile conflict' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Switch account' }));
     expect(logout).toHaveBeenCalledOnce();
-    expect(screen.getByRole('button', { name: 'Log Out' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Log out' })).toBeEnabled();
     expect(screen.queryByRole('link', { name: /claim/i })).toBeNull();
   });
 
@@ -232,7 +232,7 @@ describe('OnboardingShell status', () => {
     expect(
       screen.queryByRole('link', { name: 'Sign in with original account' })
     ).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Profile Conflict' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Profile conflict' }));
     expect(
       screen.getByRole('link', { name: 'Sign in with original account' })
     ).toBeVisible();

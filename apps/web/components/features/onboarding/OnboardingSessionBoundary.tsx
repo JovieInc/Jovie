@@ -142,7 +142,7 @@ export function OnboardingSessionBoundary(props: OnboardingShellProps) {
         {failed ? (
           <>
             <Button onClick={() => setRevision(current => current + 1)}>
-              Try Again
+              Try again
             </Button>
             {isSignedIn ? (
               <Button
@@ -152,7 +152,7 @@ export function OnboardingSessionBoundary(props: OnboardingShellProps) {
                   void runAction('logout');
                 }}
               >
-                Log Out
+                Log out
               </Button>
             ) : null}
             {actionError ? <p role='alert'>{actionError}</p> : null}

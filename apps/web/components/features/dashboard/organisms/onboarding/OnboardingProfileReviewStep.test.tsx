@@ -36,13 +36,13 @@ describe('OnboardingProfileReviewStep', () => {
   it('keeps the display-name control focusable when opening the editor by keyboard', async () => {
     renderStep();
     const user = userEvent.setup();
-    const edit = screen.getByRole('button', { name: 'Edit Display Name' });
+    const edit = screen.getByRole('button', { name: 'Edit display name' });
     edit.focus();
     expect(edit).toHaveFocus();
     expect(edit).toHaveClass('focus-ring-themed');
 
     await user.keyboard('{Enter}');
-    const input = screen.getByRole('textbox', { name: 'Edit Display Name' });
+    const input = screen.getByRole('textbox', { name: 'Edit display name' });
     expect(input).toHaveValue(enrichedProfile.name);
     expect(input).toHaveFocus();
   });
@@ -51,7 +51,7 @@ describe('OnboardingProfileReviewStep', () => {
     renderStep();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit name' }));
-    const input = screen.getByLabelText('Edit Display Name');
+    const input = screen.getByLabelText('Edit display name');
     fireEvent.change(input, { target: { value: '' } });
     fireEvent.blur(input);
 

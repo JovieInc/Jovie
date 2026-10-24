@@ -38,13 +38,14 @@ export function DesktopAuthCodeForm({
     >
       <Input
         ref={inputRef}
-        aria-label='Code From Your Browser'
+        aria-label='Code from your browser'
         aria-describedby={statusId}
         autoCapitalize='characters'
         autoComplete='one-time-code'
         inputMode='text'
         maxLength={9}
         name='return-code'
+        // ui-casing-allow: uppercase sign-in code mask
         placeholder='XXXX-XXXX'
         spellCheck={false}
         value={returnCode}
@@ -62,7 +63,7 @@ export function DesktopAuthCodeForm({
           redeemState === 'redeemed'
         }
       >
-        {isRedeeming ? 'Signing In...' : 'Continue'}
+        {isRedeeming ? 'Signing in...' : 'Continue'}
       </Button>
       <div className='flex flex-wrap items-center justify-center gap-x-4 gap-y-4'>
         <Button
@@ -72,7 +73,7 @@ export function DesktopAuthCodeForm({
           disabled={isRedeeming}
           onClick={onBack}
         >
-          Back To Sign-in Options
+          Back to sign-in options
         </Button>
         {cancelButton}
       </div>

@@ -163,18 +163,18 @@ function getDesktopAuthPresentation({
 }: DesktopAuthPresentationInput) {
   const openLabel =
     openState === 'opening'
-      ? 'Opening Browser...'
+      ? 'Opening browser...'
       : openState === 'opened'
-        ? 'Open Browser Again'
+        ? 'Open browser again'
         : openState === 'error'
-          ? 'Try Again'
-          : 'Continue In Browser';
+          ? 'Try again'
+          : 'Continue in browser';
   const copyLabel =
     copyState === 'copying'
-      ? 'Copying Sign-in Link...'
+      ? 'Copying sign-in link...'
       : copyState === 'copied'
-        ? 'Copy Sign-in Link Again'
-        : 'Copy Sign-in Link';
+        ? 'Copy sign-in link again'
+        : 'Copy sign-in link';
   const actionStatusText =
     copyState === 'copying'
       ? 'Copying the sign-in link...'
@@ -325,7 +325,7 @@ export function DesktopAuthHandoffActions({
     [authUrl, resolveAuthUrl]
   );
 
-  // The QR encodes the same link "Copy Sign-in Link" copies. The PKCE
+  // The QR encodes the same link "Copy sign-in link" copies. The PKCE
   // challenge inside is public, the verifier never leaves the app.
   useEffect(() => {
     if (selectedMethod !== 'qr' || qrSvg || qrError) return;
@@ -574,7 +574,7 @@ export function DesktopAuthHandoffActions({
       ) : selectedMethod === 'qr' ? (
         <section
           ref={qrInstructionsRef}
-          aria-label='Phone Sign-in Instructions'
+          aria-label='Phone sign-in instructions'
           className='mt-5 flex w-full flex-col items-center justify-center gap-4 focus-visible:outline-none'
           data-desktop-auth-state={
             qrError ? 'qr-error' : qrSvg ? 'qr' : 'qr-loading'
@@ -584,7 +584,7 @@ export function DesktopAuthHandoffActions({
         >
           {qrSvg ? (
             <div
-              aria-label='QR Code With Your Sign-in Link'
+              aria-label='QR code with your sign-in link'
               className='rounded-xl bg-white p-3 dark:bg-white [&_svg]:block'
               // biome-ignore lint/security/noDangerouslySetInnerHtml: generateQrCodeSvg emits a static QR matrix; the auth URL is data, never markup
               dangerouslySetInnerHTML={{ __html: qrSvg }}
@@ -599,7 +599,7 @@ export function DesktopAuthHandoffActions({
                 size='sm'
                 onClick={selectCodeMethod}
               >
-                Enter A Code
+                Enter a code
               </Button>
             ) : null}
             <Button
@@ -608,7 +608,7 @@ export function DesktopAuthHandoffActions({
               size='sm'
               onClick={returnToOptions}
             >
-              Back To Sign-in Options
+              Back to sign-in options
             </Button>
             {cancelButton}
           </div>

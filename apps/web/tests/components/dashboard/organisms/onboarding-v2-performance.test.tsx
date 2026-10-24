@@ -410,7 +410,7 @@ describe('Onboarding screen performance budgets', () => {
       'A few more things showed up',
       SCREEN_BUDGETS.lateArrivals,
     ],
-    ['profile-ready', 'Your Link Is Live', SCREEN_BUDGETS.profileReady],
+    ['profile-ready', 'Your link is live', SCREEN_BUDGETS.profileReady],
   ] as const)(
     '%s screen renders within budget',
     async (initialResumeStep, heading, budgetMs) => {

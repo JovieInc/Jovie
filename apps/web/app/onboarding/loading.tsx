@@ -12,7 +12,7 @@ const SIDEBAR_STEPS = [
 
 function SidebarLoadingState() {
   return (
-    <nav aria-label='Onboarding Steps'>
+    <nav aria-label='Onboarding steps'>
       <ul className='space-y-1.5'>
         {SIDEBAR_STEPS.map(step => (
           <li key={step}>
@@ -48,14 +48,14 @@ export default function OnboardingLoading() {
       stableStageHeight='tall'
       stageVariant='flat'
       sidebar={<SidebarLoadingState />}
-      sidebarTitle='Jovie Setup'
+      sidebarTitle='Jovie setup'
       data-testid='onboarding-loading-shell'
     >
       <div className='flex h-full flex-col items-center justify-center'>
         <div className='flex w-full max-w-md flex-col items-center text-center'>
           <div className='mb-8 space-y-2'>
             <h1 className='text-3xl font-semibold leading-[1.05] tracking-[-0.03em] text-primary-token sm:text-4xl'>
-              Preparing Your Setup
+              Preparing your setup
             </h1>
             <p className='text-mid leading-6 text-secondary-token'>
               Loading your handle step and profile context.

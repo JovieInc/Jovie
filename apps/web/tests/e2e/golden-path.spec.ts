@@ -607,7 +607,7 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
   expect(handleResponse.headers()['x-onboarding-fallback']).toMatch(/^handle:/);
   const handleCard = page.getByTestId('onboarding-handle-check');
   await expect(handleCard).toBeVisible({ timeout: 60_000 });
-  await handleCard.getByLabel('Edit Proposed Handle').fill(handle);
+  await handleCard.getByLabel('Edit proposed handle').fill(handle);
   await expect(handleCard.getByText('is available')).toBeVisible({
     timeout: 30_000,
   });

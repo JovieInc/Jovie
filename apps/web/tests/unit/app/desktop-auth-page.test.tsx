@@ -56,7 +56,7 @@ function getAuthUrlParam(): string | null {
 
 async function openSignInOptions(): Promise<HTMLElement> {
   fireEvent.click(
-    screen.getByRole('button', { name: 'Other Sign-in Options' })
+    screen.getByRole('button', { name: 'Other sign-in options' })
   );
   return screen.findByTestId('desktop-auth-options');
 }
@@ -107,19 +107,19 @@ describe('DesktopAuthPage', () => {
       '20'
     );
     expect(
-      screen.getByRole('button', { name: 'Continue In Browser' })
+      screen.getByRole('button', { name: 'Continue in browser' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Finish Signing In' })
+      screen.getByRole('heading', { name: 'Finish signing in' })
     ).toBeVisible();
     expect(
       screen.getByText('Continue in your browser, then return to Jovie.')
     ).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Other Sign-in Options' })
+      screen.getByRole('button', { name: 'Other sign-in options' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Cancel Sign-in' })
+      screen.getByRole('button', { name: 'Cancel sign-in' })
     ).toBeInTheDocument();
     const actions = screen.getByTestId('desktop-auth-actions');
     expect(actions.querySelectorAll('button')).toHaveLength(3);
@@ -130,7 +130,7 @@ describe('DesktopAuthPage', () => {
       screen.queryByTestId('desktop-auth-options')
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Copy Sign-in Link' })
+      screen.queryByRole('button', { name: 'Copy sign-in link' })
     ).not.toBeInTheDocument();
   });
 
@@ -147,10 +147,10 @@ describe('DesktopAuthPage', () => {
     ).toString();
 
     expect(openDesktopAuthUrlMock).not.toHaveBeenCalled();
-    expect(screen.getAllByText('Continue In Browser')).toHaveLength(1);
+    expect(screen.getAllByText('Continue in browser')).toHaveLength(1);
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Continue In Browser' })
+      screen.getByRole('button', { name: 'Continue in browser' })
     );
 
     await waitFor(() => {
@@ -163,7 +163,7 @@ describe('DesktopAuthPage', () => {
       'opened'
     );
     const reopenButton = screen.getByRole('button', {
-      name: 'Open Browser Again',
+      name: 'Open browser again',
     });
     fireEvent.click(reopenButton);
 
@@ -171,7 +171,7 @@ describe('DesktopAuthPage', () => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel Sign-in' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel sign-in' }));
 
     expect(closeDesktopAuthWindowMock).toHaveBeenCalledTimes(1);
   });
@@ -184,14 +184,14 @@ describe('DesktopAuthPage', () => {
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
 
     const disclosure = screen.getByRole('button', {
-      name: 'Other Sign-in Options',
+      name: 'Other sign-in options',
     });
     expect(disclosure).toHaveAttribute('aria-expanded', 'false');
     expect(
       screen.queryByTestId('desktop-auth-options')
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Copy Sign-in Link' })
+      screen.queryByRole('button', { name: 'Copy sign-in link' })
     ).not.toBeInTheDocument();
 
     const options = await openSignInOptions();
@@ -202,7 +202,7 @@ describe('DesktopAuthPage', () => {
       expect(row).toHaveAttribute('data-variant', 'tertiary');
     }
     expect(
-      screen.getByRole('button', { name: 'Copy Sign-in Link' })
+      screen.getByRole('button', { name: 'Copy sign-in link' })
     ).toHaveFocus();
 
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -212,7 +212,7 @@ describe('DesktopAuthPage', () => {
     expect(disclosure).toHaveAttribute('aria-expanded', 'false');
     expect(disclosure).toHaveFocus();
 
-    const cancel = screen.getByRole('button', { name: 'Cancel Sign-in' });
+    const cancel = screen.getByRole('button', { name: 'Cancel sign-in' });
     expect(cancel.tagName).toBe('BUTTON');
     expect(cancel).toHaveAttribute('data-variant', 'link');
     expect(cancel).toHaveAttribute('data-size', 'sm');
@@ -227,7 +227,7 @@ describe('DesktopAuthPage', () => {
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
 
     await openSignInOptions();
-    fireEvent.click(screen.getByRole('button', { name: 'Scan With Phone' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Scan with phone' }));
 
     const expectedAuthUrl = new URL(
       '/auth/start?client=electron&intent=sign_in&return_to=%2Fapp%2Fsettings&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256',
@@ -249,35 +249,35 @@ describe('DesktopAuthPage', () => {
     ).toBeInTheDocument();
     expect(qr).toHaveFocus();
     expect(
-      screen.queryByRole('button', { name: 'Open Browser Again' })
+      screen.queryByRole('button', { name: 'Open browser again' })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Enter A Code' })
+      screen.getByRole('button', { name: 'Enter a code' })
     ).toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Back To Sign-in Options' })
+      screen.getByRole('button', { name: 'Back to sign-in options' })
     );
     expect(
       await screen.findByTestId('desktop-auth-options')
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Scan With Phone' })
+      screen.getByRole('button', { name: 'Scan with phone' })
     ).toHaveFocus();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Scan With Phone' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Scan with phone' }));
     await screen.findByTestId('desktop-auth-qr');
-    fireEvent.click(screen.getByRole('button', { name: 'Enter A Code' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enter a code' }));
     expect(
-      screen.getByRole('textbox', { name: 'Code From Your Browser' })
+      screen.getByRole('textbox', { name: 'Code from your browser' })
     ).toHaveFocus();
     fireEvent.click(
-      screen.getByRole('button', { name: 'Back To Sign-in Options' })
+      screen.getByRole('button', { name: 'Back to sign-in options' })
     );
     expect(
       await screen.findByTestId('desktop-auth-options')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Enter A Code' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Enter a code' })).toHaveFocus();
   });
 
   it('keeps code entry and cancellation reachable when QR creation fails', async () => {
@@ -288,7 +288,7 @@ describe('DesktopAuthPage', () => {
 
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
     await openSignInOptions();
-    fireEvent.click(screen.getByRole('button', { name: 'Scan With Phone' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Scan with phone' }));
 
     expect(
       await screen.findByText(
@@ -296,9 +296,9 @@ describe('DesktopAuthPage', () => {
       )
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Enter A Code' })
+      screen.getByRole('button', { name: 'Enter a code' })
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel Sign-in' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel sign-in' }));
     expect(closeDesktopAuthWindowMock).toHaveBeenCalledTimes(1);
   });
 
@@ -314,16 +314,16 @@ describe('DesktopAuthPage', () => {
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
 
     const continueButton = screen.getByRole('button', {
-      name: 'Continue In Browser',
+      name: 'Continue in browser',
     });
     const actions = screen.getByTestId('desktop-auth-actions');
     const status = screen.getByRole('status');
     continueButton.focus();
     expect(continueButton).toHaveFocus();
     expect(
-      screen.getByRole('button', { name: 'Cancel Sign-in' }).parentElement
+      screen.getByRole('button', { name: 'Cancel sign-in' }).parentElement
     ).toBe(
-      screen.getByRole('button', { name: 'Other Sign-in Options' })
+      screen.getByRole('button', { name: 'Other sign-in options' })
         .parentElement
     );
     expect(actions.querySelectorAll('button')).toHaveLength(3);
@@ -338,7 +338,7 @@ describe('DesktopAuthPage', () => {
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
     });
-    const retryButton = screen.getByRole('button', { name: 'Try Again' });
+    const retryButton = screen.getByRole('button', { name: 'Try again' });
     expect(retryButton).toBeEnabled();
     expect(retryButton).toHaveFocus();
     expect(actions.querySelectorAll('button')).toHaveLength(3);
@@ -374,21 +374,21 @@ describe('DesktopAuthPage', () => {
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
 
     const continueButton = screen.getByRole('button', {
-      name: 'Continue In Browser',
+      name: 'Continue in browser',
     });
 
     fireEvent.click(continueButton);
 
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(1);
-      expect(screen.getByRole('button', { name: 'Try Again' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled();
     });
     expect(screen.getByRole('status')).toHaveTextContent(
       /The browser did not open/i
     );
 
     openDesktopAuthUrlMock.mockResolvedValueOnce({ ok: true });
-    fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
@@ -413,7 +413,7 @@ describe('DesktopAuthPage', () => {
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
 
     const continueButton = screen.getByRole('button', {
-      name: 'Continue In Browser',
+      name: 'Continue in browser',
     });
 
     fireEvent.click(continueButton);
@@ -446,7 +446,7 @@ describe('DesktopAuthPage', () => {
 
       await act(async () => {
         fireEvent.click(
-          screen.getByRole('button', { name: 'Continue In Browser' })
+          screen.getByRole('button', { name: 'Continue in browser' })
         );
       });
       expect(screen.getByRole('status')).toHaveTextContent(
@@ -462,7 +462,7 @@ describe('DesktopAuthPage', () => {
       // Reopening restarts the wait instead of nagging immediately.
       await act(async () => {
         fireEvent.click(
-          screen.getByRole('button', { name: 'Open Browser Again' })
+          screen.getByRole('button', { name: 'Open browser again' })
         );
       });
       expect(screen.getByRole('status')).toHaveTextContent(
@@ -470,11 +470,11 @@ describe('DesktopAuthPage', () => {
       );
       await act(async () => {
         fireEvent.click(
-          screen.getByRole('button', { name: 'Other Sign-in Options' })
+          screen.getByRole('button', { name: 'Other sign-in options' })
         );
       });
       expect(
-        screen.getByRole('button', { name: 'Copy Sign-in Link' })
+        screen.getByRole('button', { name: 'Copy sign-in link' })
       ).toBeEnabled();
     } finally {
       vi.useRealTimers();
@@ -491,17 +491,17 @@ describe('DesktopAuthPage', () => {
 
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
     await openSignInOptions();
-    fireEvent.click(screen.getByRole('button', { name: 'Enter A Code' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enter a code' }));
 
     const input = screen.getByRole('textbox', {
-      name: 'Code From Your Browser',
+      name: 'Code from your browser',
     });
     expect(input).toHaveFocus();
     const continueButton = screen.getByRole('button', { name: 'Continue' });
     expect(continueButton).toBeDisabled();
     // Cancel stays reachable in code mode, so the action stack keeps its rows.
     expect(
-      screen.getByRole('button', { name: 'Cancel Sign-in' })
+      screen.getByRole('button', { name: 'Cancel sign-in' })
     ).toBeInTheDocument();
 
     redeemDesktopAuthReturnCodeMock.mockResolvedValueOnce({
@@ -529,7 +529,7 @@ describe('DesktopAuthPage', () => {
       'Sign-in complete. Returning to Jovie...'
     );
     expect(
-      screen.getByRole('button', { name: 'Back To Sign-in Options' })
+      screen.getByRole('button', { name: 'Back to sign-in options' })
     ).toBeEnabled();
   });
 
@@ -551,9 +551,9 @@ describe('DesktopAuthPage', () => {
     );
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
     await openSignInOptions();
-    fireEvent.click(screen.getByRole('button', { name: 'Enter A Code' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enter a code' }));
     fireEvent.change(
-      screen.getByRole('textbox', { name: 'Code From Your Browser' }),
+      screen.getByRole('textbox', { name: 'Code from your browser' }),
       { target: { value: 'BCDFGHJK' } }
     );
     await act(async () => {
@@ -569,12 +569,12 @@ describe('DesktopAuthPage', () => {
     );
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
     await openSignInOptions();
-    expect(screen.queryByRole('button', { name: 'Enter A Code' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Enter a code' })).toBeNull();
     expect(
-      screen.queryByRole('button', { name: 'Scan With Phone' })
+      screen.queryByRole('button', { name: 'Scan with phone' })
     ).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Copy Sign-in Link' })
+      screen.getByRole('button', { name: 'Copy sign-in link' })
     ).toBeInTheDocument();
   });
 
@@ -585,10 +585,10 @@ describe('DesktopAuthPage', () => {
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} touchIdHint />);
 
     const touchId = screen.getByRole('button', {
-      name: 'Sign In With Touch ID',
+      name: 'Sign in with Touch ID',
     });
     expect(
-      screen.queryByRole('button', { name: 'Continue In Browser' })
+      screen.queryByRole('button', { name: 'Continue in browser' })
     ).not.toBeInTheDocument();
     expect(
       screen.getByTestId('desktop-auth-actions').querySelectorAll('button')
@@ -617,7 +617,7 @@ describe('DesktopAuthPage', () => {
 
     await act(async () => {
       fireEvent.click(
-        screen.getByRole('button', { name: 'Sign In With Touch ID' })
+        screen.getByRole('button', { name: 'Sign in with Touch ID' })
       );
     });
 
@@ -626,10 +626,10 @@ describe('DesktopAuthPage', () => {
       'Touch ID did not sign you in. Continue in the browser instead.'
     );
     expect(
-      screen.getByRole('button', { name: 'Continue In Browser' })
+      screen.getByRole('button', { name: 'Continue in browser' })
     ).toBeEnabled();
     expect(
-      screen.getByRole('button', { name: 'Continue In Browser' })
+      screen.getByRole('button', { name: 'Continue in browser' })
     ).toHaveFocus();
   });
 
@@ -642,29 +642,29 @@ describe('DesktopAuthPage', () => {
     );
     await openSignInOptions();
     expect(
-      screen.getByRole('button', { name: 'Continue In Browser' })
+      screen.getByRole('button', { name: 'Continue in browser' })
     ).toHaveFocus();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByTestId('desktop-auth-options')).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Other Sign-in Options' })
+      screen.getByRole('button', { name: 'Other sign-in options' })
     ).toHaveFocus();
     await openSignInOptions();
-    fireEvent.click(screen.getByRole('button', { name: 'Enter A Code' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enter a code' }));
     expect(
-      screen.queryByRole('button', { name: 'Sign In With Touch ID' })
+      screen.queryByRole('button', { name: 'Sign in with Touch ID' })
     ).not.toBeInTheDocument();
     fireEvent.click(
-      screen.getByRole('button', { name: 'Back To Sign-in Options' })
+      screen.getByRole('button', { name: 'Back to sign-in options' })
     );
     expect(
-      screen.getByRole('button', { name: 'Sign In With Touch ID' })
+      screen.getByRole('button', { name: 'Sign in with Touch ID' })
     ).toBeInTheDocument();
     unmount();
 
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
     expect(
-      screen.queryByRole('button', { name: 'Sign In With Touch ID' })
+      screen.queryByRole('button', { name: 'Sign in with Touch ID' })
     ).toBeNull();
   });
 
@@ -677,7 +677,7 @@ describe('DesktopAuthPage', () => {
 
     await openSignInOptions();
     const copyButton = screen.getByRole('button', {
-      name: 'Copy Sign-in Link',
+      name: 'Copy sign-in link',
     });
     let resolveCopy: (result: { ok: true }) => void = () => {};
     copyDesktopAuthUrlMock.mockReturnValueOnce(
@@ -728,7 +728,7 @@ describe('DesktopAuthPage', () => {
 
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Continue In Browser' })
+      screen.getByRole('button', { name: 'Continue in browser' })
     );
     expect(
       await screen.findByText(
@@ -744,7 +744,7 @@ describe('DesktopAuthPage', () => {
       ok: false,
       reason: 'invalid-auth-url',
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Sign-in Link' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy sign-in link' }));
     expect(
       await screen.findByText(
         'The sign-in link is no longer valid. Try opening the browser again.'
@@ -764,15 +764,15 @@ describe('DesktopAuthPage', () => {
     render(<DesktopAuthClient authUrlParam={getAuthUrlParam()} />);
 
     const cancelButton = screen.getByRole('button', {
-      name: 'Cancel Sign-in',
+      name: 'Cancel sign-in',
     });
     fireEvent.click(cancelButton);
     expect(closeDesktopAuthWindowMock).toHaveBeenCalledTimes(1);
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Continue In Browser' })
+      screen.getByRole('button', { name: 'Continue in browser' })
     );
-    await screen.findByRole('button', { name: 'Try Again' });
+    await screen.findByRole('button', { name: 'Try again' });
 
     fireEvent.click(cancelButton);
     expect(closeDesktopAuthWindowMock).toHaveBeenCalledTimes(2);
@@ -817,22 +817,22 @@ describe('DesktopAuthRouteHandoff', () => {
     );
     expect(screen.queryByTestId('auth-brand-panel')).not.toBeInTheDocument();
     expect(openDesktopAuthUrlMock).not.toHaveBeenCalled();
-    expect(screen.getAllByText('Continue In Browser')).toHaveLength(1);
+    expect(screen.getAllByText('Continue in browser')).toHaveLength(1);
     expect(
-      screen.getByRole('button', { name: 'Other Sign-in Options' })
+      screen.getByRole('button', { name: 'Other sign-in options' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Cancel Sign-in' })
+      screen.getByRole('button', { name: 'Cancel sign-in' })
     ).toBeInTheDocument();
     expect(
       screen.getByTestId('desktop-auth-actions').querySelectorAll('button')
     ).toHaveLength(3);
     expect(
-      screen.queryByRole('button', { name: 'Copy Sign-in Link' })
+      screen.queryByRole('button', { name: 'Copy sign-in link' })
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Continue In Browser' })
+      screen.getByRole('button', { name: 'Continue in browser' })
     );
 
     await waitFor(() => {
@@ -844,13 +844,13 @@ describe('DesktopAuthRouteHandoff', () => {
       'data-desktop-auth-state',
       'opened'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Open Browser Again' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open browser again' }));
     await waitFor(() => {
       expect(openDesktopAuthUrlMock).toHaveBeenCalledTimes(2);
     });
 
     await openSignInOptions();
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Sign-in Link' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy sign-in link' }));
     await waitFor(() => {
       expect(copyDesktopAuthUrlMock).toHaveBeenCalledWith(window.location.href);
     });
@@ -867,7 +867,7 @@ describe('DesktopAuthRouteHandoff', () => {
     render(<DesktopAuthRouteHandoff />);
 
     const continueButton = screen.getByRole('button', {
-      name: 'Continue In Browser',
+      name: 'Continue in browser',
     });
 
     fireEvent.click(continueButton);

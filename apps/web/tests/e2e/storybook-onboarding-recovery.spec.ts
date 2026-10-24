@@ -112,13 +112,13 @@ for (const scenario of cases) {
     await expect(page.getByRole('alert')).toContainText(
       'verified profile claim flow'
     );
-    const disclosure = page.getByRole('button', { name: 'Profile Conflict' });
+    const disclosure = page.getByRole('button', { name: 'Profile conflict' });
     await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
     expect(await nav.boundingBox()).toEqual(before.nav);
     expect(await transcript.boundingBox()).toEqual(before.transcript);
     expect(await input.boundingBox()).toEqual(before.input);
     await disclosure.click();
-    const recovery = page.getByRole('button', { name: 'Switch Account' });
+    const recovery = page.getByRole('button', { name: 'Switch account' });
     await expect(recovery).toBeVisible();
     const after = {
       nav: await nav.boundingBox(),
@@ -141,7 +141,7 @@ for (const scenario of cases) {
     expect(alert!.y).toBeGreaterThanOrEqual(after.nav!.y + after.nav!.height);
     expect(alert!.y + alert!.height).toBeLessThanOrEqual(after.transcript!.y);
     for (const control of [
-      page.getByRole('button', { name: 'Log Out' }),
+      page.getByRole('button', { name: 'Log out' }),
       recovery,
       input,
     ]) {

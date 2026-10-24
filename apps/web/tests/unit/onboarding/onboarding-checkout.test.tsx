@@ -151,7 +151,7 @@ describe('OnboardingCheckoutClient', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
 
     expect(
-      screen.getByRole('heading', { name: 'Upgrade To Artist Presence' })
+      screen.getByRole('heading', { name: 'Upgrade to Artist Presence' })
     ).toBeInTheDocument();
     expect(screen.getByText('Tim White')).toBeInTheDocument();
     expect(screen.getByText('@timwhite')).toBeInTheDocument();
@@ -271,7 +271,7 @@ describe('OnboardingCheckoutClient', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
 
     await user.click(
-      screen.getByRole('button', { name: 'Continue with Free' })
+      screen.getByRole('button', { name: 'Continue with free' })
     );
 
     expect(clearPlanIntentMock).toHaveBeenCalled();
@@ -314,14 +314,14 @@ describe('OnboardingCheckoutClient', () => {
     );
 
     expect(
-      screen.getByRole('heading', { name: 'Upgrade To Artist Presence' })
+      screen.getByRole('heading', { name: 'Upgrade to Artist Presence' })
     ).toBeInTheDocument();
     expect(screen.getAllByText(/free forever/i).length).toBeGreaterThan(0);
     expect(
       screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Keep My Free Profile' })
+      screen.getByRole('button', { name: 'Keep my free profile' })
     ).toBeInTheDocument();
   });
 
@@ -330,13 +330,13 @@ describe('OnboardingCheckoutClient', () => {
 
     // Hierarchy: heading → profile identity → highlights → price → CTA → free keep.
     const heading = screen.getByRole('heading', {
-      name: 'Upgrade To Artist Presence',
+      name: 'Upgrade to Artist Presence',
     });
     const cta = screen.getByRole('button', {
       name: 'Upgrade to Artist Presence',
     });
     const keepFree = screen.getByRole('button', {
-      name: 'Keep My Free Profile',
+      name: 'Keep my free profile',
     });
     expect(heading.compareDocumentPosition(cta)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
@@ -348,8 +348,8 @@ describe('OnboardingCheckoutClient', () => {
     // Certified capabilities only (JOV-7794); monitoring is internal-only.
     for (const highlight of [
       'Payments',
-      '90-day Analytics',
-      'Verified Badge',
+      '90-day analytics',
+      'Verified badge',
     ]) {
       expect(screen.getByText(highlight)).toBeInTheDocument();
     }
@@ -412,7 +412,7 @@ describe('OnboardingCheckoutClient', () => {
     );
 
     await user.click(
-      screen.getByRole('button', { name: 'Continue with Free' })
+      screen.getByRole('button', { name: 'Continue with free' })
     );
 
     expect(recordOfferDecisionMock).toHaveBeenCalledWith(
@@ -427,7 +427,7 @@ describe('OnboardingCheckoutClient', () => {
     render(<OnboardingCheckoutClient {...defaultProps} />);
 
     await user.click(
-      screen.getByRole('button', { name: 'Continue with Free' })
+      screen.getByRole('button', { name: 'Continue with free' })
     );
 
     expect(recordOfferDecisionMock).not.toHaveBeenCalled();
@@ -460,7 +460,7 @@ describe('OnboardingCheckoutClient', () => {
     );
 
     const card = screen.getByTestId('claim-time-proof');
-    expect(card).toHaveTextContent('Found From Your Profile');
+    expect(card).toHaveTextContent('Found from your profile');
     expect(card).toHaveTextContent('Tracks12');
     expect(card).toHaveTextContent('Handle@timwhite');
     expect(card).not.toHaveTextContent('https://jov.ie/timwhite');

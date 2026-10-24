@@ -107,10 +107,10 @@ describe('JOV-6709 focused task-action hierarchy', () => {
 
     expect(evaluateDefaultHierarchy(production)).toEqual([]);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Other Sign-in Options' })
+      screen.getByRole('button', { name: 'Other sign-in options' })
     );
     const optionRows = await screen.findAllByRole('button', {
-      name: /Copy Sign-in Link|Enter A Code|Scan With Phone/,
+      name: /Copy sign-in link|Enter a code|Scan with phone/,
     });
     expect(optionRows).toHaveLength(3);
     for (const row of optionRows) {
@@ -132,29 +132,29 @@ describe('JOV-6709 focused task-action hierarchy', () => {
 
     expect(evaluateDefaultHierarchy(production)).toEqual([]);
     expect(
-      screen.getByRole('button', { name: 'Sign In With Touch ID' })
+      screen.getByRole('button', { name: 'Sign in with Touch ID' })
     ).toHaveAttribute('data-variant', 'primary');
     expect(
-      screen.queryByRole('button', { name: 'Continue In Browser' })
+      screen.queryByRole('button', { name: 'Continue in browser' })
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Other Sign-in Options' })
+      screen.getByRole('button', { name: 'Other sign-in options' })
     );
     const optionRows = await screen.findAllByRole('button', {
-      name: /Continue In Browser|Copy Sign-in Link|Enter A Code|Scan With Phone/,
+      name: /Continue in browser|Copy sign-in link|Enter a code|Scan with phone/,
     });
     expect(optionRows).toHaveLength(4);
     expect(new Set(optionRows.map(row => row.className)).size).toBe(1);
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Continue In Browser' })
+      screen.getByRole('button', { name: 'Continue in browser' })
     );
     expect(
-      screen.getByRole('button', { name: 'Continue In Browser' })
+      screen.getByRole('button', { name: 'Continue in browser' })
     ).toHaveAttribute('data-variant', 'primary');
     expect(
-      screen.queryByRole('button', { name: 'Sign In With Touch ID' })
+      screen.queryByRole('button', { name: 'Sign in with Touch ID' })
     ).not.toBeInTheDocument();
   });
 });

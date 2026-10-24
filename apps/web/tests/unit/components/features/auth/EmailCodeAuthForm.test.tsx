@@ -289,7 +289,7 @@ describe('EmailCodeAuthForm', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('returns to the email step from the locked step via "Request A New Code"', async () => {
+    it('returns to the email step from the locked step via "Request a new code"', async () => {
       const user = userEvent.setup();
       mockSendVerificationOtp.mockResolvedValueOnce({ error: null });
       mockSignInEmailOtp.mockRejectedValueOnce({

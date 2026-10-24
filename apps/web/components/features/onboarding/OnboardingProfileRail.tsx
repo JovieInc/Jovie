@@ -268,7 +268,7 @@ function DspMatchStrip({
     <fieldset
       className='flex items-center gap-1.5 rounded-full border border-white/15 bg-black/28 px-2 py-1.5 text-white shadow-[0_14px_30px_rgba(0,0,0,0.22)] backdrop-blur-xl dark:text-white'
       data-testid='onboarding-dsp-match-strip'
-      aria-label='Matched Music Services'
+      aria-label='Matched music services'
     >
       {visible.map(match => (
         <span

@@ -223,7 +223,7 @@ describe('auth shell layout contract', () => {
     '$name ($width) desktop split route mounts the editorial card behind desktop-only CSS',
     ({ width }) => {
       const { container, unmount } = render(
-        <AuthLayout formTitle='Sign In' layoutVariant='split'>
+        <AuthLayout formTitle='Sign in' layoutVariant='split'>
           <div>Auth form body</div>
         </AuthLayout>
       );
@@ -310,7 +310,7 @@ describe('auth shell layout contract', () => {
 
   it('does not mount the editorial card on splash-B stack chrome', () => {
     const { container } = render(
-      <AuthLayout formTitle='Sign In' chrome='splash-b'>
+      <AuthLayout formTitle='Sign in' chrome='splash-b'>
         <div>Auth form body</div>
       </AuthLayout>
     );

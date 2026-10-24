@@ -49,7 +49,7 @@ describe('OnboardingExperienceShell', () => {
         mode='standalone'
         stableStageHeight='tall'
         sidebar={<nav>Step Navigation</nav>}
-        sidebarTitle='Jovie Setup'
+        sidebarTitle='Jovie setup'
         topBar={<div>Top Bar</div>}
         sidePanel={<aside>Preview Panel</aside>}
         footer={<div>Footer Dots</div>}
@@ -61,7 +61,7 @@ describe('OnboardingExperienceShell', () => {
 
     expect(screen.getByTestId('onboarding-shell')).toBeInTheDocument();
     expect(screen.getByText('Top Bar')).toBeInTheDocument();
-    expect(screen.getByText('Jovie Setup')).toBeInTheDocument();
+    expect(screen.getByText('Jovie setup')).toBeInTheDocument();
     expect(screen.getByText('Step Navigation')).toBeInTheDocument();
     expect(screen.getByText('Preview Panel')).toBeInTheDocument();
     expect(screen.getByText('Footer Dots')).toBeInTheDocument();

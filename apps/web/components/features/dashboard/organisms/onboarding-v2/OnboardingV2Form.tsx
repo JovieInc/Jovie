@@ -84,7 +84,7 @@ const SIDEBAR_STEPS: ReadonlyArray<Readonly<{ id: StepId; label: string }>> = [
   { id: 'handle', label: 'Handle' },
   { id: 'spotify', label: 'Spotify' },
   { id: 'upgrade', label: 'Plan' },
-  // eslint-disable-next-line @jovie/canonical-ui-label-casing -- DSP is an industry-standard initialism.
+  // ui-casing-allow: plural of the DSP acronym
   { id: 'dsp', label: 'DSPs' },
   { id: 'social', label: 'Social' },
   { id: 'releases', label: 'Releases' },
@@ -639,12 +639,12 @@ function OnboardingSidebar({
     SIDEBAR_STEPS[currentIndex]?.label ?? SIDEBAR_STEPS[0].label;
 
   return (
-    <nav aria-label='Onboarding Steps'>
+    <nav aria-label='Onboarding steps'>
       {onBack ? (
         <button
           type='button'
           onClick={onBack}
-          aria-label='Go Back'
+          aria-label='Go back'
           className='mb-3 flex h-7 w-7 items-center justify-center rounded-lg text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
         >
           <ArrowRight className='h-4 w-4 rotate-180' />
@@ -1781,7 +1781,7 @@ export function OnboardingV2Form({
                   onClick={advanceFromStep}
                   variant='secondary'
                 >
-                  Continue Free
+                  Continue free
                 </Button>
                 <Button
                   onClick={() => {
@@ -1792,7 +1792,7 @@ export function OnboardingV2Form({
                     );
                   }}
                 >
-                  Upgrade Now
+                  Upgrade now
                 </Button>
               </>
             }
@@ -2059,7 +2059,7 @@ export function OnboardingV2Form({
             prompt='Discovery kept running while you moved through onboarding.'
             actions={
               <Button onClick={advanceFromStep}>
-                Finish Setup
+                Finish setup
                 <ArrowRight className='ml-1 h-4 w-4' />
               </Button>
             }
@@ -2080,12 +2080,12 @@ export function OnboardingV2Form({
       case 'profile-ready':
         return (
           <StepFrame
-            title='Your Link Is Live'
+            title='Your link is live'
             prompt='Put your Jovie link where fans already look. We will count activation when the first Instagram visitor lands on it.'
             actions={
               <>
                 <Button onClick={handleCopyInstagramBioLink}>
-                  Copy Instagram Bio Link
+                  Copy Instagram bio link
                 </Button>
                 <Button onClick={handleOpenInstagram} variant='secondary'>
                   Open Instagram
@@ -2095,7 +2095,7 @@ export function OnboardingV2Form({
                   onClick={handleOpenDashboard}
                   variant='ghost'
                 >
-                  Open Dashboard
+                  Open dashboard
                   <ArrowRight className='ml-1 h-4 w-4' />
                 </Button>
               </>
@@ -2199,7 +2199,7 @@ export function OnboardingV2Form({
           }
         />
       }
-      sidebarTitle='Jovie Setup'
+      sidebarTitle='Jovie setup'
       stageVariant='flat'
       visualVariant={designV1 ? 'v1' : 'default'}
       data-testid='onboarding-experience-shell'

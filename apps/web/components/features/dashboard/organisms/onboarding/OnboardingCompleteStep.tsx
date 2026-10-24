@@ -43,7 +43,7 @@ export function OnboardingCompleteStep({
         </div>
 
         <AuthLinkPreviewCard
-          label='Your Link'
+          label='Your link'
           hrefText={`${displayDomain}/${handle}`}
         />
 
@@ -93,7 +93,7 @@ export function OnboardingCompleteStep({
             className={AUTH_CLASSES.authCta}
             static
           >
-            Copy Link
+            Copy link
           </Button>
         </div>
 

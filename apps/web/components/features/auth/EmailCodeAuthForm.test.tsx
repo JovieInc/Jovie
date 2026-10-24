@@ -334,7 +334,7 @@ describe('EmailCodeAuthForm', () => {
         'polite'
       );
       expect(
-        screen.queryByRole('button', { name: 'Resend Verification Code' })
+        screen.queryByRole('button', { name: 'Resend verification code' })
       ).not.toBeInTheDocument();
       expect(sendVerificationOtp).toHaveBeenCalledTimes(1);
       await act(async () => {
@@ -343,7 +343,7 @@ describe('EmailCodeAuthForm', () => {
       expect(screen.getByRole('button', { name: 'Change email' })).toBe(change);
       expect(change).toHaveFocus();
       const resend = screen.getByRole('button', {
-        name: 'Resend Verification Code',
+        name: 'Resend verification code',
       });
       await act(async () => {
         fireEvent.click(resend);

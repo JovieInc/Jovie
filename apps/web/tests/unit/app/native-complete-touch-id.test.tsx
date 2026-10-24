@@ -91,12 +91,12 @@ describe('native-complete Touch ID offer', () => {
     await renderPage();
 
     expect(
-      screen.getByRole('heading', { name: 'Sign In With Touch ID Next Time?' })
+      screen.getByRole('heading', { name: 'Sign in with Touch ID next time?' })
     ).toBeVisible();
     expect(hoisted.routerReplace).not.toHaveBeenCalled();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Turn On Touch ID' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Turn on Touch ID' }));
     });
 
     expect(hoisted.addPasskey).toHaveBeenCalledWith({
@@ -107,7 +107,7 @@ describe('native-complete Touch ID offer', () => {
     expect(hoisted.routerReplace).toHaveBeenCalledWith('/app/chat');
   });
 
-  it('keeps the browser path when enrollment fails, and Not Now remembers the choice', async () => {
+  it('keeps the browser path when enrollment fails, and Not now remembers the choice', async () => {
     hoisted.getDesktopPasskeyState.mockResolvedValueOnce({
       available: true,
       enrolled: false,
@@ -120,7 +120,7 @@ describe('native-complete Touch ID offer', () => {
     await renderPage();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Turn On Touch ID' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Turn on Touch ID' }));
     });
     expect(
       screen.getByText(
@@ -130,7 +130,7 @@ describe('native-complete Touch ID offer', () => {
     expect(hoisted.setDesktopPasskeyState).not.toHaveBeenCalled();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Not Now' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
     });
     expect(hoisted.setDesktopPasskeyState).toHaveBeenCalledWith('dismissed');
     expect(hoisted.routerReplace).toHaveBeenCalledWith('/app/chat');
@@ -151,7 +151,7 @@ describe('native-complete Touch ID offer', () => {
       assign,
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Not Now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
 
     expect(hoisted.setDesktopPasskeyState).toHaveBeenCalledWith('dismissed');
     expect(hoisted.routerReplace).toHaveBeenCalledWith('/app/chat');
@@ -180,7 +180,7 @@ describe('native-complete Touch ID offer', () => {
       }
       await renderPage();
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Not Now' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
       });
       expect(hoisted.setDesktopPasskeyState).toHaveBeenCalledWith('dismissed');
       expect(hoisted.routerReplace).toHaveBeenCalledWith('/app/chat');

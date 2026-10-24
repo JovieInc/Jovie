@@ -98,14 +98,14 @@ export function isMeaningfulIntakeAnswer(value: string): boolean {
   return !isIncompleteAdvanceMessage(trimmed);
 }
 
-/** User-visible copy for Confirm Handle CTA (Title Case). */
-export const CONFIRM_HANDLE_CTA_LABEL = 'Confirm Handle';
+/** User-visible copy for Confirm handle CTA (sentence case). */
+export const CONFIRM_HANDLE_CTA_LABEL = 'Confirm handle';
 
-/** User-visible copy for Attach Account CTA (Title Case). */
-export const ATTACH_ACCOUNT_CTA_LABEL = 'Attach Account';
+/** User-visible copy for Attach account CTA (sentence case). */
+export const ATTACH_ACCOUNT_CTA_LABEL = 'Attach account';
 
 /** User-visible copy for artist picker escape hatch. */
-export const NONE_OF_THESE_CTA_LABEL = 'None of These';
+export const NONE_OF_THESE_CTA_LABEL = 'None of these';
 
 /**
  * Display text submitted with a widget event (human-readable transcript;

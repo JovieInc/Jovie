@@ -111,7 +111,7 @@ describe('onboarding sign-in placement', () => {
     // The shell header owns Sign in; the intro offers the other next step.
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Try Another Name' })
+      screen.getByRole('button', { name: 'Try another name' })
     ).toBeInTheDocument();
   });
 

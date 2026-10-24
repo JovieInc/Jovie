@@ -149,7 +149,7 @@ export function OnboardingDspStep({
                   autoCapitalize='none'
                   autoCorrect='off'
                   spellCheck={false}
-                  aria-label='Search For Your Artist Or Paste A Spotify Link'
+                  aria-label='Search for your artist or paste a Spotify link'
                   aria-invalid={Boolean(state.error)}
                   aria-describedby={
                     state.error ? 'onboarding-dsp-search-error' : undefined
@@ -238,7 +238,7 @@ export function OnboardingDspStep({
               static
               disabled={isTransitioning}
             >
-              Skip For Now
+              Skip for now
             </Button>
           </div>
         </ContentSurfaceCard>

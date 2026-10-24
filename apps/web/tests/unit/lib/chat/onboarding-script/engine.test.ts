@@ -294,7 +294,7 @@ describe('decideFallbackTurn', () => {
     );
   });
 
-  it('advances social on Attach Account widget event', async () => {
+  it('advances social on Attach account widget event', async () => {
     const lowSignal = {
       ...CONFIRMED_OUTPUT,
       artist: { ...CONFIRMED_OUTPUT.artist, followers: 120 },

@@ -411,7 +411,7 @@ export function OnboardingProfileReviewStep({
                             AUTH_SURFACE.fieldInput,
                             'text-center text-mid font-semibold'
                           )}
-                          aria-label='Edit Display Name'
+                          aria-label='Edit display name'
                         />
                       </div>
                       {nameError && (
@@ -424,7 +424,7 @@ export function OnboardingProfileReviewStep({
                         type='button'
                         onClick={startEditingName}
                         className='group cursor-pointer focus-ring-themed rounded-md'
-                        aria-label='Edit Display Name'
+                        aria-label='Edit display name'
                       >
                         <span className='text-base font-semibold text-primary-token transition-colors group-hover:text-accent'>
                           {editableDisplayName}

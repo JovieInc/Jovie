@@ -396,7 +396,7 @@ export async function prepareBetterAuthEmailOtp(
 
     if (options.recovery.resendCode) {
       const resendButton = page.getByRole('button', {
-        name: 'Resend Verification Code',
+        name: 'Resend verification code',
       });
       await expect(resendButton).toBeVisible({ timeout: 35_000 });
       const resendResponse = page.waitForResponse(

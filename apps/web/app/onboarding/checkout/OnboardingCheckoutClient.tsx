@@ -59,13 +59,12 @@ const OFFER_HIGHLIGHTS = [
   },
   {
     icon: BarChart3,
-    // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Numeric-leading duration is valid Title Case; the rule's canonical suggestion is identical.
-    label: '90-day Analytics',
+    label: '90-day analytics',
     detail: 'Geographic insights & advanced data',
   },
   {
     icon: BadgeCheck,
-    label: 'Verified Badge',
+    label: 'Verified badge',
     detail: 'Build trust with your audience',
   },
 ] as const;
@@ -160,7 +159,7 @@ export function ClaimTimeProofCard({
     <ContentSurfaceCard className='mb-4' data-testid='claim-time-proof'>
       <div className='p-4'>
         <p className='text-xs font-medium text-tertiary-token'>
-          Found From Your Profile
+          Found from your profile
         </p>
         <dl className='mt-2 space-y-1.5'>
           {facts.map(fact => (
@@ -356,7 +355,7 @@ export function OnboardingCheckoutClient({
       <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
         <div className={FORM_LAYOUT.headerSection}>
           <h1 className={FORM_LAYOUT.title}>
-            {`Upgrade To ${planMarketing.displayName}`}
+            {`Upgrade to ${planMarketing.displayName}`}
           </h1>
           <p className={FORM_LAYOUT.hint}>
             {isDefaultUpsell && username
@@ -448,7 +447,7 @@ export function OnboardingCheckoutClient({
           disabled={isLoading}
           className='mt-4 w-full text-center text-app text-tertiary-token hover:text-secondary-token transition-colors disabled:opacity-50'
         >
-          {isDefaultUpsell ? 'Keep My Free Profile' : 'Continue with Free'}
+          {isDefaultUpsell ? 'Keep my free profile' : 'Continue with free'}
         </button>
         {isDefaultUpsell ? (
           <p className='mt-2 text-center text-xs text-tertiary-token'>

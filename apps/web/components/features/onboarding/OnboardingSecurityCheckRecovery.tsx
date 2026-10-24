@@ -64,7 +64,7 @@ export function OnboardingSecurityCheckRecovery({
             disabled={isBusy}
           >
             <RefreshCw className='size-3.5' aria-hidden='true' />
-            Try Security Check Again
+            Try security check again
           </Button>
         </div>
       </div>

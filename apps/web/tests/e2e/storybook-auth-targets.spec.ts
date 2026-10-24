@@ -705,7 +705,7 @@ for (const width of [320, 390, 768, 1440]) {
             const before = await change.boundingBox();
             await page.clock.runFor(31_000);
             await expect(
-              page.getByRole('button', { name: 'Resend Verification Code' })
+              page.getByRole('button', { name: 'Resend verification code' })
             ).toBeEnabled();
             expect(await change.boundingBox()).toEqual(before);
           }

@@ -20,7 +20,7 @@ export function HandleStatusIcon({
 }: HandleStatusIconProps) {
   if (showChecking) {
     return (
-      <LoadingSpinner size='sm' tone='muted' label='Checking Availability' />
+      <LoadingSpinner size='sm' tone='muted' label='Checking availability' />
     );
   }
   if (!handle) return null;

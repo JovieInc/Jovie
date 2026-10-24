@@ -373,7 +373,7 @@ export function EmailCodeAuthForm({
           static
           onClick={handleRequestNewCode}
         >
-          Request A New Code
+          Request a new code
         </Button>
       </div>
     );
@@ -410,7 +410,7 @@ export function EmailCodeAuthForm({
           static
           disabled={isPending || code.length < 6}
         >
-          {isPending ? 'Verifying…' : 'Verify Code'}
+          {isPending ? 'Verifying…' : 'Verify code'}
         </Button>
         <div
           className={`grid grid-cols-2 items-stretch gap-3 ${align === 'left' ? 'text-left' : 'text-center'}`}
@@ -434,7 +434,7 @@ export function EmailCodeAuthForm({
               type='button'
               onClick={handleResendCode}
               disabled={isPending}
-              aria-label='Resend Verification Code'
+              aria-label='Resend verification code'
               className='auth-quiet-target focus-ring-themed rounded-md text-app text-secondary-token underline underline-offset-2 disabled:opacity-50'
             >
               Resend code

@@ -4,7 +4,7 @@ export function DesktopAuthHeading({ copy }: { readonly copy: string }) {
   return (
     <header className='flex flex-col items-center justify-start gap-2'>
       <h1 className='text-lg font-medium tracking-tight text-primary-token'>
-        Finish Signing In
+        Finish signing in
       </h1>
       <p className='min-h-10 max-w-80 text-sm leading-5 text-secondary-token'>
         {copy}
@@ -26,7 +26,7 @@ export function DesktopAuthCancelButton({
       data-auth-action='cancel'
       onClick={onCancel}
     >
-      Cancel Sign-in
+      Cancel sign-in
     </Button>
   );
 }

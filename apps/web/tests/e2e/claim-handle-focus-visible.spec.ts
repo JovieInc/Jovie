@@ -70,7 +70,7 @@ async function tabToHandleInput(
     const element = handle.asElement() as ElementHandle<HTMLElement> | null;
     if (!element) continue;
     const label = await element.evaluate(el => el.getAttribute('aria-label'));
-    if (label === 'Choose Your Handle') return element;
+    if (label === 'Choose your handle') return element;
   }
   return null;
 }

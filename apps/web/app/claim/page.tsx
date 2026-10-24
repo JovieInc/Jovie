@@ -34,30 +34,30 @@ interface StateCopy {
 
 const STATE_COPY: Record<ClaimPageState, StateCopy> = {
   already_claimed: {
-    title: 'Profile Already Claimed',
+    title: 'Profile already claimed',
     body: 'If it is yours, sign in to manage it. Otherwise, search again.',
-    action: { label: 'Sign In', href: APP_ROUTES.SIGNIN },
+    action: { label: 'Sign in', href: APP_ROUTES.SIGNIN },
   },
   verification_required: {
-    title: 'Verification Required',
+    title: 'Verification required',
     body: `Well-known artists are verified by our team before anyone can claim them. Email ${SUPPORT_EMAIL} from an address tied to the artist and we will confirm ownership first. You will not be charged until then.`,
     action: {
-      label: 'Email Support',
+      label: 'Email support',
       href: `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Artist profile verification')}`,
     },
   },
   already_subscribed: {
-    title: `${PRO_CLAIM.displayName} Is Active`,
+    title: `${PRO_CLAIM.displayName} is active`,
     body: 'Your subscription is active. Nothing more to pay.',
-    action: { label: 'Open Dashboard', href: APP_ROUTES.DASHBOARD },
+    action: { label: 'Open dashboard', href: APP_ROUTES.DASHBOARD },
   },
   checkout_canceled: {
-    title: 'Checkout Canceled',
+    title: 'Checkout canceled',
     body: 'You were not charged. Your profile is saved, so you can pick up where you left off.',
-    action: { label: 'Resume Checkout', href: CLAIM_CHECKOUT_HREF },
+    action: { label: 'Resume checkout', href: CLAIM_CHECKOUT_HREF },
   },
   unavailable: {
-    title: 'Artist Lookup Unavailable',
+    title: 'Artist lookup unavailable',
     body: 'Artist lookup is unavailable right now. Try again in a minute.',
     action: null,
   },
@@ -96,7 +96,7 @@ export default async function ClaimPage({
         <ContentSurfaceCard className='overflow-hidden'>
           <ContentSectionHeader
             headingLevel='h1'
-            title='Claim Your Artist Profile'
+            title='Claim your artist profile'
             subtitle={`${PRO_CLAIM.displayName} is ${PRICE_DISPLAY}. Cancel anytime.`}
           />
           <div className='px-5 py-5 sm:px-6'>

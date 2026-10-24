@@ -22,7 +22,8 @@ export const DesktopAuthTouchIdButton = forwardRef<
       disabled={state === 'working' || state === 'signed-in'}
       onClick={onClick}
     >
-      Sign In With Touch ID
+      {/* ui-casing-allow: Touch ID is the Apple feature name */}
+      Sign in with Touch ID
     </Button>
   );
 });

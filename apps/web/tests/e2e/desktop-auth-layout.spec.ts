@@ -129,13 +129,13 @@ for (const viewport of [
     const primary = page.locator('[data-auth-action="primary"]');
     const before = await primary.boundingBox();
     await primary.click();
-    await expect(primary).toHaveText('Open Browser Again');
+    await expect(primary).toHaveText('Open browser again');
     const after = await primary.boundingBox();
     expect(after?.y).toBe(before?.y);
     await expectReachable(page);
-    await page.getByRole('button', { name: 'Other Sign-in Options' }).click();
+    await page.getByRole('button', { name: 'Other sign-in options' }).click();
     await page
-      .getByRole('button', { name: 'Enter A Code', exact: true })
+      .getByRole('button', { name: 'Enter a code', exact: true })
       .click();
     await expect(page.getByRole('textbox')).toBeFocused();
     await expectReachable(page);
@@ -143,10 +143,10 @@ for (const viewport of [
       body: await page.screenshot({ path: testInfo.outputPath('code.png') }),
       contentType: 'image/png',
     });
-    await page.getByRole('button', { name: 'Back To Sign-in Options' }).click();
-    await page.getByRole('button', { name: 'Scan With Phone' }).click();
+    await page.getByRole('button', { name: 'Back to sign-in options' }).click();
+    await page.getByRole('button', { name: 'Scan with phone' }).click();
     await expect(
-      page.getByRole('img', { name: 'QR Code With Your Sign-in Link' })
+      page.getByRole('img', { name: 'QR code with your sign-in link' })
     ).toBeVisible();
     await expectReachable(page);
     await testInfo.attach('qr', {
@@ -199,7 +199,7 @@ test('preserves primary geometry through browser failure and makes long scaled c
   const primary = page.locator('[data-auth-action="primary"]');
   const before = await primary.boundingBox();
   await primary.click();
-  await expect(primary).toHaveText('Try Again');
+  await expect(primary).toHaveText('Try again');
   expect((await primary.boundingBox())?.y).toBe(before?.y);
   await expect(primary).toBeFocused();
   await expectReachable(page);

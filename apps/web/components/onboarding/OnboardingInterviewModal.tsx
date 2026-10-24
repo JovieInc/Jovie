@@ -201,7 +201,7 @@ export function OnboardingInterviewModal({
   return (
     <dialog
       ref={dialogRef}
-      aria-label='Quick Interview'
+      aria-label='Quick interview'
       className='jovie-auth-modal fixed inset-0 m-auto h-auto max-h-[calc(100svh-48px)] w-full max-w-120 overflow-auto rounded-lg border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-6 text-primary-token shadow-card-elevated backdrop:bg-(--linear-bg-page) backdrop:backdrop-blur-sm'
     >
       <div className='mb-4 flex min-h-7 items-center justify-between gap-4 text-2xs text-secondary-token'>
@@ -225,12 +225,12 @@ export function OnboardingInterviewModal({
           aria-disabled={submitting}
           className='text-2xs text-secondary-token underline-offset-4 transition-colors duration-subtle hover:text-primary-token hover:underline aria-disabled:opacity-50'
         >
-          {submitError ? 'Exit without sending' : 'End Interview'}
+          {submitError ? 'Exit without sending' : 'End interview'}
         </button>
       </div>
 
       <h2 className='mb-2 text-mid font-medium text-primary-token'>
-        Quick Question
+        Quick question
       </h2>
       <p className='mb-4 text-app leading-5 text-secondary-token'>
         Takes about 30 seconds. Your answers go straight to the founders.

@@ -26,10 +26,10 @@ export const PRESENCE_BUILD_TOOL_NAMES = {
 } as const satisfies Record<PresenceBuildStepId, string>;
 
 export const PRESENCE_BUILD_STEP_LABELS = {
-  research_artist: 'Research Artist',
-  check_link_drift: 'Check Bio Links',
-  surface_library_opportunities: 'Surface Work Opportunities',
-  assemble_profile: 'Assemble Profile',
-  generate_smart_link: 'Generate Smart Link',
-  draft_welcome_post: 'Draft Welcome Post',
+  research_artist: 'Research artist',
+  check_link_drift: 'Check bio links',
+  surface_library_opportunities: 'Surface work opportunities',
+  assemble_profile: 'Assemble profile',
+  generate_smart_link: 'Generate smart link',
+  draft_welcome_post: 'Draft welcome post',
 } as const satisfies Record<PresenceBuildStepId, string>;

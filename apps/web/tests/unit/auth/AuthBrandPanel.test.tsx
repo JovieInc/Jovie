@@ -20,7 +20,7 @@ describe('AuthBrandPanel', () => {
   it('renders a single static first product frame instead of a carousel', () => {
     render(<AuthBrandPanel />);
 
-    const preview = screen.getByRole('region', { name: 'Product Preview' });
+    const preview = screen.getByRole('region', { name: 'Product preview' });
 
     expect(preview).not.toHaveAttribute('aria-roledescription', 'carousel');
     expect(

@@ -26,9 +26,9 @@ describe('onboarding widget events', () => {
   });
 
   it('uses Title Case CTAs', () => {
-    expect(CONFIRM_HANDLE_CTA_LABEL).toBe('Confirm Handle');
-    expect(ATTACH_ACCOUNT_CTA_LABEL).toBe('Attach Account');
-    expect(NONE_OF_THESE_CTA_LABEL).toBe('None of These');
+    expect(CONFIRM_HANDLE_CTA_LABEL).toBe('Confirm handle');
+    expect(ATTACH_ACCOUNT_CTA_LABEL).toBe('Attach account');
+    expect(NONE_OF_THESE_CTA_LABEL).toBe('None of these');
   });
 
   it('parses handle_confirmed metadata', () => {

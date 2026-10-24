@@ -716,10 +716,10 @@ export function OnboardingHandleCheckCard({
             <span className='text-app text-tertiary-token' aria-hidden>
               @
             </span>
-            <span className='sr-only'>Edit Proposed Handle</span>
+            <span className='sr-only'>Edit proposed handle</span>
             <input
               id={fieldId}
-              aria-label='Edit Proposed Handle'
+              aria-label='Edit proposed handle'
               value={draftHandle}
               onChange={event => setDraftHandle(event.target.value)}
               className='min-w-0 flex-1 bg-transparent px-0.5 text-app leading-5 text-primary-token placeholder:text-quaternary-token focus:outline-none'
@@ -756,7 +756,7 @@ export function OnboardingHandleCheckCard({
                   : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
               )}
             >
-              {confirmed ? 'Handle Confirmed' : CONFIRM_HANDLE_CTA_LABEL}
+              {confirmed ? 'Handle confirmed' : CONFIRM_HANDLE_CTA_LABEL}
             </Button>
           ) : null}
         </div>
@@ -855,10 +855,10 @@ export function OnboardingSocialLinkCard({
               : 'Attach a public social account'}
           </p>
           <OnboardingToolField density='compact' htmlFor={fieldId}>
-            <span className='sr-only'>Social Profile URL</span>
+            <span className='sr-only'>Social profile URL</span>
             <input
               id={fieldId}
-              aria-label='Social Profile URL'
+              aria-label='Social profile URL'
               value={draftUrl}
               onChange={event => setDraftUrl(event.target.value)}
               className='min-w-0 flex-1 bg-transparent text-app leading-5 text-primary-token placeholder:text-quaternary-token focus:outline-none'
@@ -889,7 +889,7 @@ export function OnboardingSocialLinkCard({
                   : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
               )}
             >
-              {attached ? 'Account Attached' : ATTACH_ACCOUNT_CTA_LABEL}
+              {attached ? 'Account attached' : ATTACH_ACCOUNT_CTA_LABEL}
             </Button>
           ) : null}
         </div>

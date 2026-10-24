@@ -66,7 +66,7 @@ export function DesktopAuthMethodOptions({
           disabled={disabled}
           onClick={onToggle}
         >
-          Other Sign-in Options
+          Other sign-in options
         </Button>
         {cancelButton}
       </div>
@@ -76,7 +76,7 @@ export function DesktopAuthMethodOptions({
           className='flex w-full flex-col gap-1 rounded-xl border border-subtle bg-surface-0 p-1'
           data-testid='desktop-auth-options'
         >
-          <legend className='sr-only'>Other Sign-in Options</legend>
+          <legend className='sr-only'>Other sign-in options</legend>
           {selectedMethod === 'touch-id' ? (
             <Button
               ref={browserOptionRef}
@@ -88,7 +88,7 @@ export function DesktopAuthMethodOptions({
               disabled={disabled}
               onClick={onSelectBrowser}
             >
-              Continue In Browser
+              Continue in browser
             </Button>
           ) : showTouchId ? (
             <Button
@@ -101,7 +101,8 @@ export function DesktopAuthMethodOptions({
               disabled={disabled}
               onClick={onSelectTouchId}
             >
-              Sign In With Touch ID
+              {/* ui-casing-allow: Touch ID is the Apple feature name */}
+              Sign in with Touch ID
             </Button>
           ) : null}
           <Button
@@ -128,7 +129,7 @@ export function DesktopAuthMethodOptions({
                 disabled={disabled}
                 onClick={onSelectCode}
               >
-                Enter A Code
+                Enter a code
               </Button>
               <Button
                 ref={qrOptionRef}
@@ -140,7 +141,7 @@ export function DesktopAuthMethodOptions({
                 disabled={disabled}
                 onClick={onSelectQr}
               >
-                Scan With Phone
+                Scan with phone
               </Button>
             </>
           ) : null}

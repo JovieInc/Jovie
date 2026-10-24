@@ -16,7 +16,7 @@ for (const viewport of [
     );
     const input = page.getByRole('textbox', { name: 'Chat Message Input' });
     const retry = page.getByRole('button', {
-      name: 'Try Security Check Again',
+      name: 'Try security check again',
     });
     const state = page.getByLabel('Verification state (fixture)');
     const send = page.getByRole('button', {

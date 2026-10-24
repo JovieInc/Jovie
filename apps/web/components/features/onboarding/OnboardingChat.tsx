@@ -1243,7 +1243,7 @@ export function OnboardingChat({
   return (
     <section
       className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--app-shell-content-surface)'
-      aria-label='Jovie Onboarding Chat'
+      aria-label='Jovie onboarding chat'
       data-testid='onboarding-chat'
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >

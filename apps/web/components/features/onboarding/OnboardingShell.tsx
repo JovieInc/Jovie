@@ -266,7 +266,7 @@ export function OnboardingShell({
                       disabled={actionPending || controlsDisabled}
                       onClick={onRestart}
                     >
-                      Start Over
+                      Start over
                     </Button>
                   ) : null}
                   {isSignedIn && onLogout ? (
@@ -277,7 +277,7 @@ export function OnboardingShell({
                       disabled={actionPending || controlsDisabled}
                       onClick={onLogout}
                     >
-                      Log Out
+                      Log out
                     </Button>
                   ) : null}
                   {!isSignedIn ? (
@@ -383,7 +383,7 @@ export function OnboardingIdentityConflict({
               aria-controls={detailsId}
               onClick={() => setExpanded(value => !value)}
             >
-              Profile Conflict
+              Profile conflict
             </Button>
           </>
         ) : null}
@@ -406,7 +406,7 @@ export function OnboardingIdentityConflict({
               disabled={disabled}
               onClick={onLogout}
             >
-              Switch Account
+              Switch account
             </Button>
           ) : !isSignedIn ? (
             <JovieLink asChild variant='compact' touchTarget>

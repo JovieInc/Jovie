@@ -31,7 +31,7 @@ describe('OnboardingSecurityCheckRecovery', () => {
       expect(statusRegion).toHaveAttribute('aria-live', 'polite');
       expect(screen.queryByText('Message paused')).not.toBeInTheDocument();
       expect(
-        screen.getByRole('button', { name: 'Try Security Check Again' })
+        screen.getByRole('button', { name: 'Try security check again' })
       ).toBeEnabled();
     }
   );
@@ -48,7 +48,7 @@ describe('OnboardingSecurityCheckRecovery', () => {
     );
     await user.tab();
     const retry = screen.getByRole('button', {
-      name: 'Try Security Check Again',
+      name: 'Try security check again',
     });
     expect(retry).toHaveFocus();
     await user.keyboard('{Enter}');

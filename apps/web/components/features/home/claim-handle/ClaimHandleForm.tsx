@@ -189,7 +189,7 @@ export function ClaimHandleForm({
             autoCapitalize='none'
             autoCorrect='off'
             autoComplete='off'
-            aria-label='Choose Your Handle'
+            aria-label='Choose your handle'
             aria-invalid={unavailable ? 'true' : undefined}
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
             className={cn(

@@ -16,10 +16,10 @@ export function OnboardingToolFieldRawFocusFixture() {
       data-deliberate-red=''
       className={`mt-2 flex h-9 items-center rounded-lg border border-subtle bg-surface-0 px-2.5 ${RETIRED_ONBOARDING_TOOL_FIELD_RAW_FOCUS}`}
     >
-      <span className='sr-only'>Retired Raw Focus</span>
+      <span className='sr-only'>Retired raw focus</span>
       <input
         id='onboarding-tool-field-raw-focus'
-        aria-label='Retired Raw Focus'
+        aria-label='Retired raw focus'
         className='min-w-0 flex-1 bg-transparent text-app leading-5 text-primary-token focus:outline-none'
       />
     </label>

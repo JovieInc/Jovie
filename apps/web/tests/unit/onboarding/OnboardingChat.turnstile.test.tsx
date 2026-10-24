@@ -879,7 +879,7 @@ describe('OnboardingChat Turnstile gating', () => {
     });
     const sendCount = chatMocks.sendMessage.mock.calls.length;
     fireEvent.click(
-      screen.getByRole('button', { name: 'Try Security Check Again' })
+      screen.getByRole('button', { name: 'Try security check again' })
     );
     expect(onTurnstileRejected).toHaveBeenCalledTimes(2);
     expect(chatMocks.sendMessage).toHaveBeenCalledTimes(sendCount);
@@ -1000,7 +1000,7 @@ describe('OnboardingChat Turnstile gating', () => {
       'I am Test Artist'
     );
     fireEvent.click(
-      screen.getByRole('button', { name: 'Try Security Check Again' })
+      screen.getByRole('button', { name: 'Try security check again' })
     );
     expect(onTurnstileRejected).toHaveBeenCalledTimes(2);
     expect(onTurnstileRequired).not.toHaveBeenCalled();

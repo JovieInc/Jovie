@@ -83,9 +83,9 @@ describe('OnboardingToolField', () => {
     );
     expect(picker).not.toHaveClass('h-9');
 
-    rerender(<FieldExample density='compact' label='Edit Proposed Handle' />);
+    rerender(<FieldExample density='compact' label='Edit proposed handle' />);
     const compact = screen
-      .getByLabelText('Edit Proposed Handle')
+      .getByLabelText('Edit proposed handle')
       .closest('[data-slot="onboarding-tool-field"]');
 
     expect(compact).toHaveAttribute('data-density', 'compact');
@@ -97,9 +97,9 @@ describe('OnboardingToolField', () => {
 
   it('keeps keyboard focus on the inner input while the owner carries the ring', async () => {
     const user = userEvent.setup();
-    render(<FieldExample density='compact' label='Social Profile URL' />);
+    render(<FieldExample density='compact' label='Social profile URL' />);
 
-    const input = screen.getByLabelText('Social Profile URL');
+    const input = screen.getByLabelText('Social profile URL');
     await user.tab();
 
     expect(input).toHaveFocus();
@@ -137,13 +137,13 @@ describe('OnboardingToolField', () => {
 
   it('keeps disabled fields on the same owner without the raw recipe', () => {
     render(
-      <FieldExample density='compact' label='Edit Proposed Handle' disabled />
+      <FieldExample density='compact' label='Edit proposed handle' disabled />
     );
     const owner = screen
-      .getByLabelText('Edit Proposed Handle')
+      .getByLabelText('Edit proposed handle')
       .closest('[data-slot="onboarding-tool-field"]');
 
-    expect(screen.getByLabelText('Edit Proposed Handle')).toBeDisabled();
+    expect(screen.getByLabelText('Edit proposed handle')).toBeDisabled();
     expect(owner).toHaveClass('border-subtle', 'bg-surface-0');
     expect(owner?.className).not.toContain('rgba(255,255,255,0.035)');
   });
@@ -204,13 +204,13 @@ describe('OnboardingToolFieldRawFocusFixture', () => {
   it('fails when the retired raw recipe is restored onto the production owner', () => {
     render(
       <>
-        <FieldExample density='compact' label='Edit Proposed Handle' />
+        <FieldExample density='compact' label='Edit proposed handle' />
         <OnboardingToolFieldRawFocusFixture />
       </>
     );
 
     const production = screen
-      .getByLabelText('Edit Proposed Handle')
+      .getByLabelText('Edit proposed handle')
       .closest('[data-slot="onboarding-tool-field"]');
     const fixture = screen.getByTestId(
       ONBOARDING_TOOL_FIELD_RAW_FOCUS_FIXTURE_TEST_ID
