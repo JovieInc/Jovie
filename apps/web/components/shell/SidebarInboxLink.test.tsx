@@ -38,22 +38,23 @@ describe('central Inbox bell', () => {
     expect(link).toHaveFocus();
     expect(link).toHaveAttribute('data-inbox-attention', 'available');
   });
-  it('keeps available runtime updates visible even when server work is empty', () => {
+  it('keeps runtime updates out of an empty Inbox indicator', () => {
     runtimeUpdate.available = true;
     try {
       render(
         <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
       );
       const link = screen.getByRole('link', {
-        name: 'Inbox — All Caught Up; App Update Available',
+        name: 'Inbox — All Caught Up',
       });
-      expect(link.querySelector('[data-runtime-update]')).not.toBeNull();
+      expect(link.querySelector('[data-runtime-update]')).toBeNull();
+      expect(link.querySelector('span')).toBeNull();
     } finally {
       runtimeUpdate.available = false;
     }
   });
 
-  it('consolidates pending work and runtime updates into one attention indicator', () => {
+  it('keeps pending work attention independent of runtime updates', () => {
     runtimeUpdate.available = true;
     try {
       render(
@@ -62,9 +63,10 @@ describe('central Inbox bell', () => {
         />
       );
       const link = screen.getByRole('link', {
-        name: 'Inbox — 3 Items Need Attention; App Update Available',
+        name: 'Inbox — 3 Items Need Attention',
       });
-      expect(link.querySelectorAll('[data-runtime-update]')).toHaveLength(1);
+      expect(link.querySelectorAll('[data-runtime-update]')).toHaveLength(0);
+      expect(link).toHaveAttribute('data-inbox-attention', 'available');
     } finally {
       runtimeUpdate.available = false;
     }

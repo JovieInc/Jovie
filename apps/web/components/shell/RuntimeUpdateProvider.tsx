@@ -1,6 +1,12 @@
 'use client';
 
-import { createContext, type ReactNode, useContext, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useState,
+} from 'react';
 import { DesktopUpdateProvider } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
 import {
   useDesktopUpdate,
@@ -9,6 +15,7 @@ import {
 import { env } from '@/lib/env-client';
 import { useVersionMonitor } from '@/lib/hooks/useVersionMonitor';
 import { getVersionUpdateTitle } from './getVersionUpdateTitle';
+import { RuntimeUpdateToast } from './RuntimeUpdateToast';
 
 interface RuntimeUpdate {
   readonly available: boolean;
@@ -19,7 +26,7 @@ interface RuntimeUpdate {
 }
 const RuntimeUpdateContext = createContext<RuntimeUpdate | null>(null);
 
-/** Keep existing updater events alive across routes; Inbox owns their display. */
+/** Keep existing updater events alive across routes; the shared toast owns their display. */
 export function RuntimeUpdateProvider({
   children,
 }: {
@@ -27,6 +34,7 @@ export function RuntimeUpdateProvider({
 }) {
   const isDesktop = useIsElectronRuntime();
   const desktop = useDesktopUpdate();
+  const { install } = desktop;
   const web = useVersionMonitor({
     enabled: !isDesktop && !env.IS_TEST && !env.IS_E2E,
   });
@@ -49,23 +57,29 @@ export function RuntimeUpdateProvider({
       : isDesktop
         ? 'Install the available update when you are ready.'
         : `${getVersionUpdateTitle(web.mismatchInfo?.newVersion)}. Reload when ready.`;
-  const apply = () => {
+  const apply = useCallback(() => {
     if (!available || busy) return;
     setApplying(true);
     if (isDesktop) {
-      void desktop
-        .install()
+      void install()
         .then(started => {
           if (!started) setApplying(false);
         })
         .catch(() => setApplying(false));
     } else globalThis.location.reload();
-  };
+  }, [available, busy, isDesktop, install]);
   return (
     <RuntimeUpdateContext.Provider
       value={{ available, busy, title, description, apply }}
     >
       <DesktopUpdateProvider>{children}</DesktopUpdateProvider>
+      <RuntimeUpdateToast
+        available={available}
+        busy={busy}
+        title={title}
+        description={description}
+        apply={apply}
+      />
     </RuntimeUpdateContext.Provider>
   );
 }

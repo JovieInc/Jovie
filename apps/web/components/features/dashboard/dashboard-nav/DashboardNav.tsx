@@ -15,7 +15,6 @@ import {
   useSidebar,
 } from '@/components/organisms/sidebar';
 import { RailStagedContent } from '@/components/shell/RailStagedContent';
-import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import {
   readThreadReadState,
   type SidebarThread,
@@ -76,7 +75,6 @@ export function DashboardNav({
   headerOwnsInbox = false,
 }: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
-  const runtimeUpdate = useRuntimeUpdate();
   const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
   const sidebarNavigation = useMemo(
     () =>
@@ -85,11 +83,7 @@ export function DashboardNav({
       }),
     [profilesWorkspaceEnabled]
   );
-  const hasRuntimeUpdate = Boolean(runtimeUpdate?.available);
-  const homeAttentionLabel = inboxNavItem.name;
-  const homeAttentionName = hasRuntimeUpdate
-    ? `${homeAttentionLabel} — App Update Available`
-    : homeAttentionLabel;
+  const homeAttentionName = inboxNavItem.name;
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -526,11 +520,7 @@ export function DashboardNav({
                       pendingNavigation?.itemId === inboxNavItem.id || undefined
                     }
                     aria-label={homeAttentionName}
-                    data-inbox-attention={
-                      hasRuntimeUpdate
-                        ? 'available'
-                        : (inboxNavigation?.state ?? 'unknown')
-                    }
+                    data-inbox-attention={inboxNavigation?.state ?? 'unknown'}
                     data-navigation-item-id={inboxNavItem.id}
                     data-navigation-pending={
                       pendingNavigation?.itemId === inboxNavItem.id || undefined
@@ -554,12 +544,6 @@ export function DashboardNav({
                       >
                         {Math.min(inboxNavigation.pendingCount ?? 0, 99)}
                       </span>
-                    ) : hasRuntimeUpdate ? (
-                      <span
-                        aria-hidden='true'
-                        data-inbox-runtime-update
-                        className='absolute right-0 top-0 size-1.5 rounded-full bg-accent'
-                      />
                     ) : null}
                   </Link>
                 )}

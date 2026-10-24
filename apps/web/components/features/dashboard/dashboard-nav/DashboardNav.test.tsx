@@ -238,7 +238,7 @@ describe('DashboardNav route warming', () => {
     expect(link).not.toHaveAttribute('aria-busy');
   });
 
-  it('shows runtime update attention on the existing Inbox bell while preserving opportunity counts', () => {
+  it('keeps runtime updates separate while preserving opportunity counts', () => {
     runtimeUpdateState.available = true;
     const pending = renderDashboardNav({
       renderFn: render,
@@ -247,7 +247,7 @@ describe('DashboardNav route warming', () => {
       },
     });
     expect(
-      pending.getByRole('link', { name: 'Inbox — App Update Available' })
+      pending.container.querySelector('[data-navigation-item-id="inbox"]')
     ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(
       pending.getByRole('status', { name: '3 pending items' })
@@ -265,13 +265,12 @@ describe('DashboardNav route warming', () => {
         inboxNavigation: { state: 'empty', pendingCount: 0 },
       },
     });
-    const updateLink = updateOnly.getByRole('link', {
-      name: 'Inbox — App Update Available',
-    });
-    expect(updateLink).toHaveAttribute('data-inbox-attention', 'available');
-    expect(
-      updateLink.querySelector('[data-inbox-runtime-update]')
-    ).not.toBeNull();
+    const updateLink = updateOnly.container.querySelector(
+      '[data-navigation-item-id="inbox"]'
+    );
+    expect(updateLink).toHaveAccessibleName('Inbox');
+    expect(updateLink).toHaveAttribute('data-inbox-attention', 'empty');
+    expect(updateLink?.querySelector('[data-inbox-runtime-update]')).toBeNull();
     updateOnly.unmount();
 
     runtimeUpdateState.available = false;

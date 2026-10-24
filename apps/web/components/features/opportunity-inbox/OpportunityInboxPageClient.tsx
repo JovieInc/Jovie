@@ -17,7 +17,6 @@ import { NavigationDestinationReady } from '@/components/features/dashboard/Navi
 import { JovieWorkFeed } from '@/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed';
 import { ErrorBanner } from '@/components/features/feedback/ErrorBanner';
 import { PageShell } from '@/components/organisms/PageShell';
-import { useRuntimeUpdate } from '@/components/shell/RuntimeUpdateProvider';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   OPPORTUNITY_SIGNAL_TYPE_META,
@@ -34,7 +33,6 @@ import { useOpportunityInboxMutations } from '@/lib/queries/useOpportunityInboxM
 import { useTourDateReviewMutations } from '@/lib/queries/useTourDateReviewMutations';
 import { cn } from '@/lib/utils';
 import { getRovingFocusIndex } from '@/lib/utils/keyboard';
-import { InboxRuntimeNotification } from './InboxRuntimeNotification';
 import { OpportunityInboxEmptyState } from './OpportunityInboxEmptyState';
 import { OpportunityInboxFeed } from './OpportunityInboxFeed';
 import { OpportunityInboxTourDateRow } from './OpportunityInboxTourDateRow';
@@ -118,7 +116,6 @@ export function OpportunityInboxPageClient({
 }: OpportunityInboxPageClientProps) {
   const [inboxView, setInboxView] = useState(initialView);
   useEffect(() => setInboxView(initialView), [initialView]);
-  const runtimeUpdate = useRuntimeUpdate();
   const inboxPageRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
@@ -547,7 +544,6 @@ export function OpportunityInboxPageClient({
             )
           ) : null}
           <div hidden={inboxView !== 'needs'}>
-            <InboxRuntimeNotification />
             {pendingTourDates.length > 0 ? (
               <section
                 className='system-b-opportunity-inbox-feed'
@@ -641,9 +637,7 @@ export function OpportunityInboxPageClient({
               )
             ) : null}
 
-            {!hasReviewableItems &&
-            !runtimeUpdate?.available &&
-            !inboxReadUnavailable ? (
+            {!hasReviewableItems && !inboxReadUnavailable ? (
               <OpportunityInboxEmptyState
                 actionCards={inbox.emptyActionCards}
               />

@@ -49,6 +49,26 @@ describe('DashboardNav interactions', () => {
     }
   });
 
+  it.each([
+    ['empty', 0],
+    ['available', 3],
+  ] as const)(
+    'derives Inbox attention only from pending work (%s)',
+    (state, pendingCount) => {
+      const { container } = renderDashboardNav({
+        renderFn: render,
+        overrides: { inboxNavigation: { state, pendingCount } },
+      });
+      const inbox = container.querySelector(
+        '[data-navigation-item-id="inbox"]'
+      );
+      expect(inbox).toHaveAccessibleName('Inbox');
+      expect(inbox).toHaveAttribute('data-inbox-attention', state);
+      expect(container.querySelector('[data-inbox-runtime-update]')).toBeNull();
+      if (pendingCount > 0) expect(inbox).toHaveTextContent('3');
+    }
+  );
+
   it('keeps New Chat a compact create CTA with a larger utility-to-navigation gap', () => {
     const { container } = renderDashboardNav({
       renderFn: render,
