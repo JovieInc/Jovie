@@ -103,7 +103,7 @@ struct MenuMonitorMenu: View {
       if let status = presentation.statusOutput, !status.isEmpty {
         Divider()
         Text(status)
-          .font(.system(.caption, design: .monospaced))
+          .font(.system(size: 12, design: .monospaced))
           .lineLimit(12)
           .foregroundStyle(.secondary)
       }
