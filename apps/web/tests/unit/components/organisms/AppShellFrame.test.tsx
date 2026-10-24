@@ -102,7 +102,7 @@ describe('AppShellFrame', () => {
     expect(plane).toHaveClass('bg-(--app-shell-content-surface)');
   });
 
-  it('contains the right overlay inside the main route without allocating a column', () => {
+  it('allocates the right rail beside the main column using shared motion', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -125,15 +125,18 @@ describe('AppShellFrame', () => {
     expect(mainPlane).toHaveAttribute('data-app-shell-main-plane', 'true');
     expect(mainPlane).toContainElement(main);
     expect(mainPlane).toContainElement(rightRail);
-    expect(main).toContainElement(rightRail);
+    expect(main).not.toContainElement(rightRail);
     expect(main).toContainElement(routeContent as HTMLElement);
-    expect(rightRail.parentElement).toBe(routeContent);
+    expect(rightRail.parentElement).toBe(mainPlane);
+    expect(main.closest('[data-app-shell-main-column]')?.parentElement).toBe(
+      mainPlane
+    );
     expect(routeContent?.parentElement).toBe(main);
     expect(scrollPane).not.toContainElement(rightRail);
     expect(rightRail).toContainElement(
       screen.getByTestId('fixture-right-rail')
     );
-    expect(rightRail).toHaveClass('shell-inspector-overlay');
+    expect(rightRail).toHaveClass('shell-inspector-allocation');
     expect(mainPlane).toHaveClass(
       'transition-[flex-basis,width]',
       'duration-cinematic',
@@ -446,7 +449,7 @@ describe('AppShellFrame', () => {
     expect(tray).toHaveClass('shrink-0');
   });
 
-  it('keeps the inspector within main while the audio dock retains the same column', () => {
+  it('pushes the main and audio column together beside the inspector', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -461,14 +464,14 @@ describe('AppShellFrame', () => {
     const rail = screen.getByTestId('app-shell-right-rail');
     const tray = screen.getByTestId('app-shell-audio-tray');
 
-    expect(main).toContainElement(rail);
+    expect(main).not.toContainElement(rail);
     expect(rail).not.toContainElement(tray);
     expect(tray.parentElement).toHaveAttribute(
       'data-app-shell-main-column',
       'true'
     );
     expect(rail.parentElement).toHaveAttribute(
-      'data-app-shell-main-content',
+      'data-app-shell-main-plane',
       'true'
     );
   });

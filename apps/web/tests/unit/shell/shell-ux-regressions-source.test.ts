@@ -52,28 +52,50 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(previewHost).toContain('height: 100%');
     expect(previewHost).not.toContain('box-shadow');
     expect(previewHost).not.toContain('border:');
-    expect(rail).toContain('shell-inspector-overlay');
+    expect(rail).toContain('shell-inspector-allocation');
     const foundation = readFileSync(
       path.join(webRoot, 'styles/tailwind-foundation.css'),
       'utf8'
     );
-    const overlay = foundation.slice(
-      foundation.indexOf('@utility shell-inspector-overlay')
+    const allocation = foundation.slice(
+      foundation.indexOf('@utility shell-inspector-allocation')
     );
-    expect(overlay).toMatch(
+    expect(allocation).toMatch(
       /height: 0;[\s\S]*width: 0;[\s\S]*overflow: visible;/
     );
-    expect(overlay).toMatch(
+    expect(allocation).toMatch(
       new RegExp(
-        `@media \\(min-width: ${BREAKPOINTS.lg}px\\)[\\s\\S]*position: absolute;[\\s\\S]*inset-inline-end: 0;`
+        `@media \\(min-width: ${BREAKPOINTS.lg}px\\)[\\s\\S]*position: relative;[\\s\\S]*flex-shrink: 0;`
       )
     );
-    expect(overlay).toContain('width: fit-content;');
-    expect(overlay).toContain('&:has([data-rail-phase="closed"])');
-    expect(overlay).toMatch(
-      /&:has\(\[data-rail-phase="closed"\]\)[\s\S]*width: 0;[\s\S]*padding: 0;/
+    expect(allocation).toContain('width: fit-content;');
+    expect(allocation).not.toContain('position: absolute');
+    expect(allocation).toContain(
+      'padding-inline-start: calc(var(--app-shell-gap) + var(--space-1-5));'
     );
+    expect(allocation).toContain('&:not(');
+    expect(allocation).toContain(':has([data-rail-phase="closing"])');
+    expect(allocation).toMatch(/&:not\([\s\S]*width: 0;[\s\S]*padding: 0;/);
     expect(rail).not.toMatch(/lg:flex-col lg:self-start lg:overflow-hidden/);
+  });
+
+  it('releases the settings startup reservation when the shell allocates a rail (JOV-8944)', () => {
+    const css = readFileSync(
+      path.join(webRoot, 'styles/system-b-app.css'),
+      'utf8'
+    );
+    const reservation = css.slice(
+      css.indexOf('/* Reserve the automatic settings companion')
+    );
+    expect(reservation).toMatch(
+      /\[data-app-shell-main-plane\]:not\([\s\S]*:has\(\s*\[data-rail-phase="open"\],/
+    );
+    expect(reservation).toContain('[data-rail-phase="opening"]');
+    expect(reservation).toContain('[data-rail-phase="closing"]');
+    expect(reservation).toContain('[data-settings-companion-rail="true"]');
+    expect(reservation.replace(/\s+/g, ' ')).toContain(
+      '360px + 2 * var(--space-1-5) + var(--app-shell-gap)'
+    );
   });
 
   it('keeps the sidebar collapse toggle borderless (JOV-3959)', () => {

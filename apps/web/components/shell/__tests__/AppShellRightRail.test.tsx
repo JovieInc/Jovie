@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { AppShellRightRail } from '../AppShellRightRail';
 
 describe('AppShellRightRail', () => {
-  it('contains the inspector in an overlay without allocating a desktop column', () => {
+  it('allocates a desktop inspector column beside the main content', () => {
     render(
       <AppShellRightRail className='fixture-rail'>
         <div data-testid='fixture-panel'>Panel body</div>
@@ -12,7 +12,7 @@ describe('AppShellRightRail', () => {
     const rail = screen.getByTestId('app-shell-right-rail');
     expect(rail).toHaveAttribute('aria-label', 'Context Panel');
     expect(rail).toHaveClass(
-      'shell-inspector-overlay',
+      'shell-inspector-allocation',
       'pointer-events-none',
       'fixture-rail'
     );
@@ -29,7 +29,7 @@ describe('AppShellRightRail', () => {
       </AppShellRightRail>
     );
     expect(screen.getByTestId('app-shell-right-rail')).toHaveClass(
-      'shell-inspector-overlay',
+      'shell-inspector-allocation',
       'transition-shell-rail-allocation',
       'motion-reduce:transition-none'
     );

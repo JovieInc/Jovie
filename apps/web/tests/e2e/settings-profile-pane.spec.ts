@@ -74,10 +74,10 @@ async function readPaneGeometry(page: Page) {
     const column = box(elements.column[0]);
     const field = box(elements.field[0]);
     const rail = box(elements.rail[0]);
-    // The overlay's painted/hit-test allocation is independent of the route
+    // The shell's sibling rail allocation is independent of the route
     // pane marker. A narrowed empty marker cannot certify an overflowing form.
     const railMount = elements.rail[0].closest<HTMLElement>(
-      '.shell-inspector-overlay'
+      '.shell-inspector-allocation'
     );
     if (!railMount) return { counts, geometry: null };
     const occupiedRail = box(railMount);
@@ -100,8 +100,8 @@ async function readPaneGeometry(page: Page) {
           paneContainsColumn: elements.pane[0].contains(elements.column[0]),
           columnContainsField: elements.column[0].contains(elements.field[0]),
           sameShell:
-            railMount.closest('[data-app-shell-main-content="true"]') ===
-            elements.route[0].closest('[data-app-shell-main-content="true"]'),
+            railMount.closest('[data-app-shell-main-plane="true"]') ===
+            elements.route[0].closest('[data-app-shell-main-plane="true"]'),
           fieldHit:
             hit === elements.field[0] || elements.field[0].contains(hit),
         },

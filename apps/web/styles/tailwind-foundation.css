@@ -316,16 +316,16 @@
 
 /* Keep geometry in one utility. With two Tailwind compilation contexts, a
    later base .relative/.h-0 utility can otherwise override an earlier lg
-   variant. The inspector must never enter the route's flex allocation. */
-@utility shell-inspector-overlay {
+   variant. Desktop inspectors reserve canvas beside the main column. */
+@utility shell-inspector-allocation {
   position: relative;
+  min-width: 0;
   height: 0;
   width: 0;
   overflow: visible;
   @media (min-width: 1024px) {
-    position: absolute;
-    inset-block: 0;
-    inset-inline-end: 0;
+    position: relative;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -334,11 +334,13 @@
     min-height: 0;
     overflow: hidden;
     padding: var(--space-1-5);
+    padding-inline-start: calc(var(--app-shell-gap) + var(--space-1-5));
     border-radius: var(--app-shell-radius);
     /* A closed drawer is width 0, but fit-content still counts this padding,
-       so the rail's border box stays 12px and covers the main plane. Collapse
-       only after the phase settles closed; opening and closing keep the inset. */
-    &:has([data-rail-phase="closed"]):not(
+       so its border box still reserves the inset and inter-column gap. Collapse
+       when no drawer is active, including an unmounted panel; opening and
+       closing keep the inset. */
+    &:not(
         :has([data-rail-phase="open"]),
         :has([data-rail-phase="opening"]),
         :has([data-rail-phase="closing"])

@@ -392,7 +392,7 @@ export function RightDrawer({
     );
   }
 
-  // Desktop: the shared shell contains this inspector as an overlay.
+  // Desktop: the shared shell allocates this inspector beside the main column.
   return (
     <aside
       {...rest}
@@ -403,7 +403,7 @@ export function RightDrawer({
       inert={isOpen ? undefined : true}
       data-rail-phase={railPhase}
       className={cn(
-        // The shell owns overlay placement and bounds. The drawer owns its
+        // The shell owns column allocation and bounds. The drawer owns its
         // raised surface, interrupted reveal, focus and interaction lifecycle.
         'z-10 shrink-0 h-full min-h-0 flex flex-col rounded-(--app-shell-radius) border border-(--app-shell-frame-seam) bg-surface-1 shadow-(--app-shell-drawer-shadow)',
         'outline-none focus:outline-none focus-visible:ring-0',
