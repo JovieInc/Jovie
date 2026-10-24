@@ -6476,6 +6476,121 @@ jobs:
           allow-markdown: 'true'
           retention-days: 3
 
+  ci-blocking-golden-path:
+    name: Golden Path (blocking journey)
+    # Tim-approved golden-path audit: every web-affecting combined head owes
+    # browser proof in addition to the existing unit-only Golden Path Lock.
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
+    if: >-
+      !cancelled() &&
+      github.event_name == 'merge_group' &&
+      needs.ci-lockfile-preflight.result == 'success' &&
+      needs.ci-path-changes.result == 'success' &&
+      needs.ci-path-changes.outputs.run_web == 'true' &&
+      needs.ci-merge-group-workspace.result == 'success' &&
+      needs.ci-merge-group-admission.result == 'success' &&
+      needs.ci-merge-group-admission.outputs.admitted == 'true'
+    environment: Preview – jovie
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Start journey timing
+        run: echo "JOURNEY_ENTERED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          reuse_merge_group_workspace: 'true'
+      - uses: ./.github/actions/setup-playwright
+      - name: Create isolated journey branch
+        id: journey-db
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: blocking-journey-${{ github.run_id }}-${{ github.run_attempt }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          expires_in_hours: '1'
+      - name: Create empty journey database
+        env:
+          CONNECTION_FILE: ${{ steps.journey-db.outputs.connection_file }}
+        run: |
+          pnpm --filter @jovie/web exec tsx -e '
+            import { readFileSync, appendFileSync } from "node:fs";
+            import { Pool, neonConfig } from "@neondatabase/serverless";
+            import ws from "ws";
+            neonConfig.webSocketConstructor = ws;
+            const connection = JSON.parse(readFileSync(process.env.CONNECTION_FILE!, "utf8"));
+            const pool = new Pool({ connectionString: connection.db_url, max: 1 });
+            (async () => {
+              try {
+                await pool.query("CREATE DATABASE jovie_gp_blocking_ci");
+                const url = new URL(connection.db_url);
+                url.pathname = "/jovie_gp_blocking_ci";
+                console.log("::add-mask::" + url.href);
+                appendFileSync(process.env.GITHUB_ENV!, "DATABASE_URL=" + url.href + "\n");
+              } finally { await pool.end(); }
+            })().catch(() => { console.error("Isolated journey database setup failed"); process.exitCode = 1; });'
+      - name: Migrate isolated journey database
+        run: pnpm --filter @jovie/web run drizzle:migrate:ci
+        env:
+          NODE_ENV: test
+      - name: Run blocking golden-path journey
+        env:
+          CI: 'true'
+          E2E_TEST_MODE: '1'
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          MUSICFETCH_API_TOKEN: ${{ secrets.MUSICFETCH_API_TOKEN }}
+        run: >-
+          node .github/scripts/guard-playwright-artifacts.mjs --run --
+          pnpm --filter @jovie/web exec playwright test
+          --config=playwright.config.journey.ts --project=chromium
+      - name: Delete isolated journey branch
+        if: ${{ always() && steps.journey-db.outputs.branch_id != '' }}
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          BRANCH_ID: ${{ steps.journey-db.outputs.branch_id }}
+        run: >-
+          curl --fail --silent --show-error --output /dev/null -X DELETE
+          -H "Authorization: Bearer $NEON_API_KEY"
+          "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches/$BRANCH_ID"
+
+      - name: Record journey stage timing
+        if: ${{ always() }}
+        env:
+          JOURNEY_RESULT: ${{ job.status }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const receipt = {
+            schema: 'jovie-stage-event/v1',
+            entityType: 'blocking-journey',
+            entityId: `${process.env.GITHUB_REPOSITORY}#${process.env.GITHUB_RUN_ID}/${process.env.GITHUB_RUN_ATTEMPT}`,
+            stage: 'run',
+            enteredAt: process.env.JOURNEY_ENTERED_AT,
+            exitedAt: new Date().toISOString(),
+            actor: 'ci-blocking-golden-path',
+            outcome: process.env.JOURNEY_RESULT === 'success' ? 'completed' : 'failed',
+            sourceReceipt: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+          };
+          if (!Number.isFinite(Date.parse(receipt.enteredAt))) throw new Error('Missing journey start timestamp');
+          const finished = { ...receipt, stage: 'finished', enteredAt: receipt.exitedAt };
+          writeFileSync(`${process.env.RUNNER_TEMP}/blocking-journey-stage-events.ndjson`, [receipt, finished].map(row => JSON.stringify(row)).join('\n') + '\n');
+          NODE
+      - name: Upload journey stage timing
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: blocking-journey-stage-events
+          path: ${{ runner.temp }}/blocking-journey-stage-events.ndjson
+          if-no-files-found: error
+          retention-days: 30
+
   ci-golden-path:
     name: Golden Path (manual)
     environment: Preview – jovie
@@ -7580,6 +7695,7 @@ jobs:
         ci-golden-eval-set,
         ci-secret-scan,
         ci-golden-path-lock,
+        ci-blocking-golden-path,
         ci-visual-snapshot-compare,
         drizzle-migration-guard,
         neon-db,
@@ -7618,6 +7734,7 @@ jobs:
           PROMPTFOO_RESULT="${{ needs.ci-promptfoo-evals.result }}"
           GOLDEN_EVAL_RESULT="${{ needs.ci-golden-eval-set.result }}"
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
+          GOLDEN_PATH_JOURNEY_RESULT="${{ needs.ci-blocking-golden-path.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
           RUN_MARKETING_DOM="${{ needs.ci-path-changes.outputs.run_marketing_dom }}"
@@ -7672,6 +7789,7 @@ jobs:
             echo "| Promptfoo Evals (path-selected) | $PROMPTFOO_RESULT |"
             echo "| Golden Eval Set (path-selected) | $GOLDEN_EVAL_RESULT |"
             echo "| Secret Scan | $SECRET_RESULT |"
+            echo "| Golden Path (blocking journey) | $GOLDEN_PATH_JOURNEY_RESULT |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT |"
             echo "| Visual Snapshot Compare | $VISUAL_COMPARE_RESULT |"
             echo "| Migration Guard | $MIGRATION_RESULT |"
@@ -7708,6 +7826,19 @@ jobs:
               exit 1
             fi
           done
+
+          if [[ "$RUN_WEB" != true && "$RUN_WEB" != false ]]; then
+            echo "::error::Golden Path journey requires an explicit web selection."
+            exit 1
+          fi
+          if [[ "$RUN_WEB" == true && "$GOLDEN_PATH_JOURNEY_RESULT" != success ]]; then
+            echo "::error::Golden Path journey did not pass for the web-affecting combined head ($GOLDEN_PATH_JOURNEY_RESULT)."
+            exit 1
+          fi
+          if [[ "$RUN_WEB" != true && "$GOLDEN_PATH_JOURNEY_RESULT" != skipped ]]; then
+            echo "::error::Golden Path journey ran without web selection ($GOLDEN_PATH_JOURNEY_RESULT)."
+            exit 1
+          fi
 
           if [[ "$LANE_RECEIPT_RESULT" != success ]]; then
             echo "::error::Final product-lane receipt did not pass ($LANE_RECEIPT_RESULT)."

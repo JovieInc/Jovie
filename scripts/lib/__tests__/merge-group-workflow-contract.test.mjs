@@ -41,6 +41,7 @@ import {
   LIVE_MAIN_FETCH_REF,
   resolveMergeGroupPathDiff,
 } from '../resolve-merge-group-path-diff.mjs';
+import { validateStageEvent } from '../stage-events.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const CI_WORKFLOW = readFileSync(
@@ -4798,5 +4799,163 @@ describe('merge-queue green enroll scan window and failure hold', () => {
     expect(script).toContain('resource not accessible by integration');
     expect(script).toContain('not in queue');
     expect(script).toContain('dequeueOutcome');
+  });
+});
+
+describe('blocking golden-path browser journey', () => {
+  it('runs on every admitted web-affecting combined head using an empty isolated database', () => {
+    const job = load(CI_WORKFLOW).jobs['ci-blocking-golden-path'];
+    expect(job.needs).toEqual(
+      expect.arrayContaining([
+        'ci-lockfile-preflight',
+        'ci-path-changes',
+        'ci-merge-group-admission',
+        'ci-merge-group-workspace',
+      ])
+    );
+    expect(job.if).toContain("github.event_name == 'merge_group'");
+    expect(job.if).toContain("needs.ci-path-changes.outputs.run_web == 'true'");
+    expect(job.if).toContain(
+      "needs.ci-merge-group-admission.outputs.admitted == 'true'"
+    );
+    expect(job.if).not.toContain('workflow_dispatch');
+    expect(job['continue-on-error']).toBeUndefined();
+    const command = job.steps.find(
+      s => s.name === 'Run blocking golden-path journey'
+    );
+    expect(command.run).toContain(
+      '--config=playwright.config.journey.ts --project=chromium'
+    );
+    expect(command.run).toContain('guard-playwright-artifacts.mjs');
+    expect(command['continue-on-error']).toBeUndefined();
+    expect(Object.keys(command.env).some(k => k.includes('STRIPE'))).toBe(
+      false
+    );
+    const database = job.steps.find(
+      s => s.name === 'Create empty journey database'
+    );
+    expect(database.run).toContain('CREATE DATABASE jovie_gp_blocking_ci');
+    expect(database.run).toContain('process.env.CONNECTION_FILE');
+    expect(database.run).toContain('::add-mask::');
+    expect(
+      job.steps.find(s => s.name === 'Migrate isolated journey database').run
+    ).toBe('pnpm --filter @jovie/web run drizzle:migrate:ci');
+    const config = readFileSync(
+      resolve(REPO_ROOT, 'apps/web/playwright.config.journey.ts'),
+      'utf8'
+    );
+    expect(config).toContain('retries: 0');
+    expect(config).toContain('workers: 1');
+    expect(config).not.toContain('E2E_USE_TEST_AUTH_BYPASS');
+    const spec = readFileSync(
+      resolve(REPO_ROOT, 'apps/web/tests/e2e/blocking-journey.spec.ts'),
+      'utf8'
+    );
+    expect(spec).not.toMatch(/test\.(skip|fixme|only)\s*\(/);
+  });
+
+  it('fails PR Ready for failure, cancellation, skipped or missing journey results on web heads', () => {
+    const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
+    expect(load(CI_WORKFLOW).jobs['ci-merge-group-ready'].needs).toContain(
+      'ci-blocking-golden-path'
+    );
+    const script = getStepRunScript(aggregate, 'Evaluate combined-head checks');
+    const start = script.indexOf(
+      'if [[ "$RUN_WEB" != true && "$RUN_WEB" != false ]]'
+    );
+    const end = script.indexOf('if [[ "$LANE_RECEIPT_RESULT"', start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(start).toBeLessThan(script.indexOf('RUN_WEB=false'));
+    const gate = script.slice(start, end);
+    for (const result of ['success', 'failure', 'cancelled', 'skipped', '']) {
+      for (const web of ['true', 'false', '', 'unknown']) {
+        const run = spawnSync('bash', ['-euc', gate], {
+          env: {
+            ...process.env,
+            RUN_WEB: web,
+            GOLDEN_PATH_JOURNEY_RESULT: result,
+          },
+          encoding: 'utf8',
+        });
+        const passes =
+          web === 'true'
+            ? result === 'success'
+            : web === 'false' && result === 'skipped';
+        expect(run.status, `${web}:${result}`).toBe(passes ? 0 : 1);
+      }
+    }
+  });
+  it('records red and green job timings for the existing stage collector without browser data', () => {
+    const job = load(CI_WORKFLOW).jobs['ci-blocking-golden-path'];
+    const step = job.steps.find(s => s.name === 'Record journey stage timing');
+    const source = step.run.match(/<<'NODE'\n([\s\S]+)\nNODE/)[1];
+    const directory = mkdtempSync(join(tmpdir(), 'journey-stage-'));
+    const file = join(directory, 'blocking-journey-stage-events.ndjson');
+    try {
+      for (const result of ['success', 'failure', 'cancelled']) {
+        const run = spawnSync(
+          process.execPath,
+          ['--input-type=module', '-e', source],
+          {
+            env: {
+              ...process.env,
+              RUNNER_TEMP: directory,
+              JOURNEY_RESULT: result,
+              JOURNEY_ENTERED_AT: '2026-10-23T00:00:00.000Z',
+              GITHUB_SERVER_URL: 'https://github.com',
+              GITHUB_REPOSITORY: 'JovieInc/Jovie',
+              GITHUB_RUN_ID: '1',
+              GITHUB_RUN_ATTEMPT: '2',
+            },
+            encoding: 'utf8',
+          }
+        );
+        expect(run.status, run.stderr).toBe(0);
+        const events = readFileSync(file, 'utf8')
+          .trim()
+          .split('\n')
+          .map(row => JSON.parse(row));
+        expect(events).toHaveLength(2);
+        const event = events[0];
+        expect(events[1].stage).toBe('finished');
+        expect(event).toMatchObject({
+          schema: 'jovie-stage-event/v1',
+          entityType: 'blocking-journey',
+          entityId: 'JovieInc/Jovie#1/2',
+          stage: 'run',
+          outcome: result === 'success' ? 'completed' : 'failed',
+        });
+        expect(Date.parse(event.exitedAt)).toBeGreaterThan(
+          Date.parse(event.enteredAt)
+        );
+        expect(run.stdout).toBe('');
+        const registry = JSON.parse(
+          readFileSync(
+            resolve(REPO_ROOT, 'docs/metrics/stage-manifest.json'),
+            'utf8'
+          )
+        );
+        for (const row of events)
+          expect(validateStageEvent(row, registry)).toEqual([]);
+      }
+      const manifest = JSON.parse(
+        readFileSync(
+          resolve(REPO_ROOT, 'docs/metrics/stage-manifest.json'),
+          'utf8'
+        )
+      );
+      expect(manifest.sources['blocking-journey-events'].artifact).toBe(
+        'blocking-journey-stage-events/blocking-journey-stage-events.ndjson'
+      );
+      expect(manifest.entities['blocking-journey'].stages[0].source).toBe(
+        'blocking-journey-events'
+      );
+      expect(
+        job.steps.find(s => s.name === 'Upload journey stage timing').with.name
+      ).toBe('blocking-journey-stage-events');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
