@@ -37,4 +37,23 @@ describe('AppShellSkeleton', () => {
     ).toBeTruthy();
     expect(container.querySelector('main')).toBeTruthy();
   });
+
+  it('announces the first-boot load as a text-legible status (JOV-8791)', () => {
+    // The skeleton is all shapes; without a status line its text content is
+    // empty, so screen readers and text-based probes see a blank page for the
+    // entire first-boot load.
+    const { container } = render(<AppShellSkeleton />);
+
+    const status = container.querySelector('[role="status"]');
+    expect(status).toBeTruthy();
+    expect(status?.textContent).toContain('Loading your workspace');
+  });
+
+  it('announces the load even with custom main/sidebar overrides (JOV-8791)', () => {
+    const { container } = render(<AppShellSkeleton sidebar={null} />);
+
+    const status = container.querySelector('[role="status"]');
+    expect(status).toBeTruthy();
+    expect(status?.textContent).toContain('Loading your workspace');
+  });
 });

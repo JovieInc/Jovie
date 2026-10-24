@@ -278,7 +278,9 @@ test('desktop window enters the authenticated chat shell instead of the web root
     /await shell\.openExternal\(parsed\.toString\(\)\);/
   );
   assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_X = 20;/);
-  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 17;/);
+  // JOV-8974: 17px native + one app-shell gap (8px) — the lights ride the
+  // titlebar band down below the window's top gutter.
+  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 25;/);
   assert.match(
     mainSource,
     /const MACOS_TRAFFIC_LIGHT_POSITION = \{\s*x: MACOS_TRAFFIC_LIGHT_X,\s*y: MACOS_TRAFFIC_LIGHT_Y,\s*\} as const;/
@@ -1793,7 +1795,17 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     /--electron-traffic-light-safe-width:\s*\d+px;/
   );
   assert.match(globalsCss, /--electron-traffic-light-x: 20px;/);
-  assert.match(globalsCss, /--electron-traffic-light-y: 17px;/);
+  assert.match(globalsCss, /--electron-traffic-light-y: 25px;/);
+  // JOV-8974: the shell keeps one gutter on every edge. The body's top
+  // padding and the titlebar band's top offset both use the shell gap.
+  assert.match(
+    globalsCss,
+    /\[data-app-shell-body="true"\]\[data-electron-top-gap-owner="titlebar"\] \{[^}]*padding-top:\s*var\(--app-shell-gap\);/s
+  );
+  assert.match(
+    globalsCss,
+    /\[data-electron-titlebar="true"\] \{[^}]*top:\s*var\(--app-shell-gap\);/s
+  );
   assert.match(
     globalsCss,
     /--electron-sidebar-width: var\(--app-shell-sidebar-width\);/
@@ -1891,6 +1903,13 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
     titlebarHeight >= y + controlDiameter,
     `titlebar height (${titlebarHeight}px) must contain y=${y}px + traffic-light height`
   );
+
+  // JOV-8974: the CSS mirror of the native light position must track
+  // MACOS_TRAFFIC_LIGHT_Y — the band and the lights sit one shell gap down.
+  const cssLightY = Number(
+    globalsCss.match(/--electron-traffic-light-y:\s*(\d+)px;/)?.[1]
+  );
+  assert.equal(cssLightY, y);
 
   // Main-content clearance comes from the header-inset path: the shared top
   // row reserves the fixed control-row width so chrome never overlaps the
@@ -2240,4 +2259,99 @@ test('auth handoff uses compact outer bounds and stays inside the active work ar
     /screen\.getDisplayMatching\(mainWindow\.getBounds\(\)\)/
   );
   assert.doesNotMatch(mainSource, /const AUTH_HANDOFF_WINDOW_BOUNDS/);
+});
+
+test('View Toggle Sidebar sends one command through the real preload and unsubscribes', async t => {
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const menuSource = source.slice(
+    source.indexOf('function buildViewMenu()'),
+    source.indexOf('function buildApplicationMenu()')
+  );
+  const listeners = new Map();
+  let api;
+  runInNewContext(await readBundledPreload(t), {
+    exports: {},
+    process: { platform: 'darwin', versions: { electron: '44' } },
+    document: { documentElement: { dataset: {} } },
+    require(id) {
+      assert.equal(id, 'electron');
+      return {
+        contextBridge: {
+          exposeInMainWorld(name, value) {
+            if (name === 'electronAPI') api = value;
+          },
+        },
+        ipcRenderer: {
+          on: (channel, listener) => listeners.set(channel, listener),
+          removeListener: (channel, listener) => {
+            assert.equal(listeners.get(channel), listener);
+            listeners.delete(channel);
+          },
+        },
+      };
+    },
+  });
+  let toggles = 0;
+  const unsubscribe = api.onToggleSidebar(() => toggles++);
+  let destroyed = false;
+  const context = {
+    ENABLE_DEVTOOLS: false,
+    mainWindow: {
+      isDestroyed: () => destroyed,
+      webContents: { send: channel => listeners.get(channel)?.() },
+    },
+  };
+  const compiled = ts.transpileModule(menuSource, {}).outputText;
+  const menu = runInNewContext(`${compiled}\nbuildViewMenu()`, context);
+  const toggle = menu.find(item => item.label === 'Toggle Sidebar');
+  assert.equal(toggle.accelerator, 'CommandOrControl+B');
+  toggle.click();
+  assert.equal(toggles, 1);
+  destroyed = true;
+  toggle.click();
+  assert.equal(toggles, 1);
+  context.mainWindow = null;
+  toggle.click();
+  assert.equal(toggles, 1);
+  unsubscribe();
+  assert.equal(listeners.size, 0);
+});
+
+test('Cmd+B reaches the renderer policy without consuming editor input or other menu accelerators', async () => {
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  assert.match(source, /mainWindow = win;\s+configureSidebarShortcut\(win\);/);
+  const policySource = source.slice(
+    source.indexOf('function configureSidebarShortcut('),
+    source.indexOf('function buildViewMenu()')
+  );
+  let beforeInput;
+  const ignored = [];
+  const win = {
+    webContents: {
+      on: (event, listener) => {
+        assert.equal(event, 'before-input-event');
+        beforeInput = listener;
+      },
+      setIgnoreMenuShortcuts: value => ignored.push(value),
+    },
+  };
+  const compiled = ts.transpileModule(policySource, {}).outputText;
+  runInNewContext(`${compiled}\nconfigureSidebarShortcut(win)`, { win });
+  const input = {
+    key: 'b',
+    meta: true,
+    control: false,
+    alt: false,
+    shift: false,
+  };
+  const event = {
+    preventDefault: () => assert.fail('must preserve editor key input'),
+  };
+  beforeInput(event, input);
+  beforeInput(event, { ...input, meta: false, control: true, key: 'B' });
+  beforeInput(event, { ...input, key: 'c' });
+  beforeInput(event, { ...input, shift: true });
+  beforeInput(event, { ...input, alt: true });
+  beforeInput(event, { ...input, meta: false });
+  assert.deepEqual(ignored, [true, true, false, false, false, false]);
 });

@@ -843,6 +843,7 @@ def dossier(pr: dict, classified: dict, record: dict | None = None) -> str:
     if linked.get("identifier") or pr.get("issue"):
         lines.append(f"Linked issue: {linked.get('identifier') or pr.get('issue')}")
     lines.append("Do not reset attempt history. Push to this branch. Do not open a new PR.")
+    lines.append("Never rebase, squash, reset or force-push this branch; merge origin/main and fast-forward push only.")
     return "\n".join(lines)
 
 
