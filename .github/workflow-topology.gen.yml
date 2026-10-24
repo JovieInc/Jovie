@@ -703,7 +703,6 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - push
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:sweep

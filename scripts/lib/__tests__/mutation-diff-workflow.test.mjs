@@ -25,6 +25,12 @@ describe('Mutation Diff spare-compute contract', () => {
     expect(workflow).not.toMatch(/pull_request/u);
   });
 
+  it('is event-driven: no cron, self-chains through workflow_dispatch only', () => {
+    expect(workflow).not.toMatch(/^\s*schedule:/mu);
+    expect(workflow).toMatch(/gh workflow run mutation-diff\.yml --ref main/u);
+    expect(workflow).toContain('actions: write');
+  });
+
   it('sweeps trusted main only and serializes on one group', () => {
     const sweep = workflow.slice(workflow.indexOf('\n  sweep:'));
     expect(sweep).toContain("github.ref == 'refs/heads/main'");
