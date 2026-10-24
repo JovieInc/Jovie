@@ -61,7 +61,7 @@ describe('UpdateAvailablePill', () => {
     expect(pill).toBeEnabled();
     expect(pill).toHaveAttribute('aria-busy', 'false');
     expect(pill).toHaveTextContent('Restart');
-    expect(pill).toHaveClass('w-24', 'rounded-full');
+    expect(pill).toHaveClass('min-w-24', 'rounded-full');
     expect(pill.className).toContain('focus-visible:ring-focus/30');
 
     fireEvent.click(pill);
