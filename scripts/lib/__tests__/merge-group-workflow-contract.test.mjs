@@ -4809,9 +4809,17 @@ describe('merge-queue green enroll scan window and failure hold', () => {
   });
 });
 
+/**
+ * @param {string} text
+ * @returns {Record<string, any>}
+ */
+function workflowJobs(text) {
+  return /** @type {{ jobs: Record<string, any> }} */ (load(text)).jobs;
+}
+
 describe('blocking golden-path browser journey', () => {
   it('runs on every admitted web-affecting combined head using an empty isolated database', () => {
-    const job = load(CI_WORKFLOW).jobs['ci-blocking-golden-path'];
+    const job = workflowJobs(CI_WORKFLOW)['ci-blocking-golden-path'];
     expect(job.needs).toEqual(
       expect.arrayContaining([
         'ci-lockfile-preflight',
@@ -4863,7 +4871,7 @@ describe('blocking golden-path browser journey', () => {
 
   it('fails PR Ready for failure, cancellation, skipped or missing journey results on web heads', () => {
     const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
-    expect(load(CI_WORKFLOW).jobs['ci-merge-group-ready'].needs).toContain(
+    expect(workflowJobs(CI_WORKFLOW)['ci-merge-group-ready'].needs).toContain(
       'ci-blocking-golden-path'
     );
     const script = getStepRunScript(aggregate, 'Evaluate combined-head checks');
@@ -4894,7 +4902,7 @@ describe('blocking golden-path browser journey', () => {
     }
   });
   it('records red and green job timings for the existing stage collector without browser data', () => {
-    const job = load(CI_WORKFLOW).jobs['ci-blocking-golden-path'];
+    const job = workflowJobs(CI_WORKFLOW)['ci-blocking-golden-path'];
     const step = job.steps.find(s => s.name === 'Record journey stage timing');
     const source = step.run.match(/<<'NODE'\n([\s\S]+)\nNODE/)[1];
     const directory = mkdtempSync(join(tmpdir(), 'journey-stage-'));
