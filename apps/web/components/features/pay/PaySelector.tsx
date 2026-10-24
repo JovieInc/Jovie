@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { ChevronDown, PencilLine } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
@@ -256,25 +255,23 @@ export function PaySelector({
             }
           />
 
-          <Button
+          <button
             type='button'
-            variant='ghost'
             onClick={handleCustomToggle}
-            className='inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-4 text-app font-medium tracking-[-0.015em] text-secondary-token transition-[border-color,background-color,color] duration-subtle hover:border-white/16 hover:bg-white/[0.05] hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+            className='relative inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-4 text-app font-medium tracking-[-0.015em] text-secondary-token transition-[border-color,background-color,color] duration-subtle hover:border-white/16 hover:bg-white/[0.05] hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
             aria-pressed={customMode}
             aria-controls='pay-selector-heading'
           >
             <span>Custom Amount</span>
             <PencilLine className='h-3.5 w-3.5' />
-          </Button>
+          </button>
 
           {showOtherPaymentOptions && paymentLabel ? (
             <div className='space-y-3.5'>
-              <Button
+              <button
                 type='button'
-                variant='ghost'
                 onClick={() => setShowOtherOptions(open => !open)}
-                className='flex h-auto w-full items-center gap-3.5 text-app font-medium tracking-[-0.015em] text-tertiary-token transition-colors duration-subtle hover:bg-transparent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                className='relative flex h-auto min-h-7 w-full rounded-full items-center gap-3.5 text-app font-medium tracking-[-0.015em] text-tertiary-token transition-colors duration-subtle hover:bg-transparent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 aria-expanded={showOtherOptions}
               >
                 <span className='h-px flex-1 bg-white/8' />
@@ -286,7 +283,7 @@ export function PaySelector({
                   )}
                 />
                 <span className='h-px flex-1 bg-white/8' />
-              </Button>
+              </button>
 
               <div
                 className={cn(
@@ -297,12 +294,11 @@ export function PaySelector({
                 )}
               >
                 {showOtherOptions ? (
-                  <Button
+                  <button
                     type='button'
-                    variant='ghost'
                     onClick={handleContinue}
                     disabled={isLoading || !canContinue}
-                    className='flex h-12 w-full items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.02] px-5 text-sm font-medium tracking-[-0.015em] text-white dark:text-white transition-[border-color,background-color,opacity] duration-subtle hover:border-white/16 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50'
+                    className='relative flex h-12 w-full items-center justify-center gap-3 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page border border-white/10 bg-white/[0.02] px-5 text-sm font-medium tracking-[-0.015em] text-white dark:text-white transition-[border-color,background-color,opacity] duration-subtle hover:border-white/16 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50'
                     aria-label={`Continue with ${paymentLabel} for ${formatAmountForScreenReader(selectedAmount)}`}
                   >
                     {paymentLabel === 'Venmo' ? (
@@ -314,7 +310,7 @@ export function PaySelector({
                       />
                     ) : null}
                     <span>{`Continue with ${paymentLabel}`}</span>
-                  </Button>
+                  </button>
                 ) : null}
               </div>
             </div>
@@ -363,12 +359,11 @@ export function PaySelector({
         ))}
       </fieldset>
 
-      <Button
+      <button
+        type='button'
         onClick={handleContinue}
-        className='mt-4 flex w-full items-center justify-center gap-2.5 rounded-full border border-white/8 text-mid font-semibold tracking-[-0.015em] text-btn-primary-foreground shadow-none transition-[opacity,border-color] duration-subtle hover:border-white/14'
-        size='lg'
+        className='relative mt-4 flex min-h-7 w-full items-center justify-center gap-2.5 rounded-full border border-white/8 text-mid font-semibold tracking-[-0.015em] bg-btn-primary text-btn-primary-foreground shadow-none hover:bg-btn-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page disabled:pointer-events-none disabled:opacity-50 transition-[opacity,border-color] duration-subtle hover:border-white/14'
         disabled={isLoading || !canContinue || !isMethodAvailable}
-        variant='primary'
         aria-label={continueLabel}
       >
         {resolvedMethod?.id === 'venmo' ? (
@@ -380,7 +375,7 @@ export function PaySelector({
           />
         ) : null}
         {continueLabel}
-      </Button>
+      </button>
     </div>
   );
 }
