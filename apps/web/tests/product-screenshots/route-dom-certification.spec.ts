@@ -199,6 +199,86 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     ).toEqual([]);
   });
 
+  test('accepts a compact label grouped with the hero heading', async ({
+    page,
+  }) => {
+    for (const tag of ['p', 'span', 'div']) {
+      await page.setContent(
+        `<main><section><div><${tag} style="display:inline-block;padding:8px;border:1px solid;font-size:14px;line-height:20px">Engineering</${tag}><h1 style="font-size:40px">What we shipped</h1></div></section></main>`
+      );
+      const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+      expect(
+        snapshot.findings.filter(finding => finding.kind === 'stray-before-h1')
+      ).toEqual([]);
+    }
+  });
+
+  test('rejects detached text even when a heading has a compact label', async ({
+    page,
+  }) => {
+    for (const stray of [
+      'Find yourself',
+      '<p>Find yourself</p>',
+      '<div><span>Find yourself</span></div>',
+      '<div aria-hidden="true">Find yourself</div>',
+    ]) {
+      await page.setContent(
+        `<main><section>${stray}<div><p style="font-size:14px">Engineering</p><h1>What we shipped</h1></div></section></main>`
+      );
+      await expectDeliberateRed(page, 'marketing', 'stray-before-h1');
+    }
+  });
+
+  test('rejects raw, nested or oversized content beside h1', async ({
+    page,
+  }) => {
+    for (const stray of [
+      'Find yourself',
+      '<div><span>Find yourself</span></div>',
+      '<p style="font-size:40px">Find yourself</p>',
+      '<p>Find<br>yourself</p>',
+    ]) {
+      await page.setContent(
+        `<main><section><div>${stray}<h1 style="font-size:40px">What we shipped</h1></div></section></main>`
+      );
+      await expectDeliberateRed(page, 'marketing', 'stray-before-h1');
+    }
+  });
+
+  test('excludes clipped screen-reader text from visual text findings', async ({
+    page,
+  }) => {
+    await page.setContent(`
+      <style>
+        .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+        .sr-only:focus { position:static; width:auto; height:auto; clip:auto; }
+      </style>
+      <main>
+        <a class="sr-only" href="#form">Skip to form</a>
+        <section><h1>Link analytics</h1></section>
+        <h2 class="sr-only">Profile Highlights From Tim White</h2>
+      </main>
+    `);
+    const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+    expect(
+      snapshot.findings.filter(finding =>
+        ['stray-before-h1', 'orphaned-line', 'clipped-heading'].includes(
+          finding.kind
+        )
+      )
+    ).toEqual([]);
+    const skipLink = page.getByRole('link', { name: 'Skip to form' });
+    await expect(skipLink).toHaveCount(1);
+    await expect(
+      page.getByRole('heading', { name: 'Profile Highlights From Tim White' })
+    ).toHaveCount(1);
+    await skipLink.focus();
+    const focused = await inspectRouteDom(page, { surface: 'marketing' });
+    expect(
+      focused.findings.filter(finding => finding.kind === 'stray-before-h1')
+    ).toHaveLength(1);
+  });
+
   // JOV-7710 / AM-017: one semantic level reads as one material.
   const plane = (inner: string) =>
     `<main id="main-content" style="width:1000px;height:600px;background:rgb(16,17,20)">${inner}</main>`;
