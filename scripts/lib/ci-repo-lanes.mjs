@@ -212,8 +212,8 @@ export const GUARDRAIL_INPUT_FILES = Object.freeze([
   '.claude/rules/ui.md',
 ]);
 
-/** Markdown trees read wholesale (skill catalog/governance guards). */
-export const GUARDRAIL_INPUT_DOC_PREFIXES = Object.freeze([
+/** Directory trees read wholesale (skill catalog/governance guards). */
+export const GUARDRAIL_INPUT_DIR_PREFIXES = Object.freeze([
   '.agents/skills/',
   '.claude/skills/',
   'docs/agent-context/',
@@ -224,9 +224,10 @@ export function isGuardrailInput(file) {
   const normalized = normalizeFile(file);
   if (!normalized) return false;
   if (GUARDRAIL_INPUT_FILES.includes(normalized)) return true;
-  return (
-    DOC_FILE.test(normalized) &&
-    GUARDRAIL_INPUT_DOC_PREFIXES.some(prefix => normalized.startsWith(prefix))
+  // Any file type under these trees: the skill/governance guards walk whole
+  // directories, so yaml/json/lock files there are inputs too.
+  return GUARDRAIL_INPUT_DIR_PREFIXES.some(prefix =>
+    normalized.startsWith(prefix)
   );
 }
 

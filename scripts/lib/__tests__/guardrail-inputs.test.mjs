@@ -9,7 +9,7 @@ import {
   CI_LANES,
   classifyChangedFile,
   classifyCiRepoLanes,
-  GUARDRAIL_INPUT_DOC_PREFIXES,
+  GUARDRAIL_INPUT_DIR_PREFIXES,
   GUARDRAIL_INPUT_FILES,
   isGuardrailInput,
 } from '../ci-repo-lanes.mjs';
@@ -63,6 +63,22 @@ describe('guardrail input selection', () => {
     }
   });
 
+  it('runs guardrails for non-markdown files under the input trees', () => {
+    for (const file of [
+      '.claude/skills/foo/config.json',
+      '.agents/skills/foo/lock.yaml',
+      'docs/agent-context/data.json',
+    ]) {
+      const plan = planFor([file]);
+      // Non-doc files fail closed onto the product lane (full) or, if a
+      // future rule routes them elsewhere, still select inputs mode.
+      expect(['full', 'inputs'], file).toContain(
+        guardrailsMode({ lanes: plan })
+      );
+      expect(plan.runGuardrailInputs, file).toBe(true);
+    }
+  });
+
   it('still skips guardrails for unrelated docs', () => {
     const plan = planFor(['docs/foo.md']);
     expect(plan.runGuardrailInputs).toBe(false);
@@ -98,19 +114,24 @@ describe('guardrail input selection', () => {
       expect(classifyChangedFile(file)).not.toContain(CI_LANES.JOVIE_PRODUCT);
     }
     expect(isGuardrailInput('./CLAUDE.md')).toBe(true);
-    expect(isGuardrailInput('.claude/skills/x/notes.png')).toBe(false);
+    expect(isGuardrailInput('.claude/skills/x/notes.png')).toBe(true);
+    expect(isGuardrailInput('docs/foo.md')).toBe(false);
   });
 
   it('exposes every listed input as an existing file', () => {
     for (const file of GUARDRAIL_INPUT_FILES) {
       expect(existsSync(join(REPO_ROOT, file)), file).toBe(true);
     }
-    expect(GUARDRAIL_INPUT_DOC_PREFIXES.length).toBeGreaterThan(0);
+    expect(GUARDRAIL_INPUT_DIR_PREFIXES.length).toBeGreaterThan(0);
   });
 });
 
-describe('guardrail input list stays complete', () => {
-  it('lists every non-product repo file a guardrail test or guard reads', () => {
+// LIMITATION: this is a static scan of string-literal paths only. It does not
+// follow paths built at runtime (join(root, dir, name), loops over variables)
+// or files read by helpers imported from other modules. Coverage is "all
+// literal inputs of the scanned sources", not "complete".
+describe('guardrail input list covers literal inputs', () => {
+  it('lists every literal non-product repo file a guardrail test or guard reads', () => {
     const sources = [...GUARDRAIL_OPERATIONS_TESTS, ...EXTRA_SCANNED_SOURCES];
     const missing = [];
     for (const source of sources) {
@@ -131,7 +152,7 @@ describe('guardrail input list stays complete', () => {
     }
     expect(
       [...new Set(missing)],
-      'add these to GUARDRAIL_INPUT_FILES / GUARDRAIL_INPUT_DOC_PREFIXES in scripts/lib/ci-repo-lanes.mjs, or to FIXTURE_ONLY_LITERALS with a reason'
+      'add these to GUARDRAIL_INPUT_FILES / GUARDRAIL_INPUT_DIR_PREFIXES in scripts/lib/ci-repo-lanes.mjs, or to FIXTURE_ONLY_LITERALS with a reason'
     ).toEqual([]);
   });
 });
