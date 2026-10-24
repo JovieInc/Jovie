@@ -23,7 +23,7 @@ its richer loading/focus and library-tab contract. Do not create a second
 Preserve entity data, URLs, mutations, menus, artwork, field semantics and route
 selection. Allowed delta in this PR: release and profile-edit rail composition,
 flat section surfaces and one child-owned scrolling region with pinned tabs.
-No flags, dependencies, token changes, gate changes or baseline changes.
+No flags, dependencies, token changes or weaker gates. The conservative spacing floor tightens from 590 to 588 to lock in the two removed off-grid instances; its family/utility counts and DESIGN projection follow the same decrease.
 
 Relevant locks/contracts:
 
@@ -194,11 +194,11 @@ Remaining product items are tracked in [JOV-8920](https://linear.app/jovie/issue
 
 - Pre-fix command: `pnpm --filter @jovie/web exec vitest run components/molecules/drawer/EntityTabbedRail.test.tsx tests/components/organisms/release-sidebar/ReleaseSidebar-links.interaction.test.tsx --reporter=dot`. Result: 24 passed, 2 failed. The new action was absent and release details still reported shell-owned scrolling.
 - Post-fix six-file focused run: 61 passed; the read-only profile summary test exceeded its unchanged 5000ms deadline under severe host memory pressure. Its unchanged file then passed all 5 tests with `pnpm --filter @jovie/web exec vitest run tests/unit/dashboard/ProfileContactSidebar.scroll.test.tsx --config=vitest.config.mts --maxWorkers=1 --reporter=verbose`. Release action parity, profile optimistic saves/recovery, and shared-shell behavior assertions are retained.
-- Biome check/format passed across `apps/web`; touched-file checks pass. Ten existing warnings remain outside this change; no baseline or rule was edited.
+- Biome check/format passed across `apps/web`; touched-file checks pass. Ten existing warnings remain outside this change; the spacing-count baseline only tightens; no rule was edited.
 - ESLint: all 13 touched code/test/story files passed with `--no-ignore --max-warnings=0`, including the Storybook helper. Its client directive is now explicit.
 - `git diff --check` and `python3 scripts/repository_docs.py` passed.
 - Final exact CI coverage planner/runner on rebased source `7ac67863f`, base `2314f5e84`: 101 files passed, 1 existing skipped; **959 tests passed**, 7 existing skipped. Changed-line check: **155/155, 100%**, against the unchanged 60% floor. Scoped source coverage: 74.60% lines, 63.61% branches, 71.96% functions (includes unchanged helper branches). An initial repeat hit the unchanged Library keyboard test's 5000ms deadline; that test passed in isolation at the same deadline, then this full selector passed unchanged.
-- Full web typecheck passed after the loading-dismissal change. Story typecheck passed after rebase with the same 4 existing baselined errors and no new errors; no baseline changed.
+- Full web typecheck passed after the loading-dismissal change. Story typecheck passed after rebase with the same 4 existing baselined errors and no new errors; no typecheck baseline changed.
 - Rendered source comparison at 3440×1440: release width stays 344px and profile width stays 360px; no horizontal page overflow. Release outer body changes from `overflow-y:auto` to child-owned scrolling; the same fixture detail scroller gains height from 610px to 1126px. Identity/tab controls stay outside it.
 - Keyboard Tab/Enter selected Links and Music. Explicitly opened candidate rails present visible `role=dialog`, `aria-modal=true` sheets at 390×844. Desktop-only default-open behavior is not a mobile-open action.
 - Strict component gate passed: `pnpm component-ship-gate --diff-base=origin/main --require-rendered --storybook-url=http://127.0.0.1:6019`. Matching tests/stories, source-blind certification and live rendered evaluation pass. All 7 canonical stories pass at 1280×900 and 390×844, with zoom/overflow, keyboard and WCAG checks on actual rail DOM. Story fixtures use `AppShellRightRail` in a viewport-height frame and an explicit profile open action; the evaluator and all thresholds are unchanged. The separate live-Storybook certification stage is not selected by existing policy; it is not claimed here.
@@ -221,3 +221,9 @@ P4.1 includes a specific existing gap: legacy scroll/wrap `DrawerTabs` exposes
 button tabs that support Tab/Enter but do not implement Arrow/Home/End navigation.
 `InspectorTabs` has its own roving-keyboard contract. This PR preserves those
 behaviors; full keyboard convergence remains in the tracked follow-up.
+
+### Required CI ratchet correction
+
+The first hosted Source Validation run (40060664435) passed 220 disk-read tests and failed the unchanged spacing ratchet: measured 588 versus floor 590. The same local test reproduced 1 failed / 7 passed before metadata repair. This PR lowers only the conservative count to 588, web-shell to 242, web-other to 289, and the two affected utility totals; it preserves the detector, armed state and strict tier. DESIGN's count projection and its single section hash are synchronized. This strengthens the [existing shrink-only contract](../../apps/web/tests/unit/design-system/spacing-scale-ratchet.test.ts).
+
+After repair, `spacing-scale-ratchet.test.ts` plus `enforcement-documentation.test.ts` pass all 18 tests; `node --test scripts/agent-context/check.test.mjs` passes all 26 tests, including section preservation. The product/helper executable source is unchanged by this metadata correction.
