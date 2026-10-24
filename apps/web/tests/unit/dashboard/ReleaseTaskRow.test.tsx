@@ -185,7 +185,10 @@ describe('ReleaseTaskRowPrimitives text contrast contract (JOV-8873)', () => {
       ? process.cwd()
       : resolve(process.cwd(), 'apps/web');
     const source = readFileSync(
-      resolve(webRoot, 'components/features/dashboard/release-tasks/ReleaseTaskRowPrimitives.tsx'),
+      resolve(
+        webRoot,
+        'components/features/dashboard/release-tasks/ReleaseTaskRowPrimitives.tsx'
+      ),
       'utf8'
     );
     expect(source).toContain("'text-tertiary-token line-through'");

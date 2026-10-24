@@ -30,7 +30,9 @@ describe('DrawerSettingsToggle', () => {
         testId='toggle'
       />
     );
-    expect(screen.getByRole('switch', { name: 'Show on profile' })).toBeDisabled();
+    expect(
+      screen.getByRole('switch', { name: 'Show on profile' })
+    ).toBeDisabled();
     expect(screen.getByTestId('toggle')).toHaveClass('opacity-60');
   });
 });

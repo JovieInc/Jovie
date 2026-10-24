@@ -1243,10 +1243,17 @@ describe('OpportunityInboxPageClient a11y contract (JOV-8873)', () => {
       ? process.cwd()
       : resolve(process.cwd(), 'apps/web');
     const source = readFileSync(
-      resolve(webRoot, 'components/features/opportunity-inbox/OpportunityInboxPageClient.tsx'),
+      resolve(
+        webRoot,
+        'components/features/opportunity-inbox/OpportunityInboxPageClient.tsx'
+      ),
       'utf8'
     );
-    expect(source).toContain("<ul className='system-b-opportunity-inbox-feed-list'>");
-    expect(source).not.toContain("<div className='system-b-opportunity-inbox-feed-list'>");
+    expect(source).toContain(
+      "<ul className='system-b-opportunity-inbox-feed-list'>"
+    );
+    expect(source).not.toContain(
+      "<div className='system-b-opportunity-inbox-feed-list'>"
+    );
   });
 });

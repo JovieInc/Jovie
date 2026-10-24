@@ -187,9 +187,14 @@ describe('OpportunityInboxSocialReplyCard text contrast contract (JOV-8873)', ()
       ? process.cwd()
       : resolve(process.cwd(), 'apps/web');
     const source = readFileSync(
-      resolve(webRoot, 'components/features/opportunity-inbox/OpportunityInboxSocialReplyCard.tsx'),
+      resolve(
+        webRoot,
+        'components/features/opportunity-inbox/OpportunityInboxSocialReplyCard.tsx'
+      ),
       'utf8'
     );
-    expect(source).toContain('inline-flex min-h-6 items-center text-secondary-token text-2xs underline');
+    expect(source).toContain(
+      'inline-flex min-h-6 items-center text-secondary-token text-2xs underline'
+    );
   });
 });

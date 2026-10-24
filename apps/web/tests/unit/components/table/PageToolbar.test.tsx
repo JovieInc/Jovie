@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import { Search } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import * as pageToolbarClasses from '@/components/molecules/page-toolbar-classes';
 import {
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
   PAGE_TOOLBAR_BACK_LINK_CLASS,
@@ -17,7 +18,6 @@ import {
   PageToolbarTabButton,
   TABLE_TOOLBAR_SHELL_CLASS,
 } from '@/components/organisms/table/molecules/PageToolbar';
-import * as pageToolbarClasses from '@/components/molecules/page-toolbar-classes';
 import { findPageToolbarPrimaryCtaViolations } from '../../app/app-ia-static-guard';
 
 type MockButtonProps = ComponentProps<'button'> & {

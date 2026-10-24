@@ -16,9 +16,8 @@ const row = { id: 'member-1' } as unknown as AudienceMember;
 describe('AudienceCreatedAtCell', () => {
   it('keeps the row actions exposed to assistive tech and lets clicks reach the row', () => {
     const rowClick = vi.fn();
-    render(
-      // biome-ignore lint/a11y/useKeyWithClickEvents: test harness row
-      <div onClick={rowClick}>
+    const { container } = render(
+      <div>
         <AudienceCreatedAtCell
           row={row}
           lastSeenAt='2026-01-01T00:00:00Z'
@@ -27,6 +26,7 @@ describe('AudienceCreatedAtCell', () => {
         />
       </div>
     );
+    container.addEventListener('click', rowClick);
     const trigger = screen.getByRole('button', { name: 'Row actions' });
     expect(trigger.parentElement).not.toHaveAttribute('aria-hidden');
     fireEvent.click(trigger);

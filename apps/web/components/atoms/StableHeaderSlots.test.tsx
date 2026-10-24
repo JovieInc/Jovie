@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { StableHeaderChipRail, StableHeaderTextSlot } from './StableHeaderSlots';
+import {
+  StableHeaderChipRail,
+  StableHeaderTextSlot,
+} from './StableHeaderSlots';
 
 describe('StableHeaderTextSlot', () => {
   it('renders nothing without content unless space is reserved', () => {

@@ -380,7 +380,10 @@ describe('TourDateSidebar a11y contract (JOV-8873)', () => {
       ? process.cwd()
       : resolve(process.cwd(), 'apps/web');
     const source = readFileSync(
-      resolve(webRoot, 'components/features/dashboard/organisms/tour-dates/TourDateSidebar.tsx'),
+      resolve(
+        webRoot,
+        'components/features/dashboard/organisms/tour-dates/TourDateSidebar.tsx'
+      ),
       'utf8'
     );
     expect(source).toContain("aria-label='Delete Tour Date'");

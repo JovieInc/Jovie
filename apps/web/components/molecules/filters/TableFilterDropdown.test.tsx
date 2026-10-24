@@ -63,7 +63,11 @@ vi.mock('@jovie/ui', async () => {
       children: ReactNode;
       disabled?: boolean;
     }) => (
-      <div role='menuitem' aria-disabled={disabled ? 'true' : undefined}>
+      <div
+        role='menuitem'
+        tabIndex={-1}
+        aria-disabled={disabled ? 'true' : undefined}
+      >
         {children}
       </div>
     ),

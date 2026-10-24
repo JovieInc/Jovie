@@ -137,7 +137,10 @@ describe('TimActionRequiredSection text contrast contract (JOV-8873)', () => {
       ? process.cwd()
       : resolve(process.cwd(), 'apps/web');
     const source = readFileSync(
-      resolve(webRoot, 'components/features/admin/TimActionRequiredSection.tsx'),
+      resolve(
+        webRoot,
+        'components/features/admin/TimActionRequiredSection.tsx'
+      ),
       'utf8'
     );
     expect(source).toContain('tabular-nums text-error-text');

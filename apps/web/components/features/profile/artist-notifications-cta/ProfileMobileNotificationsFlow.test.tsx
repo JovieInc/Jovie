@@ -121,7 +121,10 @@ describe('ProfileMobileNotificationsFlow text contrast contract (JOV-8873)', () 
       ? process.cwd()
       : resolve(process.cwd(), 'apps/web');
     const source = readFileSync(
-      resolve(webRoot, 'components/features/profile/artist-notifications-cta/ProfileMobileNotificationsFlow.tsx'),
+      resolve(
+        webRoot,
+        'components/features/profile/artist-notifications-cta/ProfileMobileNotificationsFlow.tsx'
+      ),
       'utf8'
     );
     expect(source).toContain('tracking-tight text-white/50');

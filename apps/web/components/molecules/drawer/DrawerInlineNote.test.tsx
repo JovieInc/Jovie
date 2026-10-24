@@ -35,7 +35,9 @@ describe('DrawerInlineNote inset (JOV-8873)', () => {
     expect(inner).toHaveClass('min-h-22', 'px-3');
     expect(screen.getByTestId('note')).not.toHaveClass('min-h-22');
 
-    rerender(<DrawerInlineNote message='Flush note' inset='flush' testId='note' />);
+    rerender(
+      <DrawerInlineNote message='Flush note' inset='flush' testId='note' />
+    );
     expect(screen.getByText('Flush note').parentElement).toHaveClass(
       'min-h-12',
       'px-0'

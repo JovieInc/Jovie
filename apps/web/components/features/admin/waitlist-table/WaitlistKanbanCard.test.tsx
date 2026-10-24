@@ -31,10 +31,9 @@ describe('WaitlistKanbanCard', () => {
   it('renders contact and social links with the AA accent text token', () => {
     render(<WaitlistKanbanCard entry={entry} />);
     expect(screen.getByRole('heading', { name: 'Ari Lane' })).toBeVisible();
-    expect(screen.getByRole('link', { name: /ari@example.com/ })).toHaveAttribute(
-      'href',
-      'mailto:ari@example.com'
-    );
+    expect(
+      screen.getByRole('link', { name: /ari@example.com/ })
+    ).toHaveAttribute('href', 'mailto:ari@example.com');
     expect(screen.getByRole('link', { name: 'instagram.com/ari' })).toHaveClass(
       'text-(--color-accent-purple-text)'
     );

@@ -302,6 +302,9 @@ describe('SlashCommandMenu combobox wiring (JOV-8873)', () => {
     const listId = combobox.getAttribute('aria-controls');
     expect(listId).toBeTruthy();
     expect(document.getElementById(listId as string)).not.toBeNull();
-    expect(combobox).toHaveAttribute('aria-activedescendant', `${listId}-row-0`);
+    expect(combobox).toHaveAttribute(
+      'aria-activedescendant',
+      `${listId}-row-0`
+    );
   });
 });

@@ -282,7 +282,10 @@ describe('AdminUsersTableUnified text contrast contract (JOV-8873)', () => {
       ? process.cwd()
       : resolve(process.cwd(), 'apps/web');
     const source = readFileSync(
-      resolve(webRoot, 'components/features/admin/admin-users-table/AdminUsersTableUnified.tsx'),
+      resolve(
+        webRoot,
+        'components/features/admin/admin-users-table/AdminUsersTableUnified.tsx'
+      ),
       'utf8'
     );
     expect(source).toContain('text-(--color-accent-purple-text)');

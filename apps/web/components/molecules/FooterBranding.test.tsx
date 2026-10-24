@@ -5,7 +5,9 @@ import { FooterBranding } from './FooterBranding';
 describe('FooterBranding', () => {
   it('names the text mark from its visible copy plus a Home hint', () => {
     render(<FooterBranding mark='text' showCTA={false} />);
-    const link = screen.getByRole('link', { name: /^Powered by\s*Jovie\s*Home$/ });
+    const link = screen.getByRole('link', {
+      name: /^Powered by\s*Jovie\s*Home$/,
+    });
     expect(link).not.toHaveAttribute('aria-label');
     expect(screen.getByText('Home')).toHaveClass('sr-only');
   });

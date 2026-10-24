@@ -19,7 +19,10 @@ describe('ErrorDialog', () => {
     );
     const primary = screen.getByTestId('error-dialog-primary-action');
     expect(primary).toHaveTextContent('Retry');
-    expect(primary).toHaveClass('bg-btn-primary', 'text-btn-primary-foreground');
+    expect(primary).toHaveClass(
+      'bg-btn-primary',
+      'text-btn-primary-foreground'
+    );
     fireEvent.click(primary);
     expect(onPrimaryAction).toHaveBeenCalledOnce();
   });

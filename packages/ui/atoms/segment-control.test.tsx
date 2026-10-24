@@ -809,8 +809,8 @@ describe('SegmentControl linear-pill active fill (JOV-8873)', () => {
         variant='linear-pill'
       />
     );
-    expect(screen.getByRole('tab', { name: 'Links', selected: true })).toHaveClass(
-      'data-[state=active]:bg-transparent'
-    );
+    expect(
+      screen.getByRole('tab', { name: 'Links', selected: true })
+    ).toHaveClass('data-[state=active]:bg-transparent');
   });
 });

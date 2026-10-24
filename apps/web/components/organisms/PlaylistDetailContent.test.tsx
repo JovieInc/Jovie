@@ -131,7 +131,9 @@ describe('PlaylistDetailContent contrast (JOV-8873)', () => {
       />
     );
     expect(screen.getByText(/Curated by/)).toHaveClass('text-white/60');
-    expect(screen.getByRole('link', { name: 'Jovie' })).toHaveClass('underline');
+    expect(screen.getByRole('link', { name: 'Jovie' })).toHaveClass(
+      'underline'
+    );
     expect(
       screen.getByRole('link', { name: 'Discover More Playlists' })
     ).toHaveClass('text-white/60');

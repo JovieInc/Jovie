@@ -239,7 +239,9 @@ describe('OpportunityInboxFeed list semantics (JOV-8873)', () => {
         onFeedback={vi.fn()}
       />
     );
-    const list = container.querySelector('.system-b-opportunity-inbox-feed-list');
+    const list = container.querySelector(
+      '.system-b-opportunity-inbox-feed-list'
+    );
     expect(list?.tagName).toBe('UL');
     expect(list?.querySelectorAll(':scope > li').length).toBeGreaterThan(0);
   });

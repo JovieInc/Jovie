@@ -22,10 +22,15 @@ describe('DataCard', () => {
     ['success', 'text-success-text'],
     ['warning', 'text-warning-text'],
     ['error', 'text-error-text'],
-  ] as const)('renders the %s badge with the AA text token', (variant, token) => {
-    render(<DataCard title='Release' badge='Status' badgeVariant={variant} />);
-    expect(screen.getByText('Status')).toHaveClass(token);
-  });
+  ] as const)(
+    'renders the %s badge with the AA text token',
+    (variant, token) => {
+      render(
+        <DataCard title='Release' badge='Status' badgeVariant={variant} />
+      );
+      expect(screen.getByText('Status')).toHaveClass(token);
+    }
+  );
 
   it('omits a blank badge', () => {
     render(<DataCard title='Release' badge='  ' />);

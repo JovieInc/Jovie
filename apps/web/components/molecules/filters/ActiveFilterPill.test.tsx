@@ -22,7 +22,9 @@ describe('ActiveFilterPill', () => {
     expect(screen.getByText('2 selected')).toHaveClass(
       'text-(--color-accent-purple-text)'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Clear Status filter' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Clear Status filter' })
+    );
     expect(onClear).toHaveBeenCalledOnce();
   });
 });
