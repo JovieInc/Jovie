@@ -142,7 +142,9 @@ vi.mock('@/components/atoms/AppIconButton', () => ({
   ),
 }));
 
-vi.mock('@/components/molecules/drawer', () => ({
+vi.mock('@/components/molecules/drawer', async () => ({
+  EntityTabbedRail: (await import('@/tests/test-utils/entity-tabbed-rail'))
+    .MockEntityTabbedRail,
   EntitySidebarShell: ({
     children,
     'data-testid': testId,
@@ -410,7 +412,7 @@ function renderEditingSidebar() {
 }
 
 function openAboutTab() {
-  fireEvent.click(screen.getByRole('button', { name: 'About' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'About' }));
 }
 
 function linkTitles() {

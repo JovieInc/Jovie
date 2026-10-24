@@ -8,6 +8,9 @@ import { EntitySidebarShell } from './EntitySidebarShell';
 
 export interface EntityTabbedRailProps<T extends string> {
   readonly isOpen: boolean;
+  readonly id?: string;
+  readonly width?: number;
+  readonly onKeyDown?: (event: KeyboardEvent) => void;
   readonly ariaLabel: string;
   readonly activeTab: T;
   readonly onTabChange: (value: T) => void;
@@ -22,6 +25,8 @@ export interface EntityTabbedRailProps<T extends string> {
   readonly emptyMessage?: string;
   readonly sectionKind?: 'facts' | 'links' | 'status' | 'details';
   readonly controls?: ReactNode;
+  readonly tabActions?: ReactNode;
+  readonly tabActionsClassName?: string;
   readonly children: ReactNode;
   readonly contentClassName?: string;
   readonly tabsContainerClassName?: string;
@@ -45,6 +50,9 @@ export interface EntityTabbedRailProps<T extends string> {
  */
 export function EntityTabbedRail<T extends string>({
   isOpen,
+  id,
+  width,
+  onKeyDown,
   ariaLabel,
   activeTab,
   onTabChange,
@@ -59,6 +67,8 @@ export function EntityTabbedRail<T extends string>({
   emptyMessage,
   sectionKind,
   controls,
+  tabActions,
+  tabActionsClassName,
   children,
   contentClassName,
   tabsContainerClassName,
@@ -71,6 +81,9 @@ export function EntityTabbedRail<T extends string>({
   return (
     <EntitySidebarShell
       isOpen={isOpen}
+      id={id}
+      width={width}
+      onKeyDown={onKeyDown}
       ariaLabel={ariaLabel}
       title={title}
       onClose={onClose}
@@ -97,6 +110,8 @@ export function EntityTabbedRail<T extends string>({
               onValueChange={onTabChange}
               options={tabOptions}
               ariaLabel={tabsAriaLabel}
+              actions={tabActions}
+              actionsClassName={tabActionsClassName}
               distribution={tabDistribution}
               overflowMode={tabOverflowMode}
             />

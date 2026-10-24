@@ -72,9 +72,12 @@ vi.mock('@jovie/ui', async () => {
 });
 
 // Mock drawer molecules — EntitySidebarShell renders children with empty state support.
-vi.mock('@/components/molecules/drawer', () => ({
+vi.mock('@/components/molecules/drawer', async () => ({
+  EntityTabbedRail: (await import('@/tests/test-utils/entity-tabbed-rail'))
+    .MockEntityTabbedRail,
   EntitySidebarShell: ({
     children,
+    scrollStrategy = 'child',
     contextMenuItems,
     isEmpty,
     emptyMessage,
@@ -83,6 +86,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     footer,
   }: {
     children?: React.ReactNode;
+    scrollStrategy?: string;
     isEmpty?: boolean;
     emptyMessage?: string;
     entityHeader?: React.ReactNode;
@@ -102,6 +106,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     ) : (
       <div
         data-testid='right-drawer'
+        data-scroll-strategy={scrollStrategy}
         data-context-action-ids={contextMenuItems
           ?.filter(item => item.type !== 'separator' && Boolean(item.id))
           .map(item => item.id)
@@ -661,6 +666,15 @@ describe('ReleaseSidebar inspector cards', () => {
     await user.click(screen.getByTestId('context-menu-refresh-release'));
 
     expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives details one child-owned scroll region below pinned tabs', () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+    expect(screen.getByTestId('release-sidebar')).toHaveAttribute(
+      'data-scroll-strategy',
+      'child'
+    );
+    expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
   });
 
   it('does not render the generic Releases title row above the entity card', () => {
