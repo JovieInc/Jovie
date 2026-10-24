@@ -4,15 +4,254 @@ import { mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { runInNewContext } from 'node:vm';
+import { build } from 'esbuild';
 import ts from 'typescript';
 import { bundleDesktopPreload } from './bundle-preload.mjs';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
+
+const helpBuildIdentity = {
+  channel: 'production',
+  version: '26.10.11',
+  sourceRevision: 'a'.repeat(40),
+  builtAt: '2026-10-21T00:00:00.000Z',
+  provenance: 'verified',
+};
+
+const desktopContractModules = new Map();
+const desktopContractDirectories = [];
+test.after(async () => {
+  await Promise.all(
+    desktopContractDirectories.map(directory =>
+      rm(directory, { recursive: true, force: true })
+    )
+  );
+});
+
+async function loadDesktopContractModule(name) {
+  if (!desktopContractModules.has(name)) {
+    desktopContractModules.set(
+      name,
+      (async () => {
+        const directory = await mkdtemp(join(tmpdir(), 'jovie-menu-contract-'));
+        desktopContractDirectories.push(directory);
+        const filename = join(directory, `${name}-contract.mjs`);
+        const result = await build({
+          entryPoints: [join(desktopRoot, 'src', `${name}.ts`)],
+          outfile: filename,
+          bundle: true,
+          platform: 'node',
+          format: 'esm',
+          write: false,
+          sourcemap: 'inline',
+        });
+        await writeFile(filename, result.outputFiles[0].text);
+        return import(pathToFileURL(filename).href);
+      })()
+    );
+  }
+  return desktopContractModules.get(name);
+}
+
+for (const platform of ['darwin', 'win32']) {
+  test(`application menu exposes native Help and launches available links in the browser on ${platform}`, async () => {
+    const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+    const ast = ts.createSourceFile(
+      'main.ts',
+      source,
+      ts.ScriptTarget.Latest,
+      true
+    );
+    const nativeHelp = await loadDesktopContractModule('native-help-menu');
+    const navigation = await loadDesktopContractModule('navigation');
+    const imports = ['./native-help-menu', './navigation'].map(name => {
+      const node = ast.statements.find(
+        statement =>
+          ts.isImportDeclaration(statement) &&
+          statement.moduleSpecifier.text === name
+      );
+      assert.ok(node, `main must import its real ${name} owner`);
+      return node.getText(ast);
+    });
+    const declarations = [
+      'buildApplicationMenu',
+      'isAllowedExternalUrl',
+      'openExternalUrl',
+    ].map(name => {
+      const node = ast.statements.find(
+        statement =>
+          ts.isFunctionDeclaration(statement) && statement.name?.text === name
+      );
+      assert.ok(node, `real ${name} must exist`);
+      return node.getText(ast);
+    });
+    const compiled = ts.transpileModule(
+      [...imports, ...declarations].join('\n'),
+      {
+        compilerOptions: {
+          target: ts.ScriptTarget.ES2022,
+          module: ts.ModuleKind.CommonJS,
+        },
+      }
+    ).outputText;
+    const opened = [];
+    const errors = [];
+    let failOpen = false;
+    const context = {
+      exports: {},
+      require: name =>
+        name === './native-help-menu' ? nativeHelp : navigation,
+      app: { name: 'Jovie' },
+      process: { platform, arch: 'arm64' },
+      desktopBuildIdentity: helpBuildIdentity,
+      URL_DISPOSITION_OPTIONS: {
+        appUrl: 'https://jov.ie',
+        appEnv: 'production',
+      },
+      Menu: { buildFromTemplate: template => template },
+      buildViewMenu: () => [{ label: 'existing view action' }],
+      buildUpdateMenuItem: () => ({ label: 'Check for Updates' }),
+      getDesktopAppDisplayName: () => 'Jovie',
+      openPreferences() {},
+      showDesktopAboutWindow() {},
+      publicProfilePreviewWindow: null,
+      shell: {
+        openExternal: async url => {
+          if (failOpen) throw new Error('browser unavailable');
+          opened.push(url);
+        },
+      },
+      console: { error: (...args) => errors.push(args) },
+    };
+    runInNewContext(compiled, context);
+    const menu = context.buildApplicationMenu();
+    const helpMenus = menu.filter(item => item.role === 'help');
+    assert.equal(
+      helpMenus.length,
+      1,
+      'installed template must contain one Help role'
+    );
+    assert.equal(menu.at(-1), helpMenus[0], 'Help follows Window');
+    assert.deepEqual(
+      Array.from(menu, item => item.role ?? item.label),
+      platform === 'darwin'
+        ? ['Jovie', 'File', 'editMenu', 'View', 'windowMenu', 'help']
+        : ['File', 'editMenu', 'View', 'windowMenu', 'help']
+    );
+    const items = helpMenus[0].submenu;
+    assert.deepEqual(
+      Array.from(items, item => item.label ?? item.type),
+      [
+        'Jovie Support',
+        'Help Center',
+        'System Status',
+        "What's New",
+        'separator',
+        'Report a Problem',
+      ]
+    );
+    assert.deepEqual(
+      Array.from(
+        items.filter(item => item.label),
+        item => item.enabled
+      ),
+      [true, true, false, true, false]
+    );
+    assert.deepEqual(
+      opened,
+      [],
+      'constructing menus must not launch a browser'
+    );
+    for (const item of items.filter(item => item.enabled)) item.click();
+    assert.deepEqual(opened, [
+      'https://jov.ie/support',
+      'https://docs.jov.ie/',
+      'https://jov.ie/changelog',
+    ]);
+
+    // Disabled in the native menu, but its prepared callback must preserve build
+    // context through the real guarded opener when the contact owner restores it.
+    items.at(-1).click();
+    const report = new URL(opened.at(-1));
+    assert.equal(
+      report.origin + report.pathname,
+      'https://docs.jov.ie/contact'
+    );
+    assert.deepEqual(
+      JSON.parse(report.searchParams.get('desktopBuild')),
+      helpBuildIdentity
+    );
+    assert.equal(report.searchParams.get('platform'), platform);
+    assert.equal(report.searchParams.get('architecture'), 'arm64');
+
+    failOpen = true;
+    items[0].click();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(
+      errors.length,
+      1,
+      'browser failures are handled by the guarded opener'
+    );
+    failOpen = false;
+    items[0].click();
+    assert.equal(
+      opened.at(-1),
+      'https://jov.ie/support',
+      'the action can be retried'
+    );
+  });
+}
+
+test('prepared problem report preserves missing metadata, provenance, and URL encoding without private fields', async () => {
+  const { buildDesktopProblemReportUrl, buildNativeHelpMenu } =
+    await loadDesktopContractModule('native-help-menu');
+  for (const provenance of ['verified', 'development', 'unverified']) {
+    const identity = {
+      ...helpBuildIdentity,
+      sourceRevision: null,
+      builtAt: null,
+      provenance,
+    };
+    const options = {
+      identity: {
+        ...identity,
+        account: 'must not be shared',
+        currentPage: 'private',
+      },
+      platform: 'darwin & test',
+      architecture: 'arm64+test',
+    };
+    const url = new URL(buildDesktopProblemReportUrl(options));
+    assert.deepEqual(
+      [...url.searchParams.keys()],
+      ['desktopBuild', 'platform', 'architecture']
+    );
+    assert.deepEqual(
+      JSON.parse(url.searchParams.get('desktopBuild')),
+      identity
+    );
+    assert.equal(url.searchParams.get('platform'), options.platform);
+    assert.equal(url.searchParams.get('architecture'), options.architecture);
+    const opened = [];
+    const menu = buildNativeHelpMenu({
+      ...options,
+      openExternal: async value => opened.push(value),
+    });
+    menu.submenu.find(item => item.label === 'System Status').click();
+    menu.submenu.find(item => item.label === 'Report a Problem').click();
+    assert.deepEqual(opened, ['https://status.jov.ie', url.toString()]);
+    assert.equal(
+      identity.provenance,
+      provenance,
+      'report preparation must not mutate identity'
+    );
+  }
+});
 
 async function readBundledPreload(t) {
   const directory = await mkdtemp(join(tmpdir(), 'jovie-shell-preload-'));

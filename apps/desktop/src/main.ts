@@ -120,6 +120,7 @@ import {
   summarizeUnhandledRejection,
 } from './main-liveness';
 import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
+import { buildNativeHelpMenu } from './native-help-menu';
 import { DesktopNavigationCoordinator } from './navigation-coordinator';
 import { createStartupMaintenanceGate } from './startup-maintenance';
 import {
@@ -312,9 +313,6 @@ const CLIENT_NAVIGATION_CHANNEL = 'desktop-client-navigation';
 const CLIENT_NAVIGATION_READY_CHANNEL = 'desktop-client-navigation-ready';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
-type UpdateChannel =
-  | typeof UPDATE_AVAILABLE_CHANNEL
-  | typeof UPDATE_DOWNLOADED_CHANNEL;
 
 interface NavState {
   canGoBack: boolean;
@@ -2990,6 +2988,12 @@ function buildApplicationMenu(): Menu {
     { role: 'editMenu' },
     { label: 'View', submenu: viewMenu },
     { role: 'windowMenu' },
+    buildNativeHelpMenu({
+      identity: desktopBuildIdentity,
+      platform: process.platform,
+      architecture: process.arch,
+      openExternal: openExternalUrl,
+    }),
   ];
 
   if (process.platform === 'darwin') {
