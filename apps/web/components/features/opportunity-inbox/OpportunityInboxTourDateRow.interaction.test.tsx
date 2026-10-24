@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { OpportunityInboxTourDateRow } from './OpportunityInboxTourDateRow';
+import {
+  OpportunityInboxTourDateRow,
+  type OpportunityInboxTourDateRowProps,
+} from './OpportunityInboxTourDateRow';
 
 const item = {
   id: 'tour-1',
@@ -14,18 +17,20 @@ const item = {
   status: 'pending' as const,
 };
 
+function renderRow(overrides: Partial<OpportunityInboxTourDateRowProps> = {}) {
+  const props = { item, onConfirm: vi.fn(), onReject: vi.fn(), ...overrides };
+  const view = render(<OpportunityInboxTourDateRow {...props} />);
+  return {
+    ...props,
+    rerenderRow: (next: Partial<OpportunityInboxTourDateRowProps>) =>
+      view.rerender(<OpportunityInboxTourDateRow {...props} {...next} />),
+  };
+}
+
 describe('OpportunityInboxTourDateRow interactions', () => {
   it('reveals a single reserved pair of distinct actions on row hover and keyboard focus', async () => {
     const user = userEvent.setup();
-    const onConfirm = vi.fn();
-    const onReject = vi.fn();
-    render(
-      <OpportunityInboxTourDateRow
-        item={item}
-        onConfirm={onConfirm}
-        onReject={onReject}
-      />
-    );
+    const { onConfirm, onReject } = renderRow();
     const row = screen.getByRole('listitem');
     const confirm = screen.getByRole('button', { name: 'Confirm Tour Date' });
     const reject = screen.getByRole('button', { name: 'Reject Tour Date' });
@@ -59,15 +64,7 @@ describe('OpportunityInboxTourDateRow interactions', () => {
   });
 
   it('preserves touch confirmation and rejection and ignores swipes while busy', () => {
-    const onConfirm = vi.fn();
-    const onReject = vi.fn();
-    const { rerender } = render(
-      <OpportunityInboxTourDateRow
-        item={item}
-        onConfirm={onConfirm}
-        onReject={onReject}
-      />
-    );
+    const { onConfirm, onReject, rerenderRow } = renderRow();
     const surface = screen.getByRole('listitem').firstElementChild;
     if (!surface) throw new Error('Missing tour date surface');
     const swipe = (endX: number) => {
@@ -78,14 +75,7 @@ describe('OpportunityInboxTourDateRow interactions', () => {
     swipe(0);
     expect(onConfirm).toHaveBeenCalledExactlyOnceWith(item.id);
     expect(onReject).toHaveBeenCalledExactlyOnceWith(item.id);
-    rerender(
-      <OpportunityInboxTourDateRow
-        item={item}
-        isBusy
-        onConfirm={onConfirm}
-        onReject={onReject}
-      />
-    );
+    rerenderRow({ isBusy: true });
     swipe(200);
     swipe(0);
     expect(onConfirm).toHaveBeenCalledTimes(1);
@@ -94,16 +84,7 @@ describe('OpportunityInboxTourDateRow interactions', () => {
 
   it('retains disabled busy controls and the confirmed indicator, and removes rejected actions', async () => {
     const user = userEvent.setup();
-    const onConfirm = vi.fn();
-    const onReject = vi.fn();
-    const { rerender } = render(
-      <OpportunityInboxTourDateRow
-        item={item}
-        isBusy
-        onConfirm={onConfirm}
-        onReject={onReject}
-      />
-    );
+    const { onConfirm, onReject, rerenderRow } = renderRow({ isBusy: true });
     const confirm = screen.getByRole('button', { name: 'Confirm Tour Date' });
     const reject = screen.getByRole('button', { name: 'Reject Tour Date' });
     await user.hover(screen.getByRole('listitem'));
@@ -115,13 +96,7 @@ describe('OpportunityInboxTourDateRow interactions', () => {
     await user.click(reject);
     expect(onConfirm).not.toHaveBeenCalled();
     expect(onReject).not.toHaveBeenCalled();
-    rerender(
-      <OpportunityInboxTourDateRow
-        item={{ ...item, status: 'confirmed' }}
-        onConfirm={onConfirm}
-        onReject={onReject}
-      />
-    );
+    rerenderRow({ item: { ...item, status: 'confirmed' }, isBusy: false });
     expect(screen.getByRole('button', { name: 'Confirmed' })).toBeDisabled();
     expect(
       screen.getByRole('button', { name: 'Confirmed' }).parentElement
@@ -129,13 +104,7 @@ describe('OpportunityInboxTourDateRow interactions', () => {
     expect(
       screen.queryByRole('button', { name: 'Reject Tour Date' })
     ).not.toBeInTheDocument();
-    rerender(
-      <OpportunityInboxTourDateRow
-        item={{ ...item, status: 'rejected' }}
-        onConfirm={onConfirm}
-        onReject={onReject}
-      />
-    );
+    rerenderRow({ item: { ...item, status: 'rejected' }, isBusy: false });
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

@@ -13,15 +13,9 @@ const props = {
 describe('OpportunityRow interactions', () => {
   it('reserves one action slot and reveals both distinct actions on hover or keyboard focus', async () => {
     const user = userEvent.setup();
-    const onPrimaryAction = vi.fn();
-    const onDismiss = vi.fn();
-    render(
-      <OpportunityRow
-        {...props}
-        onPrimaryAction={onPrimaryAction}
-        onDismiss={onDismiss}
-      />
-    );
+    const actions = { onPrimaryAction: vi.fn(), onDismiss: vi.fn() };
+    const { onPrimaryAction, onDismiss } = actions;
+    render(<OpportunityRow {...props} {...actions} />);
     const row = screen.getByRole('listitem');
     const primary = screen.getByRole('button', { name: 'Plan Opportunity' });
     const dismiss = screen.getByRole('button', { name: 'Dismiss Opportunity' });
@@ -54,15 +48,10 @@ describe('OpportunityRow interactions', () => {
 
   it('keeps busy actions visible after pointer exit and blocks duplicate submissions, including swipes', async () => {
     const user = userEvent.setup();
-    const onPrimaryAction = vi.fn();
-    const onDismiss = vi.fn();
+    const actions = { onPrimaryAction: vi.fn(), onDismiss: vi.fn() };
+    const { onPrimaryAction, onDismiss } = actions;
     const { rerender } = render(
-      <OpportunityRow
-        {...props}
-        isBusy
-        onPrimaryAction={onPrimaryAction}
-        onDismiss={onDismiss}
-      />
+      <OpportunityRow {...props} {...actions} isBusy />
     );
     const row = screen.getByRole('listitem');
     const primary = screen.getByRole('button', { name: 'Plan Opportunity' });
@@ -83,13 +72,7 @@ describe('OpportunityRow interactions', () => {
     fireEvent.touchEnd(surface, { changedTouches: [{ clientX: 0 }] });
     expect(onPrimaryAction).not.toHaveBeenCalled();
     expect(onDismiss).not.toHaveBeenCalled();
-    rerender(
-      <OpportunityRow
-        {...props}
-        onPrimaryAction={onPrimaryAction}
-        onDismiss={onDismiss}
-      />
-    );
+    rerender(<OpportunityRow {...props} {...actions} />);
     expect(primary.parentElement).toHaveClass('opacity-0');
     await user.click(primary);
     expect(onPrimaryAction).toHaveBeenCalledExactlyOnceWith(props.id);

@@ -19,6 +19,11 @@ it.each(['ISRC', 'UPC', 'Label'])(
     );
     const button = screen.getByRole('button', { name: `Copy ${label}` });
     const slot = button.parentElement;
+    expect(slot?.tagName).toBe('DIV');
+    expect(slot).toHaveAttribute(
+      'data-slot',
+      'drawer-editable-text-field-actions'
+    );
     expect(slot).toHaveClass(
       'shrink-0',
       'opacity-0',
