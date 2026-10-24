@@ -111,7 +111,7 @@ describe('bodyContainsOnboardingSessionBoundary', () => {
     // boundary shell, not the init markers.
     expect(
       bodyContainsOnboardingSessionBoundary(
-        '<div data-testid="onboarding-session-boundary" data-restore-state="restoring"><p>Restoring your conversation…</p></div>'
+        '<div data-testid="onboarding-session-boundary" data-restore-state="restoring"><h1>Restoring your conversation…</h1></div>'
       )
     ).toBe(true);
   });

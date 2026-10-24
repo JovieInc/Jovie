@@ -7,16 +7,14 @@ import * as React from 'react';
 import { memo, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
-import {
-  EmptyState,
-  type EmptyStateProps,
-} from '@/components/molecules/EmptyState';
+import type { EmptyStateProps } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   AudienceMobileCard,
   type ContextMenuItemType,
   convertToCommonDropdownItems,
   TableBulkActionsToolbar,
+  TableEmptyState,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { columnPrioritySpecsFromDefs } from '@/components/organisms/table/column-priority';
@@ -88,8 +86,8 @@ function AudienceCrmEmptyState({
   'heading' | 'description' | 'action' | 'secondaryAction'
 >) {
   return (
-    <EmptyState
-      icon={<Users className='h-6 w-6' aria-hidden='true' />}
+    <TableEmptyState
+      icon={<Users className='h-5 w-5' aria-hidden='true' />}
       heading={heading}
       description={description}
       action={action}

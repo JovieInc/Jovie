@@ -29,7 +29,8 @@ export default {
   jsonReporter: {
     fileName: process.env.STRYKER_REPORT_FILE ?? 'reports/mutation/diff.json',
   },
-  // Advisory lane: scores are reported, never enforced here.
+  // break stays null. scripts/mutation-diff.mjs enforces per-file floors
+  // after it reads this report. A Stryker break here would hide the report.
   thresholds: { high: 80, low: 60, break: null },
   concurrency: process.env.CI ? 4 : 2,
   timeoutMS: 60_000,

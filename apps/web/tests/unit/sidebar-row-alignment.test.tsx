@@ -51,11 +51,12 @@ describe('Sidebar row alignment', () => {
     localStorage.clear();
   });
 
-  it('uses px-2.5 for section labels', () => {
+  it('aligns section labels to the shared label column', () => {
     render(<SidebarGroupLabel>General</SidebarGroupLabel>);
 
     const label = screen.getByText('General');
-    expect(label.className).toContain('px-2.5');
+    expect(label.className).toContain('ps-(--app-shell-sidebar-label-inset)');
+    expect(label.className).toContain('pe-(--app-shell-sidebar-inset)');
     // Group labels use the opaque muted token. /90 measured under 4.5:1.
     expect(label.className).toContain('text-sidebar-muted');
     expect(label.className).not.toMatch(/text-sidebar-muted\/\d+/);
@@ -65,7 +66,9 @@ describe('Sidebar row alignment', () => {
     render(<SidebarGroupLabel>General</SidebarGroupLabel>);
     const label = screen.getByText('General');
     expect(label.className).toContain('motion-reduce:transition-none');
-    expect(label.className).toContain('group-data-[collapsible=icon]:-mt-7');
+    expect(label.className).toContain(
+      'group-data-[collapsible=icon]:-mt-(--app-shell-sidebar-row-height)'
+    );
     expect(label.className).toContain(
       'group-data-[collapsible=icon]:opacity-0'
     );
@@ -84,7 +87,7 @@ describe('Sidebar row alignment', () => {
     );
   });
 
-  it('uses px-2.5 for collapsible section headers', () => {
+  it('aligns collapsible section headers to the shared inset', () => {
     render(
       <SidebarCollapsibleGroup label='General'>
         <div>Child</div>
@@ -93,7 +96,7 @@ describe('Sidebar row alignment', () => {
 
     const header = screen.getByRole('button', { name: /general/i });
     const railLabel = screen.getByText('General');
-    expect(header.className).toContain('px-2.5');
+    expect(header.className).toContain('px-(--app-shell-sidebar-inset)');
     expect(header.className).toContain('text-sidebar-muted');
     expect(header.className).not.toMatch(/text-sidebar-muted\/\d+/);
     expect(railLabel.className).toContain('text-sidebar-muted');
@@ -166,9 +169,13 @@ describe('Sidebar row alignment', () => {
     const content = container.querySelector('[data-sidebar="content"]');
     const separator = container.querySelector('[role="separator"]');
 
-    expect(header?.getAttribute('class')).toContain('px-2.5');
+    expect(header?.getAttribute('class')).toContain(
+      'px-(--app-shell-sidebar-inset)'
+    );
     expect(content?.getAttribute('class')).toContain('px-0');
-    expect(separator?.getAttribute('class')).toContain('mx-2.5');
+    expect(separator?.getAttribute('class')).toContain(
+      'mx-(--app-shell-sidebar-inset)'
+    );
   });
 
   it('keeps nav-row chrome borderless in resting, hover, and active states', () => {
@@ -193,12 +200,11 @@ describe('Sidebar row alignment', () => {
     const activeRowClassName = getSidebarNavRowClassName({ active: true });
     const iconClassName = getSidebarNavIconClassName({});
 
-    expect(rowClassName).toContain('h-7');
-    expect(rowClassName).toContain('px-2.5');
-    expect(rowClassName).toContain('gap-x-2.5');
-    expect(rowClassName).toContain(
-      'grid-cols-[18px_minmax(0,1fr)_minmax(34px,auto)]'
-    );
+    expect(rowClassName).toContain('h-(--app-shell-sidebar-row-height)');
+    expect(rowClassName).toContain('px-(--app-shell-sidebar-inset)');
+    expect(rowClassName).toContain('gap-x-(--app-shell-sidebar-icon-gap)');
+    expect(rowClassName).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
+    expect(rowClassName).not.toContain('grid-cols-[18px');
     expect(rowClassName).not.toContain('before:');
     expect(rowClassName).not.toContain('after:');
     expect(rowClassName).toContain('text-xs');
@@ -214,7 +220,7 @@ describe('Sidebar row alignment', () => {
     expect(activeRowClassName).toContain('font-medium');
     expect(activeRowClassName).toContain('shadow-none');
     expect(activeRowClassName).not.toContain('inset_2px_0');
-    expect(iconClassName).toContain('h-3.5');
+    expect(iconClassName).toContain('size-(--app-shell-sidebar-icon-size)');
     expect(iconClassName).toContain('text-sidebar-muted/70');
     expect(getSidebarNavIconClassName({ active: true })).toContain(
       'text-accent-teal!'

@@ -65,7 +65,7 @@ def _status_pages(pages) -> list[dict]:
     if any(not isinstance(item, dict) for item in statuses): raise RuntimeError("execution-coordinator-history-malformed")
     return statuses
 def _trusted_creator(creator) -> bool:
-    return isinstance(creator, dict) and creator.get("login") == "jovie-bot[bot]" and creator.get("type") == "Bot"
+    return isinstance(creator, dict) and creator.get("login") in {"jovie-bot[bot]", "jovie-ci-lane[bot]", "jovie-symphony-lane[bot]", "jovie-agents-lane[bot]"} and creator.get("type") == "Bot"
 SUCCESS_TERMINAL = frozenset({"succeeded", "no_op_stale", "superseded"})
 LIVE_EVENTS = frozenset({"attempt_started", "boundary_admitted"})
 # A completion seal stays pending until the same reconcile operation appends its

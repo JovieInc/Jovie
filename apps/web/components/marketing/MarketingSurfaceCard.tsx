@@ -33,12 +33,12 @@ export interface MarketingSurfaceCardProps {
 
 const VARIANT_CLASS_NAMES: Record<MarketingSurfaceVariant, string> = {
   floating:
-    'rounded-[1.55rem] border-white/12 bg-[linear-gradient(180deg,rgba(19,21,29,0.98),rgba(12,13,20,0.94))] shadow-[0_36px_110px_rgba(0,0,0,0.48),0_12px_32px_rgba(0,0,0,0.28)]',
+    'border-white/12 bg-[linear-gradient(180deg,rgba(19,21,29,0.98),rgba(12,13,20,0.94))] shadow-[0_36px_110px_rgba(0,0,0,0.48),0_12px_32px_rgba(0,0,0,0.28)]',
   panel:
-    'rounded-[1.5rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,20,27,0.96),rgba(11,13,18,0.94))] shadow-[0_28px_90px_rgba(0,0,0,0.38),0_8px_24px_rgba(0,0,0,0.24)]',
+    'border-white/10 bg-[linear-gradient(180deg,rgba(18,20,27,0.96),rgba(11,13,18,0.94))] shadow-[0_28px_90px_rgba(0,0,0,0.38),0_8px_24px_rgba(0,0,0,0.24)]',
   'phone-inset':
-    'rounded-[2rem] border-white/14 bg-[linear-gradient(180deg,rgba(17,18,24,0.98),rgba(9,10,15,0.98))] shadow-[0_30px_90px_rgba(0,0,0,0.48),0_10px_30px_rgba(0,0,0,0.28)]',
-  'product-callout': 'rounded-3xl border-subtle bg-surface-0 shadow-card',
+    'border-white/14 bg-[linear-gradient(180deg,rgba(17,18,24,0.98),rgba(9,10,15,0.98))] shadow-[0_30px_90px_rgba(0,0,0,0.48),0_10px_30px_rgba(0,0,0,0.28)]',
+  'product-callout': 'border-subtle bg-surface-0 shadow-card',
 };
 
 const GLOW_CLASS_NAMES: Record<MarketingGlowTone, string> = {
@@ -78,7 +78,7 @@ export function MarketingSurfaceCard({
         variant === 'product-callout' ? 'true' : undefined
       }
       className={cn(
-        'relative overflow-hidden',
+        'marketing-rounded-frame relative',
         resolvedChrome === 'framed' && 'border backdrop-blur-sm',
         VARIANT_CLASS_NAMES[variant],
         className

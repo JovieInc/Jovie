@@ -8,11 +8,7 @@ import { STORYBOOK_VITEST_RUN_TIMEOUT_MS } from '../../../scripts/component-live
 
 /** Diagnostic only: accept the known negative/healthy pattern, not a green CLI. */
 export function verifyA11yRunnerControls({ findings, cli, exitCode }) {
-  assert.equal(
-    exitCode,
-    1,
-    'raw runner must fail only the explicit-error control'
-  );
+  assert.equal(exitCode, 1, 'raw runner must fail both button-name controls');
   assert.equal(findings.records.length, 4, 'all four controls must execute');
   assert.deepEqual(findings.unhandledErrors, [], 'no unrelated runner errors');
   assert.equal(
@@ -40,25 +36,22 @@ export function verifyA11yRunnerControls({ findings, cli, exitCode }) {
       error: null,
     });
   }
-  const warning = control('Default Violation');
-  assert.equal(
-    warning.state,
-    'passed',
-    'existing default mode remains warning-only'
-  );
-  assert.equal(
-    warning.a11y.length,
-    1,
-    'default violation needs an addon report'
-  );
-  assert.equal(warning.a11y[0].status, 'warning');
-  assert.deepEqual(warning.a11y[0].violations, ['button-name']);
-  assert.deepEqual(warning.a11y[0].incomplete, []);
-  assert.equal(warning.a11y[0].error, null);
-  assert.equal(control('Error Violation').state, 'failed');
+  for (const name of ['Default Violation', 'Error Violation']) {
+    const violation = control(name);
+    assert.equal(violation.state, 'failed', `${name} must fail the story`);
+    if (violation.a11y.length > 0) {
+      assert.equal(violation.a11y.length, 1, `${name} addon report`);
+      assert.equal(violation.a11y[0].status, 'failed');
+      assert.ok(
+        violation.a11y[0].violations.includes('button-name'),
+        `${name} must report button-name`
+      );
+      assert.notEqual(violation.a11y[0].status, 'warning');
+    }
+  }
   assert.equal(cli.numTotalTests, 4);
-  assert.equal(cli.numPassedTests, 3);
-  assert.equal(cli.numFailedTests, 1);
+  assert.equal(cli.numPassedTests, 2);
+  assert.equal(cli.numFailedTests, 2);
   assert.equal(cli.testResults.length, 1, 'exactly the control story module');
   assert.equal(
     cli.testResults[0].message,
@@ -68,18 +61,18 @@ export function verifyA11yRunnerControls({ findings, cli, exitCode }) {
   const failed = cli.testResults
     .flatMap(result => result.assertionResults)
     .filter(result => result.status === 'failed');
-  assert.equal(failed.length, 1);
-  assert.match(failed[0].fullName, /Error Violation$/);
-  const failure = stripVTControlCharacters(
-    failed[0].failureMessages.join('\n')
-  );
-  assert.match(failure, /toHaveNoViolations/);
-  assert.match(failure, /button-name/);
-  // The error assertion can throw before Vitest retains addon metadata.
+  assert.equal(failed.length, 2);
+  for (const result of failed) {
+    const failure = stripVTControlCharacters(result.failureMessages.join('\n'));
+    assert.match(failure, /toHaveNoViolations/);
+    assert.match(failure, /button-name/);
+  }
+  assert.ok(failed.some(result => /Default Violation$/.test(result.fullName)));
+  assert.ok(failed.some(result => /Error Violation$/.test(result.fullName)));
   return {
     controls: 4,
-    rawPassed: 3,
-    rawFailed: 1,
+    rawPassed: 2,
+    rawFailed: 2,
     expectedPatternObserved: true,
   };
 }

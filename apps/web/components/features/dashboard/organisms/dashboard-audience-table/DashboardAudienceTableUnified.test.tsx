@@ -75,6 +75,31 @@ describe('DashboardAudienceTableUnified', () => {
       )
     );
   });
+  it('renders the workspace empty state as the shared focal card', () => {
+    renderWithProviders(
+      <DashboardAudienceTableUnified
+        mode='members'
+        view='all'
+        rows={[]}
+        total={0}
+        sort='lastSeen'
+        direction='desc'
+        onSortChange={() => undefined}
+        onViewChange={() => undefined}
+        onFiltersChange={() => undefined}
+        filters={DEFAULT_AUDIENCE_FILTERS}
+        subscriberCount={0}
+      />
+    );
+
+    const card = document.querySelector('[data-empty-state-card]');
+    expect(card).not.toBeNull();
+    expect(card).toHaveClass('rounded-md');
+    expect(card).toHaveClass('border-subtle');
+    expect(card).toHaveClass('bg-surface-0');
+    expect(card).toHaveClass('text-left');
+  });
+
   it('renders the empty members view', () => {
     renderWithProviders(
       <DashboardAudienceTableUnified
