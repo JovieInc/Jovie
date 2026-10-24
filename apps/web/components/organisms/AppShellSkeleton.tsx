@@ -109,6 +109,7 @@ export function AppShellSkeleton({
 
   return (
     <AppShellFrame
+      brandVariant={brandVariant}
       placeholder
       sidebar={resolvedSidebar}
       header={
