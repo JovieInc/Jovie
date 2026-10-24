@@ -14105,3 +14105,190 @@ class AdoptionShareTest(unittest.TestCase):
             (host.state / "adopt-share.json").write_text("not json")
             with patch.dict(os.environ, {"LANES_ADOPT_SHARE_EVERY": "bogus"}):
                 self.assertEqual(sum(lane.adoption_turn_due(host) for _ in range(lane.ADOPT_SHARE_EVERY)), 1)
+
+
+class FixNowTest(unittest.TestCase):
+    """JOV-8931: lane_runner fix-now drains relay wake files with the same
+    admission as dispatch(); dedupe is an O_EXCL marker per PR+SHA+attempt."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.state = Path(self.tmp.name)
+        self.host = lane.Host(state=self.state, repo=self.state / "repo")
+        self.wake_dir = self.state / "wake"
+
+    def wake(self, *, pr=22868, sha="a" * 40, run_id=987654, attempt=2,
+             red_at="2026-10-23T18:27:30Z", payload=None):
+        path = self.wake_dir / f"red-{pr}-{sha}-{attempt}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if payload is None:
+            payload = {"schema": "jovie-lane-red-wake/v1", "pr": pr, "sha": sha,
+                       "runId": run_id, "runAttempt": attempt, "redAt": red_at}
+        path.write_text(json.dumps(payload))
+        return path
+
+    def rows(self):
+        ledger = self.state / "runs/red-dispatch.jsonl"
+        if not ledger.exists():
+            return []
+        return [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
+
+    def healthy(self, *, slots=1):
+        return patch.object(lane.disk_guard, "check", return_value={"admitted": True}), \
+            patch.object(lane, "load_providers", return_value={"codex": {"slots": slots}}), \
+            patch.object(self.host, "slots", return_value=slots), \
+            patch.object(lane, "cooling", return_value=False), \
+            patch.object(lane, "quota_pressure", return_value={"ok": True}), \
+            patch.object(lane, "provider_healthy", return_value=True)
+
+    def test_fix_now_spawns_worker_and_records_dispatch_row(self):
+        wake = self.wake()
+        fixes = self.healthy()
+        with lane.lifecycle.Guard(self.state) as guard, \
+                fixes[0], fixes[1], fixes[2], fixes[3], fixes[4], fixes[5], \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_called_once()
+            rows = self.rows()
+            self.assertEqual(len(rows), 1)
+            row = rows[0]
+            self.assertEqual(row["schema"], "jovie-lane-red-dispatch/v1")
+            self.assertEqual(row["status"], "dispatched")
+            # JOV-8933 collector joins on these four keys.
+            self.assertEqual((row["pr"], row["sha"], row["runId"], row["runAttempt"]),
+                             (22868, "a" * 40, 987654, 2))
+            self.assertEqual(row["redAt"], "2026-10-23T18:27:30Z")
+            self.assertTrue(row["dispatchedAt"])
+            self.assertIsNone(row["claimAt"])
+            self.assertFalse(wake.exists())
+            self.assertTrue((self.wake_dir / (wake.name + ".claim")).exists())
+
+    def test_fix_now_records_no_slot_and_keeps_label(self):
+        wake = self.wake()
+        fixes = self.healthy(slots=0)
+        with fixes[0], fixes[1], fixes[2], fixes[3], fixes[4], fixes[5], \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_not_called()
+            rows = self.rows()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["status"], "no-slot")
+            self.assertFalse(wake.exists())
+
+    def test_fix_now_disk_denial_records_no_slot(self):
+        wake = self.wake()
+        with patch.object(lane.disk_guard, "check", return_value={"admitted": False}), \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_not_called()
+            self.assertEqual(self.rows()[0]["status"], "no-slot")
+            self.assertFalse(wake.exists())
+
+    def test_fix_now_dedupe_marker_skips_reactivation(self):
+        wake = self.wake()
+        marker = self.wake_dir / (wake.name + ".claim")
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("")
+        with self.healthy()[0], patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_not_called()
+            self.assertEqual(self.rows(), [])
+
+    def test_fix_now_skips_active_claim(self):
+        wake = self.wake()
+        with self.healthy()[0], \
+                patch.object(lane.pr_events, "claim_active", return_value=True), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_not_called()
+            self.assertEqual(self.rows()[0]["status"], "already-claimed")
+
+    def test_fix_now_hourly_cap_keeps_label(self):
+        now = time.time()
+        ledger = self.state / "runs/red-dispatch.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        with ledger.open("a") as handle:
+            for _ in range(lane.MAX_RED_DISPATCH_PER_PR_PER_HOUR):
+                handle.write(json.dumps({"pr": 22868, "sha": "b" * 40, "status": "dispatched",
+                                         "dispatchedEpoch": now - 60}) + "\n")
+        wake = self.wake()
+        fixes = self.healthy()
+        with fixes[0], fixes[1], fixes[2], fixes[3], fixes[4], fixes[5], \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_not_called()
+            self.assertEqual(self.rows()[-1]["status"], "no-slot")
+            self.assertEqual(self.rows()[-1]["reason"], "hourly-cap")
+            self.assertFalse(wake.exists())
+
+    def test_fix_now_rejects_oversized_wake_file(self):
+        wake = self.wake(payload={"big": "x" * (lane.WAKE_FILE_MAX_BYTES + 1)})
+        with patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_not_called()
+            self.assertEqual(self.rows()[0]["status"], "invalid")
+            self.assertFalse(wake.exists())
+
+    def test_fix_now_processes_at_most_max_wake_files(self):
+        for index in range(lane.MAX_WAKE_PER_ACTIVATION + 2):
+            self.wake(pr=22868 + index)
+        fixes = self.healthy()
+        with lane.lifecycle.Guard(self.state), \
+                fixes[0], fixes[1], fixes[2], fixes[3], fixes[4], fixes[5], \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            self.assertEqual(spawn.call_count, lane.MAX_WAKE_PER_ACTIVATION)
+            remaining = list(self.wake_dir.glob("red-*.json"))
+            self.assertEqual(len(remaining), 2)
+
+    def test_fix_now_ignores_missing_wake_dir(self):
+        self.assertEqual(lane.fix_now(self.host), 0)
+
+    def test_post_claim_appends_stamps_and_claim_row(self):
+        self.state.mkdir(parents=True, exist_ok=True)
+        ledger = self.state / "runs/red-dispatch.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        ledger.write_text(json.dumps({"schema": "jovie-lane-red-dispatch/v1", "status": "dispatched",
+                                      "pr": 22868, "sha": "a" * 40, "runId": 987654, "runAttempt": 2,
+                                      "redAt": "2026-10-23T18:27:30Z", "dispatchedAt": "2026-10-23T18:28:00Z",
+                                      "claimAt": None}) + "\n")
+        calls = []
+
+        def fake_sh(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with patch.dict(os.environ, {"LANES_STATE": str(self.state)}), \
+                patch.object(lane, "sh", fake_sh), \
+                patch.object(lane, "now_iso", return_value="2026-10-23T18:30:00Z"):
+            lane.post_claim(22868, "a" * 40, "fix")
+        body = calls[0][-1]
+        self.assertIn("red_at=2026-10-23T18:27:30Z", body)
+        self.assertIn("dispatched_at=2026-10-23T18:28:00Z", body)
+        self.assertIn("claim_at=2026-10-23T18:30:00Z", body)
+        rows = [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[1]["status"], "claimed")
+        # Collector join survives the claim row.
+        self.assertEqual((rows[1]["pr"], rows[1]["sha"], rows[1]["runId"], rows[1]["runAttempt"]),
+                         (22868, "a" * 40, 987654, 2))
+
+    def test_post_claim_without_dispatch_row_unchanged(self):
+        self.state.mkdir(parents=True, exist_ok=True)
+        calls = []
+
+        def fake_sh(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with patch.dict(os.environ, {"LANES_STATE": str(self.state)}), \
+                patch.object(lane, "sh", fake_sh):
+            lane.post_claim(22868, "a" * 40, "fix")
+        self.assertNotIn("red_at=", calls[0][-1])
+        self.assertFalse((self.state / "runs/red-dispatch.jsonl").exists())
