@@ -5,6 +5,7 @@ import type { AdaptiveTranscriberOptions } from '@/lib/dictation/adaptive-transc
 
 const state = vi.hoisted(() => ({
   electron: false,
+  desktopSupported: true,
   callbacks: null as TranscriberCallbacks | null,
   options: null as AdaptiveTranscriberOptions | null,
   start: vi.fn(),
@@ -20,7 +21,7 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
   getElectronAPI: () => ({ platform: 'darwin' }),
   isElectronRuntime: () => state.electron,
   useDesktopDictationStatus: () => ({
-    supported: true,
+    supported: state.desktopSupported,
     webSpeechFallbackAllowed: !state.electron,
   }),
 }));
@@ -46,6 +47,7 @@ import { useSpeechRecognition } from './useSpeechRecognition';
 beforeEach(() => {
   vi.clearAllMocks();
   state.electron = false;
+  state.desktopSupported = true;
 });
 describe('composer adaptive dictation', () => {
   it('uses the adaptive providers and preserves final results after stop', () => {
@@ -117,6 +119,19 @@ describe('composer adaptive dictation', () => {
     act(() => result.current.start());
     act(() => state.callbacks?.onError?.('not-allowed'));
     expect(result.current.error).toBe('not-allowed');
+    expect(result.current.unavailableHint).toBeNull();
+  });
+  it('does not show the macOS fallback while the desktop capability probe is pending', () => {
+    state.electron = true;
+    state.desktopSupported = false;
+    const { result, rerender } = renderHook(() =>
+      useSpeechRecognition({ onTranscript() {} })
+    );
+    expect(result.current.isSupported).toBe(false);
+    expect(result.current.unavailableHint).toBeNull();
+    state.desktopSupported = true;
+    rerender();
+    expect(result.current.isSupported).toBe(true);
     expect(result.current.unavailableHint).toBeNull();
   });
 });

@@ -204,7 +204,7 @@ export function useSpeechRecognition({
   }, [isListening, start, stop]);
 
   const unavailableHint =
-    isElectron && !isSupported ? systemDictationHint() : null;
+    isElectron && runtimeUnsupported ? systemDictationHint() : null;
 
   return {
     isSupported,
