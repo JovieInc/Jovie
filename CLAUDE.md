@@ -110,3 +110,4 @@ All Mac app work defaults to SwiftUI. Do not add new Electron, AppKit-only, or o
 - `apps/desktop` (Electron) is maintenance-only: fixes and migrations out, not new surfaces.
 - Production runs full screen on an ultrawide monitor. That view, Ovie, is where Tim works, and anything that needs his attention lands there. Design and test Mac layouts at ultrawide full screen first.
 - The IA of that full-screen surface is a perpetual work item: keep improving it and keep refining the components inside it.
+- A perpetual design loop, not a one-time audit, covers the Ovie surface. It reviews the production surface's IA, components and visual design and proposes improvements. It runs on a deterministic gem schedule, not on Grok Bot usage, and has a dead-man check. Findings go to `pipeline-bottleneck/v1`, and design debt is tracked as Linear work items.
