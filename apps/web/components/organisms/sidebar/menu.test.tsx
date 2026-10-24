@@ -40,6 +40,8 @@ describe('sidebar menu', () => {
     expect(button?.getAttribute('data-active')).toBe('true');
     const className = button?.className ?? '';
     expect(className).toContain('duration-fast');
+    expect(button).toHaveClass('hover:bg-sidebar-accent');
+    expect(className).not.toContain('var(--color-sidebar-accent)_82%');
     expect(className).toContain('ease-interactive');
     expect(button).toHaveClass(
       'gap-(--app-shell-sidebar-icon-gap)',

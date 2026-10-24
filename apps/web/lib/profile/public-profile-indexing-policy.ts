@@ -6,6 +6,7 @@ import {
   normalizeEmail,
 } from '@/lib/utils/email';
 import { isOpaqueInternalProfileHandle } from './opaque-internal-profile-handle';
+import { isProfileSearchable } from './public-profile-access';
 import {
   getPublicProfileIdentityExclusionReason,
   type PublicProfileIdentityExclusionReason,
@@ -29,6 +30,7 @@ export type PublicProfileDiscoveryExclusionReason =
   | 'qa_display_name'
   | 'test_account_email'
   | 'private_or_unpublished'
+  | 'unlisted'
   | 'unknown_identity'
   | 'placeholder_identity'
   | 'empty_profile';
@@ -38,6 +40,7 @@ export interface PublicProfileDiscoveryIdentity {
   readonly displayName?: string | null;
   readonly isPublic?: boolean | null;
   readonly ownerEmail?: string | null;
+  readonly settings?: unknown;
   /**
    * Whether the profile has at least one publicly eligible release. Omit when
    * the source cannot supply it; only an explicit `false` excludes.
@@ -47,6 +50,7 @@ export interface PublicProfileDiscoveryIdentity {
 
 export interface PublicProfileDiscoveryEligibilityOptions {
   readonly requirePublication?: boolean;
+  readonly requireSearchability?: boolean;
 }
 
 export const PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS = {
@@ -138,6 +142,13 @@ export function getPublicProfileDiscoveryExclusionReason(
   if (identity.isPublic === false) return 'private_or_unpublished';
   if (options.requirePublication && identity.isPublic !== true) {
     return 'private_or_unpublished';
+  }
+
+  if (
+    (options.requireSearchability || options.requirePublication) &&
+    !isProfileSearchable(identity.settings)
+  ) {
+    return 'unlisted';
   }
 
   const indexingReason = getPublicProfileIndexingExclusionReason(handle);

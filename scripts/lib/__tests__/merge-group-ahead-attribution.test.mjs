@@ -52,6 +52,41 @@ describe('parseCiFastLog', () => {
     ).toBe(true);
   });
 
+  it('reads the strongest evidence from a successful ahead ci-fast (remaining) job (JOV-8760)', () => {
+    // When the ahead run failed in another job, its successful ci-fast
+    // (remaining) log reports every structural command as pass. The helper
+    // must accept that log as evidence for this group's failing commands.
+    const successfulAhead = AHEAD_LOG.split('\n')
+      .filter(line => !/^\| 58 \|/.test(line))
+      .filter(line => !line.includes('Structural command 58/58 failed'))
+      .filter(line => !line.startsWith('[ci-fast] 1 lane(s) failed'))
+      .map(line =>
+        line.replace(
+          '[ci-fast] structural: failure (311.9s)',
+          '[ci-fast] structural: success (311.9s)'
+        )
+      )
+      .join('\n');
+    expect(successfulAhead).not.toBe(AHEAD_LOG);
+    const aheadJobs = [
+      { name: 'ci-fast (remaining)', conclusion: 'success' },
+      { name: 'Unit Tests (1/4)', conclusion: 'failure' },
+      { name: 'PR Ready', conclusion: 'failure' },
+    ];
+    expect(
+      attributeAgainstAheadRun({
+        currentJobs: failedCiFastJobs,
+        aheadJobs,
+        aheadConclusion: 'failure',
+        currentCiFastLog: POISON_LOG,
+        aheadCiFastLog: successfulAhead,
+      })
+    ).toEqual({
+      attributable: true,
+      reason: 'failing-signals-passed-on-ahead-run',
+    });
+  });
+
   it('strips gh job-log prefixes and timestamps', () => {
     const parsed = parseCiFastLog(
       'ci-fast (remaining)\tRun structural ci-fast lane\t2026-10-21T03:06:40.4322457Z ======== lane: copy-gate ========\n' +
