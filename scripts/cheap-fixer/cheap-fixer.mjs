@@ -1,16 +1,25 @@
 #!/usr/bin/env node
 /**
- * Cheap fixer: first rung of the repair ladder. Triggered by cheap-fixer.yml on a failed required
- * workflow_run. Diagnoses with a cheap Gateway model, has Jev judge the patch, and either records
- * it (shadow) or pushes it as one normal commit (push). Any doubt hands off to the lanes untouched.
- * Never executes PR code; the only inputs are logs and file text, treated as untrusted.
+ * Cheap fixer: first rung of the repair ladder (docs/evaluations/cheap-fixer.md). Triggered by
+ * cheap-fixer.yml on a failed required workflow_run. Diagnoses with a cheap Gateway model, has
+ * Jev judge the patch, and either records it (shadow) or pushes it as one normal commit (push).
+ * Any doubt hands off to the lanes untouched. Never executes PR code; the only inputs are logs
+ * and file text, treated as untrusted. All outbound calls go through packages/api-client.
  *
  * Env: GH_TOKEN (read), GH_PUSH_TOKEN (push mode), AI_GATEWAY_API_KEY, REPO, EVENT_PATH,
- *      MODE=shadow|push, PUSH_CLASSES=comma list, OUT_DIR.
+ *      MODE=shadow|push, PUSH_CLASSES=comma list, OUT_DIR, REPLAY=1 (historical run, judge-only).
  */
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createApiClient } from '../../packages/api-client/client.ts';
+import { providerSpec } from '../../packages/api-client/contract.ts';
+import { createGitHubClient } from '../../packages/api-client/github.ts';
+import { curateLogTail } from '../invariants/jev-ci-failure-triage.mjs';
+import { runPreparedJevEvaluation } from '../invariants/jev-gateway.mjs';
+import {
+  interpretPatchVerdict,
+  preparePatchVerdictRequest,
+} from '../invariants/jev-patch-verdict.mjs';
 import {
   activeClaims,
   applyEdits,
@@ -31,38 +40,45 @@ import {
 } from './cheap-fixer-lib.mjs';
 
 const REPO = process.env.REPO || 'JovieInc/Jovie';
-const MODE =
-  process.env.MODE === 'push' && process.env.REPLAY !== '1' ? 'push' : 'shadow';
+const REPLAY = process.env.REPLAY === '1'; // historical red run: judge-only, never claims or pushes
+const MODE = process.env.MODE === 'push' && !REPLAY ? 'push' : 'shadow';
 const PUSH_CLASSES = new Set(
   (process.env.PUSH_CLASSES || '')
     .split(',')
     .map(s => s.trim())
     .filter(Boolean)
 );
-const REPLAY = process.env.REPLAY === '1'; // historical red run: judge-only, never claims or pushes
 const OUT_DIR = process.env.OUT_DIR || 'cheap-fixer-out';
-const GATEWAY = 'https://ai-gateway.vercel.sh/v1/chat/completions';
+const GATEWAY = `https://${providerSpec('ai-gateway').hosts[0]}/v1/chat/completions`;
 const t0 = Date.now();
 
-function gh(args, { token = process.env.GH_TOKEN, input } = {}) {
-  const r = spawnSync('gh', args, {
-    encoding: 'utf8',
-    input,
-    env: { ...process.env, GH_TOKEN: token },
-    maxBuffer: 64 << 20,
-  });
-  if (r.status !== 0)
-    throw new Error(
-      `gh ${args.slice(0, 3).join(' ')} failed: ${(r.stderr || '').slice(0, 300)}`
-    );
-  return r.stdout;
-}
-const api = (path, opts) => JSON.parse(gh(['api', path], opts) || 'null');
+// Shared budget, breaker and retries: the client layer is the contract (.claude/rules/external-apis.md).
+const reader = createGitHubClient({
+  token: process.env.GH_TOKEN ?? '',
+  credential: 'cheap-fixer-read',
+});
+const writer = process.env.GH_PUSH_TOKEN
+  ? createGitHubClient({
+      token: process.env.GH_PUSH_TOKEN,
+      credential: 'cheap-fixer-write',
+    })
+  : null;
+const modelClient = createApiClient({
+  provider: 'ai-gateway',
+  credential: 'cheap-fixer-gateway',
+  authorize: headers =>
+    headers.set('authorization', `Bearer ${process.env.AI_GATEWAY_API_KEY}`),
+});
+const call = { priority: 'repair' };
+const get = async path =>
+  (await reader.rest('GET', path, undefined, call)).json();
 const stamp = () => new Date().toISOString();
+const since = () => new Date(Date.now() - 3 * 3600e3).toISOString();
 
 const receipt = {
   schema: SCHEMA,
   mode: MODE,
+  replay: REPLAY,
   repo: REPO,
   startedAt: stamp(),
   stages: {},
@@ -93,13 +109,13 @@ function finish(outcome, extra = {}) {
 }
 
 async function chat(model, prompt) {
-  const res = await fetch(GATEWAY, {
+  const res = await modelClient.request({
+    url: GATEWAY,
     method: 'POST',
-    headers: {
-      authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
+    priority: 'repair',
+    timeoutMs: 60000,
+    maxAttempts: 2,
+    body: {
       model,
       temperature: 0,
       max_tokens: 4000,
@@ -107,11 +123,9 @@ async function chat(model, prompt) {
         { role: 'system', content: prompt.system },
         { role: 'user', content: prompt.user },
       ],
-    }),
-    signal: AbortSignal.timeout(60000),
+    },
   });
-  if (!res.ok) throw new Error(`gateway ${res.status}`);
-  const body = await res.json();
+  const body = res.json();
   const cost = costUsd(model, body.usage);
   receipt.models.push({ model, usage: body.usage ?? null, costUsd: cost });
   receipt.costUsd += cost ?? 0;
@@ -134,7 +148,7 @@ async function main() {
   mark('start');
   if (!number) finish('skip-no-pr');
 
-  const pr = api(`repos/${REPO}/pulls/${number}`);
+  const pr = await get(`repos/${REPO}/pulls/${number}`);
   const labels = new Set(pr.labels.map(l => l.name.toLowerCase()));
   if (!REPLAY && pr.state !== 'open') finish('skip-closed');
   if (!REPLAY && pr.head.sha !== sha) finish('skip-stale-head');
@@ -144,29 +158,32 @@ async function main() {
   const held = [...labels].filter(l => HOLD_LABELS.has(l));
   if (!REPLAY && held.length) finish('skip-hold', { held });
 
-  const comments = api(
-    `repos/${REPO}/issues/${number}/comments?per_page=100&since=${new Date(Date.now() - 3 * 3600e3).toISOString()}`
-  );
-  const claims = activeClaims(comments, sha);
+  const commentsPath = `repos/${REPO}/issues/${number}/comments?per_page=100&since=${since()}`;
+  const claims = activeClaims(await get(commentsPath), sha);
   const foreign = claims.filter(c => c.host !== CLAIM_HOST);
-  if (foreign.length)
+  if (!REPLAY && foreign.length)
     finish('skip-lane-claimed', { claimedBy: foreign.map(c => c.host) });
   if (MODE === 'push' && claims.length) finish('skip-already-attempted');
 
-  // Failing job + log tail.
-  const jobs = api(
-    `repos/${REPO}/actions/runs/${run.id}/jobs?per_page=100&filter=latest`
+  // Failing job (aggregators like PR Ready only echo a child) and its log tail.
+  const jobs = (
+    await get(
+      `repos/${REPO}/actions/runs/${run.id}/jobs?per_page=100&filter=latest`
+    )
   ).jobs.filter(j => j.conclusion === 'failure');
   if (!jobs.length) finish('skip-no-failed-job');
-  // Aggregator jobs (PR Ready, gates) only echo a child's failure; diagnose the child.
   const job =
     jobs.find(j => !/^(PR Ready|Merge Queue|.*\bgate\b)/i.test(j.name)) ??
     jobs[0];
   const step = job.steps?.find(s => s.conclusion === 'failure')?.name;
-  const rawLog = gh(['api', `repos/${REPO}/actions/jobs/${job.id}/logs`]);
-  const { curateLogTail } = await import(
-    '../invariants/jev-ci-failure-triage.mjs'
-  );
+  const rawLog = (
+    await reader.rest(
+      'GET',
+      `repos/${REPO}/actions/jobs/${job.id}/logs`,
+      undefined,
+      call
+    )
+  ).text;
   const logTail = curateLogTail(rawLog).slice(-LIMITS.logTailBytes);
   mark('logs');
   const { name: failureClass, match: classMatch } = classifyDetail(logTail);
@@ -184,67 +201,66 @@ async function main() {
   // Only push mode fences the head: shadow must never stop the lanes from working.
   let claimId = null;
   if (MODE === 'push') {
-    const posted = JSON.parse(
-      gh(
-        [
-          'api',
-          `repos/${REPO}/issues/${number}/comments`,
-          '-f',
-          `body=${claimBody(sha)}`,
-        ],
-        { token: process.env.GH_PUSH_TOKEN }
+    if (!writer) finish('error', { error: 'push mode without GH_PUSH_TOKEN' });
+    const posted = (
+      await writer.rest(
+        'POST',
+        `repos/${REPO}/issues/${number}/comments`,
+        { body: claimBody(sha) },
+        call
       )
-    );
+    ).json();
     claimId = posted.id;
-    const after = activeClaims(
-      api(
-        `repos/${REPO}/issues/${number}/comments?per_page=100&since=${new Date(Date.now() - 3 * 3600e3).toISOString()}`
-      ),
-      sha
-    );
-    const first = after.sort((a, b) =>
+    const after = activeClaims(await get(commentsPath), sha).sort((a, b) =>
       a.createdAt.localeCompare(b.createdAt)
-    )[0];
-    if (first && first.commentId !== claimId) {
-      gh(['api', '-X', 'DELETE', `repos/${REPO}/issues/comments/${claimId}`], {
-        token: process.env.GH_PUSH_TOKEN,
-      });
+    );
+    if (after[0] && after[0].commentId !== claimId) {
+      await writer.rest(
+        'DELETE',
+        `repos/${REPO}/issues/comments/${claimId}`,
+        undefined,
+        call
+      );
       finish('skip-lost-claim-race');
     }
     mark('claimed');
   }
-  const release = () => {
-    if (claimId)
-      try {
-        gh(
-          ['api', '-X', 'DELETE', `repos/${REPO}/issues/comments/${claimId}`],
-          { token: process.env.GH_PUSH_TOKEN }
-        );
-      } catch {}
+  const release = async () => {
+    if (!claimId) return;
+    try {
+      await writer.rest(
+        'DELETE',
+        `repos/${REPO}/issues/comments/${claimId}`,
+        undefined,
+        call
+      );
+    } catch {
+      /* the claim expires with its TTL; the lanes also treat a missing fix as unclaimed */
+    }
   };
-  const handoff = (why, extra) => {
-    release();
+  const handoff = async (why, extra) => {
+    await release();
     finish(`handoff-${why}`, extra);
   };
 
   // Files: only ones the PR changed (plus snapshots named in the log).
-  const changed = api(`repos/${REPO}/pulls/${number}/files?per_page=100`);
+  const changed = await get(`repos/${REPO}/pulls/${number}/files?per_page=100`);
   const changedInPr = new Set(
     changed.filter(f => f.status !== 'removed').map(f => f.filename)
   );
   const wanted = pathsInLog(rawLog, changedInPr);
-  if (!wanted.length) handoff('no-candidate-files');
+  if (!wanted.length) await handoff('no-candidate-files');
   const contents = {};
   for (const p of wanted) {
     try {
-      const f = api(`repos/${REPO}/contents/${encodeURI(p)}?ref=${sha}`);
+      const f = await get(`repos/${REPO}/contents/${encodeURI(p)}?ref=${sha}`);
       if (f.size <= LIMITS.maxFileBytes && f.encoding === 'base64')
         contents[p] = Buffer.from(f.content, 'base64').toString('utf8');
     } catch {
       /* file absent at head: skip */
     }
   }
-  if (!Object.keys(contents).length) handoff('no-readable-files');
+  if (!Object.keys(contents).length) await handoff('no-readable-files');
 
   // One bounded attempt: primary model, fallback model only when the reply is unparseable.
   const prompt = buildPrompt({
@@ -265,13 +281,13 @@ async function main() {
     if (reply) break;
   }
   mark('model');
-  if (!reply) handoff('model-unusable');
+  if (!reply) await handoff('model-unusable');
   if (reply.handoff || !reply.edits)
-    handoff('model-declined', {
+    await handoff('model-declined', {
       reason: String(reply.handoff ?? '').slice(0, 200),
     });
   const applied = applyEdits(reply.edits, contents);
-  if (!applied.ok) handoff('edit-invalid', { reason: applied.reason });
+  if (!applied.ok) await handoff('edit-invalid', { reason: applied.reason });
   const violations = guardPatch(applied.files, { changedInPr, failureClass });
   const diff = Object.entries(applied.files)
     .map(([p, f]) => unifiedDiff(p, f.before, f.after))
@@ -282,16 +298,10 @@ async function main() {
     explanation: String(reply.explanation ?? '').slice(0, 300),
     files: Object.keys(applied.files),
   });
-  if (violations.length) handoff('guard-violation', { violations });
+  if (violations.length) await handoff('guard-violation', { violations });
   mark('guards');
 
   // Jev judges. Admission is bounded and local to this attempt; Jev never dispatches anything.
-  const { preparePatchVerdictRequest, interpretPatchVerdict } = await import(
-    '../invariants/jev-patch-verdict.mjs'
-  );
-  const { runPreparedJevEvaluation } = await import(
-    '../invariants/jev-gateway.mjs'
-  );
   const request = preparePatchVerdictRequest({
     sourceSha: sha,
     artifactSha256: createHash('sha256').update(diff).digest('hex'),
@@ -321,72 +331,47 @@ async function main() {
     interpretPatchVerdict
   );
   mark('jev');
-  receipt.jev = {
-    status: verdict.status,
-    decision: verdict.decision ?? verdict.detail?.decision ?? null,
-  };
+  receipt.jev = { status: verdict.status, decision: verdict.decision ?? null };
   const decision = verdict.decision;
   if (verdict.status !== 'evaluated' || !decision?.approved)
-    handoff('jev-rejected', { jevStatus: verdict.status });
+    await handoff('jev-rejected', { jevStatus: verdict.status });
 
   if (MODE === 'shadow') finish('shadow-proposed');
 
-  // Push as one normal, non-forced commit via the git data API (app-signed, verified).
-  const tok = process.env.GH_PUSH_TOKEN;
-  const fresh = api(`repos/${REPO}/pulls/${number}`, { token: tok });
+  // Push: one verified, non-forced commit (createCommitOnBranch fails if the head moved).
+  const fresh = await get(`repos/${REPO}/pulls/${number}`);
   if (
     fresh.head.sha !== sha ||
     fresh.labels.some(l => HOLD_LABELS.has(l.name.toLowerCase()))
   )
-    handoff('head-moved-or-held');
-  const commit = api(`repos/${REPO}/git/commits/${sha}`, { token: tok });
-  const tree = [];
-  for (const [p, f] of Object.entries(applied.files)) {
-    const blob = JSON.parse(
-      gh(
-        [
-          'api',
-          `repos/${REPO}/git/blobs`,
-          '-f',
-          `content=${f.after}`,
-          '-f',
-          'encoding=utf-8',
-        ],
-        { token: tok }
-      )
-    );
-    tree.push({ path: p, mode: '100644', type: 'blob', sha: blob.sha });
-  }
-  const newTree = JSON.parse(
-    gh(['api', `repos/${REPO}/git/trees`, '--input', '-'], {
-      token: tok,
-      input: JSON.stringify({ base_tree: commit.tree.sha, tree }),
-    })
-  );
-  const message = `fix(ci): ${failureClass} fix from cheap-fixer for #${number}\n\n${receipt.explanation}\n\nJev verdict: approve (${decision.confidence?.toFixed?.(2)}). Run ${process.env.GITHUB_RUN_ID ?? ''}.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`;
-  const newCommit = JSON.parse(
-    gh(['api', `repos/${REPO}/git/commits`, '--input', '-'], {
-      token: tok,
-      input: JSON.stringify({ message, tree: newTree.sha, parents: [sha] }),
-    })
-  );
-  gh(
-    [
-      'api',
-      '-X',
-      'PATCH',
-      `repos/${REPO}/git/refs/heads/${pr.head.ref}`,
-      '-f',
-      `sha=${newCommit.sha}`,
-      '-F',
-      'force=false',
-    ],
-    { token: tok }
+    await handoff('head-moved-or-held');
+  const message = `fix(ci): ${failureClass} fix from cheap-fixer for #${number}`;
+  const data = await writer.graphql(
+    `mutation CheapFix($input: CreateCommitOnBranchInput!) {
+      createCommitOnBranch(input: $input) { commit { oid } }
+    }`,
+    {
+      input: {
+        branch: { repositoryNameWithOwner: REPO, branchName: pr.head.ref },
+        expectedHeadOid: sha,
+        message: {
+          headline: message,
+          body: `${receipt.explanation}\n\nJev verdict: approve (${decision.confidence?.toFixed?.(2)}). Run ${process.env.GITHUB_RUN_ID ?? ''}.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`,
+        },
+        fileChanges: {
+          additions: Object.entries(applied.files).map(([path, f]) => ({
+            path,
+            contents: Buffer.from(f.after).toString('base64'),
+          })),
+        },
+      },
+    },
+    call
   );
   mark('pushed');
   // The claim is fenced to the old head; deleting it keeps the PR clean for the lanes if the new head goes red.
-  release();
-  finish('pushed', { pushedSha: newCommit.sha });
+  await release();
+  finish('pushed', { pushedSha: data.createCommitOnBranch.commit.oid });
 }
 
 main().catch(e => {

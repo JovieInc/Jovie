@@ -12,7 +12,7 @@ export const MODELS = Object.freeze({
   primary: 'zai/glm-5.3-flash',
   fallback: 'openai/gpt-6-luna',
 });
-/** USD per token, from https://ai-gateway.vercel.sh/v1/models (2026-10-24). */
+/** USD per token, from the Gateway model list (2026-10-24). */
 export const PRICES = Object.freeze({
   'zai/glm-5.3-flash': { input: 0.00000015, output: 0.0000005 },
   'openai/gpt-6-luna': { input: 0.0000001, output: 0.0000005 },
