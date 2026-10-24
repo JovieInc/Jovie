@@ -47,6 +47,64 @@ describe('HomepageHeroCanvas', () => {
     ).not.toBeNull();
   });
 
+  it('keeps the canonical shell header and moves the claim into the copy column', () => {
+    render(
+      <HomepageHeroCanvas
+        headingId='home-hero-heading'
+        headline={hero.headline}
+        subhead={hero.subhead}
+        claim={hero.claim}
+        supportNote={hero.supportNote}
+        profile={hero.profile}
+        sectionOwner='apps/web/components/homepage/HomepageArtistProfile.tsx'
+      />
+    );
+
+    // The docked marketing shell (PublicPageShell) owns the page header:
+    // the canvas renders no private bar, so brand, nav, Log in, and the
+    // claim CTA are never duplicated or hidden behind a second chrome.
+    expect(document.querySelector('.homepage-hero-canvas__bar')).toBeNull();
+    const copy = document.querySelector('.homepage-hero-canvas__copy');
+    expect(copy).not.toBeNull();
+    expect(copy?.classList.contains('ap-section-container')).toBe(true);
+    // The claim form is the hero's one conversion control, in the copy
+    // column on the shared spine, next to the proof it supports.
+    expect(
+      copy?.querySelector('[data-testid="homepage-claim-form"]')
+    ).not.toBeNull();
+    expect(
+      copy?.querySelector('[data-testid="homepage-primary-cta"]')
+    ).not.toBeNull();
+    // The hero opts into the docked-header bleed instead of replacing it.
+    expect(
+      document
+        .querySelector('.homepage-hero-canvas')
+        ?.classList.contains('marketing-hero-dock')
+    ).toBe(true);
+  });
+
+  it('paints each headline sentence beat on its own line without editing the copy', () => {
+    render(
+      <HomepageHeroCanvas
+        headingId='home-hero-heading'
+        headline={hero.headline}
+        subhead={hero.subhead}
+        claim={hero.claim}
+        supportNote={hero.supportNote}
+        profile={hero.profile}
+        sectionOwner='apps/web/components/homepage/HomepageArtistProfile.tsx'
+      />
+    );
+
+    const heading = screen.getByRole('heading', { level: 1 });
+    // Byte-identical accessible text: the beats only control wrapping.
+    expect(heading).toHaveTextContent(hero.headline);
+    const beats = heading.querySelectorAll(
+      '.homepage-hero-canvas__headline-beat'
+    );
+    expect(beats).toHaveLength(2);
+  });
+
   it('ships no partner-logo rail on the homepage hero', () => {
     render(
       <HomepageHeroCanvas

@@ -169,6 +169,58 @@ function canvasHtml(fallback: boolean): string {
 </html>`;
 }
 
+/** The passive fallback script, transpiled once from the product source. */
+const heroScrollScript = (() => {
+  const source = readFileSync(
+    join(webRoot, 'components/homepage/hero-light/hero-light-scroll.ts'),
+    'utf8'
+  );
+  const { outputText } = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+      removeComments: true,
+    },
+  });
+  return `${outputText.replace(/^export /gm, '')}
+    globalThis.HeroCanvasScroll = {
+      bindHeroCanvasScroll,
+      heroCanvasScrollProgress,
+      heroCanvasScrollRange,
+    };`;
+})();
+
+async function bindPassiveFallback(page: Page): Promise<void> {
+  await page.addScriptTag({ content: heroScrollScript });
+  await page.evaluate(() => {
+    const root = document.querySelector('.homepage-hero-canvas');
+    if (!(root instanceof HTMLElement)) throw new Error('missing canvas');
+    const scroll = (
+      window as Window & {
+        HeroCanvasScroll: {
+          bindHeroCanvasScroll(node: HTMLElement): () => void;
+        };
+      }
+    ).HeroCanvasScroll;
+    scroll.bindHeroCanvasScroll(root);
+  });
+}
+
+/**
+ * Product parity for the progress driver. The shipped component binds the
+ * passive JS fallback whenever the browser has no native scroll-driven
+ * animations, so `--hero-canvas-progress` always follows document scroll.
+ * The harness must do the same in the non-fallback tests, or browsers
+ * without `animation-timeline: scroll()` support never advance the
+ * variable (the CSS animation is skipped by @supports and nothing runs).
+ */
+async function bindProgressDriver(page: Page): Promise<void> {
+  const native = await page.evaluate(() =>
+    Boolean(window.CSS?.supports?.('animation-timeline: scroll()'))
+  );
+  if (!native) await bindPassiveFallback(page);
+}
+
 async function readScroll(
   page: Page
 ): Promise<{ y: number; progress: number }> {
@@ -186,6 +238,7 @@ test.describe('homepage hero canvas scroll', () => {
     page,
   }) => {
     await page.setContent(canvasHtml(false), { waitUntil: 'load' });
+    await bindProgressDriver(page);
     await page.mouse.move(720, 420);
 
     const start = await readScroll(page);
@@ -220,44 +273,15 @@ test.describe('homepage hero canvas scroll', () => {
   test('the passive fallback follows scroll position and reverses', async ({
     page,
   }) => {
-    const source = readFileSync(
-      join(webRoot, 'components/homepage/hero-light/hero-light-scroll.ts'),
-      'utf8'
-    );
-    const { outputText } = ts.transpileModule(source, {
-      compilerOptions: {
-        module: ts.ModuleKind.ESNext,
-        target: ts.ScriptTarget.ES2022,
-        removeComments: true,
-      },
-    });
-    const script = `${outputText.replace(/^export /gm, '')}
-      globalThis.HeroCanvasScroll = {
-        bindHeroCanvasScroll,
-        heroCanvasScrollProgress,
-        heroCanvasScrollRange,
-      };`;
     await page.setContent(canvasHtml(true), { waitUntil: 'load' });
-    await page.addScriptTag({ content: script });
-    await page.evaluate(() => {
-      const root = document.querySelector('.homepage-hero-canvas');
-      if (!(root instanceof HTMLElement)) throw new Error('missing canvas');
-      const scroll = (
-        window as Window & {
-          HeroCanvasScroll: {
-            bindHeroCanvasScroll(node: HTMLElement): () => void;
-          };
-        }
-      ).HeroCanvasScroll;
-      scroll.bindHeroCanvasScroll(root);
-    });
+    await bindPassiveFallback(page);
 
     await page.mouse.move(200, 200);
     await page.mouse.wheel(0, 200);
     await page.evaluate(
       () =>
         new Promise<void>(resolve => {
-          requestAnimationFrame(() => resolve());
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
         })
     );
     const forward = await readScroll(page);
@@ -274,7 +298,7 @@ test.describe('homepage hero canvas scroll', () => {
     await page.evaluate(
       () =>
         new Promise<void>(resolve => {
-          requestAnimationFrame(() => resolve());
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
         })
     );
     const back = await readScroll(page);
@@ -305,6 +329,7 @@ test.describe('homepage hero canvas scroll', () => {
             bottom: box.bottom,
             left: box.left,
             right: box.right,
+            width: box.width,
             height: box.height,
           };
         };
@@ -351,6 +376,7 @@ test.describe('homepage hero canvas scroll', () => {
   test('captures dark progress frames at 1440 and 390', async ({ page }) => {
     mkdirSync(shotDir, { recursive: true });
     await page.setContent(canvasHtml(false), { waitUntil: 'load' });
+    await bindProgressDriver(page);
     await page.addStyleTag({
       content: '.homepage-hero-light__edge { animation: none; }',
     });

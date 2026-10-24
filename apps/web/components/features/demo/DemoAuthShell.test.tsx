@@ -121,6 +121,19 @@ describe('DemoAuthShell', () => {
       'Tim White'
     );
   });
+
+  it('forces the capture player via the prop when no URL opt-in exists', () => {
+    render(
+      <DemoAuthShell capturePlayer>
+        <DemoQueryProbe />
+      </DemoAuthShell>
+    );
+    expect(screen.getByTestId('capture-player')).toBeInTheDocument();
+    expect(screen.getByTestId('demo-identity')).toHaveAttribute(
+      'data-name',
+      'Tim White'
+    );
+  });
   it('keeps the standalone demo on the shared tooltip timing scope', () => {
     render(
       <DemoClientProviders>

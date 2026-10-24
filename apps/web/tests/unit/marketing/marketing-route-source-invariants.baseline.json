@@ -1,7 +1,7 @@
 {
   "arbitrary-value::components/atoms/AppIconButton.tsx": 1,
   "arbitrary-value::components/atoms/InvisibleTurnstile.tsx": 3,
-  "arbitrary-value::components/features/auth/AuthBrandPanel.tsx": 5,
+  "arbitrary-value::components/features/auth/AuthBrandPanel.tsx": 2,
   "arbitrary-value::components/features/auth/AuthLayout.tsx": 2,
   "arbitrary-value::components/features/home/HomeTrustSection.tsx": 3,
   "arbitrary-value::components/features/home/InputAuraFrame.tsx": 1,
@@ -26,7 +26,7 @@
   "arbitrary-value::components/organisms/CookieBannerSection.tsx": 2,
   "arbitrary-value::components/organisms/CookieModal.tsx": 3,
   "arbitrary-value::components/site/MarketingFooterCta.tsx": 2,
-  "arbitrary-value::components/site/MarketingTerminalCta.tsx": 15,
+  "arbitrary-value::components/site/MarketingTerminalCta.tsx": 13,
   "inline-style::app/(marketing)/renders/[state]/MarketingStateRenderClient.tsx": 1,
   "inline-style::app/(marketing)/renders/[state]/page.tsx": 1,
   "inline-style::app/(marketing)/renders/profile-admission/ProfileAdmissionFixtureClient.tsx": 4,

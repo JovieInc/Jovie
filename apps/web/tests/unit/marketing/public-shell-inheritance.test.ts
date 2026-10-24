@@ -16,14 +16,25 @@ describe('public marketing shell inheritance', () => {
     expect(source).toContain('<PublicPageShell');
   });
 
-  it('starts the homepage hero at the viewport top', () => {
+  it('bleeds the homepage hero under the docked shell header', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'app/(home)/layout.tsx'),
       'utf8'
     );
 
     expect(source).toContain('home-viewport--hero-canvas');
-    expect(source).toContain('mainOffset={false}');
+    // The canonical docked marketing header stays mounted and visible on
+    // the homepage: the hero opts into .marketing-hero-dock bleed instead
+    // of skipping the shell offset, which had hidden header-nav entirely.
+    expect(source).not.toContain('mainOffset={false}');
+    const hero = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/homepage/hero-light/HomepageHeroCanvas.tsx'
+      ),
+      'utf8'
+    );
+    expect(hero).toContain('marketing-hero-dock');
   });
 
   it('keeps the brand page on the homepage chrome while sharing the shell owner', () => {

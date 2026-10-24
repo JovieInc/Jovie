@@ -101,9 +101,7 @@ async function collectReleasesShape(
   await expect(drawer).toBeVisible({ timeout: 30_000 });
 
   return {
-    shellList: await matrix
-      .getByRole('listbox', { name: 'Releases' })
-      .isVisible(),
+    shellList: await matrix.getByRole('list', { name: 'Releases' }).isVisible(),
     drawerTabs: normalizeTexts(await drawer.getByRole('tab').allInnerTexts()),
     drawerCards: {
       analytics: await drawer

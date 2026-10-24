@@ -133,12 +133,12 @@ export const SOCIAL_PROFILE_CATALOG = {
       status: 'blocked_unreliable',
       transport: 'public_json',
       detail:
-        'The network matrix describes public ingestion, but fetchLayloProfile requests CloudFront JSON while fetchJson allows only laylo.com/www.laylo.com: INVALID_HOST precedes fetch. Supplied JSON can yield image/website links; no bio is extracted.',
+        'fetchLayloProfile reads public profile/user JSON from Laylo CloudFront hosts allowlisted in fetchJson (JOV-8466); the transport works, but destination field reads/writes remain unverified, so the manifest stays blocked. Supplied JSON can yield image/website links; no bio is extracted.',
     },
     validation: {
       profileUrlRef: `${strategyRoot}/laylo.ts`,
       constraints:
-        'validateLayloUrl requires a Laylo host and handle; extracted links use normalizeUrl/detectPlatform and canonical deduplication. CloudFront source hosts are outside the fetch allowlist.',
+        'validateLayloUrl requires a Laylo host and handle; extracted links use normalizeUrl/detectPlatform and canonical deduplication. fetchJson allowlists Laylo hosts plus Laylo\u2019s two CloudFront JSON distributions.',
     },
     sourceRefs: [`${strategyRoot}/laylo.ts`, `${strategyRoot}/base/fetch.ts`],
   }),

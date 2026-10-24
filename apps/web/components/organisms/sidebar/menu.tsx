@@ -44,8 +44,8 @@ const sidebarMenuButtonVariants = cva(
     'transition-[background-color,color,box-shadow] duration-fast ease-interactive',
     // Default text color — token-driven contrast, no extra opacity dampening
     'text-sidebar-item-foreground',
-    // Hover state — Linear: rgba(255,255,255,0.02) bg
-    'hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] hover:text-sidebar-item-foreground',
+    // Use the sidebar surface token directly so hover matches other rail controls.
+    'hover:bg-sidebar-accent hover:text-sidebar-item-foreground',
     // Active state — filled background only, no border/inset ring
     'data-[active=true]:bg-[color-mix(in_oklab,var(--color-sidebar-accent-active)_88%,var(--app-shell-content-surface))] data-[active=true]:text-sidebar-item-foreground',
     // Focus state - subtle bg plus tokenized keyboard ring

@@ -14,6 +14,13 @@ CSP, webhooks, secrets, email, fail-closed persistence, biome-ignore, environmen
 
 For webhook signature verification: verify before parsing business logic.
 
+## No Unlimited Anything
+
+- **EVERY** user-facing or system-facing capability, quota, rate, or resource (dictation, API calls, tokens, compute, storage, any consumable) MUST have an abuse limit.
+- Enforce limits server-side wherever possible; client-side limits are UX only.
+- Keep each limit in one configurable setting per capability, never scattered literals.
+- Document each limit: capability, value, scope, and behavior when hit. A capability without a documented limit is incomplete.
+
 ## Server-Side External HTTP Must Be Bounded
 
 - **ALWAYS** use a shared timeout + retry wrapper for server-side external HTTP on request handlers, webhooks, cron jobs, and admin/HUD paths.

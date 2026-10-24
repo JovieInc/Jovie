@@ -208,7 +208,7 @@ async function openReleaseDrawer(
   options?: { readonly requireSidebar?: boolean }
 ) {
   const releasesMatrix = await openReleasesMatrix();
-  const releaseRow = within(releasesMatrix).getByRole('option', {
+  const releaseRow = within(releasesMatrix).getByRole('listitem', {
     name: new RegExp(title),
   });
 
@@ -241,6 +241,22 @@ describe('DemoReleasesExperience', () => {
   it('uses the canonical founder catalog when the player capture URL opts in', async () => {
     captureQuery.value = 'capturePlayer=1';
     renderDemo();
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-shell-release-row]')
+      ).toHaveTextContent('The Deep End')
+    );
+    expect(screen.queryByText("I'm Not Alone Remixes")).toBeNull();
+  });
+
+  it('uses the canonical founder catalog when the capturePlayer prop opts in', async () => {
+    // The vitest storybook runner cannot carry per-story search params, so
+    // DemoPlayerCapture.stories forces the prop instead of the URL opt-in.
+    render(
+      <NuqsTestingAdapter>
+        <DemoReleasesExperience capturePlayer />
+      </NuqsTestingAdapter>
+    );
     await waitFor(() =>
       expect(
         document.querySelector('[data-shell-release-row]')

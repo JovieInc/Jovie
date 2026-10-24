@@ -38,7 +38,7 @@ export type AdminWorkspaceId =
   | 'outbound'
   | 'product'
   | 'operations'
-  | 'needs_you'
+  | 'inbox'
   | 'ops'
   | 'shipping'
   | 'people'
@@ -67,9 +67,10 @@ export interface AdminNavRegistryItem {
   readonly section: AdminNavigationSection;
 }
 
-/** Ovie is one Home (Tim 2026-10-21); everything else lives under Tools. */
+/** Home and Inbox are primary; operational workspaces live under Tools. */
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
   'overview',
+  'inbox',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_SETTINGS_TOOL_IDS = [
@@ -98,6 +99,13 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Home',
     href: APP_ROUTES.ADMIN_NOW,
     description: 'What matters now, shipping, and the composer',
+    section: 'workspaces',
+  },
+  {
+    id: 'inbox',
+    label: 'Inbox',
+    href: APP_ROUTES.ADMIN_INBOX,
+    description: 'Decision requests that need your attention',
     section: 'workspaces',
   },
   {
@@ -388,10 +396,10 @@ export const ADMIN_LEGACY_REDIRECT_MAP = {
     workspace: 'ops',
     href: APP_ROUTES.ADMIN_OPS,
   },
-  // Needs You folded into Home's asks (Tim 2026-10-21: one Home).
+  // Legacy Needs You links open the canonical Inbox.
   [APP_ROUTES.ADMIN_NEEDS_YOU]: {
-    workspace: 'overview',
-    href: APP_ROUTES.OV,
+    workspace: 'inbox',
+    href: APP_ROUTES.ADMIN_INBOX,
   },
 } as const;
 
