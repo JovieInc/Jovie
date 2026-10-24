@@ -267,8 +267,11 @@ describe('DemoReleasesExperience', () => {
     async () => {
       renderDemo();
 
-      // The sidebar nav has a Releases tab and it appears in the breadcrumb
-      expect(screen.getAllByText('Releases').length).toBeGreaterThan(0);
+      // The releases view retains its Work sidebar root in the shell title.
+      expect(screen.getByRole('heading', { name: 'Work' })).toBeInTheDocument();
+      expect(
+        screen.getAllByRole('link', { name: 'Work' }).length
+      ).toBeGreaterThan(0);
       await openReleaseDrawer(LEADING_RELEASE_TITLE);
 
       // Release titles should appear in the list

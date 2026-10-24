@@ -1,14 +1,16 @@
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { EmptyState } from '@/components/molecules/EmptyState';
+import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import { captureError } from '@/lib/error-tracking';
 import { loadRevenueLiftDashboard } from '@/lib/metrics/revenue-lift-dashboard';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { RevenueLiftDashboardView } from './RevenueLiftDashboardView';
 
 export const metadata: Metadata = {
-  title: 'Revenue Lift | Admin',
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_REVENUE_LIFT, 'ov'),
   description:
     'North star IRPAA + KPI tree from the canonical metrics layer (ops/VC).',
   robots: NOINDEX_ROBOTS,

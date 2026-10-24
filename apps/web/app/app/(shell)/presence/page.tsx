@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { presenceNavItem } from '@/components/features/dashboard/dashboard-nav/config';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   loadAppShellRouteContext,
@@ -10,7 +11,7 @@ import { ProfilesWorkspace } from '../profiles/ProfilesWorkspace';
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
-  title: 'Profiles',
+  title: presenceNavItem.name,
   description:
     'Manage who you are and how you are represented across public surfaces',
 };

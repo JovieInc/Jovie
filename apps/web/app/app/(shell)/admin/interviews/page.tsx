@@ -2,11 +2,15 @@ import { Badge } from '@jovie/ui';
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import { loadAdminInterviewRows } from './interviews-data';
 
-export const metadata: Metadata = { title: 'Interviews — Admin' };
+export const metadata: Metadata = {
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_INTERVIEWS, 'ov'),
+};
 export const runtime = 'nodejs';
 
 function formatDate(iso: Date | string): string {
@@ -43,7 +47,7 @@ export default async function AdminInterviewsPage() {
       description='Mom Test interviews captured after onboarding.'
       testId='admin-interviews-page'
     >
-      <ContentSurfaceCard className='overflow-hidden p-0'>
+      <ContentSurfaceCard className='overflow-hidden'>
         {rows.length === 0 ? (
           <div className='px-(--app-shell-header-padding-x) py-6 text-app text-secondary-token'>
             No interviews yet.

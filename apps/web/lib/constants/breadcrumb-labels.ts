@@ -1,3 +1,6 @@
+import { APP_ROUTES } from '@/constants/routes';
+import { getSidebarRouteLabel } from './sidebar-route-labels';
+
 /**
  * Centralized breadcrumb label map.
  * Uses sentence case (only first word capitalized) for consistency.
@@ -8,10 +11,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   // Dashboard routes
   dashboard: 'Dashboard',
   profile: 'Profile',
-  profiles: 'Profiles',
-  presence: 'Profiles',
   contacts: 'Contacts',
-  library: 'Work',
   releases: 'Releases',
   audience: 'Audience',
   earnings: 'Earnings',
@@ -45,7 +45,6 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   'visibility-audit': 'Visibility Audit',
 
   // Root routes
-  app: 'Home',
 } as const;
 
 /**
@@ -54,6 +53,12 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
  */
 export function getBreadcrumbLabel(segment: string): string {
   if (!segment) return '';
+  const sidebarLabel = getSidebarRouteLabel(
+    segment === 'app'
+      ? APP_ROUTES.DASHBOARD
+      : `${APP_ROUTES.DASHBOARD}/${segment}`
+  );
+  if (sidebarLabel) return sidebarLabel;
   if (segment in BREADCRUMB_LABELS) {
     return BREADCRUMB_LABELS[segment];
   }

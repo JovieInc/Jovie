@@ -12,6 +12,7 @@ import {
   getAdminPeopleViewLabel,
   isAdminPeopleView,
 } from '@/constants/admin-navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   type AdminAssetSort,
   adminAssetSortFields,
@@ -28,6 +29,7 @@ import {
   getWaitlistIntegritySummary,
   getWaitlistMetrics,
 } from '@/lib/admin/waitlist';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import { getAdminFeedbackItemsResult } from '@/lib/feedback';
 import {
   type AdminCreatorsSort,
@@ -54,7 +56,7 @@ interface AdminPeoplePageProps {
 }
 
 export const metadata: Metadata = {
-  title: 'Admin People',
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_PEOPLE, 'ov'),
   description: 'User table, roles, waitlist, creators, and individual actions.',
 };
 

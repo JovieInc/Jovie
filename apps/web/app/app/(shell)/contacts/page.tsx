@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
+import { audienceNavItem } from '@/components/features/dashboard/dashboard-nav/config';
 import { RouteSegmentControl } from '@/components/molecules/RouteSegmentControl';
 import { PageToolbar } from '@/components/organisms/table/molecules/PageToolbar';
 import { WorkspacePage } from '@/components/organisms/WorkspacePage';
@@ -37,7 +38,7 @@ export { resolveContactsWorkspaceTab } from './contacts-workspace';
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
-  title: 'Audience',
+  title: audienceNavItem.name,
   description: 'Your audience, contacts, and audience insights',
 };
 

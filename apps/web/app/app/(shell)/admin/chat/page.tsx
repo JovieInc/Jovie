@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
+import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { OvChatClient } from './OvChatClient';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: 'Home',
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_NOW, 'ov'),
   description: 'What matters across the company loop, with the composer.',
   robots: NOINDEX_ROBOTS,
 };

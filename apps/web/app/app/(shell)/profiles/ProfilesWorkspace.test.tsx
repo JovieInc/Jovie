@@ -651,6 +651,9 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
   it('shows one full profile inventory and a focused add action without category controls', () => {
     renderWorkspace(dataWithConnector);
+    expect(
+      screen.queryByText('Profiles', { exact: true })
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
     expect(screen.queryByText('Gmail')).not.toBeInTheDocument();

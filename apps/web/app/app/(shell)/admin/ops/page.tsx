@@ -1,7 +1,12 @@
-import HudPage, { metadata } from '@/app/hud/page';
+import HudPage, { metadata as hudMetadata } from '@/app/hud/page';
+import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 
-export { metadata };
+export const metadata = {
+  ...hudMetadata,
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_OPS, 'ov'),
+};
 
 // Next.js route-segment config must be a local literal.
 export const dynamic = 'force-dynamic';
