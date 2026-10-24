@@ -37,6 +37,7 @@ import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
 import remediation  # noqa: E402
 import shipping_attribution  # noqa: E402  (company merge provenance report)
 import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage collector)
+import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
 import throughput_sentinel  # noqa: E402  (no-progress alarms, idle-reason counts, growth bounds)
 
 COOL_OFF_S = 6 * 3600
@@ -57,6 +58,8 @@ FAILED_RUN_ALERT = 10
 # JOV-8931: a relayed red check must be claimed within this window of red_at.
 RED_DISPATCH_CLAIM_GRACE_S = 180
 RED_DISPATCH_LEDGER_LIMIT = 1024 * 1024
+# The doctor judges 24h of receipts; ~8 days of the ledger at 2026-10-24 volume.
+LEDGER_TAIL_BYTES = 16 * 1024 * 1024
 # Repairs that ended before any agent work: each still spends one of the PR's bounded fix
 # attempts (no refunds, by design), so a run of them exhausts PRs on infrastructure alone.
 NO_WORK_REPAIR_VERDICTS = frozenset({"recovery-handoff", "reconcile-unavailable", "skipped"})
@@ -368,7 +371,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     now = sample_clock()
     state = host.state
     tick = read_json(state / "tick.json", {})
-    ledger_evidence = shipping_attribution.read_ledger(state / "runs" / "ledger.jsonl")
+    ledger_evidence = shipping_attribution.read_ledger(state / "runs" / "ledger.jsonl", tail_bytes=LEDGER_TAIL_BYTES)
     ledger_evidence["remoteIngest"] = tick.get("shippingOriginIngest")
     all_receipts = ledger_evidence["rows"]
     receipts = [receipt for receipt in all_receipts
@@ -1960,7 +1963,14 @@ def locked_doctor_write(state: Path, write) -> None:
 def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     path = host.state / "doctor.json"
     previous = read_json(path, {})
+    rotation = None
+    if not os.environ.get("LANES_SELFTEST") and ledger_archive.due(host.state, time.time()):
+        try:
+            rotation = ledger_archive.rotate(host.state)
+        except (OSError, ValueError) as error:  # the ledger stays as it was; the growth-bound alarm keeps firing
+            rotation = {"status": "error", "error": f"{type(error).__name__}: {error}"[:160]}
     obs = observe(host, lane, codex)
+    obs["ledgerRotation"] = rotation
     # remember when the pool first went empty so the alert needs 30 sustained minutes
     if new_work_empty(obs):
         previous["poolEmptySince"] = previous.get("poolEmptySince") or obs["now"]

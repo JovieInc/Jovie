@@ -174,6 +174,9 @@ def growth_bounds(state: Path, limits: dict) -> list[dict]:
     rows = [
         ("repair-inventory-bytes", size("cache/open-prs-labels-v2.json"), limits.get("inventoryBytes", 16 * MIB),
          "bytes", "lane_runner.REPAIR_INVENTORY_MAX_BYTES: every repair worker idles when exceeded (JOV 2026-10-24, 154 PRs)"),
+        ("ledger-bytes", size("runs/ledger.jsonl"), 64_000_000, "bytes",
+         "backlog_admission refuses all admission above 64,000,000 bytes (native-attempt-ledger-read-bound); "
+         "ledger_archive.py rotation keeps 10 days"),
         ("fix-attempts-bytes", size("fix-attempts.json"), MIB, "bytes",
          "maintenance_json default 1 MiB: fix-attempt accounting reads fail closed"),
         ("held-bytes", size("held.json"), MIB, "bytes", "maintenance_json default 1 MiB: hold reads fail closed"),
