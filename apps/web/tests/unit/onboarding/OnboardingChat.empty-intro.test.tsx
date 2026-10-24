@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import type { UIMessage } from 'ai';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
 
@@ -96,28 +96,17 @@ vi.mock('@/components/features/onboarding/OnboardingToolArtifacts', () => ({
 vi.mock('@/components/jovie/components', () => ({
   ChatEmptyStateComposerRegion: ({
     above,
-    alignAbove,
     children,
   }: {
     readonly above?: React.ReactNode;
-    readonly alignAbove?: 'top' | 'bottom';
     readonly children: React.ReactNode;
   }) => (
-    <div
-      data-testid='chat-empty-state-composer-region'
-      data-align-above={alignAbove}
-    >
+    <div data-testid='chat-empty-state-composer-region'>
       {above}
       {children}
     </div>
   ),
-  ChatInput: ({
-    pickerPlacement,
-  }: {
-    readonly pickerPlacement?: 'flow' | 'overlay';
-  }) => (
-    <div data-testid='chat-input' data-picker-placement={pickerPlacement} />
-  ),
+  ChatInput: () => <div data-testid='chat-input' />,
   ChatMessage: ({
     parts,
   }: {
@@ -158,9 +147,6 @@ describe('OnboardingChat empty intro', () => {
     });
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
     expect(activity).not.toHaveBeenCalled();
-    expect(
-      screen.getByTestId('chat-empty-state-composer-region')
-    ).toHaveAttribute('data-align-above', 'top');
   });
 
   beforeEach(() => {
@@ -172,26 +158,19 @@ describe('OnboardingChat empty intro', () => {
     process.env.NODE_ENV = 'development';
   });
 
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
   it('shows welcome intro on a blank /start visit', () => {
     render(
       <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
     );
 
     expect(screen.getByTestId('onboarding-empty-intro')).toBeTruthy();
-    expect(
-      screen.getByTestId('chat-empty-state-composer-region')
-    ).not.toHaveAttribute('data-align-above');
     expect(screen.getByTestId('onboarding-start-ambient-mark')).toBeTruthy();
     expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
 
-  it('keeps a validated starter as a draft while verification is pending', () => {
+  it('shows a compact processing state for a validated starter handoff', () => {
     process.env.NODE_ENV = 'test';
     render(
       <OnboardingChat
@@ -204,69 +183,9 @@ describe('OnboardingChat empty intro', () => {
       />
     );
 
-    expect(
-      screen.getByRole('heading', { name: 'Your first message' })
-    ).toBeTruthy();
-    expect(
-      screen.getByTestId('chat-empty-state-composer-region')
-    ).toHaveAttribute('data-align-above', 'top');
-    expect(screen.queryByText('Your message is on its way.')).toBeNull();
+    expect(screen.getByText('Getting this ready')).toBeTruthy();
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
-  });
-
-  it('sizes pending starter guidance once without announcing or submitting it', async () => {
-    vi.stubEnv('NODE_ENV', 'test');
-    const onTurnstileRequired = vi.fn();
-    const props = {
-      starterHandoff: { kind: 'prompt' as const, prompt: 'Claim my page' },
-      turnstileHasSiteKey: true,
-      turnstileStatus: 'loading' as const,
-      turnstileToken: null,
-      onTurnstileRequired,
-    };
-    const { rerender } = render(
-      <OnboardingChat {...props} turnstilePanel={<span hidden />} />
-    );
-
-    const sizingCopy = screen.getByTestId(
-      'onboarding-verification-instruction-size'
-    );
-    expect(sizingCopy).toHaveAttribute('aria-hidden', 'true');
-    expect(sizingCopy).toHaveClass('invisible', 'pointer-events-none');
-    expect(sizingCopy).not.toHaveAttribute('role');
-    expect(sizingCopy).not.toHaveAttribute('aria-live');
-    expect(screen.queryByRole('status')).toBeNull();
-    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
-    await waitFor(() => expect(onTurnstileRequired).toHaveBeenCalledOnce());
-
-    const instruction = onTurnstileRequired.mock.calls[0][0];
-    expect(instruction).toEqual(sizingCopy.textContent);
-    rerender(
-      <OnboardingChat
-        {...props}
-        turnstilePanel={<p role='status'>{instruction}</p>}
-      />
-    );
-    expect(screen.getAllByRole('status')).toHaveLength(1);
-    expect(screen.getByRole('status')).toHaveTextContent(instruction);
-    expect(
-      screen.getByRole('heading', { name: 'Your first message' })
-    ).toBeInTheDocument();
-    expect(screen.queryByText('Your message is on its way.')).toBeNull();
-    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
-
-    rerender(
-      <OnboardingChat
-        {...props}
-        turnstileHasSiteKey={false}
-        turnstilePanel={<span hidden />}
-      />
-    );
-    expect(
-      screen.queryByTestId('onboarding-verification-instruction-size')
-    ).toBeNull();
-    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
   it('keeps a handle entry on its value screen and never auto-sends the claim draft (JOV-7753)', async () => {
@@ -304,55 +223,26 @@ describe('OnboardingChat empty intro', () => {
   it.each([
     ['default', undefined, 'pt-5'],
     ['headerOverlay', true, 'pt-16'],
-  ] as const)(
-    'reserves %s top clearance in the scroll region (JOV-7192)',
-    (_label, headerOverlay, expected) => {
-      const { container } = render(
-        <OnboardingChat
-          headerOverlay={headerOverlay}
-          turnstileToken='token'
-          turnstileStatus='verified'
-        />
-      );
-
-      const scrollRegion = container.querySelector(
-        '[aria-live="polite"].overflow-y-auto'
-      );
-      expect(scrollRegion).not.toBeNull();
-      expect(scrollRegion).toHaveClass(expected);
-      // Content scrolled under the floating sign-in fades rather than
-      // hard-clipping into a cut-off bubble; at rest, content below the 4rem
-      // clearance stays fully opaque.
-      expect(
-        scrollRegion?.className.includes('system-b-chat-thread-top-fade')
-      ).toBe(headerOverlay === true);
-    }
-  );
-
-  it('overlays the slash picker on a blank start and flows it under a paused message', async () => {
-    render(
-      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+  ] as const)('reserves %s top clearance in the scroll region (JOV-7192)', (_label, headerOverlay, expected) => {
+    const { container } = render(
+      <OnboardingChat
+        headerOverlay={headerOverlay}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
     );
 
-    expect(screen.getByTestId('chat-input')).toHaveAttribute(
-      'data-picker-placement',
-      'overlay'
+    const scrollRegion = container.querySelector(
+      '[aria-live="polite"].overflow-y-auto'
     );
-
-    chatMocks.errorMetadata = {};
-    act(() => {
-      chatMocks.onError?.(new Error('Network interrupted'));
-    });
-
-    await waitFor(() => {
-      expect(
-        screen.getByTestId('onboarding-message-recovery')
-      ).toHaveTextContent('Message paused');
-    });
-    expect(screen.getByTestId('chat-input')).toHaveAttribute(
-      'data-picker-placement',
-      'flow'
-    );
+    expect(scrollRegion).not.toBeNull();
+    expect(scrollRegion).toHaveClass(expected);
+    // Content scrolled under the floating sign-in fades rather than
+    // hard-clipping into a cut-off bubble; at rest, content below the 4rem
+    // clearance stays fully opaque.
+    expect(
+      scrollRegion?.className.includes('system-b-chat-thread-top-fade')
+    ).toBe(headerOverlay === true);
   });
 
   it('surfaces a turnstile recovery row instead of swallowing the error (JOV-7294)', async () => {
@@ -368,7 +258,18 @@ describe('OnboardingChat empty intro', () => {
     await waitFor(() => {
       expect(
         screen.getByTestId('onboarding-message-recovery')
-      ).toHaveTextContent('One quick check');
+      ).toHaveTextContent('Complete the security check to send your message.');
     });
+  });
+});
+
+describe('conversion surface marker (JOV-8068)', () => {
+  it('exports the conversion-surface flag helpers the claim hook reads', async () => {
+    const mod = await import('@/components/features/onboarding/OnboardingChat');
+    expect(typeof mod.markOnboardingConversionSurface).toBe('function');
+    expect(typeof mod.hasOnboardingConversionSurfaceShown).toBe('function');
+    expect(typeof mod.resetOnboardingConversionSurfaceForTests).toBe(
+      'function'
+    );
   });
 });

@@ -80,19 +80,14 @@ describe('onboarding sign-in placement', () => {
   it.each([
     ['anonymous', undefined, 'true'],
     ['signed-in', true, 'false'],
-  ] as const)(
-    'reserves chat top clearance under the floating sign-in only while %s (JOV-7192)',
-    (_label, isSignedIn, expected) => {
-      render(
-        <OnboardingShell sessionLabel='pending' isSignedIn={isSignedIn} />
-      );
+  ] as const)('reserves chat top clearance under the floating sign-in only while %s (JOV-7192)', (_label, isSignedIn, expected) => {
+    render(<OnboardingShell sessionLabel='pending' isSignedIn={isSignedIn} />);
 
-      expect(screen.getByTestId('onboarding-chat')).toHaveAttribute(
-        'data-header-overlay',
-        expected
-      );
-    }
-  );
+    expect(screen.getByTestId('onboarding-chat')).toHaveAttribute(
+      'data-header-overlay',
+      expected
+    );
+  });
 
   it('keeps the taken-handle intro free of a second sign-in control (JOV-7753)', () => {
     render(
@@ -123,18 +118,23 @@ describe('onboarding sign-in placement', () => {
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
 
-  it.each(['prompt_handoff', 'spotify_handoff'] as const)(
-    'keeps the %s intro free of verification theater (JOV-3379)',
-    mode => {
-      const { container } = render(<OnboardingChatEmptyIntro mode={mode} />);
+  it.each([
+    'prompt_handoff',
+    'spotify_handoff',
+  ] as const)('keeps the %s intro free of verification theater (JOV-3379)', mode => {
+    const { container } = render(<OnboardingChatEmptyIntro mode={mode} />);
 
-      expect(container.textContent ?? '').not.toMatch(
-        /verif|browser check|human/i
-      );
-      expect(screen.queryByText('Your message is on its way.')).toBeNull();
-      expect(
-        screen.getByRole('heading', { name: 'Your first message' })
-      ).toBeTruthy();
-    }
-  );
+    expect(container.textContent ?? '').not.toMatch(
+      /verif|browser check|human/i
+    );
+    expect(screen.getByText('Your message is on its way.')).toBeTruthy();
+  });
+});
+
+describe('onboarding claim handoff (JOV-8068)', () => {
+  it('renders no handoff card when the claim hook reports no handoff', () => {
+    render(<OnboardingShell sessionLabel='pending' isSignedIn />);
+
+    expect(screen.queryByTestId('onboarding-claim-handoff')).toBeNull();
+  });
 });

@@ -2,9 +2,9 @@
 
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
-import { Button, Link as JovieLink, Skeleton } from '@jovie/ui';
+import { Button, Skeleton } from '@jovie/ui';
 import type { UIMessage } from 'ai';
-import NextLink from 'next/link';
+import Link from 'next/link';
 import {
   type ReactNode,
   useCallback,
@@ -27,6 +27,7 @@ import {
 } from '@/lib/turnstile/keys';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
+import { OnboardingClaimHandoffCard } from './OnboardingClaimHandoffCard';
 import {
   EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
   type OnboardingProfileBuilderState,
@@ -38,7 +39,10 @@ import {
   OnboardingTurnstile,
   type OnboardingTurnstileState,
 } from './OnboardingTurnstile';
-import { useOnboardingClaim } from './useOnboardingClaim';
+import {
+  type OnboardingClaimHandoff,
+  useOnboardingClaim,
+} from './useOnboardingClaim';
 
 /**
  * App-shell frame for the anonymous onboarding chat.
@@ -126,6 +130,8 @@ export function OnboardingShell({
   const [turnstileFocusSignal, setTurnstileFocusSignal] = useState(0);
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
   const [claimTrigger, setClaimTrigger] = useState(0);
+  const [claimHandoff, setClaimHandoff] =
+    useState<OnboardingClaimHandoff | null>(null);
 
   useEffect(() => {
     track(ONBOARDING_FUNNEL_EVENTS.ONBOARDING_STARTED, {
@@ -183,15 +189,14 @@ export function OnboardingShell({
       testMode={turnstileTestMode}
     />
   );
-  const turnstileSiteKey = resolveOnboardingTurnstileSiteKey(
-    getBrowserTurnstileHostname(),
-    publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
-    turnstileTestMode
-  );
   const turnstilePanelVisible = isOnboardingTurnstilePanelVisible(
     turnstileState,
     turnstileInstruction,
-    turnstileSiteKey
+    resolveOnboardingTurnstileSiteKey(
+      getBrowserTurnstileHostname(),
+      publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+      turnstileTestMode
+    )
   );
 
   const isTurnstileUnavailable =
@@ -215,13 +220,15 @@ export function OnboardingShell({
     resetTurnstileVerification('One quick check before we send');
   }, [resetTurnstileVerification]);
 
-  // Auto-claim any anonymous transcript once Better Auth reports the user is
-  // authenticated, then retry after completed chat turns. Durable waitlist
-  // receipts route to /waitlist; admitted users go to checkout; missing
-  // artist identity stays in this chat.
+  // Claim the anonymous transcript once the visitor authenticates mid-chat,
+  // then retry after completed chat turns. A visitor who arrives already
+  // signed in never auto-claims on mount (JOV-8068). Resolved claims surface
+  // as an inline handoff card — checkout/waitlist navigation only happens on
+  // the visitor's click, never automatically.
   const claimStatus = useOnboardingClaim(
     claimTrigger,
-    !resumeOwnedConversation || claimTrigger > 0
+    !resumeOwnedConversation || claimTrigger > 0,
+    { onHandoffReady: setClaimHandoff }
   );
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
@@ -242,7 +249,6 @@ export function OnboardingShell({
     <SidebarProvider defaultOpen={false}>
       <AppShellFrame
         sidebar={null}
-        flushContent
         containerClassName='[color-scheme:dark]'
         contentClassName='overflow-hidden!'
         main={
@@ -281,14 +287,12 @@ export function OnboardingShell({
                     </Button>
                   ) : null}
                   {!isSignedIn ? (
-                    <JovieLink
-                      asChild
-                      variant='compact'
-                      touchTarget
-                      className='shrink-0 whitespace-nowrap'
+                    <Link
+                      className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
+                      href={APP_ROUTES.SIGNIN}
                     >
-                      <NextLink href={APP_ROUTES.SIGNIN}>Sign in</NextLink>
-                    </JovieLink>
+                      Sign in
+                    </Link>
                   ) : null}
                 </OnboardingIdentityConflict>
               ) : null}
@@ -307,7 +311,6 @@ export function OnboardingShell({
                 turnstileStatus={turnstileState.status}
                 turnstilePanel={turnstilePanel}
                 turnstilePanelVisible={turnstilePanelVisible}
-                turnstileHasSiteKey={Boolean(turnstileSiteKey)}
                 onTurnstileRequired={handleTurnstileRequired}
                 onTurnstileRejected={handleTurnstileRejected}
               />
@@ -328,6 +331,9 @@ export function OnboardingShell({
                 message='Linking your conversation...'
                 visible={isLinking}
               />
+              {claimHandoff ? (
+                <OnboardingClaimHandoffCard handoff={claimHandoff} />
+              ) : null}
               <OnboardingShellStatus
                 kind='error'
                 message="We couldn't save your request. Refresh this page to try again."
@@ -409,11 +415,12 @@ export function OnboardingIdentityConflict({
               Switch Account
             </Button>
           ) : !isSignedIn ? (
-            <JovieLink asChild variant='compact' touchTarget>
-              <NextLink href={APP_ROUTES.SIGNIN}>
-                Sign in with original account
-              </NextLink>
-            </JovieLink>
+            <Link
+              href={APP_ROUTES.SIGNIN}
+              className='btn-linear-login focus-ring-themed'
+            >
+              Sign in with original account
+            </Link>
           ) : null}
         </div>
       ) : null}

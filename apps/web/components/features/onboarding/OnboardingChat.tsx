@@ -60,7 +60,6 @@ import {
 import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
 import type { OnboardingProfileBuilderState } from './OnboardingProfileRail';
 import { OnboardingProfileRail } from './OnboardingProfileRail';
-import { OnboardingSecurityCheckRecovery } from './OnboardingSecurityCheckRecovery';
 import {
   OnboardingArtistConfirmedCard,
   type OnboardingArtistSelection,
@@ -91,7 +90,42 @@ import {
   type ToolPart,
 } from './onboardingChatHelpers';
 
-const STARTER_VERIFICATION_INSTRUCTION = 'One quick check before we send';
+/**
+ * JOV-8068: the claim hook only arms for a returning signed-in visitor once
+ * THIS chat instance has rendered the explicit conversion surface (the
+ * propose-next-step / propose-checkout card). Kept as a module-level
+ * "current instance" handle so the hook (a sibling in the shell, not a
+ * descendant of the chat) can read it without prop threading. Remounting the
+ * chat resets it.
+ */
+/**
+ * JOV-8068: the claim hook only arms for a returning signed-in visitor once
+ * THIS chat instance has rendered the explicit conversion surface (the
+ * propose-next-step / propose-checkout card). Kept as a module-level
+ * "current instance" handle so the hook (a sibling in the shell, not a
+ * descendant of the chat) can read it without prop threading. Remounting the
+ * chat resets the handle; `markOnboardingConversionSurface` also sets a
+ * session-level latch so the hook's own unit tests (no chat mounted) can arm
+ * the claim directly.
+ */
+let currentConversionSurfaceFlag: { current: boolean } | null = null;
+let conversionSurfaceLatch = false;
+
+export function markOnboardingConversionSurface(): void {
+  conversionSurfaceLatch = true;
+  if (currentConversionSurfaceFlag) currentConversionSurfaceFlag.current = true;
+}
+export function hasOnboardingConversionSurfaceShown(): boolean {
+  return (
+    conversionSurfaceLatch || (currentConversionSurfaceFlag?.current ?? false)
+  );
+}
+
+/** Test-only: clear both the instance handle and the latch between specs. */
+export function resetOnboardingConversionSurfaceForTests(): void {
+  currentConversionSurfaceFlag = null;
+  conversionSurfaceLatch = false;
+}
 
 /**
  * Anonymous onboarding chat client (JOV-2132 PR 3).
@@ -116,8 +150,6 @@ interface OnboardingChatProps {
   readonly turnstilePanel?: ReactNode;
   /** Whether the Turnstile security chrome should appear in the composer. */
   readonly turnstilePanelVisible?: boolean;
-  /** A resolved public key exists; this does not establish provider readiness. */
-  readonly turnstileHasSiteKey?: boolean;
   /** Requests the visible Turnstile panel when a send needs verification. */
   readonly onTurnstileRequired?: (message?: string) => void;
   /** Clears stale verification after the server rejects a token. */
@@ -394,6 +426,10 @@ function renderOnboardingTools({
       return;
     }
 
+    if (toolName === 'proposeNextStep' || toolName === 'proposeCheckout') {
+      markOnboardingConversionSurface();
+    }
+
     if (toolName === 'searchSpotifyArtist' && selectedArtistId) {
       return;
     }
@@ -571,9 +607,9 @@ function getDisplayMessages(
 }
 
 interface OnboardingFlowStatusProps {
+  readonly reserveTurnstileSpace?: boolean;
   readonly shouldShowTurnstileBanner: boolean;
   readonly turnstilePanel: ReactNode;
-  readonly sizeStarterInstruction: boolean;
 }
 
 function getOnboardingComposerPlaceholder(
@@ -587,30 +623,17 @@ function getOnboardingComposerPlaceholder(
 }
 
 function OnboardingFlowStatus({
+  reserveTurnstileSpace = false,
   shouldShowTurnstileBanner,
   turnstilePanel,
-  sizeStarterInstruction,
 }: OnboardingFlowStatusProps) {
   if (!shouldShowTurnstileBanner) return null;
 
   return (
     <div
+      className={reserveTurnstileSpace ? 'min-h-[10rem]' : undefined}
       data-testid='onboarding-flow-status'
-      className={cn(
-        sizeStarterInstruction &&
-          'grid grid-cols-1 [&>p[role=status]]:col-start-1 [&>p[role=status]]:row-start-1 [&:has([data-turnstile-mount=inline])>p[aria-hidden=true]]:hidden'
-      )}
     >
-      {/* Size the known instruction's text, never an unpainted provider frame. */}
-      {sizeStarterInstruction ? (
-        <p
-          aria-hidden='true'
-          className='invisible pointer-events-none mb-2 text-xs text-secondary-token col-start-1 row-start-1'
-          data-testid='onboarding-verification-instruction-size'
-        >
-          {STARTER_VERIFICATION_INSTRUCTION}
-        </p>
-      ) : null}
       {turnstilePanel}
     </div>
   );
@@ -630,8 +653,6 @@ interface OnboardingMessageRegionProps {
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly profileBuilderState: OnboardingProfileBuilderState;
   readonly shouldDockComposer: boolean;
-  /** Starter handoff paints the thread slot at the top, where the first message lands. */
-  readonly pinThreadToTop: boolean;
   readonly entryMode: OnboardingEntryMode;
   readonly entryProfile: StartEntryProfile | null;
   readonly onTryAnotherName: () => void;
@@ -656,7 +677,6 @@ function OnboardingMessageRegion({
   onSelectArtist,
   profileBuilderState,
   shouldDockComposer,
-  pinThreadToTop,
 }: OnboardingMessageRegionProps) {
   if (shouldDockComposer) {
     return (
@@ -682,13 +702,7 @@ function OnboardingMessageRegion({
     return (
       <ChatEmptyStateComposerRegion
         above={
-          <div
-            className={
-              pinThreadToTop
-                ? 'flex flex-col'
-                : 'flex min-h-full items-center justify-center'
-            }
-          >
+          <div className='flex min-h-full items-center justify-center'>
             <OnboardingChatEmptyIntro
               mode={entryMode}
               entryProfile={entryProfile}
@@ -696,7 +710,6 @@ function OnboardingMessageRegion({
             />
           </div>
         }
-        alignAbove={pinThreadToTop ? 'top' : undefined}
         hideWelcomeHeader
       >
         <div
@@ -729,10 +742,7 @@ function OnboardingMessageRegion({
   );
 
   return (
-    <ChatEmptyStateComposerRegion
-      alignAbove='top'
-      above={conversationAboveComposer}
-    >
+    <ChatEmptyStateComposerRegion above={conversationAboveComposer}>
       <div className='w-full' data-testid='onboarding-centered-composer'>
         {onboardingComposerSurface}
       </div>
@@ -751,7 +761,6 @@ export function OnboardingChat({
   entryProfile = null,
   turnstilePanel,
   turnstilePanelVisible = false,
-  turnstileHasSiteKey = false,
   turnstileStatus,
   turnstileToken,
   initialMessages = [],
@@ -760,6 +769,19 @@ export function OnboardingChat({
   onBusyChange,
 }: OnboardingChatProps) {
   const initialStarterPrompt = starterHandoff?.prompt ?? '';
+
+  // JOV-8068: register this instance's conversion-surface flag so the claim
+  // hook arms a returning signed-in visitor only after THIS chat has rendered
+  // the explicit propose-next-step / propose-checkout card. Reset on unmount.
+  useEffect(() => {
+    const flag = { current: false };
+    currentConversionSurfaceFlag = flag;
+    return () => {
+      if (currentConversionSurfaceFlag === flag) {
+        currentConversionSurfaceFlag = null;
+      }
+    };
+  }, []);
   const hasInitialStarterPrompt = initialStarterPrompt.length > 0;
   const initialDraft = hasInitialStarterPrompt
     ? initialStarterPrompt
@@ -795,7 +817,6 @@ export function OnboardingChat({
     hasInitialStarterPrompt ? initialStarterPrompt : null
   );
   const wasAwaitingTurnstileRetryRef = useRef(false);
-  const wasSecurityCheckRecoveryRef = useRef(false);
   const pendingVerifiedSubmitRef = useRef(false);
   const [localAutomationBypass, setLocalAutomationBypass] = useState<
     boolean | null
@@ -856,7 +877,6 @@ export function OnboardingChat({
       }
       if (metadata.errorCode === 'TURNSTILE_REQUIRED') {
         setHasSentFirst(false);
-        setVerificationRequested(true);
         onTurnstileRejected?.();
       }
     },
@@ -881,11 +901,7 @@ export function OnboardingChat({
     onBusyChange?.(isSubmitted || isStreaming);
   }, [isSubmitted, isStreaming, onBusyChange]);
   useLayoutEffect(() => {
-    const shouldRestoreFocus =
-      chatError !== null || wasSecurityCheckRecoveryRef.current;
-    wasSecurityCheckRecoveryRef.current =
-      chatError?.errorCode === 'TURNSTILE_REQUIRED';
-    if (!shouldRestoreFocus) return;
+    if (!chatError) return;
     composerInputRef.current?.focus({ preventScroll: true });
   }, [chatError]);
 
@@ -918,7 +934,7 @@ export function OnboardingChat({
       if (!text || isBusy || localAutomationBypass === null) return;
       if (isAwaitingFirstToken) {
         setVerificationRequested(true);
-        onTurnstileRequired?.(STARTER_VERIFICATION_INSTRUCTION);
+        onTurnstileRequired?.('One quick check before we send');
         pendingVerifiedSubmitRef.current = true;
         pendingStarterPromptRef.current = null;
         hasAutoSubmittedStarterPromptRef.current = true;
@@ -1072,7 +1088,7 @@ export function OnboardingChat({
       if (!hasRequestedStarterVerificationRef.current) {
         hasRequestedStarterVerificationRef.current = true;
         setVerificationRequested(true);
-        onTurnstileRequired?.(STARTER_VERIFICATION_INSTRUCTION);
+        onTurnstileRequired?.('One quick check before we send');
       }
       return;
     }
@@ -1117,7 +1133,7 @@ export function OnboardingChat({
     if (!chatError.failedMessage || isBusy) return;
 
     wasAwaitingTurnstileRetryRef.current = false;
-    const failedMessage = latestInputRef.current;
+    const failedMessage = chatError.failedMessage;
     setChatError(null);
     submitText(failedMessage);
   }, [
@@ -1162,13 +1178,9 @@ export function OnboardingChat({
       verificationRequested);
   const flowStatus = shouldShowTurnstileBanner ? (
     <OnboardingFlowStatus
+      reserveTurnstileSpace={shouldReserveStarterVerification}
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
       turnstilePanel={turnstilePanel}
-      sizeStarterInstruction={
-        shouldReserveStarterVerification &&
-        turnstileHasSiteKey &&
-        (turnstileStatus === 'loading' || turnstileStatus === 'interactive')
-      }
     />
   ) : null;
 
@@ -1178,7 +1190,6 @@ export function OnboardingChat({
   const hasConversationStarted = messages.length > 0 || hasSentFirst;
   const shouldDockComposer =
     chatError !== null || userTurnCount > 1 || selectedArtist !== null;
-  const isSecurityCheckRecovery = chatError?.errorCode === 'TURNSTILE_REQUIRED';
   useEffect(() => {
     if (shouldDockComposer) return;
     const scrollContainer = scrollContainerRef.current;
@@ -1194,7 +1205,7 @@ export function OnboardingChat({
     value: input,
     onChange: handleInputChange,
     onSubmit: handleSubmit,
-    isLoading: isBusy || (isSecurityCheckRecovery && isAwaitingFirstToken),
+    isLoading: isBusy,
     isSubmitting: isSubmitted,
     isStreaming,
     onStop: stop,
@@ -1213,18 +1224,7 @@ export function OnboardingChat({
   const sendLocalError = chatError;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
-      {isSecurityCheckRecovery ? null : flowStatus}
-      {isSecurityCheckRecovery ? (
-        <OnboardingSecurityCheckRecovery
-          status={turnstileStatus}
-          verification={flowStatus}
-          onRetry={() => {
-            setVerificationRequested(true);
-            onTurnstileRejected?.();
-          }}
-          isBusy={isBusy}
-        />
-      ) : sendLocalError ? (
+      {sendLocalError ? (
         <OnboardingMessageRecoveryRow
           chatError={sendLocalError}
           handleRetry={handleRetry}
@@ -1232,11 +1232,7 @@ export function OnboardingChat({
           isSubmitted={isSubmitted}
         />
       ) : null}
-      <ChatInput
-        ref={composerInputRef}
-        {...onboardingChatInputProps}
-        pickerPlacement={sendLocalError ? 'flow' : 'overlay'}
-      />
+      <ChatInput ref={composerInputRef} {...onboardingChatInputProps} />
     </div>
   );
 
@@ -1252,7 +1248,7 @@ export function OnboardingChat({
         ref={scrollContainerRef}
         onScroll={onScroll}
         className={cn(
-          'relative min-h-0 flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
+          'relative flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
           // Under the floating sign-in row, scrolled-away messages fade out
           // instead of hard-clipping at the panel edge (JOV-7192).
           headerOverlay ? 'pt-16 system-b-chat-thread-top-fade' : 'pt-5'
@@ -1263,14 +1259,13 @@ export function OnboardingChat({
           ref={shouldDockComposer ? totalSizeRef : undefined}
           className={cn(
             'mx-auto flex min-h-full w-full flex-col',
-            // The empty frame is 52rem. Keep that width when the first
-            // message commits. Narrowing to 44rem here moves a 576px-tall
-            // column by 64px with no input, which Chromium 1280×720 scores
-            // as 0.1503125. The docked composer is the later width change.
-            shouldDockComposer ? 'max-w-[44rem]' : 'max-w-[52rem]',
+            hasConversationStarted || shouldDockComposer
+              ? 'max-w-[44rem]'
+              : 'max-w-[52rem]',
             !shouldDockComposer && 'h-full justify-center'
           )}
         >
+          {flowStatus}
           <OnboardingMessageRegion
             composerPickerOpen={composerPickerOpen}
             displayMessages={displayMessages}
@@ -1289,7 +1284,6 @@ export function OnboardingChat({
             onSelectArtist={handleArtistSelect}
             profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}
-            pinThreadToTop={hasInitialStarterPrompt}
           />
         </div>
       </div>

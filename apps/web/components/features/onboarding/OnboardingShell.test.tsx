@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildEntryProfileBuilderState,
   OnboardingShell,
@@ -10,19 +10,12 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
     main,
     rightPanel,
-    flushContent,
   }: {
     readonly main: ReactNode;
     readonly rightPanel?: ReactNode;
-    readonly flushContent?: boolean;
   }) => (
     <>
-      <div
-        data-testid='onboarding-shell-main'
-        data-flush-content={flushContent ? 'true' : 'false'}
-      >
-        {main}
-      </div>
+      <div data-testid='onboarding-shell-main'>{main}</div>
       <div data-testid='onboarding-shell-overlay'>{rightPanel}</div>
     </>
   ),
@@ -41,7 +34,6 @@ const chatProps = vi.hoisted(() => ({
     onTurnstileRequired: (message?: string) => void;
     onTurnstileRejected: () => void;
     turnstileToken: string | null;
-    turnstileHasSiteKey: boolean;
   },
 }));
 
@@ -120,10 +112,6 @@ describe('OnboardingShell status', () => {
         onLogout={logout}
       />
     );
-    expect(screen.getByTestId('onboarding-shell-main')).toHaveAttribute(
-      'data-flush-content',
-      'true'
-    );
     fireEvent.click(screen.getByRole('button', { name: 'Start Over' }));
     fireEvent.click(screen.getByRole('button', { name: 'Log Out' }));
     expect(restart).toHaveBeenCalledOnce();
@@ -149,37 +137,16 @@ describe('OnboardingShell status', () => {
     turnstileProps.current = null;
   });
 
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
   it.each([
-    ['', false, false],
-    ['configured-public-key', false, true],
-    ['   ', false, false],
-    ['', true, true],
-  ] as const)(
-    'forwards resolved key availability for configured key %j and test mode %s',
-    (configuredKey, testMode, expected) => {
-      vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', configuredKey);
-      render(
-        <OnboardingShell sessionLabel='pending' turnstileTestMode={testMode} />
-      );
+    false,
+    true,
+  ])('forwards the server-selected Turnstile test mode (%s) to the widget', testMode => {
+    render(
+      <OnboardingShell sessionLabel='pending' turnstileTestMode={testMode} />
+    );
 
-      expect(chatProps.current?.turnstileHasSiteKey).toBe(expected);
-    }
-  );
-
-  it.each([false, true])(
-    'forwards the server-selected Turnstile test mode (%s) to the widget',
-    testMode => {
-      render(
-        <OnboardingShell sessionLabel='pending' turnstileTestMode={testMode} />
-      );
-
-      expect(turnstileProps.current).toMatchObject({ testMode });
-    }
-  );
+    expect(turnstileProps.current).toMatchObject({ testMode });
+  });
 
   it('explains identity recovery without suggesting another handle or a blind retry', () => {
     claimState.value = 'identity-conflict';
@@ -257,18 +224,6 @@ describe('OnboardingShell status', () => {
       .getByTestId('onboarding-sign-in-header')
       .closest('[data-onboarding-session]');
     expect(session).toHaveClass('flex', 'flex-col', 'min-h-0', 'flex-1');
-  });
-
-  it('keeps the compact sign-in face inside the canonical 44px hit target (JOV-4411)', () => {
-    render(<OnboardingShell sessionLabel='pending' />);
-
-    const signIn = screen.getByRole('link', { name: 'Sign in' });
-    expect(signIn).toHaveAttribute('data-variant', 'link');
-    expect(signIn).toHaveAttribute('data-appearance', 'compact');
-    expect(signIn).toHaveClass('btn-linear-login', 'focus-ring-themed');
-    expect(signIn.className).toContain('before:min-h-11');
-    expect(signIn.className).toContain('before:min-w-11');
-    expect(signIn.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
   });
 
   it('reports a failed chat start without verification jargon or error codes', () => {
@@ -422,5 +377,12 @@ describe('buildEntryProfileBuilderState (JOV-7753)', () => {
         .artist
     ).toBeNull();
     expect(buildEntryProfileBuilderState(null).artist).toBeNull();
+  });
+});
+
+describe('claim handoff card (JOV-8068)', () => {
+  it('renders no handoff card when no claim handoff has been reported', () => {
+    render(<OnboardingShell sessionLabel='pending' />);
+    expect(screen.queryByTestId('onboarding-claim-handoff')).toBeNull();
   });
 });

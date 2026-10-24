@@ -1,8 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import {
@@ -10,22 +8,25 @@ import {
   trackFunnelStep,
 } from '@/lib/analytics/signup-funnel-client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import { hasOnboardingConversionSurfaceShown } from './OnboardingChat';
 
 /**
- * Auto-claim the anonymous onboarding conversation when the visitor
+ * Claim the anonymous onboarding conversation when the visitor
  * authenticates mid-flow (JOV-2132 PR 4).
  *
- * Fires on mount and after completed chat turns while Better Auth reports the user
- * is signed in. Calls POST /api/onboarding/claim — the server reads the signed
+ * Fires when a visitor who rendered signed-out signs in, and after completed
+ * chat turns while signed in. A visitor whose FIRST rendered auth state is
+ * already signed in never auto-fires on mount (JOV-8068): they arrive with a
+ * session, not a conversion, and the claim (plus its checkout/waitlist
+ * handoff) must wait for an explicit in-chat step. Calls
+ * POST /api/onboarding/claim — the server reads the signed
  * `jovie_onboarding_session` cookie and attaches matching anonymous
  * conversations to the freshly created user.
  *
- * On a durable pending receipt it navigates to `/waitlist`; a server-verified
- * completed interview (`readyForCheckout`) continues to
- * `/onboarding/checkout`. Claimed transcript ownership alone is NOT a
- * handoff signal (JOV-8068): `claimed > 0` / `alreadyClaimed` without a
- * terminal next-step decision keeps the user on /start and retries after the
- * next turn. Missing durable artist data stays in the same `/start`
+ * On a durable pending receipt it reports a `waitlist` handoff; admitted
+ * users get a `checkout` handoff. The hook NEVER navigates (JOV-8068): the
+ * shell renders an inline handoff card and the visitor leaves `/start` only
+ * by clicking it. Missing durable artist data stays in the same `/start`
  * conversation and retries after the next natural-language turn. If the
  * claim returns `claimed: 0` without an idempotent receipt, it stays put and
  * retries after later chat activity.
@@ -65,30 +66,65 @@ interface ClaimResponse {
     readonly handle: string | null;
     readonly status: 'created' | 'updated' | 'skipped';
   } | null;
-  /**
-   * Server-verified terminal handoff: a completed interview produced a
-   * materialized public profile. Only this (or a durable waitlist entry)
-   * may navigate off /start — bare `claimed`/`alreadyClaimed` may not.
-   */
-  readonly readyForCheckout?: boolean;
 }
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1_500;
 
+/**
+ * Where the visitor goes next once their claim resolved (JOV-8068).
+ * Surfaced as an inline card — navigation is always the visitor's click.
+ */
+export interface OnboardingClaimHandoff {
+  readonly kind: 'waitlist' | 'checkout';
+}
+
+interface UseOnboardingClaimOptions {
+  /** Called once when a completed claim produces a next-step handoff. */
+  readonly onHandoffReady?: (handoff: OnboardingClaimHandoff) => void;
+}
+
 export function useOnboardingClaim(
   claimTrigger = 0,
-  enabled = true
+  enabled = true,
+  options?: UseOnboardingClaimOptions
 ): ClaimStatus {
   const { isLoaded, isSignedIn } = useAuthSafe();
-  const router = useRouter();
   const [status, setStatus] = useState<ClaimStatus>('idle');
   const completedTriggersRef = useRef<Set<number>>(new Set());
   const inflightTriggersRef = useRef<Set<number>>(new Set());
   const claimedRef = useRef(false);
+  // JOV-8068: true only once the hook has rendered a signed-OUT state. A
+  // visitor whose first rendered auth state is already signed in never
+  // auto-claims on mount — their claim must follow an explicit in-chat step.
+  const sawSignedOutRef = useRef(false);
+  // Deactivated claim contexts (the claim completed, was disabled mid-flight,
+  // or auth dropped) never report a handoff even if their fetch resolves.
+  const claimActiveRef = useRef(false);
+  const onHandoffReadyRef = useRef(options?.onHandoffReady);
+  onHandoffReadyRef.current = options?.onHandoffReady;
 
   useEffect(() => {
-    if (!enabled || !isLoaded || !isSignedIn) return;
+    if (!enabled || !isLoaded) {
+      claimActiveRef.current = false;
+      return;
+    }
+    if (!isSignedIn) {
+      sawSignedOutRef.current = true;
+      claimActiveRef.current = false;
+      return;
+    }
+    // JOV-8068: a visitor whose FIRST rendered auth state is already signed
+    // in never claims on mount — and never on turn activity alone. Their
+    // claim is armed only once the chat has rendered the explicit conversion
+    // surface (the propose-next-step / propose-checkout card). A visitor who
+    // signed up mid-chat is never gated: their trigger-0 claim IS the
+    // conversion.
+    if (!sawSignedOutRef.current && !hasOnboardingConversionSurfaceShown()) {
+      claimActiveRef.current = false;
+      return;
+    }
+    claimActiveRef.current = true;
     if (claimedRef.current) return;
     if (completedTriggersRef.current.has(claimTrigger)) return;
     // Prevent duplicate in-flight requests for the same trigger value.
@@ -212,7 +248,10 @@ export function useOnboardingClaim(
             outcome: body.waitlist.outcome,
             duration_ms: Date.now() - startedAt,
           });
-          router.replace(APP_ROUTES.WAITLIST);
+          if (claimActiveRef.current) {
+            onHandoffReadyRef.current?.({ kind: 'waitlist' });
+          }
+          claimActiveRef.current = false;
           return;
         }
         if (body.profile?.profileId) {
@@ -224,9 +263,12 @@ export function useOnboardingClaim(
             status: body.profile.status,
           });
         }
-        // Hand off to the existing /onboarding/checkout flow. Only reached
-        // when the server confirmed a completed interview.
-        router.replace(APP_ROUTES.ONBOARDING_CHECKOUT);
+        // Hand off to the existing /onboarding/checkout flow via the inline
+        // card — the visitor decides when to leave /start (JOV-8068).
+        if (claimActiveRef.current) {
+          onHandoffReadyRef.current?.({ kind: 'checkout' });
+        }
+        claimActiveRef.current = false;
       };
 
       if (body.waitlistIntakeRequired) {
@@ -242,16 +284,7 @@ export function useOnboardingClaim(
       }
 
       if ((body.claimed && body.claimed > 0) || body.alreadyClaimed) {
-        // JOV-8068: transcript ownership is claimed, but that is not proof
-        // the interview finished. Only a durable waitlist receipt or a
-        // server-verified readyForCheckout may navigate off /start; anything
-        // less stays in the conversation and retries after the next turn.
-        if (body.waitlist?.entryId || body.readyForCheckout) {
-          completeClaim();
-          return;
-        }
-        markTriggerCompleted();
-        setStatus('claimed');
+        completeClaim();
         return;
       }
 
@@ -266,14 +299,8 @@ export function useOnboardingClaim(
     return () => {
       cancelled = true;
     };
-    // `router` is intentionally excluded from deps. useRouter() returns a
-    // stable singleton in Next.js App Router — including it would cause
-    // spurious effect re-runs only in test environments where the mock
-    // returns a new object reference on every call. The `inflightTriggersRef`
-    // guard already prevents duplicate requests if the effect does re-run.
-    // The router closure value is always current for the navigate-on-claim
-    // path because navigation only happens after a successful fetch response,
-    // long after any router reference churn would have settled.
+    // The handoff callback is read through a ref so callers can pass an
+    // inline function without re-running the effect.
   }, [claimTrigger, enabled, isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return status;
