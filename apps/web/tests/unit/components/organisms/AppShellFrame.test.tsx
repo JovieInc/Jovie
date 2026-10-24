@@ -3,8 +3,28 @@ import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
+import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 
 describe('AppShellFrame', () => {
+  it.each([false, true])(
+    'keeps Ovie paint ownership stable while loading: %s',
+    loading => {
+      const { container } = render(
+        loading ? (
+          <AppShellSkeleton brandVariant='ov' />
+        ) : (
+          <AppShellFrame
+            brandVariant='ov'
+            sidebar={null}
+            main={<div>Home</div>}
+          />
+        )
+      );
+      expect(
+        container.querySelector('[data-app-shell-workspace="ov"]')
+      ).toBeInTheDocument();
+    }
+  );
   it('renders the canonical shell design', () => {
     render(
       <AppShellFrame

@@ -24,6 +24,7 @@ export function OvChatClient() {
   return (
     <ChatWorkspaceSurface>
       <JovieChat
+        ambientOwnedByShell
         profileId={activeProfile?.id}
         displayName={activeProfile?.displayName ?? undefined}
         avatarUrl={activeProfile?.avatarUrl}
