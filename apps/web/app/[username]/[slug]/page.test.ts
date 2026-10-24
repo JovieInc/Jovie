@@ -14,6 +14,8 @@ const hoisted = vi.hoisted(() => ({
   getFeaturedSmartLinkStaticParams: vi.fn(),
   getReleaseTrackList: vi.fn(),
   getUnpublishedReleasePresence: vi.fn(),
+  findSupersededReleaseSlug: vi.fn(),
+  findRedirectByOldSlug: vi.fn(),
   checkPromoDownloads: vi.fn(),
   resolveOpaqueInternalProfileUsername: vi.fn(),
   getArtistEntitySameAs: vi.fn(),
@@ -44,7 +46,11 @@ vi.mock('./_lib/data', () => ({
   getFeaturedSmartLinkStaticParams: hoisted.getFeaturedSmartLinkStaticParams,
   getReleaseTrackList: hoisted.getReleaseTrackList,
   getUnpublishedReleasePresence: hoisted.getUnpublishedReleasePresence,
+  findSupersededReleaseSlug: hoisted.findSupersededReleaseSlug,
   checkPromoDownloads: hoisted.checkPromoDownloads,
+}));
+vi.mock('@/lib/discography/slug', () => ({
+  findRedirectByOldSlug: hoisted.findRedirectByOldSlug,
 }));
 vi.mock('@/constants/app', async importOriginal => {
   const actual = await importOriginal<typeof import('@/constants/app')>();
@@ -256,5 +262,74 @@ describe('smartlink screen-cert fixture branch (JOV-7127)', () => {
       'ordinary-artist'
     );
     expect(hoisted.getContentBySlug).not.toHaveBeenCalled();
+  });
+});
+
+describe('superseded base slug resolution', () => {
+  const creator = {
+    id: 'creator-1',
+    username: 'tim',
+    usernameNormalized: 'tim',
+    displayName: 'Tim White',
+    userId: 'user-1',
+    avatarUrl: null,
+    settings: {},
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.resolveOpaqueInternalProfileUsername.mockResolvedValue({
+      action: 'serve',
+    });
+    hoisted.getCreatorByUsername.mockResolvedValue(creator);
+    hoisted.getContentBySlug.mockResolvedValue(null);
+    hoisted.findRedirectByOldSlug.mockResolvedValue(null);
+    hoisted.findSupersededReleaseSlug.mockResolvedValue(null);
+    hoisted.getUnpublishedReleasePresence.mockResolvedValue(null);
+  });
+
+  async function render(slug: string) {
+    const { default: Page } = await import('./page');
+    return Page({ params: Promise.resolve({ username: 'tim', slug }) });
+  }
+
+  it('308s a base slug to the single published suffixed sibling (take-me-over)', async () => {
+    hoisted.findSupersededReleaseSlug.mockResolvedValue({
+      currentSlug: 'take-me-over-2',
+    });
+    await expect(render('take-me-over')).rejects.toThrow(
+      'permanentRedirect:/tim/take-me-over-2'
+    );
+    expect(hoisted.findSupersededReleaseSlug).toHaveBeenCalledWith(
+      'creator-1',
+      'take-me-over'
+    );
+  });
+
+  it('prefers an explicit slug-history redirect over the superseded lookup', async () => {
+    hoisted.findRedirectByOldSlug.mockResolvedValue({
+      type: 'release',
+      currentSlug: 'renamed',
+    });
+    await expect(render('old')).rejects.toThrow(
+      'permanentRedirect:/tim/renamed'
+    );
+    expect(hoisted.findSupersededReleaseSlug).not.toHaveBeenCalled();
+  });
+
+  it('does not redirect a placeholder-owned base slug (seaside-heights) or ambiguous candidates; falls through to not found', async () => {
+    // findSupersededReleaseSlug returns null for both owner-present and
+    // multi-candidate cases (covered in data.test.ts).
+    await expect(render('seaside-heights')).rejects.toThrow('notFound');
+    expect(hoisted.getUnpublishedReleasePresence).toHaveBeenCalledWith(
+      'creator-1',
+      'seaside-heights'
+    );
+  });
+
+  it('does not redirect the superseded base slug when published content exists', async () => {
+    hoisted.getContentBySlug.mockResolvedValue({ type: 'track', slug: 'x' });
+    await render('x').catch(() => undefined);
+    expect(hoisted.findSupersededReleaseSlug).not.toHaveBeenCalled();
   });
 });

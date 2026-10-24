@@ -56,6 +56,7 @@ import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import type { Artist } from '@/types/db';
 import {
   checkPromoDownloads,
+  findSupersededReleaseSlug,
   getContentBySlug,
   getCreatorByUsername,
   getFeaturedSmartLinkStaticParams,
@@ -114,6 +115,16 @@ async function resolveContentOrRedirect(
   if (redirectInfo) {
     permanentRedirect(
       `/${creator.usernameNormalized}/${redirectInfo.currentSlug}`
+    );
+  }
+
+  // A base slug superseded by a collision-suffixed sibling (e.g. take-me-over
+  // -> take-me-over-2) still resolves when exactly one same-title release is
+  // published and no live release owns the base slug.
+  const superseded = await findSupersededReleaseSlug(creator.id, slug);
+  if (superseded) {
+    permanentRedirect(
+      `/${creator.usernameNormalized}/${superseded.currentSlug}`
     );
   }
   return null;
