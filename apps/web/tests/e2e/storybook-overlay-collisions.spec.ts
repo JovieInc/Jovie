@@ -622,3 +622,48 @@ test.describe('overlay collisions: anchors and scroll lock', () => {
     });
   }
 });
+
+// Auth dialogs share the hosted overlay geometry regression lane.
+
+const authModalViewports = [
+  { width: 375, height: 812 },
+  { width: 768, height: 1024 },
+  { width: 1440, height: 900 },
+];
+
+for (const viewport of authModalViewports) {
+  for (const story of ['default', 'with-status-row', 'transformed-ancestor']) {
+    test(`${story} stays centered and on-screen at ${viewport.width}×${viewport.height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.goto(
+        `/iframe.html?id=auth-authmodalshell--${story}&viewMode=story`
+      );
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toBeVisible();
+      await expect
+        .poll(async () => {
+          const box = await dialog.boundingBox();
+          if (!box) return Infinity;
+          return Math.max(
+            Math.abs(box.x + box.width / 2 - viewport.width / 2),
+            Math.abs(box.y + box.height / 2 - viewport.height / 2)
+          );
+        })
+        .toBeLessThanOrEqual(2);
+      const box = await dialog.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.y).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
+      // The small form must not stretch to the desktop max-height, leaving
+      // its controls stranded at the top of a mostly empty panel.
+      if (viewport.width >= 640) expect(box!.height).toBeLessThan(500);
+      await expect(
+        dialog.getByRole('textbox', { name: 'Email address' })
+      ).toBeInViewport();
+    });
+  }
+}
