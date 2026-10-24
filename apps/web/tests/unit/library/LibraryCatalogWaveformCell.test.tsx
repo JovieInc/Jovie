@@ -5,6 +5,7 @@ import { buildLibraryReleaseAssets } from '@/app/app/(shell)/library/library-dat
 import {
   formatLibraryItemType,
   formatReleaseType,
+  LibraryCatalogArtistCell,
   LibraryCatalogArtworkCell,
   LibraryCatalogWaveformCell,
 } from '@/components/features/library/library-catalog-columns';
@@ -97,5 +98,24 @@ describe('library type data labels (JOV-8963)', () => {
     ]);
 
     expect(formatLibraryItemType(asset!)).toBe('EP');
+  });
+
+  it('renders the artist cell with the full billing on one line', () => {
+    const [asset] = buildLibraryReleaseAssets([
+      {
+        ...buildRelease('verified'),
+        artistNames: ['A Very Long Collaborative Artist Billing'],
+      },
+    ]);
+
+    render(<LibraryCatalogArtistCell asset={asset!} />);
+
+    const cell = screen.getByText('A Very Long Collaborative Artist Billing');
+    expect(cell).toHaveAttribute(
+      'title',
+      'A Very Long Collaborative Artist Billing'
+    );
+    expect(cell).toHaveClass('whitespace-nowrap');
+    expect(cell.className).not.toContain('truncate');
   });
 });

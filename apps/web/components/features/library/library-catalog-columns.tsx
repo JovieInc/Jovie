@@ -351,6 +351,24 @@ export const LibraryCatalogWaveformCell = memo(
   }
 );
 
+export const LibraryCatalogArtistCell = memo(function LibraryCatalogArtistCell({
+  asset,
+}: {
+  readonly asset: LibraryReleaseAsset;
+}) {
+  return (
+    // Full artist value on one line (JOV-8963): the column sizes to its
+    // content instead of truncating the name, so every row keeps the same
+    // single-line text-cell treatment as Length.
+    <span
+      title={asset.artist}
+      className='system-b-library-meta-text block whitespace-nowrap text-tertiary-token'
+    >
+      {asset.artist}
+    </span>
+  );
+});
+
 const libraryCatalogColumnHelper = createColumnHelper<LibraryReleaseAsset>();
 
 /**
@@ -405,17 +423,7 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
   libraryCatalogColumnHelper.accessor('artist', {
     id: 'artist',
     header: 'Artist',
-    cell: ({ row }) => (
-      // Full artist value on one line (JOV-8963): the column sizes to its
-      // content instead of truncating the name, so every row keeps the same
-      // single-line text-cell treatment as Length.
-      <span
-        title={row.original.artist}
-        className='system-b-library-meta-text block whitespace-nowrap text-tertiary-token'
-      >
-        {row.original.artist}
-      </span>
-    ),
+    cell: ({ row }) => <LibraryCatalogArtistCell asset={row.original} />,
     size: 220,
     minSize: 160,
     enableSorting: false,
