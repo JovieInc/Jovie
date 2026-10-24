@@ -82,7 +82,7 @@ describe('CinematicMetric', () => {
     );
     expect(screen.queryByText('99')).not.toBeInTheDocument();
     expect(screen.queryByText('Old observation')).not.toBeInTheDocument();
-    expect(screen.getByText('Landed')).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading Landed');
   });
 
   it('reveals complete long content on keyboard focus', async () => {

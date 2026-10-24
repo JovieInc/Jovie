@@ -53,7 +53,14 @@ export function CinematicMetric({
             data-density={density}
           >
             <dt className='h-4 truncate text-xs leading-4 text-secondary-token'>
-              {label}
+              {loading ? (
+                <>
+                  <Skeleton className='h-4 w-1/2' />
+                  <span className='sr-only'>{label}</span>
+                </>
+              ) : (
+                label
+              )}
             </dt>
             <dd
               className={cn(

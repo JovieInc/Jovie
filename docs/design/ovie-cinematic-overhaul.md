@@ -1,64 +1,47 @@
 # Ovie cinematic Home overhaul
 
-Date: 2026-10-23. Owner: Tim White. Implementation: `ui/ovie-cinematic-home-1`, no Linear issue — ad-hoc.
+2026-10-23 · Tim White’s 6:34 PM PT brief · no Linear issue — ad-hoc implementation.
 
 Reading this as: an operations workspace for Tim, with a restrained cinematic language, leaning toward Noir Ion and Linear’s compact type and controls.
 
-Dials: low design variance, functional motion, high information density. The focal band is an operational readout, not a marketing hero.
+Dials: low design variance, functional motion, high information density. The bottleneck is scan hierarchy on ultrawide Home. The metric readout should establish one focal point while decisions and work remain easy to operate.
 
-## Problem and evidence
+## Audit
 
-The bottleneck is scan hierarchy on the full-screen ultrawide Home. Tim requested one focal point, a quiet content zone, truthful real-time state and stable geometry.
+Source baseline: `8795a323c4f`. Sixteen PNGs cover eight real Storybook stories at **3440×1440** and **1440×900**, with zero page errors and no viewport overflow. Files and viewport receipts: `/tmp/ovie-audit/` and `baseline.json`.
 
-Source audit at `8795a323c4f`:
+| Concrete finding | Evidence / implication |
+| --- | --- |
+| Home says “Nothing is blocking shipping” beside failed shipping reads. | `home-unavailable-{viewport}.png`: unavailable data must not claim a healthy clear state. |
+| Metrics have equal 80px card emphasis. | `home-populated-3440x1440.png`: no dominant operational readout. |
+| Actual Home hides two of eleven metrics at 1440px. | `home-unavailable-1440x900.png` shows nine; the ultrawide capture shows eleven. Preserve the ordered set in a responsive grid. |
+| Warning orange persists in timings and CEO/HUD status text. | Populated Home, `ceo-overview-*` and `hud-cash-*` captures. New hero status is neutral text; remaining HUD/palette convergence is tracked on [JOV-7710](https://linear.app/jovie/issue/JOV-7710). |
+| CEO overview remains a centered vertical panel on ultrawide. | `ceo-overview-3440x1440.png`: retain source/freshness evidence while adopting the shared metric densities under JOV-7710. |
+| Default Mac HUD lacks launcher/inbox sources. | `mac-hud-*` captures prove unavailable/retry presentation, not populated authenticated Mac acceptance. |
 
-- `HomeLoopPulse` gives every metric the same 80px card and text size. It fits by hiding overflow, so lower-priority measurements disappear as the workspace narrows. The hierarchy cannot distinguish a primary signal from context.
-- `HomeLoopCanvas` already has a useful ultrawide grid: asks occupy three of twelve columns and the board/completed work share nine from `@7xl`. Preserve that data and action ownership rather than adding another dashboard.
-- The Home story covers inbox asks with shipping unavailable. Populated, loading, empty and error compositions live in the real shared HomeLoop stories; they are fixtures, not production evidence.
-- `ContentMetricStat` reserves three lines only when subtitle exists; its skeleton uses two differently spaced lines. That primitive does not provide the requested state-stable density contract.
-- The existing `useHudShippingStateQuery` owns shared shipping state, source freshness and a 6-second poll; Home’s inbox query owns its 30-second poll. Neither endpoint has an SSE route in the inspected source.
+The shared busy Home story has seven fixture metrics; actual Ovie Home projects eleven. Separate fixture companies/snapshots are not one live dataset. No fixture is presented as current telemetry.
 
-Browser audit: pending local Storybook startup. PNGs and a viewport/overflow receipt are written to `/tmp/ovie-audit/`; this section will be replaced with observed findings before publication.
+Local preview retained the canonical Storybook framework, providers, theme and Vite configuration, scoped to the audited stories. Moving the temporary config required restoring the real web root for dependency resolution. Initial cold-start/timeouts are failed attempts; the final capture succeeded. No repository gate or preview source setting was disabled.
 
 ## Proposal
 
-### Layout
+**Layout:** one full-width operational focal band above a quiet content zone. Use the first source-ranked metric as the glance anchor and summary density for supporting signals. Replace the existing pulse presentation; do not append another dashboard. Preserve asks, stage board, completed work, generated answers, retry, undo, destinations and query ownership. Retain the existing ultrawide twelve-column workspace. No new route, product action or feature flag.
 
-Keep one full-width operational focal band above a quiet content zone. Emphasize the first source-ranked metric using `glance`; use `summary` for supporting signals and `dense` for compact lists. Never invent or reorder numbers to create a visual story. Keep the shared asks, stage board, completed work, generated answer and retry/undo actions intact. Ultrawide full screen (3440×1440) is primary; verify 1440×900 and compact reflow as well.
+**Metric system:** `packages/ui/atoms/cinematic-metric.tsx` owns one `CinematicMetric` family and its skeleton. Compose the existing Skeleton, tooltip and utility owners; add no dependency or token family. `glance` / `summary` / `dense` reserve 112 / 96 / 80px frames, each with fixed label/value/context slots. Labels/context are 12px; changing numbers are tabular. Null is “Not measured”; zero remains 0. Loading hides stale content, absent detail retains its slot, and keyboard focus reveals full truncated text through the canonical tooltip. Escape dismisses it without moving geometry.
 
-Integrate the metric presentation into the existing HomeLoop composition through a bounded slot. Replace the existing pulse presentation rather than appending a second metric row. No new route, panel, product action, data source or feature flag.
+**Background:** compose one clean, full-bleed editorial layer within the focal band over the shell-owned canvas. Use existing dark/glass surface roles, rounded corners and restrained contrast. No grain, gritty texture, decorative shapes, fabricated artwork, autoplay or moving hover geometry. One accent per section; the content remains the focal point.
 
-### Metric family
+EVENT: the brief specifies Ion `#3FAFF3`, Ultra `#A789F0`, Pulse `#EB6AC6`, no orange. Current shared Ion source is `#11AFFF`. Consume semantic roles; do not silently recolor Jovie’s shared foundation or create local palette aliases. Scoped anchor reconciliation and remaining CEO/HUD consumers are recorded on JOV-7710. The two-PR slice changes no locked palette source.
 
-`packages/ui/atoms/cinematic-metric.tsx` owns `CinematicMetric` and its skeleton. Compose existing `Skeleton`, tooltip and utility owners; add no dependency or token family. Densities reserve 112/96/80px frames with fixed label/value/context slots. All labels/context are 12px; values use tabular figures. Null displays “Not measured”; measured zero displays 0. Pending hides stale values and context. Missing detail keeps its space. Full text is available through the canonical tooltip on pointer hover or keyboard focus, with Escape dismissal and a visible focus ring.
+**Real time:** Home already shares React Query state: shipping polls every 6 seconds, inbox every 30 seconds, with existing cache/cancellation/focus-refresh and stale/unknown handling. No SSE endpoint exists for those feeds in the inspected source. Preserve these intervals and reconcile push into the same cache if an endpoint supplies it. Add no endpoint, second poller, event bus or page reload.
 
-This is product-specific presentation built by composing maintained internal primitives. It is not new durable infrastructure. Existing `ContentMetricStat` consumers remain owned by their current feature; only the explicitly requested Home adoption consumes the new family in this stack.
+## Delivery and verification
 
-### Background
+1. PR 1: proposal, design-system metric, stories, meaningful unit coverage and browser geometry test. Its test enters the existing Storybook CI job; a contract assertion fails before the selector addition and passes after it.
+2. PR 2: separate worktree from PR 1; Home adoption after rebasing onto background PR [#22898](https://github.com/JovieInc/Jovie/pull/22898), recorded head `a306b27c8561b513b10080128d6e2b75a38e9d9e`. Keep its shell paint ownership. Do not edit parallel sidebar/right-rail/library or shell-background files; #22806 and #22829 ownership is preserved.
 
-Use one clean, full-bleed, tokenized editorial layer behind the focal band, with a neutral quiet zone beneath. No grain, grit, orange, fabricated artwork, decorative shapes, autoplay or layout-moving effects. Transparent glass regions reuse the shared surface ladder; content contrast wins over atmosphere.
+Metric state matrix: three densities; loading; nonzero; zero; missing value/context; long content; inherited themes; hover/focus/Escape; reduced motion. Home must retain independent loading/error/empty/partial/stale/unauthorized, decision pending/undo/failure and generated-answer/history states. Reserve timing and metric geometry; never convert missing source data into success.
 
-EVENT: Tim’s 2026-10-23 brief specifies Noir Ion anchors Ion `#3FAFF3`, Ultra `#A789F0`, Pulse `#EB6AC6`, one accent per section. Consume existing semantic roles rather than embedding those hex values in components. Coordinate any source-token convergence with the background owner; never introduce local palette aliases or edit locked canonical token files in this stack.
+PR 1 receipts: **7 metric tests, 100% statements/branches/functions/lines (22 branches)**; final full UI CI selector **1,232 passed, four existing skips**; Playwright geometry/focus **3/3** at 3440×1440, 1440×900 and 390×844; workflow contracts **89/89**; `pnpm turbo typecheck` **20/20 tasks**. UI lint/typecheck, arbitrary-value guard, copy-leak and repository-doc parity pass. Workflow syntax passes; full native actionlint reports the same ShellCheck findings as the source baseline, with zero additions. Its pinned Linux CI gate remains required. Browser captures are component evidence, not deployment or installed-Mac certification. No process remains paused.
 
-### Real-time path
-
-Compose the current React Query queries and preserve cache, cancellation, focus refresh, stale/unknown states and polling intervals. Prefer push/SSE only when the endpoint already supplies it; reconcile push into the same cache. This stack introduces no endpoint, second poller, page reload, event bus or new real-time infrastructure.
-
-## State and verification contract
-
-Metric states: loading; measured nonzero; measured zero; unmeasured/unavailable; absent context; long label/value/context; all three densities; dark/light inherited themes; hover; keyboard focus; Escape dismissal; reduced motion. No metric has an enabled/disabled mutation action.
-
-Home states: shipping and asks loading independently; populated; empty; partial inbox sources; unauthorized; disconnected/stale; retry; decision pending/undo/failure; generated answer/streaming/history. Keep existing state meanings and action tests. Skeleton-to-data transitions must preserve hero/main-section geometry, focus and sibling positions.
-
-Run the actual UI unit runner with coverage, the exact CI UI selector, touched-package lint and repository typecheck. Playwright measures metric and sibling rectangles at 3440×1440, 1440×900 and 390px, checks focus/hover stability, and captures real Storybook components. Screenshots are local component evidence, not deployed or installed-Mac acceptance.
-
-## Ownership and delivery
-
-- PR 1: this proposal, design-system metric, stories, unit and browser stability tests.
-- PR 2: separate worktree from PR 1; adopt the family in Ovie Home and compose the focal-band layer after checking and stacking/rebasing onto the background PR.
-- Parallel owners: `~/JovieInc/wt-1023-bg`, `wt-1023-sidebar`, `wt-1023-rail`, `wt-1023-library`. Do not edit their shell, sidebar, right-rail or shared background files. PR #22806 owns titlebar behavior; PR #22829 includes `HudBottlenecksCard` and Storybook accessibility work. Read the fleet rules in #22870 and SwiftUI/ultrawide direction in #22877 before implementation.
-- Mac boundary: these are existing shared web components used by Ovie. No new Electron/native surface, signing, platform configuration or SwiftUI migration is included.
-
-Ship now: the two small presentation slices once their checks pass. Re-evaluate when exact-head CI or rendered state/viewport evidence finds a regression. Then repair the owning layer and rerun affected checks. Roll back by reverting the relevant presentation PR; queries and authoritative records are unchanged.
-
-GBrain retrieval: exact search returned no design decision; broader query timed out (`gbrain-unavailable`). The latest explicit brief controls; source observations above were inspected locally.
+Ship now: the two presentation slices after their normal checks. Re-evaluate when exact-head CI or rendered state/viewport evidence finds a regression; then repair the owning layer and rerun affected checks. Roll back by reverting the relevant presentation PR. GBrain retrieval query and code-callers timed out (`gbrain-unavailable`); source/caller evidence was refreshed locally.
