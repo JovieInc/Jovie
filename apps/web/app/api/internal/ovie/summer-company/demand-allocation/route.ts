@@ -7,6 +7,7 @@ import {
   DemandAllocationError,
   governDemandAllocation,
 } from '@/lib/demand/allocation-governor';
+import { OutcomeCompilerError } from '@/lib/demand/outcome-compiler';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
@@ -83,7 +84,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    if (error instanceof DemandAllocationError)
+    if (
+      error instanceof DemandAllocationError ||
+      error instanceof OutcomeCompilerError
+    )
       return NextResponse.json(
         { error: error.message },
         { status: 409, headers: NO_STORE_HEADERS }
