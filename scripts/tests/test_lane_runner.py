@@ -3407,6 +3407,83 @@ class MaintenanceDemandTest(unittest.TestCase):
         self.assertIsNone(self.census([self.pr(isDraft=True, statusCheckRollup=[])], provider="codex")["pending"])
 
 
+class BindingIsolationWorkerTest(unittest.TestCase):
+    """A full, throttled or Jovie-held pool never stalls another repository's binding."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name) / "state")
+        (self.host.state / "slots").mkdir(parents=True)
+        self.spec = {"enabled": True, "slots": 1, "cmd": ["true"]}
+
+    def worker(self, *, occupied, limit=1, ceiling=None, spec=None):
+        spec = spec or self.spec
+        with patch.object(lane, "load_providers", return_value={"codex": spec}), \
+                patch.object(self.host, "slots", return_value=limit), \
+                patch.object(self.host, "intake_slots", return_value=limit), \
+                patch.object(lane, "occupied_worker_slots", return_value=occupied), \
+                patch.object(lane.autoscale, "host_ceiling", return_value=ceiling), \
+                patch.object(lane, "reserved_binding_pass", return_value=0) as reserved, \
+                patch.object(lane, "worker_with_slot", return_value=0) as served:
+            lane.worker(self.host, "codex")
+        return reserved, served
+
+    def test_full_provider_seats_fall_through_to_the_reserved_binding_seat(self):
+        reserved, served = self.worker(occupied={"codex": 1})
+        reserved.assert_called_once()
+        served.assert_not_called()
+
+    def test_host_ceiling_and_autoscaled_zero_still_serve_the_binding(self):
+        reserved, served = self.worker(occupied={"grok": 3}, limit=2, ceiling=3)
+        reserved.assert_called_once()
+        served.assert_not_called()
+        reserved, served = self.worker(occupied={}, limit=0)
+        reserved.assert_called_once()
+
+    def test_unreadable_seat_census_does_not_strand_the_binding(self):
+        reserved, _ = self.worker(occupied=None)
+        reserved.assert_called_once()
+
+    def test_a_disabled_provider_serves_nothing(self):
+        reserved, served = self.worker(occupied={}, spec={**self.spec, "enabled": False})
+        reserved.assert_not_called()
+        served.assert_not_called()
+
+    def test_free_seat_takes_the_ordinary_path(self):
+        reserved, served = self.worker(occupied={})
+        served.assert_called_once()
+        reserved.assert_not_called()
+
+    def test_reserved_pass_runs_the_binding_but_never_on_a_critical_disk(self):
+        with patch.object(lane.disk_guard, "free_pct", return_value=7.4), \
+                patch.object(lane.bindings, "reserve", return_value="pr-opened") as reserve, \
+                patch.object(lane, "reexec", return_value=0) as reexec:
+            lane.reserved_binding_pass(self.host, "codex", self.spec)
+        reserve.assert_called_once()
+        reexec.assert_called_once()
+        with patch.object(lane.disk_guard, "free_pct", return_value=3.0), \
+                patch.object(lane.bindings, "reserve") as reserve:
+            self.assertEqual(lane.reserved_binding_pass(self.host, "codex", self.spec), 0)
+        reserve.assert_not_called()
+
+    def test_a_binding_fault_in_the_reserved_pass_is_contained(self):
+        with patch.object(lane.disk_guard, "free_pct", return_value=50.0), \
+                patch.object(lane.bindings, "reserve", side_effect=RuntimeError("boom")):
+            self.assertEqual(lane.reserved_binding_pass(self.host, "codex", self.spec), 0)
+
+    def test_a_jovie_repair_inventory_hold_never_stops_the_binding_pass(self):
+        slot = lane.Locked(self.host.state / "slots" / "codex.0.lock", blocking=False)
+        with patch.object(lane.disk_guard, "check", return_value={"admitted": True}), \
+                patch.object(lane.bindings, "work", return_value="pr-opened") as work, \
+                patch.object(lane, "capture_repair_inventory", side_effect=lane.RepairInventoryHold) as inventory, \
+                patch.object(lane, "reexec", return_value=0) as reexec:
+            lane.worker_with_slot(self.host, "codex", self.spec, slot)
+        work.assert_called_once()
+        inventory.assert_not_called()
+        reexec.assert_called_once()
+
+
 class WorkerTest(unittest.TestCase):
     def test_joined_idle_refresh_preserves_expired_same_lane_legacy_but_refuses_foreign_or_active(self):
         # Real worker and every repair selector/classifier/planner. An expired
@@ -13366,7 +13443,7 @@ class RepositoryBindingTest(unittest.TestCase):
                                      "conclusion": "SUCCESS" if green else "FAILURE"}], **fields}
         return lane.bindings.pr_row(self.node(pr), ["CI Summary"])
 
-    def claim(self, issues, prs, run_receipt=None, states=None):
+    def claim(self, issues, prs, run_receipt=None, states=None, reserved=False):
         linear = FakeLinear([])
         linear.key = "lin_test"
         self.mirror(issues)
@@ -13392,8 +13469,9 @@ class RepositoryBindingTest(unittest.TestCase):
                 patch.object(lane, "read_new_issue_budget") as jovie_budget, \
                 patch.object(lane.linear_sync, "enqueue", observed), \
                 patch.object(lane, "in_flight_issues") as jovie_in_flight:
-            verdict = lane.bindings.work(lane, self.host, "codex", {"cmd": ["true"], "model": "m"},
-                                         bindings=[self.binding])
+            entry = lane.bindings.reserve if reserved else lane.bindings.work
+            verdict = entry(lane, self.host, "codex", {"cmd": ["true"], "model": "m"},
+                            bindings=[dataclasses.replace(self.binding, reserved_seats=1) if reserved else self.binding])
         jovie_budget.assert_not_called()
         jovie_in_flight.assert_not_called()
         status = json.loads((self.host.state / "bindings.json").read_text())["LYB"]
@@ -13601,6 +13679,46 @@ class RepositoryBindingTest(unittest.TestCase):
         with patch.object(lane, "sh") as sh:
             self.assertIsNone(lane.bindings.work(lane, self.host, "codex", {"cmd": ["true"]}, bindings=[capped]))
         sh.assert_not_called()
+
+    def test_checked_in_lyb_binding_has_a_guaranteed_seat(self):
+        self.assertEqual(self.binding.reserved_seats, 1)
+        row = json.loads(json.dumps(self.policy))
+        row["bindings"]["LYB"]["reservedSeats"] = 99
+        capped = lane.bindings.extra_bindings(lane, row, env={"LANES_REPO_LYB": str(self.repo)}, hostname="mac")[0]
+        self.assertEqual(capped.reserved_seats, lane.bindings.RESERVED_SEATS_MAX)
+        row["bindings"]["LYB"]["reservedSeats"] = "x"
+        bad = lane.bindings.extra_bindings(lane, row, env={"LANES_REPO_LYB": str(self.repo)}, hostname="mac")[0]
+        self.assertEqual(bad.reserved_seats, 0)
+
+    def test_reserved_seat_runs_lyb_when_every_provider_seat_is_taken(self):
+        verdict, linear, run, status = self.claim([self.lyb("LYB-7", labels=())], [], reserved=True)
+        self.assertEqual(verdict, "pr-opened")
+        self.assertEqual(run.call_args.kwargs["issue"].identifier, "LYB-7")
+        self.assertFalse(any(path.parent.name == "slots" for path in self.host.state.rglob("*.lock")))
+
+    def test_reserved_seats_are_bounded_and_opt_in(self):
+        reserved = dataclasses.replace(self.binding, reserved_seats=1)
+        held = lane.bindings.take_reserved_seat(lane, self.host, reserved)
+        self.addCleanup(held.release)
+        self.assertIsNone(lane.bindings.take_reserved_seat(lane, self.host, reserved))
+        with patch.object(lane, "sh") as sh:
+            self.assertIsNone(lane.bindings.reserve(lane, self.host, "codex", {"cmd": ["true"]}, bindings=[reserved]))
+            plain = dataclasses.replace(self.binding, reserved_seats=0)
+            self.assertIsNone(lane.bindings.reserve(lane, self.host, "codex", {"cmd": ["true"]}, bindings=[plain]))
+            self.assertIsNone(lane.bindings.reserve(lane, self.host, "hyperagent", {"repairs": False}, bindings=[reserved]))
+        sh.assert_not_called()
+
+    def test_a_held_jovie_claim_lock_never_queues_the_lyb_scan(self):
+        jovie = lane.Locked(self.host.state / "claim.lock", blocking=False)
+        self.assertTrue(jovie.held)
+        self.addCleanup(jovie.release)
+        done = {}
+        thread = threading.Thread(target=lambda: done.update(
+            result=self.claim([self.lyb("LYB-7", labels=())], [])), daemon=True)
+        thread.start()
+        thread.join(30)
+        self.assertFalse(thread.is_alive(), "the LYB scan waited on the Jovie claim.lock")
+        self.assertEqual(done["result"][0], "pr-opened")
 
     def test_failed_run_charges_the_shared_failure_ledger(self):
         verdict, linear, _, _ = self.claim([self.lyb("LYB-7")], [],
