@@ -8338,6 +8338,36 @@ class ReleaseImportClosureTest(unittest.TestCase):
         self.assertEqual(self.missing_from_release(lane.RELEASE_EXTRAS, self.lanes_sources()), [],
                          "add the imported file to RELEASE_EXTRAS in scripts/lanes/lane_runner.py")
 
+    def test_shipped_source_admission_executes_fleet_rules_without_the_checkout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            staging = Path(tmp).resolve()
+            for relative in lane.RELEASE_EXTRAS:
+                target = staging / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / relative, target)
+            module = (staging / "scripts/lib/source-admission-policy.mjs").as_uri()
+            driver = f"""
+import assert from 'node:assert/strict';
+import {{ evaluateSourceAdmission }} from {json.dumps(module)};
+const head = 'a'.repeat(40);
+const evidence = {{
+    repository: 'JovieInc/Jovie', expectedHead: head, complete: true,
+    pr: {{ number: 1, title: 'feat: example', body: '', state: 'open', draft: false,
+           head: {{ sha: head, ref: 'fleet/example', repo: {{ fork: false }} }},
+           base: {{ ref: 'main' }}, labels: [], changed_files: 1 }},
+    files: [{{ filename: 'scripts/example.mjs' }}], reviews: [], statuses: []
+}};
+assert.equal(evaluateSourceAdmission(evidence).allowed, true);
+evidence.pr.title = 'fix: example';
+const result = evaluateSourceAdmission(evidence);
+assert.equal(result.allowed, false);
+assert.equal(result.blockers.length, 1);
+assert.match(result.blockers[0], /^red-before-green:/);
+"""
+            result = subprocess.run(["node", "--input-type=module", "-e", driver],
+                                    cwd=staging, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_comments_are_ignored_and_escaping_imports_are_reported(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
