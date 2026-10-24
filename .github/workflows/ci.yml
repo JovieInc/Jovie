@@ -6540,17 +6540,61 @@ jobs:
         run: pnpm --filter @jovie/web run drizzle:migrate:ci
         env:
           NODE_ENV: test
+      # A dev server compiles every route cold on a hosted runner and timed out
+      # before the first hydration (run 40143463460). Build once and serve the
+      # standalone production server, as the manual Golden Path lane does.
+      - name: Build the journey artifact
+        run: pnpm turbo build --filter=@jovie/web --force
+        env:
+          NEXT_PUBLIC_APP_URL: http://localhost:3250
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3250
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_DISABLE_TOOLBAR: '1'
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+      - name: Materialize standalone assets
+        run: |
+          set -euo pipefail
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
       - name: Run blocking golden-path journey
         env:
           CI: 'true'
-          E2E_TEST_MODE: '1'
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           MUSICFETCH_API_TOKEN: ${{ secrets.MUSICFETCH_API_TOKEN }}
-        run: >-
-          node .github/scripts/guard-playwright-artifacts.mjs --run --
-          pnpm --filter @jovie/web exec playwright test
-          --config=playwright.config.journey.ts --project=chromium
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+        run: |
+          set -euo pipefail
+          test -f apps/web/.next/standalone/apps/web/server.js
+          (
+            cd apps/web
+            export NODE_ENV=test VERCEL_ENV=development E2E_TEST_MODE=1 \
+              PUBLIC_NOAUTH_SMOKE=1 HOSTNAME=localhost PORT=3250 \
+              STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY=price_jovie_journey_pro \
+              NEXT_PUBLIC_APP_URL=http://localhost:3250 \
+              BETTER_AUTH_URL=http://localhost:3250 \
+              NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3250
+            URL_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+            export URL_ENCRYPTION_KEY
+            exec node .next/standalone/apps/web/server.js
+          ) &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          ready=false
+          for _ in $(seq 1 60); do
+            kill -0 "$SERVER_PID" 2>/dev/null || { echo "::error::Standalone server died"; exit 1; }
+            if curl -sf http://localhost:3250/api/health/build-info >/dev/null 2>&1; then ready=true; break; fi
+            sleep 1
+          done
+          [ "$ready" = true ] || { echo "::error::Standalone server not ready in 60s"; exit 1; }
+          BASE_URL=http://localhost:3250 E2E_SKIP_WEB_SERVER=1 \
+            node .github/scripts/guard-playwright-artifacts.mjs --run -- \
+            pnpm --filter @jovie/web exec playwright test \
+            --config=playwright.config.journey.ts --project=chromium
       - name: Delete isolated journey branch
         if: ${{ always() && steps.journey-db.outputs.branch_id != '' }}
         env:
