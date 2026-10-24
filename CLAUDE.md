@@ -66,7 +66,7 @@ Company domain canon: [index](canon/README.md). API/cron/webhook maps:
 
 ## Account limits
 
-Early-access opt-in/out: max 5 changes/day/account. Source:
+Early-access opt-in/out: max 5/day/account. Src:
 `apps/web/lib/early-access/constants.ts` (`EARLY_ACCESS_TOGGLE_LIMIT_PER_DAY`); API enforces by account.
 
 ## Tools and workflow
