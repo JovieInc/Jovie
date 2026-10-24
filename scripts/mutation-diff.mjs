@@ -220,6 +220,7 @@ if (!values['list-only']) {
       artifactName: process.env.GITHUB_RUN_ID
         ? `mutation-diff-${process.env.GITHUB_RUN_ID}`
         : null,
+      sourceSha: process.env.GITHUB_SHA ?? null,
     });
     for (const entry of intake.filed) {
       const where = entry.url ?? entry.identifier ?? entry.reason ?? 'unknown';

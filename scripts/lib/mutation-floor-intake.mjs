@@ -52,11 +52,11 @@ export function buildWorkflowRunUrl(env = process.env) {
 /**
  * Build the upsert payload for one floor breach.
  * @param {FloorFailure} failure
- * @param {{ runUrl?: string | null, artifactName?: string | null }} [context]
+ * @param {{ runUrl?: string | null, artifactName?: string | null, sourceSha?: string | null }} [context]
  */
 export function buildMutationFloorIssue(
   failure,
-  { runUrl = null, artifactName = null } = {}
+  { runUrl = null, artifactName = null, sourceSha = null } = {}
 ) {
   const fingerprint = mutationFloorFingerprint(failure.file);
   const score = failure.score === null ? 'n/a' : `${failure.score}%`;
@@ -74,6 +74,9 @@ export function buildMutationFloorIssue(
     lines.push(
       `- Report artifact: \`${artifactName}\` (apps/web/reports/mutation/diff/)`
     );
+  }
+  if (sourceSha) {
+    lines.push(`- Source SHA: ${sourceSha} (commit tested)`);
   }
   lines.push(
     '- Baseline: `scripts/mutation-score-baseline.json`',
@@ -103,6 +106,7 @@ export function buildMutationFloorIssue(
  *   failures: FloorFailure[],
  *   runUrl?: string | null,
  *   artifactName?: string | null,
+ *   sourceSha?: string | null,
  *   env?: Record<string, string | undefined>,
  *   apiKey?: string,
  *   fetchImpl?: typeof fetch,
@@ -113,6 +117,7 @@ export async function fileMutationFloorIssues({
   failures,
   runUrl = null,
   artifactName = null,
+  sourceSha = null,
   env = process.env,
   apiKey,
   fetchImpl,
@@ -148,7 +153,11 @@ export async function fileMutationFloorIssues({
    *  reopened?: boolean }[]} */
   const filed = [];
   for (const failure of withinCap) {
-    const issue = buildMutationFloorIssue(failure, { runUrl, artifactName });
+    const issue = buildMutationFloorIssue(failure, {
+      runUrl,
+      artifactName,
+      sourceSha,
+    });
     const result = await upsertIssue({
       fingerprint: issue.fingerprint,
       title: issue.title,

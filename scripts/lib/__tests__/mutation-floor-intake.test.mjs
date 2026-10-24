@@ -21,6 +21,7 @@ const failure = {
   valid: 104,
 };
 const RUN_URL = 'https://github.com/JovieInc/Jovie/actions/runs/39691992741';
+const SOURCE_SHA = 'f'.repeat(40);
 
 describe('mutation floor Linear intake (JOV-8857)', () => {
   it('files one deduped issue per breach through the canonical fingerprint upsert', async () => {
@@ -33,6 +34,7 @@ describe('mutation floor Linear intake (JOV-8857)', () => {
       failures: [failure],
       runUrl: RUN_URL,
       artifactName: 'mutation-diff-39691992741',
+      sourceSha: SOURCE_SHA,
       upsertIssue,
     });
 
@@ -51,6 +53,7 @@ describe('mutation floor Linear intake (JOV-8857)', () => {
     expect(call.description).toContain('38.4%');
     expect(call.description).toContain(RUN_URL);
     expect(call.description).toContain('mutation-diff-39691992741');
+    expect(call.description).toContain(SOURCE_SHA);
     expect(call.description).toContain('scripts/mutation-score-baseline.json');
     expect(call.priority).toBe(2);
     expect(call.reopenTerminal).toBe(true);
@@ -149,9 +152,10 @@ describe('mutation floor Linear intake (JOV-8857)', () => {
     });
   });
 
-  it('omits the run and artifact lines when invoked locally', () => {
+  it('omits the run, artifact, and source SHA lines when invoked locally', () => {
     const issue = buildMutationFloorIssue(failure, {});
     expect(issue.description).not.toContain('Report artifact');
+    expect(issue.description).not.toContain('Source SHA');
     expect(issue.description).toContain('unknown run');
   });
 

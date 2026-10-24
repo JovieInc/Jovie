@@ -735,6 +735,12 @@ describe('mutation CLI result semantics', () => {
     }
   });
 
+  it('never files Linear intake for an advisory unbaselined file (JOV-8857)', () => {
+    const run = runFixture('survived');
+    expect(run.status, run.stderr).toBe(0);
+    expect(run.stdout).not.toContain('Linear intake');
+  });
+
   it('keeps the nearest meaningful transitive suite ahead of broad auth routes under a cap', () => {
     const run = runFixture('distance-cap', ['--list-only', '--max-tests', '1']);
     expect(run.status, run.stderr).toBe(0);
