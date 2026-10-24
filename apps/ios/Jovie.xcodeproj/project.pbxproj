@@ -62,6 +62,7 @@
 		A0B10F000000000000000032 /* MetricKitReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000033 /* MetricKitReporter.swift */; };
 		A0B10F000000000000000034 /* MetricKitReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000035 /* MetricKitReporterTests.swift */; };
 		A0B10F00000000000000000E /* ObservabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F00000000000000000C /* ObservabilityTests.swift */; };
+		A0B10F000000000000000037 /* SentryHangTrackingPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000036 /* SentryHangTrackingPolicyTests.swift */; };
 		A0B10F00000000000000000F /* ObservabilityRedactionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */; };
 		A0B10F000000000000000012 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = A0B10F000000000000000011 /* Sentry */; };
 		A0B10F000000000000000020 /* AuthScreenStyleGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */; };
@@ -228,6 +229,7 @@
 		A0B10F000000000000000033 /* MetricKitReporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MetricKitReporter.swift; sourceTree = "<group>"; };
 		A0B10F000000000000000035 /* MetricKitReporterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MetricKitReporterTests.swift; sourceTree = "<group>"; };
 		A0B10F00000000000000000C /* ObservabilityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityTests.swift; sourceTree = "<group>"; };
+		A0B10F000000000000000036 /* SentryHangTrackingPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SentryHangTrackingPolicyTests.swift; sourceTree = "<group>"; };
 		A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ObservabilityRedactionTests.swift; sourceTree = "<group>"; };
 		A0B10F000000000000000021 /* AuthScreenStyleGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthScreenStyleGuardTests.swift; sourceTree = "<group>"; };
 		A0671400A0671400A0671401 /* BiometricLockView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BiometricLockView.swift; sourceTree = "<group>"; };
@@ -436,6 +438,7 @@
 				A0B10F00000000000000000D /* ObservabilityRedactionTests.swift */,
 				A0B10F000000000000000035 /* MetricKitReporterTests.swift */,
 				A0B10F00000000000000000C /* ObservabilityTests.swift */,
+				A0B10F000000000000000036 /* SentryHangTrackingPolicyTests.swift */,
 				A0GH10380000000000000001 /* VoiceCaptureServiceTests.swift */,
 				448ADF9C21BB11784C6AD119 /* QRCodeRendererTests.swift */,
 				178C37B20F46EAF919EB2031 /* ScreenBrightnessManagerTests.swift */,
@@ -845,6 +848,7 @@
 				A0B10F00000000000000000F /* ObservabilityRedactionTests.swift in Sources */,
 				A0B10F000000000000000034 /* MetricKitReporterTests.swift in Sources */,
 				A0B10F00000000000000000E /* ObservabilityTests.swift in Sources */,
+				A0B10F000000000000000037 /* SentryHangTrackingPolicyTests.swift in Sources */,
 				A0GH10380000000000000002 /* VoiceCaptureServiceTests.swift in Sources */,
 				BD6A822847064E6F3E3E5228 /* QRCodeRendererTests.swift in Sources */,
 				DA762182661489283A851F6B /* ScreenBrightnessManagerTests.swift in Sources */,
