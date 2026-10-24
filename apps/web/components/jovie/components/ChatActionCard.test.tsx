@@ -62,3 +62,36 @@ describe('ChatActionCard', () => {
     expect(screen.getAllByRole('button')).toHaveLength(2);
   });
 });
+
+describe('ChatActionCard accessible name (JOV-8873)', () => {
+  it('keeps the visible label first in the accessible name', () => {
+    const { rerender } = render(
+      <ChatActionCard
+        title='Review imported links'
+        body='Three links need review.'
+        actionLabel='Review links'
+        ariaLabel='three imported links'
+        onAct={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('button', {
+        name: 'Review links — three imported links',
+      })
+    ).toBeInTheDocument();
+
+    rerender(
+      <ChatActionCard
+        title='Review imported links'
+        body='Three links need review.'
+        actionLabel='Review links'
+        onAct={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Review links' })
+    ).not.toHaveAttribute('aria-label');
+  });
+});

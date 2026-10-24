@@ -75,3 +75,18 @@ describe('DemoShell', () => {
     expect(source).not.toMatch(/--sidebar-width['"]?\s*:\s*['"]?\d+px/);
   });
 });
+
+describe('DemoShell workspace selector name (JOV-8873)', () => {
+  it('names the workspace selector with visible text included', () => {
+    render(
+      <DemoShell activeTab='inbox' onTabChange={vi.fn()}>
+        <div>Demo content</div>
+      </DemoShell>
+    );
+    const label = screen.getByText('Open Workspace Selector:');
+    expect(label).toHaveClass('sr-only');
+    const trigger = label.closest('button');
+    expect(trigger).not.toBeNull();
+    expect(trigger).not.toHaveAttribute('aria-label');
+  });
+});
