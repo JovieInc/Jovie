@@ -174,3 +174,45 @@ export async function prepareImagesForScreenshot(page: Page) {
   });
   await waitForImages(page);
 }
+
+/**
+ * Reject a capture when any image on the page is incomplete. Runs at capture
+ * time (and again after the capture) so a lazy image that goes incomplete
+ * between preparation and the screenshot bytes fails the candidate instead
+ * of shipping a half-loaded frame. Reports at most 5 offending images to
+ * keep the failure message bounded.
+ */
+export async function assertImagesReadyForCapture(page: Page) {
+  const incompleteImages = await page.evaluate(() =>
+    Array.from(document.images)
+      .filter(
+        image =>
+          !image.complete ||
+          !(image instanceof HTMLImageElement) ||
+          image.naturalWidth === 0
+      )
+      .map(image => ({
+        src: image.currentSrc || image.src,
+        loading: image.getAttribute('loading') ?? '',
+        complete: image.complete,
+        naturalWidth:
+          image instanceof HTMLImageElement ? image.naturalWidth : 0,
+      }))
+  );
+
+  if (incompleteImages.length > 0) {
+    const samples = incompleteImages
+      .slice(0, 5)
+      .map(
+        image =>
+          `${image.src || '(no src)'} [loading=${image.loading || 'unset'}, complete=${String(image.complete)}, naturalWidth=${image.naturalWidth}]`
+      );
+    const extra =
+      incompleteImages.length > samples.length
+        ? ` (+${incompleteImages.length - samples.length} more)`
+        : '';
+    throw new Error(
+      `Rejecting capture: ${incompleteImages.length} image(s) not fully loaded: ${samples.join('; ')}${extra}`
+    );
+  }
+}
