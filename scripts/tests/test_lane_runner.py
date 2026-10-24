@@ -6,6 +6,7 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import multiprocessing
 import contextlib
 import copy
 import dataclasses
@@ -13,6 +14,7 @@ import fcntl
 import concurrent.futures
 import io
 import signal
+import socket
 import shutil
 import threading
 import hashlib
@@ -2126,7 +2128,317 @@ class HeldPruneTest(unittest.TestCase):
         self.assertEqual(left, {"1", "4"})
 
 
+def repair_inventory_pr():
+    return {'number': 999999, 'title': 'offline repair fixture', 'url': 'https://example.invalid/999999',
+            'state': 'OPEN', 'headRefName': 'grok/jov-999999-20261014', 'headRefOid': 'a'*40,
+            'isInMergeQueue': False, 'isCrossRepository': False, 'isDraft': False,
+            'mergeStateStatus': 'BLOCKED', 'labels': [], 'labelsComplete': True,
+            'filesComplete': True, 'rollup': 'FAILURE', 'updatedAt': '2026-10-14T23:00:00Z',
+            'statusCheckRollup': [{'name': 'fixture', 'status': 'COMPLETED', 'conclusion': 'FAILURE'}]}
+
+def repair_inventory_process(root, role, entered, release, preclaim, done, output, scenario="bulk"):
+    try:
+        os.environ.update(LANES_STATE=root, LANES_EXECUTION_BACKEND='offline-claim-audit',
+                          SYMPHONY_AUTOSCALE='off', PYTHONDONTWRITEBYTECODE='1')
+        # A separate process summary and actual current definitions: no inherited test stubs.
+        spec = importlib.util.spec_from_file_location('claim_inventory_fixture', ROOT/'scripts/lanes/lane_runner.py')
+        lane = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = lane
+        spec.loader.exec_module(lane)
+        state = Path(root); lane.SHARED_CACHE_DIR = state/'cache'
+        providers = {x: {'enabled': True, 'repairs': True, 'model': 'offline', 'slots': 1,
+                         'label': x} for x in ('codex', 'grok')}
+        pr = repair_inventory_pr(); rows = [pr] if role == 'grok' else []
+        clock = [time.time()]
+        lane._SUMMARY.update(at=clock[0], sourceAt=None if scenario == 'unknown' else clock[0],
+                             prs=rows, readable=scenario != 'unknown')
+        if scenario == 'stale':
+            lane._SUMMARY['sourceAt'] -= lane.CLAIM_SCAN_TTL_S
+        calls=[]; dispatch=[]; publication=[]
+        actual_lock = lane.Locked
+        def locked(path, *args, **kwargs):
+            result = actual_lock(path, *args, **kwargs)
+            if Path(path).name == 'claim.lock' and scenario == 'wait':
+                clock[0] += lane.CLAIM_SCAN_TTL_S
+            return result
+        def target(pr):
+            if scenario == 'positive-aged':
+                clock[0] += lane.CLAIM_SCAN_TTL_S + 1
+            if scenario == 'local-changed':
+                (state/'fix-attempts.json').write_text(json.dumps({str(pr['number']): {
+                    'sha': pr['headRefOid'], 'count': 1, 'lane': 'other', 'at': clock[0]}}))
+            return {**pr, 'headRefOid': 'b'*40} if scenario == 'head-changed' else copy.deepcopy(pr)
+        def forbidden(*a, **k):
+            raise AssertionError('unexpected external fixture effect')
+        def before_claim(*a, **k):
+            if role == 'codex' and scenario == 'bulk':
+                lane._SUMMARY['at'] = time.time() - lane.SUMMARY_TTL_S - 1
+            if scenario == 'same-key':
+                lane._SUMMARY['at'] = 0
+            preclaim.set()
+        def offline_sh(args, **kwargs):
+            assert role == 'codex' and args[:3] == ['gh', 'api', 'graphql'], args
+            assert any(str(x).startswith('query=') and lane.pr_events.OPEN_PRS_QUERY in str(x) for x in args)
+            calls.append({'kind': 'actual-open-prs-graphql', 'timeout': kwargs.get('timeout')})
+            entered.set(); assert release.wait(10), 'bounded offline read barrier timed out'
+            return SimpleNamespace(returncode=0, stdout=json.dumps({'data': {'repository': {
+                'pullRequests': {'nodes': [], 'pageInfo': {'hasNextPage': False, 'endCursor': None}}}}}), stderr='')
+        def execute(host, name, spec, picked):
+            attempts=json.loads((state/'fix-attempts.json').read_text())
+            assert attempts[str(picked['number'])]['count'] == 1
+            dispatch.append({'number': picked['number'], 'head': picked['headRefOid']})
+        with contextlib.ExitStack() as stack:
+            patches=[(lane.disk_guard,'check',{'return_value':{'admitted':True}}),
+                     (lane.bindings,'work',{'return_value':None}),
+                     (lane,'load_providers',{'return_value':providers}),
+                     (lane,'requeue_verified',{'side_effect':before_claim}),
+                     (lane,'sh',{'side_effect':offline_sh}),
+                     (lane.lifecycle,'run',{'side_effect':forbidden}),
+                     (lane,'provider_may_run',{'return_value':False}),
+                     (lane,'claimed_elsewhere',{'return_value':scenario == 'unknown-owner'}),
+                     (lane,'reconcile_fix_target',{'side_effect':target}),
+                     (lane,'Locked',{'side_effect':locked}),
+                     (lane.time,'time',{'side_effect':lambda:clock[0]}),
+                     (lane,'post_claim',{'side_effect':lambda *a:publication.append(a)}),
+                     (lane,'fix_red_pr',{'side_effect':execute}),
+                     (lane,'reexec',{'return_value':0}), (lane,'Linear',{'side_effect':forbidden}),
+                     (lane,'record_maintenance_demand',{}), (lane,'publish_exhausted_repairs',{}),
+                     (lane,'sweep_execution_statuses',{}), (lane,'revisit_terminal_prs',{}),
+                     (lane,'yield_deferred_requeues',{}), (lane,'claim_escalation_pr',{'return_value':None}),
+                     (lane.pr_events,'claim_event_pr',{'return_value':None}),
+                     (lane.pr_events,'cleanup_one_event',{}),
+                     (socket.socket,'connect',{'side_effect':forbidden})]
+            for obj,name,opts in patches:stack.enter_context(patch.object(obj,name,**opts))
+            host=lane.Host(state=state,repo=state,linear_env=state/'nonexistent')
+            slot=lane.Locked(state/'slots'/f'{role}.0.lock',blocking=False);assert slot.held
+            result=lane.worker_with_slot(host,role,providers[role],slot,maintenance_only=True)
+            attempts=json.loads((state/'fix-attempts.json').read_text()) if (state/'fix-attempts.json').exists() else {}
+            output.put({'role':role,'result':result,'fixtureReads':calls,'repairDispatch':dispatch,
+                        'claimPublications':len(publication),'attempts':attempts,
+                        'slotReleased':slot.handle.closed,
+                        'idle':json.loads((state/'worker-idle.json').read_text()) if (state/'worker-idle.json').exists() else {}})
+        done.set()
+    except BaseException as error:
+        output.put({'role':role,'error':f'{type(error).__name__}: {error}'})
+        done.set();raise
+
+
 class ClaimScanCacheTest(unittest.TestCase):
+    def test_repair_receipt_copies_same_call_rows_without_later_metadata_donation(self):
+        now = self.clock['now']
+        rows = [repair_inventory_pr()]
+        lane._SUMMARY.update(at=now, sourceAt=now, prs=rows, readable=True)
+        with patch.object(lane.time, 'time', side_effect=lambda: self.clock['now']):
+            receipt = lane.capture_repair_inventory('codex')
+            self.assertTrue(lane.repair_inventory_valid(receipt, 'codex'))
+            self.clock['now'] += lane.CLAIM_SCAN_TTL_S
+            lane._SUMMARY.update(at=self.clock['now'], sourceAt=self.clock['now'], prs=copy.deepcopy(rows))
+            self.assertFalse(lane.repair_inventory_valid(receipt, 'codex'))
+            self.assertEqual(receipt['summary']['sourceAt'], now)
+            self.assertTrue(lane.repair_inventory_valid(lane.capture_repair_inventory('codex'), 'codex'))
+            rows[0]['headRefOid'] = 'changed'
+            self.assertEqual(receipt['prs'][0]['headRefOid'], 'a'*40)
+            self.assertEqual(receipt['prs'], receipt['summary']['prs'])
+
+    def test_repair_receipt_qualifies_raw_cache_value_before_rollup_normalization(self):
+        now = self.clock['now']
+        raw = [{'number': 7, 'rollup': 'FAILURE'}]
+        with patch.object(lane.time, 'time', return_value=now), \
+                patch.object(lane, 'shared', return_value=copy.deepcopy(raw)), \
+                patch.object(lane, 'maintenance_json', return_value={'at': now-1, 'value': raw}):
+            receipt = lane.capture_repair_inventory('codex')
+        self.assertEqual(receipt['summary']['sourceAt'], now-1)
+        self.assertTrue(receipt['prs'][0]['statusCheckRollup'][0]['synthetic'])
+        self.assertEqual(receipt['prs'], receipt['summary']['prs'])
+        lane._SUMMARY['at'] = 0
+        with patch.object(lane.time, 'time', return_value=now), \
+                patch.object(lane, 'shared', return_value=copy.deepcopy(raw)), \
+                patch.object(lane, 'maintenance_json', return_value={'at': now, 'value': [{'number': 99}]}):
+            self.assertIsNone(lane.capture_repair_inventory('codex')['summary']['sourceAt'])
+
+    def test_repair_receipt_refuses_unknown_malformed_stale_and_cross_scope_pairs(self):
+        now = self.clock['now']
+        lane._SUMMARY.update(at=now, sourceAt=now, prs=[], readable=True)
+        with patch.object(lane.time, 'time', return_value=now):
+            good = lane.capture_repair_inventory('codex')
+            self.assertTrue(lane.repair_inventory_valid(good, 'codex'), 'known empty is qualified')
+            for stamp in (None, True, float('nan'), float('inf'), now+1, now-lane.CLAIM_SCAN_TTL_S):
+                with self.subTest(stamp=stamp):
+                    receipt = copy.deepcopy(good); receipt['summary']['sourceAt'] = stamp
+                    self.assertFalse(lane.repair_inventory_valid(receipt, 'codex'))
+            for key, value in (('repository', 'other/repo'), ('provider', 'other'), ('cacheKey', 'other'),
+                               ('cacheRoot', 'other'), ('sameCallRows', False), ('prs', None)):
+                with self.subTest(key=key):
+                    receipt = {**good, key: value}
+                    self.assertFalse(lane.repair_inventory_valid(receipt, 'codex'))
+            for summary in (None, [], {**good['summary'], 'readable': False},
+                            {**good['summary'], 'prs': [repair_inventory_pr()]}):
+                self.assertFalse(lane.repair_inventory_valid({**good, 'summary': summary}, 'codex'))
+            self.assertFalse(lane.repair_inventory_valid(None, 'codex'))
+            for rows in ([None], [{**repair_inventory_pr(), 'labelsComplete': False}]):
+                partial = {**good, 'prs': rows, 'summary': {**good['summary'], 'prs': rows}}
+                self.assertFalse(lane.repair_inventory_valid(partial, 'codex'))
+            for error in (OSError('offline'), ValueError('corrupt'), TypeError('malformed'), KeyError('prs')):
+                with self.subTest(error=type(error).__name__), patch.object(lane, 'open_prs_summary', side_effect=error):
+                    self.assertFalse(lane.repair_inventory_valid(lane.capture_repair_inventory('codex'), 'codex'))
+            for paired in ([], [{'readable': True, 'sourceAt': now, 'prs': [repair_inventory_pr()]}]):
+                def malformed(*, capture):
+                    capture.extend(paired)
+                    return []
+                with patch.object(lane, 'open_prs_summary', side_effect=malformed):
+                    self.assertFalse(lane.repair_inventory_valid(lane.capture_repair_inventory('codex'), 'codex'))
+
+    def test_partial_bulk_read_cannot_borrow_previous_success_provenance(self):
+        lane._SUMMARY.update(at=0, sourceAt=self.clock['now'], prs=[repair_inventory_pr()], readable=True)
+        page = {'data': {'repository': {'pullRequests': {
+            'nodes': [], 'pageInfo': {'hasNextPage': True, 'endCursor': 'more'}}}}}
+        with patch.object(lane.time, 'time', return_value=self.clock['now']), \
+                patch.object(lane, 'sh', return_value=SimpleNamespace(returncode=0, stdout=json.dumps(page))) as shell:
+            receipt = lane.capture_repair_inventory('codex')
+        self.assertEqual(shell.call_count, 10)
+        self.assertFalse(receipt['summary']['readable'])
+        self.assertIsNone(receipt['summary']['sourceAt'])
+        self.assertEqual(receipt['prs'], [])
+        self.assertFalse((lane.SHARED_CACHE_DIR/'open-prs-labels-v2.json').exists())
+
+    def test_supplied_repair_projection_does_not_refill_any_inventory_cache(self):
+        providers = {'codex': {'enabled': True}, 'grok': {'enabled': True}}
+        rows = [repair_inventory_pr()]
+        with patch.object(lane, 'open_prs_summary', side_effect=AssertionError('unexpected reader')), \
+                patch.object(lane, 'shared', side_effect=AssertionError('unexpected derived cache')), \
+                patch.object(lane, 'load_providers', return_value=providers):
+            self.assertEqual(lane.fix_candidates('grok', inventory=[]), [])
+            with self.assertRaisesRegex(ValueError, 'supplied-inventory-fields'):
+                lane.lane_prs('grok', fields=lane.PR_FIELDS, inventory=[])
+            selected = lane.fix_candidates('grok', inventory=rows)
+        self.assertEqual([pr['number'] for pr in selected], [999999])
+        self.assertEqual(rows, [repair_inventory_pr()])
+
+    def test_initial_repair_holds_release_both_locks_without_nested_idle_deadlock(self):
+        ctx = multiprocessing.get_context('spawn')
+        for scenario in ('unknown', 'stale', 'wait'):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as tmp:
+                output, done = ctx.Queue(), ctx.Event()
+                release = ctx.Event(); release.set()
+                entered, preclaim = ctx.Event(), ctx.Event()
+                process = ctx.Process(target=repair_inventory_process, args=(
+                    tmp, 'codex', entered, release, preclaim, done, output, scenario))
+                try:
+                    process.start(); process.join(8)
+                    self.assertFalse(process.is_alive(), 'idle recording must occur after global lock release')
+                    self.assertEqual(process.exitcode, 0)
+                    row = output.get(timeout=2)
+                    self.assertTrue(row['slotReleased'])
+                    self.assertEqual(row['attempts'], {})
+                    self.assertEqual(row['claimPublications'], 0)
+                    self.assertEqual(row['idle']['codex']['reason'], 'repair-inventory-unknown-or-stale')
+                    lock = lane.Locked(Path(tmp)/'claim.lock', blocking=False)
+                    try: self.assertTrue(lock.held)
+                    finally: lock.release()
+                finally:
+                    if process.is_alive(): process.terminate(); process.join(2)
+                    output.close(); output.join_thread()
+
+    def test_current_target_owner_and_local_preimage_fences_survive_inventory_move(self):
+        ctx = multiprocessing.get_context('spawn')
+        for scenario in ('positive-aged', 'head-changed', 'unknown-owner', 'local-changed'):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as tmp:
+                output, done = ctx.Queue(), ctx.Event()
+                release = ctx.Event(); release.set()
+                entered, preclaim = ctx.Event(), ctx.Event()
+                process = ctx.Process(target=repair_inventory_process, args=(
+                    tmp, 'grok', entered, release, preclaim, done, output, scenario))
+                try:
+                    process.start(); process.join(8)
+                    self.assertFalse(process.is_alive()); self.assertEqual(process.exitcode, 0)
+                    row = output.get(timeout=2)
+                    if scenario == 'positive-aged':
+                        self.assertEqual(row['claimPublications'], 1)
+                        self.assertEqual(row['attempts']['999999']['count'], 1)
+                        self.assertEqual(len(row['repairDispatch']), 1)
+                    else:
+                        self.assertEqual(row['claimPublications'], 0)
+                        self.assertEqual(row['repairDispatch'], [])
+                        self.assertEqual(row['attempts'].get('999999', {}).get('lane'),
+                                         'other' if scenario == 'local-changed' else None)
+                finally:
+                    if process.is_alive(): process.terminate(); process.join(2)
+                    output.close(); output.join_thread()
+
+    def test_independent_same_key_readers_coalesce_the_bulk_fill(self):
+        ctx = multiprocessing.get_context('spawn')
+        entered, release, output = ctx.Event(), ctx.Event(), ctx.Queue()
+        processes = []
+        try:
+            for name in ('codex', 'grok'):
+                preclaim, done = ctx.Event(), ctx.Event()
+                process = ctx.Process(target=repair_inventory_process, args=(
+                    self.tmp.name, name, entered, release, preclaim, done, output, 'same-key'))
+                process.start(); processes.append(process)
+                if name == 'codex':
+                    self.assertTrue(entered.wait(10))
+                else:
+                    self.assertTrue(preclaim.wait(10))
+                    self.assertFalse(done.is_set(), 'same-key reader must await the existing fill')
+            release.set()
+            for process in processes:
+                process.join(10)
+                self.assertFalse(process.is_alive())
+                self.assertEqual(process.exitcode, 0)
+            rows = [output.get(timeout=2) for _ in processes]
+            self.assertEqual(sum(len(row['fixtureReads']) for row in rows), 1)
+            self.assertTrue(all(row['slotReleased'] and not row['attempts'] for row in rows))
+        finally:
+            release.set()
+            for process in processes:
+                process.join(2)
+                if process.is_alive(): process.terminate(); process.join(2)
+            output.close(); output.join_thread()
+
+    def test_expired_bulk_fill_does_not_block_an_independent_cached_repair(self):
+        ctx = multiprocessing.get_context('spawn')
+        state = Path(self.tmp.name)
+        cache = state/'cache'; cache.mkdir()
+        (cache/'claim-fix-candidates-grok.json').write_text(json.dumps({
+            'at': time.time(), 'value': [repair_inventory_pr()]}))
+        entered, release, output = ctx.Event(), ctx.Event(), ctx.Queue()
+        pre = {name: ctx.Event() for name in ('codex', 'grok')}
+        done = {name: ctx.Event() for name in pre}
+        processes = []
+        try:
+            for name in ('codex', 'grok'):
+                process = ctx.Process(target=repair_inventory_process,
+                    args=(str(state), name, entered, release, pre[name], done[name], output))
+                process.start(); processes.append(process)
+                if name == 'codex':
+                    self.assertTrue(entered.wait(10), 'first worker must reach the offline bulk read')
+                    contender = lane.Locked(state/'claim.lock', blocking=False)
+                    try:
+                        self.assertTrue(contender.held, 'bulk fill must run outside global claim.lock')
+                    finally:
+                        contender.release()
+            self.assertTrue(pre['grok'].wait(10))
+            self.assertTrue(done['grok'].wait(5), 'qualified cached repair must progress before bulk read release')
+            self.assertEqual(json.loads((state/'fix-attempts.json').read_text())['999999']['count'], 1)
+            release.set()
+            for process in processes:
+                process.join(10)
+                self.assertFalse(process.is_alive(), 'bounded fixture must not leave a lock-hung process')
+                self.assertEqual(process.exitcode, 0)
+            rows = [output.get(timeout=2) for _ in processes]
+            repair = next(row for row in rows if row['role'] == 'grok')
+            self.assertEqual(repair['claimPublications'], 1)
+            self.assertEqual(repair['repairDispatch'], [{'number': 999999, 'head': 'a'*40}])
+            self.assertEqual(repair['attempts']['999999']['count'], 1)
+            self.assertEqual(sum(len(row['fixtureReads']) for row in rows), 1)
+        finally:
+            release.set()
+            for process in processes:
+                process.join(2)
+                if process.is_alive():
+                    process.terminate(); process.join(2)  # Only this test's verified child.
+            output.close(); output.join_thread()
+
     def setUp(self):
         budget = patch.object(lane.Linear, "_snapshot_budget_admitted", return_value=True)
         budget.start()
@@ -2764,6 +3076,18 @@ class AttributionAndThroughputTest(unittest.TestCase):
 
 
 class MaintenanceDemandTest(unittest.TestCase):
+    def test_explicit_summary_pair_cannot_borrow_later_global_demand_metadata(self):
+        rows = [self.pr()]
+        paired = {'at': self.now, 'sourceAt': self.now, 'prs': rows, 'readable': True}
+        forged = {'at': self.now+100, 'sourceAt': self.now+100, 'prs': [], 'readable': True}
+        with patch.object(lane, '_SUMMARY', forged), patch.object(lane, 'load_providers', return_value=self.providers):
+            lane.record_maintenance_demand(self.host, 'devin', rows, rows, [], set(), summary=paired)
+            self.assertEqual(json.loads((self.host.state/'maintenance-demand.json').read_text())['lanes']['devin']['pending'], 1)
+            lane.record_maintenance_demand(self.host, 'devin', rows, rows, [], set(), summary={**paired, 'readable': False})
+        row = json.loads((self.host.state/'maintenance-demand.json').read_text())['lanes']['devin']
+        self.assertIsNone(row['pending'])
+        self.assertEqual(row['observedAt'], self.now)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -3014,7 +3338,7 @@ class WorkerTest(unittest.TestCase):
                 pr = {"number": 7, "state": "OPEN", "headRefOid": "head-A",
                       "headRefName": "codex/jov-7-20261016", "isDraft": True,
                       "isCrossRepository": False, "isInMergeQueue": False,
-                      "mergeStateStatus": "BLOCKED", "labels": [],
+                      "mergeStateStatus": "BLOCKED", "labels": [], "labelsComplete": True,
                       "statusCheckRollup": [{"name": "test", "status": "COMPLETED",
                           "conclusion": "TIMED_OUT",
                           "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123"}]}
@@ -3115,7 +3439,7 @@ class WorkerTest(unittest.TestCase):
                     pr = {"number": 7, "state": "OPEN", "headRefOid": "head-A",
                           "headRefName": "codex/jov-7-20261016", "isDraft": True,
                           "isCrossRepository": False, "isInMergeQueue": False,
-                          "mergeStateStatus": "BLOCKED", "labels": [],
+                          "mergeStateStatus": "BLOCKED", "labels": [], "labelsComplete": True,
                           "statusCheckRollup": [{"name": "test", "status": "COMPLETED",
                               "conclusion": "TIMED_OUT",
                               "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123"}]}
@@ -3181,7 +3505,8 @@ class WorkerTest(unittest.TestCase):
                 clock = [10000.0]
                 original = {"number": 7, "headRefOid": "original"}
                 changed = {"number": 7, "headRefOid": "later-global-value"}
-                summary = {"readable": True, "sourceAt": clock[0], "prs": [original]}
+                summary = {"at": clock[0], "readable": True, "sourceAt": clock[0],
+                           "prs": [{**original, "labelsComplete": True}]}
                 locked = lane.Locked
                 def acquire(path, *args, **kwargs):
                     if Path(path).name == "claim.lock":
@@ -3200,10 +3525,10 @@ class WorkerTest(unittest.TestCase):
                     lane.worker(self.host, "devin")
                 if delay:
                     join.assert_not_called()
-                    self.assertEqual(claim.call_args.args[2], [])
+                    claim.assert_not_called()
                 else:
-                    self.assertEqual(join.call_args.args[2], [original])
-                    self.assertEqual(claim.call_args.args[2], [original])
+                    self.assertEqual(join.call_args.args[2], [{**original, "labelsComplete": True}])
+                    self.assertEqual(claim.call_args.args[2], [{**original, "labelsComplete": True}])
                 self.assertEqual(summary["prs"], [changed])
 
     def test_target_confirmation_precedes_claim_lock_and_worker_rechecks_age_after_wait(self):
@@ -3274,6 +3599,84 @@ class WorkerTest(unittest.TestCase):
                 patch.object(lane, "fix_red_pr") as repair, patch.object(lane, "run_issue") as new_work:
             self.assertEqual(lane.worker(self.host, "devin"), 0)
         repair.assert_called_once(); new_work.assert_not_called()
+
+    def test_initial_invalid_repair_receipt_records_idle_only_after_global_release(self):
+        real_idle = lane.record_idle_exit
+        def idle(host, name, reason):
+            contender = lane.Locked(host.state/'claim.lock', blocking=False)
+            try: self.assertTrue(contender.held, 'idle callback must run outside globalclaim')
+            finally: contender.release()
+            real_idle(host, name, reason)
+        good = lane.capture_repair_inventory('devin')
+        for change in ({'readable': False}, {'sourceAt': None}, {'sourceAt': time.time()-60}):
+            bad = {**good, 'summary': {**good['summary'], **change}}
+            with self.subTest(change=change), patch.object(lane, 'capture_repair_inventory', return_value=bad), \
+                    patch.object(lane, 'record_idle_exit', side_effect=idle), patch.object(lane, 'run_issue') as work:
+                self.assertEqual(lane.worker(self.host, 'devin'), 0)
+                work.assert_not_called()
+                self.assertEqual(json.loads((self.host.state/'worker-idle.json').read_text())['devin']['reason'],
+                                 'repair-inventory-unknown-or-stale')
+                slot = lane.Locked(self.host.state/'slots/devin.0.lock', blocking=False)
+                try: self.assertTrue(slot.held)
+                finally: slot.release()
+
+    def test_brief_unknown_response_or_elapsed_ttl_keeps_baseline_local_claim_continuity(self):
+        real_linear = self.saved[0]
+        for scenario in ('unknown-comment', 'elapsed-comment', 'remote-only'):
+            with self.subTest(scenario=scenario):
+                # Each case uses fresh actual mirror/claim state, not a refreshed remote label.
+                with tempfile.TemporaryDirectory() as tmp:
+                    host = lane.Host(state=Path(tmp), repo=ROOT, linear_env=Path('unused'))
+                    clock = [time.time()]
+                    class Client:
+                        description = 'No design brief yet'
+                        comments = []
+                        label_adds = 0
+                        def lane_issues(client, label=None):
+                            return real_linear.lane_issues(client, label)
+                        def gql(client, query, variables):
+                            if query.startswith('query'):
+                                return {'issue': {'description': client.description}}
+                            if 'd' in variables: client.description = variables['d']
+                            if 'addedLabelIds' in query: client.label_adds += 1
+                            return {'issueUpdate': {'success': True}}
+                        def comment(client, ident, body):
+                            client.comments.append((ident, body))
+                            if scenario in ('unknown-comment', 'remote-only'):
+                                raise RuntimeError('offline committed comment response lost')
+                            clock[0] += lane.CLAIM_SCAN_TTL_S + 1
+                    client = Client()
+                    node = {'id': 'brief-id', 'identifier': 'JOV-999999', 'title': 'Homepage hero',
+                            'description': client.description, 'priority': 2, 'createdAt': '2026-10-13T00:00:00Z',
+                            'updatedAt': '2026-10-14T23:00:00Z', 'state': {'name': 'Todo', 'type': 'unstarted'},
+                            'parent': None, 'labels': {'nodes': [{'name': 'ws:ui-ia'}],
+                                                     'pageInfo': {'hasNextPage': False}}}
+                    lane.linear_sync.apply(host.state, 'JOV', [node])
+                    spec = {'enabled': True, 'repairs': scenario != 'remote-only', 'model': 'offline', 'slots': 1, 'label': 'devin'}
+                    with patch.dict(os.environ, {'LANES_STATE': tmp}), \
+                            patch.object(lane.time, 'time', side_effect=lambda: clock[0]), \
+                            patch.object(lane, 'Linear', return_value=client), \
+                            patch.object(lane, 'run_issue', return_value={'verdict': 'decomposed'}) as work, \
+                            patch.object(lane, 'issue_router', return_value=None), \
+                            patch.object(lane, 'notify_issue_claim'), patch.object(lane, 'note_event_outcome'), \
+                            patch.object(lane.bindings, 'work', return_value=None), \
+                            patch.object(lane, 'sh', side_effect=AssertionError('no external calls')), \
+                            patch.object(lane, 'requeue_verified'), patch.object(lane, 'yield_deferred_requeues'), \
+                            patch.object(lane, 'publish_exhausted_repairs'), patch.object(lane, 'sweep_execution_statuses'), \
+                            patch.object(lane, 'revisit_terminal_prs'), contextlib.redirect_stderr(io.StringIO()):
+                        with contextlib.ExitStack() as guards:
+                            if scenario == 'remote-only':
+                                guards.enter_context(patch.object(lane, 'capture_repair_inventory',
+                                    side_effect=AssertionError('remote-only must bypass repair inventory gate')))
+                            for _ in range(2):
+                                slot = lane.Locked(host.state/'slots/devin.0.lock', blocking=False)
+                                self.assertTrue(slot.held)
+                                self.assertEqual(lane.worker_with_slot(host, 'devin', spec, slot), 0)
+                    self.assertEqual(len(client.comments), 1)
+                    self.assertEqual(client.label_adds, 1)
+                    self.assertEqual(client.description.count('"orderId"'), 1)
+                    self.assertEqual(lane.linear_sync.claim_status(host.state, 'brief-id'), 'active')
+                    work.assert_called_once()
 
     def test_unknown_linear_inventory_releases_the_seat_without_claiming(self):
         with patch.object(self.linear, "lane_issues", side_effect=lane.LaneInventoryUnknown("linear-refresh-reserve-held")), \
@@ -3458,6 +3861,19 @@ class WorkerTest(unittest.TestCase):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
         disk.start()
         self.addCleanup(disk.stop)
+        real_summary = lane.open_prs_summary
+        default_summary = lane._SUMMARY
+        summary = copy.deepcopy(lane._SUMMARY)
+        def known_empty_summary(*, capture=None):
+            if lane._SUMMARY is default_summary:
+                lane._SUMMARY.update(at=time.time(), sourceAt=time.time(), prs=[], readable=True)
+            return real_summary(capture=capture)
+        summary_fixture = patch.object(lane, 'open_prs_summary', side_effect=known_empty_summary)
+        summary_fixture.start()
+        self.addCleanup(summary_fixture.stop)
+        def restore_summary():
+            lane._SUMMARY.clear(); lane._SUMMARY.update(summary)
+        self.addCleanup(restore_summary)
         self.saved = (lane.Linear, lane.run_issue, lane.os.execv, lane.load_providers, lane.claim_red_pr,
                       lane.fix_red_pr, lane.claim_adoptable_pr, lane.lane_prs, lane.adopt_pr, lane.in_flight_issues,
                       lane.fix_candidates, lane.escalate_exhausted, lane.pr_events.queued_prs,
@@ -3465,14 +3881,14 @@ class WorkerTest(unittest.TestCase):
                       lane.open_hotspot_holds)
         lane.open_hotspot_holds = lambda: {}  # never a real `gh pr list` from a unit test
         lane.sweep_lane_prs = lambda host, name, linear, now=None: None
-        lane.pr_events.queued_prs = lambda module, kinds: []
+        lane.pr_events.queued_prs = lambda module, kinds, *, inventory=None: []
         lane.pr_events.claim_event_pr = lambda host, module, name, prs: None
         lane.claim_red_pr = lambda host, name, prs=None: None
         lane.claim_adoptable_pr = lambda host, name, prs, repair_candidates=None: None
-        lane.lane_prs = lambda name, fields="": []
+        lane.lane_prs = lambda name, fields="", *, inventory=None: []
         lane.read_new_issue_budget = lambda name, slots: lane.new_issue_budget(name, slots, lane.lane_prs(name, fields=lane.LIGHT_PR_FIELDS))
         lane.in_flight_issues = lambda: frozenset()  # never GitHub from a unit test
-        lane.fix_candidates = lambda name: []
+        lane.fix_candidates = lambda name, *, inventory=None: []
         lane.escalate_exhausted = lambda host, prs, linear, **kwargs: None
         self.tmp = tempfile.TemporaryDirectory()
         self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name), linear_env=Path("unused"))
@@ -3701,8 +4117,8 @@ class WorkerTest(unittest.TestCase):
 
     def test_event_queued_prs_are_fixed_first_without_optional_linear_escalation(self):
         fixed, escalated = [], []
-        lane.fix_candidates = lambda name: [{"number": 5}, {"number": 6}]
-        lane.pr_events.queued_prs = lambda module, kinds: [{"number": 6, "eventKinds": ["red"]}]
+        lane.fix_candidates = lambda name, *, inventory=None: [{"number": 5}, {"number": 6}]
+        lane.pr_events.queued_prs = lambda module, kinds, *, inventory=None: [{"number": 6, "eventKinds": ["red"]}]
         lane.pr_events.claim_event_pr = lambda host, module, name, prs: prs[0]
         lane.claim_red_pr = lambda host, name, prs=None: self.fail("the event queue goes first")
         lane.escalate_exhausted = lambda host, prs, linear, **kwargs: escalated.append(sorted(pr["number"] for pr in prs))
@@ -3788,7 +4204,7 @@ class WorkerTest(unittest.TestCase):
         self.assertTrue(record["at"].endswith("Z"))
 
     def test_unknown_in_flight_exit_names_its_reason(self):
-        lane.lane_prs = lambda name, fields="": []
+        lane.lane_prs = lambda name, fields="", *, inventory=None: []
         lane.in_flight_issues = lambda: None
         self.assertEqual(lane.worker(self.host, "devin"), 0)
         self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())
@@ -3803,7 +4219,7 @@ class WorkerTest(unittest.TestCase):
     def test_open_red_prs_never_stop_a_lane_claiming_new_work(self):
         # Tim 2026-10-12: no open-PR ceiling; only real limits bound a lane.
         red = [{"number": n, "headRefName": f"devin/jov-{n}-20260927t000000", "isDraft": True} for n in range(1, 9)]
-        lane.lane_prs = lambda name, fields="": red if fields else []
+        lane.lane_prs = lambda name, fields="", *, inventory=None: red if fields else []
         ran = []
         lane.run_issue = lambda *a: ran.append(1) or {"verdict": "landing", "prUrl": "u"}
         lane.worker(self.host, "devin")
@@ -3876,7 +4292,7 @@ class WorkerTest(unittest.TestCase):
                   "repairRunId": "run", "repairBranch": pr["headRefName"], "repairHeadBefore": "h"}
         (self.host.state / "fix-attempts.json").write_text(json.dumps({"9": record}))
         other = {**pr, "number": 10, "headRefName": "devin/jov-10-20261005", "labels": []}
-        lane.fix_candidates = lambda name: [pr]
+        lane.fix_candidates = lambda name, *, inventory=None: [pr]
         lane.read_new_issue_budget = lambda name, slots: lane.new_issue_budget(name, slots, [pr, other])
         claimed = []
         lane.run_issue = lambda host, name, spec, linear, issue: claimed.append(issue.identifier) or {"verdict": "landing"}
@@ -4584,6 +5000,79 @@ class DispatchTest(unittest.TestCase):
                 lane.ensure_full_history, lane.doctor.run = saved
             self.assertIn("git exploded", json.loads((host.state / "tick.json").read_text())["error"])
 
+    def test_an_unclean_previous_run_is_visible_and_recovers_stranded_charges(self):
+        # Gem 2026-10-23: ~180 unclean-termination warnings and no recovery path. A dead
+        # run's intent marker makes the unclean tick visible and refunds exactly the
+        # fix-attempt charges that died between the claim and their own verdict.
+        finished = subprocess.Popen(["python3", "-c", "pass"])
+        finished.wait()
+        dead_pid = finished.pid
+        for _ in range(8):  # a just-exited pid; probe instead of guessing at recycling
+            try:
+                os.kill(dead_pid, 0)
+            except ProcessLookupError:
+                break
+            dead_pid += 1
+        stranded = {"6": {"sha": "a" * 40, "count": 1, "lane": "codex", "at": time.time() - lane.pr_events.FIX_LEASE_S - 10}}
+        healthy = {"7": {"sha": "b" * 40, "count": 1, "lane": "codex", "at": time.time()}}
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off", "LANES_SLOTS_CODEX": "1"}), \
+                patch.object(lane.autoscale, "mode", return_value="off"), \
+                patch.object(lane.disk_guard, "check", return_value={"freePct": 50, "admitted": True}), \
+                patch.object(lane.worktree_sweep, "maybe_spawn", return_value="not-due"), \
+                patch.object(lane, "ensure_full_history"), \
+                patch.object(lane, "load_providers", return_value={"codex": {"slots": 1}}), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "claim_remediation_events", side_effect=RuntimeError("coordinator offline")), \
+                patch.object(lane, "Linear", side_effect=AssertionError("no Linear in tests")), \
+                patch.object(lane.linear_sync, "tick", return_value={}), \
+                patch.object(lane.epics, "reconcile", return_value={}), \
+                patch.object(lane.pr_events, "tick", return_value={}), \
+                patch.object(lane.reason_lane, "tick", return_value={}), \
+                patch.object(lane.doctor, "run"), \
+                patch.object(lane.subprocess, "Popen"):
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            attempts = {**stranded, **healthy}
+            (host.state / "fix-attempts.json").write_text(json.dumps(attempts))
+            (host.state / "tick-in-flight.json").write_text(json.dumps({
+                "schema": lane.TICK_INTENT_SCHEMA, "host": "gem", "pid": dead_pid,
+                "startedAt": time.time() - lane.pr_events.FIX_LEASE_S - 10}))
+            self.assertEqual(lane.dispatch(host), 0)
+            tick = json.loads((host.state / "tick.json").read_text())
+            self.assertTrue(tick["uncleanPreviousRun"])
+            self.assertEqual(tick["uncleanRecovery"]["refundedFixAttempts"], ["6"])
+            recovered = json.loads((host.state / "fix-attempts.json").read_text())
+            self.assertEqual(recovered["6"]["count"], 0)
+            self.assertEqual(recovered["6"]["noWorkRefund"]["reason"], "unclean-worker-termination")
+            self.assertEqual(recovered["7"]["count"], 1, "a live lease keeps its charge")
+            self.assertFalse((host.state / "tick-in-flight.json").exists(), "a clean exit clears its marker")
+
+    def test_a_live_recent_marker_is_a_long_tick_not_an_unclean_one(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off", "LANES_SLOTS_CODEX": "1"}), \
+                patch.object(lane.autoscale, "mode", return_value="off"), \
+                patch.object(lane.disk_guard, "check", return_value={"freePct": 50, "admitted": True}), \
+                patch.object(lane.worktree_sweep, "maybe_spawn", return_value="not-due"), \
+                patch.object(lane, "ensure_full_history"), \
+                patch.object(lane, "load_providers", return_value={"codex": {"slots": 1}}), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "claim_remediation_events", side_effect=RuntimeError("coordinator offline")), \
+                patch.object(lane, "Linear", side_effect=AssertionError("no Linear in tests")), \
+                patch.object(lane.linear_sync, "tick", return_value={}), \
+                patch.object(lane.epics, "reconcile", return_value={}), \
+                patch.object(lane.pr_events, "tick", return_value={}), \
+                patch.object(lane.reason_lane, "tick", return_value={}), \
+                patch.object(lane.doctor, "run"), \
+                patch.object(lane.subprocess, "Popen"):
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            (host.state / "tick-in-flight.json").write_text(json.dumps({
+                "schema": lane.TICK_INTENT_SCHEMA, "host": "gem", "pid": os.getpid(),
+                "startedAt": time.time() - 60}))
+            self.assertEqual(lane.dispatch(host), 0)
+            tick = json.loads((host.state / "tick.json").read_text())
+            self.assertIsNone(tick["uncleanPreviousRun"])
+            self.assertNotIn("uncleanRecovery", tick)
+
     def test_unprotected_worktree_removal_does_not_kill_processes_by_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             fake = FakeShell([])
@@ -5218,10 +5707,12 @@ class TerminalRevisitTest(unittest.TestCase):
                 handle.close()
             seen["candidates"] = [pr["number"] for pr in candidates]
 
+        inventory_at = time.time()
         red = {"number": 21770, "headRefOid": "h21770"}
         slot = SimpleNamespace(release=lambda: seen.setdefault("slot", True))
         with patch.object(lane.disk_guard, "check", return_value={"admitted": True}), \
                 patch.object(lane.bindings, "work", return_value=None), \
+                patch.object(lane, "_SUMMARY", {"at": inventory_at, "sourceAt": inventory_at, "readable": True, "prs": []}), \
                 patch.object(lane, "requeue_verified"), \
                 patch.object(lane, "lane_prs", return_value=[]), \
                 patch.object(lane, "fix_candidates", return_value=[red]), \
@@ -5835,6 +6326,28 @@ class PreservedRecoveryTest(unittest.TestCase):
         self.assertEqual(receipt["verdict"], "skipped")
         self.assertTrue(receipt["attemptRefunded"].startswith("worktree-unavailable"))
         self.assertEqual(self.attempt_count(), 0)
+
+    def test_infra_precondition_stops_requeue_with_backoff(self):
+        # Gem 2026-10-23: target-state and worktree infra stops re-claimed the same head
+        # on the next tick (no backoff at all), crash-looping the same precondition.
+        # Like recovery handoffs, the refund now starts the capped exponential cooldown.
+        for patch_target, side_effect, verdict in [
+                ("reconcile_fix_target", None, "target-state-unavailable"),
+                ("add_worktree", lane.WorktreeUnavailable("checkout failed"), "worktree-unavailable")]:
+            with self.subTest(reason=verdict):
+                self.charge_attempt()
+                cooldown = self.host.state / "handoff-cooldown.json"
+                cooldown.unlink(missing_ok=True)
+                with patch.object(lane, patch_target, return_value=side_effect) if side_effect is None else \
+                        patch.object(lane, patch_target, side_effect=side_effect), \
+                        patch.object(lane, "run_agent", side_effect=AssertionError("agent must not run")):
+                    receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, self.pr)
+                self.assertTrue(receipt["attemptRefunded"].startswith(verdict))
+                rows = json.loads(cooldown.read_text())
+                row = rows[f"pr:{self.pr['number']}:{self.pr['headRefOid']}"]
+                self.assertGreater(row["until"], time.time())
+                self.assertTrue(lane.pr_events.pr_recovery_held(self.host, self.pr))  # requeue holds
+                self.assertLessEqual(row["until"], time.time() + lane.HANDOFF_BACKOFF_CAP_S)  # bounded
 
     def test_recovery_handoff_refunds_the_attempt(self):
         self.cancelled_predecessor(commit=True)
@@ -6678,6 +7191,45 @@ class FixRedTest(unittest.TestCase):
         finally:
             lane.sh = real
         self.assertEqual(calls, [])
+        self.assertEqual(linear.moves, [])
+        self.assertEqual(linear.comments, [])
+
+    def test_unknown_merge_state_waits_then_rebases_before_stronger_lane(self):
+        stuck = {**self.pr(number=7), "mergeStateStatus": "UNKNOWN"}
+        attempts = {"7": {"sha": "h1", "count": lane.MAX_FIX_ATTEMPTS,
+                          "lane": "devin", "at": 1, "endedAt": 2}}
+        providers = {"devin": {"enabled": True, "tier": 0},
+                     "codex": {"enabled": True, "tier": 1}}
+        linear = FakeLinear([])
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"LANES_ESCALATION": "1", "LANES_ESCALATION_STUCK_PRS": "1"}), \
+                patch.object(lane, "load_providers", return_value=providers), \
+                patch.object(lane, "provider_healthy", return_value=True), \
+                patch.object(lane, "sh", side_effect=AssertionError("unexpected external mutation")), \
+                patch.object(lane.pr_events, "add_label", return_value=True) as label, \
+                patch.object(lane.pr_events, "sync_main", return_value="sync-failed") as sync:
+            host = lane.Host(state=Path(tmp))
+            path = host.state / "fix-attempts.json"
+            path.write_text(json.dumps(attempts))
+            for _ in range(2):
+                lane.escalate_exhausted(host, [stuck], linear)
+                self.assertEqual(json.loads(path.read_text()), attempts)
+                self.assertEqual(lane.load_escalation(host)["surfaced"], [])
+                sync.assert_not_called()
+                label.assert_not_called()
+            # A fresh known merge state resumes the same bounded episode.
+            stuck["mergeStateStatus"] = "DIRTY"
+            lane.escalate_exhausted(host, [stuck], linear)
+            sync.assert_called_once_with(host, lane.THIS, {**stuck, "state": "OPEN", "mergedAt": None},
+                                         unittest.mock.ANY, terminal_ok=True)
+            record = json.loads(path.read_text())["7"]
+            for key, value in attempts["7"].items():
+                self.assertEqual(record[key], value)
+            self.assertEqual(record["escalations"][0]["kind"], "deterministic")
+            self.assertEqual(record["escalations"][0]["rung"], "update-branch")
+            self.assertEqual(record["pendingEscalation"]["lane"], "codex")
+            self.assertIn("mergeStateStatus=DIRTY", record["pendingEscalation"]["dossier"])
+            self.assertNotIn("escalated", record)
         self.assertEqual(linear.moves, [])
         self.assertEqual(linear.comments, [])
 
@@ -9447,6 +9999,9 @@ class EscalationQueueAuthorityTest(unittest.TestCase):
             if human_hold:
                 pr.update(labels=[{"name": "hold"}], holdNote={"author": "itstimwhite",
                           "body": "use computeRatePercent from @/lib/analytics/metrics and remove hold"})
+            if fault == "merge-state-unknown":
+                pr.update(mergeStateStatus="UNKNOWN", statusCheckRollup=[{
+                    "name": "Source Validation", "status": "COMPLETED", "conclusion": "FAILURE"}])
             live = json.loads(json.dumps(pr))
             record = {"sha": "head-A", "pushedHead": "head-A", "count": lane.MAX_FIX_ATTEMPTS,
                       "lane": "devin", "at": 1, "endedAt": 2, "reentry": {"keep": True},
@@ -9454,6 +10009,8 @@ class EscalationQueueAuthorityTest(unittest.TestCase):
                       "pendingEscalation": {"lane": "codex", "head": "head-A", "dossier": "existing authority",
                                             "cls": "fixable-by-model" if human_hold else "needs-rebase",
                                             "subtype": "human-hold" if human_hold else "semantic", "topRung": top}}
+            if fault == "merge-state-unknown" and not human_hold:
+                record["pendingEscalation"].update(cls="fixable-by-model", subtype="check")
             if fault == "pending-head": record["pendingEscalation"]["head"] = "head-B"
             if fault == "malformed-dossier": record["pendingEscalation"]["dossier"] = {"invalid": True}
             if fault == "empty-dossier": record["pendingEscalation"]["dossier"] = "  "
@@ -9591,6 +10148,11 @@ class EscalationQueueAuthorityTest(unittest.TestCase):
             self.assertEqual(order, [] if fault in {"pending-head", "cached-queued", "malformed-dossier", "empty-dossier", *malformed_history} else
                              ["owner"] if fault == "owner" else
                              ["owner", "target", "owner"] if fault in after_target_custody else ["owner", "target"])
+
+    def test_unknown_merge_state_cannot_charge_a_pending_model_rung(self):
+        for human_hold in (False, True):
+            with self.subTest(human_hold=human_hold):
+                self.run_case("merge-state-unknown", human_hold=human_hold)
 
     def test_refused_targets_retain_pending_history_and_claims(self):
         for fault in ("pending-head", "cached-queued", "owner", "queued", "unknown", "missing-queue", "unreadable",
@@ -10765,6 +11327,108 @@ class EventDeliveryTest(unittest.TestCase):
         data = lane._event_delivery_state(self.host)
         lane._queue_event_delivery(data, {'events': self.events, 'comments': [{'id': 'issue', 'body': 'one receipt'}]}, [self.issue], set(), 100)
         self.assertEqual(data['actions'], {})
+
+    def start_delivery_event(self, delivery):
+        self.events['fp'].update(status='claimed', lane='codex', startedStateId='started')
+        delivery = {'nextAt': 0, 'deadline': time.time() + 3600, **delivery}
+        lane.save_escalation(self.host, {'events': {**self.events, 'fp': {**self.events['fp'], 'startDelivery': delivery}}})
+
+    def test_start_delivery_past_its_cap_is_terminal_and_never_retries(self):
+        # Gem 2026-10-23: a start delivery past its cap re-failed every 60s forever —
+        # unbounded retries with no terminal state and no authoritative ack.
+        self.start_delivery_event({'attempts': 3, 'status': 'failed'})
+        self.issue['state'] = {'id': 'todo-J', 'name': 'Todo'}
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        event = lane.load_escalation(self.host)['events']['fp']
+        self.assertEqual((event['startDelivery']['status'], event['startDelivery']['error']),
+                         ('exhausted', 'event-start-cap-exhausted'))
+        reads = self.writes
+        with patch.object(self.linear, 'gql', wraps=self.linear.gql) as remote:
+            self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        remote.assert_not_called()  # a terminal row never touches Linear again
+        self.assertEqual(lane.load_escalation(self.host)['events']['fp']['startDelivery']['status'], 'exhausted')
+        self.assertEqual(reads, [])
+
+    def test_crash_lost_start_receipt_is_reproved_by_one_idempotent_resend(self):
+        # Crash between the start mutation and its receipt save: our own persisted intent
+        # ('sending') re-proves ownership with one idempotent resend instead of wedging
+        # on ownership-unproven forever.
+        self.start_delivery_event({'attempts': 1, 'status': 'sending'})
+        self.issue['state'] = {'id': 'started', 'name': 'In Progress'}
+        claimed = lane.claim_labeled_event(self.host, 'codex', self.linear)
+        self.assertIsNotNone(claimed)
+        event = lane.load_escalation(self.host)['events']['fp']
+        self.assertEqual(event['startDelivery']['status'], 'acknowledged')
+        self.assertEqual(event['startDelivery']['attempts'], 2)
+        self.assertEqual(event['startDelivery']['mutationReceipt']['success'], True)
+        self.assertEqual(sum('issueUpdate' in q for q, _ in self.writes), 1)
+
+    def test_unproven_start_ownership_is_a_terminal_visible_failure(self):
+        # The remote start exists but this host can never prove it owns it (no persisted
+        # intent): terminal exhausted and visible, never a 60s retry loop.
+        self.start_delivery_event({'attempts': 2, 'status': 'failed'})
+        self.issue['state'] = {'id': 'started', 'name': 'In Progress'}
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        event = lane.load_escalation(self.host)['events']['fp']
+        self.assertEqual((event['startDelivery']['status'], event['startDelivery']['error']),
+                         ('exhausted', 'event-start-ownership-unproven'))
+
+    def test_moved_remote_start_is_terminal_not_a_forever_retry(self):
+        self.start_delivery_event({'attempts': 0, 'status': 'pending'})
+        self.issue['state'] = {'id': 'done-J', 'name': 'Done'}
+        self.assertIsNone(lane.claim_labeled_event(self.host, 'codex', self.linear))
+        event = lane.load_escalation(self.host)['events']['fp']
+        self.assertEqual((event['startDelivery']['status'], event['startDelivery']['error']),
+                         ('exhausted', 'event-start-preimage-changed'))
+
+    def test_exhausted_start_delivery_is_reported(self):
+        self.start_delivery_event({'attempts': 3, 'status': 'exhausted'})
+        report = lane._event_delivery_snapshot(self.host, 200)
+        self.assertEqual(report['deliveryExhausted'], 1)
+        self.assertEqual(report['deliveryFailed'], 0)
+
+    def test_drain_event_delivery_drains_the_journal_without_claiming_events(self):
+        # Reconciliation is down; the durable intents still retry with backoff here
+        # instead of waiting for a healthy planning pass that never comes.
+        self.intent(comments=[{'id': 'issue', 'body': 'drained receipt'}])
+        data = lane._event_delivery_state(self.host)
+        for row in data['actions'].values():  # the drain runs on the real clock
+            row['deadline'] = time.time() + 3600
+        lane._save_event_delivery(self.host, data)
+        report = lane.drain_event_delivery(self.host, self.linear)
+        self.assertEqual(report['deliveryAcknowledged'], 1)
+        self.assertEqual([w[1]['i']['body'] for w in self.writes], ['drained receipt'])
+
+    def test_delivery_attempt_cap_is_one_configurable_bounded_setting(self):
+        self.assertEqual(lane.event_delivery_max_attempts(), lane.EVENT_DELIVERY_ATTEMPTS)
+        for raw, expected in [('1', 1), ('5', 5), ('99', lane.EVENT_DELIVERY_ATTEMPTS_CAP),
+                              ('0', 1), ('-3', 1), ('nonsense', lane.EVENT_DELIVERY_ATTEMPTS)]:
+            with patch.dict(os.environ, {'LANES_EVENT_DELIVERY_MAX_ATTEMPTS': raw}):
+                self.assertEqual(lane.event_delivery_max_attempts(), expected)
+
+    def test_one_attempt_cap_exhausts_a_failing_delivery_after_one_send(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'rejected receipt'}])
+        data = lane._event_delivery_state(self.host)
+        for row in data['actions'].values():
+            row['deadline'] = time.time() + 3600
+        lane._save_event_delivery(self.host, data)
+        self.false = True  # the mutation reports failure
+        with patch.dict(os.environ, {'LANES_EVENT_DELIVERY_MAX_ATTEMPTS': '1'}):
+            report = lane._apply_event_plan(self.linear, {}, self.host,
+                                            lane._event_delivery_state(self.host), time.time())
+            [row] = lane._event_delivery_state(self.host)['actions'].values()
+            self.assertEqual(row['attempts'], 1)
+            self.assertEqual((row['status'], row['error']), ('exhausted', 'event-mutation-rejected'))
+            self.assertEqual(report['deliveryFailed'], 1)
+
+    def test_drain_event_delivery_yields_when_another_pass_holds_the_lock(self):
+        self.intent(comments=[{'id': 'issue', 'body': 'busy receipt'}])
+        lock = lane.Locked(self.host.state / 'event-delivery.lock', blocking=False)
+        try:
+            self.assertEqual(lane.drain_event_delivery(self.host, self.linear), {'deliveryBusy': True})
+            self.assertEqual(self.writes, [])
+        finally:
+            lock.release()
 
 
 class RemediationEventRecoveryTest(unittest.TestCase):
@@ -12856,7 +13520,7 @@ class RepairRoutingContextTest(unittest.TestCase):
         self.pr = {"number": 7, "state": "OPEN", "headRefOid": "head-A",
                    "headRefName": "codex/jov-7-20261016", "isDraft": True,
                    "isCrossRepository": False, "isInMergeQueue": False,
-                   "mergeStateStatus": "BLOCKED", "labels": [],
+                   "mergeStateStatus": "BLOCKED", "labels": [], "labelsComplete": True,
                    "statusCheckRollup": [{"name": "test", "status": "COMPLETED", "conclusion": "FAILURE"}]}
         self.record = {"sha": "head-A", "lane": "codex", "count": 2, "at": 100, "endedAt": 200,
                        "repairBranch": self.pr["headRefName"], "repairVerdict": "fix-no-change",
@@ -13223,7 +13887,7 @@ class RepairRoutingWorkerPathTest(unittest.TestCase):
             client = stack.enter_context(patch.object(lane, "Linear"))
             new_work = stack.enter_context(patch.object(lane, "run_issue"))
             self.assertEqual(lane.worker_with_slot(self.host, "grok", self.providers["grok"], SimpleNamespace(release=Mock())), 0)
-            self.assertTrue(idle.call_args.args[-1].startswith("routing-preflight-required:"))
+            self.assertEqual(idle.call_args.args[-1], "repair-inventory-unknown-or-stale")
             self.assertEqual(self.path.read_bytes(), before)
             payload.assert_not_called(); self.posted.assert_not_called()
             self.assertFalse((self.host.state / "failures.json").exists())
@@ -13231,7 +13895,7 @@ class RepairRoutingWorkerPathTest(unittest.TestCase):
             self.summary.update(sourceAt=self.now, at=self.now)
             self.assertEqual(lane.worker_with_slot(self.host, "grok", self.providers["grok"], SimpleNamespace(release=Mock())), 0)
             payload.assert_called_once(); self.posted.assert_called_once()
-            client.assert_called_once(); new_work.assert_not_called()
+            client.assert_not_called(); new_work.assert_not_called()
         self.assertEqual(self.probe.call_count, 6)
 
     def test_incomplete_routing_preserves_actual_ordinary_rerun_and_terminal_revisit(self):
