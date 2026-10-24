@@ -235,6 +235,19 @@ test('source validation blocks dependency and migration diffs', () => {
   assert.doesNotMatch(securityJob, /contents: write/);
   assert.doesNotMatch(securityJob, /continue-on-error:/);
   assert.doesNotMatch(securityJob, /pull_request_target/);
+  // Dependabot PRs: the verdict status must come from the Jovie Bot app, so a
+  // repository writer cannot forge it, and must be read in a single page.
+  assert.match(
+    securityJob,
+    /context == "Dependabot Dependency Review" and \.creator\.login == "jovie-bot\[bot\]"/
+  );
+  assert.doesNotMatch(securityJob, /--paginate/);
+  const forkGate = read('.github/workflows/fork-pr-gate.yml');
+  assert.match(forkGate, /context="Dependabot Dependency Review"/);
+  assert.match(
+    forkGate,
+    /id: dependency-review-token[\s\S]*?permission-contents: read/
+  );
   assert.match(
     workflow,
     /node scripts\/db\/lint-changed-migrations\.mjs --base "\$base_sha"/
