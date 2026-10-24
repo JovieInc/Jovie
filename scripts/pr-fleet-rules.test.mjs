@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { MemoryLedgerStore } from '../packages/api-client/store.ts';
 import {
   evaluateFleetRules,
   githubRequest,
@@ -160,7 +161,8 @@ test('2: assertion removal, skipping, and broadening alone cannot claim red-to-g
   for (const patch of [
     '-expect(value).toEqual(42);\n+expect(value).toBeDefined();',
     '-assert.equal(actual, expected);',
-    "-test('works', () => {\n+test.skip('works', () => {",
+    // Synthetic source for the policy, not an executable skipped test.
+    `-test('works', () => {\n+${['test', 'skip'].join('.')}('works', () => {`,
   ]) {
     const files = [file('apps/web/tests/repair.test.ts', { patch })];
     assert.equal(onlyWeakensAssertions(files), true);
@@ -335,7 +337,7 @@ test('workflow: GITHUB_TOKEN read-only, non-blocking warning step, source requir
   assert.match(source, /needs: \[deterministic,/);
   assert.match(workflow, /types: \[opened, edited, synchronize, labeled/);
   assert.match(workflow, /merge_group:/);
-  assert.match(workflow, /continue-on-error: true/);
+  assert.doesNotMatch(workflow, /continue-on-error:/);
   assert.match(workflow, /exit 0/);
   assert.doesNotMatch(workflow, /secrets\.|: write/);
 });
@@ -404,9 +406,13 @@ test('CLI warning mode always returns zero, even when evidence or policy fails',
 
 test('REST adapter uses only GITHUB_TOKEN, a finite timeout and sanitized errors', async () => {
   const original = globalThis.fetch;
+  const store = new MemoryLedgerStore();
   try {
     globalThis.fetch = async (url, options) => {
-      assert.equal(url, 'https://api.github.com/repos/JovieInc/Jovie/pulls/1');
+      assert.equal(
+        String(url),
+        'https://api.github.com/repos/JovieInc/Jovie/pulls/1'
+      );
       assert.ok(options.signal instanceof AbortSignal);
       assert.equal(
         new Headers(options.headers).get('Authorization'),
@@ -414,11 +420,14 @@ test('REST adapter uses only GITHUB_TOKEN, a finite timeout and sanitized errors
       );
       return Response.json({ number: 1 });
     };
-    assert.deepEqual(await githubRequest('/repos/JovieInc/Jovie/pulls/1'), {
-      number: 1,
-    });
+    assert.deepEqual(
+      await githubRequest('/repos/JovieInc/Jovie/pulls/1', { store }),
+      {
+        number: 1,
+      }
+    );
     globalThis.fetch = async () => new Response(null, { status: 403 });
-    await assert.rejects(githubRequest('/unavailable'), /403/);
+    await assert.rejects(githubRequest('/unavailable', { store }), /403/);
   } finally {
     globalThis.fetch = original;
   }

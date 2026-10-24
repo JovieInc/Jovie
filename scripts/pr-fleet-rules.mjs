@@ -283,16 +283,23 @@ export async function runFleetRules({ event, request }) {
   return evaluateFleetRules({ pr: current, files, repository });
 }
 
-export async function githubRequest(path) {
-  const response = await fetch(`https://api.github.com${path}`, {
-    headers: {
-      Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
-    signal: AbortSignal.timeout(15000),
+/**
+ * @param {string} path
+ * @param {{ store?: import('../packages/api-client/store.ts').LedgerStore }} [options]
+ */
+export async function githubRequest(path, { store } = {}) {
+  // Pure policy consumers do not need to load the network client.
+  const { createGitHubClient } = await import(
+    '../packages/api-client/github.ts'
+  );
+  const response = await createGitHubClient({
+    token: process.env.GITHUB_TOKEN,
+    store,
+  }).rest('GET', path, undefined, {
+    priority: 'merge',
+    timeoutMs: 15000,
   });
-  if (!response.ok)
+  if (response.status < 200 || response.status >= 300)
     throw new Error(`GitHub evidence request failed (${response.status})`);
   return response.json();
 }

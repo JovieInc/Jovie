@@ -27,7 +27,6 @@ jobs:
         run: node --test --experimental-test-coverage --test-coverage-include=scripts/pr-fleet-rules.mjs --test-coverage-lines=95 --test-coverage-functions=100 --test-coverage-branches=90 scripts/pr-fleet-rules.test.mjs
       - name: Blast-radius warning (never blocks)
         if: always()
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
