@@ -50,6 +50,23 @@ def providers():
 
 
 class ClassifierFixtureTest(unittest.TestCase):
+    def test_unknown_merge_state_waits_without_spending_or_surfacing(self):
+        for rollup in (checks(), checks(conclusion="FAILURE"),
+                       checks(status="IN_PROGRESS", conclusion=""), []):
+            for review in (None, "CHANGES_REQUESTED"):
+                with self.subTest(checks=rollup, review=review):
+                    target = pr(mergeStateStatus="UNKNOWN", statusCheckRollup=rollup,
+                                reviewDecision=review)
+                    record = {"sha": HEAD, "count": 2, "lane": "devin"}
+                    classified = remediation.classify_blocker(target, attempts=record)
+                    self.assertEqual((classified["cls"], classified["subtype"]),
+                                     ("ready", "awaiting"))
+                    self.assertIn("mergeStateStatus=UNKNOWN", classified["evidence"])
+                    plan = remediation.plan_ladder(classified, record, providers(), NOW, HEAD,
+                        healthy=lambda *_: self.fail("unknown merge state queried a model provider"))
+                    self.assertEqual((plan["action"], plan["reason"]), ("wait", "awaiting"))
+                    self.assertEqual(record, {"sha": HEAD, "count": 2, "lane": "devin"})
+
     def test_stuck_pr_fixtures(self):
         ready = pr(number=20079, statusCheckRollup=checks(39))
         self.assertEqual(remediation.classify_blocker(ready, {"sha": "ed4d35e", "reason": "fix-exhausted"})["cls"], "ready")
