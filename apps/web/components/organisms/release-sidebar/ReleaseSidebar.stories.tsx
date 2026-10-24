@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { RenderedFamily } from '@/.storybook/rendered-family';
 import type { ProviderKey } from '@/lib/discography/types';
 import { ReleaseSidebar } from './ReleaseSidebar';
 import type { Release } from './types';
@@ -44,6 +45,17 @@ const meta = {
     analyticsOverride: null,
   },
   decorators: [
+    (Story, context) => (
+      <RenderedFamily
+        name='ReleaseSidebar'
+        owner='ReleaseSidebar'
+        interactive={Boolean(context.args.release)}
+        targetSelector='[data-testid="release-sidebar"]'
+        surfaceToken='--app-shell-content-surface'
+      >
+        <Story />
+      </RenderedFamily>
+    ),
     Story => (
       <div className='relative h-screen w-full bg-surface-0'>
         <Story />

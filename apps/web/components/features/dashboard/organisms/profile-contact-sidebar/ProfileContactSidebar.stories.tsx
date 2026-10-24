@@ -5,6 +5,7 @@ import {
   DashboardStoryProviders,
   DEFAULT_DASHBOARD_DATA,
 } from '@/.storybook/dashboard-fixtures';
+import { RenderedFamily } from '@/.storybook/rendered-family';
 import { withSignedInSession } from '@/.storybook/signed-in-session';
 import {
   PreviewPanelProvider,
@@ -45,6 +46,17 @@ const meta = {
     });
   },
   decorators: [
+    (Story, context) => (
+      <RenderedFamily
+        name='ProfileContactSidebar'
+        owner='ProfileContactSidebar'
+        interactive={context.name !== 'Loading'}
+        targetSelector='#shell-artist-profile-rail'
+        surfaceToken='--app-shell-content-surface'
+      >
+        <Story />
+      </RenderedFamily>
+    ),
     Story => (
       <DashboardStoryProviders dashboardData={dashboardData}>
         <Story />
