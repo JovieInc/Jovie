@@ -4545,7 +4545,11 @@ class DispatchTest(unittest.TestCase):
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr="")
         lane.doctor.run = lambda *a, **k: {}
         lane.disk_guard.check = lambda host: {"freePct": 50.0, "low": False, "critical": False, "admitted": True}
-        with tempfile.TemporaryDirectory() as tmp:
+        # Autoscale samples live load/PSI; on a busy or small host it trims the
+        # fine lane below its 2 configured seats. This fixture isolates provider
+        # fault handling, not autoscale — pin the mode off like the sibling above.
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off"}):
             try:
                 host = lane.Host(state=Path(tmp), repo=Path(tmp))
                 self.assertEqual(lane.dispatch(host), 0)

@@ -14,6 +14,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -369,12 +370,29 @@ def install_isolated_tempdirs() -> None:
     if getattr(tempfile, "_jovie_isolated_temp", False):
         return
     original = tempfile.TemporaryDirectory
+    # CI runs 3.12+, where TemporaryDirectory accepts ignore_cleanup_errors
+    # (3.10+) and delete (3.12). The lanes host qualifies locally on its own
+    # ambient python3 (3.9), which accepts neither: forwarding both
+    # unconditionally raised TypeError inside every TemporaryDirectory fixture
+    # before any assertion ran (JOV-8913). Forward only what this interpreter
+    # supports and refuse the delete=False semantics it cannot honor.
+    forwards_ignore_cleanup_errors = sys.version_info >= (3, 10)
+    forwards_delete = sys.version_info >= (3, 12)
 
     class IsolatedTemporaryDirectory(original):
         def __init__(self, suffix=None, prefix=None, dir=None,
                      ignore_cleanup_errors=False, *, delete=True):
             prefix = f"jovie-lanes-{os.getpid()}-" + (prefix or "")
-            super().__init__(suffix, prefix, dir, ignore_cleanup_errors, delete=delete)
+            if delete is False and not forwards_delete:
+                raise NotImplementedError(
+                    "delete=False needs the 3.12 TemporaryDirectory contract")
+            if forwards_ignore_cleanup_errors and forwards_delete:
+                super().__init__(suffix, prefix, dir, ignore_cleanup_errors,
+                                 delete=delete)
+            elif forwards_ignore_cleanup_errors:
+                super().__init__(suffix, prefix, dir, ignore_cleanup_errors)
+            else:
+                super().__init__(suffix, prefix, dir)
 
         @classmethod
         def _rmtree(cls, name, ignore_errors=False, repeated=False):
