@@ -21,63 +21,77 @@ const NAV_ITEMS_2 = [
 
 function DefaultSidebarSkeleton({
   brandVariant,
+  collapsed,
 }: {
   readonly brandVariant: BrandVariant;
+  readonly collapsed: boolean;
 }) {
   return (
     <div
-      // Shell V1 mirrors the production sidebar token width (244px) and the
-      // compact header height so the post-resolve UnifiedSidebar slots in
-      // without a width/header reflow.
+      // Match Sidebar's desktop allocation without requiring its provider.
+      style={{ width: collapsed ? 52 : 'var(--app-shell-sidebar-width)' }}
       className={cn(
-        'max-lg:hidden bg-sidebar lg:flex lg:w-(--app-shell-sidebar-width) lg:shrink-0 lg:flex-col',
+        'max-lg:hidden bg-sidebar lg:flex overflow-hidden lg:shrink-0 lg:flex-col',
         brandVariant === 'ov' && 'ov-mode'
       )}
     >
       <div
         className={cn(
-          'flex h-(--app-shell-header-height) items-center gap-2 px-2.5 py-0.5'
+          'flex h-(--app-shell-header-height) items-center gap-2 px-2.5 py-0.5',
+          collapsed && 'justify-center'
         )}
       >
         <div className='skeleton h-6 w-6 rounded-md' />
-        <div className='skeleton h-4 w-24 rounded' />
+        {!collapsed && <div className='skeleton h-4 w-24 rounded' />}
       </div>
 
       <div className={cn('flex-1 space-y-1 px-2.5 pt-1.5')}>
         {NAV_ITEMS.map(item => (
           <div
             key={item.key}
-            className='flex h-7 items-center gap-2 rounded-md px-1.5'
+            className={cn(
+              'flex h-7 items-center gap-2 rounded-md px-1.5',
+              collapsed && 'justify-center'
+            )}
           >
             <div className='skeleton h-3.5 w-3.5 shrink-0 rounded' />
-            <div
-              className='skeleton h-3 rounded'
-              style={{ width: item.width }}
-            />
+            {!collapsed && (
+              <div
+                className='skeleton h-3 rounded'
+                style={{ width: item.width }}
+              />
+            )}
           </div>
         ))}
 
-        <div className='pb-1 pt-3'>
-          <div className='skeleton ml-1.5 h-3 w-16 rounded' />
-        </div>
+        {!collapsed && (
+          <div className='pb-1 pt-3'>
+            <div className='skeleton ml-1.5 h-3 w-16 rounded' />
+          </div>
+        )}
 
         {NAV_ITEMS_2.map(item => (
           <div
             key={item.key}
-            className='flex h-7 items-center gap-2 rounded-md px-1.5'
+            className={cn(
+              'flex h-7 items-center gap-2 rounded-md px-1.5',
+              collapsed && 'justify-center'
+            )}
           >
             <div className='skeleton h-3.5 w-3.5 shrink-0 rounded' />
-            <div
-              className='skeleton h-3 rounded'
-              style={{ width: item.width }}
-            />
+            {!collapsed && (
+              <div
+                className='skeleton h-3 rounded'
+                style={{ width: item.width }}
+              />
+            )}
           </div>
         ))}
       </div>
 
       <div className={cn('flex items-center gap-2 px-2.5 pb-2 pt-1')}>
         <div className='skeleton h-7 w-7 shrink-0 rounded-full' />
-        <div className='skeleton h-3 w-20 rounded' />
+        {!collapsed && <div className='skeleton h-3 w-20 rounded' />}
       </div>
     </div>
   );
@@ -87,8 +101,11 @@ export function AppShellSkeleton({
   main: mainOverride,
   audioPlayer,
   brandVariant = 'jovie',
+  sidebarCollapsed = false,
   sidebar: sidebarOverride,
 }: {
+  /** Persisted desktop sidebar state supplied by the loading boundary. */
+  readonly sidebarCollapsed?: boolean;
   readonly main?: ReactNode;
   readonly audioPlayer?: ReactNode;
   /** Brand skin for the sidebar fallback. */
@@ -104,7 +121,10 @@ export function AppShellSkeleton({
     sidebarOverride !== undefined ? (
       sidebarOverride
     ) : (
-      <DefaultSidebarSkeleton brandVariant={brandVariant} />
+      <DefaultSidebarSkeleton
+        brandVariant={brandVariant}
+        collapsed={sidebarCollapsed}
+      />
     );
 
   return (

@@ -1,4 +1,4 @@
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import {
@@ -16,7 +16,7 @@ import {
  * to prevent layout shift while the server layout and data resolve.
  */
 export default async function AppLoading() {
-  const headerStore = await headers();
+  const [headerStore, cookieStore] = await Promise.all([headers(), cookies()]);
   const mode = parseTrustedAppShellMode(headerStore.get(APP_SHELL_MODE_HEADER));
   const pathname = resolveAppShellLoadingPath(
     headerStore.get('next-url'),
@@ -27,6 +27,7 @@ export default async function AppLoading() {
   return (
     <AppShellSkeleton
       main={isTasksShellRoute(pathname) ? <TasksRouteSkeleton /> : undefined}
+      sidebarCollapsed={cookieStore.get('sidebar:state')?.value === 'false'}
       brandVariant={mode === 'ov' ? 'ov' : 'jovie'}
     />
   );
