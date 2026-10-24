@@ -1,5 +1,6 @@
 'use client';
 
+import { HoverReveal } from '@jovie/ui';
 import { type TouchEvent as ReactTouchEvent, useCallback, useRef } from 'react';
 import { formatTourDateDisplay } from '@/lib/connectors/opportunity-inbox-tour-dates';
 import type { OpportunityInboxTourDateItem } from '@/lib/connectors/opportunity-inbox-types';
@@ -96,7 +97,7 @@ export function OpportunityInboxTourDateRow({
 
   return (
     <li
-      className={cn('group/row list-none overflow-hidden', className)}
+      className={cn('group group/row list-none overflow-hidden', className)}
       data-testid={`tour-date-row-${item.id}`}
       data-status={item.status}
     >
@@ -139,59 +140,53 @@ export function OpportunityInboxTourDateRow({
 
         {/* Action zone — only for actionable/persistent states */}
         {isActionable || isPersistent ? (
-          <div
-            className={cn(
-              'flex items-center gap-2 shrink-0 min-w-0',
-              'transition-opacity duration-subtle',
-              isPersistent
-                ? 'opacity-100'
-                : 'opacity-0 pointer-events-none group-hover/row:opacity-100 group-hover/row:pointer-events-auto group-focus-within/row:opacity-100 group-focus-within/row:pointer-events-auto'
-            )}
-          >
-            {/* Ghost accent ring pill — 2px border, no fill */}
-            <button
-              type='button'
-              className={cn(
-                'inline-flex items-center justify-center',
-                'rounded-full min-w-7 min-h-7 px-2',
-                'bg-transparent border-2',
-                'transition-colors duration-subtle',
-                'cursor-pointer select-none',
-                isBusy && 'cursor-not-allowed opacity-50',
-                isPersistent ? 'text-primary-token' : 'text-accent-token'
-              )}
-              style={{
-                borderColor: actionAccent,
-              }}
-              onClick={handleConfirm}
-              disabled={isBusy || !isActionable}
-              aria-label={isPersistent ? 'Confirmed' : 'Confirm Tour Date'}
-            >
-              ✓
-            </button>
-
-            {/* Dismiss (reject) button — only visible on hover for pending */}
-            {!isPersistent && isActionable ? (
+          <HoverReveal asChild engaged={isPersistent || isBusy}>
+            <div className='flex items-center gap-2 shrink-0 min-w-0'>
+              {/* Ghost accent ring pill — 2px border, no fill */}
               <button
                 type='button'
                 className={cn(
                   'inline-flex items-center justify-center',
-                  'rounded-full size-7',
-                  'bg-transparent',
-                  'text-quaternary-token text-app',
+                  'rounded-full min-w-7 min-h-7 px-2',
+                  'bg-transparent border-2',
                   'transition-colors duration-subtle',
-                  'hover:text-secondary-token',
                   'cursor-pointer select-none',
-                  isBusy && 'cursor-not-allowed opacity-30'
+                  isBusy && 'cursor-not-allowed opacity-50',
+                  isPersistent ? 'text-primary-token' : 'text-accent-token'
                 )}
-                onClick={handleReject}
-                disabled={isBusy}
-                aria-label='Reject Tour Date'
+                style={{
+                  borderColor: actionAccent,
+                }}
+                onClick={handleConfirm}
+                disabled={isBusy || !isActionable}
+                aria-label={isPersistent ? 'Confirmed' : 'Confirm Tour Date'}
               >
-                &times;
+                ✓
               </button>
-            ) : null}
-          </div>
+
+              {/* Dismiss (reject) button — only visible on hover for pending */}
+              {!isPersistent && isActionable ? (
+                <button
+                  type='button'
+                  className={cn(
+                    'inline-flex items-center justify-center',
+                    'rounded-full size-7',
+                    'bg-transparent',
+                    'text-quaternary-token text-app',
+                    'transition-colors duration-subtle',
+                    'hover:text-secondary-token',
+                    'cursor-pointer select-none',
+                    isBusy && 'cursor-not-allowed opacity-30'
+                  )}
+                  onClick={handleReject}
+                  disabled={isBusy}
+                  aria-label='Reject Tour Date'
+                >
+                  &times;
+                </button>
+              ) : null}
+            </div>
+          </HoverReveal>
         ) : null}
       </div>
     </li>

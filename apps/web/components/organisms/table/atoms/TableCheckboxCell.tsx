@@ -1,6 +1,6 @@
 'use client';
 
-import { Checkbox } from '@jovie/ui';
+import { Checkbox, HoverReveal } from '@jovie/ui';
 import type { Row, RowData, Table } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
@@ -116,29 +116,31 @@ function TanStackRowCheckbox({
         handleActivationKeyDown(event, e => e.stopPropagation())
       }
     >
-      <span
-        className={cn(
-          'select-none text-app tabular-nums text-tertiary-token transition-opacity',
-          isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
-        )}
-        aria-hidden='true'
-      >
-        {rowNumber}
-      </span>
-      <div
-        className={cn(
-          'absolute inset-0 transition-opacity flex items-center justify-center',
-          isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-        )}
-      >
-        <Checkbox
-          aria-label={
-            rowNumber === undefined ? 'Select row' : `Select row ${rowNumber}`
-          }
-          checked={isChecked}
-          onCheckedChange={onToggleSelect}
-        />
-      </div>
+      <HoverReveal asChild inverse engaged={isChecked}>
+        <span
+          className={cn(
+            'select-none text-app tabular-nums text-tertiary-token transition-opacity'
+          )}
+          aria-hidden='true'
+        >
+          {rowNumber}
+        </span>
+      </HoverReveal>
+      <HoverReveal asChild engaged={isChecked}>
+        <div
+          className={cn(
+            'absolute inset-0 transition-opacity flex items-center justify-center'
+          )}
+        >
+          <Checkbox
+            aria-label={
+              rowNumber === undefined ? 'Select row' : `Select row ${rowNumber}`
+            }
+            checked={isChecked}
+            onCheckedChange={onToggleSelect}
+          />
+        </div>
+      </HoverReveal>
     </div>
   );
 }
@@ -166,29 +168,32 @@ function LegacyCheckboxCell({
     >
       <div className='relative flex items-center justify-center'>
         {!isHeader && rowNumber !== undefined && (
-          <span
-            className={cn(
-              'absolute inset-0 flex items-center justify-center text-app tabular-nums text-tertiary-token transition-opacity',
-              checked ? 'opacity-0' : 'group-hover:opacity-0'
-            )}
-          >
-            {rowNumber}
-          </span>
+          <HoverReveal asChild inverse engaged={checked || indeterminate}>
+            <span
+              className={cn(
+                'absolute inset-0 flex items-center justify-center text-app tabular-nums text-tertiary-token transition-opacity'
+              )}
+            >
+              {rowNumber}
+            </span>
+          </HoverReveal>
         )}
-        <div
-          className={cn(
-            'transition-opacity',
-            !isHeader && !checked && 'opacity-0 group-hover:opacity-100'
-          )}
+        <HoverReveal
+          asChild
+          engaged={
+            isHeader || checked || indeterminate || rowNumber === undefined
+          }
         >
-          <Checkbox
-            checked={resolveCheckboxState(checked, indeterminate)}
-            onCheckedChange={(value: boolean | 'indeterminate') =>
-              onChange(value === true)
-            }
-            aria-label={ariaLabel}
-          />
-        </div>
+          <div>
+            <Checkbox
+              checked={resolveCheckboxState(checked, indeterminate)}
+              onCheckedChange={(value: boolean | 'indeterminate') =>
+                onChange(value === true)
+              }
+              aria-label={ariaLabel}
+            />
+          </div>
+        </HoverReveal>
       </div>
     </Component>
   );

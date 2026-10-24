@@ -17,7 +17,13 @@ describe('AudienceRowSelectionCell', () => {
       />
     );
 
-    await user.click(screen.getByRole('checkbox', { name: 'Select Ada' }));
+    const checkbox = screen.getByRole('checkbox', { name: 'Select Ada' });
+    expect(checkbox.parentElement).toHaveClass(
+      'opacity-0',
+      'group-focus-within:opacity-100'
+    );
+    expect(screen.getByText('3')).toHaveClass('group-focus-within:opacity-0');
+    await user.click(checkbox);
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 });

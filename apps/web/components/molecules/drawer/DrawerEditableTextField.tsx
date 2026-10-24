@@ -1,6 +1,6 @@
 'use client';
 
-import { Input } from '@jovie/ui';
+import { HoverReveal, Input } from '@jovie/ui';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import React, {
@@ -183,7 +183,7 @@ export const DrawerEditableTextField = React.memo(
     const displayValue = value || emptyLabel;
 
     return (
-      <div className={cn('flex min-w-0 items-center gap-1.5', className)}>
+      <div className={cn('group flex min-w-0 items-center gap-1.5', className)}>
         <div className='min-w-0 flex-1'>
           {isEditing && editable ? (
             <Input
@@ -265,70 +265,77 @@ export const DrawerEditableTextField = React.memo(
         </div>
 
         {actionSlotIds.length > 0 ? (
-          <div
+          <HoverReveal
+            asChild
+            engaged={isSuccess}
             data-slot='drawer-editable-text-field-actions'
-            className='flex shrink-0 items-center gap-0.5'
             aria-hidden={isEditing ? 'true' : undefined}
           >
-            {isEditing
-              ? actionSlotIds.map(slotId => (
-                  <span
-                    key={`action-slot-placeholder-${slotId}`}
-                    className='h-6 w-6 shrink-0 rounded-md opacity-0'
-                  />
-                ))
-              : null}
+            <div className='flex shrink-0 items-center gap-0.5'>
+              {isEditing
+                ? actionSlotIds.map(slotId => (
+                    <span
+                      key={`action-slot-placeholder-${slotId}`}
+                      className='h-6 w-6 shrink-0 rounded-md opacity-0'
+                    />
+                  ))
+                : null}
 
-            {!isEditing && (copyValue ?? value) ? (
-              <DrawerInlineIconButton
-                onClick={event => {
-                  event.stopPropagation();
-                  handleCopyClick();
-                }}
-                aria-label={copyLabel ?? `Copy ${label}`}
-                className='h-6 w-6 min-h-6 min-w-6 text-tertiary-token'
-              >
-                {isSuccess ? (
-                  <Check className='h-3.5 w-3.5 text-success' />
-                ) : (
-                  <Copy className='h-3.5 w-3.5' />
-                )}
-              </DrawerInlineIconButton>
-            ) : null}
-
-            {isEditing
-              ? null
-              : visibleActions.map(action =>
-                  action.href ? (
-                    <a
-                      key={action.id}
-                      href={action.href}
-                      target='_blank'
-                      rel='noreferrer'
-                      aria-label={action.ariaLabel}
-                      className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
-                      onClick={event => {
-                        event.stopPropagation();
-                        action.onClick?.();
-                      }}
-                    >
-                      {action.icon ?? <ExternalLink className='h-3.5 w-3.5' />}
-                    </a>
+              {!isEditing && (copyValue ?? value) ? (
+                <DrawerInlineIconButton
+                  onClick={event => {
+                    event.stopPropagation();
+                    handleCopyClick();
+                  }}
+                  aria-label={copyLabel ?? `Copy ${label}`}
+                  className='h-6 w-6 min-h-6 min-w-6 text-tertiary-token'
+                >
+                  {isSuccess ? (
+                    <Check className='h-3.5 w-3.5 text-success' />
                   ) : (
-                    <DrawerInlineIconButton
-                      key={action.id}
-                      onClick={event => {
-                        event.stopPropagation();
-                        action.onClick?.();
-                      }}
-                      aria-label={action.ariaLabel}
-                      className='h-6 w-6 min-h-6 min-w-6 text-tertiary-token'
-                    >
-                      {action.icon ?? <ExternalLink className='h-3.5 w-3.5' />}
-                    </DrawerInlineIconButton>
-                  )
-                )}
-          </div>
+                    <Copy className='h-3.5 w-3.5' />
+                  )}
+                </DrawerInlineIconButton>
+              ) : null}
+
+              {isEditing
+                ? null
+                : visibleActions.map(action =>
+                    action.href ? (
+                      <a
+                        key={action.id}
+                        href={action.href}
+                        target='_blank'
+                        rel='noreferrer'
+                        aria-label={action.ariaLabel}
+                        className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
+                        onClick={event => {
+                          event.stopPropagation();
+                          action.onClick?.();
+                        }}
+                      >
+                        {action.icon ?? (
+                          <ExternalLink className='h-3.5 w-3.5' />
+                        )}
+                      </a>
+                    ) : (
+                      <DrawerInlineIconButton
+                        key={action.id}
+                        onClick={event => {
+                          event.stopPropagation();
+                          action.onClick?.();
+                        }}
+                        aria-label={action.ariaLabel}
+                        className='h-6 w-6 min-h-6 min-w-6 text-tertiary-token'
+                      >
+                        {action.icon ?? (
+                          <ExternalLink className='h-3.5 w-3.5' />
+                        )}
+                      </DrawerInlineIconButton>
+                    )
+                  )}
+            </div>
+          </HoverReveal>
         ) : null}
       </div>
     );

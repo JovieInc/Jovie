@@ -1,5 +1,6 @@
 'use client';
 
+import { HoverReveal } from '@jovie/ui';
 import { type TouchEvent as ReactTouchEvent, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { OpportunityRowProps, OpportunityRowState } from './types';
@@ -120,7 +121,7 @@ export function OpportunityRow({
 
   return (
     <li
-      className={cn('group/row list-none overflow-hidden', className)}
+      className={cn('group group/row list-none overflow-hidden', className)}
       data-testid={dataTestId ?? `opportunity-row-${id}`}
       data-state={state}
     >
@@ -171,77 +172,72 @@ export function OpportunityRow({
             For actionable states: hidden in resting state (opacity-0),
             revealed on hover or persistent for accepted/planned. */}
         {rowHasAction ? (
-          <div
-            className={cn(
-              'flex items-center gap-2 shrink-0 min-w-0',
-              'transition-opacity duration-subtle',
-              persistentAction
-                ? 'opacity-100'
-                : namedPrimaryAction
-                  ? 'opacity-100'
-                  : 'opacity-0 pointer-events-none group-hover/row:opacity-100 group-hover/row:pointer-events-auto group-focus-within/row:opacity-100 group-focus-within/row:pointer-events-auto'
-            )}
+          <HoverReveal
+            asChild
+            engaged={persistentAction || Boolean(namedPrimaryAction) || isBusy}
           >
-            {/* Ghost accent ring pill — 2px border, no fill */}
-            <button
-              type='button'
-              className={cn(
-                'inline-flex items-center justify-center',
-                'rounded-full min-w-7 min-h-7 px-2',
-                'bg-transparent border-2',
-                'transition-colors duration-subtle',
-                'cursor-pointer select-none',
-                isBusy && 'cursor-not-allowed opacity-50',
-                showCheckmark || persistentAction
-                  ? 'text-primary-token'
-                  : 'text-accent-token'
-              )}
-              style={{
-                borderColor: actionAccent,
-              }}
-              onClick={handlePrimaryAction}
-              disabled={isBusy || !rowHasAction}
-              aria-label={
-                showCheckmark
-                  ? 'Planned'
-                  : (namedPrimaryAction ?? 'Plan Opportunity')
-              }
-            >
-              {showCheckmark ? (
-                '✓'
-              ) : namedPrimaryAction ? (
-                <>
-                  {namedPrimaryAction}
-                  <span aria-hidden='true'>→</span>
-                </>
-              ) : (
-                '→'
-              )}
-            </button>
-
-            {/* Dismiss button — faint x, secondary to the primary.
-                Hidden on persistent-action states (accepted/planned). */}
-            {!persistentAction ? (
+            <div className='flex items-center gap-2 shrink-0 min-w-0'>
+              {/* Ghost accent ring pill — 2px border, no fill */}
               <button
                 type='button'
                 className={cn(
                   'inline-flex items-center justify-center',
-                  'rounded-full size-7',
-                  'bg-transparent',
-                  'text-quaternary-token text-app',
+                  'rounded-full min-w-7 min-h-7 px-2',
+                  'bg-transparent border-2',
                   'transition-colors duration-subtle',
-                  'hover:text-secondary-token',
                   'cursor-pointer select-none',
-                  isBusy && 'cursor-not-allowed opacity-30'
+                  isBusy && 'cursor-not-allowed opacity-50',
+                  showCheckmark || persistentAction
+                    ? 'text-primary-token'
+                    : 'text-accent-token'
                 )}
-                onClick={handleDismiss}
-                disabled={isBusy}
-                aria-label='Dismiss Opportunity'
+                style={{
+                  borderColor: actionAccent,
+                }}
+                onClick={handlePrimaryAction}
+                disabled={isBusy || !rowHasAction}
+                aria-label={
+                  showCheckmark
+                    ? 'Planned'
+                    : (namedPrimaryAction ?? 'Plan Opportunity')
+                }
               >
-                &times;
+                {showCheckmark ? (
+                  '✓'
+                ) : namedPrimaryAction ? (
+                  <>
+                    {namedPrimaryAction}
+                    <span aria-hidden='true'>→</span>
+                  </>
+                ) : (
+                  '→'
+                )}
               </button>
-            ) : null}
-          </div>
+
+              {/* Dismiss button — faint x, secondary to the primary.
+                Hidden on persistent-action states (accepted/planned). */}
+              {!persistentAction ? (
+                <button
+                  type='button'
+                  className={cn(
+                    'inline-flex items-center justify-center',
+                    'rounded-full size-7',
+                    'bg-transparent',
+                    'text-quaternary-token text-app',
+                    'transition-colors duration-subtle',
+                    'hover:text-secondary-token',
+                    'cursor-pointer select-none',
+                    isBusy && 'cursor-not-allowed opacity-30'
+                  )}
+                  onClick={handleDismiss}
+                  disabled={isBusy}
+                  aria-label='Dismiss Opportunity'
+                >
+                  &times;
+                </button>
+              ) : null}
+            </div>
+          </HoverReveal>
         ) : null}
       </div>
     </li>
