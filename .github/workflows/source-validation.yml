@@ -44,8 +44,26 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           set -uo pipefail
-          reuse=false proof=''
-          if [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
+          reuse=false proof='' lookup=true
+          # Quota preflight (rate_limit itself does not count against core).
+          # Low quota never passes the gate: it waits for a near reset, or
+          # skips the reuse lookup so every validation below runs in full.
+          if quota="$(gh api rate_limit --jq '"\(.resources.core.remaining) \(.resources.core.reset)"' 2>/dev/null)"; then
+            read -r remaining reset <<<"$quota"
+            wait_s=$(( reset - $(date +%s) ))
+            if [[ "$remaining" =~ ^[0-9]+$ && "$remaining" -lt 50 ]]; then
+              if (( wait_s > 0 && wait_s <= 900 )); then
+                echo "::warning::GitHub rate limited (core remaining=$remaining). Waiting ${wait_s}s for reset before the proof-reuse lookup."
+                echo "GitHub rate limited: waited ${wait_s}s for core quota reset." >> "$GITHUB_STEP_SUMMARY"
+                sleep "$wait_s"
+              else
+                lookup=false
+                echo "::warning::GitHub rate limited (core remaining=$remaining, reset in ${wait_s}s). Skipping proof reuse; running full validation."
+                echo "GitHub rate limited: proof reuse skipped, full validation runs." >> "$GITHUB_STEP_SUMMARY"
+              fi
+            fi
+          fi
+          if [[ "$lookup" == true && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
             runs="$(gh api "repos/$REPOSITORY/actions/workflows/source-validation.yml/runs?head_sha=$HEAD_SHA&event=pull_request&status=completed&per_page=100")"; then
             proof="$(jq -r --arg sha "$HEAD_SHA" --arg ref "$HEAD_REF" --argjson run "$RUN_ID" '
               [.workflow_runs[]
