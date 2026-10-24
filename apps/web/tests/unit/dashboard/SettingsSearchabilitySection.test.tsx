@@ -152,7 +152,7 @@ describe('owner discovery choice', () => {
       name: 'Show in Jovie discovery',
     });
     fireEvent.click(control);
-    await waitFor(() => expect(control).toBeEnabled());
+    await waitFor(() => expect(control).not.toHaveAttribute('aria-busy'));
     expect(control).toBeChecked();
     expect(
       screen.getByText('Could not save discovery preference. Try again.')
