@@ -7,6 +7,10 @@ import type { OpportunityInboxFeedbackRating } from '@/lib/connectors/opportunit
 import { buildOpportunityInboxFeedbackMessage } from '@/lib/connectors/opportunity-inbox-feedback';
 import { fetchWithTimeout } from './fetch';
 
+function reconcileDecisionConflict(response: Response, refresh: () => void) {
+  if (response.status === 409) refresh();
+}
+
 interface SuggestedActionMutationResponse {
   readonly ok?: boolean;
   readonly error?: string;
@@ -33,7 +37,8 @@ interface OpportunityInboxFeedbackResponse {
 
 async function postSuggestedAction(
   id: string,
-  action: 'approve' | 'reject' | 'next-step'
+  action: 'approve' | 'reject' | 'next-step',
+  refresh: () => void
 ): Promise<SuggestedActionMutationResponse> {
   const response = await fetch(
     `/api/connectors/suggested-actions/${id}/${action}`,
@@ -42,6 +47,8 @@ async function postSuggestedAction(
       headers: { 'Content-Type': 'application/json' },
     }
   );
+
+  reconcileDecisionConflict(response, refresh);
 
   const body = (await response.json()) as SuggestedActionMutationResponse;
 
@@ -56,7 +63,8 @@ export function useOpportunityInboxMutations() {
   const router = useRouter();
 
   const approveMutation = useMutation({
-    mutationFn: (id: string) => postSuggestedAction(id, 'approve'),
+    mutationFn: (id: string) =>
+      postSuggestedAction(id, 'approve', router.refresh),
     onSuccess: () => {
       toast.success('Suggestion approved — Jovie is executing it now.');
       router.refresh();
@@ -69,7 +77,8 @@ export function useOpportunityInboxMutations() {
   });
 
   const dismissMutation = useMutation({
-    mutationFn: (id: string) => postSuggestedAction(id, 'reject'),
+    mutationFn: (id: string) =>
+      postSuggestedAction(id, 'reject', router.refresh),
     onSuccess: () => {
       toast.success('Suggestion dismissed.');
       router.refresh();
@@ -131,6 +140,7 @@ export function useOpportunityInboxMutations() {
         }
       );
 
+      reconcileDecisionConflict(response, router.refresh);
       const body = (await response.json()) as SuggestedActionMutationResponse;
 
       if (!response.ok) {
@@ -151,7 +161,8 @@ export function useOpportunityInboxMutations() {
   });
 
   const nextStepMutation = useMutation({
-    mutationFn: (id: string) => postSuggestedAction(id, 'next-step'),
+    mutationFn: (id: string) =>
+      postSuggestedAction(id, 'next-step', router.refresh),
     onSuccess: () => {
       toast.success('Next step queued — it will appear in your inbox.');
       router.refresh();

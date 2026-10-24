@@ -13,6 +13,11 @@ const LIVE_CERT_STORIES = [
   '../../../packages/ui/atoms/switch.stories.tsx',
 ] as const;
 
+const DECISION_PERFORMANCE_STORIES = [
+  '../components/features/admin/hud/OvieInbox.stories.tsx',
+  '../components/features/opportunity-inbox/OpportunityInboxPageClient.stories.tsx',
+] as const;
+
 const FULL_CATALOG_STORIES = [
   // Local story matrices (e.g. the surface-elevation visual-regression
   // matrix, JOV-2156) that are not tied to a single component directory.
@@ -89,17 +94,23 @@ export function resolvePrivacyBoundaryShellAlias(
 
 const config: StorybookConfig = {
   stories:
-    // Deliberately invalid controls belong only to the explicit runner diagnostic.
-    process.env.JOVIE_STORYBOOK_A11Y_CONTROLS === '1'
-      ? ['../tests/fixtures/storybook-a11y-runner/controls.stories.tsx']
-      : process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
-        ? [...LIVE_CERT_STORIES]
-        : [...FULL_CATALOG_STORIES],
-  addons: storybookAddonsForEnvironment(),
+    process.env.JOVIE_DECISION_INBOX_PERF === '1'
+      ? [...DECISION_PERFORMANCE_STORIES]
+      : // Deliberately invalid controls belong only to the explicit runner diagnostic.
+        process.env.JOVIE_STORYBOOK_A11Y_CONTROLS === '1'
+        ? ['../tests/fixtures/storybook-a11y-runner/controls.stories.tsx']
+        : process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+          ? [...LIVE_CERT_STORIES]
+          : [...FULL_CATALOG_STORIES],
+  addons:
+    process.env.JOVIE_DECISION_INBOX_PERF === '1'
+      ? []
+      : storybookAddonsForEnvironment(),
   framework: storybookFrameworkForEnvironment(),
   docs: {},
   typescript:
-    process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+    process.env.JOVIE_LIVE_STORYBOOK_CERT === '1' ||
+    process.env.JOVIE_DECISION_INBOX_PERF === '1'
       ? { check: false, reactDocgen: false }
       : {
           check: true,

@@ -178,3 +178,28 @@ describe('OpportunityInboxSocialReplyCard', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('OpportunityInboxSocialReplyCard pending decision budget', () => {
+  it('covers the primary action with a Saving overlay and disables it while approving', () => {
+    renderCard({ isApproving: true });
+
+    const overlay = screen.getByText('Saving…');
+    expect(overlay).toBeVisible();
+    expect(overlay.closest('button')).toBeDisabled();
+    expect(screen.getByText('Approve Reply')).toHaveClass('invisible');
+  });
+
+  it('shows the same Saving overlay while dismissing', () => {
+    renderCard({ isDismissing: true });
+
+    expect(screen.getByText('Saving…')).toBeVisible();
+    expect(screen.getByText('Approve Reply')).toHaveClass('invisible');
+  });
+
+  it('keeps the primary action enabled once the decision settles', () => {
+    renderCard();
+
+    expect(screen.queryByText('Saving…')).not.toBeInTheDocument();
+    expect(screen.getByText('Approve Reply')).not.toHaveClass('invisible');
+  });
+});

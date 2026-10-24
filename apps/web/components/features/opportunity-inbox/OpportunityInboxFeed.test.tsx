@@ -228,3 +228,37 @@ describe('OpportunityInboxFeed workflow handoffs', () => {
     }
   );
 });
+
+describe('OpportunityInboxFeed pending decision budgets', () => {
+  it('marks the deciding social reply busy from pendingDecisionIds alone', () => {
+    render(
+      <OpportunityInboxFeed
+        cards={[SOCIAL_REPLY_CARD, SUGGESTION_CARD]}
+        onApprove={vi.fn()}
+        onDismiss={vi.fn()}
+        onFeedback={vi.fn()}
+        enableStackInteractions
+        pendingDecisionIds={new Set(['reply-1'])}
+      />
+    );
+
+    expect(screen.getByText('Saving…')).toBeVisible();
+    expect(screen.getByText('Saving…').closest('button')).toBeDisabled();
+  });
+
+  it('still honors the single pendingActionId fallback for the deciding card', () => {
+    render(
+      <OpportunityInboxFeed
+        cards={[SOCIAL_REPLY_CARD, SUGGESTION_CARD]}
+        onApprove={vi.fn()}
+        onDismiss={vi.fn()}
+        onFeedback={vi.fn()}
+        enableStackInteractions
+        pendingActionId='reply-1'
+      />
+    );
+
+    expect(screen.getByText('Saving…')).toBeVisible();
+    expect(screen.getByText('Saving…').closest('button')).toBeDisabled();
+  });
+});
