@@ -1,11 +1,18 @@
-/// <reference types="vite/client" />
-
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import type { ImportGlobFunction } from 'vite';
 import { describe, expect, it } from 'vitest';
 
 // Track CSS in the affected module graph, then read it directly: Vitest stubs CSS.
 import '@/styles/system-b-app.css';
+
+// Only type the glob API. vite/client also adds wildcard asset declarations,
+// which would mask unresolved assets elsewhere in the test typecheck program.
+declare global {
+  interface ImportMeta {
+    glob: ImportGlobFunction;
+  }
+}
 
 const workspaceCss = readFileSync(
   resolve(__dirname, '../../../styles/system-b-app.css'),
@@ -33,11 +40,30 @@ const read = (file: string) => {
 const selector = '.dark [data-app-shell-workspace="ov"]';
 
 function rawBackgrounds(source: string) {
-  return (
+  const utilityOrDirectColor =
     source.match(
       /\bbg-(?:\[(?!(?:var\(|--))[^\]]+\]|(?:white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)(?:-\d+)?)(?:\/[^\s'"`]+)?|\bbackground(?:Color|-color)?\s*:\s*['"`]?(?:#[\da-f]+|(?:rgba?|hsla?|oklch|oklab|lab|lch|color)\([^;}'"`]+|(?:white|black|navy)\b)/gi
-    ) ?? []
-  );
+    ) ?? [];
+  // Inspect complete literal values so named colors and gradient stops cannot
+  // hide behind a shorthand. Unquoted JS expressions remain token-owned values.
+  const declarations = [
+    ...source.matchAll(
+      /\bbackground(?:Color|Image)?\s*:\s*(['"`])([\s\S]*?)\1/g
+    ),
+    ...source.matchAll(/\bbackground(?:-color|-image)?\s*:\s*()([^;}]+);/g),
+  ];
+  const literalColors = declarations.filter(([, , value = '']) => {
+    const colorLiteral =
+      /#[\da-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|color)\(/i;
+    const keyword =
+      /^(?:transparent|currentcolor|inherit|initial|unset|revert(?:-layer)?|none)$/i;
+    const trimmed = value.trim();
+    return (
+      colorLiteral.test(trimmed) ||
+      (/^[a-z-]+$/i.test(trimmed) && !keyword.test(trimmed))
+    );
+  });
+  return [...utilityOrDirectColor, ...literalColors.map(([match]) => match)];
 }
 
 describe('Ovie Home and dashboard background contract', () => {
@@ -77,6 +103,7 @@ describe('Ovie Home and dashboard background contract', () => {
       '--app-shell-content-surface: var(--noir-ion-card)'
     );
     expect(block).toContain('--color-bg-surface-1: var(--noir-ion-card)');
+    expect(rawBackgrounds(block)).toEqual([]);
     expect(read('/components/organisms/AppShellFrame.tsx')).toContain(
       "data-app-shell-workspace={brandVariant === 'ov' ? 'ov' : undefined}"
     );
@@ -87,6 +114,23 @@ describe('Ovie Home and dashboard background contract', () => {
     expect(values.length).toBeGreaterThanOrEqual(8);
     for (const value of values) expect(value).toMatch(/^var\(--[\w-]+\)$/);
   });
+
+  it.each(['dock', 'surface', 'scroll-fade'])(
+    'bans raw fills in shared composer %s rules consumed by Ovie',
+    role => {
+      const rules = [
+        ...workspaceCss.matchAll(
+          new RegExp(
+            `:where\\(\\.system-b-chat-composer-${role}[^{}]*\\{([^}]+)\\}`,
+            'g'
+          )
+        ),
+      ];
+      expect(rules.length).toBeGreaterThan(0);
+      for (const rule of rules)
+        expect(rawBackgrounds(rule[1] ?? '')).toEqual([]);
+    }
+  );
 
   it('leaves Ovie Home paint with the shell instead of layering ambient washes', () => {
     expect(read('/app/app/(shell)/admin/chat/OvChatClient.tsx')).toMatch(
@@ -112,6 +156,10 @@ describe('Ovie Home and dashboard background contract', () => {
     'background: #101114;',
     "backgroundColor: 'rgba(1, 2, 3, 0.5)'",
     'background-color: navy;',
+    "backgroundColor: 'orange'",
+    "background: 'linear-gradient(#101114, #14161a)'",
+    'background: linear-gradient(#101114, #14161a);',
+    'background-color: orange;',
   ])('rejects a raw background regression: %s', source => {
     expect(rawBackgrounds(source)).not.toEqual([]);
   });
@@ -121,6 +169,9 @@ describe('Ovie Home and dashboard background contract', () => {
     'bg-(--app-shell-content-surface)',
     'bg-transparent',
     'background: var(--system-b-app-content-surface);',
+    "backgroundColor: 'transparent'",
+    "background: 'linear-gradient(var(--color-bg-surface-1), transparent)'",
+    'background: inherit;',
   ])('allows semantic backgrounds: %s', source => {
     expect(rawBackgrounds(source)).toEqual([]);
   });
