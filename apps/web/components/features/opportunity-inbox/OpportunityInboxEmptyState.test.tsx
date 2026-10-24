@@ -7,45 +7,36 @@ vi.mock('./FounderReviewRecorder', () => ({
 }));
 
 describe('OpportunityInboxEmptyState', () => {
-  it('uses the canonical centered empty-state layout with the catalog action', () => {
-    render(
-      <OpportunityInboxEmptyState
-        actionCards={[
-          {
-            id: 'connect-spotify',
-            title: 'Connect Spotify',
-            body: 'Link your catalog so Jovie can spot releases.',
-            actionLabel: 'Connect Spotify',
-            href: '/app/dashboard/releases?connect=spotify',
-          },
-        ]}
-      />
-    );
+  it('renders one calm centered line without setup-step actions (JOV-8967)', () => {
+    render(<OpportunityInboxEmptyState />);
 
     const emptyState = screen.getByTestId('opportunity-inbox-empty-state');
     expect(emptyState).toHaveClass('flex-1', 'items-center', 'justify-center');
-    expect(screen.getByText('Your Inbox Is Clear')).toHaveClass(
-      'text-sm',
-      'font-semibold',
-      'tracking-tight'
+    expect(emptyState).toHaveAttribute(
+      'data-empty-state-presentation',
+      'default'
     );
-    expect(
-      screen.getByRole('link', { name: 'Connect Spotify' })
-    ).toHaveAttribute('href', '/app/dashboard/releases?connect=spotify');
+    expect(screen.getByText('Your Inbox Is Clear')).toBeVisible();
   });
 
-  it('keeps the chat fallback when no catalog action is available', () => {
+  it('never renders a setup-step card or a Connect Spotify CTA (JOV-8967)', () => {
     render(<OpportunityInboxEmptyState />);
 
+    expect(screen.queryByText('Connect Spotify')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Connect Spotify' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Add dates')).not.toBeInTheDocument();
+  });
+
+  it('keeps the single chat next step and stays free of founder capture', () => {
+    render(<OpportunityInboxEmptyState />);
+
+    expect(screen.getAllByRole('link')).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveAttribute(
       'href',
       '/app/chat'
     );
-  });
-
-  it('keeps the empty creator home free of founder capture', () => {
-    render(<OpportunityInboxEmptyState />);
     expect(screen.queryByTestId('founder-recorder')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toBeVisible();
   });
 });

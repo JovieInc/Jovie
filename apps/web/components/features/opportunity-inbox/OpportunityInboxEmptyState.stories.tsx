@@ -1,7 +1,6 @@
 import '@/app/globals.css';
 import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { buildSpotifyCatalogConnectionRoute } from '@/constants/routes';
 import { OpportunityInboxEmptyState } from './OpportunityInboxEmptyState';
 
 const meta = {
@@ -18,21 +17,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Desktop: Story = {
-  args: {
-    actionCards: [
-      {
-        id: 'connect-spotify',
-        title: 'Connect Spotify',
-        body: 'Link your catalog so Jovie can spot releases.',
-        actionLabel: 'Connect Spotify',
-        href: buildSpotifyCatalogConnectionRoute(),
-      },
-    ],
-  },
-};
+export const Desktop: Story = {};
 
 export const Narrow: Story = {
-  args: {},
   parameters: { viewport: { defaultViewport: 'mobile1' } },
 };

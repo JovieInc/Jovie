@@ -532,7 +532,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.queryByText('New single detected')).not.toBeInTheDocument();
   });
 
-  it('renders the empty state when there are no cards', () => {
+  it('renders the calm empty state without setup steps when there are no cards', () => {
     render(
       <OpportunityInboxPageClient
         inbox={{
@@ -554,11 +554,17 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Inbox' })).toBeNull();
     expect(screen.getByText('Your Inbox Is Clear')).toBeInTheDocument();
+    // JOV-8967: setup steps belong on Home only; the Inbox empty state never
+    // renders an action card or its CTA, even when the mapper supplies one.
     expect(
-      screen.getByRole('link', { name: 'Connect Spotify' })
-    ).toHaveAttribute('href', '/app/dashboard/releases?connect=spotify');
+      screen.queryByRole('link', { name: 'Connect Spotify' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Connect Spotify')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveAttribute(
+      'href',
+      '/app/chat'
+    );
   });
 
   it('filters cards by signal type and restores them on All', () => {
