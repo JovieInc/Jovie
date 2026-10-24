@@ -461,7 +461,10 @@ export function ShippingMatrix() {
             {query.isFetching ? 'Refreshing' : 'Refresh'}
           </Button>
         </div>
-        <div className='overflow-x-auto'>
+        <div
+          className='h-64 overflow-auto'
+          data-testid='shipping-matrix-viewport'
+        >
           <table
             className='w-full text-left text-xs tabular-nums'
             aria-labelledby='shipping-matrix-title'
