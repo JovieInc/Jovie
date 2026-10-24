@@ -16,6 +16,7 @@ import {
   WORKFLOW_CAPTURE_REQUEST_KIND,
   YOUTUBE_THUMBNAIL_CANDIDATE_KIND,
 } from '@/lib/connectors/suggested-action-kinds';
+import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
 import {
   WorkflowCaptureExecutionResultSchema,
   WorkflowCaptureRequestPayloadSchema,
@@ -142,6 +143,49 @@ function visualFromPayload(
   }
 }
 
+/** Only explicit source context is eligible; private refs and copy are not identity. */
+function entityFromPayload(
+  payload: unknown
+): OpportunityInboxCardViewModel['entity'] {
+  if (!payload || typeof payload !== 'object') return undefined;
+  const entity = (payload as Record<string, unknown>).entity;
+  if (!entity || typeof entity !== 'object') return undefined;
+  const { kind, id, label, imageUrl } = entity as Record<string, unknown>;
+  if (
+    (kind !== 'artist' &&
+      kind !== 'release' &&
+      kind !== 'track' &&
+      kind !== 'profile') ||
+    typeof id !== 'string' ||
+    !id.trim() ||
+    typeof label !== 'string' ||
+    !label.trim()
+  )
+    return undefined;
+  let safeImageUrl: string | undefined;
+  if (typeof imageUrl === 'string') {
+    try {
+      const url = new URL(imageUrl);
+      if (
+        url.protocol === 'https:' &&
+        !url.username &&
+        !url.password &&
+        !url.port &&
+        isAllowedAvatarHostname(url.hostname)
+      )
+        safeImageUrl = url.toString();
+    } catch {
+      /* Missing media uses the shared semantic fallback. */
+    }
+  }
+  return {
+    kind,
+    id: id.trim(),
+    label: label.trim(),
+    ...(safeImageUrl ? { imageUrl: safeImageUrl } : {}),
+  };
+}
+
 export function mapSuggestedActionToInboxCard(
   row: SuggestedActionRow
 ): OpportunityInboxCardViewModel {
@@ -173,6 +217,7 @@ export function mapSuggestedActionToInboxCard(
   else category = classifySuggestedActionCategory(row);
   const title = titleFromPayload(row.payload, category);
   const visual = visualFromPayload(row.payload, title);
+  const entity = entityFromPayload(row.payload);
   let typeLabel: string;
   if (category === 'report') typeLabel = 'Report';
   else if (category === 'workflow_capture') typeLabel = 'Workflow';
@@ -207,6 +252,7 @@ export function mapSuggestedActionToInboxCard(
     status: 'pending',
     category,
     ...(visual ? { visual } : {}),
+    ...(entity ? { entity } : {}),
     ...(brandDeal ? { brandDealRankingScore: brandDeal.rankingScore } : {}),
     ...(report ? { report } : {}),
     ...(workflowCapturePayload?.success

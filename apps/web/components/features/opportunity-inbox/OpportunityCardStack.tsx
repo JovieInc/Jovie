@@ -135,6 +135,7 @@ export function OpportunityCardStack({
               id={card.id}
               state='new'
               title={card.title}
+              entity={card.entity}
               metadata={card.why}
               hideDot={false}
             />
@@ -212,6 +213,7 @@ export function OpportunityCardStack({
                   id={topCard.id}
                   state='new'
                   title={topCard.title}
+                  entity={topCard.entity}
                   metadata={topCard.why}
                   hideDot={false}
                   primaryActionLabel={topCard.primaryActionLabel}

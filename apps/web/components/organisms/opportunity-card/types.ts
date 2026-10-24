@@ -1,3 +1,5 @@
+import type { OpportunityInboxEntity } from '@/lib/connectors/opportunity-inbox-types';
+
 /**
  * OpportunityRow state — the canonical inbox row states.
  * Matches the v4 approved design spec (#13170).
@@ -40,6 +42,7 @@ export interface OpportunityRowProps {
   readonly state: OpportunityRowState;
   /** Line 1: primary title (e.g. "Detroit listeners up 340%") */
   readonly title: string;
+  readonly entity?: OpportunityInboxEntity;
   /** Line 2: secondary metadata (e.g. "Magic Stick · 3/15 · 92% match · $2k") */
   readonly metadata: string;
   /** When true, the row is considered "read"/old and shows no dot */

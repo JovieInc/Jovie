@@ -57,6 +57,31 @@ const YOUTUBE_THUMBNAIL_CARD = {
 };
 
 describe('OpportunityCardStack', () => {
+  it('keeps shared entity identity in both the current card and inert peek', () => {
+    render(
+      <OpportunityCardStack
+        cards={CARDS.map((card, index) => ({
+          ...card,
+          entity: {
+            kind: 'artist',
+            id: `artist-${index}`,
+            label: `Artist ${index}`,
+          },
+        }))}
+        onAccept={vi.fn()}
+        onReject={vi.fn()}
+        onOpen={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByTestId('opportunity-stack-top-card-1')
+    ).toHaveTextContent('Artist 0');
+    const peek = screen.getByTestId('opportunity-stack-peek-card-2');
+    expect(peek).toHaveTextContent('Artist 1');
+    expect(peek).toHaveAttribute('inert');
+    expect(peek).toHaveAttribute('aria-hidden', 'true');
+  });
+
   it('blocks queue shortcuts and visible decisions while a revision is pending', async () => {
     const user = userEvent.setup();
     const onAccept = vi.fn();

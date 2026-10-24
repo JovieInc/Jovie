@@ -15,6 +15,10 @@ import {
   UserRound,
 } from 'lucide-react';
 import { useId, useState } from 'react';
+import {
+  EntityHeader,
+  EntityHeaderThumbnail,
+} from '@/components/molecules/drawer/EntityHeader';
 import { OpportunityCard } from '@/components/organisms/opportunity-card/OpportunityCard';
 import type { OpportunitySignalType } from '@/lib/connectors/opportunity-inbox-signal-type';
 import { formatOpportunityInboxRelativeTime } from '@/lib/connectors/opportunity-inbox-time';
@@ -132,6 +136,25 @@ export function OpportunityInboxCard({
         </>
       }
     >
+      {card.entity ? (
+        <EntityHeader
+          title={card.entity.label}
+          titleLineClamp={1}
+          thumbnail={
+            <EntityHeaderThumbnail
+              variant={
+                card.entity.kind === 'artist' || card.entity.kind === 'profile'
+                  ? 'person'
+                  : 'artwork'
+              }
+              src={card.entity.imageUrl}
+              name={card.entity.label}
+              alt=''
+              size={28}
+            />
+          }
+        />
+      ) : null}
       <div className='system-b-opportunity-inbox-card-feedback'>
         <Button
           type='button'
