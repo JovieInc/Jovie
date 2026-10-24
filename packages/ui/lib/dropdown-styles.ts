@@ -82,6 +82,13 @@ export const TOOLTIP_SURFACE_DANGER =
 export const OVERLAY_CONTENT_RADIUS = 'rounded-(--system-b-radius-overlay)';
 
 /**
+ * Tooltips are L4 overlays but read quiet — the small radius token, not the
+ * shared overlay radius (JOV-8976 spec rev: tooltip corners come down from
+ * the 12/16 overlay radii to --radius-sm).
+ */
+export const TOOLTIP_CONTENT_RADIUS = 'rounded-(--radius-sm)';
+
+/**
  * Rows inset by the overlay's `p-1` use the matching inner radius so their
  * corner arc shares the overlay's center.
  */
