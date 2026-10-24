@@ -9,10 +9,12 @@
  * - API queries: 5 seconds
  *
  * PostgreSQL statement_timeout:
- * - Pool-level opt-in: set `DB_STATEMENT_TIMEOUT_MS` to apply on every new
- *   Neon pool connection (see `resolvePoolConfig` in `lib/db/client/connection.ts`).
+ * - Pool-level enforced default (JOV-3775 slice 2 / JOV-8527): every new Neon
+ *   pool connection applies statement_timeout (default 8s); the
+ *   DB_STATEMENT_TIMEOUT_MS env var tunes it within [1s, 30s] but can never
+ *   disable it (see `resolvePoolConfig` in `lib/db/client/connection.ts`).
  * - Query-wrapper opt-in: pass `{ db }` to `dashboardQuery` / `apiQuery` /
- *   `executeWithTimeout` to SET statement_timeout on that client before the query.
+ *   `executeWithTimeout` to SET a tighter statement_timeout on that client.
  */
 
 import { sql as drizzleSql } from 'drizzle-orm';

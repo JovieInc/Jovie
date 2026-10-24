@@ -3,6 +3,9 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DbType } from './types';
 
+type ConnectionModule = typeof import('./connection');
+let resetPoolFn: ConnectionModule['resetPool'];
+
 type FixtureClient = EventEmitter & {
   release: ReturnType<typeof vi.fn>;
   query: ReturnType<typeof vi.fn>;
@@ -55,6 +58,74 @@ vi.mock('@/lib/db', async () => ({
   db: (await import('./connection')).db,
   applyRlsTransactionUser: vi.fn(),
 }));
+
+describe('enforced database deadlines (JOV-8527)', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mocks.clients.length = 0;
+    mocks.query.mockReset().mockResolvedValue({ rows: [] });
+    const connection = (await import('./connection')) as ConnectionModule;
+    database = connection.initializeDb();
+    resetPoolFn = connection.resetPool;
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('resolves the pool reset even when teardown never finishes', async () => {
+    vi.useFakeTimers();
+    const endSpy = vi
+      .spyOn(mocks.pool as unknown as { end: () => Promise<void> }, 'end')
+      .mockImplementation(() => new Promise<void>(() => {}));
+
+    const pending = resetPoolFn();
+    const assertion = expect(pending).resolves.toBeUndefined();
+    await vi.advanceTimersByTimeAsync(5_000);
+    await assertion;
+
+    expect(mocks.logDbError).toHaveBeenCalledWith(
+      'pool_reset_cleanup_timeout',
+      expect.any(Error),
+      {},
+      { asBreadcrumb: true }
+    );
+    endSpy.mockRestore();
+  });
+
+  it('still ends the old pool when teardown finishes within the deadline', async () => {
+    const endSpy = vi
+      .spyOn(mocks.pool as unknown as { end: () => Promise<void> }, 'end')
+      .mockResolvedValue(undefined);
+
+    await expect(resetPoolFn()).resolves.toBeUndefined();
+
+    expect(endSpy.mock.calls).toHaveLength(1);
+    expect(mocks.logDbError).not.toHaveBeenCalled();
+    endSpy.mockRestore();
+  });
+
+  it('bounds cleanup without unhandled rejections when teardown fails late', async () => {
+    vi.useFakeTimers();
+    const lateRejection = new Error('teardown failed after the deadline');
+    const endSpy = vi
+      .spyOn(mocks.pool as unknown as { end: () => Promise<void> }, 'end')
+      .mockImplementation(
+        () =>
+          new Promise<void>((_, reject) => {
+            setTimeout(() => reject(lateRejection), 6_000);
+          })
+      );
+
+    const pending = resetPoolFn();
+    const assertion = expect(pending).resolves.toBeUndefined();
+    await vi.runAllTimersAsync();
+    await assertion;
+
+    endSpy.mockRestore();
+  });
+});
 
 describe('checked-out database client failures (JOV-8523)', () => {
   beforeEach(async () => {
