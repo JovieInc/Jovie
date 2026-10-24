@@ -86,6 +86,49 @@ class Isolated(unittest.TestCase):
         self.tmp.cleanup()
 
 
+class IsolatedSetUpHostModeTest(unittest.TestCase):
+    """JOV-8763: the orchestration host may export CODEX_LANE_AUTH_MODE=subscription-pool.
+
+    Isolated.setUp builds alpha/beta fixture accounts for the legacy ACCOUNTS_ROOT
+    scan. Inheriting the host's auth mode sends accounts() down the subscription-pool
+    path (profile validation, real CLI probes) instead, so the fixtures never decide
+    the result and tests pass or fail with the host's environment. The base setUp
+    must neutralize the inherited mode; tests that need a mode pin it themselves
+    (CurrentLoginTest, SubscriptionPoolTest).
+    """
+
+    def test_isolated_setUp_neutralizes_inherited_host_auth_mode(self):
+        with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "subscription-pool"}):
+            case = AccountsTest("test_only_chatgpt_profiles_are_accounts")
+            case.setUp()
+            try:
+                self.assertIsNone(os.environ.get("CODEX_LANE_AUTH_MODE"))
+                self.assertFalse(codex.subscription_pool_mode())
+                self.assertEqual(codex.accounts(), ["alpha", "beta"])
+            finally:
+                case.tearDown()
+                case.doCleanups()
+            self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "subscription-pool")
+
+    def test_mode_pinned_by_a_subclass_restores_inherited_host_mode_on_cleanup(self):
+        class Pinned(Isolated):
+            def setUp(self):
+                super().setUp()
+                self.env = patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "current-login"})
+                self.env.start()
+                self.addCleanup(self.env.stop)
+
+        with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "subscription-pool"}):
+            case = Pinned()
+            case.setUp()
+            try:
+                self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "current-login")
+            finally:
+                case.tearDown()
+                case.doCleanups()
+            self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "subscription-pool")
+
+
 class AccountsTest(Isolated):
     def test_only_chatgpt_profiles_are_accounts(self):
         self.assertEqual(codex.accounts(), ["alpha", "beta"])
