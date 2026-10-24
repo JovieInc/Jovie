@@ -2575,7 +2575,13 @@ describe('base-branch fetch timeout (merge-group infrastructure)', () => {
       null,
       'unreadable',
     ]) {
-      expect(fetchTimeoutEvidence(run, [fetchJob()], () => notes)).toBe('');
+      expect(
+        fetchTimeoutEvidence(
+          run,
+          [fetchJob()],
+          () => /** @type {any} */ (notes)
+        )
+      ).toBe('');
     }
     expect(
       fetchTimeoutEvidence(run, [fetchJob()], () => {
