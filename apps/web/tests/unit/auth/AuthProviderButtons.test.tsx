@@ -1,11 +1,83 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { SocialAuthButton } from '@/components/atoms/SocialAuthButton';
 import {
   AuthProviderButtonSlot,
   AuthProviderButtonSlots,
 } from '@/components/features/auth/AuthProviderButtons';
 import { preserveAuthTouchOwnership } from '@/components/features/auth/constants';
 import { getEnabledAuthOAuthProviders } from '@/lib/auth/oauth-providers';
+
+describe('SocialAuthButton', () => {
+  it.each([
+    ['apple', 'Continue with Apple'],
+    ['google', 'Continue with Google'],
+  ] as const)('starts %s sign-in when enabled', (provider, label) => {
+    const onClick = vi.fn();
+    render(
+      <SocialAuthButton
+        provider={provider}
+        disabled={false}
+        onClick={onClick}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: label });
+    expect(button).toBeEnabled();
+    expect(button).toHaveAttribute('type', 'button');
+    expect(button.querySelector('img')).toHaveAttribute(
+      'src',
+      `/auth/${provider}-logo.svg`
+    );
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['apple', 'Continue with Apple loading'],
+    ['google', 'Continue with Google loading'],
+  ] as const)(
+    'prevents another %s sign-in while pending',
+    (provider, label) => {
+      const onClick = vi.fn();
+      render(
+        <SocialAuthButton
+          provider={provider}
+          disabled={false}
+          pending
+          onClick={onClick}
+        />
+      );
+
+      const button = screen.getByRole('button', { name: label });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute('data-auth-provider-pending', 'true');
+      fireEvent.click(button);
+      expect(onClick).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([undefined, true])(
+    'prevents sign-in when disabled is %s',
+    disabled => {
+      const onClick = vi.fn();
+      render(
+        <SocialAuthButton
+          provider='google'
+          disabled={disabled}
+          onClick={onClick}
+        />
+      );
+
+      const button = screen.getByRole('button', {
+        name: 'Continue with Google',
+      });
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+      expect(onClick).not.toHaveBeenCalled();
+    }
+  );
+});
 
 describe('AuthProviderButtonSlots', () => {
   it('renders the shared full provider labels', () => {
