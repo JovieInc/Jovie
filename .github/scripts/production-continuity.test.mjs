@@ -138,8 +138,11 @@ describe('production continuity classification', () => {
     const writes = [];
     const appends = [];
     const stdout = [];
+    // Hermetic: availability-only targets. An ambient GITHUB_REPOSITORY (set in
+    // CI) would otherwise enable the freshness probe against the real network.
     const result = await runCli({
       argv,
+      env: {},
       fetchImpl: async () => new Response('{"ok":true}', { status: 200 }),
       now: NOW,
       writeFileImpl: async (...args) => writes.push(args),
@@ -645,6 +648,29 @@ describe('production freshness', () => {
       assert.notEqual(result.status, 'healthy');
       assert.deepEqual(result.unknownTargets, [FRESHNESS_TARGET_ID]);
     });
+  });
+
+  it('keys the CLI receipt as unknown when a repository is set but SHAs are unreadable', async () => {
+    const result = await runCli({
+      appendFileImpl: async () => {},
+      argv: [],
+      env: { GITHUB_REPOSITORY: 'JovieInc/Jovie' },
+      // Endpoints answer 200 with no commitSha; GitHub answers 404.
+      fetchImpl: async url => ({
+        status: url.startsWith('https://api.github.com/') ? 404 : 200,
+        text: async () => '{}',
+        json: async () => ({}),
+        headers: {},
+      }),
+      now: NOW,
+      stdout: { write() {} },
+      writeFileImpl: async () => {},
+    });
+    assert.equal(result.status, 'unknown');
+    assert.equal(
+      result.incidentKey,
+      'production-continuity:unknown:jovie-production-freshness'
+    );
   });
 
   it('includes freshness in the CLI only when a repository is configured', async () => {
