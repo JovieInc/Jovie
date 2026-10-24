@@ -152,7 +152,7 @@ unless linked below.
 | --- | --- | --- | --- | --- |
 | `@jovie/no-hardcoded-theme-colors` | `error` | L | Yes | None (no grandfathered count) |
 | `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
-| `arbitrary-radius` | `error` | S + G | Yes | 14 occurrences; 8 files |
+| `arbitrary-radius` | `error` | S + G | Yes | 12 occurrences; 7 files |
 | `arbitrary-values` | `error` | G + I | Yes | 2169 |
 | `component-family` | `error` | G | Yes | button=37; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
 | `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
