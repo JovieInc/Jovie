@@ -30,6 +30,7 @@ describe('route surface classification (JOV-8561)', () => {
     expect(classifyRouteSurface('/app/dashboard/releases')).toBe('dashboard');
     expect(classifyRouteSurface('/app/dashboard/audience')).toBe('dashboard');
     expect(classifyRouteSurface('/app/admin/users')).toBe('admin');
+    expect(classifyRouteSurface('/app/ov/chat')).toBe('admin');
   });
 
   it('classifies concrete profile slugs as public and never leaks into admin', () => {

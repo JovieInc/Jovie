@@ -3715,6 +3715,20 @@ if (p.endsWith('/zip')) {
     );
   });
 
+  it('registers the YouTube thumbnails billing screens independently', () => {
+    assert.equal(
+      classifyScreenPath('apps/web/app/billing/youtube-thumbnails/page.tsx')
+        .entry?.id,
+      'web.billing-youtube-thumbnails'
+    );
+    assert.equal(
+      classifyScreenPath(
+        'apps/web/app/billing/youtube-thumbnails/success/page.tsx'
+      ).entry?.id,
+      'web.billing-youtube-thumbnails-success'
+    );
+  });
+
   it('registers the waitlist error boundary with the waitlist screen', () => {
     const result = evaluateChangedScreens({
       changedFiles: [{ path: 'apps/web/app/waitlist/error.tsx', status: 'M' }],
