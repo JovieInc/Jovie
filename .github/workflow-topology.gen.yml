@@ -483,6 +483,19 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:worker
     jobCount: 1
+  - name: Interaction latency audit
+    path: .github/workflows/interaction-latency-audit.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:measure
+    jobCount: 1
   - name: Internal PR Review (advisory)
     path: .github/workflows/internal-review.yml
     active: true
