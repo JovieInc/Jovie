@@ -117,6 +117,23 @@ const UNBOUND_COMMERCIAL_HUB_REVISIONS = {
   '/': '2026-10-20',
   // JOV-6220 source and live section census.
   '/pricing': '2026-09-29',
+  // PR #22833 shared-container layout revision of the /product feature pages.
+  '/product/link-analytics': '2026-10-23',
+  '/product/utm-links': '2026-10-23',
+  '/product/command-palette': '2026-10-23',
+  '/product/release-scheduling': '2026-10-23',
+  '/product/dsp-links': '2026-10-23',
+  '/product/isrc': '2026-10-23',
+  '/product/pre-save': '2026-10-23',
+  // PR #22730 unique-OG-card revision of the prose commercial pages.
+  '/about': '2026-10-23',
+  '/support': '2026-10-23',
+  '/developers': '2026-10-23',
+  '/api-versioning': '2026-10-23',
+  '/compare': '2026-10-23',
+  '/alternatives': '2026-10-23',
+  // PR #22726 document-title revision.
+  '/integrations': '2026-10-23',
 } as const;
 
 /**
