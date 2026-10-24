@@ -102,6 +102,13 @@ interface BuildDropdownItemsParams {
 
 const USER_MENU_CONTENT_CLASS = 'w-80 max-w-[calc(100vw-1rem)]';
 /**
+ * JOV-8953: when the trigger is the full-width row in the open sidebar, the
+ * menu shares that column, so its edges match the sidebar row inset instead
+ * of overhanging into the content pane.
+ */
+const USER_MENU_SIDEBAR_CONTENT_CLASS =
+  'w-(--radix-dropdown-menu-trigger-width) max-w-[calc(100vw-1rem)]';
+/**
  * JOV-7130: the shared `max-h-96` cap clipped Sign out below an inner scroll
  * once the menu grew (Lock Workspace, Hide money). Use all the room Radix
  * measures above the trigger so every core control stays visible.
@@ -770,7 +777,11 @@ export function UserButton({
       align={trigger || showUserInfo ? 'start' : 'end'}
       open={isMenuOpen}
       onOpenChange={setIsMenuOpen}
-      contentClassName={USER_MENU_CONTENT_CLASS}
+      contentClassName={
+        showUserInfo && !trigger
+          ? USER_MENU_SIDEBAR_CONTENT_CLASS
+          : USER_MENU_CONTENT_CLASS
+      }
       maxHeight={USER_MENU_MAX_HEIGHT}
     />
   );

@@ -940,7 +940,7 @@ describe('UserButton billing actions', () => {
     );
     expect(identityRow).not.toBeNull();
     expect(screen.getByRole('menu')).toHaveClass(
-      'w-80',
+      'w-(--radix-dropdown-menu-trigger-width)',
       'max-w-[calc(100vw-1rem)]'
     );
     expect(identityRow).toHaveClass(
