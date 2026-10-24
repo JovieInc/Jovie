@@ -30,7 +30,7 @@ import { SidebarRail, SidebarShortcutHint, SidebarTrigger } from './controls';
 describe('sidebar controls', () => {
   it('renders SidebarTrigger with accessible label', () => {
     render(<SidebarTrigger />);
-    expect(screen.getByText('Toggle Sidebar')).toBeTruthy();
+    expect(screen.getByText('Toggle sidebar')).toBeTruthy();
   });
 
   it('renders shortcut hint', () => {
@@ -40,7 +40,7 @@ describe('sidebar controls', () => {
 
   it('renders SidebarRail toggle control', () => {
     render(<SidebarRail />);
-    expect(screen.getByLabelText('Toggle Sidebar')).toHaveAttribute(
+    expect(screen.getByLabelText('Toggle sidebar')).toHaveAttribute(
       'aria-expanded',
       'true'
     );

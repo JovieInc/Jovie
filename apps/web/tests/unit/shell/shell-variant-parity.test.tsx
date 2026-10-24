@@ -158,7 +158,7 @@ describe('canonical shell slot parity', () => {
     renderShell();
     expect(
       within(screen.getByTestId('fixture-header')).queryByRole('button', {
-        name: 'Toggle Sidebar',
+        name: 'Toggle sidebar',
       })
     ).not.toBeInTheDocument();
     expect(

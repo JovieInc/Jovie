@@ -252,7 +252,7 @@ function CommandPaletteInner({
       );
       sections.push({
         id: 'recent-chats',
-        label: 'Recent Chats',
+        label: 'Recent chats',
         defaultItemLimit: DEFAULT_PALETTE_SECTION_LIMIT,
         items: rankedConversations.map(convo => {
           const entity: EntityRef = {

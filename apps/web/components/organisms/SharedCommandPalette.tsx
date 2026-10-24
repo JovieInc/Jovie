@@ -96,7 +96,7 @@ export function buildRegistrySections(
   if (matchedNavs.length > 0) {
     sections.push({
       id: 'nav',
-      label: 'Go To',
+      label: 'Go to',
       items: matchedNavs.map(nav => ({ kind: 'nav' as const, nav })),
       // Registry order is an explicit, reviewable product priority.
       defaultItemLimit: DEFAULT_PALETTE_SECTION_LIMIT,
@@ -418,7 +418,7 @@ export function InlinePalette({
       <div
         id={listId}
         role='listbox'
-        aria-label='Slash Command Suggestions'
+        aria-label='Slash command suggestions'
         className={cn(
           'min-h-0 flex-1 overflow-y-auto p-1',
           variant === 'inline' && 'max-h-65'

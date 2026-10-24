@@ -325,7 +325,7 @@ test('route navigation keeps the shell attached and inspects rendered materials 
     // #20840 (header still titles `/app` as Home via breadcrumb-labels), and
     // the Identity destination is titled `Profiles` since #20953.
     for (const [linkName, heading, pathname] of [
-      ['New Chat', 'New Chat', '/app/chat'],
+      ['New Chat', 'New chat', '/app/chat'],
       ['Identity', 'Profiles', '/app/presence'],
       ['Work', 'Work', '/app/library'],
       ['Inbox', 'Home', '/app'],
@@ -363,7 +363,7 @@ test('chat profile stays mounted through closed, opening and interrupted exits',
     path: '/app/chat?panel=profile',
   });
   await expect(
-    page.getByRole('heading', { name: 'New Chat', exact: true })
+    page.getByRole('heading', { name: 'New chat', exact: true })
   ).toBeVisible();
   await page
     .locator('[data-app-shell-frame]')
