@@ -83,7 +83,7 @@ export function SidebarSection({
         onClick={onToggle}
         className={cn(
           SIDEBAR_ENTRY_ROW_CLASS,
-          'relative w-full rounded-md hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] transition-[background-color] duration-subtle ease-subtle'
+          'relative w-full rounded-md hover:bg-sidebar-accent transition-[background-color] duration-subtle ease-subtle'
         )}
         aria-expanded={open}
       >
