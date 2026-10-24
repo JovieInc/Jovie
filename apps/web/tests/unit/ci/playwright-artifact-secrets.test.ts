@@ -2600,7 +2600,8 @@ ${fixtureCheckout}
     expect(result.status).toBe(1);
     expect(result.stdout).toBe('');
     expect(result.stderr).toBe(
-      'PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=inspection-error:1; file-classes=unknown:1\n'
+      'PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=inspection-error:1; file-classes=unknown:1\n' +
+        '::error::PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=inspection-error:1; file-classes=unknown:1\n'
     );
   });
 
@@ -2627,6 +2628,37 @@ ${fixtureCheckout}
       );
     }
   );
+
+  it('surfaces the bounded rejection counts as an Actions error annotation', () => {
+    const workspace = fixture();
+    const runner = fixture();
+    const leakChild =
+      "const f=require('node:fs');f.mkdirSync('out',{recursive:true});f.writeFileSync('out/report.json',JSON.stringify({leak:process.env.FLAGS_SECRET}));console.log('ANNOTATION_CHILD')";
+    const counts =
+      'blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=credential-text:1; file-classes=json:1';
+
+    // In Actions the counts-only line is duplicated as a step error annotation
+    // so a fresh failing step is diagnosable from check annotations without
+    // admin job-log access (run 39820205877 class). Content is identical to
+    // the stderr line — never paths, file names, or values.
+    const annotated = runChild(workspace, runner, leakChild, {
+      FLAGS_SECRET: 'annotation-sentinel-secret',
+    });
+    expect(annotated.status).toBe(1);
+    expect(annotated.stdout).toContain('ANNOTATION_CHILD');
+    expect(annotated.stderr).toBe(
+      `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: ${counts}\n::error::PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: ${counts}\n`
+    );
+
+    const plain = runChild(fixture(), fixture(), leakChild, {
+      FLAGS_SECRET: 'annotation-sentinel-secret',
+      GITHUB_ACTIONS: 'false',
+    });
+    expect(plain.status).toBe(1);
+    expect(plain.stderr).toBe(
+      `PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE: ${counts}\n`
+    );
+  });
 
   it('masks before the child, scans after failure, and permanently poisons leaks', () => {
     const workspace = fixture();
