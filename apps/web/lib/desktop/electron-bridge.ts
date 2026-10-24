@@ -116,7 +116,7 @@ export interface ElectronAPI {
   /**
    * Desktop dictation capability probe. Native OS dictation APIs are not
    * exposed directly to the sandboxed renderer; this tells the web composer
-   * whether Electron has explicitly allowed the trusted Web Speech fallback.
+   * the preferred server transcription mode and current microphone permission.
    */
   readonly getDictationStatus?: () => Promise<DesktopDictationStatus>;
   /**
@@ -827,14 +827,27 @@ export interface DesktopNavState {
 }
 
 export interface DesktopDictationStatus {
+  readonly supported: boolean;
+  readonly preferredMode: 'stream' | 'text';
+  readonly micPermission:
+    | 'granted'
+    | 'denied'
+    | 'restricted'
+    | 'not-determined'
+    | 'unknown';
+  readonly browserSpeech: boolean;
   readonly ok: boolean;
   readonly nativeAvailable: boolean;
   readonly webSpeechFallbackAllowed: boolean;
-  readonly mode: 'native' | 'web-speech' | 'unavailable';
+  readonly mode: 'stream' | 'web-speech' | 'unavailable';
   readonly reason?: string;
 }
 
 const DESKTOP_DICTATION_UNAVAILABLE: DesktopDictationStatus = {
+  supported: false,
+  preferredMode: 'text',
+  micPermission: 'unknown',
+  browserSpeech: false,
   ok: false,
   nativeAvailable: false,
   webSpeechFallbackAllowed: false,
@@ -846,7 +859,7 @@ function isDesktopDictationMode(
   value: unknown
 ): value is DesktopDictationStatus['mode'] {
   return (
-    value === 'native' || value === 'web-speech' || value === 'unavailable'
+    value === 'stream' || value === 'web-speech' || value === 'unavailable'
   );
 }
 
@@ -856,6 +869,16 @@ function isDesktopDictationStatus(
   if (value === null || typeof value !== 'object') return false;
   const status = value as Partial<DesktopDictationStatus>;
   return (
+    typeof status.supported === 'boolean' &&
+    (status.preferredMode === 'stream' || status.preferredMode === 'text') &&
+    ['granted', 'denied', 'restricted', 'not-determined', 'unknown'].includes(
+      status.micPermission ?? ''
+    ) &&
+    status.browserSpeech === false &&
+    status.webSpeechFallbackAllowed === false &&
+    (status.supported
+      ? status.preferredMode === 'stream' && status.mode === 'stream'
+      : status.preferredMode === 'text' && status.mode === 'unavailable') &&
     typeof status.ok === 'boolean' &&
     typeof status.nativeAvailable === 'boolean' &&
     typeof status.webSpeechFallbackAllowed === 'boolean' &&
@@ -902,6 +925,10 @@ async function safeGetDictationStatus(): Promise<DesktopDictationStatus> {
       ok: true,
       nativeAvailable: false,
       webSpeechFallbackAllowed: true,
+      supported: true,
+      preferredMode: 'stream',
+      micPermission: 'unknown',
+      browserSpeech: true,
       mode: 'web-speech',
       reason: 'browser-context',
     };
@@ -941,6 +968,10 @@ export function useDesktopDictationStatus(): DesktopDictationStatus {
         ok: true,
         nativeAvailable: false,
         webSpeechFallbackAllowed: true,
+        supported: true,
+        preferredMode: 'stream',
+        micPermission: 'unknown',
+        browserSpeech: true,
         mode: 'web-speech',
         reason: 'browser-context',
       };

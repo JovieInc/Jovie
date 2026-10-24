@@ -587,18 +587,72 @@ describe('electron-bridge — defensive guards', () => {
     const getDictationStatus = vi.fn().mockResolvedValue({
       ok: true,
       nativeAvailable: false,
-      webSpeechFallbackAllowed: true,
-      mode: 'web-speech',
-      reason: 'native-unavailable',
+      webSpeechFallbackAllowed: false,
+      mode: 'stream',
+      supported: true,
+      preferredMode: 'stream',
+      micPermission: 'granted',
+      browserSpeech: false,
     });
     setElectronAPI({ getDictationStatus });
 
     await expect(__testing.safeGetDictationStatus()).resolves.toMatchObject({
       ok: true,
-      mode: 'web-speech',
-      webSpeechFallbackAllowed: true,
+      mode: 'stream',
+      supported: true,
+      preferredMode: 'stream',
+      micPermission: 'granted',
+      browserSpeech: false,
+      webSpeechFallbackAllowed: false,
     });
     expect(getDictationStatus).toHaveBeenCalledTimes(1);
+    expect(captureWarningMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { browserSpeech: true },
+    { webSpeechFallbackAllowed: true },
+    { preferredMode: 'text' },
+    { micPermission: 'allowed' },
+  ])('rejects inconsistent desktop dictation capability %o', async override => {
+    setElectronAPI({
+      getDictationStatus: vi.fn().mockResolvedValue({
+        ok: true,
+        supported: true,
+        preferredMode: 'stream',
+        micPermission: 'granted',
+        browserSpeech: false,
+        nativeAvailable: false,
+        webSpeechFallbackAllowed: false,
+        mode: 'stream',
+        ...override,
+      }),
+    });
+    await expect(__testing.safeGetDictationStatus()).resolves.toMatchObject({
+      supported: false,
+      preferredMode: 'text',
+      browserSpeech: false,
+    });
+    expect(captureWarningMock).toHaveBeenCalledOnce();
+  });
+  it('accepts a bounded unavailable status without enabling browser speech', async () => {
+    setElectronAPI({
+      getDictationStatus: vi.fn().mockResolvedValue({
+        ok: false,
+        supported: false,
+        preferredMode: 'text',
+        micPermission: 'unknown',
+        browserSpeech: false,
+        nativeAvailable: false,
+        webSpeechFallbackAllowed: false,
+        mode: 'unavailable',
+        reason: 'invalid-request',
+      }),
+    });
+    await expect(__testing.safeGetDictationStatus()).resolves.toMatchObject({
+      supported: false,
+      reason: 'invalid-request',
+    });
     expect(captureWarningMock).not.toHaveBeenCalled();
   });
 

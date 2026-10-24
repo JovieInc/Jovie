@@ -18,6 +18,7 @@ import {
   screen,
   session,
   shell,
+  systemPreferences,
   type WebContents,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
@@ -322,10 +323,14 @@ interface NavState {
 }
 
 interface DesktopDictationStatus {
+  supported: boolean;
+  preferredMode: 'stream' | 'text';
+  micPermission: 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown';
+  browserSpeech: false;
   ok: boolean;
   nativeAvailable: boolean;
   webSpeechFallbackAllowed: boolean;
-  mode: 'native' | 'web-speech' | 'unavailable';
+  mode: 'stream' | 'unavailable';
   reason?: string;
 }
 
@@ -886,22 +891,20 @@ function findLegacyAuthReturnRouteInArgv(
   return null;
 }
 
-// Chromium's Web Speech recognition backend needs Google API keys that
-// Electron cannot ship, so `webkitSpeechRecognition` exists in the renderer
-// but every start() fails with a 'network' error (electron/electron#46143,
-// #7749). Advertising it as a fallback made the composer mic look live and
-// fail on every press. Report it unavailable so the renderer points at OS
-// dictation instead — macOS dictation types into any focused field here.
+// Hosted renderer dictation uses authenticated server STT. Electron must never
+// select Chromium's unavailable Google Web Speech backend.
 function getDesktopDictationStatus(): DesktopDictationStatus {
   return {
     ok: true,
+    supported: true,
+    preferredMode: 'stream',
+    micPermission: process.platform === 'darwin'
+      ? systemPreferences.getMediaAccessStatus('microphone')
+      : 'unknown',
+    browserSpeech: false,
     nativeAvailable: false,
     webSpeechFallbackAllowed: false,
-    mode: 'unavailable',
-    reason:
-      process.platform === 'darwin'
-        ? 'web-speech-unsupported-in-electron-use-macos-system-dictation'
-        : 'web-speech-unsupported-in-electron-use-system-dictation',
+    mode: 'stream',
   };
 }
 
@@ -3789,6 +3792,10 @@ ipcMain.handle(
         webSpeechFallbackAllowed: false,
         mode: 'unavailable',
         reason: 'invalid-request',
+        supported: false,
+        preferredMode: 'text',
+        micPermission: 'unknown',
+        browserSpeech: false,
       } satisfies DesktopDictationStatus;
     }
 
