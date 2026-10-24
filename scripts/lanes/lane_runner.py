@@ -9305,6 +9305,11 @@ def prove_staging(host: Host, staging: Path) -> str | None:
     if test.returncode != 0:
         print(test.stderr[-2000:], file=sys.stderr)
         if not retry_failed_selectors(staging, test.stderr):
+            # The tail above is often only ResourceWarnings; CI summaries keep these lines, so
+            # an unbounded failure (import error, many failures) still names what broke.
+            if selftest_retry_ids(test.stderr) is None:
+                for line in selftest_failure_lines(test.stderr):
+                    print("release self-test failure: " + line, file=sys.stderr)
             return "release tests failed"
     return None
 
@@ -9312,6 +9317,13 @@ def prove_staging(host: Host, staging: Path) -> str | None:
 SELFTEST_RETRY_MAX_SELECTORS = 5
 SELFTEST_RETRY_TIMEOUT_S = 300
 _SELFTEST_FAILURE = re.compile(r"^(?:FAIL|ERROR): ([A-Za-z_][A-Za-z0-9_]*) \(([A-Za-z0-9_.]+)\)$", re.MULTILINE)
+
+
+def selftest_failure_lines(stderr, limit: int = 8) -> list[str]:
+    """The FAIL/ERROR headers and exception lines of a unittest run, bounded for CI summaries."""
+    text = stderr.decode(errors="replace") if isinstance(stderr, bytes) else (stderr or "")
+    return [line[:300] for line in text.splitlines()
+            if re.match(r"^(FAIL|ERROR): |^\w*(Error|Exception)\b", line)][:limit]
 
 
 def selftest_retry_ids(stderr) -> list[str] | None:
