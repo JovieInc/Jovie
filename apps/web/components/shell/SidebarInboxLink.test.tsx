@@ -32,7 +32,7 @@ describe('central Inbox bell', () => {
     const link = screen.getByRole('link', {
       name: 'Inbox — 3 Items Need Attention',
     });
-    expect(link).toHaveAttribute('href', '/app');
+    expect(link).toHaveAttribute('href', '/app/inbox');
     expect(link).toHaveAttribute('data-prefetch', 'false');
     await userEvent.tab();
     expect(link).toHaveFocus();
@@ -78,6 +78,9 @@ describe('central Inbox bell', () => {
     ],
   ])('keeps the destination available for %s', (availability, name) => {
     render(<SidebarInboxLink availability={availability} />);
-    expect(screen.getByRole('link', { name })).toHaveAttribute('href', '/app');
+    expect(screen.getByRole('link', { name })).toHaveAttribute(
+      'href',
+      '/app/inbox'
+    );
   });
 });

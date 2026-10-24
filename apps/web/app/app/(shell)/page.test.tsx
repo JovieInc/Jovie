@@ -14,21 +14,22 @@ vi.mock('@/lib/queries/HydrateClient', () => ({
 }));
 vi.mock('@/lib/queries/server', () => ({ getDehydratedState: () => ({}) }));
 vi.mock('./OpportunityInboxRoute', () => ({
-  OpportunityInboxRoute: ({ initialView }: { initialView: string }) => (
-    <span data-testid='inbox-view'>{initialView}</span>
-  ),
+  OpportunityInboxRoute: ({
+    initialView = 'needs',
+  }: {
+    initialView?: string;
+  }) => <span data-testid='inbox-view'>{initialView}</span>,
 }));
 
-import AppRootPage from './page';
+import { homeNavItem } from '@/components/features/dashboard/dashboard-nav/config';
+import AppRootPage, { generateMetadata } from './page';
 
-describe('Inbox direct route', () => {
-  it('opens Done for you from its permanent history destination while preserving the interview entry', async () => {
+describe('Home route', () => {
+  it('uses the canonical Home title and preserves the interview entry', async () => {
+    expect(generateMetadata().title).toBe(homeNavItem.name);
     render(
-      await AppRootPage({
-        searchParams: Promise.resolve({ view: 'done', interview: '1' }),
-      })
+      await AppRootPage({ searchParams: Promise.resolve({ interview: '1' }) })
     );
-    expect(screen.getByTestId('inbox-view')).toHaveTextContent('done');
     expect(screen.getByTestId('interview')).toHaveTextContent('true');
   });
   it('defaults the signed-in home to Needs you', async () => {

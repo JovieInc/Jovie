@@ -63,41 +63,34 @@ describe('DashboardNav route warming', () => {
     resetDashboardNavTestMocks();
   });
 
-  it.each([false, true])(
-    'leaves home attention to the brand row and retains destinations with INBOX_HOME=%s',
-    inboxHome => {
-      const label = 'Inbox';
-      const destinations = () =>
-        screen.getAllByRole('link').map(link => ({
-          label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
-          href: link.getAttribute('href'),
-        }));
-      const baseline = renderDashboardNav({
-        renderFn: render,
-        appFlags: { INBOX_HOME: inboxHome },
-      });
-      const attention = document.querySelector('[data-inbox-attention]');
-      expect(attention).toHaveAccessibleName(label);
-      expect(attention).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
-      const retained = destinations();
-      const attentionIndex = screen
-        .getAllByRole('link')
-        .findIndex(link => link === attention);
-      retained.splice(attentionIndex, 1);
-      expect(retained.length).toBeGreaterThan(0);
-      baseline.unmount();
-      renderDashboardNav({
-        renderFn: render,
-        headerOwnsInbox: true,
-        appFlags: { INBOX_HOME: inboxHome },
-      });
-      expect(document.querySelector('[data-inbox-attention]')).toBeNull();
-      expect(destinations()).toEqual(retained);
-      expect(
-        document.querySelector('[data-sidebar-search-divider]')
-      ).toBeNull();
-    }
-  );
+  it('leaves Inbox attention to the brand row and retains Home', () => {
+    const label = 'Inbox';
+    const destinations = () =>
+      screen.getAllByRole('link').map(link => ({
+        label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
+        href: link.getAttribute('href'),
+      }));
+    const baseline = renderDashboardNav({
+      renderFn: render,
+    });
+    const attention = document.querySelector('[data-inbox-attention]');
+    expect(attention).toHaveAccessibleName(label);
+    expect(attention).toHaveAttribute('href', APP_ROUTES.INBOX);
+    const retained = destinations();
+    const attentionIndex = screen
+      .getAllByRole('link')
+      .findIndex(link => link === attention);
+    retained.splice(attentionIndex, 1);
+    expect(retained.length).toBeGreaterThan(0);
+    baseline.unmount();
+    renderDashboardNav({
+      renderFn: render,
+      headerOwnsInbox: true,
+    });
+    expect(document.querySelector('[data-inbox-attention]')).toBeNull();
+    expect(destinations()).toEqual(retained);
+    expect(document.querySelector('[data-sidebar-search-divider]')).toBeNull();
+  });
 
   it('keeps the divider when a search surface precedes navigation actions', () => {
     renderDashboardNav({
@@ -122,7 +115,7 @@ describe('DashboardNav route warming', () => {
         'false'
       );
     }
-    const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
+    const homeLinks = screen.getAllByRole('link', { name: /^(Home|Inbox)$/ });
     expect(homeLinks).toHaveLength(2);
     for (const link of homeLinks) {
       expect(link).toHaveAttribute('data-prefetch', 'false');
@@ -248,7 +241,7 @@ describe('DashboardNav route warming', () => {
     });
     expect(
       pending.getByRole('link', { name: 'Inbox — App Update Available' })
-    ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+    ).toHaveAttribute('href', APP_ROUTES.INBOX);
     expect(
       pending.getByRole('status', { name: '3 pending items' })
     ).toHaveTextContent('3');
@@ -290,10 +283,9 @@ describe('DashboardNav route warming', () => {
     expect(link.querySelector('[data-inbox-runtime-update]')).toBeNull();
   });
 
-  it('labels the header bell Inbox only when INBOX_HOME is on', () => {
+  it('labels the permanent header destination Inbox', () => {
     const view = renderDashboardNav({
       renderFn: render,
-      appFlags: { INBOX_HOME: true },
     });
     expect(
       view.container.querySelector('[data-navigation-item-id="inbox"]')

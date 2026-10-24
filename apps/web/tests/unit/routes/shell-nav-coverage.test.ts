@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   artistNavigation,
   artistSettingsNavigation,
+  inboxNavItem,
   paymentsNavItem,
   primaryNavigation,
   settingsNavItem,
@@ -165,6 +166,7 @@ function findShellPages(dir: string = SHELL_ROOT): ShellPage[] {
 function getNavRoutePaths(): Set<string> {
   const navItems = [
     ...primaryNavigation,
+    inboxNavItem,
     ...artistNavigation,
     settingsNavItem,
     ...userSettingsNavigation,

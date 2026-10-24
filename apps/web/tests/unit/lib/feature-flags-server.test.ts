@@ -326,7 +326,7 @@ describe('Statsig server initialization', () => {
     const run = vi.fn().mockResolvedValue(false);
     vi.doMock('@/lib/flags/registry', () => ({
       APP_FLAG_REGISTRY: {
-        INBOX_HOME: { run },
+        YOUTUBE_WORKSPACE_NAV: { run },
       },
       SUBSCRIBE_CTA_VARIANT_FLAG: {
         run: vi.fn().mockResolvedValue('two_step'),
@@ -338,7 +338,7 @@ describe('Statsig server initialization', () => {
 
     const { getAppFlagValue } = await import('@/lib/flags/server');
     await expect(
-      getAppFlagValue('INBOX_HOME', { userId: 'admin_123' })
+      getAppFlagValue('YOUTUBE_WORKSPACE_NAV', { userId: 'admin_123' })
     ).resolves.toBe(false);
     expect(run).toHaveBeenCalledTimes(1);
   });

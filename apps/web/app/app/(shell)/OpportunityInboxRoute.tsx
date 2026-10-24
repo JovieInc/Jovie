@@ -70,11 +70,13 @@ async function resolveProfileRailSeed(clerkUserId: string): Promise<{
 
 export async function OpportunityInboxRoute({
   initialView = 'needs',
+  route = APP_ROUTES.INBOX,
 }: {
   readonly initialView?: 'needs' | 'done';
+  readonly route?: typeof APP_ROUTES.INBOX | typeof APP_ROUTES.DASHBOARD;
 } = {}) {
   const clerkUserId = await loadAuthenticatedAppShellUserId({
-    route: APP_ROUTES.DASHBOARD,
+    route,
   });
 
   const adminPromise = checkIsAdmin();
@@ -97,7 +99,7 @@ export async function OpportunityInboxRoute({
   ]);
 
   if (!baseInbox) {
-    redirect(buildAppShellSignInUrl(APP_ROUTES.DASHBOARD));
+    redirect(buildAppShellSignInUrl(route));
   }
 
   const inbox = tourDates

@@ -91,14 +91,12 @@ function readRepoFile(relativePath: string): string {
 describe('feature flag registry integrity', () => {
   it('keeps runtime app flags default-on for internal v1 access', () => {
     // RELEASE_PLAN_DEMO is off in production; dev/preview turns it on in getAppFlagValue.
-    // INBOX_HOME is an intentional default-off rollout gate (JOV-3931 / GH #13171).
     // CREATOR_FINANCE is a release-blocking gate that stays dark until the
     // JOV-4621 privacy/correctness matrix is certified.
     const defaultsExcludingRolloutGates = Object.entries(APP_FLAG_DEFAULTS)
       .filter(
         ([name]) =>
           ![
-            'INBOX_HOME',
             'YOUTUBE_WORKSPACE_NAV',
             'JOVIE_WORK_NAV',
             'PROFILES_WORKSPACE',
@@ -114,7 +112,6 @@ describe('feature flag registry integrity', () => {
     // These Cmd-K workspace doors remain off pending navigation approval.
     expect(APP_FLAG_DEFAULTS.YOUTUBE_WORKSPACE_NAV).toBe(false);
     expect(APP_FLAG_DEFAULTS.JOVIE_WORK_NAV).toBe(false);
-    expect(APP_FLAG_DEFAULTS.INBOX_HOME).toBe(false);
     expect(APP_FLAG_DEFAULTS.PROFILES_WORKSPACE).toBe(false);
     expect(APP_FLAG_DEFAULTS.PROFILE_SEARCH_MONITORING).toBe(false);
     expect(APP_FLAG_DEFAULTS.PAID_WELCOME_EMAIL).toBe(false);
@@ -161,6 +158,7 @@ describe('feature flag registry integrity', () => {
 
   it('keeps the retired design rollout family out of every runtime contract', () => {
     const retiredFlags = [
+      'INBOX_HOME',
       'DESIGN_V1',
       'SHELL_CHAT_V1',
       'DESIGN_V1_RELEASES',

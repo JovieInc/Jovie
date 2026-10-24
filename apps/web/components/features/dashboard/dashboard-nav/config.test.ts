@@ -7,6 +7,8 @@ import {
   canonicalSidebarNavigation,
   desktopMoreNavigation,
   desktopPrimaryNavigation,
+  homeNavItem,
+  inboxNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   partitionCustomerNavigation,
@@ -15,7 +17,7 @@ import {
 } from './config';
 
 const CANONICAL_NAVIGATION = [
-  ['home', 'Inbox', APP_ROUTES.DASHBOARD],
+  ['home', 'Home', APP_ROUTES.DASHBOARD],
   ['presence', 'Identity', APP_ROUTES.PRESENCE],
   ['library', 'Work', APP_ROUTES.LIBRARY],
   ['audience', 'Audience', APP_ROUTES.CONTACTS_AUDIENCE],
@@ -28,6 +30,19 @@ function toContract(
 }
 
 describe('canonical customer shell navigation', () => {
+  it('separates Home and Inbox with their canonical icons and destinations', () => {
+    expect(homeNavItem).toMatchObject({
+      name: 'Home',
+      href: APP_ROUTES.DASHBOARD,
+      iconName: 'Home',
+    });
+    expect(inboxNavItem).toMatchObject({
+      name: 'Inbox',
+      href: APP_ROUTES.INBOX,
+      iconName: 'Inbox',
+    });
+    expect(homeNavItem.href).not.toBe(inboxNavItem.href);
+  });
   it('binds the live profile settings row to the canonical route', () => {
     const profile = artistSettingsNavigation.find(
       item => item.id === 'artist-profile'

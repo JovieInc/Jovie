@@ -3,6 +3,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   audienceNavItem,
   homeNavItem,
+  inboxNavItem,
   libraryNavItem,
   linksNavItem,
   presenceNavItem,
@@ -16,6 +17,15 @@ describe('isNavigationItemActive', () => {
     expect(
       isNavigationItemActive(homeNavItem, APP_ROUTES.DASHBOARD, params)
     ).toBe(true);
+    expect(isNavigationItemActive(homeNavItem, APP_ROUTES.INBOX, params)).toBe(
+      false
+    );
+    expect(isNavigationItemActive(inboxNavItem, APP_ROUTES.INBOX, params)).toBe(
+      true
+    );
+    expect(
+      isNavigationItemActive(inboxNavItem, APP_ROUTES.DASHBOARD, params)
+    ).toBe(false);
     expect(isNavigationItemActive(homeNavItem, APP_ROUTES.CHAT, params)).toBe(
       false
     );

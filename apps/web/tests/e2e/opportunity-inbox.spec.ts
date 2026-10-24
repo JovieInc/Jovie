@@ -7,7 +7,6 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { setTestAuthBypassSession } from '../helpers/auth';
-import { installAppFlagOverrides } from './helpers/app-flag-overrides';
 import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -15,7 +14,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test.describe('Opportunity Inbox', () => {
   test('authenticated home renders the opportunity queue', async ({ page }) => {
     await setTestAuthBypassSession(page, 'creator-ready');
-    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
+    await smokeNavigateWithRetry(page, APP_ROUTES.INBOX, {
       waitUntil: 'domcontentloaded',
     });
 
@@ -37,12 +36,11 @@ test.describe('Opportunity Inbox', () => {
   });
 
   for (const persona of ['creator-ready', 'admin'] as const) {
-    test(`${persona} stays in the creator inbox with Inbox Home enabled`, async ({
+    test(`${persona} stays in the creator inbox at the permanent Inbox destination`, async ({
       page,
     }) => {
-      await installAppFlagOverrides(page, { INBOX_HOME: true });
       await setTestAuthBypassSession(page, persona);
-      await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD, {
+      await smokeNavigateWithRetry(page, APP_ROUTES.INBOX, {
         waitUntil: 'domcontentloaded',
       });
       await expect(page.getByTestId('opportunity-inbox-page')).toBeVisible({

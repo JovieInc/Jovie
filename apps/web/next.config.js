@@ -425,6 +425,11 @@ const nextConfig = {
 
     const legacyAppRedirects = [
       { source: '/account', destination: '/app/settings/account' },
+      {
+        source: '/app',
+        has: [{ type: 'query', key: 'view' }],
+        destination: '/app/inbox',
+      },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
       {
