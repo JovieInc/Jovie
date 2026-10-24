@@ -52,3 +52,17 @@ export const WithStatusRow: Story = {
     children: <SampleForm />,
   },
 };
+
+/** Native top-layer positioning must escape transformed page containers. */
+export const TransformedAncestor: Story = {
+  ...Default,
+  decorators: [
+    Story => (
+      <div
+        style={{ transform: 'translate(40px, 24px)', width: 240, height: 180 }}
+      >
+        <Story />
+      </div>
+    ),
+  ],
+};
