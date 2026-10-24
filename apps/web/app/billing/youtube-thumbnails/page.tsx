@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { env } from '@/lib/env-server';
+import { getStripePriceIds } from '@/lib/stripe/price-ids';
 import { YoutubeThumbnailCheckoutClient } from './YoutubeThumbnailCheckoutClient';
 
 export const metadata: Metadata = {
@@ -14,7 +14,7 @@ export default function YoutubeThumbnailCheckoutPage() {
       fallback={<div className='mx-auto min-h-[28rem] max-w-xl skeleton' />}
     >
       <YoutubeThumbnailCheckoutClient
-        priceId={env.STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY ?? null}
+        priceId={getStripePriceIds().youtubeThumbnailsFounderMonthly ?? null}
       />
     </Suspense>
   );

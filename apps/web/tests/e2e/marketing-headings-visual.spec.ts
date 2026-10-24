@@ -117,3 +117,22 @@ for (const route of [
     });
   }
 }
+
+for (const route of [
+  '/billing/youtube-thumbnails',
+  '/billing/youtube-thumbnails/success',
+  '/onboarding/checkout',
+  '/waitlist',
+]) {
+  test(`billing route remains renderable: ${route}`, async ({
+    page,
+  }, testInfo) => {
+    const response = await page.goto(route, { waitUntil: 'domcontentloaded' });
+    expect(response?.status()).toBeLessThan(500);
+    await expect(page.locator('body')).toBeVisible();
+    await testInfo.attach('route', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+  });
+}
