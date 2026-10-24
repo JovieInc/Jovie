@@ -4763,8 +4763,10 @@ class PublicationRevocationTest(unittest.TestCase):
             host = lane.Host(state=root)
             pidfile = root / "pid"
             # Startup may exceed the old 0.5s timer on a loaded installer host.
+            # Publish the pid atomically: the guard signals on existence, and a
+            # created-but-unwritten file made on_kill read "" (merge group 40121302814).
             command = [sys.executable, "-c",
-                       "import os,time,pathlib; time.sleep(0.75); pathlib.Path('pid').write_text(str(os.getpid())); time.sleep(30)"]
+                       "import os,time,pathlib; time.sleep(0.75); pathlib.Path('pid.tmp').write_text(str(os.getpid())); os.replace('pid.tmp', 'pid'); time.sleep(30)"]
 
             def signal_when_ready():
                 if pidfile.exists():
