@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
@@ -9,6 +9,42 @@ import {
 } from '@/lib/seo/sitemap-publication';
 
 const webRoot = resolve(__dirname, '../../..');
+
+const PRODUCTION_SOURCE_ROOTS = [
+  'app',
+  'components',
+  'lib',
+  'data',
+  'constants',
+];
+
+/** Every non-test production TS/TSX source under the app-facing roots. */
+function listProductionSources(): string[] {
+  const files: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== '__tests__') walk(full);
+        continue;
+      }
+      if (!/\.tsx?$/.test(entry.name)) continue;
+      if (
+        entry.name.endsWith('.test.ts') ||
+        entry.name.endsWith('.test.tsx') ||
+        entry.name.endsWith('.stories.tsx')
+      ) {
+        continue;
+      }
+      if (full === resolve(webRoot, 'data/companyIdentity.ts')) continue;
+      files.push(full);
+    }
+  };
+  for (const root of PRODUCTION_SOURCE_ROOTS) {
+    walk(resolve(webRoot, root));
+  }
+  return files;
+}
 
 describe('commercial hub sitemap revisions', () => {
   it('dates unbound commercial roots from cited route-manifest evidence', () => {
@@ -60,6 +96,7 @@ describe('public identity metadata', () => {
       'app/(marketing)/artist-profile/page.tsx',
       'app/(marketing)/artist-profiles/page.tsx',
       'app/(marketing)/artist-notifications/page.tsx',
+      'app/(marketing)/ai/page.tsx',
     ];
     for (const file of files) {
       const source = readFileSync(resolve(webRoot, file), 'utf8');
@@ -73,5 +110,20 @@ describe('public identity metadata', () => {
     );
     expect(homepage).not.toContain('Jovie Link in Bio');
     expect(homepage).toContain('COMPANY_IDENTITY.schemaAlternateNames');
+  });
+
+  it('bans the retired X handle from every production source', () => {
+    for (const file of listProductionSources()) {
+      const source = readFileSync(file, 'utf8');
+      expect(source, file).not.toMatch(/@jovieapp|x\.com\/jovieapp/);
+    }
+  });
+
+  it('sources every literal twitter site/creator handle from COMPANY_IDENTITY.xHandle', () => {
+    for (const file of listProductionSources()) {
+      const source = readFileSync(file, 'utf8');
+      if (!/(site|creator):\s*['"]@[A-Za-z0-9_]+/.test(source)) continue;
+      expect(source, file).toContain('COMPANY_IDENTITY.xHandle');
+    }
   });
 });
