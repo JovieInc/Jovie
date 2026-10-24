@@ -75,6 +75,7 @@ const HOMEPAGE_SOURCES = [
 
 const HOMEPAGE_STYLES = [
   'components/homepage/HomepageArtistProfile.css',
+  'components/homepage/HomepageAtmosphere.css',
   'components/marketing/MarketingProductStates.css',
 ] as const;
 
