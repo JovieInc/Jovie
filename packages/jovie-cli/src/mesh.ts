@@ -558,8 +558,10 @@ export async function meshRespond(
           inReplyTo: correlationId,
           requestSha256: raw.bodySha256 ?? null,
           handledAt: now.toISOString(),
-          responder:
-            'jovie mesh respond (deterministic; no model, no authority)',
+          responder: `jovie mesh respond ${revision}`,
+          automated: true,
+          notice:
+            "Automated mailbox ack from a poller holding this kind's credential: deterministic, no model, no authority. It is not the agent's reasoning and does not show a session is awake.",
           revision,
           host: hostname(),
         });

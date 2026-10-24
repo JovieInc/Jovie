@@ -651,7 +651,10 @@ describe('macOS keychain adapter', () => {
       schema: 'jovie.mesh-pong/v1',
       kind: 'claude',
       inReplyTo: 'ping-codex-0001',
+      automated: true,
     });
+    expect(pong.responder).toMatch(/^jovie mesh respond /);
+    expect(pong.notice).toMatch(/not the agent/);
     expect(JSON.parse(String(posts[1]?.body))).toMatchObject({
       schema: 'jovie.mesh-reply/v1',
       ask: 'status',
