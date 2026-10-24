@@ -6,7 +6,7 @@ A quick reference for what we do on each high-traffic platform. Detection = link
 | --- | --- | --- | --- | --- |
 | Linktree | ✅ Supported | 🚫 Unavailable | 🚫 Disabled | Core HTML fetch and import jobs removed; an official API integration is required. |
 | Beacons | ✅ Supported | 🚫 Unavailable | 🚫 Disabled | Core HTML reads of `beacons.ai` and `beacons.page` fail closed; isolated provider required. |
-| Laylo | ✅ Supported | ✅ Single-page scrape via `lib/ingestion/strategies/laylo.ts` | 🚫 Not enabled | Uses public profile fetch; no secondary requests. |
+| Laylo | ✅ Supported | ✅ Public JSON scrape via `lib/ingestion/strategies/laylo.ts` | 🚫 Not enabled | Fetches profile and user JSON from Laylo's allowlisted CloudFront distributions (JOV-8466); no recursive crawl. |
 | YouTube | ✅ Supported | 🚫 HTML unavailable | 🚫 Disabled | Core HTML reads of `youtube.com` and `youtu.be` fail closed; use official APIs or an isolated provider. |
 | Stan (stan.store) | ⚠️ Fallback only | 🚫 Not available | 🚫 Not available | No dedicated detection/ingestion yet; treated as generic website. |
 | Twitch | ✅ Detection & normalization only | 🚫 Not available (policy) | 🚫 Not available (policy) | Bot-protected; keep to detection-classification for now. |
