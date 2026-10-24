@@ -6,8 +6,9 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { Toaster } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { InboxRuntimeNotification } from '@/components/features/opportunity-inbox/InboxRuntimeNotification';
+import { toast } from '@/components/feedback';
 import { useDesktopUpdateContext } from '@/components/organisms/desktop-update/DesktopUpdateProvider';
 import { APP_ROUTES } from '@/constants/routes';
 import { renderDashboardNav } from '@/tests/utils/dashboard-nav-test-support';
@@ -37,7 +38,8 @@ vi.mock('@/lib/hooks/useVersionMonitor', () => ({
 function Surface({ inbox = true }: { inbox?: boolean }) {
   return (
     <RuntimeUpdateProvider>
-      {inbox ? <InboxRuntimeNotification /> : null}
+      <Toaster />
+      <main>{inbox ? 'Inbox' : 'Work'}</main>
     </RuntimeUpdateProvider>
   );
 }
@@ -51,7 +53,10 @@ beforeEach(() => {
   state.install.mockReset();
   state.install.mockResolvedValue(true);
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  toast.dismiss();
+  vi.unstubAllGlobals();
+});
 function DesktopUpdateProbe() {
   const ctx = useDesktopUpdateContext();
   return (
@@ -59,7 +64,7 @@ function DesktopUpdateProbe() {
   );
 }
 
-describe('updates in the central Inbox', () => {
+describe('runtime update toast', () => {
   it('exposes the desktop update context to descendants (unsupported on web)', () => {
     render(
       <RuntimeUpdateProvider>
@@ -72,40 +77,42 @@ describe('updates in the central Inbox', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('shows runtime attention on the canonical shell Inbox bell', () => {
+  it('keeps the Inbox bell independent of runtime updates', () => {
     state.available = true;
     state.downloaded = true;
-    const { getByRole } = renderDashboardNav({
+    const { container } = renderDashboardNav({
       renderFn: ui =>
         render(<RuntimeUpdateProvider>{ui}</RuntimeUpdateProvider>),
       overrides: { inboxNavigation: { state: 'empty', pendingCount: 0 } },
     });
-    expect(
-      getByRole('link', { name: 'Inbox — App Update Available' })
-    ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+    const bell = container.querySelector('[data-navigation-item-id="inbox"]');
+    expect(bell).toHaveAccessibleName('Inbox');
+    expect(bell).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+    expect(bell).toHaveAttribute('data-inbox-attention', 'empty');
+    expect(bell?.querySelector('[data-inbox-runtime-update]')).toBeNull();
   });
 
   it('does not show a notification without a real update', () => {
     render(<Surface />);
     expect(
-      screen.queryByTestId('inbox-runtime-notification')
+      screen.queryByRole('button', { name: /Jovie.*Update/ })
     ).not.toBeInTheDocument();
   });
-  it('keeps a downloaded update pending across route views and installs only on explicit action', () => {
+  it('keeps a downloaded update pending across route views and installs only on explicit action', async () => {
     state.available = true;
     state.downloaded = true;
     const { rerender } = render(<Surface inbox={false} />);
     rerender(<Surface />);
     expect(state.install).not.toHaveBeenCalled();
     fireEvent.click(
-      screen.getByRole('button', { name: 'Restart Jovie To Update' })
+      await screen.findByRole('button', { name: 'Restart Jovie To Update' })
     );
     expect(state.install).toHaveBeenCalledOnce();
     expect(
-      screen.getByRole('button', { name: 'Updating Jovie…' })
+      await screen.findByRole('button', { name: 'Updating Jovie…' })
     ).toBeDisabled();
     expect(
-      screen.getByRole('button', { name: 'Updating Jovie…' })
+      await screen.findByRole('button', { name: 'Updating Jovie…' })
     ).toHaveAccessibleDescription(
       'Installing the update and restarting Jovie…'
     );
@@ -122,14 +129,14 @@ describe('updates in the central Inbox', () => {
     );
     render(<Surface />);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Restart Jovie To Update' })
+      await screen.findByRole('button', { name: 'Restart Jovie To Update' })
     );
     expect(
-      screen.getByRole('button', { name: 'Updating Jovie…' })
+      await screen.findByRole('button', { name: 'Updating Jovie…' })
     ).toBeDisabled();
 
     await act(async () => settleInstall?.(false));
-    const retry = screen.getByRole('button', {
+    const retry = await screen.findByRole('button', {
       name: 'Restart Jovie To Update',
     });
     expect(retry).toBeEnabled();
@@ -139,7 +146,7 @@ describe('updates in the central Inbox', () => {
     fireEvent.click(retry);
     expect(state.install).toHaveBeenCalledTimes(2);
     expect(
-      screen.getByRole('button', { name: 'Updating Jovie…' })
+      await screen.findByRole('button', { name: 'Updating Jovie…' })
     ).toBeDisabled();
   });
   it('restores the retry action if the desktop install promise rejects', async () => {
@@ -148,23 +155,23 @@ describe('updates in the central Inbox', () => {
     state.install.mockRejectedValueOnce(new Error('IPC channel closed'));
     render(<Surface />);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Restart Jovie To Update' })
+      await screen.findByRole('button', { name: 'Restart Jovie To Update' })
     );
-    await waitFor(() =>
+    await waitFor(async () =>
       expect(
-        screen.getByRole('button', { name: 'Restart Jovie To Update' })
+        await screen.findByRole('button', { name: 'Restart Jovie To Update' })
       ).toBeEnabled()
     );
   });
-  it('prevents restart while the download is incomplete', () => {
+  it('prevents restart while the download is incomplete', async () => {
     state.available = true;
     render(<Surface />);
     expect(
-      screen.getByRole('button', { name: 'Downloading Jovie Update…' })
+      await screen.findByRole('button', { name: 'Downloading Jovie Update…' })
     ).toBeDisabled();
     expect(state.install).not.toHaveBeenCalled();
   });
-  it('renders the notification through the imported renderer when mounted directly', () => {
+  it('renders one update action in the shared toast renderer', async () => {
     // Rendered with the imported testing-library render (not the Surface
     // helper) so the runtime component evidence for the notification stays
     // executable: the update flow keeps its own dedicated notification test.
@@ -172,24 +179,24 @@ describe('updates in the central Inbox', () => {
     state.downloaded = true;
     renderRTL(
       <RuntimeUpdateProvider>
-        <InboxRuntimeNotification />
+        <Toaster />
       </RuntimeUpdateProvider>
     );
     expect(
-      screen.getByRole('button', { name: 'Restart Jovie To Update' })
+      await screen.findByRole('button', { name: 'Restart Jovie To Update' })
     ).toBeEnabled();
   });
-  it('exposes the existing browser version mismatch in the same destination', () => {
+  it('exposes the existing browser version mismatch in the same destination', async () => {
     state.desktop = false;
     state.mismatch = true;
     render(<Surface />);
     expect(
-      screen.getByRole('button', { name: 'Reload Jovie To Update' })
+      await screen.findByRole('button', { name: 'Reload Jovie To Update' })
     ).toHaveAccessibleDescription(
       'New Version Available (v26.9.1). Reload when ready.'
     );
   });
-  it('reloads a browser update only after its explicit action', () => {
+  it('reloads a browser update only after its explicit action', async () => {
     const reload = vi.fn();
     vi.stubGlobal('location', { reload });
     state.desktop = false;
@@ -197,7 +204,7 @@ describe('updates in the central Inbox', () => {
     render(<Surface />);
     expect(reload).not.toHaveBeenCalled();
     fireEvent.click(
-      screen.getByRole('button', { name: 'Reload Jovie To Update' })
+      await screen.findByRole('button', { name: 'Reload Jovie To Update' })
     );
     expect(reload).toHaveBeenCalledOnce();
   });

@@ -384,7 +384,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByRole('button', { name: 'Try Again' })).toBeVisible();
   });
 
-  it('shows runtime notifications in Inbox instead of a caught-up state', () => {
+  it('keeps the caught-up state when an app update is available', () => {
     runtimeState.update = {
       available: true,
       busy: false,
@@ -401,10 +401,10 @@ describe('OpportunityInboxPageClient', () => {
         }}
       />
     );
-    expect(screen.getByTestId('inbox-runtime-notification')).toBeVisible();
     expect(
-      screen.queryByTestId('opportunity-inbox-empty-state')
+      screen.queryByTestId('inbox-runtime-notification')
     ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('opportunity-inbox-empty-state')).toBeVisible();
   });
 
   it('hydrates the artist-profile rail with the inbox profile data', async () => {
@@ -900,8 +900,8 @@ describe('OpportunityInboxPageClient', () => {
       await user.keyboard('{ArrowRight}');
 
       expect(
-        screen.getByRole(hasUpdate ? 'button' : 'link', {
-          name: hasUpdate ? 'Restart Jovie To Update' : 'Start A Chat',
+        screen.getByRole('link', {
+          name: 'Start A Chat',
         })
       ).toHaveFocus();
     }
