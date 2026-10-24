@@ -166,6 +166,38 @@ describe('Home loop fit', () => {
 });
 
 describe('HomeLoopSection', () => {
+  it('reveals a named section and retry only after explicit expansion', () => {
+    const onRetry = vi.fn();
+    render(
+      <HomeLoopSection
+        title='In Flight'
+        summary='Could not load shipping'
+        status='error'
+        isEmpty={false}
+        emptyLabel='Nothing here'
+        errorLabel='Could not load'
+        onRetry={onRetry}
+        skeleton={<p>Skeleton</p>}
+        testId='editorial-section'
+      >
+        <p>Body</p>
+      </HomeLoopSection>
+    );
+    expect(
+      screen.queryByRole('region', { name: 'In Flight' })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /In Flight ·/ }));
+    expect(screen.getByRole('region', { name: 'In Flight' })).toHaveAttribute(
+      'data-state',
+      'error'
+    );
+    expect(
+      screen.queryByRole('heading', { name: 'In Flight' })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
   function section(
     status: 'loading' | 'error' | 'ready',
     isEmpty: boolean,

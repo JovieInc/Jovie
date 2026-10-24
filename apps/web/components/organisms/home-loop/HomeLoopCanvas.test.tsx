@@ -57,6 +57,30 @@ function props(
 }
 
 describe('HomeLoopCanvas', () => {
+  it('retains populated work behind independent editorial summaries', () => {
+    render(
+      <HomeLoopCanvas
+        {...props({
+          sectionSummaries: {
+            asks: 'Two open decisions',
+            inFlight: 'Six items in flight',
+            done: 'Twelve merges today',
+          },
+        })}
+      />
+    );
+    expect(screen.queryByTestId('home-loop-kanban')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /In Flight ·/ }));
+    expect(screen.getAllByTestId('home-loop-kanban-card')).toHaveLength(6);
+    expect(screen.queryByTestId('home-loop-done')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Done Today ·/ }));
+    expect(screen.getByTestId('home-loop-done')).toHaveTextContent('12 merges');
+    expect(screen.getByTestId('home-loop-in-flight-section')).toHaveAttribute(
+      'data-state',
+      'populated'
+    );
+  });
+
   it('renders every section populated with named headings and counts', () => {
     render(<HomeLoopCanvas {...props()} />);
 
