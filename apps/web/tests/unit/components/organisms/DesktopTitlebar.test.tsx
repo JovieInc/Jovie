@@ -107,6 +107,9 @@ describe('DesktopTitlebar', () => {
     renderTitlebar();
 
     const row = screen.getByTestId('electron-titlebar-row');
+    expect(screen.getByTestId('electron-titlebar-sidebar-cell')).toHaveClass(
+      'h-full'
+    );
     expect(row).not.toHaveAttribute('data-electron-drag-region');
     expect(row).toHaveAttribute('data-electron-no-drag', 'true');
     const toggle = screen.getByTestId('electron-sidebar-toggle');
