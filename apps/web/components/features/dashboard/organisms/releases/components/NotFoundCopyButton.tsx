@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/dashboard/organisms/releases/cells/ProviderCell.interaction.test.tsx
+
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { DrawerButton } from '@/components/molecules/drawer';
@@ -35,7 +37,7 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
       className={cn(
         'group/btn h-7 gap-1.5 rounded-full px-2.5 text-2xs font-normal',
         isCopied
-          ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+          ? 'border-success/15 bg-success/10 text-success'
           : 'text-tertiary-token'
       )}
       onClick={() =>
