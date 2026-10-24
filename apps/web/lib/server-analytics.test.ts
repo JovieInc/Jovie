@@ -452,8 +452,7 @@ describe('server analytics contract', () => {
         new Error(
           'current transaction is aborted, commands ignored until end of transaction block'
         )
-      )
-      .mockResolvedValueOnce(undefined);
+      );
 
     const result = await trackServerEventTx(
       {
@@ -470,7 +469,9 @@ describe('server analytics contract', () => {
       eventId: 'event-1',
       deduplicated: false,
     });
-    expect(execute).toHaveBeenCalledTimes(3);
+    // Guard failed -> no previous timeout was captured, so the restore is
+    // intentionally skipped (no redundant set_config on a suspect statement).
+    expect(execute).toHaveBeenCalledTimes(2);
     expect(mocks.insert).toHaveBeenCalledOnce();
     expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
       expect.objectContaining({
