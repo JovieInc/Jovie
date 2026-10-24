@@ -312,6 +312,7 @@ vi.mock('@/lib/db/schema/links', () => ({
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
+  userProfileClaims: 'user_profile_claims',
   creatorDistributionEvents: {
     createdAt: 'createdAt',
     creatorProfileId: 'creatorProfileId',

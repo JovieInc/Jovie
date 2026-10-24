@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 const getExactProfileAccess = vi.hoisted(() => vi.fn());
@@ -11,6 +10,9 @@ const and = vi.hoisted(() =>
 
 vi.mock('@/lib/auth/profile-access', () => ({
   getExactProfileAccess,
+}));
+vi.mock('@/lib/db/queries/profile-ownership', () => ({
+  writableProfileForUser: vi.fn(() => 'canonical-access-predicate'),
 }));
 vi.mock('drizzle-orm', async () => {
   const actual =
@@ -153,7 +155,6 @@ describe('updateProfileRecords exact-profile CAS', () => {
         location: 'Austin, TX',
         settings: { hometown: 'Tulsa, OK' },
       },
-      displayNameForUserUpdate: undefined,
       usernameUpdate: undefined,
       expectedVersion: 1,
       precomputedAvatarTheme: undefined,
@@ -198,7 +199,6 @@ describe('updateProfileRecords exact-profile CAS', () => {
       appUserId: 'user-a',
       profileId: 'profile-a',
       dbProfileUpdates: { avatarUrl },
-      displayNameForUserUpdate: undefined,
       usernameUpdate: undefined,
       expectedVersion: 1,
       precomputedAvatarTheme: { profileAccent },
@@ -211,7 +211,7 @@ describe('updateProfileRecords exact-profile CAS', () => {
     });
   });
 
-  it('keeps username, profile fields, and users.name in one transaction outcome', async () => {
+  it('updates username and profile fields without renaming the account', async () => {
     const { tx, predicates, updates } = createTx({ conflict: null });
     const { updateProfileRecords } = await import(
       '@/app/api/dashboard/profile/lib/db-operations'
@@ -222,7 +222,6 @@ describe('updateProfileRecords exact-profile CAS', () => {
       appUserId: 'user-a',
       profileId: 'profile-a',
       dbProfileUpdates: { bio: 'New bio' },
-      displayNameForUserUpdate: 'New Name',
       usernameUpdate: 'newname',
       expectedVersion: 1,
       precomputedAvatarTheme: undefined,
@@ -234,14 +233,11 @@ describe('updateProfileRecords exact-profile CAS', () => {
       username: 'newname',
       usernameNormalized: 'newname',
     });
-    expect(updates[1]?.values).toMatchObject({ name: 'New Name' });
-    expect(predicates[1]).toEqual({
-      left: users.id,
-      right: 'user-a',
-    });
+    expect(updates).toHaveLength(1);
+    expect(predicates).toHaveLength(1);
   });
 
-  it('updates the profile owner identity instead of the manager identity', async () => {
+  it('keeps both owner and manager account identities separate from artist edits', async () => {
     getExactProfileAccess.mockResolvedValue({
       ok: true,
       profileId: 'profile-a',
@@ -257,18 +253,15 @@ describe('updateProfileRecords exact-profile CAS', () => {
       appUserId: 'manager-user',
       profileId: 'profile-a',
       dbProfileUpdates: { displayName: 'Artist Name' },
-      displayNameForUserUpdate: 'Artist Name',
       usernameUpdate: undefined,
       expectedVersion: 1,
       precomputedAvatarTheme: undefined,
     });
 
     expect(result).not.toBeInstanceOf(NextResponse);
-    expect(updates[1]?.table).toBe(users);
-    expect(predicates[1]).toEqual({
-      left: users.id,
-      right: 'owner-user',
-    });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]?.table).toBe(creatorProfiles);
+    expect(predicates).toHaveLength(1);
   });
 
   it('does not update users.name when the exact CAS loses', async () => {
@@ -285,7 +278,6 @@ describe('updateProfileRecords exact-profile CAS', () => {
       appUserId: 'user-a',
       profileId: 'profile-a',
       dbProfileUpdates: { bio: 'Stale' },
-      displayNameForUserUpdate: 'Must Roll Back',
       usernameUpdate: undefined,
       expectedVersion: 1,
       precomputedAvatarTheme: undefined,
@@ -319,7 +311,6 @@ describe('updateProfileRecords exact-profile CAS', () => {
       dbProfileUpdates: {
         avatarUrl: 'https://example.com/new-avatar.png',
       },
-      displayNameForUserUpdate: undefined,
       usernameUpdate: undefined,
       expectedVersion: 3,
       precomputedAvatarTheme: undefined,
@@ -353,7 +344,6 @@ describe('updateProfileRecords exact-profile CAS', () => {
       dbProfileUpdates: {
         avatarUrl: 'https://example.com/request-avatar.png',
       },
-      displayNameForUserUpdate: undefined,
       usernameUpdate: undefined,
       precomputedAvatarTheme: undefined,
       avatarPreflightVersion: 3,
@@ -377,7 +367,6 @@ describe('updateProfileRecords exact-profile CAS', () => {
       appUserId: 'user-a',
       profileId: 'profile-a',
       dbProfileUpdates: {},
-      displayNameForUserUpdate: undefined,
       usernameUpdate: 'taken',
       expectedVersion: 1,
       precomputedAvatarTheme: undefined,

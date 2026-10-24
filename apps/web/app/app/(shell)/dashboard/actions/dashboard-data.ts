@@ -22,6 +22,7 @@ import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
 import { getDeepErrorMessage, unwrapPgError } from '@/lib/db/errors';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
+import { writableProfileForUser } from '@/lib/db/queries/profile-ownership';
 import {
   dashboardQuery,
   isPostgresTimeoutError,
@@ -830,7 +831,7 @@ async function fetchDashboardBaseWithSession(
       tx
         .select()
         .from(creatorProfiles)
-        .where(eq(creatorProfiles.userId, userData.id))
+        .where(writableProfileForUser(userData.id))
         .orderBy(asc(creatorProfiles.createdAt)),
     'Creator profiles query'
   ).catch((error: unknown) => {
@@ -1339,7 +1340,7 @@ const getCachedDashboardEssential = unstableCache(
     fetchDashboardEssentialWithSession(clerkUserId, {
       allowMissingUserProvisioning: false,
     }),
-  ['dashboard-essential'],
+  ['dashboard-essential-claims-v1'],
   {
     revalidate: CACHE_TTL.MEDIUM,
     tags: [CACHE_TAGS.DASHBOARD_DATA],
@@ -1351,7 +1352,7 @@ const getCachedDashboardShell = unstableCache(
     fetchDashboardShellWithSession(clerkUserId, {
       allowMissingUserProvisioning: false,
     }),
-  ['dashboard-shell'],
+  ['dashboard-shell-claims-v1'],
   {
     revalidate: CACHE_TTL.MEDIUM,
     tags: [CACHE_TAGS.DASHBOARD_DATA],
@@ -1368,7 +1369,7 @@ const getCachedDashboardCore = unstableCache(
     fetchDashboardCoreWithSession(clerkUserId, {
       allowMissingUserProvisioning: false,
     }),
-  ['dashboard-core'],
+  ['dashboard-core-claims-v1'],
   {
     revalidate: CACHE_TTL.MEDIUM,
     tags: [CACHE_TAGS.DASHBOARD_DATA],

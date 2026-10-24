@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   requireAuth: vi.fn(),
   withDbSessionTx: vi.fn(),
   buildThemeWithProfileAccent: vi.fn(),
+  getProfileByClerkId: vi.fn(),
   getProfileUpdatePreflight: vi.fn(),
   readWritableProfileUsername: vi.fn(),
   getCurrentUserEntitlements: vi.fn(),
@@ -32,7 +33,9 @@ vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: mocks.getCurrentUserEntitlements,
 }));
 vi.mock('@/lib/db', () => ({ db: {} }));
-vi.mock('@/lib/db/query-timeout', () => ({ dashboardQuery: vi.fn() }));
+vi.mock('@/lib/db/query-timeout', () => ({
+  dashboardQuery: vi.fn((callback: () => Promise<unknown>) => callback()),
+}));
 vi.mock('@/lib/db/social-links-sync', () => ({
   syncSocialLinksFromPrimaryMusicUrls: vi.fn(),
 }));
@@ -52,13 +55,13 @@ vi.mock('@/app/api/dashboard/profile/lib', () => ({
   updateProfileRecords: mocks.updateProfileRecords,
   finalizeProfileResponse: mocks.finalizeProfileResponse,
   addAvatarCacheBust: (profile: unknown) => profile,
-  getProfileByClerkId: vi.fn(),
+  getProfileByClerkId: mocks.getProfileByClerkId,
 }));
 
 const APP_USER_ID = '11111111-1111-4111-8111-111111111111';
 const PROFILE_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-describe('PUT /api/dashboard/profile exact transaction', () => {
+describe('/api/dashboard/profile exact transaction', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
@@ -92,7 +95,6 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
     });
     mocks.buildProfileUpdateContext.mockReturnValue({
       dbProfileUpdates: { displayName: 'New Name' },
-      displayNameForUserUpdate: 'New Name',
       avatarUrl: undefined,
       usernameUpdate: 'newname',
     });
@@ -103,6 +105,19 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
         profileEditVersion: 4,
       },
       oldUsernameNormalized: 'oldname',
+    });
+  });
+
+  it('pins profile GET to the selected-entity reader on the tenant transaction', async () => {
+    mocks.getProfileByClerkId.mockResolvedValue({
+      profile: { id: PROFILE_ID },
+    });
+    const { GET } = await import('@/app/api/dashboard/profile/route');
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ profile: { id: PROFILE_ID } });
+    expect(mocks.getProfileByClerkId).toHaveBeenCalledWith(APP_USER_ID, {
+      marker: 'transaction',
     });
   });
 
@@ -118,7 +133,6 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
       appUserId: APP_USER_ID,
       profileId: PROFILE_ID,
       dbProfileUpdates: { displayName: 'New Name' },
-      displayNameForUserUpdate: 'New Name',
       usernameUpdate: 'newname',
       expectedVersion: 3,
       precomputedAvatarTheme: undefined,
@@ -263,7 +277,6 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
       });
       mocks.buildProfileUpdateContext.mockReturnValue({
         dbProfileUpdates: { avatarUrl },
-        displayNameForUserUpdate: undefined,
         avatarUrl,
         usernameUpdate: undefined,
       });
@@ -302,7 +315,6 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
     });
     mocks.buildProfileUpdateContext.mockReturnValue({
       dbProfileUpdates: { avatarUrl },
-      displayNameForUserUpdate: undefined,
       avatarUrl,
       usernameUpdate: undefined,
     });
@@ -341,7 +353,6 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
     });
     mocks.buildProfileUpdateContext.mockReturnValue({
       dbProfileUpdates: { avatarUrl },
-      displayNameForUserUpdate: undefined,
       avatarUrl,
       usernameUpdate: undefined,
     });
@@ -393,7 +404,6 @@ describe('PUT /api/dashboard/profile exact transaction', () => {
     });
     mocks.buildProfileUpdateContext.mockReturnValue({
       dbProfileUpdates: { avatarUrl },
-      displayNameForUserUpdate: undefined,
       avatarUrl,
       usernameUpdate: undefined,
     });

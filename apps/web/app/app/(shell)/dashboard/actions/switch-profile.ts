@@ -1,6 +1,6 @@
 'use server';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, exists } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
@@ -8,7 +8,11 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { setupDbSession } from '@/lib/auth/session';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
-import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
+import {
+  runAtomicDbOperation,
+  runLegacyDbTransaction,
+} from '@/lib/db/legacy-transaction';
+import { writableProfileForUser } from '@/lib/db/queries/profile-ownership';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
@@ -24,8 +28,8 @@ const MAX_PROFILES_PER_USER = 10;
 
 /**
  * Switch the authenticated user's active profile.
- * Verifies ownership via userProfileClaims or legacy creatorProfiles.userId.
- * Lazy-backfills userProfileClaims if missing.
+ * Rechecks canonical access even for an already-selected profile. Selection
+ * never grants ownership or creates a claim from a legacy compatibility field.
  */
 export async function switchActiveProfile(
   profileId: string
@@ -40,63 +44,34 @@ export async function switchActiveProfile(
       return { success: false, error: 'Invalid profile ID' };
     }
 
-    await setupDbSession(appUserId);
-
-    const [user] = await db
-      .select({ id: users.id, activeProfileId: users.activeProfileId })
-      .from(users)
-      .where(appUserIdFilter(appUserId))
-      .limit(1);
-
-    if (!user) {
-      return { success: false, error: 'User not found' };
-    }
-
-    if (user.activeProfileId === profileId) {
-      return { success: true };
-    }
-
-    const [claim] = await db
-      .select({ id: userProfileClaims.id })
-      .from(userProfileClaims)
-      .where(
-        and(
-          eq(userProfileClaims.userId, user.id),
-          eq(userProfileClaims.creatorProfileId, profileId)
-        )
-      )
-      .limit(1);
-
-    if (!claim) {
-      const [legacyProfile] = await db
-        .select({ id: creatorProfiles.id })
-        .from(creatorProfiles)
-        .where(
-          and(
-            eq(creatorProfiles.id, profileId),
-            eq(creatorProfiles.userId, user.id)
+    const [updated] = await runAtomicDbOperation(
+      tx =>
+        tx
+          .update(users)
+          .set({ activeProfileId: profileId, updatedAt: new Date() })
+          .where(
+            and(
+              eq(users.id, appUserId),
+              exists(
+                tx
+                  .select({ id: creatorProfiles.id })
+                  .from(creatorProfiles)
+                  .where(
+                    and(
+                      eq(creatorProfiles.id, profileId),
+                      writableProfileForUser(appUserId)
+                    )
+                  )
+              )
+            )
           )
-        )
-        .limit(1);
+          .returning({ id: users.id }),
+      { actorId: appUserId, retry: 'never' }
+    );
 
-      if (!legacyProfile) {
-        return { success: false, error: 'Profile not found or not owned' };
-      }
-
-      await db
-        .insert(userProfileClaims)
-        .values({
-          userId: user.id,
-          creatorProfileId: profileId,
-          role: 'owner',
-        })
-        .onConflictDoNothing();
+    if (!updated) {
+      return { success: false, error: 'Profile not found or not owned' };
     }
-
-    await db
-      .update(users)
-      .set({ activeProfileId: profileId, updatedAt: new Date() })
-      .where(eq(users.id, user.id));
 
     revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
 

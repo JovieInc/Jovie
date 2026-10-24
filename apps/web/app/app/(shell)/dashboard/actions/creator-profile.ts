@@ -8,15 +8,17 @@
  * public visibility settings.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
-import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { withDbSession } from '@/lib/auth/session';
+import { isCanonicalUuid } from '@/lib/auth/profile-access';
 import { invalidateProfileCache } from '@/lib/cache/profile';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
+import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
+import {
+  getActiveWritableProfile,
+  writableProfileForUser,
+} from '@/lib/db/queries/profile-ownership';
 import { type CreatorProfile, creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { isContentClean } from '@/lib/validation/content-filter';
@@ -38,8 +40,8 @@ function isExpectedProfileActionError(error: unknown): boolean {
  * Updates a creator profile with the provided data.
  *
  * This server action updates the specified profile fields for a creator
- * profile owned by the current user. It validates ownership via the
- * user's database ID and invalidates the profile cache after the update.
+ * writable by the current account under canonical claims precedence. Public
+ * and owner caches are invalidated only after the transaction commits.
  *
  * @param profileId - The ID of the creator profile to update
  * @param updates - Partial object containing fields to update
@@ -70,42 +72,59 @@ export async function updateCreatorProfile(
       throw new Error('Unauthorized');
     }
 
-    return await withDbSession(async appUserId => {
-      // First get the user's database ID
-      const [user] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(appUserIdFilter(appUserId))
-        .limit(1);
+    if (!isCanonicalUuid(profileId)) {
+      throw new TypeError('Profile not found or unauthorized');
+    }
 
-      if (!user) {
-        throw new TypeError('User not found');
-      }
-
-      // Update the creator profile
-      const [updatedProfile] = await db
-        .update(creatorProfiles)
-        .set({
-          ...updates,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(creatorProfiles.id, profileId),
-            eq(creatorProfiles.userId, user.id)
+    const { updatedProfile, oldUsername } = await runAtomicDbOperation(
+      async tx => {
+        const [existing] = await tx
+          .select({ usernameNormalized: creatorProfiles.usernameNormalized })
+          .from(creatorProfiles)
+          .where(
+            and(
+              eq(creatorProfiles.id, profileId),
+              writableProfileForUser(userId)
+            )
           )
-        )
-        .returning();
+          .limit(1);
+        if (!existing) throw new TypeError('Profile not found or unauthorized');
 
-      if (!updatedProfile) {
-        throw new TypeError('Profile not found or unauthorized');
-      }
+        // Server-action input is untrusted at runtime. Never spread arbitrary
+        // fields into persistence (notably id, userId, or ownership metadata).
+        const [updatedProfile] = await tx
+          .update(creatorProfiles)
+          .set({
+            marketingOptOut: updates.marketingOptOut,
+            displayName: updates.displayName,
+            bio: updates.bio,
+            avatarUrl: updates.avatarUrl,
+            onboardingCompletedAt: updates.onboardingCompletedAt,
+            isPublic: updates.isPublic,
+            username: updates.username,
+            usernameNormalized: updates.usernameNormalized,
+            profileEditVersion: drizzleSql`${creatorProfiles.profileEditVersion} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(creatorProfiles.id, profileId),
+              writableProfileForUser(userId)
+            )
+          )
+          .returning();
+        if (!updatedProfile)
+          throw new TypeError('Profile not found or unauthorized');
+        return { updatedProfile, oldUsername: existing.usernameNormalized };
+      },
+      { actorId: userId, retry: 'never' }
+    );
 
-      // Use centralized cache invalidation
-      await invalidateProfileCache(updatedProfile.usernameNormalized);
-
-      return updatedProfile;
-    });
+    await invalidateProfileCache(
+      updatedProfile.usernameNormalized,
+      oldUsername
+    );
+    return updatedProfile;
   } catch (error) {
     if (!isExpectedProfileActionError(error)) {
       await captureError('updateCreatorProfile failed', error, {
@@ -179,49 +198,6 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
 }
 
 /**
- * Resolves the creator profile for the current user.
- * Shared helper for settings-style server actions.
- */
-async function requireOwnProfile() {
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  const [user] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(appUserIdFilter(userId))
-    .limit(1);
-
-  if (!user) {
-    throw new TypeError('User not found');
-  }
-
-  const [profile] = await db
-    .select({
-      id: creatorProfiles.id,
-      settings: creatorProfiles.settings,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.userId, user.id))
-    .limit(1);
-
-  if (!profile) {
-    throw new TypeError('Profile not found');
-  }
-
-  return profile;
-}
-
-/**
- * Update the "allow profile photo downloads" setting for a creator profile.
- * Stored in the profile's settings JSONB field, mirroring the
- * allowArtworkDownloads pattern used for album art.
- */
-
-/**
  * Generic helper to update a single boolean setting on the creator profile.
  */
 async function updateProfileBooleanSetting(
@@ -236,24 +212,36 @@ async function updateProfileBooleanSetting(
   }
 
   try {
-    const profile = await requireOwnProfile();
-    const currentSettings = (profile.settings ?? {}) as Record<string, unknown>;
+    const { userId } = await getCachedAuth();
+    if (!userId) throw new Error('Unauthorized');
 
-    const [updated] = await db
-      .update(creatorProfiles)
-      .set({
-        settings: {
-          ...currentSettings,
-          [key]: value,
-        },
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id))
-      .returning({ id: creatorProfiles.id });
-
-    if (!updated) {
-      throw new Error('Profile update failed — profile not found');
-    }
+    const profile = await runAtomicDbOperation(
+      async tx => {
+        const selected = await getActiveWritableProfile(tx, userId);
+        if (!selected) throw new TypeError('Profile not found');
+        const currentSettings = (selected.settings ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const [updated] = await tx
+          .update(creatorProfiles)
+          .set({
+            settings: { ...currentSettings, [key]: value },
+            profileEditVersion: drizzleSql`${creatorProfiles.profileEditVersion} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(creatorProfiles.id, selected.id),
+              writableProfileForUser(userId)
+            )
+          )
+          .returning({ id: creatorProfiles.id });
+        if (!updated) throw new TypeError('Profile not found or unauthorized');
+        return selected;
+      },
+      { actorId: userId, retry: 'never' }
+    );
 
     if (profile.usernameNormalized) {
       await invalidateProfileCache(profile.usernameNormalized);
