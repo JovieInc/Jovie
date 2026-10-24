@@ -157,10 +157,11 @@ export async function loadMeshRead(options?: {
       label: agent.label,
       receiveMode: agent.receiveMode,
       waitingOnTim: agent.waitingOnTim ?? null,
-      status:
-        mailbox && record
-          ? deriveStatus(record.lastReceivedAt ?? null, nowMs)
-          : 'unknown',
+      status: mailbox
+        ? // Source is available: a missing per-agent record means the agent
+          // has been silent (stale), not that the source is unknown.
+          deriveStatus(record?.lastReceivedAt ?? null, nowMs)
+        : 'unknown',
       lastSentAt: record?.lastSentAt ?? null,
       lastReceivedAt: record?.lastReceivedAt ?? null,
       recentMessages: record?.recentMessages ?? null,
