@@ -18,7 +18,9 @@
       "endToEnd": [
         ["issue", "verified"],
         ["pr-open", "merged"],
-        ["merged", "verified"]
+        ["merged", "verified"],
+        ["verified", "closed"],
+        ["merged", "closed"]
       ],
       "stages": [
         {
@@ -115,6 +117,13 @@
           "producer": "production-controller.yml",
           "status": "derived",
           "source": "github-controller"
+        },
+        {
+          "id": "closed",
+          "meaning": "Linear issue reached Done at or after production verification; verified to closed is the closure lag",
+          "producer": "linear-sync-on-merge.yml",
+          "status": "derived",
+          "source": "linear-history"
         }
       ]
     },
