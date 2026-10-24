@@ -9,6 +9,7 @@
  *   company right now.
  */
 
+import { goldenPathSentryBottleneck } from '@jovie/agent-transport-contracts/pipeline-bottleneck';
 import { APP_ROUTES } from '@/constants/routes';
 import type { FounderFunnelData } from '@/lib/admin/types';
 import {
@@ -189,7 +190,8 @@ export function deriveOpsExceptions(
 
 /**
  * Ranked bottlenecks: the few things most constraining shipping or revenue.
- * Deterministic order — a stopped pipeline outranks a funnel leak, which
+ * Deterministic order — golden-path regressions outrank a stopped pipeline, which
+ * outranks a funnel leak, which
  * outranks blocked agent work. At most `OPS_BOTTLENECK_LIMIT` entries.
  */
 export function rankOpsBottlenecks(
@@ -197,6 +199,16 @@ export function rankOpsBottlenecks(
   funnel?: FounderFunnelData | null
 ): OpsBottleneck[] {
   const candidates: OpsBottleneck[] = [];
+
+  const sentry = goldenPathSentryBottleneck(
+    metrics.pipelineBottleneck?.golden_path_sentry
+  );
+  if (sentry) {
+    candidates.push({
+      ...sentry,
+      href: metrics.sources.sentry?.dashboardUrl ?? null,
+    });
+  }
 
   if (metrics.deployments.current?.status === 'failure') {
     candidates.push({

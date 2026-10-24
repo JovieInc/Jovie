@@ -29,6 +29,7 @@ import {
   LANE_GROUPS,
   laneFailureExcerpt,
   MARKETING_CERTIFICATION_COMMAND,
+  PIPELINE_BOTTLENECK_COVERAGE_COMMAND,
   runCommandPool,
   runDesignConformance,
   runMergeGroupGuards,
@@ -44,6 +45,29 @@ import {
   VALIDATION_LIFECYCLE_COVERAGE_COMMAND,
   webCiContractTestsCommand,
 } from '../../ci-fast-lanes.mjs';
+
+it('enforces shared pipeline bottleneck behavior and coverage on source and combined heads', () => {
+  for (const event of ['pull_request', 'merge_group', 'push']) {
+    for (const path of [
+      'packages/agent-transport-contracts/pipeline-bottleneck.ts',
+      'packages/agent-transport-contracts/pipeline-bottleneck.node.ts',
+      'scripts/pipeline-bottleneck-loop.mts',
+      'apps/web/lib/hud/metrics.ts',
+      'apps/web/components/features/admin/hud/HudBottlenecksCard.tsx',
+    ]) {
+      expect(
+        selectSourceGuards(event, [path]).find(
+          guard => guard.id === 'pipeline-bottleneck-coverage'
+        )?.command
+      ).toBe(PIPELINE_BOTTLENECK_COVERAGE_COMMAND);
+    }
+  }
+  expect(
+    selectSourceGuards('pull_request', ['docs/OVIE.md']).some(
+      guard => guard.id === 'pipeline-bottleneck-coverage'
+    )
+  ).toBe(false);
+});
 
 it('selects writing readiness regressions and the evaluator coverage command', async () => {
   const names = [
@@ -2272,6 +2296,7 @@ describe('source-read guard selection', () => {
     const all = SOURCE_GUARDS.map(guard => guard.id);
     // Manual dispatch runs web Unit Tests and structural, which carry the rest.
     expect(selected('workflow_dispatch', ['README.md'])).toEqual([
+      'pipeline-bottleneck-coverage',
       'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
@@ -2285,6 +2310,7 @@ describe('source-read guard selection', () => {
     expect(selected('pull_request', null)).toEqual(all);
     expect(selected('pull_request', [])).toEqual(all);
     expect(selected('merge_group', null)).toEqual([
+      'pipeline-bottleneck-coverage',
       'artist-launch-contract',
       'artist-profile-conformance',
       'ci-schedule-inventory',
@@ -2298,6 +2324,21 @@ describe('source-read guard selection', () => {
 
   it('points every guard at a test file that exists', () => {
     for (const guard of SOURCE_GUARDS) {
+      if (guard.id === 'pipeline-bottleneck-coverage') {
+        expect(guard.prOnly).toBe(false);
+        for (const path of [
+          'tests/unit/lib/hud/pipeline-bottleneck.test.ts',
+          'tests/unit/app/ops-cockpit.test.tsx',
+          'tests/lib/hud/metrics.test.ts',
+          'tests/unit/lib/hud/cockpit.test.ts',
+        ]) {
+          expect(guard.command).toContain(path);
+          expect(
+            readFileSync(join(REPO_ROOT, 'apps/web', path), 'utf8')
+          ).toContain('vitest');
+        }
+        continue;
+      }
       if (guard.id === 'artist-profile-conformance') {
         expect(guard.command).toContain(
           join(REPO_ROOT, 'scripts/artist-profile-conformance.mjs')

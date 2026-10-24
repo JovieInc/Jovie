@@ -3,9 +3,17 @@ import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { ServerFetchTimeoutError } from '@/lib/http/server-fetch';
 import { buildDegradedHudMetrics, getHudMetrics } from '@/lib/hud/metrics';
+import {
+  goldenPathSentry,
+  legacyBottleneckState,
+} from '@/tests/fixtures/pipeline-bottleneck';
 
 const mockGetHudDeployments = vi.hoisted(() => vi.fn());
 const mockGetHudAiOpsSummary = vi.hoisted(() => vi.fn());
+const mockReadPipelineBottleneck = vi.hoisted(() => vi.fn());
+vi.mock('@jovie/agent-transport-contracts/pipeline-bottleneck.node', () => ({
+  readPipelineBottleneck: mockReadPipelineBottleneck,
+}));
 
 vi.mock('@/lib/env-server', () => ({
   env: {
@@ -15,6 +23,7 @@ vi.mock('@/lib/env-server', () => ({
     HUD_GITHUB_OWNER: 'owner',
     HUD_GITHUB_REPO: 'repo',
     HUD_GITHUB_WORKFLOW: 'deploy.yml',
+    HUD_BOTTLENECK_STATE_PATH: '/state/bottleneck-state.json',
   },
 }));
 
@@ -88,6 +97,7 @@ afterEach(() => {
 
 describe('getHudMetrics', () => {
   beforeEach(() => {
+    mockReadPipelineBottleneck.mockResolvedValue(null);
     mockGetHudAiOpsSummary.mockResolvedValue({
       availability: 'not_configured',
       generatedAtIso: '2026-05-07T00:00:00.000Z',
@@ -133,6 +143,24 @@ describe('getHudMetrics', () => {
         ci: { availability: 'not_configured', configured: false, itemCount: 0 },
       },
     });
+  });
+
+  it('passes the canonical collector observation into HUD metrics', async () => {
+    mockGetHudDeployments.mockResolvedValueOnce({
+      availability: 'not_configured',
+      current: null,
+      recent: [],
+    });
+    const state = {
+      schema: 'pipeline-bottleneck/v1',
+      ...legacyBottleneckState,
+      golden_path_sentry: goldenPathSentry,
+    };
+    mockReadPipelineBottleneck.mockResolvedValue(state);
+    expect((await getHudMetrics('admin')).pipelineBottleneck).toEqual(state);
+    expect(mockReadPipelineBottleneck).toHaveBeenCalledWith(
+      '/state/bottleneck-state.json'
+    );
   });
 
   it('degrades deployment metrics when GitHub request times out', async () => {

@@ -81,6 +81,9 @@ export const ACQUISITION_CERTIFICATION_COMMAND =
 export const CODEX_BOOTSTRAP_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/codex-cloud-setup.mjs --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=100 scripts/codex-cloud-setup.test.mjs';
 
+export const PIPELINE_BOTTLENECK_COVERAGE_COMMAND =
+  'node --test scripts/pipeline-bottleneck-loop.test.mjs && pnpm --filter @jovie/web exec vitest run tests/unit/lib/hud/pipeline-bottleneck.test.ts tests/unit/app/ops-cockpit.test.tsx tests/lib/hud/metrics.test.ts tests/unit/lib/hud/cockpit.test.ts --maxWorkers=1 --coverage --coverage.allowExternal=true --coverage.include=../../packages/agent-transport-contracts/pipeline-bottleneck*.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-golden-path-sentry-coverage" --coverage.thresholds.perFile=true --coverage.thresholds.lines=100 --coverage.thresholds.statements=100 --coverage.thresholds.functions=100 --coverage.thresholds.branches=100';
+
 export const BILLING_PROVENANCE_COVERAGE_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/lib/entitlements/creator-plan.test.ts tests/unit/lib/entitlements.server.test.ts tests/unit/lib/stripe/customer-sync.billing-info.test.ts tests/unit/lib/stripe/customer-sync.queries.test.ts lib/stripe/test-price-contract.test.ts --coverage.enabled --coverage.provider=v8 --coverage.include=lib/entitlements/creator-plan.ts --coverage.include=lib/entitlements/server.ts --coverage.include=lib/stripe/customer-sync/billing-info.ts --coverage.include=lib/stripe/test-price-contract.ts --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-billing-provenance-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=lcov --coverage.thresholds.perFile=true --coverage.thresholds.lines=90 --coverage.thresholds.statements=90 --coverage.thresholds.branches=70 --coverage.thresholds.functions=80';
 export const FAN_SEND_SAFETY_COVERAGE_COMMAND =
@@ -114,6 +117,13 @@ export const MERGE_GROUP_GUARDS_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts';
 
 export const SOURCE_GUARDS = Object.freeze([
+  Object.freeze({
+    id: 'pipeline-bottleneck-coverage',
+    command: PIPELINE_BOTTLENECK_COVERAGE_COMMAND,
+    inputs:
+      /^(?:packages\/agent-transport-contracts\/(?:pipeline-bottleneck|package\.json)|scripts\/pipeline-bottleneck-loop\.(?:mts|test\.mjs)$|apps\/web\/(?:lib\/hud\/(?:cockpit|metrics)\.ts$|components\/features\/admin\/hud\/HudBottlenecksCard\.tsx$|tests\/.*(?:pipeline-bottleneck|ops-cockpit|hud\/metrics|hud\/cockpit)\.test\.tsx?$))/u,
+    prOnly: false,
+  }),
   Object.freeze({
     id: 'artist-launch-contract',
     command:

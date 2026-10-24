@@ -1,3 +1,4 @@
+import type { PipelineBottleneck } from '@jovie/agent-transport-contracts/pipeline-bottleneck';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import type { HermesAiOpsSummary } from '@/types/ai-ops';
 
@@ -101,6 +102,8 @@ export interface HudGbrainHealth {
 }
 
 export interface HudMetrics {
+  /** Optional collector snapshot; absence means unmeasured. */
+  pipelineBottleneck?: PipelineBottleneck | null;
   accessMode: HudAccessMode;
   branding: HudBranding;
   overview: HudOverviewMetrics;
