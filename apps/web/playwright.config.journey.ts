@@ -25,7 +25,7 @@ export default defineConfig({
     baseURL,
     navigationTimeout: 120_000,
     storageState: { cookies: [], origins: [] },
-    trace: 'off',
+    trace: process.env.CI ? 'off' : 'on-first-retry',
     video: 'off',
     screenshot: 'off',
   },

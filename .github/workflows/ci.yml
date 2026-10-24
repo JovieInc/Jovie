@@ -6511,7 +6511,9 @@ jobs:
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
-          branch_name: blocking-journey-${{ github.run_id }}-${{ github.run_attempt }}
+          # This job and the manual golden path are event-exclusive. Reuse
+          # the registered reaper prefix so interrupted runs remain attributable.
+          branch_name: golden-path-${{ github.run_id }}-${{ github.run_attempt }}
           api_key: ${{ secrets.NEON_API_KEY }}
           expires_in_hours: '1'
       - name: Create empty journey database
