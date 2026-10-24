@@ -97,6 +97,32 @@ describe('YouTube artist interview admission', () => {
     ).toBe('waitlist');
   });
 
+  it('surfaces a cadence-qualified channel as an unverified candidate without admitting', async () => {
+    uploads(['2026-10-20', '2026-09-01', '2026-01-01']);
+    const decision = await decideYouTubeOnboardingAccess(base);
+    expect(decision.kind).toBe('waitlist');
+    expect(decision.youtubeCandidate).toEqual({
+      channelId: OWNED_ID,
+      title: 'Test artist',
+      url: `https://www.youtube.com/channel/${OWNED_ID}`,
+      cadenceQualified: true,
+    });
+  });
+
+  it('does not surface a candidate for a sparse channel', async () => {
+    uploads(['2026-01-01', '2026-02-01', '2026-10-20']);
+    expect(
+      (await decideYouTubeOnboardingAccess(base)).youtubeCandidate
+    ).toBeUndefined();
+  });
+
+  it('does not surface a candidate on provider failure (fail closed)', async () => {
+    vi.mocked(serverFetch).mockRejectedValue(new Error('boom'));
+    const decision = await decideYouTubeOnboardingAccess(base);
+    expect(decision.kind).toBe('waitlist');
+    expect(decision.youtubeCandidate).toBeUndefined();
+  });
+
   it('fails closed when ownership cannot be established', async () => {
     uploads(['2026-10-20', '2026-09-01', '2026-01-01']);
     expect((await decideYouTubeOnboardingAccess(base, [])).kind).toBe(

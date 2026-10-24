@@ -17,9 +17,15 @@ import {
 import { YOUTUBE_OAUTH_SCOPES } from '@/lib/connectors/youtube/scopes';
 import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { serverFetch } from '@/lib/http/server-fetch';
+import {
+  pickOwnedCandidateChannel,
+  readYouTubeCandidateFromSettings,
+  type YouTubeCandidate,
+} from '@/lib/onboarding/youtube-verification';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -102,12 +108,18 @@ function grantedYouTubeScopes(scopeText: string): string[] | null {
 }
 
 async function chooseOwnedYouTubeChannel(
-  accessToken: string
+  accessToken: string,
+  candidate: YouTubeCandidate | null
 ): Promise<ChannelChoice> {
   const channels = await listOwnedYouTubeChannels({ accessToken });
   if (channels.length === 0) return { ok: false, error: 'youtube_no_channel' };
-  if (channels.length > 1)
-    return { ok: false, error: 'youtube_channel_choice' };
+  if (channels.length > 1) {
+    // With several channels, only the onboarding candidate disambiguates.
+    const match = pickOwnedCandidateChannel(channels, candidate);
+    return match
+      ? { ok: true, channel: match }
+      : { ok: false, error: 'youtube_channel_choice' };
+  }
 
   const channel = channels[0];
   return channel
@@ -247,7 +259,16 @@ export async function GET(request: Request) {
     const grantedScopes = grantedYouTubeScopes(tokenData.scope);
     if (!grantedScopes) return fail('youtube_scopes');
 
-    const channelChoice = await chooseOwnedYouTubeChannel(accessToken);
+    const [profileRow] = await db
+      .select({ settings: creatorProfiles.settings })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId))
+      .limit(1);
+    const candidate = readYouTubeCandidateFromSettings(profileRow?.settings);
+    const channelChoice = await chooseOwnedYouTubeChannel(
+      accessToken,
+      candidate
+    );
     if (!channelChoice.ok) return fail(channelChoice.error);
 
     const channel = channelChoice.channel;
@@ -272,7 +293,18 @@ export async function GET(request: Request) {
       refreshToken,
       expiresAt: new Date(Date.now() + expiresIn * 1000),
     });
-    return redirectWith(url.origin, returnTo, { connected: 'youtube' });
+    return redirectWith(url.origin, returnTo, {
+      connected: 'youtube',
+      // The OAuth-confirmed channel id decides verification, never the URL
+      // the visitor typed. A different owned channel connects but leaves the
+      // candidate unverified.
+      ...(candidate
+        ? {
+            youtube_verification:
+              channel.id === candidate.channelId ? 'verified' : 'mismatch',
+          }
+        : {}),
+    });
   } catch (error) {
     if (accountId) await markYouTubeConnectorNeedsReauth(accountId);
     await captureError(

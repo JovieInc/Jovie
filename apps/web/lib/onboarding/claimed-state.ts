@@ -5,6 +5,10 @@ import {
   type InterviewSignal,
   interviewSignalSchema,
 } from '@/lib/chat/tools/onboarding-signals';
+import {
+  parseYouTubeCandidate,
+  type YouTubeCandidate,
+} from '@/lib/onboarding/youtube-verification';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export interface ClaimedOnboardingArtist {
@@ -22,6 +26,8 @@ export interface ClaimedOnboardingState {
   readonly handle: string | null;
   readonly socialLinks: readonly string[];
   readonly interviewSignals: readonly InterviewSignal[];
+  /** Server-recorded, unverified: see lib/onboarding/youtube-verification. */
+  readonly youtubeCandidate?: YouTubeCandidate;
 }
 
 export interface ClaimedOnboardingMessageRow {
@@ -114,6 +120,7 @@ export function deriveClaimedOnboardingStateFromToolEvents(
   let artist: ClaimedOnboardingArtist | null = null;
   let handle: string | null = null;
   const socialLinks: string[] = [];
+  let youtubeCandidate: YouTubeCandidate | null = null;
   const interviewSignals: InterviewSignal[] = [];
 
   for (const event of events) {
@@ -127,6 +134,12 @@ export function deriveClaimedOnboardingStateFromToolEvents(
         output.action === WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
       ) {
         handle = cleanHandle(output.handle) ?? handle;
+      }
+
+      if (output.action === 'propose_next_step') {
+        // Latest decision wins: a later decision without a candidate clears it.
+        const decision = isRecord(output.decision) ? output.decision : null;
+        youtubeCandidate = parseYouTubeCandidate(decision?.youtubeCandidate);
       }
 
       if (output.action === 'propose_social_link') {
@@ -147,6 +160,7 @@ export function deriveClaimedOnboardingStateFromToolEvents(
     handle,
     socialLinks: Array.from(new Set(socialLinks)),
     interviewSignals,
+    ...(youtubeCandidate ? { youtubeCandidate } : {}),
   };
 }
 

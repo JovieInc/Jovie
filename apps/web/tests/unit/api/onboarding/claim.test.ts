@@ -18,6 +18,7 @@ const {
   mockMaterializeClaimedOnboardingProfile,
   mockSubmitWaitlistAccessRequest,
   mockIsWaitlistGateEnabled,
+  mockVerifiedYouTubeIds,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockGetCachedCurrentUser: vi.fn(),
@@ -34,6 +35,7 @@ const {
   mockMaterializeClaimedOnboardingProfile: vi.fn(),
   mockSubmitWaitlistAccessRequest: vi.fn(),
   mockIsWaitlistGateEnabled: vi.fn(),
+  mockVerifiedYouTubeIds: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -47,6 +49,10 @@ vi.mock('@/lib/auth/session', () => ({
 
 vi.mock('@/lib/waitlist/access-request', () => ({
   submitWaitlistAccessRequest: mockSubmitWaitlistAccessRequest,
+}));
+
+vi.mock('@/lib/onboarding/youtube-verified-channels', () => ({
+  getVerifiedOwnedYouTubeChannelIds: mockVerifiedYouTubeIds,
 }));
 
 vi.mock('@/lib/waitlist/settings', () => ({
@@ -232,6 +238,51 @@ function instantAccessDecisionMessageRows() {
   ];
 }
 
+const CANDIDATE_CHANNEL_ID = 'UCabcdefghijklmnopqrstuv';
+
+function unverifiedYouTubeCandidateRows() {
+  return [
+    {
+      toolCalls: [
+        {
+          schemaVersion: 2,
+          toolCallId: 'social-yt',
+          toolName: 'proposeSocialLink',
+          state: 'succeeded',
+          input: {},
+          output: {
+            action: 'propose_social_link',
+            url: `https://www.youtube.com/channel/${CANDIDATE_CHANNEL_ID}`,
+          },
+          uiHint: 'artifact',
+        },
+        {
+          schemaVersion: 2,
+          toolCallId: 'decision-1',
+          toolName: 'proposeNextStep',
+          state: 'succeeded',
+          input: {},
+          output: {
+            action: 'propose_next_step',
+            decision: {
+              kind: 'waitlist',
+              rationale: 'youtube_artist_icp_required',
+              score: 30,
+              youtubeCandidate: {
+                channelId: CANDIDATE_CHANNEL_ID,
+                title: 'Lena Hart',
+                url: `https://www.youtube.com/channel/${CANDIDATE_CHANNEL_ID}`,
+                cadenceQualified: true,
+              },
+            },
+          },
+          uiHint: 'artifact',
+        },
+      ],
+    },
+  ];
+}
+
 function needsMoreInfoDecisionMessageRows() {
   return [
     {
@@ -381,6 +432,7 @@ function pickPrimaryAndOthers<T extends { createdAt: Date }>(
 describe('POST /api/onboarding/claim — race, idempotency, failure paths', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockVerifiedYouTubeIds.mockResolvedValue([]);
     mockGetCachedAuth.mockResolvedValue({
       userId: '3a53ba3e-150c-4ab5-8e73-2d2499764e2c',
       sessionId: 'ba_session_123',
@@ -549,6 +601,52 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalled();
     expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
       expect.objectContaining({ visibility: 'reserved' })
+    );
+  });
+
+  it('keeps an unverified YouTube candidate on the waitlist (no admission)', async () => {
+    mockVerifiedYouTubeIds.mockResolvedValue([]);
+    setupDbSelectForCandidates(
+      [{ id: 'conv_yt_unverified', createdAt: new Date() }],
+      unverifiedYouTubeCandidateRows()
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect((await res.json()).readyForCheckout).toBeUndefined();
+    expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledWith(
+      expect.not.objectContaining({ admitYoutubeArtist: true })
+    );
+  });
+
+  it('keeps the candidate unverified when OAuth proved a different channel', async () => {
+    mockVerifiedYouTubeIds.mockResolvedValue(['UCsomeoneelse000000000000']);
+    setupDbSelectForCandidates(
+      [{ id: 'conv_yt_mismatch', createdAt: new Date() }],
+      unverifiedYouTubeCandidateRows()
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledWith(
+      expect.not.objectContaining({ admitYoutubeArtist: true })
+    );
+  });
+
+  it('admits through the YouTube fast path once OAuth proved ownership', async () => {
+    mockVerifiedYouTubeIds.mockResolvedValue([CANDIDATE_CHANNEL_ID]);
+    setupDbSelectForCandidates(
+      [{ id: 'conv_yt_verified', createdAt: new Date() }],
+      unverifiedYouTubeCandidateRows()
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ admitYoutubeArtist: true })
     );
   });
 

@@ -20,6 +20,7 @@ import {
   qualificationReceipt,
 } from '@/lib/acquisition/conversation-loop';
 import { type CanonicalArtistMetrics } from '@/lib/onboarding/canonical-metrics';
+import type { YouTubeCandidate } from '@/lib/onboarding/youtube-verification';
 import {
   type AudienceBand,
   collapseInterviewSignals,
@@ -106,10 +107,18 @@ export interface AccessDecision {
     readonly missingDimensions: readonly MomTestDimension[];
     readonly nextDimension: MomTestDimension | null;
   };
+  /**
+   * A cadence-qualified channel the visitor named but has NOT proven they own.
+   * Display-only: it never changes `kind`. Verification (OAuth ownership)
+   * promotes it via `promoteVerifiedYouTubeDecision`.
+   */
+  readonly youtubeCandidate?: YouTubeCandidate;
 }
 
 /** Legacy recovery turn budget; it never substitutes for an interview answer. */
 export const MAX_INTERVIEW_TURNS_BEFORE_FORCE = 3;
+
+export const YOUTUBE_ICP_REQUIRED_RATIONALE = 'youtube_artist_icp_required';
 
 export const YOUTUBE_ARTIST_ACCESS_RATIONALE =
   'regularly_uploading_youtube_music_artist';
@@ -216,4 +225,33 @@ export function decideOnboardingAccess(
     turnCount: input.turnCount,
     youtubeQualified: input.youtubeQualified,
   });
+}
+
+/**
+ * Promote a stored decision once OAuth proved the candidate channel is owned
+ * by the signed-in user. Only the exact "qualified channel, ownership not
+ * proven" waitlist (`youtube_artist_icp_required`) promotes; disqualified or
+ * incomplete decisions never do, and without a matching verified channel id
+ * the decision is returned unchanged (fail closed).
+ */
+export function promoteVerifiedYouTubeDecision(
+  decision: AccessDecision,
+  verifiedOwnedChannelIds: readonly string[]
+): AccessDecision {
+  const candidate = decision.youtubeCandidate;
+  if (
+    decision.kind !== 'waitlist' ||
+    decision.rationale !== YOUTUBE_ICP_REQUIRED_RATIONALE ||
+    !candidate ||
+    candidate.cadenceQualified !== true ||
+    !verifiedOwnedChannelIds.includes(candidate.channelId)
+  ) {
+    return decision;
+  }
+  return {
+    ...decision,
+    kind: 'instant_access',
+    rationale: YOUTUBE_ARTIST_ACCESS_RATIONALE,
+    score: 90,
+  };
 }

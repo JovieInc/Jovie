@@ -317,6 +317,10 @@ vi.mock('./SidebarLinkInput', () => ({
   ),
 }));
 
+vi.mock('./YouTubeVerifyCard', () => ({
+  YouTubeVerifyCard: () => null,
+}));
+
 vi.mock('./SuggestedDspMatches', () => ({
   SuggestedDspMatches: () => null,
 }));
