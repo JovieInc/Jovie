@@ -3,7 +3,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { generate, loadAnchors } from './generate-design-tokens-export.mjs';
+import {
+  generate,
+  loadAnchors,
+  loadChromeTokens,
+} from './generate-design-tokens-export.mjs';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -27,4 +31,14 @@ test('export documents Noir Ion as the generated projection', () => {
   assert.equal(doc.color['surface.canvas'].$value, '#030406');
   assert.equal(doc.color['surface.surface1'].$value, '#131417');
   assert.match(doc.$description, /generate-design-tokens-export\.mjs/);
+});
+
+test('window chrome exports the locked geometry from CSS', () => {
+  const { chrome, motion } = loadChromeTokens();
+  assert.equal(chrome['titleRow.height'].$value, '44px');
+  assert.equal(chrome['trafficLights.reserve'].$value, '76px');
+  assert.equal(chrome['sidebar.width'].$value, '240px');
+  assert.equal(motion['sidebar.collapse'].$value, '160ms');
+  assert.equal(motion['sidebar.expand'].$value, '220ms');
+  assert.throws(() => loadChromeTokens(''), /Missing chrome token/);
 });

@@ -38,8 +38,8 @@ test('desktop window enters the authenticated chat shell instead of the web root
     mainSource,
     /await shell\.openExternal\(parsed\.toString\(\)\);/
   );
-  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_X = 20;/);
-  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 17;/);
+  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_X = 12;/);
+  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 15;/);
   assert.match(
     mainSource,
     /const MACOS_TRAFFIC_LIGHT_POSITION = \{\s*x: MACOS_TRAFFIC_LIGHT_X,\s*y: MACOS_TRAFFIC_LIGHT_Y,\s*\} as const;/
@@ -1545,21 +1545,25 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
   assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
-  assert.match(globalsCss, /--electron-titlebar-height: 40px;/);
-  assert.match(globalsCss, /--electron-traffic-light-control-size: 14px;/);
-  assert.match(globalsCss, /--electron-traffic-light-clearance: 8px;/);
-  assert.match(globalsCss, /--electron-traffic-light-safe-width:\s*calc\(/);
-  assert.doesNotMatch(
+  assert.match(
     globalsCss,
-    /--electron-traffic-light-safe-width:\s*\d+px;/
+    /--electron-titlebar-height: var\(--chrome-title-row-height\);/
   );
-  assert.match(globalsCss, /--electron-traffic-light-x: 20px;/);
-  assert.match(globalsCss, /--electron-traffic-light-y: 17px;/);
+  assert.match(globalsCss, /--electron-traffic-light-control-size: 14px;/);
+  assert.match(globalsCss, /--electron-traffic-light-clearance: 6px;/);
+  assert.match(globalsCss, /--electron-traffic-light-toggle-gap: 12px;/);
+  assert.match(globalsCss, /--electron-traffic-light-safe-width:\s*calc\(/);
+  assert.match(
+    globalsCss,
+    /data-electron-fullscreen="true"[\s\S]*--electron-traffic-light-safe-width:\s*calc\(var\(--chrome-traffic-lights-reserve\) \* 0\);/
+  );
+  assert.match(globalsCss, /--electron-traffic-light-x: 12px;/);
+  assert.match(globalsCss, /--electron-traffic-light-y: 15px;/);
   assert.match(
     globalsCss,
     /--electron-sidebar-width: var\(--app-shell-sidebar-width\);/
   );
-  assert.match(globalsCss, /--electron-sidebar-collapsed-width: 52px;/);
+  assert.match(globalsCss, /--electron-sidebar-collapsed-width: 0px;/);
   // The electron titlebar is an absolute flex overlay sharing one top row
   // with the page header; the retired two-column grid must stay gone.
   assert.doesNotMatch(
@@ -1609,7 +1613,7 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
     mainSource.match(/const MACOS_TRAFFIC_LIGHT_Y = (\d+);/)?.[1]
   );
   const titlebarHeight = Number(
-    globalsCss.match(/--electron-titlebar-height: (\d+)px;/)?.[1]
+    designSystem.match(/--chrome-title-row-height: (\d+)px;/)?.[1]
   );
   const controlDiameter = Number(
     globalsCss.match(/--electron-traffic-light-control-size: (\d+)px;/)?.[1]
@@ -1624,20 +1628,19 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
     designSystem.match(/--space-2:\s*([\d.]+)rem;/)?.[1]
   );
   const iconGap = space2Rem * 16;
-  // Safe width is a calc of those tokens. The titlebar's padding-left is the
-  // shell gap, so the reserve is measured from the content origin:
-  // x - gap + 3 controls + 2 inter-light gaps + trailing clearance - icon gap.
-  const safeWidth =
-    x -
-    shellGap +
-    3 * controlDiameter +
-    2 * trailingClearance +
-    trailingClearance -
-    iconGap;
+  const toggleGap = Number(
+    globalsCss.match(/--electron-traffic-light-toggle-gap:\s*(\d+)px;/)?.[1]
+  );
+  const reserve = Number(
+    designSystem.match(/--chrome-traffic-lights-reserve: (\d+)px;/)?.[1]
+  );
+  const safeWidth = reserve - shellGap;
 
   assert.ok(Number.isFinite(x) && Number.isFinite(y));
   assert.ok(Number.isFinite(titlebarHeight) && Number.isFinite(safeWidth));
-  assert.equal(safeWidth, 70);
+  assert.equal(safeWidth, 68);
+  assert.equal(titlebarHeight, 44);
+  assert.equal(y + controlDiameter / 2, titlebarHeight / 2);
 
   // The first interactive control starts at window x = shell gap + reserve +
   // the shared icon gap. That must clear the third traffic light plus the
@@ -1645,7 +1648,7 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
   const lightsEnd = x + 3 * controlDiameter + 2 * trailingClearance;
   const toggleStart = shellGap + safeWidth + iconGap;
   assert.ok(
-    toggleStart >= lightsEnd + trailingClearance,
+    toggleStart >= lightsEnd + toggleGap,
     `toggle window x (${toggleStart}px) must clear lights ending at ${lightsEnd}px plus ${trailingClearance}px`
   );
   assert.ok(
@@ -2001,4 +2004,41 @@ test('auth handoff uses compact outer bounds and stays inside the active work ar
     /screen\.getDisplayMatching\(mainWindow\.getBounds\(\)\)/
   );
   assert.doesNotMatch(mainSource, /const AUTH_HANDOFF_WINDOW_BOUNDS/);
+});
+
+test('Linear titlebar keeps native navigation, bounded debounced history and full-screen row height', async () => {
+  const main = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const preload = await readFile(join(desktopRoot, 'src/preload.ts'), 'utf8');
+  const css = await readFile(
+    join(desktopRoot, '../web/app/globals.css'),
+    'utf8'
+  );
+  assert.match(main, /accelerator: 'CommandOrControl\+\['/);
+  assert.match(main, /accelerator: 'CommandOrControl\+\]'/);
+  assert.match(main, /clearTimeout\(historyTimer\)/);
+  assert.match(
+    main,
+    /trimNavigationHistory\(win.webContents.navigationHistory\)/
+  );
+  assert.match(
+    main,
+    /win.once\('closed', \(\) => clearTimeout\(historyTimer\)\)/
+  );
+  assert.match(
+    main,
+    /ipcMain.handle\(SHOW_HISTORY_CHANNEL[\s\S]*?isTrustedIpcSender\(event\)[\s\S]*?BrowserWindow.fromWebContents\(event.sender\)/
+  );
+  assert.match(
+    preload,
+    /showHistory: \(\) => ipcRenderer.invoke\(SHOW_HISTORY_CHANNEL\)/
+  );
+  const fullScreen =
+    css.match(
+      /html\[data-desktop-runtime="electron"\]\[data-electron-fullscreen="true"\] \{([^}]+)\}/
+    )?.[1] ?? '';
+  assert.match(
+    fullScreen,
+    /--electron-traffic-light-safe-width: calc\(var\(--chrome-traffic-lights-reserve\) \* 0\)/
+  );
+  assert.doesNotMatch(fullScreen, /--electron-titlebar-(?:height|top-gap): 0/);
 });

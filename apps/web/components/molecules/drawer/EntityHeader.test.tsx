@@ -127,6 +127,26 @@ describe('EntityHeader', () => {
 });
 
 describe('EntityHeader chrome layout', () => {
+  it('makes chrome whitespace draggable without blocking header actions', () => {
+    const onClick = vi.fn();
+    render(
+      <EntityHeader
+        layout='chrome'
+        title='Details'
+        actions={
+          <button type='button' data-electron-no-drag='true' onClick={onClick}>
+            Close
+          </button>
+        }
+      />
+    );
+    expect(screen.getByTestId('entity-header')).toHaveAttribute(
+      'data-electron-drag-region',
+      'true'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
   it('renders title and actions in a utility bar', () => {
     const first = render(
       <EntityHeader layout='chrome' title='Contact Details' />

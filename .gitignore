@@ -223,6 +223,7 @@ apps/desktop/src/*
 !apps/desktop/src/desktop-notifications.ts
 !apps/desktop/src/desktop-permissions.ts
 !apps/desktop/src/desktop-security-reporting.ts
+!apps/desktop/src/window-navigation-history.ts
 !apps/desktop/src/window-state.ts
 !apps/desktop/src/visual-activity.ts
 !apps/desktop/src/renderer-recovery.ts

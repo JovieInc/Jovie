@@ -25,6 +25,39 @@ vi.mock('@/lib/queries/prefetch-dashboard', () => ({
 const PRIMARY_LABELS = ['New Chat', 'Identity', 'Work', 'Audience'] as const;
 
 describe('DashboardNav interactions', () => {
+  it('moves the existing native compose command into row two without duplicating it', async () => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {},
+    });
+    const slot = document.createElement('span');
+    slot.dataset.desktopComposeSlot = 'true';
+    document.body.append(slot);
+    try {
+      const { container } = renderDashboardNav({
+        renderFn: ui =>
+          render(
+            <div data-sidebar='sidebar'>
+              <span data-desktop-compose-slot='true' />
+              {ui}
+            </div>
+          ),
+      });
+      const ownSlot = container.querySelector('[data-desktop-compose-slot]');
+      const compose = await screen.findByRole('link', { name: 'New Chat' });
+      await waitFor(() => expect(ownSlot).toContainElement(compose));
+      expect(slot).toBeEmptyDOMElement();
+      expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
+      fireEvent.click(compose);
+      expect(compose).toHaveAttribute('href', APP_ROUTES.CHAT);
+      expect(mockStartNavigationTelemetry).toHaveBeenCalledWith(
+        expect.objectContaining({ destinationHref: APP_ROUTES.CHAT })
+      );
+    } finally {
+      slot.remove();
+      Reflect.deleteProperty(window, 'electronAPI');
+    }
+  });
   afterEach(() => {
     vi.useRealTimers();
     prefetchForRouteMock.mockReset();

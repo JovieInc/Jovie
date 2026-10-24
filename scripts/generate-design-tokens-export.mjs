@@ -96,6 +96,36 @@ export function loadAnchors(css = readFileSync(SOURCE_PATH, 'utf8')) {
   return anchors;
 }
 
+/** Export window chrome from the same CSS source consumed by the renderer. */
+export function loadChromeTokens(css = readFileSync(SOURCE_PATH, 'utf8')) {
+  const token = (name, type) => {
+    const value = css.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1];
+    if (!value) throw new Error(`Missing chrome token ${name}`);
+    return { $value: value.trim(), $type: type };
+  };
+  return {
+    chrome: {
+      'titleRow.height': token('--chrome-title-row-height', 'dimension'),
+      'trafficLights.leading': token(
+        '--chrome-traffic-lights-leading',
+        'dimension'
+      ),
+      'trafficLights.reserve': token(
+        '--chrome-traffic-lights-reserve',
+        'dimension'
+      ),
+      'sidebar.width': token('--chrome-sidebar-width', 'dimension'),
+      'sidebar.minWidth': token('--chrome-sidebar-min-width', 'dimension'),
+      'sidebar.maxWidth': token('--chrome-sidebar-max-width', 'dimension'),
+      hairline: token('--chrome-hairline', 'color'),
+    },
+    motion: {
+      'sidebar.collapse': token('--motion-sidebar-collapse', 'duration'),
+      'sidebar.expand': token('--motion-sidebar-expand', 'duration'),
+    },
+  };
+}
+
 /** @returns {string} serialized design.tokens.json */
 export function generate(anchors = loadAnchors()) {
   const color = {};
@@ -113,6 +143,7 @@ export function generate(anchors = loadAnchors()) {
     $description:
       'Canonical Jovie design tokens, dark-first. Generated from the Noir Ion anchors (--noir-ion-*) in apps/web/styles/design-system.css by scripts/generate-design-tokens-export.mjs — do not edit by hand. Rebuild: pnpm design:tokens:export. Used by importers (e.g. Magic Patterns) instead of scraping raw repo colors.',
     color,
+    ...loadChromeTokens(),
   };
   return `${JSON.stringify(doc, null, 2)}\n`;
 }

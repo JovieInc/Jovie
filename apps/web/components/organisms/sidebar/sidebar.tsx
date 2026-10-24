@@ -4,6 +4,7 @@ import { Sheet, SheetContent } from '@jovie/ui';
 import React from 'react';
 import { SHELL_RAIL_ALLOCATION } from '@/components/shell/rail-motion';
 import { useRailMotionPhase } from '@/components/shell/useRailMotionPhase';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './context';
 
@@ -37,7 +38,12 @@ export const Sidebar = React.forwardRef<
     } = useSidebar();
     // Shared rail lifecycle: certification samples data-rail-phase to prove
     // opening/closing resolve toward the latest requested state (JOV-4522).
-    const railPhase = useRailMotionPhase(state === 'open');
+    const isDesktop = useIsElectronRuntime();
+    const nativeCollapsed = isDesktop && state === 'closed';
+    const railPhase = useRailMotionPhase(
+      state === 'open',
+      isDesktop ? (state === 'open' ? 220 : 160) : undefined
+    );
 
     if (collapsible === 'none') {
       return (
@@ -112,11 +118,13 @@ export const Sidebar = React.forwardRef<
           data-side={side}
           aria-hidden={
             isMobile ||
+            nativeCollapsed ||
             (state === 'closed' && collapsible === 'offcanvas') ||
             undefined
           }
           inert={
             isMobile ||
+            nativeCollapsed ||
             (state === 'closed' && collapsible === 'offcanvas') ||
             undefined
           }

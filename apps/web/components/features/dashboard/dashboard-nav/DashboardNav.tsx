@@ -5,6 +5,7 @@ import { Bell, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { toast } from '@/components/feedback';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
@@ -105,6 +106,17 @@ export function DashboardNav({
   const previousNavigationHrefRef = useRef(currentNavigationHref);
   const queryClient = useQueryClient();
   const isElectron = useIsElectronRuntime();
+  const navRef = useRef<HTMLElement>(null);
+  const [composeSlot, setComposeSlot] = useState<Element | null>(null);
+  useEffect(() => {
+    setComposeSlot(
+      isElectron && !isMobile
+        ? (navRef.current
+            ?.closest('[data-sidebar="sidebar"]')
+            ?.querySelector('[data-desktop-compose-slot="true"]') ?? null)
+        : null
+    );
+  }, [isElectron, isMobile, openMobile, pathname]);
   // Persisted navigation state is a client-only enhancement. Reading it during
   // the first render would make a returning browser render different badges
   // from the server markup and can force React to abandon hydration.
@@ -471,6 +483,7 @@ export function DashboardNav({
   return (
     <>
       <nav
+        ref={navRef}
         className='flex min-h-0 flex-1 flex-col overflow-anchor-none overflow-clip'
         aria-label='Dashboard Navigation'
       >
@@ -564,7 +577,9 @@ export function DashboardNav({
                   </Link>
                 )}
               </RailStagedContent>
-              {newChatAction}
+              {composeSlot
+                ? createPortal(newChatAction, composeSlot)
+                : newChatAction}
             </div>
             <SidebarGroupContent className='pb-2 pt-5'>
               {navSections.map(section => (

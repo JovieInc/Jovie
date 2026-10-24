@@ -228,6 +228,13 @@ function renderUnifiedSidebar({
 }
 
 describe('UnifiedSidebar library route', () => {
+  it('reserves desktop compose space in the workspace and search row', () => {
+    const { container } = renderUnifiedSidebar();
+    const slot = container.querySelector('[data-desktop-compose-slot]');
+    expect(slot).not.toBeNull();
+    expect(slot?.closest('[data-sidebar-brand-row]')).not.toBeNull();
+  });
+
   it('shows the seeded creator name in demo workspace chrome', () => {
     renderUnifiedSidebar({ pathname: '/demo', section: 'dashboard' });
     const brand = document.querySelector('[data-sidebar-brand-row]');

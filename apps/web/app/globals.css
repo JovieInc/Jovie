@@ -111,25 +111,31 @@ body {
 }
 
 html[data-desktop-runtime="electron"] {
-  --electron-titlebar-height: 40px;
+  --electron-titlebar-height: var(--chrome-title-row-height);
   --electron-controls-width: 200px;
-  --electron-traffic-light-x: 20px;
-  --electron-traffic-light-y: 17px;
+  --electron-traffic-light-x: 12px;
+  --electron-traffic-light-y: 15px;
   --electron-traffic-light-control-size: 14px;
-  --electron-traffic-light-clearance: 8px;
-  /* Content origin is the shell gap (titlebar padding-left). The reserve
-     places the first control at the native lights' trailing clearance.
-     20 - 8 + 42 + 16 + 8 - 8 = 70. Toggle window x = 8 + 70 + 8 = 86. */
+  --electron-traffic-light-clearance: 6px;
+  --electron-traffic-light-toggle-gap: 12px;
+  --electron-titlebar-top-gap: var(--electron-titlebar-height);
   --electron-traffic-light-safe-width: calc(
-    var(--electron-traffic-light-x) -
-    var(--app-shell-gap) +
-    (3 * var(--electron-traffic-light-control-size)) +
-    (2 * var(--electron-traffic-light-clearance)) +
-    var(--electron-traffic-light-clearance) -
+    var(--chrome-traffic-lights-reserve) -
+    var(--app-shell-gap) -
     var(--app-shell-sidebar-icon-gap)
   );
   --electron-sidebar-width: var(--app-shell-sidebar-width);
-  --electron-sidebar-collapsed-width: 52px;
+  --electron-sidebar-collapsed-width: 0px;
+  --app-shell-sidebar-width: var(--chrome-sidebar-width);
+}
+
+/* Full screen hides native lights, never the 44pt row above sidebar content. */
+html[data-desktop-runtime="electron"][data-electron-fullscreen="true"] {
+  --electron-traffic-light-safe-width: calc(
+    var(--chrome-traffic-lights-reserve) *
+    0
+  );
+  --electron-controls-width: 140px;
 }
 
 html[data-desktop-runtime="electron"] body {
@@ -181,7 +187,7 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
 }
 
 html[data-desktop-runtime="electron"] [data-app-shell-sidebar-mount="true"] {
-  padding-top: var(--electron-titlebar-height);
+  padding-top: var(--electron-titlebar-top-gap);
 }
 
 html[data-desktop-runtime="electron"]
@@ -243,7 +249,7 @@ html[data-desktop-runtime="electron"]
     :has([data-top-spacing-owner="shell-header"])
   )
   [data-app-shell-content-column="true"] {
-  padding-top: var(--electron-titlebar-height);
+  padding-top: var(--electron-titlebar-top-gap);
 }
 
 /* Settings now supplies the shared desktop header inside its route panel. */
@@ -299,6 +305,66 @@ html[data-desktop-runtime="electron"]
   [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--app-shell-gap);
+  padding-right: var(--chrome-traffic-lights-leading);
+}
+
+html[data-desktop-runtime="electron"] [data-testid="electron-sidebar-toggle"] {
+  order: 2;
+}
+html[data-desktop-runtime="electron"] [data-app-shell-sidebar-mount="true"] {
+  overflow: hidden;
+}
+html[data-desktop-runtime="electron"] #shell-left-rail {
+  transition-property: width, opacity, visibility;
+  transition-duration: var(--motion-sidebar-expand);
+  transition-timing-function: var(--motion-sidebar-expand-easing);
+  opacity: 1;
+  visibility: visible;
+}
+html[data-desktop-runtime="electron"] #shell-left-rail > div {
+  width: var(--app-shell-sidebar-width);
+}
+html[data-desktop-runtime="electron"] #shell-left-rail[data-state="closed"] {
+  width: 0 !important; /* Override the browser's inline 52px icon-rail width. */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition-duration: var(--motion-sidebar-collapse);
+  transition-timing-function: var(--motion-sidebar-collapse-easing);
+}
+html[data-desktop-runtime="electron"]
+  [data-electron-collapsed-rail]
+  [data-testid="electron-nav-history"] {
+  display: none;
+}
+html[data-desktop-runtime="electron"]
+  [data-right-rail-workspace]
+  [data-layout="chrome"] {
+  height: var(--chrome-title-row-height);
+  min-height: var(--chrome-title-row-height);
+  padding-block: 0;
+}
+/* Keep empty title-row space draggable, with navigation on the trailing edge. */
+html[data-desktop-runtime="electron"] [data-testid="electron-nav-pill"] {
+  margin-left: auto;
+  order: 3;
+}
+html[data-desktop-runtime="electron"]
+  [data-testid="electron-titlebar-drag-strip"] {
+  order: 1;
+  min-width: 0;
+}
+html[data-desktop-runtime="electron"][data-electron-fullscreen="true"]
+  [data-electron-titlebar="true"] {
+  padding-left: var(--chrome-traffic-lights-leading);
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-desktop-runtime="electron"] [data-app-shell-sidebar-mount="true"] {
+    overflow: visible;
+  }
+  html[data-desktop-runtime="electron"] #shell-left-rail {
+    transition-property: opacity, visibility;
+  }
 }
 
 /* Public pages use document scrolling rather than app-shell scroll panes.
@@ -2919,4 +2985,11 @@ body {
   .dictation-waveform-bar {
     animation: none !important;
   }
+}
+
+[data-desktop-location-icon] {
+  display: none;
+}
+html[data-desktop-runtime="electron"] [data-desktop-location-icon] {
+  display: inline-flex;
 }
