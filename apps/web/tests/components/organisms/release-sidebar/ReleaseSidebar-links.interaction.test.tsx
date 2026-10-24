@@ -498,7 +498,9 @@ describe('ReleaseSidebar inspector cards', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
+    expect(
+      screen.getByRole('tablist', { name: 'Release sidebar tabs' })
+    ).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tab-overview')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tab-dsps')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-tab-tasks')).toBeInTheDocument();
@@ -818,7 +820,9 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
     expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-tabs')).toBeInTheDocument();
+    expect(
+      screen.getByRole('tablist', { name: 'Release sidebar tabs' })
+    ).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
     expect(screen.getByTestId('release-lyrics-card')).toBeInTheDocument();
     expect(screen.getAllByRole('tab')).toHaveLength(3);
