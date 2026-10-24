@@ -349,7 +349,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:record-production-publish
