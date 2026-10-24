@@ -41,10 +41,9 @@ test('dmg background uses the generated year and installer geometry', () => {
 });
 
 test('electron-builder configs do not pin a stale copyright year', async () => {
-  const configs = await Promise.all([
-    readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
-    readFile(join(desktopRoot, 'electron-builder.staging.yml'), 'utf8'),
-  ]);
+  const configs = [
+    await readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
+  ];
 
   for (const config of configs) {
     assert.doesNotMatch(config, /^copyright:\s*["']?Copyright/m);

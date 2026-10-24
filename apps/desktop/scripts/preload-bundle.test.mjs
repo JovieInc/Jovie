@@ -128,9 +128,7 @@ test('every Electron launch and package path bundles the preload', async () => {
   assert.equal(packageJson.scripts.compile, 'tsc && pnpm run bundle:preload');
   for (const scriptName of [
     'dev',
-    'build:staging',
     'build:production',
-    'package:staging',
     'package:production',
     'package:local',
   ]) {

@@ -459,7 +459,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/desktop-release-guard.test.mjs',
       'scripts/desktop-release-publisher.test.mjs',
       'apps/desktop/electron-builder.yml',
-      'apps/desktop/electron-builder.staging.yml',
       'apps/desktop/scripts/notarize-release-dmg.cjs',
     ]) {
       expect(

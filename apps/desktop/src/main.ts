@@ -220,10 +220,7 @@ const HOSTED_LOAD_RETRY_DELAY_MS = APP_ENV === 'local' ? 2_000 : 0;
 const { bootMs: RENDERER_BOOT_WATCHDOG_MS, loadMs: RENDERER_LOAD_WATCHDOG_MS } =
   rendererWatchdogMs(APP_ENV);
 const HUD_BUILD_INFO_POLL_INTERVAL_MS = 60 * 1000;
-// electron-builder.local.yml and electron-builder.staging.yml both package the
-// staging icon assets; only the production config ships icon.png.
-const APP_ICON_FILENAME =
-  APP_ENV === 'production' ? 'icon.png' : 'icon-staging.png';
+const APP_ICON_FILENAME = 'icon.png';
 const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
 const APP_ICON_AVAILABLE = fs.existsSync(APP_ICON_PATH);
 const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop/${app.getVersion()}`;

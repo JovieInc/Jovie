@@ -14,9 +14,8 @@ const GATE_RECEIPTS = {
   },
   mac: {
     tests:
-      'swift build --package-path apps/macos/MenuMonitor -c release && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging',
-    artifact:
-      'desktop-staging-<merge-group-head-sha> with MenuMonitor release binary',
+      'swift build --package-path apps/macos/MenuMonitor -c release && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test',
+    artifact: 'MenuMonitor release binary',
     releaseWorkflow: '.github/workflows/desktop-release.yml',
   },
   web: {
@@ -144,7 +143,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
   ],
   [
     // Files outside apps/desktop that `@jovie/desktop` test and
-    // package:staging read: prepare-icons runs apps/web's brand generator
+    // Desktop tests read apps/web's brand generator
     // (which reads the iOS AppIcon set), system-b-tokens.test reads the web
     // CSS, url-disposition.test reads the route manifest, and the dogfood
     // inventory must resolve its web sources. A guard test derives the

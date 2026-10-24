@@ -20,7 +20,7 @@ The customer Mac app is **Electron wrapping the hosted web app**. It is not a na
 
 | Surface | Runtime | Role |
 |---|---|---|
-| Packaged `Jovie.app` / Jovie Local / Jovie Staging | Electron 43 (`apps/desktop`), `BrowserWindow` + preload, `webviewTag: false` | Product shell. Loads hosted Next (`APP_URL`). Local userData = `Jovie-Local`. Default entry `/app/chat`. |
+| Packaged `Jovie.app` / Jovie Local | Electron (`apps/desktop`), `BrowserWindow` + preload, `webviewTag: false` | Product shell. Loads hosted Next (`APP_URL`). Local userData = `Jovie-Local`. Default entry `/app/chat`. |
 | Packaged Ovie | Same Electron process | Menu opens `/hud?ovie=mac` (`apps/desktop/src/ovie-door.ts`). One heads-up. |
 | Electron tray | Same Electron process (`apps/desktop/src/tray.ts`) | Chat / new-message / preferences. |
 | `apps/macos/MenuMonitor` | Native SwiftUI `MenuBarExtra` | Operator shipping-count menu. Not the product app. |
