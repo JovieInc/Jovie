@@ -362,6 +362,32 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("40 PR repairs", alerts["repairs-without-work"])
         self.assertIn("target-state-unavailable 23", alerts["repairs-without-work"])
 
+    def test_refunded_no_work_repairs_are_counted_as_requeues_not_spend(self):
+        # Gem 2026-10-23: refunded infra stops never consumed an attempt, so the alert
+        # must say so instead of claiming the budget was burned.
+        alerts = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": 10},
+                                  refundedNoWorkRepairs24h=7))
+        alert = alerts["repairs-without-work"]
+        self.assertIn("3 spent a fix attempt", alert)
+        self.assertIn("7 were refunded and requeued with backoff", alert)
+
+    def test_an_unclean_previous_tick_is_a_visible_alert_with_its_recovery(self):
+        alerts = doctor.judge(obs(tick={"at": "x", "error": None,
+                                        "uncleanPreviousRun": {"pid": 4242, "startedAt": 1.0},
+                                        "uncleanRecovery": {"refundedFixAttempts": ["6"]}}))
+        self.assertIn("lanes-tick-unclean", alerts)
+        self.assertIn("pid 4242", alerts["lanes-tick-unclean"])
+        self.assertIn("1 stranded fix-attempt charge", alerts["lanes-tick-unclean"])
+
+    def test_exhausted_only_delivery_failure_is_still_a_visible_alert(self):
+        # Terminal exhausted rows never retry: they must alert on their own, without a
+        # failed count, or a terminal failure would go silent.
+        alerts = doctor.judge(obs(tick={"remediationEvents": {"deliveryFailed": 0,
+                                                              "deliveryExhausted": 2,
+                                                              "deliveryNextAt": None}}))
+        self.assertIn("remediation-delivery", alerts)
+        self.assertIn("exhausted=2", alerts["remediation-delivery"])
+
     def test_disk_tiers_page_summer_only_below_critical(self):
         self.assertEqual(set(doctor.judge(obs(diskFreePct=7.0))), {"disk-low"})
         alerts = doctor.judge(obs(diskFreePct=4.9))
