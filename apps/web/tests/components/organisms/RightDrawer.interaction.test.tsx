@@ -68,6 +68,35 @@ describe('RightDrawer', () => {
     expect(aside).toHaveClass('outline-none', 'focus:outline-none');
   });
 
+  it('renders the desktop inspector as an in-flow sibling column that releases its width when closed (JOV-8944)', () => {
+    const { rerender } = render(
+      <RightDrawer isOpen width={360} ariaLabel='Sibling inspector'>
+        <button type='button'>Push contract child</button>
+      </RightDrawer>
+    );
+
+    const aside = screen.getByLabelText('Sibling inspector');
+    // Push contract (JOV-8944): the shell allocates the inspector beside the
+    // main column, so the desktop surface is an in-flow flex sibling — never
+    // a fixed/absolute overlay — running on the shared rail allocation motion.
+    expect(aside).not.toHaveClass('fixed');
+    expect(aside).not.toHaveClass('absolute');
+    expect(aside).toHaveClass('shrink-0', 'h-full', 'min-h-0');
+    expect(aside).toHaveClass('transition-shell-rail-allocation');
+    expect(aside).toHaveStyle({ width: '360px' });
+
+    rerender(
+      <RightDrawer isOpen={false} width={360} ariaLabel='Sibling inspector'>
+        <button type='button'>Push contract child</button>
+      </RightDrawer>
+    );
+
+    // A closed in-flow column releases its allocation (zero width, no paint)
+    // so the main plane reclaims the canvas instead of leaving the overlay.
+    expect(aside).toHaveStyle({ width: '0px' });
+    expect(aside).toHaveClass('opacity-0');
+  });
+
   it('keeps the inspector content width stable through interrupted closes', () => {
     const { rerender } = render(
       <RightDrawer isOpen width={360} ariaLabel='Stable inspector'>
