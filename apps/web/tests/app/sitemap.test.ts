@@ -321,7 +321,7 @@ describe('sitemap', () => {
 
     expect(entries.length).toBeGreaterThan(0);
     expect(artist?.lastModified).toEqual(new Date('2026-01-01'));
-    expect(about?.lastModified).toBeUndefined();
+    expect(about?.lastModified).toEqual(new Date('2026-10-23'));
   });
 
   it('excludes automatic unclaimed structured-credit profiles', async () => {

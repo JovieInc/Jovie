@@ -176,9 +176,9 @@ describe('SEO ratchet — sitemap must stay reachable and fresh (JOV-11044)', ()
     expect(issues, issues.map(issue => issue.message).join('\n')).toEqual([]);
     expect(entries.length).toBeGreaterThan(0);
     expect(entries.map(entry => entry.url)).toContain('https://jov.ie/tim');
-    const unchanged = entries.find(
-      entry => entry.url === 'https://jov.ie/about'
-    );
-    expect(unchanged?.lastModified).toBeUndefined();
+    const about = entries.find(entry => entry.url === 'https://jov.ie/about');
+    // /about carries its cited content revision (PR #22730, 2026-10-23) —
+    // still nothing request-time: it is a fixed date, not `now`.
+    expect(about?.lastModified).toEqual(new Date('2026-10-23'));
   });
 });

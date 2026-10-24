@@ -31,9 +31,43 @@ describe('commercial hub sitemap revisions', () => {
     ).toBe('2026-08-01T00:00:00.000Z');
   });
 
+  it('dates the remaining unbound commercial pages from cited revisions', () => {
+    for (const path of [
+      '/about',
+      '/support',
+      '/developers',
+      '/api-versioning',
+      '/compare',
+      '/alternatives',
+      '/integrations',
+      '/product/link-analytics',
+      '/product/utm-links',
+      '/product/command-palette',
+      '/product/release-scheduling',
+      '/product/dsp-links',
+      '/product/isrc',
+      '/product/pre-save',
+    ]) {
+      expect(commercialHubContentRevision(path)?.toISOString()).toBe(
+        '2026-10-23T00:00:00.000Z'
+      );
+    }
+  });
+
   it('leaves pages without a cited revision undated', () => {
-    expect(commercialHubContentRevision('/about')).toBeUndefined();
-    expect(commercialHubContentRevision('/support')).toBeUndefined();
+    expect(commercialHubContentRevision('/no-such-page')).toBeUndefined();
+  });
+
+  it('dates every published commercial hub (JOV-8567)', () => {
+    const undated = getPublishedCommercialHubPaths().filter(
+      path =>
+        commercialHubContentRevision(
+          path,
+          getRouteCapability(path)?.contentRevision
+        ) === undefined
+    );
+
+    expect(undated).toEqual([]);
   });
 
   it('publishes those revisions from the marketing sitemap loop', () => {
