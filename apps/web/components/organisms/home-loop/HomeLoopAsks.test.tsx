@@ -115,9 +115,9 @@ describe('HomeLoopAsks answered card dim', () => {
     );
     const card = screen.getByTestId('home-loop-ask');
     // 0.70 dropped the tertiary/secondary meta composites to ~4.0:1 on the
-    // storybook canvas; 0.75 is the documented AA floor for the muted token
+    // storybook canvas; 0.80 keeps contrast above the AA floor for the muted token
     // composited over the shell canvas (design-system.css noir-ion-text-muted).
-    expect(card).toHaveClass('opacity-75');
+    expect(card).toHaveClass('opacity-80');
     expect(card).not.toHaveClass('opacity-70');
   });
 });

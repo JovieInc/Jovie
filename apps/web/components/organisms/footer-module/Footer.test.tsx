@@ -65,3 +65,13 @@ describe('Footer', () => {
     expect(screen.queryByRole('link', { name: 'Report' })).toBeNull();
   });
 });
+
+describe('Footer legal link contrast (JOV-8873)', () => {
+  it('renders profile legal links at 80% resting opacity', () => {
+    render(<Footer variant='profile' />);
+    for (const link of screen.getAllByRole('link', { name: 'Privacy' })) {
+      expect(link).toHaveClass('opacity-80');
+      expect(link).not.toHaveClass('opacity-60');
+    }
+  });
+});

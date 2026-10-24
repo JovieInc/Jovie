@@ -663,7 +663,7 @@ test.describe('sidebar attention and Settings header', () => {
       exact: true,
     });
     const search = mobile.getByRole('button', {
-      name: 'Search Jovie',
+      name: /Search Jovie$/,
       exact: true,
     });
     await expect(collapse).toBeVisible();
@@ -682,7 +682,7 @@ test.describe('sidebar attention and Settings header', () => {
     await openStory(page, 'organisms-unifiedsidebar--demo', 'light');
     const slot = page.locator('[data-sidebar-search-slot]');
     const search = page.getByRole('button', {
-      name: 'Search Jovie',
+      name: /Search Jovie$/,
       exact: true,
     });
     const divider = page.locator('[data-sidebar-search-divider]');
@@ -774,7 +774,7 @@ test.describe('sidebar attention and Settings header', () => {
       await openStory(page, 'organisms-unifiedsidebar--dashboard', theme);
       const row = page.locator('[data-sidebar-brand-row]');
       const inbox = page.getByRole('link', { name: /Inbox —/ });
-      const search = page.getByRole('button', { name: 'Search Jovie' });
+      const search = page.getByRole('button', { name: /Search Jovie$/ });
       await expect(inbox).toHaveAttribute('href', '/app');
       await expect(search).toHaveCount(1);
       await expect(row).toContainText('Jovie');

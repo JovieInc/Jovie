@@ -56,7 +56,11 @@ export const AllStarters: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const first = cards[0]!;
-    await userEvent.click(canvas.getByRole('button', { name: first.title }));
+    await userEvent.click(
+      canvas.getByRole('button', {
+        name: `${first.actionLabel} — ${first.title}`,
+      })
+    );
     await expect(args.onAct).toHaveBeenCalledWith(first);
     await userEvent.click(
       canvas.getByRole('button', { name: `Dismiss ${first.title}` })

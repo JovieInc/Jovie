@@ -36,7 +36,9 @@ describe('OnboardingProfileReviewStep', () => {
   it('keeps the display-name control focusable when opening the editor by keyboard', async () => {
     renderStep();
     const user = userEvent.setup();
-    const edit = screen.getByRole('button', { name: 'Edit Display Name' });
+    const edit = screen.getByRole('button', {
+      name: `Edit Display Name: ${enrichedProfile.name}`,
+    });
     edit.focus();
     expect(edit).toHaveFocus();
     expect(edit).toHaveClass('focus-ring-themed');

@@ -168,6 +168,7 @@ export const Large: Story = {
 
 export const Icon: Story = {
   args: {
+    'aria-label': 'Add',
     size: 'icon',
     children: (
       <svg
@@ -425,7 +426,7 @@ export const AllVariants: Story = {
           <Button size='sm'>Small</Button>
           <Button size='md'>Medium</Button>
           <Button size='lg'>Large</Button>
-          <Button size='icon'>
+          <Button size='icon' aria-label='Add'>
             <svg
               className='h-4 w-4'
               fill='none'

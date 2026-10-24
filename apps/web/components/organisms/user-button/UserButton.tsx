@@ -696,9 +696,6 @@ export function UserButton({
     (showUserInfo ? (
       <button
         type='button'
-        aria-label={
-          dockStatus ? `Open user menu · ${dockStatus.label}` : undefined
-        }
         className={cn(
           'relative group/user-button flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
           // Founder lock 2026-09-25: single compact 32px row — 20px avatar,
@@ -709,6 +706,9 @@ export function UserButton({
             'relative h-8 px-0.5 gap-(--space-2-5) before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-[""]'
         )}
       >
+        {dockStatus ? (
+          <span className='sr-only'>Open user menu · {dockStatus.label} </span>
+        ) : null}
         {dockStatus?.badges}
         <Avatar
           src={userImageUrl}

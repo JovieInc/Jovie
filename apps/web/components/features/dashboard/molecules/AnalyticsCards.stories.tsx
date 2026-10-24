@@ -51,7 +51,7 @@ const MockAnalyticsCards = ({
 
   if (error) {
     return (
-      <div className='text-center text-red-600'>
+      <div className='text-center text-error'>
         <p>Failed to load analytics</p>
       </div>
     );

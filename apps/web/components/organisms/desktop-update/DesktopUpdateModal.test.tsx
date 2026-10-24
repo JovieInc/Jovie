@@ -131,3 +131,15 @@ describe('DesktopUpdateModal', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
+
+describe('DesktopUpdateModalView scroll region (JOV-8873)', () => {
+  it('makes the release-notes scroll region keyboard focusable', () => {
+    renderView(available, {
+      notes: { summary: 'Ship it', items: ['Faster sync'] },
+    });
+    expect(screen.getByTestId('desktop-update-notes')).toHaveAttribute(
+      'tabindex',
+      '0'
+    );
+  });
+});

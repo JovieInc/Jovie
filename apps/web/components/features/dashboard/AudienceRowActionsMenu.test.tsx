@@ -32,6 +32,16 @@ const row = {
 } as AudienceMember;
 
 describe('AudienceRowActionsMenu', () => {
+  it('removes the background trigger from navigation only while its modal is open', () => {
+    const { container, rerender } = render(
+      <AudienceRowActionsMenu row={row} open />
+    );
+    const trigger = container.querySelector('button');
+    expect(trigger).toHaveAttribute('inert');
+    rerender(<AudienceRowActionsMenu row={row} open={false} />);
+    expect(trigger).not.toHaveAttribute('inert');
+  });
+
   it('offers copy actions and hides the unfinished id action', () => {
     render(<AudienceRowActionsMenu row={row} open />);
 

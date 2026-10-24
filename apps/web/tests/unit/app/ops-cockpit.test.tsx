@@ -90,3 +90,20 @@ describe('Ops cockpit sections', () => {
     );
   });
 });
+
+describe('HudBottlenecksCard list semantics (JOV-8873)', () => {
+  it('exposes ranked bottlenecks as list items', () => {
+    render(
+      <HudBottlenecksCard
+        metrics={cockpitMetrics({
+          deployments: {
+            current: { status: 'failure', branch: 'main', url: null },
+          },
+        })}
+      />
+    );
+    const items = screen.getAllByRole('listitem');
+    expect(items.length).toBeGreaterThan(0);
+    expect(items[0]).toHaveTextContent('Shipping pipeline is failing');
+  });
+});

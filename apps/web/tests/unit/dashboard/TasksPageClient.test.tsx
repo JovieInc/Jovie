@@ -1917,7 +1917,7 @@ describe('TasksPageClient', () => {
     expect(latestHeaderSearchAdapter?.totalCount).toBe(2);
     const searchTrigger = within(
       screen.getByTestId('header-actions-host')
-    ).getByRole('button', { name: 'Search Jovie' });
+    ).getByRole('button', { name: /Search Jovie$/ });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
     expect(
       within(screen.getByTestId('header-actions-host')).queryByRole('button', {
@@ -1938,7 +1938,7 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(
       within(screen.getByTestId('header-actions-host')).getByRole('button', {
-        name: 'Search Jovie',
+        name: /Search Jovie$/,
       })
     );
 

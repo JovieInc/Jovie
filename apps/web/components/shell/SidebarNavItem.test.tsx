@@ -126,6 +126,20 @@ describe('SidebarNavItem active chrome', () => {
     expect(row.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('keeps collapsed navigation named and active', () => {
+    const TestIcon = (props: { className?: string }) => <svg {...props} />;
+    render(
+      <SidebarNavItem
+        item={{ icon: TestIcon, label: 'Releases', active: true }}
+        collapsed
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Releases' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
+
   it('does not mark an inactive row pressed', () => {
     const TestIcon = (props: { className?: string }) => <svg {...props} />;
 

@@ -27,13 +27,13 @@ describe('Copyright', () => {
   it('applies dark variant classes by default', () => {
     render(<Copyright />);
     const el = screen.getByText('© 2026');
-    expect(el).toHaveClass('text-white/40');
+    expect(el).toHaveClass('text-white/50');
   });
 
   it('applies light variant classes', () => {
     render(<Copyright variant='light' />);
     const el = screen.getByText('© 2026');
-    expect(el).toHaveClass('text-quaternary-token');
+    expect(el).toHaveClass('text-tertiary-token');
   });
 
   it('applies base styles', () => {
@@ -42,7 +42,7 @@ describe('Copyright', () => {
     expect(el).toHaveClass('text-xs');
     expect(el).toHaveClass('font-normal');
     expect(el).toHaveClass('tracking-tight');
-    expect(el).toHaveClass('opacity-50');
+    expect(el.className).not.toContain('opacity-');
   });
 
   it('applies custom className', () => {

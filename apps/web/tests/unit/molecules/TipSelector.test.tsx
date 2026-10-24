@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { PaySelector } from '@/components/molecules/PaySelector';
+import { PaySelector } from '@/components/features/pay/PaySelector';
 
 describe('PaySelector', () => {
   it('uses the selected amount in the Venmo CTA and icon', () => {

@@ -96,7 +96,10 @@ export function FooterBranding({
       <Link
         href={logoHref}
         prefetch={false}
-        aria-label='Jovie Home'
+        // mark='text' renders visible "Powered by Jovie" copy; an aria-label
+        // there shadows the visible text (WCAG 2.5.3 label-in-name), so only
+        // the icon/wordmark marks get the explicit label.
+        aria-label={mark === 'text' ? undefined : 'Jovie Home'}
         className={logoLinkClass}
       >
         {renderLogoMark(mark, size, isLinear, logoClass)}

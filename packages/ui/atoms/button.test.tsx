@@ -697,3 +697,19 @@ describe('Button', () => {
   });
   // href prop removed; use asChild with an anchor element instead
 });
+
+describe('Button destructive contrast (JOV-8873)', () => {
+  it.each(['secondary', 'tertiary', 'ghost', 'link'] as const)(
+    'uses the AA error text token for destructive %s buttons',
+    variant => {
+      render(
+        <Button variant={variant} destructive>
+          Delete
+        </Button>
+      );
+      const btn = screen.getByRole('button', { name: 'Delete' });
+      expect(btn).toHaveClass('text-error-text');
+      expect(btn).not.toHaveClass('text-error');
+    }
+  );
+});

@@ -183,7 +183,10 @@ export function AdminTablePagination({
               value={String(pageSize)}
               onValueChange={value => onPageSizeChange(Number(value))}
             >
-              <SelectTrigger className='h-8 w-16 px-2 text-xs'>
+              <SelectTrigger
+                aria-label='Rows Per Page'
+                className='h-8 w-16 px-2 text-xs'
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

@@ -96,7 +96,10 @@ export function OperatorBanner({
           <span className='truncate'>
             {envIssues.slice(0, 2).join('; ')}
             {envIssues.length > 2 && (
-              <span className='ml-1 text-amber-800'>
+              // amber-800 on the amber-500 banner measured ~3.3:1 — below WCAG
+              // AA; amber-950 matches the banner's primary ink (axe
+              // color-contrast).
+              <span className='ml-1 text-amber-950'>
                 +{envIssues.length - 2} more
               </span>
             )}

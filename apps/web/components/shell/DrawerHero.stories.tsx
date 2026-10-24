@@ -49,7 +49,7 @@ export const StableRail: Story = {
 export const WithActions: Story = {
   args: {
     onPlay: fn(),
-    playLabel: 'Play Lost in the Light',
+    playLabel: 'Play LI — Lost in the Light',
     onMenu: fn(),
     statusBadge: (
       <span className='inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-caption text-secondary-token'>

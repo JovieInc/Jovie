@@ -94,7 +94,7 @@ test.describe('Command palette — Cmd+K contract', () => {
     // The sidebar trigger's accessible name is `Search Jovie` (its visible
     // text is `Search`/`Search chats`), see HeaderSearchSurfaceFromContext.
     await page
-      .getByRole('button', { name: 'Search Jovie', exact: true })
+      .getByRole('button', { name: /Search Jovie$/, exact: true })
       .filter({ visible: true })
       .first()
       .click();

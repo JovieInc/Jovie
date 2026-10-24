@@ -108,11 +108,7 @@ export function DemoShell({
             <SidebarHeader className='relative h-12 justify-center gap-0 pl-2 pr-3.5 pt-0 pb-0'>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton
-                    size='sm'
-                    className='h-7 font-medium'
-                    aria-label='Open Workspace Selector'
-                  >
+                  <SidebarMenuButton size='sm' className='h-7 font-medium'>
                     <div className='flex items-center gap-1.5 w-full'>
                       <BrandLogo
                         size='compact'
@@ -120,6 +116,9 @@ export function DemoShell({
                         tone='auto'
                       />
                       <span className='truncate flex-1 text-app tracking-tight [font-weight:var(--font-weight-nav)]'>
+                        <span className='sr-only'>
+                          Open Workspace Selector:
+                        </span>{' '}
                         {DEMO_ARTIST_NAME}
                       </span>
                       <ChevronDown className='size-3 shrink-0 text-sidebar-item-icon opacity-60' />

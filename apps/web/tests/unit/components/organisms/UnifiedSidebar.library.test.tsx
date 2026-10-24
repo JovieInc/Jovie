@@ -346,7 +346,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: 'Switch Identity' })
+      screen.getByRole('button', { name: /^Switch Identity:/ })
     ).toBeInTheDocument();
   });
 
@@ -357,7 +357,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.queryByRole('button', { name: 'Switch Identity' })
+      screen.queryByRole('button', { name: /^Switch Identity:/ })
     ).not.toBeInTheDocument();
   });
 
@@ -584,7 +584,7 @@ describe('UnifiedSidebar library route', () => {
         logos[0].parentElement?.closest('[inert], [aria-hidden="true"]')
       ).toBeNull();
       expect(
-        screen.getByRole('button', { name: 'Switch Workspace' })
+        screen.getByRole('button', { name: /^Switch Workspace: / })
       ).toBeInTheDocument();
       expect(
         screen.getAllByRole('button', { name: 'Expand sidebar' })
@@ -600,7 +600,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: 'Switch Workspace' })
+      screen.getByRole('button', { name: /^Switch Workspace: / })
     ).toHaveTextContent('Jovie');
   });
 
@@ -612,7 +612,7 @@ describe('UnifiedSidebar library route', () => {
     });
 
     expect(
-      screen.queryByRole('button', { name: 'Switch Workspace' })
+      screen.queryByRole('button', { name: /^Switch Workspace: / })
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Ask Jovie' })
@@ -627,7 +627,7 @@ describe('UnifiedSidebar library route', () => {
       variant: 'ov',
     });
 
-    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    const trigger = screen.getByRole('button', { name: /^Switch Workspace: / });
     expect(trigger).toHaveTextContent('OV');
     expect(trigger).toHaveClass('h-7');
     expect(container.querySelector('[data-brand-variant="ov"]')).not.toBeNull();

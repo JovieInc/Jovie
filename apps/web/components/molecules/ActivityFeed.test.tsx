@@ -67,10 +67,9 @@ describe('ActivityFeed', () => {
   it('keeps the loading skeleton on the same row shell geometry', () => {
     render(<ActivityFeed events={[]} isLoading />);
 
-    expect(screen.getByRole('feed', { name: 'Activity Feed' })).toHaveAttribute(
-      'aria-busy',
-      'true'
-    );
+    expect(
+      screen.getByRole('status', { name: 'Loading Activity Feed' })
+    ).toHaveAttribute('aria-busy', 'true');
     expect(
       screen.getAllByTestId('activity-timeline-skeleton-line')
     ).toHaveLength(4);

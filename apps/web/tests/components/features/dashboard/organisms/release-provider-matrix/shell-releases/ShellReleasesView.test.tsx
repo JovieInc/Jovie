@@ -591,11 +591,12 @@ describe('ShellReleasesView', () => {
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
     expect(screen.getByText('Other')).toBeInTheDocument();
-    // The catalog is a native list (not an ARIA listbox): rows own real
-    // per-cell controls, which an ARIA `option` cannot contain (axe
-    // nested-interactive).
+    // List rows own real per-cell controls and keep their list owner
+    // through the context-menu host wrappers.
     const list = screen.getByRole('list', { name: 'Releases' });
-    expect(list.tagName).toBe('UL');
+    expect(
+      screen.getByRole('listitem', { name: 'Lost in the Light' }).closest('ul')
+    ).toBe(list);
     expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(2);
   });
 
@@ -755,7 +756,7 @@ describe('ShellReleasesView', () => {
     expect(probe).toBeInTheDocument();
     expect(probe).toHaveAttribute('data-search-total', '2');
     const searchTrigger = await screen.findByRole('button', {
-      name: 'Search Jovie',
+      name: /Search Jovie$/,
     });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
   });
@@ -768,7 +769,7 @@ describe('ShellReleasesView', () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Search Jovie' })
+      await screen.findByRole('button', { name: /Search Jovie$/ })
     );
 
     expect(

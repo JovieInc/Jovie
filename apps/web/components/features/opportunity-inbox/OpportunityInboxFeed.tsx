@@ -141,22 +141,26 @@ export function OpportunityInboxFeed({
                 isBusy={pendingActionId === card.id}
               />
             ) : (
-              <OpportunityRow
-                key={card.id}
-                id={card.id}
-                state={mapCardState(card.status)}
-                title={card.title}
-                metadata={card.why}
-                hideDot={false}
-                primaryActionLabel={
-                  card.category === 'brand_deal'
-                    ? card.primaryActionLabel
-                    : undefined
-                }
-                onPrimaryAction={id => onApprove(id)}
-                onDismiss={id => onDismiss(id)}
-                isBusy={pendingActionId === card.id}
-              />
+              // OpportunityRow renders an li; each row gets its own list
+              // context because sibling card types are not list items
+              // (axe listitem / list).
+              <ul key={card.id} className='m-0 list-none p-0'>
+                <OpportunityRow
+                  id={card.id}
+                  state={mapCardState(card.status)}
+                  title={card.title}
+                  metadata={card.why}
+                  hideDot={false}
+                  primaryActionLabel={
+                    card.category === 'brand_deal'
+                      ? card.primaryActionLabel
+                      : undefined
+                  }
+                  onPrimaryAction={id => onApprove(id)}
+                  onDismiss={id => onDismiss(id)}
+                  isBusy={pendingActionId === card.id}
+                />
+              </ul>
             )
           )}
       </div>

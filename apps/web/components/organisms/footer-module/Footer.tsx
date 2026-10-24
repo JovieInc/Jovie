@@ -101,7 +101,7 @@ export function Footer({
             ariaLabel='Legal'
             links={profileLegalLinks}
             className='gap-2 text-3xs leading-4'
-            linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
+            linkClassName='text-3xs leading-4 opacity-80 hover:opacity-100'
           />
         </div>
 
@@ -111,7 +111,7 @@ export function Footer({
             ariaLabel='Legal'
             links={profileLegalLinks}
             className='gap-2 text-3xs leading-4'
-            linkClassName='text-3xs leading-4 opacity-60 hover:opacity-100'
+            linkClassName='text-3xs leading-4 opacity-80 hover:opacity-100'
           />
         </div>
       </footer>

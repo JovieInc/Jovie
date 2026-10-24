@@ -557,7 +557,7 @@ export function OpportunityInboxPageClient({
                 <div className='system-b-opportunity-inbox-section-label'>
                   Tour Dates To Review
                 </div>
-                <div className='system-b-opportunity-inbox-feed-list'>
+                <ul className='system-b-opportunity-inbox-feed-list'>
                   {pendingTourDates.map(item => (
                     <OpportunityInboxTourDateRow
                       key={item.id}
@@ -567,7 +567,7 @@ export function OpportunityInboxPageClient({
                       isBusy={pendingTourDateActionId === item.id}
                     />
                   ))}
-                </div>
+                </ul>
               </section>
             ) : null}
 

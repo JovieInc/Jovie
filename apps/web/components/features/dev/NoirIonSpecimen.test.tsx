@@ -38,3 +38,15 @@ describe('NoirIonSpecimen', () => {
     expect(screen.getByText('Ion focus ring')).toBeInTheDocument();
   });
 });
+
+describe('NoirIonSpecimen text contrast (JOV-8873)', () => {
+  it('renders accent labels with the AA text variants where defined', () => {
+    const { container } = render(<NoirIonSpecimen />);
+    expect(
+      container.querySelector('[style*="--color-accent-purple-text"]')
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[style*="--color-error-text"]')
+    ).not.toBeNull();
+  });
+});

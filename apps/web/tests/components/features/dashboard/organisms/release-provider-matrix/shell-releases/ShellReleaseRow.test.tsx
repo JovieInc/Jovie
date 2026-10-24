@@ -105,18 +105,36 @@ describe('ShellReleaseRow audio affordance', () => {
     );
 
     const row = container.querySelector('[data-shell-release-row]');
-    // Rows ARE native list items inside `role="list"` (implicit listitem —
-    // no explicit role, no wrapper element): an ARIA `option` cannot contain
-    // the row's real controls (axe nested-interactive), so selection stays
-    // visual (`data-selected` + selected tokens), not `aria-selected`.
-    expect(row?.tagName).toBe('LI');
-    expect(row).not.toHaveAttribute('role');
+    // The row renders on the shared ShellListRowFrame div host inside the
+    // parent `role="list"`, carrying the explicit name-from-author
+    // `listitem` role: an ARIA `option` cannot contain the row's real
+    // controls (axe nested-interactive), so selection stays visual
+    // (`data-selected` + selected tokens), not `aria-selected`.
+    expect(row?.tagName).toBe('DIV');
+    expect(row).toHaveAttribute('role', 'listitem');
     // name-from-author: the row announces its release title.
     expect(row).toHaveAttribute('aria-label', 'Lost in the Light');
     expect(row).not.toHaveAttribute('aria-selected');
     expect(row).toHaveAttribute('data-selected', 'true');
     expect(row?.className).toContain('system-b-table-row-selected');
     expect(row?.className).toContain('system-b-table-row-focus-visible');
+  });
+
+  it('omits the listitem role when the caller owns the list item wrapper', () => {
+    const { container } = render(
+      <ShellReleaseRow
+        release={fakeRelease({ id: 'r1', title: 'Lost in the Light' })}
+        isSelected={false}
+        onSelect={() => undefined}
+        asListItem={false}
+      />
+    );
+
+    const row = container.querySelector('[data-shell-release-row]');
+    // ShellReleasesView wraps each row in its own <li> listitem trigger;
+    // nesting listitem-in-listitem would fail axe `listitem`.
+    expect(row).not.toHaveAttribute('role');
+    expect(row).not.toHaveAttribute('aria-label');
   });
 
   it('mounts trailing actions in the shared contextual action slot', () => {

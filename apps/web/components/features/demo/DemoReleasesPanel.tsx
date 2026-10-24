@@ -38,7 +38,7 @@ export function DemoReleasesPanel({
     () => new Set()
   );
   const [focusIndex, setFocusIndex] = useState(-1);
-  const listRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLElement>(null);
 
   // Build flat list of IDs for keyboard navigation
   const flatIds = groups.flatMap(g =>
@@ -94,12 +94,9 @@ export function DemoReleasesPanel({
   );
 
   return (
-    <div // NOSONAR - custom listbox pattern with keyboard navigation, native <select> not suitable for this UI
+    <section
       ref={listRef}
       className='h-full overflow-y-auto overflow-x-hidden outline-none scrollbar-hide'
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-      role='listbox'
       aria-label='Releases'
     >
       {groups.map(group => {
@@ -113,7 +110,6 @@ export function DemoReleasesPanel({
                 type='button'
                 onClick={() => toggleGroup(group.status)}
                 className='flex min-w-0 flex-1 items-center gap-2 text-xs text-tertiary-token [font-weight:var(--font-weight-medium)]'
-                aria-label={`Toggle ${STATUS_LABEL[group.status]} releases section`}
               >
                 <ChevronRight
                   className={cn(
@@ -126,6 +122,7 @@ export function DemoReleasesPanel({
                 {WARNING_STATUSES.has(group.status) && (
                   <AlertTriangle className='size-3 text-yellow-500/80' />
                 )}
+                <span className='sr-only'>Toggle releases section:</span>{' '}
                 <span className='truncate'>{STATUS_LABEL[group.status]}</span>
                 <span className='text-2xs text-quaternary-token'>
                   {group.releases.length}
@@ -141,97 +138,105 @@ export function DemoReleasesPanel({
             </div>
 
             {/* Rows */}
-            {!isCollapsed &&
-              group.releases.map(release => {
-                const globalIndex = flatIds.indexOf(release.id);
-                const isFocused = globalIndex === focusIndex;
-                const isSelected = release.id === selectedId;
+            {!isCollapsed && (
+              <div
+                role='listbox'
+                tabIndex={0}
+                onKeyDown={handleKeyDown}
+                aria-label={`${STATUS_LABEL[group.status]} releases`}
+              >
+                {group.releases.map(release => {
+                  const globalIndex = flatIds.indexOf(release.id);
+                  const isFocused = globalIndex === focusIndex;
+                  const isSelected = release.id === selectedId;
 
-                return (
-                  <div // NOSONAR - custom listbox option with keyboard support
-                    key={release.id}
-                    data-release-id={release.id}
-                    role='option'
-                    tabIndex={0}
-                    aria-selected={isSelected}
-                    onClick={() => {
-                      onSelect(release.id);
-                      setFocusIndex(globalIndex);
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
+                  return (
+                    <div // NOSONAR - custom listbox option with keyboard support
+                      key={release.id}
+                      data-release-id={release.id}
+                      role='option'
+                      tabIndex={0}
+                      aria-selected={isSelected}
+                      onClick={() => {
                         onSelect(release.id);
                         setFocusIndex(globalIndex);
-                      }
-                    }}
-                    className={cn(
-                      'flex h-8 cursor-pointer items-center gap-3 border-b border-(--app-shell-frame-seam) px-4 text-app',
-                      isSelected &&
-                        'bg-[color-mix(in_oklab,var(--linear-row-selected)_20%,transparent)] shadow-[inset_2px_0_0_var(--color-accent)]',
-                      isFocused && !isSelected && 'bg-surface-2',
-                      !isSelected && !isFocused && ''
-                    )}
-                  >
-                    {/* Priority */}
-                    {release.priority === 'none' ? (
-                      <span className='size-4' />
-                    ) : (
-                      <DemoPriorityIcon priority={release.priority} />
-                    )}
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onSelect(release.id);
+                          setFocusIndex(globalIndex);
+                        }
+                      }}
+                      className={cn(
+                        'flex h-8 cursor-pointer items-center gap-3 border-b border-(--app-shell-frame-seam) px-4 text-app',
+                        isSelected &&
+                          'bg-[color-mix(in_oklab,var(--linear-row-selected)_20%,transparent)] shadow-[inset_2px_0_0_var(--color-accent)]',
+                        isFocused && !isSelected && 'bg-surface-2',
+                        !isSelected && !isFocused && ''
+                      )}
+                    >
+                      {/* Priority */}
+                      {release.priority === 'none' ? (
+                        <span className='size-4' />
+                      ) : (
+                        <DemoPriorityIcon priority={release.priority} />
+                      )}
 
-                    {/* Release ID */}
-                    <span className='max-sm:hidden w-14 shrink-0 font-mono text-xs text-quaternary-token'>
-                      {release.displayId}
-                    </span>
-
-                    {/* Status icon */}
-                    <DemoStatusIcon status={release.status} />
-
-                    {/* Title + artist inline */}
-                    <div className='min-w-0 flex flex-1 items-baseline gap-2'>
-                      <span className='truncate text-xs font-medium text-primary-token'>
-                        {release.title}
+                      {/* Release ID */}
+                      <span className='max-sm:hidden w-14 shrink-0 font-mono text-xs text-quaternary-token'>
+                        {release.displayId}
                       </span>
-                      <span className='truncate text-xs text-tertiary-token'>
-                        {release.artist}
-                      </span>
-                    </div>
 
-                    {/* Labels */}
-                    <div className='max-sm:hidden items-center gap-1 sm:flex'>
-                      {release.labels.slice(0, 2).map(label => (
-                        <span
-                          key={label.id}
-                          className='flex items-center gap-1.5 rounded-sm bg-surface-1 px-1.5 py-0.5 text-3xs text-secondary-token [font-weight:var(--font-weight-medium)]'
-                        >
-                          <span
-                            className='size-1.5 rounded-full'
-                            style={{ backgroundColor: label.color }}
-                          />
-                          {label.name}
+                      {/* Status icon */}
+                      <DemoStatusIcon status={release.status} />
+
+                      {/* Title + artist inline */}
+                      <div className='min-w-0 flex flex-1 items-baseline gap-2'>
+                        <span className='truncate text-xs font-medium text-primary-token'>
+                          {release.title}
                         </span>
-                      ))}
+                        <span className='truncate text-xs text-tertiary-token'>
+                          {release.artist}
+                        </span>
+                      </div>
+
+                      {/* Labels */}
+                      <div className='max-sm:hidden items-center gap-1 sm:flex'>
+                        {release.labels.slice(0, 2).map(label => (
+                          <span
+                            key={label.id}
+                            className='flex items-center gap-1.5 rounded-sm bg-surface-1 px-1.5 py-0.5 text-3xs text-secondary-token [font-weight:var(--font-weight-medium)]'
+                          >
+                            <span
+                              className='size-1.5 rounded-full'
+                              style={{ backgroundColor: label.color }}
+                            />
+                            {label.name}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Type badge */}
+                      <span className='max-lg:hidden shrink-0 text-2xs text-quaternary-token'>
+                        {release.type}
+                      </span>
+
+                      {/* Assignee */}
+                      <DemoAvatar assignee={release.assignee} size={16} />
+
+                      {/* Date */}
+                      <span className='max-xl:hidden w-16 shrink-0 text-right text-xs text-quaternary-token'>
+                        {release.releaseDate}
+                      </span>
                     </div>
-
-                    {/* Type badge */}
-                    <span className='max-lg:hidden shrink-0 text-2xs text-quaternary-token'>
-                      {release.type}
-                    </span>
-
-                    {/* Assignee */}
-                    <DemoAvatar assignee={release.assignee} size={16} />
-
-                    {/* Date */}
-                    <span className='max-xl:hidden w-16 shrink-0 text-right text-xs text-quaternary-token'>
-                      {release.releaseDate}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}
-    </div>
+    </section>
   );
 }

@@ -5,8 +5,23 @@ import { Button, TooltipShortcut } from '@jovie/ui';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
+import {
+  PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+  PAGE_TOOLBAR_ICON_CLASS,
+  PAGE_TOOLBAR_ICON_STROKE_WIDTH,
+} from '@/components/molecules/page-toolbar-classes';
 import { cn } from '@/lib/utils';
-import { ACTION_BAR_BUTTON_CLASS, ActionBar } from './ActionBar';
+import { ActionBar } from './ActionBar';
+
+export {
+  PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+  PAGE_TOOLBAR_ICON_CLASS,
+  PAGE_TOOLBAR_ICON_STROKE_WIDTH,
+};
 
 export const PAGE_TOOLBAR_CONTAINER_CLASS =
   'flex min-h-10 min-w-0 items-center gap-1.5 bg-transparent px-3 py-1.5';
@@ -27,14 +42,6 @@ export const PAGE_TOOLBAR_TAB_BUTTON_CLASS =
   'inline-flex h-7.5 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-pill bg-transparent px-2.5 text-2xs font-caption font-[540] tracking-tight text-tertiary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 disabled:pointer-events-none disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
 
 export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS = 'bg-surface-1 text-primary-token';
-
-export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
-  ACTION_BAR_BUTTON_CLASS,
-  'h-7 rounded-full border-0 bg-transparent px-2 text-2xs font-[540] text-tertiary-token shadow-none hover:border-0 hover:bg-surface-1 hover:text-primary-token hover:shadow-none focus-visible:border-0 focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-0 active:border-0 active:bg-surface-1 active:text-primary-token active:shadow-none disabled:pointer-events-none disabled:bg-transparent disabled:opacity-35 [&_svg]:h-3.5 [&_svg]:w-3.5'
-);
-
-export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
-  'w-7 justify-center px-0 text-tertiary-token';
 
 export const PAGE_TOOLBAR_BACK_LINK_CLASS = cn(
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
@@ -66,12 +73,6 @@ export const PAGE_TOOLBAR_MENU_TRIGGER_CLASS = cn(
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
   'min-w-28 justify-between gap-1.5 rounded-full px-2.5 text-secondary-token'
 );
-
-export const PAGE_TOOLBAR_ACTION_ACTIVE_CLASS =
-  'border-transparent bg-transparent text-primary-token shadow-none';
-
-export const PAGE_TOOLBAR_ICON_CLASS = 'h-3.5 w-3.5';
-export const PAGE_TOOLBAR_ICON_STROKE_WIDTH = 2;
 
 export interface TableToolbarBulkAction {
   readonly label: string;

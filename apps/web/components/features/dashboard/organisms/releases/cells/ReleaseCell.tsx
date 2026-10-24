@@ -89,7 +89,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             className={cn(
               'h-4 w-4 rounded-xs p-0 transition-opacity duration-subtle focus-visible:opacity-100',
               isPlaying
-                ? 'text-(--linear-accent) opacity-100'
+                ? 'text-(--color-accent-purple-text) opacity-100'
                 : 'text-quaternary-token opacity-0 group-hover:opacity-100 aria-[pressed=true]:opacity-100'
             )}
             aria-label={
@@ -124,9 +124,9 @@ export const ReleaseCell = memo(function ReleaseCell({
           type='button'
           onClick={handleSelect}
           className='min-w-0 flex-1 text-left focus-visible:outline-none'
-          aria-label={`Open ${release.title}`}
           data-testid={`release-open-${release.id}`}
         >
+          <span className='sr-only'>Open </span>
           <div className='flex min-w-0 items-center gap-1.5 leading-none'>
             <TruncatedText
               lines={1}

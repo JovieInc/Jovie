@@ -112,3 +112,14 @@ describe('ProfileMobileNotificationsFlow', () => {
     expect(source).toContain('text-error');
   });
 });
+
+describe('ProfileMobileNotificationsFlow contrast floor', () => {
+  it('keeps secondary copy at white/60, never the sub-AA white/42', () => {
+    const source = readFileSync(
+      resolve(__dirname, 'ProfileMobileNotificationsFlow.tsx'),
+      'utf8'
+    );
+    expect(source).not.toContain('text-white/42');
+    expect(source).toContain('text-white/60');
+  });
+});

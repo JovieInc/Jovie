@@ -13,7 +13,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock dnd-kit sortable
 vi.mock('@dnd-kit/sortable', () => ({
   useSortable: () => ({
-    attributes: {},
+    attributes: {
+      role: 'button',
+      tabIndex: 0,
+      'aria-roledescription': 'sortable',
+    },
     listeners: {},
     setNodeRef: vi.fn(),
     transform: undefined,
@@ -394,8 +398,11 @@ describe('SortableLinkItem', () => {
         <SortableLinkItem {...defaultProps} draggable={true} />
       );
 
-      // Component should render without error
-      expect(mockBuildPillLabel).toHaveBeenCalled();
+      const handle = screen.getByRole('button', {
+        name: 'Drag to reorder Instagram',
+      });
+      expect(handle.parentElement).not.toHaveAttribute('role', 'button');
+      expect(handle.querySelector('button, a, input')).toBeNull();
     });
 
     it('should still render when draggable is false', () => {
@@ -403,8 +410,9 @@ describe('SortableLinkItem', () => {
         <SortableLinkItem {...defaultProps} draggable={false} />
       );
 
-      // Component should still render
-      expect(mockBuildPillLabel).toHaveBeenCalled();
+      expect(
+        screen.queryByRole('button', { name: /Drag to reorder/ })
+      ).not.toBeInTheDocument();
     });
   });
 

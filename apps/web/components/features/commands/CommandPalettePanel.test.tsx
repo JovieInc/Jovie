@@ -93,6 +93,12 @@ describe('CommandPalettePanel', () => {
     );
 
     expect(screen.getByText('No matches.')).toBeVisible();
-    expect(screen.queryByRole('option')).toBeNull();
+    // The empty-state hint is a disabled placeholder option (valid listbox
+    // child); no selectable rows remain.
+    expect(
+      screen
+        .queryAllByRole('option')
+        .filter(row => row.getAttribute('aria-disabled') !== 'true')
+    ).toHaveLength(0);
   });
 });
