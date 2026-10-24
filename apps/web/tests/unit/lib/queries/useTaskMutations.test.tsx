@@ -185,14 +185,13 @@ describe('useTaskMutations', () => {
     // committed row must retain every field, not just the last write.
     let version = 4;
     const seen: Array<number | undefined> = [];
-    const row: Pick<
-      TaskView,
-      'title' | 'status' | 'priority' | 'assigneeKind'
-    > = {
+    // TaskView fields are readonly; track the committed patch in a mutable
+    // draft and hand copies to the fixture helper.
+    const committed = {
       title: 'Layout QA task fixture',
-      status: 'backlog',
-      priority: 'medium',
-      assigneeKind: 'human',
+      status: 'backlog' as TaskStatus,
+      priority: 'medium' as TaskView['priority'],
+      assigneeKind: 'human' as TaskView['assigneeKind'],
     };
     mockUpdateTask.mockImplementation(
       async (_taskId: string, data: UpdateTaskInput) => {
@@ -201,13 +200,13 @@ describe('useTaskMutations', () => {
           throw new Error('Task changed in another session');
         }
         version += 1;
-        if (data.title !== undefined) row.title = data.title;
-        if (data.status !== undefined) row.status = data.status;
-        if (data.priority !== undefined) row.priority = data.priority;
+        if (data.title !== undefined) committed.title = data.title;
+        if (data.status !== undefined) committed.status = data.status;
+        if (data.priority !== undefined) committed.priority = data.priority;
         if (data.assigneeKind !== undefined) {
-          row.assigneeKind = data.assigneeKind;
+          committed.assigneeKind = data.assigneeKind;
         }
-        return createTask({ ...row, mutationVersion: version });
+        return createTask({ ...committed, mutationVersion: version });
       }
     );
 
@@ -246,7 +245,7 @@ describe('useTaskMutations', () => {
     });
 
     expect(seen).toEqual([4, 5, 6, 7]);
-    expect(row).toEqual({
+    expect(committed).toEqual({
       title: 'Layout QA task fixture 2',
       status: 'in_progress',
       priority: 'urgent',
