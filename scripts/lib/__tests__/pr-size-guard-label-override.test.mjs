@@ -220,6 +220,9 @@ describe('pr-size-guard label provenance', () => {
   it('allowlists only the mechanical bot actors that apply real codemod labels', () => {
     expect(TRUSTED_SIZE_GUARD_LABEL_BOTS).toEqual([
       'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
       'claude[bot]',
     ]);
   });
