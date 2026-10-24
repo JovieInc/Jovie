@@ -169,3 +169,13 @@ Never mark a task complete without confirming the fix works:
 Do not land `test.skip`, `it.skip`, `describe.skip`, `.only`, or `xit` to get a
 change through CI. The gate-weakening detector fails that pull request. Deleting
 or emptying a `scripts/invariants/*.test.*` file fails the same check.
+
+## Fleet premise rule
+
+When the same check fails twice in a row on a PR, state the assumption behind
+the proposed repair and run one test that could falsify it **before patching**.
+Read both failures, including reruns at the same head. Record `Assumption:`,
+`Falsifying test:` (exact command), and `Result:` (observed output and implication)
+in the PR body under `## Premise check`. Repeating the failing check without
+testing the assumption is not a falsifying test. This applies to lane-fix-relay,
+safe-pr-remediation, and remediation-sweep handoffs as well as direct agents.

@@ -996,6 +996,66 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('renders Jovie footer branding on the free public profile (JOV-8777)', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const branding = await screen.findByTestId('profile-jovie-branding');
+    expect(
+      within(branding).getByRole('link', { name: /Jovie home/i })
+    ).toHaveAttribute(
+      'href',
+      `/?utm_source=profile&utm_artist=${mockArtist.handle}`
+    );
+  });
+
+  it('hides Jovie footer branding inside embedded previews (JOV-8777)', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        embeddedPreview
+      />
+    );
+
+    expect(await screen.findByTestId('profile-compact-surface')).toBeVisible();
+    expect(
+      screen.queryByTestId('profile-jovie-branding')
+    ).not.toBeInTheDocument();
+  });
+
+  it('passes hideJovieBranding through to the desktop surface (JOV-8777)', async () => {
+    const restoreViewport = mockViewport('desktop');
+    try {
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockProfileDesktopSurface).toHaveBeenCalled();
+      });
+      const desktopProps = mockProfileDesktopSurface.mock.calls.at(
+        -1
+      )?.[0] as Record<string, unknown>;
+      expect(desktopProps.hideJovieBranding).toBe(false);
+    } finally {
+      restoreViewport();
+    }
+  });
+
   it('renders the compact bottom navigation with four primary icon tabs', async () => {
     render(
       <ProfileCompactTemplate
@@ -1513,6 +1573,7 @@ describe('ProfileCompactTemplate', () => {
       );
     });
     expect(pushStateSpy).not.toHaveBeenCalled();
+    const rendersAfterLanding = mockUseProfileShell.mock.calls.length;
 
     // A client Link (the about drawer's contact links) moves the URL to
     // contact mode; requestedMode is still 'about' until the shell's
@@ -1531,6 +1592,13 @@ describe('ProfileCompactTemplate', () => {
         socialLinks={[]}
         contacts={[]}
       />
+    );
+
+    // A fresh JSX element actually re-rendered the template; an identical
+    // element reference would bail out and prove nothing. The zero-write
+    // assertions below are only meaningful if the history effect re-ran.
+    expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+      rendersAfterLanding
     );
 
     await waitFor(() => {
@@ -1556,6 +1624,10 @@ describe('ProfileCompactTemplate', () => {
         contentPreferences: null,
       },
     }));
+    // The mode-sync rerender must also be real: capture the count before
+    // the flip so the assertion below proves this rerender re-ran the
+    // history effect too.
+    const rendersBeforeModeSync = mockUseProfileShell.mock.calls.length;
     view.rerender(
       <ProfileCompactTemplate
         mode='contact'
@@ -1563,6 +1635,9 @@ describe('ProfileCompactTemplate', () => {
         socialLinks={[]}
         contacts={[]}
       />
+    );
+    expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+      rendersBeforeModeSync
     );
     await waitFor(() => {
       expect(`${window.location.pathname}${window.location.search}`).toBe(
@@ -1630,6 +1705,7 @@ describe('ProfileCompactTemplate', () => {
     });
     pushStateSpy.mockClear();
     replaceStateSpy.mockClear();
+    const rendersAfterLanding = mockUseProfileShell.mock.calls.length;
     try {
       view.rerender(
         <ProfileCompactTemplate
@@ -1638,6 +1714,13 @@ describe('ProfileCompactTemplate', () => {
           socialLinks={[]}
           contacts={[]}
         />
+      );
+
+      // A fresh JSX element actually re-rendered the template; an identical
+      // element reference would bail out and prove nothing. The zero-write
+      // assertions below are only meaningful if the history effect re-ran.
+      expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+        rendersAfterLanding
       );
 
       await waitFor(() => {

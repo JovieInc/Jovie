@@ -2955,7 +2955,9 @@ export function LibrarySurface({
     Record<string, LibraryAssetShareViewModel>
   >({});
   const [preset, setPreset] = useState<LibraryPresetId>(() =>
-    parseLibraryViewParam(searchParams.get('view'))
+    parseLibraryViewParam(
+      searchParams.get('preset') ?? searchParams.get('view')
+    )
   );
   const [stage, setStage] = useState(() =>
     parseLibraryStageParam(
@@ -2987,7 +2989,11 @@ export function LibrarySurface({
   const deferredSort = useDeferredValue(sort);
 
   useEffect(() => {
-    setPreset(parseLibraryViewParam(searchParams.get('view')));
+    setPreset(
+      parseLibraryViewParam(
+        searchParams.get('preset') ?? searchParams.get('view')
+      )
+    );
     setStage(
       parseLibraryStageParam(
         searchParams.get('stage') ?? searchParams.get('section')
@@ -3168,10 +3174,12 @@ export function LibrarySurface({
     (next: LibraryPresetId) => {
       setPreset(next);
       const params = new URLSearchParams(searchParams.toString());
+      // Migrate legacy filter links without writing the releases matrix alias.
+      params.delete('view');
       if (next === 'all') {
-        params.delete('view');
+        params.delete('preset');
       } else {
-        params.set('view', next);
+        params.set('preset', next);
       }
       const query = params.toString();
       router.replace(
