@@ -83,11 +83,10 @@ Use repo-root `pnpm` / `pnpm turbo`; `.nvmrc` and `package.json` pins are
 authoritative. Secret-bound commands use Doppler. Never bypass hooks, weaken
 gates, or use `--no-verify`.
 
-Select skills by intent; load their entry and needed references. Edit `.tmpl`
-sources and regenerate. CLAUDE.md is a router; use Playwright for repo web QA.
-Message agents: `jovie mesh send/read`.
-Batch independent reads, serialize state changes, and require evidence to
-integrate delegated work.
+Select skills by intent; load their entry and references. Edit `.tmpl` sources
+and regenerate. CLAUDE.md stays a router; use Playwright only for repo web QA.
+Message agents: `jovie mesh send/read`. Batch independent reads, serialize
+state changes, and require evidence to integrate delegated work.
 
 Before publication follow `docs/PR_FLOW.md`: coherent draft → rolling CI → review
 and required checks. Auth/payment edits use CI + Migration Guard, not an extra

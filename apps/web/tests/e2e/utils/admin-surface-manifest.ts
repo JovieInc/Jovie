@@ -61,6 +61,15 @@ function getRedirectName(path: string): string {
 
 const renderSurfaces = [
   {
+    id: 'inbox',
+    name: 'Admin Inbox',
+    path: APP_ROUTES.ADMIN_INBOX,
+    rootTestId: 'founder-inbox-page',
+    snapshotSlug: 'admin-inbox',
+    utilityRoot: false,
+    includeInFastHealth: true,
+  },
+  {
     id: 'home',
     name: 'Admin Home',
     path: APP_ROUTES.ADMIN_NOW,
