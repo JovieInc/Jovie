@@ -6,6 +6,7 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/http/server-fetch', () => ({ serverFetch: vi.fn() }));
 
 const channelUrl = 'https://www.youtube.com/@testartist';
+const OWNED_ID = 'UC1234567890123456789012';
 const base = {
   accessControlled: true,
   spotifyArtistId: null,
@@ -71,16 +72,35 @@ describe('YouTube artist interview admission', () => {
     vi.useRealTimers();
   });
 
-  it('admits a music artist without Spotify using actual public upload evidence', async () => {
+  it('admits an owner-verified music artist using actual public upload evidence', async () => {
     uploads(['2026-10-20', '2026-09-01', '2026-01-01']);
-    expect(await decideYouTubeOnboardingAccess(base)).toMatchObject({
-      kind: 'instant_access',
-      rationale: 'regularly_uploading_youtube_music_artist',
-    });
+    expect(await decideYouTubeOnboardingAccess(base, [OWNED_ID])).toMatchObject(
+      {
+        kind: 'instant_access',
+        rationale: 'regularly_uploading_youtube_music_artist',
+      }
+    );
     expect(serverFetch).toHaveBeenCalledTimes(3);
     expect(serverFetch).toHaveBeenCalledWith(
       expect.stringContaining('/videos?'),
       expect.objectContaining({ timeoutMs: 10_000 })
+    );
+  });
+
+  it('never grants access to an unverified channel that passes cadence', async () => {
+    uploads(['2026-10-20', '2026-09-01', '2026-01-01']);
+    expect((await decideYouTubeOnboardingAccess(base)).kind).toBe('waitlist');
+    uploads(['2026-10-20', '2026-09-01', '2026-01-01']);
+    expect(
+      (await decideYouTubeOnboardingAccess(base, ['UCsomeoneelse00000000000']))
+        .kind
+    ).toBe('waitlist');
+  });
+
+  it('fails closed when ownership cannot be established', async () => {
+    uploads(['2026-10-20', '2026-09-01', '2026-01-01']);
+    expect((await decideYouTubeOnboardingAccess(base, [])).kind).toBe(
+      'waitlist'
     );
   });
 
@@ -148,7 +168,9 @@ describe('YouTube artist interview admission', () => {
         vi.mocked(serverFetch).mockResolvedValueOnce(
           Response.json({ items: [] })
         );
-      expect((await decideYouTubeOnboardingAccess(base)).kind).toBe('waitlist');
+      expect((await decideYouTubeOnboardingAccess(base, [OWNED_ID])).kind).toBe(
+        'waitlist'
+      );
     }
   );
 });
