@@ -254,7 +254,7 @@ export function ArtistProfileMonetizationSection({
                 }}
                 disabled={activeCardIndex === 0}
                 className={cn(
-                  'ap-monetization__nav-btn pointer-events-auto rounded-full p-2.5 backdrop-blur-xl transition-colors',
+                  'ap-monetization__nav-btn pointer-events-auto rounded-full p-2.5 ds-glass transition-colors',
                   activeCardIndex === 0 && 'cursor-not-allowed opacity-35'
                 )}
                 aria-label='Scroll Monetization Left'
@@ -268,7 +268,7 @@ export function ArtistProfileMonetizationSection({
                 }}
                 disabled={activeCardIndex === cards.length - 1}
                 className={cn(
-                  'ap-monetization__nav-btn pointer-events-auto rounded-full p-2.5 backdrop-blur-xl transition-colors',
+                  'ap-monetization__nav-btn pointer-events-auto rounded-full p-2.5 ds-glass transition-colors',
                   activeCardIndex === cards.length - 1 &&
                     'cursor-not-allowed opacity-35'
                 )}

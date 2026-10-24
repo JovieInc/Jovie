@@ -126,6 +126,12 @@ describe('public CTA guard', () => {
     fireEvent.focus(screen.getByRole('button', { name: /Customers/ }));
     const flyout = document.getElementById('marketing-header-flyout-customers');
     expect(flyout).toHaveClass('marketing-glass-header__flyout--compact');
+    expect(
+      flyout?.querySelector('.marketing-glass-header__flyout-inner')
+    ).toHaveClass('ds-glass');
+    const header = screen.getByTestId('header-nav');
+    expect(header.style.backdropFilter).toBe('');
+    expect(header.style.getPropertyValue('-webkit-backdrop-filter')).toBe('');
     expect(flyout?.querySelectorAll('[data-variant]')).toHaveLength(0);
     expect(
       screen.getAllByRole('link', { name: 'Request access' })
@@ -240,7 +246,13 @@ describe('public CTA guard', () => {
     expect(headerNav).toContain(
       "cn('focus-ring-themed shrink-0 whitespace-nowrap', className)"
     );
-    expect(headerNav).toContain('blur(var(--blur-header))');
+    const glassCss = readFileSync(
+      join(ROOT, 'styles/primitives/glass.css'),
+      'utf8'
+    );
+    expect(glassCss).toContain('backdrop-filter: blur(8px)');
+    expect(glassCss).toContain('var(--noir-ion-ion) 3%');
+    expect(headerNav).not.toMatch(/(?:WebkitBackdropFilter|backdropFilter):/);
     expect(headerNav).not.toContain('--linear-blur-header');
     expect(headerNav).not.toMatch(
       /minimalAuth[\s\S]*?<Button[\s\S]*?>Get started<\/Button>/

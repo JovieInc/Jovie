@@ -22,10 +22,10 @@
     "heightRem": 2.75,
     "heightPx": 44,
     "shellMixPercent": 82,
-    "scrolledShellMixPercent": 90,
-    "blurPx": 20,
-    "saturatePercent": 165,
-    "backdropFilter": "blur(20px) saturate(165%)",
+    "scrolledShellMixPercent": 82,
+    "blurPx": 8,
+    "saturatePercent": 100,
+    "backdropFilter": "blur(8px)",
     "darkShellHex": "#07080A",
     "darkCanvasHex": "#030406"
   },
@@ -42,13 +42,13 @@
     "reducedMotion": "static-glow-only"
   },
   "compactGlass": {
-    "css": "apps/web/components/marketing/artist-profile/captureShared.css",
-    "selector": ".artist-profile-audience-pill",
-    "shell": "color-mix(in oklab, var(--system-b-cinematic-black) 82%, transparent)",
-    "shellToken": "--system-b-cinematic-black",
-    "shellHex": "#06070A",
-    "blurPx": 14,
-    "backdropFilter": "blur(14px)",
+    "css": "apps/web/styles/primitives/glass.css",
+    "selector": ".ds-glass",
+    "shell": "color-mix(in oklab, var(--noir-ion-shell) 82%, transparent)",
+    "shellToken": "--noir-ion-shell",
+    "shellHex": "#07080A",
+    "blurPx": 8,
+    "backdropFilter": "blur(8px)",
     "minHeightRem": 3,
     "maxWidth": "min(21rem, calc(100vw - 4rem))",
     "radius": "9999px",
@@ -81,8 +81,8 @@
       "hex": "#07080A"
     },
     "compact-glass": {
-      "token": "--system-b-cinematic-black",
-      "hex": "#06070A"
+      "token": "--noir-ion-shell",
+      "hex": "#07080A"
     },
     "soft-editorial-background": {
       "token": "--system-b-text-primary",

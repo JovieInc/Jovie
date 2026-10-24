@@ -12,8 +12,7 @@ export interface CompactGlassModuleProps {
 /**
  * Compact glass module (JOV-6248) — marketing presentation variant of the
  * `compact-glass` media recipe approved in JOV-6246 (reference #23).
- * The audience-pill material at module scale; shares captureShared.css as the
- * single material owner with `.artist-profile-audience-pill`.
+ * Geometry lives in captureShared.css; ds-glass is the single material owner.
  */
 export function CompactGlassModule({
   label,
@@ -21,9 +20,9 @@ export function CompactGlassModule({
   className,
 }: Readonly<CompactGlassModuleProps>) {
   return (
-    <div className={cn('compact-glass-module', className)}>
+    <div className={cn('compact-capture-module ds-glass', className)}>
       {label ? (
-        <span className='compact-glass-module__label'>{label}</span>
+        <span className='compact-capture-module__label'>{label}</span>
       ) : null}
       {children}
     </div>

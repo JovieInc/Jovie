@@ -280,7 +280,7 @@ function MarketingGlassFlyout({
         animateOpen && 'marketing-glass-header__flyout--open'
       )}
     >
-      <div className='marketing-glass-header__flyout-inner'>
+      <div className='marketing-glass-header__flyout-inner ds-glass'>
         <p className='marketing-glass-header__flyout-heading'>{menu.heading}</p>
         <div className='marketing-glass-header__flyout-grid'>
           {menu.links.map((link, index) => (
@@ -626,7 +626,7 @@ export function HeaderNav({
             : 'fixed top-0 left-0 right-0 w-full transition-colors duration-subtle motion-reduce:transition-none',
           presentation === 'homepage-embedded' || isMarketingGlass
             ? 'border-b border-transparent'
-            : 'border-b',
+            : 'border-b ds-glass',
           className
         )}
         style={{
@@ -640,14 +640,6 @@ export function HeaderNav({
               ? 'transparent'
               : 'var(--linear-bg-header)',
           zIndex: 100,
-          backdropFilter:
-            presentation === 'homepage-embedded' || isMarketingGlass
-              ? 'none'
-              : `blur(var(--blur-header))`,
-          WebkitBackdropFilter:
-            presentation === 'homepage-embedded' || isMarketingGlass
-              ? 'none'
-              : `blur(var(--blur-header))`,
           minWidth: 0,
           minHeight: 0,
           /* iOS safe area: push header content below the notch/Dynamic Island */

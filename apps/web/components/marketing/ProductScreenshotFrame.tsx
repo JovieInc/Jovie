@@ -89,7 +89,7 @@ function FeatureFocusOverlay({
         className='psf-focus__scrim psf-focus__scrim--left'
       />
       <span aria-hidden='true' className='psf-focus__ring' />
-      <span className='psf-focus__label'>{focus.label}</span>
+      <span className='psf-focus__label ds-glass'>{focus.label}</span>
     </div>
   );
 }
@@ -138,7 +138,7 @@ export function ProductScreenshotFrame({
         isPhone
           ? 'psf mobile-web-screen'
           : 'psf relative overflow-hidden rounded-xl border border-(--color-bg-button) bg-surface-1 p-1 shadow-[0_30px_80px_rgba(0,0,0,0.5)]',
-        variant === 'dark-glass' && 'psf--dark-glass',
+        variant === 'dark-glass' && 'ds-glass',
         fill && 'h-full w-full',
         className
       )}
