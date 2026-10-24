@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
@@ -177,23 +178,82 @@ class BookmarkTests(unittest.TestCase):
         self.assertEqual(item["linked"]["title"], "Linked article")
         self.assertIn("What the article says.", item["summary"])
 
-    def test_composio_is_skipped_without_credentials_and_parses_bookmarks(self):
-        self.assertEqual(W.bookmarks_from_composio({}), [])
-        def poster(url, body, headers, timeout=30):
-            self.assertTrue(url.endswith("/tools/execute/TWITTER_BOOKMARKS_BY_USER"))
-            self.assertEqual(body["connected_account_id"], "ca_1")
-            return 200, {"successful": True, "data": {"data": [
-                {"id": "2110400343301382614", "author_id": "9", "text": "Expand Fetch",
-                 "entities": {"urls": [{"expanded_url": "https://expand.dev/fetch"}, {"expanded_url": "https://x.com/a/status/1"}]}}],
-                "includes": {"users": [{"id": "9", "username": "TimSuchanek"}]}, "meta": {}}}
-        items = W.bookmarks_from_composio({"SIGNALS_COMPOSIO_API_KEY": "k", "SIGNALS_COMPOSIO_X_ACCOUNT": "ca_1"}, poster)
-        self.assertEqual(items[0]["author"], "TimSuchanek")
-        self.assertEqual(items[0]["links"], ["https://expand.dev/fetch"])
+    def test_x_config_validates_handles(self):
+        config = W.load_x_config()
+        self.assertTrue(config["enabled"])
+        self.assertIn("AnthropicAI", config["accounts"])
+        bad = self.tmp_sources({"schema": "jovie.signal-sources/v1", "x": {"accounts": ["not a handle"]}, "sources": []})
+        with self.assertRaises(ValueError):
+            W.load_x_config(bad)
 
-    def test_composio_failure_raises(self):
-        with self.assertRaises(RuntimeError):
-            W.bookmarks_from_composio({"SIGNALS_COMPOSIO_API_KEY": "k", "SIGNALS_COMPOSIO_X_ACCOUNT": "ca"},
-                                      lambda *a, **k: (200, {"successful": False, "error": "no connected account"}))
+    def tmp_sources(self, data):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = Path(tmp.name) / "sources.json"
+        path.write_text(json.dumps(data))
+        return path
+
+
+X_POST = {"id": "2112579251555721573", "author": "AnthropicAI", "text": "New on our Science Blog: protein binders.",
+          "createdAt": "2026-10-20T16:18:38Z", "url": "https://x.com/AnthropicAI/status/2112579251555721573",
+          "links": ["https://www.anthropic.com/research/claude-scorpion-toxin-binder-design"]}
+
+
+class XPostTests(unittest.TestCase):
+    def search(self, posts, status="ok"):
+        calls = []
+
+        def fake(accounts, queries, since, env=None):
+            calls.append((accounts, queries, since))
+            return {"status": status, "posts": posts, "costUsd": 0.08}
+        return fake, calls
+
+    def test_poll_x_dedupes_caps_and_tracks_since(self):
+        state, config = {}, {"enabled": True, "accounts": ["AnthropicAI"], "queries": []}
+        fake, calls = self.search([X_POST])
+        items, summary = W.poll_x(state, config, {}, NOW + 86400, fake)
+        self.assertEqual([item["id"] for item in items], ["x-post:2112579251555721573"])
+        self.assertEqual((items[0]["kind"], items[0]["sourceName"]), ("x-post", "X @AnthropicAI"))
+        self.assertEqual(W.brain_slug(items[0]), "signals/x-posts/2112579251555721573")
+        self.assertEqual(calls[0][2], "2026-10-19")
+        self.assertEqual((summary["new"], summary["callsToday"]), (1, 1))
+        again, _ = W.poll_x(state, config, {}, NOW + 86400 + 60, fake)
+        self.assertEqual(again, [])
+        self.assertEqual(calls[1][2], "2026-10-20")
+        _, capped = W.poll_x(state, config, {"SIGNALS_GROK_DAILY_CALLS": "2"}, NOW + 86400 + 120, fake)
+        self.assertEqual(capped["status"], "capped")
+        _, off = W.poll_x({}, config, {"SIGNALS_X_DISABLED": "1"}, NOW, fake)
+        self.assertEqual(off["status"], "disabled")
+
+    @patch.object(W.capacity_limit, "summer_config", side_effect=AssertionError("host Summer config must not be read"))
+    def test_x_posts_card_as_changelog_origin_and_record_dwell(self, _summer_config):
+        state_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(state_dir.cleanup)
+        fake, _ = self.search([X_POST])
+        poster = Poster({"protein binders": jev_answer("adopt", 0.8)})
+        result = W.run(Path(state_dir.name) / "state.json", env={"AI_GATEWAY_API_KEY": "k"}, sources=[],
+                       inbox=Path(state_dir.name) / "inbox", fetcher=Fetcher({}), poster=poster, put=Brain(),
+                       summer={}, now=NOW + 86400, triage=lambda since: {"status": "ok"},
+                       x_config={"enabled": True, "accounts": ["AnthropicAI"], "queries": []}, x_search=fake)
+        self.assertEqual((result["xPostsNew"], result["bookmarksNew"], len(result["cardsQueued"])), (1, 0, 1))
+        self.assertEqual(result["x"]["dwellS"]["n"], 1)
+        self.assertAlmostEqual(result["x"]["dwellS"]["p50"], NOW + 86400 - W.epoch("2026-10-20T16:18:38Z"))
+        state = json.loads((Path(state_dir.name) / "state.json").read_text())
+        self.assertEqual(state["outbox"][0]["body"]["origin"], "changelog")
+        rows = [json.loads(line) for line in (Path(state_dir.name) / "stage-events.ndjson").read_text().splitlines()]
+        self.assertEqual((rows[0]["entityType"], rows[0]["stage"], rows[0]["enteredAt"]),
+                         ("market-signal", "published", "2026-10-20T16:18:38Z"))
+
+    def test_a_failing_x_source_never_fails_the_run(self):
+        def broken(*args, **kwargs):
+            raise FileNotFoundError("grok")
+        state_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(state_dir.cleanup)
+        result = W.run(Path(state_dir.name) / "state.json", env={}, sources=[], inbox=Path(state_dir.name) / "i",
+                       fetcher=Fetcher({}), poster=Poster(), put=Brain(), summer=None, now=NOW,
+                       x_config={"enabled": True, "accounts": ["xai"], "queries": []}, x_search=broken)
+        self.assertEqual(result["x"]["status"], "failed")
+        self.assertTrue(any(failure.startswith("x-posts:") for failure in result["failures"]))
 
 
 class ClassifyTests(unittest.TestCase):
@@ -238,6 +298,7 @@ class RunTests(unittest.TestCase):
     def run_once(self, poster, brain, env=None, **kwargs):
         fetcher = Fetcher({"https://vercel.com/atom": RSS, "https://t.co/abc": ARTICLE})
         kwargs.setdefault("triage", lambda since: {"status": "ok", "since": since})
+        kwargs.setdefault("x_config", {"enabled": False})
         return W.run(self.dir / "state.json", env={"AI_GATEWAY_API_KEY": "k", **(env or {})}, sources=[source()],
                      inbox=self.inbox, fetcher=fetcher, poster=poster, put=brain, summer=self.summer, now=NOW, **kwargs)
 
@@ -287,7 +348,7 @@ class RunTests(unittest.TestCase):
                       fetcher=Fetcher({"https://vercel.com/atom": lambda h: {"status": 304, "body": "", "url": "",
                                                                               "etag": None, "lastModified": None}}),
                       poster=Poster(), put=brain, summer=self.summer, now=NOW + 7200,
-                      triage=lambda since: {"status": "ok"})
+                      triage=lambda since: {"status": "ok"}, x_config={"enabled": False})
         self.assertEqual((later["classified"], later["pending"]), (2, 0))
 
     def test_failed_gbrain_writes_stay_pending_with_their_verdict(self):
@@ -303,7 +364,7 @@ class RunTests(unittest.TestCase):
                       fetcher=Fetcher({"https://vercel.com/atom": lambda h: {"status": 304, "body": "", "url": "",
                                                                               "etag": None, "lastModified": None}}),
                       poster=poster, put=brain, summer=self.summer, now=NOW + 3600,
-                      triage=lambda since: {"status": "ok"})
+                      triage=lambda since: {"status": "ok"}, x_config={"enabled": False})
         self.assertEqual((later["status"], later["stored"], later["pending"], later["classified"]), ("ok", 2, 0, 0))
         self.assertEqual(sum(1 for call in poster.calls if call[0] == W.JEV_URL), jev_calls)
         self.assertEqual(len(later["cardsQueued"]), 1)

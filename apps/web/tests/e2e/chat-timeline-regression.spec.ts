@@ -132,7 +132,7 @@ test('send and stream stay visible through stale refetch without skeleton cascad
   test.setTimeout(180_000);
 
   await mockTimelineBackend(page);
-  await setTestAuthBypassSession(page, null, 'e2e-chat-timeline');
+  await setTestAuthBypassSession(page, 'creator-ready');
   await page.goto('/app/chat', { waitUntil: 'domcontentloaded' });
   await waitForHydration(page);
 

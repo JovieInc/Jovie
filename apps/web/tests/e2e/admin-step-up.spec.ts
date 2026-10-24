@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { hasAdminCredentials } from '../helpers/auth';
 import { signInAsAdmin } from './utils/admin-test-utils';
@@ -7,7 +7,11 @@ import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 /**
  * Admin passkey step-up unlock flow (JOV-6892).
  *
- * The Ovie shell locks behind a passkey step-up. The reported bug: clicking
+ * Admin data APIs require a passkey step-up on the session (JOV-4806). The
+ * shell-wide step-up lock was replaced by the opt-in Ovie privacy lock on
+ * 2026-09-30 (#19631), so the step-up now surfaces inline wherever an admin
+ * API returns 403: AdminVerificationRequired renders Unlock plus the step-up
+ * error. These specs drive it on the Growth status panel. The reported bug: clicking
  * Unlock entered "Waiting for passkey…" forever with no ceremony, and a
  * device-only passkey silently looped back to the lock. These specs run the
  * real client flow end-to-end with the WebAuthn network/authenticator layer
@@ -56,7 +60,9 @@ function fakeAssertionScript(mode: 'resolve' | 'hang') {
     window.PublicKeyCredential = function PublicKeyCredential() {};
     window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable =
       function () { return Promise.resolve(true); };
-    navigator.credentials = {
+    // navigator.credentials is a prototype getter: plain assignment is a
+    // silent no-op, so shadow it on the instance.
+    Object.defineProperty(navigator, 'credentials', { configurable: true, value: {
       create: function () { return Promise.reject(new Error('not stubbed')); },
       get: function () {
         window.__passkeyGetCalled = true;
@@ -79,7 +85,7 @@ function fakeAssertionScript(mode: 'resolve' | 'hang') {
                });`
         }
       },
-    };
+    } });
   `;
 }
 
@@ -103,7 +109,7 @@ const CANCELLED_REGISTRATION_SCRIPT = `
   window.PublicKeyCredential = function PublicKeyCredential() {};
   window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable =
     function () { return Promise.resolve(true); };
-  navigator.credentials = {
+  Object.defineProperty(navigator, 'credentials', { configurable: true, value: {
     create: function () {
       return Promise.reject(
         new DOMException(
@@ -113,11 +119,11 @@ const CANCELLED_REGISTRATION_SCRIPT = `
       );
     },
     get: function () { return Promise.reject(new Error('not stubbed')); },
-  };
+  } });
 `;
 
 async function mockPasskeyApi(
-  page: import('@playwright/test').Page,
+  page: Page,
   {
     unlocked,
     passkeys = [{ id: 'pk_1', name: 'Ovie' }],
@@ -170,6 +176,21 @@ async function mockPasskeyApi(
   );
 }
 
+/**
+ * Growth status loads from an admin API that 403s until the session completes
+ * the passkey step-up, so the panel renders the inline verification state.
+ */
+async function openGrowthVerification(page: Page) {
+  await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_GROWTH, {
+    timeout: 60_000,
+  });
+  // Growth status and the GTM speed dial each render the inline state; each
+  // owns its own step-up hook, so drive the first one.
+  const verification = page.getByTestId('admin-verification-required').first();
+  await expect(verification).toBeVisible({ timeout: 30_000 });
+  return verification;
+}
+
 test.describe('Admin passkey step-up (JOV-6892)', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!hasAdminCredentials(), 'Admin credentials not configured');
@@ -182,10 +203,11 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     await page.addInitScript(fakeAssertionScript('resolve'));
     await mockPasskeyApi(page, { unlocked: true });
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_OPS, {
-      timeout: 60_000,
+    const verification = await openGrowthVerification(page);
+    const unlock = verification.getByRole('button', {
+      name: 'Unlock',
+      exact: true,
     });
-    const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
     await expect(unlock).toBeVisible();
 
     const verifyRequest = page.waitForRequest(
@@ -208,19 +230,20 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     await page.addInitScript(fakeAssertionScript('resolve'));
     await mockPasskeyApi(page, { unlocked: false });
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_OPS, {
-      timeout: 60_000,
+    const verification = await openGrowthVerification(page);
+    const unlock = verification.getByRole('button', {
+      name: 'Unlock',
+      exact: true,
     });
-    const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
     await expect(unlock).toBeVisible();
     await unlock.click();
 
-    await expect(page.getByRole('alert')).toContainText(
+    await expect(verification.getByRole('alert')).toContainText(
       'cannot unlock admin access'
     );
     // Recovery is available — the user can retry instead of looping.
     await expect(
-      page.getByRole('button', { name: 'Unlock', exact: true })
+      verification.getByRole('button', { name: 'Try again', exact: true })
     ).toBeEnabled();
   });
 
@@ -230,10 +253,11 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     await page.addInitScript(CANCELLED_REGISTRATION_SCRIPT);
     await mockPasskeyApi(page, { unlocked: true, passkeys: [] });
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_OPS, {
-      timeout: 60_000,
+    const verification = await openGrowthVerification(page);
+    const unlock = verification.getByRole('button', {
+      name: 'Unlock',
+      exact: true,
     });
-    const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
     await expect(unlock).toBeVisible();
 
     let authenticateRequested = false;
@@ -249,12 +273,14 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
 
     // Canceled setup must fail as a recoverable enrollment state — no
     // phantom credential, no fall-through into the authenticate ceremony.
-    await expect(page.getByRole('alert')).toContainText('no passkey was saved');
+    await expect(verification.getByRole('alert')).toContainText(
+      'no passkey was saved'
+    );
     await expect
       .poll(() => authenticateRequested, { timeout: 5_000 })
       .toBe(false);
     await expect(
-      page.getByRole('button', { name: 'Unlock', exact: true })
+      verification.getByRole('button', { name: 'Try again', exact: true })
     ).toBeEnabled();
   });
 
@@ -267,18 +293,19 @@ test.describe('Admin passkey step-up (JOV-6892)', () => {
     `);
     await mockPasskeyApi(page, { unlocked: true });
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.ADMIN_OPS, {
-      timeout: 60_000,
+    const verification = await openGrowthVerification(page);
+    const unlock = verification.getByRole('button', {
+      name: 'Unlock',
+      exact: true,
     });
-    const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
     await expect(unlock).toBeVisible();
     await unlock.click();
 
-    await expect(page.getByRole('alert')).toContainText(
+    await expect(verification.getByRole('alert')).toContainText(
       'passkey prompt did not appear'
     );
     await expect(
-      page.getByRole('button', { name: 'Unlock', exact: true })
+      verification.getByRole('button', { name: 'Try again', exact: true })
     ).toBeEnabled();
     await expect
       .poll(() =>

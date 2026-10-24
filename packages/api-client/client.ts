@@ -14,9 +14,9 @@ import {
 } from './cache.ts';
 import {
   CONTRACT,
+  callableSpec,
   type PriorityName,
   priorityPolicy,
-  providerSpec,
   resourceFor,
 } from './contract.ts';
 import {
@@ -34,13 +34,16 @@ import {
   decide,
   observe,
   recordOutcome,
+  refundSpend,
+  reserveSpend,
+  type SpendDecision,
   type Transition,
 } from './policy.ts';
 import { credentialLabel, defaultStore, type LedgerStore } from './store.ts';
 
 export const EX_TEMPFAIL = 75;
 
-export type ApiErrorKind = 'shed' | 'budget' | 'exhausted';
+export type ApiErrorKind = 'shed' | 'budget' | 'exhausted' | 'budget_exhausted';
 
 /** Infrastructure, never a verdict: retry after `retryAt` (exit 75). */
 export class ApiError extends Error {
@@ -71,6 +74,37 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Money, not quota: today's spend cap would be exceeded, no cap is configured
+ * for a priced call, or the provider answered HTTP 402 (empty wallet). Never
+ * retried in-process; `retryAt` is the next UTC day (null for a 402).
+ */
+export class BudgetExhaustedError extends ApiError {
+  readonly priceUsd: number;
+  readonly spentUsd: number | null;
+  readonly capUsd: number | null;
+
+  constructor(
+    provider: string,
+    message: string,
+    extra: {
+      priceUsd: number;
+      spentUsd?: number | null;
+      capUsd?: number | null;
+      retryAt?: number | null;
+    }
+  ) {
+    super('budget_exhausted', provider, message, {
+      retryAt: extra.retryAt ?? null,
+      status: 402,
+    });
+    this.name = 'BudgetExhaustedError';
+    this.priceUsd = extra.priceUsd;
+    this.spentUsd = extra.spentUsd ?? null;
+    this.capUsd = extra.capUsd ?? null;
+  }
+}
+
 export interface ApiResponse {
   readonly status: number;
   readonly headers: Headers;
@@ -98,6 +132,8 @@ export interface RequestOptions {
   readonly maxWaitMs?: number;
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
+  /** USD this call costs; defaults to the provider's pricing.perCallUsd. */
+  readonly priceUsd?: number;
 }
 
 /** Bridges legacy state files into the ledger (see legacy.ts). */
@@ -124,6 +160,8 @@ export interface ApiClientOptions {
   readonly random?: () => number;
   readonly log?: (event: Record<string, unknown>) => void;
   readonly hooks?: LedgerHooks;
+  /** Per-credential daily USD cap; defaults to the provider's pricing.dailyCapUsd. */
+  readonly dailySpendCapUsd?: number;
 }
 
 export interface ApiClient {
@@ -194,7 +232,8 @@ const defaultLog = (event: Record<string, unknown>) => {
 
 export function createApiClient(options: ApiClientOptions): ApiClient {
   const { provider, credential } = options;
-  const spec = providerSpec(provider);
+  const spec = callableSpec(provider);
+  const spendCap = options.dailySpendCapUsd ?? spec.pricing?.dailyCapUsd;
   const store = options.store ?? defaultStore();
   const cache = options.cache ?? new MemoryResponseCache();
   const fetchImpl = options.fetch ?? globalThis.fetch;
@@ -244,6 +283,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       now() + (opts.maxWaitMs ?? CONTRACT.defaults.maxWaitMs[policy.class]);
     const conditional =
       method === 'GET' && (opts.conditional ?? spec.conditionalGet === true);
+    const price = opts.priceUsd ?? spec.pricing?.perCallUsd ?? 0;
 
     if (read && opts.cacheTtlMs) {
       const hit = await cache.get(key);
@@ -255,6 +295,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
 
     for (let attempt = 0; ; ) {
       const prepared = await options.hooks?.prepare?.();
+      let denied: SpendDecision | null = null;
       const decision: Decision = await inLedger((s, at) => {
         options.hooks?.merge?.(s, prepared, at);
         const d = decide(
@@ -270,9 +311,40 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         if (d.action === 'shed') bump(s, priority, 'shed', at);
         if (d.action === 'wait') bump(s, priority, 'waited', at);
         if (d.action === 'go' && attempt > 0) bump(s, priority, 'retries', at);
+        if (d.action === 'go' && price > 0) {
+          const spend = reserveSpend(s, price, spendCap, at);
+          if (!spend.ok) denied = spend;
+        }
         return d;
       });
       transition(decision.transition, now());
+      // The assertion keeps this visible after the ledger closure write.
+      // scripts/tsconfig.json is strict:false, so `!ok` does not narrow the union.
+      const spendDenied = denied as SpendDecision | null;
+      if (spendDenied !== null && spendDenied.ok === false) {
+        log({
+          schema: 'jovie.api-client.spend/v1',
+          provider,
+          credential: credentialLabel(credential),
+          outcome: 'budget_exhausted',
+          priceUsd: price,
+          spentUsd: spendDenied.spentUsd,
+          capUsd: spendDenied.capUsd,
+          at: now(),
+        });
+        throw new BudgetExhaustedError(
+          provider,
+          spendDenied.capUsd == null
+            ? `priced call ($${price}) with no daily spend cap configured`
+            : `daily spend cap $${spendDenied.capUsd} reached ($${spendDenied.spentUsd} spent, call costs $${price})`,
+          {
+            priceUsd: price,
+            spentUsd: spendDenied.spentUsd,
+            capUsd: spendDenied.capUsd,
+            retryAt: spendDenied.retryAt,
+          }
+        );
+      }
       if (decision.action === 'shed') {
         throw new ApiError(
           'shed',
@@ -337,7 +409,12 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       const observations = response
         ? parseBudget(spec, response.headers, at, resource)
         : [];
+      const paidFailed =
+        price > 0 &&
+        !notModified &&
+        (response === null || response.status >= 400);
       const outcome = await inLedger((s, t) => {
+        if (paidFailed) refundSpend(s, price, t);
         observe(s, observations, t);
         if (notModified) bump(s, priority, 'notModified', t);
         return {
@@ -357,6 +434,13 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       });
       transition(outcome.change, at);
       await options.hooks?.publish?.(outcome.state, failure, outcome.at);
+      if (response?.status === 402) {
+        throw new BudgetExhaustedError(
+          provider,
+          `${method} ${url.pathname} answered 402 (provider wallet or plan exhausted)`,
+          { priceUsd: price }
+        );
+      }
       if (response && (failure.kind === 'none' || failure.kind === 'client')) {
         if (notModified && stored) return fromCached(stored, 'etag', attempt);
         if (

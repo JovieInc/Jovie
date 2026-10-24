@@ -69,6 +69,8 @@ describe('AiCrawlerIntelligenceCard', () => {
     expect(
       screen.getByText('420 reads · 2 services tracked')
     ).toBeInTheDocument();
+    // Linear-scale status pill: quiet Title Case, no all-caps treatment.
+    expect(screen.getByText('Active').className).not.toContain('uppercase');
     expect(
       screen.getByText(/They do not show an AI answer mention/)
     ).toBeInTheDocument();

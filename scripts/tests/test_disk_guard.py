@@ -484,6 +484,10 @@ class RetiredHostLoopTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
+        import worktree_sweep
+        scan = patch.object(worktree_sweep, "scan_snapshot", return_value=None)  # scanners: own tests
+        scan.start()
+        self.addCleanup(scan.stop)
         self.root = Path(self.tmp.name).resolve()
         self.env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
         self.env.update(GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.com",

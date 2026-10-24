@@ -149,6 +149,23 @@ files (~8.7 MiB of the unchanged 12 MiB `maxSnapshotBytes` budget). The +10%
 raise restores a small headroom so ordinary new coverage does not trip the
 guard on every landing.
 
+Approved raise (measured 2026-10-21, visual-baseline auto-refresh PR #22501):
+`maxSnapshotFiles` 110 → 121 (+10%, the per-raise cap). Exact `origin/main`
+measured 110 canonical baselines — 100% of the prior budget — so the Admin
+Home pair required by `admin-surface-manifest.ts` (`admin-home-desktop.png`,
+`admin-home-mobile.png`) could not land. Since the 2026-10-10 raise the tree
+gained the four onboarding security-check baselines and
+`modal-signin-tablet.png`, and lost `homepage-mobile.png` (net +4, filling
+the previous headroom). A hash audit found three identical groups
+(`admin-growth-desktop` / `admin-growth-campaigns-desktop` /
+`admin-growth-ingest-desktop`, `pricing-dark` / `pricing-light`, and
+`signin-dark` / `signup-dark`); each filename is still requested by a live
+`toHaveScreenshot`, so deleting one would drop a route or theme tripwire.
+The four wide public-profile baselines are the flag-on
+`PROFILE_DESKTOP_SURFACE_ENABLED` comparisons and the visual-QA coverage
+entry for that surface. No unreferenced file remained. Resulting tree: 112
+files (~8.2 MiB of the unchanged 12 MiB `maxSnapshotBytes` budget).
+
 All must hold: exact-main is at least 90% of an absolute byte budget or two ordinary changes exceed a p99 delta; 30/90-day tree/new-blob, contributor, checkout, and CI measurements are included; Knip, hashes, generated paths, and owners prove no safe removal; increase is at most p99 +25% for deltas or 10% for payloads; tests and rationale change together. Larger changes require a separate decision and Linear issue. A number-only change fails review and never promotes rollout mode.
 
 ### Prune or archive

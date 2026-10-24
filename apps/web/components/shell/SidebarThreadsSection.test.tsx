@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -7,11 +8,22 @@ import {
   isTimestampAfter,
   readThreadReadState,
   type SidebarThread,
+  SidebarThreadRow,
   SidebarThreadsSection,
   THREAD_READ_STORAGE_KEY,
   toSidebarThread,
   writeThreadReadState,
 } from './SidebarThreadsSection';
+
+// Expose the Next Link prefetch contract without starting a router in jsdom.
+vi.mock('next/link', () => ({
+  default: React.forwardRef<
+    HTMLAnchorElement,
+    React.ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+  >(function TestLink({ prefetch, ...props }, ref) {
+    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
+  }),
+}));
 
 const threads: SidebarThread[] = [
   {
@@ -53,8 +65,17 @@ describe('SidebarThreadsSection', () => {
       .getByRole('link', { name: 'All Chats' })
       .querySelector('svg');
 
-    expect(chatActionIcon).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
-    expect(allChatsIcon).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
+    expect(chatActionIcon).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)',
+      'text-sidebar-muted/70'
+    );
+    expect(allChatsIcon).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)',
+      'text-sidebar-muted/70'
+    );
+    const recent = screen.getByText('Recent');
+    expect(recent.className).toContain('text-sidebar-muted');
+    expect(recent.className).not.toMatch(/text-sidebar-muted\/\d+/);
 
     rerender(
       <SidebarThreadsSection
@@ -69,7 +90,10 @@ describe('SidebarThreadsSection', () => {
 
     expect(
       screen.getByRole('button', { name: 'Retry Chats' }).querySelector('svg')
-    ).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
+    ).toHaveClass(
+      'size-(--app-shell-sidebar-icon-size)',
+      'text-sidebar-muted/70'
+    );
 
     rerender(
       <SidebarThreadsSection
@@ -122,9 +146,9 @@ describe('SidebarThreadsSection', () => {
       name: `Chat Actions for ${title}`,
     });
 
-    expect(row).toHaveClass('grid-cols-[18px_minmax(0,1fr)_minmax(34px,auto)]');
+    expect(row).toHaveClass('grid-cols-(--app-shell-sidebar-nav-grid)');
     expect(action).toHaveClass(
-      'right-2.5',
+      'right-(--app-shell-sidebar-inset)',
       'hover:bg-surface-0',
       'active:bg-surface-0'
     );
@@ -132,7 +156,10 @@ describe('SidebarThreadsSection', () => {
       'group-hover/thread:bg-surface-0',
       'focus-visible:bg-surface-0'
     );
-    expect(action).toHaveClass('absolute', 'opacity-0');
+    expect(action).toHaveClass(
+      'absolute',
+      '[@media(hover:hover)_and_(pointer:fine)]:opacity-0'
+    );
   });
 
   it('renders dense thread links with canonical shell row state', () => {
@@ -152,7 +179,7 @@ describe('SidebarThreadsSection', () => {
 
     expect(activeThread).toHaveAttribute('href', '/app/chat/thread-newer');
     expect(activeThread).toHaveAttribute('aria-current', 'page');
-    expect(activeThread).toHaveClass('h-6');
+    expect(activeThread).toHaveClass('h-(--app-shell-sidebar-row-height)');
     expect(activeThread).toHaveClass('bg-sidebar-accent-active');
     expect(activeThread).toHaveClass('text-primary-token');
     expect(activeThread).not.toHaveClass(
@@ -166,6 +193,37 @@ describe('SidebarThreadsSection', () => {
     );
     expect(inactiveThread).toHaveClass('focus-visible:ring-2');
   });
+
+  it.each([false, true])(
+    'disables prefetch for active and inactive thread links with calm=%s',
+    calm => {
+      render(
+        <SidebarThreadsSection
+          threads={threads}
+          activeThreadId='thread-newer'
+          tight
+          calm={calm}
+          collapsed={false}
+        />
+      );
+
+      for (const thread of threads) {
+        const link = screen.getByRole('link', { name: thread.title });
+        expect(link).toHaveAttribute('href', thread.href);
+        expect(link).toHaveAttribute('data-prefetch', 'false');
+      }
+      expect(screen.getByRole('link', { name: 'Pitch tasks' })).toHaveAttribute(
+        'aria-current',
+        'page'
+      );
+      expect(
+        screen.getByRole('link', { name: 'Release rollout' })
+      ).not.toHaveAttribute('aria-current');
+      expect(
+        screen.getByRole('link', { name: calm ? 'All chats' : 'All Chats' })
+      ).toHaveAttribute('data-prefetch', 'false');
+    }
+  );
 
   it('keeps thread action affordances opt-in and wired to the row thread', () => {
     const onThreadContextMenu = vi.fn();
@@ -243,7 +301,12 @@ describe('SidebarThreadsSection', () => {
 
     const sectionHeader = screen.getByText('Recent').parentElement;
 
-    expect(sectionHeader).toHaveClass('px-2.5', 'pb-0.5', 'pt-2');
+    expect(sectionHeader).toHaveClass(
+      'h-(--app-shell-sidebar-row-height)',
+      'ps-(--app-shell-sidebar-label-inset)',
+      'pe-(--app-shell-sidebar-inset)'
+    );
+    expect(sectionHeader).not.toHaveClass('px-2.5', 'pb-0.5', 'pt-2');
     expect(sectionHeader).not.toHaveClass('border-t');
     expect(sectionHeader?.className).not.toContain(
       'border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)]'
@@ -273,7 +336,10 @@ describe('SidebarThreadsSection', () => {
     const threadButton = screen.getByRole('button', { name: 'Draft thread' });
 
     expect(threadButton).toHaveAttribute('aria-pressed', 'true');
-    expect(threadButton).toHaveClass('h-6', 'bg-sidebar-accent-active');
+    expect(threadButton).toHaveClass(
+      'h-(--app-shell-sidebar-row-height)',
+      'bg-sidebar-accent-active'
+    );
     expect(threadButton).not.toHaveClass('h-auto', 'hover:bg-transparent');
     fireEvent.click(threadButton);
     expect(onSelect).toHaveBeenCalledWith('draft-thread');
@@ -353,7 +419,7 @@ describe('SidebarThreadsSection', () => {
 
     const loadingRow =
       container.querySelector('.skeleton')?.parentElement?.parentElement;
-    expect(loadingRow).toHaveClass('h-7');
+    expect(loadingRow).toHaveClass('h-(--app-shell-sidebar-row-height)');
 
     rerender(
       <SidebarThreadsSection
@@ -368,7 +434,7 @@ describe('SidebarThreadsSection', () => {
     const errorRow = screen.getByText(
       'Conversations unavailable'
     ).parentElement;
-    expect(errorRow).toHaveClass('h-7');
+    expect(errorRow).toHaveClass('h-(--app-shell-sidebar-row-height)');
     fireEvent.click(screen.getByRole('button', { name: 'Retry Chats' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
@@ -393,7 +459,7 @@ describe('SidebarThreadsSection', () => {
       })
     ).toMatchObject({
       href: `${APP_ROUTES.CHAT}/thread%20%2F%20one`,
-      title: 'Untitled chat',
+      title: 'Conversation',
       status: 'running',
       unread: true,
     });
@@ -523,4 +589,116 @@ describe('founder-locked calm sidebar history', () => {
     expect(formatSidebarThreadTime('2026-09-11T10:00:00', now)).toBe('Fri');
     expect(formatSidebarThreadTime('2026-03-04T10:00:00', now)).toBe('Mar 4');
   });
+});
+
+describe('chat title tooltip eligibility', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('omits a readable full-width title hint and opens a clipped title below the list', () => {
+    let width = 300;
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(
+      () => width
+    );
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(200);
+    let resize = () => {};
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(private callback: () => void) {}
+        observe(target: Element) {
+          if (target.classList.contains('text-ellipsis'))
+            resize = this.callback;
+        }
+        disconnect() {}
+      }
+    );
+    render(
+      <SidebarThreadRow thread={threads[1]} active={false} unread={false} />
+    );
+    const row = screen.getByRole('link', { name: 'Pitch tasks' });
+    fireEvent.focus(row);
+    expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+    fireEvent.blur(row);
+    width = 100;
+    act(() => resize());
+    fireEvent.focus(row);
+    expect(screen.getByTestId('tooltip-content')).toHaveAttribute(
+      'data-side',
+      'bottom'
+    );
+    expect(screen.getByTestId('tooltip-content')).toHaveAttribute(
+      'data-align',
+      'start'
+    );
+    width = 300;
+    act(() => resize());
+    expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+    width = 100;
+    act(() => resize());
+    expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+    fireEvent.blur(row);
+    fireEvent.focus(row);
+    expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
+  });
+
+  it('remeasures the same title when unread typography changes and retains sidebar placement', () => {
+    let textWidth = 90;
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(100);
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(
+      () => textWidth
+    );
+    const view = (unread: boolean) => (
+      <div data-sidebar='sidebar'>
+        <SidebarThreadRow thread={threads[1]} active={false} unread={unread} />
+      </div>
+    );
+    const { rerender } = render(view(false));
+    const row = screen.getByRole('link', { name: 'Pitch tasks' });
+    fireEvent.focus(row);
+    expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+    fireEvent.blur(row);
+    textWidth = 120;
+    rerender(view(true));
+    fireEvent.focus(row);
+    expect(screen.getByTestId('tooltip-content')).toHaveAttribute(
+      'data-side',
+      'right'
+    );
+    textWidth = 90;
+    rerender(view(false));
+    expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+  });
+});
+
+it('remeasures title text after font loading and window resize', () => {
+  let textWidth = 90;
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(100);
+  vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(
+    () => textWidth
+  );
+  const fonts = new EventTarget();
+  Object.defineProperty(fonts, 'ready', { value: Promise.resolve() });
+  const originalFonts = Object.getOwnPropertyDescriptor(document, 'fonts');
+  Object.defineProperty(document, 'fonts', {
+    configurable: true,
+    value: fonts,
+  });
+  const { unmount } = render(
+    <SidebarThreadRow thread={threads[1]} active={false} unread={false} />
+  );
+  const row = screen.getByRole('link', { name: 'Pitch tasks' });
+  textWidth = 150;
+  act(() => fonts.dispatchEvent(new Event('loadingdone')));
+  fireEvent.focus(row);
+  expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
+  textWidth = 90;
+  act(() => globalThis.dispatchEvent(new Event('resize')));
+  expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+  unmount();
+  if (originalFonts) Object.defineProperty(document, 'fonts', originalFonts);
+  else Reflect.deleteProperty(document, 'fonts');
+  vi.restoreAllMocks();
 });

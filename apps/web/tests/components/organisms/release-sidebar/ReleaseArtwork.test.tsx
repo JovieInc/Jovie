@@ -8,8 +8,17 @@ vi.mock('next/image', () => ({
 }));
 
 vi.mock('@/components/molecules/drawer', () => ({
-  EntityHeader: ({ thumbnail }: { thumbnail: ReactNode }) => (
-    <div data-testid='entity-header-card'>{thumbnail}</div>
+  EntityHeader: ({
+    thumbnail,
+    title,
+  }: {
+    thumbnail: ReactNode;
+    title: ReactNode;
+  }) => (
+    <div data-testid='entity-header-card'>
+      {thumbnail}
+      <span>{title}</span>
+    </div>
   ),
   DrawerMediaThumb: ({
     children,
@@ -43,6 +52,17 @@ vi.mock('@/components/organisms/AvatarUploadable', () => ({
 }));
 
 describe('ReleaseArtwork', () => {
+  it('labels artwork for a release whose title is missing', () => {
+    render(
+      <ReleaseArtwork artworkUrl={null} title='' canUploadArtwork={false} />
+    );
+
+    expect(screen.getByTestId('entity-header-card')).toHaveTextContent(
+      'Release'
+    );
+    expect(screen.queryByText('Untitled')).not.toBeInTheDocument();
+  });
+
   it('renders release artwork uploadable as rounded square', () => {
     render(
       <ReleaseArtwork

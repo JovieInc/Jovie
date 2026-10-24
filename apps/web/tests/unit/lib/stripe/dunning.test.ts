@@ -14,11 +14,17 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/db/schema/auth', () => ({
-  users: { clerkId: 'clerk_id', email: 'email', name: 'name' },
+  users: {
+    id: 'users.id',
+    clerkId: 'users.clerkId',
+    email: 'email',
+    name: 'name',
+  },
 }));
 
 vi.mock('drizzle-orm', () => ({
-  eq: vi.fn(),
+  eq: vi.fn((column: unknown, value: unknown) => ({ column, value })),
+  or: vi.fn((...args: unknown[]) => ({ or: args })),
 }));
 
 vi.mock('@/lib/email/templates/payment-failed', () => ({
@@ -57,8 +63,10 @@ vi.mock('@/lib/stripe/config', () => ({
   }),
 }));
 
+import { eq } from 'drizzle-orm';
 import {
   isRecoveryScenario,
+  sendPaymentFailedEmail,
   shouldSendDunningEmail,
 } from '@/lib/stripe/dunning';
 
@@ -120,6 +128,25 @@ describe('dunning', () => {
 
     it('should return false for trialing previous status', () => {
       expect(isRecoveryScenario('trialing')).toBe(false);
+    });
+  });
+
+  describe('sendPaymentFailedEmail', () => {
+    it('looks up a Better Auth app user id on users.id as well as clerkId', async () => {
+      const appUserId = '11111111-1111-4111-8111-111111111111';
+
+      const result = await sendPaymentFailedEmail({
+        userId: appUserId,
+        amountDue: 1200,
+        currency: 'usd',
+        attemptCount: 1,
+        invoiceId: 'in_123',
+        priceId: 'price_pro',
+      });
+
+      expect(result.success).toBe(false);
+      expect(eq).toHaveBeenCalledWith('users.id', appUserId);
+      expect(eq).toHaveBeenCalledWith('users.clerkId', appUserId);
     });
   });
 });

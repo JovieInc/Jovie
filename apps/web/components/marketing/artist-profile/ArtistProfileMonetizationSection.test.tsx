@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
@@ -84,5 +84,17 @@ describe('ArtistProfileMonetizationSection source contract', () => {
     expect(storySource).toContain(
       "bindingStatus: 'registry-reclassification-owner-stacked'"
     );
+  });
+});
+
+const OWN_WIDTH_CAP =
+  /max-w-(?:300|315|280|4xl|6xl|linear-content)|--homepage-section-max/;
+
+describe('single container width', () => {
+  it.each([
+    'components/marketing/artist-profile/ArtistProfileMonetizationSection.tsx',
+  ])('%s takes its width from the shared container, not its own cap', file => {
+    const source = readFileSync(join(process.cwd(), file), 'utf8');
+    expect(source).not.toMatch(OWN_WIDTH_CAP);
   });
 });

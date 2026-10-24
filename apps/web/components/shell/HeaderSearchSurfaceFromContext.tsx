@@ -59,9 +59,8 @@ export function HeaderSearchSurfaceFromContext({
           ? 'focus-ring-themed inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-item-foreground hover:bg-sidebar-accent focus-visible:bg-sidebar-accent'
           : cn(
               getSidebarNavRowClassName({}),
-              'grid-cols-[18px_minmax(0,1fr)_auto] text-left',
-              calm &&
-                'h-9 min-w-0 flex-1 rounded-full pl-(--space-3-5) pr-0 text-(length:--text-app)'
+              'text-left',
+              calm && 'h-9 min-w-0 flex-1 rounded-full text-(length:--text-app)'
             ),
         className
       )}

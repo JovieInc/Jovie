@@ -21,8 +21,25 @@ import {
 
 type CheckoutStep = {
   uses?: string;
-  with?: { ref?: string; 'persist-credentials'?: boolean };
+  with?: {
+    ref?: string;
+    repository?: string;
+    path?: string;
+    'persist-credentials'?: boolean;
+  };
 };
+
+const CANDIDATE_CHECKOUT_REF = '${{ inputs.expected_sha }}';
+
+/** The gate CLIs are checked out from the workflow file, not the candidate. */
+function isTrustedGateToolingCheckout(step: CheckoutStep): boolean {
+  return (
+    step.with?.ref === '${{ job.workflow_sha }}' &&
+    step.with?.repository === '${{ job.workflow_repository }}' &&
+    step.with?.path === 'promotion-gate-tooling' &&
+    step.with?.['persist-credentials'] === false
+  );
+}
 
 function assertAuthorizedCheckouts(workflow: string) {
   const parsed = parseYaml(workflow) as {
@@ -34,8 +51,9 @@ function assertAuthorizedCheckouts(workflow: string) {
   expect(checkouts.length).toBeGreaterThan(0);
   for (const step of checkouts) {
     expect(step.uses).toMatch(/^actions\/checkout@[a-f0-9]{40}$/);
-    expect(step.with?.ref).toBe('${{ inputs.expected_sha }}');
     expect(step.with?.['persist-credentials']).toBe(false);
+    if (isTrustedGateToolingCheckout(step)) continue;
+    expect(step.with?.ref).toBe(CANDIDATE_CHECKOUT_REF);
   }
 }
 
@@ -1611,6 +1629,9 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(promoteJob).toContain(
       'steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype'
     );
+    expect(promoteJob).toContain(
+      'steps.verify-production.outputs.failure_subtype || steps.journey-gate.outputs.failure_subtype'
+    );
     expect(domainGuardStep).toContain('id: domain-guard');
     expect(domainGuardStep).toContain(
       'node .github/scripts/verify-vercel-production-domains.mjs'
@@ -1686,11 +1707,17 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
         'if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts'
       )
     );
-    // Staged public-profile budgets are warning-only; the measurement remains enforced.
-    expect(stagedPublicProfileGate).not.toContain('fail_performance_gate');
+    // JOV-8338 graduated the exact staged-build budget independently
+    // (2026-10-21 receipt: staging 14/14 qualifying), so it fails closed with
+    // the exact-build failure subtype. Production canonical-alias budgets
+    // above stay warning-only (11/14, streak 0/14) until their own receipt
+    // graduates.
+    expect(stagedPublicProfileGate).toContain(
+      'fail_performance_gate "Exact staged-build public-profile alias budgets failed."'
+    );
     expect(stagedPublicProfileGate).not.toContain('continue-on-error: true');
-    expect(stagedPublicProfileGate).toContain('performance_status=warn');
-    expect(stagedPublicProfileGate).toContain('::warning::');
+    expect(stagedPublicProfileGate).not.toContain('performance_status=warn');
+    expect(stagedPublicProfileGate).not.toContain('::warning::');
     for (const routeId of [
       'public-profile-listen',
       'public-profile-music',
@@ -3186,6 +3213,9 @@ describe('CI E2E smoke workflow', () => {
     expect(goldenPathStep).toContain(
       'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY }}'
     );
+    expect(getJobBlock(workflow, 'ci-golden-path')).toContain(
+      "FEATURE_STRIPE_TEST_PRICE_CONFIGURED: 'true'"
+    );
     expect(goldenPathStep).toContain(
       'STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv'
     );
@@ -4185,8 +4215,14 @@ describe('production promotion exact-artifact contract', () => {
     expect(finalCurrentStep).not.toContain(
       'Refusing stale production promotion'
     );
+    // The closed lineage predicate stays in the step. The live if repeats it
+    // inside one ${{ }} with the journey gate: text after }} is always true
+    // (actions/runner#1173), so the gate cannot be appended outside.
     expect(promoteStep).toContain(
       "if: ${{ steps.final-current.outputs.is_current == 'true' }}"
+    );
+    expect(promoteStep).toContain(
+      "if: ${{ steps.final-current.outputs.is_current == 'true' && steps.journey-gate.outcome == 'success' }}"
     );
     expect(promoteJob).toContain(
       'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha || steps.mutation-head.outputs.superseded_sha }}'
@@ -4641,6 +4677,19 @@ describe('production promotion exact-artifact contract', () => {
       { ...safe, with: { 'persist-credentials': false } },
       { ...safe, with: { ...safe.with, 'persist-credentials': true } },
       { ...safe, uses: 'actions/checkout@v7' },
+      {
+        ...safe,
+        with: { ...safe.with, ref: '${{ job.workflow_sha }}' },
+      },
+      {
+        ...safe,
+        with: {
+          ...safe.with,
+          ref: '${{ job.workflow_sha }}',
+          repository: '${{ job.workflow_repository }}',
+          path: 'not-the-gate-tooling',
+        },
+      },
     ]) {
       expect(() =>
         assertAuthorizedCheckouts(

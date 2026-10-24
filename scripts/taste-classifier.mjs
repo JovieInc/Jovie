@@ -62,7 +62,6 @@ const NON_TASTE_FILE_PATTERNS = [
   /apps\/web\/drizzle\//i,
   /apps\/web\/lib\/db\//i,
   /apps\/web\/app\/api\//i,
-  /apps\/web\/middleware\.ts$/i,
   /apps\/web\/proxy\.ts$/i,
   /\.github\/workflows\//i,
   /scripts\//i,

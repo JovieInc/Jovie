@@ -9,6 +9,7 @@ export {
   type HomeLoopCanvasProps,
   type HomeLoopCopy,
 } from './HomeLoopCanvas';
+export { HomeLoopKanban } from './HomeLoopKanban';
 export { HomeLoopConstraintBanner, HomeLoopPulse } from './HomeLoopPulse';
 export { HomeLoopSection, type HomeLoopSectionStatus } from './HomeLoopSection';
 export {
@@ -16,3 +17,4 @@ export {
   HomeLoopStagePips,
   HomeLoopStageRows,
 } from './HomeLoopStageRows';
+export { HomeLoopStageStrip } from './HomeLoopStageStrip';

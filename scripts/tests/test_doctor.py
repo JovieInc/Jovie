@@ -362,6 +362,32 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("40 PR repairs", alerts["repairs-without-work"])
         self.assertIn("target-state-unavailable 23", alerts["repairs-without-work"])
 
+    def test_refunded_no_work_repairs_are_counted_as_requeues_not_spend(self):
+        # Gem 2026-10-23: refunded infra stops never consumed an attempt, so the alert
+        # must say so instead of claiming the budget was burned.
+        alerts = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": 10},
+                                  refundedNoWorkRepairs24h=7))
+        alert = alerts["repairs-without-work"]
+        self.assertIn("3 spent a fix attempt", alert)
+        self.assertIn("7 were refunded and requeued with backoff", alert)
+
+    def test_an_unclean_previous_tick_is_a_visible_alert_with_its_recovery(self):
+        alerts = doctor.judge(obs(tick={"at": "x", "error": None,
+                                        "uncleanPreviousRun": {"pid": 4242, "startedAt": 1.0},
+                                        "uncleanRecovery": {"refundedFixAttempts": ["6"]}}))
+        self.assertIn("lanes-tick-unclean", alerts)
+        self.assertIn("pid 4242", alerts["lanes-tick-unclean"])
+        self.assertIn("1 stranded fix-attempt charge", alerts["lanes-tick-unclean"])
+
+    def test_exhausted_only_delivery_failure_is_still_a_visible_alert(self):
+        # Terminal exhausted rows never retry: they must alert on their own, without a
+        # failed count, or a terminal failure would go silent.
+        alerts = doctor.judge(obs(tick={"remediationEvents": {"deliveryFailed": 0,
+                                                              "deliveryExhausted": 2,
+                                                              "deliveryNextAt": None}}))
+        self.assertIn("remediation-delivery", alerts)
+        self.assertIn("exhausted=2", alerts["remediation-delivery"])
+
     def test_disk_tiers_page_summer_only_below_critical(self):
         self.assertEqual(set(doctor.judge(obs(diskFreePct=7.0))), {"disk-low"})
         alerts = doctor.judge(obs(diskFreePct=4.9))
@@ -444,6 +470,12 @@ class JudgeTest(unittest.TestCase):
         alerts = doctor.judge(observed, {"providerIdleSince": {"devin": 0}})
         self.assertIn("provider-down:devin", alerts)
         self.assertNotIn("provider-idle:devin", alerts)
+
+    def test_a_missing_linear_app_credential_fails_closed_with_its_own_condition(self):
+        alerts = doctor.judge(obs(linearAppCredential=False))
+        self.assertIn("no personal-key fallback", alerts["linear-app-credential-missing"])
+        for present in (True, None):  # installed, or a fixture/self-test with no host file
+            self.assertNotIn("linear-app-credential-missing", doctor.judge(obs(linearAppCredential=present)))
 
     def test_started_issues_without_a_live_owner_escalate_after_the_grace(self):
         quiet = doctor.judge(obs(ownership={"started": 536, "ownerless": 3, "overGrace": 0}))
@@ -1872,6 +1904,24 @@ class PublishTest(unittest.TestCase):
         self.assertEqual(events({**row, "gateWaitS": 99999}), [events({**row, "gateWaitS": None})[0]])
         self.assertEqual(events({**row, "pr": None}), [])
 
+    def test_a_held_sweep_snapshot_raises_an_alert_per_checkout(self):
+        alerts = doctor.judge(obs(sweepSecretHeld=[{"name": "94af-Jovie", "path": "/w/Jovie",
+                                                     "reason": "secret-finding:trufflehog"}]))
+        self.assertIn("secret-finding:trufflehog", alerts["sweep-snapshot-secret:94af-Jovie"])
+        self.assertFalse([key for key in doctor.judge(obs()) if key.startswith("sweep-snapshot-secret:")])
+
+    def test_outcome_verification_is_the_outcome_receipt_stage(self):
+        events = doctor.stage_events.events
+        row = {"runId": "o1", "kind": "outcome-verify", "provider": "codex", "issue": "JOV-7771",
+               "startedAt": "2026-10-21T11:27:54Z", "endedAt": "2026-10-21T12:00:00Z",
+               "verdict": "recorded", "decision": "pass"}
+        [event] = events(row)
+        self.assertEqual((event["entityId"], event["stage"], event["outcome"]),
+                         ("JOV-7771", "outcome-receipt", "advanced"))
+        self.assertEqual(events({**row, "decision": "fail"})[0]["outcome"], "failed")
+        self.assertEqual(events({**row, "verdict": "verifier-failed"})[0]["outcome"], "abandoned")
+        self.assertEqual(events({**row, "issue": "LYB-1"}), [])
+
     def test_a_truncated_stage_file_is_read_back_by_its_size(self):
         now = time.time()
         iso = lambda delta: doctor.datetime.fromtimestamp(now - delta, doctor.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -2659,3 +2709,69 @@ class ProviderPayloadCensusTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RedDispatchAlertTest(unittest.TestCase):
+    """JOV-8931: a relayed red check with no lane claim inside the grace window alerts."""
+
+    NOW = 1_000_000_000.0
+
+    def write_ledger(self, state, rows):
+        ledger = state / "runs/red-dispatch.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        with ledger.open("a") as handle:
+            for row in rows:
+                handle.write(json.dumps(row) + "\n")
+
+    def dispatched_row(self, *, pr=22868, sha="a" * 40, red_epoch=None):
+        return {"schema": "jovie-lane-red-dispatch/v1", "status": "dispatched", "pr": pr,
+                "sha": sha, "runId": 987654, "runAttempt": 2,
+                "redAt": "2026-10-23T18:27:30Z", "redAtEpoch": red_epoch,
+                "dispatchedAt": "2026-10-23T18:28:00Z", "claimAt": None,
+                "provider": "codex", "reason": None}
+
+    def test_summary_flags_dispatch_rows_past_the_grace_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [
+                self.dispatched_row(red_epoch=self.NOW - 60),
+                self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300),
+            ])
+            summary = doctor.red_dispatch_summary(state, self.NOW)
+            self.assertEqual(summary["graceS"], 180)
+            self.assertEqual([row["pr"] for row in summary["unclaimed"]], [1])
+            self.assertEqual(summary["unclaimed"][0]["ageS"], 300)
+
+    def test_summary_clears_once_a_claim_row_lands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [
+                self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300),
+                {"status": "claimed", "pr": 1, "sha": "b" * 40, "claimAt": "2026-10-23T18:30:00Z"},
+            ])
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW)["unclaimed"], [])
+
+    def test_summary_tolerates_missing_or_corrupt_ledger(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW),
+                             {"graceS": 180, "unclaimed": []})
+            (state / "runs").mkdir(parents=True)
+            (state / "runs/red-dispatch.jsonl").write_text("not json\n")
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW)["unclaimed"], [])
+
+    def test_judge_raises_the_alert_with_a_stable_key_per_pr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300)])
+            obs = {"now": self.NOW, "redDispatch": doctor.red_dispatch_summary(state, self.NOW)}
+            alerts = doctor.judge(obs)
+            self.assertIn("red-dispatch-unclaimed:1", alerts)
+            self.assertIn("unclaimed 300s after red_at", alerts["red-dispatch-unclaimed:1"])
+
+    def test_judge_stays_quiet_inside_the_grace_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [self.dispatched_row(red_epoch=self.NOW - 60)])
+            obs = {"now": self.NOW, "redDispatch": doctor.red_dispatch_summary(state, self.NOW)}
+            self.assertFalse(doctor.judge(obs))

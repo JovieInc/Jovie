@@ -91,13 +91,13 @@ export function SidebarCollapsibleGroup({
             tooltip={tooltip}
             className={cn(
               'justify-between',
-              'h-7 px-2.5 text-sidebar-muted/90 hover:bg-transparent hover:text-sidebar-muted/90'
+              'h-(--app-shell-sidebar-row-height) px-(--app-shell-sidebar-inset) text-sidebar-muted hover:bg-transparent hover:text-sidebar-muted'
             )}
             aria-expanded={open}
           >
             <span
               data-rail-label='true'
-              className='truncate text-xs font-caption tracking-normal text-sidebar-muted/90'
+              className='truncate text-xs font-caption tracking-normal text-sidebar-muted'
             >
               {label}
             </span>

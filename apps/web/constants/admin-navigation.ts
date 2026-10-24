@@ -38,7 +38,7 @@ export type AdminWorkspaceId =
   | 'outbound'
   | 'product'
   | 'operations'
-  | 'needs_you'
+  | 'inbox'
   | 'ops'
   | 'shipping'
   | 'people'
@@ -67,15 +67,16 @@ export interface AdminNavRegistryItem {
   readonly section: AdminNavigationSection;
 }
 
+/** Home and Inbox are primary; operational workspaces live under Tools. */
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
   'overview',
-  'growth',
-  'product',
-  'operations',
-  'needs_you',
+  'inbox',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_SETTINGS_TOOL_IDS = [
+  'growth',
+  'product',
+  'operations',
   'ops',
   'certifications',
   'outbound',
@@ -101,32 +102,32 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     section: 'workspaces',
   },
   {
+    id: 'inbox',
+    label: 'Inbox',
+    href: APP_ROUTES.ADMIN_INBOX,
+    description: 'Decision requests that need your attention',
+    section: 'workspaces',
+  },
+  {
     id: 'growth',
     label: 'Growth',
     href: APP_ROUTES.ADMIN_GROWTH,
     description: 'Visited through expanded, with people behind every stage',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
     id: 'product',
     label: 'Product',
     href: APP_ROUTES.ADMIN_PRODUCT,
     description: 'Certified, deployed, exposed, and observed customer reality',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
     id: 'operations',
     label: 'Operations',
     href: APP_ROUTES.ADMIN_OPERATIONS,
     description: 'Autonomous execution outcomes, exceptions, costs, and queues',
-    section: 'workspaces',
-  },
-  {
-    id: 'needs_you',
-    label: 'Needs You',
-    href: APP_ROUTES.ADMIN_NEEDS_YOU,
-    description: 'Founder judgments that automation cannot safely make',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
     id: 'ops',
@@ -394,6 +395,11 @@ export const ADMIN_LEGACY_REDIRECT_MAP = {
   [APP_ROUTES.ADMIN_GROWTH_YC_METRICS]: {
     workspace: 'ops',
     href: APP_ROUTES.ADMIN_OPS,
+  },
+  // Legacy Needs You links open the canonical Inbox.
+  [APP_ROUTES.ADMIN_NEEDS_YOU]: {
+    workspace: 'inbox',
+    href: APP_ROUTES.ADMIN_INBOX,
   },
 } as const;
 

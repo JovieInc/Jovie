@@ -106,6 +106,12 @@ export interface ChatInputProps {
    */
   readonly onPickerOpenChange?: (open: boolean) => void;
   /**
+   * `overlay` floats the slash menu above the composer. `flow` keeps it in
+   * document flow so it cannot cover a recovery alert sitting above the form.
+   * Empty onboarding stays on overlay so opening `/` does not move the composer.
+   */
+  readonly pickerPlacement?: 'overlay' | 'flow';
+  /**
    * Required when chips/entity-pickers are wired up — used by the inline
    * slash picker to scope `useReleasesQuery` to the active creator.
    */
@@ -302,6 +308,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onAddSkill,
       onAddEntity,
       onPickerOpenChange,
+      pickerPlacement = 'overlay',
       profileId,
       statusBanner,
       dictationEnabled = true,
@@ -909,7 +916,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const showInlinePicker = picker.state.status === 'root';
     const showEntitySurface = picker.state.status === 'entity';
     const reserveInlinePickerSpace =
-      showInlinePicker && variant === 'compact' && !onPickerOpenChange;
+      showInlinePicker &&
+      (pickerPlacement === 'flow' ||
+        (variant === 'compact' && !onPickerOpenChange));
     const dockClass = reserveInlinePickerSpace
       ? 'relative flex flex-col items-center'
       : surfaceMode === 'entity' && !isStacked

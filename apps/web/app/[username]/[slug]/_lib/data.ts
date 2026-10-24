@@ -266,6 +266,14 @@ function attachCanonicalCredits(
     );
   }
 
+  if (reconciled.idConflicts && reconciled.idConflicts.length > 0) {
+    logger.info('Release credit provider id conflict collapsed by name', {
+      entityType: context.entityType,
+      entityId: context.entityId,
+      conflicts: reconciled.idConflicts,
+    });
+  }
+
   const primaryArtists = toSmartLinkPrimaryEntries(reconciled.primaryArtists);
   const otherGroups = groups.filter(group => group.role !== 'main_artist');
   const credits =

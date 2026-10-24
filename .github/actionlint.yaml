@@ -36,3 +36,11 @@ paths:
   .github/workflows/pr-conflict-handler.yml:
     ignore:
       - 'unexpected key "queue" for "concurrency" section.*'
+  # job.workflow_sha and job.workflow_repository identify the reusable
+  # workflow file (September 2026). github.workflow_sha is the caller.
+  # actionlint 1.7.12's job object does not include them yet. The ignore
+  # is this file only; a typo of either property still fails.
+  .github/workflows/production-release.yml:
+    ignore:
+      - 'property "workflow_repository" is not defined in object type'
+      - 'property "workflow_sha" is not defined in object type'

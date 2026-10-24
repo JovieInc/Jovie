@@ -17,7 +17,11 @@ section-shell owner. Both changes are covered by the renewed source digest.
   geometry and campaign attribution.
 - Pro displays $12/month and links to `/claim?plan=pro`; Free and Enterprise keep
   their existing actions. The browser suite now asserts the self-serve contract.
-- Source digest: `2757fea8de89291f29de54ed1439db8db1529c9d0ff511222f81d0d13da8a8ec`.
+- Source digest: `3b81badb69eb5c619810a2762a09e4c69ac2145ad87457064631da0f798d56b4`.
+  Rebound onto the 2026-10-21 renewal while merging the homepage branch:
+  `MarketingHeader.tsx` and `ArtistProfileLandingPage.css` are pricing owners.
+  The header CTA change is homepage-only, and `.ap-section-container` lives in
+  `ArtistProfileSectionShell.css`. The captures are that 2026-10-21 renewal.
 
 ## Previous certification, 2026-10-15
 
