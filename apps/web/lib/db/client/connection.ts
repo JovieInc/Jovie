@@ -155,35 +155,75 @@ export function resolvePoolMax(): number {
 }
 
 /**
- * Opt-in pool-level PostgreSQL statement_timeout (milliseconds).
- * When unset, connections use the server default (no app-enforced cap).
+ * Enforced database deadlines (JOV-3775 slice 2 / JOV-8527).
+ *
+ * A rejected JavaScript timer never cancels SQL, so every deadline below is
+ * applied as a real driver/server setting on the pool itself:
+ * - statement_timeout is a PostgreSQL startup parameter on each connection
+ *   (real server-side SQL cancellation);
+ * - connectionTimeoutMillis bounds both new connections and queued checkout
+ *   in the Neon serverless driver;
+ * - resetPool() bounds pool teardown so cleanup cannot hang callers.
+ *
+ * Environment overrides may only move a deadline inside hard bounds; they can
+ * never disable or remove one.
  */
-export function resolveStatementTimeoutMs(): number | undefined {
-  const raw = process.env.DB_STATEMENT_TIMEOUT_MS;
-  if (!raw) {
-    return undefined;
-  }
+const DEFAULT_STATEMENT_TIMEOUT_MS = 8_000;
+const MIN_STATEMENT_TIMEOUT_MS = 1_000;
+const MAX_STATEMENT_TIMEOUT_MS = 30_000;
+const DEFAULT_ACQUISITION_TIMEOUT_MS = 15_000;
+const MIN_ACQUISITION_TIMEOUT_MS = 1_000;
+const MAX_ACQUISITION_TIMEOUT_MS = 30_000;
+/** Pool teardown budget in resetPool(); not env-tunable. */
+const CLEANUP_TIMEOUT_MS = 5_000;
 
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return undefined;
-  }
+function resolveDeadlineMs(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(Math.max(parsed, min), max);
+}
 
-  return parsed;
+/**
+ * Pool-level PostgreSQL statement_timeout (milliseconds), always enforced.
+ * Defaults to the dashboard query ceiling (8s, under Neon's 20s idle timeout);
+ * DB_STATEMENT_TIMEOUT_MS may tune it within [1s, 30s] but never disable it.
+ */
+export function resolveStatementTimeoutMs(): number {
+  return resolveDeadlineMs(
+    process.env.DB_STATEMENT_TIMEOUT_MS,
+    DEFAULT_STATEMENT_TIMEOUT_MS,
+    MIN_STATEMENT_TIMEOUT_MS,
+    MAX_STATEMENT_TIMEOUT_MS
+  );
+}
+
+/**
+ * Pool-level acquisition deadline (milliseconds) for pool.connect(), covering
+ * both new connections and queued checkout. Defaults to the prior hard-coded
+ * 15s; DB_ACQUISITION_TIMEOUT_MS may tune it within [1s, 30s].
+ */
+export function resolveAcquisitionTimeoutMs(): number {
+  return resolveDeadlineMs(
+    process.env.DB_ACQUISITION_TIMEOUT_MS,
+    DEFAULT_ACQUISITION_TIMEOUT_MS,
+    MIN_ACQUISITION_TIMEOUT_MS,
+    MAX_ACQUISITION_TIMEOUT_MS
+  );
 }
 
 export function resolvePoolConfig(connectionString: string) {
-  const statementTimeoutMs = resolveStatementTimeoutMs();
-
   return {
     connectionString,
     max: resolvePoolMax(),
     idleTimeoutMillis: 20_000,
-    connectionTimeoutMillis: 15_000,
+    connectionTimeoutMillis: resolveAcquisitionTimeoutMs(),
     allowExitOnIdle: true,
-    ...(statementTimeoutMs !== undefined
-      ? { statement_timeout: statementTimeoutMs }
-      : {}),
+    statement_timeout: resolveStatementTimeoutMs(),
   };
 }
 
@@ -222,14 +262,16 @@ export function initializeDb(): DbType {
   // Create Neon WebSocket pool for stateful connections and RLS context
   //
   // Pool settings tuned for Neon serverless to prevent
-  // "Connection terminated unexpectedly" errors:
+  // "Connection terminated unexpectedly" errors. Deadlines are enforced by
+  // resolvePoolConfig (JOV-3775 slice 2 / JOV-8527):
   //   - max: 20 — audited source default. DB_POOL_MAX may lower it after the
   //     fleet budget is measured. This lazy, process-local client ceiling is
   //     not a fleet-wide backend connection count.
   //   - idleTimeoutMillis: 20s — close idle connections before Neon's server-side
   //     timeout (typically 30-60s) can terminate them unexpectedly
-  //   - connectionTimeoutMillis: 15s — allow time for Neon cold starts (up to ~10s)
-  //     without waiting forever
+  //   - connectionTimeoutMillis: acquisition deadline (default 15s) — allow time
+  //     for Neon cold starts (up to ~10s) while bounding queued checkout
+  //   - statement_timeout: SQL deadline (default 8s) — server-side cancellation
   //   - allowExitOnIdle: true — let the Node process exit even if pool connections
   //     remain (important for serverless/edge runtimes)
   const poolConfig = resolvePoolConfig(databaseUrl);
@@ -398,12 +440,35 @@ export async function resetPool(): Promise<void> {
   _pool = undefined;
   _db = undefined;
   globalThis.db = undefined;
-  if (oldPool) {
-    try {
-      await oldPool.end();
-    } catch (err) {
-      logDbError('pool_reset_end', err, {}, { asBreadcrumb: true });
+  if (!oldPool) {
+    return;
+  }
+
+  // Cleanup deadline (JOV-8527): pool.end() waits for checked-out clients,
+  // so a wedged client must not hang recovery forever. Both race inputs stay
+  // handled — a late end() rejection after the deadline is ignored.
+  let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const completed = await Promise.race([
+      oldPool.end().then(() => true),
+      new Promise<false>(resolve => {
+        cleanupTimer = setTimeout(() => resolve(false), CLEANUP_TIMEOUT_MS);
+      }),
+    ]);
+    if (!completed) {
+      logDbError(
+        'pool_reset_cleanup_timeout',
+        new Error(
+          `Pool teardown exceeded ${CLEANUP_TIMEOUT_MS}ms; abandoned the old pool`
+        ),
+        {},
+        { asBreadcrumb: true }
+      );
     }
+  } catch (err) {
+    logDbError('pool_reset_end', err, {}, { asBreadcrumb: true });
+  } finally {
+    if (cleanupTimer) clearTimeout(cleanupTimer);
   }
 }
 
