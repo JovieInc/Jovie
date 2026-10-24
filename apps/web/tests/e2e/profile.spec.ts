@@ -153,11 +153,9 @@ describeProfile('Profile - Core Rendering', () => {
     await expect(anyLink).toBeVisible();
   });
 
-  // JOV-8777: free public profiles currently render no Jovie branding at all
-  // (hideJovieBranding is accepted but unused since #14559), while SmartLinks
-  // still show "Powered by Jovie". Where free-tier profile branding lives is a
-  // product/taste call; re-enable and repoint once JOV-8777 ships.
-  test.fixme('has Jovie footer branding', async ({ page }) => {
+  // JOV-8777: free public profiles render the Jovie footer branding; the
+  // paid-tier removal path is the hideJovieBranding opt-out the surfaces honor.
+  test('has Jovie footer branding', async ({ page }) => {
     const footerLink = page.getByRole('link', { name: /Jovie home/i });
     await expect(footerLink.first()).toBeVisible({ timeout: 10000 });
   });

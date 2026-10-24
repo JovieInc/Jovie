@@ -124,10 +124,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .home-viewport
   [data-testid="header-nav"]:not([data-presentation="marketing-glass"])
   nav {
-  width: min(
-    var(--ds-public-content-max),
-    calc(100% - var(--ds-public-gutter) * 2)
-  ) !important;
+  /* The docked header owns the contained width and page gutters. */
+  width: 100% !important;
   max-width: var(--ds-public-content-max) !important;
   margin-inline: auto !important;
   padding-inline: 0 !important;
