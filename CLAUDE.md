@@ -85,7 +85,16 @@ gates, or use `--no-verify`.
 
 Select skills by intent; load their entry and needed references. Edit `.tmpl`
 sources and regenerate. CLAUDE.md is a router; use Playwright for repo web QA.
-Message agents: `jovie mesh send/read`.
+Message agents: `jovie mesh send/read`. The Ovie Mesh page
+(`/app/ov/mesh`, JOV-8937) is a read-only roster of mesh agents: server-side
+reads come from the in-repo registry (sender ids only) plus the Summer mesh
+origin (`JOVIE_MESH_URL`, the CLI's env contract — kept out of Jovie config).
+Its ping button POSTs `/api/admin/mesh/ping` (admin-only), which delivers a
+`jovie.mesh-ping/v1` test message to the real mesh inbox
+(`/summer/v1/mesh/inbox`) using the `JOVIE_MESH_TOKEN` + `_SENDER_ID` +
+`_SENDER_KIND` env credentials. The abuse cap is 10 pings per agent per hour
+(`MESH_PING_HOURLY_LIMIT` in apps/web/lib/rate-limit/config.ts), enforced
+server-side with 429 beyond.
 Batch independent reads, serialize state changes, and require evidence to
 integrate delegated work.
 
