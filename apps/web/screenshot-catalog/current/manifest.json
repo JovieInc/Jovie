@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-23T23:34:51.674Z",
-    "gitSha": "86bf884c864b5856bd3c0ac9e75d4fac4eb14f3f",
+    "capturedAt": "2026-10-23T23:09:53.367Z",
+    "gitSha": "92c201827bb312ec5e23a0bb569175506017a00b",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-23T23:36:04.647Z",
-    "gitSha": "86bf884c864b5856bd3c0ac9e75d4fac4eb14f3f",
+    "capturedAt": "2026-10-23T23:10:01.806Z",
+    "gitSha": "92c201827bb312ec5e23a0bb569175506017a00b",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
