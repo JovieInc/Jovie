@@ -67,6 +67,17 @@ describe('KeyboardShortcutsSheet', () => {
     expect(screen.getByText('Lock workspace')).toBeInTheDocument();
     expect(screen.getByText('Focus main menu')).toBeInTheDocument();
   });
+
+  it('lets keyboard users reach the scrollable shortcut list', async () => {
+    const user = userEvent.setup();
+    renderSheet(true, '/app/ov');
+    const list = screen.getByRole('region', { name: 'Shortcuts' });
+    const search = within(list).getByRole('textbox', {
+      name: 'Search Shortcuts',
+    });
+    await user.click(search);
+    expect(search).toHaveFocus();
+  });
 });
 
 it('renders 32px shortcut rows', () => {

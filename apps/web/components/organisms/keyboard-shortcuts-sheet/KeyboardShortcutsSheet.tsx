@@ -185,90 +185,96 @@ export function KeyboardShortcutsSheet() {
         hideClose
         onAnimationEnd={handleAnimationEnd}
       >
-        <div className='sticky top-0 z-10 shrink-0 bg-surface-0'>
-          <SheetHeader className='flex flex-row items-center gap-2 space-y-0 px-3 py-2'>
-            <Button
-              variant='ghost'
-              size='icon'
-              className='h-8 w-8 shrink-0'
-              onClick={close}
-              aria-label='Close Keyboard Shortcuts'
-            >
-              <ChevronLeft className='h-4 w-4' />
-            </Button>
-            <SheetTitle className='text-app font-medium tracking-tight'>
-              Keyboard Shortcuts
-            </SheetTitle>
-            <Button
-              variant='ghost'
-              size='icon'
-              className='ml-auto h-8 w-8 shrink-0'
-              onClick={close}
-              aria-label='Close'
-            >
-              <X className='h-4 w-4' />
-            </Button>
-          </SheetHeader>
+        <section
+          aria-label='Shortcuts'
+          className='relative min-h-0 flex-1 overflow-y-auto'
+        >
+          <div className='sticky top-0 z-10 shrink-0 bg-surface-0'>
+            <SheetHeader className='flex flex-row items-center gap-2 space-y-0 px-3 py-2'>
+              <Button
+                variant='ghost'
+                size='icon'
+                className='h-8 w-8 shrink-0'
+                onClick={close}
+                aria-label='Close Keyboard Shortcuts'
+              >
+                <ChevronLeft className='h-4 w-4' />
+              </Button>
+              <SheetTitle className='text-app font-medium tracking-tight'>
+                Keyboard Shortcuts
+              </SheetTitle>
+              <Button
+                variant='ghost'
+                size='icon'
+                className='ml-auto h-8 w-8 shrink-0'
+                onClick={close}
+                aria-label='Close'
+              >
+                <X className='h-4 w-4' />
+              </Button>
+            </SheetHeader>
 
-          <div className='px-3 py-2'>
-            <div className='relative'>
-              <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tertiary-token' />
-              <Input
-                ref={inputRef}
-                type='text'
-                placeholder='Search shortcuts'
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className='bg-surface-1 pl-9 text-app'
-                inputSize='sm'
-              />
-              {searchQuery && (
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  className='absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2'
-                  onClick={() => setSearchQuery('')}
-                  aria-label='Clear Search'
-                >
-                  <X className='h-3 w-3' />
-                </Button>
-              )}
+            <div className='px-3 py-2'>
+              <div className='relative'>
+                <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tertiary-token' />
+                <Input
+                  ref={inputRef}
+                  type='text'
+                  aria-label='Search Shortcuts'
+                  placeholder='Search shortcuts'
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className='bg-surface-1 pl-9 text-app'
+                  inputSize='sm'
+                />
+                {searchQuery && (
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    className='absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2'
+                    onClick={() => setSearchQuery('')}
+                    aria-label='Clear Search'
+                  >
+                    <X className='h-3 w-3' />
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Shortcuts list */}
-        <div className='flex-1 overflow-y-auto px-1.5 py-2'>
-          {hasResults ? (
-            <div className='space-y-4 pb-1'>
-              {categoryOrder.map(category => (
-                <ShortcutCategorySection
-                  key={category}
-                  category={category}
-                  shortcuts={groupedShortcuts[category]}
+          {/* Shortcuts list */}
+          <div className='px-1.5 py-2'>
+            {hasResults ? (
+              <div className='space-y-4 pb-1'>
+                {categoryOrder.map(category => (
+                  <ShortcutCategorySection
+                    key={category}
+                    category={category}
+                    shortcuts={groupedShortcuts[category]}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className='flex flex-col items-center justify-center py-12 text-center'>
+                <Search
+                  className='mb-3 h-8 w-8 text-tertiary-token'
+                  aria-hidden
                 />
-              ))}
-            </div>
-          ) : (
-            <div className='flex flex-col items-center justify-center py-12 text-center'>
-              <Search
-                className='mb-3 h-8 w-8 text-tertiary-token'
-                aria-hidden
-              />
-              <p className='mb-3 text-sm text-tertiary-token'>
-                No shortcuts found for &quot;{searchQuery}&quot;
-              </p>
-              <Button
-                type='button'
-                variant='secondary'
-                size='sm'
-                onClick={() => setSearchQuery('')}
-              >
-                Clear Search
-              </Button>
-            </div>
-          )}
-        </div>
+                <p className='mb-3 text-sm text-tertiary-token'>
+                  No shortcuts found for &quot;{searchQuery}&quot;
+                </p>
+                <Button
+                  type='button'
+                  variant='secondary'
+                  size='sm'
+                  onClick={() => setSearchQuery('')}
+                >
+                  Clear Search
+                </Button>
+              </div>
+            )}
+          </div>
+        </section>
       </SheetContent>
     </Sheet>
   );

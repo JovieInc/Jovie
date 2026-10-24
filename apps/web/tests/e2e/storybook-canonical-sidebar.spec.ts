@@ -686,6 +686,36 @@ for (const theme of ['dark', 'light']) {
   });
 }
 
+test('Ovie shortcuts keep keyboard scrolling inside the list', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 450 });
+  await page.goto(
+    '/iframe.html?id=organisms-keyboardshortcutssheet--ovie-navigation&viewMode=story',
+    { waitUntil: 'domcontentloaded' }
+  );
+  const dialog = page.getByRole('dialog', { name: 'Keyboard Shortcuts' });
+  await expect(dialog).toBeVisible({ timeout: 60_000 });
+  expect(
+    await dialog.evaluate(
+      element => element.scrollHeight - element.clientHeight
+    )
+  ).toBeLessThanOrEqual(1);
+  const list = dialog.getByRole('region', { name: 'Shortcuts' });
+  const search = list.getByRole('textbox', { name: 'Search Shortcuts' });
+  await search.focus();
+  await expect(search).toBeFocused();
+  await page.keyboard.press('PageDown');
+  await expect
+    .poll(() => list.evaluate(element => element.scrollTop))
+    .toBeGreaterThan(0);
+  await expect(
+    dialog.getByRole('button', { name: 'Close', exact: true })
+  ).toBeInViewport();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+});
+
 test('Ovie Tools preference survives mobile drawer to desktop resize', async ({
   page,
 }) => {
