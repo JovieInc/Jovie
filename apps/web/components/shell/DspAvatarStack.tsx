@@ -120,11 +120,16 @@ export function DspAvatarStack({
     >
       <button
         aria-describedby={popoverId}
-        aria-label='View DSP Distribution Details'
         className='inline-flex items-center gap-1.5 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-(--system-b-bg-page)'
         type='button'
       >
-        <span className='inline-flex items-center'>
+        {/* WCAG 2.5.3 label-in-name (axe label-content-name-mismatch,
+            JOV-8781): name the trigger from its content — the sr-only label
+            plus the visible '+N' overflow chip — instead of an aria-label
+            that can diverge from the rendered text. Avatar glyphs are
+            decorative and stay out of the name. */}
+        <span className='sr-only'>View DSP Distribution Details</span>
+        <span aria-hidden='true' className='inline-flex items-center'>
           {visible.map((dsp, index) => (
             <span
               key={dsp.id}
