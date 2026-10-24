@@ -275,6 +275,8 @@ const DESKTOP_UPDATE_NOTES_URL = `${APP_ORIGIN}/changelog`;
 const GO_BACK_CHANNEL = 'go-back';
 const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
+const FULL_SCREEN_STATE_CHANNEL = 'full-screen-state-changed';
+const GET_FULL_SCREEN_STATE_CHANNEL = 'get-full-screen-state';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
 const OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL = 'open-current-ovie-in-browser';
@@ -2512,6 +2514,13 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   mainWindow = win;
+  const sendFullScreenState = () => {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send(FULL_SCREEN_STATE_CHANNEL, win.isFullScreen());
+    }
+  };
+  win.on('enter-full-screen', sendFullScreenState);
+  win.on('leave-full-screen', sendFullScreenState);
   const navigationContentsId = win.webContents.id;
   win.webContents.on('render-process-gone', () => {
     desktopNavigation.setReady(navigationContentsId, false);
@@ -3327,6 +3336,15 @@ ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (win && !win.isDestroyed() && win.webContents.canGoForward())
     win.webContents.goForward();
 });
+
+ipcMain.handle(
+  GET_FULL_SCREEN_STATE_CHANNEL,
+  (event: IpcMainInvokeEvent) => {
+    if (!isTrustedIpcSender(event)) return false;
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return Boolean(win && !win.isDestroyed() && win.isFullScreen());
+  }
+);
 
 ipcMain.handle(
   OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL,

@@ -1516,13 +1516,14 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
   assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
-  assert.match(globalsCss, /--electron-titlebar-height: 40px;/);
+  assert.match(globalsCss, /--electron-titlebar-height: 48px;/);
   assert.match(globalsCss, /--electron-traffic-light-control-size: 14px;/);
   assert.match(globalsCss, /--electron-traffic-light-clearance: 8px;/);
+  assert.match(globalsCss, /--electron-traffic-light-toggle-gap: 12px;/);
   assert.match(globalsCss, /--electron-traffic-light-safe-width:\s*calc\(/);
-  assert.doesNotMatch(
+  assert.match(
     globalsCss,
-    /--electron-traffic-light-safe-width:\s*\d+px;/
+    /data-electron-fullscreen="true"[\s\S]*--electron-traffic-light-safe-width:\s*0px;/
   );
   assert.match(globalsCss, /--electron-traffic-light-x: 20px;/);
   assert.match(globalsCss, /--electron-traffic-light-y: 17px;/);
@@ -1595,20 +1596,23 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
     designSystem.match(/--space-2:\s*([\d.]+)rem;/)?.[1]
   );
   const iconGap = space2Rem * 16;
+  const toggleGap = Number(
+    globalsCss.match(/--electron-traffic-light-toggle-gap:\s*(\d+)px;/)?.[1]
+  );
   // Safe width is a calc of those tokens. The titlebar's padding-left is the
   // shell gap, so the reserve is measured from the content origin:
-  // x - gap + 3 controls + 2 inter-light gaps + trailing clearance - icon gap.
+  // x - gap + 3 controls + 2 inter-light gaps + toggle gap - icon gap.
   const safeWidth =
     x -
     shellGap +
     3 * controlDiameter +
     2 * trailingClearance +
-    trailingClearance -
+    toggleGap -
     iconGap;
 
   assert.ok(Number.isFinite(x) && Number.isFinite(y));
   assert.ok(Number.isFinite(titlebarHeight) && Number.isFinite(safeWidth));
-  assert.equal(safeWidth, 70);
+  assert.equal(safeWidth, 74);
 
   // The first interactive control starts at window x = shell gap + reserve +
   // the shared icon gap. That must clear the third traffic light plus the

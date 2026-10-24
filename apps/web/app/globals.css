@@ -111,25 +111,35 @@ body {
 }
 
 html[data-desktop-runtime="electron"] {
-  --electron-titlebar-height: 40px;
+  --electron-titlebar-height: 48px;
   --electron-controls-width: 200px;
   --electron-traffic-light-x: 20px;
   --electron-traffic-light-y: 17px;
   --electron-traffic-light-control-size: 14px;
   --electron-traffic-light-clearance: 8px;
+  --electron-traffic-light-toggle-gap: 12px;
+  --electron-titlebar-top-gap: var(--electron-titlebar-height);
   /* Content origin is the shell gap (titlebar padding-left). The reserve
-     places the first control at the native lights' trailing clearance.
-     20 - 8 + 42 + 16 + 8 - 8 = 70. Toggle window x = 8 + 70 + 8 = 86. */
+     places the toggle 12px beyond the native lights.
+     20 - 8 + 42 + 16 + 12 - 8 = 74. Toggle window x = 8 + 74 + 8 = 90. */
   --electron-traffic-light-safe-width: calc(
     var(--electron-traffic-light-x) -
     var(--app-shell-gap) +
     (3 * var(--electron-traffic-light-control-size)) +
     (2 * var(--electron-traffic-light-clearance)) +
-    var(--electron-traffic-light-clearance) -
+    var(--electron-traffic-light-toggle-gap) -
     var(--app-shell-sidebar-icon-gap)
   );
   --electron-sidebar-width: var(--app-shell-sidebar-width);
   --electron-sidebar-collapsed-width: 52px;
+}
+
+/* Native full-screen removes the traffic lights and their vertical inset.
+   Keep the unified toolbar controls, but collapse only the native safe area
+   and any shell allocation that existed to clear the titlebar. */
+html[data-desktop-runtime="electron"][data-electron-fullscreen="true"] {
+  --electron-traffic-light-safe-width: 0px;
+  --electron-titlebar-top-gap: 0px;
 }
 
 html[data-desktop-runtime="electron"] body {
@@ -181,7 +191,7 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
 }
 
 html[data-desktop-runtime="electron"] [data-app-shell-sidebar-mount="true"] {
-  padding-top: var(--electron-titlebar-height);
+  padding-top: var(--electron-titlebar-top-gap);
 }
 
 html[data-desktop-runtime="electron"]
@@ -243,7 +253,7 @@ html[data-desktop-runtime="electron"]
     :has([data-top-spacing-owner="shell-header"])
   )
   [data-app-shell-content-column="true"] {
-  padding-top: var(--electron-titlebar-height);
+  padding-top: var(--electron-titlebar-top-gap);
 }
 
 /* Settings now supplies the shared desktop header inside its route panel. */

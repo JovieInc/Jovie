@@ -20,6 +20,7 @@ import {
   __testing,
   isDesktopEnvironment,
   notifyDesktopComposerReadiness,
+  observeDesktopFullScreen,
   observeDesktopVisualActivity,
   reportDesktopWorkState,
   useDesktopBuildIdentity,
@@ -69,6 +70,41 @@ afterEach(() => {
 });
 
 describe('electron-bridge — defensive guards', () => {
+  it('keeps a native full-screen event ahead of a delayed initial snapshot', async () => {
+    let resolveSnapshot: ((isFullScreen: boolean) => void) | undefined;
+    let listener: ((isFullScreen: boolean) => void) | undefined;
+    const getFullScreenState = () =>
+      new Promise<boolean>(resolve => {
+        resolveSnapshot = resolve;
+      });
+    const unsubscribe = vi.fn();
+    setElectronAPI({
+      platform: 'darwin',
+      electronVersion: '44.0.0',
+      onUpdateAvailable: vi.fn(),
+      onUpdateDownloaded: vi.fn(),
+      installUpdateAndRestart: vi.fn(),
+      goBack: vi.fn(),
+      goForward: vi.fn(),
+      onNavStateChanged: vi.fn(),
+      getFullScreenState,
+      onFullScreenChanged: (callback: (isFullScreen: boolean) => void) => {
+        listener = callback;
+        return unsubscribe;
+      },
+    });
+
+    const callback = vi.fn();
+    const dispose = observeDesktopFullScreen(callback);
+    listener?.(true);
+    resolveSnapshot?.(false);
+    await Promise.resolve();
+
+    expect(callback).toHaveBeenCalledExactlyOnceWith(true);
+    dispose();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
   it('reports work only through a supported bridge and tolerates stale or throwing shells', () => {
     expect(reportDesktopWorkState(null)).toBe(false);
     setElectronAPI({ versions: { app: 'old' } });

@@ -4,12 +4,13 @@
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CSSProperties } from 'react';
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
 import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
 import {
   type DesktopBuildIdentity,
+  observeDesktopFullScreen,
   useDesktopBuildIdentity,
   useDesktopNavigation,
   useIsElectronRuntime,
@@ -151,6 +152,19 @@ export function DesktopTitlebar() {
   const sidebarToggleOpen = isMobile
     ? sidebarCtx?.openMobile === true
     : sidebarCtx?.state === 'open';
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!isDesktop) {
+      delete root.dataset.electronFullscreen;
+      return;
+    }
+
+    const applyFullScreenState = (isFullScreen: boolean) => {
+      root.dataset.electronFullscreen = isFullScreen ? 'true' : 'false';
+    };
+    return observeDesktopFullScreen(applyFullScreenState);
+  }, [isDesktop]);
 
   return (
     <div
