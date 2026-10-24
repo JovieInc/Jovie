@@ -211,13 +211,16 @@ function maybeJson(text: string, headers: Headers | undefined): unknown {
   }
 }
 
-function bodyText(body: string | object | undefined): string | undefined {
+function bodyText(
+  body: string | object | undefined
+): string | FormData | undefined {
   if (body === undefined) return undefined;
+  if (body instanceof FormData) return body;
   return typeof body === 'string' ? body : JSON.stringify(body);
 }
 
-function graphqlQuery(body: string | undefined): string {
-  if (!body) return '';
+function graphqlQuery(body: string | FormData | undefined): string {
+  if (typeof body !== 'string' || !body) return '';
   try {
     const query = (JSON.parse(body) as { query?: unknown }).query;
     return typeof query === 'string' ? query : '';
@@ -270,7 +273,9 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     const read =
       method === 'GET' ||
       method === 'HEAD' ||
-      (isGraphql && !/^\s*mutation\b/.test(graphqlQuery(body)));
+      (isGraphql &&
+        typeof body === 'string' &&
+        !/^\s*mutation\b/.test(graphqlQuery(body)));
     const write = opts.write ?? !read;
     const idempotent =
       opts.idempotent ?? (read || method === 'PUT' || method === 'DELETE');
@@ -488,11 +493,12 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         method,
         opts.url,
         opts.headers?.accept ?? '',
-        method === 'GET' ? '' : body,
+        method === 'GET' || typeof body !== 'string' ? '' : body,
       ]);
       const read =
         method === 'GET' ||
         (method === 'POST' &&
+          typeof body === 'string' &&
           new URL(opts.url).pathname.endsWith('/graphql') &&
           !/^\s*mutation\b/.test(graphqlQuery(body)));
       if (!read || opts.coalesce === false) return send(opts, key);

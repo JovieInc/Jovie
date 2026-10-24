@@ -55,6 +55,7 @@ describe('composer adaptive dictation', () => {
     expect(result.current.isSupported).toBe(true);
     expect(state.options?.providers?.map(p => p.id)).toEqual([
       'elevenlabs-stream',
+      'elevenlabs-batch',
       'web-speech',
     ]);
     act(() => result.current.start());

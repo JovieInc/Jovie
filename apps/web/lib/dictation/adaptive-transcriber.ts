@@ -9,6 +9,8 @@ import {
   resolveFailureLadder,
 } from '@/lib/voice-gateway/realtime-session';
 import { DictationError } from './errors';
+import { DICTATION_LIMITS } from './limits';
+import { createDictationRecording, type DictationRecording } from './recorder';
 import { createDictationRegistry } from './registry';
 import {
   DICTATION_MIC_CONSTRAINTS,
@@ -26,6 +28,7 @@ export interface AdaptiveTranscriberOptions {
   browserWindow?: Window;
   getMicrophone?: () => Promise<MediaStream>;
   activeTts?: () => TtsStream | null;
+  createRecording?: (mic: MediaStream) => DictationRecording;
   onFallback?: (code: DictationErrorCode) => void;
 }
 const TERMINAL_ERRORS = new Set<DictationErrorCode>([
@@ -57,7 +60,17 @@ export function createAdaptiveTranscriber(
   let unsubscribe: (() => void) | undefined;
   let committed = new Map<string, string>();
   let stopping = false;
+  let stopRequested = false;
+  let recording: DictationRecording | null = null;
+  let recordedBlob: Blob | null = null;
+  let recordingResult: Promise<Blob> | null = null;
+  let batchStop: (() => void) | null = null;
+  let sessionTimer: ReturnType<typeof setTimeout> | undefined;
   const release = () => {
+    clearTimeout(sessionTimer);
+    recording?.abort();
+    recording = null;
+    batchStop = null;
     for (const track of mic?.getTracks() ?? []) track.stop();
     mic = null;
   };
@@ -72,12 +85,16 @@ export function createAdaptiveTranscriber(
     generation++;
     detach();
     release();
+    recordedBlob = null;
+    recordingResult = null;
     callbacks.onEnd?.();
   };
   const terminal = (code: DictationErrorCode) => {
     generation++;
     detach();
     release();
+    recordedBlob = null;
+    recordingResult = null;
     if (
       !['not-allowed', 'service-not-allowed', 'audio-capture'].includes(code)
     ) {
@@ -102,8 +119,21 @@ export function createAdaptiveTranscriber(
     }
     const fail = (code: DictationErrorCode) => {
       if (session !== generation) return;
-      if (stopping || TERMINAL_ERRORS.has(code)) {
+      if (TERMINAL_ERRORS.has(code)) {
         terminal(code);
+        return;
+      }
+      if (stopRequested) {
+        const batchIndex = providers.findIndex(
+          (candidate, position) =>
+            position > index && candidate.capabilities.batch
+        );
+        if (recording && batchIndex >= 0 && !provider.capabilities.batch) {
+          detach();
+          stopping = false;
+          attempt = 0;
+          void open(batchIndex, ++generation);
+        } else terminal(code);
         return;
       }
       detach();
@@ -147,7 +177,12 @@ export function createAdaptiveTranscriber(
         return;
       }
       if (session !== generation) return;
-      if (!mic && provider.id !== 'web-speech') {
+      if (
+        !mic &&
+        !recordedBlob &&
+        !recordingResult &&
+        provider.id !== 'web-speech'
+      ) {
         const acquired = await (options.getMicrophone?.() ??
           navigator.mediaDevices.getUserMedia({
             audio: DICTATION_MIC_CONSTRAINTS,
@@ -157,8 +192,58 @@ export function createAdaptiveTranscriber(
           return;
         }
         mic = acquired;
+        if (
+          providers.some(p => p.capabilities.batch) &&
+          (options.createRecording || typeof MediaRecorder !== 'undefined')
+        ) {
+          try {
+            recording = (options.createRecording ?? createDictationRecording)(
+              mic
+            );
+          } catch {
+            recording = null;
+          }
+        }
       }
       controller = new AbortController();
+      if (provider.transcribe && provider.capabilities.batch) {
+        if (!recording && !recordedBlob && !recordingResult) {
+          attempt = 1;
+          fail('provider-down');
+          return;
+        }
+        const batchSignal = controller.signal;
+        let submitted = false;
+        batchStop = () => {
+          if (submitted || session !== generation) return;
+          submitted = true;
+          void (async () => {
+            try {
+              const blob =
+                recordedBlob ?? (await (recordingResult ?? recording?.stop()));
+              if (!blob || session !== generation) return;
+              recordedBlob = blob;
+              release();
+              const text = await provider.transcribe?.(blob, batchSignal);
+              if (session !== generation || batchSignal.aborted) return;
+              // Batch covers the entire buffered session, replacing streaming
+              // segments instead of appending them and duplicating speech.
+              if (text !== undefined) callbacks.onTranscript(text);
+              finish();
+            } catch (error) {
+              fail(
+                error instanceof DictationError ? error.code : 'provider-down'
+              );
+            }
+          })();
+        };
+        if (stopRequested) {
+          stopping = true;
+          batchStop();
+        }
+        return;
+      }
+      batchStop = null;
       const opened = await provider.openStream?.(mic, controller.signal);
       if (session !== generation) {
         opened?.abort();
@@ -202,26 +287,59 @@ export function createAdaptiveTranscriber(
     stopping = true;
     detach();
     release();
+    recordedBlob = null;
+    recordingResult = null;
+  };
+  const stop = () => {
+    stopRequested = true;
+    stopping = true;
+    clearTimeout(sessionTimer);
+    if (recording && !recordingResult) {
+      recordingResult = recording.stop();
+      const capturedMic = mic;
+      const stopTracks = () => {
+        if (mic !== capturedMic) return;
+        for (const track of capturedMic?.getTracks() ?? []) track.stop();
+        mic = null;
+      };
+      void recordingResult.then(stopTracks, stopTracks);
+    }
+    if (batchStop) batchStop();
+    else if (stream) {
+      stream.commit();
+      stream.close();
+    } else if (recording) {
+      const batchIndex = providers.findIndex(
+        provider => provider.capabilities.batch
+      );
+      if (batchIndex >= 0) {
+        detach();
+        stopping = false;
+        attempt = 0;
+        void open(batchIndex, ++generation);
+      } else finish();
+    } else {
+      generation++;
+      finish();
+    }
   };
   return {
     isSupported: providers.length > 0,
     start() {
       cancel();
       stopping = false;
+      stopRequested = false;
       attempt = 0;
       committed = new Map();
+      recordedBlob = null;
+      recordingResult = null;
+      sessionTimer = setTimeout(
+        stop,
+        DICTATION_LIMITS.maxSessionSeconds * 1000
+      );
       void open(0, ++generation);
     },
-    stop() {
-      stopping = true;
-      if (stream) {
-        stream.commit();
-        stream.close();
-      } else {
-        generation++;
-        finish();
-      }
-    },
+    stop,
     cancel,
     dispose: cancel,
   };
