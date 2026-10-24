@@ -1,7 +1,14 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   enqueueForEve,
@@ -14,7 +21,7 @@ import {
   persistGbrainFinding,
 } from '../../qa-swarm/gbrain.mjs';
 import { buildEnrichedIssueBody } from '../../qa-swarm/linear.mjs';
-import { getQaSwarmPaths } from '../../qa-swarm/paths.mjs';
+import { getQaSwarmPaths, getRepoRoot } from '../../qa-swarm/paths.mjs';
 import { proposeQaSwarmFindings } from '../../qa-swarm/propose.mjs';
 import {
   getRecipeByCommand,
@@ -27,6 +34,22 @@ import {
 } from '../../qa-swarm/types.mjs';
 
 const tempRoots = [];
+
+// Scope the shared Linear cooldown state to a per-suite temp dir (JOV-8909).
+// Without this, the suite's own rate-limited fixture publishes a >=60s
+// cooldown for the well-known test credential into the real user state root,
+// and any later qa-swarm run (same process or a sibling control stage —
+// control stages are separate processes) fails 'linear rate limited'. This
+// matches the isolation pattern already used by golden-path-lock and
+// linear-cooldown tests.
+let previousCooldownStateDir;
+let cooldownStateDir;
+
+beforeEach(() => {
+  previousCooldownStateDir = process.env.LINEAR_COOLDOWN_STATE_DIR;
+  cooldownStateDir = mkdtempSync(path.join(tmpdir(), 'qa-swarm-cooldown-'));
+  process.env.LINEAR_COOLDOWN_STATE_DIR = cooldownStateDir;
+});
 
 function linearFinding(id, title) {
   return /** @type {const} */ ({
@@ -52,6 +75,15 @@ function jsonResponse(data, status = 200) {
 afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.LINEAR_API_KEY;
+  if (previousCooldownStateDir === undefined) {
+    delete process.env.LINEAR_COOLDOWN_STATE_DIR;
+  } else {
+    process.env.LINEAR_COOLDOWN_STATE_DIR = previousCooldownStateDir;
+  }
+  if (cooldownStateDir) {
+    rmSync(cooldownStateDir, { recursive: true, force: true });
+    cooldownStateDir = undefined;
+  }
   while (tempRoots.length > 0) {
     const root = tempRoots.pop();
     if (root) {
@@ -62,6 +94,12 @@ afterEach(() => {
 
 function makeTempRepo() {
   const repoRoot = mkdtempSync(path.join(tmpdir(), 'qa-swarm-test-'));
+  // Anchor getRepoRoot() to the fixture itself (JOV-8909): the discovery walk
+  // in qa-swarm/paths.mjs stops at the first .git OR package.json above the
+  // cwd, so a bare temp dir under a shared /tmp that carries an unrelated
+  // marker (seen on macOS) hijacked the fixture root. Writing a marker here
+  // makes the fixture hermetic regardless of its ancestors.
+  writeFileSync(path.join(repoRoot, 'package.json'), '{}\n');
   tempRoots.push(repoRoot);
   const originalCwd = process.cwd();
   process.chdir(repoRoot);
@@ -72,6 +110,32 @@ function makeTempRepo() {
     },
   };
 }
+
+it('resolves the fixture root itself when a parent temp dir holds a foreign git marker', () => {
+  // Regression for macOS portability (JOV-8909): a shared /tmp containing an
+  // unrelated .git or package.json must not hijack getRepoRoot() for a
+  // fixture repo. The environment override makes the fixture's own
+  // mkdtemp land inside a deliberately contaminated parent.
+  const contaminatedParent = mkdtempSync(
+    path.join(tmpdir(), 'qa-swarm-contaminated-')
+  );
+  mkdirSync(path.join(contaminatedParent, '.git'), { recursive: true });
+  const originalTmpdir = process.env.TMPDIR;
+  process.env.TMPDIR = contaminatedParent;
+  const { repoRoot, restore } = makeTempRepo();
+  try {
+    expect(getRepoRoot()).toBe(repoRoot);
+    expect(getQaSwarmPaths().repoRoot).toBe(repoRoot);
+  } finally {
+    restore();
+    if (originalTmpdir === undefined) {
+      delete process.env.TMPDIR;
+    } else {
+      process.env.TMPDIR = originalTmpdir;
+    }
+    rmSync(contaminatedParent, { recursive: true, force: true });
+  }
+});
 
 describe('qa-swarm registry', () => {
   it('defines six recipes with matching slash-command files', () => {
