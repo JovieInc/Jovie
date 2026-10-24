@@ -283,6 +283,9 @@ describe('MarketingHero source-backed default story', () => {
     expect(shell).toHaveClass('relative', 'w-full');
     expect(shell).toHaveClass('pt-20', 'pb-16');
     expect(shell).toHaveClass('items-center', 'text-center');
+    // One boxed width: the hero never sets its own max-width or gutter.
+    expect(shell).toHaveClass('public-container');
+    expect(shell.className).not.toMatch(/\bmax-w-|\bpx-/);
   });
 
   it('paints the landing hero backdrop through the shared token class', () => {

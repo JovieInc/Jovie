@@ -10,7 +10,7 @@ export function PreSaveCountdown() {
   return (
     <div
       data-testid='pre-save-countdown'
-      className='flex w-full flex-col gap-6'
+      className='flex w-full flex-col gap-6 rounded-2xl bg-surface-1 p-4'
     >
       <p className='text-sm font-medium text-primary-token'>
         {PRE_SAVE_FIXTURE.releaseTitle}

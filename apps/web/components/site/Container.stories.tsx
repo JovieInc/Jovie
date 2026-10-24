@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Compatibility container with the canonical public-content width aliases. MarketingContainer remains the canonical marketing shell owner.',
+          'The single boxed public width plus the one full-bleed override.',
       },
     },
   },
@@ -20,12 +20,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const SIZE_LABELS = {
-  sm: 'sm (legacy)',
-  md: 'md (legacy)',
-  lg: 'lg (canonical)',
-  xl: 'xl (canonical alias)',
-  homepage: 'homepage (canonical alias)',
-  full: 'full',
+  page: 'page (the one boxed width)',
+  bleed: 'bleed (the one full-bleed override)',
 } as const;
 
 export const Default: Story = {
@@ -36,7 +32,7 @@ export const Default: Story = {
         <div className='rounded-lg border border-subtle bg-surface-1 p-6'>
           <h2 className='text-lg font-semibold'>Public content container</h2>
           <p className='mt-2 text-secondary-token'>
-            The default maps to the canonical public-content max width.
+            The default is the single public content width.
           </p>
         </div>
       </Container>

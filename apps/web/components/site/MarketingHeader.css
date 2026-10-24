@@ -14,7 +14,7 @@
 .marketing-glass-header[data-presentation="marketing-glass"] {
   --marketing-glass-top: var(--space-2-5);
   --marketing-glass-height: 2.75rem;
-  --marketing-glass-gutter: var(--space-6);
+  --marketing-glass-gutter: var(--ds-public-gutter);
   --marketing-glass-text: var(--noir-ion-text-primary);
   --marketing-glass-muted: var(--noir-ion-text-muted);
   /* The reserved main offset is the header border box, including the 1px
@@ -98,7 +98,7 @@
   /* Fill the offset floor minus the header's bottom border. */
   min-height: calc(var(--public-shell-header-offset) - var(--space-px));
   padding-block: var(--marketing-glass-top);
-  padding-inline: var(--marketing-glass-gutter) !important;
+  padding-inline: 0 !important;
 }
 
 .marketing-glass-header[data-presentation="marketing-glass"]
@@ -215,7 +215,7 @@
   .marketing-glass-header[data-presentation="marketing-glass"] {
     --marketing-glass-top: var(--space-2-5);
     --marketing-glass-height: 2.75rem;
-    --marketing-glass-gutter: var(--space-6);
+    --marketing-glass-gutter: var(--ds-public-gutter);
   }
 }
 

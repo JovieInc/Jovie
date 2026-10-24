@@ -264,7 +264,7 @@ whose sha256 is registered with Summer.
 | `mesh vouch --kind <kind> --sender-id <uuid> --token-sha256 <hex>` | `POST /summer/v1/mesh/register`; pending until Tim approves |
 
 Kinds: `grokbot`, `aeon`, `dots`, `stella`, `instinct`, `chloe`, `claude`,
-`codex`, `devin`, `muse`. The credential comes from `JOVIE_MESH_TOKEN` plus
+`codex`, `devin`, `muse`, `lola`. The credential comes from `JOVIE_MESH_TOKEN` plus
 `JOVIE_MESH_SENDER_ID` and `JOVIE_MESH_SENDER_KIND`, or from the keychain item
 for `--as <kind>` (or `JOVIE_MESH_SENDER_KIND`). `JOVIE_MESH_URL` overrides
 `https://summer.jov.ie` (https only; http only on loopback). The `correlationId`

@@ -121,12 +121,7 @@ describe('MarketingFooter', () => {
       MARKETING_PEN_CONTRACT_IDS.shell.footer
     );
     expect(MARKETING_PEN_CONTRACT_IDS.shell.footer).toBe('jhV4a');
-    expect(footer.firstElementChild).toHaveClass(
-      'max-w-public-content',
-      'px-5',
-      'sm:px-6',
-      'lg:px-8'
-    );
+    expect(footer.firstElementChild).toHaveClass('public-container');
     expect(footer.firstElementChild).not.toHaveClass('max-w-linear-content');
     expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
@@ -321,7 +316,7 @@ describe('MarketingFooter', () => {
       'utf8'
     );
 
-    expect(source).toContain('max-w-public-content px-5 sm:px-6 lg:px-8');
+    expect(source).toContain("'public-container'");
     expect(source).not.toContain('max-w-linear-content px-[clamp(');
   });
 

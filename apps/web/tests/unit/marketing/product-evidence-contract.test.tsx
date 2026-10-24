@@ -86,6 +86,7 @@ vi.mock('@/lib/analytics', async importOriginal => ({
 import { JovieCardLanding } from '@/app/(marketing)/card/JovieCardLanding';
 import DownloadPage from '@/app/(marketing)/download/page';
 import { InstantMerchLanding } from '@/app/(marketing)/instant-merch/InstantMerchLanding';
+import { CommandPaletteLanding } from '@/app/(marketing)/product/command-palette/CommandPaletteLanding';
 import { DspLinksLanding } from '@/app/(marketing)/product/dsp-links/DspLinksLanding';
 import { IsrcLanding } from '@/app/(marketing)/product/isrc/IsrcLanding';
 import { LinkAnalyticsLanding } from '@/app/(marketing)/product/link-analytics/LinkAnalyticsLanding';
@@ -179,6 +180,9 @@ const RENDERERS: Readonly<Record<string, () => ReactElement>> = {
   '(marketing)/youtube-thumbnails/page.tsx': () => <YoutubeThumbnailsLanding />,
   '(marketing)/product/link-analytics/page.tsx': () => <LinkAnalyticsLanding />,
   '(marketing)/product/page.tsx': () => <ProductLanding />,
+  '(marketing)/product/command-palette/page.tsx': () => (
+    <CommandPaletteLanding />
+  ),
   '(marketing)/product/release-scheduling/page.tsx': () => (
     <ReleaseSchedulingLanding />
   ),
@@ -219,6 +223,18 @@ const COPY_ONLY_FIXTURE_ENTRY: Pick<
 };
 
 describe('product-evidence contract (JOV-6917)', () => {
+  it('binds the download hero to its complete accessible heading', () => {
+    const { getByRole, getByTestId } = render(<DownloadPage />);
+    const heading = getByRole('heading', {
+      level: 1,
+      name: 'Jovie, Installed Where You Work.',
+    });
+    expect(getByTestId('marketing-section-hero')).toHaveAttribute(
+      'aria-labelledby',
+      heading.id
+    );
+  });
+
   it('Card uses an honest planned description instead of a destination-profile screenshot', () => {
     const { container } = render(<JovieCardLanding />);
     const hero = container.querySelector<HTMLElement>(

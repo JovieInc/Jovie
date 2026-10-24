@@ -105,10 +105,12 @@ describe('ShellReleaseRow audio affordance', () => {
     );
 
     const row = container.querySelector('[data-shell-release-row]');
-    // Rows are `listitem`s inside `role="list"` — an ARIA `option` cannot
-    // contain the row's real controls (axe nested-interactive), so selection
-    // stays visual (`data-selected` + selected tokens), not `aria-selected`.
-    expect(row).toHaveAttribute('role', 'listitem');
+    // Rows ARE native list items inside `role="list"` (implicit listitem —
+    // no explicit role, no wrapper element): an ARIA `option` cannot contain
+    // the row's real controls (axe nested-interactive), so selection stays
+    // visual (`data-selected` + selected tokens), not `aria-selected`.
+    expect(row?.tagName).toBe('LI');
+    expect(row).not.toHaveAttribute('role');
     // name-from-author: the row announces its release title.
     expect(row).toHaveAttribute('aria-label', 'Lost in the Light');
     expect(row).not.toHaveAttribute('aria-selected');

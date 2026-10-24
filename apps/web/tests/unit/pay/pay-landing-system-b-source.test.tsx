@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -122,4 +123,17 @@ describe('pay landing System B source contract', () => {
       /\bxl:leading-(?:tight|snug|normal|relaxed|loose)\b/
     );
   });
+});
+
+const OWN_WIDTH_CAP =
+  /max-w-(?:300|315|280|4xl|6xl|linear-content)|--homepage-section-max/;
+
+describe('single container width', () => {
+  it.each(['components/features/pay/PayLanding.tsx'])(
+    '%s takes its width from the shared container, not its own cap',
+    file => {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).not.toMatch(OWN_WIDTH_CAP);
+    }
+  );
 });
