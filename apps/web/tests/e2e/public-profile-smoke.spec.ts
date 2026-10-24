@@ -134,6 +134,77 @@ test('public profile renders core elements within budget', async ({ page }) => {
   });
 });
 
+// Release (smart-link) pages are the fan-facing half of the artist golden
+// path. A profile that renders while its releases 404 or show the "Coming
+// soon" placeholder reached production unnoticed because nothing walked them.
+const RELEASE_PAGE_HANDLE = process.env.SMOKE_RELEASE_HANDLE ?? 'tim';
+// Historical slugs shared outside Jovie before a release was re-slugged. They
+// must keep resolving to the live release rather than 404 or a placeholder.
+const LEGACY_RELEASE_SLUGS = (
+  process.env.SMOKE_LEGACY_RELEASE_SLUGS ?? 'take-me-over,seaside-heights'
+)
+  .split(',')
+  .map(slug => slug.trim())
+  .filter(Boolean);
+
+async function expectLiveReleasePage(
+  page: import('@playwright/test').Page,
+  path: string
+) {
+  const response = await page.goto(path, { waitUntil: 'domcontentloaded' });
+  expect(response?.status(), `${path} must return 200`).toBe(200);
+  const title = await page.title();
+  expect(title, `${path} rendered the Coming soon placeholder`).not.toMatch(
+    /^Coming soon/i
+  );
+  const heading = page.locator('h1').first();
+  await expect(heading, `${path} has no release title`).toBeVisible();
+  const headingText = (await heading.textContent())?.trim() ?? '';
+  expect(headingText, `${path} rendered a not-found heading`).not.toMatch(
+    /content not found|profile not found|get alerts first/i
+  );
+  await expect(
+    page
+      .locator('a[data-dsp-provider], a[href*="spotify"], a[href*="apple"]')
+      .first(),
+    `${path} has no streaming link`
+  ).toBeVisible();
+}
+
+test('every release linked from the profile renders a live release page', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.goto(`/${RELEASE_PAGE_HANDLE}`, { waitUntil: 'domcontentloaded' });
+  const hrefs = await page
+    .locator(`a[href^="/${RELEASE_PAGE_HANDLE}/"]`)
+    .evaluateAll(anchors =>
+      Array.from(
+        new Set(anchors.map(a => (a as HTMLAnchorElement).getAttribute('href')))
+      )
+    );
+  const releasePaths = hrefs
+    .filter((href): href is string => Boolean(href))
+    .map(href => href.split(/[?#]/)[0])
+    .filter(href => href.split('/').length === 3);
+  expect(
+    releasePaths.length,
+    `/${RELEASE_PAGE_HANDLE} links to no release pages`
+  ).toBeGreaterThan(0);
+  for (const path of releasePaths) {
+    await expectLiveReleasePage(page, path);
+  }
+});
+
+test('legacy release slugs still resolve to a live release page', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  for (const slug of LEGACY_RELEASE_SLUGS) {
+    await expectLiveReleasePage(page, `/${RELEASE_PAGE_HANDLE}/${slug}`);
+  }
+});
+
 test.describe('public profile document semantics @regression', () => {
   test.skip(!hasDatabase, 'Profile document semantics require a real database');
 
