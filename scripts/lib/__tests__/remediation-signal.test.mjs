@@ -489,12 +489,13 @@ describe('real monitor intake preserves quota canary identity', () => {
 
 describe('continuity intake treats unknown freshness as neither green nor silent', () => {
   let entry = 0;
-  async function runContinuityIntake({ conclusion, previous, run }) {
+  async function runContinuityIntake({ conclusion, previous, seedState, run }) {
     clearRemediationLabelCache();
     const dir = mkdtempSync(join(tmpdir(), 'continuity-intake-'));
     const previousFile = join(dir, 'previous');
     const stateFile = join(dir, 'status');
     if (previous !== undefined) writeFileSync(previousFile, `${previous}\n`);
+    if (seedState !== undefined) writeFileSync(stateFile, `${seedState}\n`);
     const values = {
       LINEAR_API_KEY: 'lin_test',
       REMEDIATION_MODE: 'monitor',
@@ -564,12 +565,14 @@ describe('continuity intake treats unknown freshness as neither green nor silent
     const out = await runContinuityIntake({
       conclusion: 'unknown',
       previous: 'red',
+      seedState: 'red',
       run,
     });
-    // No resolve, no comment, no create.
+    // No resolve, no comment, no create: zero Linear calls.
     expect(out.queries).toEqual([]);
-    // The recorded red is preserved, not overwritten with green.
-    expect(out.state).toBeNull();
+    expect(run.fetchImpl).not.toHaveBeenCalled();
+    // The pre-seeded recorded red is still red after the unknown run.
+    expect(out.state).toBe('red');
     const json = JSON.parse(out.logs.find(line => line.startsWith('{')));
     expect(json).toMatchObject({
       ok: true,
@@ -618,11 +621,12 @@ describe('continuity intake treats unknown freshness as neither green nor silent
 
 describe('production-continuity workflow maps unknown freshness to a non-resolving conclusion', () => {
   const body = readFileSync(workflows.continuity, 'utf8');
-  it('(5) only a healthy rollup is success; unknown is never success', () => {
+  it('(5) the conclusion comes from the unit-tested mapper, not an inline expression', () => {
+    expect(body).toContain('--remediation-conclusion');
     expect(body).toContain(
-      "needs.observe.outputs.status == 'healthy' && 'success' || 'unknown'"
+      'REMEDIATION_CONCLUSION: ${{ steps.verdict.outputs.conclusion }}'
     );
-    expect(body).not.toMatch(/REMEDIATION_CONCLUSION:.*\|\| 'success' \}\}/);
+    expect(body).not.toMatch(/REMEDIATION_CONCLUSION:.*'success'/);
     expect(body).toContain('unknown_targets');
   });
 });

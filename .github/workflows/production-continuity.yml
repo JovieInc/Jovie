@@ -224,6 +224,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Map the observe verdict to a remediation conclusion
+        id: verdict
+        env:
+          OBSERVE_RESULT: ${{ needs.observe.result }}
+          OBSERVE_STATUS: ${{ needs.observe.outputs.status }}
+        run: node .github/scripts/production-continuity.mjs --remediation-conclusion
       - name: File or resolve production-monitor-continuity
         env:
           GH_TOKEN: ${{ github.token }}
@@ -232,9 +238,8 @@ jobs:
           REMEDIATION_MODE: monitor
           REMEDIATION_FINGERPRINT: production-monitor-continuity
           REMEDIATION_SOURCE: production-continuity.yml
-          # Only an observed `healthy` rollup is success. Unreadable evidence
-          # (`unknown`, or any status the probe did not emit) is never green.
-          REMEDIATION_CONCLUSION: ${{ (needs.observe.result != 'success' || needs.observe.outputs.status == 'unhealthy') && 'failure' || (needs.observe.outputs.status == 'healthy' && 'success' || 'unknown') }}
+          # Only an observed `healthy` rollup is success; see remediationConclusion().
+          REMEDIATION_CONCLUSION: ${{ steps.verdict.outputs.conclusion }}
           REMEDIATION_DETAIL: ${{ needs.observe.outputs.incident_key }} ${{ needs.observe.outputs.incident_classes }} ${{ needs.observe.outputs.unknown_targets }} ${{ needs.observe.outputs.unknown_reasons }}
           REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           REMEDIATION_GATE_STEADY_GREEN: '1'

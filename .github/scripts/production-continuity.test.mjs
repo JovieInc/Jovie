@@ -13,6 +13,7 @@ import {
   parseCliArgs,
   parseTargets,
   planBudgetContinuityAction,
+  remediationConclusion,
   runCli,
 } from './production-continuity.mjs';
 
@@ -304,6 +305,56 @@ describe('founder-first staged budget policy', () => {
         currentSpendUsd: -1,
       })
     );
+  });
+});
+
+describe('remediation conclusion mapping', () => {
+  it('maps healthy, unknown, unhealthy, stale+unknown and a failed observe job', async () => {
+    const unknownRow = {
+      id: 'f',
+      healthy: null,
+      reason: 'main-sha-unreadable',
+    };
+    const staleRow = {
+      id: 's',
+      healthy: false,
+      incidentClass: 'production-stale',
+    };
+    const ok = observation({ status: 200 });
+    const status = rows => aggregateContinuity(rows, { now: NOW }).status;
+    const cases = [
+      [{ observeResult: 'success', status: status([ok]) }, 'success'],
+      [
+        { observeResult: 'success', status: status([ok, unknownRow]) },
+        'unknown',
+      ],
+      [{ observeResult: 'success', status: status([ok, staleRow]) }, 'failure'],
+      [
+        {
+          observeResult: 'success',
+          status: status([ok, staleRow, unknownRow]),
+        },
+        'failure',
+      ],
+      [
+        {
+          observeResult: 'success',
+          status: status([observation({ status: 503 }), unknownRow]),
+        },
+        'failure',
+      ],
+      [{ observeResult: 'failure', status: 'healthy' }, 'failure'],
+      [{ observeResult: 'cancelled', status: '' }, 'failure'],
+      [{ observeResult: 'success', status: '' }, 'unknown'],
+      [{ observeResult: 'success', status: undefined }, 'unknown'],
+      [{ observeResult: 'success', status: 'surprise' }, 'unknown'],
+    ];
+    for (const [input, expected] of cases)
+      assert.equal(
+        remediationConclusion(input),
+        expected,
+        JSON.stringify(input)
+      );
   });
 });
 

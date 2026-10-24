@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { appendFileSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -406,6 +407,17 @@ export async function observeProductionContinuity({
   return aggregateContinuity(observations, { now });
 }
 
+/**
+ * Remediation verdict for the intake: only an observed `healthy` rollup from a
+ * successful observe job is `success`. A failed observe job or `unhealthy`
+ * rollup is `failure` (a verified failure outranks unknown). Anything else,
+ * including `unknown` and a missing status, is `unknown` and never resolves.
+ */
+export function remediationConclusion({ observeResult, status } = {}) {
+  if (observeResult !== 'success' || status === 'unhealthy') return 'failure';
+  return status === 'healthy' ? 'success' : 'unknown';
+}
+
 export function continuityIncidentKey(result) {
   if (result?.schema !== CONTINUITY_SCHEMA) {
     throw new Error(
@@ -585,7 +597,19 @@ export async function runCli({
   return { ...result, incidentKey };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (
+  import.meta.url === pathToFileURL(process.argv[1] ?? '').href &&
+  process.argv[2] === '--remediation-conclusion'
+) {
+  const conclusion = remediationConclusion({
+    observeResult: process.env.OBSERVE_RESULT,
+    status: process.env.OBSERVE_STATUS,
+  });
+  if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `conclusion=${conclusion}\n`);
+  }
+  process.stdout.write(`${conclusion}\n`);
+} else if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   runCli().catch(error => {
     process.stderr.write(
       `production-continuity: ${error instanceof Error ? error.message : String(error)}\n`
