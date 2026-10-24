@@ -7,7 +7,8 @@ import { filterPublicDiscoveryIdentities } from '@/lib/profile/public-profile-in
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
-export const revalidate = 3600; // Cache results for 1 hour
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -23,6 +24,7 @@ async function getFeaturedCreators() {
         .select({
           id: creatorProfiles.id,
           username: creatorProfiles.username,
+          settings: creatorProfiles.settings,
           displayName: creatorProfiles.displayName,
           avatarUrl: creatorProfiles.avatarUrl,
           creatorType: creatorProfiles.creatorType,
@@ -63,7 +65,7 @@ export async function GET() {
 
     return NextResponse.json(creators, {
       headers: {
-        'Cache-Control': 'public, s-maxage=180, stale-while-revalidate=360',
+        'Cache-Control': 'no-store',
       },
     });
   } catch (error) {

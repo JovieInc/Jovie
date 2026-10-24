@@ -10,6 +10,7 @@ import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { extractHandleFromSocialUrl } from '@/lib/ingestion/flows/handle-extraction';
 import { ingestSocialPlatformUrl } from '@/lib/ingestion/flows/social-platform-ingest';
 import { fetchSpotifyArtistData } from '@/lib/ingestion/flows/spotify-integration';
+import { isProfileSearchable } from '@/lib/profile/public-profile-access';
 import { isPublicProfileDiscoveryEligible } from '@/lib/profile/public-profile-indexing-policy';
 import {
   agentProfileCreateLimiter,
@@ -41,14 +42,19 @@ function canExposeProfile(profile: {
   readonly username: string;
   readonly isPublic: boolean | null;
   readonly displayName?: string | null;
+  readonly settings?: unknown;
 }): boolean {
   return (
     profile.isPublic === true &&
-    isPublicProfileDiscoveryEligible({
-      handle: profile.username,
-      displayName: profile.displayName,
-      isPublic: profile.isPublic,
-    })
+    isPublicProfileDiscoveryEligible(
+      {
+        handle: profile.username,
+        displayName: profile.displayName,
+        isPublic: profile.isPublic,
+        settings: profile.settings,
+      },
+      { requireSearchability: true }
+    )
   );
 }
 
@@ -140,6 +146,7 @@ export async function POST(request: Request) {
         isClaimed: creatorProfiles.isClaimed,
         isPublic: creatorProfiles.isPublic,
         displayName: creatorProfiles.displayName,
+        settings: creatorProfiles.settings,
       })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.spotifyId, spotify.spotifyId))
@@ -162,7 +169,11 @@ export async function POST(request: Request) {
     // candidate window cannot prove there is no private match beyond the cap.
     if (
       candidates.length === MAX_PROFILE_CANDIDATES ||
-      candidates.some(candidate => candidate.isPublic !== true)
+      candidates.some(
+        candidate =>
+          candidate.isPublic !== true ||
+          !isProfileSearchable(candidate.settings)
+      )
     ) {
       return fail(404, 'ARTIST_NOT_FOUND', 'Spotify artist not found.');
     }
@@ -188,6 +199,7 @@ export async function POST(request: Request) {
         isPublic: creatorProfiles.isPublic,
         isClaimed: creatorProfiles.isClaimed,
         displayName: creatorProfiles.displayName,
+        settings: creatorProfiles.settings,
       })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.usernameNormalized, username))
