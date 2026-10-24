@@ -646,6 +646,27 @@ describe('UnifiedSidebar library route', () => {
     expect(marks[0]?.closest('[data-sidebar="header"]')).not.toBeNull();
   });
 
+  it('prefetches Shipping on hover and keyboard focus without duplicate requests', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => new Promise(() => {}));
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.ADMIN_OPS,
+      section: 'ov',
+      variant: 'ov',
+    });
+    const nav = screen.getByRole('navigation', { name: 'OV Navigation' });
+    const link = within(nav).getByRole('link', { name: 'Shipping' });
+    fireEvent.mouseOver(link);
+    fireEvent.focus(link);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/hud/shipping-state',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    fetchMock.mockRestore();
+  });
+
   it('renders dedicated operator navigation without the customer dashboard nav', () => {
     const { container } = renderUnifiedSidebar({
       pathname: APP_ROUTES.ADMIN_OPS,

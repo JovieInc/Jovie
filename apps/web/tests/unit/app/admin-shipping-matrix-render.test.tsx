@@ -11,6 +11,9 @@ import {
 import { unknownProjection } from '@/lib/ovie/shipping-state/project';
 
 vi.mock('@jovie/ui', () => ({
+  LoadingSkeleton: () => (
+    <span data-testid='matrix-skeleton' aria-hidden='true' />
+  ),
   Button: ({ children, ...props }: ComponentProps<'button'>) => (
     <button type='button' {...props}>
       {children}
@@ -346,6 +349,9 @@ describe('ShippingMatrix rendering (JOV-6893)', () => {
     renderMatrix();
 
     expect(screen.getByText('Loading in-flight work…')).toBeInTheDocument();
+    expect(screen.getAllByTestId('matrix-skeleton')).toHaveLength(35);
+    expect(screen.getAllByRole('row')).toHaveLength(6);
+    expect(screen.queryByText(/UNKNOWN/)).not.toBeInTheDocument();
     await act(async () => {
       resolveFetch?.(jsonResponse(projection([])));
     });

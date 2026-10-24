@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
 
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -46,6 +47,7 @@ import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
+import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import type { AppShellSection } from '@/types/app-shell';
@@ -76,10 +78,12 @@ function SettingsNavGroup({
   items,
   pathname,
   isItemActive,
+  onPrefetch,
 }: Readonly<{
   items: readonly NavItem[];
   pathname: string;
   isItemActive?: (item: NavItem) => boolean;
+  onPrefetch?: (item: NavItem) => void;
 }>) {
   return (
     <SidebarMenu>
@@ -88,7 +92,13 @@ function SettingsNavGroup({
           isItemActive?.(item) ??
           (pathname === item.href || pathname.startsWith(`${item.href}/`));
         return (
-          <NavMenuItem key={item.id} item={item} isActive={isActive} calm />
+          <NavMenuItem
+            key={item.id}
+            item={item}
+            isActive={isActive}
+            calm
+            onPrefetch={onPrefetch ? () => onPrefetch(item) : undefined}
+          />
         );
       })}
     </SidebarMenu>
@@ -109,6 +119,12 @@ function OperatorNavGroup({
   readonly section: OperatorNavSection;
   readonly pathname: string;
 }>) {
+  const queryClient = useQueryClient();
+  const prefetchShipping = (item: NavItem) => {
+    if (item.href === APP_ROUTES.ADMIN_SHIPPING) {
+      void queryClient.prefetchQuery(shippingStateQueryOptions);
+    }
+  };
   const [stored, setStored] = useState(false);
   useEffect(() => {
     if (!section.collapsible) return;
@@ -166,6 +182,7 @@ function OperatorNavGroup({
           items={section.items}
           pathname={pathname}
           isItemActive={isActive}
+          onPrefetch={prefetchShipping}
         />
       </div>
     </div>

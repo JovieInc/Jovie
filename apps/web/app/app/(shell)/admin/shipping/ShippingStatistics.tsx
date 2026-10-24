@@ -1,21 +1,16 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, LoadingSkeleton } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
+import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import {
-  parseShippingCockpitProjection,
-  type ShippingCockpitProjection,
-} from '@/lib/ovie/shipping-state/client';
-import { SHIPPING_STATE_FRESHNESS_MS } from '@/lib/ovie/shipping-state/contract';
+  SHIPPING_STATE_REFETCH_MS,
+  shippingStateQueryOptions,
+} from '@/lib/queries/shipping-state';
 
-/**
- * Observations expire SHIPPING_STATE_FRESHNESS_MS after they are taken and the
- * table re-checks freshness every second, so without a timed refetch every
- * count flipped to "stale / unavailable" ~10 s after load and stayed there.
- */
-export const SHIPPING_STATE_REFETCH_MS = SHIPPING_STATE_FRESHNESS_MS / 2;
+export { SHIPPING_STATE_REFETCH_MS } from '@/lib/queries/shipping-state';
 
 export function pipelineRows(
   projection: ShippingCockpitProjection | undefined,
@@ -62,24 +57,7 @@ export function ShippingStatistics() {
     return () => clearInterval(timer);
   }, []);
   const query = useQuery({
-    queryKey: ['ovie', 'shipping-state'],
-    queryFn: async ({ signal }) => {
-      const response = await fetch('/api/hud/shipping-state', {
-        signal,
-        cache: 'no-store',
-      });
-      if (!response.ok)
-        throw new Error(
-          `Shipping observation unavailable (${response.status})`
-        );
-      const data = parseShippingCockpitProjection(await response.json());
-      if (!data) throw new Error('Shipping receipt could not be validated');
-      return data;
-    },
-    staleTime: 0,
-    gcTime: 60 * 1000,
-    retry: false,
-    refetchOnWindowFocus: true,
+    ...shippingStateQueryOptions,
     refetchInterval: SHIPPING_STATE_REFETCH_MS,
   });
   const rows = pipelineRows(query.data, now);
@@ -149,20 +127,53 @@ export function ShippingStatistics() {
                     {row.label}
                   </th>
                   <td className='p-2'>
-                    {query.isError ? 'UNKNOWN' : (row.value ?? 'UNKNOWN')}
+                    {query.isPending ? (
+                      <LoadingSkeleton
+                        height='h-4'
+                        width='w-10'
+                        announce={false}
+                      />
+                    ) : query.isError ? (
+                      'UNKNOWN'
+                    ) : (
+                      (row.value ?? 'UNKNOWN')
+                    )}
                   </td>
                   <td className='p-2'>{row.source}</td>
-                  <td className='p-2'>{row.state}</td>
-                  <td className='p-2'>{row.timestamp}</td>
+                  <td className='p-2'>
+                    {query.isPending ? (
+                      <LoadingSkeleton
+                        height='h-4'
+                        width='w-24'
+                        announce={false}
+                      />
+                    ) : (
+                      row.state
+                    )}
+                  </td>
+                  <td className='p-2'>
+                    {query.isPending ? (
+                      <LoadingSkeleton
+                        height='h-4'
+                        width='w-40'
+                        announce={false}
+                      />
+                    ) : (
+                      row.timestamp
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className='min-h-12 py-2 text-xs text-secondary-token'>
-          Current bottleneck: UNKNOWN — these point-in-time counts do not
-          establish a throughput limiter.
-        </p>
+        <div className='min-h-12 py-2 text-xs text-secondary-token'>
+          {query.isPending ? (
+            <LoadingSkeleton height='h-4' width='w-full' announce={false} />
+          ) : (
+            'Current bottleneck: UNKNOWN — these point-in-time counts do not establish a throughput limiter.'
+          )}
+        </div>
       </section>
       <section
         className='border-y border-subtle'
@@ -180,19 +191,31 @@ export function ShippingStatistics() {
         >
           Deployment And Runtime
         </h2>
-        <p>
-          Production controller: {meaning('productionVerified')} · Exact live
-          build: {meaning('exactLiveBuild')}
-        </p>
-        <p>
+        <div className='min-h-8'>
+          {query.isPending ? (
+            <LoadingSkeleton height='h-4' width='w-full' announce={false} />
+          ) : (
+            <>
+              Production controller: {meaning('productionVerified')} · Exact
+              live build: {meaning('exactLiveBuild')}
+            </>
+          )}
+        </div>
+        <div className='min-h-8'>
           Source: /api/hud/shipping-state · Observed:{' '}
-          {query.data?.observationTimestamp ?? 'UNKNOWN'}
-        </p>
-        <p>
-          Deployments over time: UNKNOWN · Verified runtime shipments over time:
-          UNKNOWN. The existing receipt provides current verification, not a
-          historical shipment count.
-        </p>
+          {query.isPending ? (
+            <LoadingSkeleton height='h-4' width='w-40' announce={false} />
+          ) : (
+            (query.data?.observationTimestamp ?? 'UNKNOWN')
+          )}
+        </div>
+        <div className='min-h-12'>
+          {query.isPending ? (
+            <LoadingSkeleton height='h-4' width='w-full' announce={false} />
+          ) : (
+            'Deployments over time: UNKNOWN · Verified runtime shipments over time: UNKNOWN. The existing receipt provides current verification, not a historical shipment count.'
+          )}
+        </div>
       </section>
     </div>
   );

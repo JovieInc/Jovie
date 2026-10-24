@@ -1,9 +1,20 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { type ButtonHTMLAttributes, createElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@jovie/ui', () => ({
+  LoadingSkeleton: () =>
+    createElement('span', {
+      'data-testid': 'shipping-skeleton',
+      'aria-hidden': true,
+    }),
   Button: ({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) =>
     createElement(
       'button',
@@ -180,6 +191,58 @@ describe('pipelineRows', () => {
 });
 
 describe('ShippingStatistics states', () => {
+  it('preserves pipeline rows with skeletons and no UNKNOWN during a slow initial read', () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () => new Promise(() => {})
+    );
+    renderStatistics();
+    expect(screen.getByText('Running')).toBeInTheDocument();
+    expect(screen.getAllByTestId('shipping-skeleton')).toHaveLength(19);
+    expect(screen.queryByText(/UNKNOWN/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('row')).toHaveLength(6);
+    vi.restoreAllMocks();
+  });
+
+  it('does not refetch on resize, focus, or a responsive remount with cached data', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(
+        async () =>
+          new Response(JSON.stringify(projectionWithCounts()), { status: 200 })
+      );
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const tree = () =>
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(ShippingStatistics)
+      );
+    const view = render(tree());
+    await screen.findByText('3');
+    act(() => {
+      for (const width of [640, 1440, 800]) {
+        Object.defineProperty(globalThis, 'innerWidth', {
+          configurable: true,
+          value: width,
+        });
+        fireEvent(globalThis, new Event('resize'));
+        fireEvent(globalThis, new Event('focus'));
+      }
+    });
+    view.unmount();
+    const remounted = render(tree());
+    expect(screen.getByText('3')).toBeInTheDocument();
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 30));
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    remounted.unmount();
+    client.clear();
+    fetchMock.mockRestore();
+  });
+
   it('renders a retryable UNKNOWN state after the shipping receipt fails', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
