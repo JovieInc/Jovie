@@ -332,6 +332,8 @@ export const queryKeys = {
   // scope — never raw kiosk tokens.
   hud: {
     all: ['hud'] as const,
+    pipelineBottleneck: () =>
+      [...queryKeys.hud.all, 'pipeline-bottleneck'] as const,
     metrics: (scope: 'admin' | 'kiosk') =>
       [...queryKeys.hud.all, 'metrics', scope] as const,
   },
