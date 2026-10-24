@@ -160,3 +160,59 @@ describe('SuggestedProfilesCarousel', () => {
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeDisabled();
   });
 });
+
+// JOV-8137: incomplete profiles get nudge cards instead of the live claim.
+describe('SuggestedProfilesCarousel nudges (JOV-8137)', () => {
+  const nudgeSuggestion: ProfileSuggestion = {
+    id: '__nudge_photo__',
+    type: 'profile_nudge',
+    platform: '',
+    platformLabel: '',
+    title: 'Set a profile photo',
+    subtitle: 'Complete this essential so fans can find you.',
+    imageUrl: null,
+    externalUrl: '/app/settings/profile',
+    confidence: null,
+  };
+
+  function renderNudgeCarousel(
+    overrides: Partial<
+      React.ComponentProps<typeof SuggestedProfilesCarousel>
+    > = {}
+  ) {
+    return render(
+      <SuggestedProfilesCarousel
+        suggestions={[nudgeSuggestion]}
+        isLoading={false}
+        currentIndex={0}
+        total={1}
+        next={vi.fn()}
+        prev={vi.fn()}
+        confirm={vi.fn()}
+        reject={vi.fn()}
+        isActioning={false}
+        {...overrides}
+      />
+    );
+  }
+
+  it('renders the nudge title, heading, and a continue-setup link', () => {
+    renderNudgeCarousel();
+
+    expect(screen.getByText('Finish your profile')).toBeInTheDocument();
+    expect(screen.getByText('Set a profile photo')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Continue setup' })
+    ).toHaveAttribute('href', '/app/settings/profile');
+  });
+
+  it('dismisses the nudge via the Dismiss control', async () => {
+    const user = userEvent.setup();
+    const reject = vi.fn();
+    renderNudgeCarousel({ reject });
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+    expect(reject).toHaveBeenCalledTimes(1);
+  });
+});

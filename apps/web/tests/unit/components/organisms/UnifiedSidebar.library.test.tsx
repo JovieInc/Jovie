@@ -788,3 +788,52 @@ describe('UnifiedSidebar library route', () => {
     expect(screen.getAllByTestId('operator-lists-nav')).toHaveLength(1);
   });
 });
+
+// JOV-8137: the completion widget persists in the sidebar on every page
+// until the profile hits 100%.
+describe('UnifiedSidebar profile completion widget (JOV-8137)', () => {
+  const incompleteCompletion = {
+    percentage: 50,
+    completedCount: 2,
+    totalCount: 4,
+    steps: [
+      {
+        id: 'avatar' as const,
+        label: 'Add A Profile Photo',
+        description: 'A recognizable photo makes your page feel personal.',
+        href: APP_ROUTES.SETTINGS_PROFILE,
+      },
+    ],
+    profileIsLive: false,
+  };
+
+  it('renders the completion widget while the profile is incomplete', () => {
+    renderUnifiedSidebar({
+      section: 'dashboard',
+      data: { profileCompletion: incompleteCompletion },
+    });
+
+    expect(
+      document.querySelector('[data-testid="sidebar-profile-completion"]')
+    ).not.toBeNull();
+  });
+
+  it('renders no completion widget once the profile is complete', () => {
+    renderUnifiedSidebar({
+      section: 'dashboard',
+      data: {
+        profileCompletion: {
+          ...incompleteCompletion,
+          percentage: 100,
+          completedCount: 4,
+          steps: [],
+          profileIsLive: true,
+        },
+      },
+    });
+
+    expect(
+      document.querySelector('[data-testid="sidebar-profile-completion"]')
+    ).toBeNull();
+  });
+});

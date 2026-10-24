@@ -94,18 +94,20 @@ async function getCreatorMetaPixelId(
   }
 }
 
-function calculateProfileCompletion(result: {
-  displayName?: string | null;
-  avatarUrl?: string | null;
-  userEmail?: string | null;
-  spotifyUrl?: string | null;
-  appleMusicUrl?: string | null;
-  youtubeUrl?: string | null;
-  socialLinks?: Array<{
-    platform?: string | null;
-    platformType?: string | null;
-  }> | null;
-}): number {
+function calculateProfileCompletion(
+  result: {
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    spotifyUrl?: string | null;
+    appleMusicUrl?: string | null;
+    youtubeUrl?: string | null;
+    socialLinks?: Array<{
+      platform?: string | null;
+      platformType?: string | null;
+    }> | null;
+  },
+  username: string
+): number {
   const hasMusicLinks =
     Boolean(result.spotifyUrl || result.appleMusicUrl || result.youtubeUrl) ||
     Boolean(
@@ -121,7 +123,7 @@ function calculateProfileCompletion(result: {
   return calculateRequiredProfileCompletion({
     displayName: result.displayName,
     avatarUrl: result.avatarUrl,
-    email: result.userEmail,
+    handle: username,
     hasMusicLinks,
   }).percentage;
 }
@@ -168,7 +170,7 @@ const fetchProfileAndLinks = async (
       typeof result.userClerkId === 'string' ? result.userClerkId : null;
 
     const mappedProfile = mapProfileWithLinksToCreatorProfile(result, {
-      profileCompletionPct: calculateProfileCompletion(result),
+      profileCompletionPct: calculateProfileCompletion(result, username),
     });
     const profile = {
       ...mappedProfile,
