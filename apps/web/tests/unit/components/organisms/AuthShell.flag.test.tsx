@@ -29,14 +29,20 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
     main,
     mobileBottomNav,
     contentClassName,
+    chatAmbientGradient,
   }: {
     sidebar: ReactNode;
     header?: ReactNode;
     main: ReactNode;
     mobileBottomNav?: ReactNode;
     contentClassName?: string;
+    chatAmbientGradient?: boolean;
   }) => (
-    <div data-testid='app-shell-frame' data-content-class={contentClassName}>
+    <div
+      data-testid='app-shell-frame'
+      data-content-class={contentClassName}
+      data-chat-ambient-gradient={chatAmbientGradient}
+    >
       {sidebar}
       {header}
       {main}
@@ -179,6 +185,22 @@ describe('AuthShell runtime update wiring', () => {
 });
 
 describe('AuthShell canonical wiring', () => {
+  it.each(['ov', 'dashboard'] as const)(
+    'keeps the Ovie canvas flat while preserving customer chat paint: %s',
+    section => {
+      render(
+        <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+          <AuthShell section={section} breadcrumbs={[]} isChatRoute>
+            <div>Chat</div>
+          </AuthShell>
+        </AppFlagProvider>
+      );
+      expect(screen.getByTestId('app-shell-frame')).toHaveAttribute(
+        'data-chat-ambient-gradient',
+        section === 'ov' ? 'false' : 'true'
+      );
+    }
+  );
   beforeEach(() => {
     sidebarMock.isMobile = false;
     sidebarMock.state = 'open';

@@ -108,6 +108,7 @@ function AuthShellInner({
   return (
     <RuntimeUpdateProvider>
       <AppShellFrame
+        brandVariant={section === 'ov' ? 'ov' : 'jovie'}
         sidebar={sidebar}
         header={
           hideTopHeader ? null : (
@@ -130,7 +131,8 @@ function AuthShellInner({
             />
           )
         }
-        chatAmbientGradient={isChatRoute}
+        // Ovie Home and dashboards share one flat shell canvas.
+        chatAmbientGradient={isChatRoute && section !== 'ov'}
         main={children}
         rightPanel={rightPanel}
         audioPlayer={audioPlayer}
