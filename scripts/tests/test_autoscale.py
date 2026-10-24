@@ -377,9 +377,11 @@ class AutoscaleTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, env(SYMPHONY_AUTOSCALE="apply"):
             root = Path(tmp); (root / "linear-app.env").write_text("LINEAR_CLIENT_ID=cid\nLINEAR_CLIENT_SECRET=sec\n"); host = lane.Host(state=root / "state", repo=root, linear_env=root / "linear-app.env")
             app = patch.object(lane.linear_app_token, "default_path", return_value=root / "linear-app.env"); app.start(); self.addCleanup(app.stop)
+            inventory_at = time.time()
             with patch.object(lane.autoscale, "effective_slots", return_value=9), \
                     patch.object(lane.autoscale, "intake_slots", return_value=9), \
                     patch.object(lane.disk_guard, "check", return_value={"admitted": True, "freePct": 40}), \
+                    patch.object(lane, "_SUMMARY", {"at": inventory_at, "sourceAt": inventory_at, "readable": True, "prs": []}), \
                     patch.object(lane, "lane_prs", return_value=[]), patch.object(lane, "fix_candidates", return_value=[]), \
                     patch.object(lane.pr_events, "queued_prs", return_value=[]), patch.object(lane.pr_events, "claim_event_pr", return_value=None), \
                     patch.object(lane, "claim_red_pr", return_value=None), patch.object(lane, "provider_may_run", return_value=False), \
