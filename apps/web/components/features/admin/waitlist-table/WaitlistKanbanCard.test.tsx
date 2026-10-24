@@ -38,8 +38,11 @@ describe('WaitlistKanbanCard', () => {
     expect(screen.getByRole('link', { name: 'instagram.com/ari' })).toHaveClass(
       'text-(--color-accent-purple-text)'
     );
+    // Inline link inside running text: underlined so it is distinguishable
+    // without relying on color (axe link-in-text-block).
     expect(screen.getByRole('link', { name: 'Profile' })).toHaveClass(
-      'text-(--color-accent-purple-text)'
+      'text-(--color-accent-purple-text)',
+      'underline'
     );
   });
 

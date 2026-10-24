@@ -103,7 +103,7 @@ export function WaitlistKanbanCard({
               href={entry.spotifyUrlNormalized}
               target='_blank'
               rel='noopener noreferrer'
-              className='text-(--color-accent-purple-text) hover:underline'
+              className='text-(--color-accent-purple-text) underline'
             >
               Profile
             </a>
