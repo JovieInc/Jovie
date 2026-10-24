@@ -80,6 +80,7 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   // outage so a new visitor's first message never hard-fails (JOV-6114).
   anonymousOnboardingChatFirstTouch: advisoryAllow,
   adminImpersonate: mandatoryDeny,
+  meshPing: mandatoryDeny,
   deployPromote: mandatoryDeny,
   accountDelete: mandatoryDeny,
   publicArtistApi: mandatoryDenyFixed,

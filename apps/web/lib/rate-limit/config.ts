@@ -48,6 +48,13 @@ const ALBUM_ART_GENERATION_BURST_LIMIT = parseIntEnv(
 // ============================================================================
 
 /**
+ * Mesh ping abuse cap (JOV-8937): 10 pings per agent per hour, enforced
+ * server-side by the Ovie Mesh page's ping endpoint. This is the single
+ * config constant for that cap.
+ */
+export const MESH_PING_HOURLY_LIMIT = 10;
+
+/**
  * All rate limiter configurations in the application
  */
 export const RATE_LIMITERS = {
@@ -335,6 +342,21 @@ export const RATE_LIMITERS = {
     analytics: false,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
+  } satisfies RateLimitConfig,
+
+  /**
+   * Ovie mesh pings (JOV-8937): MESH_PING_HOURLY_LIMIT per agent per hour.
+   * Redis-backed so the abuse cap survives multi-instance traffic.
+   */
+  meshPing: {
+    name: 'Mesh Ping',
+    limit: MESH_PING_HOURLY_LIMIT,
+    window: '1 h',
+    prefix: 'mesh_ping',
+    analytics: false,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 
   /** Admin creator ingest: 10 per minute per admin - heavy ingestion job */

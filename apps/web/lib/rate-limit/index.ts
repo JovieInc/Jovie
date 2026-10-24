@@ -33,7 +33,11 @@
 export type { RateLimiterName } from './config';
 
 // Configuration
-export { parseWindowToMs, RATE_LIMITERS } from './config';
+export {
+  MESH_PING_HOURLY_LIMIT,
+  parseWindowToMs,
+  RATE_LIMITERS,
+} from './config';
 // Pre-configured Limiter Instances
 export {
   accountDeleteLimiter,
@@ -102,6 +106,7 @@ export {
   isrcRescanLimiter,
   libraryAssetShareAccessLimiter,
   merchCheckoutLimiter,
+  meshPingLimiter,
   musicBrainzLookupLimiter,
   navigationTelemetryLimiter,
   onboardingLimiter,

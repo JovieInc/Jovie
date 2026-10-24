@@ -7,6 +7,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Added
+
+- Ovie Mesh page: read-only agent mesh roster with an entity-card rail and a capped, owner-only mesh ping (JOV-8937).
+
 ## [26.10.15] - 2026-10-23
 
 ## [26.10.14] - 2026-10-23

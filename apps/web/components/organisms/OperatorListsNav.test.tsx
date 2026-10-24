@@ -165,11 +165,29 @@ describe('OperatorListsNav', () => {
   it('still offers New list before any data loads', () => {
     mocks.data = undefined;
     renderNav();
-    expect(screen.queryAllByRole('link')).toHaveLength(0);
+    // The static Mesh entry (JOV-8937) is the only link before data loads.
+    expect(screen.queryAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Mesh' })).toHaveAttribute(
+      'href',
+      '/app/ov/mesh'
+    );
     // No matching smart views: the whole group hides, not just its rows.
     expect(screen.queryByText('Smart Views')).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'New List' })
     ).toBeInTheDocument();
+  });
+
+  it('links the read-only Mesh roster next to the entity lists', () => {
+    const view = renderNav('/app/ov/mesh');
+    const mesh = screen.getByRole('link', { name: 'Mesh' });
+    expect(mesh).toHaveAttribute('href', '/app/ov/mesh');
+    expect(mesh).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('list', { name: 'Mesh' })).toContainElement(mesh);
+    view.unmount();
+    renderNav('/app/ov/lists/l1');
+    expect(screen.getByRole('link', { name: 'Mesh' })).not.toHaveAttribute(
+      'aria-current'
+    );
   });
 });

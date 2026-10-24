@@ -326,14 +326,15 @@ export const queryKeys = {
       creatorSearch: (query: string) =>
         [...queryKeys.admin.lists.all(), 'creator-search', query] as const,
     },
+    mesh: {
+      read: () => [...queryKeys.admin.all, 'mesh-read'] as const,
+    },
   },
 
   // HUD ops surfaces (admin shell + kiosk). Keys carry only the access
   // scope — never raw kiosk tokens.
   hud: {
     all: ['hud'] as const,
-    pipelineBottleneck: () =>
-      [...queryKeys.hud.all, 'pipeline-bottleneck'] as const,
     metrics: (scope: 'admin' | 'kiosk') =>
       [...queryKeys.hud.all, 'metrics', scope] as const,
   },

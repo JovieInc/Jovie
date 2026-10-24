@@ -62,6 +62,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Internal admin wiki article reached from the /hud/wiki/:path* rewrite into the OV app shell',
   '/app/ov/lists':
     'Founder lists index reached from the Lists block in the OV sidebar, which links each list directly',
+  '/app/ov/mesh':
+    'Read-only agent mesh roster (JOV-8937) reached from the Mesh block in the OV sidebar',
   '/app/ov/lists/[id]':
     'One founder list, linked from the OV sidebar Lists block and the lists index',
   '/app/ov/lists/views/[viewId]':
