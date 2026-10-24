@@ -472,7 +472,7 @@ describe('surface elevation guardrails', () => {
     );
   });
 
-  it('defines one elevation ladder from window background to overlays (JOV-8976)', () => {
+  it('defines one elevation ladder from window background to modals (JOV-8976)', () => {
     const designSystem = readFileSync(
       join(ROOT, 'styles/design-system.css'),
       'utf-8'
@@ -480,7 +480,7 @@ describe('surface elevation guardrails', () => {
 
     // Levels follow importance page -> category -> entity. Each level =
     // surface + 1px border + shadow, defined in both light and dark.
-    for (let level = 0; level <= 4; level++) {
+    for (let level = 0; level <= 5; level++) {
       for (const part of ['surface', 'border', 'shadow']) {
         expect(
           designSystem.match(new RegExp(`--elev-${level}-${part}:`, 'g')),
@@ -489,22 +489,28 @@ describe('surface elevation guardrails', () => {
       }
     }
 
-    // L0 is the window background plane; L4 overlays ride the popover shadow.
+    // L0 is the window background plane; L4 overlays and the L5 modal ride
+    // the popover shadow, and the modal carries its own scrim token.
     expect(designSystem).toContain('--elev-0-border: transparent;');
     expect(designSystem).toContain('--elev-0-shadow: none;');
     expect(designSystem).toContain('--elev-4-shadow: var(--shadow-popover);');
+    expect(designSystem).toContain('--elev-5-shadow: var(--shadow-popover);');
+    expect(
+      designSystem.match(/--elev-5-scrim: rgba\(0, 0, 0, 0\.52\);/g)
+    ).toHaveLength(2);
 
     // L1 and L2 share one border treatment (canvas + sidebar).
     expect(designSystem).toContain('--elev-1-border: var(--app-shell-border);');
     expect(designSystem).toContain('--elev-2-border: var(--app-shell-border);');
 
-    // Legacy names resolve through the ladder instead of diverging.
+    // Legacy names resolve through the ladder instead of diverging. Cards on
+    // the flat L2 canvas carry no elevation of their own.
     expect(designSystem).toContain('--app-shell-shadow: var(--elev-2-shadow);');
     expect(designSystem).toContain(
       '--app-shell-sidebar-shadow: var(--elev-1-shadow);'
     );
     expect(designSystem).toContain(
-      '--app-shell-card-shadow: var(--elev-2-shadow);'
+      '--app-shell-card-shadow: var(--elev-0-shadow);'
     );
     expect(designSystem).toContain(
       '--app-shell-drawer-shadow: var(--elev-3-shadow);'

@@ -140,17 +140,21 @@
   --app-shell-border: rgba(0, 0, 0, 0.05);
   --app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
   --app-shell-frame-seam: rgba(0, 0, 0, 0.045);
-  /* ONE elevation system (JOV-8976, Tim 2026-10-23). Levels follow importance
-     page -> category -> entity. Each level = surface + 1px border + shadow:
+  /* ONE elevation system (JOV-8976, Tim 2026-10-23; spec rev 2026-10-23: adds
+     L5, flattens L2). Levels follow importance page -> category -> entity.
+     Each level = surface + 1px border + shadow:
      L0 window background (behind the left rail), L1 sidebar nav, L2 page
-     canvas/layout (entity tables inside the canvas stay L2; a card sits at
-     its container's level), L3 right rail / entity detail panels, L4
-     popovers, tooltips, menus. Shadows are subtle and blur-free — no
-     glassmorphism. L1 and L2 share one border treatment; the L2 ring
-     supersedes the 2025-09-25 'borderless' canvas lock (see AppShellFrame).
-     Surfaces/borders compose existing tokens; the 1px ring at the head of
-     each shadow IS that level's border. Legacy --app-shell-*-shadow names
-     alias the ladder — new work consumes --elev-*. */
+     canvas/layout — ONE flat, uniform-color surface (Notion/Linear style):
+     no 'main content card' level and no unnecessary separators, borders, or
+     dividers inside the canvas (table row hairlines stay where needed);
+     L3 right rail / entity detail panels, L4 popovers, tooltips, menus,
+     L5 modal — above popovers, with its own scrim token. Shadows are
+     subtle and blur-free — no glassmorphism. L1 and L2 share one border
+     treatment; the L2 ring supersedes the 2025-09-25 'borderless' canvas
+     lock (see AppShellFrame). Surfaces/borders compose existing tokens; the
+     1px ring at the head of each shadow IS that level's border. Legacy
+     --app-shell-*-shadow names alias the ladder — new work consumes
+     --elev-*. */
   --elev-0-surface: var(--noir-ion-shell);
   --elev-0-border: transparent;
   --elev-0-shadow: none;
@@ -169,11 +173,20 @@
   --elev-4-surface: var(--color-bg-surface-2);
   --elev-4-border: var(--color-border-default);
   --elev-4-shadow: var(--shadow-popover);
+  /* Modal rides one tier above popovers: same surface treatment, plus the
+     scrim that paints behind it (matches the shared overlay primitive).
+     The scrim is identical in light and dark. */
+  --elev-5-surface: var(--color-bg-elevated);
+  --elev-5-border: var(--color-border-default);
+  --elev-5-shadow: var(--shadow-popover);
+  --elev-5-scrim: rgba(0, 0, 0, 0.52);
 
-  /* Legacy aliases — old names stay valid, resolved by the ladder. */
+  /* Legacy aliases — old names stay valid, resolved by the ladder.
+     Cards inside the canvas sit on the flat L2 plane: no card-level
+     elevation, so the card shadow resolves to the flat plane's none. */
   --app-shell-sidebar-shadow: var(--elev-1-shadow);
   --app-shell-shadow: var(--elev-2-shadow);
-  --app-shell-card-shadow: var(--elev-2-shadow);
+  --app-shell-card-shadow: var(--elev-0-shadow);
   --app-shell-drawer-shadow: var(--elev-3-shadow);
   --app-shell-content-padding-x: 12px;
   --app-shell-content-padding-y: 8px;
@@ -1586,11 +1599,17 @@
   --elev-4-surface: var(--color-bg-surface-2);
   --elev-4-border: var(--color-border-default);
   --elev-4-shadow: var(--shadow-popover);
+  /* Modal — one tier above popovers, with the scrim behind it. */
+  --elev-5-surface: var(--color-bg-elevated);
+  --elev-5-border: var(--color-border-default);
+  --elev-5-shadow: var(--shadow-popover);
+  --elev-5-scrim: rgba(0, 0, 0, 0.52);
 
-  /* Legacy aliases — old names stay valid, resolved by the ladder. */
+  /* Legacy aliases — old names stay valid, resolved by the ladder. Cards on
+     the flat L2 canvas carry no elevation of their own (flat alias). */
   --app-shell-sidebar-shadow: var(--elev-1-shadow);
   --app-shell-shadow: var(--elev-2-shadow);
-  --app-shell-card-shadow: var(--elev-2-shadow);
+  --app-shell-card-shadow: var(--elev-0-shadow);
   --app-shell-drawer-shadow: var(--elev-3-shadow);
   --app-shell-sidebar-background: rgb(7 8 10);
   --app-shell-sidebar-background-rgb: 7 8 10;
