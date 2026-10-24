@@ -146,7 +146,7 @@
       ".github/**",
       "scripts/**"
     ],
-    "bodySha256": "2f5b5b01bd34142deb0a9a71784152ebe60d1be2c18e56bb7cd6aaa44a68d3fa"
+    "bodySha256": "8fc3a2864799b7d08f7512eeda0c5ec7a074e6b2f1c283ab750fc50d60b77e30"
   },
   {
     "file": ".claude/rules/swarm.md",

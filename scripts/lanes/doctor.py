@@ -468,6 +468,9 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "noWorkRepairs24h": dict(Counter(
             (r.get("reasons") or ["?"])[0].split(":", 1)[0] for r in receipts
             if r.get("kind") == "fix-red" and r.get("verdict") in NO_WORK_REPAIR_VERDICTS)),
+        "refundedNoWorkRepairs24h": sum(1 for r in receipts if r.get("kind") == "fix-red"
+                                       and r.get("verdict") in NO_WORK_REPAIR_VERDICTS
+                                       and r.get("attemptRefunded")),
         "lastLandingAge": min(landings) if landings else None, "runs24h": len(receipts),
         "lastWorkAge": min((age_s(r.get("endedAt"), now) for r in receipts if r.get("kind") != "sync-main"), default=None),
         # Per-provider age of the last clean claim-scan exit: proves spawned workers reach the
@@ -803,9 +806,17 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     tick = obs.get("tick") or {}
     if tick.get("error"):
         alerts["tick-error"] = f"last dispatch tick failed: {tick['error'][:140]}"
+    if tick.get("uncleanPreviousRun"):
+        # A run-intent marker survived its own tick: that tick was killed (crash, SIGKILL,
+        # power loss). Its bounded recovery already refunded stranded fix-attempt charges.
+        refunded = len(((tick.get("uncleanRecovery") or {}).get("refundedFixAttempts")) or [])
+        alerts["lanes-tick-unclean"] = (f"the previous lanes tick terminated without a clean receipt "
+                                        f"(pid {tick['uncleanPreviousRun'].get('pid')}); recovery refunded "
+                                        f"{refunded} stranded fix-attempt charge(s); check the host journal for the kill cause")
     delivery = tick.get("remediationEvents") or {}
     delivery_error = tick.get("remediationEventsError")
-    if delivery.get("deliveryFailed"):
+    if delivery.get("deliveryFailed") or delivery.get("deliveryExhausted"):
+        # Terminal exhausted rows are a visible failure, not silence: they never retry.
         alerts["remediation-delivery"] = (
             "remediation action lacks authoritative acknowledgement; "
             f"failed={delivery.get('deliveryFailed', 'unknown')}, "
@@ -973,8 +984,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     no_work = obs.get("noWorkRepairs24h") or {}
     if sum(no_work.values()) >= NO_WORK_REPAIR_ALERT:
         causes = ", ".join(f"{reason} {count}" for reason, count in sorted(no_work.items(), key=lambda kv: -kv[1])[:3])
-        alerts["repairs-without-work"] = (f"{sum(no_work.values())} PR repairs in 24h spent a fix attempt before any "
-                                          f"agent work ({causes}); infrastructure, not the PRs, is exhausting them")
+        requeued = obs.get("refundedNoWorkRepairs24h") or 0
+        alerts["repairs-without-work"] = (f"{sum(no_work.values())} PR repairs in 24h stopped before any "
+                                          f"agent work ({causes}); {sum(no_work.values()) - requeued} spent a fix "
+                                          f"attempt and {requeued} were refunded and requeued with backoff; "
+                                          "infrastructure, not the PRs, is exhausting them")
     # No design-brief-stale alert: since 2026-10-11 no issue is held for a brief (the
     # claiming run writes it), so a held brief is no longer a condition to watch.
     for row in obs.get("sweepSecretHeld") or []:
