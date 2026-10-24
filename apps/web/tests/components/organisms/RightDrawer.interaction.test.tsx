@@ -97,6 +97,29 @@ describe('RightDrawer', () => {
     expect(aside).toHaveClass('opacity-0');
   });
 
+  it('releases desktop allocation when closed while retaining the content plane', () => {
+    const fixture = (isOpen: boolean) => (
+      <RightDrawer isOpen={isOpen} width={380} ariaLabel='Allocated inspector'>
+        <button type='button'>Inspector action</button>
+      </RightDrawer>
+    );
+    const { rerender } = render(fixture(true));
+    const drawer = screen.getByLabelText('Allocated inspector');
+    const content = drawer.firstElementChild;
+    expect(drawer).not.toHaveClass('absolute', 'fixed');
+    expect(drawer).toHaveClass('shrink-0');
+    expect(drawer).toHaveStyle({ width: '380px' });
+    expect(drawer.style.borderWidth).toBe('1px');
+    rerender(fixture(false));
+    expect(drawer).toHaveStyle({ width: '0px' });
+    expect(drawer.style.borderWidth).toBe('0px');
+    expect(drawer).toHaveAttribute('inert');
+    rerender(fixture(true));
+    expect(drawer.firstElementChild).toBe(content);
+    expect(drawer).toHaveStyle({ width: '380px' });
+    expect(drawer).not.toHaveAttribute('inert');
+  });
+
   it('keeps the inspector content width stable through interrupted closes', () => {
     const { rerender } = render(
       <RightDrawer isOpen width={360} ariaLabel='Stable inspector'>

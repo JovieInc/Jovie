@@ -59,7 +59,7 @@ function splitShadowLayers(boxShadow: string) {
   return layers;
 }
 
-async function expectDrawerTabChrome(locator: Locator) {
+async function expectDrawerTabChrome(locator: Locator, pill = false) {
   const metrics = await locator.evaluate(element => {
     const style = getComputedStyle(element);
     return {
@@ -73,7 +73,11 @@ async function expectDrawerTabChrome(locator: Locator) {
   expect(metrics.height).toBeGreaterThanOrEqual(27);
   expect(metrics.height).toBeLessThanOrEqual(32);
   expect(metrics.radius).toBeGreaterThanOrEqual(9.5);
-  expect(metrics.radius).toBeLessThan(16);
+  if (pill) {
+    expect(metrics.radius).toBeGreaterThanOrEqual(metrics.height / 2);
+  } else {
+    expect(metrics.radius).toBeLessThan(16);
+  }
   expect(metrics.borderTop).toBeGreaterThan(0);
   expect(hasVisibleShadow(metrics.boxShadow)).toBeFalsy();
 }
@@ -162,15 +166,21 @@ for (const theme of ['light', 'dark'] as const) {
     ).toHaveCount(1);
     await expect(drawer.getByTestId('release-tabbed-card')).toBeVisible();
 
-    const overviewTab = drawer.getByTestId('drawer-tab-overview');
-    const platformsTab = drawer.getByTestId('drawer-tab-dsps');
-    const tasksTab = drawer.getByTestId('drawer-tab-tasks');
+    const overviewTab = drawer
+      .getByRole('tab')
+      .filter({ has: drawer.getByTestId('drawer-tab-overview') });
+    const platformsTab = drawer
+      .getByRole('tab')
+      .filter({ has: drawer.getByTestId('drawer-tab-dsps') });
+    const tasksTab = drawer
+      .getByRole('tab')
+      .filter({ has: drawer.getByTestId('drawer-tab-tasks') });
     await expect(overviewTab).toBeVisible();
     await expect(platformsTab).toBeVisible();
     await expect(tasksTab).toBeVisible();
-    await expectDrawerTabChrome(overviewTab);
-    await expectDrawerTabChrome(platformsTab);
-    await expectDrawerTabChrome(tasksTab);
+    await expectDrawerTabChrome(overviewTab, true);
+    await expectDrawerTabChrome(platformsTab, true);
+    await expectDrawerTabChrome(tasksTab, true);
     await expectCardChrome(drawer.getByTestId('release-tabbed-card'));
     await expectFlatSurface(drawer.getByTestId('release-metadata-card'));
     await expect(drawer.getByTestId('release-header-card')).toBeVisible();
