@@ -75,21 +75,8 @@ jobs:
           key: ${{ runner.os }}-electron-downloads-${{ hashFiles('pnpm-lock.yaml', 'apps/desktop/electron-builder*.yml') }}
           restore-keys: |
             ${{ runner.os }}-electron-downloads-
-      - name: Bind staging package identity to the exact CI attempt
-        id: desktop-staging-identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(node apps/desktop/scripts/sync-version.mjs \
-            --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Test and package exact Mac head
         env:
-          # The staging package is unsigned by design. Hosted runners have no
-          # signing identity; a self-hosted Mac has the owner's Developer ID in
-          # its keychain and electron-builder would try to codesign with it
-          # headless and fail (2026-10-10, tw-mac-001).
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           SOURCE_SHA: ${{ inputs.checkout-ref || github.sha }}
         run: |
           set -euo pipefail
@@ -97,10 +84,6 @@ jobs:
           swift build --package-path apps/macos/MenuMonitor -c release
           pnpm --filter @jovie/desktop run typecheck
           pnpm --filter @jovie/desktop run test
-          ELECTRON_ENV=staging \
-            DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}" \
-            JOVIE_DESKTOP_SOURCE_REVISION="$SOURCE_SHA" \
-            pnpm --filter @jovie/desktop run package:staging
       - name: Save Electron downloads
         if: >-
           github.event_name == 'push' &&
@@ -112,32 +95,12 @@ jobs:
             ~/Library/Caches/electron
             ~/Library/Caches/electron-builder
           key: ${{ steps.electron-downloads.outputs.cache-primary-key }}
-      - name: Verify exact Mac artifact set
-        run: |
-          set -euo pipefail
-          version="${{ steps.desktop-staging-identity.outputs.version }}"
-          for artifact in \
-            "apps/desktop/dist/Jovie-Staging-${version}-universal.dmg" \
-            "apps/desktop/dist/Jovie-Staging-${version}-universal.dmg.blockmap" \
-            "apps/desktop/dist/Jovie-Staging-${version}-universal.zip" \
-            "apps/desktop/dist/Jovie-Staging-${version}-universal.zip.blockmap" \
-            "apps/macos/MenuMonitor/.build/release/MenuMonitor"; do
-            [ -f "$artifact" ] || { echo "::error::Missing Mac artifact: $artifact"; exit 1; }
-          done
-      - name: Upload exact Mac staging package
-        # Retention-only artifact (no workflow downloads it). A self-hosted
-        # laptop uploads the ~460 MB package at ~20 KB/s and would time the
-        # job out, so only hosted runners keep it; the artifact set is still
-        # verified on every runner above.
+      - name: Upload MenuMonitor release binary
         if: ${{ runner.environment == 'github-hosted' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: desktop-staging-${{ inputs.checkout-ref || github.sha }}
+          name: menumonitor-${{ inputs.checkout-ref || github.sha }}
           path: |
-            apps/desktop/dist/Jovie-Staging-*-universal.dmg
-            apps/desktop/dist/Jovie-Staging-*-universal.dmg.blockmap
-            apps/desktop/dist/Jovie-Staging-*-universal.zip
-            apps/desktop/dist/Jovie-Staging-*-universal.zip.blockmap
             apps/macos/MenuMonitor/.build/release/MenuMonitor
           if-no-files-found: error
           compression-level: 0
