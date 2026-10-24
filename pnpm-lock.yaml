@@ -418,6 +418,9 @@ importers:
       '@jovie/agent-transport-contracts':
         specifier: workspace:^
         version: link:../../packages/agent-transport-contracts
+      '@jovie/api-client':
+        specifier: workspace:^
+        version: link:../../packages/api-client
       '@jovie/audio-contracts':
         specifier: workspace:*
         version: link:../../packages/audio-contracts
