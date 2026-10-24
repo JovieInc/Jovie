@@ -13,6 +13,10 @@
  * and uncompressed) for the chunks that ship browser telemetry onto public
  * routes. Limits live in docs/performance/telemetry-budgets.json with a
  * documented Jovie-measured baseline; a missing build manifest fails closed.
+ *
+ * JOV-8555: the initial-JS growth ratchet is fail-closed. A missing, malformed,
+ * or placeholder (never-captured) bundle baseline fails the run instead of
+ * silently skipping growth detection.
  */
 
 import { execSync } from 'node:child_process';
@@ -100,6 +104,48 @@ interface Baseline {
   commit: string | null;
   totalInitialJS_bytes: number;
   chunks: Record<string, number>;
+}
+
+/**
+ * JOV-8555: load the committed bundle baseline, fail-closed. A missing,
+ * malformed, or placeholder (never-captured) baseline means the initial-JS
+ * growth ratchet cannot run — that state is a failure, never a skip.
+ */
+export function loadBaseline(baselinePath: string = BASELINE_PATH): Baseline {
+  if (!existsSync(baselinePath)) {
+    throw new TypeError(
+      `Bundle baseline file is missing: ${baselinePath}. The initial-JS growth ratchet is fail-closed — run \`pnpm --filter @jovie/web compare-chunks:snapshot\` after a clean build and commit docs/performance/bundle-baseline.json instead of skipping the check.`
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(baselinePath, 'utf-8'));
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new TypeError(
+      `Bundle baseline file is malformed: ${baselinePath} (${reason}).`
+    );
+  }
+
+  const candidate = parsed as Partial<Baseline> | null;
+  if (
+    !candidate ||
+    typeof candidate.totalInitialJS_bytes !== 'number' ||
+    candidate.totalInitialJS_bytes <= 0 ||
+    typeof candidate.capturedAt !== 'string' ||
+    candidate.capturedAt === '' ||
+    typeof candidate.commit !== 'string' ||
+    candidate.commit === '' ||
+    typeof candidate.chunks !== 'object' ||
+    candidate.chunks === null
+  ) {
+    throw new TypeError(
+      `Bundle baseline is unwired: ${baselinePath} carries no captured measurements (capturedAt, commit, totalInitialJS_bytes, chunks). Run \`pnpm --filter @jovie/web compare-chunks:snapshot\` after a clean build and commit the captured baseline.`
+    );
+  }
+
+  return candidate as Baseline;
 }
 
 interface BuildManifest {
@@ -369,10 +415,16 @@ function compare(): void {
     0
   );
 
-  // Load baseline
+  // Load baseline — fail closed (JOV-8555): an unwired baseline must red the
+  // run instead of silently skipping growth detection. The failure reason is
+  // reported after the report table so the rest of the diagnostics still print.
   let baseline: Baseline | null = null;
-  if (existsSync(BASELINE_PATH)) {
-    baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf-8'));
+  let baselineError: string | null = null;
+  try {
+    baseline = loadBaseline();
+  } catch (error) {
+    baseline = null;
+    baselineError = error instanceof Error ? error.message : String(error);
   }
 
   // Load route budgets
@@ -481,6 +533,12 @@ function compare(): void {
     }
   } else {
     console.log(`| vs Baseline | No baseline captured yet |`);
+    // JOV-8555: fail closed — an unwired growth ratchet must red the run and
+    // point at the capture command instead of skipping growth detection.
+    console.log(
+      `\n❌ BUNDLE BASELINE UNWIRED: ${baselineError ?? 'docs/performance/bundle-baseline.json is missing, malformed, or still the empty placeholder'}, so initial-JS growth detection cannot run. Capture it with \`pnpm --filter @jovie/web compare-chunks:snapshot\` after a clean build and commit the result.`
+    );
+    hasFailure = true;
   }
 
   // Budget check
