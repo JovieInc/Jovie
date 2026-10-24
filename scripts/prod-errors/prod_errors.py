@@ -39,6 +39,8 @@ REPO = os.environ.get("PROD_ERRORS_REPO", "JovieInc/Jovie")
 USER_THRESHOLD = int(os.environ.get("PROD_ERRORS_USER_THRESHOLD", "25"))
 CLAIM_S = int(os.environ.get("PROD_ERRORS_CLAIM_S", str(4 * 3600)))
 QUIET_S = 24 * 3600
+# A main run still in progress past this is a hang, even if nothing cancelled it.
+RUN_TIMEOUT_S = int(os.environ.get("PROD_ERRORS_RUN_TIMEOUT_S", str(2 * 3600)))
 SUSPECT_WINDOW_S = 6 * 3600
 # Watcher -> expected heartbeat interval in seconds (dead-man alerts at 2x, or N straight errors).
 # Each watcher is judged on its OWN cadence: the receiver only heartbeats when the dead-man pokes
@@ -455,14 +457,27 @@ def sweep(sentry: Sentry, linear: Linear, state: Path = STATE) -> dict:
 
 def ci_main(linear: Linear, state: Path = STATE) -> dict:
     latest: dict[str, dict] = {}
+    runs_by_wf: dict[str, list[dict]] = {}
     for wf in WORKFLOWS:
         runs = gh_json(["run", "list", "-R", REPO, "--branch", "main", "--workflow", wf, "--limit", "5",
-                        "--json", "databaseId,workflowName,conclusion,status,event,createdAt,url"]) or []
+                        "--json", "databaseId,workflowName,conclusion,status,event,createdAt,runStartedAt,headSha,url"]) or []
+        runs_by_wf[wf] = runs
         done = [r for r in runs if r.get("status") == "completed"]
         if done:
             latest[wf] = done[0]
     seen = read_json(state / "ci-ledger.json", {})
     opened = 0
+    for wf, runs in runs_by_wf.items():  # hang check: the newest run never finished in time
+        key = f"ci:{hashlib.sha1(wf.encode()).hexdigest()[:10]}"
+        entry = seen.setdefault(key, {"workflow": wf})
+        newest = runs[0] if runs else None
+        if newest and newest.get("status") != "completed":
+            started = parse_ts(newest.get("runStartedAt") or newest.get("createdAt"))
+            if (started and now() - started > RUN_TIMEOUT_S
+                    and entry.get("hangRunId") != newest.get("databaseId")):
+                entry["hangRunId"] = newest.get("databaseId")  # one hang alert per run, not per sweep
+                alert("ci-hang", f"{wf}'s newest main run never finished within its timeout "
+                      f"({RUN_TIMEOUT_S}s): {newest.get('url')}", False, linear, state)
     for wf, r in latest.items():
         key = f"ci:{hashlib.sha1(wf.encode()).hexdigest()[:10]}"
         entry = seen.setdefault(key, {"workflow": wf})
@@ -479,9 +494,18 @@ def ci_main(linear: Linear, state: Path = STATE) -> dict:
                 linear.set_state(entry["linear"], "completed")
             entry.update(state="green")
         elif r["conclusion"] == "cancelled":
-            entry["cancelStreak"] = entry.get("cancelStreak", 0) + 1
-            if entry["cancelStreak"] == 3:
-                alert("ci-cancelled", f"{wf} cancelled 3x in a row on main; it never finishes.", False, linear, state)
+            # Concurrency supersession is normal: a newer main push started a newer run for a
+            # different SHA, cancelling this one. Only a cancel with NO newer run (same newest
+            # SHA) is a real hang -- and each distinct run counts once, not once per sweep.
+            superseded = any(x is not r and x.get("headSha") and x.get("headSha") != r.get("headSha")
+                             and str(x.get("createdAt") or "") > str(r.get("createdAt") or "")
+                             for x in runs_by_wf[wf])
+            if not superseded and entry.get("lastCancelId") != r.get("databaseId"):
+                entry["lastCancelId"] = r.get("databaseId")
+                entry["cancelStreak"] = entry.get("cancelStreak", 0) + 1
+                if entry["cancelStreak"] == 3:
+                    alert("ci-cancelled", f"{wf} cancelled 3x in a row on main with no newer run "
+                          "superseding them; it never finishes.", False, linear, state)
         if r["conclusion"] != "cancelled":
             entry["cancelStreak"] = 0
         entry["lastRunAt"] = r["createdAt"]

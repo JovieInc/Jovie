@@ -17,6 +17,10 @@ heartbeat, the synthetic weekly). A watcher missing env config fails fast with O
 dead-man gate. Staleness is never disabled: past the grace window, or 2x the interval since the
 last heartbeat, the dead-man still pages.
 
+On main, a run cancelled by a newer push (different head SHA in the same concurrency group) is
+normal supersession and never alerts; three DISTINCT cancels with no newer run superseding them,
+or a newest run still unfinished past `PROD_ERRORS_RUN_TIMEOUT_S` (2h), alert once per run.
+
 Rules: golden-path flows (checkout, auth, onboarding, public profile/track pages, navigation) trigger
 at any count; others at `PROD_ERRORS_USER_THRESHOLD` (25) users. One Linear issue per Sentry ID
 (labels `sentry:<id>`, `golden-path`). Closed means zero events for 24h after the fix merged; only

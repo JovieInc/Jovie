@@ -3,6 +3,7 @@ import os
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import prod_errors as pe
@@ -51,6 +52,20 @@ class LoopTest(unittest.TestCase):
         base = {"id": "101", "title": "TypeError in track page release credits", "culprit": "app/[username]/[slug]",
                 "userCount": 3, "count": 9, "firstSeen": iso(self.t - 60), "lastSeen": iso(self.t - 30)}
         return {**base, **kw}
+
+    def ghrun(self, n, **kw):
+        base = {"databaseId": n, "workflowName": "E2E Full Browser Matrix", "conclusion": "success",
+                "status": "completed", "event": "push", "createdAt": pe.iso(self.t + n * 60),
+                "runStartedAt": pe.iso(self.t + n * 60), "headSha": f"sha{n}",
+                "url": f"https://example.com/runs/{n}"}
+        return {**base, **kw}
+
+    def ci(self, runs_by_wf):
+        def fake(args):
+            if args[0] == "run":
+                return runs_by_wf.get(args[args.index("--workflow") + 1], [])
+            return []
+        return mock.patch("prod_errors.gh_json", fake)
 
     def test_golden_path_triggers_at_any_count_and_one_linear_issue_per_id(self):
         self.assertEqual(pe.handle_issue(self.issue(), self.ledger, self.s, self.l, [], self.t, self.dir), "opened")
@@ -234,6 +249,49 @@ class LoopTest(unittest.TestCase):
         pe.write_json(self.dir / "ledger.json", ep2)  # a new episode must re-alert
         pe.deadman(self.l, self.dir)
         self.assertEqual(len(self.l.created), 2)
+
+    def ci_sweeps(self, sweeps):
+        wf = "E2E Full Browser Matrix"
+        old_expected = pe.EXPECTED_RUNS
+        pe.EXPECTED_RUNS = {}  # keep the missed-run alarm out of these fixtures
+        try:
+            for runs_by_wf in sweeps:
+                with self.ci({wf: runs_by_wf}):
+                    pe.ci_main(self.l, self.dir)
+        finally:
+            pe.EXPECTED_RUNS = old_expected
+
+    def test_ci_cancelled_superseded_by_newer_sha_is_ignored(self):
+        # JOV-8916: those cancelled runs were superseded when a newer main push started a newer
+        # run for a different SHA -- normal concurrency, never a hang. Three sweeps, no issue.
+        runs = [self.ghrun(2, status="in_progress", conclusion=None, headSha="sha-new"),
+                self.ghrun(1, conclusion="cancelled", headSha="sha-old")]
+        self.ci_sweeps([runs, runs, runs])
+        self.assertEqual(self.l.created, [])
+
+    def test_ci_cancelled_with_no_newer_run_still_flags(self):
+        # Three DISTINCT cancels on the newest SHA with nothing superseding them = a real hang.
+        # The same cancelled run repeated across sweeps counts once, not once per sweep.
+        self.ci_sweeps([[self.ghrun(1, conclusion="cancelled", headSha="same")]])
+        self.ci_sweeps([[self.ghrun(2, conclusion="cancelled", headSha="same"),
+                         self.ghrun(1, conclusion="cancelled", headSha="same")]])
+        self.ci_sweeps([[self.ghrun(3, conclusion="cancelled", headSha="same"),
+                         self.ghrun(2, conclusion="cancelled", headSha="same"),
+                         self.ghrun(1, conclusion="cancelled", headSha="same")]])
+        self.ci_sweeps([[self.ghrun(3, conclusion="cancelled", headSha="same"),
+                         self.ghrun(2, conclusion="cancelled", headSha="same"),
+                         self.ghrun(1, conclusion="cancelled", headSha="same")]])  # no re-alert
+        self.assertEqual(len(self.l.created), 1)
+        self.assertIn("cancelled 3x", self.l.created[0]["title"])
+
+    def test_ci_newest_run_stuck_past_timeout_flags_once(self):
+        stuck = [self.ghrun(7, status="in_progress", conclusion=None, headSha="sha-new",
+                          createdAt=pe.iso(self.t - 3 * 3600), runStartedAt=pe.iso(self.t - 3 * 3600))]
+        young = [self.ghrun(8, status="in_progress", conclusion=None, headSha="sha-new2",
+                          createdAt=pe.iso(self.t - 60), runStartedAt=pe.iso(self.t - 60))]
+        self.ci_sweeps([stuck, stuck, young])
+        self.assertEqual(len(self.l.created), 1)
+        self.assertIn("never finished within its timeout", self.l.created[0]["title"])
 
     def test_bottleneck_fragment(self):
         pe.handle_issue(self.issue(userCount=30), self.ledger, self.s, self.l, [], self.t, self.dir)
