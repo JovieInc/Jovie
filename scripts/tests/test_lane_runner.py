@@ -8338,6 +8338,36 @@ class ReleaseImportClosureTest(unittest.TestCase):
         self.assertEqual(self.missing_from_release(lane.RELEASE_EXTRAS, self.lanes_sources()), [],
                          "add the imported file to RELEASE_EXTRAS in scripts/lanes/lane_runner.py")
 
+    def test_shipped_source_admission_executes_fleet_rules_without_the_checkout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            staging = Path(tmp).resolve()
+            for relative in lane.RELEASE_EXTRAS:
+                target = staging / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / relative, target)
+            module = (staging / "scripts/lib/source-admission-policy.mjs").as_uri()
+            driver = f"""
+import assert from 'node:assert/strict';
+import {{ evaluateSourceAdmission }} from {json.dumps(module)};
+const head = 'a'.repeat(40);
+const evidence = {{
+    repository: 'JovieInc/Jovie', expectedHead: head, complete: true,
+    pr: {{ number: 1, title: 'feat: example', body: '', state: 'open', draft: false,
+           head: {{ sha: head, ref: 'fleet/example', repo: {{ fork: false }} }},
+           base: {{ ref: 'main' }}, labels: [], changed_files: 1 }},
+    files: [{{ filename: 'scripts/example.mjs' }}], reviews: [], statuses: []
+}};
+assert.equal(evaluateSourceAdmission(evidence).allowed, true);
+evidence.pr.title = 'fix: example';
+const result = evaluateSourceAdmission(evidence);
+assert.equal(result.allowed, false);
+assert.equal(result.blockers.length, 1);
+assert.match(result.blockers[0], /^red-before-green:/);
+"""
+            result = subprocess.run(["node", "--input-type=module", "-e", driver],
+                                    cwd=staging, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_comments_are_ignored_and_escaping_imports_are_reported(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
@@ -11132,6 +11162,236 @@ class TerminalPublicationTest(unittest.TestCase):
                     self.assertFalse(any(c[0] == 'gh' for c in self.calls))
 
 
+class HumanHoldEnforcementTest(unittest.TestCase):
+    """A needs-human-decision disposition becomes an honoured `tim-hold`; every mutation path
+    refuses it; lanes never remove it; a repair that rewrites history is never published."""
+
+    HOLD = [{"name": "tim-hold"}]
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+        self.pr = {"number": 7, "title": "t", "headRefOid": "h1", "headRefName": "devin/jov-7-20261002t0000",
+                   "state": "OPEN", "isDraft": False, "mergeStateStatus": "CLEAN", "labels": self.HOLD,
+                   "isInMergeQueue": False, "isCrossRepository": False}
+        self.calls = []
+        # Hermetic: claim ownership is read from GitHub/host state, which differs per machine and
+        # inside a staged release. Every test here states its own claim outcome.
+        claims = patch.object(lane, "claimed_elsewhere", return_value=False)
+        claims.start()
+        self.addCleanup(claims.stop)
+
+    def shell(self, routes=None):
+        routes = routes or {}
+        def run(cmd, **kwargs):
+            self.calls.append(cmd)
+            for prefix, reply in routes.items():
+                if tuple(cmd[:len(prefix)]) == prefix:
+                    code, out = reply
+                    return SimpleNamespace(returncode=code, stdout=out, stderr="")
+            return SimpleNamespace(returncode=0, stdout=publication_response(cmd), stderr="")
+        return run
+
+    def deleted_labels(self):
+        return [c for c in self.calls if "DELETE" in c]
+
+    # Rule 1: the hold comes from remediation's structured disposition only.
+    def test_human_decision_disposition_applies_the_honoured_hold_once_per_head(self):
+        self.assertIn(lane.pr_events.HUMAN_DECISION_LABEL, lane.pr_events.HOLD_LABELS)
+        classified = {"cls": "needs-human-decision", "subtype": "hold", "evidence": ["x"], "next_action": "tim-decides"}
+        data = {"surfaced": [], "ladderExhausted": [], "escalating": []}
+        pr = {**self.pr, "labels": []}
+        with patch.object(lane, "sh", side_effect=self.shell()):
+            lane._surface_exhausted(self.host, pr, {}, classified, "needs-human-decision", None, {}, data)
+            applied = [c for c in self.calls if c[:4] == ["gh", "api", "-X", "POST"] and "labels[]=tim-hold" in c]
+            self.assertEqual(len(applied), 1)
+            self.assertTrue(data["surfaced"][0]["holdApplied"])
+            # A human removes the label; the same head is never re-held by the lanes.
+            lane._surface_exhausted(self.host, pr, {}, classified, "needs-human-decision", None, {}, data)
+        self.assertEqual(len([c for c in self.calls if "labels[]=tim-hold" in c]), 1)
+
+    def test_only_the_structured_class_creates_authority_not_comment_text_or_other_classes(self):
+        data = {"surfaced": [], "ladderExhausted": [], "escalating": []}
+        pr = {**self.pr, "labels": []}
+        for cls in ("fixable-by-model", "needs-rebase", "flaky-infra", "obsolete", "ready"):
+            classified = {"cls": cls, "evidence": ["Decision needed: tim-decides (comment text)"], "next_action": "tim-decides"}
+            with self.subTest(cls=cls), patch.object(lane, "sh", side_effect=self.shell()):
+                lane._surface_exhausted(self.host, {**pr, "headRefOid": "h" + cls}, {}, classified, "ladder-exhausted",
+                                        None, {}, data)
+            self.assertFalse([c for c in self.calls if "labels[]=tim-hold" in c])
+
+    # Rule 2: every mutation path refuses a PR carrying the hold.
+    def test_dispatch_claim_adopt_and_terminal_selection_refuse_the_hold(self):
+        self.assertEqual(lane.gate_disposition(self.pr, {}, {}), "existing-pr-hold")
+        self.assertTrue(lane.pr_is_terminal(self.pr))
+        self.assertEqual(lane.pr_events.maintenance_hold(self.host, lane, self.pr, 1.0), "tim-hold")
+        self.assertEqual(lane.pr_events.maintenance_hold(self.host, lane, self.pr, 1.0, terminal_ok=True), "tim-hold")
+        self.assertEqual(lane.terminal_prs([{**self.pr, "labels": self.HOLD + [{"name": "lane-fix-exhausted"}]}],
+                                           {"7": {"escalated": True}}, {}), [])
+        draft = {**self.pr, "isDraft": True, "labels": self.HOLD}
+        self.assertFalse(lane.pr_events.in_scope(draft, "green", set(), 1.0))
+
+    def test_fix_refuses_a_live_hold_before_any_checkout_or_agent(self):
+        for dirty in (False, True):
+            self.calls.clear()
+            pr = {**self.pr, "mergeStateStatus": "DIRTY" if dirty else "UNSTABLE"}
+            with self.subTest(dirty=dirty), patch.object(lane, "sh", side_effect=self.shell()), \
+                    patch.object(lane, "reconcile_fix_target", side_effect=lambda p: {**p, "state": "OPEN"}), \
+                    patch.object(lane, "run_agent") as agent, patch.object(lane.disk_guard, "free_pct", return_value=50.0):
+                receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, pr)
+            self.assertEqual(receipt["verdict"], "cancelled")
+            self.assertEqual(receipt["reasons"], ["target-pr-human-hold"])
+            agent.assert_not_called()
+            self.assertFalse([c for c in self.calls if c[:2] in (["git", "merge"], ["git", "push"])
+                              or c[:3] == ["git", "worktree", "add"]])
+
+    def test_a_hold_applied_mid_run_stops_the_repair_at_the_next_boundary(self):
+        with patch.object(lane, "reconcile_fix_target", return_value={**self.pr, "labels": self.HOLD}):
+            with self.assertRaises(lane.RepairStopped) as stopped:
+                lane.require_fix_target({**self.pr, "labels": []}, "agent-running", repair=True)
+        self.assertEqual(str(stopped.exception), "target-pr-human-hold")
+        for label in ("tim:hold", "hold:tim", "do-not-merge"):
+            with self.subTest(label=label), patch.object(lane, "reconcile_fix_target",
+                                                         return_value={**self.pr, "labels": [{"name": label}]}):
+                with self.assertRaises(lane.RepairStopped):
+                    lane.require_fix_target(self.pr, "after-agent", repair=True)
+
+    def test_conflict_repair_and_main_sync_paths_refuse_the_hold(self):
+        dirty = {**self.pr, "mergeStateStatus": "DIRTY"}
+        with patch.object(lane, "sh", side_effect=self.shell()), patch.object(lane, "newest_clean_main") as newest:
+            self.assertIsNone(lane.partial_main_sync(self.host, dirty))
+            newest.assert_not_called()
+            self.assertEqual(lane.pr_events.sync_main(self.host, lane, dirty, 1.0, terminal_ok=True), "held:tim-hold")
+            self.assertEqual(lane.pr_events.sync_main(self.host, lane, self.pr, 1.0), "held:tim-hold")
+        self.assertEqual(self.calls, [], "no update-branch, merges API call or git mutation")
+
+    def test_terminal_revisit_never_syncs_a_held_dirty_pr(self):
+        dirty = {**self.pr, "mergeStateStatus": "DIRTY", "labels": self.HOLD + [{"name": "lane-fix-exhausted"}]}
+        with patch.object(lane, "sh", side_effect=self.shell({("git", "ls-remote"): (0, "m1\trefs/heads/main\n")})), \
+                patch.object(lane, "partial_main_sync") as partial:
+            self.assertEqual(lane.revisit_terminal_prs(self.host, [dirty], now=10.0), [])
+        partial.assert_not_called()
+        self.assertFalse([c for c in self.calls if c[:2] == ["gh", "api"]])
+
+    def test_ready_and_enqueue_refuse_the_hold_on_live_labels(self):
+        (self.host.state / "verified.json").write_text(json.dumps({"7:h1": gate_proof("h1")}))
+        draft = {**self.pr, "isDraft": True, "labels": []}
+        live = {**draft, "labels": self.HOLD}
+        with patch.object(lane, "sh", side_effect=self.shell()), patch.object(lane, "claimed_elsewhere", return_value=False), \
+                patch.object(lane, "reconcile_fix_target", side_effect=lambda _: dict(live)):
+            outcome = lane.publish_verified(self.host, draft)
+        self.assertEqual(outcome, "held:existing-pr-hold")
+        self.assertFalse([c for c in self.calls if c[:3] == ["gh", "pr", "ready"] or c[:3] == ["gh", "pr", "merge"]])
+        self.assertFalse((self.host.state / "requeue.json").exists())
+        # The green-wake eligibility (the only enqueue trigger the lanes feed) is closed too.
+        self.assertFalse(lane.pr_events.in_scope(draft | {"labels": self.HOLD}, "green", set(), 1.0))
+
+    # Rule 3: lanes never remove the hold; a human removing it is the release.
+    def test_lanes_never_remove_the_human_decision_hold(self):
+        pr = {**self.pr, "labels": self.HOLD + [{"name": "hold"}, {"name": "queue-poison"}]}
+        self.assertEqual(lane.pr_events.auto_unhold_labels(pr), ["hold", "queue-poison"])
+        self.assertEqual(lane.pr_events.auto_unhold_labels({**self.pr, "labels": self.HOLD}), [])
+        with patch.object(lane.pr_events, "hold_context") as read:
+            self.assertIsNone(lane.pr_events.stale_hold(7, self.pr, 2e9, lambda *a, **k: None))
+            read.assert_not_called()
+        # The label deletions the lanes issue anywhere never target it.
+        source = (Path(lane.__file__).parent / "lane_runner.py").read_text() \
+            + (Path(lane.__file__).parent / "pr_events.py").read_text()
+        self.assertNotIn("labels/tim-hold", source)
+        self.assertNotIn('labels/{HUMAN_DECISION_LABEL}', source)
+
+    def test_removing_the_label_releases_the_pr(self):
+        released = {**self.pr, "labels": []}
+        self.assertIsNone(lane.gate_disposition(released, {}, {}))
+        self.assertIsNone(lane.pr_events.maintenance_hold(self.host, lane, released, 1.0))
+        with patch.object(lane, "reconcile_fix_target", return_value=released):
+            self.assertEqual(lane.require_fix_target(released, "before-execution-claim", repair=True)["number"], 7)
+
+    # Rule 4: non-fast-forward prevention.
+    def test_prompts_forbid_history_rewrites(self):
+        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")):
+            fix = lane.render_fix_prompt({**self.pr, "labels": []}, "")
+        for text in (fix, lane.remediation.dossier({**self.pr, "labels": []}, {"cls": "fixable-by-model", "evidence": []})):
+            self.assertRegex(text, r"(?s)Never rebase, squash, reset or force-push")
+        self.assertIn("merging origin/main", fix)
+        self.assertEqual(sum("Never rebase, squash, reset or force-push" in line for line in lane.NO_HISTORY_REWRITE), 1)
+
+    def test_runner_push_helper_never_forces(self):
+        pushes = []
+        def shell(cmd, **kwargs):
+            pushes.append(cmd)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with patch.object(lane, "sh", side_effect=shell):
+            self.assertTrue(lane.resolve_generated_conflict(Path(self.tmp.name), "devin/b", None))
+        push = [c for c in pushes if c[:2] == ["git", "push"]]
+        self.assertEqual(len(push), 1)
+        self.assertFalse([a for a in push[0] if a.startswith("--force") or a == "-f" or a.startswith("+")])
+        self.assertNotIn("--force", " ".join(" ".join(c) for c in pushes if c[:2] == ["git", "push"]))
+
+    def test_remote_fast_forward_check_uses_real_ancestry(self):
+        repo = Path(self.tmp.name) / "ff"
+        repo.mkdir()
+        def git(*args):
+            return subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True).stdout.strip()
+        git("init", "-q", "-b", "main")
+        for key, value in (("user.name", "t"), ("user.email", "t@example.test"), ("commit.gpgsign", "false"),
+                           ("gc.auto", "0")):
+            git("config", key, value)
+        git("commit", "--allow-empty", "-qm", "one")
+        before = git("rev-parse", "HEAD")
+        git("commit", "--allow-empty", "-qm", "two")
+        forward = git("rev-parse", "HEAD")
+        git("reset", "-q", "--hard", before)
+        git("commit", "--allow-empty", "-qm", "squashed replacement")
+        rewritten = git("rev-parse", "HEAD")
+        with patch.object(lane, "sh", side_effect=lambda cmd, **kw: subprocess.run(
+                cmd if cmd[1] != "fetch" else ["true"], cwd=kw.get("cwd"), capture_output=True, text=True)):
+            self.assertTrue(lane.remote_fast_forwarded(repo, before, forward))
+            self.assertFalse(lane.remote_fast_forwarded(repo, forward, rewritten))
+            self.assertFalse(lane.remote_fast_forwarded(repo, "0" * 40, forward), "unreadable evidence fails closed")
+        with patch.object(lane, "sh", side_effect=subprocess.TimeoutExpired("git", 1)):
+            self.assertFalse(lane.remote_fast_forwarded(repo, before, forward))
+
+    def run_fix(self, ancestor_code, draft=False):
+        pr = {**self.pr, "labels": [], "isDraft": draft, "mergeStateStatus": "UNSTABLE",
+              "statusCheckRollup": [{"name": "ci", "status": "COMPLETED", "conclusion": "FAILURE",
+                                     "detailsUrl": "https://github.com/x/actions/runs/1/job/42"}]}
+        def shell(cmd, **kwargs):
+            self.calls.append(cmd)
+            if cmd[:3] == ["git", "worktree", "add"]:
+                Path(cmd[-2]).mkdir(parents=True)
+            out = "h2\trefs/heads/devin/jov-7-20261002t0000\n" if cmd[:2] == ["git", "ls-remote"] else ""
+            code = ancestor_code if cmd[:3] == ["git", "merge-base", "--is-ancestor"] else 0
+            return SimpleNamespace(returncode=code, stdout=out, stderr="")
+        with patch.object(lane, "sh", side_effect=shell), \
+                patch.object(lane, "reconcile_fix_target", side_effect=lambda p: {**p, "state": "OPEN"}), \
+                patch.object(lane, "run_agent", return_value=SimpleNamespace(returncode=0)), \
+                patch.object(lane, "repair_created_head", return_value=True), \
+                patch.object(lane, "install_dependencies"), patch.object(lane, "failure_excerpt", return_value=""), \
+                patch.object(lane, "update_requeue_locked") as requeue, \
+                patch.object(lane.disk_guard, "free_pct", return_value=50.0):
+            receipt = lane.fix_red_pr(self.host, "codex", {"cmd": ["true"]}, pr)
+        return receipt, requeue
+
+    def test_a_non_fast_forward_agent_push_is_recorded_and_never_published(self):
+        receipt, requeue = self.run_fix(ancestor_code=1)
+        self.assertEqual(receipt["verdict"], "history-rewrite-detected")
+        self.assertEqual(receipt["alert"], {"kind": "history-rewrite-detected", "pr": 7,
+                                            "before": "h1", "after": "h2"})
+        requeue.assert_not_called()
+        self.assertFalse([c for c in self.calls if c[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"])
+                          or "DELETE" in c or "POST" in c])
+        attempts = json.loads((self.host.state / "fix-attempts.json").read_text()) \
+            if (self.host.state / "fix-attempts.json").exists() else {}
+        self.assertNotEqual((attempts.get("7") or {}).get("pushed"), True)
+
+    def test_a_fast_forward_agent_push_still_proceeds(self):
+        receipt, requeue = self.run_fix(ancestor_code=0)
+        self.assertEqual(receipt["verdict"], "fix-pushed")
+        requeue.assert_called_once()
+
+
 class PublicationBundlePrerequisitesTest(unittest.TestCase):
     def test_backlog_fleet_policy_loads_from_only_declared_release_files(self):
         # A checkout or inherited PYTHONPATH must not hide missing installed extras.
@@ -13835,8 +14095,11 @@ class PendingRungDispositionTest(unittest.TestCase):
                 self.assertEqual(path.read_bytes(), before); label.assert_not_called(); transport.assert_not_called()
                 lane.escalate_exhausted(host, [pr], linear)
                 lane.escalate_exhausted(host, [pr], linear)
+            # One deduped comment, then the honoured human-decision hold, each exactly once.
             self.assertEqual(transport.call_count, 1)
             self.assertEqual(transport.call_args.args[0][:3], ["gh", "pr", "comment"])
+            holds = [c for c in label.call_args_list if c.kwargs.get("prefix") == ""]
+            self.assertEqual([c.args[1] for c in holds], ["tim-hold"])
             self.assertTrue(json.loads(path.read_text())["7"]["escalated"])
             self.assertEqual(linear.moves, [("issue7", "Backlog")])
             self.assertEqual(len(linear.comments), 1)
