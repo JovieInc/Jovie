@@ -3474,9 +3474,16 @@ ${selectedGateScript}`,
       .sort();
     expect(mergeGroupWorkflows).toEqual([
       'ci.yml',
+      'pr-fleet-rules.yml',
       'pr-size-guard.yml',
       'pr-targets-main.yml',
     ]);
+    const fleet = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/pr-fleet-rules.yml'),
+      'utf8'
+    );
+    expect(fleet).not.toContain('secrets.');
+    expect(fleet).not.toMatch(/: write/);
     expect(getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-fork')).not.toContain(
       'secrets.'
     );

@@ -53,6 +53,23 @@ async function readPaneGeometry(page: Page) {
       field: '#displayName',
       rail: '#shell-artist-profile-rail',
     };
+    // Rail lifecycle evidence rides with every sample. The matrix artifacts
+    // are the only readable record of the drawer's phase when a lifecycle
+    // assertion fails, so the observed phase/hiding state must travel with
+    // the geometry instead of living only in the moment of the assertion.
+    const railLifecycle = (() => {
+      const element = document.querySelector<HTMLElement>(
+        '#shell-artist-profile-rail'
+      );
+      return {
+        present: element !== null,
+        railPhase: element?.getAttribute('data-rail-phase') ?? null,
+        ariaHidden: element?.getAttribute('aria-hidden') ?? null,
+        modalSheet:
+          element?.getAttribute('role') === 'dialog' &&
+          element?.getAttribute('aria-modal') === 'true',
+      };
+    })();
     const elements = Object.fromEntries(
       Object.entries(selectors).map(([name, selector]) => [
         name,
@@ -63,7 +80,7 @@ async function readPaneGeometry(page: Page) {
       Object.entries(elements).map(([name, matches]) => [name, matches.length])
     );
     if (Object.values(counts).some(count => count !== 1)) {
-      return { counts, geometry: null };
+      return { counts, railLifecycle, geometry: null };
     }
     const box = (element: HTMLElement) => {
       const rect = element.getBoundingClientRect();
@@ -88,6 +105,7 @@ async function readPaneGeometry(page: Page) {
     );
     return {
       counts,
+      railLifecycle,
       geometry: {
         route,
         pane,
@@ -591,6 +609,23 @@ test('Account keeps its full pane after Profile navigation and browser history',
   await assertFullSettingsPane(page);
   await page.goBack({ waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.SETTINGS_PROFILE}$`));
+  // Durable receipt for the Back leg: the exact observed rail lifecycle at
+  // assertion time. The phase the drawer is actually in (and whether the
+  // element exists at all) was the missing diagnostic in run 40027215925.
+  const backRailObserved = await page.evaluate(() => {
+    const element = document.querySelector('#shell-artist-profile-rail');
+    return {
+      present: element !== null,
+      railPhase: element?.getAttribute('data-rail-phase') ?? null,
+      ariaHidden: element?.getAttribute('aria-hidden') ?? null,
+      modalSheet:
+        element?.getAttribute('role') === 'dialog' &&
+        element?.getAttribute('aria-modal') === 'true',
+    };
+  });
+  process.stdout.write(
+    `${JSON.stringify({ name: 'history-profile-rail', observed: backRailObserved })}\n`
+  );
   await expect(page.locator('#shell-artist-profile-rail')).toHaveAttribute(
     'data-rail-phase',
     'open'
