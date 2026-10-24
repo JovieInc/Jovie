@@ -184,7 +184,7 @@ describe('ProfileAboutTab', () => {
         <ProfileAboutTab {...baseProps} bio='Old bio' onBioChange={vi.fn()} />
       );
 
-      await user.click(screen.getByRole('button', { name: 'Edit Bio' }));
+      await user.click(screen.getByRole('button', { name: 'Edit bio' }));
 
       expect(screen.getByRole('textbox', { name: 'Bio' })).toBeInTheDocument();
     });

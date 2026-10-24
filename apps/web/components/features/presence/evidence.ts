@@ -39,7 +39,7 @@ export function evaluatePresenceChecks(
 
   if (failing.length > 0) {
     return {
-      label: 'Needs Review',
+      label: 'Needs review',
       tone: 'error',
       needsAttention: true,
       sortPriority: 0,
@@ -50,7 +50,7 @@ export function evaluatePresenceChecks(
   }
   if (warning.length > 0) {
     return {
-      label: 'Needs Attention',
+      label: 'Needs attention',
       tone: 'warning',
       needsAttention: true,
       sortPriority: 1,
@@ -84,7 +84,7 @@ export function evaluatePresenceChecks(
   }
   if (measured.length < checks.length) {
     return {
-      label: 'Partially Measured',
+      label: 'Partially measured',
       tone: 'neutral',
       needsAttention: false,
       sortPriority: 2,

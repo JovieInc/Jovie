@@ -25,7 +25,7 @@ export function PresenceOutcomeStrip({
 
   return (
     <section
-      aria-label='Artist Presence Outcomes'
+      aria-label='Artist presence outcomes'
       data-testid='presence-outcomes'
       className='shrink-0 border-b border-subtle'
     >
@@ -57,7 +57,7 @@ export function PresenceOutcomeStrip({
             <button
               key={outcome.group}
               type='button'
-              aria-label={`${outcome.label} Outcome`}
+              aria-label={`${outcome.label} outcome`}
               className={cn(
                 className,
                 'transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/50'

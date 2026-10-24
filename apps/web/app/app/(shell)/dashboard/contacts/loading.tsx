@@ -84,7 +84,7 @@ export default function ContactsLoading() {
       aria-busy='true'
       aria-live='polite'
       aria-atomic='true'
-      aria-label='Loading Contacts'
+      aria-label='Loading contacts'
     >
       {/* Mobile: card layout (visible below sm) */}
       <div className='flex-1 min-h-0 overflow-hidden sm:hidden'>

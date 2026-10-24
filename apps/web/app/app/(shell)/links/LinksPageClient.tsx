@@ -50,7 +50,7 @@ function LinkInspector({ row }: { readonly row: LinkRow }) {
     <aside
       data-testid='links-inspector'
       className='flex w-full shrink-0 flex-col gap-4 border-l border-subtle p-4 lg:w-80'
-      aria-label='Link Details'
+      aria-label='Link details'
     >
       <div className='flex flex-col gap-1'>
         <span className={typography.cellTertiary}>{row.type}</span>

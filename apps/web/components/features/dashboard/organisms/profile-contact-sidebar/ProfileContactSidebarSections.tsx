@@ -41,8 +41,8 @@ export function ProfileBentoView({
   const destination =
     identity?.destination ?? `${APP_ROUTES.SETTINGS_PROFILE}?tab=music`;
   const actionLabel = identity
-    ? `Manage In ${identity.label}`
-    : 'Manage Profile';
+    ? `Manage in ${identity.label.toLowerCase()}`
+    : 'Manage profile';
 
   return (
     <div

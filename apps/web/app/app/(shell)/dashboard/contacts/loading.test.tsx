@@ -11,7 +11,7 @@ describe('ContactsLoading', () => {
     const { container } = render(<ContactsLoading />);
 
     expect(
-      screen.getByRole('status', { name: 'Loading Contacts' })
+      screen.getByRole('status', { name: 'Loading contacts' })
     ).toHaveAttribute('aria-live', 'polite');
     expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual([]);
     expect(

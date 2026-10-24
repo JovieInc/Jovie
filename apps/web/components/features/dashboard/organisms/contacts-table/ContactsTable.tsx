@@ -220,7 +220,7 @@ export const ContactsTable = memo(function ContactsTable({
               ) : null}
               <Button type='button' size='sm' onClick={() => onAddContact()}>
                 <Plus className='h-3.5 w-3.5' aria-hidden='true' />
-                Add Contact
+                Add contact
               </Button>
             </>
           }
@@ -230,14 +230,14 @@ export const ContactsTable = memo(function ContactsTable({
         <div className='flex min-h-0 flex-1 overflow-auto'>
           {isEmpty ? (
             <EmptyState
-              heading='No Contacts Yet'
+              heading='No contacts yet'
               description='Add bookings, management, and press contacts.'
               presentation='workspace'
               className='min-h-full'
               actionSlot={
                 <Button type='button' size='sm' onClick={() => onAddContact()}>
                   <Plus className='h-3.5 w-3.5' aria-hidden='true' />
-                  Add Contact
+                  Add contact
                 </Button>
               }
             />

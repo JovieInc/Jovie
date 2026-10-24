@@ -142,8 +142,8 @@ describe('presence identity', () => {
 
     expect(photo.freshness).toBe('stale');
     expect(isPresenceObservationStale(observedAt, now)).toBe(true);
-    expect(formatPresenceRank(null, 'pending')).toBe('Not Measured');
-    expect(formatPresenceRank(null, 'measured')).toBe('Not Ranked');
+    expect(formatPresenceRank(null, 'pending')).toBe('Not measured');
+    expect(formatPresenceRank(null, 'measured')).toBe('Not ranked');
     expect(formatPresenceRank(0, 'measured')).toBe('#0');
   });
 
@@ -176,7 +176,7 @@ describe('presence identity', () => {
     });
     expect(search({})).toMatchObject({
       status: 'pending',
-      value: 'Not Measured',
+      value: 'Not measured',
       detail: 'No search run has completed yet',
       attentionCount: 1,
     });
@@ -195,7 +195,7 @@ describe('presence identity', () => {
       search({ lastObservedAt: '2026-09-15T12:00:00.000Z' })
     ).toMatchObject({
       status: 'measured',
-      value: 'Not Ranked',
+      value: 'Not ranked',
       detail: 'Best measured Jovie rank',
       attentionCount: 0,
     });
@@ -279,7 +279,7 @@ describe('presence identity', () => {
         rank: null,
         lastObservedAt: null,
       })
-    ).toMatchObject({ status: 'pending', label: 'Not Measured' });
+    ).toMatchObject({ status: 'pending', label: 'Not measured' });
     expect(
       getPresenceObservation(
         {

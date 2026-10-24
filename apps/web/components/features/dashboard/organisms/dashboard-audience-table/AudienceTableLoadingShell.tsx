@@ -26,7 +26,7 @@ export function AudienceTableLoadingShell() {
       frame='none'
       contentPadding='none'
       aria-busy='true'
-      aria-label='Loading Audience'
+      aria-label='Loading audience'
       data-testid='dashboard-audience-loading'
       surfaceMode='table'
       toolbar={

@@ -30,7 +30,7 @@ export interface SuggestionPillConfig {
  * Note: This list is filtered at runtime to exclude platforms the user has already added.
  */
 export const SUGGESTION_PILLS: SuggestionPillConfig[] = [
-  { id: 'spotify-artist', label: 'Spotify Artist', simpleIconId: 'spotify' },
+  { id: 'spotify-artist', label: 'Spotify artist', simpleIconId: 'spotify' },
   { id: 'apple-music', label: 'Apple Music', simpleIconId: 'applemusic' },
   {
     id: 'youtube-music',
