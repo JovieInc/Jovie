@@ -1355,6 +1355,22 @@ class FrameSnapshotTest(unittest.TestCase):
                     path.write_text(text)
                 self.assertEqual(text, path.read_text())
 
+    def test_default_frames_replace_legacy_slots_with_panels(self):
+        """Keep main's legacy frames as before evidence for the tty1 default change."""
+        for name in FIXTURE_NAMES:
+            for width, height in SNAPSHOT_SIZES:
+                value, now = fixture(name)
+                frame = hud.render(value, width, height, now=now)
+                with self.subTest(fixture=name, size=f"{width}x{height}"):
+                    self.assertEqual(len(frame), height)
+                    self.assertTrue(all(hud.visible(row) == width for row in frame))
+                    text = "\n".join(plain(row) for row in frame)
+                    before = (FIXTURES / "__snapshots__" / f"legacy-{name}-{width}x{height}.txt").read_text()
+                    self.assertIn(" SLOTS ", before)
+                    self.assertIn(" WORKERS ", text)
+                    self.assertNotIn(" SLOTS ", text)
+                    self.assertIn("● running ○ idle", plain(frame[-1]))
+
     def test_every_frame_fills_the_grid_with_console_font_glyphs_only(self):
         for name, width, height, frame in self.frames():
             with self.subTest(fixture=name, size=f"{width}x{height}"):

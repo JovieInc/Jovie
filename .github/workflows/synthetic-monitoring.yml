@@ -1,4 +1,5 @@
 name: Production Synthetic Monitoring
+run-name: Production Synthetic Monitoring (${{ github.event.schedule || github.event_name }})
 # clock-class: production-liveness
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
