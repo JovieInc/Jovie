@@ -3,6 +3,7 @@
  * Validates timeout behavior for analytics queries
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   apiQuery,
@@ -15,6 +16,11 @@ import {
   setStatementTimeout,
   withTimeout,
 } from '@/lib/db/query-timeout';
+
+vi.mock('@sentry/nextjs', () => ({
+  addBreadcrumb: vi.fn(),
+  captureException: vi.fn(),
+}));
 
 describe('Query Timeout', () => {
   beforeEach(() => {
@@ -153,6 +159,27 @@ describe('Query Timeout', () => {
         'Invalid statement_timeout ms: 0'
       );
       expect(execute).not.toHaveBeenCalled();
+    });
+
+    it('does not fail the surrounding operation when the guard statement fails (JOV-8761)', async () => {
+      const execute = vi
+        .fn()
+        .mockRejectedValue(
+          new Error(
+            'current transaction is aborted, commands ignored until end of transaction block'
+          )
+        );
+      const db = { execute } as const;
+
+      await expect(setStatementTimeout(db, 5000)).resolves.toBeUndefined();
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: 'database',
+          level: 'error',
+          message: expect.stringContaining('statement_timeout_guard'),
+        })
+      );
     });
   });
 
