@@ -120,6 +120,40 @@ describe('findProfileForSource', () => {
     expect(selectMock).not.toHaveBeenCalled();
   });
 
+  it('does not disclose an unlisted source association or return it as a fallback', async () => {
+    selectResults.push([
+      {
+        username: 'unlisted',
+        displayName: 'Unlisted secret',
+        url: 'https://instagram.com/@creator',
+        settings: { searchable: false },
+      },
+    ]);
+    await expect(
+      findProfileForSource('instagram', 'https://instagram.com/@creator')
+    ).resolves.toBeNull();
+  });
+
+  it('skips an unlisted source candidate and returns a separately searchable match', async () => {
+    selectResults.push([
+      {
+        username: 'unlisted',
+        displayName: 'Unlisted secret',
+        url: 'https://instagram.com/@creator',
+        settings: { searchable: false },
+      },
+      {
+        username: 'listed',
+        displayName: 'Listed',
+        url: 'https://instagram.com/@creator',
+        settings: { searchable: true },
+      },
+    ]);
+    await expect(
+      findProfileForSource('instagram', 'https://instagram.com/@creator')
+    ).resolves.toMatchObject({ username: 'listed' });
+  });
+
   it('matches an active social link by handle identity', async () => {
     selectResults.push([
       {
