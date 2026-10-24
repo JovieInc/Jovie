@@ -53,6 +53,25 @@ describe('isEmbarrassingDisplayName', () => {
     expect(isEmbarrassingDisplayName('ARTIST_abc')).toBe(true);
   });
 
+  it('returns true for scraped page-title chrome (JOV-8464)', () => {
+    expect(
+      isEmbarrassingDisplayName('Mega Ran | Instagram, Facebook, Twitch')
+    ).toBe(true);
+    expect(
+      isEmbarrassingDisplayName('ninadevitry - Listen on YouTube, Spotify')
+    ).toBe(true);
+    expect(
+      isEmbarrassingDisplayName('ODESZA Tour Dates, Tickets & Merch Links')
+    ).toBe(true);
+  });
+
+  it('returns false for artist names with dashes, ampersands, or pipes but no title chrome', () => {
+    expect(isEmbarrassingDisplayName('A-ha')).toBe(false);
+    expect(isEmbarrassingDisplayName('Panic! At The Disco')).toBe(false);
+    expect(isEmbarrassingDisplayName('Simon & Garfunkel')).toBe(false);
+    expect(isEmbarrassingDisplayName('Earth, Wind & Fire')).toBe(false);
+  });
+
   it('returns false for normal artist names', () => {
     expect(isEmbarrassingDisplayName('DJ Shadow')).toBe(false);
     expect(isEmbarrassingDisplayName('Skrillex')).toBe(false);
@@ -140,6 +159,18 @@ describe('evaluateProfileQuality', () => {
 
     expect(result.isPublic).toBe(false);
     expect(result.quarantineReasons).toHaveLength(3);
+  });
+
+  it('quarantines scraped page-title chrome as display name (JOV-8464)', () => {
+    const result = evaluateProfileQuality({
+      displayName: 'Mega Ran | Instagram, Facebook, Twitch',
+      avatarUrl: 'https://blob.example.com/avatar.avif',
+      linkCount: 1,
+    });
+
+    expect(result.isPublic).toBe(false);
+    expect(result.quarantineReasons).toHaveLength(1);
+    expect(result.quarantineReasons[0]).toContain('Display name');
   });
 
   it('handles whitespace-padded avatar URL', () => {
