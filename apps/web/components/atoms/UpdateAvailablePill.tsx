@@ -1,6 +1,6 @@
 'use client';
 
-import { Download, Loader2, RotateCcw } from 'lucide-react';
+import { Download, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { useDesktopUpdate } from '@/lib/desktop/electron-bridge';
 import { cn } from '@/lib/utils';
@@ -54,18 +54,16 @@ export function UpdateAvailablePillView({
       aria-label={ariaLabel}
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       className={cn(
-        'inline-flex h-6 w-24 items-center justify-center gap-1 rounded-full border px-1.5 text-2xs font-caption tracking-tight',
+        'inline-flex h-6 min-w-24 items-center justify-center gap-1 rounded-full border px-1.5 text-2xs font-caption tracking-tight',
         'transition-[background-color,border-color,color,opacity] duration-subtle',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:ring-offset-1 focus-visible:ring-offset-surface-page',
         isDownloading
           ? 'border-subtle bg-surface-1 text-secondary-token'
-          : 'border-transparent bg-primary-token text-surface-1 hover:opacity-90',
+          : 'border-default bg-surface-1 text-primary-token hover:bg-surface-0',
         'disabled:cursor-default disabled:opacity-70'
       )}
     >
-      {isBusy ? (
-        <Loader2 className='h-3 w-3 shrink-0 animate-spin' aria-hidden='true' />
-      ) : isDesktopReady ? (
+      {isBusy ? null : isDesktopReady ? (
         <RotateCcw className='h-3 w-3 shrink-0' aria-hidden='true' />
       ) : (
         <Download className='h-3 w-3 shrink-0' aria-hidden='true' />

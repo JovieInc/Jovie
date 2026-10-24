@@ -43,6 +43,9 @@ describe('UpdateAvailablePill', () => {
     expect(pill).toBeDisabled();
     expect(pill).toHaveAttribute('aria-busy', 'true');
     expect(pill).toHaveTextContent('Downloading…');
+    expect(pill.querySelector('.animate-spin')).toBeNull();
+    expect(pill.className).toContain('min-w-24');
+    expect(pill.className).not.toMatch(/(^|\s)w-24(\s|$)/);
 
     fireEvent.click(pill);
     expect(updateState.install).not.toHaveBeenCalled();
