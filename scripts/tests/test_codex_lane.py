@@ -80,6 +80,15 @@ class Isolated(unittest.TestCase):
         profile(codex.ACCOUNTS_ROOT, "beta")
         profile(codex.ACCOUNTS_ROOT, "openrouter", kind="apikey")
         (codex.ACCOUNTS_ROOT / "locks").mkdir()
+        # JOV-8763: the orchestration host may export CODEX_LANE_AUTH_MODE
+        # (subscription-pool). Inheriting it would route accounts()/state reads
+        # down the subscription-pool path instead of the fixtures above. Tests
+        # needing a mode (CurrentLoginTest, SubscriptionPoolTest) start their own
+        # patch after super().setUp(), and cleanup order restores theirs first.
+        self.host_env = patch.dict(os.environ)
+        self.host_env.start()
+        self.addCleanup(self.host_env.stop)
+        os.environ.pop("CODEX_LANE_AUTH_MODE", None)
 
     def tearDown(self):
         codex.ACCOUNTS_ROOT, codex.STATE = self.saved
