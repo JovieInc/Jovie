@@ -17,7 +17,7 @@ pnpm --version
 
 Required:
 
-- Node `>=24.21.0 <25`
+- Node `>=24.22.1 <25`
 - pnpm `9.15.9`
 
 If needed:

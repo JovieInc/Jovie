@@ -56,7 +56,7 @@ describe('WaitlistOutcomeView Start Pro (JOV-7701: anyone can buy)', () => {
     );
 
     const cta = screen.getByTestId('waitlist-start-pro-checkout');
-    expect(cta).toHaveTextContent('Start Pro ($199)');
+    expect(cta).toHaveTextContent('Start Pro ($12)');
     fireEvent.click(cta);
     // Default checkout: no onboarding source, so success lands on
     // /billing/success and routes a link-less buyer to /start.

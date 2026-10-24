@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  assertBaselineAllowlist,
   auditUiStoryCoverage,
   classifyUiPath,
   resolveUiStoryCoverageMode,
@@ -15,20 +16,22 @@ const repositoryRoot = resolve(testDirectory, '../../../../..');
 const webWorkspace = resolve(repositoryRoot, 'apps/web');
 
 describe('visual CI harness', () => {
-  it('keeps the Chromatic config reachable from the filtered web workspace', () => {
-    const configPath = resolve(webWorkspace, '../../chromatic.config.json');
-    const config = JSON.parse(readFileSync(configPath, 'utf8')) as {
-      onlyChanged?: boolean;
-      projectId?: string;
-      zip?: boolean;
-    };
+  it('does not treat Chromatic as a live visual gate', () => {
+    expect(existsSync(resolve(repositoryRoot, 'chromatic.config.json'))).toBe(
+      false
+    );
+    const storybookMain = readFileSync(
+      resolve(webWorkspace, '.storybook/main.ts'),
+      'utf8'
+    );
+    const webPackage = JSON.parse(
+      readFileSync(resolve(webWorkspace, 'package.json'), 'utf8')
+    ) as { devDependencies?: Record<string, string> };
 
-    expect(configPath).toBe(resolve(repositoryRoot, 'chromatic.config.json'));
-    expect(config).toEqual({
-      onlyChanged: true,
-      projectId: 'Project:68a7da03dd53297b6349f724',
-      zip: true,
-    });
+    expect(storybookMain).not.toContain('@chromatic-com/storybook');
+    expect(webPackage.devDependencies?.['@chromatic-com/storybook']).toBe(
+      undefined
+    );
   });
 
   it('keeps database-backed redirects out of DB-free visual smoke', () => {
@@ -61,7 +64,7 @@ describe('visual CI harness', () => {
     ).toBe(true);
   });
 
-  it('keeps the new coverage gate forward-only during baseline audit', () => {
+  it('keeps the coverage gate blocking only after the recorded activation', () => {
     const policy = JSON.parse(
       readFileSync(
         resolve(repositoryRoot, '.github/ui-story-coverage-policy.json'),
@@ -70,13 +73,23 @@ describe('visual CI harness', () => {
     );
 
     expect(validateUiStoryCoveragePolicy(policy)).toEqual(policy);
+    expect(assertBaselineAllowlist(repositoryRoot, policy).length).toBe(
+      policy.allowlist.length
+    );
     expect(
       resolveUiStoryCoverageMode({
         policy,
         pullRequestNumber: 99_999,
         openedAt: '2026-07-27T00:00:00Z',
       })
-    ).toBe('audit');
+    ).toBe('grandfathered');
+    expect(
+      resolveUiStoryCoverageMode({
+        policy,
+        pullRequestNumber: 22_700,
+        openedAt: '2026-10-23T03:00:00.000Z',
+      })
+    ).toBe('blocking');
     expect(classifyUiPath('apps/web/lib/backend-only.ts')).toBeNull();
     expect(classifyUiPath('apps/web/components/example/NewCard.tsx')).toBe(
       'component'
@@ -106,6 +119,22 @@ describe('visual CI harness', () => {
       path: 'apps/web/components/example/NewCard.tsx',
       reason: 'changed reusable UI component has no adjacent Storybook story',
     });
+    const policy = JSON.parse(
+      readFileSync(
+        resolve(repositoryRoot, '.github/ui-story-coverage-policy.json'),
+        'utf8'
+      )
+    ) as { allowlist: Array<{ path: string; linearIssue: string }> };
+    const baselinePath = policy.allowlist[0]?.path;
+    expect(baselinePath).toBeTruthy();
+    const allowlisted = auditUiStoryCoverage({
+      root: repositoryRoot,
+      changedFiles: [baselinePath],
+      allowlist: policy.allowlist,
+    });
+    expect(allowlisted.issues.some(issue => issue.path === baselinePath)).toBe(
+      false
+    );
   });
 
   it('rejects blocking rollout without five authoritative clean runs', () => {

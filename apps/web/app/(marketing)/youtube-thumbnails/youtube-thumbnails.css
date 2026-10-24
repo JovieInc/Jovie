@@ -1,0 +1,7 @@
+/* The locked paste-first headline needs compact display type on phones. */
+@media (max-width: 767px) {
+  .youtube-thumbnails-hero-title {
+    font-size: var(--text-3xl);
+    letter-spacing: var(--ds-marketing-display-tracking);
+  }
+}

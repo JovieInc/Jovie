@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { AlertsSettingsView } from '@/features/profile/AlertsSettingsView';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
@@ -151,6 +152,8 @@ interface ProfileDesktopSurfaceProps {
    *  mobile so cold desktop loads paint the real composition (JOV-6452). While
    *  hidden, portaled overlays (modal drawer, auto-open alerts) stay closed. */
   readonly overlaysEnabled?: boolean;
+  /** JOV-8777: free public profiles carry the Jovie mark; opt-outs suppress it. */
+  readonly hideJovieBranding?: boolean;
 }
 
 function toDateValue(value: Date | string | null | undefined) {
@@ -309,6 +312,7 @@ export function ProfileDesktopSurface({
   onReady,
   onOpenReleaseCredits,
   overlaysEnabled = true,
+  hideJovieBranding = false,
 }: ProfileDesktopSurfaceProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   useEffect(() => {
@@ -1068,6 +1072,18 @@ export function ProfileDesktopSurface({
             data-testid='profile-desktop-content-scroll'
           >
             {nonHomeContent}
+            {!hideJovieBranding ? (
+              <div
+                className='flex justify-center pb-1 pt-2'
+                data-testid='profile-jovie-branding'
+              >
+                <FooterBranding
+                  artistHandle={artist.handle}
+                  showCTA={false}
+                  size='sm'
+                />
+              </div>
+            ) : null}
           </div>
         </div>
 

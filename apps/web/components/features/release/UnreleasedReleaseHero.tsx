@@ -105,7 +105,9 @@ export function UnreleasedReleaseHero({
           </div>
 
           <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]'>
-            <SmartLinkPoweredByFooter />
+            <SmartLinkPoweredByFooter
+              reportTarget={`/${artist.handle}/${release.slug}`}
+            />
           </div>
         </div>
       </SmartLinkShell>

@@ -109,6 +109,27 @@ describe('useModalFocusBoundary', () => {
     expect(backdrop).toHaveFocus();
   });
 
+  it('keeps a modal companion surface interactive and focusable', () => {
+    render(<BoundaryHarness />);
+    const companion = document.createElement('div');
+    companion.dataset.modalCompanion = '';
+    const companionClose = document.createElement('button');
+    companionClose.textContent = 'Companion Close';
+    companion.append(companionClose);
+    document.body.append(companion);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+
+    expect(companion).not.toHaveAttribute('inert');
+    expect(companion).not.toHaveAttribute('aria-hidden');
+    expect(
+      screen.getByRole('button', { name: 'Companion Close' })
+    ).toBeInTheDocument();
+    companionClose.focus();
+    expect(companionClose).toHaveFocus();
+    companion.remove();
+  });
+
   it('pulls escaped focus back into the topmost dialog', () => {
     render(<BoundaryHarness />);
     fireEvent.click(screen.getByRole('button', { name: 'Open' }));

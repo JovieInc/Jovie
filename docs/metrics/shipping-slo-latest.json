@@ -1,28 +1,170 @@
 {
-  "at": "2026-10-20T12:42:19.659Z",
+  "at": "2026-10-24T12:21:06.149Z",
   "ciP95Seconds": {
-    "pull_request": null,
-    "merge_group": 1012
+    "pull_request": 1136,
+    "merge_group": 755
   },
-  "queueWaitP95Seconds": null,
-  "queueEjectionRate": null,
+  "queueWaitP95Seconds": 15124,
+  "queueEjectionRate": 0.5769230769230769,
   "leadTimeP95Seconds": {
-    "devin": null,
-    "codex": 37836,
-    "other": 9940
+    "devin": 328323,
+    "codex": 443220,
+    "other": 54727
   },
   "remediationP95Seconds": {
-    "prRedToGreen": null,
+    "prRedToGreen": 4800,
     "mainRedToGreen": null,
     "productionPromoteHold": null
   },
-  "productionLagP95Seconds": null,
+  "productionLagP95Seconds": 18832,
   "throughput": {
-    "mergesPerDay": 42.857142857142854,
-    "verifiedPerDay": null,
-    "wowGrowth": null,
-    "growthTrend": "unknown"
+    "mergesPerDay": 83.57142857142857,
+    "verifiedPerDay": 83.57142857142857,
+    "wowGrowth": -0.37566702241195304,
+    "growthTrend": "decelerating"
   },
-  "regressions": ["lead_time.codex.p95"],
-  "flatStall": false
+  "regressions": [
+    "ci_walltime.pull_request.p95",
+    "merge_queue.wait.p95",
+    "merge_queue.ejection_rate",
+    "lead_time.devin.p95",
+    "lead_time.codex.p95",
+    "remediation.pr_red_to_green.p95",
+    "production_lag.merged_to_verified.p95"
+  ],
+  "flatStall": false,
+  "stages": {
+    "schema": "jovie-stage-summary/v1",
+    "at": "2026-10-24T12:21:06.149Z",
+    "coverage": {
+      "stagesTotal": 48,
+      "stagesWithData": 35,
+      "events": 38487
+    },
+    "regressions": [
+      "shipping:admitted.p95",
+      "shipping:worker-start.p95",
+      "shipping:pr-open.p95",
+      "shipping:gate.p95",
+      "shipping:queued.p95",
+      "shipping:pr-open->merged.p95",
+      "remediation:repair-start.p95",
+      "remediation:red->green.p95",
+      "release:canary.p95"
+    ],
+    "slowestP95_7d": [
+      {
+        "stage": "shipping:issue",
+        "p50": 23885.125,
+        "p95": 1540638.136,
+        "n": 146
+      },
+      {
+        "stage": "shipping:outcome-receipt",
+        "p50": 675655,
+        "p95": 1247922,
+        "n": 60
+      },
+      {
+        "stage": "shipping:admitted",
+        "p50": 0,
+        "p95": 1242950.176,
+        "n": 155
+      },
+      {
+        "stage": "shipping:eligible",
+        "p50": 1789.24,
+        "p95": 1209456.121,
+        "n": 63
+      },
+      {
+        "stage": "shipping:worker-start",
+        "p50": 644,
+        "p95": 363932,
+        "n": 122
+      }
+    ],
+    "endToEnd7d": {
+      "shipping:issue->verified": {
+        "p50": 132589.722,
+        "p95": 2298778.451,
+        "n": 188
+      },
+      "shipping:pr-open->merged": {
+        "p50": 6017,
+        "p95": 255993,
+        "n": 585
+      },
+      "shipping:merged->verified": {
+        "p50": 4400,
+        "p95": 18832,
+        "n": 585
+      },
+      "remediation:red->green": {
+        "p50": 5319,
+        "p95": 153688,
+        "n": 208
+      },
+      "release:staging->verified": {
+        "p50": 2307,
+        "p95": 4652,
+        "n": 149
+      },
+      "release-replay:blocked->replayed": {
+        "p50": 141,
+        "p95": 141,
+        "n": 1
+      },
+      "ios-release:merge->testflight": {
+        "p50": 2042,
+        "p95": 4191,
+        "n": 14
+      },
+      "ios-release:merge->released": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      },
+      "revenue-funnel:signup->paid": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      },
+      "revenue-funnel:visit->paid": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      },
+      "automation-run:started->finished": {
+        "p50": 30,
+        "p95": 304,
+        "n": 603
+      },
+      "linear-intake:triage->classified": {
+        "p50": 88.993,
+        "p95": 350496.796,
+        "n": 101
+      },
+      "summer-turn:event->outcome": {
+        "p50": 47,
+        "p95": 140,
+        "n": 193
+      },
+      "summer-turn:model-turn->outcome": {
+        "p50": 45,
+        "p95": 140,
+        "n": 215
+      },
+      "claim-dogfood:wait->journey": {
+        "p50": 304,
+        "p95": 565,
+        "n": 32
+      },
+      "market-signal:published->delivered": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    }
+  }
 }

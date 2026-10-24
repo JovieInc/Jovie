@@ -181,10 +181,6 @@
       "tables": 0,
       "rates": 1
     },
-    "components/features/home/demo/DashboardLinksDemo.tsx": {
-      "tables": 0,
-      "rates": 1
-    },
     "components/features/release/AudioWaveformEditor.tsx": {
       "tables": 0,
       "rates": 1

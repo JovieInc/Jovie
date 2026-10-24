@@ -128,7 +128,7 @@ describe('shared route adapters', () => {
 });
 
 describe('independent deployment config', () => {
-  it('keeps deep-link queries on local rewrites and starts at Ops', async () => {
+  it('keeps deep-link queries on local rewrites and starts at Ovie Home', async () => {
     expect(await config.rewrites()).toMatchObject({
       beforeFiles: expect.arrayContaining([
         { source: '/hud/wiki', destination: '/app/admin/wiki' },
@@ -143,7 +143,7 @@ describe('independent deployment config', () => {
     });
     expect(await config.redirects()).toContainEqual({
       source: '/',
-      destination: '/hud',
+      destination: '/app/ov',
       permanent: false,
     });
     expect(

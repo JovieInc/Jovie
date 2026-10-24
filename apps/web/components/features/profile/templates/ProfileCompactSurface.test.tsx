@@ -327,10 +327,42 @@ describe('ProfileCompactSurface', () => {
     expect(screen.queryByTestId('profile-proof-claim-bar')).toBeNull();
   });
 
+  it('renders Jovie footer branding on the free public profile (JOV-8777)', () => {
+    renderSurface();
+
+    const branding = screen.getByTestId('profile-jovie-branding');
+    const link = within(branding).getByRole('link', { name: /Jovie home/i });
+    expect(link).toHaveAttribute(
+      'href',
+      `/?utm_source=profile&utm_artist=${artist.handle}`
+    );
+  });
+
+  it('omits Jovie footer branding when hideJovieBranding is set (JOV-8777)', () => {
+    renderSurface({ hideJovieBranding: true });
+
+    expect(screen.queryByTestId('profile-jovie-branding')).toBeNull();
+  });
+
   it('hides the bottom tab bar in static previews so it cannot cover clipped content (JOV-7192)', () => {
     renderSurface({ renderMode: 'preview', presentation: 'embedded' });
 
     expect(screen.queryByTestId('profile-bottom-nav')).toBeNull();
+    expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+      'data-render-mode',
+      'preview'
+    );
+  });
+
+  it('exposes the interactive render mode so md+ embedded chrome still reserves the dock', () => {
+    // From md up the live profile passes presentation="embedded" and still
+    // renders the dock; the dock-reservation CSS keys off data-render-mode.
+    renderSurface({ presentation: 'embedded' });
+
+    const surface = screen.getByTestId('profile-compact-surface');
+    expect(surface).toHaveAttribute('data-presentation', 'embedded');
+    expect(surface).toHaveAttribute('data-render-mode', 'interactive');
+    expect(screen.getByTestId('profile-bottom-nav')).toBeTruthy();
   });
 
   it('uses pearlQuiet top chrome without IconButton restyle classes', () => {

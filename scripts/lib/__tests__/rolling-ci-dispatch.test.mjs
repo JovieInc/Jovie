@@ -673,7 +673,7 @@ describe('rolling CI dispatch CLI and workflow', () => {
     expect(WORKFLOW).not.toMatch(/^\s+contents:\s+write\s*$/m);
     expect(WORKFLOW).not.toMatch(/^\s{2}check_suite:\s*$/m);
     expect(WORKFLOW).not.toMatch(/^\s{2}check_run:\s*$/m);
-    expect(WORKFLOW).toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(WORKFLOW).toContain('SYMPHONY_APP_PRIVATE_KEY');
     expect(WORKFLOW).not.toContain(
       'ref: ${{ github.event.workflow_run.head_sha }}'
     );

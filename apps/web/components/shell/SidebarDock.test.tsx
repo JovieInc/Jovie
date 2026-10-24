@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BannerViewport } from '@/components/feedback/BannerViewport';
 import { banner } from '@/components/feedback/banner-store';
@@ -13,6 +14,16 @@ import {
   type SidebarDockProps,
   sidebarDockSeenKey,
 } from './SidebarDock';
+
+// Expose the Next Link contract without starting a router in jsdom.
+vi.mock('next/link', () => ({
+  default: forwardRef<
+    HTMLAnchorElement,
+    ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+  >(function TestLink({ prefetch, ...props }, ref) {
+    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
+  }),
+}));
 
 const release = {
   id: '2026-10-15',
@@ -137,6 +148,7 @@ describe('SidebarDock', () => {
     expect(screen.queryByRole('link')).toBeNull();
     rerender(<SidebarDock userId='two' release={release} />);
     expect(screen.getByRole('link')).toHaveAttribute('href', '/changelog');
+    expect(screen.getByRole('link')).toHaveAttribute('data-prefetch', 'false');
     rerender(<SidebarDock userId='one' release={release} />);
     expect(screen.queryByRole('link')).toBeNull();
     unmount();

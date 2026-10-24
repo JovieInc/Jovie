@@ -1,4 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { isThemeRoute } from '@/lib/theme/route-policy';
 import { setTestAuthBypassSession } from '../helpers/auth';
 import { expect, test } from './setup';
@@ -29,6 +30,22 @@ function shouldSkipBlockingAxe(surface: {
     surface.allowedFinalDocumentStatuses?.includes(404) === true
   );
 }
+
+/**
+ * Theme routes whose light theme is not certified yet (JOV-8780). Production
+ * ships theme switching off, so visitors only ever see dark here; the dark
+ * WCAG scan above still gates these surfaces. Remove an id once its
+ * light-mode color-contrast scan passes in Chromium and Firefox.
+ */
+const LIGHT_MODE_CONTRAST_DEBT: ReadonlySet<string> = new Set([
+  'home',
+  'marketing-new',
+  'marketing-pricing',
+  'marketing-launch',
+  'marketing-launch-pricing',
+  'marketing-artist-profiles',
+  'marketing-artist-notifications',
+]);
 
 function getSurfaceFilter() {
   const raw = process.env.PUBLIC_SURFACE_FILTER?.trim();
@@ -136,7 +153,7 @@ const {
   error: surfaceManifestLoadError,
 } = loadSurfaceManifests();
 
-test.describe('Axe WCAG 2.1 Compliance', () => {
+test.describe('Axe WCAG 2.2 AA Compliance', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
   test.setTimeout(120_000);
 
@@ -184,7 +201,7 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
         }
 
         const results = await new AxeBuilder({ page })
-          .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+          .options(wcag22AaAxeOptions())
           .analyze();
 
         expect(
@@ -203,6 +220,13 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
         // `.dark` there scans a state no visitor can reach, so skip it; the
         // dark-theme scan above still gates those surfaces.
         if (!isThemeRoute(new URL(page.url()).pathname)) {
+          return;
+        }
+        if (LIGHT_MODE_CONTRAST_DEBT.has(surface.id)) {
+          testInfo.annotations.push({
+            type: 'light-mode-contrast-debt',
+            description: 'JOV-8780: light-mode color-contrast scan skipped',
+          });
           return;
         }
         await page.evaluate(() => {

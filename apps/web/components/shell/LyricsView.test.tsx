@@ -76,4 +76,14 @@ describe('JOV-5466 token retire', () => {
       'text-lg font-display text-primary-token line-clamp-2'
     );
   });
+
+  it('renders the empty-state primary CTA on canonical button tokens', () => {
+    const source = readFileSync(resolve(__dirname, './LyricsView.tsx'), 'utf8');
+    expect(source).not.toMatch(/bg-white|text-black/);
+    expect(source).toContain('border-btn-primary bg-btn-primary');
+    expect(source).toContain('text-btn-primary-foreground');
+    expect(source).toContain(
+      'hover:border-(--color-btn-primary-hover) hover:bg-(--color-btn-primary-hover)'
+    );
+  });
 });

@@ -56,9 +56,11 @@ test.describe('Demo page — structural QA', () => {
     expect(bodyText.toLowerCase()).not.toContain('application error');
     expect(bodyText.toLowerCase()).not.toContain('internal server error');
 
-    // Sidebar navigation should be present
-    const releasesNav = page.getByRole('button', { name: 'Releases' });
-    await expect(releasesNav).toBeVisible({ timeout: 30_000 });
+    // Sidebar navigation should be present. The canonical customer nav is
+    // Inbox / Identity / Work / Audience links; Work is the demo's live root.
+    const sidebarNav = page.locator('nav[aria-label="Dashboard Navigation"]');
+    const workNav = sidebarNav.getByRole('link', { name: 'Work' });
+    await expect(workNav).toBeVisible({ timeout: 30_000 });
 
     // No fatal console errors (filter out known noisy warnings)
     const fatalErrors = consoleErrors.filter(
@@ -82,15 +84,12 @@ test.describe('Demo page — structural QA', () => {
       timeout: 60_000,
     });
 
-    // Wait for the releases nav to appear (signals app shell loaded)
-    const releasesNav = page.getByRole('button', { name: 'Releases' });
-    await expect(releasesNav).toBeVisible({ timeout: 30_000 });
-
-    // Click Releases tab
-    await releasesNav.click();
+    // Wait for the releases workspace (the demo's core content)
+    const matrix = page.getByTestId('releases-matrix');
+    await expect(matrix).toBeVisible({ timeout: 30_000 });
 
     const primaryReleaseTitle = getPrimaryReleaseTitle();
-    const firstReleaseRow = page.getByTestId('release-row');
+    const firstReleaseRow = matrix.locator('[data-shell-release-row]').first();
 
     await expect(firstReleaseRow).toBeVisible({ timeout: 15_000 });
     await expect(firstReleaseRow.getByText(primaryReleaseTitle)).toBeVisible({
@@ -98,7 +97,7 @@ test.describe('Demo page — structural QA', () => {
     });
   });
 
-  test('release drawer opens from the preview toggle', async ({ page }) => {
+  test('release drawer opens from the shell release row', async ({ page }) => {
     test.setTimeout(90_000);
 
     await page.goto('/demo', {
@@ -106,15 +105,11 @@ test.describe('Demo page — structural QA', () => {
       timeout: 60_000,
     });
 
-    const releasesNav = page.getByRole('button', { name: 'Releases' });
-    await expect(releasesNav).toBeVisible({ timeout: 30_000 });
-    await releasesNav.click();
-
-    const previewToggle = page.getByRole('button', {
-      name: 'Toggle release preview',
-    });
-    await expect(previewToggle).toBeVisible({ timeout: 15_000 });
-    await previewToggle.click();
+    // /demo renders the same shell release list as /app/releases; the
+    // production release drawer opens from the row itself.
+    const firstReleaseRow = page.locator('[data-shell-release-row]').first();
+    await expect(firstReleaseRow).toBeVisible({ timeout: 30_000 });
+    await firstReleaseRow.click();
 
     await expect(page.getByTestId('release-sidebar')).toBeVisible({
       timeout: 10_000,
@@ -164,14 +159,15 @@ test.describe('Demo page — structural QA', () => {
       timeout: 60_000,
     });
 
-    // Core sidebar nav items should be present and keyboard-accessible
-    const releasesNav = page.getByRole('button', { name: 'Releases' });
-    await expect(releasesNav).toBeVisible({ timeout: 30_000 });
+    // Core sidebar nav items should be present and keyboard-accessible.
+    // The canonical customer nav renders Inbox / Identity / Work / Audience
+    // links; Work is the only root with demo content.
+    const sidebarNav = page.locator('nav[aria-label="Dashboard Navigation"]');
+    const workNav = sidebarNav.getByRole('link', { name: 'Work' });
+    await expect(workNav).toBeVisible({ timeout: 30_000 });
 
     // Check for other expected nav items in the demo shell
-    const audienceNav = page
-      .getByRole('button', { name: 'Audience' })
-      .or(page.getByRole('link', { name: 'Audience' }));
-    await expect(audienceNav.first()).toBeVisible({ timeout: 10_000 });
+    const audienceNav = sidebarNav.getByRole('link', { name: 'Audience' });
+    await expect(audienceNav).toBeVisible({ timeout: 10_000 });
   });
 });

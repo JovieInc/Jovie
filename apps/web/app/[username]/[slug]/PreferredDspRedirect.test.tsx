@@ -92,7 +92,7 @@ describe('<PreferredDspRedirect>', () => {
     renderRedirect();
 
     expect(replaceMock).toHaveBeenCalledWith(
-      'https://open.spotify.com/album/abc'
+      'https://open.spotify.com/album/abc?utm_source=jovie'
     );
     expect(
       sessionStorage.getItem('jovie:smartlink:auto-redirected:/artist/midnight')
@@ -135,7 +135,7 @@ describe('<PreferredDspRedirect>', () => {
     renderRedirect();
 
     expect(replaceMock).toHaveBeenCalledWith(
-      'https://open.spotify.com/album/abc'
+      'https://open.spotify.com/album/abc?utm_source=jovie'
     );
   });
 
@@ -149,7 +149,19 @@ describe('<PreferredDspRedirect>', () => {
     renderRedirect();
 
     expect(replaceMock).toHaveBeenCalledWith(
-      'https://open.spotify.com/album/abc'
+      'https://open.spotify.com/album/abc?utm_source=jovie'
+    );
+  });
+
+  it('forwards the visit UTM params instead of the Jovie default', () => {
+    const replaceMock = setLocation({
+      search: '?dsp=spotify&utm_source=instagram&utm_campaign=midnight',
+    });
+
+    renderRedirect();
+
+    expect(replaceMock).toHaveBeenCalledWith(
+      'https://open.spotify.com/album/abc?utm_source=instagram&utm_campaign=midnight'
     );
   });
 
@@ -199,7 +211,7 @@ describe('<PreferredDspRedirect>', () => {
     renderRedirect();
 
     expect(replaceMock).toHaveBeenCalledWith(
-      'https://music.apple.com/album/abc'
+      'https://music.apple.com/album/abc?utm_source=jovie'
     );
   });
 });

@@ -14,6 +14,20 @@ import { load as parseYaml } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as realGhHarness from '../../../../../scripts/lib/real-gh-harness.mjs';
 
+// gh-api-hold.sh and the deferred-record step read `date +%s`. Node's
+// Date.now() moves under shift-clock.mjs and the shell clock does not, so
+// a reset that is "30s ago" in the test becomes a day in the future for bash.
+function shellEpochSeconds(): number {
+  const result = spawnSync('date', ['+%s'], { encoding: 'utf8' });
+  const epoch = Number(String(result.stdout).trim());
+  if (result.status !== 0 || !Number.isSafeInteger(epoch)) {
+    throw new Error(
+      `date +%s failed: ${result.stderr || result.stdout || result.status}`
+    );
+  }
+  return epoch;
+}
+
 const { resolveRealGh, runWithRealGh, storedZip } =
   realGhHarness as unknown as {
     resolveRealGh: () => string | null;
@@ -291,7 +305,7 @@ function routes(world: World) {
               reset:
                 world.quota.resetInSeconds === null
                   ? ''
-                  : Math.floor(Date.now() / 1000) +
+                  : shellEpochSeconds() +
                     (world.quota.resetInSeconds ?? 10_000),
             },
           },
@@ -1214,7 +1228,7 @@ describe.skipIf(!gh)(
             return {
               body: {
                 resources: {
-                  core: { reset: Math.floor(Date.now() / 1000) + 10000 },
+                  core: { reset: shellEpochSeconds() + 10000 },
                 },
               },
             };
@@ -1591,10 +1605,10 @@ describe('iOS TestFlight job graph', () => {
         encoding: 'utf8',
         env: { ...process.env, QUOTA_RESET_EPOCH: epoch },
       });
-    const ready = runWait(String(Math.floor(Date.now() / 1000) - 30));
+    const ready = runWait(String(shellEpochSeconds() - 30));
     expect(ready.status, ready.stderr).toBe(0);
     expect(ready.stdout).toContain('Waiting 0s');
-    const late = runWait(String(Math.floor(Date.now() / 1000) + 10_000));
+    const late = runWait(String(shellEpochSeconds() + 10_000));
     expect(late.status).toBe(1);
     expect(late.stderr).toContain('outside the 3900s retry cap');
     const malformed = runWait('nope');

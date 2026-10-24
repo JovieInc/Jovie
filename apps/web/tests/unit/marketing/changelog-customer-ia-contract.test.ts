@@ -19,7 +19,7 @@ describe('customer changelog IA contract', () => {
 
     expect(page).toContain("What's new in Jovie");
     expect(page).toContain(
-      "title: 'Jovie Changelog: Product Updates & New Features'"
+      "title: documentTitle('Jovie Changelog: Product Updates & New Features')"
     );
     expect(page).not.toContain('What shipped.');
     expect(page.match(/className='changelog-hero__kicker'/g)).toHaveLength(1);

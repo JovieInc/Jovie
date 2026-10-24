@@ -11,14 +11,19 @@ export const CONFLICT_FX_RECEIPT_SCHEMA = 'jovie-conflict-fx/v1';
 export const CONFLICT_FX_COHORT_SCHEMA = 'jovie-conflict-fx-cohort/v1';
 export const CONFLICT_STEERING_EXCEPTION_SCHEMA =
   'jovie-conflict-steering-exception/v1';
-export const CONFLICT_FX_MODEL = 'openai/gpt-5.6-sol';
+export const CONFLICT_FX_MODEL = 'zai/glm-5.3';
 export const CONFLICT_FX_MAX_ATTEMPTS = 2;
 export const CONFLICT_FX_CLAIM_TTL_MS = 20 * 60 * 1000;
 export const CONFLICT_FX_COHORT_TIERS = Object.freeze([2, 10, 40]);
 export const CONFLICT_FX_COHORT_MARKER_PREFIX = 'jovie-conflict-fx-cohort:v1:';
 export const CONFLICT_PERMISSION_EXCEPTION_SCHEMA =
   'jovie-conflict-permission-exception/v1';
-export const CONFLICT_FX_TRUSTED_ACTORS = Object.freeze(['jovie-bot[bot]']);
+export const CONFLICT_FX_TRUSTED_ACTORS = Object.freeze([
+  'jovie-bot[bot]',
+  'jovie-ci-lane[bot]',
+  'jovie-symphony-lane[bot]',
+  'jovie-agents-lane[bot]',
+]);
 export const CONFLICT_FX_MAX_HEALTHY_CI_LATENCY_MS = 12 * 60 * 1000;
 export const CONFLICT_FX_MAX_CI_LATENCY_REGRESSION_RATIO = 1.5;
 export const CONFLICT_FX_COHORT_REPOSITORY_READ_LIMIT = 1000;

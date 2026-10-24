@@ -203,11 +203,11 @@ describe('MarketingHeader', () => {
     ).toHaveLength(0);
   });
 
-  it('uses the one Find yourself CTA on the homepage header (JOV-5085)', () => {
+  it('uses the one claim CTA on the homepage header (JOV-5085)', () => {
     mockUsePathname.mockReturnValue('/');
     render(<MarketingHeader />);
 
-    const ctas = screen.getAllByRole('link', { name: 'Find yourself' });
+    const ctas = screen.getAllByRole('link', { name: 'Claim your profile' });
     expect(ctas.length).toBeGreaterThanOrEqual(1);
     for (const cta of ctas) {
       expect(cta).toHaveAttribute('href', '/start');
@@ -259,10 +259,9 @@ describe('MarketingHeader', () => {
       'href',
       '/product'
     );
-    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
-      'href',
-      '/start'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Claim your profile' })
+    ).toHaveAttribute('href', '/start');
   });
 
   it('docks with no glass at the top and fades it in once the sentinel scrolls away', () => {

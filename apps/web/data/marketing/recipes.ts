@@ -15,7 +15,8 @@
  * Post-charter stubs per ARCHITECTURE.md §15: newsletter-signup (JOV-4067).
  */
 
-import { HOMEPAGE_IDENTITY_COPY } from '../homepageIdentityCopy';
+import { HOMEPAGE_COPY } from '../homepageCopy';
+import { HOMEPAGE_FAN_STATES_COPY } from '../homepageFanStatesCopy';
 import type { MarketingAudience, MarketingSectionId } from './sections';
 
 export type RecipeId =
@@ -162,62 +163,64 @@ export interface MarketingRecipe {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
-  // ── homepage (proven — selected company-level identity route: /) ─────────
+  // ── homepage (proven — reference: /) ─────────────────────────────────────
+  // EVENT 2026-10-20 (Tim): the homepage sells the artist profile. Company
+  // metadata and structured data stay general; the page body does not.
   {
     id: 'homepage',
     label: 'Homepage',
     status: 'proven',
     referenceRoute: '/', // /new is a retired redirect, not a rendered reference
     audience: 'general',
-    // The selected identity homepage owns presence and structure as distinct
-    // editorial occurrences. Available FAQ/proof copy does not mount a section.
-    sectionOrder: ['hero', 'feature-split', 'feature-split', 'cta'],
+    // Claim + live profile, three real fan states, then the free offer with
+    // the same claim. Prices and plan terms come from offer truth only.
+    sectionOrder: ['hero', 'product-gallery', 'cta'],
     arc: [
       {
         beat: 'promise',
-        feeling: HOMEPAGE_IDENTITY_COPY.hero.headline,
+        feeling: HOMEPAGE_COPY.hero.headline,
         section: 'hero',
       },
       {
-        beat: 'comprehension',
-        feeling: HOMEPAGE_IDENTITY_COPY.sections[0].headline,
-        section: 'feature-split',
-      },
-      {
-        beat: 'depth',
-        feeling: HOMEPAGE_IDENTITY_COPY.sections[1].headline,
-        section: 'feature-split',
+        beat: 'proof',
+        feeling: HOMEPAGE_FAN_STATES_COPY.headline,
+        section: 'product-gallery',
       },
       {
         beat: 'action',
-        feeling: HOMEPAGE_IDENTITY_COPY.close.headline,
+        feeling: HOMEPAGE_COPY.offer.headline,
         section: 'cta',
       },
     ],
     hierarchy: {
-      oneBigIdea: HOMEPAGE_IDENTITY_COPY.hero.subhead,
+      oneBigIdea: HOMEPAGE_COPY.hero.subhead,
       seeFirst: 'hero',
-      second: 'feature-split',
-      third: 'feature-split',
+      second: 'product-gallery',
+      third: 'cta',
       emphasisBudget: {
         maxDisplayScaleMoments: 1,
         maxFullBleedBreaks: 1,
         maxHeroWeightProofElements: 1,
       },
       aboveTheFoldContract: {
-        desktop: ['hero'], // identity hero carries headline + claim action + real profile proof
+        desktop: ['hero'], // headline + claim + the live profile capture
         mobile: ['hero'],
       },
     },
     ctaCadence: {
       strategy: 'sparse',
-      primaryLabel: HOMEPAGE_IDENTITY_COPY.hero.claim.action,
+      primaryLabel: HOMEPAGE_COPY.hero.claim.action,
       cadence: 'hero-and-close',
     },
     fallbacks: [
       {
         missing: 'logo-cloud verified logos',
         fallback: 'omit section logo-cloud (zero-proof path)',
+      },
+      {
+        missing: 'a public paid artist-profile offer in offer truth',
+        fallback:
+          'state the free offer only and link to /pricing (JOV-8368 owns the paid pilot)',
       },
     ],
     minContent: [
@@ -230,7 +233,6 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     chooseWhen:
       'traffic=home OR (audience=general AND intent=category AND conversion=start)',
     neverUse: [
-      'For audience=artist specifically (use artist-lp recipe — the arc differs)',
       'As a feature page (use feature recipe — narrower scope, deeper demo)',
     ],
   },

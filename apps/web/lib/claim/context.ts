@@ -2,6 +2,7 @@ import 'server-only';
 
 import crypto from 'node:crypto';
 import { cookies } from 'next/headers';
+import type { NextResponse } from 'next/server';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { trackServerEvent } from '@/lib/server-analytics';
@@ -88,6 +89,33 @@ function createPendingClaimContext(
   };
 }
 
+function pendingClaimCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: isSecureEnv(),
+    sameSite: 'lax' as const,
+    path: '/',
+    maxAge: Math.floor(PENDING_CLAIM_TTL_MS / 1000),
+  };
+}
+
+/**
+ * `cookies().set` does not always land on a `NextResponse.redirect` the route
+ * builds itself. The claim CTA then arrives without the pending cookie and
+ * the protected fixture sends the browser home.
+ */
+export function applyPendingClaimCookie(
+  response: NextResponse,
+  context: PendingClaimContext
+): NextResponse {
+  response.cookies.set(
+    PENDING_CLAIM_COOKIE,
+    serializePendingClaim(context),
+    pendingClaimCookieOptions()
+  );
+  return response;
+}
+
 export async function writePendingClaimContext(input: {
   mode: ClaimEntryMode;
   creatorProfileId: string;
@@ -99,13 +127,11 @@ export async function writePendingClaimContext(input: {
   const context = createPendingClaimContext(input);
   const cookieStore = await cookies();
 
-  cookieStore.set(PENDING_CLAIM_COOKIE, serializePendingClaim(context), {
-    httpOnly: true,
-    secure: isSecureEnv(),
-    sameSite: 'lax',
-    path: '/',
-    maxAge: Math.floor(PENDING_CLAIM_TTL_MS / 1000),
-  });
+  cookieStore.set(
+    PENDING_CLAIM_COOKIE,
+    serializePendingClaim(context),
+    pendingClaimCookieOptions()
+  );
 
   // Canonical unique-profile claim_started: durable server event independent
   // of client telemetry. This intentionally measures the first recorded claim

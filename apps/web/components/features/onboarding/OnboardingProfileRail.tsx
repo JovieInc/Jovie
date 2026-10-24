@@ -381,71 +381,78 @@ export function OnboardingProfileRail({
           isInline ? 'px-0 py-2' : 'lg:w-95 lg:px-4 lg:py-4'
         )}
       >
-        <ProfilePreviewBento
-          phoneContent={
-            draft?.activeRole && draft.activeRole !== 'artist' && source ? (
-              <div
-                className='h-full overflow-y-auto bg-surface-1 px-4 pb-6 pt-19'
-                data-testid='onboarding-source-preview'
+        <div className='flex min-h-0 w-full flex-col items-center'>
+          <ProfilePreviewBento
+            phoneContent={
+              draft?.activeRole && draft.activeRole !== 'artist' && source ? (
+                <div
+                  className='h-full overflow-y-auto bg-surface-1 px-4 pb-6 pt-19'
+                  data-testid='onboarding-source-preview'
+                >
+                  <ProfileIdentityHeader
+                    name={previewArtist.name}
+                    handle={previewArtist.handle}
+                    imageUrl={null}
+                    profileHref={source.url}
+                    listenHref={source.url}
+                    hasListenDestination={false}
+                    headingAs='p'
+                  />
+                  <p className='my-4 line-clamp-4 text-app text-secondary-token'>
+                    {draft.outcome ?? 'Profile draft'}
+                  </p>
+                  <Button asChild variant='secondary'>
+                    <a
+                      href={source.url}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    >
+                      {sourceLabels[draft.activeRole]}
+                    </a>
+                  </Button>
+                </div>
+              ) : undefined
+            }
+            artist={previewArtist}
+            socialLinks={previewLinks}
+            genres={previewArtist.genres}
+            profileHref={profileHref}
+            // Onboarding previews the cold-visitor experience, never owner controls.
+            isSubscribed={false}
+            // Never show Live — ownership is unverified during onboarding.
+            showLiveBadge={false}
+            dataTestId='onboarding-profile-bento'
+            phonePreviewTestId='onboarding-phone-preview'
+            surfaceTestId='onboarding-profile-compact-surface'
+            className={cn('w-full', isInline ? 'max-w-86' : 'h-full max-w-87')}
+            heroClassName={cn(
+              'w-full rounded-3xl',
+              isInline ? 'min-h-114 p-4' : 'min-h-0 max-h-170 p-5'
+            )}
+            // Width only: the screen keeps its 402:874 aspect, so a fixed frame
+            // height let it overflow the frame (JOV-7192).
+            phoneFrameClassName={isInline ? 'w-50 sm:w-57' : 'w-71'}
+            topRight={
+              <span
+                className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/50 px-2.5 text-3xs font-semibold uppercase tracking-wider text-white backdrop-blur-md dark:text-white'
+                data-testid='onboarding-profile-preview-badge'
               >
-                <ProfileIdentityHeader
-                  name={previewArtist.name}
-                  handle={previewArtist.handle}
-                  imageUrl={null}
-                  profileHref={source.url}
-                  listenHref={source.url}
-                  hasListenDestination={false}
-                  headingAs='p'
-                />
-                <p className='my-4 line-clamp-4 text-app text-secondary-token'>
-                  {draft.outcome ?? 'Profile draft'}
-                </p>
-                <Button asChild variant='secondary'>
-                  <a
-                    href={source.url}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                  >
-                    {sourceLabels[draft.activeRole]}
-                  </a>
-                </Button>
-              </div>
-            ) : undefined
-          }
-          artist={previewArtist}
-          socialLinks={previewLinks}
-          genres={previewArtist.genres}
-          profileHref={profileHref}
-          // Onboarding previews the cold-visitor experience, never owner controls.
-          isSubscribed={false}
-          // Never show Live — ownership is unverified during onboarding.
-          showLiveBadge={false}
-          dataTestId='onboarding-profile-bento'
-          phonePreviewTestId='onboarding-phone-preview'
-          surfaceTestId='onboarding-profile-compact-surface'
-          className={cn('w-full', isInline ? 'max-w-86' : 'h-full max-w-87')}
-          heroClassName={cn(
-            'w-full rounded-3xl',
-            isInline ? 'min-h-114 p-4' : 'min-h-0 max-h-170 p-5'
-          )}
-          // Width only: the screen keeps its 402:874 aspect, so a fixed frame
-          // height let it overflow the frame (JOV-7192).
-          phoneFrameClassName={isInline ? 'w-50 sm:w-57' : 'w-71'}
-          topRight={
-            <span
-              className='inline-flex h-6 items-center rounded-full border border-white/12 bg-black/50 px-2.5 text-3xs font-semibold uppercase tracking-wider text-white backdrop-blur-md dark:text-white'
-              data-testid='onboarding-profile-preview-badge'
-            >
-              Preview
-            </span>
-          }
-          caption={
-            state.profileDraft?.activeRole
-              ? `Draft · ${state.profileDraft.activeRole} · ${state.profileDraft.awaiting === 'review' ? 'Review' : 'In progress'}`
-              : 'Preview — not claimed yet'
-          }
-          overlay={<DspMatchStrip matches={dspMatches} />}
-        />
+                Preview
+              </span>
+            }
+            caption={
+              state.profileDraft?.activeRole
+                ? `Draft · ${state.profileDraft.activeRole} · ${state.profileDraft.awaiting === 'review' ? 'Review' : 'In progress'}`
+                : 'Preview — not claimed yet'
+            }
+            overlay={<DspMatchStrip matches={dspMatches} />}
+          />
+          {previewArtist.tagline ? (
+            <p className='px-4 pt-2 text-center text-xs text-secondary-token'>
+              {previewArtist.tagline}
+            </p>
+          ) : null}
+        </div>
       </div>
     </aside>
   );

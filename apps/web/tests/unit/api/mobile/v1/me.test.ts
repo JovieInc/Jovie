@@ -78,7 +78,7 @@ const JOVIE_WORKSPACE = {
 const OVIE_WORKSPACE = {
   id: 'ov',
   label: 'OV',
-  href: APP_ROUTES.ADMIN_CHAT,
+  href: APP_ROUTES.OV,
   brandVariant: 'ov',
   role: 'secondary',
   access: 'admin',
