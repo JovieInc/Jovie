@@ -13,6 +13,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import type {
   ProfileMode,
@@ -345,6 +346,7 @@ export function ProfileCompactSurface({
   dataTestId,
   hideBackButton = false,
   allowSignedInEscape = false,
+  hideJovieBranding = false,
   hideMoreMenu = false,
   headerSocialLinksOverride,
   renderInteractiveOverlays = true,
@@ -863,6 +865,22 @@ export function ProfileCompactSurface({
                 modeCardAccents={modeCardAccents}
               />
             )}
+            {!hideJovieBranding && renderMode !== 'preview' ? (
+              /* JOV-8777: free public profiles carry the Jovie mark so the
+                 free tier has real branding for the paid removal upgrade to
+                 take away. Opt-outs (previews, demos) pass hideJovieBranding. */
+              <div
+                className='flex justify-center pb-4 pt-2'
+                data-testid='profile-jovie-branding'
+              >
+                <FooterBranding
+                  artistHandle={artist.handle}
+                  variant='linear'
+                  showCTA={false}
+                  size='sm'
+                />
+              </div>
+            ) : null}
           </div>
         </div>
 

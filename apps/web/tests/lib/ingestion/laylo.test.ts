@@ -1,11 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   extractLaylo,
   extractLayloHandle,
+  fetchLayloProfile,
   isLayloUrl,
   normalizeLayloHandle,
   validateLayloUrl,
 } from '@/lib/ingestion/strategies/laylo';
+
+const jsonResponse = (body: unknown): Response =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
 
 const getHostname = (value: string): string | null => {
   try {
@@ -16,6 +23,8 @@ const getHostname = (value: string): string | null => {
 };
 
 describe('Laylo strategy', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it('validates laylo profile URLs', () => {
     expect(isLayloUrl('https://laylo.com/mochakk')).toBe(true);
     expect(validateLayloUrl('https://www.laylo.com/MochaKK')).toBe(
@@ -61,6 +70,40 @@ describe('Laylo strategy', () => {
       expect(
         link.evidence?.signals?.some(signal => signal.includes('laylo'))
       ).toBe(true);
+    });
+  });
+
+  it('fetches profile and user JSON from Laylo CloudFront hosts', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        jsonResponse({ user: { id: 'user123', username: 'artist' } })
+      )
+      .mockResolvedValueOnce(jsonResponse({ displayName: 'Artist' }));
+
+    const result = await fetchLayloProfile('Artist');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://d21i0hc4hl3bvt.cloudfront.net/artist/profile.json'
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      'https://d3oyaxbt9vo0fg.cloudfront.net/users/user123.json'
+    );
+    expect(result.profile.user?.id).toBe('user123');
+    expect(result.user?.displayName).toBe('Artist');
+  });
+
+  it('still rejects redirects to hosts outside the Laylo fetch allowlist', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: 'https://evil.example.com/profile.json' },
+      })
+    );
+
+    await expect(fetchLayloProfile('artist')).rejects.toMatchObject({
+      code: 'INVALID_HOST',
     });
   });
 });
