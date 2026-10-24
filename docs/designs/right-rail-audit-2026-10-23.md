@@ -35,8 +35,9 @@ Relevant locks/contracts:
   [UI owner contracts](../../.claude/rules/ui.md#interaction-quality-contract).
 - Pen `RosMb` is mapped to `component.entity-sidebar`; the source registry marks
   it reference-ineligible pending D6. This audit does not claim Pen parity.
-- App sidebar/homepage, auth, canonical palette, CI and ratchet files are outside
-  the edit boundary. The latest task specifies Noir Ion: Ion `#3FAFF3`, Ultra
+- App sidebar/homepage, auth, canonical palette and CI are outside the edit
+  boundary. The sole ratchet change locks in the measured spacing reduction;
+  its detector and armed state are preserved. The latest task specifies Noir Ion: Ion `#3FAFF3`, Ultra
   `#A789F0`, Pulse `#EB6AC6`, no orange. Consume semantic tokens, never local hex.
 
 ## Inventory and findings
@@ -227,3 +228,7 @@ behaviors; full keyboard convergence remains in the tracked follow-up.
 The first hosted Source Validation run (40060664435) passed 220 disk-read tests and failed the unchanged spacing ratchet: measured 588 versus floor 590. The same local test reproduced 1 failed / 7 passed before metadata repair. This PR lowers only the conservative count to 588, web-shell to 242, web-other to 289, and the two affected utility totals; it preserves the detector, armed state and strict tier. DESIGN's count projection and its single section hash are synchronized. This strengthens the [existing shrink-only contract](../../apps/web/tests/unit/design-system/spacing-scale-ratchet.test.ts).
 
 After repair, `spacing-scale-ratchet.test.ts` plus `enforcement-documentation.test.ts` pass all 18 tests; `node --test scripts/agent-context/check.test.mjs` passes all 26 tests, including section preservation. The product/helper executable source is unchanged by this metadata correction.
+
+### Test-fixture typecheck correction
+
+The second hosted Source Validation run (40061163547) passed the spacing/source-read and script-contract guards, then test typecheck found 20 TS2741 errors in the release interaction fixture against its existing 19-error floor. Assumption: the new regression added a use of the legacy fixture missing required `status`. The falsifying command `pnpm --filter @jovie/web run typecheck:tests` reproduced that exact growth before the repair. The new regression now reuses the file's existing complete `mockReleaseWithStatus` fixture. All assertions are unchanged; all 22 release interaction tests pass. The exact test typecheck passes with the same 661 baselined errors and no new errors; no typecheck baseline changed.

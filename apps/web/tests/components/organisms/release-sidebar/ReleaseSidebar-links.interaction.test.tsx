@@ -669,7 +669,9 @@ describe('ReleaseSidebar inspector cards', () => {
   });
 
   it('gives details one child-owned scroll region below pinned tabs', () => {
-    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+    render(
+      <ReleaseSidebar release={mockReleaseWithStatus} {...defaultProps} />
+    );
     expect(screen.getByTestId('release-sidebar')).toHaveAttribute(
       'data-scroll-strategy',
       'child'
