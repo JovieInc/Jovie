@@ -2002,3 +2002,98 @@ test('auth handoff uses compact outer bounds and stays inside the active work ar
   );
   assert.doesNotMatch(mainSource, /const AUTH_HANDOFF_WINDOW_BOUNDS/);
 });
+
+test('View Toggle Sidebar sends one command through the real preload and unsubscribes', async t => {
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const menuSource = source.slice(
+    source.indexOf('function buildViewMenu()'),
+    source.indexOf('function buildApplicationMenu()')
+  );
+  const listeners = new Map();
+  let api;
+  runInNewContext(await readBundledPreload(t), {
+    exports: {},
+    process: { platform: 'darwin', versions: { electron: '44' } },
+    document: { documentElement: { dataset: {} } },
+    require(id) {
+      assert.equal(id, 'electron');
+      return {
+        contextBridge: {
+          exposeInMainWorld(name, value) {
+            if (name === 'electronAPI') api = value;
+          },
+        },
+        ipcRenderer: {
+          on: (channel, listener) => listeners.set(channel, listener),
+          removeListener: (channel, listener) => {
+            assert.equal(listeners.get(channel), listener);
+            listeners.delete(channel);
+          },
+        },
+      };
+    },
+  });
+  let toggles = 0;
+  const unsubscribe = api.onToggleSidebar(() => toggles++);
+  let destroyed = false;
+  const context = {
+    ENABLE_DEVTOOLS: false,
+    mainWindow: {
+      isDestroyed: () => destroyed,
+      webContents: { send: channel => listeners.get(channel)?.() },
+    },
+  };
+  const compiled = ts.transpileModule(menuSource, {}).outputText;
+  const menu = runInNewContext(`${compiled}\nbuildViewMenu()`, context);
+  const toggle = menu.find(item => item.label === 'Toggle Sidebar');
+  assert.equal(toggle.accelerator, 'CommandOrControl+B');
+  toggle.click();
+  assert.equal(toggles, 1);
+  destroyed = true;
+  toggle.click();
+  assert.equal(toggles, 1);
+  context.mainWindow = null;
+  toggle.click();
+  assert.equal(toggles, 1);
+  unsubscribe();
+  assert.equal(listeners.size, 0);
+});
+
+test('Cmd+B reaches the renderer policy without consuming editor input or other menu accelerators', async () => {
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  assert.match(source, /mainWindow = win;\s+configureSidebarShortcut\(win\);/);
+  const policySource = source.slice(
+    source.indexOf('function configureSidebarShortcut('),
+    source.indexOf('function buildViewMenu()')
+  );
+  let beforeInput;
+  const ignored = [];
+  const win = {
+    webContents: {
+      on: (event, listener) => {
+        assert.equal(event, 'before-input-event');
+        beforeInput = listener;
+      },
+      setIgnoreMenuShortcuts: value => ignored.push(value),
+    },
+  };
+  const compiled = ts.transpileModule(policySource, {}).outputText;
+  runInNewContext(`${compiled}\nconfigureSidebarShortcut(win)`, { win });
+  const input = {
+    key: 'b',
+    meta: true,
+    control: false,
+    alt: false,
+    shift: false,
+  };
+  const event = {
+    preventDefault: () => assert.fail('must preserve editor key input'),
+  };
+  beforeInput(event, input);
+  beforeInput(event, { ...input, meta: false, control: true, key: 'B' });
+  beforeInput(event, { ...input, key: 'c' });
+  beforeInput(event, { ...input, shift: true });
+  beforeInput(event, { ...input, alt: true });
+  beforeInput(event, { ...input, meta: false });
+  assert.deepEqual(ignored, [true, true, false, false, false, false]);
+});

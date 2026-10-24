@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { onDesktopToggleSidebar } from '@/lib/desktop/electron-bridge';
 import { isShellShortcutSuppressed } from '@/lib/utils/keyboard';
 
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
@@ -47,8 +48,12 @@ export function useSidebarKeyboardShortcut(
       }
     };
 
+    const unsubscribe = onDesktopToggleSidebar(() => handlerRef.current());
     globalThis.addEventListener('keydown', handleKeyDown);
-    return () => globalThis.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      unsubscribe();
+      globalThis.removeEventListener('keydown', handleKeyDown);
+    };
   }, [shortcutKey]);
 }
 

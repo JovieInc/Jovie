@@ -127,6 +127,8 @@ export interface ElectronAPI {
     state: string;
     unreadCount?: number;
   }) => Promise<{ ok: boolean; reason?: string }>;
+  /** Subscribe to the native View > Toggle Sidebar command. */
+  readonly onToggleSidebar?: (cb: () => void) => () => void;
   /**
    * Subscribe to tray quick-action events from the main process.
    * Returns an unsubscribe function.
@@ -1056,4 +1058,10 @@ export const __testing = {
 /** A public-route recovery must discard Next's intercepted marketing background. */
 export function recoverApplicationDocument(path: string): void {
   globalThis.location.replace(path);
+}
+
+/** Native View menu and keyboard accelerator share the mounted sidebar action. */
+export function onDesktopToggleSidebar(cb: () => void): () => void {
+  const subscribe = getRawElectronAPI()?.onToggleSidebar;
+  return typeof subscribe === 'function' ? subscribe(cb) : noopUnsubscribe;
 }
