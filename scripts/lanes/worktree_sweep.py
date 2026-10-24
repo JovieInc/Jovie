@@ -70,7 +70,7 @@ def default_roots(home: Path, state: Path) -> list[Path]:
             home / "jovie-worktrees", home / "worktrees", home / "LogYourBody-wt",
             home / "jovie-wt-*", Path("/private/tmp/claude-501"), Path("/private/tmp/jovie-*"),
             home / "codex-worktrees", home / "grok-wt", home / "grok-ship-workspaces",
-            home / "codex-ship-workspaces", home / "wt-*"]
+            home / "codex-ship-workspaces", home / "wt-*", Path("/srv/worktrees/codex-worktrees")]
 
 
 def default_never(home: Path) -> list[Path]:
@@ -448,7 +448,7 @@ STATE_REF_MAX_BYTES = 8 * 1024 * 1024
 
 def standalone_globs(home: Path, state: Path) -> list[tuple[Path, str]]:
     return [(home, "grok-ship-workspaces/*/*"), (home, "codex-ship-workspaces/*/*"), (home, "grok-wt/*"),
-            (home, "codex-worktrees/*"), (home, "wt-*"), (state, "bindings/*/worktrees/*"),
+            (home, "codex-worktrees/*"), (home, "wt-*"), (Path("/srv/worktrees"), "codex-worktrees/*"), (state, "bindings/*/worktrees/*"),
             (state, "runs/owner-*/checkout")]
 
 
