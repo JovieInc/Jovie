@@ -1,9 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback } from 'react';
+import { Modal } from '@/components/molecules/Modal';
 import { APP_ROUTES } from '@/constants/routes';
-import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
 import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 
@@ -75,7 +75,6 @@ export function AuthModalShell({
     backDestination
   );
   const router = useRouter();
-  const dialogRef = useRef<HTMLDialogElement>(null);
   // Escape and backdrop are modal-DISMISSAL: pop the intercepted route via
   // history. They must never navigate somewhere unrelated, so they do not
   // use the destination path.
@@ -97,50 +96,18 @@ export function AuthModalShell({
     dismiss();
   }, [dismiss, resolvedBackDestination]);
 
-  useModalFocusBoundary(dialogRef, true, {
-    lockScroll: true,
-    onDismiss: dismiss,
-  });
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (!dialog.open) dialog.showModal();
-  }, []);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const onCancel = (event: Event) => {
-      event.preventDefault();
-      dismiss();
-    };
-    dialog.addEventListener('cancel', onCancel);
-    return () => dialog.removeEventListener('cancel', onCancel);
-  }, [dismiss]);
-
-  const onBackdropMouseDown = useCallback(
-    (event: React.MouseEvent<HTMLDialogElement>) => {
-      if (event.target === dialogRef.current) dismiss();
-    },
-    [dismiss]
-  );
-
-  // A fixed dialog with inset-0 and height:auto stretches to its max-height.
-  // Fit the desktop panel to its contents before auto margins center it.
   return (
-    <dialog
-      ref={dialogRef}
+    <Modal
+      onDismiss={dismiss}
       aria-label={ariaLabel}
       aria-modal='true'
       data-auth-modal-shell
       data-auth-shell-kind={AUTH_SHELL_KIND.interceptedModal}
-      onMouseDown={onBackdropMouseDown}
-      className='jovie-auth-modal fixed inset-0 m-0 h-dvh max-h-dvh w-[100dvw] max-w-none overflow-y-auto overscroll-contain rounded-none border-0 bg-base p-0 text-primary-token shadow-none backdrop:bg-black/70 backdrop:backdrop-blur-sm sm:m-auto sm:h-fit sm:max-h-[min(600px,calc(100svh-32px))] sm:w-[min(calc(100vw-32px),420px)] sm:rounded-[2rem] sm:border sm:border-white/[0.08] sm:bg-(--color-bg-base)/96 sm:p-4 sm:shadow-[0_36px_100px_rgba(0,0,0,0.5)]'
+      className='jovie-auth-modal'
     >
       <div
         data-auth-modal-body
-        className='flex min-h-dvh flex-col bg-transparent pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(1rem,env(safe-area-inset-top))] sm:min-h-0 sm:rounded-[1.6rem] sm:px-4 sm:py-4'
+        className='flex min-h-dvh flex-col bg-transparent pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(1rem,env(safe-area-inset-top))] sm:min-h-0 sm:px-4 sm:py-4'
       >
         <div className='mb-5 flex min-w-0 flex-col items-start gap-3 sm:mb-6'>
           <button
@@ -152,7 +119,7 @@ export function AuthModalShell({
             {resolvedBackButtonLabel}
           </button>
           {statusRow ? (
-            <div className='min-w-0 text-xs leading-[1.45] tracking-[-0.01em] text-white/54'>
+            <div className='min-w-0 text-xs leading-[1.45] tracking-[-0.01em] text-secondary-token'>
               {statusRow}
             </div>
           ) : null}
@@ -162,6 +129,6 @@ export function AuthModalShell({
           {children}
         </div>
       </div>
-    </dialog>
+    </Modal>
   );
 }
