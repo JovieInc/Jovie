@@ -23,7 +23,7 @@ import {
 } from './loader';
 
 export const metadata: Metadata = {
-  title: 'Share Studio | Admin',
+  title: 'Share studio | Admin',
 };
 
 export const runtime = 'nodejs';
@@ -308,7 +308,7 @@ export default async function AdminShareStudioPage({
   const params = await searchParams;
   return (
     <AdminPage
-      title='Share Studio'
+      title='Share studio'
       description='Preview public share payloads, download story assets, and inspect tracked-link outputs across all public surfaces.'
       testId='admin-share-studio-page'
     >

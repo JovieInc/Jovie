@@ -57,8 +57,8 @@ function prStatusTone(
 function prListSummary(
   snapshot: OvieMacHudSnapshot['inFlightPullRequests']
 ): string {
-  if (snapshot.availability === 'not_configured') return 'No GitHub Signal';
-  if (snapshot.availability === 'error') return 'Signal Error';
+  if (snapshot.availability === 'not_configured') return 'No GitHub signal';
+  if (snapshot.availability === 'error') return 'Signal error';
   if (snapshot.totalOpen === 0) return '0 Open';
   const visible = snapshot.items.length.toLocaleString('en-US');
   const total = snapshot.totalOpen.toLocaleString('en-US');
@@ -242,9 +242,10 @@ export function OvieMacHud({
               size='sm'
               className='min-w-fit gap-1.5'
             >
-              <Link href={APP_ROUTES.ADMIN_CHAT} aria-label='Talk To Summer'>
+              {/* ui-casing-allow: Summer is the agent's proper name. */}
+              <Link href={APP_ROUTES.ADMIN_CHAT} aria-label='Talk to Summer'>
                 <MessageCircle className='h-4 w-4' aria-hidden='true' />
-                Talk To Summer
+                Talk to Summer
               </Link>
             </Button>
             <HudStatusPill
@@ -267,7 +268,7 @@ export function OvieMacHud({
             <div className='grid gap-3 md:grid-cols-3 xl:col-span-3'>
               <ContentMetricCard
                 className='h-full'
-                label='Default Alive'
+                label='Default alive'
                 value={status}
                 valueClassName={VALUE_CLASS}
                 subtitleClassName='min-h-52'
@@ -280,11 +281,11 @@ export function OvieMacHud({
                       value={formatUsd(alive.cashUsd)}
                     />
                     <ContentMetricRow
-                      label='Weekly Burn'
+                      label='Weekly burn'
                       value={formatUsd(alive.weeklyBurnUsd)}
                     />
                     <ContentMetricRow
-                      label='Weekly Revenue'
+                      label='Weekly revenue'
                       value={formatUsd(alive.weeklyRevenueUsd)}
                     />
                     <p>{alive.detail}</p>
@@ -293,7 +294,7 @@ export function OvieMacHud({
               />
               <ContentMetricCard
                 className='h-full'
-                label='Week-over-week Growth'
+                label='Week-over-week growth'
                 value={growthValue}
                 valueClassName={VALUE_CLASS}
                 subtitleClassName='min-h-52'
@@ -303,7 +304,7 @@ export function OvieMacHud({
                   <div className='grid gap-1.5'>
                     <ContentMetricRow
                       label={
-                        growth.source === 'revenue' ? 'Revenue' : 'Active Users'
+                        growth.source === 'revenue' ? 'Revenue' : 'Active users'
                       }
                       value={
                         growth.source === 'revenue'
@@ -317,7 +318,7 @@ export function OvieMacHud({
               />
               <ContentMetricCard
                 className='h-full'
-                label='Shipping Throughput'
+                label='Shipping throughput'
                 value={shippingValue}
                 valueClassName={VALUE_CLASS}
                 subtitleClassName='min-h-52'

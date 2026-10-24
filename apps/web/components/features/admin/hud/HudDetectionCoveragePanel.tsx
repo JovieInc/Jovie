@@ -63,12 +63,12 @@ export function HudDetectionCoveragePanel({
       <div className='space-y-3 p-3'>
         <div className='grid gap-3 sm:grid-cols-3'>
           <Metric
-            label='Detector Coverage'
+            label='Detector coverage'
             value={`${snapshot.covered} / ${snapshot.total}`}
             detail='Red + control + live firing required'
           />
           <Metric
-            label='Founder Rescue Rate'
+            label='Founder rescue rate'
             value={formatRate(snapshot.founderRescueRate)}
             detail={trendCopy(
               snapshot.founderRescueTrend,
@@ -76,7 +76,7 @@ export function HudDetectionCoveragePanel({
             )}
           />
           <Metric
-            label='Median Failure → Detection'
+            label='Median failure → detection'
             value={formatMinutes(snapshot.medianDetectionMinutes)}
             detail={trendCopy(
               snapshot.medianDetectionTrend,
@@ -87,7 +87,7 @@ export function HudDetectionCoveragePanel({
 
         <div className='border-t border-subtle pt-3'>
           <p className='text-2xs font-medium text-tertiary-token'>
-            Next Highest-Value Capability
+            Next highest-value capability
           </p>
           {next ? (
             <>
@@ -113,7 +113,7 @@ export function HudDetectionCoveragePanel({
         <div className='grid gap-3 border-t border-subtle pt-3 md:grid-cols-2'>
           <div>
             <p className='text-2xs font-medium text-tertiary-token'>
-              Recent Blind Spots
+              Recent blind spots
             </p>
             <ul className='mt-2 space-y-2'>
               {snapshot.blindSpots.map(item => (
@@ -130,7 +130,7 @@ export function HudDetectionCoveragePanel({
           </div>
           <div>
             <p className='text-2xs font-medium text-tertiary-token'>
-              Recent Founder Rescues
+              Recent founder rescues
             </p>
             <ul className='mt-2 space-y-2'>
               {snapshot.recentFounderRescues.map(item => (

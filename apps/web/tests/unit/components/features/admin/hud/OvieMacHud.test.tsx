@@ -110,7 +110,7 @@ describe('OvieMacHud', () => {
       'Taste Inbox'
     );
     expect(
-      screen.getByRole('link', { name: 'Talk To Summer' })
+      screen.getByRole('link', { name: 'Talk to Summer' })
     ).toHaveAttribute('href', '/app/ov/chat');
   });
 
@@ -160,7 +160,7 @@ describe('OvieMacHud', () => {
     );
 
     const panel = screen.getByTestId('ovie-mac-hud-inflight-prs');
-    expect(panel).toHaveTextContent('Signal Error');
+    expect(panel).toHaveTextContent('Signal error');
     expect(panel).toHaveTextContent('GitHub API error (502)');
   });
 });

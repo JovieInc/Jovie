@@ -100,10 +100,10 @@ describe('OperationalTasksPanelView', () => {
     );
 
     expect(mockTaskQuery).toHaveBeenCalledWith(null);
-    expect(screen.getByText('Stale Cache')).toBeInTheDocument();
+    expect(screen.getByText('Stale cache')).toBeInTheDocument();
     expect(
       screen
-        .getByRole('region', { name: 'Operational Tasks' })
+        .getByRole('region', { name: 'Operational tasks' })
         .querySelector('.overflow-y-auto')
     ).toBeNull();
     const inspect = screen.getByRole('button', { name: /Inspect JOV-5544/ });
@@ -135,7 +135,7 @@ describe('OperationalTasksPanelView', () => {
 
   it('uses page scrolling and exposes the full task identity as a link', () => {
     render(<OperationalTasksPanelView feed={feed()} presentation='page' />);
-    const panel = screen.getByRole('region', { name: 'Operational Tasks' });
+    const panel = screen.getByRole('region', { name: 'Operational tasks' });
     expect(panel.querySelector('.overflow-y-auto')).toBeNull();
     expect(panel.className).not.toContain('bg-surface');
     const link = screen.getByRole('link', { name: feed().tasks[0].title });
@@ -188,7 +188,7 @@ describe('OperationalTasksPanelView', () => {
   it('keeps last-known tasks visible and labels them stale after a request error', () => {
     render(<OperationalTasksPanelView feed={feed()} requestState='error' />);
 
-    expect(screen.getByText('Stale Cache')).toBeInTheDocument();
+    expect(screen.getByText('Stale cache')).toBeInTheDocument();
     expect(
       screen.getByText('Cache Symphony workspaces on NVMe')
     ).toBeInTheDocument();
@@ -207,7 +207,7 @@ describe('OperationalTasksPanelView', () => {
       />
     );
 
-    expect(screen.getByText('Sync Failed')).toBeInTheDocument();
+    expect(screen.getByText('Sync failed')).toBeInTheDocument();
     expect(
       screen.getByText(
         'Task cache unavailable. Active tasks are unknown. Retrying automatically.'
@@ -223,7 +223,7 @@ describe('OperationalTasksPanelView', () => {
       />
     );
 
-    expect(screen.getByText('Stale Cache')).toBeInTheDocument();
+    expect(screen.getByText('Stale cache')).toBeInTheDocument();
     expect(
       screen.queryByText('No active operational tasks.')
     ).not.toBeInTheDocument();
@@ -280,7 +280,7 @@ describe('OperationalTasksPanelView', () => {
       expect(rail).toHaveTextContent('devin');
       expect(rail).toHaveTextContent('Failing checks');
       expect(rail).toHaveTextContent('PR Ready');
-      expect(rail).toHaveTextContent('Next Expected Action');
+      expect(rail).toHaveTextContent('Next expected action');
       expect(rail).toHaveTextContent('#42 on GitHub');
       expect(rail).toHaveTextContent('JOV-5544');
     });
@@ -296,7 +296,7 @@ describe('OperationalTasksPanelView', () => {
       ).toHaveAttribute('href', feed().tasks[0].linearUrl);
       expect(
         screen
-          .getByRole('region', { name: 'Operational Tasks' })
+          .getByRole('region', { name: 'Operational tasks' })
           .querySelector('.overflow-y-auto')
       ).toBeNull();
 

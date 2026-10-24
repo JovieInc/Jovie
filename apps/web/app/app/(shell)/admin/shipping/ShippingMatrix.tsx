@@ -289,14 +289,15 @@ function ShippingRowRailContent({ row }: Readonly<{ row: MatrixRow }>) {
         <DrawerPropertyRow label='Queue' value={<QueueCell row={row} />} />
         <DrawerPropertyRow label='Owner' value={row.agent ?? 'UNKNOWN'} />
         <DrawerPropertyRow label='Branch' value={row.branch ?? 'UNKNOWN'} />
+        {/* ui-casing-allow: SHA is an acronym. */}
         <DrawerPropertyRow label='Head SHA' value={headSha} />
         <DrawerPropertyRow label='Opened' value={opened} />
         {row.attempt == null ? null : (
           <DrawerPropertyRow label='Attempt' value={row.attempt} />
         )}
-        <DrawerPropertyRow label='Last Transition' value={lastTransition} />
+        <DrawerPropertyRow label='Last transition' value={lastTransition} />
         <DrawerPropertyRow
-          label='Next Expected Action'
+          label='Next expected action'
           value={nextExpectedAction(row)}
         />
       </DrawerSection>
@@ -314,7 +315,7 @@ function ShippingRowRailContent({ row }: Readonly<{ row: MatrixRow }>) {
       <DrawerSection title='Evidence' sectionKind='links'>
         {row.prUrl ? (
           <DrawerPropertyRow
-            label='Pull Request'
+            label='Pull request'
             value={
               <a
                 href={row.prUrl}
@@ -461,7 +462,7 @@ export function ShippingMatrix() {
               id='shipping-matrix-title'
               className='line-clamp-2 text-app font-semibold text-primary-token'
             >
-              In-flight Work
+              In-flight work
             </h2>
             <p className='truncate text-2xs text-tertiary-token'>
               {matrixSummary(

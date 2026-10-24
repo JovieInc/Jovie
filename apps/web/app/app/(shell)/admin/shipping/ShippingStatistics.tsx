@@ -25,7 +25,7 @@ export function pipelineRows(
     ['Running', 'lanes-status', 'running'],
     ['Retrying', 'lanes-status', 'retrying'],
     ['Blocked', 'lane-pull-requests', 'blocked'],
-    ['Open Pull Requests', 'github-native-merge-queue', 'openPullRequests'],
+    ['Open pull requests', 'github-native-merge-queue', 'openPullRequests'],
     ['Native merge queue', 'github-native-merge-queue', 'queued'],
   ] as const;
   return definitions.map(([label, id, field]) => {
@@ -102,7 +102,7 @@ export function ShippingStatistics() {
             id='shipping-pipeline-title'
             className='text-sm font-semibold text-primary-token line-clamp-2'
           >
-            Current Pipeline
+            Current pipeline
           </h2>
           <Button
             variant='secondary'
@@ -166,7 +166,7 @@ export function ShippingStatistics() {
       </section>
       <section
         className='border-y border-subtle'
-        aria-label='Source Merge History'
+        aria-label='Source merge history'
       >
         <ShippingVelocityChart />
       </section>
@@ -178,7 +178,7 @@ export function ShippingStatistics() {
           id='shipping-runtime-title'
           className='text-sm font-semibold text-primary-token line-clamp-2'
         >
-          Deployment And Runtime
+          Deployment and runtime
         </h2>
         <p>
           Production controller: {meaning('productionVerified')} · Exact live

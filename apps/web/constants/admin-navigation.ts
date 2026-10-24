@@ -169,7 +169,7 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
   },
   {
     id: 'platform_connections',
-    label: 'Platform Connections',
+    label: 'Platform connections',
     href: APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS,
     description: 'Spotify publisher and playlist generation controls',
     section: 'utilities',
@@ -212,7 +212,7 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
   },
   {
     id: 'revenue_lift',
-    label: 'Revenue Lift',
+    label: 'Revenue lift',
     href: APP_ROUTES.ADMIN_REVENUE_LIFT,
     description:
       'IRPAA North Star, KPI tree, cohort lift, multi-agent contribution',
@@ -220,7 +220,7 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
   },
   {
     id: 'share_studio',
-    label: 'Share Studio',
+    label: 'Share studio',
     href: APP_ROUTES.ADMIN_SHARE_STUDIO,
     description: 'Preview story assets, payloads, and tracked share outputs',
     section: 'utilities',
