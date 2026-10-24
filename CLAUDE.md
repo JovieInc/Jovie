@@ -37,6 +37,19 @@ task or permission authority.
   implementation or landing; remove them. Ship external-authority paths disabled
   and track that post-landing action separately.
 
+## Release rings
+
+1. PR preview builds.
+2. `staging.jov.ie` canary on machines, using the same Vercel project and
+   database as production; the release pipeline test stop.
+3. Staff and dogfooders.
+4. Opted-in early-access users, a permanent cohort via dogfooders' `early_access`
+   mode, not a merge flag.
+5. Everyone.
+
+The dedicated Mac staging app is retired; use early-access opt-in in the regular
+app instead.
+
 ## Load context on demand
 
 Read the relevant rule before editing its area. Do not preload docs, skills,
