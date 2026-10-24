@@ -17,6 +17,7 @@ import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { resolveUserState } from '@/lib/auth/gate';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
+import { pendingForUser } from '@/lib/connectors/opportunity-inbox-data';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
@@ -60,7 +61,6 @@ import {
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   type InboxNavigationAvailability,
-  PENDING_SUGGESTED_ACTION_STATUS,
   resolveInboxNavigationAvailability,
   UNKNOWN_INBOX_NAVIGATION_AVAILABILITY,
 } from '@/lib/inbox/navigation-availability';
@@ -527,12 +527,12 @@ async function loadInboxNavigationAvailability(
         tx
           .select({ count: drizzleSql<number>`count(*)` })
           .from(suggestedActions)
-          .where(
-            and(
-              eq(suggestedActions.userId, userId),
-              eq(suggestedActions.status, PENDING_SUGGESTED_ACTION_STATUS)
-            )
-          ),
+          // JOV-8968: the bell must count exactly what the Inbox feed shows.
+          // Reuse the feed's own pending selector (same owner/status filter
+          // plus the creator-inbox source condition) so workflow recordings
+          // and operator-source actions can't light the bell on an Inbox the
+          // creator sees as empty.
+          .where(pendingForUser(userId)),
       'Inbox navigation suggested actions count query',
       { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
     );

@@ -17,6 +17,7 @@ import { buildMobileInbox } from '@/lib/mobile/action-loop-inbox';
 import {
   loadOpportunityInboxData,
   loadOpportunityInboxTourDateSections,
+  pendingForUser,
 } from './opportunity-inbox-data';
 
 vi.mock('@/lib/auth/require-auth', () => ({
@@ -51,6 +52,27 @@ function expectConsumerQuery(call: number) {
     'ovie.%',
   ]);
 }
+
+describe('shared pending-Inbox selector (JOV-8968)', () => {
+  it('carries the creator-inbox source condition the bell count reuses', () => {
+    // The sidebar bell derives its availability from this exact condition —
+    // workflow recordings (Ovie) and operator-source actions must never light
+    // the bell on an Inbox the creator sees as empty.
+    const query = new PgDialect().sqlToQuery(pendingForUser('owner')!);
+    expect(query.sql).toContain('"suggested_actions"."user_id" =');
+    expect(query.sql).toContain('"suggested_actions"."status" =');
+    expect(query.sql).toContain('"suggested_actions"."kind" <>');
+    expect(query.sql).toContain('not ilike');
+    expect(query.params).toEqual([
+      'owner',
+      'pending',
+      'workflow_capture.request',
+      'founder.%',
+      'ops.%',
+      'ovie.%',
+    ]);
+  });
+});
 
 describe('consumer opportunity storage boundary', () => {
   it.each([false, true])(

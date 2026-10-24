@@ -238,7 +238,7 @@ describe('DashboardNav route warming', () => {
     expect(link).not.toHaveAttribute('aria-busy');
   });
 
-  it('shows runtime update attention on the existing Inbox bell while preserving opportunity counts', () => {
+  it('shows runtime update attention on the existing Inbox bell without a count (JOV-8968)', () => {
     runtimeUpdateState.available = true;
     const pending = renderDashboardNav({
       renderFn: render,
@@ -249,14 +249,13 @@ describe('DashboardNav route warming', () => {
     expect(
       pending.getByRole('link', { name: 'Inbox — App Update Available' })
     ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
-    expect(
-      pending.getByRole('status', { name: '3 pending items' })
-    ).toHaveTextContent('3');
-    // text-background emits no CSS (no --color-background token); the badge
-    // count must use the base-color token on its accent fill.
-    expect(
-      pending.getByRole('status', { name: '3 pending items' })
-    ).toHaveClass('bg-accent', 'text-(--color-bg-base)');
+    // The bell is a passive dot only: no count badge, no count text.
+    expect(pending.queryByRole('status')).toBeNull();
+    const pendingDot = pending.container.querySelector(
+      '[data-inbox-attention-dot]'
+    );
+    expect(pendingDot).not.toBeNull();
+    expect(pendingDot?.textContent).toBe('');
     pending.unmount();
 
     const updateOnly = renderDashboardNav({
@@ -288,6 +287,7 @@ describe('DashboardNav route warming', () => {
     if (!(link instanceof HTMLElement)) return;
     expect(link).toHaveAttribute('data-inbox-attention', 'empty');
     expect(link.querySelector('[data-inbox-runtime-update]')).toBeNull();
+    expect(link.querySelector('[data-inbox-attention-dot]')).toBeNull();
   });
 
   it('labels the header bell Inbox only when INBOX_HOME is on', () => {
