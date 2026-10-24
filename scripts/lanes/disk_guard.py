@@ -39,6 +39,7 @@ import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 # while ~178 GB of retired workspaces sat on disk.
 LOW_PCT = float(autoscale.DISK_INCREASE_MIN)
 CRITICAL_PCT = 5.0
+STATE_FLOOR_PCT = 2.0  # the state drive alone: below this nothing can record its work
 DERIVED_DATA_IDLE_S = 5 * 3600
 WORKTREE_IDLE_S = 12 * 3600
 DERIVED_DATA_ROOT = Path(os.environ.get("LANES_DERIVED_DATA",
@@ -71,6 +72,14 @@ def free_pct(path: Path) -> float | None:
     except OSError:
         return None
     return round(100 * usage.free / usage.total, 1) if usage.total else None
+
+
+def write_path(host, binding: str | None = None) -> Path:
+    """The directory a lane actually writes its checkouts to, so admission measures that volume
+    (a symlinked or relocated worktrees dir reports the drive behind it, not the state drive).
+    A binding writes under state/bindings/<KEY>/worktrees; Jovie under state/worktrees."""
+    root = host.state / "bindings" / binding / "worktrees" if binding else host.state / "worktrees"
+    return root if root.is_dir() else host.state
 
 
 def recently_touched(path: Path, idle_s: float, now: float) -> bool:
@@ -462,7 +471,9 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
     explicit admission result even when another worker owns cleanup.
     """
     now = time.time() if now is None else now
-    pct = free_pct(host.state)
+    where = write_path(host)  # the volume Jovie checkouts land on (a relocated worktrees dir counts)
+    pct = free_pct(where)
+    state_pct = free_pct(host.state)
     report = {"at": now_iso(), "freePct": pct, "low": False, "critical": False, "actions": [], "errors": []}
     report["low"] = pct is not None and pct <= LOW_PCT
     if sweep and pct is not None and CRITICAL_PCT < pct <= LOW_PCT:
@@ -482,7 +493,7 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
                                  lambda: sweep_old_logs(host, now, report),
                                  lambda: sweep_host_tools(run, report)):
                         # Pressure can change between steps; never keep sweeping critically low disk.
-                        current = free_pct(host.state)
+                        current = free_pct(where)
                         if current is None or current <= CRITICAL_PCT:
                             break
                         try:
@@ -491,7 +502,7 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
                             report["errors"].append(f"{type(error).__name__}: {error}"[:200])
         except OSError as error:
             report["errors"].append(f"cleanup-lock:{error}"[:200])
-        pct = free_pct(host.state)
+        pct = free_pct(where)
     report["freePctAfter"] = pct
     # An observation-only check never flattens the last real sweep's record: a
     # fresh receipt without its own sweep carries the last sweep's actions and
@@ -512,8 +523,11 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
     # Disk is a capacity limit only once nothing reclaimable is left (capacity_limit reads this).
     report["reclaimable"] = reclaimable(host)
     report["critical"] = pct is not None and pct <= CRITICAL_PCT
-    report["admitted"] = pct is not None and pct > CRITICAL_PCT
-    report["reason"] = "disk-unobservable" if pct is None else "disk-critical" if report["critical"] else "disk-available"
+    report["statePct"] = state_pct
+    state_full = state_pct is not None and state_pct <= STATE_FLOOR_PCT  # ledgers/receipts must stay writable
+    report["admitted"] = pct is not None and pct > CRITICAL_PCT and not state_full
+    report["reason"] = ("disk-unobservable" if pct is None else "disk-critical" if report["critical"]
+                        else "state-volume-full" if state_full else "disk-available")
     try:
         host.state.mkdir(parents=True, exist_ok=True)
         (host.state / "disk-pressure.json").write_text(json.dumps(report, indent=1))

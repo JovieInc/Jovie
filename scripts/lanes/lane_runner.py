@@ -7652,11 +7652,26 @@ def occupied_worker_slots(host: Host) -> dict[str, int] | None:
         return None
 
 
+def reserved_binding_pass(host: Host, name: str, spec: dict) -> int:
+    """A provider with no free seat (cap, host ceiling, or autoscaled to 0) still serves a binding's
+    guaranteed seat, so a full or throttled Jovie pool cannot stall another repository. Disk-critical
+    hosts admit nothing: a binding run needs a local checkout like any other."""
+    try:
+        # The binding checks its own checkout volume; cleanup stays with slot holders.
+        bound = bindings.reserve(THIS, host, name, spec)
+    except Exception as error:
+        print(f"reserved binding pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
+        return 0
+    return 0 if bound is None else reexec(host, name)
+
+
 def worker(host: Host, name: str) -> int:
     spec = load_providers()[name]
     limit = host.slots(name, spec.get("slots", 1))
-    if not spec.get("enabled", True) or limit <= 0:
+    if not spec.get("enabled", True):
         return 0
+    if limit <= 0:
+        return reserved_binding_pass(host, name, spec)
     intake_limit = host.intake_slots(name, spec.get("slots", 1))
     slot = None
     # One ledger and one serialized count/acquire, even while old occupied seats
@@ -7665,10 +7680,9 @@ def worker(host: Host, name: str) -> int:
     try:
         occupied = occupied_worker_slots(host)
         ceiling = autoscale.host_ceiling(host.state)
-        if occupied is None or occupied.get(name, 0) >= limit or (
-                ceiling is not None and sum(occupied.values()) >= ceiling):
-            return 0
-        for index in range(limit):
+        full = occupied is None or occupied.get(name, 0) >= limit or (
+            ceiling is not None and sum(occupied.values()) >= ceiling)
+        for index in range(0 if full else limit):
             maintenance_only = index >= intake_limit
             if maintenance_only and spec.get("repairs") is False:
                 continue
@@ -7680,7 +7694,7 @@ def worker(host: Host, name: str) -> int:
     finally:
         admission.release()
     if slot is None:
-        return 0
+        return reserved_binding_pass(host, name, spec)
     try:
         return worker_with_slot(host, name, spec, slot, maintenance_only=maintenance_only)
     finally:
@@ -7943,16 +7957,27 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
 
 def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, maintenance_only=False) -> int:
     """Release ownership on every exceptional exit, including notification failures."""
-    try:
-        report = disk_guard.check(host, sweep=True)
-        if not report.get("admitted"):
-            record_idle_exit(host, name, report.get("reason", "disk-unobservable"))
-            slot.release()
-            return 1
-    except Exception:
-        record_idle_exit(host, name, "disk-unobservable")
+    # A remote-only provider (`localDisk: false`, e.g. Hyperagent) writes no local checkout, so
+    # gem disk pressure never idles it. Otherwise the volume the lane writes to is measured; when
+    # Jovie's volume denies admission, a binding on another volume still gets its own pass.
+    denied = None
+    if spec.get("localDisk", True) is not False:
+        try:
+            report = disk_guard.check(host, sweep=True)
+            if not report.get("admitted"):
+                denied = report.get("reason", "disk-unobservable")
+        except Exception:
+            denied = "disk-unobservable"
+    if denied:
+        try:
+            bound = None if spec.get("repairs") is False else bindings.work(
+                THIS, host, name, spec, maintenance_only=maintenance_only)
+        except Exception as error:
+            bound = None
+            print(f"binding pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
+        record_idle_exit(host, name, denied)
         slot.release()
-        return 1
+        return 1 if bound is None else reexec(host, name)
     # Extra repository bindings (LYB) share this seat. Jovie-only holds below never block them,
     # and a binding fault never blocks the Jovie path. No configured binding = no reads at all.
     try:
