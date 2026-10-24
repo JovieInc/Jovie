@@ -66,7 +66,7 @@ function ms(isoTs) {
  * attempt restarts before GitHub refreshes the run row). Handle explicitly:
  * keep the raw timestamp verbatim, flag the anomaly, and expose a normalized
  * start = max(job.started_at, run.created_at) for gap math.
- * @param {{ created_at: string }} run
+ * @param {{ created_at: string, run_started_at?: string | null, updated_at?: string | null }} run
  * @param {{ started_at?: string | null, queued_at?: string | null }} job
  */
 function normalizeStart(run, job) {
@@ -194,6 +194,7 @@ export async function collectRunRows({ run, fetchJson, collectedAt }) {
   } = await pagedJson(fetchJson, jobsPath, CAPS.maxJobPages);
 
   let truncated = pagesFetched >= CAPS.maxJobPages && jobs.length < total;
+  /** @type {any[]} */
   let rows = jobs
     .slice(0, CAPS.maxRowsPerRunEvent)
     .map(job => jobAttemptRow({ run, job, collectedAt }));
