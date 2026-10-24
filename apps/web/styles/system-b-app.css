@@ -6509,19 +6509,24 @@
   table-layout: fixed;
 }
 
-/* Settings owns its usable pane beside the companion overlay. Reserve on
-   the pane, so the capped form centers and shrinks inside the remaining
-   space. The shell's existing content inset already accounts for part of
-   the overlay padding; do not subtract that inset a second time. */
+/* Reserve the automatic settings companion before the drawer mounts. Once
+   the shell allocates an active rail, it owns all of the reserved width. */
 @media (min-width: 1024px) {
-  [data-testid="settings-shell-content"]:has(
-    [data-settings-companion-rail="true"]
-  ) {
+  [data-app-shell-main-plane]:not(
+      :has(
+        [data-rail-phase="open"],
+        [data-rail-phase="opening"],
+        [data-rail-phase="closing"]
+      )
+    )
+    [data-testid="settings-shell-content"]:has(
+      [data-settings-companion-rail="true"]
+    ) {
     margin-inline-end: calc(
       360px +
       2 *
-      var(--space-1-5) -
-      var(--app-shell-content-inset)
+      var(--space-1-5) +
+      var(--app-shell-gap)
     );
   }
 }

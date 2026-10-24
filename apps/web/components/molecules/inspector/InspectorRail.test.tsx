@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -119,9 +120,11 @@ describe('InspectorShell', () => {
 
     const selected = screen.getByRole('tab', { name: 'Details' });
     expect(selected).toHaveAttribute('aria-selected', 'true');
-    expect(selected.className).toContain('border-accent');
-    expect(selected.className).toContain('bg-surface-0/80');
-    expect(selected.className).not.toContain('rounded-full');
+    expect(selected).toHaveAttribute('data-state', 'active');
+    expect(selected).toHaveAttribute('aria-controls', panel.id);
+    expect(selected.className).toContain('rounded-full');
+    expect(tabs.parentElement).toHaveAttribute('data-size', 'sm');
+    expect(tabs.parentElement).toHaveAttribute('data-layout', 'fill');
 
     expect(screen.getByRole('tab', { name: 'Assets' })).toHaveAttribute(
       'aria-selected',
@@ -132,12 +135,13 @@ describe('InspectorShell', () => {
     ).not.toBeInTheDocument();
     expect(container.querySelector('[data-section-collapsible]')).toBeNull();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assets' }));
+    await userEvent.setup().click(screen.getByRole('tab', { name: 'Assets' }));
     expect(onTabChange).toHaveBeenCalledWith('assets');
     await expectNoA11yViolations(container);
   });
 
-  it('moves selection with arrow keys and does not use pill chrome', () => {
+  it('moves selection with the shared pill keyboard navigation', async () => {
+    const user = userEvent.setup();
     const onTabChange = vi.fn();
     render(
       <>
@@ -161,13 +165,55 @@ describe('InspectorShell', () => {
     );
 
     const tablist = screen.getByRole('tablist', { name: 'Inspector tabs' });
-    fireEvent.keyDown(tablist, { key: 'ArrowRight' });
+    const details = tablist.querySelector<HTMLElement>(
+      '[aria-selected="true"]'
+    )!;
+    details.focus();
+    await user.keyboard('{ArrowRight}');
     expect(onTabChange).toHaveBeenCalledWith('assets');
 
-    fireEvent.keyDown(tablist, { key: 'End' });
+    await user.keyboard('{End}');
     expect(onTabChange).toHaveBeenCalledWith('rights');
 
-    expect(tablist.className).not.toContain('rounded-full');
+    expect(tablist.parentElement?.className).toContain('rounded-full');
+    expect(
+      tablist.querySelector('[data-state="inactive"]:last-child')
+    ).toHaveFocus();
+  });
+
+  it('skips disabled destinations and retains the selector when selection changes', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const options = [
+      { value: 'overview', label: 'Overview' },
+      { value: 'files', label: 'Files', disabled: true },
+      { value: 'rights', label: 'Rights' },
+    ];
+    const props = {
+      value: 'overview',
+      onValueChange,
+      options,
+      ariaLabel: 'Work inspector',
+      panelId: 'work-panel',
+    };
+    const { rerender } = render(<InspectorTabs {...props} />);
+    const selector = screen.getByRole('tablist');
+    const overview = screen.getByRole('tab', { name: 'Overview' });
+    const rights = screen.getByRole('tab', { name: 'Rights' });
+    expect(screen.getByRole('tab', { name: 'Files' })).toBeDisabled();
+    overview.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(rights).toHaveFocus();
+    expect(onValueChange).toHaveBeenCalledWith('rights');
+    rerender(<InspectorTabs {...props} value='rights' />);
+    expect(screen.getByRole('tablist')).toBe(selector);
+    expect(rights).toHaveFocus();
+    expect(rights).toHaveAttribute('aria-selected', 'true');
+    expect(rights).toHaveAttribute('aria-controls', 'work-panel');
+    expect(screen.queryByRole('tabpanel')).toBeNull();
+    await user.keyboard('{Home}');
+    expect(overview).toHaveFocus();
+    expect(onValueChange).toHaveBeenLastCalledWith('overview');
   });
 
   it('renders standardized empty and loading states', () => {

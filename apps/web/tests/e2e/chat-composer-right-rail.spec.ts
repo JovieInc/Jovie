@@ -13,8 +13,8 @@
  *   2. Close rail via header toggle → invariants. Reopen + close via the `]`
  *      keyboard shortcut → invariants.
  *   3. In-rail "Copy profile link" action → invariants.
- *   4. Close rail → composer width stays stable (the desktop rail is an
- *      overlay that never narrows the route) → type + submit end-to-end.
+ *   4. Close rail → main column and composer reclaim width allocated to the
+ *      desktop rail → type + submit end-to-end.
  *   5. Sub-lg viewport: mobile overlay branch (`fixed inset-0 z-50` in
  *      RightDrawer) legitimately covers the composer → Escape closes it and
  *      the composer recovers.
@@ -58,7 +58,10 @@ const RAIL_SHORTCUT = ']';
 /** lg breakpoint is 1024px; one px below selects RightDrawer's mobile overlay branch. */
 const SUB_LG_VIEWPORT = { width: 1023, height: 800 } as const;
 
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({
+  storageState: { cookies: [], origins: [] },
+  viewport: { width: 1350, height: 860 },
+});
 
 async function expectRailOpen(page: Page) {
   await expect(page.locator(PROFILE_RAIL)).toBeVisible({ timeout: 15_000 });
@@ -242,15 +245,12 @@ test.describe('chat composer × right-rail interaction matrix', () => {
     await page.locator(RAIL_TOGGLE).click();
     await expectRailClosed(page);
 
-    // Since #20813 the desktop right rail is an inspector overlay contained by
-    // the main surface (AppShellRightRail): it never narrows the route, so the
-    // composer keeps the same width while the rail opens and closes. Assert
-    // that stability instead of the retired column reflow.
+    // Desktop rails allocate a sibling column (JOV-8944).
     await expect
       .poll(async () => (await textarea.boundingBox())?.width ?? 0, {
         timeout: 15_000,
       })
-      .toBeCloseTo(openBox?.width ?? 0, 0);
+      .toBeGreaterThan(openBox?.width ?? 0);
 
     // Type + submit a message end-to-end: the composer clears on submit and
     // the user message renders in the thread.
@@ -263,6 +263,45 @@ test.describe('chat composer × right-rail interaction matrix', () => {
     await expect(page.getByText(message).first()).toBeVisible({
       timeout: 30_000,
     });
+  });
+
+  test('opening the rail shrinks the main column by its allocation without covering the composer (JOV-8944)', async ({
+    page,
+  }) => {
+    const column = page.locator('[data-app-shell-main-column]');
+    const rail = page.getByTestId('app-shell-right-rail');
+    await page.locator(RAIL_TOGGLE).click();
+    await expectRailClosed(page);
+    await expect
+      .poll(async () => (await rail.boundingBox())?.width ?? 0)
+      .toBe(0);
+    const closedBox = await column.boundingBox();
+    expect(closedBox).not.toBeNull();
+
+    await page.locator(RAIL_TOGGLE).click();
+    await expectRailOpen(page);
+    await expect(rail.locator('[data-rail-phase]').first()).toHaveAttribute(
+      'data-rail-phase',
+      'open'
+    );
+    await expect
+      .poll(async () => {
+        const mainBox = await column.boundingBox();
+        const railBox = await rail.boundingBox();
+        if (!mainBox || !railBox || !closedBox) return Number.POSITIVE_INFINITY;
+        return Math.abs(closedBox.width - mainBox.width - railBox.width);
+      })
+      .toBeLessThanOrEqual(1);
+    const openBox = await column.boundingBox();
+    const railBox = await rail.boundingBox();
+    expect(openBox!.width).toBeLessThan(closedBox!.width);
+    expect(openBox!.x + openBox!.width).toBeLessThanOrEqual(railBox!.x + 1);
+    const composerBox = await page.locator(COMPOSER_SURFACE).boundingBox();
+    expect(composerBox).not.toBeNull();
+    expect(composerBox!.x + composerBox!.width).toBeLessThanOrEqual(
+      railBox!.x + 1
+    );
+    await assertComposerInteractive(page, 'rail pushes main column');
   });
 
   test('5: sub-lg mobile overlay legitimately covers the composer and recovers on close', async ({
