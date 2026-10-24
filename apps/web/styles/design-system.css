@@ -22,6 +22,19 @@
    THEME INPUTS - The only 3 variables needed
    ============================================ */
 :root {
+  /* Native/web window chrome, JOV-8940. Exported to design.tokens.json. */
+  --chrome-title-row-height: 44px;
+  --chrome-traffic-lights-leading: 12px;
+  --chrome-traffic-lights-reserve: 76px;
+  --chrome-sidebar-width: 240px;
+  --chrome-sidebar-min-width: 200px;
+  --chrome-sidebar-max-width: 320px;
+  --chrome-hairline: rgb(255 255 255 / 6%);
+  --motion-sidebar-collapse: 160ms;
+  --motion-sidebar-expand: 220ms;
+  --motion-sidebar-collapse-easing: ease-in;
+  --motion-sidebar-expand-easing: ease-out;
+
   /* Public shell semantic aliases — preserve current public surface values while
      centralizing the contract used by marketing and legal layouts. */
   --public-shell-header-offset: var(--linear-header-height);

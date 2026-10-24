@@ -10,7 +10,10 @@ const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
 const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
 const GO_BACK_CHANNEL = 'go-back';
 const GO_FORWARD_CHANNEL = 'go-forward';
+const SHOW_HISTORY_CHANNEL = 'show-navigation-history';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
+const FULL_SCREEN_STATE_CHANNEL = 'full-screen-state-changed';
+const GET_FULL_SCREEN_STATE_CHANNEL = 'get-full-screen-state';
 const CLIENT_NAVIGATION_CHANNEL = 'desktop-client-navigation';
 const CLIENT_NAVIGATION_READY_CHANNEL = 'desktop-client-navigation-ready';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
@@ -135,6 +138,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke(GO_FORWARD_CHANNEL);
   },
 
+  showHistory: () => ipcRenderer.invoke(SHOW_HISTORY_CHANNEL),
+
   /** Announce readiness only while a client-router listener is installed. */
   onNavigate: (cb: (path: string) => void): (() => void) => {
     if (typeof cb !== 'function') return () => undefined;
@@ -159,6 +164,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ) => cb(state);
     ipcRenderer.on(NAV_STATE_CHANNEL, listener);
     return () => ipcRenderer.removeListener(NAV_STATE_CHANNEL, listener);
+  },
+
+  /** Read and subscribe to the native window's full-screen state. */
+  getFullScreenState: () =>
+    ipcRenderer.invoke(GET_FULL_SCREEN_STATE_CHANNEL) as Promise<boolean>,
+  onFullScreenChanged: (cb: (isFullScreen: boolean) => void) => {
+    if (typeof cb !== 'function') return () => undefined;
+    const listener = (_event: unknown, isFullScreen: unknown) => {
+      if (typeof isFullScreen === 'boolean') cb(isFullScreen);
+    };
+    ipcRenderer.on(FULL_SCREEN_STATE_CHANNEL, listener);
+    return () => ipcRenderer.removeListener(FULL_SCREEN_STATE_CHANNEL, listener);
   },
 
   /** Ask the main process to show the dedicated desktop auth handoff window. */

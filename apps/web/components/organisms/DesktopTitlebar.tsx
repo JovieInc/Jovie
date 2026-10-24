@@ -1,15 +1,20 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/components/organisms/DesktopTitlebar.test.tsx
+// @interaction-via apps/web/tests/unit/components/organisms/DesktopTitlebar.interaction.test.tsx
 
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { IconButton } from '@jovie/ui';
+import { ChevronLeft, ChevronRight, History } from 'lucide-react';
 import type { CSSProperties } from 'react';
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
 import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
 import {
   type DesktopBuildIdentity,
+  observeDesktopFullScreen,
+  showDesktopHistory,
+  supportsDesktopHistory,
   useDesktopBuildIdentity,
   useDesktopNavigation,
   useIsElectronRuntime,
@@ -152,6 +157,19 @@ export function DesktopTitlebar() {
     ? sidebarCtx?.openMobile === true
     : sidebarCtx?.state === 'open';
 
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!isDesktop) {
+      delete root.dataset.electronFullscreen;
+      return;
+    }
+
+    const applyFullScreenState = (isFullScreen: boolean) => {
+      root.dataset.electronFullscreen = isFullScreen ? 'true' : 'false';
+    };
+    return observeDesktopFullScreen(applyFullScreenState);
+  }, [isDesktop]);
+
   return (
     <div
       data-electron-titlebar='true'
@@ -167,7 +185,7 @@ export function DesktopTitlebar() {
         <div
           data-testid='electron-titlebar-sidebar-cell'
           data-electron-no-drag='true'
-          className='flex w-full min-w-0 items-center gap-(--app-shell-sidebar-icon-gap)'
+          className='flex h-full w-full min-w-0 items-center gap-(--app-shell-sidebar-icon-gap)'
           style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
         >
           <div
@@ -211,38 +229,39 @@ export function DesktopTitlebar() {
             className='flex shrink-0 items-center gap-0.5'
             style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
           >
-            <button
+            <IconButton
+              variant='ghost'
+              size='sm'
               type='button'
               onClick={goBack}
               disabled={!canGoBack}
               aria-label='Go Back'
               data-testid='electron-nav-back'
-              className={cn(
-                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
-                'transition-colors duration-subtle',
-                'hover:bg-white/[0.06] hover:text-primary-token',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
-                'disabled:pointer-events-none disabled:opacity-30'
-              )}
             >
               <ChevronLeft className='h-3.5 w-3.5' strokeWidth={2} />
-            </button>
-            <button
+            </IconButton>
+            <IconButton
+              variant='ghost'
+              size='sm'
               type='button'
               onClick={goForward}
               disabled={!canGoForward}
               aria-label='Go Forward'
               data-testid='electron-nav-forward'
-              className={cn(
-                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-secondary-token',
-                'transition-colors duration-subtle',
-                'hover:bg-white/[0.06] hover:text-primary-token',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
-                'disabled:pointer-events-none disabled:opacity-30'
-              )}
             >
               <ChevronRight className='h-3.5 w-3.5' strokeWidth={2} />
-            </button>
+            </IconButton>
+            <IconButton
+              type='button'
+              variant='ghost'
+              size='sm'
+              aria-label='History'
+              disabled={!supportsDesktopHistory()}
+              data-testid='electron-nav-history'
+              onClick={showDesktopHistory}
+            >
+              <History className='size-3.5' aria-hidden='true' />
+            </IconButton>
           </div>
           <div
             data-testid='electron-titlebar-drag-strip'

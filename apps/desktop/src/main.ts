@@ -20,6 +20,7 @@ import {
   shell,
   type WebContents,
 } from 'electron';
+import { trimNavigationHistory, navigationHistoryItems } from './window-navigation-history';
 import { autoUpdater } from 'electron-updater';
 import { openCurrentOvieInBrowser } from './ovie-browser-recovery';
 import {
@@ -257,8 +258,8 @@ const desktopBuildIdentity = resolveDesktopBuildIdentity({
 const printBuildIdentityOnStart = process.argv.includes(
   DESKTOP_BUILD_IDENTITY_PRINT_FLAG
 );
-const MACOS_TRAFFIC_LIGHT_X = 20;
-const MACOS_TRAFFIC_LIGHT_Y = 17;
+const MACOS_TRAFFIC_LIGHT_X = 12;
+const MACOS_TRAFFIC_LIGHT_Y = 15;
 const MACOS_TRAFFIC_LIGHT_POSITION = {
   x: MACOS_TRAFFIC_LIGHT_X,
   y: MACOS_TRAFFIC_LIGHT_Y,
@@ -274,7 +275,10 @@ const DESKTOP_UPDATE_INSTALL_CHANNEL = 'desktop-update-install';
 const DESKTOP_UPDATE_NOTES_URL = `${APP_ORIGIN}/changelog`;
 const GO_BACK_CHANNEL = 'go-back';
 const GO_FORWARD_CHANNEL = 'go-forward';
+const SHOW_HISTORY_CHANNEL = 'show-navigation-history';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
+const FULL_SCREEN_STATE_CHANNEL = 'full-screen-state-changed';
+const GET_FULL_SCREEN_STATE_CHANNEL = 'get-full-screen-state';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
 const OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL = 'open-current-ovie-in-browser';
@@ -2528,6 +2532,13 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   mainWindow = win;
+  const sendFullScreenState = () => {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send(FULL_SCREEN_STATE_CHANNEL, win.isFullScreen());
+    }
+  };
+  win.on('enter-full-screen', sendFullScreenState);
+  win.on('leave-full-screen', sendFullScreenState);
   const navigationContentsId = win.webContents.id;
   win.webContents.on('render-process-gone', () => {
     desktopNavigation.setReady(navigationContentsId, false);
@@ -2700,6 +2711,18 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     win.webContents.send(NAV_STATE_CHANNEL, state);
   }
 
+  let historyTimer: ReturnType<typeof setTimeout> | undefined;
+  const scheduleHistoryTrim = () => {
+    clearTimeout(historyTimer);
+    historyTimer = setTimeout(() => {
+      if (win.isDestroyed() || win.webContents.isDestroyed()) return;
+      trimNavigationHistory(win.webContents.navigationHistory);
+      sendNavState();
+    }, 160);
+  };
+  win.once('closed', () => clearTimeout(historyTimer));
+  win.webContents.on('did-navigate-in-page', scheduleHistoryTrim);
+  win.webContents.on('did-navigate', scheduleHistoryTrim);
   win.webContents.on('did-navigate-in-page', sendNavState);
   win.webContents.on('did-navigate', sendNavState);
 
@@ -2742,6 +2765,12 @@ function navigateInApp(win: BrowserWindow, url: string): void {
   } else if (action?.kind === 'document') {
     void win.loadURL(action.url);
   }
+}
+
+function navigateFocusedWindow(direction: 'back' | 'forward'): void {
+  const contents = BrowserWindow.getFocusedWindow()?.webContents;
+  if (direction === 'back' && contents?.canGoBack()) contents.goBack();
+  if (direction === 'forward' && contents?.canGoForward()) contents.goForward();
 }
 
 function openPreferences(): void {
@@ -2974,6 +3003,17 @@ function buildViewMenu(): MenuItemConstructorOptions[] {
   }
 
   viewMenu.push(
+    {
+      label: 'Back',
+      accelerator: 'CommandOrControl+[',
+      click: () => navigateFocusedWindow('back'),
+    },
+    {
+      label: 'Forward',
+      accelerator: 'CommandOrControl+]',
+      click: () => navigateFocusedWindow('forward'),
+    },
+    { type: 'separator' },
     { role: 'resetZoom' },
     { role: 'zoomIn' },
     { role: 'zoomOut' },
@@ -3330,6 +3370,16 @@ app.on('before-quit', event => {
     });
 });
 
+ipcMain.handle(SHOW_HISTORY_CHANNEL, (event: IpcMainInvokeEvent) => {
+  if (!isTrustedIpcSender(event)) return;
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return;
+  const history = win.webContents.navigationHistory;
+  trimNavigationHistory(history);
+  const items = navigationHistoryItems(history);
+  Menu.buildFromTemplate(items).popup({ window: win });
+});
+
 ipcMain.handle(GO_BACK_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (!isTrustedIpcSender(event)) return;
   const win = BrowserWindow.fromWebContents(event.sender);
@@ -3343,6 +3393,15 @@ ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (win && !win.isDestroyed() && win.webContents.canGoForward())
     win.webContents.goForward();
 });
+
+ipcMain.handle(
+  GET_FULL_SCREEN_STATE_CHANNEL,
+  (event: IpcMainInvokeEvent) => {
+    if (!isTrustedIpcSender(event)) return false;
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return Boolean(win && !win.isDestroyed() && win.isFullScreen());
+  }
+);
 
 ipcMain.handle(
   OPEN_CURRENT_OVIE_IN_BROWSER_CHANNEL,

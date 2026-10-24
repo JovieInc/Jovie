@@ -407,6 +407,16 @@ function SidebarHeaderNav({
         </RailStagedContent>
       ) : null}
 
+      {isDesktop &&
+      !isMobile &&
+      !isRouteSidebar &&
+      !isOperatorSection &&
+      !isDemoRoute ? (
+        <span
+          data-desktop-compose-slot='true'
+          className='flex shrink-0 items-center'
+        />
+      ) : null}
       {!isDesktop ? (
         <RailStagedContent
           hidden={!pinned && !isMobile && headerOwnsCollapsedToggle}

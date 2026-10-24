@@ -227,15 +227,22 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
       sidebarWidth: readPx('--electron-sidebar-width'),
       shellGap: readPx('--app-shell-gap'),
       collapsedSidebarWidth: readPx('--electron-sidebar-collapsed-width'),
+      trafficLightToggleGap: readPx('--electron-traffic-light-toggle-gap'),
     };
   });
 
   // If we can read the token, check the sidebar column width matches.
-  expect(tokens.titlebarHeight).toBe(40);
-  expect(tokens.trafficLightSafeWidth).toBe(70);
-  expect(tokens.trafficLightX).toBe(20);
-  expect(tokens.trafficLightY).toBe(17);
-  expect(tokens.collapsedSidebarWidth).toBe(52);
+  expect(tokens.titlebarHeight).toBe(44);
+  expect(tokens.trafficLightSafeWidth).toBe(68);
+  expect(tokens.trafficLightX).toBe(12);
+  expect(tokens.trafficLightY).toBe(15);
+  expect(tokens.collapsedSidebarWidth).toBe(0);
+  expect(tokens.trafficLightToggleGap).toBeGreaterThanOrEqual(12);
+  expect(
+    Math.abs(
+      (tokens.trafficLightY ?? 0) + 14 / 2 - (tokens.titlebarHeight ?? 0) / 2
+    )
+  ).toBeLessThanOrEqual(1);
 
   if (tokens.sidebarWidth !== null && tokens.sidebarWidth > 0) {
     const sidebarCell = page.locator(
@@ -272,6 +279,33 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
       ).toBeLessThanOrEqual(tokens.sidebarWidth);
     }
   }
+});
+
+test('full-screen Electron shell collapses native safe area while preserving the title row', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+
+  await installElectronRuntime(page);
+  await gotoShellRoute(page);
+  await waitForSettledShell(page);
+
+  await page.evaluate(() => {
+    document.documentElement.dataset.electronFullscreen = 'true';
+  });
+
+  await expect(page.getByTestId('electron-traffic-light-safe-area')).toHaveCSS(
+    'width',
+    '0px'
+  );
+  await expect(page.getByTestId('app-shell-sidebar-mount')).toHaveCSS(
+    'padding-top',
+    '44px'
+  );
+  await expect(page.getByTestId('electron-titlebar-row')).toHaveCSS(
+    'height',
+    '44px'
+  );
 });
 
 test('Electron shell keeps one control contract across chat, calendar, tasks, library, and settings routes', async ({
@@ -353,6 +387,9 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const sidebar = document.querySelector<HTMLElement>(
         '[data-app-shell-sidebar-mount="true"]'
       );
+      const contentColumn = document.querySelector<HTMLElement>(
+        '[data-app-shell-content-column="true"]'
+      );
       const mainPlane = document.querySelector<HTMLElement>(
         '[data-app-shell-main-plane="true"]'
       );
@@ -362,12 +399,22 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const settingsColumn = document.querySelector<HTMLElement>(
         '[data-settings-layout-column="true"]'
       );
-      if (!titlebar || !body || !sidebar || !mainPlane) return null;
+      if (!titlebar || !body || !sidebar || !mainPlane || !contentColumn)
+        return null;
 
       const titlebarBox = titlebar.getBoundingClientRect();
       const bodyBox = body.getBoundingClientRect();
       const sidebarBox = sidebar.getBoundingClientRect();
       const mainPlaneBox = mainPlane.getBoundingClientRect();
+      const contentColumnBox = contentColumn.getBoundingClientRect();
+      const header = contentColumn.querySelector<HTMLElement>(
+        '[data-top-spacing-owner="shell-header"]'
+      );
+      const title = header?.querySelector<HTMLElement>('h1');
+      const headerInner = header?.firstElementChild as HTMLElement | null;
+      const headerPaddingLeft = headerInner
+        ? Number.parseFloat(getComputedStyle(headerInner).paddingLeft)
+        : null;
       const settingsShellBox = settingsShell?.getBoundingClientRect();
       const settingsColumnBox = settingsColumn?.getBoundingClientRect();
       return {
@@ -377,6 +424,13 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         bodyTop: bodyBox.top,
         sidebarTop: sidebarBox.top,
         mainPlaneTop: mainPlaneBox.top,
+        titleColumnStartDelta:
+          title && headerPaddingLeft !== null
+            ? Math.abs(
+                title.getBoundingClientRect().left -
+                  (contentColumnBox.left + headerPaddingLeft)
+              )
+            : null,
         settingsShellTop: settingsShellBox?.top ?? null,
         settingsShellCenterX:
           settingsShellBox === undefined
@@ -406,6 +460,10 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
     expect(
       Math.abs((geometry?.mainPlaneTop ?? 0) - (geometry?.bodyTop ?? 0)),
       `${route} main plane aligns to the body grid`
+    ).toBeLessThanOrEqual(1);
+    expect(
+      geometry?.titleColumnStartDelta,
+      `${route} title aligns with the content column start`
     ).toBeLessThanOrEqual(1);
 
     if (route.startsWith(APP_ROUTES.SETTINGS)) {

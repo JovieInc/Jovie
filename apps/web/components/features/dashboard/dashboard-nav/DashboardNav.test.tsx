@@ -57,6 +57,20 @@ describe('Linear-scale density (founder lock 2026-09-25)', () => {
 });
 
 describe('DashboardNav route warming', () => {
+  it('keeps native compose reachable when no workspace header slot is mounted', () => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {},
+    });
+    try {
+      renderDashboardNav({ renderFn: render });
+      const compose = screen.getByRole('link', { name: 'New Chat' });
+      expect(compose.closest('nav')).not.toBeNull();
+      expect(compose).toHaveAttribute('href', APP_ROUTES.CHAT);
+    } finally {
+      Reflect.deleteProperty(window, 'electronAPI');
+    }
+  });
   afterEach(() => {
     vi.useRealTimers();
     runtimeUpdateState.available = false;

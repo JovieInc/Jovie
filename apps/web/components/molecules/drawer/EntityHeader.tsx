@@ -302,6 +302,7 @@ export function EntityHeader({
           'flex min-h-10 shrink-0 items-center justify-between gap-3 px-3 py-1.5',
           className
         )}
+        data-electron-drag-region='true'
         data-layout='chrome'
         data-testid={testId}
       >

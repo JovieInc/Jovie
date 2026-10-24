@@ -5,6 +5,24 @@ import { describe, expect, it } from 'vitest';
 import { DashboardHeader } from './DashboardHeader';
 
 describe('DashboardHeader', () => {
+  it('keeps the desktop location icon beside the breadcrumb and preserves route actions', () => {
+    const { container } = render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'Library' }]}
+        locationIcon={<svg data-testid='route-location-icon' />}
+        action={<button type='button'>Add Asset</button>}
+      />
+    );
+    expect(
+      container.querySelector('[data-testid=dashboard-header-title-slot]')
+    ).toContainElement(screen.getByTestId('route-location-icon'));
+    expect(
+      screen.getByRole('heading', { name: 'Library' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add Asset' })
+    ).toBeInTheDocument();
+  });
   it('hides the web toggle and divider before Electron hydration without hiding route actions', () => {
     // Load the real prepaint rule: this behavior must work before any effect.
     const css = readFileSync(

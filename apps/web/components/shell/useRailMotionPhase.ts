@@ -16,7 +16,10 @@ import { type RailMotionPhase, SHELL_RAIL_MOTION_MS } from './rail-motion';
  * Under prefers-reduced-motion the phase resolves directly to the final
  * state, matching `motion-reduce:transition-none`.
  */
-export function useRailMotionPhase(open: boolean): RailMotionPhase {
+export function useRailMotionPhase(
+  open: boolean,
+  durationMs = SHELL_RAIL_MOTION_MS
+): RailMotionPhase {
   const prefersReducedMotion = useReducedMotion();
   const [transitioning, setTransitioning] = useState(false);
 
@@ -37,10 +40,10 @@ export function useRailMotionPhase(open: boolean): RailMotionPhase {
     }
     const timeout = globalThis.window.setTimeout(
       () => setTransitioning(false),
-      SHELL_RAIL_MOTION_MS
+      durationMs
     );
     return () => globalThis.window.clearTimeout(timeout);
-  }, [transitioning, open, prefersReducedMotion]);
+  }, [transitioning, open, prefersReducedMotion, durationMs]);
 
   if (prefersReducedMotion || !transitioning) {
     return open ? 'open' : 'closed';

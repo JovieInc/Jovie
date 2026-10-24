@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, PanelTop } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
@@ -6,6 +6,7 @@ import { VerticalDivider } from '../atoms/VerticalDivider';
 
 export interface DashboardHeaderProps {
   readonly breadcrumbs: DashboardBreadcrumbItem[];
+  readonly locationIcon?: ReactNode;
   readonly leading?: ReactNode;
   readonly sidebarTrigger?: ReactNode;
   /** Mirrored shared right-rail control, reserved immediately before title seam. */
@@ -73,6 +74,7 @@ function HeaderTitle({
 
 export function DashboardHeader({
   breadcrumbs,
+  locationIcon,
   leading,
   sidebarTrigger,
   railToggle,
@@ -145,6 +147,13 @@ export function DashboardHeader({
             className='order-first flex min-w-0 flex-1 items-center gap-2'
             data-testid='dashboard-header-title-slot'
           >
+            <span
+              data-desktop-location-icon
+              aria-hidden='true'
+              className='shrink-0 text-secondary-token'
+            >
+              {locationIcon ?? <PanelTop className='size-3.5' />}
+            </span>
             {commandPaletteHeader ? (
               <div
                 className='flex h-full min-w-0 flex-1 items-center'

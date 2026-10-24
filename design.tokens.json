@@ -160,5 +160,45 @@
       "$value": "#ff7800",
       "$type": "color"
     }
+  },
+  "chrome": {
+    "titleRow.height": {
+      "$value": "44px",
+      "$type": "dimension"
+    },
+    "trafficLights.leading": {
+      "$value": "12px",
+      "$type": "dimension"
+    },
+    "trafficLights.reserve": {
+      "$value": "76px",
+      "$type": "dimension"
+    },
+    "sidebar.width": {
+      "$value": "240px",
+      "$type": "dimension"
+    },
+    "sidebar.minWidth": {
+      "$value": "200px",
+      "$type": "dimension"
+    },
+    "sidebar.maxWidth": {
+      "$value": "320px",
+      "$type": "dimension"
+    },
+    "hairline": {
+      "$value": "rgb(255 255 255 / 6%)",
+      "$type": "color"
+    }
+  },
+  "motion": {
+    "sidebar.collapse": {
+      "$value": "160ms",
+      "$type": "duration"
+    },
+    "sidebar.expand": {
+      "$value": "220ms",
+      "$type": "duration"
+    }
   }
 }

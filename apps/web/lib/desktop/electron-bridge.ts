@@ -64,9 +64,15 @@ export interface ElectronAPI {
   readonly goForward: () => Promise<void>;
   /** Validated application route commands. Optional on older binaries. */
   readonly onNavigate?: (cb: (path: string) => void) => () => void;
+  readonly showHistory?: () => Promise<void>;
   /** Subscribe to nav-state changes; returns unsubscribe. */
   readonly onNavStateChanged: (
     cb: (state: { canGoBack: boolean; canGoForward: boolean }) => void
+  ) => () => void;
+  /** Native full-screen state, optional on older desktop shells. */
+  readonly getFullScreenState?: () => Promise<boolean>;
+  readonly onFullScreenChanged?: (
+    cb: (isFullScreen: boolean) => void
   ) => () => void;
   /** Ask the main process to show the dedicated auth handoff window. */
   readonly startDesktopAuthHandoff?: (authUrl: string) => Promise<{
@@ -893,6 +899,38 @@ export function useDesktopNavigation(): DesktopNavState {
       void getElectronAPI()?.goForward();
     },
   };
+}
+
+export function supportsDesktopHistory(): boolean {
+  return typeof getRawElectronAPI()?.showHistory === 'function';
+}
+
+/** Native history owns both the bounded entries and their navigation targets. */
+export function showDesktopHistory(): void {
+  const showHistory = getRawElectronAPI()?.showHistory;
+  if (typeof showHistory === 'function') void showHistory();
+}
+
+/** Subscribe to native full-screen changes while closing the initial-state race. */
+export function observeDesktopFullScreen(
+  callback: (isFullScreen: boolean) => void
+): () => void {
+  const api = getElectronAPI();
+  if (!api) return () => undefined;
+
+  let eventReceived = false;
+  const unsubscribe = api.onFullScreenChanged?.(isFullScreen => {
+    eventReceived = true;
+    callback(isFullScreen);
+  });
+  const snapshot = api.getFullScreenState?.();
+  if (snapshot) {
+    void snapshot.then(isFullScreen => {
+      if (!eventReceived) callback(isFullScreen);
+    });
+  }
+
+  return () => unsubscribe?.();
 }
 
 async function safeGetDictationStatus(): Promise<DesktopDictationStatus> {
