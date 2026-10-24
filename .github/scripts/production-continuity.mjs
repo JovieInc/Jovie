@@ -155,6 +155,13 @@ export const FRESHNESS_INCIDENT_CLASS = 'production-stale';
 // this only fires once the in-band guard has already failed to ship.
 export const DEFAULT_STALE_AFTER_SECONDS = 7200;
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
+// Strict: only a real string can be a SHA (RegExp.test would stringify arrays).
+const isSha = value => typeof value === 'string' && SHA_PATTERN.test(value);
+// Strict: the compare API returns ahead_by as a JSON number. Only a finite
+// non-negative integer number is accepted; null, '', false, undefined, numeric
+// strings such as '3', negatives, fractions, NaN and anything else are unknown.
+// Number()/parseInt coercion is deliberately avoided (Number(null) === 0).
+const isCommitCount = value => Number.isSafeInteger(value) && value >= 0;
 
 /**
  * Production freshness: how long has main carried commits that production
@@ -217,7 +224,7 @@ export async function observeProductionFreshness({
   };
   const buildInfo = await readJson(buildInfoUrl);
   const liveSha = buildInfo?.commitSha;
-  if (!SHA_PATTERN.test(liveSha ?? '')) {
+  if (!isSha(liveSha)) {
     return unknownResult({ reason: 'live-sha-unreadable' });
   }
   const githubHeaders = token ? { Authorization: `Bearer ${token}` } : {};
@@ -226,7 +233,7 @@ export async function observeProductionFreshness({
     githubHeaders
   );
   const mainSha = head?.sha;
-  if (!SHA_PATTERN.test(mainSha ?? '')) {
+  if (!isSha(mainSha)) {
     return unknownResult({ liveSha, reason: 'main-sha-unreadable' });
   }
   if (mainSha === liveSha) {
@@ -236,19 +243,20 @@ export async function observeProductionFreshness({
     `${githubApiUrl}/repos/${repository}/compare/${liveSha}...${mainSha}`,
     githubHeaders
   );
-  const unshippedCommits = Number(compare?.ahead_by);
+  const unshippedCommits = compare?.ahead_by;
   const oldestUnshippedAt = compare?.commits?.[0]?.commit?.committer?.date;
-  if (!Number.isInteger(unshippedCommits) || unshippedCommits < 0) {
+  if (!isCommitCount(unshippedCommits)) {
     return unknownResult({
       liveSha,
       mainSha,
-      reason: 'unshipped-range-unreadable',
+      reason: 'unshipped-count-unreadable',
     });
   }
   if (unshippedCommits === 0) {
     return { ...base, liveSha, mainSha, reason: 'production-current' };
   }
-  const oldestEpoch = Date.parse(oldestUnshippedAt ?? '');
+  const oldestEpoch =
+    typeof oldestUnshippedAt === 'string' ? Date.parse(oldestUnshippedAt) : NaN;
   if (!Number.isFinite(oldestEpoch)) {
     return unknownResult({
       liveSha,

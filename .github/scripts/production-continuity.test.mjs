@@ -433,7 +433,7 @@ describe('production freshness', () => {
     const cases = [
       [{ liveSha: 'nope' }, 'live-sha-unreadable'],
       [{ mainSha: '' }, 'main-sha-unreadable'],
-      [{ failCompare: true }, 'unshipped-range-unreadable'],
+      [{ failCompare: true }, 'unshipped-count-unreadable'],
     ];
     for (const [overrides, reason] of cases) {
       const result = await observe(overrides);
@@ -671,6 +671,115 @@ describe('production freshness', () => {
       result.incidentKey,
       'production-continuity:unknown:jovie-production-freshness'
     );
+  });
+
+  it('accepts only a finite non-negative integer ahead_by (table-driven)', async () => {
+    const rawFetch = compare => async url => {
+      const json = body => ({
+        status: 200,
+        json: async () => body,
+        text: async () => JSON.stringify(body),
+        headers: {},
+      });
+      if (url.endsWith('/build-info')) return json({ commitSha: LIVE });
+      if (url.endsWith('/commits/main')) return json({ sha: MAIN });
+      return json(compare);
+    };
+    const commits = [
+      { commit: { committer: { date: '2026-09-13T13:00:00Z' } } },
+    ];
+    const run = ahead => {
+      const compare = { commits };
+      if (ahead !== undefined) compare.ahead_by = ahead;
+      return observeProductionFreshness({
+        fetchImpl: rawFetch(compare),
+        now: NOW,
+        repository: 'JovieInc/Jovie',
+      });
+    };
+    const malformed = [
+      null,
+      '',
+      false,
+      undefined,
+      '3',
+      -1,
+      1.5,
+      Number.NaN,
+      'abc',
+      true,
+      [],
+      {},
+      Number.POSITIVE_INFINITY,
+    ];
+    for (const value of malformed) {
+      const result = await run(value);
+      assert.equal(result.healthy, null, String(value));
+      assert.equal(result.reason, 'unshipped-count-unreadable', String(value));
+      assert.equal(result.incidentClass, null, String(value));
+    }
+    const current = await observeProductionFreshness({
+      fetchImpl: rawFetch({ ahead_by: 0, commits: [] }),
+      now: NOW,
+      repository: 'JovieInc/Jovie',
+    });
+    assert.deepEqual(
+      [current.healthy, current.reason],
+      [true, 'production-current']
+    );
+    const stale = await run(4);
+    assert.deepEqual(
+      [stale.healthy, stale.incidentClass],
+      [false, FRESHNESS_INCIDENT_CLASS]
+    );
+    const fresh = await observeProductionFreshness({
+      fetchImpl: rawFetch({
+        ahead_by: 4,
+        commits: [{ commit: { committer: { date: '2026-09-13T15:00:00Z' } } }],
+      }),
+      now: NOW,
+      repository: 'JovieInc/Jovie',
+    });
+    assert.deepEqual(
+      [fresh.healthy, fresh.reason],
+      [true, 'unshipped-for-2292s-within-7200s']
+    );
+  });
+
+  it('treats non-string SHAs and non-string commit dates as unknown', async () => {
+    const make = ({
+      live = LIVE,
+      main = MAIN,
+      date = '2026-09-13T13:00:00Z',
+    }) =>
+      observeProductionFreshness({
+        fetchImpl: async url => {
+          const json = body => ({
+            status: 200,
+            json: async () => body,
+            text: async () => '',
+            headers: {},
+          });
+          if (url.endsWith('/build-info')) return json({ commitSha: live });
+          if (url.endsWith('/commits/main')) return json({ sha: main });
+          return json({
+            ahead_by: 2,
+            commits: [{ commit: { committer: { date } } }],
+          });
+        },
+        now: NOW,
+        repository: 'JovieInc/Jovie',
+      });
+    for (const [input, reason] of [
+      [{ live: [LIVE] }, 'live-sha-unreadable'],
+      [{ main: [MAIN] }, 'main-sha-unreadable'],
+      [{ date: 0 }, 'unshipped-age-unreadable'],
+      [{ date: 1757768400000 }, 'unshipped-age-unreadable'],
+      [{ date: 'not-a-date' }, 'unshipped-age-unreadable'],
+    ]) {
+      const result = await make(input);
+      assert.deepEqual([result.healthy, result.reason], [null, reason], reason);
+    }
   });
 
   it('includes freshness in the CLI only when a repository is configured', async () => {
