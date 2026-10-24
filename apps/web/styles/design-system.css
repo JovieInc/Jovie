@@ -3107,6 +3107,166 @@
   color-scheme: dark;
 }
 
+/* JOV-8780 — certified light mode for the marketing night stages.
+
+   home, pricing, launch, artist-profiles and artist-notifications are
+   art-directed night pages: they paint fixed cinematic-black surfaces
+   (.home-viewport, .system-b-pricing-page, .system-b-launch-page,
+   .frame-skin, bg-black stages) in BOTH themes. In the light theme their
+   text/badge/button tokens flipped to light-ink values over those dark
+   stages (axe color-contrast: 58 failing pairs across the 7 theme-route
+   surfaces). These scopes resolve the SAME Noir Ion token environment as
+   dark mode — every literal below is the verbatim :root.dark /
+   .system-b-marketing.dark value, so every text/background pair inside a
+   night page is the pair the dark WCAG scan already certifies. No new
+   colors.
+
+   Scoping note: custom-property aliases (--noir-ion-text-* and friends)
+   compute their var() references at :root, so this block must re-pin the
+   resolved tokens; re-aliasing them here would inherit the light
+   :root-computed values. The night-page match is done on the page-root
+   class hooks via :has() so other marketing pages (about, support, legal)
+   keep their light chrome. color-scheme: dark keeps native form controls
+   and scrollbars on the night surfaces; background-color is deliberately
+   NOT set so each stage keeps painting its own fixed background. */
+html:not(.dark) .home-viewport,
+html:not(.dark) .system-b-marketing:has(.system-b-pricing-page),
+html:not(.dark) .system-b-marketing:has(.system-b-launch-page),
+html:not(.dark) .system-b-marketing:has(.artist-profiles-home-system),
+html:not(.dark) .system-b-marketing:has(.artist-notifications-landing) {
+  color-scheme: dark;
+  --color-bg-base: #030406;
+  --color-bg-surface-0: #07080a;
+  --color-bg-surface-1: #131417;
+  --color-bg-surface-2: #1a1b1e;
+  --color-bg-surface-3: #232427;
+  --color-bg-page: #030406;
+  --color-bg-hover: rgba(168, 176, 195, 0.06);
+  --color-bg-elevated: #0a0d16;
+  --color-bg-input: #131417;
+  --color-bg-active: #1a1b1e;
+  --color-bg-primary: #131417;
+  --color-bg-secondary: #07080a;
+  --color-bg-button: #1a1b1e;
+  --color-bg-tooltip: #232427;
+  --color-base: var(--color-bg-base);
+  --color-surface-0: var(--color-bg-surface-0);
+  --color-surface-1: var(--color-bg-surface-1);
+  --color-surface-2: var(--color-bg-surface-2);
+  --color-surface-3: var(--color-bg-surface-3);
+  --color-surface-page: var(--color-bg-page);
+  --color-surface-hover: var(--color-bg-hover);
+  --color-surface-elevated: var(--color-bg-elevated);
+  --color-surface-input: var(--color-bg-input);
+  --color-surface-active: var(--color-bg-active);
+  --color-text-primary-token: #f5f7fb;
+  --color-text-secondary-token: #a0a5af;
+  --color-text-tertiary-token: #9da2ac;
+  --color-text-quaternary-token: #858b96;
+  --color-text-disabled-token: #77839d;
+  --color-text-tooltip: #ffffff;
+  --color-primary-token: var(--color-text-primary-token);
+  --color-secondary-token: var(--color-text-secondary-token);
+  --color-tertiary-token: var(--color-text-tertiary-token);
+  --color-quaternary-token: var(--color-text-quaternary-token);
+  --color-accent-gray: #8d8d93;
+  --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
+  --color-accent-blue: #11afff;
+  --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
+  --color-accent-purple: #a982ff;
+  --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
+  --color-accent-pink: #ff48d2;
+  --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  --color-accent-red: #ff677d;
+  --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
+  --color-accent-orange: #ffc857;
+  --color-accent-orange-subtle: rgba(255, 200, 87, 0.12);
+  --color-accent-green: #39e58c;
+  --color-accent-green-subtle: rgba(57, 229, 140, 0.12);
+  --color-accent-teal: #24f6d2;
+  --color-accent-teal-subtle: rgba(36, 246, 210, 0.1);
+  --color-accent: #11afff;
+  --color-accent-hover: #3bc0ff;
+  --color-accent-active: #0088ff;
+  --color-accent-subtle: rgba(17, 175, 255, 0.12);
+  --color-border-subtle: rgba(168, 176, 195, 0.1);
+  --color-border-default: rgba(168, 176, 195, 0.16);
+  --color-border-strong: rgba(199, 237, 255, 0.26);
+  --color-subtle: var(--color-border-subtle);
+  --color-default: var(--color-border-default);
+  --color-strong: var(--color-border-strong);
+  --color-btn-primary-bg: #e6e6e6;
+  --color-btn-primary-fg: #020307;
+  --color-btn-primary-hover: #f0f0f0;
+  --color-btn-secondary-bg: #1a1b1e;
+  --color-btn-secondary-fg: #f5f7fb;
+  --color-btn-secondary-hover: #232427;
+  --color-interactive-hover: rgba(168, 176, 195, 0.06);
+  --color-interactive-active: rgba(17, 175, 255, 0.1);
+  --color-badge-bg: rgba(168, 176, 195, 0.08);
+  --color-badge-border: rgba(168, 176, 195, 0.1);
+  --color-badge-text: #f5f7fb;
+  --color-cell-hover: #1a1b1e;
+  --color-logo-muted: rgba(245, 247, 251, 0.55);
+  --color-logo-muted-hover: rgba(245, 247, 251, 0.75);
+  --noir-ion-canvas: #030406;
+  --noir-ion-shell: #07080a;
+  --noir-ion-card: #131417;
+  --noir-ion-elevated: #1a1b1e;
+  --noir-ion-floating: #232427;
+  --noir-ion-text-strong: #ffffff;
+  --noir-ion-text-primary: #f5f7fb;
+  --noir-ion-text-secondary: #a0a5af;
+  --noir-ion-text-muted: #9da2ac;
+  --noir-ion-text-tertiary: #8c939e;
+  --noir-ion-text-disabled: #77839d;
+  --noir-ion-text-inverse: #020307;
+  --noir-ion-ion: #11afff;
+  --noir-ion-ion-solid: #11afff;
+  --noir-ion-ion-soft: rgba(17, 175, 255, 0.12);
+  --noir-ion-pulse: #f52bb5;
+  --noir-ion-pulse-solid: #f52bb5;
+  --noir-ion-pulse-soft: rgba(245, 43, 181, 0.12);
+  --noir-ion-ultra: #8e56f5;
+  --noir-ion-ultra-solid: #8e56f5;
+  --noir-ion-ultra-soft: rgba(142, 86, 245, 0.12);
+  --noir-ion-mint: #3ffa8b;
+  --noir-ion-mint-solid: #3ffa8b;
+  --noir-ion-mint-soft: rgba(63, 250, 139, 0.12);
+  --noir-ion-orange: #ff7800;
+  --noir-ion-gold: #ff7800;
+  --noir-ion-gold-solid: #ff7800;
+  --noir-ion-gold-soft: rgba(255, 120, 0, 0.12);
+  --noir-ion-red: #f72a36;
+  --noir-ion-flare: #f72a36;
+  --noir-ion-flare-solid: #f72a36;
+  --noir-ion-flare-soft: rgba(247, 42, 54, 0.12);
+  --noir-ion-aqua: #3ffa8b;
+  --noir-ion-aqua-solid: #3ffa8b;
+  --noir-ion-aqua-soft: rgba(63, 250, 139, 0.12);
+  --noir-ion-selected: rgba(17, 175, 255, 0.1);
+  --noir-ion-selected-strong: rgba(17, 175, 255, 0.16);
+  --noir-ion-border-subtle: rgba(168, 176, 195, 0.1);
+  --noir-ion-border-default: rgba(168, 176, 195, 0.16);
+  --noir-ion-border-strong: rgba(199, 237, 255, 0.26);
+  --noir-ion-border-interactive: rgba(17, 175, 255, 0.48);
+  --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
+  --system-b-text-primary: var(--color-text-primary-token);
+  --system-b-bg-page: var(--color-bg-base);
+  --system-b-bg-surface-0: var(--color-bg-surface-0);
+  --system-b-bg-surface-1: var(--color-bg-surface-1);
+  --system-b-bg-surface-2: var(--color-bg-surface-2);
+  --system-b-app-shell-border: var(--color-border-default);
+  --system-b-app-frame-seam: var(--color-border-subtle);
+  --system-b-app-content-surface: var(--color-bg-elevated);
+  --system-b-entity-chip-release-accent: var(--color-accent);
+  --system-b-entity-chip-artist-accent: var(--color-accent-purple);
+  --system-b-entity-chip-track-accent: var(--color-accent-blue);
+  --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  --ds-marketing-eyebrow-color: #9da2ac;
+  --public-shell-text: #f5f7fb;
+}
+
 .system-b-marketing.dark :where(.bg-base),
 :root.dark .system-b-marketing :where(.bg-base) {
   background-color: var(--color-bg-base);
