@@ -151,6 +151,39 @@ test('titlebar DOM has a single sidebar toggle and no second main-cell band', as
   );
 });
 
+test('Electron main panel reaches the native window right and bottom edges', async ({
+  page,
+}) => {
+  test.skip(
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
+  );
+  test.setTimeout(180_000);
+
+  await installElectronRuntime(page);
+  await page.setViewportSize({ width: 1350, height: 860 });
+  await gotoShellRoute(page);
+  await waitForSettledShell(page);
+
+  const geometry = await page.locator('#main-content').evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return {
+      right: rect.right,
+      bottom: rect.bottom,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
+  });
+
+  expect(geometry.right, 'main panel is flush with the window right edge').toBe(
+    geometry.viewportWidth
+  );
+  expect(
+    geometry.bottom,
+    'main panel is flush with the window bottom edge'
+  ).toBe(geometry.viewportHeight);
+});
+
 test('no duplicate sidebar dock button and titlebar toggle on the same page', async ({
   page,
 }) => {
