@@ -6,20 +6,18 @@ import { fileURLToPath } from 'node:url';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
-test('tray module exports required types and classes', async () => {
+test('tray module keeps state types only (Electron tray retired)', async () => {
   const traySource = await readFile(join(desktopRoot, 'src/tray.ts'), 'utf8');
 
   assert.match(
     traySource,
     /export type TrayAppState = 'idle' \| 'active' \| 'unread' \| 'error';/
   );
-  assert.match(traySource, /export class MenuBarTray/);
+  assert.doesNotMatch(traySource, /MenuBarTray|from 'electron'/);
   assert.match(traySource, /export \{ isTrayAppState \}/);
-  assert.match(traySource, /setState\(payload: TrayStatePayload\)/);
-  assert.match(traySource, /destroy\(\)/);
 });
 
-test('main.ts wires tray IPC handler on darwin', async () => {
+test('main.ts keeps the state IPC but creates no Electron tray', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
 
   assert.match(mainSource, /TRAY_SET_STATE_CHANNEL = 'tray-set-state'/);
@@ -27,7 +25,9 @@ test('main.ts wires tray IPC handler on darwin', async () => {
   // handler may be on next line: ipcMain.handle(\n  TRAY_SET_STATE_CHANNEL,
   assert.match(mainSource, /ipcMain\.handle\(\s*\n?\s*TRAY_SET_STATE_CHANNEL/);
   assert.match(mainSource, /process\.platform === 'darwin'/);
-  assert.match(mainSource, /menuBarTray = new MenuBarTray\(/);
+  assert.doesNotMatch(mainSource, /new MenuBarTray|new Tray\(/);
+  assert.match(mainSource, /reason: 'tray-retired'/);
+  assert.match(mainSource, /accelerator: 'CommandOrControl\+N'/);
 });
 
 test('preload exposes setTrayState and onTrayAction on the bridge', async () => {

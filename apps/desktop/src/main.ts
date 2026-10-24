@@ -172,7 +172,6 @@ import { authHandoffWindowBounds } from './auth-handoff-window';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import {
   isTrayAppState,
-  MenuBarTray,
   type TrayAction,
   type TrayStatePayload,
 } from './tray';
@@ -368,7 +367,6 @@ const visualActivityReaders = new Map<number, () => boolean>();
 let publicProfilePreviewWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
 let aboutWindow: BrowserWindow | null = null;
-let menuBarTray: MenuBarTray | null = null;
 let pendingAuthCompletion: DesktopAuthCompletion | null = null;
 let recentAuthCompletion: RecentDesktopAuthCompletion | null = null;
 let pendingLegacyAuthReturnRoute: string | null = null;
@@ -3777,10 +3775,7 @@ app.whenReady().then(async () => {
   await hydrateWindowState();
   await bootSplashWordmarkReady;
 
-  // macOS menu bar extra (NSStatusItem via Electron Tray)
-  if (process.platform === 'darwin') {
-    menuBarTray = new MenuBarTray(handleTrayAction);
-  }
+  // Menu bar is owned by the SwiftUI MenuMonitor (apps/macos); no Electron tray.
 
   startupMaintenance = createStartupMaintenanceGate();
   createWindow(
@@ -3843,15 +3838,14 @@ ipcMain.handle(
       return { ok: false, reason: 'invalid-request' };
     }
     if (
-      !menuBarTray ||
       payload === null ||
       typeof payload !== 'object' ||
       !isTrayAppState((payload as Record<string, unknown>).state)
     ) {
       return { ok: false, reason: 'invalid-payload' };
     }
-    menuBarTray.setState(payload as TrayStatePayload);
-    return { ok: true };
+    // Accepted and dropped: the Electron tray is retired.
+    return { ok: false, reason: 'tray-retired' };
   }
 );
 
