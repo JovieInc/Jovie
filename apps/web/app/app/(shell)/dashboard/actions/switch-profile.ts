@@ -51,7 +51,7 @@ export async function switchActiveProfile(
           .set({ activeProfileId: profileId, updatedAt: new Date() })
           .where(
             and(
-              eq(users.id, appUserId),
+              appUserIdFilter(appUserId),
               exists(
                 tx
                   .select({ id: creatorProfiles.id })

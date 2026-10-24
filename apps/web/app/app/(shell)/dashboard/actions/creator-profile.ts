@@ -8,9 +8,10 @@
  * public visibility settings.
  */
 
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, exists } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
+import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { isCanonicalUuid } from '@/lib/auth/profile-access';
 import { invalidateProfileCache } from '@/lib/cache/profile';
@@ -19,6 +20,7 @@ import {
   getActiveWritableProfile,
   writableProfileForUser,
 } from '@/lib/db/queries/profile-ownership';
+import { users } from '@/lib/db/schema/auth';
 import { type CreatorProfile, creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { isContentClean } from '@/lib/validation/content-filter';
@@ -109,7 +111,13 @@ export async function updateCreatorProfile(
           .where(
             and(
               eq(creatorProfiles.id, profileId),
-              writableProfileForUser(userId)
+              writableProfileForUser(userId),
+              exists(
+                tx
+                  .select({ id: users.id })
+                  .from(users)
+                  .where(appUserIdFilter(userId))
+              )
             )
           )
           .returning();
@@ -233,7 +241,13 @@ async function updateProfileBooleanSetting(
           .where(
             and(
               eq(creatorProfiles.id, selected.id),
-              writableProfileForUser(userId)
+              writableProfileForUser(userId),
+              exists(
+                tx
+                  .select({ id: users.id })
+                  .from(users)
+                  .where(appUserIdFilter(userId))
+              )
             )
           )
           .returning({ id: creatorProfiles.id });
