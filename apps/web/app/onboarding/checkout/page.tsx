@@ -25,6 +25,7 @@ import {
 } from '@/lib/onboarding/upgrade-offer';
 import { loadClaimTimeProof } from '@/lib/proof/claim-time-proof.server';
 import { isRenderFixtureEnabled } from '@/lib/render-fixture-policy';
+import { getStripePriceIds } from '@/lib/stripe/price-ids';
 import { OnboardingCheckoutClient } from './OnboardingCheckoutClient';
 
 /**
@@ -40,7 +41,7 @@ function resolvePriceIds(plan: PlanIntentTier): {
   switch (plan) {
     case 'pro':
       return {
-        monthlyPriceId: PRICING.pro.monthly.priceId || '',
+        monthlyPriceId: getStripePriceIds().artistVisibilityProMonthly || '',
         annualPriceId: null,
         monthlyAmount: PRICING.pro.monthly.amount,
         annualAmount: null,

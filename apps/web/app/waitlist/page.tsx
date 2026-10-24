@@ -10,7 +10,7 @@ import {
   getWaitlistReservedHandle,
   resolveUserState,
 } from '@/lib/auth/gate';
-import { PRICING } from '@/lib/config/pricing';
+import { getStripePriceIds } from '@/lib/stripe/price-ids';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
@@ -70,7 +70,8 @@ export default async function WaitlistPage() {
 
   // Anyone signed in can buy the self-serve Pro offer while waiting; a
   // verified payment admits them (JOV-7701 founder decision, 2026-10-03).
-  const proCheckoutPriceId = PRICING.pro.monthly.priceId || null;
+  const proCheckoutPriceId =
+    getStripePriceIds().artistVisibilityProMonthly || null;
 
   // JOV-6449: gate-off post-auth must not depend on a waitlist table read.
   // Canonical WAITLIST_PENDING is enough to render the receipt.

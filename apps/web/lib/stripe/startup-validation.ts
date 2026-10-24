@@ -2,8 +2,8 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
-import { env } from '@/lib/env-server';
 import { getActivePriceIds, validateStripeConfig } from '@/lib/stripe/config';
+import { getStripePriceIds } from './price-ids';
 
 /** Startup copy for a missing Artist Visibility price. Amount comes from the offer. */
 function missingArtistVisibilityPriceIssue(): string {
@@ -44,7 +44,7 @@ export function validateStripeBillingConfig(): {
   // A later call in the same process must still see a price that was restored
   // after that import, then clear the dedupe key on the healthy result.
   const activePriceIds = getActivePriceIds();
-  const visibilityPriceId = env.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY;
+  const visibilityPriceId = getStripePriceIds().artistVisibilityProMonthly;
   const configuredPriceIds =
     activePriceIds.length > 0
       ? activePriceIds

@@ -8,6 +8,7 @@ import {
   isHostWithOptionalPort,
   sessionSecretSchema,
 } from '@/lib/env-configuration-policy';
+import { getStripePriceIdsFromEnv } from '@/lib/stripe/price-ids';
 import {
   getActiveSyntheticPrincipal,
   isControlledSyntheticMailbox,
@@ -284,7 +285,7 @@ export function checkSyntheticCohortConfiguration({
   if (expected?.scenario === 'checkout_test') {
     if (
       !/^price_[A-Za-z0-9]+$/.test(
-        env.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY ?? ''
+        getStripePriceIdsFromEnv(env).artistVisibilityProMonthly ?? ''
       )
     ) {
       issues.add('canonical_test_price_required');

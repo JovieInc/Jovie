@@ -18,6 +18,7 @@ import { PRICING } from '@/lib/config/pricing';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { HARDCODED_LEGACY_PRICES } from './legacy-prices';
+import { getStripePriceIds } from './price-ids';
 
 // Plan types supported by the application
 export type PlanType = 'free' | 'pro' | 'max';
@@ -50,9 +51,10 @@ const toMappingRecord = (
 
 // Current active price mappings (checkout-eligible)
 const buildActivePriceMappings = (): Record<string, PriceMapping> => {
+  const priceIds = getStripePriceIds();
   const mappings: PriceMapping[] = [
     {
-      priceId: env.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY || '',
+      priceId: priceIds.artistVisibilityProMonthly || '',
       plan: 'pro',
       amount: toCents(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd),
       currency: ARTIST_VISIBILITY_OFFER.pro.currency,
@@ -70,9 +72,10 @@ const buildActivePriceMappings = (): Record<string, PriceMapping> => {
  * founding -> pro per ENTITLEMENT_REGISTRY.getEntitlements('founding').
  */
 const buildLegacyPriceMappings = (): Record<string, PriceMapping> => {
+  const priceIds = getStripePriceIds();
   const mappings: PriceMapping[] = [
     {
-      priceId: env.STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY || '',
+      priceId: priceIds.youtubeThumbnailsFounderMonthly || '',
       plan: 'pro',
       amount: 2900,
       currency: 'usd',
@@ -83,7 +86,7 @@ const buildLegacyPriceMappings = (): Record<string, PriceMapping> => {
     },
 
     {
-      priceId: env.STRIPE_PRICE_PRO_MONTHLY || '',
+      priceId: priceIds.proMonthly || '',
       plan: PRICING.pro.monthly.entitlementPlan,
       amount: 3900,
       currency: 'usd',
@@ -92,7 +95,7 @@ const buildLegacyPriceMappings = (): Record<string, PriceMapping> => {
       description: PRICING.pro.monthly.label,
     },
     {
-      priceId: PRICING.pro.annual.priceId || '',
+      priceId: priceIds.proAnnual || priceIds.proYearly || '',
       plan: PRICING.pro.annual.entitlementPlan,
       amount: PRICING.pro.annual.amount,
       currency: 'usd',
@@ -101,7 +104,7 @@ const buildLegacyPriceMappings = (): Record<string, PriceMapping> => {
       description: PRICING.pro.annual.label,
     },
     {
-      priceId: PRICING.max.monthly.priceId || '',
+      priceId: priceIds.maxMonthly || priceIds.growthMonthly || '',
       plan: PRICING.max.monthly.entitlementPlan,
       amount: PRICING.max.monthly.amount,
       currency: 'usd',
@@ -110,7 +113,7 @@ const buildLegacyPriceMappings = (): Record<string, PriceMapping> => {
       description: PRICING.max.monthly.label,
     },
     {
-      priceId: PRICING.max.annual.priceId || '',
+      priceId: priceIds.maxYearly || priceIds.growthYearly || '',
       plan: PRICING.max.annual.entitlementPlan,
       amount: PRICING.max.annual.amount,
       currency: 'usd',
@@ -120,9 +123,9 @@ const buildLegacyPriceMappings = (): Record<string, PriceMapping> => {
     },
   ];
 
-  if (env.STRIPE_PRICE_FOUNDING_MONTHLY) {
+  if (priceIds.foundingMonthly) {
     mappings.push({
-      priceId: env.STRIPE_PRICE_FOUNDING_MONTHLY,
+      priceId: priceIds.foundingMonthly,
       plan: 'pro',
       amount: 1200,
       currency: 'usd',
@@ -197,8 +200,8 @@ export function getAvailablePricing() {
 
 export function isYouTubeThumbnailFounderPriceId(priceId: string): boolean {
   return (
-    Boolean(env.STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY) &&
-    priceId === env.STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY
+    Boolean(getStripePriceIds().youtubeThumbnailsFounderMonthly) &&
+    priceId === getStripePriceIds().youtubeThumbnailsFounderMonthly
   );
 }
 
@@ -228,7 +231,7 @@ export function validateStripeConfig(): {
   }
 
   // Pro tier is the primary paid product — must be configured
-  if (!env.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY) {
+  if (!getStripePriceIds().artistVisibilityProMonthly) {
     missingVars.push('STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY');
   }
 
