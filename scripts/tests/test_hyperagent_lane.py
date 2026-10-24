@@ -102,6 +102,27 @@ class HyperagentLaneTest(unittest.TestCase):
         self.assertEqual(rows[0]["threadId"], "thread-1")
         self.assertFalse(any(n == "resolve_approval" for n, _ in self.calls))
 
+    def test_model_budget_stop_is_resumed_once_then_goes_to_a_human(self):
+        self.payload["messages"] = [{"role": "error", "content": "This turn reached its model budget of $10.00. Continue with a new message"}]
+        self.payload["isRunning"] = False
+        self.payload["awaitingApproval"] = False
+        held = self.run_remote()
+        sends = [a for n, a in self.calls if n == "send_message"]
+        self.assertEqual(len(sends), 1)
+        self.assertEqual(held["reasons"], ["remote-pr-missing"])
+        journal = self.path.parent / "hyperagent-approvals.jsonl"
+        self.assertEqual(json.loads(journal.read_text().splitlines()[0])["reason"], "budget-exhausted-twice")
+
+    def test_agent_that_ends_on_a_question_is_recorded_not_answered(self):
+        self.payload["messages"] = [{"role": "assistant", "content": "Which of the two branches should I use?"}]
+        self.payload["isRunning"] = False
+        self.payload["awaitingApproval"] = False
+        held = self.run_remote()
+        self.assertEqual(held["reasons"], ["remote-pr-missing"])
+        self.assertFalse(any(n == "send_message" for n, _ in self.calls))
+        rows = [json.loads(l) for l in (self.path.parent / "hyperagent-approvals.jsonl").read_text().splitlines()]
+        self.assertEqual(rows[0]["reason"], "agent-needs-input")
+
     def test_restart_resumes_known_thread_without_send_or_create(self):
         self.payload["awaitingApproval"] = True
         self.assertEqual(self.run_remote()["reasons"], ["remote-approval-required"])
