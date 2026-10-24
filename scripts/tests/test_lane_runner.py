@@ -750,6 +750,11 @@ class PromptTest(unittest.TestCase):
                 self.assertIn("linear-issue-identifier:JOV-42", prompt)
                 self.assertIn("normal implementation", prompt)
 
+    def test_prompt_defaults_pr_body_to_internal_changelog_decision(self):
+        prompt = lane.render_prompt(issue("JOV-42"), "codex/jov-42-x", "")
+        self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', prompt)
+        self.assertIn("docs/CHANGELOG_PUBLICATION.md", prompt)
+
     def test_contract_forbids_interactive_skill_workflows(self):
         prompt = lane.render_prompt(issue(), "codex/jov-1", "")
         self.assertIn("Never stop to ask", prompt)
@@ -4961,7 +4966,11 @@ class DispatchTest(unittest.TestCase):
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stdout="", stderr="")
         lane.doctor.run = lambda *a, **k: {}
         lane.disk_guard.check = lambda host: {"freePct": 50.0, "low": False, "critical": False, "admitted": True}
-        with tempfile.TemporaryDirectory() as tmp:
+        # Autoscale samples live load/PSI; on a busy or small host it trims the
+        # fine lane below its 2 configured seats. This fixture isolates provider
+        # fault handling, not autoscale — pin the mode off like the sibling above.
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"SYMPHONY_AUTOSCALE": "off"}):
             try:
                 host = lane.Host(state=Path(tmp), repo=Path(tmp))
                 self.assertEqual(lane.dispatch(host), 0)
@@ -13090,6 +13099,133 @@ class RepositoryBindingTest(unittest.TestCase):
         self.assertFalse(Path(receipt["worktree"]).exists())
         self.assertFalse(any("pre-push-gate" in " ".join(map(str, args)) for args in calls))
 
+    def issue_origin(self):
+        """A bare origin with a main the binding clone tracks (the push tests' fixture)."""
+        root = Path(self.tmp.name)
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
+        env.pop("GIT_DIR", None)
+        run = lambda *args, cwd=root: subprocess.run(args, cwd=cwd, env=env, check=True, capture_output=True)
+        run("git", "init", "-q", "--bare", "-b", "main", str(root / "origin.git"))
+        shutil.rmtree(self.repo)
+        run("git", "clone", "-q", str(root / "origin.git"), str(self.repo))
+        run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=self.repo)
+        run("git", "push", "-q", "origin", "HEAD:main", cwd=self.repo)
+        return env
+
+    def test_binding_fetch_serializes_per_repo_and_retries_a_lost_ref_lock(self):
+        # JOV-8902 (LYB-226): three seats claimed in the same second raced the shared clone's
+        # refs/remotes/origin/main and the run died "cannot lock ref" 2s in. One fetch at a
+        # time per binding repo; a lost race retries once instead of failing the run.
+        calls, in_flight, overlap, guard = [], [], [], threading.Lock()
+
+        def sh(args, *rest, **kwargs):
+            if args[:2] == ["git", "fetch"]:
+                with guard:
+                    calls.append(args)
+                    in_flight.append(args)
+                    if len(in_flight) > 1:
+                        overlap.append(list(args))
+                time.sleep(0.05)
+                with guard:
+                    in_flight.pop()
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with patch.object(lane, "sh", side_effect=sh):
+            threads = [threading.Thread(target=lane.bindings.fetch,
+                                        args=(lane, self.host, self.binding, None, "main"))
+                       for _ in range(3)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(10)
+        self.assertFalse(any(thread.is_alive() for thread in threads))
+        self.assertEqual(overlap, [], "concurrent seats never fetch the same clone at once")
+        self.assertEqual(len(calls), 3)
+
+    def test_binding_fetch_retries_a_lost_ref_lock_and_fails_closed_after_the_cap(self):
+        lost_lock = ("error: cannot lock ref 'refs/remotes/origin/main': "
+                     "is at 8c586db0 but expected 4e376fa0")
+        calls = []
+
+        def sh(args, *rest, **kwargs):
+            if args[:2] == ["git", "fetch"]:
+                calls.append(args)
+                if len(calls) == 1:
+                    return SimpleNamespace(returncode=1, stdout="", stderr=lost_lock)
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with patch.object(lane, "sh", side_effect=sh):
+            lane.bindings.fetch(lane, self.host, self.binding, None, "main")
+        self.assertEqual(len(calls), 2, "one lost ref-lock race retried once")
+        calls.clear()
+
+        def always(args, *rest, **kwargs):
+            if args[:2] == ["git", "fetch"]:
+                calls.append(args)
+                return SimpleNamespace(returncode=1, stdout="", stderr=lost_lock)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with patch.object(lane, "sh", side_effect=always):
+            with self.assertRaises(RuntimeError) as caught:
+                lane.bindings.fetch(lane, self.host, self.binding, None, "main")
+        self.assertEqual(str(caught.exception), "git-fetch-failed")
+        self.assertEqual(len(calls), lane.bindings.FETCH_ATTEMPTS, "bounded, no unbounded re-fetching")
+        calls.clear()
+
+        def real_fault(args, *rest, **kwargs):
+            if args[:2] == ["git", "fetch"]:
+                calls.append(args)
+                return SimpleNamespace(returncode=128, stdout="", stderr="fatal: not a git repository")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with patch.object(lane, "sh", side_effect=real_fault):
+            with self.assertRaises(RuntimeError):
+                lane.bindings.fetch(lane, self.host, self.binding, None, "main")
+        self.assertEqual(len(calls), 1, "a non-ref-lock fault fails immediately, no retry")
+
+    def test_a_flaky_pre_push_hook_does_not_fail_the_issue(self):
+        # JOV-8902: LYB's pre-push hook runs the test suite; a flaky suite must not fail the
+        # run's push (and the issue with it). One retry, never --no-verify: the hook still
+        # gates every attempt.
+        env = self.issue_origin()
+        real_sh, pushes = lane.sh, []
+
+        def sh(args, *rest, **kwargs):
+            if args[:2] == ["git", "push"]:
+                pushes.append(args)
+                if len(pushes) == 1:
+                    return SimpleNamespace(returncode=1, stdout="", stderr="Pre-push checks failed. Push aborted.")
+            if args[0] == "gh":
+                return SimpleNamespace(returncode=0, stdout="https://github.com/JovieInc/LogYourBody/pull/9\n", stderr="")
+            return real_sh(args, *rest, **kwargs)
+        spec = {"model": "m", "cmd": ["sh", "-c", "echo fix > fix.txt && git add fix.txt && git commit -qm 'fix: x'"]}
+        with patch.dict(os.environ, env), patch.object(lane, "sh", side_effect=sh), \
+                patch.object(lane, "context_pack", return_value=""):
+            binding = dataclasses.replace(self.binding, install=())
+            receipt = lane.bindings.run(lane, self.host, binding, "codex", spec, issue=self.lyb("LYB-7"))
+        self.assertEqual(receipt["verdict"], "pr-opened", receipt)
+        self.assertEqual(len(pushes), 2, "the flaky push retried once and succeeded")
+        self.assertFalse(any("--no-verify" in args for args in pushes), "the hook still gates every push")
+
+    def test_a_persistent_pre_push_failure_still_fails_the_issue(self):
+        env = self.issue_origin()
+        real_sh, pushes = lane.sh, []
+
+        def sh(args, *rest, **kwargs):
+            if args[:2] == ["git", "push"]:
+                pushes.append(args)
+                return SimpleNamespace(returncode=1, stdout="", stderr="Pre-push checks failed. Push aborted.")
+            if args[0] == "gh":
+                return SimpleNamespace(returncode=0, stdout="https://github.com/JovieInc/LogYourBody/pull/9\n", stderr="")
+            return real_sh(args, *rest, **kwargs)
+        spec = {"model": "m", "cmd": ["sh", "-c", "echo fix > fix.txt && git add fix.txt && git commit -qm 'fix: x'"]}
+        with patch.dict(os.environ, env), patch.object(lane, "sh", side_effect=sh), \
+                patch.object(lane, "context_pack", return_value=""):
+            binding = dataclasses.replace(self.binding, install=())
+            receipt = lane.bindings.run(lane, self.host, binding, "codex", spec, issue=self.lyb("LYB-7"))
+        self.assertEqual(receipt["verdict"], "failed", "a real regression still fails: the hook is the gate")
+        self.assertIn("git-push-failed", receipt["reasons"][0])
+        self.assertEqual(len(pushes), lane.bindings.PUSH_ATTEMPTS, "bounded, no unbounded hook re-runs")
+
     def repair_origin(self):
         root = Path(self.tmp.name)
         env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
@@ -14572,3 +14708,190 @@ class AdoptionShareTest(unittest.TestCase):
             (host.state / "adopt-share.json").write_text("not json")
             with patch.dict(os.environ, {"LANES_ADOPT_SHARE_EVERY": "bogus"}):
                 self.assertEqual(sum(lane.adoption_turn_due(host) for _ in range(lane.ADOPT_SHARE_EVERY)), 1)
+
+
+class FixNowTest(unittest.TestCase):
+    """JOV-8931: lane_runner fix-now drains relay wake files with the same
+    admission as dispatch(); dedupe is an O_EXCL marker per PR+SHA+attempt."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.state = Path(self.tmp.name)
+        self.host = lane.Host(state=self.state, repo=self.state / "repo")
+        self.wake_dir = self.state / "wake"
+
+    def wake(self, *, pr=22868, sha="a" * 40, run_id=987654, attempt=2,
+             red_at="2026-10-23T18:27:30Z", payload=None):
+        path = self.wake_dir / f"red-{pr}-{sha}-{attempt}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if payload is None:
+            payload = {"schema": "jovie-lane-red-wake/v1", "pr": pr, "sha": sha,
+                       "runId": run_id, "runAttempt": attempt, "redAt": red_at}
+        path.write_text(json.dumps(payload))
+        return path
+
+    def rows(self):
+        ledger = self.state / "runs/red-dispatch.jsonl"
+        if not ledger.exists():
+            return []
+        return [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
+
+    def healthy(self, *, slots=1):
+        return patch.object(lane.disk_guard, "check", return_value={"admitted": True}), \
+            patch.object(lane, "load_providers", return_value={"codex": {"slots": slots}}), \
+            patch.object(self.host, "slots", return_value=slots), \
+            patch.object(lane, "cooling", return_value=False), \
+            patch.object(lane, "quota_pressure", return_value={"ok": True}), \
+            patch.object(lane, "provider_healthy", return_value=True)
+
+    def test_fix_now_spawns_worker_and_records_dispatch_row(self):
+        wake = self.wake()
+        fixes = self.healthy()
+        with lane.lifecycle.Guard(self.state) as guard, \
+                fixes[0], fixes[1], fixes[2], fixes[3], fixes[4], fixes[5], \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_called_once()
+            rows = self.rows()
+            self.assertEqual(len(rows), 1)
+            row = rows[0]
+            self.assertEqual(row["schema"], "jovie-lane-red-dispatch/v1")
+            self.assertEqual(row["status"], "dispatched")
+            # JOV-8933 collector joins on these four keys.
+            self.assertEqual((row["pr"], row["sha"], row["runId"], row["runAttempt"]),
+                             (22868, "a" * 40, 987654, 2))
+            self.assertEqual(row["redAt"], "2026-10-23T18:27:30Z")
+            self.assertTrue(row["dispatchedAt"])
+            self.assertIsNone(row["claimAt"])
+            self.assertFalse(wake.exists())
+            self.assertTrue((self.wake_dir / (wake.name + ".claim")).exists())
+
+    def test_fix_now_records_no_slot_and_keeps_label(self):
+        wake = self.wake()
+        fixes = self.healthy(slots=0)
+        with fixes[0], fixes[1], fixes[2], fixes[3], fixes[4], fixes[5], \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_not_called()
+            rows = self.rows()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["status"], "no-slot")
+            self.assertFalse(wake.exists())
+
+    def test_fix_now_disk_denial_records_no_slot(self):
+        wake = self.wake()
+        with patch.object(lane.disk_guard, "check", return_value={"admitted": False}), \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_not_called()
+            self.assertEqual(self.rows()[0]["status"], "no-slot")
+            self.assertFalse(wake.exists())
+
+    def test_fix_now_dedupe_marker_skips_reactivation(self):
+        wake = self.wake()
+        marker = self.wake_dir / (wake.name + ".claim")
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("")
+        with self.healthy()[0], patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_not_called()
+            self.assertEqual(self.rows(), [])
+
+    def test_fix_now_skips_active_claim(self):
+        wake = self.wake()
+        with self.healthy()[0], \
+                patch.object(lane.pr_events, "claim_active", return_value=True), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_not_called()
+            self.assertEqual(self.rows()[0]["status"], "already-claimed")
+
+    def test_fix_now_hourly_cap_keeps_label(self):
+        now = time.time()
+        ledger = self.state / "runs/red-dispatch.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        with ledger.open("a") as handle:
+            for _ in range(lane.MAX_RED_DISPATCH_PER_PR_PER_HOUR):
+                handle.write(json.dumps({"pr": 22868, "sha": "b" * 40, "status": "dispatched",
+                                         "dispatchedEpoch": now - 60}) + "\n")
+        wake = self.wake()
+        fixes = self.healthy()
+        with fixes[0], fixes[1], fixes[2], fixes[3], fixes[4], fixes[5], \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_not_called()
+            self.assertEqual(self.rows()[-1]["status"], "no-slot")
+            self.assertEqual(self.rows()[-1]["reason"], "hourly-cap")
+            self.assertFalse(wake.exists())
+
+    def test_fix_now_rejects_oversized_wake_file(self):
+        wake = self.wake(payload={"big": "x" * (lane.WAKE_FILE_MAX_BYTES + 1)})
+        with patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            spawn.assert_not_called()
+            self.assertEqual(self.rows()[0]["status"], "invalid")
+            self.assertFalse(wake.exists())
+
+    def test_fix_now_processes_at_most_max_wake_files(self):
+        for index in range(lane.MAX_WAKE_PER_ACTIVATION + 2):
+            self.wake(pr=22868 + index)
+        fixes = self.healthy()
+        with lane.lifecycle.Guard(self.state), \
+                fixes[0], fixes[1], fixes[2], fixes[3], fixes[4], fixes[5], \
+                patch.object(lane.pr_events, "claim_active", return_value=False), \
+                patch.object(lane.subprocess, "Popen") as spawn:
+            self.assertEqual(lane.fix_now(self.host), 0)
+            self.assertEqual(spawn.call_count, lane.MAX_WAKE_PER_ACTIVATION)
+            remaining = list(self.wake_dir.glob("red-*.json"))
+            self.assertEqual(len(remaining), 2)
+
+    def test_fix_now_ignores_missing_wake_dir(self):
+        self.assertEqual(lane.fix_now(self.host), 0)
+
+    def test_post_claim_appends_stamps_and_claim_row(self):
+        self.state.mkdir(parents=True, exist_ok=True)
+        ledger = self.state / "runs/red-dispatch.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        ledger.write_text(json.dumps({"schema": "jovie-lane-red-dispatch/v1", "status": "dispatched",
+                                      "pr": 22868, "sha": "a" * 40, "runId": 987654, "runAttempt": 2,
+                                      "redAt": "2026-10-23T18:27:30Z", "dispatchedAt": "2026-10-23T18:28:00Z",
+                                      "claimAt": None}) + "\n")
+        calls = []
+
+        def fake_sh(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with patch.dict(os.environ, {"LANES_STATE": str(self.state)}), \
+                patch.object(lane, "sh", fake_sh), \
+                patch.object(lane, "now_iso", return_value="2026-10-23T18:30:00Z"):
+            lane.post_claim(22868, "a" * 40, "fix")
+        body = calls[0][-1]
+        self.assertIn("red_at=2026-10-23T18:27:30Z", body)
+        self.assertIn("dispatched_at=2026-10-23T18:28:00Z", body)
+        self.assertIn("claim_at=2026-10-23T18:30:00Z", body)
+        rows = [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[1]["status"], "claimed")
+        # Collector join survives the claim row.
+        self.assertEqual((rows[1]["pr"], rows[1]["sha"], rows[1]["runId"], rows[1]["runAttempt"]),
+                         (22868, "a" * 40, 987654, 2))
+
+    def test_post_claim_without_dispatch_row_unchanged(self):
+        self.state.mkdir(parents=True, exist_ok=True)
+        calls = []
+
+        def fake_sh(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with patch.dict(os.environ, {"LANES_STATE": str(self.state)}), \
+                patch.object(lane, "sh", fake_sh):
+            lane.post_claim(22868, "a" * 40, "fix")
+        self.assertNotIn("red_at=", calls[0][-1])
+        self.assertFalse((self.state / "runs/red-dispatch.jsonl").exists())

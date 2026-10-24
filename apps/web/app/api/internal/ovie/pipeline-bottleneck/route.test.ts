@@ -93,6 +93,18 @@ describe('GET pipeline bottleneck', () => {
     }
   );
 
+  it.each(['not-a-url', 'javascript:alert(1)'])(
+    'returns unknown for Summer input with a malformed status link (%s)',
+    async statusLink => {
+      mocks.get.mockImplementation(async (path: string) =>
+        path === PIPELINE_BOTTLENECK_PATH
+          ? blob(bottleneckFixture({ statusLink }))
+          : blob(contributionFixture())
+      );
+      expect(await (await GET()).json()).toBeNull();
+    }
+  );
+
   it('retains Summer when the optional loop Blob fails', async () => {
     mocks.get.mockImplementation(async (path: string) => {
       if (path === PIPELINE_CONTRIBUTION_PATH) throw new Error('Unavailable');
