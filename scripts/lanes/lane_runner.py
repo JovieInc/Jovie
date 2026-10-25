@@ -5208,6 +5208,59 @@ def _event_delivery_snapshot(host: Host, now: float) -> dict:
     return report
 
 
+def settle_obsolete_start_deliveries(host: Host, linear, now: float | None = None, limit: int = 30) -> dict:
+    """Close start deliveries that can never be acknowledged, each with a recorded reason.
+
+    Gem 2026-10-25: the doctor said "Remediation alerts are not being acknowledged (57 failed delivery
+    records)" for days. All 57 were `startDelivery` rows that failed with a terminal error before the
+    terminal rule existed (event-start-preimage-changed 46, ownership-unproven 7, cap-exhausted 4) and
+    that nothing revisits: 39 belonged to events already done or exhausted, 18 to events claimed by a lane
+    that never calls claim_labeled_event. A start that no longer applies is closed `superseded` with
+    `closedReason`; one whose issue is still Todo gets a fresh delivery once; one whose remote moved on
+    ends its event as exhausted (it stays in eventsExhausted, which has its own alarm)."""
+    now = time.time() if now is None else now
+    lock = Locked(host.state / "claim.lock", blocking=True)
+    closed = {"event-ended": 0, "remote-moved-on": 0, "reset": 0, "unread": 0}
+    try:
+        data = _event_escalation(host)
+        reads = 0
+        for fingerprint, row in (data.get("events") or {}).items():
+            delivery = row.get("startDelivery") if isinstance(row, dict) else None
+            if not isinstance(delivery, dict) or delivery.get("status") not in {"failed", "sending", "exhausted"} or row.get("running"):
+                continue
+            if row.get("status") in {"done", "exhausted"}:
+                delivery.update(status="superseded", closedAt=now, closedReason=f"event-{row['status']}: its generation ended, so the start no longer applies")
+                closed["event-ended"] += 1
+                continue
+            if reads >= limit or not row.get("issueId"):
+                continue
+            reads += 1
+            try:
+                remote = linear.gql('query($id:String!){issue(id:$id){id state{id name}}}', {"id": row["issueId"]})
+                state = (remote.get("issue") or {}).get("state") if isinstance(remote, dict) else None
+            except (Exception, SystemExit):
+                state = None
+            if not isinstance(state, dict):
+                closed["unread"] += 1
+                continue
+            if state.get("id") == row.get("startedStateId"):
+                continue  # already started remotely: the owning lane's claim path proves or releases it
+            if state.get("name") == "Todo":
+                row["priorStartDeliveries"] = [*(row.get("priorStartDeliveries") or []), delivery][-20:]
+                row.pop("startDelivery", None)  # one fresh delivery: the issue is still startable
+                closed["reset"] += 1
+                continue
+            delivery.update(status="superseded", closedAt=now,
+                            closedReason=f"remote-moved-on: the issue is now {state.get('name')}, not the Todo preimage")
+            row.update(status="exhausted", lane=None, running=False, release=False, exhaustedReason="remote-moved-on")
+            closed["remote-moved-on"] += 1
+        if any(closed[key] for key in ("event-ended", "remote-moved-on", "reset")):
+            _save_event_json(host, "escalation.json", data)
+    finally:
+        lock.release()
+    return closed
+
+
 def drain_event_delivery(host: Host, linear) -> dict:
     """Drain the durable journal without claiming new events, for a tick whose wider
     remediation reconciliation failed: a failed delivery still retries with backoff here
@@ -8873,6 +8926,11 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["shippingOriginIngest"] = collect_shipping_origin(host.state)
             except Exception as error:
                 tick["shippingOriginIngest"] = {"errors": [f"{type(error).__name__}:{error}"[:200]]}
+        if not os.environ.get("LANES_SELFTEST"):
+            try:
+                tick["remediationStartSettled"] = settle_obsolete_start_deliveries(host, Linear(host.linear_env))
+            except (Exception, SystemExit) as error:  # settling stale starts never takes spawn down
+                tick["remediationStartSettledError"] = f"{type(error).__name__}: {error}"[:200]
         try:
             tick["remediationEvents"] = claim_remediation_events(host, Linear(host.linear_env))
         except (Exception, SystemExit) as error:  # the label scan (or a missing key) never takes spawn down
