@@ -192,14 +192,12 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
       name: 'Create Release',
       exact: true,
     });
-    // The drawer is a lazy chunk: a fill that lands before React attaches its
-    // handlers changes only the DOM and is reverted on the next render. The
-    // button is enabled only once the title reached React state, so retry the
-    // fill until that is observable.
-    await expect(async () => {
-      await drawer.locator('#release-title').fill(releaseTitle);
-      await expect(createRelease).toBeEnabled({ timeout: 2_000 });
-    }).toPass({ timeout: 60_000 });
+    const titleInput = drawer.locator('#release-title');
+    await expect(titleInput).toBeVisible();
+    await expect(titleInput).toBeEditable();
+    await titleInput.fill(releaseTitle, { timeout: 30_000 });
+    await expect(titleInput).toHaveValue(releaseTitle);
+    await expect(createRelease).toBeEnabled();
     await drawer
       .getByRole('button', { name: 'Release Date', exact: true })
       .click();
