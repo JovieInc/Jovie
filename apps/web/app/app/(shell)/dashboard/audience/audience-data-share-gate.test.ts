@@ -51,4 +51,42 @@ describe('audience share gate runs outside the cache', () => {
       emailVisibleToArtist: false,
     });
   });
+
+  it('also gates the subscribers view after the cache (names and birthdays too)', async () => {
+    STALE.mode = 'subscribers';
+    STALE.rows = [
+      {
+        id: 's1',
+        type: 'email',
+        displayName: 'Revoked Person',
+        birthday: '1990-01-01',
+        email: 'revoked@example.com',
+        phone: null,
+        emailVisibleToArtist: true,
+      },
+    ] as never;
+    const chain = {
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockResolvedValue([]),
+    };
+    vi.mocked(withDbSessionTx).mockImplementation(operation =>
+      operation(chain as unknown as DbSessionTx, 'app-user-1')
+    );
+
+    const result = await getAudienceServerData({
+      userId: 'app-user-1',
+      selectedProfileId: 'profile-1',
+      searchParams: {},
+    });
+
+    expect(result.rows[0]).toMatchObject({
+      email: null,
+      phone: null,
+      displayName: 'Email Subscriber',
+      birthday: null,
+      emailVisibleToArtist: false,
+    });
+    expect(JSON.stringify(result)).not.toContain('Revoked Person');
+  });
 });
