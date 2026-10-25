@@ -5088,6 +5088,7 @@ class DispatchTest(unittest.TestCase):
                     patch.object(lane, "claim_remediation_events", return_value={}), \
                     patch.object(lane, "Linear", side_effect=failure, return_value=client), \
                     patch.object(lane.linear_sync, "tick", return_value={"JOV": {"outcome": "rate-limited"}}) as sync, \
+                    patch.object(lane.macos_pool, "sample", return_value={}), \
                     patch.object(lane.epics, "reconcile", return_value={}), \
                     patch.object(lane.pr_events, "tick", return_value={}), \
                     patch.object(lane.reason_lane, "tick", return_value={}), \

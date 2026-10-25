@@ -28,6 +28,7 @@ import time
 from pathlib import Path
 
 import backlog_rank
+import macos_pool
 
 READY_LABEL = "agent-ready"
 # Labels that mean a human decision, a human-owned task or a container: never auto-promoted.
@@ -181,8 +182,15 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
         _write(path, receipt)
         return receipt
     live = [row for row in rows if pending.get(row["id"]) != "Todo"]
+    # LYB iOS work waits while LYB's running + queued hosted-macOS jobs are at the cap (macos_pool.HOLD_AT):
+    # the shared pool is Jovie's merge-group Mac lane too. Fails open without a fresh sample.
+    admission = macos_pool.admission(state, now) if binding.key == "LYB" else {"hold": False}
+    live, macos_held = macos_pool.partition_ios(live, admission["hold"])
     picked, skipped = select(live, goal - depth, binding.excluded, lambda row: lane.issue_hits_red_line(_issue(lane, row)),
                              now, _factory_share(state))
+    skipped.update(macos_held)
+    if binding.key == "LYB":
+        receipt["macosAdmission"] = admission
     outbox = lane.linear_sync.Outboxed(state, linear)
     for row in picked:
         outbox.move(row["id"], "Todo")
