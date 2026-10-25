@@ -29,7 +29,7 @@ paths = [
     #
     # WHY this broad test-path allowlist stays (JOV-8895, measured 2026-10-25):
 # with the default ruleset loaded, a scan of the current tree WITHOUT these
-# six entries reports 71 findings, every one a synthetic test value (fake API
+# six entries reports 36 findings, every one a synthetic test value (fake API
 # keys, JWT stubs, hex literals) in test/spec/fixture/mock files. Excluding
 # whole test paths is the only volume-feasible shape until each test value is
 # individually regex-excluded; new code that must be scanned should live
