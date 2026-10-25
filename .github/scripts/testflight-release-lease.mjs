@@ -535,7 +535,7 @@ export function command(args, options = {}) {
       : evidenceFailureKind(result.stderr, result.stdout, route);
   const annotation = stderr
     .split('\n')
-    .find(line => line.startsWith('::error::GitHub rate limit'));
+    .find(line => /^::error::(?:\[fixture\] )?GitHub rate limit/.test(line));
   const detail = annotation ? `: ${annotation.slice('::error::'.length)}` : '';
   assert(
     result.status === 0,

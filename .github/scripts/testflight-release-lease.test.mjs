@@ -450,6 +450,9 @@ printf '%s\\n' '{"ok":true}'
         assert.match(error.message, /; rate limited: /);
         assert.match(error.message, /outside the 30s budget/);
         assert.match(error.message, /Not passing/);
+        // Mocked resets are labelled so they cannot pass for a live refusal.
+        assert.match(error.message, /\[fixture\] GitHub rate limit resets at/);
+        assert.match(error.message, /\(resource=core\)/);
         assert.doesNotMatch(error.message, /rewound or diverged/);
         assert.doesNotMatch(
           error.message,
