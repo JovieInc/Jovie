@@ -8188,7 +8188,15 @@ def record_idle_exit(host: Host, name: str, reason: str, *, deferred=None) -> No
         if deferred: blocks[str(deferred["pr"]["number"])] = deferred
         else: blocks = {number: row for number, row in blocks.items() if row.get("terminal", False)}
         data[name] = {"at": now_iso(), "reason": reason, **({"deferredRequeue": blocks} if blocks else {})}
-        path.write_text(json.dumps(data))
+        # Readers (doctor, HUD, the next worker's deferred-requeue scan, test snapshots) do not take
+        # claim.lock. A truncating write_text let them read an empty file: ClaimScanCacheTest failed
+        # ~5% of runs under load with JSONDecodeError and refused the 07:39Z release on Gem.
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        try:
+            temporary.write_text(json.dumps(data))
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
         throughput_sentinel.append_idle_exit(host.state, REPO_SLUG, name, reason)
     except (OSError, ValueError):
         pass

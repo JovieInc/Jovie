@@ -259,9 +259,10 @@ export async function runFleetRules({ event, request }) {
   )
     throw new Error('PR event metadata missing');
   const path = `/repos/${repository}/pulls/${number}`;
-  const pr = await request(path);
-  if (pr.head?.sha !== event.pull_request.head?.sha)
-    throw new Error('PR head changed; fresh event required');
+  // Two reads, not three: the files, then the PR once. The event's own head
+  // sha is the baseline the old first PR read only copied, and one PR read
+  // after the files still proves the head did not move and the file count is
+  // complete. Saves one GITHUB_TOKEN call per PR event (~590 runs/hour).
   const files = [];
   for (let page = 1; page <= 30; page++) {
     const batch = await request(`${path}/files?per_page=100&page=${page}`);
@@ -269,17 +270,14 @@ export async function runFleetRules({ event, request }) {
     files.push(...batch);
     if (batch.length < 100) break;
   }
+  const current = await request(path);
+  if (current.head?.sha !== event.pull_request.head?.sha)
+    throw new Error('PR head changed; fresh event required');
   if (
-    files.length !== pr.changed_files ||
+    files.length !== current.changed_files ||
     files.some(file => typeof file.filename !== 'string')
   )
     throw new Error('incomplete PR file count');
-  const current = await request(path);
-  if (
-    current.head?.sha !== pr.head.sha ||
-    current.changed_files !== files.length
-  )
-    throw new Error('PR head or files changed during read');
   return evaluateFleetRules({ pr: current, files, repository });
 }
 
