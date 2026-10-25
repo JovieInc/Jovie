@@ -714,7 +714,8 @@ class RetiredHostLoopTest(unittest.TestCase):
         backups = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/sweep/"],
                                  cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
         self.assertEqual(len(backups), 1, report)
-        self.assertTrue(backups[0].endswith("/JOV-2-" + guard.datetime.fromtimestamp(NOW, guard.timezone.utc).strftime("%Y%m%d")))
+        self.assertIn("/JOV-2-" + guard.datetime.fromtimestamp(NOW, guard.timezone.utc).strftime("%Y%m%d") + "-",
+                      backups[0])
         shown = subprocess.run(["git", "show", f"{backups[0]}:wip.txt"], cwd=origin, env=self.env,
                                capture_output=True, text=True).stdout
         self.assertEqual(shown, "unsaved")
