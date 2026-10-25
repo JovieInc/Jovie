@@ -15,7 +15,8 @@ jobs:
   fleet:
     name: PR Fleet Rules
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    # 3 min of work plus one bounded quota-reset hold (FLEET_RULES_QUOTA_HOLD_SECONDS, 120s).
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -25,14 +26,11 @@ jobs:
           node-version-file: .nvmrc
       - name: Test fleet policy with coverage
         run: node --test --experimental-test-coverage --test-coverage-include=scripts/pr-fleet-rules.mjs --test-coverage-lines=95 --test-coverage-functions=100 --test-coverage-branches=90 scripts/pr-fleet-rules.test.mjs
-      - name: Blast-radius warning (never blocks)
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          node scripts/pr-fleet-rules.mjs --warnings-only || true
-          exit 0
+      # One evidence read prints the blast-radius warnings and enforces the
+      # blocking rules. Two reads doubled this workflow's installation-budget
+      # spend on every PR event. Quota or outage exits 75 with a
+      # github-quota-deferred marker that the lane relay re-runs, never repairs.
       - name: Enforce receipts, red-before-green and locked areas
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/pr-fleet-rules.mjs
+        run: node scripts/pr-fleet-rules.mjs --with-warnings
