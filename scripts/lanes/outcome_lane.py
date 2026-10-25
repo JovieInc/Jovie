@@ -40,6 +40,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import lifecycle  # noqa: E402
 import outcome_escalation as esc  # noqa: E402
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 VERDICT_SCHEMA = "jovie.outcome-verdict/v1"
 VERDICT_FILE = "outcome-verdict.json"
@@ -519,7 +522,7 @@ def tick(host, lane, spawn=subprocess.Popen) -> dict:
         last = 0
     if time.time() - last < 900:
         return {"status": "not-due"}
-    stamp.write_text(json.dumps({"at": time.time()}))
+    atomic_write_text(stamp, json.dumps({"at": time.time()}))
     spawn([sys.executable, str(HERE / "outcome_lane.py"), "drain"], stdin=subprocess.DEVNULL,
           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
           **lifecycle.spawn_kwargs())
