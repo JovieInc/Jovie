@@ -6572,7 +6572,10 @@ jobs:
           test -f apps/web/.next/standalone/apps/web/server.js
           (
             cd apps/web
+            # Same deterministic switches as the manual Golden Path lane: the
+            # scripted onboarding fallback and one bounded real Spotify import.
             export NODE_ENV=test VERCEL_ENV=development E2E_TEST_MODE=1 \
+              E2E_FAST_ONBOARDING=1 CHAT_LLM_FAILURE_INJECTION=1 \
               PUBLIC_NOAUTH_SMOKE=1 HOSTNAME=localhost PORT=3250 \
               STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY=price_jovie_journey_pro \
               NEXT_PUBLIC_APP_URL=http://localhost:3250 \
@@ -6595,6 +6598,16 @@ jobs:
             node .github/scripts/guard-playwright-artifacts.mjs --run -- \
             pnpm --filter @jovie/web exec playwright test \
             --config=playwright.config.journey.ts --project=chromium
+      - name: Upload journey failure evidence
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        continue-on-error: true
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: blocking-journey-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/
+          if-no-files-found: error
+          retention-days: 7
+          allow-markdown: 'true'
       - name: Delete isolated journey branch
         if: ${{ always() && steps.journey-db.outputs.branch_id != '' }}
         env:

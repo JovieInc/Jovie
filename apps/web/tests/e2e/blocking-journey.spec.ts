@@ -84,10 +84,20 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
         send.click(),
       ]);
       expect(response.status()).toBe(200);
-      await expect(input).toBeEditable();
+      await expect(input).toBeEditable({ timeout: 60_000 });
+      return response;
     };
-    await sendTurn('https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN');
-    await sendTurn('Set my profile handle');
+    // The deterministic onboarding engine names the stage it answered with in
+    // x-onboarding-fallback; asserting it separates "injection is off" from
+    // "the card never rendered".
+    const artistTurn = await sendTurn(
+      'https://open.spotify.com/artist/1ZlSI1juLMMN1HU8X7RViN'
+    );
+    expect(artistTurn.headers()['x-onboarding-fallback']).toMatch(
+      /^confirm_artist:/
+    );
+    const handleTurn = await sendTurn('Set my profile handle');
+    expect(handleTurn.headers()['x-onboarding-fallback']).toMatch(/^handle:/);
     const card = page.getByTestId('onboarding-handle-check');
     await expect(card).toBeVisible();
     await card.getByLabel('Edit Proposed Handle').fill(handle);
