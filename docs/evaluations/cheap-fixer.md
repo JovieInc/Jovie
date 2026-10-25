@@ -42,21 +42,3 @@ Per attempt (scripts/cheap-fixer/cheap-fixer.mjs), exits at the first failed gat
 11. Never executes PR code. Logs and file text are untrusted; the prompt says so, and the guards plus Jev are the backstop.
 
 Measurement (receipt `jovie-cheap-fixer-receipt/v1`, uploaded every run): `stages.red` (run updated_at) to `start`, `logs`, `claimed`, `model`, `guards`, `jev`, `pushed` ISO stamps, `durationMs`, per-model token usage and USD, outcome, class, matched signature, failed jobs. Derived: time-to-first-fix = pushed - red; success = new head goes green and is not reverted (join to check suites on `pushedSha`); cost per fixed PR = sum costUsd of runs ending `pushed` plus Jev cost / count; lanes load avoided = fixed PRs whose `lane-fix-red` clears with no lane claim. `scripts/cheap-fixer/report` (follow-up) will join receipts to outcomes.
-
-## Rungs (2026-10-24 update)
-
-Order inside one attempt, all behind the same hold, lane-claim, stale-head and handoff rules. A rung is chosen from the failing job's log; push mode requires the rung's action in `CHEAP_FIXER_PUSH_CLASSES`.
-
-| Action (push-class name) | Trigger | What it does | Model / Jev |
-|---|---|---|---|
-| `format`, `lint` (biome) | log shows biome/formatter | Biome pinned to 2.5.14 with the trusted `biome.json` from main runs `check --write` on the files the PR changed (data only, no PR code or config runs), then `check` again; pushes only if the second pass is clean. Guards: protected paths, at most 25 files / 600 lines. | none |
-| `fleet_rerun` | `Fleet rule evidence unavailable` (the rule script threw: head moved, incomplete read, API quota) | `rerun-failed-jobs` once, only for attempt 1 and only while the PR head still equals the run's sha. Changes nothing else. | none |
-| `fleet_body` | `red-before-green` | Fills `Failing command:` and `Failing run (before fix):` from an earlier failed required run on the same branch whose failing step is a single-line command and whose log classifies as a code failure. Verified by running the real `evaluateFleetRules` on the new body. Never overwrites a real value. If no such run exists the facts are not derivable: hand off. | none |
-| `fleet_handoff` | locked-areas, done-receipt, assertions, or red-before-green with no derivable facts | Posts one comment per head naming exactly what is missing (a human or lane owns the fact). | none |
-| `typecheck`, `test`, `snapshot`, `generated` | everything else code-like | Model rung described above. | glm-5.3-flash + Jev |
-
-Graduation: model classes need at least 95% of approved fixes to go green in shadow; deterministic actions can graduate after 10 real events pass.
-
-### Proposal for the lanes (not built here)
-
-`lane_runner.post_claim` already holds the red run id (`red_dispatch_stamps`). The lane could write `## Red-before-green` with `Failing run (before fix): <run URL>` into the PR body when it claims a `lane-fix-red` PR (and `Failing command:` when the failing step is a single-line command), instead of relying on the agent to remember the instruction in `render_fix_prompt`. That removes the red-before-green class at the source. It touches `scripts/lanes/lane_runner.py`, so it needs the lanes owner.
