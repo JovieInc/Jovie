@@ -75,6 +75,37 @@ describe('Ops cockpit sections', () => {
     ).toHaveTextContent('Failing, 54 behind');
   });
 
+  it('shows Jovie merge-to-production p95 lag against its target, bad when over', () => {
+    const view = {
+      ...cockpitShipping,
+      delivery: {
+        ...cockpitShipping.delivery,
+        lanes: {
+          deployHealth: {
+            observedAt: '2026-10-25T06:40:00.000Z',
+            healthy: true,
+            repos: [],
+            lag: [
+              {
+                repo: 'JovieInc/Jovie',
+                p50Min: 56,
+                p95Min: 246,
+                samples: 187,
+                targetP50Min: 30,
+                targetP95Min: 90,
+              },
+            ],
+          },
+        },
+      },
+    };
+    render(<HudShippingStrip view={view} />);
+
+    expect(screen.getByTestId('hud-shipping-chip-prod-lag')).toHaveTextContent(
+      'p95 246m / 90m'
+    );
+  });
+
   it('shows LogYourBody behind main as not measured until the feed publishes it', () => {
     render(<HudShippingStrip view={cockpitShipping} />);
 
