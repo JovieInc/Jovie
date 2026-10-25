@@ -168,6 +168,19 @@ describe('router', () => {
     const third = await system1Call({ task: 't', state: '3' }, d);
     expect(third.status).toBe('over-budget');
   });
+  it('counts tuning replays against their own cap so they never starve production', async () => {
+    const fake = async () => ({ ...answer('yes', 0.9), costUsd: 0.3 });
+    const d = { registry: registry(), store, now, transports: { fake } };
+    await system1Call({ task: 't', state: 'r1', replay: true }, d);
+    await system1Call({ task: 't', state: 'r2', replay: true }, d);
+    const replayDenied = await system1Call(
+      { task: 't', state: 'r3', replay: true },
+      d
+    );
+    const production = await system1Call({ task: 't', state: 'p1' }, d);
+    expect(replayDenied.status).toBe('over-budget');
+    expect(production.status).toBe('ok');
+  });
   it('builds few-shot state and picks the tuned version while active', () => {
     expect(
       buildState(
