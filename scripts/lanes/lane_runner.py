@@ -57,6 +57,7 @@ import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
+from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
 import ownership  # noqa: E402  (started-state live-owner invariant)
@@ -141,7 +142,8 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_linear_sync.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
+RELEASE_EXTRAS = ["scripts/apiclient/__init__.py", "scripts/apiclient/__main__.py", "scripts/apiclient/cache.py", "scripts/apiclient/client.py", "scripts/apiclient/contract.py", "scripts/apiclient/credentials.py", "scripts/apiclient/fake.py", "scripts/apiclient/gh.py", "scripts/apiclient/github.py", "scripts/apiclient/headers.py", "scripts/apiclient/legacy.py", "scripts/apiclient/linear.py", "scripts/apiclient/policy.py", "scripts/apiclient/store.py", "packages/api-client/providers.json",
+                  "scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
                   "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
                   "scripts/fleet-gate/symphony_proof_context.py", "scripts/fleet-gate/scoped_admission.py",
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
@@ -3283,15 +3285,15 @@ def stamp_agent_path(number, provider: str, account: str, dispatch: str | None =
     """Append `Agent-Path: <provider>/<account>` to an agent-spawned PR body once. Best effort and
     idempotent: attribution must never change a run's outcome."""
     try:
-        viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO_SLUG, "--json", "body", "--jq", ".body"], timeout=60)
+        viewed = gh_call(["pr", "view", str(number), "--repo", REPO_SLUG, "--json", "body", "--jq", ".body"])
         if viewed.returncode:
             return False
         body = viewed.stdout.rstrip("\n")
         if AGENT_PATH_RE.search(body):
             return False
-        edited = sh(["gh", "pr", "edit", str(number), "--repo", REPO_SLUG,
-                     "--body", f"{body}\n\nAgent-Path: {provider}/{account}\n"
-                     + (f"Dispatch ID: thread {dispatch}\n" if dispatch else "")], timeout=60)
+        edited = gh_call(["pr", "edit", str(number), "--repo", REPO_SLUG,
+                          "--body", f"{body}\n\nAgent-Path: {provider}/{account}\n"
+                          + (f"Dispatch ID: thread {dispatch}\n" if dispatch else "")])
         return edited.returncode == 0
     except (subprocess.SubprocessError, OSError):
         return False
@@ -3417,8 +3419,8 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
                         raise RuntimeError("PR read unavailable")
                     return json.loads(result.stdout)
                 def find_branch_pr(head_branch):
-                    result = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--head", head_branch, "--state", "open",
-                                 "--json", "number,url,state,title,body,headRefName,headRefOid"])
+                    result = gh_call(["pr", "list", "--repo", REPO_SLUG, "--head", head_branch, "--state", "open",
+                                      "--json", "number,url,state,title,body,headRefName,headRefOid"])
                     rows = json.loads(result.stdout or "[]") if result.returncode == 0 else []
                     return rows[0] if len(rows) == 1 else None
                 def gate(pr):

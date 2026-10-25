@@ -322,16 +322,22 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         self.addCleanup(attest.stop)
         self.edits = []
         def read(args, **kwargs):
+            self.assertEqual(args[:3], ["gh", "pr", "view"])
+            return type("Read", (), {"returncode": 0, "stdout": json.dumps(self.pr)})()
+        def budgeted(args, **kwargs):  # gh_call: the Agent-Path stamp and the branch lookup
             reply = lambda out: type("Read", (), {"returncode": 0, "stdout": out})()
-            if args[:3] == ["gh", "pr", "edit"]:  # Agent-Path attribution stamp
+            if args[:2] == ["pr", "edit"]:
                 self.edits.append(args)
                 return reply("")
-            self.assertEqual(args[:3], ["gh", "pr", "view"])
-            return reply(self.pr["body"] if "--jq" in args else json.dumps(self.pr))
+            if args[:2] == ["pr", "list"]:
+                return reply("[]")
+            self.assertEqual(args[:2], ["pr", "view"])
+            return reply(self.pr["body"])
         def adopt(host, provider, pr):
             self.gates.append((provider, pr))
             return {"verdict": "verified-not-queued", "pr": 7, "prUrl": pr["url"], "headSha": pr["headRefOid"]}
         for patcher in [patch.object(lane, "sh", side_effect=read),
+                        patch.object(lane, "gh_call", side_effect=budgeted),
                         patch.object(lane, "context_pack", return_value="fixture context"),
                         patch.object(lane, "adopt_pr", side_effect=adopt),
                         patch("runpy.run_path", return_value={"mcp_call": self.call}),

@@ -5998,14 +5998,14 @@ class ProviderBreakerTest(unittest.TestCase):
         calls = []
         def shell(args, **kwargs):
             calls.append(args)
-            body = "Refs JOV-1.\n" if args[:3] == ["gh", "pr", "view"] else ""
+            body = "Refs JOV-1.\n" if args[:2] == ["pr", "view"] else ""
             return SimpleNamespace(returncode=0, stdout=body, stderr="")
-        with patch.object(lane, "sh", side_effect=shell):
+        with patch.object(lane, "gh_call", side_effect=shell):
             self.assertTrue(lane.stamp_agent_path(5, "hyperagent", "agent-1", "thread-9"))
-        edit = next(args for args in calls if args[:3] == ["gh", "pr", "edit"])
+        edit = next(args for args in calls if args[:2] == ["pr", "edit"])
         self.assertIn("Agent-Path: hyperagent/agent-1\nDispatch ID: thread thread-9", edit[edit.index("--body") + 1])
         calls.clear()
-        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout="x\n\nAgent-Path: codex/a\n", stderr="")) as run:
+        with patch.object(lane, "gh_call", return_value=SimpleNamespace(returncode=0, stdout="x\n\nAgent-Path: codex/a\n", stderr="")) as run:
             self.assertFalse(lane.stamp_agent_path(5, "codex", "a"))
         self.assertEqual(run.call_count, 1)
 
