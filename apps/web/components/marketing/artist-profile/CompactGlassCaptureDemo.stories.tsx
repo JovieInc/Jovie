@@ -46,7 +46,7 @@ export const Resettable: Story = {
 export const Static: Story = {
   render: () => (
     <CompactGlassModule>
-      <div className='compact-glass-module__demo'>
+      <div className='compact-capture-module__demo'>
         <CaptureActionPill capture={ARTIST_PROFILE_COPY.capture} phase='done' />
       </div>
     </CompactGlassModule>
@@ -72,9 +72,9 @@ export const LongContent: Story = {
 export const Fallback: Story = {
   render: () => (
     <CompactGlassModule>
-      <div className='compact-glass-module__demo'>
+      <div className='compact-capture-module__demo'>
         <CaptureActionPill capture={ARTIST_PROFILE_COPY.capture} phase='idle' />
-        <p className='compact-glass-module__status'>
+        <p className='compact-capture-module__status'>
           Demo preview — the live demo needs JavaScript; nothing is sent or
           stored.
         </p>
