@@ -26,6 +26,11 @@ import {
   hashEmailOtp,
   isValidEmailOtpFormat,
 } from '@/lib/notifications/email-otp';
+import {
+  consumeEmailOtp,
+  EMAIL_OTP_MAX_ATTEMPTS,
+  spendEmailOtpAttempt,
+} from '@/lib/notifications/email-otp-attempts';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 
@@ -225,35 +230,28 @@ export async function verifyEmailOtp(
     };
   }
 
-  // Check attempt limit
-  if ((subscription.emailOtpAttempts ?? 0) >= 5) {
-    return {
-      success: false,
-      error: 'Too many attempts. Request a new code.',
-      status: 429,
-    };
+  const tooManyAttempts = {
+    success: false,
+    error: 'Too many attempts. Request a new code.',
+    status: 429,
+  } as const;
+  if ((subscription.emailOtpAttempts ?? 0) >= EMAIL_OTP_MAX_ATTEMPTS) {
+    return tooManyAttempts;
   }
 
-  // Verify hash
+  const currentOtp = {
+    id: subscription.id,
+    emailOtpHash: subscription.emailOtpHash,
+  };
+  if (!(await spendEmailOtpAttempt(currentOtp, now))) return tooManyAttempts;
+
   if (hashEmailOtp(params.code) !== subscription.emailOtpHash) {
-    await db
-      .update(notificationSubscriptions)
-      .set({ emailOtpAttempts: (subscription.emailOtpAttempts ?? 0) + 1 })
-      .where(eq(notificationSubscriptions.id, subscription.id));
     return { success: false, error: 'Invalid verification code', status: 400 };
   }
 
-  // Confirm subscription
-  await db
-    .update(notificationSubscriptions)
-    .set({
-      confirmedAt: now,
-      confirmationToken: null,
-      emailOtpHash: null,
-      emailOtpExpiresAt: null,
-      emailOtpAttempts: 0,
-    })
-    .where(eq(notificationSubscriptions.id, subscription.id));
+  if (!(await consumeEmailOtp(currentOtp, now))) {
+    return { success: false, error: 'Invalid verification code', status: 400 };
+  }
 
   return { success: true, subscriptionId: subscription.id };
 }
