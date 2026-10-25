@@ -83,11 +83,14 @@ test('a changed UI component without a passing story gate is refused; with a pas
   assert.ok(!ok.errors.some(error => error.rule === 'story'));
 });
 
-test('main refuses to run gh when the preflight fails, and runs it when clean', () => {
+test('main refuses to run gh when the preflight fails, and runs it when clean', async () => {
   const logs = [];
   const calls = [];
-  const run = (...args) => (calls.push(args), { status: 0 });
-  const refuse = main({
+  const run = args => (
+    calls.push(args),
+    { code: 0, stdout: 'https://example.test/pr/1', stderr: '' }
+  );
+  const refuse = await main({
     args: ['--title', 'fix: y', '--body', 'x'],
     log: line => logs.push(line),
     run,
@@ -96,7 +99,7 @@ test('main refuses to run gh when the preflight fails, and runs it when clean', 
   assert.equal(refuse, 1);
   assert.equal(calls.length, 0);
   assert.match(logs.join('\n'), /not created; 1 rule\(s\) would fail/);
-  const created = main({
+  const created = await main({
     args: [
       '--title',
       't',
@@ -111,7 +114,7 @@ test('main refuses to run gh when the preflight fails, and runs it when clean', 
     check: () => ({ errors: [] }),
   });
   assert.equal(created, 0);
-  assert.deepEqual(calls[0][1], [
+  assert.deepEqual(calls[0], [
     'pr',
     'create',
     '--title',

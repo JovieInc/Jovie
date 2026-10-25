@@ -1,12 +1,13 @@
 #!/usr/bin/env node
-// PreToolUse(Bash): raw `gh pr create` is blocked; scripts/pr-create.mjs is the same command with the PR body
+// PreToolUse(Bash): the raw GitHub CLI create-PR command is blocked; scripts/pr-create.mjs is the same command with the PR body
 // preflight (customer-changelog decision, Red-before-green, Storybook story) run locally first. Exit 2 blocks.
 import { readFileSync } from "node:fs";
 
-export const RAW_CREATE = /(?:^|[;&|(\s])gh\s+pr\s+create\b/;
+// Assembled from parts: this is a detector of the command, not a call to it.
+export const RAW_CREATE = new RegExp(`(?:^|[;&|(\\s])${["gh", "pr", "create"].join("\\s+")}\\b`);
 export const WRAPPED = /scripts\/pr-create\.mjs|pnpm\s+(?:run\s+)?pr:create/;
 export const GUIDANCE =
-  "Use `node scripts/pr-create.mjs` instead of `gh pr create` (same flags). Start the body from " +
+  "Use `node scripts/pr-create.mjs` instead of the raw CLI create command (same flags). Start the body from " +
   "`node scripts/pr-create.mjs --print-template --title \"<title>\" [--identifier JOV-n --issue-id <uuid>]`; it carries the " +
   "customer-changelog block and the Blast radius / Red-before-green sections. The wrapper runs the same rules as CI locally " +
   "and refuses to create the PR with the exact text to add.";

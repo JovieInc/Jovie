@@ -8,9 +8,9 @@
  * One list call per workflow plus one log read per failed run (the shared GitHub quota is the cost; --max-logs bounds it
  * and the unread remainder is reported as `unclassified`).
  */
-import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { runGh } from '../packages/api-client/gh.ts';
 
 export const WORKFLOWS = ['PR Fleet Rules', 'Source Validation'];
 export const CAUSES = [
@@ -28,18 +28,17 @@ export const CAUSES = [
 export const classify = log =>
   CAUSES.filter(([, pattern]) => pattern.test(log)).map(([name]) => name);
 
-export function census({
+export async function census({
   hours = 24,
   maxLogs = 120,
-  gh = args =>
-    execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 64 << 20 }),
+  gh = async args => (await runGh(args, { priority: 'poll' })).stdout,
   now = Date.now(),
 } = {}) {
   const since = new Date(now - hours * 3600e3).toISOString();
   const runs = [];
   for (const workflow of WORKFLOWS) {
     const rows = JSON.parse(
-      gh([
+      await gh([
         'run',
         'list',
         '-R',
@@ -80,7 +79,7 @@ export function census({
     read++;
     let log = '';
     try {
-      log = gh([
+      log = await gh([
         'run',
         'view',
         String(run.databaseId),
@@ -116,7 +115,7 @@ if (
   const args = process.argv.slice(2);
   const value = (name, fallback) =>
     args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
-  const result = census({
+  const result = await census({
     hours: Number(value('--hours', 24)),
     maxLogs: Number(value('--max-logs', 120)),
   });

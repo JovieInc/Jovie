@@ -14,7 +14,7 @@ test('failed-run logs are attributed to the avoidable reds', () => {
   assert.deepEqual(classify('unrelated vitest failure'), []);
 });
 
-test('the census counts only failed pull_request runs, bounds log reads and reports the rest', () => {
+test('the census counts only failed pull_request runs, bounds log reads and reports the rest', async () => {
   const rows = [
     {
       databaseId: 1,
@@ -45,7 +45,7 @@ test('the census counts only failed pull_request runs, bounds log reads and repo
     args[0] === 'run' && args[1] === 'list'
       ? JSON.stringify(args.includes('PR Fleet Rules') ? rows : [])
       : 'red-before-green: x';
-  const result = census({
+  const result = await census({
     hours: 24,
     maxLogs: 1,
     gh,
@@ -58,7 +58,7 @@ test('the census counts only failed pull_request runs, bounds log reads and repo
   assert.equal(result.distinctBranches, 1);
 });
 
-test('a capped log read samples every workflow, not only the first listed', () => {
+test('a capped log read samples every workflow, not only the first listed', async () => {
   const row = (id, branch) => ({
     databaseId: id,
     conclusion: 'failure',
@@ -76,6 +76,6 @@ test('a capped log read samples every workflow, not only the first listed', () =
     read.push(args[2]);
     return '';
   };
-  census({ maxLogs: 2, gh, now: Date.UTC(2026, 9, 25) });
+  await census({ maxLogs: 2, gh, now: Date.UTC(2026, 9, 25) });
   assert.deepEqual(read, ['1', '3']);
 });

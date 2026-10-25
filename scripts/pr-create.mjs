@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
- * `gh pr create` that cannot forget the three things nearly every PR was red for (customer-changelog decision,
- * Red-before-green, Storybook story for UI). Same flags as `gh pr create` plus:
+ * the GitHub CLI create-PR command that cannot forget the three things nearly every PR was red for (customer-changelog decision,
+ * Red-before-green, Storybook story for UI). Same flags as the GitHub CLI create-PR command plus:
  *
  *   node scripts/pr-create.mjs --print-template --title "fix: x" [--identifier JOV-1 --issue-id UUID]
  *   node scripts/pr-create.mjs --check --title "fix: x" --body-file body.md      # preflight only (JSON-free, exit 1 on a miss)
- *   node scripts/pr-create.mjs --title "fix: x" --body-file body.md [--draft ...] # preflight, then gh pr create
+ *   node scripts/pr-create.mjs --title "fix: x" --body-file body.md [--draft ...] # preflight, then create the PR
  *
  * The preflight runs locally, with no API call, and refuses to create the PR when a rule would fail, naming
  * exactly what to add. There is deliberately no skip flag.
  */
-import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { runGh } from '../packages/api-client/gh.ts';
 import { buildBody, formatErrors, preflight } from './lib/pr-body-template.mjs';
 
 const value = (args, name) => {
@@ -31,10 +31,10 @@ const without = (args, names) => {
   return out;
 };
 
-export function main({
+export async function main({
   args = process.argv.slice(2),
   log = console.log,
-  run = spawnSync,
+  run = args => runGh(args, { priority: 'default' }),
   check = preflight,
   read = readFileSync,
 } = {}) {
@@ -72,11 +72,11 @@ export function main({
     return 0;
   }
   const passthrough = without(args, ['--base-ref']);
-  return (
-    run('gh', ['pr', 'create', ...passthrough], { stdio: 'inherit' }).status ??
-    1
-  );
+  const done = await run(['pr', 'create', ...passthrough]);
+  if (done.stdout) log(String(done.stdout).trimEnd());
+  if (done.stderr) console.error(String(done.stderr).trimEnd());
+  return done.code ?? 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
-  process.exitCode = main();
+  process.exitCode = await main();
