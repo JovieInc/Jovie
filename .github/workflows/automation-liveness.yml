@@ -53,6 +53,33 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # 2026-10-24: the shared installation REST budget ran dry and a dozen PRs
+      # went red until a manual rerun. GET /rate_limit is free; each sample is a
+      # point in the consumption series and alarms below 15% remaining. Reuses
+      # this sanctioned ~25m backstop (JOV-INV-042: no new clock).
+      - name: Sample GitHub installation budget
+        id: installation-budget
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/installation-budget-sentinel.mjs
+
+      - name: Send Slack Alert on Low Installation Budget
+        if: ${{ always() && steps.installation-budget.outputs.low == 'true' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: "#alerts-production"
+          author_name: "CI Budget Sentinel"
+          custom_payload: |
+            {
+              "text": "GitHub installation REST budget below 15%: ${{ steps.installation-budget.outputs.remaining }}/${{ steps.installation-budget.outputs.limit }} left, resets in ${{ steps.installation-budget.outputs.reset_in_seconds }}s. PR gates defer (exit 75) until the reset.",
+              "attachments": [{ "color": "warning", "fields": [{ "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>", "short": false }] }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
       # JOV-6813: independent of the canary's own job/alert steps. Reuse this
       # sanctioned ~25m backstop; a daily AI-only success is not a heartbeat.
       - name: Check synthetic canary heartbeat
@@ -67,8 +94,8 @@ jobs:
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
-          channel: '#alerts-production'
-          author_name: 'Synthetic Monitoring'
+          channel: "#alerts-production"
+          author_name: "Synthetic Monitoring"
           custom_payload: |
             {
               "text": "Production Synthetic Monitoring Failed - jov.ie",
