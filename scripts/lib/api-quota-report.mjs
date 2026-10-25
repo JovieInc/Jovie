@@ -6,6 +6,9 @@
 //     reads the `api-quota` notices Merge Queue Green Enroll's enroll job emits
 //     (bucket=github-token|jovie-bot) and prints per-10-minute minimum
 //     remaining per bucket, plus exhausted samples.
+//   node scripts/lib/api-quota-report.mjs headroom --hours 1 [--json]
+//     hourly headroom per bucket: min/median remaining, exhausted samples and
+//     the share of samples that were empty (the number Ovie shows).
 //   node scripts/lib/api-quota-report.mjs admission --runs 40
 //     prints Merge Group Admission job duration p50/p95/max over recent
 //     merge_group CI runs (a quota stall shows up as minutes, not seconds).
@@ -74,6 +77,50 @@ export function summarizeQuota(samples, windowSeconds = 600) {
   );
 }
 
+/**
+ * Hourly headroom per bucket from `api-quota` samples.
+ * `emptyShare` is the fraction of samples taken with zero calls left: the
+ * share of the hour merge-queue and evidence reads would have been deferred.
+ * @param {Array<ReturnType<typeof parseQuotaNotice>>} samples
+ * @param {number} windowSeconds
+ */
+export function summarizeHeadroom(samples, windowSeconds = 3600) {
+  const rows = new Map();
+  for (const sample of samples) {
+    if (!sample) continue;
+    const windowStart = Math.floor(sample.at / windowSeconds) * windowSeconds;
+    const key = `${sample.bucket}@${windowStart}`;
+    const row = rows.get(key) ?? {
+      bucket: sample.bucket,
+      windowStart,
+      limit: sample.limit,
+      values: [],
+    };
+    row.values.push(sample.remaining);
+    rows.set(key, row);
+  }
+  return [...rows.values()]
+    .map(row => ({
+      bucket: row.bucket,
+      windowStart: new Date(row.windowStart * 1000).toISOString(),
+      limit: row.limit,
+      samples: row.values.length,
+      minRemaining: Math.min(...row.values),
+      medianRemaining: percentile(row.values, 50),
+      exhaustedSamples: row.values.filter(value => value === 0).length,
+      emptyShare:
+        Math.round(
+          (row.values.filter(value => value === 0).length / row.values.length) *
+            1000
+        ) / 1000,
+    }))
+    .sort(
+      (a, b) =>
+        a.windowStart.localeCompare(b.windowStart) ||
+        a.bucket.localeCompare(b.bucket)
+    );
+}
+
 /** Seconds a job ran, or null when it never started or finished. */
 export function jobSeconds(job) {
   const started = Date.parse(job?.started_at);
@@ -96,7 +143,7 @@ function flag(argv, name, fallback) {
   return index >= 0 ? Number(argv[index + 1]) : fallback;
 }
 
-function quota(argv) {
+function collectSamples(argv) {
   const hours = flag(argv, 'hours', 3);
   const maxSamples = flag(argv, 'max-samples', 60);
   const since = new Date(Date.now() - hours * 3600_000).toISOString();
@@ -119,7 +166,30 @@ function quota(argv) {
         samples.push(parseQuotaNotice(annotation.message));
     }
   }
-  const rows = summarizeQuota(samples);
+  return samples;
+}
+
+function headroom(argv) {
+  const rows = summarizeHeadroom(collectSamples(argv));
+  if (argv.includes('--json')) {
+    console.log(
+      JSON.stringify({
+        schema: 'jovie-actions-quota-headroom/v1',
+        generatedAt: new Date().toISOString(),
+        windows: rows,
+      })
+    );
+    return;
+  }
+  for (const row of rows)
+    console.log(
+      `${row.windowStart.slice(0, 16)}Z ${row.bucket.padEnd(12)} min=${row.minRemaining} median=${row.medianRemaining} limit=${row.limit} empty=${(row.emptyShare * 100).toFixed(1)}% samples=${row.samples}`
+    );
+  if (rows.length === 0) console.log('no api-quota samples in window');
+}
+
+function quota(argv) {
+  const rows = summarizeQuota(collectSamples(argv));
   for (const row of rows) {
     console.log(
       `${new Date(row.windowStart * 1000).toISOString().slice(11, 16)}Z ${row.bucket.padEnd(12)} min_remaining=${row.minRemaining} samples=${row.samples} exhausted=${row.exhausted}`
@@ -150,10 +220,11 @@ function admission(argv) {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const [command, ...rest] = process.argv.slice(2);
   if (command === 'quota') quota(rest);
+  else if (command === 'headroom') headroom(rest);
   else if (command === 'admission') admission(rest);
   else {
     console.error(
-      'usage: api-quota-report.mjs quota|admission [--hours N] [--runs N]'
+      'usage: api-quota-report.mjs quota|headroom|admission [--hours N] [--runs N]'
     );
     process.exit(2);
   }
