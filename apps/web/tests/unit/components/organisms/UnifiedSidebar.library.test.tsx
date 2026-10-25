@@ -689,7 +689,7 @@ describe('UnifiedSidebar library route', () => {
         href: link.getAttribute('href'),
       }))
     ).toEqual(
-      // Business is collapsed here; Tools is open because Ops is active.
+      // Company is collapsed here; Tools is open because Ops is active.
       ADMIN_NAV_REGISTRY.filter(item => item.section !== 'business').map(
         item => ({
           label: item.label,
@@ -787,7 +787,7 @@ describe('UnifiedSidebar library route', () => {
       within(operatorNavigation).getByRole('link', { name: 'Presence' })
     ).toBeVisible();
     const business = within(operatorNavigation).getByRole('button', {
-      name: 'Business',
+      name: 'Company',
     });
     expect(business).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(business);
