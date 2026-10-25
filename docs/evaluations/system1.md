@@ -38,6 +38,46 @@ labeler over an outcome source; today `backlog-readiness` reads the lanes Linear
 mirror (reached Validating/Merging/In Review = ready; Rework or a blocked /
 human-decision label = not_ready; everything else stays unlabeled).
 
+## Tune
+
+`node scripts/system1.mjs tune --task T [--apply]` splits the labeled items
+deterministically (about 30% held out by item id), proposes candidates, scores
+the current version and each candidate on the same held-out items, and promotes
+the best one only if all hold:
+
+1. at least `minHeldout` held-out items,
+2. every task guardrail passes on the candidate (precision, recall, false-positive
+   rate, coverage, abstain),
+3. objective gain >= 0.02,
+4. net wins >= 2, where an item is a win when the candidate's outcome is better
+   (right = +1, abstain = 0, wrong = -1).
+
+Levers, cheapest first: recalibrated abstain floor (offline), recalibrated
+positive-class cutoff (offline), few-shot examples built from verified mistakes,
+another route (Jev vs Clef), and a cutoff recalibrated on replayed train items
+for each replayed variant. Replays are logged with `replay: true` and excluded
+from volume, accuracy and joins; their cost shows as tuning cost.
+
+A promoted version is stored in `versions/<task>.json` with its parent and the
+held-out evidence; the router uses the active pointer. `rollback --task T` moves
+the pointer back one step (to the baseline `v1` when there is no earlier tuned
+version). `weekly` runs label-outcomes, tune --apply for every task, and writes
+`reports/latest.json` (per-task volume, cost, latency, label coverage, quality,
+weekly trend, tuning outcome) for Ovie and the liveness check.
+
+## Fine-tuning paths (checked 2026-10-25)
+
+- Clef: Cloudflare launched a managed RL fine-tuning service with the models
+  (Oct 1 2026): forward-deployed-engineer led, design-partner form for existing
+  customers, self-serve platform announced with no date, no public pricing.
+  Datasets can come from AI Gateway logs; the tuned model is served through
+  Workers AI "bring your own model". The weights are open (Apache 2.0), so a
+  self-run LoRA is possible on our own GPU but is not set up. Both are Tim asks
+  (outbound form, unpriced spend).
+- Jev: no public tuning path found; TypeSafe console is the place to ask.
+- Until either lands, prompt/few-shot, thresholds/cutoffs and route choice are
+  the levers; the ledger and eval sets are the datasets a fine-tune would use.
+
 ## Add a task
 
 Add an entry to `ops/registry/system1-tasks.json` (labels, positive class,
