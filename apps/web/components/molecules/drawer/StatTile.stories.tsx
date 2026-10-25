@@ -30,3 +30,34 @@ export const WithHint: Story = {
     hint: '+8% vs last week',
   },
 };
+
+export const Loading: Story = {
+  args: {
+    state: 'loading',
+  },
+};
+
+export const NotMeasured: Story = {
+  args: {
+    state: 'not-measured',
+    notMeasuredSource: 'streaming ingestion',
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    label: 'Top referrer territory this quarter',
+    value: '1,234,567',
+    hint: 'Measures the leading territory by referred clicks over the rolling quarter window',
+  },
+};
+
+export const Rtl: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl' className='w-40 bg-surface-0 p-3'>
+        <Story />
+      </div>
+    ),
+  ],
+};
