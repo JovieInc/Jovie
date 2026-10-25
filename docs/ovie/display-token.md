@@ -25,8 +25,11 @@ login.
    to `/display`.
 4. The server accepts a proof at most 60 s old and 5 s ahead, compares in
    constant time, spends it once (Redis `SET NX` per device and timestamp), and
-   rate limits attempts (10 a minute). All of this fails closed when Redis is
-   unavailable. It then sets `ovie_display` (HttpOnly, Secure, SameSite=Strict,
+   rate limits attempts (10 a minute per client address and claimed device id, so
+   junk from elsewhere cannot lock the Air out). The POST must be JSON and, if it
+   carries an Origin, same origin. A denial is 401, over the cap is 429, and a
+   store outage is a retryable 503 that does not spend the proof; none of these
+   is ever treated as allowed. On success it sets `ovie_display` (HttpOnly, Secure, SameSite=Strict,
    12 h): an HMAC-signed `{scope: ovie-home-read, device, iat, exp}`.
 5. Every display request re-checks signature, expiry, scope, that the device is
    still registered and enabled, `iat >= revokedBefore`, and the runtime
