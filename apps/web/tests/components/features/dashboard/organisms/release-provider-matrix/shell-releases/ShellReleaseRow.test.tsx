@@ -105,7 +105,15 @@ describe('ShellReleaseRow audio affordance', () => {
     );
 
     const row = container.querySelector('[data-shell-release-row]');
-    expect(row).toHaveAttribute('aria-selected', 'true');
+    // Rows ARE native list items inside `role="list"` (implicit listitem —
+    // no explicit role, no wrapper element): an ARIA `option` cannot contain
+    // the row's real controls (axe nested-interactive), so selection stays
+    // visual (`data-selected` + selected tokens), not `aria-selected`.
+    expect(row?.tagName).toBe('LI');
+    expect(row).not.toHaveAttribute('role');
+    // name-from-author: the row announces its release title.
+    expect(row).toHaveAttribute('aria-label', 'Lost in the Light');
+    expect(row).not.toHaveAttribute('aria-selected');
     expect(row).toHaveAttribute('data-selected', 'true');
     expect(row?.className).toContain('system-b-table-row-selected');
     expect(row?.className).toContain('system-b-table-row-focus-visible');
@@ -132,7 +140,7 @@ describe('ShellReleaseRow audio affordance', () => {
     });
 
     expect(row?.className).toContain('system-b-table-row-shell');
-    expect(row?.className).toContain('h-14');
+    expect(row?.className).toContain('h-8');
     expect(slot).toHaveClass('system-b-table-contextual-action');
     expect(slot.className).not.toContain('group-hover/row');
     expect(trigger.className).not.toContain('group-hover/row');
@@ -159,6 +167,26 @@ describe('ShellReleaseRow audio affordance', () => {
       'leading-[1.2]'
     );
     expect(screen.getByText('Bahamas').className).toContain('text-2xs');
+  });
+
+  it('keeps the title target at the 24px WCAG 2.5.8 floor in the dense row', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r-target-size',
+          title: 'Lost in the Light',
+          previewUrl: null,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    // The h-8 dense row renders the title as the EntityHoverLink button;
+    // axe target-size (WCAG 2.2 AA, not allowlistable) measures its box.
+    expect(screen.getByText('Lost in the Light').className).toContain(
+      'min-h-6'
+    );
   });
 
   it('omits the play overlay when the release has no preview URL', () => {
@@ -436,7 +464,7 @@ describe('ShellReleaseRow enrichment', () => {
       />
     );
     const idleRow = idle.container.querySelector('[data-shell-release-row]');
-    expect(idleRow?.className).toContain('h-14');
+    expect(idleRow?.className).toContain('h-8');
     idle.unmount();
 
     const syncing = render(
@@ -453,7 +481,7 @@ describe('ShellReleaseRow enrichment', () => {
     // Same fixed row height token in both states — the sync chrome lives
     // inside the existing single-line subtitle and an absolutely-positioned
     // pulse, so adding it cannot reflow the row.
-    expect(syncingRow?.className).toContain('h-14');
+    expect(syncingRow?.className).toContain('h-8');
   });
 });
 

@@ -1141,7 +1141,7 @@ test('read failures abort without enqueue and a raced mutation does not stop the
   assert.equal(result.warnings.length, 2);
 });
 
-test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant', () => {
+test('failure-hold dequeue uses the CI lane app token without a merge-queue grant', () => {
   const hold = workflow.jobs['hold-failed-revision'];
   const token = hold.steps.find(step => step.id === 'app-token');
   const persist = hold.steps.find(step => step.id === 'failure-hold');
@@ -1149,7 +1149,7 @@ test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant'
     String(token.uses).startsWith('actions/create-github-app-token@'),
     true
   );
-  assert.equal(token.with['app-id'], '${{ vars.JOVIE_BOT_APP_ID }}');
+  assert.equal(token.with['app-id'], '${{ vars.CI_APP_ID }}');
   assert.equal(token.with['permission-actions'], 'read');
   assert.equal(token.with['permission-contents'], 'write');
   assert.equal(token.with['permission-pull-requests'], 'write');

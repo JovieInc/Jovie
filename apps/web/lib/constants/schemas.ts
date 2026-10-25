@@ -79,8 +79,28 @@ export function buildWebsiteSchema(overrides: {
   });
 }
 
+/** Offer shape accepted by buildSoftwareSchema (schema.org Offer subset). */
+type SoftwareApplicationOffer = {
+  readonly '@type': 'Offer';
+  readonly name?: string;
+  readonly price: string;
+  readonly priceCurrency: string;
+  readonly description?: string;
+  readonly availability?: string;
+};
+
 /** Build a SoftwareApplication schema with page-specific description */
-export function buildSoftwareSchema(description: string) {
+export function buildSoftwareSchema(
+  description: string,
+  /**
+   * Canonical offer truth for the page. Defaults to the shared free-offer
+   * fragment; pages carrying billing claims (e.g. the homepage artist-profile
+   * launch, JOV-8565) pass offers derived from lib/billing/offer-truth.
+   */
+  offers:
+    | SoftwareApplicationOffer
+    | readonly SoftwareApplicationOffer[] = SCHEMA_FRAGMENTS.offers
+) {
   return jsonLd({
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -90,7 +110,7 @@ export function buildSoftwareSchema(description: string) {
     url: BASE_URL,
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web',
-    offers: SCHEMA_FRAGMENTS.offers,
+    offers,
     // aggregateRating intentionally omitted — no verified user reviews yet
     author: { '@id': SCHEMA_IDS.organization },
   });

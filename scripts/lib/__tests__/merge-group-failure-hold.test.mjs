@@ -702,6 +702,218 @@ process.stdout.write(JSON.stringify(result));
 });
 
 it.each([
+  ['proven', 'ahead-22328-lanes-flake.txt', false],
+  ['unproven', 'poison-22331-api-guard.txt', true],
+])(
+  'CLI attributes against a completed failed ahead run from its job logs (%s)',
+  (_label, aheadLogName, waits) => {
+    const dir = mkdtempSync(join(tmpdir(), 'failure-hold-attribution-'));
+    try {
+      const logs = resolve(import.meta.dirname, 'fixtures/ahead-attribution');
+      const fixturePath = join(dir, 'fixture.json');
+      writeFileSync(
+        fixturePath,
+        JSON.stringify({
+          run,
+          timeline,
+          source: SOURCE,
+          currentLog: join(logs, 'poison-22331-api-guard.txt'),
+          // The unproven case feeds the poison log as the ahead evidence too:
+          // its own failing commands never passed there.
+          aheadLog: join(logs, aheadLogName),
+        })
+      );
+      writeFileSync(
+        join(dir, 'gh'),
+        `#!${process.execPath}
+const fs = require('node:fs');
+const fixture = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
+const args = process.argv.slice(2);
+const failed = id => [
+  { id, name: 'ci-fast (remaining)', conclusion: 'failure',
+    steps: [{ name: 'Run structural ci-fast lane', conclusion: 'failure' }] },
+  { id: id + 1, name: 'PR Ready', conclusion: 'failure',
+    steps: [{ name: 'Evaluate combined-head checks', conclusion: 'failure' }] },
+];
+let result;
+if (args[1] === 'graphql') {
+  const query = args.find(arg => arg.startsWith('query='));
+  const pr = query.includes('timelineItems')
+    ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
+    : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
+        isInMergeQueue: false, mergeQueueEntry: null, autoMergeRequest: null };
+  result = { data: { repository: { pullRequest: pr } } };
+} else if (args.includes('POST')) result = {};
+else if (args[1].endsWith('/actions/jobs/11/logs')) { process.stdout.write(fs.readFileSync(fixture.currentLog, 'utf8')); process.exit(0); }
+else if (args[1].endsWith('/actions/jobs/21/logs')) { process.stdout.write(fs.readFileSync(fixture.aheadLog, 'utf8')); process.exit(0); }
+else if (args[1].includes('/compare/')) result = { status: 'behind' };
+else if (args[1].includes('/actions/runs?head_sha=')) result = { workflow_runs: [
+  { id: 900, workflow_id: 178737329, created_at: '2026-10-12T08:43:05Z', conclusion: 'failure' },
+] };
+else if (args[1].includes('/runs/900/jobs?')) result = { jobs: args[1].includes('page=1') ? failed(21) : [] };
+else if (args[1].includes('/jobs?')) result = { jobs: args[1].includes('page=1') ? failed(11) : [] };
+else if (args[1].includes('/statuses')) result = [];
+else result = fixture.run;
+process.stdout.write(JSON.stringify(result));
+`,
+        { mode: 0o755 }
+      );
+      const eventPath = join(dir, 'event.json');
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          repository: { full_name: REPOSITORY },
+          workflow_run: { id: run.id },
+        })
+      );
+      const execution = spawnSync(
+        process.execPath,
+        [
+          resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
+          '--event-path',
+          eventPath,
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            HOLD_TEST_FIXTURE: fixturePath,
+            GITHUB_OUTPUT: join(dir, 'output'),
+          },
+        }
+      );
+      expect(execution.status, execution.stderr).toBe(0);
+      const receipt = JSON.parse(execution.stdout);
+      expect(Boolean(receipt.aheadEntryUnproven)).toBe(waits);
+      expect(receipt.statusWritten).toBe(!waits);
+      expect(receipt.aheadAttribution?.attributable).toBe(!waits);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);
+
+it('CLI attributes against a successful ahead ci-fast (remaining) job even when the ahead run failed elsewhere (JOV-8760)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'failure-hold-ahead-success-'));
+  try {
+    const logs = resolve(import.meta.dirname, 'fixtures/ahead-attribution');
+    const aheadLog = readFileSync(
+      join(logs, 'ahead-22328-lanes-flake.txt'),
+      'utf8'
+    );
+    // A ci-fast (remaining) job that SUCCEEDED has no failed structural
+    // commands and reports every lane as success. Build that log from the
+    // 2026-10-21 ahead fixture by dropping its one failing command.
+    const successfulAhead = aheadLog
+      .split('\n')
+      .filter(line => !/^\| 58 \|/.test(line))
+      .filter(line => !line.includes('Structural command 58/58 failed'))
+      .filter(line => !line.startsWith('[ci-fast] 1 lane(s) failed'))
+      .map(line =>
+        line.replace(
+          '[ci-fast] structural: failure (311.9s)',
+          '[ci-fast] structural: success (311.9s)'
+        )
+      )
+      .join('\n');
+    expect(successfulAhead).not.toBe(aheadLog);
+    expect(successfulAhead).not.toContain('exit 1');
+    expect(successfulAhead).toContain('| 31 | 149.1s | pass |');
+    const aheadLogPath = join(dir, 'ahead-success.txt');
+    writeFileSync(aheadLogPath, successfulAhead);
+    const fixturePath = join(dir, 'fixture.json');
+    writeFileSync(
+      fixturePath,
+      JSON.stringify({
+        run,
+        timeline,
+        source: SOURCE,
+        currentLog: join(logs, 'poison-22331-api-guard.txt'),
+        aheadLog: aheadLogPath,
+      })
+    );
+    writeFileSync(
+      join(dir, 'gh'),
+      `#!${process.execPath}
+const fs = require('node:fs');
+const fixture = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
+const args = process.argv.slice(2);
+const failed = id => [
+  { id, name: 'ci-fast (remaining)', conclusion: 'failure',
+    steps: [{ name: 'Run structural ci-fast lane', conclusion: 'failure' }] },
+  { id: id + 1, name: 'PR Ready', conclusion: 'failure',
+    steps: [{ name: 'Evaluate combined-head checks', conclusion: 'failure' }] },
+];
+// The ahead run failed in a Unit Tests shard while its ci-fast (remaining)
+// job succeeded — the successful log is the evidence (JOV-8760).
+const aheadJobs = [
+  { id: 21, name: 'ci-fast (remaining)', conclusion: 'success' },
+  { id: 23, name: 'Unit Tests (1/4)', conclusion: 'failure' },
+  { id: 22, name: 'PR Ready', conclusion: 'failure' },
+];
+let result;
+if (args[1] === 'graphql') {
+  const query = args.find(arg => arg.startsWith('query='));
+  const pr = query.includes('timelineItems')
+    ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
+    : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
+        isInMergeQueue: false, mergeQueueEntry: null, autoMergeRequest: null };
+  result = { data: { repository: { pullRequest: pr } } };
+} else if (args.includes('POST')) result = {};
+else if (args[1].endsWith('/actions/jobs/11/logs')) { process.stdout.write(fs.readFileSync(fixture.currentLog, 'utf8')); process.exit(0); }
+else if (args[1].endsWith('/actions/jobs/21/logs')) { process.stdout.write(fs.readFileSync(fixture.aheadLog, 'utf8')); process.exit(0); }
+else if (args[1].includes('/compare/')) result = { status: 'behind' };
+else if (args[1].includes('/actions/runs?head_sha=')) result = { workflow_runs: [
+  { id: 900, workflow_id: 178737329, created_at: '2026-10-12T08:43:05Z', conclusion: 'failure' },
+] };
+else if (args[1].includes('/runs/900/jobs?')) result = { jobs: args[1].includes('page=1') ? aheadJobs : [] };
+else if (args[1].includes('/jobs?')) result = { jobs: args[1].includes('page=1') ? failed(11) : [] };
+else if (args[1].includes('/statuses')) result = [];
+else result = fixture.run;
+process.stdout.write(JSON.stringify(result));
+`,
+      { mode: 0o755 }
+    );
+    const eventPath = join(dir, 'event.json');
+    writeFileSync(
+      eventPath,
+      JSON.stringify({
+        repository: { full_name: REPOSITORY },
+        workflow_run: { id: run.id },
+      })
+    );
+    const execution = spawnSync(
+      process.execPath,
+      [
+        resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
+        '--event-path',
+        eventPath,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${dir}:${process.env.PATH}`,
+          HOLD_TEST_FIXTURE: fixturePath,
+          GITHUB_OUTPUT: join(dir, 'output'),
+        },
+      }
+    );
+    expect(execution.status, execution.stderr).toBe(0);
+    const receipt = JSON.parse(execution.stdout);
+    expect(receipt.aheadEntryUnproven).toBeFalsy();
+    expect(receipt.statusWritten).toBe(true);
+    expect(receipt.aheadAttribution).toEqual({
+      attributable: true,
+      reason: 'failing-signals-passed-on-ahead-run',
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+it.each([
   ['behind', 'in_progress', true],
   ['diverged', 'failure', true],
   ['behind', 'success', false],
@@ -1714,6 +1926,65 @@ describe('terminal failure hold application', () => {
       expect(dequeuePullRequest).not.toHaveBeenCalled();
       expect(disableAutoMerge).not.toHaveBeenCalled();
     }
+  });
+
+  it('holds when the completed ahead run proves the failure is this entry own (#22331)', async () => {
+    const writeStatus = vi.fn();
+    const signatureAttribution = {
+      attributable: true,
+      reason: 'failing-signals-passed-on-ahead-run',
+    };
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        aheadGroup: {
+          baseOnMain: false,
+          aheadConclusion: 'failure',
+          aheadRunId: 39536019717,
+          signatureAttribution,
+        },
+      },
+      {
+        writeStatus,
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: false,
+          mergeQueueEntry: null,
+          autoMergeRequest: null,
+        })),
+        dequeuePullRequest: vi.fn(),
+        disableAutoMerge: vi.fn(),
+      }
+    );
+    expect(result).not.toHaveProperty('skipped');
+    expect(result).not.toHaveProperty('aheadEntryUnproven');
+    expect(result).toMatchObject({
+      statusWritten: true,
+      aheadAttribution: signatureAttribution,
+    });
+    expect(writeStatus).toHaveBeenCalled();
+  });
+
+  it('keeps waiting when ahead attribution is unproven', () => {
+    expect(
+      aheadEntryUnproven({
+        baseOnMain: false,
+        aheadConclusion: 'failure',
+        signatureAttribution: {
+          attributable: false,
+          reason: 'ci-fast-log-missing',
+        },
+      })
+    ).toBe(true);
+    expect(
+      aheadEntryUnproven({
+        baseOnMain: false,
+        aheadConclusion: 'failure',
+        signatureAttribution: { attributable: true, reason: 'x' },
+      })
+    ).toBe(false);
   });
 
   it('holds when the base is main, the group ahead passed, or the base is unreadable', () => {

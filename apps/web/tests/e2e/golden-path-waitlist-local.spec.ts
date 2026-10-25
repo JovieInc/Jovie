@@ -315,7 +315,9 @@ test.describe('local seeded waitlist golden path', () => {
       .locator(COMPOSER_TEXTAREA)
       .fill('Golden Path Artist has a release in three weeks.');
     await page.getByRole('button', { name: 'Send message' }).click();
-    await expect(page.getByText("You're on the list")).toBeVisible({
+    await expect(
+      page.getByRole('heading', { name: "You're on the list" })
+    ).toBeVisible({
       timeout: 30_000,
     });
     await capture(page, testInfo, 'golden-path-03-qualified-waitlisted-chat');

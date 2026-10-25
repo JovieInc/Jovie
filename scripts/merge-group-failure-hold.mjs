@@ -5,6 +5,10 @@ import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { isTransientAdmissionFailureMessage } from './lib/merge-group-admission.mjs';
 import {
+  attributeAgainstAheadRun,
+  CI_FAST_REMAINING_JOB,
+} from './lib/merge-group-ahead-attribution.mjs';
+import {
   DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS,
   MERGE_GROUP_FAILURE_CONCLUSIONS,
   RETRYABLE_PRODUCT_FAILURE_STEPS,
@@ -292,7 +296,16 @@ export function parseTrustedFailureStatus(status, repository) {
   const creator = statusCreator(status);
   if (
     creator.type !== 'Bot' ||
-    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+    ![
+      'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
+      'jovie-bot',
+      'jovie-ci-lane',
+      'jovie-symphony-lane',
+      'jovie-agents-lane',
+    ].includes(creator.login)
   ) {
     return null;
   }
@@ -319,7 +332,16 @@ export function parseTrustedRetryStatus(status, repository) {
   const creator = statusCreator(status);
   if (
     creator.type !== 'Bot' ||
-    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+    ![
+      'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
+      'jovie-bot',
+      'jovie-ci-lane',
+      'jovie-symphony-lane',
+      'jovie-agents-lane',
+    ].includes(creator.login)
   ) {
     return null;
   }
@@ -386,7 +408,16 @@ function parseTrustedAdmissionRecoveryStatus(status, repository) {
   const creator = statusCreator(status);
   if (
     creator.type !== 'Bot' ||
-    !['jovie-bot', 'jovie-bot[bot]'].includes(creator.login)
+    ![
+      'jovie-bot[bot]',
+      'jovie-ci-lane[bot]',
+      'jovie-symphony-lane[bot]',
+      'jovie-agents-lane[bot]',
+      'jovie-bot',
+      'jovie-ci-lane',
+      'jovie-symphony-lane',
+      'jovie-agents-lane',
+    ].includes(creator.login)
   )
     return null;
   const match =
@@ -830,13 +861,22 @@ export function supersededByLiveEntry(pr, sourceHeadSha, groupHeadSha) {
 // that #21384, ahead of it, broke, while the ahead group was still running.
 // GitHub removes the failing ahead entry and rebuilds this one, so the hold
 // waits. An unreadable base keeps the hold (`baseOnMain` defaults true).
-/** @typedef {{ baseOnMain?: boolean, aheadConclusion?: string | null }} AheadGroup */
+// Exception: when the ahead run COMPLETED and its own results prove every
+// signal failing here passed (or was not selected) on this base, the failure
+// is this group's own (2026-10-21: a lanes flake ahead hid #22331's guard
+// failure for several cycles). See lib/merge-group-ahead-attribution.mjs.
+/** @typedef {{ baseOnMain?: boolean, aheadConclusion?: string | null, aheadRunId?: number | null, signatureAttribution?: { attributable: boolean, reason: string } }} AheadGroup */
 /** @param {AheadGroup} [group] */
 export function aheadEntryUnproven({
   baseOnMain = true,
   aheadConclusion,
+  signatureAttribution,
 } = {}) {
-  return baseOnMain === false && aheadConclusion !== 'success';
+  return (
+    baseOnMain === false &&
+    aheadConclusion !== 'success' &&
+    signatureAttribution?.attributable !== true
+  );
 }
 
 // Persist the exact-source failure before removing native merge intent. A new
@@ -961,6 +1001,9 @@ export async function applyMergeGroupFailure(
       mergeGroupHeadSha: groupHeadSha,
       mergeGroupBaseSha: front.baseSha,
       aheadConclusion: aheadGroup.aheadConclusion ?? null,
+      ...(aheadGroup.signatureAttribution
+        ? { aheadAttribution: aheadGroup.signatureAttribution }
+        : {}),
       workflowRunId: run.id,
       workflowRunAttempt: run.run_attempt,
       classification,
@@ -1087,6 +1130,9 @@ export async function applyMergeGroupFailure(
         ? current.headRefOid.toLowerCase()
         : null,
     exactHeadStillCurrent: currentMatches(),
+    ...(aheadGroup?.signatureAttribution
+      ? { aheadAttribution: aheadGroup.signatureAttribution }
+      : {}),
     dequeued,
     dequeueOutcome,
     autoMergeDisabled,
@@ -1273,6 +1319,65 @@ function instructionContractEvidence(repository, run, jobs, baseSha) {
   }
 }
 
+// The current log is only consumed for a failing `ci-fast (remaining)` job.
+// The ahead log is also read when that job SUCCEEDED (JOV-8760): an ahead run
+// that failed in another job still proves, through its successful structural
+// timings table, that this group's failing commands passed on the base —
+// skipping the successful log left every such group waiting unattributed.
+function ciFastRemainingLog(
+  repository,
+  jobs,
+  { includeSuccessful = false } = {}
+) {
+  const job = jobs.find(item => item?.name === CI_FAST_REMAINING_JOB);
+  const accepted = includeSuccessful ? ['failure', 'success'] : ['failure'];
+  if (
+    !job ||
+    !accepted.includes(job.conclusion) ||
+    !Number.isSafeInteger(job.id)
+  )
+    return null;
+  return gh(['api', `repos/${repository}/actions/jobs/${job.id}/logs`]);
+}
+
+// Only a completed, failed ahead run can prove this group's own failure; any
+// read error keeps today's wait (no attribution).
+/** @returns {AheadGroup} */
+function withAheadAttribution(repository, jobs, aheadGroup) {
+  if (
+    aheadGroup?.baseOnMain !== false ||
+    aheadGroup.aheadConclusion !== 'failure' ||
+    !Number.isSafeInteger(aheadGroup.aheadRunId)
+  ) {
+    return aheadGroup;
+  }
+  try {
+    const aheadJobs = restPages(
+      `repos/${repository}/actions/runs/${aheadGroup.aheadRunId}/jobs?filter=latest`
+    );
+    return {
+      ...aheadGroup,
+      signatureAttribution: attributeAgainstAheadRun({
+        currentJobs: jobs,
+        aheadJobs,
+        aheadConclusion: aheadGroup.aheadConclusion,
+        currentCiFastLog: ciFastRemainingLog(repository, jobs),
+        aheadCiFastLog: ciFastRemainingLog(repository, aheadJobs, {
+          includeSuccessful: true,
+        }),
+      }),
+    };
+  } catch {
+    return {
+      ...aheadGroup,
+      signatureAttribution: {
+        attributable: false,
+        reason: 'evidence-read-failed',
+      },
+    };
+  }
+}
+
 // Is the group's base on main, and how did the CI run of the group ahead end?
 // Any unreadable answer returns {} (attributable), the pre-existing behavior.
 /** @returns {AheadGroup} */
@@ -1298,7 +1403,11 @@ function readAheadGroup(repository, baseSha) {
     const ahead = runs
       .filter(item => item?.workflow_id === CI_WORKFLOW_ID)
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
-    return { baseOnMain: false, aheadConclusion: ahead?.conclusion ?? null };
+    return {
+      baseOnMain: false,
+      aheadConclusion: ahead?.conclusion ?? null,
+      aheadRunId: Number.isSafeInteger(ahead?.id) ? ahead.id : null,
+    };
   } catch {
     return {};
   }
@@ -1380,7 +1489,11 @@ async function main(argv) {
       changedFiles: evidence.changedFiles,
       mainSha,
       admissionText,
-      aheadGroup: readAheadGroup(repository, front.baseSha),
+      aheadGroup: withAheadAttribution(
+        repository,
+        jobs,
+        readAheadGroup(repository, front.baseSha)
+      ),
     },
     {
       writeStatus: async receipt =>

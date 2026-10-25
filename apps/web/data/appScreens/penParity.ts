@@ -426,19 +426,12 @@ export const APP_SCREEN_PEN_PENDING_DECISIONS: readonly PenPendingDecision[] = [
   },
   {
     decisionId: 'D10',
-    checkId: 'sidebar-nav-item.gap',
-    recordedOn: '2026-09-27',
-    penValue: 8,
-    sourceValue: 10,
-    summary: 'ki3Zp icon-label gap is 8; calm row uses gap-x-(--space-2-5).',
-  },
-  {
-    decisionId: 'D10',
     checkId: 'sidebar-nav-item.padding-x',
-    recordedOn: '2026-09-27',
+    recordedOn: '2026-10-23',
     penValue: 8,
-    sourceValue: 10,
-    summary: 'ki3Zp pads 8px sideways; the row uses px-2.5.',
+    sourceValue: 12,
+    summary:
+      'ki3Zp pads 8px sideways. PR #22743 moved the row to the shared 12px optical-column inset (px-(--app-shell-sidebar-inset); icons at window x=20, labels at x=44); the design-session decision on the Pen value is still open.',
   },
 ];
 

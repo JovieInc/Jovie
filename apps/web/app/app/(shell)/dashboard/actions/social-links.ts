@@ -93,7 +93,7 @@ export async function getProfileSocialLinks(
       throw new Error('Unauthorized');
     }
 
-    return await withDbSession(async clerkUserId => {
+    return await withDbSession(async appUserId => {
       // Query against creatorProfiles with ownership check and left-join links
       const hasVerificationColumns =
         await getSocialLinksVerificationColumnSupport(db);
@@ -122,13 +122,11 @@ export async function getProfileSocialLinks(
           socialLinks,
           eq(socialLinks.creatorProfileId, creatorProfiles.id)
         )
-        .where(
-          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
-        )
+        .where(and(eq(creatorProfiles.id, profileId), eq(users.id, appUserId)))
         .orderBy(socialLinks.sortOrder)
         .catch(error => {
           const migrationResult = handleMigrationErrors(error, {
-            userId: clerkUserId,
+            userId: appUserId,
             operation: 'social_links_count',
           });
 
