@@ -73,6 +73,12 @@ NO_WORK_REPAIR_VERDICTS = frozenset({"recovery-handoff", "reconcile-unavailable"
 NO_WORK_REPAIR_ALERT = 6
 DISK_MIN_PCT = 10
 DISK_CRIT_PCT = 5
+# Autoscale blocks growth (capacity held below base, blocker "disk-low") at or below
+# autoscale.DISK_INCREASE_MIN free. Held that long with no alarm let merges collapse unseen
+# on 2026-10-25, so a sustained hold raises its own incident naming the top consumers.
+DISK_HELD_S = 30 * 60
+DISK_TOP_REFRESH_S = 10 * 60
+DISK_TOP_BUDGET_S = 45
 GITHUB_MIN_REMAINING = gh_app_token.FLOOR
 # An open PR older than this is a governor signal (JOV-7079): the cockpit names it and its
 # disposition instead of letting it age silently.
@@ -782,6 +788,30 @@ def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
                 and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
 
 
+def disk_held(obs: dict) -> bool:
+    free = obs.get("diskFreePct")
+    return free is not None and free <= autoscale.DISK_INCREASE_MIN
+
+
+def top_disk_consumers(state: Path, budget_s: float = DISK_TOP_BUDGET_S, run=subprocess.run) -> list[dict]:
+    """Largest of the usual suspects, measured with a shared time budget (du over a full
+    worktree tree can take minutes on a loaded host; whatever finishes is reported)."""
+    home = Path.home()
+    roots = [state / "worktrees", state / "runs", home / "codex-worktrees", home / "grok-wt", home / "gem-workspace",
+             home / ".cache", home / ".npm", home / "symphony-elixir-workspaces", Path("/tmp")]
+    deadline, rows = time.monotonic() + budget_s, []
+    for root in roots:
+        left = deadline - time.monotonic()
+        if left <= 1 or not root.exists():
+            continue
+        try:
+            out = run(["du", "-xsk", str(root)], capture_output=True, text=True, timeout=left).stdout.split()
+            rows.append({"path": str(root), "gib": round(int(out[0]) / 1048576, 1)})
+        except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+            continue
+    return sorted(rows, key=lambda row: -row["gib"])[:5]
+
+
 def provider_idle_since(obs: dict, previous: dict) -> dict[str, float]:
     """Preserve the first failed restart tick independently for every provider family."""
     started = dict(previous.get("providerIdleSince") or {})
@@ -1113,6 +1143,13 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
     elif obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_MIN_PCT:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
+    held_since = (previous or {}).get("diskHeldSince")
+    if disk_held(obs) and isinstance(held_since, (int, float)) and obs["now"] - held_since >= DISK_HELD_S:
+        top = obs.get("diskTop") or (previous or {}).get("diskTop") or []
+        named = ", ".join(f"{row['path']} {row['gib']} GiB" for row in top) or "consumers not yet measured"
+        alerts["disk-capacity-held"] = (
+            f"root disk {obs['diskFreePct']}% free (growth floor {autoscale.DISK_INCREASE_MIN}%) for "
+            f"{int((obs['now'] - held_since) // 60)}m: lane capacity is held below base. Top consumers: {named}")
     if github_reads_held:
         alerts["github-quota"] = (f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; read-only polling "
                                   f"held below the {GITHUB_MIN_REMAINING}-point floor to preserve writes")
@@ -1179,6 +1216,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "bottleneck:merge-queue": "reduce-lane-slots-and-reconcile-merge-queue",
         "workers-without-completions": "verify-process-and-fenced-repair-ownership",
         "admission-repair-needed": "repair-existing-pr-inventory-before-new-intake",
+        "disk-capacity-held": "reclaim-top-disk-consumers-then-restore-lane-seats",
         "delivery-stalled": "investigate-repair-and-verify-native-delivery",
         "remediation-delivery": "repair-and-read-back-existing-event-delivery",
     }
@@ -2096,6 +2134,15 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         previous["admissionRepairSince"] = previous.get("admissionRepairSince") or obs["now"]
     elif repair_holds is not None or not (previous.get("alerts") or {}).get("admission-repair-needed"):
         previous["admissionRepairSince"] = None
+    if disk_held(obs):
+        previous["diskHeldSince"] = previous.get("diskHeldSince") or obs["now"]
+        top_at = previous.get("diskTopAt")
+        if obs["now"] - previous["diskHeldSince"] >= DISK_HELD_S and not os.environ.get("LANES_SELFTEST") \
+                and not (isinstance(top_at, (int, float)) and obs["now"] - top_at < DISK_TOP_REFRESH_S):
+            previous["diskTop"], previous["diskTopAt"] = top_disk_consumers(host.state), obs["now"]
+    else:
+        previous["diskHeldSince"] = previous["diskTop"] = previous["diskTopAt"] = None
+    obs["diskTop"] = previous.get("diskTop")
     previous["providerIdleSince"] = provider_idle_since(obs, previous)
     previous["codexIdleSince"] = previous["providerIdleSince"].get("codex")  # old readers
     obs["delivery"] = delivery_evidence(obs, previous)
@@ -2119,6 +2166,8 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         result["factoryIntake"] = factory_intake.run_pass(host.state, tracker.linear)
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["admissionRepairSince"] = previous.get("admissionRepairSince")
+    for key in ("diskHeldSince", "diskTop", "diskTopAt"):
+        result[key] = previous.get(key)
     result["deliveryDemandSince"] = previous.get("deliveryDemandSince")
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]

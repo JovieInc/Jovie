@@ -467,6 +467,18 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual(set(alerts), {"disk-critical"})
         self.assertIn("Summer", alerts["disk-critical"])
 
+    def test_disk_hold_below_growth_floor_alarms_after_thirty_minutes_naming_consumers(self):
+        # 2026-10-25: 13.2% free held codex at 1 seat for hours with no alarm (floor is 15%).
+        top = [{"path": "/home/x/codex-worktrees", "gib": 210.5}]
+        held = obs(diskFreePct=13.2, diskTop=top)
+        self.assertNotIn("disk-capacity-held", doctor.judge(held))
+        self.assertNotIn("disk-capacity-held", doctor.judge(
+            held, {"diskHeldSince": held["now"] - doctor.DISK_HELD_S + 1}))
+        alerts = doctor.judge(held, {"diskHeldSince": held["now"] - doctor.DISK_HELD_S})
+        self.assertIn("/home/x/codex-worktrees 210.5 GiB", alerts["disk-capacity-held"])
+        self.assertNotIn("disk-capacity-held", doctor.judge(
+            obs(diskFreePct=16.0), {"diskHeldSince": held["now"] - 9999}))
+
     def test_pool_empty_needs_thirty_sustained_minutes(self):
         self.assertEqual(doctor.judge(obs(pool=0, busy=0), {"poolEmptySince": 1_000_000.0}), {})
         alerts = doctor.judge(obs(pool=0, busy=0), {"poolEmptySince": 1_000_000.0 - 1801})
