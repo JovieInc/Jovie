@@ -10,7 +10,6 @@ const warmNavigationLoadingBoundaries = [
   'chat/[id]/loading.tsx',
   'calendar/loading.tsx',
   'contacts/loading.tsx',
-  'library/loading.tsx',
   'tasks/loading.tsx',
   'settings/loading.tsx',
   'settings/account/loading.tsx',
@@ -26,9 +25,15 @@ const shellLayout = readFileSync(join(shellDirectory, 'layout.tsx'), 'utf8');
 describe('authenticated shell warm navigation contract', () => {
   it('does not install a loading boundary that replaces primary customer routes during warm navigation', () => {
     // In the App Router, a segment loading.tsx becomes the immediate fallback
-    // for navigation into that segment. Keeping this file absent lets the
+    // for navigation into that segment. Keeping these files absent lets the
     // current authenticated route remain visible until the destination RSC
     // payload is ready instead of flashing a route-shaped skeleton.
+    // JOV-9024 supersedes that blanket policy for the canonical rail
+    // destinations: a first-class navigation must show the destination or a
+    // skeleton, never the previous page under the new active nav state. The
+    // Work route now owns library/loading.tsx (pinned with the Identity
+    // boundary in tests/unit/routes/shell-nav-coverage.test.ts); it is
+    // removed from this ban list. Presence (/app/presence) was never listed.
     for (const relativePath of warmNavigationLoadingBoundaries) {
       expect(
         existsSync(join(shellDirectory, relativePath)),
