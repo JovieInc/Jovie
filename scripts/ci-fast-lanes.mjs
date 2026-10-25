@@ -147,6 +147,32 @@ export const STRUCTURAL_STATIC_SCAN_EXEMPT = Object.freeze({
   'pnpm ci:control:test': 'control-plane suite, ~40s; merge-group only',
 });
 
+/**
+ * Body of the lanes-selftest-changed-tests guard (run under bash -c). Exported
+ * so the test can assert the env and the file selection.
+ */
+export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
+  'set -euo pipefail',
+  'B="${GITHUB_BASE_REF:-main}"',
+  't="$(mktemp -d)"',
+  'git worktree add -q --detach "$t/wt" HEAD',
+  'trap \'git worktree remove --force "$t/wt" >/dev/null 2>&1 || true; rm -rf "$t"\' EXIT',
+  'cd "$t/wt"',
+  'git fetch -q --no-tags origin "$B" || true',
+  'git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/$B" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }',
+  'files="$(git diff --name-only --diff-filter=d "origin/$B" HEAD -- scripts/lanes scripts/tests)"',
+  'cand=""',
+  'for f in $files; do case "$f" in scripts/tests/test_*.py) cand="$cand $f";; scripts/lanes/lane_runner.py) ;; scripts/lanes/*.py) cand="$cand scripts/tests/test_$(basename "$f" .py).py";; esac; done',
+  // The release self-test runs only LANE_TESTS (lane_runner.py), with unittest and no conftest.
+  // A lane_runner.py edit alone does not pull in test_lane_runner.py (867 tests, ~90s); edit that test to run it.
+  'tests=""',
+  'for m in $(printf "%s\\n" $cand | sort -u); do if [ -f "$m" ] && grep -q "\\"$m\\"" scripts/lanes/lane_runner.py; then tests="$tests $m"; fi; done',
+  '[ -n "${tests// /}" ] || { echo "no changed release self-test lanes tests"; exit 0; }',
+  'mkdir -p "$t/state/home"',
+  'echo "release self-test env (LANES_SELFTEST=1) on:$tests"',
+  'LANES_SELFTEST=1 LANES_STATE="$t/state" HOME="$t/state/home" python3 -m unittest -q $tests',
+].join('; ');
+
 export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
     id: 'artist-launch-contract',
@@ -365,6 +391,19 @@ export const SOURCE_GUARDS = Object.freeze([
     id: 'merged-with-base-invariants',
     command: `bash -c ${shellQuote('set -euo pipefail; t="$(mktemp -d)"; root="$PWD"; git worktree add -q --detach "$t" HEAD; for nm in node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules; do [ -d "$root/$nm" ] && mkdir -p "$t/$(dirname "$nm")" && ln -s "$root/$nm" "$t/$nm"; done; trap \'git worktree remove --force "$t"\' EXIT; cd "$t"; git fetch -q --no-tags origin "${GITHUB_BASE_REF:-main}" || true; git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/${GITHUB_BASE_REF:-main}" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }; [ -f canon/invariants.jsonl ] || { echo "no invariant registry in this checkout; skipped"; exit 0; }; node scripts/invariants/design-surfaces.mjs; if [ -f scripts/invariants/stack-pattern-ratchet.mjs ]; then node scripts/invariants/stack-pattern-ratchet.mjs; fi; ' + PR_CHEAP_SCAN_COMMANDS.join('; ') + '; pnpm invariants:check')}`,
     inputs: /./u,
+    prOnly: true,
+  }),
+  Object.freeze({
+    // The lanes release self-test (lane_runner prove-staging, lifecycle) runs
+    // LANE_TESTS with unittest, LANES_SELFTEST=1, a scratch LANES_STATE and HOME,
+    // which changes behaviour (credentials_spend.tick() returns
+    // selftest-skipped). A new lanes test passed at PR time and failed in the
+    // merge group (#23137, 2026-10-25). Run only the changed or added lanes
+    // tests, plus the test named after a changed scripts/lanes module, with that
+    // env on the PR merged with base. The full 336s pytest stays merge-group.
+    id: 'lanes-selftest-changed-tests',
+    command: `bash -c ${shellQuote(LANES_SELFTEST_CHANGED_TESTS_SCRIPT)}`,
+    inputs: /^scripts\/(?:lanes\/|tests\/test_)/u,
     prOnly: true,
   }),
   Object.freeze({
@@ -1013,6 +1052,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ui-story-coverage-policy.test.mjs',
   'scripts/lib/__tests__/ci-fast-pr-structural-guards.test.mjs',
   'scripts/lib/__tests__/ci-structural-inventory.test.mjs',
+  'scripts/lib/__tests__/ci-lanes-selftest-guard.test.mjs',
   'scripts/lib/__tests__/unstack-merged-parent.test.mjs',
   'scripts/lib/__tests__/vercel-branch-exclusions.test.mjs',
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',

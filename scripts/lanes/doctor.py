@@ -45,7 +45,7 @@ import shipping_attribution  # noqa: E402  (company merge provenance report)
 import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage collector)
 import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
 import throughput_sentinel  # noqa: E402
-import deploy_health  # noqa: E402  (production deploy failure and lag incidents, Jovie + LogYourBody)  (no-progress alarms, idle-reason counts, growth bounds)
+import deploy_health  # noqa: E402  (production deploy failure and lag incidents, Jovie + LogYourBody)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
