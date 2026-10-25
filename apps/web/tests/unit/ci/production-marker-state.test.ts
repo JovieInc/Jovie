@@ -2002,3 +2002,85 @@ describe('producer activation evidence CLI', () => {
     ).toBe(true);
   });
 });
+
+// R1 characterization for the release-lease split (fleet/release-lease-split-design.md).
+// These pin TODAY's behavior so the classifier rewrite (verification run as the
+// authority, a promoted SHA is never `none`) shows up as an intentional diff, not
+// an accident. Each case names the hazard the adversarial review found; the R1
+// change flips the cases marked FLIPS in R1 and keeps the rest.
+describe('R1 characterization: states the lease split must not leave admissible', () => {
+  const live = 'b'.repeat(40);
+
+  it('FLIPS in R1: a generation with no marker is `none`, and a foreign live SHA is admitted as bootstrap', () => {
+    // After the split, the controller run for a promoted generation completes
+    // while its verification is still running, so its marker is still absent.
+    const result = classifyProductionMarkerEvidence(
+      evidence({ markers: [], recoveryArtifacts: [] })
+    );
+    expect(result).toEqual({ state: 'none', reason: 'no_marker' });
+    const admission = admitReleaseBase(result, live, sha);
+    expect(admission.ok).toBe(true);
+    expect(admission.warning).toContain('Bootstrapping the release range');
+    // R1: a SHA our controller promoted must classify PENDING (verification
+    // active), FAIL (failed or rolled back) or UNREADABLE (past deadline),
+    // never `none`, and none of those may be admissible.
+  });
+
+  it('keeps refusing to bootstrap the release SHA from its own missing marker', () => {
+    const result = classifyProductionMarkerEvidence(evidence({ markers: [] }));
+    expect(admitReleaseBase(result, sha, sha)).toMatchObject({
+      ok: false,
+      errors: [
+        'Current production cannot bootstrap its own missing verified marker.',
+      ],
+    });
+  });
+
+  it('FLIPS in R1: a marker whose run is not the production controller is rejected (verification-run markers would stall releases)', () => {
+    const marker = primaryMarker('completed', 'success');
+    marker.attemptRun = {
+      ...marker.attemptRun,
+      path: '.github/workflows/production-verification.yml',
+    };
+    const result = classifyProductionMarkerEvidence(
+      evidence({ markers: [marker] })
+    );
+    expect(result.state).toBe('manual');
+    expect(admitReleaseBase(result, live, sha).ok).toBe(false);
+  });
+
+  it('keeps a pending generation inadmissible as a release base', () => {
+    const result = classifyProductionMarkerEvidence(
+      evidence({ markers: [primaryMarker('in_progress', null)] })
+    );
+    expect(result.state).toBe('pending');
+    expect(admitReleaseBase(result, live, sha).ok).toBe(false);
+  });
+
+  it('keeps a rolled-back generation inadmissible (verdict FAIL stays refused)', () => {
+    const rolledBack = primaryMarker(
+      'completed',
+      'cancelled',
+      job(
+        'Production Release / Centralized production rollback',
+        1,
+        'completed',
+        'success'
+      )
+    );
+    const result = classifyProductionMarkerEvidence(
+      evidence({ markers: [rolledBack] })
+    );
+    expect(result).toMatchObject({
+      state: 'manual',
+      reason: 'unsafe_or_contradictory_rollback',
+    });
+    expect(admitReleaseBase(result, live, sha).ok).toBe(false);
+  });
+
+  it('keeps an interrupted (cancelled) generation inadmissible', () => {
+    const result = classifyProductionMarkerEvidence(evidence());
+    expect(result.state).not.toBe('verified');
+    expect(admitReleaseBase(result, live, sha).ok).toBe(false);
+  });
+});

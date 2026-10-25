@@ -21,6 +21,7 @@ function createMember(): AudienceMember {
     referrerHistory: [{ url: 'https://instagram.com/jovie' }],
     utmParams: { source: 'instagram', medium: 'social' },
     email: 'taylor@example.com',
+    emailVisibleToArtist: true,
     phone: null,
     spotifyConnected: false,
     purchaseCount: 0,
