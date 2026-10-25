@@ -18,13 +18,15 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import deploy_lag
 import throughput_sentinel as sentinel
 
 # Lag limits are the measured p95 of NORMAL deploys over the 7 days to 2026-10-25T07:00Z (successful deploy after a
 # successful deploy; commits = batch size, age = oldest commit in the batch to deploy completion), not guesses:
 #   Jovie (465 runs, 187 samples): commits p50 2 / p95 6 / max 16; age p50 56 min / p95 246 min / max 317 min
 #   LogYourBody (50 runs, 34 samples): commits p50 2 / p95 5 / max 5; age p50 36 min / p95 183 min / max 2946 min
-# Method: per successful deploy that follows a successful deploy, compare previous deploy head..this head; remeasure when cadence changes.
+# These are SEEDS: deploy_lag.py recomputes the limits weekly from the trailing 7 days of real deploys and they replace
+# the seeds once 20 samples exist. Method: each successful deploy that followed a successful deploy, previous head..this head.
 REPOS = {
     "JovieInc/Jovie": {"label": "jovie", "workflow": "production-controller.yml", "behindCommits": 6, "behindMaxAgeS": 246 * 60},
     "JovieInc/LogYourBody": {"label": "lyb", "workflow": "deploy.yml", "behindCommits": 5, "behindMaxAgeS": 183 * 60},
@@ -73,7 +75,8 @@ def evaluate(repo: str, runs: list[dict], compare: dict | None, now: float) -> d
 
 def reasons(state: dict, now: float) -> list[str]:
     spec = REPOS.get(state.get("repo"), {})
-    max_commits, max_age = spec.get("behindCommits", 6), spec.get("behindMaxAgeS", 246 * 60)
+    max_commits = state.get("limitCommits", spec.get("behindCommits", 6))
+    max_age = state.get("limitAgeS", spec.get("behindMaxAgeS", 246 * 60))
     out = []
     if state.get("status") == "failing":
         since = state.get("failingSince")
@@ -114,7 +117,7 @@ def feed_block(sample: dict | None, now: float) -> dict | None:
                                                  "oldestUnshippedAge")}
     alerts = judge(sample, now)
     observed = sample.get("observedAt")
-    return {"schema": "jovie-deploy-health/v1",
+    return {"schema": "jovie-deploy-health/v1", "limits": sample.get("limits") or {}, "lag": sample.get("lag") or {},
             "observedAt": datetime.fromtimestamp(observed, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if observed else None,
             "healthy": not alerts, "repos": repos}
 
@@ -128,24 +131,38 @@ def sample(state_dir: Path, now: float, run=None, repos: dict | None = None) -> 
         cached = {}
     if isinstance(cached.get("observedAt"), (int, float)) and 0 <= now - cached["observedAt"] < REFRESH_S:
         return cached, None
-    out, errors = {}, []
+    out, errors, limits, lag = {}, [], dict(cached.get("limits") or {}), dict(cached.get("lag") or {})
     previous = cached.get("repos") or {}
     for repo, spec in (repos or REPOS).items():
         try:
-            runs = sentinel._gh_json(run, f"repos/{repo}/actions/workflows/{spec['workflow']}/runs"
-                                          "?branch=main&status=completed&per_page=30").get("workflow_runs") or []
+            store = deploy_lag.load(state_dir, spec["label"])
+            pages = deploy_lag.BACKLOG_PAGES if store.get("backlog") or not store.get("samples") else 1
+            runs = []
+            for page in range(1, pages + 1):
+                batch = sentinel._gh_json(run, f"repos/{repo}/actions/workflows/{spec['workflow']}/runs"
+                                               f"?branch=main&status=completed&per_page={100 if pages > 1 else 30}&page={page}").get("workflow_runs") or []
+                runs += batch
+                if len(batch) < (100 if pages > 1 else 30):
+                    break
+            try:  # the measurement never blocks the failure alarm
+                store = deploy_lag.update_limits(deploy_lag.collect(store, repo, runs, now, lambda path: sentinel._gh_json(run, path)), now)
+                deploy_lag.save(state_dir, spec["label"], store)
+            except Exception as error:  # noqa: BLE001
+                errors.append(f"{repo} lag: {type(error).__name__}: {str(error)[:80]}")
+            limits[repo] = deploy_lag.limits_or_seed(store, spec["behindCommits"], spec["behindMaxAgeS"])
+            lag[repo] = deploy_lag.lag_summary(store, now)
             first = evaluate(repo, runs, None, now)
             compare = None
             if first["lastSuccessSha"]:
                 compare = sentinel._gh_json(run, f"repos/{repo}/compare/{first['lastSuccessSha']}...main")
-            out[repo] = evaluate(repo, runs, compare, now)
+            out[repo] = {**evaluate(repo, runs, compare, now), "limitCommits": limits[repo]["commits"], "limitAgeS": limits[repo]["ageS"]}
         except Exception as error:  # noqa: BLE001 - an unreadable repo keeps its last state, never reads as healthy-new
             errors.append(f"{repo}: {type(error).__name__}: {str(error)[:100]}")
             if repo in previous:
                 out[repo] = previous[repo]
     if not out:
         return cached or None, "; ".join(errors) or "no repos read"
-    data = {"observedAt": now if not errors else cached.get("observedAt"), "repos": out}
+    data = {"observedAt": now if not errors else cached.get("observedAt"), "repos": out, "limits": limits, "lag": lag}
     if errors:
         data["errors"] = errors
     try:
