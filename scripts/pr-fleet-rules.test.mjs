@@ -487,7 +487,7 @@ test('contract: Fleet Rules Evidence is base-branch code only and never hands th
   );
 });
 
-test('verdict script maps exit codes to statuses and never turns a deferral into a pass', () => {
+test('verdict script maps exit codes to the job result and never turns a deferral into a pass', () => {
   const dir = mkdtempSync(join(tmpdir(), 'fleet-verdict-'));
   try {
     mkdirSync(join(dir, 'scripts'));
@@ -526,28 +526,29 @@ test('verdict script maps exit codes to statuses and never turns a deferral into
         out: done.stdout + done.stderr,
       };
     };
+    // The job result is the verdict. No commit status is posted: it was
+    // informational and its github.token POST turned a verdict read on the CI
+    // App budget into a quota deferral (run 40164178818).
+    const noStatusPost = result =>
+      assert.doesNotMatch(result.posts, /statuses|-X POST/);
     const green = run(0, '');
     assert.equal(green.status, 0);
+    noStatusPost(green);
+    // A decisive verdict looks up the failed Source Validation run to re-run.
     assert.match(
       green.posts,
-      /gh --priority merge -- api -X POST repos\/o\/r\/statuses\/a{40} .*state=success/
+      /gh --priority repair -- api repos\/o\/r\/actions\/workflows\/source-validation\.yml\/runs/
     );
     const red = run(1, '::error::red-before-green: add a command');
     assert.equal(red.status, 1);
-    assert.match(
-      red.posts,
-      /state=failure.*description=red-before-green: add a command/
-    );
+    noStatusPost(red);
     const deferred = run(
       75,
       '::error::Fleet rule evidence unavailable (github-quota-deferred)'
     );
+    // A deferral is exit 75, never a pass, and spends no further quota.
     assert.equal(deferred.status, 75);
-    assert.match(
-      deferred.posts,
-      /state=error.*description=github-quota-deferred/
-    );
-    assert.doesNotMatch(deferred.posts, /state=success/);
+    assert.equal(deferred.posts, '');
     assert.doesNotMatch(
       green.out + red.out + deferred.out,
       /app-token-value|gh-token-value/

@@ -1,6 +1,6 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: Fleet-rule evidence (PR body/labels/files) is read on the dedicated CI App installation budget by base-branch code only, then published as a commit status the required PR Ready aggregate reads.
+# necessary-trust-boundary: Fleet-rule evidence (PR body/labels/files) is read on the dedicated CI App installation budget by base-branch code only, then this job's result, which the required PR Ready aggregate reads.
 # removal-trigger: Remove when the repo-wide GITHUB_TOKEN bucket no longer starves PR evidence reads, or GitHub offers per-workflow API budgets.
 name: Fleet Rules Evidence
 # The title binds a run to one PR and base so PR Ready can reject a run that merely
@@ -17,8 +17,9 @@ run-name: "${{ github.event_name == 'pull_request_target' && format('fleet-rules
 # api-client (sparse, persist-credentials: false). No PR code, no PR-controlled
 # value is interpolated into a shell, and the CI App key is never present in any
 # pull_request-triggered workflow (see scripts/pr-fleet-rules.test.mjs). The
-# minted token is read-only (contents, pull-requests); the verdict is posted with
-# github.token. A failed mint falls back to github.token, so evidence is never
+# minted token is read-only (contents, pull-requests); the verdict is this job's
+# own result (no commit status is posted: it was informational and its github.token
+# POST turned a read verdict into a quota deferral). A failed mint falls back to github.token, so evidence is never
 # skipped.
 on:
   pull_request_target:
@@ -47,7 +48,6 @@ jobs:
     timeout-minutes: 6
     permissions:
       contents: read
-      statuses: write
       actions: write
     steps:
       - name: Mint CI App read token for fleet evidence
@@ -75,7 +75,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-      - name: Read evidence and publish the Fleet Rules Evidence status
+      - name: Read evidence and fail or defer the job as the verdict
         env:
           FLEET_TOKEN: ${{ steps.fleet-token.outputs.token }}
           GH_TOKEN: ${{ github.token }}
