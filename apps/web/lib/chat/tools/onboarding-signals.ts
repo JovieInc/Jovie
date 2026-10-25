@@ -67,6 +67,11 @@ export const objectionSchema = chatToolSchema({
  * optional, but at least one MUST be present (enforced via refine).
  */
 export const interviewSignalSchema = chatToolSchema({
+  /** What happened the last time they shared or released their work. */
+  pastBehavior: z.string().trim().min(8).max(2000).optional(),
+  /** Artist role learned in the interview, never inferred from audience size. */
+  isMusicArtist: z.boolean().optional(),
+  youtubeChannelUrl: z.string().url().max(200).optional(),
   releaseStage: releaseStageSchema.optional(),
   audienceBand: audienceBandSchema.optional(),
   currentTool: currentToolSchema.optional(),
@@ -76,7 +81,10 @@ export const interviewSignalSchema = chatToolSchema({
 }).refine(
   v =>
     Boolean(
-      v.releaseStage ||
+      v.pastBehavior ||
+        v.isMusicArtist !== undefined ||
+        v.youtubeChannelUrl ||
+        v.releaseStage ||
         v.audienceBand ||
         v.currentTool ||
         v.objection ||
@@ -91,8 +99,9 @@ export type InterviewSignal = z.infer<typeof interviewSignalSchema>;
  * Append-only: each tool call appends one entry. Read-time consumers should
  * use the most recent occurrence of a given field as the canonical value.
  */
-export const interviewSignalsMetadataSchema = z.object({
-  metadataVersion: z.literal(1),
+export const interviewSignalsMetadataSchema = chatToolSchema({
+  // v2 adds past behavior, music role and channel; persisted v1 remains readable.
+  metadataVersion: z.union([z.literal(1), z.literal(2)]),
   signals: z
     .array(
       interviewSignalSchema.and(z.object({ recordedAt: z.string().datetime() }))
@@ -109,6 +118,9 @@ export function collapseInterviewSignals(
 ): InterviewSignal {
   const result: InterviewSignal = {};
   for (const s of signals) {
+    if (s.pastBehavior) result.pastBehavior = s.pastBehavior;
+    if (s.isMusicArtist !== undefined) result.isMusicArtist = s.isMusicArtist;
+    if (s.youtubeChannelUrl) result.youtubeChannelUrl = s.youtubeChannelUrl;
     if (s.releaseStage) result.releaseStage = s.releaseStage;
     if (s.audienceBand) result.audienceBand = s.audienceBand;
     if (s.currentTool) result.currentTool = s.currentTool;

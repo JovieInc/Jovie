@@ -104,7 +104,7 @@ describe('provisionAppUser waitlist gate (JOV-6449)', () => {
 
     expect(mockIsWaitlistGateEnabled).toHaveBeenCalledOnce();
     expect(mockGetWaitlistAccess).not.toHaveBeenCalled();
-    expect(mockInsertReturning).toHaveBeenCalledOnce();
+    expect(mockInsertReturning).toHaveBeenCalledTimes(2);
   });
 
   it('reads waitlist only after the launch gate is on', async () => {

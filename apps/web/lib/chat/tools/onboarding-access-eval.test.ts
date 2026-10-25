@@ -9,14 +9,14 @@ import {
 const EMPTY_SIGNAL = {};
 
 describe('evaluateAccessSignal', () => {
-  it('grants instant access at >= 1000 Spotify followers', () => {
+  it('requires the interview even with a large Spotify audience', () => {
     const result = evaluateAccessSignal({
       signal: EMPTY_SIGNAL,
       spotifyFollowers: 1500,
       turnCount: 1,
     });
-    expect(result.kind).toBe('instant_access');
-    expect(result.rationale).toContain('spotify_followers_1500');
+    expect(result.kind).toBe('needs_more_info');
+    expect(result.rationale).toBe('past_behavior_required');
   });
 
   it('does not treat monthly listeners as Spotify followers for access', () => {
@@ -31,15 +31,14 @@ describe('evaluateAccessSignal', () => {
     expect(result.kind).toBe('needs_more_info');
   });
 
-  it('prefers metrics.spotifyFollowers over a contradictory bare count', () => {
+  it('does not use canonical Spotify metrics as a substitute for the ICP', () => {
     const result = evaluateAccessSignal({
       signal: EMPTY_SIGNAL,
       spotifyFollowers: 50,
       metrics: normalizeArtistMetrics({ spotifyFollowers: 2500 }),
       turnCount: 1,
     });
-    expect(result.kind).toBe('instant_access');
-    expect(result.rationale).toContain('spotify_followers_2500');
+    expect(result.kind).toBe('needs_more_info');
   });
 
   it('never grants instant access on a self-reported audience band (JOV-7144)', () => {
@@ -73,22 +72,26 @@ describe('evaluateAccessSignal', () => {
       turnCount: 1,
     });
     expect(result.kind).toBe('needs_more_info');
-    expect(result.rationale).toBe('insufficient_signal');
+    expect(result.rationale).toBe('past_behavior_required');
   });
 
-  it('forces waitlist after the max-turn cap with weak signal', () => {
+  it('does not skip the interview after the turn cap', () => {
     const result = evaluateAccessSignal({
       signal: { audienceBand: 'under_500' },
       spotifyFollowers: null,
       turnCount: MAX_INTERVIEW_TURNS_BEFORE_FORCE,
     });
-    expect(result.kind).toBe('waitlist');
-    expect(result.rationale).toContain('max_turns_reached');
+    expect(result.kind).toBe('needs_more_info');
+    expect(result.rationale).toBe('past_behavior_required');
   });
 
-  it('still grants instant access even at the turn cap if signal qualifies', () => {
+  it('admits verified YouTube artists after their past-behavior answer', () => {
     const result = evaluateAccessSignal({
-      signal: EMPTY_SIGNAL,
+      signal: {
+        pastBehavior:
+          'I shared my last music video using my channel description.',
+      },
+      youtubeQualified: true,
       spotifyFollowers: 10_000,
       turnCount: MAX_INTERVIEW_TURNS_BEFORE_FORCE + 5,
     });
@@ -128,7 +131,7 @@ describe('evaluateAccessSignal', () => {
       spotifyFollowers: null,
       turnCount: 1,
     });
-    expect(result.kind).toBe('needs_more_info');
+    expect(result.kind).toBe('waitlist');
     expect(result.qualification?.coveredDimensions).toEqual(
       expect.arrayContaining([
         'current_behavior',
@@ -143,6 +146,7 @@ describe('evaluateAccessSignal', () => {
   it('waitlists a stated wrong-audience disqualifier even with strong Spotify data', () => {
     const result = evaluateAccessSignal({
       signal: {
+        pastBehavior: 'I posted my latest podcast on my website.',
         objection: { category: 'wrong_audience', text: 'I only do podcasts.' },
       },
       spotifyFollowers: 50_000,
@@ -170,11 +174,11 @@ describe('decideOnboardingAccess (single gate, JOV-7144)', () => {
     accessControlled: false,
     spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm',
     spotifyFollowers: 9_900,
-    signals: [],
+    signals: [{ pastBehavior: 'I shared the last release using my website.' }],
     turnCount: 2,
   };
 
-  it('keeps the controlled-access gate authoritative', () => {
+  it('waitlists non-ICP interviews with either global gate setting', () => {
     expect(
       decideOnboardingAccess({ ...base, accessControlled: true }).kind
     ).toBe('waitlist');
@@ -196,10 +200,23 @@ describe('decideOnboardingAccess (single gate, JOV-7144)', () => {
       publicProfileUrl: 'https://averychen.design',
     });
     expect(decision.kind).toBe('waitlist');
-    expect(decision.rationale).toBe('controlled_access_gate_enabled');
+    expect(decision.rationale).toBe('youtube_artist_icp_required');
   });
 
-  it('evaluates verified Spotify data when the gate is off', () => {
-    expect(decideOnboardingAccess(base).kind).toBe('instant_access');
+  it('does not admit Spotify-only artists when the gate is off', () => {
+    expect(decideOnboardingAccess(base).kind).toBe('waitlist');
   });
+});
+
+it('admits the verified YouTube ICP even while other segments are gated', () => {
+  expect(
+    decideOnboardingAccess({
+      accessControlled: true,
+      spotifyArtistId: 'artist',
+      spotifyFollowers: 0,
+      signals: [{ pastBehavior: 'I put the last video on my music channel.' }],
+      turnCount: 2,
+      youtubeQualified: true,
+    }).kind
+  ).toBe('instant_access');
 });

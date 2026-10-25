@@ -221,7 +221,7 @@ function instantAccessDecisionMessageRows() {
             action: 'propose_next_step',
             decision: {
               kind: 'instant_access',
-              rationale: 'spotify_followers_5000',
+              rationale: 'regularly_uploading_youtube_music_artist',
               score: 90,
             },
           },
@@ -402,11 +402,11 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
       username: 'test-creator',
       primaryEmailAddress: { emailAddress: 'creator@example.com' },
     });
-    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+    mockSubmitWaitlistAccessRequest.mockImplementation(async input => ({
       entryId: 'entry-1',
-      status: 'waitlisted',
-      outcome: 'waitlisted_gate_on',
-    });
+      status: input.admitYoutubeArtist ? 'approved' : 'waitlisted',
+      outcome: input.admitYoutubeArtist ? 'accepted' : 'waitlisted_gate_on',
+    }));
     mockIsWaitlistGateEnabled.mockResolvedValue(false);
   });
 
@@ -503,6 +503,55 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     );
   });
 
+  it.each([true, false])(
+    'admits the verified YouTube ICP with gate enabled=%s',
+    async gateEnabled => {
+      mockIsWaitlistGateEnabled.mockResolvedValue(gateEnabled);
+      setupDbSelectForCandidates(
+        [{ id: 'conv_icp', createdAt: new Date() }],
+        instantAccessDecisionMessageRows()
+      );
+      setupUpdateForPrimary(1);
+      setupInsertAudit(true);
+      mockMaterializeClaimedOnboardingProfile.mockResolvedValue({
+        profileId: 'profile_icp',
+        handle: 'artist',
+        status: 'created',
+      });
+      const res = await POST(makeRequest());
+      expect(res.status).toBe(200);
+      expect((await res.json()).readyForCheckout).toBe(true);
+      expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          admitYoutubeArtist: true,
+          conversationId: 'conv_icp',
+        })
+      );
+    }
+  );
+
+  it('waitlists a legacy Spotify-only instant-access decision instead of publishing', async () => {
+    const rows = JSON.parse(
+      JSON.stringify(instantAccessDecisionMessageRows()).replace(
+        'regularly_uploading_youtube_music_artist',
+        'spotify_followers_5000'
+      )
+    );
+    setupDbSelectForCandidates(
+      [{ id: 'conv_legacy', createdAt: new Date() }],
+      rows
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect((await res.json()).readyForCheckout).toBeUndefined();
+    expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalled();
+    expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ visibility: 'reserved' })
+    );
+  });
+
   it('claims the single (most recent) candidate, writes audit, clears cookie, returns claimed count', async () => {
     const appUserId = '3a53ba3e-150c-4ab5-8e73-2d2499764e2c';
     setupDbSelectForCandidates(
@@ -580,6 +629,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
         appUserId,
         email: 'creator@example.com',
         source: 'onboarding_chat_claim',
+        conversationId: 'conv_waitlist',
         data: expect.objectContaining({
           primarySocialUrl: 'https://instagram.com/test-creator',
         }),

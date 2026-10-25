@@ -136,7 +136,10 @@ export function deriveClaimedOnboardingStateFromToolEvents(
     }
 
     const signal = readInterviewSignal(event);
-    if (signal) interviewSignals.push(signal);
+    if (signal) {
+      interviewSignals.push(signal);
+      if (signal.youtubeChannelUrl) socialLinks.push(signal.youtubeChannelUrl);
+    }
   }
 
   return {

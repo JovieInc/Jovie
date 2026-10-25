@@ -101,7 +101,11 @@ export function qualifyRegularlyUploadingChannel(input: {
   const uploadsInWindow = input.videos.filter(video => {
     if (!video.publishedAt) return false;
     const published = new Date(video.publishedAt).getTime();
-    return Number.isFinite(published) && published >= cutoff;
+    return (
+      Number.isFinite(published) &&
+      published >= cutoff &&
+      published <= now.getTime()
+    );
   }).length;
   const publicVideoCount = input.videos.length;
   let reason = 'regularly_uploading_music_channel';
