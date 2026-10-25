@@ -17,9 +17,8 @@ import { createHash } from 'node:crypto';
  * Panel 2026-10-25 (26 real screenshots, 6 known-bad incl. the seaside-heights Coming soon
  * page): clef-flash acc 0.96, 6/6 bad, $0.000087/verdict; glm-5.3-flash 0.96, 6/6, $0.000224;
  * clef 0.92, 4/6; glm-5.3 0.88, 5/6, $0.0019.
- * clef-flash wins on accuracy and price, and its one false positive scored 0.63
- * against the 0.65 gate below (a 26-image panel: treat the threshold as
- * provisional). Without a Workers AI token the run falls back to glm-5.3-flash.
+ * clef-flash wins; its one false positive scored 0.63 vs the 0.65 gate (provisional).
+ * Without a Workers AI token the run falls back to glm-5.3-flash.
  */
 export const VISION_PROVIDERS = {
   'clef-flash': {
