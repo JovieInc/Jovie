@@ -1,0 +1,87 @@
+{
+  "url": "http://localhost:6006/iframe.html?id=library-workinspectoractions--layout-unknown-hidden&viewMode=story",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.96 Safari/537.36",
+  "viewport": {
+    "width": 390,
+    "height": 844,
+    "scale": 1
+  },
+  "coarse": false,
+  "reducedMotion": false,
+  "loadedFonts": [
+    {
+      "family": "Nunito Sans",
+      "status": "unloaded"
+    },
+    {
+      "family": "Nunito Sans",
+      "status": "unloaded"
+    },
+    {
+      "family": "Nunito Sans",
+      "status": "unloaded"
+    },
+    {
+      "family": "Nunito Sans",
+      "status": "unloaded"
+    },
+    {
+      "family": "\"Inter Variable\"",
+      "status": "loaded"
+    }
+  ],
+  "host": {
+    "x": 16,
+    "y": 16,
+    "width": 138,
+    "height": 88,
+    "right": 154,
+    "bottom": 104
+  },
+  "primary": {
+    "id": "work-action-share-privately",
+    "face": {
+      "x": 16,
+      "y": 40,
+      "width": 108,
+      "height": 28,
+      "right": 124,
+      "bottom": 68
+    },
+    "expanded": {
+      "x": 16,
+      "y": 32,
+      "right": 124,
+      "bottom": 76,
+      "width": 108,
+      "height": 44
+    },
+    "font": {
+      "family": "\"Inter Variable\", Inter, \"SF Pro Display\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen, Ubuntu, Cantarell, \"Open Sans\", \"Helvetica Neue\", sans-serif",
+      "size": "12px",
+      "weight": "510"
+    }
+  },
+  "utilities": [
+    {
+      "id": "work-action-ask-jovie",
+      "rect": {
+        "x": 16,
+        "y": 76,
+        "width": 90,
+        "height": 28,
+        "right": 106,
+        "bottom": 104
+      },
+      "overlapArea": 0,
+      "topOwner": "work-action-ask-jovie",
+      "centerOwner": "work-action-ask-jovie",
+      "font": {
+        "family": "\"Inter Variable\", Inter, \"SF Pro Display\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen, Ubuntu, Cantarell, \"Open Sans\", \"Helvetica Neue\", sans-serif",
+        "size": "12px",
+        "weight": "510"
+      }
+    }
+  ],
+  "limits": "Quiet utility faces are measured; this does not certify 44px targets or full accessibility."
+}
