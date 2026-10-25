@@ -33,6 +33,7 @@ export function OvieCompanyHome({
   answers,
   done,
   doneSummary,
+  mergesToday,
   loopStatus,
   answer,
   generatedInFlight,
@@ -53,6 +54,8 @@ export function OvieCompanyHome({
   readonly answers: Readonly<Record<string, HomeLoopAnswer>>;
   readonly done: readonly HomeLoopDoneItem[];
   readonly doneSummary: string | null;
+  /** Merges since Pacific midnight, the one "today" every tile and chip uses. */
+  readonly mergesToday?: number | null;
   readonly loopStatus: HomeLoopSectionStatus;
   readonly answer?: ReactNode;
   readonly generatedInFlight?: ReactNode;
@@ -106,7 +109,7 @@ export function OvieCompanyHome({
         </HomeLoopSection>
         <HomeLoopSection
           title={copy.doneTitle}
-          count={done.length}
+          count={mergesToday ?? done.length}
           status={generatedInFlight ? 'ready' : loopStatus}
           isEmpty={!generatedInFlight && done.length === 0 && !doneSummary}
           emptyLabel={copy.doneEmpty}

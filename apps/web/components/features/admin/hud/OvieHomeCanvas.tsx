@@ -236,9 +236,15 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
             reliability: metrics.data?.reliability ?? null,
             funnel: funnel.data ?? null,
             delivery: snapshot?.view.delivery ?? null,
-            verifiedToday: home
-              ? home.done.filter(item => item.verified).length
-              : null,
+            // The listed work is a capped sample of today's merges; a verified
+            // count over the sample would understate it. Only count when the
+            // list is complete.
+            verifiedToday:
+              home &&
+              home.mergesToday !== null &&
+              home.done.length >= home.mergesToday
+                ? home.done.filter(item => item.verified).length
+                : null,
             fleet,
             openAsks: inbox.data ? openAsks.length : null,
             nextDeadlineIso,
@@ -289,7 +295,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     () => buildCanvasTurns(chat?.messages ?? [], chat?.isStreaming ?? false),
     [chat?.messages, chat?.isStreaming]
   );
-  const history = useCanvasHistory(turns.length);
+  const history = useCanvasHistory(turns.length, chat?.isStreaming ?? false);
   const turn = history.index >= 0 ? turns[history.index] : undefined;
   const generated = turn ? partitionCanvasCards(turn.cards) : null;
   const answerPanel = turn ? (
@@ -348,6 +354,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       asksMoreHref={APP_ROUTES.ADMIN_INBOX}
       answers={answers}
       done={home?.done ?? []}
+      mergesToday={home?.mergesToday ?? null}
       doneSummary={
         home?.mergesToday != null
           ? `${home.mergesToday} ${home.mergesToday === 1 ? 'merge' : 'merges'}`

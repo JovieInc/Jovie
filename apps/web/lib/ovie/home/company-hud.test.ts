@@ -171,6 +171,51 @@ describe('buildCompanyTiles', () => {
     );
   });
 
+  it('defines today once (Pacific midnight) on the tile', () => {
+    expect(byId(buildCompanyTiles(inputs()), 'shipping')?.details).toContain(
+      'Today is midnight to now, Pacific time.'
+    );
+  });
+
+  it('says how long production has been behind main, and never invents it', () => {
+    const NOW = Date.parse('2026-10-25T12:00:00.000Z');
+    const withProduction = (production: unknown) =>
+      byId(
+        buildCompanyTiles(
+          inputs({
+            nowMs: NOW,
+            delivery: { ...delivery, production } as never,
+          })
+        ),
+        'shipping'
+      )?.details ?? [];
+    expect(
+      withProduction({
+        deployedAt: '2026-10-25T09:00:00.000Z',
+        behindMain: { state: 'measured-nonzero', value: 5 },
+      })
+    ).toContain(
+      'Production is 5 commits behind main since the last deploy 3h ago.'
+    );
+    expect(
+      withProduction({
+        deployedAt: null,
+        behindMain: { state: 'measured-zero', value: 0 },
+      })
+    ).toContain('Production is on main.');
+    expect(
+      withProduction({ behindMain: { state: 'not-measured', value: null } })
+    ).toContain('Production distance from main is not measured.');
+  });
+
+  it('shows no verified count when it was not measured, not a false zero', () => {
+    const tile = byId(
+      buildCompanyTiles(inputs({ verifiedToday: null })),
+      'shipping'
+    );
+    expect(tile?.line).not.toContain('verified');
+  });
+
   it('joins fleet verdict and production incidents in one line', () => {
     const tile = byId(buildCompanyTiles(inputs()), 'fleet');
     expect(tile).toMatchObject({ value: 'Degraded', tone: 'warn' });

@@ -223,9 +223,37 @@ function buildFunnelHref(): string {
   return APP_ROUTES.ADMIN_GROWTH;
 }
 
+/** Production distance from main, with how long it has been that way. */
+function productionBehindDetail(
+  delivery: NonNullable<CompanyInputs['delivery']>,
+  nowMs: number
+): string[] {
+  const behind = delivery.production?.behindMain;
+  if (!behind || behind.state === 'not-measured')
+    return ['Production distance from main is not measured.'];
+  if (behind.value === 0) return ['Production is on main.'];
+  const deployed = delivery.production?.deployedAt
+    ? Date.parse(delivery.production.deployedAt)
+    : Number.NaN;
+  const age = Number.isFinite(deployed)
+    ? ` since the last deploy ${ageText(nowMs - deployed)} ago`
+    : '';
+  return [
+    `Production is ${behind.value} ${behind.value === 1 ? 'commit' : 'commits'} behind main${age}.`,
+  ];
+}
+
+function ageText(ms: number): string {
+  const minutes = Math.max(0, Math.round(ms / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  return hours < 48 ? `${hours}h` : `${Math.round(hours / 24)}d`;
+}
+
 function shippingTile(
   delivery: CompanyInputs['delivery'],
-  verifiedToday: number | null
+  verifiedToday: number | null,
+  nowMs: number
 ): CompanyTile {
   const href = APP_ROUTES.ADMIN_SHIPPING;
   const today = delivery?.merges.today;
@@ -258,9 +286,11 @@ function shippingTile(
     href,
     hrefLabel: 'Shipping',
     details: [
+      'Today is midnight to now, Pacific time.',
       last7.state !== 'not-measured'
         ? `${last7.value} merges in the last 7 days.`
         : 'Last 7 days not measured.',
+      ...productionBehindDetail(delivery, nowMs),
     ],
   };
 }
@@ -357,7 +387,7 @@ export function buildCompanyTiles(
     aliveTile(input.overview),
     revenueTile(input.overview),
     funnelTile(input.funnel),
-    shippingTile(input.delivery, input.verifiedToday),
+    shippingTile(input.delivery, input.verifiedToday, input.nowMs),
     fleetTile(input.fleet, input.reliability),
     blockedTile(input.openAsks, input.nextDeadlineIso, input.nowMs),
   ];

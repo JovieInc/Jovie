@@ -172,13 +172,19 @@ function renderCanvas(chat?: HomeCanvasState) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const tree = (next?: HomeCanvasState) => (
     <QueryClientProvider client={client}>
       <TooltipProvider>
-        <OvieHomeCanvas chat={chat} />
+        <OvieHomeCanvas chat={next} />
       </TooltipProvider>
     </QueryClientProvider>
   );
+  const utils = render(tree(chat));
+  return {
+    ...utils,
+    /** Same query client and component instance, new chat state (a new turn arrives). */
+    rerenderCanvas: (next: HomeCanvasState) => utils.rerender(tree(next)),
+  };
 }
 
 function opsCard(kind: 'shipping' | 'revenue', title: string) {
@@ -605,13 +611,23 @@ describe('OvieHomeCanvas', () => {
     ).toHaveAttribute('href', '/app/ov/inbox');
   });
 
-  it('renders the latest turn in place and restores earlier canvas states', async () => {
-    const chat = chatState();
-    renderCanvas(chat);
+  it('restored chat history does not take over Home (no stale hi card on open)', async () => {
+    renderCanvas(chatState());
     await screen.findByText('Vercel on-demand concurrency');
+    expect(screen.queryByTestId('home-loop-answer')).toBeNull();
+    expect(screen.getByTestId('ovie-company-home')).toBeInTheDocument();
+  });
 
-    const answer = screen.getByTestId('home-loop-answer');
-    expect(answer).toHaveTextContent('Shipping?');
+  it('renders a new turn in place and restores earlier canvas states', async () => {
+    const full = chatState();
+    const chat = { ...full, messages: full.messages.slice(0, 2) };
+    const { rerenderCanvas } = renderCanvas(chat);
+    await screen.findByText('Vercel on-demand concurrency');
+    expect(screen.queryByTestId('home-loop-answer')).toBeNull();
+    rerenderCanvas({ ...full, onOpenTranscript: chat.onOpenTranscript });
+
+    const answer = await screen.findByTestId('home-loop-answer');
+    expect(answer).toHaveTextContent('You asked: Shipping?');
     expect(answer).toHaveTextContent('2 of 2');
     // Shipping cards update the in-flight section in place.
     expect(
@@ -634,6 +650,13 @@ describe('OvieHomeCanvas', () => {
 
     fireEvent.click(screen.getByTestId('home-loop-answer-home'));
     expect(screen.queryByTestId('home-loop-answer')).toBeNull();
+  });
+
+  it('never claims an empty pipeline it did not measure (all-clear guard)', async () => {
+    renderCanvas();
+    await screen.findByText('Vercel on-demand concurrency');
+    expect(screen.queryByText('No work in flight.')).toBeNull();
+    expect(screen.queryByText('Nothing is blocking shipping')).toBeNull();
   });
 
   it('reserves the answer slot while a reply streams', async () => {

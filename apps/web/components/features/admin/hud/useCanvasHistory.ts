@@ -7,8 +7,12 @@ import { useState } from 'react';
  * state. A new turn jumps to the latest state; Back and Forward step through
  * earlier ones; Home returns to the plain company loop without losing them.
  */
-export function useCanvasHistory(turnCount: number) {
-  const [cursor, setCursor] = useState<number | 'home' | null>(null);
+export function useCanvasHistory(turnCount: number, live = false) {
+  // Restored chat history must not hijack Home: Tim reopened Ovie to a card
+  // reading just "hi" (19 of 19). Start on Home; a NEW turn jumps to itself.
+  const [cursor, setCursor] = useState<number | 'home' | null>(
+    turnCount > 0 && !live ? 'home' : null
+  );
   const [seenCount, setSeenCount] = useState(turnCount);
   if (turnCount !== seenCount) {
     setSeenCount(turnCount);
