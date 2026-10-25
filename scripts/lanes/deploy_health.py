@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import deploy_lag
+from atomic_state import atomic_write_text
 import throughput_sentinel as sentinel
 
 # Lag limits are the measured p95 of NORMAL deploys over the 7 days to 2026-10-25T07:00Z (successful deploy after a
@@ -166,7 +167,7 @@ def sample(state_dir: Path, now: float, run=None, repos: dict | None = None) -> 
     if errors:
         data["errors"] = errors
     try:
-        path.write_text(json.dumps(data, sort_keys=True))
+        atomic_write_text(path, json.dumps(data, sort_keys=True))
     except OSError:
         pass
     return data, "; ".join(errors) or None

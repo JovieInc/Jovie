@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import json
 import math
-import os
 from pathlib import Path
 
 import throughput_sentinel as sentinel
+from atomic_state import atomic_write_text
 
 WEEK_S = 7 * 86400
 KEEP_S = 14 * 86400
@@ -58,13 +58,10 @@ def load(state_dir: Path, label: str) -> dict:
 
 
 def save(state_dir: Path, label: str, store: dict) -> None:
-    path = Path(state_dir) / f"deploy-lag-{label}.json"
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
-        tmp.write_text(json.dumps(store, sort_keys=True))
-        os.replace(tmp, path)
+        atomic_write_text(Path(state_dir) / f"deploy-lag-{label}.json", json.dumps(store, sort_keys=True))
     except OSError:
-        tmp.unlink(missing_ok=True)
+        pass
 
 
 def collect(store: dict, repo: str, runs: list[dict], now: float, gh) -> dict:
