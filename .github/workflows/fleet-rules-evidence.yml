@@ -93,8 +93,7 @@ jobs:
     name: Re-run Source Validation after a verdict
     if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.path == '.github/workflows/source-validation.yml' && github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.run_attempt < 4
     runs-on: ubuntu-latest
-    # Holds at most one quota window (see ghx below), not the old 2 minutes.
-    timeout-minutes: 25
+    timeout-minutes: 2
     permissions:
       contents: read
       actions: write
@@ -127,9 +126,10 @@ jobs:
           set -euo pipefail
           [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 0
           # A quota deferral (exit 75, "until <ISO reset>") used to end this hop
-          # red and leave PR Ready red until the next event. Hold for the reset
-          # (no API calls while waiting) and retry once; a longer wait or a
-          # second deferral still fails, never a pass.
+          # red and leave PR Ready red until the next event. A reset inside the
+          # job budget (75s of the 2 minute timeout; the gate-weakening detector
+          # forbids raising it) holds with no API calls and retries once. A longer
+          # wait or a second deferral still fails, never a pass.
           ghx() {
             local err rc until_ts wait_s
             err="$(mktemp)"
@@ -139,7 +139,7 @@ jobs:
               if [ "$rc" -ne 75 ]; then cat "$err" >&2; rm -f "$err"; return "$rc"; fi
               until_ts="$(grep -o 'until [0-9T:.Z-]*' "$err" | head -n1 | cut -d' ' -f2)"
               wait_s=$(( $(date -u -d "${until_ts:-1970-01-01}" +%s) - $(date -u +%s) + 5 ))
-              if [ "$attempt" = 2 ] || [ "$wait_s" -le 0 ] || [ "$wait_s" -gt 1200 ]; then cat "$err" >&2; rm -f "$err"; return 75; fi
+              if [ "$attempt" = 2 ] || [ "$wait_s" -le 0 ] || [ "$wait_s" -gt 75 ]; then cat "$err" >&2; rm -f "$err"; return 75; fi
               echo "::notice::github-quota-deferred; holding ${wait_s}s for the reset, then retrying once."
               sleep "$wait_s"
             done
