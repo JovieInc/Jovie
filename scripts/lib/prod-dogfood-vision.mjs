@@ -5,20 +5,12 @@
 import { createHash } from 'node:crypto';
 
 /**
- * Provider choice (Tim 2026-10-25: pick by the capacity registry route and the
- * cheapest model that passes a labelled panel of real dogfood screenshots).
- *
- * Registry route (canon/CAPACITY.md routing order): Cloudflare Startup credits
- * (given, spend before expiry) come before the Vercel AI Gateway (prepaid, about
- * $12 left). The Gateway is also allowlisted to zai/glm-5.3, zai/glm-5.3-flash
- * and typesafe-ai/jev only (Tim STRICT 2026-09-17), so claude-haiku, gemini and
- * gpt-4o-mini are denied there.
- *
- * Panel 2026-10-25 (26 real screenshots, 6 known-bad incl. the seaside-heights Coming soon
- * page): clef-flash acc 0.96, 6/6 bad, $0.000087/verdict; glm-5.3-flash 0.96, 6/6, $0.000224;
- * clef 0.92, 4/6; glm-5.3 0.88, 5/6, $0.0019.
- * clef-flash wins; its one false positive scored 0.63 vs the 0.65 gate (provisional).
- * Without a Workers AI token the run falls back to glm-5.3-flash.
+ * Provider choice: capacity-registry route (Cloudflare credits before the prepaid Gateway;
+ * the Gateway allowlist is zai/glm-5.3, zai/glm-5.3-flash, typesafe-ai/jev only) plus a
+ * labelled panel: 26 real screenshots, 6 known-bad incl. seaside-heights Coming soon.
+ * clef-flash acc 0.96, 6/6 bad, bash.000087/verdict (its one false positive scored 0.63 vs
+ * the 0.65 gate, provisional); glm-5.3-flash 0.96, 6/6, bash.000224; clef 0.92, 4/6; glm-5.3
+ * 0.88, 5/6, bash.0019. No Workers AI token: fall back to glm-5.3-flash.
  */
 export const VISION_PROVIDERS = {
   'clef-flash': {
