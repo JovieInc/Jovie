@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		A07571000000000000000002 /* MacComposerTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A07571000000000000000001 /* MacComposerTextView.swift */; };
-		1896A3883415894102BD7253 /* JovieTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB44E21E153FB9E310A070D5 /* JovieTheme.swift */; };
 		3353B95B121A56335FF6FE38 /* JovieMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 757F8502356A59A5F57050B8 /* JovieMacApp.swift */; };
 		3AE40D4F04A738A193B7ABF6 /* Inter-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 0ED25F3AE58B87A3EC2CB07D /* Inter-Variable.ttf */; };
 		7C2DC859CF9A98CC979BE7C8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C7307463378A4CD5C32D2818 /* Assets.xcassets */; };
@@ -47,7 +46,6 @@
 		29D5ED72B96DE18C73D3034E /* MacDevelopmentBoundaryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacDevelopmentBoundaryTests.swift; sourceTree = "<group>"; };
 		757F8502356A59A5F57050B8 /* JovieMacApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieMacApp.swift; sourceTree = "<group>"; };
 		B6A8941AB0E3F97761A1A4C5 /* JovieMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JovieMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		BB44E21E153FB9E310A070D5 /* JovieTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieTheme.swift; sourceTree = "<group>"; };
 		C467FF241C814A0409E33490 /* JovieMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JovieMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C7307463378A4CD5C32D2818 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CF034425181827A1F0DE391F /* MacDevelopmentContent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacDevelopmentContent.swift; sourceTree = "<group>"; };
@@ -103,14 +101,6 @@
 			path = Fonts;
 			sourceTree = "<group>";
 		};
-		439F3503579FAE5E1B0CE7D2 /* DesignSystem */ = {
-			isa = PBXGroup;
-			children = (
-				BB44E21E153FB9E310A070D5 /* JovieTheme.swift */,
-			);
-			path = DesignSystem;
-			sourceTree = "<group>";
-		};
 		4A923170AE15028DA071DFF8 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
@@ -123,7 +113,6 @@
 		5B07057F23811EC0D7C4E196 /* Jovie */ = {
 			isa = PBXGroup;
 			children = (
-				439F3503579FAE5E1B0CE7D2 /* DesignSystem */,
 				A0766100000000000000012C /* Core */,
 				A0766100000000000000012D /* Features */,
 				4A923170AE15028DA071DFF8 /* Resources */,
@@ -318,7 +307,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1896A3883415894102BD7253 /* JovieTheme.swift in Sources */,
 				A076610000000000000000C9 /* ChatRepository.swift in Sources */,
 				A076610000000000000000CB /* ChatCache.swift in Sources */,
 				A076610000000000000000CD /* NativeSessionTokenStore.swift in Sources */,
