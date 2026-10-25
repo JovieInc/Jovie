@@ -803,6 +803,7 @@ export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && 
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/prod-dogfood-vision.test.mjs',
+  'scripts/lib/__tests__/prod-dogfood-filer.test.mjs',
   'scripts/lib/__tests__/prod-dogfood.test.mjs',
   'scripts/lib/__tests__/prod-dogfood-checks.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
